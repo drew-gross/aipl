@@ -4971,9 +4971,9 @@ allocations: 2105746
 deallocations: 2105746
 reallocations: 299810
 bytes allocated: 406409308
-instructions executed: 627152320
-binary size: 7033312
-  code: 4653832
+instructions executed: 627152416
+binary size: 7033328
+  code: 4653848
   data: 59172
   metadata: 2320308
 functions:
@@ -5525,7 +5525,7 @@ functions:
     bytes: 3144
   __m22__render_cst$__m23__AiplTok$__m1__Ast$s1$lam$aipl_space:
     calls: 24
-    bytes: 288
+    bytes: 304
   __m23__aipl_rules$lambda0:
     calls: 0
     bytes: 144

@@ -1,12 +1,12 @@
-import { filter, map, print, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
+# Every *check-phase* lambda / function-value error, in one file, reported in
+# one run. The checker recovers at each item, so each failing function below is
+# recorded and the next is still checked.
+#
+# `err_operator_value_not_imported` is not here: the operator-import gate is a
+# *loader* check, so it aborts the file before the checker runs and would mask
+# everything below.
 
-// Every *check-phase* lambda / function-value error, in one file, reported in
-// one run. The checker recovers at each item, so each failing function below is
-// recorded and the next is still checked.
-//
-// `err_operator_value_not_imported` is not here: the operator-import gate is a
-// *loader* check, so it aborts the file before the checker runs and would mask
-// everything below.
+import { filter, map, print, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
 
 fn apply_i64(f: (i64) -> i64, x: i64) -> i64 { f(x) }
 

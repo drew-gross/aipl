@@ -1,6 +1,7 @@
-// A constructor must be brought into scope: using `A` bare without importing it
-// (or writing `Color.A`) is an error, even though the variant `Color` itself is
-// imported.
+# A constructor must be brought into scope: using `A` bare without importing it
+# (or writing `Color.A`) is an error, even though the variant `Color` itself is
+# imported.
+
 import { Color } from "./color.aipl";
 
 fn take(c: Color) -> i64 { 0 }
@@ -10,7 +11,7 @@ fn main() -> i64 { take(A(5)) }
 variant Color = A(i64) | B
 --- errors ---
 error: call to undefined fn "A" — "A" is a variant constructor that isn't in scope; import it with `import { A } from` its defining file, or write it qualified as `Variant.A`
- --> ./tests/cases/imports/err_constructor_not_imported.aipl:8:25
+ --> ./tests/cases/imports/err_constructor_not_imported.aipl:9:25
   |
-8 | fn main() -> i64 { take(A(5)) }
+9 | fn main() -> i64 { take(A(5)) }
   |                         ^^^^

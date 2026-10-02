@@ -1,3 +1,10 @@
+# The struct form of "recursion only through an array": `kids` is `Tree[]`,
+# and no field is a `Tree` (or a `Tree?`) directly. The cycle is real —
+# dropping a `Tree` drops its kids, which are `Tree`s — so `Tree` is boxed,
+# and rebinding a node to a fresh one that holds the old one as a child is an
+# ordinary refcount transfer rather than a byte-wise copy of a value that
+# still owns heap.
+
 import {
     equal as ==,
     is_empty,
@@ -9,12 +16,6 @@ import {
     wrapping_increment as ++,
 } from builtins;
 
-// The struct form of "recursion only through an array": `kids` is `Tree[]`,
-// and no field is a `Tree` (or a `Tree?`) directly. The cycle is real —
-// dropping a `Tree` drops its kids, which are `Tree`s — so `Tree` is boxed,
-// and rebinding a node to a fresh one that holds the old one as a child is an
-// ordinary refcount transfer rather than a byte-wise copy of a value that
-// still owns heap.
 struct Tree { label: i64, kids: Tree[] }
 
 fn total(self: Tree) -> i64 {

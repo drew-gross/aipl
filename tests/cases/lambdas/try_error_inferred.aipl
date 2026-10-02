@@ -1,17 +1,18 @@
+# A lambda that can fail *only* through a `?` still names its error type.
+#
+# `ok(v)` mentions no error, so it types as `v!__none__`. That is right for a
+# value but wrong for a lambda, whose failures leave through the `?` in its
+# body rather than through an `err(..)` the literal spells out. So a callback
+# like `|x| ok(W { n: f(x)? })` used to carry a placeholder error side — and a
+# higher-order function whose error type appears *nowhere but the callback*
+# (`E` in `(T) -> U!E`) then had nothing anywhere to pin `E` from, and the call
+# was rejected as uninferrable.
+#
+# The `?` is what names it: propagating an `i64!str` out of the lambda makes
+# the lambda's own type `W!str`.
+
 import { equal as ==, is_err_and, map, print, to_str, try_map } from builtins;
 
-// A lambda that can fail *only* through a `?` still names its error type.
-//
-// `ok(v)` mentions no error, so it types as `v!__none__`. That is right for a
-// value but wrong for a lambda, whose failures leave through the `?` in its
-// body rather than through an `err(..)` the literal spells out. So a callback
-// like `|x| ok(W { n: f(x)? })` used to carry a placeholder error side — and a
-// higher-order function whose error type appears *nowhere but the callback*
-// (`E` in `(T) -> U!E`) then had nothing anywhere to pin `E` from, and the call
-// was rejected as uninferrable.
-//
-// The `?` is what names it: propagating an `i64!str` out of the lambda makes
-// the lambda's own type `W!str`.
 struct Wrapped { n: i64, tag: str }
 
 fn checked(n: i64) -> i64!str { if (n == 0) { err("zero") } else { ok(n) } }

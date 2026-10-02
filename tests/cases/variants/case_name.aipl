@@ -1,12 +1,13 @@
+# `case_name(v)` is the name of the case `v` was built with, with no payload:
+# `to_str` with everything after the constructor left off. It reads only the
+# tag, which is what lets one implementation serve every variant — the same
+# reason `same_case` is generic (see `same_case.aipl`).
+#
+# The pair divides the two questions a reader has about a tag: `same_case`
+# compares two of them, `case_name` names one.
+
 import { case_name, equal as ==, print, to_str } from builtins;
 
-// `case_name(v)` is the name of the case `v` was built with, with no payload:
-// `to_str` with everything after the constructor left off. It reads only the
-// tag, which is what lets one implementation serve every variant — the same
-// reason `same_case` is generic (see `same_case.aipl`).
-//
-// The pair divides the two questions a reader has about a tag: `same_case`
-// compares two of them, `case_name` names one.
 variant Tok = Space | Name(str) | IntLit(i64) | StrLit(str, i64) | InterpolatedText(str)
 
 // Generic over `K`, the shape a driver that cannot name a language's kinds

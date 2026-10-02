@@ -1,19 +1,19 @@
-import { print } from builtins;
+# A return-type mismatch points at the expression that produced the type — not
+# at the body as a whole. Each function here is a different shape of "where is
+# the value", and the four spans below are the whole point of the fixture.
+#
+# The body's own span deliberately covers the whole body, which is right for an
+# error *about the body* and wrong for one about its **value**: reporting it
+# underlined whichever statement came first. So the parser records the value's
+# span when it builds the block (`Expr::value_span`), and this diagnostic reads
+# that. A body with no trailing expression at all has nothing to underline and
+# gets its block's `{` — which is why `{` carries a span, like `[` and `#`.
+#
+# Before the fix, `leading_statements` pointed at its `let`, and both
+# `no_tail_expression` and `empty_body` pointed at line 1, underlining the
+# import at the top of the file.
 
-// A return-type mismatch points at the expression that produced the type — not
-// at the body as a whole. Each function here is a different shape of "where is
-// the value", and the four spans below are the whole point of the fixture.
-//
-// The body's own span deliberately covers the whole body, which is right for an
-// error *about the body* and wrong for one about its **value**: reporting it
-// underlined whichever statement came first. So the parser records the value's
-// span when it builds the block (`Expr::value_span`), and this diagnostic reads
-// that. A body with no trailing expression at all has nothing to underline and
-// gets its block's `{` — which is why `{` carries a span, like `[` and `#`.
-//
-// Before the fix, `leading_statements` pointed at its `let`, and both
-// `no_tail_expression` and `empty_body` pointed at line 1, underlining the
-// import at the top of the file.
+import { print } from builtins;
 
 fn one_statement() -> str { 5 }
 

@@ -1,7 +1,7 @@
-import { equal as ==, len, push } from builtins;
+# Builtins are usable once imported, with the same `import { .. }`
+# syntax as files — just `from builtins` instead of a path.
 
-// Builtins are usable once imported, with the same `import { .. }`
-// syntax as files — just `from builtins` instead of a path.
+import { equal as ==, len, push } from builtins;
 
 fn pushed_len() -> u64 {
     mut xs = [1, 2];

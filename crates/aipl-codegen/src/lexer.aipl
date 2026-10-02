@@ -1511,9 +1511,9 @@ allocations: 366
 deallocations: 366
 reallocations: 10
 bytes allocated: 76592
-instructions executed: 697702
-binary size: 835520
-  code: 559176
+instructions executed: 697710
+binary size: 835552
+  code: 559208
   data: 9004
   metadata: 267340
 functions:
@@ -1717,7 +1717,7 @@ functions:
     bytes: 772
   lex_scoped$Kind:
     calls: 1
-    bytes: 316
+    bytes: 348
   lex_step$Kind:
     calls: 224
     bytes: 31404

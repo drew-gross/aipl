@@ -1,10 +1,10 @@
-import { print, to_str, wrapping_add as + } from builtins;
+# The two struct-literal lints, reported in one run. Lints are ordinary errors
+# — they fail the compile — but unlike a type error they are *independent
+# findings*: nothing has to be recovered from to keep looking, so the pass
+# collects them all and reports the set, which is what lets one file show
+# several at once.
 
-// The two struct-literal lints, reported in one run. Lints are ordinary errors
-// — they fail the compile — but unlike a type error they are *independent
-// findings*: nothing has to be recovered from to keep looking, so the pass
-// collects them all and reports the set, which is what lets one file show
-// several at once.
+import { print, to_str, wrapping_add as + } from builtins;
 
 struct Point { x: i64, y: i64 }
 

@@ -1,12 +1,12 @@
-import { print, to_str } from builtins;
+# `match (r) { ok(v) => ok(v), err(e) => err(g) }` rewrites a result's error
+# side and passes its value straight through, which is exactly what `map_err`
+# does — in one line, without naming either case.
+#
+# The `ok` arm handing its own binding back to `ok` is what makes this a
+# `map_err` rather than a `match` that transforms both sides. Arm order does not
+# matter, so the second function below is flagged too.
 
-// `match (r) { ok(v) => ok(v), err(e) => err(g) }` rewrites a result's error
-// side and passes its value straight through, which is exactly what `map_err`
-// does — in one line, without naming either case.
-//
-// The `ok` arm handing its own binding back to `ok` is what makes this a
-// `map_err` rather than a `match` that transforms both sides. Arm order does not
-// matter, so the second function below is flagged too.
+import { print, to_str } from builtins;
 
 struct Wrapped { message: str, code: i64 }
 

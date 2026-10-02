@@ -1,3 +1,7 @@
+# All-constant expressions are folded at compile time — main compiles to a
+# bare constant return (see the instruction count below). The asserts pin the
+# folded values to the run-time semantics they must match.
+
 import {
     equal as ==,
     greater_than as >,
@@ -15,9 +19,6 @@ import {
     wrapping_sub as -,
 } from builtins;
 
-// All-constant expressions are folded at compile time — main compiles to a
-// bare constant return (see the instruction count below). The asserts pin the
-// folded values to the run-time semantics they must match.
 fn arith() -> i64 { ((2 + 3) * 10) - ((7 / 2) + (7 % 2)) }.test({
     assert(arith() == 46);
 })

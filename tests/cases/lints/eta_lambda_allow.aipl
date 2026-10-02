@@ -1,7 +1,8 @@
+# `#[allow]` squelches the eta-lambda lint on its line, so this forwarding
+# lambda compiles and runs as written (see err_eta_lambda.aipl for the lint).
+
 import { equal as ==, map, to_str } from builtins;
 
-// `#[allow]` squelches the eta-lambda lint on its line, so this forwarding
-// lambda compiles and runs as written (see err_eta_lambda.aipl for the lint).
 fn stringify(xs: i64[]) -> str[] {
     xs.map(|x| to_str(x)) #[allow]
 }.test({

@@ -1,8 +1,9 @@
+# The receiver is just the first parameter, so a default reads it like any
+# other — which is what lets a width, a limit, or a separator default to
+# something derived from the value the method was called on.
+
 import { concat as +++, equal as ==, len, print } from builtins;
 
-// The receiver is just the first parameter, so a default reads it like any
-// other — which is what lets a width, a limit, or a separator default to
-// something derived from the value the method was called on.
 fn head(self: str, n: u64 = self.len()) -> str { self[..n] }.test({
     assert("hello".head() == "hello");
     assert("hello".head(n=2) == "he");

@@ -1,13 +1,13 @@
-import { print, to_str, wrapping_add as + } from builtins;
+# A bare integer literal adapts to whatever integer type the context expects,
+# as long as its value fits. There is no conversion form to reach for; the
+# literal itself is always the same 64-bit constant; only its *static type*
+# bends to the target, so this is purely a type-level convenience.
+#
+# Flexing reaches through the constructs that merely pass a value along: a
+# block's tail, an early `return`, and every arm of an `if`. A literal that
+# does *not* fit is still a compile error (see `errors/err_literal_too_big`).
 
-// A bare integer literal adapts to whatever integer type the context expects,
-// as long as its value fits. There is no conversion form to reach for; the
-// literal itself is always the same 64-bit constant; only its *static type*
-// bends to the target, so this is purely a type-level convenience.
-//
-// Flexing reaches through the constructs that merely pass a value along: a
-// block's tail, an early `return`, and every arm of an `if`. A literal that
-// does *not* fit is still a compile error (see `errors/err_literal_too_big`).
+import { print, to_str, wrapping_add as + } from builtins;
 
 struct Pair { a: u64, b: u8 }
 

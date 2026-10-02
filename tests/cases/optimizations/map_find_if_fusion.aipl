@@ -1,3 +1,18 @@
+# Operation fusion: `xs.map(f).find_if(p)` collapses into `map_find_if`, which
+# maps and tests one element at a time and stops at the first match — instead
+# of mapping every element into a fresh array that `find_if` then reads only
+# the front of.
+#
+# Both halves have to be pure for the pass to fire (an effect in `f` would be
+# observably skipped for the elements after the match), which `stepped` and
+# `is_big` are.
+#
+# Measured on this case with the fusion switched off: 31,909 instructions
+# become 22,716 and 3,638 bytes allocated become 1,998. The `functions:` list
+# is the readable evidence: three chains, but one `aipl_array_with_cap` — the
+# unfused chain's array in `first_big_twice` — and no `__map*` beside the two
+# `__builtin_map_find_if*` specializations.
+
 import {
     find_if,
     less_than as <,
@@ -7,21 +22,6 @@ import {
     wrapping_increment as ++,
     wrapping_mul as *,
 } from builtins;
-
-// Operation fusion: `xs.map(f).find_if(p)` collapses into `map_find_if`, which
-// maps and tests one element at a time and stops at the first match — instead
-// of mapping every element into a fresh array that `find_if` then reads only
-// the front of.
-//
-// Both halves have to be pure for the pass to fire (an effect in `f` would be
-// observably skipped for the elements after the match), which `stepped` and
-// `is_big` are.
-//
-// Measured on this case with the fusion switched off: 31,909 instructions
-// become 22,716 and 3,638 bytes allocated become 1,998. The `functions:` list
-// is the readable evidence: three chains, but one `aipl_array_with_cap` — the
-// unfused chain's array in `first_big_twice` — and no `__map*` beside the two
-// `__builtin_map_find_if*` specializations.
 
 fn many() -> i64[] {
     mut xs = [0];

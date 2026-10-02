@@ -1,19 +1,19 @@
+# Two function-typed parameters, each given its own lambda at the call site.
+#
+# Monomorphization specializes a higher-order function per *function value* it
+# receives, so two lambda parameters mean two independent specialization keys
+# on one call: each lambda is lifted to its own synthesized function, with its
+# own captures threaded through. That is what the cases below pin down —
+# different captures per lambda, two structurally identical lambdas at
+# different parameters, a pair whose two types differ, and a pair forwarded
+# onward together.
+
 import {
     equal as ==,
     less_than_or_equal as <=,
     wrapping_add as +,
     wrapping_mul as *,
 } from builtins;
-
-// Two function-typed parameters, each given its own lambda at the call site.
-//
-// Monomorphization specializes a higher-order function per *function value* it
-// receives, so two lambda parameters mean two independent specialization keys
-// on one call: each lambda is lifted to its own synthesized function, with its
-// own captures threaded through. That is what the cases below pin down —
-// different captures per lambda, two structurally identical lambdas at
-// different parameters, a pair whose two types differ, and a pair forwarded
-// onward together.
 
 fn combine(x: i64, f: (i64) -> i64, g: (i64) -> i64) -> i64 { f(x) + g(x) }.test({
     fn double(x: i64) -> i64 { x * 2 }

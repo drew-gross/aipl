@@ -1,10 +1,11 @@
+# A result payload (either side) may be a variant. Variants ride the same
+# generic composite machinery as struct payloads (struct/variant layout
+# resolution is unified), so construction, `match` binding, `==`, and `?`
+# all work, including refcounting of heap-carrying arms (the str payloads
+# below) — the allocation accounting confirms retain/drop stay in balance.
+
 import { concat as +++, equal as ==, wrapping_add as + } from builtins;
 
-// A result payload (either side) may be a variant. Variants ride the same
-// generic composite machinery as struct payloads (struct/variant layout
-// resolution is unified), so construction, `match` binding, `==`, and `?`
-// all work, including refcounting of heap-carrying arms (the str payloads
-// below) — the allocation accounting confirms retain/drop stay in balance.
 variant Shape = Empty | Square(i64) | Named(str)
 
 fn shape(n: i64) -> Shape!str {

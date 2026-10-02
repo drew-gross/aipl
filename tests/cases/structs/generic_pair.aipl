@@ -1,7 +1,8 @@
+# Two type parameters, pinned independently by the two field values. Distinct
+# argument tuples give distinct instances (`Pair$i64$str`, `Pair$bool$i64`).
+
 import { equal as == } from builtins;
 
-// Two type parameters, pinned independently by the two field values. Distinct
-// argument tuples give distinct instances (`Pair$i64$str`, `Pair$bool$i64`).
 struct Pair<A, B> { first: A, second: B }
 
 fn mixed() -> str {

@@ -1,10 +1,10 @@
+# The shapes a parameter pattern cannot replace, each for its own reason.
+
 import { print, wrapping_add as +, wrapping_increment as ++ } from builtins;
 
 struct Pos { line: i64, col: i64 }
 
 fn take(p: Pos) -> i64 { p.line + p.col } #[allow]
-
-// The shapes a parameter pattern cannot replace, each for its own reason.
 
 // `self` is what makes a function method-callable, so a pattern there would
 // change how it is called.

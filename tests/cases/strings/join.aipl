@@ -1,8 +1,9 @@
+# `join(parts, sep=sep)` concatenates the parts with `sep` *between* consecutive
+# elements — none before the first or after the last. `[]` -> `""`, `[x]` -> `x`.
+# Callable free (`join(xs, sep=sep)`) or as a method (`xs.join(sep=sep)`).
+
 import { equal as ==, join, split } from builtins;
 
-// `join(parts, sep=sep)` concatenates the parts with `sep` *between* consecutive
-// elements — none before the first or after the last. `[]` -> `""`, `[x]` -> `x`.
-// Callable free (`join(xs, sep=sep)`) or as a method (`xs.join(sep=sep)`).
 fn rejoin(s: str, sep: str) -> str { s.split(sep).join(sep=sep) }.test({
     assert(["a", "b", "c"].join(sep="hi") == "ahibhic");
     assert(["a", "b", "c"].join(sep="") == "abc"); // empty separator

@@ -1,10 +1,11 @@
+# `import { saturating_add as + }` binds `+` to clamping integer add: instead of
+# wrapping on overflow (`wrapping_add`), the result is pinned at the type's
+# bound. The operator resolves to the `saturating_add` builtin, so the same
+# `a + b` spelling means saturating here and wrapping in a file that imported
+# `wrapping_add as +`.
+
 import { equal as ==, saturating_add as + } from builtins;
 
-// `import { saturating_add as + }` binds `+` to clamping integer add: instead of
-// wrapping on overflow (`wrapping_add`), the result is pinned at the type's
-// bound. The operator resolves to the `saturating_add` builtin, so the same
-// `a + b` spelling means saturating here and wrapping in a file that imported
-// `wrapping_add as +`.
 fn probe() -> bool { true }.test({
     // In range: exact sum, same as any add.
     assert(10 + 20 == 30);

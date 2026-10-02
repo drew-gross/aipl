@@ -1,7 +1,8 @@
+# A nested match is checked exhaustive over the whole arm list, and a missing
+# case is named as a value shape — here nothing matches a `none` on the right.
+
 import { print } from builtins;
 
-// A nested match is checked exhaustive over the whole arm list, and a missing
-// case is named as a value shape — here nothing matches a `none` on the right.
 fn f(a: i64, b: i64?) -> str {
     match (a, b) {
         (1, some(1)) => "a",
@@ -15,7 +16,7 @@ fn main() !prints {
 }
 --- errors ---
 error: non-exhaustive match: (_, none) is not matched
- --> ./tests/cases/match_arms/err_nested_non_exhaustive.aipl:6:5
+ --> ./tests/cases/match_arms/err_nested_non_exhaustive.aipl:7:5
   |
-6 |     match (a, b) {
+7 |     match (a, b) {
   |     ^^^^^^^^^^^^^^

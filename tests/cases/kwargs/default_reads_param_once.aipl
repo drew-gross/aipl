@@ -1,3 +1,6 @@
+# An argument a default reads is mentioned twice in the expanded call, so the
+# loader binds it to a temporary first: `noisy` runs once, not twice.
+
 import { print, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
 
 fn tick(label: str, n: i64) !prints -> i64 {
@@ -5,8 +8,6 @@ fn tick(label: str, n: i64) !prints -> i64 {
     n
 }
 
-// An argument a default reads is mentioned twice in the expanded call, so the
-// loader binds it to a temporary first: `noisy` runs once, not twice.
 fn scaled(n: i64, by: i64 = n * 10) -> i64 { n + by }
 
 // And the arguments *before* it are bound too, so hoisting doesn't reorder the

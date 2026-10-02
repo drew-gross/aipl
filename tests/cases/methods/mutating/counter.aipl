@@ -1,8 +1,9 @@
+# A user-defined mutating method: `mut self` makes `bump` mutate its receiver
+# in place. It returns nothing and is called `c.bump(n)`. Value semantics
+# hold — a `let` snapshot taken mid-way is unaffected by later mutations.
+
 import { equal as ==, wrapping_add as + } from builtins;
 
-// A user-defined mutating method: `mut self` makes `bump` mutate its receiver
-// in place. It returns nothing and is called `c.bump(n)`. Value semantics
-// hold — a `let` snapshot taken mid-way is unaffected by later mutations.
 struct Counter { n: i64 }
 
 fn bump(mut self: Counter, by: i64) {

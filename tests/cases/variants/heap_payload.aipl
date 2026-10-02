@@ -1,8 +1,9 @@
+# Variant cases with heap payloads (`str`): construction retains them and the
+# per-variant drop releases only the active case's fields. Used in an array, so
+# a leak or double-free would unbalance the allocation counts.
+
 import { concat as +++, equal as ==, to_str } from builtins;
 
-// Variant cases with heap payloads (`str`): construction retains them and the
-// per-variant drop releases only the active case's fields. Used in an array, so
-// a leak or double-free would unbalance the allocation counts.
 variant Json = Null | Num(i64) | Text(str) | Pair(str, i64)
 
 fn describe(j: Json) -> str {

@@ -1,7 +1,8 @@
+# A generic struct whose field is an *application of another generic* — the
+# field type mentions the outer struct's own type variable.
+
 import { equal as ==, map } from builtins;
 
-// A generic struct whose field is an *application of another generic* — the
-// field type mentions the outer struct's own type variable.
 struct Tok<K> { kind: K, text: str }
 
 variant Kind = Word | Num

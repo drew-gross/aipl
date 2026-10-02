@@ -1,11 +1,12 @@
-// Regression test for lambda effect inheritance bug (fixed 2026-07-15).
-// Before the fix, when a lambda was synthesized inside a .test block
-// (which declares !prints and other effects), the lambda would inherit
-// those effects into its ConcreteTemplate. This caused the lambda to
-// carry unintended effects and could conflict with calls to the same
-// lambda in different effect contexts. The fix ensures lambdas always
-// start with `effects: Vec::new()`, letting the type checker determine
-// which effects are actually needed from their body.
+# Regression test for lambda effect inheritance bug (fixed 2026-07-15).
+# Before the fix, when a lambda was synthesized inside a .test block
+# (which declares !prints and other effects), the lambda would inherit
+# those effects into its ConcreteTemplate. This caused the lambda to
+# carry unintended effects and could conflict with calls to the same
+# lambda in different effect contexts. The fix ensures lambdas always
+# start with `effects: Vec::new()`, letting the type checker determine
+# which effects are actually needed from their body.
+
 import { equal as ==, push, saturating_remainder as % } from builtins;
 
 fn filter_evens(arr: i64[], pred: (i64) -> bool) -> i64[] {

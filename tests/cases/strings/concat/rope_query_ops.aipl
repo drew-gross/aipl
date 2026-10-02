@@ -1,9 +1,10 @@
+# Query operations stream a rope's leaves instead of flattening it: equality,
+# prefix/suffix tests, indexing, and length all run without materializing. So
+# building this 18-byte rope and querying it every which way allocates only the
+# concat node (1) — never a flattened 18-byte buffer (which would be a 2nd).
+
 import { concat as +++, ends_with, equal as ==, len, print, starts_with, to_str } from builtins;
 
-// Query operations stream a rope's leaves instead of flattening it: equality,
-// prefix/suffix tests, indexing, and length all run without materializing. So
-// building this 18-byte rope and querying it every which way allocates only the
-// concat node (1) — never a flattened 18-byte buffer (which would be a 2nd).
 fn main() !prints {
     let r = "Hello, " +++ "rope world!"; // 18-byte rope; never flattened below
     print(to_str(r == "Hello, rope world!")); // true  (streamed vs the literal)

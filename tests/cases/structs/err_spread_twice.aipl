@@ -1,7 +1,8 @@
+# Two spreads would have to be ordered against each other to know which wins,
+# so a literal takes at most one.
+
 import { print, to_str } from builtins;
 
-// Two spreads would have to be ordered against each other to know which wins,
-// so a literal takes at most one.
 struct P { a: i64, b: i64 }
 
 fn main() !prints {
@@ -12,7 +13,7 @@ fn main() !prints {
 }
 --- errors ---
 error: a struct literal takes at most one ".." spread
-  --> ./tests/cases/structs/err_spread_twice.aipl:10:13
+  --> ./tests/cases/structs/err_spread_twice.aipl:11:13
    |
-10 |     let p = P { ..x, ..y };
+11 |     let p = P { ..x, ..y };
    |             ^^^^^^^^^^^^^^

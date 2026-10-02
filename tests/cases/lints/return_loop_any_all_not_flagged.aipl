@@ -1,7 +1,7 @@
-import { equal as ==, greater_than as >, print, to_str, wrapping_increment as ++ } from builtins;
+# Near misses. Each is a loop that looks like a fold to yes/no and is not one,
+# or is one the rewrite could not spell — so the lint stays quiet.
 
-// Near misses. Each is a loop that looks like a fold to yes/no and is not one,
-// or is one the rewrite could not spell — so the lint stays quiet.
+import { equal as ==, greater_than as >, print, to_str, wrapping_increment as ++ } from builtins;
 
 // A second statement in the loop: work neither builtin has anywhere to put.
 fn counted(xs: i64[], lo: i64) -> bool {

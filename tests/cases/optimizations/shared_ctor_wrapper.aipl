@@ -1,19 +1,20 @@
+# A payload-carrying constructor used as a *value* lowers to one shared
+# function, not to a fresh lambda at each reference. Nothing about the run
+# changes; the `functions:` block below is where the difference shows — one
+# `__ctor$Tagged$Nums`, however many times the constructor is passed.
+#
+# It matters because a reference multiplies with inlining. `rule` is small
+# enough to be inlined into each of its call sites, so a per-reference lambda
+# is copied into each one too, and each copy is lifted into its own top-level
+# function. One library helper passing a constructor from inside a small
+# function this way cost 62 of them.
+#
+# The constructor has to reach an *indirect* call for any of this to survive:
+# a `map(Nums)` is specialized and inlined until nothing is left to count.
+# Held in a field and called through it, as a lowering is, it stays an address.
+
 import { print } from builtins;
 
-// A payload-carrying constructor used as a *value* lowers to one shared
-// function, not to a fresh lambda at each reference. Nothing about the run
-// changes; the `functions:` block below is where the difference shows — one
-// `__ctor$Tagged$Nums`, however many times the constructor is passed.
-//
-// It matters because a reference multiplies with inlining. `rule` is small
-// enough to be inlined into each of its call sites, so a per-reference lambda
-// is copied into each one too, and each copy is lifted into its own top-level
-// function. One library helper passing a constructor from inside a small
-// function this way cost 62 of them.
-//
-// The constructor has to reach an *indirect* call for any of this to survive:
-// a `map(Nums)` is specialized and inlined until nothing is left to count.
-// Held in a field and called through it, as a lowering is, it stays an address.
 variant Tagged = Nums(i64[]) | Word(str)
 
 struct Rule { name: str, make: (i64[]) -> Tagged }

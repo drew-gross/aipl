@@ -1,14 +1,15 @@
+# `{1` is never closed by a `}`, and nothing follows before EOF — the
+# interpolation scanner hits end-of-input while still looking for the
+# closing brace. The error points at the unclosed `{` itself, not at the
+# (irrelevant) EOF position.
+
 import { print } from builtins;
 
-// `{1` is never closed by a `}`, and nothing follows before EOF — the
-// interpolation scanner hits end-of-input while still looking for the
-// closing brace. The error points at the unclosed `{` itself, not at the
-// (irrelevant) EOF position.
 fn main() !prints {
     print(```{1
 --- errors ---
 error: unterminated triple-backtick template literal
- --> ./tests/cases/strings/err_unclosed_interpolation_eof.aipl:8:11
+ --> ./tests/cases/strings/err_unclosed_interpolation_eof.aipl:9:11
   |
-8 |     print(```{1
+9 |     print(```{1
   |           ^^^

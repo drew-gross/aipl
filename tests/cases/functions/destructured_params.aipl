@@ -1,13 +1,14 @@
+# A parameter may be destructured in place of being named, exactly as a `let`
+# may: the pattern names the struct, so nothing is written twice and there is no
+# `: T` to follow. The fields are bound at the top of the body, which is the
+# same desugaring `let Point { x, y } = v;` gets.
+
 import { equal as ==, print, wrapping_add as + } from builtins;
 
 struct Point { x: i64, y: i64 }
 
 struct Named { label: str, at: Point }
 
-// A parameter may be destructured in place of being named, exactly as a `let`
-// may: the pattern names the struct, so nothing is written twice and there is no
-// `: T` to follow. The fields are bound at the top of the body, which is the
-// same desugaring `let Point { x, y } = v;` gets.
 fn sum(Point { x, y }) -> i64 { x + y }
 
 // Mixed with ordinary parameters, in any position.

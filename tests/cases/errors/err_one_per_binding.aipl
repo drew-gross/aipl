@@ -1,17 +1,17 @@
-import { len } from builtins;
+# The other side of `err_several_per_function`: where the checker deliberately
+# does *not* recover, so a body still stops at one error.
+#
+# A binding's initializer is the case that matters. Its body is checked against
+# the type the initializer produced, so recovering from a failed initializer
+# would leave every later line measured against a type that doesn't exist — and
+# the follow-on errors would be cascades rather than findings. One real error
+# beats one real error plus three invented ones, which is why `Cx::recover` is
+# applied per position instead of replacing `?` throughout the checker.
+#
+# So only the *first* bad `let` below is reported. The second one, and the bad
+# statement after it, are not: fix the first and the next run finds them.
 
-// The other side of `err_several_per_function`: where the checker deliberately
-// does *not* recover, so a body still stops at one error.
-//
-// A binding's initializer is the case that matters. Its body is checked against
-// the type the initializer produced, so recovering from a failed initializer
-// would leave every later line measured against a type that doesn't exist — and
-// the follow-on errors would be cascades rather than findings. One real error
-// beats one real error plus three invented ones, which is why `Cx::recover` is
-// applied per position instead of replacing `?` throughout the checker.
-//
-// So only the *first* bad `let` below is reported. The second one, and the bad
-// statement after it, are not: fix the first and the next run finds them.
+import { len } from builtins;
 
 fn first_bad_let_only(v: str[]) -> u64 {
     let a = len(1);

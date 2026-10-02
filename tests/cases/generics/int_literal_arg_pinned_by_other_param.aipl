@@ -1,10 +1,11 @@
+# The counterpart to `int_literal_arg`: when something *else* pins the type
+# variable, the literal is not the thing deciding, so nothing is inlined and
+# the parameter stays. The literal simply flexes to the width that argument
+# pinned — which is the behavior that predates per-value instances and has to
+# keep working.
+
 import { print, to_str, value_or } from builtins;
 
-// The counterpart to `int_literal_arg`: when something *else* pins the type
-// variable, the literal is not the thing deciding, so nothing is inlined and
-// the parameter stays. The literal simply flexes to the width that argument
-// pinned — which is the behavior that predates per-value instances and has to
-// keep working.
 fn pick<T: any>(a: T?, b: T) -> T { a.value_or(b) }
 
 fn widths(hint: u8?, wide: u64?) !prints -> u8 {

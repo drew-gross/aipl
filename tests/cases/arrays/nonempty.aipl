@@ -1,3 +1,11 @@
+# `T[] without []` — an array the type system knows is not empty.
+#
+# At runtime it is a `T[]`: the same block, so a refined array goes anywhere
+# an array does. The refinement buys `nonempty_first`/`nonempty_last`, which
+# hand back the element rather than a `T?`. There are two ways in: a literal
+# with an element in it takes the refined type on sight, and
+# `ensure_nonempty` tests any other array at runtime.
+
 import {
     ensure_nonempty,
     equal as ==,
@@ -11,13 +19,6 @@ import {
     value_or,
 } from builtins;
 
-// `T[] without []` — an array the type system knows is not empty.
-//
-// At runtime it is a `T[]`: the same block, so a refined array goes anywhere
-// an array does. The refinement buys `nonempty_first`/`nonempty_last`, which
-// hand back the element rather than a `T?`. There are two ways in: a literal
-// with an element in it takes the refined type on sight, and
-// `ensure_nonempty` tests any other array at runtime.
 fn main() !prints {
     let xs: i64[] without [] = [3, 1, 2];
     print(xs.nonempty_first().to_str());

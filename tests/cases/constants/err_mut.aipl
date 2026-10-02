@@ -1,12 +1,13 @@
-// There is no mutable top-level constant: a `mut` one would need storage, and
-// storage is what substituting a literal avoids. The parser has no such form,
-// so it is refused where an item was expected.
+# There is no mutable top-level constant: a `mut` one would need storage, and
+# storage is what substituting a literal avoids. The parser has no such form,
+# so it is refused where a declaration would start.
+
 mut COUNT = 1;
 
 fn main() { let x = COUNT; }
 --- errors ---
-error: expected an item or end of input, found `mut`
- --> ./tests/cases/constants/err_mut.aipl:4:1
+error: expected DocComment, `fn`, `import`, `let`, `pub`, `struct`, or `variant`, found `mut`
+ --> ./tests/cases/constants/err_mut.aipl:5:1
   |
-4 | mut COUNT = 1;
+5 | mut COUNT = 1;
   | ^^^

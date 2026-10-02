@@ -1,13 +1,14 @@
+# A generic variant's type parameter resolves from the *expected* type when the
+# constructor's own arguments don't pin it — the rule generic structs already
+# had.
+#
+# `Literal(str)` and `Named(str)` mention no `K`, so they pin nothing. Before,
+# such a constructor compiled only while exactly one instance of `Rule` existed
+# program-wide, and adding a second broke the first: the two grammars below
+# could not coexist.
+
 import { print, to_str } from builtins;
 
-// A generic variant's type parameter resolves from the *expected* type when the
-// constructor's own arguments don't pin it — the rule generic structs already
-// had.
-//
-// `Literal(str)` and `Named(str)` mention no `K`, so they pin nothing. Before,
-// such a constructor compiled only while exactly one instance of `Rule` existed
-// program-wide, and adding a second broke the first: the two grammars below
-// could not coexist.
 variant Tok = Space | Word(str)
 
 variant Tok2 = Dot | Num(i64)

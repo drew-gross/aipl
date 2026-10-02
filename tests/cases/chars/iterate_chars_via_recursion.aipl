@@ -1,7 +1,8 @@
+# Count 'a's by walking with `s[i]`; stop when indexing returns none
+# (past end of string).
+
 import { equal as ==, map, value_or, wrapping_add as + } from builtins;
 
-// Count 'a's by walking with `s[i]`; stop when indexing returns none
-// (past end of string).
 fn count_a(s: str, i: i64) -> i64 {
     s[i].map(|c| if (c == 'a') { 1 + count_a(s, i + 1) } else { count_a(s, i + 1) }).value_or(0)
 }.test({

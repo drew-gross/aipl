@@ -1,8 +1,8 @@
-import { equal as ==, len } from builtins;
+# Each `any[]` parameter is its own type variable, so the two arrays may
+# have different element types. `same_length` is specialized on the pair
+# of element types at each call site.
 
-// Each `any[]` parameter is its own type variable, so the two arrays may
-// have different element types. `same_length` is specialized on the pair
-// of element types at each call site.
+import { equal as ==, len } from builtins;
 
 fn same_length(v1: any[], v2: any[]) -> bool { len(v1) == len(v2) }.test({
     // i64[] vs char[], both length 3

@@ -1,9 +1,10 @@
+# `xs.to_set()` — an array's distinct elements as a set. *Which* set comes from
+# the use site, the way an empty `#{}` takes its type from context: a return
+# type, an annotation or a parameter of `#>{T}` / `#<{T}` gets an ordered set,
+# built in that order; with nothing to say, it is a plain `#{T}`.
+
 import { has, len, map, print, to_set, wrapping_mul as * } from builtins;
 
-// `xs.to_set()` — an array's distinct elements as a set. *Which* set comes from
-// the use site, the way an empty `#{}` takes its type from context: a return
-// type, an annotation or a parameter of `#>{T}` / `#<{T}` gets an ordered set,
-// built in that order; with nothing to say, it is a plain `#{T}`.
 fn tightest_first(xs: i64[]) -> #>{i64} { xs.to_set() }
 
 fn doubled_asc(xs: i64[]) -> #<{i64} { xs.map(|x| x * 2).to_set() }
@@ -32,11 +33,11 @@ allocations: 19
 deallocations: 19
 reallocations: 0
 bytes allocated: 1153
-instructions executed: 2279
-binary size: 10872
-  code: 6308
+instructions executed: 2277
+binary size: 10776
+  code: 6256
   data: 439
-  metadata: 4125
+  metadata: 4081
 functions:
   __to_str_bool:
     calls: 2
@@ -86,9 +87,6 @@ functions:
   aipl_write_u64:
     calls: 2
     bytes: (external)
-  doubled_asc:
-    calls: 1
-    bytes: 496
   main:
     calls: 1
-    bytes: 3132
+    bytes: 3576

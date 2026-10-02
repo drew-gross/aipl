@@ -1,10 +1,11 @@
+# A slice of a long (heap) string whose result is > 7 bytes shares the source's
+# buffer as a *view*. A view is still a plain `str`: it prints, renders with
+# `to_str`, iterates with `for`, concatenates, compares, and re-slices — and its
+# refcounts balance at scope exit (the `allocations`/`deallocations` counts below
+# stay equal).
+
 import { concat as +++, equal as ==, print, to_str, wrapping_increment as ++ } from builtins;
 
-// A slice of a long (heap) string whose result is > 7 bytes shares the source's
-// buffer as a *view*. A view is still a plain `str`: it prints, renders with
-// `to_str`, iterates with `for`, concatenates, compares, and re-slices — and its
-// refcounts balance at scope exit (the `allocations`/`deallocations` counts below
-// stay equal).
 fn main() !prints {
     let s = "hello, world!"; // 13 bytes (heap)
     let v = s[1..11]; // "ello, worl" (10 bytes -> a view sharing s)

@@ -1,15 +1,16 @@
+# A `match` arm whose value is read straight out of the scrutinee hands back a
+# pointer into the scrutinee's own storage, because a composite (here a `str`)
+# travels as a pointer. If the scrutinee is a freshly built boxed value, it dies
+# at the end of the enclosing scope and takes those bytes with it — so the arm's
+# result has to be copied into the enclosing function's frame, not aliased.
+#
+# The bug this locks down was invisible whenever the scrutinee outlived the
+# match, which is the usual case: `render_plain` below matches a borrowed
+# parameter and was always correct. `render` differs from it by one identity
+# copy, and printed `[ ]` instead of `[a b]`.
+
 import { join, map, print } from builtins;
 
-// A `match` arm whose value is read straight out of the scrutinee hands back a
-// pointer into the scrutinee's own storage, because a composite (here a `str`)
-// travels as a pointer. If the scrutinee is a freshly built boxed value, it dies
-// at the end of the enclosing scope and takes those bytes with it — so the arm's
-// result has to be copied into the enclosing function's frame, not aliased.
-//
-// The bug this locks down was invisible whenever the scrutinee outlived the
-// match, which is the usual case: `render_plain` below matches a borrowed
-// parameter and was always correct. `render` differs from it by one identity
-// copy, and printed `[ ]` instead of `[a b]`.
 variant R = Nm(str) | Seq(R[])
 
 // An identity walk: every case rebuilt from its own payload.

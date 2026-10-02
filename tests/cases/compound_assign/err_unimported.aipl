@@ -1,7 +1,8 @@
+# Importing `+` does not bring `+=` with it: the compound operator is its own
+# spelling with its own named builtins, so the gate asks for it by name.
+
 import { print, to_str, wrapping_add as + } from builtins;
 
-// Importing `+` does not bring `+=` with it: the compound operator is its own
-// spelling with its own named builtins, so the gate asks for it by name.
 fn main() !prints {
     mut n = 1 + 1;
     set n += 2;
@@ -9,7 +10,7 @@ fn main() !prints {
 }
 --- errors ---
 error: operator "+=" must be imported: add `import { wrapping_add_assign as += } from builtins;`
- --> ./tests/cases/compound_assign/err_unimported.aipl:7:11
+ --> ./tests/cases/compound_assign/err_unimported.aipl:8:11
   |
-7 |     set n += 2;
+8 |     set n += 2;
   |           ^^

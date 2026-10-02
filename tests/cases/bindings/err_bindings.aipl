@@ -1,9 +1,9 @@
-// Every *check-phase* binding error, in one file, reported in one run. The
-// checker recovers at each item, so each failing function below is recorded and
-// the next is still checked.
-//
-// `err_incr_needs_plusplus_import` is not here: the operator-import gate is a
-// *loader* check, so it aborts the file before the checker runs.
+# Every *check-phase* binding error, in one file, reported in one run. The
+# checker recovers at each item, so each failing function below is recorded and
+# the next is still checked.
+#
+# `err_incr_needs_plusplus_import` is not here: the operator-import gate is a
+# *loader* check, so it aborts the file before the checker runs.
 
 // A name nothing declares — read, and assigned to.
 fn undefined_ident() -> i64 { bogus }

@@ -1,9 +1,10 @@
-// Using a builtin (`is_all_whitespace`) without importing it: the "undefined fn"
-// error reminds you it's a builtin and how to import it.
+# Using a builtin (`is_all_whitespace`) without importing it: the "undefined fn"
+# error reminds you it's a builtin and how to import it.
+
 fn blank(s: str) -> bool { s.is_all_whitespace() }
 --- errors ---
 error: call to undefined fn "is_all_whitespace" — "is_all_whitespace" is a builtin; import it with `import { is_all_whitespace } from builtins;`
- --> ./tests/cases/builtins/err_unimported_builtin.aipl:3:28
+ --> ./tests/cases/builtins/err_unimported_builtin.aipl:4:28
   |
-3 | fn blank(s: str) -> bool { s.is_all_whitespace() }
+4 | fn blank(s: str) -> bool { s.is_all_whitespace() }
   |                            ^^^^^^^^^^^^^^^^^^^^^

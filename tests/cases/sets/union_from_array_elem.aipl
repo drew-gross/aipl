@@ -1,31 +1,32 @@
+# Reassigning a `mut` set from inside a nested scope, where the new value is
+# built from an element borrowed out of an array.
+#
+# This is a regression test for a use-after-free: a `mut` set binding used to
+# keep the *value-track* ownership model, where the sole reference on the
+# binding's current value belongs to the scope that created that value rather
+# than to the binding's own slot. That is fine while every assignment happens in
+# the binding's own scope, and wrong the moment one happens in a nested one: the
+# match arm's teardown released the value `acc` had just been assigned, so
+# `acc.len()` after the match read a freed block (97 under `aipl run`, 2043
+# under the case harness — a value that depends on how the process was started
+# is freed memory, not an answer). The replaced value leaked in the same step,
+# for the mirror-image reason: nothing owned it to release.
+#
+# The fix was to give sets and dicts the same slot-owned-reference model arrays
+# and boxed types already had — see `mut_binding_owns_slot_ref` in
+# `aipl-codegen`. The slot retains the incoming value and releases the outgoing
+# one, so the arm's teardown only releases the arm's own reference.
+#
+# `union` is incidental — any heap value assigned from a nested scope did it,
+# and the same shape with an array binding was already correct. It is kept here
+# because the array element is what makes the shape realistic: this is the
+# accumulate-over-a-list-of-sets loop, written bounded so a failure prints
+# rather than aborts.
+#
+# Introduced by `25f946d` (sets and dicts as array elements).
+
 import { len, print, to_str, union } from builtins;
 
-// Reassigning a `mut` set from inside a nested scope, where the new value is
-// built from an element borrowed out of an array.
-//
-// This is a regression test for a use-after-free: a `mut` set binding used to
-// keep the *value-track* ownership model, where the sole reference on the
-// binding's current value belongs to the scope that created that value rather
-// than to the binding's own slot. That is fine while every assignment happens in
-// the binding's own scope, and wrong the moment one happens in a nested one: the
-// match arm's teardown released the value `acc` had just been assigned, so
-// `acc.len()` after the match read a freed block (97 under `aipl run`, 2043
-// under the case harness — a value that depends on how the process was started
-// is freed memory, not an answer). The replaced value leaked in the same step,
-// for the mirror-image reason: nothing owned it to release.
-//
-// The fix was to give sets and dicts the same slot-owned-reference model arrays
-// and boxed types already had — see `mut_binding_owns_slot_ref` in
-// `aipl-codegen`. The slot retains the incoming value and releases the outgoing
-// one, so the arm's teardown only releases the arm's own reference.
-//
-// `union` is incidental — any heap value assigned from a nested scope did it,
-// and the same shape with an array binding was already correct. It is kept here
-// because the array element is what makes the shape realistic: this is the
-// accumulate-over-a-list-of-sets loop, written bounded so a failure prints
-// rather than aborts.
-//
-// Introduced by `25f946d` (sets and dicts as array elements).
 fn main() !prints {
     let ls: #{i64}[] = [#{1}, #{2}];
     mut acc: #{i64} = #{9};

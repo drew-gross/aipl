@@ -1,3 +1,7 @@
+# `+`/`-` bound to the saturating flavors fold with saturating semantics:
+# MAX + 1 pins at MAX (the wrapping flavor would go negative), and stepping
+# past MIN pins at MIN.
+
 import {
     equal as ==,
     less_than as <,
@@ -6,9 +10,6 @@ import {
     saturating_sub as -,
 } from builtins;
 
-// `+`/`-` bound to the saturating flavors fold with saturating semantics:
-// MAX + 1 pins at MAX (the wrapping flavor would go negative), and stepping
-// past MIN pins at MIN.
 fn sat() -> bool {
     ((9223372036854775807 + 1) == 9223372036854775807) && (((0 - 9223372036854775807) - 2) < 0)
 }.test({

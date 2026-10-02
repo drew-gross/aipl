@@ -1,7 +1,8 @@
+# A function value is a legal variant payload: stored inline as its 8-byte code
+# address, bound out by a `match`, and called indirectly.
+
 import { equal as ==, wrapping_add as + } from builtins;
 
-// A function value is a legal variant payload: stored inline as its 8-byte code
-// address, bound out by a `match`, and called indirectly.
 variant Apply = Fn((i64) -> i64) | Const(i64)
 
 fn eval(a: Apply, x: i64) -> i64 {

@@ -1,14 +1,15 @@
+# Tail-call elimination, in its simplest form: a call in tail position reuses
+# the caller's frame instead of stacking a new one, so recursion depth stops
+# being bounded by the native stack.
+#
+# The depth here is the point. A case binary is linked and run as a real
+# process, so it gets the OS default stack — 8 MB — not the 256 MB the `aipl`
+# CLI and the cases harness raise themselves to. Without the `return_call` this
+# lowers to, 300,000 frames overflow that by more than an order of magnitude
+# and the case dies on a signal instead of printing.
+
 import { equal as ==, print, saturating_sub as -, to_str, wrapping_add as + } from builtins;
 
-// Tail-call elimination, in its simplest form: a call in tail position reuses
-// the caller's frame instead of stacking a new one, so recursion depth stops
-// being bounded by the native stack.
-//
-// The depth here is the point. A case binary is linked and run as a real
-// process, so it gets the OS default stack — 8 MB — not the 256 MB the `aipl`
-// CLI and the cases harness raise themselves to. Without the `return_call` this
-// lowers to, 300,000 frames overflow that by more than an order of magnitude
-// and the case dies on a signal instead of printing.
 fn sum_to(n: u64, acc: u64) -> u64 { if (n == 0) { acc } else { sum_to(n - 1, acc + n) } }
 
 fn main() !prints {

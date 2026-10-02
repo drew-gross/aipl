@@ -1,10 +1,11 @@
+# `#[allow]` on the `return` line squelches `return_loop_find_index`, like any
+# other lint — the long-hand loop compiles and runs as written.
+#
+# Both spellings are here side by side and asserted to agree, so the rewrite the
+# lint advises is proven equivalent rather than merely plausible.
+
 import { equal as ==, find_index, less_than as <, print, to_str } from builtins;
 
-// `#[allow]` on the `return` line squelches `return_loop_find_index`, like any
-// other lint — the long-hand loop compiles and runs as written.
-//
-// Both spellings are here side by side and asserted to agree, so the rewrite the
-// lint advises is proven equivalent rather than merely plausible.
 fn index_of_big_loop(xs: i64[], lo: i64) -> u64? {
     for (let i, x : xs) {
         if (lo < x) {

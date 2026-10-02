@@ -1,9 +1,10 @@
+# Allocation accounting doubles as a leak/double-free check: a refcount-correct
+# program frees everything it allocates, so allocations == deallocations. The
+# counts are pinned, so a regression in the refcount protocol (an extra alloc,
+# a missing free, a double-free) shows up here as a mismatch.
+
 import { print, push, to_str } from builtins;
 
-// Allocation accounting doubles as a leak/double-free check: a refcount-correct
-// program frees everything it allocates, so allocations == deallocations. The
-// counts are pinned, so a regression in the refcount protocol (an extra alloc,
-// a missing free, a double-free) shows up here as a mismatch.
 fn main() !prints {
     mut xs = [];
     set xs.push(1);

@@ -1,13 +1,13 @@
-import { print } from builtins;
+# A top-level `let NAME = <literal>;` names a literal. The loader substitutes
+# each use with that literal and drops the declaration, so nothing past the
+# loader knows constants exist — which is why the value must *be* a literal
+# (there is no point at which a computation would run) and why there is no
+# `mut` form (a mutable one would need storage).
+#
+# The ALL_CAPS rule is what keeps a substituted use readable at the site that
+# reads it: the name says "not a binding from around here".
 
-// A top-level `let NAME = <literal>;` names a literal. The loader substitutes
-// each use with that literal and drops the declaration, so nothing past the
-// loader knows constants exist — which is why the value must *be* a literal
-// (there is no point at which a computation would run) and why there is no
-// `mut` form (a mutable one would need storage).
-//
-// The ALL_CAPS rule is what keeps a substituted use readable at the site that
-// reads it: the name says "not a binding from around here".
+import { print } from builtins;
 
 # The TextMate scope a keyword is painted with.
 pub let S_KEYWORD: str = "keyword.control.aipl";

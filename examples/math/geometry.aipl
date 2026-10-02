@@ -1,9 +1,9 @@
-import { wrapping_add as +, wrapping_mul as * } from builtins;
+# Imported by examples/imports.aipl. Only the names listed in that
+# file's `import { ... }` clause are visible from the importer;
+# `area` and `double` stay private to this module even though they're
+# called by the exported `double_area`.
 
-// Imported by examples/imports.aipl. Only the names listed in that
-// file's `import { ... }` clause are visible from the importer;
-// `area` and `double` stay private to this module even though they're
-// called by the exported `double_area`.
+import { wrapping_add as +, wrapping_mul as * } from builtins;
 
 struct Rect { width: i64, height: i64 }
 

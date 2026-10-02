@@ -1,9 +1,10 @@
+# A variadic parameter on a *generic* function, without a default. Each call
+# specializes on the argument's shape — sequence, single element, or optional —
+# the same way a concrete variadic does; before, only concrete ones did, and a
+# bare element reached codegen still typed as the sequence.
+
 import { print, to_str, wrapping_increment as ++ } from builtins;
 
-// A variadic parameter on a *generic* function, without a default. Each call
-// specializes on the argument's shape — sequence, single element, or optional —
-// the same way a concrete variadic does; before, only concrete ones did, and a
-// bare element reached codegen still typed as the sequence.
 fn total<T: any>(self: T[], extra: T*) -> u64 {
     mut n: u64 = 0;
     for (let _ : self) {

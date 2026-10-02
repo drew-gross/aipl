@@ -1,8 +1,9 @@
+# `str` and `char[]` share a runtime representation (a `char` is a single
+# byte, exactly like a `str`'s content), so they're mutually usable wherever
+# the other is expected, and compare/hash equal when their bytes match.
+
 import { equal as ==, hash, len, print, reverse, to_str } from builtins;
 
-// `str` and `char[]` share a runtime representation (a `char` is a single
-// byte, exactly like a `str`'s content), so they're mutually usable wherever
-// the other is expected, and compare/hash equal when their bytes match.
 fn takes_str(s: str) -> u64 { s.len() }
 
 fn takes_chars(cs: char[]) -> u64 { cs.len() }

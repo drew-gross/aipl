@@ -1,10 +1,11 @@
+# A result's Ok/Err payload may be a struct (in addition to scalar/str/unit):
+# `elem_size_of`/`store_array_elem`/`emit_rc` already size, copy, and refcount
+# composite `Result` payloads generically (the same machinery an optional's
+# core uses), so this needed no new runtime support — just widening the
+# checker's/`ok`/`err`-codegen's allowed-payload list.
+
 import { concat as +++, equal as ==, logical_and as &&, print, to_str } from builtins;
 
-// A result's Ok/Err payload may be a struct (in addition to scalar/str/unit):
-// `elem_size_of`/`store_array_elem`/`emit_rc` already size, copy, and refcount
-// composite `Result` payloads generically (the same machinery an optional's
-// core uses), so this needed no new runtime support — just widening the
-// checker's/`ok`/`err`-codegen's allowed-payload list.
 struct Point { x: i64, y: i64, label: str }
 
 fn parse(valid: bool) -> Point!str {

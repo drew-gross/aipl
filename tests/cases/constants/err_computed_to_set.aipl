@@ -1,8 +1,9 @@
-// `"…".to_set()` is admitted as a constant because its receiver is a literal:
-// there is nothing to evaluate in any order, and codegen folds it to the four
-// words of the bitfield. A *computed* receiver is an ordinary computation and
-// stays refused — otherwise the constant would run `src()` at every use, which
-// is exactly what a constant promises not to do.
+# `"…".to_set()` is admitted as a constant because its receiver is a literal:
+# there is nothing to evaluate in any order, and codegen folds it to the four
+# words of the bitfield. A *computed* receiver is an ordinary computation and
+# stays refused — otherwise the constant would run `src()` at every use, which
+# is exactly what a constant promises not to do.
+
 import { to_set } from builtins;
 
 fn src() -> char[] { "ab" }
@@ -12,7 +13,7 @@ let COMPUTED = src().to_set();
 fn main() {}
 --- errors ---
 error: a top-level constant stands for a literal, and "COMPUTED" is given something to evaluate — a constant is substituted into each use, so there is no point at which a computation would run
-  --> ./tests/cases/constants/err_computed_to_set.aipl:10:16
+  --> ./tests/cases/constants/err_computed_to_set.aipl:11:16
    |
-10 | let COMPUTED = src().to_set();
+11 | let COMPUTED = src().to_set();
    |                ^^^^^^^^^^^^^^

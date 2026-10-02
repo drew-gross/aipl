@@ -1,18 +1,19 @@
+# Fusion is refused when either operand has an effect.
+#
+# Fusing changes how much of the collection is examined and moves the other
+# operand's evaluation ahead of the traversal. For pure operands neither is
+# observable — but an effect *is* the observable behaviour, and an optimization
+# that changes it is a bug. So the pass declines and the ordinary
+# `count`-then-compare runs.
+#
+# Measured on this shape in isolation: the same `many().count(2) < 3` runs in
+# 5,632 instructions fused and 13,943 when an effect in the bound blocks it —
+# the difference between stopping at the third match and walking all 201.
+# (Symbol lists are not evidence either way here: post-mono inlining folds a
+# single-use `count` into its caller, so the name disappears regardless.)
+
 import { count, less_than as <, print, push, to_str, wrapping_increment as ++ } from builtins;
 
-// Fusion is refused when either operand has an effect.
-//
-// Fusing changes how much of the collection is examined and moves the other
-// operand's evaluation ahead of the traversal. For pure operands neither is
-// observable — but an effect *is* the observable behaviour, and an optimization
-// that changes it is a bug. So the pass declines and the ordinary
-// `count`-then-compare runs.
-//
-// Measured on this shape in isolation: the same `many().count(2) < 3` runs in
-// 5,632 instructions fused and 13,943 when an effect in the bound blocks it —
-// the difference between stopping at the third match and walking all 201.
-// (Symbol lists are not evidence either way here: post-mono inlining folds a
-// single-use `count` into its caller, so the name disappears regardless.)
 fn many() -> i64[] {
     mut xs = [2];
     mut i: u64 = 0;

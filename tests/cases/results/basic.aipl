@@ -1,8 +1,9 @@
+# A result `T!E` is `ok(v)` or `err(e)` — an inline `{tag, value}` (tag 1 = ok,
+# 0 = err), matched like an optional. `ok`/`err` are constructors like
+# `some`/`none`: the unbound side is inferred from context.
+
 import { concat as +++, equal as ==, print, saturating_divide as /, to_str } from builtins;
 
-// A result `T!E` is `ok(v)` or `err(e)` — an inline `{tag, value}` (tag 1 = ok,
-// 0 = err), matched like an optional. `ok`/`err` are constructors like
-// `some`/`none`: the unbound side is inferred from context.
 fn safe_div(a: i64, b: i64) -> i64!str { if (b == 0) { err("divide by zero") } else { ok(a / b) } }
 
 fn describe(a: i64, b: i64) -> str {

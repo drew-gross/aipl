@@ -1,3 +1,12 @@
+# `set n += e;` accumulates in place — the compound form of `set n = n + e;`.
+# Like `set n++;` it takes a bare binding: the receiver is mentioned twice, so a
+# field path or a call would have to be re-evaluated to spell it this way.
+#
+# Each operator is imported on its own (`wrapping_add_assign as +=`), exactly as
+# `++` is `wrapping_increment as ++` rather than a second alias of `+`. The two
+# spellings are independent: this file accumulates with `+=`, `-=` and `/=`
+# without importing `+`, `-` or `/`, and imports `*` only for `triple`'s body.
+
 import {
     print,
     saturating_divide_assign as /=,
@@ -8,14 +17,6 @@ import {
     wrapping_sub_assign as -=,
 } from builtins;
 
-// `set n += e;` accumulates in place — the compound form of `set n = n + e;`.
-// Like `set n++;` it takes a bare binding: the receiver is mentioned twice, so a
-// field path or a call would have to be re-evaluated to spell it this way.
-//
-// Each operator is imported on its own (`wrapping_add_assign as +=`), exactly as
-// `++` is `wrapping_increment as ++` rather than a second alias of `+`. The two
-// spellings are independent: this file accumulates with `+=`, `-=` and `/=`
-// without importing `+`, `-` or `/`, and imports `*` only for `triple`'s body.
 fn triple(x: i64) -> i64 { x * 3 }
 
 fn main() !prints {

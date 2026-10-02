@@ -1,3 +1,10 @@
+# Every `set` form takes a field path as its target, not just a name: the
+# step and compound operators, and the mutating-method writeback, all read
+# the field, apply, and store it back — `set b.counter.n++` is
+# `set b.counter.n = b.counter.n ++ 1`, and `set b.counter.hits.push(x)` is
+# `set b.counter.hits = b.counter.hits.push(x)`. Siblings at every level are
+# left alone, exactly as with a plain `set b.counter.n = v`.
+
 import {
     equal as ==,
     len,
@@ -12,12 +19,6 @@ struct Counter { n: i64, hits: i64[] = [] }
 
 struct Board { counter: Counter, name: str }
 
-// Every `set` form takes a field path as its target, not just a name: the
-// step and compound operators, and the mutating-method writeback, all read
-// the field, apply, and store it back — `set b.counter.n++` is
-// `set b.counter.n = b.counter.n ++ 1`, and `set b.counter.hits.push(x)` is
-// `set b.counter.hits = b.counter.hits.push(x)`. Siblings at every level are
-// left alone, exactly as with a plain `set b.counter.n = v`.
 fn tally(mut self: Board, x: i64) {
     set self.counter.n++;
     set self.counter.n += x;

@@ -1,3 +1,9 @@
+# A `T+` parameter is a variadic that takes one element or more. Inside the
+# body it is the non-empty sequence — `T[] without []` — so the ends are
+# there for the taking. At a call site it accepts a single element or a
+# `T[] without []`: the two shapes that cannot be empty. An optional and a
+# plain array are refused, however they were built — see `err_nonempty_variadic`.
+
 import {
     ensure_nonempty,
     equal as ==,
@@ -8,11 +14,6 @@ import {
     wrapping_increment as ++,
 } from builtins;
 
-// A `T+` parameter is a variadic that takes one element or more. Inside the
-// body it is the non-empty sequence — `T[] without []` — so the ends are
-// there for the taking. At a call site it accepts a single element or a
-// `T[] without []`: the two shapes that cannot be empty. An optional and a
-// plain array are refused, however they were built — see `err_nonempty_variadic`.
 fn first_and_last(self: i64+) -> str { `{self.nonempty_first()}..{self.nonempty_last()}` }.test({
     assert(first_and_last(7) == "7..7"); // a single element -> [7]
     assert(first_and_last([1, 2, 3]) == "1..3"); // a literal with an element in it

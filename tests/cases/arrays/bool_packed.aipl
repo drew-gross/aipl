@@ -1,8 +1,9 @@
+# `bool[]` is bit-packed — 8 elements per byte (like `std::vector<bool>`) — but
+# presents exactly the ordinary array interface. This literal spans two bytes
+# (9 elements), exercising the cross-byte addressing.
+
 import { equal as ==, len, wrapping_add_assign as += } from builtins;
 
-// `bool[]` is bit-packed — 8 elements per byte (like `std::vector<bool>`) — but
-// presents exactly the ordinary array interface. This literal spans two bytes
-// (9 elements), exercising the cross-byte addressing.
 fn packed() -> bool[] { [true, false, true, true, false, false, true, false, true] }.test({
     let xs = packed();
     assert(xs == [true, false, true, true, false, false, true, false, true]);

@@ -1,9 +1,10 @@
+# `#[allow]` keeps the `mut`, as every lint's escape hatch does. The marker
+# goes on the seed, which is where this lint points: `#[allow]` is line-scoped,
+# so the hit has to name a line that survives `aipl fmt`, and `mut out = xs;`
+# is a short statement that always occupies one.
+
 import { join, map, print, push, to_str } from builtins;
 
-// `#[allow]` keeps the `mut`, as every lint's escape hatch does. The marker
-// goes on the seed, which is where this lint points: `#[allow]` is line-scoped,
-// so the hit has to name a line that survives `aipl fmt`, and `mut out = xs;`
-// is a short statement that always occupies one.
 fn appended(xs: i64[], x: i64) -> i64[] {
     mut out = xs; #[allow]
     set out.push(x);

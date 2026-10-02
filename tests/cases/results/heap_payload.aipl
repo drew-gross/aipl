@@ -1,8 +1,9 @@
+# Both sides of a result can be `str` (heap). Constructing, matching, and `?`-
+# propagating them must keep refcounts balanced — the `--- performance ---`
+# alloc/dealloc counts below would diverge on a leak or double-free.
+
 import { concat as +++, equal as ==, print } from builtins;
 
-// Both sides of a result can be `str` (heap). Constructing, matching, and `?`-
-// propagating them must keep refcounts balanced — the `--- performance ---`
-// alloc/dealloc counts below would diverge on a leak or double-free.
 fn lookup(k: str) -> str!str { if (k == "x") { ok("found-x") } else { err("missing: " +++ k) } }
 
 // `?` on a `str!str`: the ok `str` is unwrapped (and owned) here; an err `str`

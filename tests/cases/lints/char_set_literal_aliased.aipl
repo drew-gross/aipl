@@ -1,8 +1,9 @@
+# The advice names the file's own spelling of `to_set`, and drops the
+# import clause once the file has it: this one imports it aliased, so the
+# rewrite it suggests is `.to_char_set()`.
+
 import { has, print, to_set as to_char_set } from builtins;
 
-// The advice names the file's own spelling of `to_set`, and drops the
-// import clause once the file has it: this one imports it aliased, so the
-// rewrite it suggests is `.to_char_set()`.
 fn main() !prints {
     let vowels: #{char} = #{'a', 'e', 'i', 'o', 'u'};
     let digits: #{char} = "0123456789".to_char_set();
@@ -10,7 +11,7 @@ fn main() !prints {
 }
 --- errors ---
 error: a char set of 5 elements spelled out — write `"aeiou".to_char_set()` (or append #[allow] to this line to keep it)
- --> ./tests/cases/lints/char_set_literal_aliased.aipl:7:27
+ --> ./tests/cases/lints/char_set_literal_aliased.aipl:8:27
   |
-7 |     let vowels: #{char} = #{'a', 'e', 'i', 'o', 'u'};
+8 |     let vowels: #{char} = #{'a', 'e', 'i', 'o', 'u'};
   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^

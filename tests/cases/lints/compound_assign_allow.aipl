@@ -1,7 +1,8 @@
+# `#[allow]` on the line squelches the compound-assignment lint, like any other
+# — the long-hand `set n = n + 5;` compiles and runs as written.
+
 import { print, to_str, wrapping_add as + } from builtins;
 
-// `#[allow]` on the line squelches the compound-assignment lint, like any other
-// — the long-hand `set n = n + 5;` compiles and runs as written.
 fn main() !prints {
     mut n = 10;
     set n = n + 5; #[allow]

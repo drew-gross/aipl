@@ -1,10 +1,10 @@
-import { equal as ==, less_than as <, print, to_str, wrapping_mul as * } from builtins;
+# `for (let x : xs) { if (..) { return some(x); }; } none` — a loop whose only
+# way out is the first element passing a test, falling through to `none` when
+# no element does. `find_if` is that in one expression: it says the answer *is*
+# the first match, rather than leaving a reader to check that the early return
+# is the loop's only exit and that falling off the end means "not found".
 
-// `for (let x : xs) { if (..) { return some(x); }; } none` — a loop whose only
-// way out is the first element passing a test, falling through to `none` when
-// no element does. `find_if` is that in one expression: it says the answer *is*
-// the first match, rather than leaving a reader to check that the early return
-// is the loop's only exit and that falling off the end means "not found".
+import { equal as ==, less_than as <, print, to_str, wrapping_mul as * } from builtins;
 
 // The `none` as the block's tail.
 fn first_big(xs: i64[], lo: i64) -> i64? {

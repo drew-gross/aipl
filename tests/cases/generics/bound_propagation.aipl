@@ -1,12 +1,13 @@
+# A bound is satisfiable from inside another generic body: when a call's type
+# parameter resolves to one of the *enclosing* function's variables, the
+# enclosing variable's declared bound is what has to satisfy it.
+#
+# Without this, a bounded builtin could not be called from generic code at all
+# — every type variable looked alike to the checker, so there was no bound left
+# to consult and `xs.minimum()` below was a compile error.
+
 import { minimum, print, same_case, to_str } from builtins;
 
-// A bound is satisfiable from inside another generic body: when a call's type
-// parameter resolves to one of the *enclosing* function's variables, the
-// enclosing variable's declared bound is what has to satisfy it.
-//
-// Without this, a bounded builtin could not be called from generic code at all
-// — every type variable looked alike to the checker, so there was no bound left
-// to consult and `xs.minimum()` below was a compile error.
 variant Tok = Space | Name(str) | IntLit(i64)
 
 // A grammar rule, generic over the token kind -- the parser-library shape.

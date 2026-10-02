@@ -1,9 +1,10 @@
+# `extend` is a mutating method, so — like `push` — only the `set` writeback
+# form mutates. Used as a *value*, in either the free-call or the method form,
+# it is copy-and-modify: a fresh array with the elements appended, receiver
+# untouched.
+
 import { equal as ==, extend, logical_and as && } from builtins;
 
-// `extend` is a mutating method, so — like `push` — only the `set` writeback
-// form mutates. Used as a *value*, in either the free-call or the method form,
-// it is copy-and-modify: a fresh array with the elements appended, receiver
-// untouched.
 fn probe() -> bool {
     mut xs = [1];
     let a = extend(xs, [2, 3]); // free form: a == [1, 2, 3]

@@ -1,13 +1,13 @@
-import { equal as ==, wrapping_mul as * } from builtins;
+# Regression guard: `aipl check` must run *every* function's `.test({ .. })`
+# block in the checked file, not just one of them. The loader's flatten pass
+# drops a `.test` body only for a function coming from a *non-root* (imported)
+# file, so an importer doesn't re-run an already-independently-checked file's
+# tests — it must still keep every test body belonging to the root file
+# itself. Two functions here, each with its own passing test, pin the count
+# via `--- check ---` so a regression that only ran one of them would show up
+# as "1 tests: 1 passed, 0 failed" instead of the expected "2 tests: ...".
 
-// Regression guard: `aipl check` must run *every* function's `.test({ .. })`
-// block in the checked file, not just one of them. The loader's flatten pass
-// drops a `.test` body only for a function coming from a *non-root* (imported)
-// file, so an importer doesn't re-run an already-independently-checked file's
-// tests — it must still keep every test body belonging to the root file
-// itself. Two functions here, each with its own passing test, pin the count
-// via `--- check ---` so a regression that only ran one of them would show up
-// as "1 tests: 1 passed, 0 failed" instead of the expected "2 tests: ...".
+import { equal as ==, wrapping_mul as * } from builtins;
 
 fn double(x: i64) -> i64 { x * 2 }.test({
     assert(double(2) == 4);

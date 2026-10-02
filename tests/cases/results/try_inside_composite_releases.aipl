@@ -1,19 +1,20 @@
-// A `?` that fires from inside a composite under construction must not leak the
-// parts already built.
-//
-// Construction used to interleave "compile field k+1" with "retain field k", so
-// a `?` in a later field early-returned through a struct that owned references
-// nothing tracked — the scope drop never saw it. Evaluating every field before
-// storing any closes the window: until a value is retained into the composite it
-// is an ordinary tracked temp, which the early-return path drops correctly.
-//
-// The array literal is the control. It always evaluated all its elements first,
-// which is exactly why `[a, f()?]` never leaked while `S { a, n: f()? }` did —
-// and is where the two-phase shape was borrowed from.
-//
-// What proves it is the `--- performance ---` section below: allocations must
-// equal deallocations. Each function is called on the *failing* path, with a
-// heap-allocated value already in place ahead of the `?`.
+# A `?` that fires from inside a composite under construction must not leak the
+# parts already built.
+#
+# Construction used to interleave "compile field k+1" with "retain field k", so
+# a `?` in a later field early-returned through a struct that owned references
+# nothing tracked — the scope drop never saw it. Evaluating every field before
+# storing any closes the window: until a value is retained into the composite it
+# is an ordinary tracked temp, which the early-return path drops correctly.
+#
+# The array literal is the control. It always evaluated all its elements first,
+# which is exactly why `[a, f()?]` never leaked while `S { a, n: f()? }` did —
+# and is where the two-phase shape was borrowed from.
+#
+# What proves it is the `--- performance ---` section below: allocations must
+# equal deallocations. Each function is called on the *failing* path, with a
+# heap-allocated value already in place ahead of the `?`.
+
 import { first, int_parse, print, value_or, value_or_err } from builtins;
 
 struct S { a: str, n: i64 }

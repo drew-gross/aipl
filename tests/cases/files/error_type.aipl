@@ -1,3 +1,8 @@
+# The file builtins return the builtin `Error` type as their error side
+# (`read_file_to_string -> str!Error`, `write_string_to_file -> !Error`).
+# `Error` is a distinct named type, but for now it's a string under the hood:
+# it renders, compares, and concatenates like one, and coerces to/from `str`.
+
 import {
     concat as +++,
     equal as ==,
@@ -5,11 +10,6 @@ import {
     read_file_to_string,
     write_string_to_file,
 } from builtins;
-
-// The file builtins return the builtin `Error` type as their error side
-// (`read_file_to_string -> str!Error`, `write_string_to_file -> !Error`).
-// `Error` is a distinct named type, but for now it's a string under the hood:
-// it renders, compares, and concatenates like one, and coerces to/from `str`.
 
 // A user function can make an `Error` from a string and propagate builtin ones.
 fn nonempty(s: str) -> str!Error { if (s == "") { err("empty input") } else { ok(s) } }

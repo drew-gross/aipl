@@ -1,11 +1,12 @@
+# `+` and `+=` here are *different* flavors — a wrapping add beside a saturating
+# accumulate — so `set n = n + 1;` and `set n += 1;` genuinely differ and the
+# lint stays quiet. It fires only when the file's two spellings resolve to the
+# same implementation, the same test `step_by_one` makes of `+` against `++`.
+# (The added value is 10 rather than 1 so the *increment* lint has nothing to
+# say here either — this case is about the compound one.)
+
 import { print, saturating_add_assign as +=, to_str, wrapping_add as + } from builtins;
 
-// `+` and `+=` here are *different* flavors — a wrapping add beside a saturating
-// accumulate — so `set n = n + 1;` and `set n += 1;` genuinely differ and the
-// lint stays quiet. It fires only when the file's two spellings resolve to the
-// same implementation, the same test `step_by_one` makes of `+` against `++`.
-// (The added value is 10 rather than 1 so the *increment* lint has nothing to
-// say here either — this case is about the compound one.)
 fn main() !prints {
     mut n: u8 = 250;
     set n = n + 10; // wraps to 4

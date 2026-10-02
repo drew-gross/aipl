@@ -1,19 +1,20 @@
+# A keyword parameter may be typed by its function's own *type variable*.
+#
+# Such a default can't be checked where it's written — whether `0` is a `T`
+# depends on the instantiation, and the declaration is checked once for the
+# template. So the check happens per call site instead, which is exactly where
+# the keyword-argument pass splices the default in, as an ordinary argument of
+# an ordinary generic call. Generic struct field defaults have always deferred
+# the same way.
+#
+# The consequence worth knowing: a `T`-typed default constrains only the
+# instantiations that *omit* it. `padded` below defaults to `0`, so `T` is
+# pinned to an integer wherever the argument is left out — but a `str`
+# instantiation is still free to supply its own. Omitting it there is an error
+# (`err_generic_default_conflicts`).
+
 import { print, to_str } from builtins;
 
-// A keyword parameter may be typed by its function's own *type variable*.
-//
-// Such a default can't be checked where it's written — whether `0` is a `T`
-// depends on the instantiation, and the declaration is checked once for the
-// template. So the check happens per call site instead, which is exactly where
-// the keyword-argument pass splices the default in, as an ordinary argument of
-// an ordinary generic call. Generic struct field defaults have always deferred
-// the same way.
-//
-// The consequence worth knowing: a `T`-typed default constrains only the
-// instantiations that *omit* it. `padded` below defaults to `0`, so `T` is
-// pinned to an integer wherever the argument is left out — but a `str`
-// instantiation is still free to supply its own. Omitting it there is an error
-// (`err_generic_default_conflicts`).
 fn padded<T: any>(xs: T[], pad: T = 0) -> T[] { [..xs, pad] }
 
 fn main() !prints {

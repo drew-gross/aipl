@@ -1,14 +1,15 @@
+# `xs.fold(init, f)` combines the elements left to right — `[a, b, c]` folds to
+# `f(f(f(init, a), b), c)`, with the accumulator first and the element second.
+# It's implemented in AIPL itself (`builtin_left_fold.aipl`) and specializes
+# like a user generic, over the element and accumulator types independently.
+#
+# Import convention: bring `left_fold` in as plain `fold`, as here — one fold
+# direction per file is the usual case. Spell it out as `left_fold` only in a
+# file that imports `right_fold` too, so the pair reads as a pair (see
+# `right_fold.aipl`).
+
 import { concat as +++, equal as ==, filter, left_fold as fold, wrapping_add as + } from builtins;
 
-// `xs.fold(init, f)` combines the elements left to right — `[a, b, c]` folds to
-// `f(f(f(init, a), b), c)`, with the accumulator first and the element second.
-// It's implemented in AIPL itself (`builtin_left_fold.aipl`) and specializes
-// like a user generic, over the element and accumulator types independently.
-//
-// Import convention: bring `left_fold` in as plain `fold`, as here — one fold
-// direction per file is the usual case. Spell it out as `left_fold` only in a
-// file that imports `right_fold` too, so the pair reads as a pair (see
-// `right_fold.aipl`).
 fn sum(xs: i64[]) -> i64 { xs.fold(0, |acc, x| acc + x) }
 
 fn sums_an_array() -> i64 { sum([1, 2, 3]) }.test({

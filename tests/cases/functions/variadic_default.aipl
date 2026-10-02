@@ -1,11 +1,12 @@
+# A variadic parameter may carry a default: `T* = []`.
+#
+# The two halves compose without conflicting. It stays *variadic* in what it
+# accepts — the sequence, a single element, or an optional element — and the
+# default makes it a *keyword* parameter in how it's passed, exactly as a
+# default does anywhere else. So it is omitted or named, never positional.
+
 import { len, print, to_str } from builtins;
 
-// A variadic parameter may carry a default: `T* = []`.
-//
-// The two halves compose without conflicting. It stays *variadic* in what it
-// accepts — the sequence, a single element, or an optional element — and the
-// default makes it a *keyword* parameter in how it's passed, exactly as a
-// default does anywhere else. So it is omitted or named, never positional.
 fn count<T: any>(self: T[], sep: T* = []) -> u64 { sep.len() }
 
 // `char*`'s sequence type is `str` (an AIPL string *is* the char sequence), so

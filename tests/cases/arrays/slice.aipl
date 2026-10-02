@@ -1,11 +1,12 @@
+# Array slicing `xs[start..end]` yields an array of the elements in
+# `[start, end)`. Both bounds clamp to `[0, len]` (an out-of-range end gives a
+# shorter array, `start >= end` gives `[]`), and the open-ended forms run to
+# the array's edges. Like a `str`'s slice, it shares rather than copies: the
+# result is a window onto the source's elements (see `slice_shares` for what
+# that costs and what it means for mutation); the source is unchanged.
+
 import { print, reverse, to_str } from builtins;
 
-// Array slicing `xs[start..end]` yields an array of the elements in
-// `[start, end)`. Both bounds clamp to `[0, len]` (an out-of-range end gives a
-// shorter array, `start >= end` gives `[]`), and the open-ended forms run to
-// the array's edges. Like a `str`'s slice, it shares rather than copies: the
-// result is a window onto the source's elements (see `slice_shares` for what
-// that costs and what it means for mutation); the source is unchanged.
 fn main() !prints {
     let xs = [10, 20, 30, 40, 50];
     print(xs[1..4].to_str()); // [20, 30, 40]

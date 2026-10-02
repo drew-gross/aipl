@@ -1,11 +1,12 @@
+# `set l.start.x = v;` rewrites one nested field, leaving every other field —
+# at both levels — unchanged.
+
 import { concat as +++, equal as ==, wrapping_add_assign as += } from builtins;
 
 struct Point { x: i64, y: i64 }
 
 struct Line { start: Point, end: Point, label: str }
 
-// `set l.start.x = v;` rewrites one nested field, leaving every other field —
-// at both levels — unchanged.
 fn shift_start_x(l: Line, by: i64) -> Line {
     mut m = l;
     set m.start.x += by;

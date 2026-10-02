@@ -1,10 +1,11 @@
+# A nested struct that holds heap data: the inner `Name` owns two `str`s (built
+# by concatenation, so they're genuinely heap-allocated, not static literals),
+# and `Contact` holds an optional too. The outer struct co-owns the inner's
+# heap fields, so the balanced alloc/dealloc count below proves each string is
+# retained on construction and released exactly once when the struct drops.
+
 import { concat as +++, equal as == } from builtins;
 
-// A nested struct that holds heap data: the inner `Name` owns two `str`s (built
-// by concatenation, so they're genuinely heap-allocated, not static literals),
-// and `Contact` holds an optional too. The outer struct co-owns the inner's
-// heap fields, so the balanced alloc/dealloc count below proves each string is
-// retained on construction and released exactly once when the struct drops.
 struct Name { first: str, last: str }
 
 struct Contact { name: Name, nick: str? }

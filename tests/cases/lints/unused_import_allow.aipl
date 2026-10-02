@@ -1,9 +1,10 @@
+# `#[allow]` on the import line squelches the unused-import lint, like any
+# other: `value_or` is never referenced, and the file still compiles and runs
+# as written. (The marker is line-scoped, so it silences every lint reported on
+# that line — here, the whole import list.)
+
 import { print, value_or } from builtins; #[allow]
 
-// `#[allow]` on the import line squelches the unused-import lint, like any
-// other: `value_or` is never referenced, and the file still compiles and runs
-// as written. (The marker is line-scoped, so it silences every lint reported on
-// that line — here, the whole import list.)
 fn main() !prints { print("ok") }
 --- stdout ---
 ok

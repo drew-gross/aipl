@@ -1,11 +1,12 @@
+# `intersperse(xs, sep)` inserts `sep` *between* consecutive elements, never
+# leading or trailing — the array counterpart of `join`.
+#
+# `join` is this followed by concatenation, which only `str` can do; every
+# element type can be interleaved, so that is where the generic version stops.
+# Callable free (`intersperse(xs, sep)`) or as a method (`xs.intersperse(sep)`).
+
 import { equal as ==, intersperse, join, len, print, to_str } from builtins;
 
-// `intersperse(xs, sep)` inserts `sep` *between* consecutive elements, never
-// leading or trailing — the array counterpart of `join`.
-//
-// `join` is this followed by concatenation, which only `str` can do; every
-// element type can be interleaved, so that is where the generic version stops.
-// Callable free (`intersperse(xs, sep)`) or as a method (`xs.intersperse(sep)`).
 fn main() !prints {
     // Between, not around: three elements give five slots.
     print(["a", "b", "c"].intersperse("-").len().to_str());

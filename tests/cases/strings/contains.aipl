@@ -1,8 +1,8 @@
-import { concat as +++, contains, logical_not as ! } from builtins;
+# `contains` on a `str` receiver takes a `char*` needle: a `str` matches as a
+# substring, a `char` as a single character, and a `char?` as its character
+# when `some` — a `none` needle is nothing to find, so it's `false`.
 
-// `contains` on a `str` receiver takes a `char*` needle: a `str` matches as a
-// substring, a `char` as a single character, and a `char?` as its character
-// when `some` — a `none` needle is nothing to find, so it's `false`.
+import { concat as +++, contains, logical_not as ! } from builtins;
 
 fn first_char(s: str) -> char? { s[0] }.test({
     // Char needle.

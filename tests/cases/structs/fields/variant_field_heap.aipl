@@ -1,8 +1,9 @@
+# A variant field whose payload owns heap (`str`): constructing the struct
+# retains the payload, dropping the struct releases it (the asserted
+# alloc/dealloc balance below proves ownership is threaded through the field).
+
 import { concat as +++, print, to_str } from builtins;
 
-// A variant field whose payload owns heap (`str`): constructing the struct
-// retains the payload, dropping the struct releases it (the asserted
-// alloc/dealloc balance below proves ownership is threaded through the field).
 variant Name = Anon | Named(str)
 
 struct Person { name: Name, age: i64 }

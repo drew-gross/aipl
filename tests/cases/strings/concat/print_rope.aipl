@@ -1,10 +1,11 @@
+# Printing a rope streams its leaves straight to stdout without materializing,
+# so no flattened buffer is allocated even when the result exceeds the inline
+# (<= 7 byte) limit. The only heap here is the concat node itself: `allocations`
+# stays at 1 (the node), not 2 (node + a materialized buffer). A nested rope
+# streams its sub-ropes the same way, still without flattening.
+
 import { concat as +++, print } from builtins;
 
-// Printing a rope streams its leaves straight to stdout without materializing,
-// so no flattened buffer is allocated even when the result exceeds the inline
-// (<= 7 byte) limit. The only heap here is the concat node itself: `allocations`
-// stays at 1 (the node), not 2 (node + a materialized buffer). A nested rope
-// streams its sub-ropes the same way, still without flattening.
 fn main() !prints {
     // 18 bytes: materializing would heap-allocate a flattened buffer.
     let greeting = "Hello, " +++ "rope world!";

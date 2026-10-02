@@ -1,18 +1,19 @@
+# The shape that makes tail-call elimination worth having, and the one a
+# "eliminate only where no drops are pending" rule can never reach: a function
+# that destructures an owned recursive value and recurses on one of its fields.
+# Its payload bindings (`s` and `rest`) are released on scope exit — *after* the
+# recursive call would return — so there is always a drop pending at the call.
+#
+# A tail call runs that cleanup *before* transferring control, which is safe
+# because every argument that owns heap holds a reference of its own by then:
+# `rest` is retained for the call (a participant's boxed parameters join the
+# caller-retains/callee-releases protocol precisely so this works), and no
+# release of some *other* reference can take it. The `--- performance ---`
+# section is the second half of the assertion — every allocation is still freed
+# exactly once, so the extra retain/release pairs balance.
+
 import { equal as ==, len, print, saturating_sub as -, to_str, wrapping_add as + } from builtins;
 
-// The shape that makes tail-call elimination worth having, and the one a
-// "eliminate only where no drops are pending" rule can never reach: a function
-// that destructures an owned recursive value and recurses on one of its fields.
-// Its payload bindings (`s` and `rest`) are released on scope exit — *after* the
-// recursive call would return — so there is always a drop pending at the call.
-//
-// A tail call runs that cleanup *before* transferring control, which is safe
-// because every argument that owns heap holds a reference of its own by then:
-// `rest` is retained for the call (a participant's boxed parameters join the
-// caller-retains/callee-releases protocol precisely so this works), and no
-// release of some *other* reference can take it. The `--- performance ---`
-// section is the second half of the assertion — every allocation is still freed
-// exactly once, so the extra retain/release pairs balance.
 variant List = Nil | Cons(str, List)
 
 fn build(n: u64, acc: List) -> List { if (n == 0) { acc } else { build(n - 1, Cons("item", acc)) } }

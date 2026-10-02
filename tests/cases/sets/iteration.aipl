@@ -1,3 +1,11 @@
+# `for (let x : s)` walks a set's elements. A set shares the array heap block
+# (see `is_heap` in `aipl-codegen`), so this is the array walk — same length
+# word, same element reads.
+#
+# **No order is promised.** A set is unordered, and the representation that
+# gives it an order today is not a guarantee to write code against, so every
+# assertion below either sorts the result or is order-independent.
+
 import {
     print,
     push,
@@ -7,13 +15,6 @@ import {
     wrapping_increment as ++,
 } from builtins;
 
-// `for (let x : s)` walks a set's elements. A set shares the array heap block
-// (see `is_heap` in `aipl-codegen`), so this is the array walk — same length
-// word, same element reads.
-//
-// **No order is promised.** A set is unordered, and the representation that
-// gives it an order today is not a guarantee to write code against, so every
-// assertion below either sorts the result or is order-independent.
 fn elems(s: #{str}) -> str[] {
     mut out: str[] = []; #[allow]
     for (let x : s) {

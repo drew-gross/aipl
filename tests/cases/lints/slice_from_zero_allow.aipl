@@ -1,6 +1,7 @@
+# `#[allow]` on the line squelches the `slice starts at 0` lint, like any other.
+
 import { print, to_str } from builtins;
 
-// `#[allow]` on the line squelches the `slice starts at 0` lint, like any other.
 fn main() !prints {
     let xs = [10, 20, 30];
     print(xs[0..2].to_str()); #[allow]

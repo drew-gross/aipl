@@ -1,15 +1,16 @@
+# A snapshot of a `mut` string survives the rebuilds that follow it — with
+# strings long enough to live on the heap. `concat_alias_keeps_value_semantics`
+# covers the same shape with inline strings, which own no block and so never
+# noticed that the rebuilt binding used to *free* the version a snapshot still
+# named; the freed block was then handed to the next allocation (`filler`
+# below), and the snapshot read that string's bytes instead of its own.
+#
+# A non-exclusive string binding now keeps each version alive until the scope
+# that built it exits, so a snapshot taken in the outer scope stays good even
+# when the binding is rebuilt inside a loop body.
+
 import { extend, len, less_than as <, print, wrapping_increment as ++ } from builtins;
 
-// A snapshot of a `mut` string survives the rebuilds that follow it — with
-// strings long enough to live on the heap. `concat_alias_keeps_value_semantics`
-// covers the same shape with inline strings, which own no block and so never
-// noticed that the rebuilt binding used to *free* the version a snapshot still
-// named; the freed block was then handed to the next allocation (`filler`
-// below), and the snapshot read that string's bytes instead of its own.
-//
-// A non-exclusive string binding now keeps each version alive until the scope
-// that built it exits, so a snapshot taken in the outer scope stays good even
-// when the binding is rebuilt inside a loop body.
 fn main() !prints {
     mut s = "hello world, long enough to live on the heap";
     set s.extend("!");

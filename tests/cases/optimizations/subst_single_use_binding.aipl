@@ -1,3 +1,16 @@
+# A binding read exactly once is substituted into its use site. That removes no
+# work by itself — codegen emits the same instructions for `let a = f(x); g(a)`
+# as for `g(f(x))` — so what this pass is for is the *shape*: the passes that
+# rewrite an expression match on its form, and a binding hides the form from
+# them.
+#
+# `kept` is the motivating case. Written with the binding, `filter` and `map`
+# are two passes over the elements with an intermediate array between them,
+# because the fusion pass looks for a call whose receiver is another call and
+# finds a call on a *name*. Substituted, it is `xs.filter(..).map(..)`, which
+# fuses — the `functions:` block below has a `__filter_map` instance and no
+# separate `map` over an intermediate.
+
 import {
     filter,
     greater_than as >,
@@ -9,18 +22,6 @@ import {
     wrapping_mul as *,
 } from builtins;
 
-// A binding read exactly once is substituted into its use site. That removes no
-// work by itself — codegen emits the same instructions for `let a = f(x); g(a)`
-// as for `g(f(x))` — so what this pass is for is the *shape*: the passes that
-// rewrite an expression match on its form, and a binding hides the form from
-// them.
-//
-// `kept` is the motivating case. Written with the binding, `filter` and `map`
-// are two passes over the elements with an intermediate array between them,
-// because the fusion pass looks for a call whose receiver is another call and
-// finds a call on a *name*. Substituted, it is `xs.filter(..).map(..)`, which
-// fuses — the `functions:` block below has a `__filter_map` instance and no
-// separate `map` over an intermediate.
 fn big_doubled(xs: i64[]) -> i64[] {
     let kept = xs.filter(|x| x > 2);
     kept.map(|x| x * 2)

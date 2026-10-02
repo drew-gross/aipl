@@ -1,6 +1,7 @@
+# Set equality is order-independent: same size and same members.
+
 import { equal as ==, logical_not as !, not_equal as != } from builtins;
 
-// Set equality is order-independent: same size and same members.
 fn eq_set(a: #{i64}, b: #{i64}) -> bool { a == b }.test({
     assert(#{1, 2, 3} == #{3, 2, 1});
     assert(!(#{1, 2, 3} == #{1, 2})); // size differs

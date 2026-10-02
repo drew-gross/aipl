@@ -1,12 +1,13 @@
+# A function *value* whose return type is a boxed recursive variant.
+#
+# The boxing matters: `Tree` refers to itself directly, so a `Tree` is a
+# refcounted pointer rather than an inline composite. Returning one through a
+# function *pointer* — where the callee is not known at the call site — is the
+# shape the parser library needs for a grammar's per-rule builder, and it is
+# what makes the return's ownership transfer indirect.
+
 import { print, to_str, wrapping_add as + } from builtins;
 
-// A function *value* whose return type is a boxed recursive variant.
-//
-// The boxing matters: `Tree` refers to itself directly, so a `Tree` is a
-// refcounted pointer rather than an inline composite. Returning one through a
-// function *pointer* — where the callee is not known at the call site — is the
-// shape the parser library needs for a grammar's per-rule builder, and it is
-// what makes the return's ownership transfer indirect.
 variant Tree = Leaf(i64) | Node(Tree, Tree)
 
 fn leaf(n: i64) -> Tree { Leaf(n) }

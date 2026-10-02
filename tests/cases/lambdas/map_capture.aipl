@@ -1,10 +1,11 @@
+# A higher-order function: `f` is a function-typed parameter, called per
+# element. At the call site, the lambda `|x| x + hi` captures `hi` from the
+# enclosing scope. Monomorphization lifts the lambda to a synthesized function
+# (taking `x` plus the captured `hi`), specializes `map` for it, and forwards
+# `hi` at the call.
+
 import { equal as ==, push, wrapping_add as +, wrapping_mul as * } from builtins;
 
-// A higher-order function: `f` is a function-typed parameter, called per
-// element. At the call site, the lambda `|x| x + hi` captures `hi` from the
-// enclosing scope. Monomorphization lifts the lambda to a synthesized function
-// (taking `x` plus the captured `hi`), specializes `map` for it, and forwards
-// `hi` at the call.
 fn map(xs: i64[], f: (i64) -> i64) -> i64[] {
     // A user-defined `map` — the builtin the push-loop lint recommends is what
     // this case exists to reimplement.

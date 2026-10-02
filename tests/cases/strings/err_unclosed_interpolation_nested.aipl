@@ -1,21 +1,22 @@
+# `{1` is never closed by a `}` (a stray space + ``` follows instead). The
+# interpolation scanner, still looking for `}`, reads that stray ``` as the
+# *opening* of a brand-new triple-backtick literal (a legitimate thing to
+# nest in general) and keeps scanning for a closing ``` that doesn't exist —
+# so the primary error reports "unterminated" at that inner (misidentified)
+# literal, far from the actual mistake. The dogfooded lexer's `LexError` is
+# single-span, so it can't yet add the `note: in this unclosed interpolation`
+# caret the retired native lexer pointed back at the real culprit `{` with —
+# restoring that note needs `LexError` to carry a secondary span (a separate
+# change; see TODO).
+
 import { print } from builtins;
 
-// `{1` is never closed by a `}` (a stray space + ``` follows instead). The
-// interpolation scanner, still looking for `}`, reads that stray ``` as the
-// *opening* of a brand-new triple-backtick literal (a legitimate thing to
-// nest in general) and keeps scanning for a closing ``` that doesn't exist —
-// so the primary error reports "unterminated" at that inner (misidentified)
-// literal, far from the actual mistake. The dogfooded lexer's `LexError` is
-// single-span, so it can't yet add the `note: in this unclosed interpolation`
-// caret the retired native lexer pointed back at the real culprit `{` with —
-// restoring that note needs `LexError` to carry a secondary span (a separate
-// change; see TODO).
 fn main() !prints {
     print(```{1 ```)
 }
 --- errors ---
 error: unterminated triple-backtick template literal
-  --> ./tests/cases/strings/err_unclosed_interpolation_nested.aipl:14:17
+  --> ./tests/cases/strings/err_unclosed_interpolation_nested.aipl:15:17
    |
-14 |     print(```{1 ```)
+15 |     print(```{1 ```)
    |                 ^^^

@@ -1,7 +1,8 @@
+# A variant is legal as a struct field: stored inline like a nested struct,
+# read back by address, matched and compared structurally.
+
 import { equal as == } from builtins;
 
-// A variant is legal as a struct field: stored inline like a nested struct,
-// read back by address, matched and compared structurally.
 variant Kind = Ident | Int | Punct
 
 struct Token { kind: Kind, start: i64 }

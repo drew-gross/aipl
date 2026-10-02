@@ -1,6 +1,7 @@
-// `import { name as local }` binds an imported item under a different local
-// name — for both path imports and builtins. The alias is what the importing
-// file uses; the original name is what the source exports.
+# `import { name as local }` binds an imported item under a different local
+# name — for both path imports and builtins. The alias is what the importing
+# file uses; the original name is what the source exports.
+
 import { print, to_str as show } from builtins;
 import { greeting, helper as double } from "./util.aipl";
 

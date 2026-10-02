@@ -1,9 +1,10 @@
+# A struct field may be an optional of another *struct* or *variant*, not only
+# of a scalar, a `str` or an array. Like every optional it is stored inline and
+# flat — `{ tag, Core }` — so `Inner?` is a tag plus `Inner`'s own layout, and
+# `Inner??` is no wider than `Inner?`.
+
 import { concat as +++, equal as ==, map, not_equal as !=, value_or } from builtins;
 
-// A struct field may be an optional of another *struct* or *variant*, not only
-// of a scalar, a `str` or an array. Like every optional it is stored inline and
-// flat — `{ tag, Core }` — so `Inner?` is a tag plus `Inner`'s own layout, and
-// `Inner??` is no wider than `Inner?`.
 struct Inner { a: i64, b: str }
 
 variant Tag = Red | Blue(i64)

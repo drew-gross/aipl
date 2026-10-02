@@ -1,12 +1,13 @@
+# `match (o) { some(v) => v, none => d }` unwraps an optional to its payload
+# with a fallback, which is exactly what `value_or` does — in one line, without
+# naming either case.
+#
+# The `some` arm handing back its own binding unchanged is what makes this a
+# `value_or` rather than a `map`. Arm order does not matter, so the second
+# function below is flagged too.
+
 import { print, saturating_divide as /, to_str } from builtins;
 
-// `match (o) { some(v) => v, none => d }` unwraps an optional to its payload
-// with a fallback, which is exactly what `value_or` does — in one line, without
-// naming either case.
-//
-// The `some` arm handing back its own binding unchanged is what makes this a
-// `value_or` rather than a `map`. Arm order does not matter, so the second
-// function below is flagged too.
 fn or_zero(o: i64?) -> i64 {
     match (o) {
         some(v) => v,
@@ -59,25 +60,25 @@ fn main() !prints {
 }
 --- errors ---
 error: this `match` hands back the optional's payload or a default — write "o.value_or(0)" instead (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or.aipl:12:20
+  --> ./tests/cases/lints/err_match_value_or.aipl:13:20
    |
-12 |         some(v) => v,
+13 |         some(v) => v,
    |                    ^
 
 error: this `match` hands back the optional's payload or a default — write "o.value_or(0)" instead (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or.aipl:20:20
+  --> ./tests/cases/lints/err_match_value_or.aipl:21:20
    |
-20 |         some(v) => v,
+21 |         some(v) => v,
    |                    ^
 
 error: this `match` hands back the optional's payload or a default — write it as "o.value_or(..)" with that arm's value as the default (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or.aipl:37:20
+  --> ./tests/cases/lints/err_match_value_or.aipl:38:20
    |
-37 |         some(v) => v,
+38 |         some(v) => v,
    |                    ^
 
 error: this `match` hands back the optional's payload or a default — write it as "o.value_or(..)" with that arm's value as the default (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or.aipl:49:20
+  --> ./tests/cases/lints/err_match_value_or.aipl:50:20
    |
-49 |         some(v) => v,
+50 |         some(v) => v,
    |                    ^

@@ -1,16 +1,17 @@
+# A `_` arm stands for the cases of a variant not named above it. It is for a
+# match that reads a *few* cases out of a wide variant — the alternative is
+# naming every other case, which past a handful the formatter breaks one per
+# line, back into the arms the alternation replaced.
+#
+# The cost is real and is why this stays a judgement call: a listed case makes
+# the compiler name every match that has to be revisited when the variant
+# grows, and a `_` gives that up. It is right where the default is correct for
+# *any* case that could be added — the `is_*` predicate below asks whether a
+# value is one specific case, and anything else is false however the variant
+# grows — and wrong where a new case would need a decision.
+
 import { print, wrapping_add as + } from builtins;
 
-// A `_` arm stands for the cases of a variant not named above it. It is for a
-// match that reads a *few* cases out of a wide variant — the alternative is
-// naming every other case, which past a handful the formatter breaks one per
-// line, back into the arms the alternation replaced.
-//
-// The cost is real and is why this stays a judgement call: a listed case makes
-// the compiler name every match that has to be revisited when the variant
-// grows, and a `_` gives that up. It is right where the default is correct for
-// *any* case that could be added — the `is_*` predicate below asks whether a
-// value is one specific case, and anything else is false however the variant
-// grows — and wrong where a new case would need a decision.
 variant Shape = Circle(i64) | Square(i64) | Point | Tri(i64, i64) | Empty
 
 fn size(s: Shape) -> i64 {

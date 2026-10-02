@@ -1,9 +1,10 @@
+# An expression `match` produces a value, so it may not *also* mutate: reading
+# `let v = match (..) {..}` should tell you the whole effect. This arm assigns
+# to `n`, declared outside the `match`. Either make every arm a statement (and
+# end the `match` with `;`), or lift the assignment out.
+
 import { print, to_str, wrapping_increment as ++ } from builtins;
 
-// An expression `match` produces a value, so it may not *also* mutate: reading
-// `let v = match (..) {..}` should tell you the whole effect. This arm assigns
-// to `n`, declared outside the `match`. Either make every arm a statement (and
-// end the `match` with `;`), or lift the assignment out.
 variant Ev = Tick | Tock
 
 fn main() !prints {
@@ -20,7 +21,7 @@ fn main() !prints {
 }
 --- errors ---
 error: this arm assigns to "n", which is declared outside the `match` — an expression `match` produces a value and may not also mutate. Make every arm a statement (ending the `match` with ";"), or lift the assignment out and use the `match`'s value
-  --> ./tests/cases/match_arms/err_expression_match_mutates.aipl:13:17
+  --> ./tests/cases/match_arms/err_expression_match_mutates.aipl:14:17
    |
-13 |             set n++;
+14 |             set n++;
    |                 ^^^

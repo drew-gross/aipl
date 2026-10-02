@@ -1,9 +1,10 @@
+# A payload slot with a default is a *keyword* slot, carrying exactly a keyword
+# parameter's semantics: keyword slots come after every positional one, may only
+# be supplied by name at a construction, and a default may read the slots
+# declared before it.
+
 import { equal as ==, wrapping_add as +, wrapping_mul as * } from builtins;
 
-// A payload slot with a default is a *keyword* slot, carrying exactly a keyword
-// parameter's semantics: keyword slots come after every positional one, may only
-// be supplied by name at a construction, and a default may read the slots
-// declared before it.
 variant Shape = Circle(r: i64, color: str = "red") | Pt(x: i64, y: i64 = x + 1)
 
 fn color_of(s: Shape) -> str {

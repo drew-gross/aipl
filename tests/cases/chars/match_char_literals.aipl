@@ -1,10 +1,11 @@
+# `match` on a `char` dispatches on char-literal arms. Like a `str` match this
+# compares by value over an *open* domain — every `char` a scrutinee could hold
+# can't be listed — so the arms bind nothing and the match must end in `_`.
+# Dispatch is one integer comparison per arm; a char is a bare scalar, with no
+# length, elements or refcounting behind it.
+
 import { equal as ==, print, wrapping_add_assign as += } from builtins;
 
-// `match` on a `char` dispatches on char-literal arms. Like a `str` match this
-// compares by value over an *open* domain — every `char` a scrutinee could hold
-// can't be listed — so the arms bind nothing and the match must end in `_`.
-// Dispatch is one integer comparison per arm; a char is a bare scalar, with no
-// length, elements or refcounting behind it.
 fn kind(c: char) -> str {
     match (c) {
         'a' | 'e' | 'i' => "vowel",

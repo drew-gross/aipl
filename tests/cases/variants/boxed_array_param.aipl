@@ -1,11 +1,12 @@
+# An `A[]` parameter where `A` is a boxed recursive variant.
+#
+# Each element is a refcounted pointer, so passing the array borrows every one
+# of them: the callee must not release elements it did not take, and building a
+# new array from them has to retain. This is the parser library's node list —
+# a rule's children arrive as exactly this shape.
+
 import { len, print, push, to_str, wrapping_add as +, wrapping_add_assign as += } from builtins;
 
-// An `A[]` parameter where `A` is a boxed recursive variant.
-//
-// Each element is a refcounted pointer, so passing the array borrows every one
-// of them: the callee must not release elements it did not take, and building a
-// new array from them has to retain. This is the parser library's node list —
-// a rule's children arrive as exactly this shape.
 variant Tree = Leaf(i64) | Node(Tree, Tree)
 
 fn total(self: Tree) -> i64 {

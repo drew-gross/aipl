@@ -1,12 +1,13 @@
+# map over a *fresh array literal* producing a variant. The in-place reuse
+# optimization (see map_in_place.aipl) must not apply: a variant is a
+# composite (tag + payload, 16+ bytes), so it can't overwrite the fresh
+# array's 8-byte slots. Regression: variants were missing from the composite
+# exclusion, so this corrupted the output. The lambda is spelled out (not
+# eta-reduced to `Num`) so this case exercises the in-place path in
+# isolation from constructor-as-function-value lowering.
+
 import { equal as ==, map } from builtins;
 
-// map over a *fresh array literal* producing a variant. The in-place reuse
-// optimization (see map_in_place.aipl) must not apply: a variant is a
-// composite (tag + payload, 16+ bytes), so it can't overwrite the fresh
-// array's 8-byte slots. Regression: variants were missing from the composite
-// exclusion, so this corrupted the output. The lambda is spelled out (not
-// eta-reduced to `Num`) so this case exercises the in-place path in
-// isolation from constructor-as-function-value lowering.
 variant V = Num(i64) | Empty
 
 fn nums() -> V[] {

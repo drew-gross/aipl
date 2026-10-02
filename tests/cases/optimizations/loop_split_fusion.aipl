@@ -1,3 +1,22 @@
+# Operation fusion: a `for` over `s.split(sep)` walks a cursor instead of an
+# array of parts.
+#
+# `split` on its own allocates a block and fills it with one retained view per
+# part; a loop that only walks it needs neither. The fusion pass relabels the
+# iterable and codegen drives a split cursor — the same cuts, in the same
+# order, with the part handed straight to the body.
+#
+# `for (let l : src.lines())` is the shape this exists for: `lines` is
+# `split("\n")` and reaches the pass inlined, with its parameter bound ahead of
+# the body (`let self: str = src; split(self, "\n")`), so the fusion looks
+# under that binding — which is what `numbered` below proves.
+#
+# Measured on this case with the fusion switched off: the walked splits are one
+# array allocation each (86 become 78, 5,428 bytes become 4,692) and 3,085
+# instructions become 2,411. The `functions:` list is the evidence — two
+# `aipl_array_new`, the ones `materialized` and `rewriting` build because they
+# have to, where the unfused case has ten.
+
 import {
     concat as +++,
     equal as ==,
@@ -8,25 +27,6 @@ import {
     to_str,
     wrapping_increment as ++,
 } from builtins;
-
-// Operation fusion: a `for` over `s.split(sep)` walks a cursor instead of an
-// array of parts.
-//
-// `split` on its own allocates a block and fills it with one retained view per
-// part; a loop that only walks it needs neither. The fusion pass relabels the
-// iterable and codegen drives a split cursor — the same cuts, in the same
-// order, with the part handed straight to the body.
-//
-// `for (let l : src.lines())` is the shape this exists for: `lines` is
-// `split("\n")` and reaches the pass inlined, with its parameter bound ahead of
-// the body (`let self: str = src; split(self, "\n")`), so the fusion looks
-// under that binding — which is what `numbered` below proves.
-//
-// Measured on this case with the fusion switched off: the walked splits are one
-// array allocation each (86 become 78, 5,428 bytes become 4,692) and 3,085
-// instructions become 2,411. The `functions:` list is the evidence — two
-// `aipl_array_new`, the ones `materialized` and `rewriting` build because they
-// have to, where the unfused case has ten.
 
 fn lines(self: str) -> str[] { self.split("\n") }
 

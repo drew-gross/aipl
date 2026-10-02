@@ -1,5 +1,6 @@
-// `helper` isn't imported by main, but `entry` calls it internally —
-// the loader must keep within-file references wired up post-rewrite.
+# `helper` isn't imported by main, but `entry` calls it internally —
+# the loader must keep within-file references wired up post-rewrite.
+
 import { print, to_str } from builtins;
 import { entry } from "./util.aipl";
 

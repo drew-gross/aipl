@@ -1,8 +1,9 @@
-// A variant's constructors come into scope by explicit import: `import { Circle }`
-// lets you write `Circle(..)`, and importing the variant `Shape` lets you qualify
-// a case as `Shape.Rect(..)` / `Shape.Empty`. Patterns resolve the same way — a
-// bare imported `Circle(r)`, or a qualified `Shape.Empty`. The defining file uses
-// its own cases directly (see `area` in the companion), with no import needed.
+# A variant's constructors come into scope by explicit import: `import { Circle }`
+# lets you write `Circle(..)`, and importing the variant `Shape` lets you qualify
+# a case as `Shape.Rect(..)` / `Shape.Empty`. Patterns resolve the same way — a
+# bare imported `Circle(r)`, or a qualified `Shape.Empty`. The defining file uses
+# its own cases directly (see `area` in the companion), with no import needed.
+
 import { print, to_str, wrapping_add as + } from builtins;
 import { Circle, Rect, Shape, area } from "./shapes.aipl";
 

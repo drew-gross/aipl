@@ -1,9 +1,9 @@
-import { len, print, push, to_str, wrapping_mul as * } from builtins;
+# `mut out = xs; set out.push(x); out` — an array bound `mut` only to append
+# to it and hand it straight back. The literal `[..xs, x]` says what the array
+# *is* in one expression, instead of a binding the reader has to follow
+# through two more statements to learn that appending is all that happens.
 
-// `mut out = xs; set out.push(x); out` — an array bound `mut` only to append
-// to it and hand it straight back. The literal `[..xs, x]` says what the array
-// *is* in one expression, instead of a binding the reader has to follow
-// through two more statements to learn that appending is all that happens.
+import { len, print, push, to_str, wrapping_mul as * } from builtins;
 
 // One push onto a named seed — the plain case.
 fn appended(xs: i64[], x: i64) -> i64[] {

@@ -1,17 +1,18 @@
+# A `match` is *either* a statement or an expression, never quietly both. Which
+# one it is comes from its arms; each kind then carries one obligation, and the
+# two are complementary, so no `match` can satisfy both.
+#
+#   arms produce nothing → statement: may assign to anything in scope, and must
+#                          sit where its value is discarded (so it ends in `;`)
+#   arms produce a value → expression: its value must be used, and no arm may
+#                          assign to a binding declared outside the `match`
+#
+# The point is that reading `let x = match (..) {..}` tells you the whole
+# effect of the `match`: it computed `x`. Anything that also mutates is spelled
+# as a statement, where a reader expects effects.
+
 import { print, to_str, wrapping_increment as ++ } from builtins;
 
-// A `match` is *either* a statement or an expression, never quietly both. Which
-// one it is comes from its arms; each kind then carries one obligation, and the
-// two are complementary, so no `match` can satisfy both.
-//
-//   arms produce nothing → statement: may assign to anything in scope, and must
-//                          sit where its value is discarded (so it ends in `;`)
-//   arms produce a value → expression: its value must be used, and no arm may
-//                          assign to a binding declared outside the `match`
-//
-// The point is that reading `let x = match (..) {..}` tells you the whole
-// effect of the `match`: it computed `x`. Anything that also mutates is spelled
-// as a statement, where a reader expects effects.
 variant Ev = Tick | Tock | Reset(u64)
 
 // Expression: every arm yields a value, nothing outside is touched.

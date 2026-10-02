@@ -1,3 +1,8 @@
+# The shapes the push-loop lint must leave alone. It rewrites exactly one
+# shape — a `mut acc = [];` whose very next statement is a loop doing nothing
+# but pushing one element, optionally behind an else-less `if` — so everything
+# here compiles.
+
 import {
     filter,
     join,
@@ -12,11 +17,6 @@ import {
     wrapping_increment as ++,
     wrapping_mul as *,
 } from builtins;
-
-// The shapes the push-loop lint must leave alone. It rewrites exactly one
-// shape — a `mut acc = [];` whose very next statement is a loop doing nothing
-// but pushing one element, optionally behind an else-less `if` — so everything
-// here compiles.
 
 fn show(xs: i64[]) -> str { xs.map(to_str).join(sep=",") }
 

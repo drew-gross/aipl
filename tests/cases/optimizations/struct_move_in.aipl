@@ -1,19 +1,20 @@
+# A struct parameter can be owned too. Where an array parameter is owned when
+# the body consumes it as `mut y = p`, a struct one is owned when the body
+# reads it only through its fields, each heap-owning field at most once and
+# never in a loop: every such read is then a *move* of that field — its
+# reference goes to the value read, nothing is retained — and what the body
+# never read is released at exit. A fresh argument (a literal, a call
+# result) moves in whole; a binding at its last use moves in through
+# `__move`; anything else is retained field by field and released by the
+# callee, as any borrowed argument is.
+#
+# The payoff is `merge`: `self.kinds` taken out of an owned `self` is a set
+# this scope owns outright, and `union` on such a receiver grows it in place
+# (`aipl_set_union_mut`, behind an `aipl_arr_reserve` that copies a block
+# anyone else still holds) instead of building a fresh set.
+
 import { concat as +++, len, logical_or as ||, print, union } from builtins;
 
-// A struct parameter can be owned too. Where an array parameter is owned when
-// the body consumes it as `mut y = p`, a struct one is owned when the body
-// reads it only through its fields, each heap-owning field at most once and
-// never in a loop: every such read is then a *move* of that field — its
-// reference goes to the value read, nothing is retained — and what the body
-// never read is released at exit. A fresh argument (a literal, a call
-// result) moves in whole; a binding at its last use moves in through
-// `__move`; anything else is retained field by field and released by the
-// callee, as any borrowed argument is.
-//
-// The payoff is `merge`: `self.kinds` taken out of an owned `self` is a set
-// this scope owns outright, and `union` on such a receiver grows it in place
-// (`aipl_set_union_mut`, behind an `aipl_arr_reserve` that copies a block
-// anyone else still holds) instead of building a fresh set.
 struct First { kinds: #{i64} = #{}, texts: #{str} = #{}, nullable: bool = false }
 
 fn merge(self: First, other: First) -> First {

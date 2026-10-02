@@ -1,7 +1,7 @@
-import { equal as ==, saturating_divide as /, value_or, wrapping_add as + } from builtins;
+# Optional returns: callee emits (tag, value) as two i64s; caller
+# reconstructs a 16-byte slot. Unwrap with the `value_or` builtin.
 
-// Optional returns: callee emits (tag, value) as two i64s; caller
-// reconstructs a 16-byte slot. Unwrap with the `value_or` builtin.
+import { equal as ==, saturating_divide as /, value_or, wrapping_add as + } from builtins;
 
 fn divide(x: i64, y: i64) -> i64? { if (y == 0) { none } else { some(x / y) } }.test({
     assert(divide(100, 4) == some(25));

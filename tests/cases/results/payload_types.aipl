@@ -1,9 +1,9 @@
-import { equal as ==, get, len, print, to_str, wrapping_add as + } from builtins;
+# A result payload can be *any* value type, not a privileged handful. Each side
+# rides the same generic machinery — sized by its layout, written and refcounted
+# like any other value — so what a payload may be is just "a type that is valid
+# on its own". The cases below are the ones that used to be rejected.
 
-// A result payload can be *any* value type, not a privileged handful. Each side
-// rides the same generic machinery — sized by its layout, written and refcounted
-// like any other value — so what a payload may be is just "a type that is valid
-// on its own". The cases below are the ones that used to be rejected.
+import { equal as ==, get, len, print, to_str, wrapping_add as + } from builtins;
 
 struct Point { x: i64, y: i64 }
 

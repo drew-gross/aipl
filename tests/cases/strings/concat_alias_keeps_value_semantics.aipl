@@ -1,8 +1,9 @@
+# Aliasing disables the in-place append: once `s` is captured by `t`, the
+# static analysis marks `s` non-exclusive, so further `set s.extend(..)` build
+# fresh strings (copy) and the snapshot `t` is never mutated underneath us.
+
 import { equal as ==, extend } from builtins;
 
-// Aliasing disables the in-place append: once `s` is captured by `t`, the
-// static analysis marks `s` non-exclusive, so further `set s.extend(..)` build
-// fresh strings (copy) and the snapshot `t` is never mutated underneath us.
 fn grown() -> str {
     mut s = "ab";
     set s.extend("c");

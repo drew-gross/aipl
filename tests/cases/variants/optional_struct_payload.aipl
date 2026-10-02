@@ -1,11 +1,12 @@
+# A variant payload slot holding an optional of a struct. This was silently
+# miscompiled: the payload walked the optional without resolving the nested
+# struct's layout, so `Zzz` was sized as one word and the `i64` after it landed
+# inside the payload. It only reproduced when the variant sorted *before* the
+# struct, since layouts resolve alphabetically — and only when the case had a
+# slot after the optional for the undersizing to displace.
+
 import { concat as +++, equal as ==, greater_than as > } from builtins;
 
-// A variant payload slot holding an optional of a struct. This was silently
-// miscompiled: the payload walked the optional without resolving the nested
-// struct's layout, so `Zzz` was sized as one word and the `i64` after it landed
-// inside the payload. It only reproduced when the variant sorted *before* the
-// struct, since layouts resolve alphabetically — and only when the case had a
-// slot after the optional for the undersizing to displace.
 struct Zzz { p: i64, q: i64, r: str }
 
 variant Aaa = Nothing | Has(Zzz?, i64, str)

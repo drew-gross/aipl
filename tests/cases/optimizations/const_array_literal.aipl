@@ -1,3 +1,18 @@
+# A constant array literal — every element a scalar literal, or no elements at
+# all — is laid out in the binary's data section, exactly as a string literal
+# is. Reading one costs no allocation: the `--- performance ---` section below
+# counts none for `digits()`, `flags()` or `letters()`, however often they are
+# called (a `char[]` literal *is* a static `str`, the same object `"abc"` is).
+#
+# A static block is shared by every evaluation of the literal, so nothing may
+# write into it. Every path that would — `push`/`extend` on an exclusive
+# `mut`, the in-place buffer reuse behind `map`/`filter` on a fresh value —
+# copies the block first, which is why `digits()` still reads `[0, 3, 5]` after
+# each of them has had a turn: the allocations counted here are exactly those
+# copies. The same guard is what makes `xs.reverse().map(f)` correct — a
+# reversed *view* isn't a writable block either, and the in-place `map` used to
+# store straight through it.
+
 import {
     equal as ==,
     extend,
@@ -10,21 +25,6 @@ import {
     wrapping_add as +,
     wrapping_mul as *,
 } from builtins;
-
-// A constant array literal — every element a scalar literal, or no elements at
-// all — is laid out in the binary's data section, exactly as a string literal
-// is. Reading one costs no allocation: the `--- performance ---` section below
-// counts none for `digits()`, `flags()` or `letters()`, however often they are
-// called (a `char[]` literal *is* a static `str`, the same object `"abc"` is).
-//
-// A static block is shared by every evaluation of the literal, so nothing may
-// write into it. Every path that would — `push`/`extend` on an exclusive
-// `mut`, the in-place buffer reuse behind `map`/`filter` on a fresh value —
-// copies the block first, which is why `digits()` still reads `[0, 3, 5]` after
-// each of them has had a turn: the allocations counted here are exactly those
-// copies. The same guard is what makes `xs.reverse().map(f)` correct — a
-// reversed *view* isn't a writable block either, and the in-place `map` used to
-// store straight through it.
 
 fn digits() -> i64[] { [0, 3, 5] }
 

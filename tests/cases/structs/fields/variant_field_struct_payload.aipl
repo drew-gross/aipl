@@ -1,8 +1,9 @@
+# Struct → variant → struct nesting (non-recursive): a variant whose payload
+# is a struct can itself be a field of another struct. The outer layout sizes
+# the variant field to its widest case (tag + inline Point).
+
 import { equal as ==, wrapping_add as + } from builtins;
 
-// Struct → variant → struct nesting (non-recursive): a variant whose payload
-// is a struct can itself be a field of another struct. The outer layout sizes
-// the variant field to its widest case (tag + inline Point).
 struct Point { x: i64, y: i64 }
 
 variant Shape = Dot(Point) | Empty

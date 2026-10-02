@@ -1,6 +1,6 @@
-import { contains, print, to_str } from builtins;
+# Every *check-phase* set error, in one file, reported in one run.
 
-// Every *check-phase* set error, in one file, reported in one run.
+import { contains, print, to_str } from builtins;
 
 // `contains` is for arrays and strs; a set uses `has`.
 fn contains_on_set(s: #{i64}) -> bool { s.contains(1) }

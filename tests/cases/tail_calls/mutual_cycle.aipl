@@ -1,3 +1,15 @@
+# A three-function cycle, none of whose edges is a self-call. This is the shape
+# the compiler's own `doc.aipl` uses (`fits` / `fits_atom` / `fits_after`), and
+# the reason rewriting self-calls as a jump — which needs no calling-convention
+# change at all — is not a useful substitute: across the compiler's own IR, 128
+# of 130 tail calls are cross-function.
+#
+# A cycle is bounded only when *every* edge in it is eliminated, so this is the
+# case that would catch an implementation handling direct recursion and stopping
+# there. Each function is deliberately a little wider than the inliner's
+# four-expression budget, so the cycle survives to codegen as three functions
+# rather than being folded into one self-recursive body.
+
 import {
     contains,
     ends_with,
@@ -10,17 +22,6 @@ import {
     to_str,
 } from builtins;
 
-// A three-function cycle, none of whose edges is a self-call. This is the shape
-// the compiler's own `doc.aipl` uses (`fits` / `fits_atom` / `fits_after`), and
-// the reason rewriting self-calls as a jump — which needs no calling-convention
-// change at all — is not a useful substitute: across the compiler's own IR, 128
-// of 130 tail calls are cross-function.
-//
-// A cycle is bounded only when *every* edge in it is eliminated, so this is the
-// case that would catch an implementation handling direct recursion and stopping
-// there. Each function is deliberately a little wider than the inliner's
-// four-expression budget, so the cycle survives to codegen as three functions
-// rather than being folded into one self-recursive body.
 variant Work = WNil | WCons(str, Work)
 
 fn fits(budget: u64, work: Work) -> bool {

@@ -1,8 +1,9 @@
+# A constant is importable exactly as a `pub fn` is — it rides the same
+# per-file view — and a private one is not.
+
 import { print } from builtins;
 import { SHARED } from "./scopes.aipl";
 
-// A constant is importable exactly as a `pub fn` is — it rides the same
-// per-file view — and a private one is not.
 fn main() !prints {
     print(SHARED);
 }

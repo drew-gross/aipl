@@ -1,3 +1,9 @@
+# `set n--;` decrements a mut binding by one — the mirror of `set n++;` (see
+# `bindings/mut/incr`). `--` is its own operator with its own flavors, imported
+# separately from `-`: `wrapping_decrement as --` here, `saturating_decrement as
+# --` for the clamping one (see `bindings/mut/decr_saturating`). Each shares its
+# `-` counterpart's implementation, since decrementing is subtracting 1.
+
 import {
     equal as ==,
     greater_than as >,
@@ -5,11 +11,6 @@ import {
     wrapping_decrement as --,
 } from builtins;
 
-// `set n--;` decrements a mut binding by one — the mirror of `set n++;` (see
-// `bindings/mut/incr`). `--` is its own operator with its own flavors, imported
-// separately from `-`: `wrapping_decrement as --` here, `saturating_decrement as
-// --` for the clamping one (see `bindings/mut/decr_saturating`). Each shares its
-// `-` counterpart's implementation, since decrementing is subtracting 1.
 fn triangle(n: i64) -> i64 {
     mut i = n;
     mut total = 0;

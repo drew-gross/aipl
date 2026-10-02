@@ -1,7 +1,8 @@
+# A struct returned out of an `if` — both branches build the struct, the
+# merge yields the selected one, and the function returns it via sret.
+
 import { equal as ==, wrapping_add as + } from builtins;
 
-// A struct returned out of an `if` — both branches build the struct, the
-// merge yields the selected one, and the function returns it via sret.
 struct Vec2 { x: i64, y: i64 }
 
 fn choose(big: bool) -> Vec2 {

@@ -1,9 +1,10 @@
+# A generic function may return and take a generic struct instantiated at its
+# own type parameter (`Box<T>`) — "higher-order" generics. The application stays
+# abstract while the function is checked, and is pinned once the caller supplies
+# a concrete type.
+
 import { equal as ==, wrapping_add as + } from builtins;
 
-// A generic function may return and take a generic struct instantiated at its
-// own type parameter (`Box<T>`) — "higher-order" generics. The application stays
-// abstract while the function is checked, and is pinned once the caller supplies
-// a concrete type.
 struct Box<T> { value: T }
 
 fn wrap<T>(x: T) -> Box<T> { value: x }

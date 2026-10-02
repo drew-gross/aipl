@@ -1,7 +1,8 @@
+# Copy-and-modify call form on an array receiver: `extend(xs, ..)` copies the
+# array, grows the copy, and yields it; the original `xs` keeps its length.
+
 import { equal as ==, push } from builtins;
 
-// Copy-and-modify call form on an array receiver: `extend(xs, ..)` copies the
-// array, grows the copy, and yields it; the original `xs` keeps its length.
 fn extend(mut self: i64[], a: i64, b: i64) {
     set self.push(a);
     set self.push(b);

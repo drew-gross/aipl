@@ -1,8 +1,9 @@
+# `#[allow]` on the line squelches the `slice covers the whole receiver` lint,
+# like any other. The marker sits on the line the *bound* is written on, which
+# is where the hit is reported from and where `aipl fmt` leaves it.
+
 import { print, to_str } from builtins;
 
-// `#[allow]` on the line squelches the `slice covers the whole receiver` lint,
-// like any other. The marker sits on the line the *bound* is written on, which
-// is where the hit is reported from and where `aipl fmt` leaves it.
 fn main() !prints {
     let xs = [10, 20, 30];
     print(xs[0..].to_str()); #[allow]

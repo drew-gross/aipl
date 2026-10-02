@@ -1,3 +1,20 @@
+# `%` is total, the remainder half of `saturating_divide`. It answers the same
+# two pairs a machine remainder cannot, and the answers are chosen so the two
+# operators stay coherent with each other:
+#
+#   - a **zero divisor** answers the dividend. That is the only answer that
+#     keeps the division identity intact beside a saturating `/`:
+#     `(a / 0) * 0 + (a % 0)` is `MAX * 0 + a`, which is `a`. Answering 0 would
+#     break it.
+#   - **`MIN % -1`** answers 0, the true remainder — `MIN` is divisible by `-1`.
+#     No choice can keep the identity here, because the real quotient is not
+#     representable; that is exactly what `MIN / -1` saturating to `MAX` already
+#     conceded, so the remainder is simply correct instead.
+#
+# Both operands come through parameters throughout, so constant folding can't
+# answer these before codegen does — and the folder is held to the same rule
+# (see `fold_constants`), so the two agree either way.
+
 import {
     equal as ==,
     saturating_divide as /,
@@ -7,22 +24,6 @@ import {
     wrapping_sub as -,
 } from builtins;
 
-// `%` is total, the remainder half of `saturating_divide`. It answers the same
-// two pairs a machine remainder cannot, and the answers are chosen so the two
-// operators stay coherent with each other:
-//
-//   - a **zero divisor** answers the dividend. That is the only answer that
-//     keeps the division identity intact beside a saturating `/`:
-//     `(a / 0) * 0 + (a % 0)` is `MAX * 0 + a`, which is `a`. Answering 0 would
-//     break it.
-//   - **`MIN % -1`** answers 0, the true remainder — `MIN` is divisible by `-1`.
-//     No choice can keep the identity here, because the real quotient is not
-//     representable; that is exactly what `MIN / -1` saturating to `MAX` already
-//     conceded, so the remainder is simply correct instead.
-//
-// Both operands come through parameters throughout, so constant folding can't
-// answer these before codegen does — and the folder is held to the same rule
-// (see `fold_constants`), so the two agree either way.
 fn r(x: i64, y: i64) -> i64 { x % y }
 
 fn d(x: i64, y: i64) -> i64 { x / y }

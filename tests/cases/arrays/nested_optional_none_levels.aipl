@@ -1,11 +1,11 @@
-import { print, to_str } from builtins;
+# `none` at every level of a nested optional. Each chain is built from a
+# concrete-core piece (the `wrap`/`none` functions) so the core type is known —
+# only then can a partial chain like `some(none)` render its (unreached) core
+# branch. With the flattened representation `none` at level k is just tag k, and
+# the core value is read only at the full tag, so a `none` at any level touches
+# no heap.
 
-// `none` at every level of a nested optional. Each chain is built from a
-// concrete-core piece (the `wrap`/`none` functions) so the core type is known —
-// only then can a partial chain like `some(none)` render its (unreached) core
-// branch. With the flattened representation `none` at level k is just tag k, and
-// the core value is read only at the full tag, so a `none` at any level touches
-// no heap.
+import { print, to_str } from builtins;
 
 fn wrap2(x: i64?) -> i64?? { some(x) }
 

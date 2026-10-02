@@ -1,17 +1,17 @@
-import { equal as ==, len, print, to_set, union, value_or } from builtins;
+# An empty `#{}` is the shared empty *array* block until something gives it an
+# element type; a `#{char}` is the 256-bit inline bitfield instead. So a `#{}`
+# landing in a `#{char}` location has to become one *before* the store sizes
+# itself by the destination type — otherwise the 32-byte copy reads 24 bytes
+# past the 8-byte block, and the symptom moves when an unrelated literal
+# changes length.
+#
+# Deciding that is the checker's job: it resolves the literal against the
+# position (`flex_fit`) and records the answer on the node (`Cx::lock`), which
+# codegen reads back. Every position that can *be* the context has to record
+# it — a position that only type-checks the literal and discards the resolved
+# type leaves codegen guessing. This covers each one.
 
-// An empty `#{}` is the shared empty *array* block until something gives it an
-// element type; a `#{char}` is the 256-bit inline bitfield instead. So a `#{}`
-// landing in a `#{char}` location has to become one *before* the store sizes
-// itself by the destination type — otherwise the 32-byte copy reads 24 bytes
-// past the 8-byte block, and the symptom moves when an unrelated literal
-// changes length.
-//
-// Deciding that is the checker's job: it resolves the literal against the
-// position (`flex_fit`) and records the answer on the node (`Cx::lock`), which
-// codegen reads back. Every position that can *be* the context has to record
-// it — a position that only type-checks the literal and discards the resolved
-// type leaves codegen guessing. This covers each one.
+import { equal as ==, len, print, to_set, union, value_or } from builtins;
 
 struct Holder { cs: #{char} }
 

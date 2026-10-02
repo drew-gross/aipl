@@ -1,9 +1,10 @@
+# A variant's first case may be preceded by a `|`. It means nothing — this
+# declares the same type `Circle(i64) | ..` would — but it lets every case line
+# up under one `|`, which is exactly the layout `aipl fmt` emits once the cases
+# are too wide to sit on one line.
+
 import { equal as ==, wrapping_add as +, wrapping_mul as * } from builtins;
 
-// A variant's first case may be preceded by a `|`. It means nothing — this
-// declares the same type `Circle(i64) | ..` would — but it lets every case line
-// up under one `|`, which is exactly the layout `aipl fmt` emits once the cases
-// are too wide to sit on one line.
 variant Shape =
     | Circle(i64)
     | Rectangle(i64, i64)

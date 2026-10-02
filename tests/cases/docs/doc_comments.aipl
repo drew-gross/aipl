@@ -1,9 +1,10 @@
+# A `# ..` block in front of a declaration is its documentation. It is ignored
+# by run/check/build (only `aipl doc` and `aipl docs` surface it) and attaches
+# to any declaration, not just a function — which is what `.doc("..")`, the
+# form it replaced, could not do.
+
 import { equal as ==, print, wrapping_add as + } from builtins;
 
-// A `# ..` block in front of a declaration is its documentation. It is ignored
-// by run/check/build (only `aipl doc` and `aipl docs` surface it) and attaches
-// to any declaration, not just a function — which is what `.doc("..")`, the
-// form it replaced, could not do.
 # Adds two integers and returns the sum.
 #
 # A bare `#` is a blank line, so a doc block can have paragraphs.

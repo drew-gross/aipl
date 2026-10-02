@@ -1,16 +1,17 @@
+# An integer literal passed to a generic parameter that nothing else pins
+# carries a *value*, not a width. Rather than pinning the type variable to
+# `i64` — fixing the literal at 64 bits for good — the function is
+# monomorphized once per literal value, with the literal inlined into the body
+# in place of the parameter. That is the same bow-out an empty `[]` or a bare
+# `none` argument takes (see `empty_array_arg` / `none_literal_arg`), for the
+# same reason: the argument names no type the instance can't supply itself.
+#
+# The instance names are not observable from a case file — post-mono inlining
+# folds single-call-site instances away — so this asserts behavior. The naming
+# is pinned in `tests/suites/mono.rs`.
+
 import { len, print, to_str, wrapping_add as + } from builtins;
 
-// An integer literal passed to a generic parameter that nothing else pins
-// carries a *value*, not a width. Rather than pinning the type variable to
-// `i64` — fixing the literal at 64 bits for good — the function is
-// monomorphized once per literal value, with the literal inlined into the body
-// in place of the parameter. That is the same bow-out an empty `[]` or a bare
-// `none` argument takes (see `empty_array_arg` / `none_literal_arg`), for the
-// same reason: the argument names no type the instance can't supply itself.
-//
-// The instance names are not observable from a case file — post-mono inlining
-// folds single-call-site instances away — so this asserts behavior. The naming
-// is pinned in `tests/suites/mono.rs`.
 fn identity<T: any>(x: T) -> T { x }
 
 fn wrap<T: any>(x: T) -> T[] { [x] }

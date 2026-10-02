@@ -1,13 +1,13 @@
-import { print, to_str } from builtins;
+# `match (r) { ok(v) => ok(g), err(e) => err(e) }` rewrites a result's value
+# side and passes its error straight through, which is exactly what `map_ok`
+# does — in one line, without naming either case. The mirror of the
+# `map_err` lint next door.
+#
+# The `err` arm handing its own binding back to `err` is what makes this a
+# `map_ok`. Arm order does not matter, so the second function below is flagged
+# too.
 
-// `match (r) { ok(v) => ok(g), err(e) => err(e) }` rewrites a result's value
-// side and passes its error straight through, which is exactly what `map_ok`
-// does — in one line, without naming either case. The mirror of the
-// `map_err` lint next door.
-//
-// The `err` arm handing its own binding back to `err` is what makes this a
-// `map_ok`. Arm order does not matter, so the second function below is flagged
-// too.
+import { print, to_str } from builtins;
 
 fn parse(s: str) -> i64!str { if (s == "1") { ok(1) } else { err("not a one") } }
 

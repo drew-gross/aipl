@@ -1,12 +1,13 @@
+# An array of structs that each hold a boxed recursive field.
+#
+# The struct itself is an inline composite, but one of its fields is a
+# refcounted pointer — so copying a `Holder` out of the array is a *retain* of
+# that field, not a byte-wise copy of a value that owns heap. That distinction
+# is what `tests/cases/structs/boxed_field_with_array.aipl` locks in for a
+# single struct; this is the same shape one level up, held in an array.
+
 import { len, map, print, to_str, value_or, wrapping_add as + } from builtins;
 
-// An array of structs that each hold a boxed recursive field.
-//
-// The struct itself is an inline composite, but one of its fields is a
-// refcounted pointer — so copying a `Holder` out of the array is a *retain* of
-// that field, not a byte-wise copy of a value that owns heap. That distinction
-// is what `tests/cases/structs/boxed_field_with_array.aipl` locks in for a
-// single struct; this is the same shape one level up, held in an array.
 variant Tree = Leaf(i64) | Node(Tree, Tree)
 
 struct Holder { tag: i64, tree: Tree }

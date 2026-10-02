@@ -1,6 +1,7 @@
+# none in else branch picks up the type from the some branch.
+
 import { equal as ==, value_or } from builtins;
 
-// none in else branch picks up the type from the some branch.
 fn maybe(want: bool) -> i64 {
     let x = if (want) { some(42) } else { none };
     x.value_or(-1)
@@ -16,8 +17,8 @@ bytes allocated: 0
 instructions executed: 51
 binary size: 1216
   code: 288
-  data: 92
-  metadata: 836
+  data: 93
+  metadata: 835
 functions:
   __test$maybe:
     calls: 1

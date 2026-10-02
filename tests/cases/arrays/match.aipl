@@ -1,8 +1,9 @@
+# `match` on an array: each arm is an array literal, matched by exact length +
+# elementwise equality, with a required `_` default as the last arm. The
+# elements are literals (validated by the checker).
+
 import { print, to_str } from builtins;
 
-// `match` on an array: each arm is an array literal, matched by exact length +
-// elementwise equality, with a required `_` default as the last arm. The
-// elements are literals (validated by the checker).
 fn code(xs: i64[]) -> i64 {
     match (xs) {
         [1, 2, 3] => 1,

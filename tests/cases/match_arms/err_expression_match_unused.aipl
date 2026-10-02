@@ -1,8 +1,9 @@
+# The mirror image: every arm produces a value, so this is an expression
+# `match` — and throwing that value away is the mistake the rule catches. Bind
+# it, return it, or make the arms statements.
+
 import { print } from builtins;
 
-// The mirror image: every arm produces a value, so this is an expression
-// `match` — and throwing that value away is the mistake the rule catches. Bind
-// it, return it, or make the arms statements.
 variant Ev = Tick | Tock
 
 fn main() !prints {
@@ -14,7 +15,7 @@ fn main() !prints {
 }
 --- errors ---
 error: this `match` produces i64, but its value is unused — bind it with "let", return it, or make every arm a statement so the `match` is a statement too
- --> ./tests/cases/match_arms/err_expression_match_unused.aipl:9:5
-  |
-9 |     match (Tick) {
-  |     ^^^^^^^^^^^^^^
+  --> ./tests/cases/match_arms/err_expression_match_unused.aipl:10:5
+   |
+10 |     match (Tick) {
+   |     ^^^^^^^^^^^^^^

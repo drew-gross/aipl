@@ -1,6 +1,7 @@
+# srem semantics: result takes sign of dividend.
+
 import { equal as ==, saturating_remainder as %, wrapping_add as + } from builtins;
 
-// srem semantics: result takes sign of dividend.
 fn m(x: i64, y: i64) -> i64 { x % y }.test({
     assert(m(-7, 3) == -1);
     assert(m(-7, 3) + 1 == 0);

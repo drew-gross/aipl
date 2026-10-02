@@ -1,8 +1,9 @@
+# String slicing `s[start..end]` yields the bytes in `[start, end)`. Both
+# bounds clamp to `[0, len]`, so an out-of-range end gives a shorter string and
+# `start >= end` gives `""`.
+
 import { concat as +++, print } from builtins;
 
-// String slicing `s[start..end]` yields the bytes in `[start, end)`. Both
-// bounds clamp to `[0, len]`, so an out-of-range end gives a shorter string and
-// `start >= end` gives `""`.
 fn main() !prints {
     let s = "hello, world";
     print(s[..5]); // hello

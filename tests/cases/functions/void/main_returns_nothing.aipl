@@ -1,6 +1,7 @@
+# A `main` with no return type returns nothing; the exit code is implicitly 0.
+
 import { print } from builtins;
 
-// A `main` with no return type returns nothing; the exit code is implicitly 0.
 fn main() !prints {
     print("done");
 }

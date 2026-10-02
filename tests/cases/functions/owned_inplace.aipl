@@ -1,10 +1,11 @@
+# `extended` takes an array, appends to it, and returns it — the canonical
+# "take ownership and mutate" shape. The compiler emits an in-place `$mut`
+# variant: a call on a *fresh* (uniquely-owned) array moves the array in and
+# reuses its buffer (the push becomes a realloc), while a call on a named
+# (shared) array borrows and copies, leaving the original intact.
+
 import { equal as ==, push } from builtins;
 
-// `extended` takes an array, appends to it, and returns it — the canonical
-// "take ownership and mutate" shape. The compiler emits an in-place `$mut`
-// variant: a call on a *fresh* (uniquely-owned) array moves the array in and
-// reuses its buffer (the push becomes a realloc), while a call on a named
-// (shared) array borrows and copies, leaving the original intact.
 fn extended(xs: i64[]) -> i64[] {
     mut ys = xs; #[allow]
     set ys.push(99);

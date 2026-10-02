@@ -1,15 +1,16 @@
+# `k?=v` — the call-site escape for a `k?: T = none` parameter.
+#
+# Such a parameter is normally supplied as a bare `T`, which leaves one shape
+# unsayable: a wrapper that holds its *own* `T?` and wants to pass it on.
+# `clamp(5, hi=hi)` would wrap an optional in another one. `?=` says "this is
+# already the optional" and hands it through untouched.
+#
+# The two spellings are the two halves of the same parameter: `hi=9` supplies a
+# value, `hi?=o` supplies the presence-or-absence itself, and omitting it is the
+# same as forwarding a `none`.
+
 import { print, value_or } from builtins;
 
-// `k?=v` — the call-site escape for a `k?: T = none` parameter.
-//
-// Such a parameter is normally supplied as a bare `T`, which leaves one shape
-// unsayable: a wrapper that holds its *own* `T?` and wants to pass it on.
-// `clamp(5, hi=hi)` would wrap an optional in another one. `?=` says "this is
-// already the optional" and hands it through untouched.
-//
-// The two spellings are the two halves of the same parameter: `hi=9` supplies a
-// value, `hi?=o` supplies the presence-or-absence itself, and omitting it is the
-// same as forwarding a `none`.
 fn clamp(x: u64, hi?: u64 = none) -> str { `{x} hi={hi.value_or(99)}` }
 
 // The wrapper this exists for: `outer` has the same parameter and passes it on

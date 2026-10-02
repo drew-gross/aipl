@@ -1,7 +1,8 @@
+# `main` can both take the CLI arguments and return nothing — it runs for its
+# effects and exits 0.
+
 import { print } from builtins;
 
-// `main` can both take the CLI arguments and return nothing — it runs for its
-// effects and exits 0.
 fn main(args: str[]) !prints {
     for (let a : args) {
         print(a);

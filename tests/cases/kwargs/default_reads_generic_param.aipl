@@ -1,10 +1,11 @@
+# Reading a parameter whose type is the function's own type variable works the
+# same way, minus one thing: the call-site binding the read becomes can't be
+# annotated, because `T` names no runtime type until the instantiation is
+# known. So it infers from the argument — which is the same argument the
+# parameter itself gets, so the two agree by construction.
+
 import { equal as ==, print, to_str } from builtins;
 
-// Reading a parameter whose type is the function's own type variable works the
-// same way, minus one thing: the call-site binding the read becomes can't be
-// annotated, because `T` names no runtime type until the instantiation is
-// known. So it infers from the argument — which is the same argument the
-// parameter itself gets, so the two agree by construction.
 fn pair<T: any>(x: T, y: T = x) -> T[] { [x, y] }.test({
     assert(pair(1) == [1, 1]);
     assert(pair("a", y="b") == ["a", "b"]);

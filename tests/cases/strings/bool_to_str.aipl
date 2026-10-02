@@ -1,7 +1,8 @@
+# `to_str` renders a scalar bool; `to_str` renders a bool[] as
+# `[true, false]` (and `[]` when empty). Both return fresh refcounted strings.
+
 import { concat as +++, equal as ==, print, push, to_str, wrapping_add as + } from builtins;
 
-// `to_str` renders a scalar bool; `to_str` renders a bool[] as
-// `[true, false]` (and `[]` when empty). Both return fresh refcounted strings.
 fn main() !prints {
     print(to_str(true)); // true
     print(to_str(false)); // false

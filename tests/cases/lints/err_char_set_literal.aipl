@@ -1,8 +1,9 @@
+# Every char set literal the lint flags, and what it advises for each. This
+# file has no `to_set`, so each hit names the import to add alongside the
+# rewrite.
+
 import { has, print } from builtins;
 
-// Every char set literal the lint flags, and what it advises for each. This
-// file has no `to_set`, so each hit names the import to add alongside the
-// rewrite.
 fn main() !prints {
     // Three is the threshold: below it the two spellings are a tie.
     let abc: #{char} = #{'a', 'b', 'c'};
@@ -16,19 +17,19 @@ fn main() !prints {
 }
 --- errors ---
 error: a char set of 3 elements spelled out — write `"abc".to_set()`, importing `to_set` from builtins (or append #[allow] to this line to keep it)
- --> ./tests/cases/lints/err_char_set_literal.aipl:8:24
+ --> ./tests/cases/lints/err_char_set_literal.aipl:9:24
   |
-8 |     let abc: #{char} = #{'a', 'b', 'c'};
+9 |     let abc: #{char} = #{'a', 'b', 'c'};
   |                        ^^^^^^^^^^^^^^^^
 
 error: a char set of 10 elements spelled out — write `"0123456789".to_set()`, importing `to_set` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_char_set_literal.aipl:10:27
+  --> ./tests/cases/lints/err_char_set_literal.aipl:11:27
    |
-10 |     let digits: #{char} = #{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
+11 |     let digits: #{char} = #{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: a char set of 5 elements spelled out — write `"\"\\'\n\t".to_set()`, importing `to_set` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_char_set_literal.aipl:14:28
+  --> ./tests/cases/lints/err_char_set_literal.aipl:15:28
    |
-14 |     let escapes: #{char} = #{'"', '\\', '\'', '\n', '\t'};
+15 |     let escapes: #{char} = #{'"', '\\', '\'', '\n', '\t'};
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

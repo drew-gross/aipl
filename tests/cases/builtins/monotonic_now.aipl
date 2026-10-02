@@ -1,3 +1,9 @@
+# `monotonic_now` reads the system's monotonic clock in nanoseconds. It carries
+# the same `!clock` effect as `now_nanos`, but answers a different question:
+# this clock only ever counts up, so a *difference* between two readings is a
+# real elapsed duration. Its origin is unspecified, so an absolute reading means
+# nothing on its own — which is why the checks below are all about differences.
+
 import {
     execute_program,
     greater_than as >,
@@ -8,12 +14,6 @@ import {
     monotonic_now,
     wrapping_sub as -,
 } from builtins;
-
-// `monotonic_now` reads the system's monotonic clock in nanoseconds. It carries
-// the same `!clock` effect as `now_nanos`, but answers a different question:
-// this clock only ever counts up, so a *difference* between two readings is a
-// real elapsed duration. Its origin is unspecified, so an absolute reading means
-// nothing on its own — which is why the checks below are all about differences.
 
 fn readings_never_go_backwards() !clock -> bool {
     let a = monotonic_now();

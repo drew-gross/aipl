@@ -1,7 +1,8 @@
+# `#[allow]` on the line keeps the longhand. The rewrite sits beside it so both
+# spellings run and are proven to agree.
+
 import { equal as ==, is_empty, len, print } from builtins;
 
-// `#[allow]` on the line keeps the longhand. The rewrite sits beside it so both
-// spellings run and are proven to agree.
 fn the_long_way(xs: i64[]) -> bool { xs.len() == 0 } #[allow]
 
 fn the_short_way(xs: i64[]) -> bool { xs.is_empty() }

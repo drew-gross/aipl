@@ -1,13 +1,14 @@
+# A binding only one branch uses is computed inside that branch, not ahead of
+# it. `big` is built on every call to `size`, but only the `flag` arm ever
+# looks at it — so the sinking pass moves the binding into that arm and the
+# other call stops paying for a string it throws away.
+#
+# Both calls below run and only one takes the arm that needs the string, so the
+# program builds it exactly once. The `allocations:` counter is the assertion:
+# without sinking it would be one higher.
+
 import { is_nonempty, len, print, to_str } from builtins;
 
-// A binding only one branch uses is computed inside that branch, not ahead of
-// it. `big` is built on every call to `size`, but only the `flag` arm ever
-// looks at it — so the sinking pass moves the binding into that arm and the
-// other call stops paying for a string it throws away.
-//
-// Both calls below run and only one takes the arm that needs the string, so the
-// program builds it exactly once. The `allocations:` counter is the assertion:
-// without sinking it would be one higher.
 fn label(n: i64) -> str { `value {n} padded out well past the inline-string limit` }
 
 fn size(flag: bool, n: i64) -> u64 {

@@ -1,7 +1,8 @@
+# A function can return a struct by value. The result is materialized in a
+# caller-provided slot (sret), so reading its fields afterwards is valid.
+
 import { equal as ==, wrapping_add as + } from builtins;
 
-// A function can return a struct by value. The result is materialized in a
-// caller-provided slot (sret), so reading its fields afterwards is valid.
 struct Point { x: i64, y: i64 }
 
 fn make(a: i64, b: i64) -> Point { x: a, y: b }.test({

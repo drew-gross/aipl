@@ -1,8 +1,9 @@
+# A struct field may be another struct, stored inline (no heap pointer). This
+# also exercises a forward reference: `Line` names `Point` before `Point` is
+# declared, so layouts resolve in dependency order, not source order.
+
 import { equal as ==, wrapping_add as +, wrapping_sub as - } from builtins;
 
-// A struct field may be another struct, stored inline (no heap pointer). This
-// also exercises a forward reference: `Line` names `Point` before `Point` is
-// declared, so layouts resolve in dependency order, not source order.
 struct Line { start: Point, end: Point }
 
 struct Point { x: i64, y: i64 }

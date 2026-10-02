@@ -1,8 +1,9 @@
+# Growable arrays: start from an empty literal and push. `xs.push(x)` grows
+# the array variable in place. Snapshotting it first (`let b = a`) keeps `b`
+# independent — pushing to `a` afterward doesn't change `b` (value semantics).
+
 import { equal as ==, push } from builtins;
 
-// Growable arrays: start from an empty literal and push. `xs.push(x)` grows
-// the array variable in place. Snapshotting it first (`let b = a`) keeps `b`
-// independent — pushing to `a` afterward doesn't change `b` (value semantics).
 fn appended(xs: i64[], x: i64) -> i64[] {
     mut ys = xs; #[allow]
     set ys.push(x);

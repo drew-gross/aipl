@@ -1,8 +1,9 @@
+# `match` on a `str`: each arm is a string literal, with a required `_` default
+# as the last arm. Arms compare by content (string equality), so a rope (a
+# `str + str` value) scrutinee matches the same as a flat one.
+
 import { concat as +++, print, to_str } from builtins;
 
-// `match` on a `str`: each arm is a string literal, with a required `_` default
-// as the last arm. Arms compare by content (string equality), so a rope (a
-// `str + str` value) scrutinee matches the same as a flat one.
 fn classify(s: str) -> str {
     match (s) {
         "foo" => "got foo",

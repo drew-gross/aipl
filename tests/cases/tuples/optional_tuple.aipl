@@ -1,8 +1,9 @@
+# `(A, B)?` — an optional tuple. A tuple type is not a `base_ty`, so it does not
+# inherit `base_ty`'s chained `?`/`[]` suffixes; each `(`-led form is its own
+# production, and this is the `?` one alongside `(A, B)[]` and `(A, B)!E`.
+
 import { equal as ==, map, print, to_str, value_or } from builtins;
 
-// `(A, B)?` — an optional tuple. A tuple type is not a `base_ty`, so it does not
-// inherit `base_ty`'s chained `?`/`[]` suffixes; each `(`-led form is its own
-// production, and this is the `?` one alongside `(A, B)[]` and `(A, B)!E`.
 fn lookup(want: bool) -> (i64, str)? { if (want) { some((7, "seven")) } else { none } }
 
 // It works as a parameter too. It does *not* chain into further suffixes:

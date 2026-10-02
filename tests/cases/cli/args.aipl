@@ -1,8 +1,9 @@
+# `main` may take the CLI arguments as a `str[]` (argv without the program
+# name). Each `--- cli ---` line below is one argument; the program echoes
+# them and prints the count.
+
 import { len, print, to_str } from builtins;
 
-// `main` may take the CLI arguments as a `str[]` (argv without the program
-// name). Each `--- cli ---` line below is one argument; the program echoes
-// them and prints the count.
 fn main(args: str[]) !prints {
     for (let a : args) {
         print(a);

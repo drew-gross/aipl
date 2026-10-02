@@ -1,8 +1,8 @@
-import { equal as ==, print, to_str } from builtins;
+# The shapes the lint deliberately leaves alone. Each is a `match` on an
+# optional that is *close* to the flagged form but has no `is_some_and`
+# spelling, so rewriting it would be a loss.
 
-// The shapes the lint deliberately leaves alone. Each is a `match` on an
-// optional that is *close* to the flagged form but has no `is_some_and`
-// spelling, so rewriting it would be a loss.
+import { equal as ==, print, to_str } from builtins;
 
 // `none => true` is the opposite question, and inverting the predicate to fit
 // `is_some_and` would obscure it.

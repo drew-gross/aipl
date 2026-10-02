@@ -1,3 +1,15 @@
+# A *generic* variant that reaches itself — the parser library's `Rule<K>`.
+#
+# Both halves were attested separately: a recursive variant (`variants/
+# recursive_list`), and a generic one (`generics/variant_infer_from_expected`).
+# Together they were not, and the combination hung the compiler: recovering an
+# instance's type arguments unifies the template against the instance's cases,
+# so a case whose payload *is* that instance (`Then(Rule<K>[])` in `Rule$Tok`)
+# asked for the arguments already being recovered, and the two calls recursed
+# until the stack ran out. The guard is in `instance_args` (`aipl-mono`'s
+# `check.rs` and `lib.rs` both carry a copy): a re-entrant lookup bows out, and
+# the type's other cases — `Term(K)` here — do the pinning.
+
 import {
     equal as ==,
     map,
@@ -7,17 +19,6 @@ import {
     wrapping_add_assign as +=,
 } from builtins;
 
-// A *generic* variant that reaches itself — the parser library's `Rule<K>`.
-//
-// Both halves were attested separately: a recursive variant (`variants/
-// recursive_list`), and a generic one (`generics/variant_infer_from_expected`).
-// Together they were not, and the combination hung the compiler: recovering an
-// instance's type arguments unifies the template against the instance's cases,
-// so a case whose payload *is* that instance (`Then(Rule<K>[])` in `Rule$Tok`)
-// asked for the arguments already being recovered, and the two calls recursed
-// until the stack ran out. The guard is in `instance_args` (`aipl-mono`'s
-// `check.rs` and `lib.rs` both carry a copy): a re-entrant lookup bows out, and
-// the type's other cases — `Term(K)` here — do the pinning.
 variant Tok = Space | Name(str)
 
 variant Rule<K: variant> = Term(K) | Then(Rule<K>[]) | Repeat(Rule<K>) | Idx(u64)

@@ -1,6 +1,6 @@
-import { equal as ==, map_err, print, to_str, wrapping_add as + } from builtins;
+# Shapes that look close but are deliberately left alone.
 
-// Shapes that look close but are deliberately left alone.
+import { equal as ==, map_err, print, to_str, wrapping_add as + } from builtins;
 
 struct Wrapped { message: str }
 

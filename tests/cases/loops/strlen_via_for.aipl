@@ -1,6 +1,7 @@
+# `len` written in AIPL using the for-each-char loop + mutation.
+
 import { equal as ==, wrapping_increment as ++ } from builtins;
 
-// `len` written in AIPL using the for-each-char loop + mutation.
 fn len(s: str) -> i64 {
     mut n = 0;
     for (let c : s) {

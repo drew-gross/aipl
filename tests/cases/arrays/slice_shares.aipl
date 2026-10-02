@@ -1,14 +1,15 @@
+# An array slice is a window onto its source, the way a `str`'s slice is a
+# window onto its bytes: `xs[a..b]` allocates one small view block, never a
+# copy of the elements. So its cost does not grow with the window — the
+# `bytes allocated` below would be thousands if any of these copied — and
+# slicing a slice looks through to the source rather than stacking views.
+#
+# A window is read-only in the sense that matters: writing into it would write
+# into the source, so the first mutation (`push`, `extend`, an in-place `map`)
+# materializes the window into a block of its own. The source never changes.
+
 import { equal as ==, len, print, push, reverse, to_str, value_or } from builtins;
 
-// An array slice is a window onto its source, the way a `str`'s slice is a
-// window onto its bytes: `xs[a..b]` allocates one small view block, never a
-// copy of the elements. So its cost does not grow with the window — the
-// `bytes allocated` below would be thousands if any of these copied — and
-// slicing a slice looks through to the source rather than stacking views.
-//
-// A window is read-only in the sense that matters: writing into it would write
-// into the source, so the first mutation (`push`, `extend`, an in-place `map`)
-// materializes the window into a block of its own. The source never changes.
 fn numbers(n: u64) -> u64[] {
     mut out: u64[] = [];
     for (let i : 0..n) {

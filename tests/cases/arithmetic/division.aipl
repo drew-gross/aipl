@@ -1,14 +1,15 @@
+# Division saturates rather than trapping — the language has no aborts, which
+# is why the builtin is named `saturating_divide`. The two cases a machine
+# divide cannot answer both give the largest value of the operand type:
+#
+#   - a zero divisor, whose quotient is unbounded
+#   - `MIN / -1`, whose true quotient is one past `MAX`
+#
+# That is the same "clamp at the end of the range" rule `saturating_add`
+# follows, so the two read alike at a call site.
+
 import { equal as ==, saturating_divide as /, wrapping_add as +, wrapping_sub as - } from builtins;
 
-// Division saturates rather than trapping — the language has no aborts, which
-// is why the builtin is named `saturating_divide`. The two cases a machine
-// divide cannot answer both give the largest value of the operand type:
-//
-//   - a zero divisor, whose quotient is unbounded
-//   - `MIN / -1`, whose true quotient is one past `MAX`
-//
-// That is the same "clamp at the end of the range" rule `saturating_add`
-// follows, so the two read alike at a call site.
 fn d(x: i64, y: i64) -> i64 { x / y }.test({
     // Truncating division (rounds toward zero): 20/4 = 5, -10/3 = -3.
     assert(d(20, 4) == 5);

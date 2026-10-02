@@ -14,6 +14,8 @@
 
       <h1><code>examples/arrays.aipl</code></h1>
 
+      <div class="module-doc"><p>Arrays: a growable, refcounted sequence of primitives written <code>T[]</code> (e.g. <code>i64[]</code>, <code>char[]</code>, <code>bool[]</code>).</p><ul><li><code>[a, b, c]</code>     constructs an array literal (<code>[]</code> is the empty one)</li><li><code>xs[i]</code>         indexes, yielding <code>T?</code> — <code>some(elem)</code> in bounds, <code>none</code> when <code>i</code> is out of range</li><li><code>len(xs)</code>       returns the element count</li><li><code>xs.push(x)</code>    appends <code>x</code> to the array variable <code>xs</code> in place (<code>xs</code> must be <code>mut</code>); copies of <code>xs</code> are unaffected</li><li><code>[..xs, y]</code>     splices <code>xs</code>'s elements into a new literal, so this is <code>xs</code> with <code>y</code> appended; <code>xs</code> itself is untouched</li><li><code>for (let x : xs) { ... }</code> iterates the elements in order</li></ul></div>
+
 
 
 

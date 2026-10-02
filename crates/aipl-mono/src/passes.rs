@@ -66,7 +66,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use aipl_syntax::ast::{Expr, Item, Program};
+use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, Program};
 use aipl_syntax::DebugOptions;
 
 use crate::{ConcreteFn, MonoProgram};
@@ -202,6 +202,43 @@ pub fn optimize<P: Optimizable>(
     dbg: DebugOptions,
 ) -> P {
     let mut scope = Scope::Everything;
+    // Which spans arrive with a recorded type. Collected once: a pass may lose
+    // a record but never adds one, so comparing each pass's output against the
+    // original set is both cheaper and stricter than re-deriving it per pass.
+    let recorded = match cfg!(debug_assertions) {
+        true => recorded_spans(&program),
+        false => HashSet::new(),
+    };
+    // Nothing may arrive already missing a record that the same span carries
+    // elsewhere. This used to be an exclusion set rather than an assertion,
+    // because it was not empty: monomorphization instantiates one template
+    // into several functions that all keep the template's spans, and
+    // `subst_expr_tys` rebuilt each instance's body with `ty: None` — so a
+    // record the checker made survived on one instance and vanished on the
+    // next. `walker.aipl` entered the post-mono passes with 365 recorded spans
+    // and 1 already lost, `grammar_aipl.aipl` with 236 and 2. That is fixed at
+    // the source now (`subst_expr_tys` substitutes the record through, like
+    // every other annotation it carries), so this is an assertion: if it
+    // fires, whatever built this program dropped a record before the passes
+    // got it — for the post-mono phase, monomorphization again.
+    //
+    // Note when chasing one that a span is only meaningful *with its file*: a
+    // monomorphized program merges many sources and every span is an offset
+    // into whichever one its function came from, so reading one against the
+    // file named on the command line lands anywhere.
+    if cfg!(debug_assertions) {
+        let inherited = lost_records(&program, &recorded);
+        assert!(
+            inherited.is_empty(),
+            "the program handed to the pass manager is already missing the \
+             recorded type of {} context-typed expression(s) — dropped before \
+             any pass here ran, so by whatever produced it (monomorphization, \
+             for the post-mono phase). Sites:\n  {}",
+            inherited.len(),
+            inherited.join("\n  "),
+        );
+    }
+
     for round in 1..=rounds {
         let mut changed: HashSet<String> = HashSet::new();
         for pass in passes {
@@ -209,6 +246,24 @@ pub fn optimize<P: Optimizable>(
                 continue;
             }
             let next = (pass.rewrite)(&program, &scope);
+            // Checked per pass, because this is the only point at which the
+            // culprit is still known: one pass later and the only evidence is
+            // a program that compiles to the wrong representation.
+            if cfg!(debug_assertions) {
+                let lost = lost_records(&next, &recorded);
+                assert!(
+                    lost.is_empty(),
+                    "pass `{}` (round {round}) dropped the recorded type of {} \
+                     context-typed expression(s). The checker resolved these from \
+                     the expected type and wrote the answer onto the expression so \
+                     that a pass could move them; rebuilding one with `Expr::new` \
+                     instead of `Expr::rebuilt` loses it, and codegen then picks \
+                     the representation from nothing. Sites:\n  {}",
+                    pass.name,
+                    lost.len(),
+                    lost.join("\n  "),
+                );
+            }
             let rewritten = rewritten_functions(&program, &next);
             if !rewritten.is_empty() {
                 dbg.trace(
@@ -236,6 +291,117 @@ pub fn optimize<P: Optimizable>(
         format_args!("stopped at the {rounds}-round cap without reaching a fixpoint"),
     );
     program
+}
+
+/// Where a context-typed expression carries its recorded type, keyed by span.
+///
+/// The checker resolves these from the expected type and writes the answer onto
+/// the expression ([`Expr::ty`]) precisely so that a later pass may move them.
+/// `crate::check::needs_lock` is the candidate set, and its own doc notes it is
+/// "deliberately the same set the inliner used to refuse to move". Codegen
+/// reads the record back (`let locked = expr.ty...`) and for some of them picks
+/// the *runtime representation* from it: an empty `#{}` is the shared empty
+/// block while `#{char}` is a 256-bit bitfield, and `xs.to_set()` builds an
+/// ordered set or an unordered one depending on what was recorded.
+///
+/// So a pass that rebuilds one of these without carrying `ty` across does not
+/// produce a worse program — it produces a differently-typed one, and codegen
+/// either picks the wrong representation or rejects a call the checker
+/// accepted.
+///
+/// # Why spans, and why not a count
+///
+/// Being unrecorded is *normal*: the checker records a lock only where the
+/// resolution is worth recording, so one real source file enters this with
+/// ~190 unrecorded context-typed expressions. Counting them therefore proves
+/// nothing — `inline_small` duplicates a body at every call site, so copying
+/// one already-unrecorded `none` five times raises the count five times
+/// without anything having been lost. It is a convincing false positive: it is
+/// the first thing this check reported when it counted.
+///
+/// Span is the only identity that survives a pass. The checker's own `node_id`
+/// is a pointer address, good for one walk and meaningless after a rebuild;
+/// `Expr::rebuilt` and `rename_params` both carry the span across, and a
+/// duplicated body's copies all keep the span they came from — so "this span
+/// had its type recorded, and now an expression at that span does not" is
+/// exactly the loss, and duplication cannot fake it.
+fn recorded_spans(program: &impl Optimizable) -> HashSet<(usize, usize)> {
+    let mut out = HashSet::new();
+    for f in program.functions() {
+        collect_recorded(f.body, &mut out);
+        if let Some(test_body) = f.test_body {
+            collect_recorded(test_body, &mut out);
+        }
+    }
+    out
+}
+
+fn collect_recorded(e: &Expr, out: &mut HashSet<(usize, usize)>) {
+    if is_context_typed(e) && e.ty.is_some() {
+        out.insert((e.span.start, e.span.end));
+    }
+    for child in crate::children(e) {
+        collect_recorded(child, out);
+    }
+}
+
+/// Context-typed expressions that have lost a record `recorded` says their
+/// span had, ignoring the spans in `inherited` (see the caller).
+fn lost_records(program: &impl Optimizable, recorded: &HashSet<(usize, usize)>) -> Vec<String> {
+    let mut out = Vec::new();
+    for f in program.functions() {
+        let mut found = Vec::new();
+        collect_lost(f.body, recorded, &mut found);
+        if let Some(test_body) = f.test_body {
+            collect_lost(test_body, recorded, &mut found);
+        }
+        out.extend(
+            found
+                .into_iter()
+                .map(|(what, span)| format!("{} — {what} at bytes {}..{}", f.name, span.0, span.1)),
+        );
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+fn collect_lost(
+    e: &Expr,
+    recorded: &HashSet<(usize, usize)>,
+    out: &mut Vec<(&'static str, (usize, usize))>,
+) {
+    let span = (e.span.start, e.span.end);
+    if is_context_typed(e) && e.ty.is_none() && recorded.contains(&span) {
+        out.push((context_kind(e), span));
+    }
+    for child in crate::children(e) {
+        collect_lost(child, recorded, out);
+    }
+}
+
+/// Whether `e`'s type comes from where it sits rather than from what it says.
+fn is_context_typed(e: &Expr) -> bool {
+    crate::check::needs_lock(&e.kind) || aipl_syntax::ctor_ref_case(e).is_some()
+}
+
+/// How a context-typed expression reads in the panic message. Its kind and
+/// span are what identify the site, together with the function it is in.
+fn context_kind(e: &Expr) -> &'static str {
+    match &e.kind {
+        ExprKind::None => "a bare `none`",
+        ExprKind::ArrayLit(_) => "an empty `[]`",
+        ExprKind::SetLit(..) => "an empty set literal",
+        ExprKind::DictLit(_) => "an empty dict literal",
+        ExprKind::Call(callee, ..) => match callee {
+            Callee::Ok => "an `ok(..)`",
+            Callee::Err => "an `err(..)`",
+            Callee::Some => "a `some(..)`",
+            Callee::ToSet => "a `to_set()`",
+            _ => "a call",
+        },
+        _ => "a constructor reference",
+    }
 }
 
 /// A rewritten set as the trace names it: the functions themselves while there
@@ -406,6 +572,85 @@ mod tests {
             DebugOptions::new(false),
         );
         assert_eq!(literal(&out, "a"), 3, "three rounds, three increments");
+    }
+
+    /// A `none` whose type the checker resolved and recorded, at a span.
+    fn pinned_none(span: std::ops::Range<usize>) -> Expr {
+        Expr::new(ExprKind::None, span).with_ty(aipl_syntax::ast::Type::Optional(Box::new(
+            aipl_syntax::ast::Type::Primitive(aipl_syntax::ast::Primitive::I64),
+        )))
+    }
+
+    /// Rebuilding a context-typed expression with `Expr::new` loses the
+    /// recorded type, which is the bug the guard exists for.
+    #[test]
+    #[should_panic(expected = "dropped the recorded type")]
+    fn a_pass_that_drops_a_recorded_type_is_caught() {
+        let dropper = Pass::scoped("dropper", |program: &Program, _| {
+            let mut next = program.clone();
+            for item in &mut next.items {
+                if let Item::Fn(f) = item {
+                    f.body = Expr::new(f.body.kind.clone(), f.body.span.clone());
+                }
+            }
+            next
+        });
+        optimize(
+            program(vec![function("f", pinned_none(10..14))]),
+            &[dropper],
+            100,
+            DebugOptions::new(false),
+        );
+    }
+
+    /// The same rewrite through `Expr::rebuilt`, which carries `ty` across, is
+    /// not a violation — otherwise the guard would refuse every pass.
+    #[test]
+    fn rebuilding_through_rebuilt_is_fine() {
+        let keeper = Pass::scoped("keeper", |program: &Program, _| {
+            let mut next = program.clone();
+            for item in &mut next.items {
+                if let Item::Fn(f) = item {
+                    f.body = Expr::rebuilt(f.body.kind.clone(), &f.body);
+                }
+            }
+            next
+        });
+        let out = optimize(
+            program(vec![function("f", pinned_none(10..14))]),
+            &[keeper],
+            100,
+            DebugOptions::new(false),
+        );
+        assert!(out.functions()[0].body.ty.is_some(), "the record survived");
+    }
+
+    /// Duplicating a body that was *already* unrecorded is not a loss — the
+    /// false positive that counting unrecorded sites produced, and the reason
+    /// the guard keys on spans instead.
+    #[test]
+    fn copying_an_unrecorded_expression_is_not_a_loss() {
+        let bare = Expr::new(ExprKind::None, 10..14);
+        let duplicator = Pass::scoped("duplicator", |program: &Program, _| {
+            let mut next = program.clone();
+            // One `none` becomes two, neither recorded, as inlining a body at
+            // two call sites would.
+            for item in &mut next.items {
+                if let Item::Fn(f) = item {
+                    f.body = Expr::new(
+                        ExprKind::Seq(Box::new(f.body.clone()), Box::new(f.body.clone())),
+                        f.body.span.clone(),
+                    );
+                }
+            }
+            next
+        });
+        optimize(
+            program(vec![function("f", bare)]),
+            &[duplicator],
+            2,
+            DebugOptions::new(false),
+        );
     }
 
     /// The worklist, which is the whole reason this is a manager and not a

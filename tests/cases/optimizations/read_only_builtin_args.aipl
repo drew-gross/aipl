@@ -1,14 +1,15 @@
+# A `mut` binding stays *exclusive* — its `push` mutates in place — as long as
+# nothing else can hold a reference to its buffer. Handing it to a call used
+# to count against that, whatever the call: a user function may store its
+# argument anywhere. A builtin's contract is known, though, and `extend`'s
+# source and `union`'s second operand are only read: the elements are copied
+# out one by one, and no reference to the buffer survives the call. So `ys`
+# here is still exclusive after `set xs.extend(ys)`, which is what lets both
+# its pushes and `merge`'s second parameter (`mut ys = b`) go in place —
+# `aipl_array_push_mut`, not the copying `aipl_array_push`, in the counts.
+
 import { extend, print, push, union } from builtins;
 
-// A `mut` binding stays *exclusive* — its `push` mutates in place — as long as
-// nothing else can hold a reference to its buffer. Handing it to a call used
-// to count against that, whatever the call: a user function may store its
-// argument anywhere. A builtin's contract is known, though, and `extend`'s
-// source and `union`'s second operand are only read: the elements are copied
-// out one by one, and no reference to the buffer survives the call. So `ys`
-// here is still exclusive after `set xs.extend(ys)`, which is what lets both
-// its pushes and `merge`'s second parameter (`mut ys = b`) go in place —
-// `aipl_array_push_mut`, not the copying `aipl_array_push`, in the counts.
 fn merge(a: i64[], b: i64[]) -> i64[] {
     mut xs = a;
     mut ys = b;

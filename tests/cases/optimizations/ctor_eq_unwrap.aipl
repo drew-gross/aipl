@@ -1,19 +1,20 @@
+# Comparing against `some(e)` asks the tag instead of building the value.
+#
+# `x == some(y)` reads as "is `x` this optional", and used to compile that way:
+# an optional was materialized out of `y` — a stack slot, a tag store, a payload
+# store, and for a heap payload a retain — then compared field by field against
+# `x`. The constructed value died the moment the comparison ended, and half of
+# it was a tag the comparison already knew. So known-constructor elimination
+# (`aipl_mono::eliminate_known_constructors_post_mono`) rewrites it to a match
+# on `x` that compares payloads directly, which is what the comparison did
+# anyway, minus the value it had to be handed.
+#
+# The `allocations:` counter is the assertion for the heap case below: without
+# the rewrite, building `some("a string long past the inline limit")` to throw
+# it away is an allocation this program never makes.
+
 import { equal as ==, is_nonempty, not_equal as !=, print, to_str } from builtins;
 
-// Comparing against `some(e)` asks the tag instead of building the value.
-//
-// `x == some(y)` reads as "is `x` this optional", and used to compile that way:
-// an optional was materialized out of `y` — a stack slot, a tag store, a payload
-// store, and for a heap payload a retain — then compared field by field against
-// `x`. The constructed value died the moment the comparison ended, and half of
-// it was a tag the comparison already knew. So known-constructor elimination
-// (`aipl_mono::eliminate_known_constructors_post_mono`) rewrites it to a match
-// on `x` that compares payloads directly, which is what the comparison did
-// anyway, minus the value it had to be handed.
-//
-// The `allocations:` counter is the assertion for the heap case below: without
-// the rewrite, building `some("a string long past the inline limit")` to throw
-// it away is an allocation this program never makes.
 fn matches(x: i64?, y: i64) -> bool { x == some(y) }
 
 // Both operand orders, and `!=` as well as `==`.

@@ -1,7 +1,8 @@
+# A type parameter written without a bound (`<T>`) defaults to the `any`
+# bound, exactly like `<T: any>`.
+
 import { equal as == } from builtins;
 
-// A type parameter written without a bound (`<T>`) defaults to the `any`
-// bound, exactly like `<T: any>`.
 fn identity<T>(x: T) -> T { x }.test({
     assert(identity(5) == 5);
     assert(identity('a') == 'a');

@@ -1,5 +1,6 @@
-// A shim stands in for the operation at every call site, so it must accept and
-// return exactly what the operation does.
+# A shim stands in for the operation at every call site, so it must accept and
+# return exactly what the operation does.
+
 fn fake_wall() -> u64 { 1 }
 
 fn takes_an_arg(n: i64) -> u64 { 2 }
@@ -9,7 +10,7 @@ fn main() {
 }
 --- errors ---
 error: fn "takes_an_arg" cannot shim "monotonic_now": it is (i64) -> u64, but "monotonic_now" is () -> u64
- --> ./tests/cases/effects/err_shim_signature_mismatch.aipl:8:5
+ --> ./tests/cases/effects/err_shim_signature_mismatch.aipl:9:5
   |
-8 |     shim clock { now_nanos = fake_wall, monotonic_now = takes_an_arg } {};
+9 |     shim clock { now_nanos = fake_wall, monotonic_now = takes_an_arg } {};
   |     ^^^^^^^^^^

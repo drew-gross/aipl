@@ -1,9 +1,10 @@
+# The shapes the lint must leave alone: a `find_if` over mapped values with a
+# predicate other than `is_some` is a search, not a `find_map` (the fusion pass
+# handles it); and `is_some` on a `find_if` without a `map` in front is just a
+# search for the first `some`.
+
 import { equal as ==, find_if, is_some, map, print, wrapping_mul as * } from builtins;
 
-// The shapes the lint must leave alone: a `find_if` over mapped values with a
-// predicate other than `is_some` is a search, not a `find_map` (the fusion pass
-// handles it); and `is_some` on a `find_if` without a `map` in front is just a
-// search for the first `some`.
 fn nonzero(x: i64) -> i64? { if (x == 0) { none } else { some(x) } }
 
 fn first_big(xs: i64[]) -> i64? { xs.map(|x| x * 10).find_if(|y| y == 20) }

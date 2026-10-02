@@ -1,17 +1,17 @@
-import { len, map, print, to_str, wrapping_add as +, zip_with } from builtins;
+# A generic signature's *container* is not a type variable. `map`'s
+# `self: T[]` says "an array" whatever `T` turns out to be, and the checker now
+# says so — at the call, naming what it got.
+#
+# It used to say so only in monomorphization, which runs after simple bindings
+# are substituted: `let n = 5; n.map(..)` reported against the `5` in the `let`,
+# a line that need not be anywhere near the call. Every error below points at
+# the receiver that is wrong.
+#
+# The check is deliberately one level deep. It judges the outermost type
+# constructor and nothing under it, so the specific messages the later passes
+# give for nested shapes — `join`'s "an array of arrays" — still get their say.
 
-// A generic signature's *container* is not a type variable. `map`'s
-// `self: T[]` says "an array" whatever `T` turns out to be, and the checker now
-// says so — at the call, naming what it got.
-//
-// It used to say so only in monomorphization, which runs after simple bindings
-// are substituted: `let n = 5; n.map(..)` reported against the `5` in the `let`,
-// a line that need not be anywhere near the call. Every error below points at
-// the receiver that is wrong.
-//
-// The check is deliberately one level deep. It judges the outermost type
-// constructor and nothing under it, so the specific messages the later passes
-// give for nested shapes — `join`'s "an array of arrays" — still get their say.
+import { len, map, print, to_str, wrapping_add as +, zip_with } from builtins;
 
 struct P { x: i64 }
 

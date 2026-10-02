@@ -1,6 +1,7 @@
+# The shapes the char-set lint deliberately leaves alone.
+
 import { has, len, print } from builtins;
 
-// The shapes the char-set lint deliberately leaves alone.
 fn main() !prints {
     // Two elements: the spellings are the same width, and the literal keeps each
     // element visibly a char.

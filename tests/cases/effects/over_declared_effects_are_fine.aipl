@@ -1,4 +1,5 @@
-// Declaring an effect you don't actually use should still compile/run.
+# Declaring an effect you don't actually use should still compile/run.
+
 fn main() !prints -> i64 { 0 }
 --- performance ---
 allocations: 0

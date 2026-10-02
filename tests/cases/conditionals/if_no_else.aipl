@@ -1,8 +1,9 @@
+# An `if` in statement position (its value discarded) may omit `else`. Its
+# `then` block must be unit-typed and the `if` itself yields unit, so it reads
+# as a plain conditional statement. Several run in sequence here.
+
 import { equal as ==, less_than as < } from builtins;
 
-// An `if` in statement position (its value discarded) may omit `else`. Its
-// `then` block must be unit-typed and the `if` itself yields unit, so it reads
-// as a plain conditional statement. Several run in sequence here.
 fn sign(n: i64) -> i64 {
     mut r = 0;
     if (n < 0) {

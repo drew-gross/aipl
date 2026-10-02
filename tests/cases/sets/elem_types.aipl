@@ -1,12 +1,13 @@
+# Sets of bool and char (the other two scalar element types). A bool set holds
+# at most {true, false}; chars behave like array char elements.
+#
+# The char sets stay spelled out (`#[allow]`, against `char_set_literal`) rather
+# than becoming `"abac".to_set()`: this case is about what a set *literal* does
+# per element type, and the char rows only say that beside the bool ones if both
+# are written the same way.
+
 import { equal as ==, has, len, logical_not as ! } from builtins;
 
-// Sets of bool and char (the other two scalar element types). A bool set holds
-// at most {true, false}; chars behave like array char elements.
-//
-// The char sets stay spelled out (`#[allow]`, against `char_set_literal`) rather
-// than becoming `"abac".to_set()`: this case is about what a set *literal* does
-// per element type, and the char rows only say that beside the bool ones if both
-// are written the same way.
 fn bools() -> #{bool} {
     #{true, false, true, false} // -> {true, false}
 }.test({

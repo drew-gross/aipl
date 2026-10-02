@@ -1,3 +1,10 @@
+# Ends and truncation, without index arithmetic.
+#
+# `first`/`last` hand back a `T?` — the array may be empty, and that is the
+# same optional an index yields. The four `drop_*` return a shorter array, and
+# all of them saturate: dropping more than there is gives an empty array rather
+# than an error, matching how an out-of-range slice clamps.
+
 import {
     drop_first,
     drop_last,
@@ -10,12 +17,6 @@ import {
     to_str,
 } from builtins;
 
-// Ends and truncation, without index arithmetic.
-//
-// `first`/`last` hand back a `T?` — the array may be empty, and that is the
-// same optional an index yields. The four `drop_*` return a shorter array, and
-// all of them saturate: dropping more than there is gives an empty array rather
-// than an error, matching how an out-of-range slice clamps.
 fn main() !prints {
     let xs = [1, 2, 3, 4];
 

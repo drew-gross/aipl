@@ -1,3 +1,21 @@
+# Inlining a mutating method (`fn f(mut self: T, ..)`).
+#
+# The inliner used to refuse these outright. Binding a `mut self` receiver with
+# a plain `let` and taking the body's value would have been nonsense twice over:
+# the body is a run of assignments to that binding, and what a call *produces*
+# is the mutated receiver, not the body's (void) value. The inliner now binds
+# the receiver `mut` and names it after the body, which is what such a call
+# means in either position it can appear:
+#
+#   * `set v.f(a)` parses to `set v = v.f(a)`, so the enclosing assignment
+#     writes the result straight back into `v`.
+#   * In value position it is copy-and-modify: the receiver was copied into the
+#     inlined binding, so the caller's own binding is left alone.
+#
+# Both are exercised below, on a struct receiver and on an array one, and the
+# `functions:` block records the point: neither method survives as a function —
+# both bodies ended up in `main`.
+
 import {
     len,
     print,
@@ -7,23 +25,6 @@ import {
     wrapping_increment as ++,
 } from builtins;
 
-// Inlining a mutating method (`fn f(mut self: T, ..)`).
-//
-// The inliner used to refuse these outright. Binding a `mut self` receiver with
-// a plain `let` and taking the body's value would have been nonsense twice over:
-// the body is a run of assignments to that binding, and what a call *produces*
-// is the mutated receiver, not the body's (void) value. The inliner now binds
-// the receiver `mut` and names it after the body, which is what such a call
-// means in either position it can appear:
-//
-//   * `set v.f(a)` parses to `set v = v.f(a)`, so the enclosing assignment
-//     writes the result straight back into `v`.
-//   * In value position it is copy-and-modify: the receiver was copied into the
-//     inlined binding, so the caller's own binding is left alone.
-//
-// Both are exercised below, on a struct receiver and on an array one, and the
-// `functions:` block records the point: neither method survives as a function —
-// both bodies ended up in `main`.
 struct Counter { n: i64 }
 
 fn bump(mut self: Counter, by: i64) {

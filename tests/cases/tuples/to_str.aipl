@@ -1,9 +1,10 @@
+# A tuple renders as it is written — `(1, "a")` — through `to_str` and
+# interpolation alike, and nested inside anything else that renders. It lowers
+# to a synthetic struct, but that struct's name and field names are the
+# compiler's, and never appear in output.
+
 import { print, to_str } from builtins;
 
-// A tuple renders as it is written — `(1, "a")` — through `to_str` and
-// interpolation alike, and nested inside anything else that renders. It lowers
-// to a synthetic struct, but that struct's name and field names are the
-// compiler's, and never appear in output.
 fn main() !prints {
     let t = (1, "a");
     print(t.to_str());

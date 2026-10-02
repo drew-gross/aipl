@@ -1,11 +1,12 @@
+# A negative integer literal lexes as a single token: a `-` immediately followed
+# by digits binds them into one literal (a space after the `-` would make it the
+# subtraction operator instead). So a negative constant needs no `-` operator
+# import (this file imports none), and it reaches the full i64 range — including
+# i64::MIN, whose magnitude exceeds i64::MAX and so can't be written as a positive
+# literal and then negated.
+
 import { equal as ==, less_than as < } from builtins;
 
-// A negative integer literal lexes as a single token: a `-` immediately followed
-// by digits binds them into one literal (a space after the `-` would make it the
-// subtraction operator instead). So a negative constant needs no `-` operator
-// import (this file imports none), and it reaches the full i64 range — including
-// i64::MIN, whose magnitude exceeds i64::MAX and so can't be written as a positive
-// literal and then negated.
 fn probe() -> bool { true }.test({
     fn id(x: i64) -> i64 { x }
 

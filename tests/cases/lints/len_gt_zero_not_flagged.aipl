@@ -1,3 +1,7 @@
+# The shapes the length-against-zero lint must leave alone. It flags exactly
+# three idioms — `0 < x.len()`, `x.len() > 0` and `!x.is_empty()` — so
+# everything here compiles.
+
 import {
     greater_than as >,
     greater_than_or_equal as >=,
@@ -10,10 +14,6 @@ import {
     print,
     to_str,
 } from builtins;
-
-// The shapes the length-against-zero lint must leave alone. It flags exactly
-// three idioms — `0 < x.len()`, `x.len() > 0` and `!x.is_empty()` — so
-// everything here compiles.
 
 // A different bound is a different question.
 fn at_least_two(xs: i64[]) -> bool { 1 < xs.len() }

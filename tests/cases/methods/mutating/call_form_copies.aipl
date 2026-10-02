@@ -1,8 +1,9 @@
+# Calling a mutating function in `foo(b, ..)` style (instead of `b.foo(..)`)
+# is sugar for copy-and-modify: `b` is copied, the copy is mutated, and the
+# modified copy is the value of the call. The original `b` is left untouched.
+
 import { equal as ==, wrapping_add as + } from builtins;
 
-// Calling a mutating function in `foo(b, ..)` style (instead of `b.foo(..)`)
-// is sugar for copy-and-modify: `b` is copied, the copy is mutated, and the
-// modified copy is the value of the call. The original `b` is left untouched.
 struct Counter { n: i64 }
 
 fn bump(mut self: Counter, by: i64) {

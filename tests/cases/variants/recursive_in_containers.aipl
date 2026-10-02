@@ -1,11 +1,12 @@
+# A boxed (recursive) value can be stored in ordinary containers. From a
+# container's view the reference is *external*, so it is strong-counted like
+# any heap value: an array element, a non-recursive struct field, an optional
+# core. Dropping the container releases those strong references (and cascades
+# the frees). Balanced allocation counts prove the external-reference paths
+# don't leak or double-free.
+
 import { equal as ==, len, print, to_str, wrapping_add as + } from builtins;
 
-// A boxed (recursive) value can be stored in ordinary containers. From a
-// container's view the reference is *external*, so it is strong-counted like
-// any heap value: an array element, a non-recursive struct field, an optional
-// core. Dropping the container releases those strong references (and cascades
-// the frees). Balanced allocation counts prove the external-reference paths
-// don't leak or double-free.
 variant List = Cons(i64, List) | Nil
 
 struct Holder { name: str, list: List }

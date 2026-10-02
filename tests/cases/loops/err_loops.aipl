@@ -1,9 +1,9 @@
-import { equal as ==, wrapping_add as +, wrapping_increment as ++ } from builtins;
+# Every *check-phase* loop error, in one file, reported in one run. The four
+# `for`-syntax fixtures (`err_for_body_stmt_then_expr`,
+# `err_for_body_trailing_expr`, `err_for_missing_colon`, `err_for_missing_let`)
+# are *parse* errors and stay separate — the file never reaches the checker.
 
-// Every *check-phase* loop error, in one file, reported in one run. The four
-// `for`-syntax fixtures (`err_for_body_stmt_then_expr`,
-// `err_for_body_trailing_expr`, `err_for_missing_colon`, `err_for_missing_let`)
-// are *parse* errors and stay separate — the file never reaches the checker.
+import { equal as ==, wrapping_add as +, wrapping_increment as ++ } from builtins;
 
 // A `for` body that compares the loop variable to the wrong type.
 fn for_body_type_mismatch() -> i64 {

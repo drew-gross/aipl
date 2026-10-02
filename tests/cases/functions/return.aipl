@@ -1,8 +1,9 @@
+# `return value;` early-exits the enclosing function. It's a statement (like
+# `set`), so it appears followed by `;`; control never falls through it, and the
+# function still ends with a trailing value for the no-early-return path.
+
 import { equal as ==, extend, less_than_or_equal as <=, print, to_str } from builtins;
 
-// `return value;` early-exits the enclosing function. It's a statement (like
-// `set`), so it appears followed by `;`; control never falls through it, and the
-// function still ends with a trailing value for the no-early-return path.
 fn clamp_low(x: i64) -> i64 {
     if (x <= 0) {
         return 0;

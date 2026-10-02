@@ -1,10 +1,11 @@
+# A function whose whole body is a struct literal of its declared return type
+# may drop the stutter: `-> Vec2 { Vec2 { x: 1, y: 2 } }` writes as
+# `-> Vec2 { x: 1, y: 2 }`. The return type names the struct, so the literal
+# needn't; it desugars in the parser to exactly the construct the long form
+# builds, and nothing downstream can tell the two apart.
+
 import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
-// A function whose whole body is a struct literal of its declared return type
-// may drop the stutter: `-> Vec2 { Vec2 { x: 1, y: 2 } }` writes as
-// `-> Vec2 { x: 1, y: 2 }`. The return type names the struct, so the literal
-// needn't; it desugars in the parser to exactly the construct the long form
-// builds, and nothing downstream can tell the two apart.
 struct Vec2 { x: i64, y: i64 }
 
 struct Named { name: str, at: Vec2 }

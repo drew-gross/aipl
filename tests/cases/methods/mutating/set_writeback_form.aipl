@@ -1,9 +1,10 @@
+# `set recv.f(args)` is the writeback form of a mutating method call: it mutates
+# `recv` in place. It works for the builtin `push` and for user `mut self`
+# methods (which themselves use the `set` form internally), including inside a
+# loop, where the receiver grows in place rather than being copied per iteration.
+
 import { equal as ==, push } from builtins;
 
-// `set recv.f(args)` is the writeback form of a mutating method call: it mutates
-// `recv` in place. It works for the builtin `push` and for user `mut self`
-// methods (which themselves use the `set` form internally), including inside a
-// loop, where the receiver grows in place rather than being copied per iteration.
 fn extend2(mut self: i64[], a: i64, b: i64) {
     set self.push(a);
     set self.push(b);

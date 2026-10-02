@@ -1,12 +1,13 @@
+# `extend` on a never-aliased `char[]` appends into the value's own storage,
+# exactly as `push` does one char at a time (`push/push_char_in_place.aipl`).
+#
+# `cs.extend(cs)` is the case worth having a test for: the source lives inside
+# the block the append is about to grow, so reading it while writing would be
+# reading through a pointer `realloc` may already have moved. The runtime spots
+# that the two overlap and copies instead.
+
 import { equal as ==, extend, len } from builtins;
 
-// `extend` on a never-aliased `char[]` appends into the value's own storage,
-// exactly as `push` does one char at a time (`push/push_char_in_place.aipl`).
-//
-// `cs.extend(cs)` is the case worth having a test for: the source lives inside
-// the block the append is about to grow, so reading it while writing would be
-// reading through a pointer `realloc` may already have moved. The runtime spots
-// that the two overlap and copies instead.
 fn doubled(n: str) -> char[] {
     mut cs = ['a', 'b', 'c'];
     for (let _ : n) {

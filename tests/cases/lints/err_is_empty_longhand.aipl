@@ -1,6 +1,7 @@
+# Every spelling that asks emptiness the long way. `is_empty` asks it directly.
+
 import { equal as ==, is_nonempty, len, logical_not as ! } from builtins;
 
-// Every spelling that asks emptiness the long way. `is_empty` asks it directly.
 fn negated(xs: i64[]) -> bool { !xs.is_nonempty() }
 
 fn len_zero(xs: i64[]) -> bool { xs.len() == 0 }
@@ -16,31 +17,31 @@ fn free_call(xs: i64[]) -> bool { len(xs) == 0 }
 fn empty_str(s: str) -> bool { s.len() == 0 }
 --- errors ---
 error: emptiness asked the long way — use "xs.is_empty()", importing `is_empty` from builtins (or append #[allow] to this line to keep it)
- --> ./tests/cases/lints/err_is_empty_longhand.aipl:4:33
+ --> ./tests/cases/lints/err_is_empty_longhand.aipl:5:33
   |
-4 | fn negated(xs: i64[]) -> bool { !xs.is_nonempty() }
+5 | fn negated(xs: i64[]) -> bool { !xs.is_nonempty() }
   |                                 ^^^^^^^^^^^^^^^^^
 
 error: emptiness asked the long way — use "xs.is_empty()", importing `is_empty` from builtins (or append #[allow] to this line to keep it)
- --> ./tests/cases/lints/err_is_empty_longhand.aipl:6:34
+ --> ./tests/cases/lints/err_is_empty_longhand.aipl:7:34
   |
-6 | fn len_zero(xs: i64[]) -> bool { xs.len() == 0 }
+7 | fn len_zero(xs: i64[]) -> bool { xs.len() == 0 }
   |                                  ^^^^^^^^^^^^^
 
 error: emptiness asked the long way — use "xs.is_empty()", importing `is_empty` from builtins (or append #[allow] to this line to keep it)
- --> ./tests/cases/lints/err_is_empty_longhand.aipl:8:34
+ --> ./tests/cases/lints/err_is_empty_longhand.aipl:9:34
   |
-8 | fn zero_len(xs: i64[]) -> bool { 0 == xs.len() }
+9 | fn zero_len(xs: i64[]) -> bool { 0 == xs.len() }
   |                                  ^^^^^^^^^^^^^
 
 error: emptiness asked the long way — use "xs.is_empty()", importing `is_empty` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_is_empty_longhand.aipl:13:35
+  --> ./tests/cases/lints/err_is_empty_longhand.aipl:14:35
    |
-13 | fn free_call(xs: i64[]) -> bool { len(xs) == 0 }
+14 | fn free_call(xs: i64[]) -> bool { len(xs) == 0 }
    |                                   ^^^^^^^^^^^^
 
 error: emptiness asked the long way — use "s.is_empty()", importing `is_empty` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_is_empty_longhand.aipl:16:32
+  --> ./tests/cases/lints/err_is_empty_longhand.aipl:17:32
    |
-16 | fn empty_str(s: str) -> bool { s.len() == 0 }
+17 | fn empty_str(s: str) -> bool { s.len() == 0 }
    |                                ^^^^^^^^^^^^

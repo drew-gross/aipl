@@ -1,7 +1,8 @@
+# The three slice lints — a bound that says only what the open-ended form
+# already means — and the marker's scope.
+
 import { len, print } from builtins;
 
-// The three slice lints — a bound that says only what the open-ended form
-// already means — and the marker's scope.
 fn main() !prints {
     let s = "hello, world";
 
@@ -28,37 +29,37 @@ fn main() !prints {
 }
 --- errors ---
 error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_slices.aipl:16:13
+  --> ./tests/cases/lints/err_slices.aipl:17:13
    |
-16 |     print(s[0..]);
+17 |     print(s[0..]);
    |             ^
 
 error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_slices.aipl:17:15
+  --> ./tests/cases/lints/err_slices.aipl:18:15
    |
-17 |     print(s[..s.len()]);
+18 |     print(s[..s.len()]);
    |               ^^^^^^^
 
 error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_slices.aipl:18:13
+  --> ./tests/cases/lints/err_slices.aipl:19:13
    |
-18 |     print(s[0..s.len()]);
+19 |     print(s[0..s.len()]);
    |             ^
 
 error: slice end is the receiver's whole length — use the open-ended "s[3..]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_slices.aipl:10:16
+  --> ./tests/cases/lints/err_slices.aipl:11:16
    |
-10 |     print(s[3..s.len()]);
+11 |     print(s[3..s.len()]);
    |                ^^^^^^^
 
 error: slice end is the receiver's whole length — use the open-ended "s[4..]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_slices.aipl:27:16
+  --> ./tests/cases/lints/err_slices.aipl:28:16
    |
-27 |     print(s[4..s.len()]);
+28 |     print(s[4..s.len()]);
    |                ^^^^^^^
 
 error: slice starts at 0 — drop it for the open-ended "s[..end]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_slices.aipl:22:13
+  --> ./tests/cases/lints/err_slices.aipl:23:13
    |
-22 |     print(s[0..2]);
+23 |     print(s[0..2]);
    |             ^

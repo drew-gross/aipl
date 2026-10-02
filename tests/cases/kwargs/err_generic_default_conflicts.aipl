@@ -1,9 +1,10 @@
+# Omitting a type-variable-typed keyword parameter at an instantiation its
+# default doesn't fit is an error — reported at the call site, where the
+# default was spliced in, rather than at the declaration (which is fine for
+# every integer instantiation). See `generic_default` for the working shape.
+
 import { print, to_str } from builtins;
 
-// Omitting a type-variable-typed keyword parameter at an instantiation its
-// default doesn't fit is an error — reported at the call site, where the
-// default was spliced in, rather than at the declaration (which is fine for
-// every integer instantiation). See `generic_default` for the working shape.
 fn padded<T: any>(xs: T[], pad: T = 0) -> T[] { xs }
 
 fn main() !prints {
@@ -11,7 +12,7 @@ fn main() !prints {
 }
 --- errors ---
 error: conflicting types for "T" in "padded": str vs i64
-  --> ./tests/cases/kwargs/err_generic_default_conflicts.aipl:10:18
+  --> ./tests/cases/kwargs/err_generic_default_conflicts.aipl:11:18
    |
-10 |     print(to_str(padded(["a"])));
+11 |     print(to_str(padded(["a"])));
    |                  ^^^^^^^^^^^^^

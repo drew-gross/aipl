@@ -1,8 +1,9 @@
+# `map` over an optional: the one value there may be is mapped, and `none`
+# stays `none` — `some(v)` becomes `some(f(v))`, with the result an optional of
+# the lambda's type. The same `map` as an array's, dispatched on the receiver.
+
 import { equal as ==, map, print, to_str, value_or, wrapping_add as + } from builtins;
 
-// `map` over an optional: the one value there may be is mapped, and `none`
-// stays `none` — `some(v)` becomes `some(f(v))`, with the result an optional of
-// the lambda's type. The same `map` as an array's, dispatched on the receiver.
 fn double(n: i64) -> i64 { n + n }
 
 fn describe(o: i64?) -> str { o.map(|v| `some({v})`).value_or("none") }

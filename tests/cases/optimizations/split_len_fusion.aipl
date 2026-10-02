@@ -1,18 +1,18 @@
-import { join, len, print, split, split_len } from builtins;
+# Operation fusion: `s.split(sep).len()` collapses into `split_len`, which runs
+# `split`'s counting pass and stops there — instead of building an array of
+# every part (a retained view each) only for it to be counted and dropped.
+#
+# The site that matters is `src.lines().len()`: `lines` is `split("\n")`, and
+# it reaches the pass inlined, with its parameter bound ahead of the body
+# (`let self: str = src; split(self, "\n")`). The pass looks under that binding
+# for the chain, which is what `line_of` below proves — a user function of the
+# same shape fuses exactly as the direct spelling does.
+#
+# The `functions:` list is the evidence: six strings counted, but one
+# `aipl_array_new` — the array `first_and_count` binds and reads twice, which
+# therefore has to exist — and no array for the other five.
 
-// Operation fusion: `s.split(sep).len()` collapses into `split_len`, which runs
-// `split`'s counting pass and stops there — instead of building an array of
-// every part (a retained view each) only for it to be counted and dropped.
-//
-// The site that matters is `src.lines().len()`: `lines` is `split("\n")`, and
-// it reaches the pass inlined, with its parameter bound ahead of the body
-// (`let self: str = src; split(self, "\n")`). The pass looks under that binding
-// for the chain, which is what `line_of` below proves — a user function of the
-// same shape fuses exactly as the direct spelling does.
-//
-// The `functions:` list is the evidence: six strings counted, but one
-// `aipl_array_new` — the array `first_and_count` binds and reads twice, which
-// therefore has to exist — and no array for the other five.
+import { join, len, print, split, split_len } from builtins;
 
 fn lines(self: str) -> str[] { self.split("\n") }
 

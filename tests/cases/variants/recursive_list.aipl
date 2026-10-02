@@ -1,14 +1,15 @@
+# A recursive sum type: its payload refers back to itself, so it can't be
+# stored inline (infinite size). The compiler detects the containment cycle
+# and boxes it — values live on a refcounted heap block that keeps a *strong*
+# count (external references: locals, arguments) and a *weak* count (internal
+# references: one node's tail pointing at another node of the same type).
+# Dropping the last external reference frees the head and cascades the frees
+# down the (now-unreachable) tail. Shared tails survive until their last
+# holder is gone. A leak or double-free would unbalance the allocation counts
+# asserted below.
+
 import { equal as ==, not_equal as !=, print, to_str, wrapping_add as + } from builtins;
 
-// A recursive sum type: its payload refers back to itself, so it can't be
-// stored inline (infinite size). The compiler detects the containment cycle
-// and boxes it — values live on a refcounted heap block that keeps a *strong*
-// count (external references: locals, arguments) and a *weak* count (internal
-// references: one node's tail pointing at another node of the same type).
-// Dropping the last external reference frees the head and cascades the frees
-// down the (now-unreachable) tail. Shared tails survive until their last
-// holder is gone. A leak or double-free would unbalance the allocation counts
-// asserted below.
 variant List = Cons(i64, List) | Nil
 
 fn sum(self: List) -> i64 {

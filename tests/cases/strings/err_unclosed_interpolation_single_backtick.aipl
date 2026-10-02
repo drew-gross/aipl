@@ -1,12 +1,13 @@
+# Same as the triple-backtick EOF case, but for a single-backtick template
+# literal: `{1` is never closed, and nothing follows before EOF.
+
 import { print } from builtins;
 
-// Same as the triple-backtick EOF case, but for a single-backtick template
-// literal: `{1` is never closed, and nothing follows before EOF.
 fn main() !prints {
     print(`{1
 --- errors ---
 error: unterminated template literal
- --> ./tests/cases/strings/err_unclosed_interpolation_single_backtick.aipl:6:11
+ --> ./tests/cases/strings/err_unclosed_interpolation_single_backtick.aipl:7:11
   |
-6 |     print(`{1
+7 |     print(`{1
   |           ^

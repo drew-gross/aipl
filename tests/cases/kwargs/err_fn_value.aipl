@@ -1,6 +1,7 @@
-// A function with keyword parameters cannot be passed as a function value:
-// there is no call site to fill its defaults at, and a function type has no
-// keyword parameters.
+# A function with keyword parameters cannot be passed as a function value:
+# there is no call site to fill its defaults at, and a function type has no
+# keyword parameters.
+
 import { len, map } from builtins;
 
 fn double(x: i64, k: i64 = 0) -> i64 { x }
@@ -8,7 +9,7 @@ fn double(x: i64, k: i64 = 0) -> i64 { x }
 fn main() -> i64 { [1].map(double).len() }
 --- errors ---
 error: fn "double" has keyword parameters, so it cannot be passed as a function value
- --> ./tests/cases/kwargs/err_fn_value.aipl:8:28
+ --> ./tests/cases/kwargs/err_fn_value.aipl:9:28
   |
-8 | fn main() -> i64 { [1].map(double).len() }
+9 | fn main() -> i64 { [1].map(double).len() }
   |                            ^^^^^^

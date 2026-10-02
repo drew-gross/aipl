@@ -1,18 +1,19 @@
+# Fusion is refused when it would change what the program does — and the two
+# reasons are different in kind.
+#
+# An effect anywhere in the expression: fusing reorders the evaluation around
+# the traversal (a slice bound moves behind the remaining arguments), and an
+# effect *is* the observable behaviour, so the pass declines and the ordinary
+# slice-then-test runs.
+#
+# A bounded slice: `xs[i..j]` is a different receiver — its end truncates it —
+# so `starts_with_at`, which always runs to the end of `xs`, would answer a
+# different question. The second line below is exactly that difference: a
+# three-element pattern that doesn't fit in the two-element slice, but does fit
+# in the array behind it.
+
 import { less_than as <, print, push, starts_with, to_str, wrapping_increment as ++ } from builtins;
 
-// Fusion is refused when it would change what the program does — and the two
-// reasons are different in kind.
-//
-// An effect anywhere in the expression: fusing reorders the evaluation around
-// the traversal (a slice bound moves behind the remaining arguments), and an
-// effect *is* the observable behaviour, so the pass declines and the ordinary
-// slice-then-test runs.
-//
-// A bounded slice: `xs[i..j]` is a different receiver — its end truncates it —
-// so `starts_with_at`, which always runs to the end of `xs`, would answer a
-// different question. The second line below is exactly that difference: a
-// three-element pattern that doesn't fit in the two-element slice, but does fit
-// in the array behind it.
 fn many() -> i64[] {
     mut xs = [7];
     mut i: u64 = 0;

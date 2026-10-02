@@ -1,3 +1,9 @@
+# `#[allow]` at the end of the line keeps a length comparison, or a negated
+# emptiness test, as written — the program compiles and runs. Both operand
+# orders are squelched the same way, since the marker matches on the line the
+# hit's span starts on. The rewrite sits beside them, so the two spellings are
+# proven to agree.
+
 import {
     greater_than as >,
     is_empty,
@@ -9,11 +15,6 @@ import {
     to_str,
 } from builtins;
 
-// `#[allow]` at the end of the line keeps a length comparison, or a negated
-// emptiness test, as written — the program compiles and runs. Both operand
-// orders are squelched the same way, since the marker matches on the line the
-// hit's span starts on. The rewrite sits beside them, so the two spellings are
-// proven to agree.
 fn main() !prints {
     let xs = [1, 2, 3];
     print(to_str(0 < xs.len())); #[allow]

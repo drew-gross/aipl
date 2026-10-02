@@ -1,13 +1,14 @@
+# `match (o) { some(v) => p, none => false }` asks one question — does the
+# optional hold a value the arm accepts — and `is_some_and` asks it in one
+# line, without naming the `none` case at all.
+#
+# The literal `false` arm is what makes this recognizable without consulting
+# types: arms must agree on a type, so a `false` arm proves the whole `match`
+# is a `bool`, and `some`/`none` only ever match an optional. Arm order does
+# not matter, so the second function below is flagged too.
+
 import { equal as ==, print } from builtins;
 
-// `match (o) { some(v) => p, none => false }` asks one question — does the
-// optional hold a value the arm accepts — and `is_some_and` asks it in one
-// line, without naming the `none` case at all.
-//
-// The literal `false` arm is what makes this recognizable without consulting
-// types: arms must agree on a type, so a `false` arm proves the whole `match`
-// is a `bool`, and `some`/`none` only ever match an optional. Arm order does
-// not matter, so the second function below is flagged too.
 fn has_five(o: i64?) -> bool {
     match (o) {
         some(v) => v == 5,
@@ -28,13 +29,13 @@ fn main() !prints {
 }
 --- errors ---
 error: this `match` only asks whether the optional holds a value the arm accepts — write "o.is_some_and(|v| ..)" instead (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_is_some_and.aipl:14:17
+  --> ./tests/cases/lints/err_match_is_some_and.aipl:15:17
    |
-14 |         none => false,
+15 |         none => false,
    |                 ^^^^^
 
 error: this `match` only asks whether the optional holds a value the arm accepts — write "o.is_some_and(|v| ..)" instead (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_is_some_and.aipl:20:17
+  --> ./tests/cases/lints/err_match_is_some_and.aipl:21:17
    |
-20 |         none => false,
+21 |         none => false,
    |                 ^^^^^

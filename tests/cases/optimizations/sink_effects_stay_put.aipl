@@ -1,11 +1,12 @@
+# A value with an effect does not sink. Only one arm reads `v`, so the shape is
+# the one this pass looks for — but computing it is *observable*, and moving it
+# into the arm would mean the `false` call never prints at all.
+#
+# The interleaving below is the assertion: "computing" appears for both calls,
+# including the one that discards the result.
+
 import { print, to_str } from builtins;
 
-// A value with an effect does not sink. Only one arm reads `v`, so the shape is
-// the one this pass looks for — but computing it is *observable*, and moving it
-// into the arm would mean the `false` call never prints at all.
-//
-// The interleaving below is the assertion: "computing" appears for both calls,
-// including the one that discards the result.
 fn noisy(n: i64) !prints -> i64 {
     print(`computing {n}`);
     n

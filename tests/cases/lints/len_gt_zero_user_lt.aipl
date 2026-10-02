@@ -1,7 +1,8 @@
-// `<` need not be a builtin either: bound to one of your own functions,
-// `0 < xs.len()` is a call to that function and not a length test at all, so
-// the length-against-zero lint stays quiet rather than recommending a rewrite
-// that would mean something else.
+# `<` need not be a builtin either: bound to one of your own functions,
+# `0 < xs.len()` is a call to that function and not a length test at all, so
+# the length-against-zero lint stays quiet rather than recommending a rewrite
+# that would mean something else.
+
 import { len, print, to_str } from builtins;
 import { my_custom_lt as < } from "./myord.aipl";
 

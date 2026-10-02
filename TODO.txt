@@ -81,7 +81,8 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
-  move inlining after type checking so that the type refinement problems don't happen: I think the loss of types after inlining is an architectural problem that shouldn't even have potential to occur. If we move inlining to after type checking, will that solve the problem? So that all types are post-pinning and thus a pin can't be lost? Or maybe we need a separate pinning pass that happens before checking?
+  prevent untyped expressions from even getting to mono by using a separate type that can't contain them
+  move inlining after type checking so that the type refinement problems don't happen
   optimizations don't need internal fixpointing, since we now have pass manager. inline_small probably needs a guard against inline itself if recursive and small though.
   figure out why vscode thinks TODO.txt is indented with tabs
   go through and remove all comments that talk about how the code used to work.
@@ -212,6 +213,7 @@ bugs:
     It needs the binding held while both a scalar field and the boxed-optional field are read — reading only .next allocates 1 and balances, reading only .val elides the allocation entirely. That's presumably why recursive_struct.aipl and recursive_list.aipl never tripped it. My boxed case is reshaped to cover the boxed store path without hitting it
 
 errors:
+  attempting to do a top level mut should give a specific error
   report multiple errors when one call site has multiple type errors
   report multiple errors when there is a badly typed let
   assert should print the mixed values when there is an
@@ -343,6 +345,7 @@ sets:
   support other types
 
 parser:
+  support putting a different name in error messages e.g. "expected a doc comment..." instead of "expected a DocComment..."
   cleanup/remove nest/nest2/nest3
   OneOf([Then([T, U]), T]) should instead be Then([T, Maybe(U)]) (e.g. in variant)
   remove expr_unary, it's silly

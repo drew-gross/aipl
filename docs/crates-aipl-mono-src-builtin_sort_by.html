@@ -14,6 +14,8 @@
 
       <h1><code>crates/aipl-mono/src/builtin_sort_by.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>sort_by</code> builtin. Monomorphization registers this under the canonical name <code>__builtin_sort_by</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.sort_by(less)</code> resolves through the ordinary generic / higher-order machinery — the in-file name <code>sort_by</code> is only for this file's own tests, which read exactly like user code.</p><p>Insertion sort: each element is spliced into the already-sorted prefix at the first position it <code>less</code>-precedes, the splice being an array-literal spread — one pre-sized allocation per element (see the loader's <code>desugar_spread</code>).</p><p>The sort is <em>stable</em>: <code>insert_at</code> stops at the first <code>y</code> with <code>less(x, y)</code>, so an <code>x</code> equal to <code>y</code> (neither precedes the other) walks past it and lands after. Callers rely on this — the formatter hoists imports by key and expects two imports sharing a key to stay in source order.</p><p>Insertion sort is quadratic. That is the deliberate trade for a definition this small and obviously-stable: its callers sort import lists and other short sequences. Sorting a large array by its natural order should still use the native <code>sort</code> builtin.</p></div>
+
 
 
       <section class="group">

@@ -1,9 +1,9 @@
-import { concat as +++, print, to_str, wrapping_add as +, wrapping_sub as - } from builtins;
+# A `str` or array `match` may *destructure* with `[..]` patterns: each element
+# position is a binder (a bare name, bound to that element) or a literal
+# (matched by equality). A `str` is matched as its `char[]` view, so its element
+# binders are `char`. Fixed length — the `_` arm covers every other length.
 
-// A `str` or array `match` may *destructure* with `[..]` patterns: each element
-// position is a binder (a bare name, bound to that element) or a literal
-// (matched by equality). A `str` is matched as its `char[]` view, so its element
-// binders are `char`. Fixed length — the `_` arm covers every other length.
+import { concat as +++, print, to_str, wrapping_add as +, wrapping_sub as - } from builtins;
 
 // Destructure a str: an empty string, a single char, a leading `-` then one
 // more char, any other two chars, else the default. Mixes a string-literal arm

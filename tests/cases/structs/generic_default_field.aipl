@@ -1,7 +1,8 @@
+# A generic struct may mix a type-parameter field with an ordinary field that
+# carries a default. The default rides along with each instantiation.
+
 import { equal as == } from builtins;
 
-// A generic struct may mix a type-parameter field with an ordinary field that
-// carries a default. The default rides along with each instantiation.
 struct Tagged<T> { value: T, tag: str = "none" }
 
 fn default_tag() -> str { Tagged { value: 7 }.tag }.test({

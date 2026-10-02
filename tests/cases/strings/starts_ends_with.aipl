@@ -1,3 +1,17 @@
+# `s.starts_with(p)` / `s.ends_with(p)` test whether `s`'s bytes begin / end
+# with `p`'s. The pattern is variadic (`char*`): besides a `str` it accepts a
+# single `char` or a `char?` (an AIPL string is the char sequence). The empty
+# pattern always matches; a pattern longer than `s` never does. A view (long
+# slice) works as a receiver too.
+#
+# A one-char question is asked with a `char`, not a one-char `str`: the char
+# shape is a single byte compare in the runtime, where a `str` pattern is a
+# window compare — `is_dotfile` below is the shape to copy.
+#
+# `s.starts_with_at(p, i)` is `s[i..].starts_with(p)` without building the
+# slice — the answer the fusion pass rewrites that shape into (see
+# `cases/optimizations/slice_starts_with_fusion`), and callable directly.
+
 import {
     ends_with,
     logical_and as &&,
@@ -6,19 +20,6 @@ import {
     starts_with_at,
 } from builtins;
 
-// `s.starts_with(p)` / `s.ends_with(p)` test whether `s`'s bytes begin / end
-// with `p`'s. The pattern is variadic (`char*`): besides a `str` it accepts a
-// single `char` or a `char?` (an AIPL string is the char sequence). The empty
-// pattern always matches; a pattern longer than `s` never does. A view (long
-// slice) works as a receiver too.
-//
-// A one-char question is asked with a `char`, not a one-char `str`: the char
-// shape is a single byte compare in the runtime, where a `str` pattern is a
-// window compare — `is_dotfile` below is the shape to copy.
-//
-// `s.starts_with_at(p, i)` is `s[i..].starts_with(p)` without building the
-// slice — the answer the fusion pass rewrites that shape into (see
-// `cases/optimizations/slice_starts_with_fusion`), and callable directly.
 fn is_dotfile(name: str) -> bool { name.starts_with('.') && !name.ends_with('/') }.test({
     assert("hello".starts_with("he")); // common prefix
     assert("hello".starts_with("hello")); // whole string

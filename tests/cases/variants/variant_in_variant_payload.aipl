@@ -1,7 +1,8 @@
+# A (non-recursive) variant is a legal payload of another variant: stored
+# inline like a struct payload, constructed and matched structurally.
+
 import { equal as ==, wrapping_sub as - } from builtins;
 
-// A (non-recursive) variant is a legal payload of another variant: stored
-// inline like a struct payload, constructed and matched structurally.
 variant Inner = A(i64) | B
 
 variant Outer = Wrap(Inner) | Empty

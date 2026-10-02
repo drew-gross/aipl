@@ -1,7 +1,8 @@
+# `#[allow]` at the end of the line keeps a literal interpolation as written;
+# the template beside it says the same thing in place.
+
 import { print } from builtins;
 
-// `#[allow]` at the end of the line keeps a literal interpolation as written;
-// the template beside it says the same thing in place.
 fn main() !prints {
     print(`a: {'a'}, aa: {"aa"}`); #[allow]
     print(`a: a, aa: aa`);

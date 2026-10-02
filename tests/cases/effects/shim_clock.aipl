@@ -1,15 +1,15 @@
-import { equal as ==, greater_than as >, monotonic_now, now_nanos, print, to_str } from builtins;
+# A `shim <effect> { op = f, .. } { body }` installs stand-ins for an effect's
+# operations over the *dynamic* extent of `body`: every call made while it runs
+# reaches the bound function instead of the real one, at any call depth, without
+# the callees knowing a shim exists.
+#
+# Because every operation of `!clock` is bound, the body provably cannot reach
+# the real clock — so the effect is *discharged*. The functions below that
+# install shims declare **no effects at all**, while calling code that declares
+# `!clock`. (What an installer must still declare is whatever the shim functions
+# themselves declare — see `err_shim_undeclared_effect`.)
 
-// A `shim <effect> { op = f, .. } { body }` installs stand-ins for an effect's
-// operations over the *dynamic* extent of `body`: every call made while it runs
-// reaches the bound function instead of the real one, at any call depth, without
-// the callees knowing a shim exists.
-//
-// Because every operation of `!clock` is bound, the body provably cannot reach
-// the real clock — so the effect is *discharged*. The functions below that
-// install shims declare **no effects at all**, while calling code that declares
-// `!clock`. (What an installer must still declare is whatever the shim functions
-// themselves declare — see `err_shim_undeclared_effect`.)
+import { equal as ==, greater_than as >, monotonic_now, now_nanos, print, to_str } from builtins;
 
 fn fixed_wall() -> u64 { 1111 }
 

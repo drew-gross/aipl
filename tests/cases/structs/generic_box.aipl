@@ -1,8 +1,9 @@
+# A generic struct is a template: each construction infers its type argument
+# from the field values, monomorphizing to a distinct instance (`Box$i64`,
+# `Box$str`, `Box$bool`). The type parameter's bound defaults to `any`.
+
 import { equal as == } from builtins;
 
-// A generic struct is a template: each construction infers its type argument
-// from the field values, monomorphizing to a distinct instance (`Box$i64`,
-// `Box$str`, `Box$bool`). The type parameter's bound defaults to `any`.
 struct Box<T> { value: T }
 
 fn boxed_int() -> i64 { Box { value: 5 }.value }.test({

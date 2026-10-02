@@ -1,10 +1,10 @@
-import { less_than as < } from builtins;
+# Every *check-phase* result error, in one file, reported in one run.
+#
+# `err_try_outside_result` is not here: a bad `?` is caught during
+# *monomorphization*, which only visits functions something reaches — so it
+# needs a `main` that calls it, and mono stops at its first error anyway.
 
-// Every *check-phase* result error, in one file, reported in one run.
-//
-// `err_try_outside_result` is not here: a bad `?` is caught during
-// *monomorphization*, which only visits functions something reaches — so it
-// needs a `main` that calls it, and mono stops at its first error anyway.
+import { less_than as < } from builtins;
 
 fn might_fail(n: i64) -> i64!str { if (n < 0) { err("negative") } else { ok(n) } }
 

@@ -1,8 +1,9 @@
+# An optional may carry an array payload (`str[]?`), since an array is an
+# 8-byte heap pointer that fits the optional slot. The `some` arm owns the
+# array; the `none` arm falls back to an empty one.
+
 import { equal as ==, len, value_or, wrapping_add as + } from builtins;
 
-// An optional may carry an array payload (`str[]?`), since an array is an
-// 8-byte heap pointer that fits the optional slot. The `some` arm owns the
-// array; the `none` arm falls back to an empty one.
 fn pick(b: bool) -> str[]? { if (b) { some(["x", "y", "z"]) } else { none } }.test({
     let present = pick(true).value_or([]);
     assert(present[1] == some("y"));

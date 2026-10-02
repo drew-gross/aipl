@@ -1,7 +1,8 @@
-// A generic variant scopes its constructors by import just like a concrete one:
-// `import { Some }` brings the constructor into scope (its instance is inferred
-// from the argument), and importing the variant `Opt` lets you write its nullary
-// case as `Opt.Nothing`.
+# A generic variant scopes its constructors by import just like a concrete one:
+# `import { Some }` brings the constructor into scope (its instance is inferred
+# from the argument), and importing the variant `Opt` lets you write its nullary
+# case as `Opt.Nothing`.
+
 import { print, to_str } from builtins;
 import { Opt, Some, unwrap_or } from "./opt.aipl";
 

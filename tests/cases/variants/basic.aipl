@@ -1,7 +1,8 @@
+# A sum type (Haskell-style `data`, paren'd payloads): an inline `{tag, payload}`
+# value sized to the widest case. Constructed and matched positionally.
+
 import { equal as ==, is_some, wrapping_mul as * } from builtins;
 
-// A sum type (Haskell-style `data`, paren'd payloads): an inline `{tag, payload}`
-// value sized to the widest case. Constructed and matched positionally.
 variant Shape = Circle(i64) | Rect(i64, i64) | Empty
 
 // Returned by value (variants are composites, handed back via sret).

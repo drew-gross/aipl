@@ -1,9 +1,9 @@
-import { print, to_str } from builtins;
+# Deep `none` coercion: a chain like `some(some(none))` has a `__none__` core
+# (no concrete element). That core now coerces through the `some` layers to a
+# concrete one, so a deep partial chain fits a concrete nested-optional type as
+# a return value, a function argument, an `if`/`else` branch, and a `match` arm.
 
-// Deep `none` coercion: a chain like `some(some(none))` has a `__none__` core
-// (no concrete element). That core now coerces through the `some` layers to a
-// concrete one, so a deep partial chain fits a concrete nested-optional type as
-// a return value, a function argument, an `if`/`else` branch, and a `match` arm.
+import { print, to_str } from builtins;
 
 // Return-type coercion: __none__??? -> i64???.
 fn ret_deep() -> i64??? { some(some(none)) }

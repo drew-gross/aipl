@@ -1,5 +1,6 @@
-// A `_` with nothing left to cover is dead code — and the shape that would go
-// quiet the moment the last case it stood for is removed.
+# A `_` with nothing left to cover is dead code — and the shape that would go
+# quiet the moment the last case it stood for is removed.
+
 variant Shape = Circle(i64) | Square(i64) | Point
 
 fn size(s: Shape) -> i64 {
@@ -16,7 +17,7 @@ fn main() {
 }
 --- errors ---
 error: unreachable `_` arm: every case is already matched above it
-  --> ./tests/cases/match_arms/err_wildcard_unreachable.aipl:10:9
+  --> ./tests/cases/match_arms/err_wildcard_unreachable.aipl:11:9
    |
-10 |         _ => 1,
+11 |         _ => 1,
    |         ^

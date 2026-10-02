@@ -1,9 +1,10 @@
+# `#[allow]` keeps the rebuild form — the escape hatch every lint carries. The
+# marker goes on the line holding the `..self` spread, which is where this lint
+# points; it is always one line, so it takes a trailing marker and keeps it
+# through `aipl fmt`.
+
 import { equal as ==, extend, print, push, to_str } from builtins;
 
-// `#[allow]` keeps the rebuild form — the escape hatch every lint carries. The
-// marker goes on the line holding the `..self` spread, which is where this lint
-// points; it is always one line, so it takes a trailing marker and keeps it
-// through `aipl fmt`.
 fn rebuilt(mut self: i64[]) {
     set self = [..self, 3]; #[allow]
 }

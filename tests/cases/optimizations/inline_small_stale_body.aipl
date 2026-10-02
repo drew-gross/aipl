@@ -1,19 +1,20 @@
+# `inline_small_post_mono` picks its candidates once, up front, but every
+# candidate's body keeps changing as *earlier* candidates are inlined into it.
+# Splicing the up-front snapshot back in revives a call to a function an earlier
+# round had already expanded away and dropped, and codegen then fails with
+# "call to undefined fn". So each candidate's body is re-read when its turn
+# comes.
+#
+# The shape that hits it: `shout` reaches codegen through two routes at once —
+# directly, from its own `.test` driver, and indirectly, baked into the
+# lambda-specialized instance of the higher-order `apply` (`apply$str$str$s0$lam0`).
+# `shout` is inlined into every site and dropped; the stale copy of that
+# instance then puts the call back. Two `apply` calls rather than one, so the
+# instance is not single-use and survives to the small-body pass, where the
+# ordering is what matters.
+
 import { equal as == } from builtins;
 
-// `inline_small_post_mono` picks its candidates once, up front, but every
-// candidate's body keeps changing as *earlier* candidates are inlined into it.
-// Splicing the up-front snapshot back in revives a call to a function an earlier
-// round had already expanded away and dropped, and codegen then fails with
-// "call to undefined fn". So each candidate's body is re-read when its turn
-// comes.
-//
-// The shape that hits it: `shout` reaches codegen through two routes at once —
-// directly, from its own `.test` driver, and indirectly, baked into the
-// lambda-specialized instance of the higher-order `apply` (`apply$str$str$s0$lam0`).
-// `shout` is inlined into every site and dropped; the stale copy of that
-// instance then puts the call back. Two `apply` calls rather than one, so the
-// instance is not single-use and survives to the small-body pass, where the
-// ordering is what matters.
 fn apply<T: any, U: any>(x: T, f: (T) -> U) -> U { f(x) }.test({
     fn shout(self: str) -> str { `{self}!` }
     assert(shout("hi") == "hi!");

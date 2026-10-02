@@ -1,15 +1,16 @@
+# A `match` arm's body may be a brace-delimited statement block, exactly like an
+# `if` branch: statements first, and the trailing expression (if any) is the
+# arm's value. Before this, an arm was a single *expression*, so any arm needing
+# intermediate bindings had to become its own function returning a carrier
+# struct — the shape `doc.aipl`'s printer and `walker.aipl`'s token walker both
+# carried comments apologising for.
+#
+# The two forms mix freely within one `match`, and the block form works for
+# every pattern kind, which is what this covers: constructor arms with payload
+# bindings, `some`/`none`, string- and char-literal arms, and the wildcard.
+
 import { len, print, to_str, wrapping_add as +, wrapping_increment as ++ } from builtins;
 
-// A `match` arm's body may be a brace-delimited statement block, exactly like an
-// `if` branch: statements first, and the trailing expression (if any) is the
-// arm's value. Before this, an arm was a single *expression*, so any arm needing
-// intermediate bindings had to become its own function returning a carrier
-// struct — the shape `doc.aipl`'s printer and `walker.aipl`'s token walker both
-// carried comments apologising for.
-//
-// The two forms mix freely within one `match`, and the block form works for
-// every pattern kind, which is what this covers: constructor arms with payload
-// bindings, `some`/`none`, string- and char-literal arms, and the wildcard.
 variant Shape = Dot | Line(u64) | Box(u64, u64)
 
 fn area(s: Shape) -> u64 {

@@ -1,6 +1,7 @@
-// An array *pattern* has no rest form. Its elements are patterns, and no
-// pattern is led by `..`, so the parser is what refuses one — where a `..` in a
-// call argument list parses and is refused later.
+# An array *pattern* has no rest form. Its elements are patterns, and no
+# pattern is led by `..`, so the parser is what refuses one — where a `..` in a
+# call argument list parses and is refused later.
+
 import { equal as ==} from builtins;
 
 fn main() -> i64 {
@@ -12,7 +13,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: expected `]` or a pattern, found `..`
- --> ./tests/cases/arrays/spread/err_spread_in_pattern.aipl:9:10
-  |
-9 |         [..a] => 1,
-  |          ^^
+  --> ./tests/cases/arrays/spread/err_spread_in_pattern.aipl:10:10
+   |
+10 |         [..a] => 1,
+   |          ^^

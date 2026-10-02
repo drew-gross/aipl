@@ -1,3 +1,5 @@
+# A named predicate.
+
 import {
     equal as ==,
     filter,
@@ -10,7 +12,6 @@ import {
     wrapping_sub as -,
 } from builtins;
 
-// A named predicate.
 fn is_even(x: i64) -> bool { x - (x / 2) * 2 == 0 }.test({
     let xs = [1, 2, 3, 4, 5, 6];
 

@@ -1,9 +1,10 @@
+# Optionals nest: `some(some(1))` is an `i64??`, stored inline (the outer's
+# value region holds the whole inner optional). And indexing a `T?[]` yields a
+# genuine `T??` — no flattening — so an out-of-bounds index (outer `none`) is
+# distinct from an element that is itself `none`.
+
 import { print, to_str } from builtins;
 
-// Optionals nest: `some(some(1))` is an `i64??`, stored inline (the outer's
-// value region holds the whole inner optional). And indexing a `T?[]` yields a
-// genuine `T??` — no flattening — so an out-of-bounds index (outer `none`) is
-// distinct from an element that is itself `none`.
 fn main() !prints {
     // Nested optional construction + Debug-style rendering.
     print(to_str(some(some(1)))); // some(some(1))

@@ -1,11 +1,12 @@
+# The struct a pattern names is resolved through the file's import view like any
+# other type name, so destructuring an imported struct pins the same way a local
+# one does. This is worth its own case because the pattern's type only became
+# load-bearing when the scrutinee binding started carrying it — before that the
+# name was parsed and dropped, and no import resolution happened at all.
+
 import { print } from builtins;
 import { Rec, make } from "./destructure_imported_lib.aipl";
 
-// The struct a pattern names is resolved through the file's import view like any
-// other type name, so destructuring an imported struct pins the same way a local
-// one does. This is worth its own case because the pattern's type only became
-// load-bearing when the scrutinee binding started carrying it — before that the
-// name was parsed and dropped, and no import resolution happened at all.
 fn main() !prints {
     let Rec { a, b } = make();
     print(`{a} {b}`);

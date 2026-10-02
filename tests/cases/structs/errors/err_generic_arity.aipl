@@ -1,4 +1,5 @@
-// A generic type used with the wrong number of type arguments is an error.
+# A generic type used with the wrong number of type arguments is an error.
+
 struct Pair<A, B> { first: A, second: B }
 
 fn take(p: Pair<i64>) -> i64 { p.first }

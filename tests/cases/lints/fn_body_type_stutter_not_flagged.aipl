@@ -1,11 +1,12 @@
+# Shapes the body-shorthand lint must leave alone. Each involves a struct
+# literal in a function body, but none can be written as the shorthand — and a
+# false hit is a build nothing but `#[allow]` could fix, so the lint stays
+# narrow. (There is deliberately no "literal of the wrong type" case: a body's
+# type *is* the return type, so that shape cannot type-check in the first
+# place.)
+
 import { equal as ==, wrapping_add as + } from builtins;
 
-// Shapes the body-shorthand lint must leave alone. Each involves a struct
-// literal in a function body, but none can be written as the shorthand — and a
-// false hit is a build nothing but `#[allow]` could fix, so the lint stays
-// narrow. (There is deliberately no "literal of the wrong type" case: a body's
-// type *is* the return type, so that shape cannot type-check in the first
-// place.)
 struct Point { x: i64, y: i64 }
 
 struct Other { n: i64 }

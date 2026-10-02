@@ -1,19 +1,20 @@
+# Operation fusion: `xs[i..].starts_with(p)` collapses into `starts_with_at`,
+# which compares in place from `i` rather than building the tail first and then
+# looking at its first few elements.
+#
+# The slice is the expensive half. An array slice allocates a fresh block and
+# copies every remaining element; a str slice allocates a view that has to be
+# refcounted and dropped. Neither is ever read past `p`'s length.
+#
+# Measured on this case with the fusion switched off: 16 allocations totalling
+# 3,880 bytes become 8 totalling 360 — mostly the 200-element copy `many()[1..]`
+# makes, twice over. `instructions executed` barely moves (12,127 -> 12,082),
+# because it counts a call into the runtime as one instruction however much work
+# it does, and `aipl_arr_slice` is where the copying happens. The `functions:`
+# list below is the readable evidence: no slice call survives.
+
 import { less_than as <, print, push, starts_with, to_str, wrapping_increment as ++ } from builtins;
 
-// Operation fusion: `xs[i..].starts_with(p)` collapses into `starts_with_at`,
-// which compares in place from `i` rather than building the tail first and then
-// looking at its first few elements.
-//
-// The slice is the expensive half. An array slice allocates a fresh block and
-// copies every remaining element; a str slice allocates a view that has to be
-// refcounted and dropped. Neither is ever read past `p`'s length.
-//
-// Measured on this case with the fusion switched off: 16 allocations totalling
-// 3,880 bytes become 8 totalling 360 — mostly the 200-element copy `many()[1..]`
-// makes, twice over. `instructions executed` barely moves (12,127 -> 12,082),
-// because it counts a call into the runtime as one instruction however much work
-// it does, and `aipl_arr_slice` is where the copying happens. The `functions:`
-// list below is the readable evidence: no slice call survives.
 fn many() -> i64[] {
     mut xs = [7];
     mut i: u64 = 0;

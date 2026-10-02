@@ -1,14 +1,15 @@
+# `min`/`max` return the smaller / larger of two comparable values. They carry
+# the `ord` bound — the same one `minimum`/`maximum` use — so they work at any
+# integer width, on `char`, and on `str`, not just `i64`. Callable free
+# (`min(a, b)`, the form to prefer) or as a method (`a.max(b)`); a bare literal
+# operand flexes to the other side's type. Equal operands return that value.
+#
+# Signedness comes from the operand type, which is the whole point of the
+# bound: a `u64` above `i64::MAX` compares as the large number it is, where a
+# signed compare would read it as negative and pick the wrong side.
+
 import { concat as +++, equal as ==, len, max, min, wrapping_add as + } from builtins;
 
-// `min`/`max` return the smaller / larger of two comparable values. They carry
-// the `ord` bound — the same one `minimum`/`maximum` use — so they work at any
-// integer width, on `char`, and on `str`, not just `i64`. Callable free
-// (`min(a, b)`, the form to prefer) or as a method (`a.max(b)`); a bare literal
-// operand flexes to the other side's type. Equal operands return that value.
-//
-// Signedness comes from the operand type, which is the whole point of the
-// bound: a `u64` above `i64::MAX` compares as the large number it is, where a
-// signed compare would read it as negative and pick the wrong side.
 fn clamp_low(x: i64, lo: i64) -> i64 { x.max(lo) }.test({
     assert(min(3, 7) == 3);
     assert(max(3, 7) == 7);

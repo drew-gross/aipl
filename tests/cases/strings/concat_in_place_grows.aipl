@@ -1,13 +1,14 @@
+# The heap half of `concat_in_place.aipl`: a builder loop whose result outgrows
+# the 22-byte inline form. The binding is never aliased, so each append writes
+# into the value's own storage — filling spare capacity where there is some and
+# growing the block under itself where there isn't. Capacity doubles, so N
+# appends cost O(log N) reallocations rather than N fresh strings.
+#
+# `binding_is_exclusive` is what licenses it: `s` is read only by the appends
+# themselves and the tail move, so nothing else can be holding those bytes.
+
 import { equal as ==, extend, len } from builtins;
 
-// The heap half of `concat_in_place.aipl`: a builder loop whose result outgrows
-// the 22-byte inline form. The binding is never aliased, so each append writes
-// into the value's own storage — filling spare capacity where there is some and
-// growing the block under itself where there isn't. Capacity doubles, so N
-// appends cost O(log N) reallocations rather than N fresh strings.
-//
-// `binding_is_exclusive` is what licenses it: `s` is read only by the appends
-// themselves and the tail move, so nothing else can be holding those bytes.
 fn build(parts: str) -> str {
     mut s = "";
     for (let _ : parts) {

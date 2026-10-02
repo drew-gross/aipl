@@ -1,7 +1,8 @@
-// An operator can be passed as a first-class function value: `apply(2, 3, +)`
-// desugars to passing the binary lambda `|lhs, rhs| lhs + rhs`. It reuses all
-// the lambda machinery — the receiver is monomorphized per operator. The
-// operator must still be imported (the desugared `+`/`*` is gated like any use).
+# An operator can be passed as a first-class function value: `apply(2, 3, +)`
+# desugars to passing the binary lambda `|lhs, rhs| lhs + rhs`. It reuses all
+# the lambda machinery — the receiver is monomorphized per operator. The
+# operator must still be imported (the desugared `+`/`*` is gated like any use).
+
 import { print, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
 
 fn apply(a: i64, b: i64, f: (i64, i64) -> i64) -> i64 { f(a, b) }

@@ -1,7 +1,8 @@
+# `to_str` on arrays of any element type, rendered `[e, e]` with the elements
+# themselves Debug-formatted (strings quoted, chars quoted).
+
 import { print, push, to_str } from builtins;
 
-// `to_str` on arrays of any element type, rendered `[e, e]` with the elements
-// themselves Debug-formatted (strings quoted, chars quoted).
 fn main() !prints {
     print(to_str([1, 2, 3])); // [1, 2, 3]
     print(to_str([true, false])); // [true, false]

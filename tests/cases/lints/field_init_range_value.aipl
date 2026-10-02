@@ -1,9 +1,10 @@
+# Regression: a range `start..end` desugars to a synthetic `__builtin_Span`
+# construct whose bound identifiers happen to match the Span field names. That
+# is not a user-written `field: field`, so the field-init-shorthand lint must
+# not flag it (the value's preceding source char is the *outer* `span:` colon).
+
 import { Span, equal as == } from builtins;
 
-// Regression: a range `start..end` desugars to a synthetic `__builtin_Span`
-// construct whose bound identifiers happen to match the Span field names. That
-// is not a user-written `field: field`, so the field-init-shorthand lint must
-// not flag it (the value's preceding source char is the *outer* `span:` colon).
 struct Tok { span: Span }
 
 fn tok(start: i64, end: i64) -> Tok { span: start..end }.test({

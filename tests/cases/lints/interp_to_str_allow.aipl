@@ -1,7 +1,8 @@
+# `#[allow]` at the end of the line keeps a `to_str` inside an interpolation
+# as written; the plain interpolation beside it renders the same text.
+
 import { print, to_str } from builtins;
 
-// `#[allow]` at the end of the line keeps a `to_str` inside an interpolation
-// as written; the plain interpolation beside it renders the same text.
 fn main() !prints {
     let n = 42;
     print(`n = {to_str(n)}`); #[allow]

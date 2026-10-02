@@ -744,9 +744,9 @@ allocations: 2325
 deallocations: 2325
 reallocations: 217
 bytes allocated: 186475
-instructions executed: 296811
-binary size: 255704
-  code: 164424
+instructions executed: 296835
+binary size: 255752
+  code: 164472
   data: 6076
   metadata: 85204
 functions:
@@ -1112,13 +1112,13 @@ functions:
     bytes: 2728
   render_cst$FKind$str$s1$lam$__test$fmt_node$spaced_unless_punct:
     calls: 6
-    bytes: 288
+    bytes: 304
   render_cst$FKind$str$s1$lam$__test$render_cst$always_space:
     calls: 1
-    bytes: 288
+    bytes: 304
   render_cst$FKind$str$s1$lam$never_space:
     calls: 1
-    bytes: 288
+    bytes: 304
   wrapped$lam$never_space:
     calls: 15
     bytes: 2556

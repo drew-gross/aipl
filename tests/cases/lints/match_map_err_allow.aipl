@@ -1,16 +1,16 @@
-import { equal as ==, map_err, print, to_str } from builtins;
+# `#[allow]` keeps the long form — the escape hatch every lint carries.
+# `map_err`'s own definition needs exactly this, since it cannot be written in
+# terms of itself.
+#
+# The marker goes on the `ok(v) => ok(v)` arm, which is where this lint points.
+# That is deliberate: `#[allow]` is line-scoped, so a lint spanning the whole
+# multi-line `match` could never be squelched — the only line able to carry the
+# marker would be the `match (..) {` header, and the formatter moves a marker
+# written there onto its own line, where it squelches nothing. The
+# pass-through arm is always one line (the `err` arm's replacement need not
+# be), so it always takes a trailing marker and keeps it through `aipl fmt`.
 
-// `#[allow]` keeps the long form — the escape hatch every lint carries.
-// `map_err`'s own definition needs exactly this, since it cannot be written in
-// terms of itself.
-//
-// The marker goes on the `ok(v) => ok(v)` arm, which is where this lint points.
-// That is deliberate: `#[allow]` is line-scoped, so a lint spanning the whole
-// multi-line `match` could never be squelched — the only line able to carry the
-// marker would be the `match (..) {` header, and the formatter moves a marker
-// written there onto its own line, where it squelches nothing. The
-// pass-through arm is always one line (the `err` arm's replacement need not
-// be), so it always takes a trailing marker and keeps it through `aipl fmt`.
+import { equal as ==, map_err, print, to_str } from builtins;
 
 struct Wrapped { message: str, code: i64 }
 

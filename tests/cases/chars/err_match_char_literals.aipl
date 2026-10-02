@@ -1,6 +1,6 @@
-// Every char-match error, in one run: the domain is open so a `_` is required
-// and must come last, duplicate arms are dead code, and a char literal only
-// matches a `char`.
+# Every char-match error, in one run: the domain is open so a `_` is required
+# and must come last, duplicate arms are dead code, and a char literal only
+# matches a `char`.
 
 // No `_`: the arms can't cover every char.
 fn missing_wildcard(c: char) -> i64 {

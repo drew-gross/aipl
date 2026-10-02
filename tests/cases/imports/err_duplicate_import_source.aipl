@@ -1,6 +1,7 @@
-// Importing from the same place on more than one line is an error: every import
-// from a given source must be a single `import { .. }`. Here `builtins` is
-// imported twice — the names belong on one line.
+# Importing from the same place on more than one line is an error: every import
+# from a given source must be a single `import { .. }`. Here `builtins` is
+# imported twice — the names belong on one line.
+
 import { print } from builtins;
 import { to_str } from builtins;
 
@@ -9,7 +10,7 @@ fn main() !prints {
 }
 --- errors ---
 error: duplicate import from "builtins"; merge the names into the first `import { .. } from builtins;`
- --> ./tests/cases/imports/err_duplicate_import_source.aipl:5:24
+ --> ./tests/cases/imports/err_duplicate_import_source.aipl:6:24
   |
-5 | import { to_str } from builtins;
+6 | import { to_str } from builtins;
   |                        ^^^^^^^^

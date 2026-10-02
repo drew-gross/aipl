@@ -1,3 +1,8 @@
+# The shapes the indexed find-loop lint must leave alone. It rewrites exactly
+# one shape — an indexed loop whose body is an else-less `if` around
+# `return some(<the index binding>);`, falling through to `none`, with a test
+# that reads only the element — so everything here compiles.
+
 import {
     find_index,
     len,
@@ -8,11 +13,6 @@ import {
     wrapping_add as +,
     wrapping_increment as ++,
 } from builtins;
-
-// The shapes the indexed find-loop lint must leave alone. It rewrites exactly
-// one shape — an indexed loop whose body is an else-less `if` around
-// `return some(<the index binding>);`, falling through to `none`, with a test
-// that reads only the element — so everything here compiles.
 
 // **The test reads the index.** `find_index` hands its predicate the element and
 // nothing else, so there is nowhere for `i` to go: this is a scan the builtin

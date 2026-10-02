@@ -1,13 +1,14 @@
+# `#[allow]` keeps the braces — the escape hatch every lint carries.
+#
+# The marker goes on the line holding the block's closing `}`, which is where
+# this lint points, and that is deliberate: it is the one line that carries a
+# marker whatever the layout. An arm written on one line ends with it; a broken
+# block has it alone on its own line. A marker after the opening `{`, or after
+# the value's first line when the value itself breaks, is moved by `aipl fmt`
+# onto its own line — where it squelches nothing.
+
 import { print, to_str, wrapping_add as + } from builtins;
 
-// `#[allow]` keeps the braces — the escape hatch every lint carries.
-//
-// The marker goes on the line holding the block's closing `}`, which is where
-// this lint points, and that is deliberate: it is the one line that carries a
-// marker whatever the layout. An arm written on one line ends with it; a broken
-// block has it alone on its own line. A marker after the opening `{`, or after
-// the value's first line when the value itself breaks, is moved by `aipl fmt`
-// onto its own line — where it squelches nothing.
 fn f(x: i64) -> i64 {
     match (x) {
         0 => { 1 }, #[allow]

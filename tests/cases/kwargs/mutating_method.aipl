@@ -1,4 +1,5 @@
-// A mutating method can carry a keyword parameter after its `mut self`.
+# A mutating method can carry a keyword parameter after its `mut self`.
+
 import { len, print, push, to_str } from builtins;
 
 fn extend(mut self: i64[], v: i64 = 5) {

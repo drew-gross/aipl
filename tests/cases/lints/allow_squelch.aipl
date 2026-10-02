@@ -1,8 +1,9 @@
+# `#[allow]` at the end of a line squelches every lint on that line — the
+# program compiles and runs as written. Only lints are squelchable; regular
+# errors (type mismatches etc.) take no notice of the marker.
+
 import { len, print } from builtins;
 
-// `#[allow]` at the end of a line squelches every lint on that line — the
-// program compiles and runs as written. Only lints are squelchable; regular
-// errors (type mismatches etc.) take no notice of the marker.
 fn main() !prints {
     let x = "hello, world";
     print(x[3..x.len()]); #[allow]

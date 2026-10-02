@@ -1,8 +1,9 @@
+# Spread works for every element representation, not just `i64`. `char[]` is
+# the interesting one: it is str-shaped, so the build has to start from a
+# typed array rather than an untyped empty literal.
+
 import { equal as ==, join } from builtins;
 
-// Spread works for every element representation, not just `i64`. `char[]` is
-// the interesting one: it is str-shaped, so the build has to start from a
-// typed array rather than an untyped empty literal.
 struct P { x: i64 }
 
 fn chars() -> char[] { [..['a', 'b'], 'c'] }.test({

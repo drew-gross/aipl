@@ -1,8 +1,9 @@
+# `#[allow]` on the `none` arm — where this lint points, since the default is
+# the one part of the shape that is reliably a single line — keeps the long
+# form. The rewrite beside it computes the same thing.
+
 import { map, print, to_str, value_or, wrapping_add as + } from builtins;
 
-// `#[allow]` on the `none` arm — where this lint points, since the default is
-// the one part of the shape that is reliably a single line — keeps the long
-// form. The rewrite beside it computes the same thing.
 fn plus_one_or_zero(o: i64?) -> i64 {
     match (o) {
         some(v) => v + 1,

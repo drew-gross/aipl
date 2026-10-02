@@ -1,3 +1,18 @@
+# An early exit releases every live scope before control leaves — and it has to
+# release them innermost first, the order ordinary exit unwinds them in. This
+# is the shape that told the difference.
+#
+# `eval` is a tail-call participant (its `"^"` arm hands off to `pow`), so its
+# `self` is a reference of its own — and `main` passes a *fresh* `Bin`, which is
+# moved in outright: `eval`'s release of `self` is the one that frees the block.
+# The arm's `op` is a heap `str` read in place out of that block (a `map_join`
+# result — the fused `map(..).join()` — is heap-backed even at one byte, where a
+# literal would be inline and have nothing to release). Released outermost
+# first, `self` went before `op`, and `op`'s release then read its pointer out
+# of freed memory and never reached the buffer: one allocation leaked per `^`.
+# The `--- performance ---` section is the assertion — allocations and
+# deallocations agree.
+
 import {
     join,
     less_than as <,
@@ -8,20 +23,6 @@ import {
     wrapping_mul_assign as *=,
 } from builtins;
 
-// An early exit releases every live scope before control leaves — and it has to
-// release them innermost first, the order ordinary exit unwinds them in. This
-// is the shape that told the difference.
-//
-// `eval` is a tail-call participant (its `"^"` arm hands off to `pow`), so its
-// `self` is a reference of its own — and `main` passes a *fresh* `Bin`, which is
-// moved in outright: `eval`'s release of `self` is the one that frees the block.
-// The arm's `op` is a heap `str` read in place out of that block (a `map_join`
-// result — the fused `map(..).join()` — is heap-backed even at one byte, where a
-// literal would be inline and have nothing to release). Released outermost
-// first, `self` went before `op`, and `op`'s release then read its pointer out
-// of freed memory and never reached the buffer: one allocation leaked per `^`.
-// The `--- performance ---` section is the assertion — allocations and
-// deallocations agree.
 variant Calc = Num(i64) | Bin(str, Calc, Calc)
 
 fn pow(base: i64, exp: i64) -> i64 {

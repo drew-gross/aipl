@@ -1,8 +1,9 @@
+# A named type parameter `<T: any>` ties several occurrences of `T` to the
+# same concrete type and lets `T` appear in the return type. `value_or`
+# monomorphizes per `T`; the type can be pinned by either argument.
+
 import { equal as == } from builtins;
 
-// A named type parameter `<T: any>` ties several occurrences of `T` to the
-// same concrete type and lets `T` appear in the return type. `value_or`
-// monomorphizes per `T`; the type can be pinned by either argument.
 fn value_or<T: any>(self: T?, default: T) -> T {
     match (self) {
         some(v) => v, #[allow]

@@ -1,6 +1,7 @@
-// A constructor referenced only as an `if (let ..)` pattern is a use of its
-// import: the unused-import lint reads the pattern of an `if let` exactly as
-// it reads a `match` arm's, so `Circle` below is not reported as dead.
+# A constructor referenced only as an `if (let ..)` pattern is a use of its
+# import: the unused-import lint reads the pattern of an `if let` exactly as
+# it reads a `match` arm's, so `Circle` below is not reported as dead.
+
 import { print } from builtins;
 import { Circle, Shape } from "./shapes.aipl";
 

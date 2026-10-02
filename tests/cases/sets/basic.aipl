@@ -1,6 +1,7 @@
+# Set literals dedup at construction; `has`/`len` query them.
+
 import { equal as ==, has, is_empty, len, logical_not as ! } from builtins;
 
-// Set literals dedup at construction; `has`/`len` query them.
 fn build() -> #{i64} {
     #{1, 2, 3, 2, 1} // duplicates dropped -> {1, 2, 3}
 }.test({
@@ -22,17 +23,17 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 128
 instructions executed: 308
-binary size: 3288
-  code: 1608
+binary size: 3296
+  code: 1612
   data: 160
-  metadata: 1520
+  metadata: 1524
 functions:
   __eq_set$i64:
     calls: 1
     bytes: 256
   __test$build:
     calls: 1
-    bytes: 1248
+    bytes: 1252
   aipl_array_dec:
     calls: 2
     bytes: (external)

@@ -1,8 +1,9 @@
+# A spread copies: growing the result never writes through to the array that
+# was spread, even though `[..xs, ..]` starts the build *from* `xs` — the
+# ordinary copy-on-grow idiom.
+
 import { equal as ==, push } from builtins;
 
-// A spread copies: growing the result never writes through to the array that
-// was spread, even though `[..xs, ..]` starts the build *from* `xs` — the
-// ordinary copy-on-grow idiom.
 fn with_extra(xs: i64[]) -> i64[] { [..xs, 99] }.test({
     mut base = [1];
     set base.push(2);

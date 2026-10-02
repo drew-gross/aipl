@@ -2888,6 +2888,8 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_sort_by.html">crates/aipl-mono/src/builtin_sort_by.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>sort_by</code> builtin. Monomorphization registers this under the canonical name <code>__builtin_sort_by</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.sort_by(less)</code> resolves through the ordinary generic / higher-order machinery — the in-file name <code>sort_by</code> is only for this file's own tests, which read exactly like user code.</p>
+
 
 
           <ul class="items">
@@ -3047,6 +3049,8 @@
         <li>
           <a class="file" href="examples-arrays.html">examples/arrays.aipl</a>
 
+          <p class="file-summary">Arrays: a growable, refcounted sequence of primitives written <code>T[]</code> (e.g. <code>i64[]</code>, <code>char[]</code>, <code>bool[]</code>).</p>
+
 
           <span class="private-count"><a href="examples-arrays.html#private">4 private</a></span>
 
@@ -3055,6 +3059,8 @@
 
         <li>
           <a class="file" href="examples-hello.html">examples/hello.aipl</a>
+
+          <p class="file-summary">Smallest end-to-end example: a struct and a fn that sums its fields. <code>main</code> also runs a deliberately heavy naive recursive Fibonacci — recursion depth stays shallow (~n, so the stack is fine) but the call count grows exponentially, so this does real work (unlike the microsecond-scale cases). That gives the perf monitor (<code>AIPL_REFRESH_PERFMON=1 cargo test --test cases</code>) a meaningful wall-clock to report for <code>examples/hello</code>. Bump the <code>30</code> to scale the workload up or down. The fib result is <em>used</em> (so the compute isn't optimized away) but is 0 here, leaving the exit code at 42.</p>
 
 
           <span class="private-count"><a href="examples-hello.html#private">3 private</a></span>
@@ -3085,6 +3091,8 @@
         <li>
           <a class="file" href="examples-lib-strlen.html">examples/lib/strlen.aipl</a>
 
+          <p class="file-summary"><code>len</code> implemented in AIPL itself rather than as a builtin: walk the string char-by-char with a <code>for</code> loop, incrementing a mutable counter.</p>
+
 
 
           <ul class="items">
@@ -3100,6 +3108,8 @@
 
         <li>
           <a class="file" href="examples-math-geometry.html">examples/math/geometry.aipl</a>
+
+          <p class="file-summary">Imported by examples/imports.aipl. Only the names listed in that file's <code>import { ... }</code> clause are visible from the importer; <code>area</code> and <code>double</code> stay private to this module even though they're called by the exported <code>double_area</code>.</p>
 
 
           <span class="private-count"><a href="examples-math-geometry.html#private">2 private</a></span>
@@ -3124,6 +3134,8 @@
         <li>
           <a class="file" href="examples-strings.html">examples/strings.aipl</a>
 
+          <p class="file-summary">Strings: literal comparison, concatenation, and the <code>print</code> builtin. <code>print</code> carries the <code>!prints</code> effect, so any caller has to declare it.</p>
+
 
           <span class="private-count"><a href="examples-strings.html#private">2 private</a></span>
 
@@ -3132,6 +3144,8 @@
 
         <li>
           <a class="file" href="examples-uses_strlen.html">examples/uses_strlen.aipl</a>
+
+          <p class="file-summary">Pulls <code>len</code> out of the strlen library and uses it like any builtin. Validates the chain: import resolution → mangling of non-root items → for-loop + mutation inside an imported function all the way through to a binary executable.</p>
 
 
           <span class="private-count"><a href="examples-uses_strlen.html#private">1 private</a></span>

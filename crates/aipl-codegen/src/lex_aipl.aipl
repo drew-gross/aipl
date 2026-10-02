@@ -877,9 +877,9 @@ allocations: 313
 deallocations: 313
 reallocations: 15
 bytes allocated: 487096
-instructions executed: 2390384
-binary size: 333544
-  code: 239964
+instructions executed: 2390400
+binary size: 333576
+  code: 239996
   data: 7332
   metadata: 86248
 functions:
@@ -1005,7 +1005,7 @@ functions:
     bytes: 772
   __m1__lex_scoped$AiplTok:
     calls: 2
-    bytes: 316
+    bytes: 348
   __m1__lex_step$AiplTok:
     calls: 129
     bytes: 30152

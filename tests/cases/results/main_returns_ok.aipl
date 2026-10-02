@@ -1,4 +1,5 @@
-// The success path of an `!Error` main: returning `ok()` exits 0 with no output.
+# The success path of an `!Error` main: returning `ok()` exits 0 with no output.
+
 import { print } from builtins;
 
 fn main() !prints -> !Error {

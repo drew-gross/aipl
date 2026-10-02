@@ -1,3 +1,8 @@
+# `for (let i : a..b)` walks the integers from `a` up to but not including `b`
+# — the counted loop `mut i = a; while (i < b) { ..; set i++; }` stands for.
+# The range is the same `a..b` a slice takes, so its bounds are slice bounds
+# (either signedness), and the variable is a `u64` like them.
+
 import {
     len,
     print,
@@ -8,10 +13,6 @@ import {
     wrapping_add_assign as +=,
 } from builtins;
 
-// `for (let i : a..b)` walks the integers from `a` up to but not including `b`
-// — the counted loop `mut i = a; while (i < b) { ..; set i++; }` stands for.
-// The range is the same `a..b` a slice takes, so its bounds are slice bounds
-// (either signedness), and the variable is a `u64` like them.
 fn main() !prints {
     // The common case: a count.
     mut seen: u64[] = [];

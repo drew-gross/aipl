@@ -1,3 +1,5 @@
+# A user-defined higher-order function taking a function-typed parameter.
+
 import { equal as ==, map, push, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
 
 fn inc(x: i64) -> i64 { x + 1 }.test({
@@ -6,7 +8,6 @@ fn inc(x: i64) -> i64 { x + 1 }.test({
     assert(map(xs, inc) == [2, 3, 4]);
 })
 
-// A user-defined higher-order function taking a function-typed parameter.
 fn apply(f: (i64) -> i64, x: i64) -> i64 { f(x) }.test({
     // Plain named functions — no captures, just regular `fn`s.
     fn double(x: i64) -> i64 { x * 2 }

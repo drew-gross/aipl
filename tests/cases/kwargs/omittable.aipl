@@ -1,19 +1,20 @@
+# `k?: T = none` — a keyword parameter that may be *omitted*, as against
+# `k: T? = none`, whose type is optional.
+#
+# The two describe the same parameter from opposite ends. `k: T? = none` says
+# what the *body* gets and makes every caller restate it (`max = some(2)`);
+# `k?: T = none` says what a *caller* supplies and lets the optional stay an
+# implementation detail of "you may leave this out". For an argument that is
+# either given or absent — a bound, a limit — the second is what the call site
+# means, and `some(..)` at every site is noise.
+#
+# The body is unchanged either way: it sees `T?` and matches on it. Only the
+# call site moves, so the two spellings compile to the same call — the loader's
+# keyword-argument pass wraps each supplied argument in `some(..)` and nothing
+# downstream can tell them apart.
+
 import { map, print, value_or, wrapping_add as + } from builtins;
 
-// `k?: T = none` — a keyword parameter that may be *omitted*, as against
-// `k: T? = none`, whose type is optional.
-//
-// The two describe the same parameter from opposite ends. `k: T? = none` says
-// what the *body* gets and makes every caller restate it (`max = some(2)`);
-// `k?: T = none` says what a *caller* supplies and lets the optional stay an
-// implementation detail of "you may leave this out". For an argument that is
-// either given or absent — a bound, a limit — the second is what the call site
-// means, and `some(..)` at every site is noise.
-//
-// The body is unchanged either way: it sees `T?` and matches on it. Only the
-// call site moves, so the two spellings compile to the same call — the loader's
-// keyword-argument pass wraps each supplied argument in `some(..)` and nothing
-// downstream can tell them apart.
 fn clamp(x: u64, lo: u64 = 0, hi?: u64 = none) -> str { `{x} lo={lo} hi={hi.value_or(99)}` }
 
 // The same slot on a variant case's payload, which declares its keyword slots

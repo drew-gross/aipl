@@ -1,10 +1,10 @@
-import { equal as ==, filter, is_empty, less_than as < } from builtins;
+# A result payload may be an array — on either side. Array payloads ride the
+# same generic machinery as struct payloads (a single refcounted pointer
+# word), so construction, `match` binding, `==`, and `?` all work; the
+# allocation accounting confirms the payload is retained and dropped in
+# balance.
 
-// A result payload may be an array — on either side. Array payloads ride the
-// same generic machinery as struct payloads (a single refcounted pointer
-// word), so construction, `match` binding, `==`, and `?` all work; the
-// allocation accounting confirms the payload is retained and dropped in
-// balance.
+import { equal as ==, filter, is_empty, less_than as < } from builtins;
 
 // Ok side: the values below a threshold, or an error when none are.
 fn below(xs: i64[], cap: i64) -> i64[]!str {

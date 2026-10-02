@@ -1,7 +1,8 @@
+# `map` is a builtin: no user definition needed. It desugars to an inline loop
+# in the enclosing scope, so lambdas (including capturing ones) just work.
+
 import { equal as ==, map, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
 
-// `map` is a builtin: no user definition needed. It desugars to an inline loop
-// in the enclosing scope, so lambdas (including capturing ones) just work.
 fn doubled(xs: i64[]) -> i64[] { xs.map(|x| x * 2) }.test({
     let xs = [1, 2, 3];
     assert(xs.map(|x| x * 2) == [2, 4, 6]); // method form

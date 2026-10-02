@@ -1,3 +1,5 @@
+# Operators are imported individually by spelling, like any other builtin.
+
 import {
     equal as ==,
     less_than as <,
@@ -6,8 +8,6 @@ import {
     wrapping_add as +,
     wrapping_mul as *,
 } from builtins;
-
-// Operators are imported individually by spelling, like any other builtin.
 
 fn compute(a: i64, b: i64) -> i64 { a * b + a }.test({
     assert(compute(3, 4) == 15);

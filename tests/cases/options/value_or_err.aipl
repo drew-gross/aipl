@@ -1,8 +1,8 @@
-import { print, to_digit, value_or_err } from builtins;
+# `value_or_err` turns an optional into a result: `some(v)` -> `ok(v)`, `none`
+# -> `err(e)`. Unlike `value_or`, which substitutes a default and forgets that
+# anything was missing, it keeps the absence as a failure the caller can report.
 
-// `value_or_err` turns an optional into a result: `some(v)` -> `ok(v)`, `none`
-// -> `err(e)`. Unlike `value_or`, which substitutes a default and forgets that
-// anything was missing, it keeps the absence as a failure the caller can report.
+import { print, to_digit, value_or_err } from builtins;
 
 // Its main use is in front of `?`: each step's `none` becomes a message and
 // leaves the function, so the body reads as the happy path alone. Without it,

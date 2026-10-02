@@ -1,3 +1,23 @@
+# The AIPL implementation of the `sort_by` builtin. Monomorphization registers
+# this under the canonical name `__builtin_sort_by` (see `AIPL_BUILTIN_SOURCES`
+# in `lib.rs`), so a user's `xs.sort_by(less)` resolves through the ordinary
+# generic / higher-order machinery — the in-file name `sort_by` is only for
+# this file's own tests, which read exactly like user code.
+#
+# Insertion sort: each element is spliced into the already-sorted prefix at the
+# first position it `less`-precedes, the splice being an array-literal spread —
+# one pre-sized allocation per element (see the loader's `desugar_spread`).
+#
+# The sort is *stable*: `insert_at` stops at the first `y` with `less(x, y)`, so
+# an `x` equal to `y` (neither precedes the other) walks past it and lands
+# after. Callers rely on this — the formatter hoists imports by key and expects
+# two imports sharing a key to stay in source order.
+#
+# Insertion sort is quadratic. That is the deliberate trade for a definition
+# this small and obviously-stable: its callers sort import lists and other
+# short sequences. Sorting a large array by its natural order should still use
+# the native `sort` builtin.
+
 import {
     equal as ==,
     len,
@@ -11,25 +31,6 @@ import {
 # Test fixture: a record sorted by one of its fields.
 struct E { key: str, tag: str }
 
-// The AIPL implementation of the `sort_by` builtin. Monomorphization registers
-// this under the canonical name `__builtin_sort_by` (see `AIPL_BUILTIN_SOURCES`
-// in `lib.rs`), so a user's `xs.sort_by(less)` resolves through the ordinary
-// generic / higher-order machinery — the in-file name `sort_by` is only for
-// this file's own tests, which read exactly like user code.
-//
-// Insertion sort: each element is spliced into the already-sorted prefix at the
-// first position it `less`-precedes, the splice being an array-literal spread —
-// one pre-sized allocation per element (see the loader's `desugar_spread`).
-//
-// The sort is *stable*: `insert_at` stops at the first `y` with `less(x, y)`, so
-// an `x` equal to `y` (neither precedes the other) walks past it and lands
-// after. Callers rely on this — the formatter hoists imports by key and expects
-// two imports sharing a key to stay in source order.
-//
-// Insertion sort is quadratic. That is the deliberate trade for a definition
-// this small and obviously-stable: its callers sort import lists and other
-// short sequences. Sorting a large array by its natural order should still use
-// the native `sort` builtin.
 # Sorts by a caller-supplied `less` predicate: `less(a, b)` is true when `a`
 # must come before `b`. Stable — elements neither of which precedes the other
 # keep their input order.

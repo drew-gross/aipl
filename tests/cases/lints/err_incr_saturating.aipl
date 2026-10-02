@@ -1,10 +1,11 @@
+# The increment lint names the `++` flavor that matches the file's `+`. This
+# file adds with `saturating_add`, so the form it recommends is the saturating
+# increment — taking `wrapping_increment as ++` instead would wrap past the
+# type's bound where this code clamps at it, which is the silent change the
+# pairing exists to prevent.
+
 import { print, saturating_add as +, to_str } from builtins;
 
-// The increment lint names the `++` flavor that matches the file's `+`. This
-// file adds with `saturating_add`, so the form it recommends is the saturating
-// increment — taking `wrapping_increment as ++` instead would wrap past the
-// type's bound where this code clamps at it, which is the silent change the
-// pairing exists to prevent.
 fn main() !prints {
     mut n: u8 = 254;
     set n = n + 1;
@@ -12,7 +13,7 @@ fn main() !prints {
 }
 --- errors ---
 error: adding 1 to "n" — use the increment form "set n++;", importing `saturating_increment as ++` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_incr_saturating.aipl:10:9
+  --> ./tests/cases/lints/err_incr_saturating.aipl:11:9
    |
-10 |     set n = n + 1;
+11 |     set n = n + 1;
    |         ^^^^^^^^^

@@ -1,3 +1,19 @@
+# Inlining a function whose body has an early exit.
+#
+# The inliner used to refuse any body with a `return` in it, which in this
+# language is a lot of bodies: a guard clause is the idiomatic way to deal
+# with the uninteresting case first, and the compiler's own AIPL is written
+# that way throughout.
+#
+# A `return` is only an exit because of where it sits. The value it carries is
+# the value the call produces, and an expression can say that without leaving
+# anything — so the body is rewritten before it is placed:
+#
+#     if (c) { return v; }; rest   ->   if (c) { v } else { rest }
+#
+# The continuation moves into the arm that falls through, which is where it
+# was always going. See `early_exit::without_early_exits`.
+
 import {
     equal as ==,
     greater_than as >,
@@ -6,22 +22,6 @@ import {
     wrapping_add as +,
     wrapping_mul as *,
 } from builtins;
-
-// Inlining a function whose body has an early exit.
-//
-// The inliner used to refuse any body with a `return` in it, which in this
-// language is a lot of bodies: a guard clause is the idiomatic way to deal
-// with the uninteresting case first, and the compiler's own AIPL is written
-// that way throughout.
-//
-// A `return` is only an exit because of where it sits. The value it carries is
-// the value the call produces, and an expression can say that without leaving
-// anything — so the body is rewritten before it is placed:
-//
-//     if (c) { return v; }; rest   ->   if (c) { v } else { rest }
-//
-// The continuation moves into the arm that falls through, which is where it
-// was always going. See `early_exit::without_early_exits`.
 
 // Called from one place, so `inline_single_use` takes it — and `clamped` is
 // gone from the `functions:` block below, guard clause and all.

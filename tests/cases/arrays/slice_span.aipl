@@ -1,7 +1,8 @@
+# The `xs[span]` Span-index sugar (see strings/slice_span.aipl) slices arrays
+# too: it's sugar for `xs[span.start..span.end]`, with the same clamping.
+
 import { Span, print, to_str } from builtins;
 
-// The `xs[span]` Span-index sugar (see strings/slice_span.aipl) slices arrays
-// too: it's sugar for `xs[span.start..span.end]`, with the same clamping.
 fn main() !prints {
     let xs = [10, 20, 30, 40, 50];
     let s = Span { start: 1, end: 4 };

@@ -1,6 +1,6 @@
-import { print, to_str, value_or, wrapping_add as + } from builtins;
+# Shapes that look close but are deliberately left alone.
 
-// Shapes that look close but are deliberately left alone.
+import { print, to_str, value_or, wrapping_add as + } from builtins;
 
 // The `some` arm transforms the payload, so this is a `map`, not a `value_or`
 // — which is `match_map_value_or`'s shape, squelched here so this case stays

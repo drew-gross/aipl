@@ -1,3 +1,11 @@
+# `xs.opt_right_fold(init, f)` mirrors `opt_left_fold`: it combines right to
+# left, takes the element first and the accumulator second, and yields `none` as
+# soon as a combiner does. Unlike the left fold it really does stop — walking
+# backwards is index-driven anyway, so the `while` condition carries the exit.
+#
+# This file imports both directions, so it spells the left one `opt_left_fold`
+# rather than aliasing it to plain `opt_fold` (see `opt_fold.aipl`).
+
 import {
     concat as +++,
     equal as ==,
@@ -6,13 +14,6 @@ import {
     wrapping_add as +,
 } from builtins;
 
-// `xs.opt_right_fold(init, f)` mirrors `opt_left_fold`: it combines right to
-// left, takes the element first and the accumulator second, and yields `none` as
-// soon as a combiner does. Unlike the left fold it really does stop — walking
-// backwards is index-driven anyway, so the `while` condition carries the exit.
-//
-// This file imports both directions, so it spells the left one `opt_left_fold`
-// rather than aliasing it to plain `opt_fold` (see `opt_fold.aipl`).
 variant List = Cons(i64, List) | Nil
 
 // Build a list that keeps the array's order, rejecting any negative element.

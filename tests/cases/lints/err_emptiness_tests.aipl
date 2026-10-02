@@ -1,3 +1,6 @@
+# The emptiness lints: a length compared against zero, or an emptiness test
+# negated, is `is_nonempty` — the test named after what it means.
+
 import {
     greater_than as >,
     is_empty,
@@ -7,9 +10,6 @@ import {
     print,
     to_str,
 } from builtins;
-
-// The emptiness lints: a length compared against zero, or an emptiness test
-// negated, is `is_nonempty` — the test named after what it means.
 
 // `0 < xs.len()` / `xs.len() > 0` — a length computed only to be compared
 // against zero; both operand orders are the same idiom.

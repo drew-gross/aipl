@@ -1,19 +1,19 @@
-import { push, value_or } from builtins;
+# Every *check-phase* array error, in one file, reported in one run. The
+# checker recovers at each item, so each failing function below is recorded and
+# the next is still checked.
+#
+# Three array errors are not here, because they belong to other phases and so
+# can't be reported alongside these:
+#   - the two `..` spread errors — spread desugaring runs in the *loader*, so
+#     either one aborts the file before the checker sees it;
+#   - `err_push_char_from_empty` — a *codegen* error (pushing a char would
+#     change the array's representation), and codegen only runs once checking
+#     has passed, so it can never appear next to a check error;
+#   - `err_array_pattern_non_literal` — an array pattern's elements are
+#     patterns, so an expression among them is a *parse* error, which aborts
+#     the file before any of these are reached.
 
-// Every *check-phase* array error, in one file, reported in one run. The
-// checker recovers at each item, so each failing function below is recorded and
-// the next is still checked.
-//
-// Three array errors are not here, because they belong to other phases and so
-// can't be reported alongside these:
-//   - the two `..` spread errors — spread desugaring runs in the *loader*, so
-//     either one aborts the file before the checker sees it;
-//   - `err_push_char_from_empty` — a *codegen* error (pushing a char would
-//     change the array's representation), and codegen only runs once checking
-//     has passed, so it can never appear next to a check error;
-//   - `err_array_pattern_non_literal` — an array pattern's elements are
-//     patterns, so an expression among them is a *parse* error, which aborts
-//     the file before any of these are reached.
+import { push, value_or } from builtins;
 
 // Indexing something that isn't an array.
 fn index_non_array() -> i64 {

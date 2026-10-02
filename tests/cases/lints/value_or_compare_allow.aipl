@@ -1,9 +1,10 @@
+# `#[allow]` keeps the filled form — the escape hatch every lint carries.
+# The marker goes on the line holding the default argument, which is where
+# this lint points; a literal is always one line, so it always takes a
+# trailing marker and keeps it through `aipl fmt`.
+
 import { equal as ==, print, to_str, value_or } from builtins;
 
-// `#[allow]` keeps the filled form — the escape hatch every lint carries.
-// The marker goes on the line holding the default argument, which is where
-// this lint points; a literal is always one line, so it always takes a
-// trailing marker and keeps it through `aipl fmt`.
 fn is_dot(c: char?) -> bool { c.value_or(' ') == '.' } #[allow]
 
 // The rewrite the lint asks for, so the two spellings are checked side by

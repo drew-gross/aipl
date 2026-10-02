@@ -1,9 +1,10 @@
+# `set n++;` uses the `++` operator, which must be imported on its own spelling
+# — importing `+` does not enable it, even though the two share an
+# implementation. Here `++` is not imported, so the operator gate rejects it,
+# pointing at the `++` and naming the wrapping flavor to import.
+
 import { less_than as < } from builtins;
 
-// `set n++;` uses the `++` operator, which must be imported on its own spelling
-// — importing `+` does not enable it, even though the two share an
-// implementation. Here `++` is not imported, so the operator gate rejects it,
-// pointing at the `++` and naming the wrapping flavor to import.
 fn bump(limit: i64) -> i64 {
     mut n = 0;
     while (n < limit) {
@@ -13,7 +14,7 @@ fn bump(limit: i64) -> i64 {
 }
 --- errors ---
 error: operator "++" must be imported: add `import { wrapping_increment as ++ } from builtins;`
-  --> ./tests/cases/bindings/mut/err_incr_needs_plusplus_import.aipl:10:13
+  --> ./tests/cases/bindings/mut/err_incr_needs_plusplus_import.aipl:11:13
    |
-10 |         set n++;
+11 |         set n++;
    |             ^^^

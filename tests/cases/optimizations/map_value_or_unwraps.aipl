@@ -1,14 +1,15 @@
+# `sp.map(|s| src[s]).value_or("")` compiles to what the `match` it replaces
+# compiled to. Inlining leaves the shape as `let self: str? = <map's match>;
+# match (self) { some(v) => v, none => "" }` — a `match` on a *name* — and
+# known-constructor elimination sees through the binding to the constructors
+# behind it, so no optional is ever built and `v` is never bound: the `some`
+# arm is the slice and the `none` arm the literal, exactly as written below.
+#
+# The `instructions executed` count is the assertion: the two spellings are
+# called the same way, and each costs what the other does.
+
 import { Span, map, print, value_or } from builtins;
 
-// `sp.map(|s| src[s]).value_or("")` compiles to what the `match` it replaces
-// compiled to. Inlining leaves the shape as `let self: str? = <map's match>;
-// match (self) { some(v) => v, none => "" }` — a `match` on a *name* — and
-// known-constructor elimination sees through the binding to the constructors
-// behind it, so no optional is ever built and `v` is never bound: the `some`
-// arm is the slice and the `none` arm the literal, exactly as written below.
-//
-// The `instructions executed` count is the assertion: the two spellings are
-// called the same way, and each costs what the other does.
 fn edge(src: str, sp: Span?) -> str { sp.map(|s| src[s]).value_or("") }
 
 fn edge_long(src: str, sp: Span?) -> str {

@@ -1,3 +1,7 @@
+# A `str`/`char` scrutinee has no case list to be exhaustive over: `if let`
+# reuses the same value-equality `_` fallthrough a `match` on one would end
+# with, so a non-matching value just isn't a special case here either.
+
 import {
     equal as ==,
     less_than as <,
@@ -18,9 +22,6 @@ fn safe_add(a: i64, b: i64, allow_neg: bool) -> i64!str {
 
 fn describe_result(r: i64!str) -> str { if (let ok(v) = r) { to_str(v) } else { "error" } }
 
-// A `str`/`char` scrutinee has no case list to be exhaustive over: `if let`
-// reuses the same value-equality `_` fallthrough a `match` on one would end
-// with, so a non-matching value just isn't a special case here either.
 fn greet(name: str) -> str {
     if (let "world" = name) { "hello, world!" } else { `hi, {name}` }
 }.test({

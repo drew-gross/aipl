@@ -1,14 +1,14 @@
-import { len, wrapping_add as + } from builtins;
+# Every *check-phase* generic error, in one file, reported in one run.
+#
+# Not here, because each aborts before or outside the per-item checking loop:
+# `err_unknown_type_param_bound` (bounds are validated in an earlier pass over
+# signatures), `err_generic_arity` / `err_generic_cannot_infer` /
+# `err_instance_name_demangled` (generic lowering), and
+# `err_ord_bound_violation` / `err_type_param_conflict` / `err_bare_any_param` /
+# `err_any_in_return` (all raised while monomorphizing a *call* — a generic
+# body is only checked once something instantiates it).
 
-// Every *check-phase* generic error, in one file, reported in one run.
-//
-// Not here, because each aborts before or outside the per-item checking loop:
-// `err_unknown_type_param_bound` (bounds are validated in an earlier pass over
-// signatures), `err_generic_arity` / `err_generic_cannot_infer` /
-// `err_instance_name_demangled` (generic lowering), and
-// `err_ord_bound_violation` / `err_type_param_conflict` / `err_bare_any_param` /
-// `err_any_in_return` (all raised while monomorphizing a *call* — a generic
-// body is only checked once something instantiates it).
+import { len, wrapping_add as + } from builtins;
 
 // Arithmetic on an unconstrained type parameter.
 fn arith_on_type_param<T: any>(a: T, b: T) -> T { a + b }

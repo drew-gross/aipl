@@ -1,15 +1,16 @@
-// A bare `import { + }` is refused by the grammar itself: the `import_name`
-// production recognises the operator spelling and then `Refuse`s it, so the
-// message says what to write (`wrapping_add as +`) rather than "expected an
-// import name, found `+`". This pins that `+` reaches that refusal — a grammar
-// that dropped `+` from its `operator` production would fall through to the
-// generic parse error instead.
+# A bare `import { + }` is refused by the grammar itself: the `import_name`
+# production recognises the operator spelling and then `Refuse`s it, so the
+# message says what to write (`wrapping_add as +`) rather than "expected an
+# import name, found `+`". This pins that `+` reaches that refusal — a grammar
+# that dropped `+` from its `operator` production would fall through to the
+# generic parse error instead.
+
 import { + } from builtins;
 
 fn main() {}
 --- errors ---
 error: the "+" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_add as +` or `saturating_add as +` from builtins
- --> ./tests/cases/imports/err_bare_plus_operator.aipl:7:10
+ --> ./tests/cases/imports/err_bare_plus_operator.aipl:8:10
   |
-7 | import { + } from builtins;
+8 | import { + } from builtins;
   |          ^

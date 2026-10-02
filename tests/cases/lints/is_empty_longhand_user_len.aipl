@@ -1,13 +1,14 @@
+# A `len` of the file's own is a different function answering a different
+# question, and `is_empty` does not even accept what it takes — advising it here
+# would advise code that does not compile. So the lint stays quiet, the way
+# `len_gt_zero_user_lt` does when `<` is not a comparison.
+#
+# This needs its own case because a file cannot both define `len` and import the
+# builtin one: the loader refuses the collision, which is also what makes the
+# import alone a sufficient test for the lint.
+
 import { equal as ==, print, to_str } from builtins;
 
-// A `len` of the file's own is a different function answering a different
-// question, and `is_empty` does not even accept what it takes — advising it here
-// would advise code that does not compile. So the lint stays quiet, the way
-// `len_gt_zero_user_lt` does when `<` is not a comparison.
-//
-// This needs its own case because a file cannot both define `len` and import the
-// builtin one: the loader refuses the collision, which is also what makes the
-// import alone a sufficient test for the lint.
 variant List = Nil | Cons(i64)
 
 fn len(self: List) -> i64 {

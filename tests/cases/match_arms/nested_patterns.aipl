@@ -1,13 +1,14 @@
+# Patterns nest. A tuple pattern matches a tuple element by element, a
+# constructor's slots are patterns themselves, an integer literal matches by
+# value, and a bare name in a nested slot binds what it matched. Arms are tried
+# top to bottom, and the whole match is checked exhaustive — the last arm here
+# is `(lo, none)`, not `_`, and it is enough together with `(lo, some(hi))`.
+#
+# `match (a, b)` is a tuple scrutinee without its own parentheses, and its
+# elements are matched directly: no tuple is built.
+
 import { print, to_str, wrapping_add as + } from builtins;
 
-// Patterns nest. A tuple pattern matches a tuple element by element, a
-// constructor's slots are patterns themselves, an integer literal matches by
-// value, and a bare name in a nested slot binds what it matched. Arms are tried
-// top to bottom, and the whole match is checked exhaustive — the last arm here
-// is `(lo, none)`, not `_`, and it is enough together with `(lo, some(hi))`.
-//
-// `match (a, b)` is a tuple scrutinee without its own parentheses, and its
-// elements are matched directly: no tuple is built.
 fn rep_suffix(min: u64, max: u64?) -> str {
     match (min, max) {
         (1, some(1)) => "",

@@ -1,3 +1,11 @@
+# `xs.opt_fold(init, f)` is `fold` with a *fallible* combiner: `f` returns `A?`,
+# and a `none` result makes the whole fold `none`. Because `?` works inside the
+# combiner, a fold that can fail reads as one expression — this is how
+# `int_parse` accumulates its digits.
+#
+# Import convention matches `fold`: bring `opt_left_fold` in as plain `opt_fold`
+# unless the file also imports `opt_right_fold` (see `opt_right_fold.aipl`).
+
 import {
     concat as +++,
     equal as ==,
@@ -7,13 +15,6 @@ import {
     wrapping_mul as *,
 } from builtins;
 
-// `xs.opt_fold(init, f)` is `fold` with a *fallible* combiner: `f` returns `A?`,
-// and a `none` result makes the whole fold `none`. Because `?` works inside the
-// combiner, a fold that can fail reads as one expression — this is how
-// `int_parse` accumulates its digits.
-//
-// Import convention matches `fold`: bring `opt_left_fold` in as plain `opt_fold`
-// unless the file also imports `opt_right_fold` (see `opt_right_fold.aipl`).
 fn digits_to_int(s: str) -> i64? { s.opt_fold(0, |acc, c| some(acc * 10 + c.to_digit()?)) }
 
 fn parses_a_digit_run() -> i64? { digits_to_int("127") }.test({

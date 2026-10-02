@@ -1,9 +1,10 @@
+# A struct may hold optional fields (`T?`), stored inline as 16-byte
+# {tag, value} composites. They're built with `some`/`none`, read back with
+# `value_or`, and the whole struct (optionals and all) is returned by value.
+# The `str?` field holds a freshly allocated string to exercise refcounting.
+
 import { concat as +++, equal as ==, value_or, wrapping_add as + } from builtins;
 
-// A struct may hold optional fields (`T?`), stored inline as 16-byte
-// {tag, value} composites. They're built with `some`/`none`, read back with
-// `value_or`, and the whole struct (optionals and all) is returned by value.
-// The `str?` field holds a freshly allocated string to exercise refcounting.
 struct Box { item: str?, count: i64? }
 
 fn make(present: bool) -> Box {

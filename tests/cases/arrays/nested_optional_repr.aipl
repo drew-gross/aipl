@@ -1,10 +1,11 @@
+# The flattened optional representation: an optional chain `Optional^n(Core)` is
+# `{ tag: i64, value: <Core> }` — a single core-sized value field shared by the
+# whole chain, with the tag (0..=n) counting the present `some` layers. So
+# `i64????` is 16 bytes (8 tag + 8 value), the same as `i64?`, no matter how
+# deep the nesting; only the tag's range grows.
+
 import { is_some, print, to_str } from builtins;
 
-// The flattened optional representation: an optional chain `Optional^n(Core)` is
-// `{ tag: i64, value: <Core> }` — a single core-sized value field shared by the
-// whole chain, with the tag (0..=n) counting the present `some` layers. So
-// `i64????` is 16 bytes (8 tag + 8 value), the same as `i64?`, no matter how
-// deep the nesting; only the tag's range grows.
 fn main() !prints {
     // Four `some` layers — the tag reaches 4, the value field still holds one
     // i64. Rendering walks the tag back down to the core.

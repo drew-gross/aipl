@@ -1,7 +1,8 @@
+# `identity`'s `<T: ord>` only accepts comparable scalars (integers, char) —
+# a struct doesn't satisfy that bound.
+
 struct Point { x: i64, y: i64 }
 
-// `identity`'s `<T: ord>` only accepts comparable scalars (integers, char) —
-// a struct doesn't satisfy that bound.
 fn identity<T: ord>(x: T) -> T { x }
 
 fn main() -> i64 {
@@ -10,7 +11,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: fn "identity": type parameter "T" requires "ord", but was inferred as Point
- --> ./tests/cases/generics/errors/err_ord_bound_violation.aipl:8:5
+ --> ./tests/cases/generics/errors/err_ord_bound_violation.aipl:9:5
   |
-8 |     identity(Point { x: 1, y: 2 });
+9 |     identity(Point { x: 1, y: 2 });
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

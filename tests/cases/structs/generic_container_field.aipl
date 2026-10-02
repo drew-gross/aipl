@@ -1,7 +1,8 @@
+# A type parameter can appear inside a container field type: `items: T[]`.
+# The element type is pinned by the array's elements, giving `Stack$i64`.
+
 import { equal as ==, len } from builtins;
 
-// A type parameter can appear inside a container field type: `items: T[]`.
-// The element type is pinned by the array's elements, giving `Stack$i64`.
 struct Stack<T> { items: T[] }
 
 fn item_count() -> u64 {

@@ -1,13 +1,14 @@
+# A character class as a top-level constant. `"…".to_set()` is admitted as a
+# constant even though it is written as a call: it has no operands to evaluate
+# in any order, and codegen folds a literal receiver to the four words of the
+# `#{char}` bitfield — so the substituted use is four immediate stores, not a
+# walk over the characters.
+#
+# This is what a lexer wants. A class asked for per rule rebuilt itself once
+# per keyword; as a constant it is spliced into each use already built.
+
 import { has, len, logical_not as !, print, to_set, to_str } from builtins;
 
-// A character class as a top-level constant. `"…".to_set()` is admitted as a
-// constant even though it is written as a call: it has no operands to evaluate
-// in any order, and codegen folds a literal receiver to the four words of the
-// `#{char}` bitfield — so the substituted use is four immediate stores, not a
-// walk over the characters.
-//
-// This is what a lexer wants. A class asked for per rule rebuilt itself once
-// per keyword; as a constant it is spliced into each use already built.
 pub let IDENT_START: #{char} = "abcdefghijklmnopqrstuvwxyz_".to_set();
 
 let PUNCT: #{char} = "(){}[],;".to_set();

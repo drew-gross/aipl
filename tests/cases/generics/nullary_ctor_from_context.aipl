@@ -1,10 +1,11 @@
+# A *payload-free* case of a generic variant takes its instance from context,
+# like any other constructor whose arguments don't pin it. It is the one shape
+# with nothing of its own to pin the type parameter — there is no payload to
+# read a type off — so every answer has to come from where the constructor
+# sits.
+
 import { first, len, map, print, to_str, value_or } from builtins;
 
-// A *payload-free* case of a generic variant takes its instance from context,
-// like any other constructor whose arguments don't pin it. It is the one shape
-// with nothing of its own to pin the type parameter — there is no payload to
-// read a type off — so every answer has to come from where the constructor
-// sits.
 variant Tok = Space | Word(str)
 
 variant Tok2 = Dot | Num(i64)

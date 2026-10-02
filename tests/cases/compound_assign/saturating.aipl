@@ -1,10 +1,11 @@
+# The two arithmetic compound assignments carry the same choice of semantics
+# their plain forms do, and the alias is what records it — `saturating_add_assign
+# as +=` here, `wrapping_add_assign as +=` in `basic.aipl`. Nothing downstream
+# can tell which spelling produced the operation, so the flavor is the whole
+# difference between these two files.
+
 import { print, saturating_add_assign as +=, saturating_sub_assign as -=, to_str } from builtins;
 
-// The two arithmetic compound assignments carry the same choice of semantics
-// their plain forms do, and the alias is what records it — `saturating_add_assign
-// as +=` here, `wrapping_add_assign as +=` in `basic.aipl`. Nothing downstream
-// can tell which spelling produced the operation, so the flavor is the whole
-// difference between these two files.
 fn main() !prints {
     mut n: u8 = 250;
     set n += 10; // clamps at 255 rather than wrapping to 4

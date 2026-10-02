@@ -1,11 +1,12 @@
+# The generic `to_str` renders any value by its static type — exactly what a
+# template's `{v}` interpolates. Scalars: i64 as decimal, bool as true/false,
+# and the text scalars as their text: a char is the one-char string, a str is
+# itself. (Only *nested* in a rendered container or constructor is text
+# quoted, where the quotes tell it apart from the structure around it.)
+# Callable as a function or a method.
+
 import { concat as +++, print, to_str, wrapping_add as + } from builtins;
 
-// The generic `to_str` renders any value by its static type — exactly what a
-// template's `{v}` interpolates. Scalars: i64 as decimal, bool as true/false,
-// and the text scalars as their text: a char is the one-char string, a str is
-// itself. (Only *nested* in a rendered container or constructor is text
-// quoted, where the quotes tell it apart from the structure around it.)
-// Callable as a function or a method.
 fn main() !prints {
     print(to_str(42)); // 42
     print(to_str(-7)); // -7

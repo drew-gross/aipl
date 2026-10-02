@@ -1,3 +1,11 @@
+# A struct that holds *both* a direct boxed (recursive) field and an array
+# field, plus the variant spelling of the same mix — a `Climb`-shaped case
+# carrying a self reference (an internal, weak-counted one) alongside an array
+# payload. The two references are counted differently, so the pairing is worth
+# pinning down: dropping one of these values releases the boxed field weakly
+# and the array strongly, and the balanced allocation counts below are what
+# proves neither path leaks or over-drops.
+
 import {
     equal as ==,
     less_than as <,
@@ -11,13 +19,6 @@ import {
     wrapping_increment as ++,
 } from builtins;
 
-// A struct that holds *both* a direct boxed (recursive) field and an array
-// field, plus the variant spelling of the same mix — a `Climb`-shaped case
-// carrying a self reference (an internal, weak-counted one) alongside an array
-// payload. The two references are counted differently, so the pairing is worth
-// pinning down: dropping one of these values releases the boxed field weakly
-// and the array strongly, and the balanced allocation counts below are what
-// proves neither path leaks or over-drops.
 variant List = Cons(i64, List) | Nil
 
 struct Prec { power: u64, right: bool }

@@ -1,7 +1,8 @@
-// Passing an operator that's aliased to a *user function* (`my_add as +`) as a
-// value works too: the desugared `|lhs, rhs| lhs + rhs` has its `+` dispatched
-// to a call to `my_add`, so `apply(2, 3, +)` runs the custom function (here
-// tagged with +1000 to prove it).
+# Passing an operator that's aliased to a *user function* (`my_add as +`) as a
+# value works too: the desugared `|lhs, rhs| lhs + rhs` has its `+` dispatched
+# to a call to `my_add`, so `apply(2, 3, +)` runs the custom function (here
+# tagged with +1000 to prove it).
+
 import { print, to_str } from builtins;
 import { my_custom_add as + } from "./mymath.aipl";
 

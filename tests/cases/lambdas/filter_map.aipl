@@ -1,3 +1,20 @@
+# `xs.filter_map(keep, f)` selects and maps in **one** pass — what
+# `xs.filter(keep).map(f)` computes in two, with an array in between. The
+# compiler writes it for you wherever it sees that chain (see
+# `optimizations/filter_map_fusion`); it is also worth writing by hand where
+# the two halves belong together.
+#
+# Two separate lambdas, each lifted and specialized on its own and each
+# carrying its own captures — `two_lambda_args` is what pins that machinery
+# down.
+#
+# There are two bodies behind the one name, and which one runs is invisible
+# except in the numbers. When the source array is uniquely owned and the
+# element sizing allows, the result is compacted into the source's own buffer;
+# otherwise a fresh output is reserved to the source length up front, so the
+# loop never reallocates. Every pair of functions below is written to agree
+# across that split.
+
 import {
     concat as +++,
     equal as ==,
@@ -8,23 +25,6 @@ import {
     trim,
     wrapping_mul as *,
 } from builtins;
-
-// `xs.filter_map(keep, f)` selects and maps in **one** pass — what
-// `xs.filter(keep).map(f)` computes in two, with an array in between. The
-// compiler writes it for you wherever it sees that chain (see
-// `optimizations/filter_map_fusion`); it is also worth writing by hand where
-// the two halves belong together.
-//
-// Two separate lambdas, each lifted and specialized on its own and each
-// carrying its own captures — `two_lambda_args` is what pins that machinery
-// down.
-//
-// There are two bodies behind the one name, and which one runs is invisible
-// except in the numbers. When the source array is uniquely owned and the
-// element sizing allows, the result is compacted into the source's own buffer;
-// otherwise a fresh output is reserved to the source length up front, so the
-// loop never reallocates. Every pair of functions below is written to agree
-// across that split.
 
 fn fresh(n: i64) -> i64[] { [n, n * 2, n * 3, n * 4] }
 

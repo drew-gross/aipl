@@ -1,9 +1,10 @@
+# A `char` interpolates as the bare character, mirroring how a `str` does —
+# and `to_str` is the same rendering, so `to_str(c)` is the bare character
+# too. Only a char nested inside a rendered container still shows its literal
+# form, where the quotes tell it apart from the structure around it.
+
 import { concat as +++, print, to_str } from builtins;
 
-// A `char` interpolates as the bare character, mirroring how a `str` does —
-// and `to_str` is the same rendering, so `to_str(c)` is the bare character
-// too. Only a char nested inside a rendered container still shows its literal
-// form, where the quotes tell it apart from the structure around it.
 fn main() !prints {
     let c = 'b';
     print(`bare: {c}`); // bare: b

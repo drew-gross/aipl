@@ -1,14 +1,15 @@
+# `#[allow]` keeps the loop — the escape hatch every lint carries.
+#
+# The marker goes on the `return some(x);`, which is where this lint points.
+# That is deliberate: `#[allow]` is line-scoped, so a hit spanning the loop
+# could never be squelched — the marker would have to go on the `for (..) {`
+# header, and `aipl fmt` moves one written there onto a line of its own, where
+# it squelches nothing. The early return is a short statement that always
+# occupies one line, and it is the line that makes this loop a search for the
+# first match.
+
 import { find_if, less_than as <, print, to_str } from builtins;
 
-// `#[allow]` keeps the loop — the escape hatch every lint carries.
-//
-// The marker goes on the `return some(x);`, which is where this lint points.
-// That is deliberate: `#[allow]` is line-scoped, so a hit spanning the loop
-// could never be squelched — the marker would have to go on the `for (..) {`
-// header, and `aipl fmt` moves one written there onto a line of its own, where
-// it squelches nothing. The early return is a short statement that always
-// occupies one line, and it is the line that makes this loop a search for the
-// first match.
 fn first_big(xs: i64[], lo: i64) -> i64? {
     for (let x : xs) {
         if (lo < x) {

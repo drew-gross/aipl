@@ -1,12 +1,13 @@
+# A generic *variant* with two type parameters.
+#
+# Two-parameter generic **structs** are attested
+# (`tests/cases/structs/generic_pair.aipl`), but until this case no generic
+# variant anywhere in the corpus took more than one — so the instantiation and
+# mangling of a second parameter went unexercised on the variant path. The
+# parser library wants it for a result-shaped node (`Ok(A) | Fail(B)`).
+
 import { print, to_str } from builtins;
 
-// A generic *variant* with two type parameters.
-//
-// Two-parameter generic **structs** are attested
-// (`tests/cases/structs/generic_pair.aipl`), but until this case no generic
-// variant anywhere in the corpus took more than one — so the instantiation and
-// mangling of a second parameter went unexercised on the variant path. The
-// parser library wants it for a result-shaped node (`Ok(A) | Fail(B)`).
 variant Either<A: any, B: any> = Left(A) | Right(B)
 
 fn left_or<A: any, B: any>(e: Either<A, B>, fallback: A) -> A {

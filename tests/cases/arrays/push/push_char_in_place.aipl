@@ -1,9 +1,10 @@
+# `push` on a never-aliased `char[]` appends into the value's own storage
+# rather than rebuilding the whole string per element — the `char[]` half of
+# `strings/concat_in_place_grows.aipl`, and the reason `push_char.aipl` (which
+# takes a snapshot, and so is *not* exclusive) still copies.
+
 import { equal as ==, len, push } from builtins;
 
-// `push` on a never-aliased `char[]` appends into the value's own storage
-// rather than rebuilding the whole string per element — the `char[]` half of
-// `strings/concat_in_place_grows.aipl`, and the reason `push_char.aipl` (which
-// takes a snapshot, and so is *not* exclusive) still copies.
 fn build(src: str) -> char[] {
     mut cs = ['a'];
     for (let c : src) {

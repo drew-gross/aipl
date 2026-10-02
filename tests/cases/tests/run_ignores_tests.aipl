@@ -1,8 +1,8 @@
-import { equal as ==, print, to_str, wrapping_mul as * } from builtins;
+# A `.test({ .. })` block is compiled and run only by `aipl check`; `run` and
+# `build` (this harness) ignore it entirely. This fixture just confirms a
+# program carrying a test block still builds and runs normally.
 
-// A `.test({ .. })` block is compiled and run only by `aipl check`; `run` and
-// `build` (this harness) ignore it entirely. This fixture just confirms a
-// program carrying a test block still builds and runs normally.
+import { equal as ==, print, to_str, wrapping_mul as * } from builtins;
 
 fn double(x: i64) -> i64 { x * 2 }.test({
     assert(double(2) == 4);

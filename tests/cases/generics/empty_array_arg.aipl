@@ -1,8 +1,9 @@
+# An empty array literal passed to an `any[]` parameter pins the type
+# variable to the `EmptyArray` pseudo-type and produces a monomorphized
+# instance accepting the empty array; no element type needs to be inferred.
+
 import { equal as == } from builtins;
 
-// An empty array literal passed to an `any[]` parameter pins the type
-// variable to the `EmptyArray` pseudo-type and produces a monomorphized
-// instance accepting the empty array; no element type needs to be inferred.
 fn g(v: any[]) -> i64 { 0 }.test({
     assert(g([]) == 0);
 })

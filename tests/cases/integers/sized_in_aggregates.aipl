@@ -1,3 +1,13 @@
+# The sized integer types (`i8`..`i64`, `u8`..`u64`) are storable *inside*
+# aggregates, not just as locals and parameters: struct fields, variant
+# payloads, array/set elements, dict keys and values, and optional cores all
+# take them. Each occupies an 8-byte slot holding the width-canonicalized
+# value, exactly like an `i64` — so layout, refcounting (none: no heap), and
+# equality are unchanged; only the value's own canonicalization differs.
+#
+# The interesting case throughout is a `u64` above `i64::MAX`: it must survive
+# a round trip through the aggregate and render unsigned.
+
 import {
     contains_key,
     equal as ==,
@@ -14,15 +24,6 @@ import {
     wrapping_sub as -,
 } from builtins;
 
-// The sized integer types (`i8`..`i64`, `u8`..`u64`) are storable *inside*
-// aggregates, not just as locals and parameters: struct fields, variant
-// payloads, array/set elements, dict keys and values, and optional cores all
-// take them. Each occupies an 8-byte slot holding the width-canonicalized
-// value, exactly like an `i64` — so layout, refcounting (none: no heap), and
-// equality are unchanged; only the value's own canonicalization differs.
-//
-// The interesting case throughout is a `u64` above `i64::MAX`: it must survive
-// a round trip through the aggregate and render unsigned.
 struct P { w: u32, b: u8, big: u64 }
 
 variant W = WNil | WC(u64, bool, W)

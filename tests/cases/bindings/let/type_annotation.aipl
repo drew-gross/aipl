@@ -1,3 +1,23 @@
+# A `let` or `mut` binding may carry an explicit type: `let x: T = value;`.
+# Without one a binding simply takes its initializer's type, which is the right
+# default nearly always — but it leaves no way to *say* what a binding is when
+# the initializer alone would infer something else. The motivating case is a
+# narrow integer: `mut n = 0;` infers `i64`, and there is no context anywhere in
+# the block to bend it, so a `u8` counter has to say `mut n: u8 = 0;`.
+#
+# With an annotation the declared type wins and the initializer is checked
+# *against* it, so a bare integer literal flexes to it exactly as it would
+# flowing into a parameter or a declared return type — and that reaches into
+# container literals too (`let xs: u8[] = [200];`).
+#
+# The annotation is also the only place a value *changes* integer type: `let n:
+# u8 = some_i64;` wraps to 8 bits and `let n: i64 = some_u8;` widens. That is
+# deliberate — there is no conversion form, so a lossy narrowing is always
+# written down as a declaration rather than buried in an expression.
+#
+# One limit: only the plain `let name`/`mut name` forms take an annotation, not
+# the `let (a, b) = ..` / `let P { x, y } = ..` destructuring forms.
+
 import {
     equal as ==,
     get,
@@ -8,26 +28,6 @@ import {
     wrapping_add as +,
     wrapping_add_assign as +=,
 } from builtins;
-
-// A `let` or `mut` binding may carry an explicit type: `let x: T = value;`.
-// Without one a binding simply takes its initializer's type, which is the right
-// default nearly always — but it leaves no way to *say* what a binding is when
-// the initializer alone would infer something else. The motivating case is a
-// narrow integer: `mut n = 0;` infers `i64`, and there is no context anywhere in
-// the block to bend it, so a `u8` counter has to say `mut n: u8 = 0;`.
-//
-// With an annotation the declared type wins and the initializer is checked
-// *against* it, so a bare integer literal flexes to it exactly as it would
-// flowing into a parameter or a declared return type — and that reaches into
-// container literals too (`let xs: u8[] = [200];`).
-//
-// The annotation is also the only place a value *changes* integer type: `let n:
-// u8 = some_i64;` wraps to 8 bits and `let n: i64 = some_u8;` widens. That is
-// deliberate — there is no conversion form, so a lossy narrowing is always
-// written down as a declaration rather than buried in an expression.
-//
-// One limit: only the plain `let name`/`mut name` forms take an annotation, not
-// the `let (a, b) = ..` / `let P { x, y } = ..` destructuring forms.
 
 struct P { x: i64, y: i64 }
 

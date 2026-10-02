@@ -1,13 +1,14 @@
-// A for body is a statement list with no trailing expression — a bare
-// expression like `0` at the end is a parse error (its value could never
-// be observed; evaluate-for-effect via `expr;`).
+# A for body is a statement list with no trailing expression — a bare
+# expression like `0` at the end is a parse error (its value could never
+# be observed; evaluate-for-effect via `expr;`).
+
 fn f(s: str) -> i64 {
     for (let c : s) { 0 }
     0
 }
 --- errors ---
 error: expected `.`, `;`, `?`, `[`, or an operator, found `}`
- --> ./tests/cases/loops/errors/err_for_body_trailing_expr.aipl:5:25
+ --> ./tests/cases/loops/errors/err_for_body_trailing_expr.aipl:6:25
   |
-5 |     for (let c : s) { 0 }
+6 |     for (let c : s) { 0 }
   |                         ^

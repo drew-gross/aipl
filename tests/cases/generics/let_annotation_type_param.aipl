@@ -1,20 +1,20 @@
-import { equal as ==, is_empty, less_than as <, print, push, to_str, value_or } from builtins;
+# A `let`/`mut` annotation may name the enclosing function's type parameter:
+# `mut out: T[] = [];`. Monomorphization substitutes type variables into a
+# specialized instance's *body* annotations, not just its signature, so the
+# instance sees `i64[]` (or `str[]`, …) exactly as its parameters do.
+#
+# The motivating use is seeding a generic accumulator. An untyped `[]` has
+# element type `__none__`, which meets a real `T` only by accident (it happens
+# to meet `i64`), so building up a `T[]` from `[]` needs the element type
+# stated. The alternative — an empty slice of the input, `self[..0]` — works
+# but reads as a trick.
+#
+# Both loops are spelled out rather than written as pipelines, because the seed
+# is the whole point of the case — `#[allow]` keeps them. `collect([])` also
+# instantiates `T` at the empty literal's `__none__`, which `push` stores like any
+# other 8-byte element (see `is_storable_elem` in aipl-codegen).
 
-// A `let`/`mut` annotation may name the enclosing function's type parameter:
-// `mut out: T[] = [];`. Monomorphization substitutes type variables into a
-// specialized instance's *body* annotations, not just its signature, so the
-// instance sees `i64[]` (or `str[]`, …) exactly as its parameters do.
-//
-// The motivating use is seeding a generic accumulator. An untyped `[]` has
-// element type `__none__`, which meets a real `T` only by accident (it happens
-// to meet `i64`), so building up a `T[]` from `[]` needs the element type
-// stated. The alternative — an empty slice of the input, `self[..0]` — works
-// but reads as a trick.
-//
-// Both loops are spelled out rather than written as pipelines, because the seed
-// is the whole point of the case — `#[allow]` keeps them. `collect([])` also
-// instantiates `T` at the empty literal's `__none__`, which `push` stores like any
-// other 8-byte element (see `is_storable_elem` in aipl-codegen).
+import { equal as ==, is_empty, less_than as <, print, push, to_str, value_or } from builtins;
 
 fn collect<T: any>(xs: T[]) -> T[] {
     mut out: T[] = []; #[allow]

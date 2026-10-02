@@ -1,3 +1,7 @@
+# The shapes the union-loop lint must leave alone. It rewrites exactly one
+# shape — a `mut acc = #{};` whose very next statement is a loop doing nothing
+# but unioning one thing into it — so everything here compiles.
+
 import {
     greater_than as >,
     is_nonempty,
@@ -11,10 +15,6 @@ import {
     union,
     union_all,
 } from builtins;
-
-// The shapes the union-loop lint must leave alone. It rewrites exactly one
-// shape — a `mut acc = #{};` whose very next statement is a loop doing nothing
-// but unioning one thing into it — so everything here compiles.
 
 fn show(s: #{i64}) -> str {
     mut out: i64[] = []; #[allow]
@@ -175,11 +175,11 @@ allocations: 120
 deallocations: 120
 reallocations: 0
 bytes allocated: 4547
-instructions executed: 9823
-binary size: 15984
-  code: 9904
+instructions executed: 9819
+binary size: 15792
+  code: 9788
   data: 99
-  metadata: 5981
+  metadata: 5905
 functions:
   __to_str_i64:
     calls: 30
@@ -194,13 +194,13 @@ functions:
     calls: 3
     bytes: (external)
   aipl_arr_inc:
-    calls: 136
+    calls: 135
     bytes: (external)
   aipl_arr_sort:
     calls: 10
     bytes: (external)
   aipl_array_dec:
-    calls: 243
+    calls: 242
     bytes: (external)
   aipl_array_new:
     calls: 3
@@ -243,10 +243,7 @@ functions:
     bytes: 716
   main:
     calls: 1
-    bytes: 5400
-  merged_desc:
-    calls: 1
-    bytes: 436
+    bytes: 5720
   show:
     calls: 10
     bytes: 1672

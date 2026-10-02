@@ -1,6 +1,6 @@
-import { print, to_str, wrapping_mul as * } from builtins;
+# Every *check-phase* variant error, in one file, reported in one run.
 
-// Every *check-phase* variant error, in one file, reported in one run.
+import { print, to_str, wrapping_mul as * } from builtins;
 
 variant Shape = Circle(i64) | Rect(i64, i64) | Empty
 

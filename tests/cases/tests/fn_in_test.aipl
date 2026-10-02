@@ -1,9 +1,10 @@
+# A `.test` block may declare functions of its own — fixtures and helpers the
+# test needs and nothing else does. They sit wherever a statement could, may
+# call each other and themselves, and are named only inside the block: the
+# function under test, and every other function in the file, cannot see them.
+
 import { equal as ==, map, wrapping_add as + } from builtins;
 
-// A `.test` block may declare functions of its own — fixtures and helpers the
-// test needs and nothing else does. They sit wherever a statement could, may
-// call each other and themselves, and are named only inside the block: the
-// function under test, and every other function in the file, cannot see them.
 fn double(n: i64) -> i64 { n + n }.test({
     fn four() -> i64 { 4 }
     assert(double(2) == four());

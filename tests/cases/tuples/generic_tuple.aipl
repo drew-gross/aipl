@@ -1,17 +1,18 @@
+# A tuple whose element types mention a type parameter.
+#
+# A tuple lowers to a synthetic struct named after its element types
+# (`__tuple$i64$str`), which works because those types name a layout. A tuple
+# over a type *variable* names none until monomorphization binds it, so it
+# lowers instead to a per-arity template (`__tuple2`) that the ordinary generic
+# machinery instantiates — the same road `Box<T>` takes.
+#
+# Both roads have to end at the same struct, or a tuple built in a generic
+# function and read by a concrete caller would be two incompatible types. They
+# do: an instance of a tuple template is named by its element types alone,
+# which is exactly what the concrete route spells.
+
 import { print, to_str } from builtins;
 
-// A tuple whose element types mention a type parameter.
-//
-// A tuple lowers to a synthetic struct named after its element types
-// (`__tuple$i64$str`), which works because those types name a layout. A tuple
-// over a type *variable* names none until monomorphization binds it, so it
-// lowers instead to a per-arity template (`__tuple2`) that the ordinary generic
-// machinery instantiates — the same road `Box<T>` takes.
-//
-// Both roads have to end at the same struct, or a tuple built in a generic
-// function and read by a concrete caller would be two incompatible types. They
-// do: an instance of a tuple template is named by its element types alone,
-// which is exactly what the concrete route spells.
 fn first<T: any>(p: (T, T)) -> T { p.0 }
 
 fn swap<A: any, B: any>(p: (A, B)) -> (B, A) { (p.1, p.0) }

@@ -1,3 +1,15 @@
+# `xs.right_fold(init, f)` mirrors `left_fold`: it combines right to left, so
+# `[a, b, c]` folds to `f(a, f(b, f(c, init)))` — and the combiner takes the
+# element *first*, the accumulator second, the opposite of `left_fold`.
+#
+# This file imports both directions, so it spells the left one `left_fold`
+# rather than aliasing it to plain `fold` (see `fold.aipl` for the usual
+# single-direction spelling).
+#
+# `right_fold` walks the indices backwards instead of folding over a reversed
+# copy, so it allocates nothing — which is the point of having it rather than
+# writing `xs.reverse().fold(..)`.
+
 import {
     concat as +++,
     equal as ==,
@@ -7,17 +19,6 @@ import {
     wrapping_add as +,
 } from builtins;
 
-// `xs.right_fold(init, f)` mirrors `left_fold`: it combines right to left, so
-// `[a, b, c]` folds to `f(a, f(b, f(c, init)))` — and the combiner takes the
-// element *first*, the accumulator second, the opposite of `left_fold`.
-//
-// This file imports both directions, so it spells the left one `left_fold`
-// rather than aliasing it to plain `fold` (see `fold.aipl` for the usual
-// single-direction spelling).
-//
-// `right_fold` walks the indices backwards instead of folding over a reversed
-// copy, so it allocates nothing — which is the point of having it rather than
-// writing `xs.reverse().fold(..)`.
 variant List = Cons(i64, List) | Nil
 
 // The motivating case: build a cons list that keeps the array's order. The left

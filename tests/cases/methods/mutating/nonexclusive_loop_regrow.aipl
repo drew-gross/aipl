@@ -1,14 +1,14 @@
-import { equal as ==, logical_and as &&, push } from builtins;
+# Regression for the latent ownership bug: a *non-exclusive* `mut` array grown
+# by a mutating call inside a loop must stay correct. The fresh per-iteration
+# buffer is currently tracked in the loop-body scope and freed at the end of
+# each iteration, leaving the binding dangling (corruption / abort). Two shapes
+# exercise the two broken codegen paths:
+#   1. a user `mut self` method called in `set` form inside a loop
+#      (the mutating-method writeback path), and
+#   2. a genuinely-aliased array (`let alias = a`) grown in a loop
+#      (the non-exclusive `push` copy path).
 
-// Regression for the latent ownership bug: a *non-exclusive* `mut` array grown
-// by a mutating call inside a loop must stay correct. The fresh per-iteration
-// buffer is currently tracked in the loop-body scope and freed at the end of
-// each iteration, leaving the binding dangling (corruption / abort). Two shapes
-// exercise the two broken codegen paths:
-//   1. a user `mut self` method called in `set` form inside a loop
-//      (the mutating-method writeback path), and
-//   2. a genuinely-aliased array (`let alias = a`) grown in a loop
-//      (the non-exclusive `push` copy path).
+import { equal as ==, logical_and as &&, push } from builtins;
 
 fn addtwo(mut self: i64[], v: i64) {
     set self.push(v);

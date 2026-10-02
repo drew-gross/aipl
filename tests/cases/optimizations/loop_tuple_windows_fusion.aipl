@@ -1,3 +1,31 @@
+# Operation fusion: a `for` over `xs.tuple_windows()` never builds the pairs.
+#
+# Unfused, `tuple_windows` allocates an array of every adjacent pair — twice
+# the source's size, for a two-element tuple — that the loop walks once and
+# frees. Fused, the loop runs over `xs` itself carrying the previous element
+# along, and builds each pair on the stack as the loop variable:
+#
+#     let $src = xs;
+#     if (let some($first) = $src[0]) {
+#         mut $prev = $first;
+#         mut $skip = true;
+#         for (let $cur : $src) {
+#             if ($skip) { set $skip = false; }
+#             else { let w = ($prev, $cur); body; set $prev = $cur; };
+#         }
+#     };
+#
+# Nothing about the rewrite can change behaviour — no function is called, `xs`
+# is evaluated once either way, and the pairs reach the body in order — so it
+# fires unconditionally: the body may print, accumulate, or return early.
+#
+# Measured on this case with the fusion switched off: 21 allocations (40
+# reallocations) become 14 (17), and 63,608 instructions become 42,353. The
+# `functions:` list is the readable evidence — no `__builtin_tuple_windows$..`
+# specialization is emitted at all. Unfused, every loop below shares one
+# `__builtin_tuple_windows$i64`; fused, only `materialized` still calls it, and
+# that single use is inlined into `main`.
+
 import {
     equal as ==,
     extend,
@@ -9,34 +37,6 @@ import {
     tuple_windows,
     wrapping_increment as ++,
 } from builtins;
-
-// Operation fusion: a `for` over `xs.tuple_windows()` never builds the pairs.
-//
-// Unfused, `tuple_windows` allocates an array of every adjacent pair — twice
-// the source's size, for a two-element tuple — that the loop walks once and
-// frees. Fused, the loop runs over `xs` itself carrying the previous element
-// along, and builds each pair on the stack as the loop variable:
-//
-//     let $src = xs;
-//     if (let some($first) = $src[0]) {
-//         mut $prev = $first;
-//         mut $skip = true;
-//         for (let $cur : $src) {
-//             if ($skip) { set $skip = false; }
-//             else { let w = ($prev, $cur); body; set $prev = $cur; };
-//         }
-//     };
-//
-// Nothing about the rewrite can change behaviour — no function is called, `xs`
-// is evaluated once either way, and the pairs reach the body in order — so it
-// fires unconditionally: the body may print, accumulate, or return early.
-//
-// Measured on this case with the fusion switched off: 21 allocations (40
-// reallocations) become 14 (17), and 63,608 instructions become 42,353. The
-// `functions:` list is the readable evidence — no `__builtin_tuple_windows$..`
-// specialization is emitted at all. Unfused, every loop below shares one
-// `__builtin_tuple_windows$i64`; fused, only `materialized` still calls it, and
-// that single use is inlined into `main`.
 
 fn many() -> i64[] {
     mut xs = [0];

@@ -1,11 +1,12 @@
+# `A => { expr }` — a block that holds nothing but the arm's value. The braces
+# add nesting and say nothing; `A => expr` is the same arm.
+#
+# A block that does something else keeps its braces: one with a statement in
+# it (`let`, a `;`), or one holding a comment, which would have nowhere to go.
+# An alternation shares one body, so it is reported once, at the `=>` arm.
+
 import { print, to_str, wrapping_add as + } from builtins;
 
-// `A => { expr }` — a block that holds nothing but the arm's value. The braces
-// add nesting and say nothing; `A => expr` is the same arm.
-//
-// A block that does something else keeps its braces: one with a statement in
-// it (`let`, a `;`), or one holding a comment, which would have nowhere to go.
-// An alternation shares one body, so it is reported once, at the `=>` arm.
 fn f(x: i64) -> i64 {
     match (x) {
         0 => { 1 },
@@ -31,19 +32,19 @@ fn main() !prints {
 }
 --- errors ---
 error: this arm's block holds nothing but its value — write the value as the arm's body, without the braces (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_arm_block_value.aipl:11:18
+  --> ./tests/cases/lints/err_arm_block_value.aipl:12:18
    |
-11 |         0 => { 1 },
+12 |         0 => { 1 },
    |                  ^
 
 error: this arm's block holds nothing but its value — write the value as the arm's body, without the braces (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_arm_block_value.aipl:12:22
+  --> ./tests/cases/lints/err_arm_block_value.aipl:13:22
    |
-12 |         1 => { x + 1 },
+13 |         1 => { x + 1 },
    |                      ^
 
 error: this arm's block holds nothing but its value — write the value as the arm's body, without the braces (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_arm_block_value.aipl:21:22
+  --> ./tests/cases/lints/err_arm_block_value.aipl:22:22
    |
-21 |         4 | 5 => { x },
+22 |         4 | 5 => { x },
    |                      ^

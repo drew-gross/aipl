@@ -1,7 +1,7 @@
-import { equal as ==, greater_than as >, len } from builtins;
+# A generic function over `any[]`: written once, monomorphized per element
+# type at each call site.
 
-// A generic function over `any[]`: written once, monomorphized per element
-// type at each call site.
+import { equal as ==, greater_than as >, len } from builtins;
 
 fn is_len_greater_than_5(v: any[]) -> bool { len(v) > 5 }.test({
     let ints = [1, 2, 3];

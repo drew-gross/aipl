@@ -1,6 +1,7 @@
+# char[] iteration and bool[] indexing.
+
 import { equal as ==, map, value_or, wrapping_add as + } from builtins;
 
-// char[] iteration and bool[] indexing.
 fn count_h(cs: char[]) -> i64 {
     mut n = 0;
     for (let c : cs) {

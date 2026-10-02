@@ -1,7 +1,8 @@
+# Trailing commas are accepted in params, struct fields, struct literal
+# field inits, and call args.
+
 import { equal as ==, wrapping_add as + } from builtins;
 
-// Trailing commas are accepted in params, struct fields, struct literal
-// field inits, and call args.
 struct Point { x: i64, y: i64 }
 
 fn add(a: i64, b: i64) -> i64 { a + b }

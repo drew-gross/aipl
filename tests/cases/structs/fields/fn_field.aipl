@@ -1,3 +1,7 @@
+# A function value is storable in a struct field (as its 8-byte code address)
+# and callable back through the field — including from a field of an array
+# element pulled at runtime, which no monomorphization can specialize away.
+
 import {
     equal as ==,
     wrapping_add as +,
@@ -9,9 +13,6 @@ fn inc(x: i64) -> i64 { x + 1 }
 
 fn dec(x: i64) -> i64 { x - 1 }
 
-// A function value is storable in a struct field (as its 8-byte code address)
-// and callable back through the field — including from a field of an array
-// element pulled at runtime, which no monomorphization can specialize away.
 struct Op { f: (i64) -> i64 }
 
 fn apply_first() -> i64 { Op { f: inc }.f(41) }.test({

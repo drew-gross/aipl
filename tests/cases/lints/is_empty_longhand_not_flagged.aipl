@@ -1,3 +1,7 @@
+# The near-misses, each for its own reason. The one shape that cannot live here
+# is a `len` of the file's own — a file defining one cannot also import the
+# builtin, so that case has its own file (`is_empty_longhand_user_len.aipl`).
+
 import {
     equal as ==,
     is_nonempty,
@@ -8,9 +12,6 @@ import {
     print,
 } from builtins;
 
-// The near-misses, each for its own reason. The one shape that cannot live here
-// is a `len` of the file's own — a file defining one cannot also import the
-// builtin, so that case has its own file (`is_empty_longhand_user_len.aipl`).
 fn main() !prints {
     let xs = [1, 2];
 

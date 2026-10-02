@@ -1,8 +1,8 @@
-import { equal as ==, push, wrapping_increment as ++ } from builtins;
+# A generic that iterates the array elements (binding each as the concrete
+# element type per instance) and counts them. Exercises element-level body
+# operations across i64[], char[], and bool[] instances.
 
-// A generic that iterates the array elements (binding each as the concrete
-// element type per instance) and counts them. Exercises element-level body
-// operations across i64[], char[], and bool[] instances.
+import { equal as ==, push, wrapping_increment as ++ } from builtins;
 
 fn count(v: any[]) -> i64 {
     mut n = 0;

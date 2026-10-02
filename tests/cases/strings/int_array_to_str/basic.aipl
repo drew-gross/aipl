@@ -1,7 +1,8 @@
+# `to_str(xs)` renders an i64[] as a bracketed, comma-separated
+# list. Negatives and zero render via the same decimal logic as to_str.
+
 import { print, to_str } from builtins;
 
-// `to_str(xs)` renders an i64[] as a bracketed, comma-separated
-// list. Negatives and zero render via the same decimal logic as to_str.
 fn main() !prints {
     print(to_str([1, 2, 3]));
     print(to_str([42]));

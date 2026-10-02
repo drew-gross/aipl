@@ -1,7 +1,8 @@
-// `zip_with(a, b, f)` pairs two arrays positionally and applies `f`, like
-// Haskell's zipWith / Python's `map(f, zip(a, b))`. The pairing function can be
-// an operator passed as a value (`+`), a lambda, or a named function. The
-// result runs to the shorter input (Python `zip` semantics).
+# `zip_with(a, b, f)` pairs two arrays positionally and applies `f`, like
+# Haskell's zipWith / Python's `map(f, zip(a, b))`. The pairing function can be
+# an operator passed as a value (`+`), a lambda, or a named function. The
+# result runs to the shorter input (Python `zip` semantics).
+
 import { print, to_str, wrapping_add as +, wrapping_mul as *, zip_with } from builtins;
 
 fn tagged(x: i64, y: i64) -> i64 { x + y + 1000 }

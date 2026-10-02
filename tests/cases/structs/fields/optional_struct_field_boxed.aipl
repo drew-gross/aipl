@@ -1,8 +1,9 @@
+# A *recursive* struct is boxed — its value is a pointer to a refcounted heap
+# payload — so its fields are stored through that pointer rather than into a
+# stack slot. An optional-of-struct field has to work down that path too.
+
 import { equal as ==, map } from builtins;
 
-// A *recursive* struct is boxed — its value is a pointer to a refcounted heap
-// payload — so its fields are stored through that pointer rather than into a
-// stack slot. An optional-of-struct field has to work down that path too.
 struct Wide { p: i64, q: i64, r: i64, s: str }
 
 // `next: Node?` is what makes `Node` recursive, and so boxed: that optional's

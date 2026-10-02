@@ -1,13 +1,14 @@
+# `int_parse` parses a decimal integer — an optional leading `-`, then one or
+# more ASCII digits, nothing else — as `i64?`: `none` for empty input, a bare
+# sign, any other character, or a value outside i64. It is implemented in
+# AIPL (`aipl-mono/src/builtin_int_parse.aipl`) and its body calls other
+# builtins (`starts_with`, `is_digit`, `enumerate`), so this also exercises
+# the loader pass that lets an AIPL-implemented builtin's body call builtins.
+# Each check returns a distinct exit code so a failure pinpoints which one
+# broke; all passing exits 0.
+
 import { equal as ==, int_parse, logical_not as !, wrapping_sub as - } from builtins;
 
-// `int_parse` parses a decimal integer — an optional leading `-`, then one or
-// more ASCII digits, nothing else — as `i64?`: `none` for empty input, a bare
-// sign, any other character, or a value outside i64. It is implemented in
-// AIPL (`aipl-mono/src/builtin_int_parse.aipl`) and its body calls other
-// builtins (`starts_with`, `is_digit`, `enumerate`), so this also exercises
-// the loader pass that lets an AIPL-implemented builtin's body call builtins.
-// Each check returns a distinct exit code so a failure pinpoints which one
-// broke; all passing exits 0.
 fn main() -> i64 {
     if (!("123".int_parse() == some(123))) {
         return 1;

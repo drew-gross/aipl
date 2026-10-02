@@ -1,9 +1,10 @@
+# An optional may carry a *boxed* (recursive) variant payload the same way it
+# carries a str or array: the value is an 8-byte heap pointer that fits the
+# optional slot, so `value_or` unwraps it directly (a `select`), no `match`
+# needed. The `some` arm owns its list; the `none` arm falls back to a default.
+
 import { equal as ==, value_or, wrapping_add as + } from builtins;
 
-// An optional may carry a *boxed* (recursive) variant payload the same way it
-// carries a str or array: the value is an 8-byte heap pointer that fits the
-// optional slot, so `value_or` unwraps it directly (a `select`), no `match`
-// needed. The `some` arm owns its list; the `none` arm falls back to a default.
 variant List = Nil | Cons(i64, List)
 
 fn sum(self: List) -> i64 {

@@ -1,15 +1,16 @@
+# An untyped `[]` has element type `__none__`, and a generic instantiated at
+# one carries it all the way through the body: in `collect([])`, `T` *is*
+# `__none__`, so `xs` is a `__none__[]` and `x` is a `__none__`.
+#
+# A value of that type can only be produced by code that cannot run — the only
+# sources are an empty container's element and a bare `none`'s payload — so the
+# loop below never executes at `T = __none__`. It still has to compile, and it
+# does: the slot is an ordinary 8-byte word with no-op drop and retain, which
+# is what `is_storable_elem` in aipl-codegen says and what the array-literal
+# spread has always done. The two spellings of an append agree.
+
 import { equal as ==, is_empty, print, push, to_str } from builtins;
 
-// An untyped `[]` has element type `__none__`, and a generic instantiated at
-// one carries it all the way through the body: in `collect([])`, `T` *is*
-// `__none__`, so `xs` is a `__none__[]` and `x` is a `__none__`.
-//
-// A value of that type can only be produced by code that cannot run — the only
-// sources are an empty container's element and a bare `none`'s payload — so the
-// loop below never executes at `T = __none__`. It still has to compile, and it
-// does: the slot is an ordinary 8-byte word with no-op drop and retain, which
-// is what `is_storable_elem` in aipl-codegen says and what the array-literal
-// spread has always done. The two spellings of an append agree.
 fn collect<T: any>(xs: T[]) -> T[] {
     mut out: T[] = []; #[allow]
     for (let x : xs) {

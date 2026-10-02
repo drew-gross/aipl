@@ -1,11 +1,12 @@
+# `same_case(a, b)` asks whether two values share a constructor, ignoring any
+# payload. `==` on a variant is structural — it compares the payload too — so
+# "is this token a Name, whatever its text" has no spelling in terms of `==`.
+#
+# The `variant` bound restricts it to named variants: there is no sensible
+# answer for a scalar, so asking is a compile error rather than a silent one.
+
 import { equal as ==, print, same_case, to_str } from builtins;
 
-// `same_case(a, b)` asks whether two values share a constructor, ignoring any
-// payload. `==` on a variant is structural — it compares the payload too — so
-// "is this token a Name, whatever its text" has no spelling in terms of `==`.
-//
-// The `variant` bound restricts it to named variants: there is no sensible
-// answer for a scalar, so asking is a compile error rather than a silent one.
 variant Tok = Space | Name(str) | IntLit(i64) | StrLit(str, i64)
 
 fn main() !prints {

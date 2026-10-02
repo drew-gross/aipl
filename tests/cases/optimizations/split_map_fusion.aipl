@@ -1,24 +1,24 @@
-import { equal as ==, join, len, map, print, split, split_map, to_str } from builtins;
+# Operation fusion: `s.split(sep).map(f)` collapses into `split_map`, which
+# maps each part as the cut is made — instead of `split` building a block of
+# every part, a retained view each, for `map` to walk once and drop.
+#
+# `src.lines().map(f)` is the shape this exists for: `lines` is `split("\n")`
+# and reaches the pass inlined, with its parameter bound ahead of the body, so
+# the fusion looks under that binding — which is what `tagged_lines` proves.
+#
+# `split_map` is itself written as a `for` over a `split` (see
+# `builtin_split_map.aipl`), so the loop fusion applies inside it too: the part
+# goes from the source string through `f` into the result with nothing built in
+# between, and the one array is the answer.
+#
+# Measured on this case with the split+map row switched off: 37 allocations
+# become 35 and 2,693 bytes become 2,533 — `map`'s in-place reuse already
+# spends the split's own block on the result, so what goes is the retain per
+# part and the second block where the mapped type is not `str`-sized. The pass
+# shows up more in the work than the allocation: 2,359 instructions become
+# 1,929, and the binary 10,640 bytes become 8,760.
 
-// Operation fusion: `s.split(sep).map(f)` collapses into `split_map`, which
-// maps each part as the cut is made — instead of `split` building a block of
-// every part, a retained view each, for `map` to walk once and drop.
-//
-// `src.lines().map(f)` is the shape this exists for: `lines` is `split("\n")`
-// and reaches the pass inlined, with its parameter bound ahead of the body, so
-// the fusion looks under that binding — which is what `tagged_lines` proves.
-//
-// `split_map` is itself written as a `for` over a `split` (see
-// `builtin_split_map.aipl`), so the loop fusion applies inside it too: the part
-// goes from the source string through `f` into the result with nothing built in
-// between, and the one array is the answer.
-//
-// Measured on this case with the split+map row switched off: 37 allocations
-// become 35 and 2,693 bytes become 2,533 — `map`'s in-place reuse already
-// spends the split's own block on the result, so what goes is the retain per
-// part and the second block where the mapped type is not `str`-sized. The pass
-// shows up more in the work than the allocation: 2,359 instructions become
-// 1,929, and the binary 10,640 bytes become 8,760.
+import { equal as ==, join, len, map, print, split, split_map, to_str } from builtins;
 
 fn lines(self: str) -> str[] { self.split("\n") }
 

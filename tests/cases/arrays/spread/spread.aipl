@@ -1,9 +1,10 @@
+# `..xs` inside an array literal splices `xs`'s elements in at that position,
+# rather than nesting the array. Spreads mix freely with plain elements, and
+# the operand can be any array expression — a binding, a call, or another
+# literal.
+
 import { equal as == } from builtins;
 
-// `..xs` inside an array literal splices `xs`'s elements in at that position,
-// rather than nesting the array. Spreads mix freely with plain elements, and
-// the operand can be any array expression — a binding, a call, or another
-// literal.
 fn tail() -> i64[] { [3, 4] }
 
 fn five() -> i64 { 5 }

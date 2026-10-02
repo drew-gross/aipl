@@ -1,3 +1,16 @@
+# Every integer width — not just the 64-bit pair — is a legal array and
+# optional element. An element slot is 8 bytes and a narrow value is *already*
+# canonicalized to its width before it is stored (sign-extended for `i*`,
+# zero-extended for `u*`), so a full 8-byte store/load round-trips it
+# unchanged; nothing has to be truncated on store or re-extended on load. Only
+# the *interpretation* differs, and everything that reads an element —
+# rendering, equality, `sort`, `minimum`/`maximum` — already dispatches on the
+# element type's width and signedness.
+#
+# The values below are chosen to catch a lost extension: each width's extreme
+# (`i8::MIN`, `u32::MAX`, …) has bits set outside every narrower width, and a
+# negative signed value shares its low bits with a large unsigned one.
+
 import {
     contains,
     equal as ==,
@@ -12,19 +25,6 @@ import {
     value_or,
     wrapping_add as +,
 } from builtins;
-
-// Every integer width — not just the 64-bit pair — is a legal array and
-// optional element. An element slot is 8 bytes and a narrow value is *already*
-// canonicalized to its width before it is stored (sign-extended for `i*`,
-// zero-extended for `u*`), so a full 8-byte store/load round-trips it
-// unchanged; nothing has to be truncated on store or re-extended on load. Only
-// the *interpretation* differs, and everything that reads an element —
-// rendering, equality, `sort`, `minimum`/`maximum` — already dispatches on the
-// element type's width and signedness.
-//
-// The values below are chosen to catch a lost extension: each width's extreme
-// (`i8::MIN`, `u32::MAX`, …) has bits set outside every narrower width, and a
-// negative signed value shares its low bits with a large unsigned one.
 
 fn i8s() -> i8[] { [3, -128, 127] }.test({
     assert(i8s().to_str() == "[3, -128, 127]");

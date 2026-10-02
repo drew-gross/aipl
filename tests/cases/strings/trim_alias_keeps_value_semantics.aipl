@@ -1,8 +1,9 @@
+# Aliasing disables the in-place trim: once `s` is captured by `t`, `s` is
+# non-exclusive, so `set s = trim(s)` builds a fresh string and the snapshot
+# `t` keeps its original (untrimmed) value.
+
 import { equal as ==, trim } from builtins;
 
-// Aliasing disables the in-place trim: once `s` is captured by `t`, `s` is
-// non-exclusive, so `set s = trim(s)` builds a fresh string and the snapshot
-// `t` keeps its original (untrimmed) value.
 fn trimmed() -> str {
     mut s = "  hi  ";
     let t = s; // snapshot "  hi  "

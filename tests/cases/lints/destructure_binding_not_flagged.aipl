@@ -1,3 +1,5 @@
+# The shapes a pattern cannot replace, each for its own reason.
+
 import { equal as ==, print } from builtins;
 
 struct Pos { line: i64, col: i64 }
@@ -10,7 +12,6 @@ fn take(p: Pos) -> i64 { p.line } #[allow]
 
 fn pair() -> Pair { a: 1, b: 2 }
 
-// The shapes a pattern cannot replace, each for its own reason.
 fn main() !prints {
     // One mention that is not a field read is enough: the value itself is what
     // is passed, and a pattern keeps only the fields.

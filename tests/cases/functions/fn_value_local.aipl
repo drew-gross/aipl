@@ -1,10 +1,11 @@
+# A named function can be used as a first-class *value*: bound to a local and
+# called indirectly. Unlike passing a function to a higher-order function
+# (which the compiler specializes away), the value here is a genuine runtime
+# code address — a `mut` binding can be reassigned and the callee chosen at
+# run time, so nothing is resolved at compile time.
+
 import { concat as +++, equal as ==, wrapping_add as + } from builtins;
 
-// A named function can be used as a first-class *value*: bound to a local and
-// called indirectly. Unlike passing a function to a higher-order function
-// (which the compiler specializes away), the value here is a genuine runtime
-// code address — a `mut` binding can be reassigned and the callee chosen at
-// run time, so nothing is resolved at compile time.
 fn inc(x: i64) -> i64 { x + 1 }
 
 fn scalar_values() -> i64 {

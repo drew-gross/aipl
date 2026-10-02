@@ -5230,7 +5230,7 @@ fn is_unknown(t: &Type) -> bool {
 /// placeholder element type, `ok`/`err` leave their *other* side a placeholder,
 /// and a generic constructor whose arguments don't pin every variable takes them
 /// from the expected type.
-fn needs_lock(k: &ExprKind) -> bool {
+pub(crate) fn needs_lock(k: &ExprKind) -> bool {
     match k {
         ExprKind::None => true,
         ExprKind::ArrayLit(v) | ExprKind::SetLit(v, _) => v.is_empty(),

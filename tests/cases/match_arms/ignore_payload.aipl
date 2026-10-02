@@ -1,12 +1,13 @@
+# `Ctor(..)` matches a case *and ignores what it carries*, so an arm never has
+# to name a payload it doesn't read — or even know how many slots there are.
+#
+# It is deliberately not the same as the nullary `Ctor`, which says the case has
+# no payload at all and stays an error when it does: a reader can tell "this
+# case is empty" from "I'm ignoring what it holds" without going to look up the
+# variant.
+
 import { print, to_str, wrapping_sub as - } from builtins;
 
-// `Ctor(..)` matches a case *and ignores what it carries*, so an arm never has
-// to name a payload it doesn't read — or even know how many slots there are.
-//
-// It is deliberately not the same as the nullary `Ctor`, which says the case has
-// no payload at all and stays an error when it does: a reader can tell "this
-// case is empty" from "I'm ignoring what it holds" without going to look up the
-// variant.
 variant Shape = Circle(i64) | Rect(i64, i64) | Point | Line(i64, i64, i64, i64)
 
 fn arity_free(s: Shape) -> str {

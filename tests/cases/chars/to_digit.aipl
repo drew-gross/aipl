@@ -1,10 +1,11 @@
+# `to_digit` maps an ASCII decimal digit '0'..'9' to its 0..9 value (`c - '0'`)
+# and yields `none` for any other char — including the chars just outside the
+# digit range, '/' (47) and ':' (58). It's a codegen intrinsic returning an
+# `i64?`. Each check returns a distinct exit code so a failure pinpoints which
+# one broke; all passing exits 0.
+
 import { equal as ==, logical_not as !, to_digit } from builtins;
 
-// `to_digit` maps an ASCII decimal digit '0'..'9' to its 0..9 value (`c - '0'`)
-// and yields `none` for any other char — including the chars just outside the
-// digit range, '/' (47) and ':' (58). It's a codegen intrinsic returning an
-// `i64?`. Each check returns a distinct exit code so a failure pinpoints which
-// one broke; all passing exits 0.
 fn main() -> i64 {
     if (!('0'.to_digit() == some(0))) {
         return 1;

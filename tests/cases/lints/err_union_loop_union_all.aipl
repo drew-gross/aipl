@@ -1,12 +1,12 @@
-import { len, print, to_str, union, wrapping_add as + } from builtins;
+# `mut out = #{}; for (let s : xs) { set out = out.union(s); }` — a set seeded
+# empty and grown by a loop that does nothing else. `union_all` says that in one
+# word, and says it up front: the reader learns what the set *is* without having
+# to run three statements to find out that nothing else happens to `out`.
+#
+# Neither `map` nor `union_all` is imported here, so every message names the
+# import its advice needs. The companion `union_loop_union_all_allow` has both.
 
-// `mut out = #{}; for (let s : xs) { set out = out.union(s); }` — a set seeded
-// empty and grown by a loop that does nothing else. `union_all` says that in one
-// word, and says it up front: the reader learns what the set *is* without having
-// to run three statements to find out that nothing else happens to `out`.
-//
-// Neither `map` nor `union_all` is imported here, so every message names the
-// import its advice needs. The companion `union_loop_union_all_allow` has both.
+import { len, print, to_str, union, wrapping_add as + } from builtins;
 
 // The element unioned in unchanged — `union_all` alone.
 fn merged(xs: #{i64}[]) -> #{i64} {

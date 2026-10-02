@@ -1,17 +1,17 @@
-import { greater_than as >, less_than as <, logical_and as &&, now_nanos } from builtins;
+# `now_nanos` reads the system wall clock: nanoseconds since the Unix epoch, as
+# a `u64`. It carries the `!clock` effect, so every caller must declare it.
+#
+# A live clock can't be asserted exactly, so the property checked here is the
+# one that holds on any correctly-set machine: the reading lands inside a wide
+# plausible window. That window also pins the *unit* — a seconds- or
+# milliseconds-since-epoch reading falls below the lower bound, and a
+# thousand-fold-too-large one blows past the upper.
+#
+# Deliberately not asserted: that two successive readings increase. This is the
+# wall clock, which NTP or a manual change can step backwards at any moment;
+# `now_nanos` answers "when", not reliably "how long".
 
-// `now_nanos` reads the system wall clock: nanoseconds since the Unix epoch, as
-// a `u64`. It carries the `!clock` effect, so every caller must declare it.
-//
-// A live clock can't be asserted exactly, so the property checked here is the
-// one that holds on any correctly-set machine: the reading lands inside a wide
-// plausible window. That window also pins the *unit* — a seconds- or
-// milliseconds-since-epoch reading falls below the lower bound, and a
-// thousand-fold-too-large one blows past the upper.
-//
-// Deliberately not asserted: that two successive readings increase. This is the
-// wall clock, which NTP or a manual change can step backwards at any moment;
-// `now_nanos` answers "when", not reliably "how long".
+import { greater_than as >, less_than as <, logical_and as &&, now_nanos } from builtins;
 
 // 2024-01-01 and 2100-01-01 UTC, in nanoseconds since the epoch.
 fn year_2024_nanos() -> u64 { 1704067200000000000 }

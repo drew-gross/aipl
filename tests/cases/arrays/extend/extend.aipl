@@ -1,10 +1,11 @@
+# `extend` is `push` for a whole array: `set dst.extend(src)` appends every
+# element of `src` to `dst` in place, leaving `src` untouched.
+#
+# It is a builtin rather than an AIPL loop over `push` so it can size the
+# destination once — see `extend_reserves_once`, where that is the assertion.
+
 import { extend, join, print, to_str, wrapping_add as +, wrapping_add_assign as += } from builtins;
 
-// `extend` is `push` for a whole array: `set dst.extend(src)` appends every
-// element of `src` to `dst` in place, leaving `src` untouched.
-//
-// It is a builtin rather than an AIPL loop over `push` so it can size the
-// destination once — see `extend_reserves_once`, where that is the assertion.
 variant Tree = Leaf(i64) | Node(Tree, Tree)
 
 fn total(self: Tree) -> i64 {

@@ -1,10 +1,11 @@
+# `#[allow]` on the binding's own line keeps it.
+
 import { print } from builtins;
 
 struct Pos { line: i64, col: i64 }
 
 fn make() -> Pos { line: 3, col: 7 }
 
-// `#[allow]` on the binding's own line keeps it.
 fn main() !prints {
     let p = make(); #[allow]
     print(`{p.line} {p.col}`);

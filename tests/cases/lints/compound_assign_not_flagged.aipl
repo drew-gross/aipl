@@ -1,3 +1,8 @@
+# The shapes the compound lint must leave alone. Subtraction and division are
+# not commutative, so a receiver on the *right* is not an accumulate at all:
+# `set n = 20 - n;` is not `set n -= 20;`, and rewriting it that way would
+# silently change the program.
+
 import {
     print,
     saturating_divide as /,
@@ -8,10 +13,6 @@ import {
 
 struct Counter { n: i64 }
 
-// The shapes the compound lint must leave alone. Subtraction and division are
-// not commutative, so a receiver on the *right* is not an accumulate at all:
-// `set n = 20 - n;` is not `set n -= 20;`, and rewriting it that way would
-// silently change the program.
 fn main() !prints {
     mut n = 10;
     set n = 20 - n; // the receiver is the subtrahend, not the accumulator

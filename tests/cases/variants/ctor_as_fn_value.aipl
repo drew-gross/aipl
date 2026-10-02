@@ -1,8 +1,9 @@
+# A payload-carrying variant constructor can be passed as a function value,
+# anywhere a named function can: `xs.map(Circle)` means `xs.map(|x| Circle(x))`.
+# (Nullary constructors are unaffected — a bare `Dot` is already a value.)
+
 import { equal as ==, map, push, wrapping_add as + } from builtins;
 
-// A payload-carrying variant constructor can be passed as a function value,
-// anywhere a named function can: `xs.map(Circle)` means `xs.map(|x| Circle(x))`.
-// (Nullary constructors are unaffected — a bare `Dot` is already a value.)
 variant Shape = Circle(i64) | Rect(i64, i64) | Label(str) | Dot
 
 // A builtin HOF taking a constructor, in both call forms.

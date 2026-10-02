@@ -1,7 +1,8 @@
+# `#[allow]` on the line squelches the decrement lint, like any other — the
+# long-hand `set n = n - 1;` compiles and runs as written.
+
 import { print, to_str, wrapping_sub as - } from builtins;
 
-// `#[allow]` on the line squelches the decrement lint, like any other — the
-// long-hand `set n = n - 1;` compiles and runs as written.
 fn main() !prints {
     mut n = 1;
     set n = n - 1; #[allow]

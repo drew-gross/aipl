@@ -1,3 +1,10 @@
+# An ordered set: `#>{T}` walks its elements largest first, `#<{T}` smallest
+# first. Both are sets — deduplicated, `has`/`len`/`union`, `==` regardless of
+# how they were built — and distinct types from each other and from the
+# unordered `#{T}`, which promises no order at all. The block is kept sorted,
+# so iteration is the array walk and `to_array` is the same block seen as an
+# array. The element must be `ord`: an integer, char, or str (bytewise).
+
 import {
     equal as ==,
     has,
@@ -10,12 +17,6 @@ import {
     wrapping_add as +,
 } from builtins;
 
-// An ordered set: `#>{T}` walks its elements largest first, `#<{T}` smallest
-// first. Both are sets — deduplicated, `has`/`len`/`union`, `==` regardless of
-// how they were built — and distinct types from each other and from the
-// unordered `#{T}`, which promises no order at all. The block is kept sorted,
-// so iteration is the array walk and `to_array` is the same block seen as an
-// array. The element must be `ord`: an integer, char, or str (bytewise).
 fn main() !prints {
     // Literals sort and dedup at construction.
     let d = #>{3, 1, 2, 3, 10};

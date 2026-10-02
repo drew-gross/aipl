@@ -1,3 +1,7 @@
+# `tuple_windows` pairs each element with the one after it, overlapping:
+# `[1, 2, 3]` gives `(1, 2)` and `(2, 3)`. Fewer than two elements give no
+# pairs. A `str` receiver pairs its chars.
+
 import {
     equal as ==,
     is_empty,
@@ -8,9 +12,6 @@ import {
     wrapping_increment as ++,
 } from builtins;
 
-// `tuple_windows` pairs each element with the one after it, overlapping:
-// `[1, 2, 3]` gives `(1, 2)` and `(2, 3)`. Fewer than two elements give no
-// pairs. A `str` receiver pairs its chars.
 fn main() !prints {
     for (let (a, b) : [1, 2, 3, 4].tuple_windows()) {
         print(`{a} -> {b}`);

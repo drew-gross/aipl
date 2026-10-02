@@ -1,8 +1,9 @@
+# `s[start..]` slices from `start` to the end of the string (the open end runs
+# to `s`'s length, filled in by codegen — no `len` import needed). `start` is
+# clamped to `[0, len]`, like the closed `s[start..end]` form.
+
 import { equal as == } from builtins;
 
-// `s[start..]` slices from `start` to the end of the string (the open end runs
-// to `s`'s length, filled in by codegen — no `len` import needed). `start` is
-// clamped to `[0, len]`, like the closed `s[start..end]` form.
 fn drop_prefix(s: str, n: i64) -> str { s[n..] }.test({
     // The whole-range form is what `slice_whole` flags — squelched here, since
     // exercising it *is* the point of these two lines.
@@ -24,9 +25,9 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 293
-binary size: 3456
+binary size: 3464
   code: 1496
-  data: 344
+  data: 352
   metadata: 1616
 functions:
   __test$drop_prefix:

@@ -1,3 +1,8 @@
+# `#{}` is the empty literal for a set *and* a dict, and which one it is comes
+# from the use site — the same way `[]`, `none` and a bare integer take their
+# type from context. An empty brace pair says nothing about which it is, so
+# there is nothing to tell apart at the parse and everything to decide later.
+
 import {
     equal as ==,
     get,
@@ -9,10 +14,6 @@ import {
     wrapping_add as +,
 } from builtins;
 
-// `#{}` is the empty literal for a set *and* a dict, and which one it is comes
-// from the use site — the same way `[]`, `none` and a bare integer take their
-// type from context. An empty brace pair says nothing about which it is, so
-// there is nothing to tell apart at the parse and everything to decide later.
 fn empty_dict() -> #{str: i64} { #{} }
 
 fn empty_set() -> #{i64} { #{} }

@@ -1,3 +1,10 @@
+# An optional-of-struct field is sized `8 (tag) + sizeof(Core)`, so every field
+# *after* it depends on the nested type's layout already being known. Layouts
+# resolve in alphabetical order, so `Aaa` is laid out before the `Zzz` it holds
+# — the order in which a missing resolution goes unnoticed, because the size
+# falls back to one word and the next field is then placed on top of the
+# payload rather than after it.
+
 import {
     concat as +++,
     equal as ==,
@@ -7,12 +14,6 @@ import {
     wrapping_add_assign as +=,
 } from builtins;
 
-// An optional-of-struct field is sized `8 (tag) + sizeof(Core)`, so every field
-// *after* it depends on the nested type's layout already being known. Layouts
-// resolve in alphabetical order, so `Aaa` is laid out before the `Zzz` it holds
-// — the order in which a missing resolution goes unnoticed, because the size
-// falls back to one word and the next field is then placed on top of the
-// payload rather than after it.
 struct Zzz { p: i64, q: i64, r: str }
 
 struct Aaa { lead: i64, mid: Zzz?, tail: str, last: i64 }

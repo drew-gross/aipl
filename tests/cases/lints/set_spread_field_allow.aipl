@@ -1,11 +1,12 @@
+# `#[allow]` keeps the spread form — the escape hatch every lint carries. The
+# marker goes on the line holding the `..self` spread, which is where this lint
+# points; it is always one line, so it takes a trailing marker and keeps it
+# through `aipl fmt`.
+
 import { equal as ==, print, to_str } from builtins;
 
 struct Point { x: i64, y: i64 }
 
-// `#[allow]` keeps the spread form — the escape hatch every lint carries. The
-// marker goes on the line holding the `..self` spread, which is where this lint
-// points; it is always one line, so it takes a trailing marker and keeps it
-// through `aipl fmt`.
 fn rebuilt(mut self: Point) {
     set self = Point { ..self, x: 1 }; #[allow]
 }

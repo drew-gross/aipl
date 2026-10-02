@@ -1,12 +1,12 @@
-import { len, less_than_or_equal as <=, print, push, to_str, wrapping_mul as * } from builtins;
+# `mut out = []; for (let x : xs) { if (..) { set out.push(..); } }` — an array
+# seeded empty and filled by a loop that does nothing else. `filter` and `map`
+# say that in one expression, and say it up front: the reader learns what the
+# array *is* without having to run three statements to find out that nothing
+# else happens to `out`.
+#
+# Both halves are optional, and which are present picks the advice.
 
-// `mut out = []; for (let x : xs) { if (..) { set out.push(..); } }` — an array
-// seeded empty and filled by a loop that does nothing else. `filter` and `map`
-// say that in one expression, and say it up front: the reader learns what the
-// array *is* without having to run three statements to find out that nothing
-// else happens to `out`.
-//
-// Both halves are optional, and which are present picks the advice.
+import { len, less_than_or_equal as <=, print, push, to_str, wrapping_mul as * } from builtins;
 
 // Both: a guard and a transformed element.
 fn scaled_above(xs: i64[], lo: i64) -> i64[] {

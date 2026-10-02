@@ -1,6 +1,7 @@
+# Shapes that look close but are deliberately left alone.
+
 import { concat as +++, print } from builtins;
 
-// Shapes that look close but are deliberately left alone.
 fn main() !prints {
     let s = "x";
 

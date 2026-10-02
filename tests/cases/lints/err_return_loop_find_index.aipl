@@ -1,14 +1,14 @@
-import { equal as ==, less_than as <, print, to_str, wrapping_mul as * } from builtins;
+# `for (let i, x : xs) { if (..) { return some(i); }; } none` — a loop whose
+# only way out is the *position* of the first element passing a test, falling
+# through to `none` when no element does. `find_index` is that in one
+# expression. The twin of `return_loop_find_if`, which asks the same of the same
+# loop returning the element instead.
+#
+# The shape reaches the lint desugared: the indexed `for` is folded into a plain
+# loop over a synthetic `__idx$N` counter, so what is matched is that, not what
+# is written here.
 
-// `for (let i, x : xs) { if (..) { return some(i); }; } none` — a loop whose
-// only way out is the *position* of the first element passing a test, falling
-// through to `none` when no element does. `find_index` is that in one
-// expression. The twin of `return_loop_find_if`, which asks the same of the same
-// loop returning the element instead.
-//
-// The shape reaches the lint desugared: the indexed `for` is folded into a plain
-// loop over a synthetic `__idx$N` counter, so what is matched is that, not what
-// is written here.
+import { equal as ==, less_than as <, print, to_str, wrapping_mul as * } from builtins;
 
 // The `none` as the block's tail.
 fn index_of_big(xs: i64[], lo: i64) -> u64? {

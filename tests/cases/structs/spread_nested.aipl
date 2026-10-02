@@ -1,6 +1,7 @@
+# Two shapes the desugar has to get right beyond the simple one.
+
 import { print, to_str } from builtins;
 
-// Two shapes the desugar has to get right beyond the simple one.
 struct Inner { a: i64, b: i64 }
 
 struct Outer { inner: Inner, n: i64 }

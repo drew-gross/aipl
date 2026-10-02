@@ -1,6 +1,7 @@
+# `#[allow]` on the line squelches the append lint, like any other lint.
+
 import { concat as +++, print } from builtins;
 
-// `#[allow]` on the line squelches the append lint, like any other lint.
 fn main() !prints {
     mut s = "a";
     set s = s +++ "b"; #[allow]

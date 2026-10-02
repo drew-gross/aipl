@@ -1,16 +1,17 @@
+# Loop fusion is refused when interleaving the mapping function with the body
+# would change what the program does — for either of two reasons.
+#
+# The mapping function has an effect. Unfused, every `f(x)` runs before the
+# first iteration of the body; fused, they would alternate. Both orders are
+# visible below, and only the first is what the source says.
+#
+# The body writes something the mapping function reads. Unfused, every `f(x)`
+# sees the binding as it was before the loop; fused, later calls would see
+# the body's updates. The second loop's output is the unfused answer: every
+# element offset by the *initial* `n`.
+
 import { map, print, to_str, wrapping_add as +, wrapping_add_assign as += } from builtins;
 
-// Loop fusion is refused when interleaving the mapping function with the body
-// would change what the program does — for either of two reasons.
-//
-// The mapping function has an effect. Unfused, every `f(x)` runs before the
-// first iteration of the body; fused, they would alternate. Both orders are
-// visible below, and only the first is what the source says.
-//
-// The body writes something the mapping function reads. Unfused, every `f(x)`
-// sees the binding as it was before the loop; fused, later calls would see
-// the body's updates. The second loop's output is the unfused answer: every
-// element offset by the *initial* `n`.
 fn noisy(x: i64) !prints -> i64 {
     print(`f{x}`);
     x

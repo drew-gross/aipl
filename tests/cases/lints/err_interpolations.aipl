@@ -1,8 +1,8 @@
-import { print, to_str } from builtins;
+# The two interpolation lints: what a template's `{..}` renders is already
+# text, so wrapping a value in `to_str` or writing a literal there says
+# nothing the template could not say itself.
 
-// The two interpolation lints: what a template's `{..}` renders is already
-// text, so wrapping a value in `to_str` or writing a literal there says
-// nothing the template could not say itself.
+import { print, to_str } from builtins;
 
 // `{to_str(n)}` — a `to_str` inside an interpolation, which already renders
 // its value the same way; `{n}` says the same thing. The method spelling is

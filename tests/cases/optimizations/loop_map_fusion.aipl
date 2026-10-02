@@ -1,3 +1,22 @@
+# Operation fusion: a `for` over a mapped array never builds the array.
+#
+# `for (let y : xs.map(f)) { body }` would allocate an array of every `f(x)`,
+# walk it once, and free it. Fused, it is a loop over `xs` itself that applies
+# `f` at the top of each iteration — `for (let $e : xs) { let y = f($e); body }`
+# — so the element goes straight from `xs` through `f` into the body and no
+# intermediate exists. A `filter` receiver becomes an `if` around the body,
+# and a `filter(p).map(f)` chain (already fused into `filter_map`) both.
+#
+# Only the mapping function has to be pure: the body may print or accumulate
+# freely, since with nothing observable in `f` there is no order for the body's
+# effects to change.
+#
+# Measured on this case with the fusion switched off: 17 allocations totalling
+# 6,879 bytes become 13 totalling 319, and 65,129 instructions become 38,693.
+# The `functions:` list is the readable evidence — no `__map*` or `__filter*`
+# specialization is emitted for any loop below; unfused it reads `__map4$own0`
+# and `__map7$own0`, each a whole array built to be walked once.
+
 import {
     filter,
     less_than as <,
@@ -10,25 +29,6 @@ import {
     wrapping_increment as ++,
     wrapping_mul as *,
 } from builtins;
-
-// Operation fusion: a `for` over a mapped array never builds the array.
-//
-// `for (let y : xs.map(f)) { body }` would allocate an array of every `f(x)`,
-// walk it once, and free it. Fused, it is a loop over `xs` itself that applies
-// `f` at the top of each iteration — `for (let $e : xs) { let y = f($e); body }`
-// — so the element goes straight from `xs` through `f` into the body and no
-// intermediate exists. A `filter` receiver becomes an `if` around the body,
-// and a `filter(p).map(f)` chain (already fused into `filter_map`) both.
-//
-// Only the mapping function has to be pure: the body may print or accumulate
-// freely, since with nothing observable in `f` there is no order for the body's
-// effects to change.
-//
-// Measured on this case with the fusion switched off: 17 allocations totalling
-// 6,879 bytes become 13 totalling 319, and 65,129 instructions become 38,693.
-// The `functions:` list is the readable evidence — no `__map*` or `__filter*`
-// specialization is emitted for any loop below; unfused it reads `__map4$own0`
-// and `__map7$own0`, each a whole array built to be walked once.
 
 fn many() -> i64[] {
     mut xs = [0];

@@ -1,3 +1,11 @@
+# A heap binding passed to a user function at its last use is *moved* — the
+# caller hands over the reference it holds instead of retaining a second one
+# for the callee and releasing its own at scope exit. Mono marks such
+# arguments (`move_last_use`), and what this case pins is that every one of
+# the shapes below still computes the right answer: the moves are invisible
+# except in the `--- performance ---` counts, and the borrows that must
+# survive — an alias, a later read, a use inside a loop — do.
+
 import {
     concat as +++,
     equal as ==,
@@ -10,13 +18,6 @@ import {
     wrapping_add_assign as +=,
 } from builtins;
 
-// A heap binding passed to a user function at its last use is *moved* — the
-// caller hands over the reference it holds instead of retaining a second one
-// for the callee and releasing its own at scope exit. Mono marks such
-// arguments (`move_last_use`), and what this case pins is that every one of
-// the shapes below still computes the right answer: the moves are invisible
-// except in the `--- performance ---` counts, and the borrows that must
-// survive — an alias, a later read, a use inside a loop — do.
 fn consume(xs: i64[]) -> u64 { xs.len() }
 
 fn grow(xs: i64[]) -> i64[] {

@@ -1,8 +1,9 @@
+# Growable bool[]: start empty and push. `bs.push(x)` grows the variable in
+# place; a snapshot taken first (`let snap = bs`) keeps its own value, so a
+# later push to `bs` doesn't disturb it (value semantics).
+
 import { equal as ==, len, push } from builtins;
 
-// Growable bool[]: start empty and push. `bs.push(x)` grows the variable in
-// place; a snapshot taken first (`let snap = bs`) keeps its own value, so a
-// later push to `bs` doesn't disturb it (value semantics).
 fn appended(xs: bool[], x: bool) -> bool[] {
     mut ys = xs; #[allow]
     set ys.push(x);

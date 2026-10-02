@@ -1,8 +1,8 @@
-import { concat as +++, equal as ==, hash, not_equal as != } from builtins;
+# `hash(x) -> i64` is a deterministic structural hash, consistent with `==`:
+# equal values hash equal. It recurses over every type. Set/dict hashing is
+# order-INDEPENDENT (matching their `==`); array hashing is order-sensitive.
 
-// `hash(x) -> i64` is a deterministic structural hash, consistent with `==`:
-// equal values hash equal. It recurses over every type. Set/dict hashing is
-// order-INDEPENDENT (matching their `==`); array hashing is order-sensitive.
+import { concat as +++, equal as ==, hash, not_equal as != } from builtins;
 
 fn h(x: i64) -> i64 { hash(x) }.test({
     assert(h(42) == hash(42)); // deterministic: same value, same hash

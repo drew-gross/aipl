@@ -1,5 +1,5 @@
-// Every *check-phase* conditional error, in one file, reported in one run.
-// `err_if_without_parens` is a parse error and stays separate.
+# Every *check-phase* conditional error, in one file, reported in one run.
+# `err_if_without_parens` is a parse error and stays separate.
 
 // Branches of different types.
 fn if_branch_type_mismatch() -> i64 { if (true) { 1 } else { "two" } }

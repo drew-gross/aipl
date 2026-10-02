@@ -1,11 +1,11 @@
-import { concat as +++, equal as ==, len, print, to_str, wrapping_increment as ++ } from builtins;
+# Every `str + str` builds the *concatenated-string* representation — a lazy
+# rope of two str pointers, materialized (and memoized) only when its bytes are
+# first read. To the source it is just a `str`: it prints, measures with `len`,
+# compares with `==`, indexes, slices, iterates with `for`, nests, and passes to
+# a `str` parameter. Passing a concat value to a `str` parameter also selects a
+# distinct, concat-specialized monomorphization of the callee (here `label`).
 
-// Every `str + str` builds the *concatenated-string* representation — a lazy
-// rope of two str pointers, materialized (and memoized) only when its bytes are
-// first read. To the source it is just a `str`: it prints, measures with `len`,
-// compares with `==`, indexes, slices, iterates with `for`, nests, and passes to
-// a `str` parameter. Passing a concat value to a `str` parameter also selects a
-// distinct, concat-specialized monomorphization of the callee (here `label`).
+import { concat as +++, equal as ==, len, print, to_str, wrapping_increment as ++ } from builtins;
 
 fn label(s: str) -> str { "[" +++ s +++ "]" }
 

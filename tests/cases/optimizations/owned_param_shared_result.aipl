@@ -1,20 +1,21 @@
+# A call result counts as *fresh* — a candidate for moving into an owned
+# parameter — but a function may return one of its own borrowed arguments,
+# retained: `same(a)` hands back `a`'s block at refcount two. The owned
+# instance of `grow` then takes that block as its exclusive `mut ys` and
+# pushes in place — which grew `a`'s block underneath it (its length word
+# lives in the block) until the move into `mut ys` learned to make the block
+# unique first: `aipl_arr_reserve` keeps a refcount-one block and copies any
+# other, the guard the in-place `map`/`filter` bodies already had. A call
+# boundary is the one place a refcount above one means sharing; the runtime's
+# in-place entries themselves never check it, since inside a function one
+# owner's bookkeeping holds several.
+#
+# `same` is kept too large to inline: inlined, `grow(same(a))` is
+# `grow(let p = a; p)`, whose value is a binding rather than a call, and no
+# owned instance is chosen at all.
+
 import { equal as ==, print, push, wrapping_add_assign as += } from builtins;
 
-// A call result counts as *fresh* — a candidate for moving into an owned
-// parameter — but a function may return one of its own borrowed arguments,
-// retained: `same(a)` hands back `a`'s block at refcount two. The owned
-// instance of `grow` then takes that block as its exclusive `mut ys` and
-// pushes in place — which grew `a`'s block underneath it (its length word
-// lives in the block) until the move into `mut ys` learned to make the block
-// unique first: `aipl_arr_reserve` keeps a refcount-one block and copies any
-// other, the guard the in-place `map`/`filter` bodies already had. A call
-// boundary is the one place a refcount above one means sharing; the runtime's
-// in-place entries themselves never check it, since inside a function one
-// owner's bookkeeping holds several.
-//
-// `same` is kept too large to inline: inlined, `grow(same(a))` is
-// `grow(let p = a; p)`, whose value is a binding rather than a call, and no
-// owned instance is chosen at all.
 fn same(xs: i64[]) -> i64[] {
     mut n = 0;
     for (let x : xs) {

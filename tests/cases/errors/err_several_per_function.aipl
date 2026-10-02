@@ -1,16 +1,16 @@
-import { len, wrapping_add as + } from builtins;
+# The checker recovers *within* a function body, not only at each item, so one
+# run reports every independent finding in a body instead of only the earliest.
+# That is what makes a type change a single fix-them-all pass rather than one
+# `check` per broken call site.
+#
+# Recovery happens where the failing expression's type isn't needed by what
+# follows — see `Cx::recover`. Two such positions, each with two errors below:
+# sibling elements of an array or set literal, and a statement whose value is
+# discarded. A binding's initializer is deliberately *not* one (its body is
+# checked against the type that just failed), so `err_one_per_binding` holds
+# that side.
 
-// The checker recovers *within* a function body, not only at each item, so one
-// run reports every independent finding in a body instead of only the earliest.
-// That is what makes a type change a single fix-them-all pass rather than one
-// `check` per broken call site.
-//
-// Recovery happens where the failing expression's type isn't needed by what
-// follows — see `Cx::recover`. Two such positions, each with two errors below:
-// sibling elements of an array or set literal, and a statement whose value is
-// discarded. A binding's initializer is deliberately *not* one (its body is
-// checked against the type that just failed), so `err_one_per_binding` holds
-// that side.
+import { len, wrapping_add as + } from builtins;
 
 struct Rule { pat: str }
 

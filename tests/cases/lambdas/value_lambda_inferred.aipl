@@ -1,12 +1,12 @@
-import { equal as ==, map, wrapping_add as + } from builtins;
+# A lambda used as a *value* takes its parameter types from the position it
+# sits in, when that position declares a function type: a constructor's
+# payload, a struct's field, or a binding's annotation. Only a position that
+# declares nothing (`let g = |x| ..`) needs the types written on the lambda.
+#
+# The lambda is still a value — non-capturing, effect-free — so the rules of
+# `functions/fn_value_lambda` all hold; only the annotations are optional.
 
-// A lambda used as a *value* takes its parameter types from the position it
-// sits in, when that position declares a function type: a constructor's
-// payload, a struct's field, or a binding's annotation. Only a position that
-// declares nothing (`let g = |x| ..`) needs the types written on the lambda.
-//
-// The lambda is still a value — non-capturing, effect-free — so the rules of
-// `functions/fn_value_lambda` all hold; only the annotations are optional.
+import { equal as ==, map, wrapping_add as + } from builtins;
 
 variant Build<A: any> = Kids((A[]) -> A) | Text((str) -> A) | Const(A)
 

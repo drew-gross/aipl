@@ -1,9 +1,10 @@
-// Only `any` and `ord` are valid generic bounds.
+# Only `any` and `ord` are valid generic bounds.
+
 fn f<T: whatever>(x: T) -> T { x }
 fn main() -> i64 { 0 }
 --- errors ---
 error: unknown type parameter bound "whatever"; expected "any" or "ord"
- --> ./tests/cases/generics/errors/err_unknown_type_param_bound.aipl:2:9
+ --> ./tests/cases/generics/errors/err_unknown_type_param_bound.aipl:3:9
   |
-2 | fn f<T: whatever>(x: T) -> T { x }
+3 | fn f<T: whatever>(x: T) -> T { x }
   |         ^^^^^^^^

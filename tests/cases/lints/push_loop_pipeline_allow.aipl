@@ -1,3 +1,15 @@
+# `#[allow]` keeps the loop — the escape hatch every lint carries. It is the
+# answer for the one thing this lint cannot check: `map` and `filter` take
+# arrays, but a `for` also walks a `str`'s bytes, and which one an iterable is
+# only becomes known two passes later.
+#
+# The marker goes on the `mut out = [];` seed, which is where this lint points.
+# That is deliberate: `#[allow]` is line-scoped, so a hit spanning the loop
+# could never be squelched — the marker would have to go on the `for (..) {`
+# header, and `aipl fmt` moves one written there onto a line of its own, where
+# it squelches nothing. The seed is a short statement that always occupies one
+# line, so it always takes a trailing marker and keeps it through `aipl fmt`.
+
 import {
     filter,
     join,
@@ -9,17 +21,6 @@ import {
     wrapping_mul as *,
 } from builtins;
 
-// `#[allow]` keeps the loop — the escape hatch every lint carries. It is the
-// answer for the one thing this lint cannot check: `map` and `filter` take
-// arrays, but a `for` also walks a `str`'s bytes, and which one an iterable is
-// only becomes known two passes later.
-//
-// The marker goes on the `mut out = [];` seed, which is where this lint points.
-// That is deliberate: `#[allow]` is line-scoped, so a hit spanning the loop
-// could never be squelched — the marker would have to go on the `for (..) {`
-// header, and `aipl fmt` moves one written there onto a line of its own, where
-// it squelches nothing. The seed is a short statement that always occupies one
-// line, so it always takes a trailing marker and keeps it through `aipl fmt`.
 fn scaled_above(xs: i64[], lo: i64) -> i64[] {
     mut out: i64[] = []; #[allow]
     for (let x : xs) {

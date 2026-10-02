@@ -1,7 +1,8 @@
+# A generic function may match a generic *variant* at its own type parameter and
+# call a function stored in a payload — the shape the lexer's `Emit<K>` uses.
+
 import { equal as ==, wrapping_sub as - } from builtins;
 
-// A generic function may match a generic *variant* at its own type parameter and
-// call a function stored in a payload — the shape the lexer's `Emit<K>` uses.
 variant Emit<K> = OfInt((i64) -> K) | Plain(K)
 
 variant Tok = Num(i64) | Bare

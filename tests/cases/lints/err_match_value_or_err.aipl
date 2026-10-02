@@ -1,12 +1,13 @@
+# `match (o) { some(v) => ok(v), none => err(e) }` turns an optional into a
+# result by naming both cases — which is exactly what `value_or_err` does, in
+# one line and without naming either.
+#
+# The `none` arm building an `err` is what identifies the shape; it is the
+# bridge from the optional world to the result world. Arm order does not
+# matter, so the second function below is flagged too.
+
 import { equal as ==, print } from builtins;
 
-// `match (o) { some(v) => ok(v), none => err(e) }` turns an optional into a
-// result by naming both cases — which is exactly what `value_or_err` does, in
-// one line and without naming either.
-//
-// The `none` arm building an `err` is what identifies the shape; it is the
-// bridge from the optional world to the result world. Arm order does not
-// matter, so the second function below is flagged too.
 fn need(o: i64?) -> i64!str {
     match (o) {
         some(v) => ok(v),
@@ -96,37 +97,37 @@ fn main() !prints {
 }
 --- errors ---
 error: this `match` turns an optional into a result — write "o.value_or_err("missing")" instead (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or_err.aipl:13:17
+  --> ./tests/cases/lints/err_match_value_or_err.aipl:14:17
    |
-13 |         none => err("missing"),
+14 |         none => err("missing"),
    |                 ^^^^^^^^^^^^^^
 
 error: this `match` turns an optional into a result — write "o.value_or_err("missing")" instead (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or_err.aipl:19:17
+  --> ./tests/cases/lints/err_match_value_or_err.aipl:20:17
    |
-19 |         none => err("missing"),
+20 |         none => err("missing"),
    |                 ^^^^^^^^^^^^^^
 
 error: this `match` turns an optional into a result — write "o.value_or_err("integer literal overflows i64")?" and use the payload directly — `?` does the early return this arm is doing by hand (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or_err.aipl:33:17
+  --> ./tests/cases/lints/err_match_value_or_err.aipl:34:17
    |
-33 |         none => err("integer literal overflows i64"),
+34 |         none => err("integer literal overflows i64"),
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: this `match` turns an optional into a result — write "let v = o.value_or_err("missing")?;" and continue with the `some` arm's body — `?` does the early return this arm is doing by hand (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or_err.aipl:47:20
+  --> ./tests/cases/lints/err_match_value_or_err.aipl:48:20
    |
-47 |             return err("missing");
+48 |             return err("missing");
    |                    ^^^^^^^^^^^^^^
 
 error: this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or_err.aipl:65:17
+  --> ./tests/cases/lints/err_match_value_or_err.aipl:66:17
    |
-65 |         none => err(describe(tag)),
+66 |         none => err(describe(tag)),
    |                 ^^^^^^^^^^^^^^^^^^
 
 error: this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or_err.aipl:75:17
+  --> ./tests/cases/lints/err_match_value_or_err.aipl:76:17
    |
-75 |         none => err(Fault { code: 7 }),
+76 |         none => err(Fault { code: 7 }),
    |                 ^^^^^^^^^^^^^^^^^^^^^^

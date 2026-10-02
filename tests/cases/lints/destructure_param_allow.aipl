@@ -1,12 +1,13 @@
+# The marker squelches it, on the line the hit is reported at: the start of the
+# body. A parameter has no span of its own to blame, and the alternative — the
+# parameter's own line — is not squelchable, since `aipl fmt` may move a marker
+# written inside a broken parameter list onto a line of its own, where it
+# silences nothing.
+
 import { equal as ==, print, wrapping_add as + } from builtins;
 
 struct Pos { line: i64, col: i64 }
 
-// The marker squelches it, on the line the hit is reported at: the start of the
-// body. A parameter has no span of its own to blame, and the alternative — the
-// parameter's own line — is not squelchable, since `aipl fmt` may move a marker
-// written inside a broken parameter list onto a line of its own, where it
-// silences nothing.
 fn squelched(p: Pos) -> i64 {
     p.line + p.col #[allow]
 }

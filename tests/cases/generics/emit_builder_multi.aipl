@@ -1,8 +1,9 @@
+# The lexer-shaped pattern at *two* instances (`Emit$TokA`, `Emit$TokB`): a
+# generic variant carrying constructors, whose shared constructor names
+# (`OfStr`, `OfInt`, `Bare`) resolve to the right instance per construction.
+
 import { print, to_str } from builtins;
 
-// The lexer-shaped pattern at *two* instances (`Emit$TokA`, `Emit$TokB`): a
-// generic variant carrying constructors, whose shared constructor names
-// (`OfStr`, `OfInt`, `Bare`) resolve to the right instance per construction.
 variant TokA = IdentA(str) | NumA(i64)
 
 variant TokB = WordB(str) | PlusB

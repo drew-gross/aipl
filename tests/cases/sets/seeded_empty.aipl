@@ -1,9 +1,10 @@
+# A binding seeded with an empty literal takes its element type from the first
+# concrete value stored into it — through `set` as well as through `push`. A
+# plain `set` used to leave the binding typed by its placeholder, so a later
+# read rendered the set (or array) as empty while it held elements.
+
 import { print, push, union } from builtins;
 
-// A binding seeded with an empty literal takes its element type from the first
-// concrete value stored into it — through `set` as well as through `push`. A
-// plain `set` used to leave the binding typed by its placeholder, so a later
-// read rendered the set (or array) as empty while it held elements.
 fn main() !prints {
     mut s = #{};
     set s = s.union(#{2, 1});

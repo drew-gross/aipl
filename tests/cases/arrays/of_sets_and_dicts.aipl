@@ -1,3 +1,11 @@
+# A set and a dict are heap blocks addressed by an 8-byte pointer — the same
+# shape a nested array element already has — so they can be array elements, and
+# the element retain/drop helpers a `T[][]` already uses carry them unchanged.
+#
+# The `--- performance ---` section below is the real assertion: balanced
+# allocations are what says the element blocks are retained and released exactly
+# once each.
+
 import {
     equal as ==,
     get,
@@ -10,13 +18,6 @@ import {
     wrapping_add_assign as +=,
 } from builtins;
 
-// A set and a dict are heap blocks addressed by an 8-byte pointer — the same
-// shape a nested array element already has — so they can be array elements, and
-// the element retain/drop helpers a `T[][]` already uses carry them unchanged.
-//
-// The `--- performance ---` section below is the real assertion: balanced
-// allocations are what says the element blocks are retained and released exactly
-// once each.
 fn tag_sets() -> #{str}[] { [#{"a", "b"}, #{}, #{"c"}] }
 
 fn counts() -> #{str: i64}[] { [#{"a": 1, "b": 2}, #{}] }

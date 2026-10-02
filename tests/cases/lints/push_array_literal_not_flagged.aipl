@@ -1,7 +1,7 @@
-import { join, len, map, print, push, to_str } from builtins;
+# The shape has to be exactly "seed, pushes, the binding" — these are the
+# near-misses, and none of them is an array literal in disguise.
 
-// The shape has to be exactly "seed, pushes, the binding" — these are the
-// near-misses, and none of them is an array literal in disguise.
+import { join, len, map, print, push, to_str } from builtins;
 
 // A pushed element that mentions the binding: `out.len()` is a running index,
 // and the literal has no `out` for it to refer to.

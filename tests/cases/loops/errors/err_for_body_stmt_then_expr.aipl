@@ -1,4 +1,5 @@
-// A trailing expression after a statement in a for body is also rejected.
+# A trailing expression after a statement in a for body is also rejected.
+
 fn f(s: str) -> i64 {
     mut n = 0;
     for (let c : s) {
@@ -9,7 +10,7 @@ fn f(s: str) -> i64 {
 }
 --- errors ---
 error: expected `.`, `;`, `?`, `[`, or an operator, found `}`
- --> ./tests/cases/loops/errors/err_for_body_stmt_then_expr.aipl:7:5
+ --> ./tests/cases/loops/errors/err_for_body_stmt_then_expr.aipl:8:5
   |
-7 |     }
+8 |     }
   |     ^

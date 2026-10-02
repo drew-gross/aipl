@@ -1,10 +1,11 @@
+# A containment cycle that runs through *both* a struct and a variant: `S`
+# stores a `V`, and `V`'s `Node` case stores an `S`. The two form one
+# recursion group, so both are boxed (heap-allocated with strong/weak
+# refcounts) and the cycle is broken by indirection rather than rejected. The
+# `Leaf` case is the non-recursive base that makes values constructible.
+
 import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
-// A containment cycle that runs through *both* a struct and a variant: `S`
-// stores a `V`, and `V`'s `Node` case stores an `S`. The two form one
-// recursion group, so both are boxed (heap-allocated with strong/weak
-// refcounts) and the cycle is broken by indirection rather than rejected. The
-// `Leaf` case is the non-recursive base that makes values constructible.
 struct S { tag: i64, child: V }
 
 variant V = Node(S) | Leaf

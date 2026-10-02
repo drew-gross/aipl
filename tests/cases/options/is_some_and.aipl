@@ -1,9 +1,10 @@
+# `is_some_and` folds an optional and a predicate into a bool: true only when
+# the value is present and satisfies the predicate. `none` short-circuits to
+# false without calling the predicate. Each check returns a distinct exit code
+# so a failure pinpoints which one broke; all passing exits 0.
+
 import { equal as ==, is_some_and, less_than_or_equal as <=, logical_not as ! } from builtins;
 
-// `is_some_and` folds an optional and a predicate into a bool: true only when
-// the value is present and satisfies the predicate. `none` short-circuits to
-// false without calling the predicate. Each check returns a distinct exit code
-// so a failure pinpoints which one broke; all passing exits 0.
 fn main() -> i64 {
     if (!some(7).is_some_and(|x| x == 7)) {
         return 1;

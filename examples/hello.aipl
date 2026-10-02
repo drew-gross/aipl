@@ -1,13 +1,13 @@
-import { less_than_or_equal as <=, wrapping_add as +, wrapping_sub as - } from builtins;
+# Smallest end-to-end example: a struct and a fn that sums its fields. `main`
+# also runs a deliberately heavy naive recursive Fibonacci — recursion depth
+# stays shallow (~n, so the stack is fine) but the call count grows
+# exponentially, so this does real work (unlike the microsecond-scale cases).
+# That gives the perf monitor (`AIPL_REFRESH_PERFMON=1 cargo test --test cases`)
+# a meaningful wall-clock to report for `examples/hello`. Bump the `30` to scale
+# the workload up or down. The fib result is *used* (so the compute isn't
+# optimized away) but is 0 here, leaving the exit code at 42.
 
-// Smallest end-to-end example: a struct and a fn that sums its fields. `main`
-// also runs a deliberately heavy naive recursive Fibonacci — recursion depth
-// stays shallow (~n, so the stack is fine) but the call count grows
-// exponentially, so this does real work (unlike the microsecond-scale cases).
-// That gives the perf monitor (`AIPL_REFRESH_PERFMON=1 cargo test --test cases`)
-// a meaningful wall-clock to report for `examples/hello`. Bump the `30` to scale
-// the workload up or down. The fib result is *used* (so the compute isn't
-// optimized away) but is 0 here, leaving the exit code at 42.
+import { less_than_or_equal as <=, wrapping_add as +, wrapping_sub as - } from builtins;
 
 struct Point { x: i64, y: i64 }
 

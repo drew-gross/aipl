@@ -1,12 +1,13 @@
+# A tuple literal takes a trailing comma, like every other comma list in the
+# language — and has to, because `aipl fmt` writes one when it breaks a list
+# across lines. A printer that writes a separator the parser refuses is a
+# formatter that emits source it cannot read back, and this file is the proof
+# it does not: it is checked in already formatted, so the corpus formatting test
+# asserts the shape below is what the formatter produces, and running it at all
+# asserts the parser accepts that shape.
+
 import { print, to_str } from builtins;
 
-// A tuple literal takes a trailing comma, like every other comma list in the
-// language — and has to, because `aipl fmt` writes one when it breaks a list
-// across lines. A printer that writes a separator the parser refuses is a
-// formatter that emits source it cannot read back, and this file is the proof
-// it does not: it is checked in already formatted, so the corpus formatting test
-// asserts the shape below is what the formatter produces, and running it at all
-// asserts the parser accepts that shape.
 fn wide() -> (str, str) {
     (
         "a fairly long string, long enough that the pair cannot fit on one line",

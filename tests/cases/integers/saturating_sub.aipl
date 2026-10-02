@@ -1,10 +1,11 @@
+# `import { saturating_sub as - }` binds `-` to clamping integer subtraction:
+# instead of wrapping on overflow (`wrapping_sub`), the result is pinned at the
+# type's bound. The operator resolves to the `saturating_sub` builtin, so the
+# same `a - b` spelling means saturating here and wrapping in a file that
+# imported `wrapping_sub as -`. Unary negation (`-x`) is unaffected.
+
 import { equal as ==, saturating_sub as - } from builtins;
 
-// `import { saturating_sub as - }` binds `-` to clamping integer subtraction:
-// instead of wrapping on overflow (`wrapping_sub`), the result is pinned at the
-// type's bound. The operator resolves to the `saturating_sub` builtin, so the
-// same `a - b` spelling means saturating here and wrapping in a file that
-// imported `wrapping_sub as -`. Unary negation (`-x`) is unaffected.
 fn probe() -> bool { true }.test({
     // In range: exact difference, same as any subtraction.
     assert(30 - 20 == 10);

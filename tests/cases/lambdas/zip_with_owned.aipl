@@ -1,9 +1,10 @@
-// Like `map`, `zip_with` consumes a *fresh* input (an array literal or call
-// result) and reuses its buffer for the result instead of allocating a new one.
-// One fresh input is reused regardless of which side it's on; with both fresh,
-// the longer one (only known at runtime) is reused and the shorter freed. The
-// reused array's surplus elements are dropped and its length truncated, so the
-// balanced allocation counters below double as a leak check.
+# Like `map`, `zip_with` consumes a *fresh* input (an array literal or call
+# result) and reuses its buffer for the result instead of allocating a new one.
+# One fresh input is reused regardless of which side it's on; with both fresh,
+# the longer one (only known at runtime) is reused and the shorter freed. The
+# reused array's surplus elements are dropped and its length truncated, so the
+# balanced allocation counters below double as a leak check.
+
 import { concat as +++, map, print, to_str, wrapping_add as +, zip_with } from builtins;
 
 fn show(label: str, xs: i64[]) !prints {

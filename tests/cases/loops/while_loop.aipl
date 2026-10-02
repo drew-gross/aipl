@@ -1,3 +1,7 @@
+# `while (cond) { .. }` runs the body while `cond` (a bool) holds, re-checking
+# it before each pass. The counter is a `mut` declared before the loop; the
+# body reassigns it with `set`, and the change persists across iterations.
+
 import {
     equal as ==,
     less_than as <,
@@ -5,9 +9,6 @@ import {
     wrapping_increment as ++,
 } from builtins;
 
-// `while (cond) { .. }` runs the body while `cond` (a bool) holds, re-checking
-// it before each pass. The counter is a `mut` declared before the loop; the
-// body reassigns it with `set`, and the change persists across iterations.
 fn sum_below(n: i64) -> i64 {
     mut i = 0;
     mut total = 0;

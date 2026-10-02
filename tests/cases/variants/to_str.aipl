@@ -1,10 +1,11 @@
+# `to_str` renders a variant as `Ctor(field, ...)` (or a bare `Ctor` for a
+# nullary case), recursing into each payload field by its own type — including
+# str (quoted), arrays, optionals, and structs.
+
 import { print, to_str } from builtins;
 
 struct P { x: i64, y: i64 }
 
-// `to_str` renders a variant as `Ctor(field, ...)` (or a bare `Ctor` for a
-// nullary case), recursing into each payload field by its own type — including
-// str (quoted), arrays, optionals, and structs.
 variant V = I(i64) | S(str) | Arr(i64[]) | Opt(i64?) | Pt(P) | Nil
 
 fn main() !prints {

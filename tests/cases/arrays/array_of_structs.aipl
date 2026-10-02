@@ -1,12 +1,13 @@
+# Arrays of structs: elements are stored inline at the struct's size. A struct
+# with heap fields needs per-element retain/drop, which codegen generates once
+# per element type.
+
 import { print, push, to_str, wrapping_add_assign as += } from builtins;
 
 struct Point { x: i64, y: i64 }
 
 struct Named { id: i64, label: str }
 
-// Arrays of structs: elements are stored inline at the struct's size. A struct
-// with heap fields needs per-element retain/drop, which codegen generates once
-// per element type.
 fn main() !prints {
     // Scalar-field structs: literal, to_str, index (→ Point?), iteration.
     let pts = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];

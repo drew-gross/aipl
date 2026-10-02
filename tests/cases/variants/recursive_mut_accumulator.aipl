@@ -1,18 +1,19 @@
+# Reassigning a `mut` binding of a *boxed* (recursive) type from inside a
+# nested scope — the classic `set acc = Cons(x, acc)` fold in a `for` body.
+#
+# The binding's slot holds one strong reference of its own on whatever value it
+# currently points at (see `mut_binding_owns_slot_ref`), taken at declaration
+# and re-taken on every `set`, with the replaced value released right after. So
+# the value assigned inside the loop body outlives that body: it is *not* the
+# inner scope's value-track that keeps it alive. Under the plain value-track
+# model the new value was freed at the end of each iteration and the slot was
+# left dangling — the accumulator read back as empty, or the walk crashed.
+#
+# Any leak or double-free here would unbalance the allocation counts asserted
+# below.
+
 import { equal as ==, map, print, to_str, value_or, wrapping_add as + } from builtins;
 
-// Reassigning a `mut` binding of a *boxed* (recursive) type from inside a
-// nested scope — the classic `set acc = Cons(x, acc)` fold in a `for` body.
-//
-// The binding's slot holds one strong reference of its own on whatever value it
-// currently points at (see `mut_binding_owns_slot_ref`), taken at declaration
-// and re-taken on every `set`, with the replaced value released right after. So
-// the value assigned inside the loop body outlives that body: it is *not* the
-// inner scope's value-track that keeps it alive. Under the plain value-track
-// model the new value was freed at the end of each iteration and the slot was
-// left dangling — the accumulator read back as empty, or the walk crashed.
-//
-// Any leak or double-free here would unbalance the allocation counts asserted
-// below.
 variant List = Cons(i64, List) | Nil
 
 // Boxed the other way: a struct that reaches itself through an optional field.

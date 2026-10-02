@@ -1,8 +1,9 @@
+# `xs.map(f).join(sep=s)` fuses into one pass over `xs` that appends every
+# piece into a single buffer (`map_join`), so the pieces are never gathered
+# into an array first. The three separators are `join`'s.
+
 import { join, map, print, to_str } from builtins;
 
-// `xs.map(f).join(sep=s)` fuses into one pass over `xs` that appends every
-// piece into a single buffer (`map_join`), so the pieces are never gathered
-// into an array first. The three separators are `join`'s.
 fn main() !prints {
     print([1, 2, 3].map(to_str).join(sep=", "));
     print([1, 2, 3].map(to_str).join(sep=", ", final_sep=", or ", only_sep=" or "));

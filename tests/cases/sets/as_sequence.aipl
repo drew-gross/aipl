@@ -1,3 +1,7 @@
+# A set is usable wherever a generic takes a `T[]` it only reads: the
+# instance keeps the set's own type and walks it in the set's order — the
+# insertion order of a plain set, the sorted order of an ordered one.
+
 import {
     all,
     count_if,
@@ -10,9 +14,6 @@ import {
     to_str,
 } from builtins;
 
-// A set is usable wherever a generic takes a `T[]` it only reads: the
-// instance keeps the set's own type and walks it in the set's order — the
-// insertion order of a plain set, the sorted order of an ordered one.
 fn main() !prints {
     let s = [3, 1, 2, 3].to_set();
     print(s.map(to_str).join(sep=", "));

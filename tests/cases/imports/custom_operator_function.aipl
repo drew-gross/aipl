@@ -1,7 +1,8 @@
-// An operator can be aliased to one of your own functions, not just a builtin:
-// `import { my_fn as + } from "./file"` makes `a + b` desugar to `my_fn(a, b)`.
-// Here the "custom +" tags its result with +1000 so the output proves the
-// dispatch reached the user function rather than the primitive add.
+# An operator can be aliased to one of your own functions, not just a builtin:
+# `import { my_fn as + } from "./file"` makes `a + b` desugar to `my_fn(a, b)`.
+# Here the "custom +" tags its result with +1000 so the output proves the
+# dispatch reached the user function rather than the primitive add.
+
 import { print, to_str } from builtins;
 import { my_custom_add as + } from "./mymath.aipl";
 

@@ -1,14 +1,15 @@
+# `T { ..base, field: value }` — a struct spread. Every field not given
+# explicitly is taken from `base`, so a derived value names only what differs
+# instead of restating the whole struct.
+#
+# The spread comes first and the explicit fields override it. Both are
+# deliberate: one spread, always leading, gives the literal exactly one
+# reading. A trailing spread would read as "and the rest from base" while a
+# leading one reads as "start from base, then override" — the same text with
+# two plausible meanings, so only the unambiguous order is accepted.
+
 import { print, to_str, value_or } from builtins;
 
-// `T { ..base, field: value }` — a struct spread. Every field not given
-// explicitly is taken from `base`, so a derived value names only what differs
-// instead of restating the whole struct.
-//
-// The spread comes first and the explicit fields override it. Both are
-// deliberate: one spread, always leading, gives the literal exactly one
-// reading. A trailing spread would read as "and the rest from base" while a
-// leading one reads as "start from base, then override" — the same text with
-// two plausible meanings, so only the unambiguous order is accepted.
 struct Config { host: str, port: i64, debug: bool }
 
 // Field names come from the *template* for a generic struct, so a spread works

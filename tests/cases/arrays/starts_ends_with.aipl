@@ -1,15 +1,16 @@
+# `xs.starts_with(p)` / `xs.ends_with(p)` test whether `p`'s elements equal a
+# contiguous prefix / suffix of `xs`'s, by element-wise structural `==`. The
+# pattern is variadic (`T*`): besides a `T[]` it accepts a single `T` or a `T?`.
+# The empty pattern always matches; a pattern longer than `xs` never does.
+# Elements can be any comparable type (scalars, str, even nested arrays).
+#
+# `xs.starts_with_at(p, i)` is `xs[i..].starts_with(p)` without building the
+# slice — which for an array means without allocating a fresh block and copying
+# every remaining element. It is what the fusion pass rewrites that shape into
+# (see `cases/optimizations/slice_starts_with_fusion`), and callable directly.
+
 import { ends_with, logical_not as !, starts_with, starts_with_at } from builtins;
 
-// `xs.starts_with(p)` / `xs.ends_with(p)` test whether `p`'s elements equal a
-// contiguous prefix / suffix of `xs`'s, by element-wise structural `==`. The
-// pattern is variadic (`T*`): besides a `T[]` it accepts a single `T` or a `T?`.
-// The empty pattern always matches; a pattern longer than `xs` never does.
-// Elements can be any comparable type (scalars, str, even nested arrays).
-//
-// `xs.starts_with_at(p, i)` is `xs[i..].starts_with(p)` without building the
-// slice — which for an array means without allocating a fresh block and copying
-// every remaining element. It is what the fusion pass rewrites that shape into
-// (see `cases/optimizations/slice_starts_with_fusion`), and callable directly.
 fn has_header(xs: i64[]) -> bool { xs.starts_with([0, 0]) }.test({
     let xs = [1, 2, 3, 4];
     assert(xs.starts_with([1, 2])); // common prefix

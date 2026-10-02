@@ -1,16 +1,17 @@
+# A branch that is followed by more statements still sinks. The binding is
+# scoped over the whole remainder of the function, but nothing after the branch
+# reads it — so its scope narrows to the branch, and from there it moves into
+# the one arm that uses it.
+#
+# Narrowing reorders nothing: the value, then the branch, then the tail, in
+# that order either way. It is only the second step, moving into the arm, that
+# defers anything.
+#
+# As in `sink_into_branch`, `allocations:` is the assertion: two calls, one
+# string built.
+
 import { is_nonempty, len, print, to_str, wrapping_add as + } from builtins;
 
-// A branch that is followed by more statements still sinks. The binding is
-// scoped over the whole remainder of the function, but nothing after the branch
-// reads it — so its scope narrows to the branch, and from there it moves into
-// the one arm that uses it.
-//
-// Narrowing reorders nothing: the value, then the branch, then the tail, in
-// that order either way. It is only the second step, moving into the arm, that
-// defers anything.
-//
-// As in `sink_into_branch`, `allocations:` is the assertion: two calls, one
-// string built.
 fn label(n: u64) -> str { `value {n} padded out well past the inline-string limit` }
 
 fn size(flag: bool, n: u64) -> u64 {

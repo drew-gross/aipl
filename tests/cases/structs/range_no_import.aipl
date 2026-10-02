@@ -1,7 +1,8 @@
+# A range expression needs no `Span` import — no name is spelled, matching
+# `..` in slice position (which has always worked unimported).
+
 import { print } from builtins;
 
-// A range expression needs no `Span` import — no name is spelled, matching
-// `..` in slice position (which has always worked unimported).
 fn main() !prints {
     let r = 2..6;
     print("hello, world"[r]);

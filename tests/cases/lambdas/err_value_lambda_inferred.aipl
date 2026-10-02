@@ -1,9 +1,9 @@
-import { print, wrapping_add as + } from builtins;
+# A value lambda whose parameter types come from its position is still a
+# value lambda: the position and any annotation must agree, and the body may
+# neither capture nor have effects. Where the position leaves a type variable
+# open that only the lambda's parameters could have pinned, the error says so.
 
-// A value lambda whose parameter types come from its position is still a
-// value lambda: the position and any annotation must agree, and the body may
-// neither capture nor have effects. Where the position leaves a type variable
-// open that only the lambda's parameters could have pinned, the error says so.
+import { print, wrapping_add as + } from builtins;
 
 variant Build<A: any> = Kids((A[]) -> A) | Const(A)
 

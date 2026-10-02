@@ -1,10 +1,11 @@
+# A block arm with no trailing expression is unit-valued, so a `match` used
+# purely for its effects needs no filler value in each arm. The arms below also
+# `set` a `mut` binding declared *outside* the `match` — the assignment that an
+# expression-only arm could never make, and the reason the printer in
+# `doc.aipl` used to thread its loop state through a returned struct.
+
 import { print, push, to_str, wrapping_increment as ++ } from builtins;
 
-// A block arm with no trailing expression is unit-valued, so a `match` used
-// purely for its effects needs no filler value in each arm. The arms below also
-// `set` a `mut` binding declared *outside* the `match` — the assignment that an
-// expression-only arm could never make, and the reason the printer in
-// `doc.aipl` used to thread its loop state through a returned struct.
 variant Ev = Tick | Tock | Reset(u64)
 
 fn main() !prints {

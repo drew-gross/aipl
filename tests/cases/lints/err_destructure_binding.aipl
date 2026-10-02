@@ -1,12 +1,13 @@
+# Every mention of `p` is a field read, so the binding can be a pattern — and
+# then it says up front what it holds, instead of leaving a reader to scan the
+# block for whether `p` is also passed, compared or returned.
+
 import { wrapping_add as + } from builtins;
 
 struct Pos { line: i64, col: i64 }
 
 fn make() -> Pos { line: 3, col: 7 }
 
-// Every mention of `p` is a field read, so the binding can be a pattern — and
-// then it says up front what it holds, instead of leaving a reader to scan the
-// block for whether `p` is also passed, compared or returned.
 fn f() -> i64 {
     let p = make();
     p.line
@@ -32,19 +33,19 @@ fn self_named() -> i64 {
 fn shift(n: i64) -> Pos { line: n, col: n }
 --- errors ---
 error: only the fields of "p" are read — destructure the binding instead: "let <Type> { line } = ..." (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_destructure_binding.aipl:11:13
+  --> ./tests/cases/lints/err_destructure_binding.aipl:12:13
    |
-11 |     let p = make();
+12 |     let p = make();
    |             ^^^^^^
 
 error: only the fields of "step" are read — destructure the binding instead: "let <Type> { line, col } = ..." (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_destructure_binding.aipl:21:16
+  --> ./tests/cases/lints/err_destructure_binding.aipl:22:16
    |
-21 |     let step = shift(head.line);
+22 |     let step = shift(head.line);
    |                ^^^^^^^^^^^^^^^^
 
 error: only the fields of "col" are read — destructure the binding instead: "let <Type> { col, line } = ..." (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_destructure_binding.aipl:28:15
+  --> ./tests/cases/lints/err_destructure_binding.aipl:29:15
    |
-28 |     let col = make();
+29 |     let col = make();
    |               ^^^^^^

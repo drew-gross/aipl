@@ -14,6 +14,8 @@
 
       <h1><code>examples/hello.aipl</code></h1>
 
+      <div class="module-doc"><p>Smallest end-to-end example: a struct and a fn that sums its fields. <code>main</code> also runs a deliberately heavy naive recursive Fibonacci — recursion depth stays shallow (~n, so the stack is fine) but the call count grows exponentially, so this does real work (unlike the microsecond-scale cases). That gives the perf monitor (<code>AIPL_REFRESH_PERFMON=1 cargo test --test cases</code>) a meaningful wall-clock to report for <code>examples/hello</code>. Bump the <code>30</code> to scale the workload up or down. The fib result is <em>used</em> (so the compute isn't optimized away) but is 0 here, leaving the exit code at 42.</p></div>
+
 
 
       <section class="group">
@@ -60,7 +62,7 @@
             <a class="anchor" href="#item-sum">sum</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn sum(__spat$829: Point) -&#62; i64</code></pre>
+          <pre class="signature"><code>fn sum(__spat$821: Point) -&#62; i64</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

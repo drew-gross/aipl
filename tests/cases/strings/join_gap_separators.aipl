@@ -1,10 +1,11 @@
+# `sep` goes between consecutive parts; `final_sep` overrides it in the *last*
+# gap and `only_sep` in the sole gap of a two-part join. The two are separate
+# because they are the same gap seen two ways: a list of two has no "rest" for
+# `sep` to appear in, so `"a, b, or c"` and `"a or b"` have to name their gaps
+# apart. Both default to `sep`, so an ordinary join is unaffected.
+
 import { equal as ==, join, print, to_str } from builtins;
 
-// `sep` goes between consecutive parts; `final_sep` overrides it in the *last*
-// gap and `only_sep` in the sole gap of a two-part join. The two are separate
-// because they are the same gap seen two ways: a list of two has no "rest" for
-// `sep` to appear in, so `"a, b, or c"` and `"a or b"` have to name their gaps
-// apart. Both default to `sep`, so an ordinary join is unaffected.
 fn oxford(items: str[]) -> str { items.join(sep=", ", final_sep=", or ", only_sep=" or ") }.test({
     assert(oxford([]) == "");
     assert(oxford(["a"]) == "a");

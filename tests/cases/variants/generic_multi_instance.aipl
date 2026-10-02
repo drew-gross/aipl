@@ -1,11 +1,12 @@
+# A generic variant may now be instantiated at several type arguments in one
+# program. Each instance (`Wrap$i64`, `Wrap$str`) is a distinct monomorphic
+# variant; the shared constructor names (`Val`, `Pair`) resolve to the right
+# instance — by the argument type at a construction, and by the scrutinee type
+# in a `match`. (A nullary constructor, which no argument pins, is resolved
+# only when the template has a single instance — see `generic_option`.)
+
 import { concat as +++, print, to_str, wrapping_add as + } from builtins;
 
-// A generic variant may now be instantiated at several type arguments in one
-// program. Each instance (`Wrap$i64`, `Wrap$str`) is a distinct monomorphic
-// variant; the shared constructor names (`Val`, `Pair`) resolve to the right
-// instance — by the argument type at a construction, and by the scrutinee type
-// in a `match`. (A nullary constructor, which no argument pins, is resolved
-// only when the template has a single instance — see `generic_option`.)
 variant Wrap<T> = Val(T) | Pair(T, T)
 
 fn combine_i(w: Wrap<i64>) -> i64 {

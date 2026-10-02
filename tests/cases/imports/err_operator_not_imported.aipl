@@ -1,9 +1,10 @@
-// The `+` operator is provided by the `wrapping_add` builtin, so using it
-// without importing `wrapping_add as +` is a compile error.
+# The `+` operator is provided by the `wrapping_add` builtin, so using it
+# without importing `wrapping_add as +` is a compile error.
+
 fn main() -> i64 { 1 + 2 }
 --- errors ---
 error: operator "+" must be imported: add `import { wrapping_add as + } from builtins;`
- --> ./tests/cases/imports/err_operator_not_imported.aipl:3:20
+ --> ./tests/cases/imports/err_operator_not_imported.aipl:4:20
   |
-3 | fn main() -> i64 { 1 + 2 }
+4 | fn main() -> i64 { 1 + 2 }
   |                    ^^^^^

@@ -1,9 +1,10 @@
+# A variadic ("zero or more") parameter is written `T*`. Inside the body it is
+# the *sequence* type — `i64[]` here — so it iterates like any array. At a call
+# site it also accepts a single element (wrapped to a one-item sequence) or an
+# optional element (`none` → empty, `some(v)` → one item).
+
 import { equal as ==, extend, wrapping_add_assign as += } from builtins;
 
-// A variadic ("zero or more") parameter is written `T*`. Inside the body it is
-// the *sequence* type — `i64[]` here — so it iterates like any array. At a call
-// site it also accepts a single element (wrapped to a one-item sequence) or an
-// optional element (`none` → empty, `some(v)` → one item).
 fn sum(self: i64, others: i64*) -> i64 {
     mut total = self;
     for (let i : others) {

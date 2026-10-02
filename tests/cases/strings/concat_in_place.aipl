@@ -1,11 +1,12 @@
+# Building a string by repeated `set s.extend(..)` on a never-aliased binding:
+# each append writes into `s`'s own storage. The result is four bytes, so it
+# never leaves the inline form and the whole function allocates *nothing* —
+# see `concat_in_place_grows.aipl` for the same loop past the 22-byte inline
+# capacity, where the buffer is grown under itself instead. Without the
+# optimization each of the four appends builds a fresh string.
+
 import { concat as +++, equal as ==, extend } from builtins;
 
-// Building a string by repeated `set s.extend(..)` on a never-aliased binding:
-// each append writes into `s`'s own storage. The result is four bytes, so it
-// never leaves the inline form and the whole function allocates *nothing* —
-// see `concat_in_place_grows.aipl` for the same loop past the 22-byte inline
-// capacity, where the buffer is grown under itself instead. Without the
-// optimization each of the four appends builds a fresh string.
 fn build() -> str {
     mut s = "";
     set s.extend("a");

@@ -1,3 +1,7 @@
+# The shapes the find-loop lint must leave alone. It rewrites exactly one
+# shape — a loop whose body is an else-less `if` around `return some(<the loop
+# variable>);`, falling through to `none` — so everything here compiles.
+
 import {
     equal as ==,
     find_if,
@@ -11,10 +15,6 @@ import {
     wrapping_increment as ++,
     wrapping_mul as *,
 } from builtins;
-
-// The shapes the find-loop lint must leave alone. It rewrites exactly one
-// shape — a loop whose body is an else-less `if` around `return some(<the loop
-// variable>);`, falling through to `none` — so everything here compiles.
 
 // The element is transformed on the way out. That is a `find_if` *and* a map,
 // which is two steps the one-line advice doesn't spell, so it is left alone

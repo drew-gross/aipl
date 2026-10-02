@@ -1,11 +1,11 @@
-import { print, to_str, value_or_err } from builtins;
+# Shapes that look close but are deliberately left alone.
+#
+# A *computed* error is not among them: the optimizer inlines `value_or_err`
+# and sinks its argument into the `none` branch, so the rewrite builds the error
+# exactly when the `match` did. What survives here is the short list the sinker
+# itself refuses to defer.
 
-// Shapes that look close but are deliberately left alone.
-//
-// A *computed* error is not among them: the optimizer inlines `value_or_err`
-// and sinks its argument into the `none` branch, so the rewrite builds the error
-// exactly when the `match` did. What survives here is the short list the sinker
-// itself refuses to defer.
+import { print, to_str, value_or_err } from builtins;
 
 struct Fault { code: i64 }
 

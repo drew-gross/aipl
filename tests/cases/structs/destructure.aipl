@@ -1,9 +1,10 @@
+# `let T { a, b } = value;` binds each named field. The type name is part of the
+# pattern, not decoration: it pins which struct is being taken apart, so a
+# pattern naming a different struct is rejected even when the field names line
+# up (`err_destructure_wrong_struct.aipl`) — the same rule a `..` spread follows.
+
 import { print, to_str } from builtins;
 
-// `let T { a, b } = value;` binds each named field. The type name is part of the
-// pattern, not decoration: it pins which struct is being taken apart, so a
-// pattern naming a different struct is rejected even when the field names line
-// up (`err_destructure_wrong_struct.aipl`) — the same rule a `..` spread follows.
 struct Point { x: i64, y: i64 }
 
 struct LineAt { line: i64, line_start: i64 }

@@ -1,9 +1,10 @@
+# Ownership-as-monomorphization on bool[]: `extended` takes an array, appends,
+# and returns it. A call on a *fresh* (uniquely-owned) literal is sent to the
+# owned instance and reuses the buffer in place (the push is a realloc); a call
+# on a *named* (shared) array borrows and copies, leaving the original intact.
+
 import { equal as ==, push } from builtins;
 
-// Ownership-as-monomorphization on bool[]: `extended` takes an array, appends,
-// and returns it. A call on a *fresh* (uniquely-owned) literal is sent to the
-// owned instance and reuses the buffer in place (the push is a realloc); a call
-// on a *named* (shared) array borrows and copies, leaving the original intact.
 fn extended(xs: bool[]) -> bool[] {
     mut ys = xs; #[allow]
     set ys.push(true);

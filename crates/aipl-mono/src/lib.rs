@@ -8331,7 +8331,22 @@ fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
     Expr {
         kind,
         span: e.span.clone(),
-        ty: None,
+        // The checker's recorded type is the fourth annotation carrier, and it
+        // gets the same treatment as the other three. A pinned `none` inside a
+        // generic body records `T?`, and the instance needs `i64?` — so the
+        // record is substituted through, not merely copied, or an instance
+        // would carry a type variable in exactly the way this walk exists to
+        // prevent.
+        //
+        // This used to be `None`, which read as a decision rather than the loss
+        // it was: hand-building the struct makes every field look deliberate,
+        // where `Expr::rebuilt` would have carried it. Dropping it throws away
+        // the resolution the checker made from the expected type, and codegen
+        // then picks a representation from nothing — for an empty `#{}`, the
+        // shared empty block instead of a 256-bit bitfield. Caught by the
+        // record-preservation check in `crate::passes`, which attributes it to
+        // monomorphization rather than to the pass that happened to run next.
+        ty: e.ty.as_ref().map(|t| Box::new(subst_vars(t, map))),
         // Carried over with `span`: substituting a type variable in an
         // annotation moves no text.
         value_span: e.value_span.clone(),
@@ -9066,56 +9081,6 @@ fn mentions_abstract_type(ty: &Type) -> bool {
     }
 }
 
-/// Whether `ty` says something about a set's *ordering* that an inlined body
-/// would not.
-///
-/// A declared return type can carry more than the body's own type does, and
-/// inlining throws the declaration away: codegen types the inlined expression
-/// by compiling it, so what it sees is the body. Set order is where that
-/// bites, and the tree has the case —
-///
-/// ```text
-/// fn powers_desc(precs: Prec[]) -> #>{u64} { precs.map(|pr| pr.power).to_set() }
-/// ```
-///
-/// is checked and correct, but `to_set`'s own type is the *unordered* `#{u64}`;
-/// the ordering is the return type's claim, which the checker verified. Inline
-/// that body into `powers_desc(precs).to_array()` and the receiver is an
-/// unordered set — and `to_array` is the one builtin that insists on the
-/// ordering (`is_ordered`, the only such check in codegen). A call the checker
-/// accepted then fails in codegen.
-///
-/// So such a function is not inlined. The alternative — pinning the inlined
-/// body to the declared type with an annotated `let`, which is how
-/// [`build_inlined`] keeps a parameter's declared type — does not survive the
-/// pipeline here: that binding is read exactly once, so
-/// [`inline_single_use_bindings`] substitutes it straight back out and takes
-/// the annotation with it.
-///
-/// The sibling of [`mentions_abstract_type`], which refuses the same kind of
-/// mismatch from the parameter side.
-fn mentions_ordered_set(ty: &Type) -> bool {
-    match ty {
-        Type::Set(inner, order) => order.is_ordered() || mentions_ordered_set(inner),
-        Type::Case(t) | Type::Optional(t) | Type::Array(t) | Type::Without(t, _) => {
-            mentions_ordered_set(t)
-        }
-        Type::Dict(k, v) | Type::Result(k, v) => mentions_ordered_set(k) || mentions_ordered_set(v),
-        Type::Fn(ps, r) => ps.iter().any(mentions_ordered_set) || mentions_ordered_set(r),
-        Type::Tuple(ts) | Type::Generic(_, ts) => ts.iter().any(mentions_ordered_set),
-        Type::Any
-        | Type::NoneInner
-        | Type::EmptyArrayArg
-        | Type::NoneLiteralArg
-        | Type::ConcatStr
-        | Type::Unknown
-        | Type::Unit
-        | Type::Primitive(_)
-        | Type::Named(_)
-        | Type::TypeVar(_) => false,
-    }
-}
-
 /// A body's size for [`inline_small`]: the number of *non-leaf* expressions in
 /// it — the operations, not their operands.
 ///
@@ -9177,10 +9142,6 @@ pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
                     && f.sig.type_vars.is_empty()
                     && !f.sig.params.iter().any(|p| mentions_abstract_type(&p.ty))
                     && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
-                    // A declared return type that pins a set's ordering is information
-                    // the body need not carry, and inlining keeps only the body — see
-                    // `mentions_ordered_set`.
-                    && !f.sig.return_ty.as_ref().is_some_and(mentions_ordered_set)
                     && !binders.contains(f.name.as_str())
                     && is_inline_shape(
                         f.sig
@@ -9370,10 +9331,6 @@ fn is_inline_candidate(
         // reason and has since been lifted.
         && !f.sig.params.iter().any(|p| mentions_abstract_type(&p.ty))
         && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
-        // A declared return type that pins a set's ordering is information
-        // the body need not carry, and inlining keeps only the body — see
-        // `mentions_ordered_set`.
-        && !f.sig.return_ty.as_ref().is_some_and(mentions_ordered_set)
         && is_inline_shape(
             f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _)) || p.arity.is_variadic()),
             &f.body,
@@ -9444,12 +9401,6 @@ fn is_inline_candidate_mono(
         && f.name != "__test_main"
         && !skip.contains(f.name.as_str())
         && !binders.contains(f.name.as_str())
-        // As pre-mono: the ordering a declared return type claims is lost with
-        // the declaration. See `mentions_ordered_set`.
-        && !f
-            .return_ty
-            .as_ref()
-            .is_some_and(|ty| mentions_ordered_set(&ty.widen()))
         && is_inline_shape(
             f.params
                 .iter()

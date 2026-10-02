@@ -1,3 +1,13 @@
+# Operation fusion: `xs.count(x)` compared against a bound collapses into one
+# builtin that stops as soon as the answer is settled, instead of counting the
+# whole collection and then comparing.
+#
+# All six comparisons fuse, in both operand orders — `n > xs.count(x)` is the
+# same claim as `xs.count(x) < n`, so one rule covers the mirrored form.
+#
+# The saving is in this case's `instructions executed`: `many()` holds 201
+# matches, and every answer below is decided within the first few elements.
+
 import {
     count,
     equal as ==,
@@ -12,15 +22,6 @@ import {
     wrapping_increment as ++,
 } from builtins;
 
-// Operation fusion: `xs.count(x)` compared against a bound collapses into one
-// builtin that stops as soon as the answer is settled, instead of counting the
-// whole collection and then comparing.
-//
-// All six comparisons fuse, in both operand orders — `n > xs.count(x)` is the
-// same claim as `xs.count(x) < n`, so one rule covers the mirrored form.
-//
-// The saving is in this case's `instructions executed`: `many()` holds 201
-// matches, and every answer below is decided within the first few elements.
 fn many() -> i64[] {
     mut xs = [2];
     mut i: u64 = 0;

@@ -1,9 +1,10 @@
+# `set p.field = value;` updates one field of a mut struct binding, leaving
+# the other fields unchanged. The old field value may appear on the right.
+
 import { concat as +++, equal as ==, wrapping_add_assign as += } from builtins;
 
 struct Point { x: i64, y: i64 }
 
-// `set p.field = value;` updates one field of a mut struct binding, leaving
-// the other fields unchanged. The old field value may appear on the right.
 fn bump_x(p: Point, by: i64) -> Point {
     mut q = p;
     set q.x += by;

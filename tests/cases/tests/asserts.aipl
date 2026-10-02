@@ -1,3 +1,7 @@
+# Exercises the `aipl check` path (run by the cases harness on every `.test`
+# case) across a few value kinds: i64, str, array, and dict. The `main` run is
+# what the harness checks for stdout/perf; the `.test` blocks run under `check`.
+
 import {
     concat as +++,
     contains_key,
@@ -7,10 +11,6 @@ import {
     print,
     wrapping_add as +,
 } from builtins;
-
-// Exercises the `aipl check` path (run by the cases harness on every `.test`
-// case) across a few value kinds: i64, str, array, and dict. The `main` run is
-// what the harness checks for stdout/perf; the `.test` blocks run under `check`.
 
 fn add(a: i64, b: i64) -> i64 { a + b }.test({
     assert(add(2, 3) == 5);

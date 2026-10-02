@@ -1,8 +1,8 @@
-import { now_nanos, print } from builtins;
+# Every *check-phase* effect error, in one file, reported in one run. The four
+# `shim` fixtures stay separate: shim validation is its own pass and stops at
+# the first problem.
 
-// Every *check-phase* effect error, in one file, reported in one run. The four
-// `shim` fixtures stay separate: shim validation is its own pass and stops at
-// the first problem.
+import { now_nanos, print } from builtins;
 
 fn declares_unknown_effect() !mystery -> i64 { 0 }
 

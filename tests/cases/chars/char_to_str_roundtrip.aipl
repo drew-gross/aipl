@@ -1,7 +1,8 @@
+# `to_str` on a char yields the one-char string holding it, `X` — the text,
+# not a quoted literal — the same as `{c}` interpolates.
+
 import { equal as ==, print, to_str } from builtins;
 
-// `to_str` on a char yields the one-char string holding it, `X` — the text,
-// not a quoted literal — the same as `{c}` interpolates.
 fn main() !prints {
     let s = to_str('X');
     print(to_str(if (s == "X") { 1 } else { 0 })); // 1

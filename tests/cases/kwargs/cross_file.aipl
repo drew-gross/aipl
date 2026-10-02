@@ -1,7 +1,8 @@
-// A keyword parameter's default is spliced into call sites in *other* files,
-// so its references must resolve through the declaring file's imports:
-// `framed`'s default calls `default_edge`, a private helper of frame.aipl that
-// this root file never imports (and couldn't — it isn't pub).
+# A keyword parameter's default is spliced into call sites in *other* files,
+# so its references must resolve through the declaring file's imports:
+# `framed`'s default calls `default_edge`, a private helper of frame.aipl that
+# this root file never imports (and couldn't — it isn't pub).
+
 import { print } from builtins;
 import { framed } from "./frame.aipl";
 

@@ -1,6 +1,7 @@
+# Structural equality of optionals (including nesting and comparison to `none`).
+
 import { equal as ==, logical_not as !, not_equal as != } from builtins;
 
-// Structural equality of optionals (including nesting and comparison to `none`).
 fn eq_opt(a: i64?, b: i64?) -> bool { a == b }.test({
     let a = some(5);
     let b = some(5);
@@ -22,17 +23,17 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 199
-binary size: 1792
-  code: 964
+binary size: 1800
+  code: 968
   data: 1
-  metadata: 827
+  metadata: 831
 functions:
   __eq_i64$opt:
     calls: 2
     bytes: 100
   __test$eq_opt:
     calls: 1
-    bytes: 760
+    bytes: 764
   aipl_assert:
     calls: 6
     bytes: (external)

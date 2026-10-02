@@ -1,3 +1,32 @@
+# Operation fusion: `xs.filter(keep).map(f)` collapses into `filter_map`, which
+# selects and maps in one pass instead of walking the elements twice with a
+# whole array built between the two.
+#
+# The intermediate is the expensive half. Unfused, `filter` produces an array
+# of the kept elements and `map` then walks *that* — a second traversal, a
+# second per-element call, and a buffer that exists only to be consumed. Fused,
+# one loop tests each element and writes the mapped value straight to the
+# output; and when the source is uniquely owned and the element sizing allows,
+# that output *is* the source's buffer, compacted in place and truncated.
+#
+# Measured on this case with the fusion switched off: 16 allocations totalling
+# 6,998 bytes become 14 totalling 5,334, and 103,650 instructions become
+# 90,496. Where the saving comes from depends on the element type, which is why
+# both shapes are here:
+#
+#   - A *scalar* element saves the traversal but not the allocation. `filter`
+#     and `map` each already had an in-place path, so the unfused pair was
+#     already reusing one buffer — it just walked it twice.
+#   - A *composite* element saves the allocation too. Neither half can work in
+#     place on a 16-byte element, so unfused there are two output arrays; fused
+#     there is one, reserved to the source length up front.
+#
+# The `functions:` list below is the readable evidence: two `__filter_map*`
+# specializations and no `__filter*`/`__map*` pair beside them. Unfused it
+# reads `__filter7`, `__map4`, `__map4$tail`, `__map9` — and one
+# `__filter_map13`, which is `spelled_out` below, the call the other two fuse
+# into.
+
 import {
     filter,
     filter_map,
@@ -11,35 +40,6 @@ import {
     wrapping_increment as ++,
     wrapping_mul as *,
 } from builtins;
-
-// Operation fusion: `xs.filter(keep).map(f)` collapses into `filter_map`, which
-// selects and maps in one pass instead of walking the elements twice with a
-// whole array built between the two.
-//
-// The intermediate is the expensive half. Unfused, `filter` produces an array
-// of the kept elements and `map` then walks *that* — a second traversal, a
-// second per-element call, and a buffer that exists only to be consumed. Fused,
-// one loop tests each element and writes the mapped value straight to the
-// output; and when the source is uniquely owned and the element sizing allows,
-// that output *is* the source's buffer, compacted in place and truncated.
-//
-// Measured on this case with the fusion switched off: 16 allocations totalling
-// 6,998 bytes become 14 totalling 5,334, and 103,650 instructions become
-// 90,496. Where the saving comes from depends on the element type, which is why
-// both shapes are here:
-//
-//   - A *scalar* element saves the traversal but not the allocation. `filter`
-//     and `map` each already had an in-place path, so the unfused pair was
-//     already reusing one buffer — it just walked it twice.
-//   - A *composite* element saves the allocation too. Neither half can work in
-//     place on a 16-byte element, so unfused there are two output arrays; fused
-//     there is one, reserved to the source length up front.
-//
-// The `functions:` list below is the readable evidence: two `__filter_map*`
-// specializations and no `__filter*`/`__map*` pair beside them. Unfused it
-// reads `__filter7`, `__map4`, `__map4$tail`, `__map9` — and one
-// `__filter_map13`, which is `spelled_out` below, the call the other two fuse
-// into.
 
 fn many() -> i64[] {
     mut xs = [0];

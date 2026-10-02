@@ -1,13 +1,14 @@
+# An array-destructuring arm's elements are ordinary *patterns*, so a position
+# may hold a constructor, a literal or `_` rather than only a binder name. The
+# arms then read as the shapes they match, and the grammar reaches an element
+# through `pattern` exactly as it reaches every other slot.
+#
+# This is to `[a, b]` what `Nested` is to `Ctor`: an array pattern whose
+# elements are all plain binders or literals is unchanged, and lowers to the
+# same simple form it always did — see `array_patterns.aipl` for that one.
+
 import { print, to_str, wrapping_add as + } from builtins;
 
-// An array-destructuring arm's elements are ordinary *patterns*, so a position
-// may hold a constructor, a literal or `_` rather than only a binder name. The
-// arms then read as the shapes they match, and the grammar reaches an element
-// through `pattern` exactly as it reaches every other slot.
-//
-// This is to `[a, b]` what `Nested` is to `Ctor`: an array pattern whose
-// elements are all plain binders or literals is unchanged, and lowers to the
-// same simple form it always did — see `array_patterns.aipl` for that one.
 variant Slot = Tok(str) | Sub(i64)
 
 // Length alone tells these apart: the five-position alternative is the one with

@@ -1,14 +1,15 @@
+# `value_or`'s default is an ordinary argument, so on the face of it a caller
+# pays for it whether or not the optional is empty. It doesn't, and the reason
+# is three passes meeting: monomorphization instantiates `value_or`, post-mono
+# inlining folds the instance into its caller, and the binding holding the
+# default then sits directly ahead of a `match` that only the `none` arm reads
+# — which is exactly the shape the sinking pass moves into that arm.
+#
+# So the two calls below build one string between them, not two. The
+# `allocations:` counter is the assertion.
+
 import { len, print, to_str, value_or } from builtins;
 
-// `value_or`'s default is an ordinary argument, so on the face of it a caller
-// pays for it whether or not the optional is empty. It doesn't, and the reason
-// is three passes meeting: monomorphization instantiates `value_or`, post-mono
-// inlining folds the instance into its caller, and the binding holding the
-// default then sits directly ahead of a `match` that only the `none` arm reads
-// — which is exactly the shape the sinking pass moves into that arm.
-//
-// So the two calls below build one string between them, not two. The
-// `allocations:` counter is the assertion.
 fn fallback(n: u64) -> str { `fallback {n} padded out well past the inline limit` }
 
 fn text(o: str?, n: u64) -> u64 { o.value_or(fallback(n)).len() }

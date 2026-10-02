@@ -1,9 +1,9 @@
-import { equal as ==, has, is_empty, len, union } from builtins;
+# `a.union(b)` is the set of all distinct elements of both (overlap deduped).
+# `set a = a.union(b)` on an exclusive `a` reuses a's allocation in place;
+# other uses build a fresh set. (Split across small functions to keep each
+# one's codegen modest.)
 
-// `a.union(b)` is the set of all distinct elements of both (overlap deduped).
-// `set a = a.union(b)` on an exclusive `a` reuses a's allocation in place;
-// other uses build a fresh set. (Split across small functions to keep each
-// one's codegen modest.)
+import { equal as ==, has, is_empty, len, union } from builtins;
 
 fn basic() -> #{i64} {
     let a = #{1, 2, 3};

@@ -1,3 +1,8 @@
+# `pipe` forwards its function parameter `g` onward to `map` rather than
+# calling it directly. Monomorphization specializes `pipe` for the lambda,
+# then — seeing `g` forwarded to `map` — specializes `map` for the same
+# synthesized function, threading any captures through both.
+
 import { equal as ==, push, wrapping_add as +, wrapping_mul as * } from builtins;
 
 fn map(xs: i64[], f: (i64) -> i64) -> i64[] {
@@ -10,10 +15,6 @@ fn map(xs: i64[], f: (i64) -> i64) -> i64[] {
     out
 }
 
-// `pipe` forwards its function parameter `g` onward to `map` rather than
-// calling it directly. Monomorphization specializes `pipe` for the lambda,
-// then — seeing `g` forwarded to `map` — specializes `map` for the same
-// synthesized function, threading any captures through both.
 fn pipe(xs: i64[], g: (i64) -> i64) -> i64[] { map(xs, g) }.test({
     assert(pipe([1, 2, 3], |x| x + 1) == [2, 3, 4]);
     // A captured variable is forwarded through `pipe` into `map`'s call.

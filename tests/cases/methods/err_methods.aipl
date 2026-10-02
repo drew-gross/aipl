@@ -1,8 +1,8 @@
-import { push, wrapping_add_assign as += } from builtins;
+# Every *check-phase* method error, in one file, reported in one run. The
+# checker recovers at each item, so each failing function below is recorded and
+# the next is still checked.
 
-// Every *check-phase* method error, in one file, reported in one run. The
-// checker recovers at each item, so each failing function below is recorded and
-// the next is still checked.
+import { push, wrapping_add_assign as += } from builtins;
 
 fn no_self(x: i64) -> i64 { x }
 

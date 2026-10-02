@@ -1,14 +1,15 @@
+# Pushing the *same* array `a` into `b` twice: `b` ends up holding two
+# references to the one `[1, 2, 3]` block (plus `a`'s own binding), so it has
+# refcount 3. `push` retains each heap element it stores, and `a` stays usable
+# afterward (value semantics — push doesn't consume it).
+#
+# Then we mutate `a`: because `a` is aliased (its block is shared with `b`), the
+# push can't mutate in place — it copies `a` into a fresh block, leaving `b`'s
+# two references to the original block untouched. So `b` is the same before and
+# after, and at scope exit every block is released exactly once.
+
 import { equal as ==, push } from builtins;
 
-// Pushing the *same* array `a` into `b` twice: `b` ends up holding two
-// references to the one `[1, 2, 3]` block (plus `a`'s own binding), so it has
-// refcount 3. `push` retains each heap element it stores, and `a` stays usable
-// afterward (value semantics — push doesn't consume it).
-//
-// Then we mutate `a`: because `a` is aliased (its block is shared with `b`), the
-// push can't mutate in place — it copies `a` into a fresh block, leaving `b`'s
-// two references to the original block untouched. So `b` is the same before and
-// after, and at scope exit every block is released exactly once.
 fn appended(xs: i64[], x: i64) -> i64[] {
     mut ys = xs; #[allow]
     set ys.push(x);

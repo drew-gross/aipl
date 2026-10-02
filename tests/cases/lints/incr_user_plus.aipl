@@ -1,6 +1,7 @@
-// `+` need not be a builtin at all: bound to one of your own functions, no `++`
-// flavor can match it, so the increment lint stays quiet rather than
-// recommending a form that would call something else.
+# `+` need not be a builtin at all: bound to one of your own functions, no `++`
+# flavor can match it, so the increment lint stays quiet rather than
+# recommending a form that would call something else.
+
 import { print, to_str } from builtins;
 import { my_custom_add as + } from "./mymath.aipl";
 

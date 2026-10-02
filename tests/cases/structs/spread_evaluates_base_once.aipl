@@ -1,9 +1,10 @@
+# The spread operand is evaluated **once**, however many fields it stands for.
+# The expansion mentions the base once per field, so a naive desugar would call
+# `make` three times here; the loader binds a non-name operand to a synthetic
+# `let` first. `"called"` printing exactly once is the assertion.
+
 import { print, to_str } from builtins;
 
-// The spread operand is evaluated **once**, however many fields it stands for.
-// The expansion mentions the base once per field, so a naive desugar would call
-// `make` three times here; the loader binds a non-name operand to a synthetic
-// `let` first. `"called"` printing exactly once is the assertion.
 struct P { a: i64, b: i64, c: i64 }
 
 fn make(n: i64) !prints -> P {

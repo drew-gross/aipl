@@ -1,9 +1,10 @@
+# `extend` on a *shared* `char[]` builds one fresh buffer of the combined
+# length and copies both sides in, exactly as `push` does for a single char, so
+# value semantics hold for the aliases. `extend_char_in_place.aipl` covers the
+# unaliased receiver, which appends into its own storage instead.
+
 import { extend, print } from builtins;
 
-// `extend` on a *shared* `char[]` builds one fresh buffer of the combined
-// length and copies both sides in, exactly as `push` does for a single char, so
-// value semantics hold for the aliases. `extend_char_in_place.aipl` covers the
-// unaliased receiver, which appends into its own storage instead.
 fn main() !prints {
     mut cs = ['a'];
     let more = ['b', 'c'];

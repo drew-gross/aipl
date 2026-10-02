@@ -1,9 +1,9 @@
-import { contains_key, equal as ==, get, is_empty, len, logical_not as ! } from builtins;
+# A dict `#{K: V}` maps scalar/str keys to values of any type. Built from a
+# literal `#{k: v, ...}` (last binding wins on a duplicate key); looked up with
+# `get` (→ `V?`), tested with `contains_key`, sized with `len`. (Split across
+# small functions to keep each one's codegen modest, like the set tests.)
 
-// A dict `#{K: V}` maps scalar/str keys to values of any type. Built from a
-// literal `#{k: v, ...}` (last binding wins on a duplicate key); looked up with
-// `get` (→ `V?`), tested with `contains_key`, sized with `len`. (Split across
-// small functions to keep each one's codegen modest, like the set tests.)
+import { contains_key, equal as ==, get, is_empty, len, logical_not as ! } from builtins;
 
 fn ints() -> #{i64: str} { #{1: "one", 2: "two", 3: "three"} }.test({
     let d = ints();

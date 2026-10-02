@@ -1,15 +1,16 @@
+# The shapes the decrement lint must leave alone: subtracting something other
+# than one, subtracting one from a *different* binding, subtracting the binding
+# *from* one — which is no decrement at all — and a field store fed from a
+# different binding, since only the same path on both sides is a step.
+#
+# The first of those is still an accumulate, so the *compound* lint owns it and
+# is squelched here: this case is about what the step lint does, and it can only
+# show that by keeping the long-hand spelling.
+
 import { print, to_str, wrapping_decrement as --, wrapping_sub as - } from builtins;
 
 struct Counter { n: i64 }
 
-// The shapes the decrement lint must leave alone: subtracting something other
-// than one, subtracting one from a *different* binding, subtracting the binding
-// *from* one — which is no decrement at all — and a field store fed from a
-// different binding, since only the same path on both sides is a step.
-//
-// The first of those is still an accumulate, so the *compound* lint owns it and
-// is squelched here: this case is about what the step lint does, and it can only
-// show that by keeping the long-hand spelling.
 fn main() !prints {
     mut n = 9;
     set n = n - 2; #[allow]

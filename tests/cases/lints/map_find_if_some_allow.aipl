@@ -1,7 +1,8 @@
+# `#[allow]` keeps the chain; beside it, the `find_map` it is advised to be.
+# The chain's answer is wrapped twice and needs peeling; `find_map`'s is not.
+
 import { equal as ==, find_if, find_map, is_some, map, print, value_or } from builtins;
 
-// `#[allow]` keeps the chain; beside it, the `find_map` it is advised to be.
-// The chain's answer is wrapped twice and needs peeling; `find_map`'s is not.
 fn nonzero(x: i64) -> i64? { if (x == 0) { none } else { some(x) } }
 
 fn chained(xs: i64[]) -> i64? { xs.map(nonzero).find_if(is_some).value_or(none) } #[allow]

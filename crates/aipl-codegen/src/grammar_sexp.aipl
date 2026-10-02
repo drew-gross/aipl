@@ -277,11 +277,11 @@ allocations: 6481
 deallocations: 6481
 reallocations: 724
 bytes allocated: 677066
-instructions executed: 1875573
-binary size: 399312
-  code: 266224
+instructions executed: 1875621
+binary size: 399000
+  code: 266048
   data: 4692
-  metadata: 128396
+  metadata: 128260
 functions:
   __arr_drop_SexpKind:
     calls: 0
@@ -379,7 +379,7 @@ functions:
   __builtin_any$__m3__Prec$lam$__m13__climb$SexpKind$__m15__Sexp$lambda1:
     calls: 0
     bytes: 276
-  __builtin_any$__m3__Prec$lam$__m2__prod_line$SexpKind$__m15__Sexp$lambda0$lambda4:
+  __builtin_any$__m3__Prec$lam$__m2__prod_line$SexpKind$__m15__Sexp$lambda2$lambda4:
     calls: 0
     bytes: 248
   __builtin_any$__m5__Doc$lam$__m5__has_hard:
@@ -646,15 +646,9 @@ functions:
   __m2__merge$SexpKind:
     calls: 9
     bytes: 604
-  __m2__powers_desc:
-    calls: 0
-    bytes: 524
-  __m2__render_climb$SexpKind$map1:
-    calls: 0
-    bytes: 680
   __m2__render_rule$SexpKind:
     calls: 7
-    bytes: 12220
+    bytes: 12780
   __m2__rep_suffix:
     calls: 1
     bytes: 1708
@@ -729,7 +723,7 @@ functions:
     bytes: 3144
   __m4__render_cst$SexpKind$__m15__Sexp$s1$lam$sexp_space:
     calls: 12
-    bytes: 10940
+    bytes: 10964
   __m5__col_after:
     calls: 77
     bytes: 628
@@ -783,7 +777,7 @@ functions:
     bytes: 392
   __test$sexp_grammar:
     calls: 1
-    bytes: 9944
+    bytes: 10388
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84

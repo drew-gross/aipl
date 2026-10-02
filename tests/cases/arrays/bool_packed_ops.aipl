@@ -1,7 +1,7 @@
-import { equal as ==, filter, greater_than as >, len, logical_not as !, map, push } from builtins;
+# `push`, `map`, and `filter` on bit-packed `bool[]`, including growth across a
+# byte boundary.
 
-// `push`, `map`, and `filter` on bit-packed `bool[]`, including growth across a
-// byte boundary.
+import { equal as ==, filter, greater_than as >, len, logical_not as !, map, push } from builtins;
 
 // Start with 7 elements (one byte), then push past the 8-element boundary so
 // the packed buffer grows into a second byte.

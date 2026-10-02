@@ -1,9 +1,10 @@
+# `mut T { a, b } = value;` destructures like the `let` form
+# (`destructure.aipl`) but binds each field mutably, so the copies can be
+# reassigned afterwards. The value is copied out field by field, so writing to a
+# binding changes nothing about the struct it came from.
+
 import { extend, print, to_str, wrapping_add_assign as +=, wrapping_increment as ++ } from builtins;
 
-// `mut T { a, b } = value;` destructures like the `let` form
-// (`destructure.aipl`) but binds each field mutably, so the copies can be
-// reassigned afterwards. The value is copied out field by field, so writing to a
-// binding changes nothing about the struct it came from.
 struct Point { x: i64, y: i64 }
 
 struct Named { id: i64, label: str }

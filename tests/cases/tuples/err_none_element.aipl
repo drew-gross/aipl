@@ -1,8 +1,9 @@
+# A bare `none` (or `[]`) takes its type from context, and a tuple slot gives
+# it none: the tuple lowers to a struct named after its element types, so an
+# element with no type yet has nowhere to go. This used to panic the compiler.
+
 import { print, push } from builtins;
 
-// A bare `none` (or `[]`) takes its type from context, and a tuple slot gives
-// it none: the tuple lowers to a struct named after its element types, so an
-// element with no type yet has nowhere to go. This used to panic the compiler.
 fn main() !prints {
     let t = (none, 1);
     print(`{t.1}`);
@@ -21,7 +22,7 @@ fn main() !prints {
 }
 --- errors ---
 error: tuple element 0 has no type of its own here — a bare `none` or `[]` takes its type from context, and a tuple slot gives it none; annotate the binding it comes from (e.g. `mut p: i64? = none;`)
- --> ./tests/cases/tuples/err_none_element.aipl:7:14
+ --> ./tests/cases/tuples/err_none_element.aipl:8:14
   |
-7 |     let t = (none, 1);
+8 |     let t = (none, 1);
   |              ^^^^

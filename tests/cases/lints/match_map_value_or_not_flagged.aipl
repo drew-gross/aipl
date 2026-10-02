@@ -1,3 +1,5 @@
+# Shapes that look close but belong to another lint, or to no rewrite.
+
 import {
     greater_than as >,
     is_some_and,
@@ -7,8 +9,6 @@ import {
     value_or,
     wrapping_add as +,
 } from builtins;
-
-// Shapes that look close but belong to another lint, or to no rewrite.
 
 // The identity arm is `match_value_or`'s shape, not a map of anything —
 // squelched so this case stays about which lint does *not* fire.

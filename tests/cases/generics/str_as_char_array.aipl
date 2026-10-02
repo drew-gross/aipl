@@ -1,9 +1,10 @@
+# A `str` is implicitly usable as `char[]`: passing a string to a generic `T[]`
+# parameter infers `T = char` and materializes the string's bytes into a real
+# char array, so one generic serves both arrays and strings. (The two have
+# different runtime reps, so the conversion happens at the call boundary.)
+
 import { equal as ==, wrapping_increment as ++ } from builtins;
 
-// A `str` is implicitly usable as `char[]`: passing a string to a generic `T[]`
-// parameter infers `T = char` and materializes the string's bytes into a real
-// char array, so one generic serves both arrays and strings. (The two have
-// different runtime reps, so the conversion happens at the call boundary.)
 fn count_eq<T: any>(self: T[], target: T) -> i64 {
     mut n = 0;
     for (let x : self) {

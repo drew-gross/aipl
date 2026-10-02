@@ -1,8 +1,9 @@
+# `s[..end]` slices from the start of the string to `end` (the open start is 0,
+# filled in by the parser — no `len` import needed). `end` is clamped to
+# `[0, len]`, like the closed `s[start..end]` form.
+
 import { equal as == } from builtins;
 
-// `s[..end]` slices from the start of the string to `end` (the open start is 0,
-// filled in by the parser — no `len` import needed). `end` is clamped to
-// `[0, len]`, like the closed `s[start..end]` form.
 fn take_prefix(s: str, n: i64) -> str { s[..n] }.test({
     assert("hello"[..5] == "hello"); // whole string
     assert("hello"[..2] == "he"); // up to the 3rd byte

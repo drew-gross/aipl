@@ -1,7 +1,7 @@
-import { greater_than as >, logical_not as !, print } from builtins;
+# Every shape that fires. The expected block below is generated, never
+# hand-written.
 
-// Every shape that fires. The expected block below is generated, never
-// hand-written.
+import { greater_than as >, logical_not as !, print } from builtins;
 
 // The `any` direction: an early `return true`, falling through to `false`.
 fn has_big(xs: i64[], lo: i64) -> bool {

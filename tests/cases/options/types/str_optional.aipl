@@ -1,8 +1,9 @@
+# `str?` is an optional holding a heap string. Both arms round-trip: the
+# `some` arm carries an owned string, the `none` arm falls back via
+# `value_or`. Returning a `str?` extends the optional ABI.
+
 import { equal as == } from builtins;
 
-// `str?` is an optional holding a heap string. Both arms round-trip: the
-// `some` arm carries an owned string, the `none` arm falls back via
-// `value_or`. Returning a `str?` extends the optional ABI.
 fn pick(b: bool) -> str? { if (b) { some("present") } else { none } }.test({
     assert(pick(true) == some("present"));
     assert(pick(true) == some("present"));
@@ -16,8 +17,8 @@ bytes allocated: 0
 instructions executed: 98
 binary size: 1952
   code: 712
-  data: 157
-  metadata: 1083
+  data: 158
+  metadata: 1082
 functions:
   __test$pick:
     calls: 1

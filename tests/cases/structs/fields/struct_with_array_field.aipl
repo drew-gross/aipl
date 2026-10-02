@@ -1,7 +1,8 @@
+# A struct field may be an array (`str[]`), an 8-byte heap pointer. The
+# field is retained on construction and released when the struct drops.
+
 import { equal as ==, len, push, wrapping_add as +, wrapping_mul as * } from builtins;
 
-// A struct field may be an array (`str[]`), an 8-byte heap pointer. The
-// field is retained on construction and released when the struct drops.
 struct Tags { id: i64, names: str[] }
 
 fn make() -> Tags {

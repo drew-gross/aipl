@@ -1,3 +1,14 @@
+# Fixed-width integers: signed i8/i16/i32/i64 and unsigned u8/u16/u32/u64.
+# Arithmetic and comparison happen at the type's width and signedness; results
+# wrap.
+#
+# A value reaches a given width by *context*: a bare literal takes the type its
+# position expects (a parameter, a return type, the other operand of a binop),
+# and a binding says the type outright with `let n: u8 = ..`. There is no
+# conversion form — the annotated binding is the only place a value changes
+# integer type, and it is also how a *non*-literal is converted (`let n: i8 =
+# some_i64;` wraps to 8 bits).
+
 import {
     equal as ==,
     greater_than as >,
@@ -8,16 +19,6 @@ import {
     wrapping_mul as *,
 } from builtins;
 
-// Fixed-width integers: signed i8/i16/i32/i64 and unsigned u8/u16/u32/u64.
-// Arithmetic and comparison happen at the type's width and signedness; results
-// wrap.
-//
-// A value reaches a given width by *context*: a bare literal takes the type its
-// position expects (a parameter, a return type, the other operand of a binop),
-// and a binding says the type outright with `let n: u8 = ..`. There is no
-// conversion form — the annotated binding is the only place a value changes
-// integer type, and it is also how a *non*-literal is converted (`let n: i8 =
-// some_i64;` wraps to 8 bits).
 fn add8(a: i8, b: i8) -> i8 { a + b }.test({
     // Signed addition wraps two's-complement. The literals here take `i8` from
     // `add8`'s parameters.

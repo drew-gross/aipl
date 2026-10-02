@@ -1,8 +1,9 @@
+# An `if`/`else if`/`else` ladder: each `else` is followed by another `if`
+# (the only brace-less `else` form), and the whole thing is a right-nested
+# `if` in the else position.
+
 import { equal as ==, less_than as < } from builtins;
 
-// An `if`/`else if`/`else` ladder: each `else` is followed by another `if`
-// (the only brace-less `else` form), and the whole thing is a right-nested
-// `if` in the else position.
 fn classify(n: i64) -> i64 {
     if (n < 0) { 10 } else if (n == 0) { 20 } else if (n < 10) { 30 } else { 40 }
 }.test({

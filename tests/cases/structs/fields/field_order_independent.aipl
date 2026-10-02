@@ -1,6 +1,7 @@
+# Field init order differs from declaration order; behavior should match.
+
 import { equal as ==, wrapping_sub as - } from builtins;
 
-// Field init order differs from declaration order; behavior should match.
 struct Point { x: i64, y: i64 }
 
 fn sub(p: Point) -> i64 {
@@ -16,8 +17,8 @@ bytes allocated: 0
 instructions executed: 40
 binary size: 1032
   code: 212
-  data: 59
-  metadata: 761
+  data: 60
+  metadata: 760
 functions:
   __test$sub:
     calls: 1

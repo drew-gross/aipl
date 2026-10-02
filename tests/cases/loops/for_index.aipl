@@ -1,8 +1,9 @@
+# `for (let i, x : xs)` binds the iteration index alongside the element. The
+# index counts iterations, so it is the element's position for an array and the
+# byte offset for a `str`.
+
 import { print, to_str } from builtins;
 
-// `for (let i, x : xs)` binds the iteration index alongside the element. The
-// index counts iterations, so it is the element's position for an array and the
-// byte offset for a `str`.
 fn main() !prints {
     let words = ["zero", "one", "two"];
     for (let i, w : words) {

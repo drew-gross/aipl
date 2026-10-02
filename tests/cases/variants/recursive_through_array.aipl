@@ -1,11 +1,12 @@
+# A variant that reaches itself only *through an array*: `CTree` carries
+# `Cst[]`, and no case has a direct `Cst` payload. That is still a containment
+# cycle — rendering, dropping and comparing a `Cst` each have to recurse into
+# the array's elements, which are `Cst`s again — so `Cst` is boxed (a
+# refcounted heap block) exactly like a directly recursive type. The array
+# itself holds *external* (strong) references to its element nodes.
+
 import { equal as ==, not_equal as !=, print, to_str, wrapping_add_assign as += } from builtins;
 
-// A variant that reaches itself only *through an array*: `CTree` carries
-// `Cst[]`, and no case has a direct `Cst` payload. That is still a containment
-// cycle — rendering, dropping and comparing a `Cst` each have to recurse into
-// the array's elements, which are `Cst`s again — so `Cst` is boxed (a
-// refcounted heap block) exactly like a directly recursive type. The array
-// itself holds *external* (strong) references to its element nodes.
 variant Cst = CLeaf(i64) | CTree(str, Cst[])
 
 fn sum_kids(kids: Cst[]) -> i64 {
