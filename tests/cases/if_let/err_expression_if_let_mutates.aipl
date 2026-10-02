@@ -1,0 +1,24 @@
+# The `if let` form is an expression `if` too, so the same rule holds: a branch
+# of one whose value is used may not assign to a binding declared outside it.
+# The pattern's own binders are fair game — they are declared *by* the branch —
+# which is why `v` here is fine and `n` is not.
+
+import { print, to_str, wrapping_increment as ++ } from builtins;
+
+fn main() !prints {
+    mut n = 0;
+    let v = if (let some(x) = some(3)) {
+        set n++;
+        x
+    } else {
+        0
+    };
+    print(v.to_str());
+    print(n.to_str());
+}
+--- errors ---
+error: this branch assigns to "n", which is declared outside the `if` — an expression `if` produces a value and may not also mutate. Make every branch a statement (ending the `if` with ";"), or lift the assignment out and use the `if`'s value
+  --> ./tests/cases/if_let/err_expression_if_let_mutates.aipl:11:13
+   |
+11 |         set n++;
+   |             ^^^

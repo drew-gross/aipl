@@ -176,18 +176,21 @@ const KNOWN_EFFECTS: &[&str] = &[
 
 /// Whether an expression's value is used by whatever encloses it.
 ///
-/// AIPL requires each `match` to be *either* a statement or an expression, and
-/// this is half of how that is decided (the other half is whether its arms
-/// produce a value):
+/// Every construct that holds a block — `match`, `if`, `if let`, `shim` — is
+/// *either* a statement or an expression, and this is the half of that decision
+/// its position makes:
 ///
-/// - arms produce a value → an **expression** `match`: its value must be used
-///   ([`Pos::Value`]), and its arms may not assign to anything declared outside
-///   it, so that reading it is enough to know what it does;
-/// - arms produce nothing → a **statement** `match`: it may assign freely, and
-///   must sit where its (absent) value is discarded ([`Pos::Discard`]).
+/// - in [`Pos::Value`] it is an **expression**, and its blocks may not assign
+///   to anything declared outside it ([`no_outer_assign`]), so that reading it
+///   is enough to know what it does;
+/// - in [`Pos::Discard`] it is a **statement**, and may assign freely.
 ///
-/// The practical effect is that a `match` run purely for effect is written
-/// `match (x) { .. };` — with the semicolon that makes it a statement.
+/// `match` carries the rule twice over, because its arms also say which kind it
+/// is: arms that produce a value make it an expression whose value must be used,
+/// arms that produce none make it a statement that must sit where its value is
+/// discarded. The practical effect is that a `match` run purely for effect is
+/// written `match (x) { .. };` — with the semicolon that makes it a statement,
+/// and the same semicolon is what makes a mutating `if` or `shim` one.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Pos {
     /// The value is consumed: a binding's initializer, a call argument, a
@@ -249,6 +252,57 @@ fn outer_assign(body: &Expr, declared: &HashSet<String>) -> Option<(String, Span
         _ => crate::children(body)
             .into_iter()
             .find_map(|c| outer_assign(c, declared)),
+    }
+}
+
+/// A block-holding construct, as the "may not also mutate" diagnostic names it.
+///
+/// `if let` is a [`ValueForm::If`]: the keyword a reader sees is `if`, and it is
+/// made a statement the same way.
+enum ValueForm {
+    Match,
+    If,
+    Shim,
+}
+
+impl ValueForm {
+    /// What to call the block a hit sits in, the construct's keyword, and how
+    /// *this* construct is written as a statement — which is the form a `set`
+    /// belongs in. Each reaches statement position its own way, and naming the
+    /// way is most of what the diagnostic is worth.
+    fn words(&self) -> (&'static str, &'static str, &'static str) {
+        match self {
+            ValueForm::Match => ("arm", "match", "Make every arm a statement"),
+            ValueForm::If => ("branch", "if", "Make every branch a statement"),
+            ValueForm::Shim => ("body", "shim", "Make the body a statement"),
+        }
+    }
+}
+
+/// Reject an assignment in `body` reaching a binding declared outside it.
+///
+/// This is the half of the statement-or-expression rule that applies to a
+/// construct used as an *expression* (see [`Pos`]): it produces a value, so it
+/// may not also mutate, and `let v = <construct>` therefore tells you its whole
+/// effect. A construct run for effect is written as a statement instead, where a
+/// reader expects effects.
+///
+/// `declared` is what the block itself binds before its first statement — a
+/// pattern's binders, or nothing — and [`outer_assign`] grows it as it walks, so
+/// a block driving its own `mut` to compute its value is untouched.
+fn no_outer_assign(body: &Expr, declared: &HashSet<String>, form: ValueForm) -> Result<(), Error> {
+    let (part, kw, make_stmt) = form.words();
+    match outer_assign(body, declared) {
+        None => Ok(()),
+        Some((name, at)) => Err(Error::at(
+            format!(
+                "this {part} assigns to {name:?}, which is declared outside the `{kw}` — an \
+                 expression `{kw}` produces a value and may not also mutate. {make_stmt} \
+                 (ending the `{kw}` with \";\"), or lift the assignment out and use the \
+                 `{kw}`'s value"
+            ),
+            at,
+        )),
     }
 }
 
@@ -2815,6 +2869,7 @@ impl Cx<'_> {
         body: &Expr,
         env: &Env,
         effects: &[String],
+        pos: Pos,
         span: Span,
     ) -> Result<Type, Error> {
         let Some(ops) = aipl_syntax::effect_operations(effect) else {
@@ -2916,7 +2971,14 @@ impl Cx<'_> {
         if !inner.iter().any(|e| e == effect) {
             inner.push(effect.to_string());
         }
-        self.check_expr(body, env, &inner)
+        // The body sits where the `shim` does, so a `shim` run for effect — the
+        // usual case, `shim c { .. } { .. };` — discards its body's value, and an
+        // expression `shim` may not mutate the scope around it.
+        let ty = self.check_expr_at(body, env, &inner, pos)?;
+        if pos == Pos::Value {
+            no_outer_assign(body, &HashSet::new(), ValueForm::Shim)?;
+        }
+        Ok(ty)
     }
 
     /// Check `expr` and return its type. `effects` is the enclosing function's
@@ -2966,7 +3028,7 @@ impl Cx<'_> {
             ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
             ExprKind::Unit => Type::Unit,
             ExprKind::Shim(effect, bindings, body) => {
-                self.check_shim(effect, bindings, body, env, effects, span.clone())?
+                self.check_shim(effect, bindings, body, env, effects, pos, span.clone())?
             }
             ExprKind::Num(_) => Type::Primitive(Primitive::I64),
             ExprKind::Bool(_) => Type::Primitive(Primitive::Bool),
@@ -3071,6 +3133,14 @@ impl Cx<'_> {
                         ),
                         span.clone(),
                     ));
+                }
+                // An expression `if` produces a value, so neither branch may also
+                // mutate the surrounding scope. A branch declares nothing before
+                // its first statement, so it starts with an empty `declared` set.
+                if pos == Pos::Value {
+                    let declared = HashSet::new();
+                    no_outer_assign(t, &declared, ValueForm::If)?;
+                    no_outer_assign(e, &declared, ValueForm::If)?;
                 }
                 merge(tt, et)
             }
@@ -3653,15 +3723,14 @@ impl Cx<'_> {
                 ty
             }
             // `if (let PATTERN = EXPR) { THEN } else { ELSE }` — checked like a
-            // `match` with exactly one named arm, but without the exhaustiveness
-            // (or statement/expression-kind) restrictions `match` has: only this
-            // one case is named, `ELSE` covers everything else, and the two
-            // branches merge their types exactly as an ordinary `if`'s do (a
-            // bare-literal branch may flex to the other's narrow-int type). No
-            // `outer_assign` restriction either, for the same reason `if` itself
-            // has none: unlike `match`, there's only ever the one pattern to read,
-            // so an expression-position `if let` mutating an outer binding in
-            // `THEN` is no more surprising than an ordinary `if` doing the same.
+            // `match` with exactly one named arm, but without the
+            // exhaustiveness (or statement/expression-kind) restrictions
+            // `match` has: only this one case is named, `ELSE` covers
+            // everything else, and the two branches merge their types exactly
+            // as an ordinary `if`'s do (a bare-literal branch may flex to the
+            // other's narrow-int type). The `no_outer_assign` rule *does* apply,
+            // as it does to every expression-position block: `THEN` binds the
+            // pattern's names, `ELSE` binds nothing.
             ExprKind::IfLet(arm, scrut, else_b) => {
                 let st = self.check_scrutinee(scrut, std::slice::from_ref(arm), env, effects)?;
                 let binders: Vec<(String, Type)> = if arm.pattern.is_nested() {
@@ -3688,6 +3757,11 @@ impl Cx<'_> {
                         ),
                         span.clone(),
                     ));
+                }
+                if pos == Pos::Value {
+                    let declared: HashSet<String> = arm.pattern.bindings().into_iter().collect();
+                    no_outer_assign(&arm.body, &declared, ValueForm::If)?;
+                    no_outer_assign(else_b, &HashSet::new(), ValueForm::If)?;
                 }
                 merge(tt, et)
             }
@@ -3765,18 +3839,7 @@ impl Cx<'_> {
             (_, Pos::Value) => {
                 for arm in arms {
                     let declared: HashSet<String> = arm.pattern.bindings().into_iter().collect();
-                    if let Some((name, at)) = outer_assign(&arm.body, &declared) {
-                        return Err(Error::at(
-                            format!(
-                                "this arm assigns to {name:?}, which is declared outside \
-                                 the `match` — an expression `match` produces a value and \
-                                 may not also mutate. Make every arm a statement (ending \
-                                 the `match` with \";\"), or lift the assignment out and \
-                                 use the `match`'s value"
-                            ),
-                            at,
-                        ));
-                    }
+                    no_outer_assign(&arm.body, &declared, ValueForm::Match)?;
                 }
                 Ok(())
             }

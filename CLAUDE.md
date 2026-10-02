@@ -447,26 +447,43 @@ parser, and `Ctor(..)` expands to one `_` binder per slot in monomorphization
 exhaustiveness, codegen, the lints — only ever sees one pattern per arm with its
 binders named.
 
-## `match` is either a statement or an expression, never both
-An arm's body may be a single expression or a brace-delimited statement block
-(statements, then an optional trailing expression that is the arm's value). Which
-kind the whole `match` is follows from its arms, and each kind carries one
-obligation — they're complementary, so no `match` satisfies both:
+## A construct is either a statement or an expression, never both
+`match`, `if`, `if let` and `shim` all hold brace-delimited blocks (statements,
+then an optional trailing expression that is the block's value), and all four
+obey one rule: **an expression may not also mutate.** Which kind a construct is
+comes from where it sits — its value used, or discarded — and each kind carries
+the complementary obligation, so nothing satisfies both:
 
-| arms produce | kind | obligation |
-|---|---|---|
-| nothing | statement | may assign freely; must sit where its value is discarded — i.e. ends in `;` |
-| a value | expression | its value must be used; no arm may assign to a binding declared **outside** the `match` |
+| kind | obligation |
+|---|---|
+| statement (value discarded — i.e. ends in `;`) | may assign freely |
+| expression (value used) | no block may assign to a binding declared **outside** the construct |
 
-So a `match` run for effect is written `match (x) { .. };` — with the semicolon.
-The point is that `let v = match (..) {..}` tells you the whole effect: it
-computed `v`. Anything that also mutates is spelled as a statement, where a
-reader expects effects.
+So one run for effect is written with the semicolon that discards its value:
+`match (x) { .. };`, `if (c) { .. };`, `shim clock { .. } { .. };`. The point is
+that `let v = match (..) {..}` tells you the whole effect: it computed `v`.
+Anything that also mutates is spelled as a statement, where a reader expects
+effects. There is no bare block expression — `let x = { set y = a; b }` is a
+*parse* error — so these four forms are the whole surface the rule has to cover.
 
-"Outside" is the operative word: an arm may declare and drive its own `mut`
-freely (that's how a block arm computes its value), and a *statement* `match`
-nested inside an expression arm is fine. Only a `set` reaching a binding declared
-outside the `match` is rejected.
+`match` carries a second obligation on top, because its arms also announce which
+kind it is: arms that produce nothing make it a statement, which must then sit
+where its value is discarded, and arms that produce a value make it an
+expression, whose value must then be used. `if` and `shim` read their kind from
+their position alone.
+
+"Outside" is the operative word: a block may declare and drive its own `mut`
+freely (that's how a block computes its value), and an `if let` branch may assign
+to the pattern's own binders — they are declared *by* the branch. Only a `set`
+reaching a binding declared outside the construct is rejected, and it is rejected
+wherever in the block it sits: a *statement* `match`/`if` nested inside an
+expression block is a fine *kind* (it isn't required to produce a value), but a
+`set` inside it still can't reach past the enclosing expression.
+
+The rule lives in `no_outer_assign` (`crates/aipl-mono/src/check.rs`), reached
+from each of the four forms once its position is known to be `Pos::Value`; add a
+new block-holding form to `ValueForm` beside it rather than letting it default to
+unrestricted.
 
 ## Struct spread — `T { ..base, field: value }`
 Every field not given explicitly comes from `base`. Prefer it to restating

@@ -17,11 +17,8 @@ import { equal as ==, to_str, wrapping_add_assign as +=, wrapping_increment as +
 fn count_ones(s: str) -> i64 {
     mut n = 0;
     for (let c : s) {
-        let _ = if (c == '1') {
+        if (c == '1') {
             set n++;
-            0
-        } else {
-            0
         };
     }
     n

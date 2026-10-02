@@ -1,0 +1,24 @@
+# An expression `if` produces a value, so it may not *also* mutate: reading
+# `let v = if (..) {..} else {..}` should tell you the whole effect. This branch
+# assigns to `n`, declared outside the `if`. Either make every branch a
+# statement (and end the `if` with `;`), or lift the assignment out.
+
+import { equal as ==, print, to_str, wrapping_increment as ++ } from builtins;
+
+fn main() !prints {
+    mut n = 0;
+    let v = if (n == 0) {
+        set n++;
+        1
+    } else {
+        2
+    };
+    print(v.to_str());
+    print(n.to_str());
+}
+--- errors ---
+error: this branch assigns to "n", which is declared outside the `if` — an expression `if` produces a value and may not also mutate. Make every branch a statement (ending the `if` with ";"), or lift the assignment out and use the `if`'s value
+  --> ./tests/cases/conditionals/err_expression_if_mutates.aipl:11:13
+   |
+11 |         set n++;
+   |             ^^^

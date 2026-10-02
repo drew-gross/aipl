@@ -1,0 +1,28 @@
+# A `shim` is the third block-holding form the rule covers: used as an
+# expression its body may not assign to a binding declared outside it. A shim
+# installed purely for effect is written as a statement — `shim c { .. } { .. };`
+# — which is where mutation belongs.
+
+import { now_nanos, print, to_str } from builtins;
+
+fn fixed_now() -> u64 { 7 }
+
+fn fixed_monotonic() -> u64 { 7 }
+
+fn reads() !clock -> u64 { now_nanos() }
+
+fn main() !prints {
+    mut seen: u64 = 0;
+    let v = shim clock { now_nanos = fixed_now, monotonic_now = fixed_monotonic } {
+        set seen = reads();
+        seen
+    };
+    print(v.to_str());
+    print(seen.to_str());
+}
+--- errors ---
+error: this body assigns to "seen", which is declared outside the `shim` — an expression `shim` produces a value and may not also mutate. Make the body a statement (ending the `shim` with ";"), or lift the assignment out and use the `shim`'s value
+  --> ./tests/cases/effects/err_expression_shim_mutates.aipl:17:13
+   |
+17 |         set seen = reads();
+   |             ^^^^^^^^^^^^^^

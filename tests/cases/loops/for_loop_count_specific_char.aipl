@@ -3,11 +3,8 @@ import { equal as ==, wrapping_increment as ++ } from builtins;
 fn count_a(s: str) -> i64 {
     mut n = 0;
     for (let c : s) {
-        let _ = if (c == 'a') {
+        if (c == 'a') {
             set n++;
-            0
-        } else {
-            0
         };
     }
     n
