@@ -17421,6 +17421,68 @@ fn compile_call_expr<M: Module>(
                 (sbase, result_ty)
             }
         }
+        Callee::DictKeyAt | Callee::DictValueAt => {
+            // `__dict_key_at(d, i)` / `__dict_value_at(d, i)` — the key or the
+            // value of `d`'s `i`th pair. Mono's dict loop is the only caller, and
+            // it only ever asks for an `i` below `len(d)`, so there is no absent
+            // case to answer: a pair is simply there.
+            //
+            // A dict is an array block of `[key][value]` pairs, so the pair's
+            // address is `aipl_arr_elem_ptr` strided by the pair — the same entry
+            // every element read uses, so every array representation is handled
+            // where hand-rolled arithmetic would assume one. The value sits
+            // immediately after the key, which is what `dict_key_size` is.
+            //
+            // Borrows the dict and retains what it hands back, exactly as `get`
+            // does: the read aliases the dict's heap, and the loop binding has to
+            // own a reference that outlives the dict.
+            let want_key = *callee == Callee::DictKeyAt;
+            let what = if want_key {
+                "__dict_key_at"
+            } else {
+                "__dict_value_at"
+            };
+            if args.len() != 2 {
+                return Err(Error::at(
+                    format!("{what:?} expects 2 args, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let (key_ty, val_ty) = match &dict_ty {
+                ConcreteType::Dict(k, v) => ((**k).clone(), (**v).clone()),
+                other => {
+                    return Err(Error::at(
+                        format!("{what:?} expects a dict, got {}", type_name(other)),
+                        args[0].span.clone(),
+                    ));
+                }
+            };
+            let (idx_v, idx_t) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            expect_len_operand(&idx_t, what, args[1].span.clone())?;
+            let pair_size = dict_pair_size(&key_ty, &val_ty, structs);
+            let psz = builder.ins().iconst(types::I64, pair_size);
+            let pair = builtins.call(
+                module,
+                builder,
+                "aipl_arr_elem_ptr",
+                &[dict_ptr, idx_v, psz],
+            );
+            let (offset, out_ty) = if want_key {
+                (0, key_ty.clone())
+            } else {
+                (dict_key_size(&key_ty, structs) as u32, val_ty)
+            };
+            let v = component(builder, pair, offset, &out_ty, structs);
+            emit_retain(builder, module, builtins, structs, v, &out_ty);
+            if needs_drop(&out_ty, structs) {
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(v, &out_ty));
+            }
+            (v, out_ty)
+        }
         Callee::ContainsKey => {
             // `contains_key(d: #{K: V}, key: K) -> bool`. Borrows the dict.
             if args.len() != 2 {

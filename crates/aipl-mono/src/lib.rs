@@ -6635,6 +6635,102 @@ impl Mono<'_> {
             }
             ExprKind::For(var, index, iter, body) => {
                 let (ri, it) = self.infer(iter, env)?;
+                // A dict walks its pairs, and a dict is indexed by its key: the
+                // index binder is the key, the element binder the value. Spelled
+                // out as the counted loop it stands for —
+                //   let $d = <iter>;
+                //   mut $i: u64 = 0;
+                //   while ($i < $d.len()) {
+                //       let k = __dict_key_at($d, $i);      // when written
+                //       let v = __dict_value_at($d, $i);
+                //       body;
+                //       set $i = $i + 1;
+                //   }
+                // — and re-inferred, so every binding it introduces is typed like
+                // one the program wrote. The position never escapes the lowering:
+                // a dict's order is not promised, so `$i` is the compiler's and
+                // only the key is the program's.
+                if let Type::Dict(..) = aipl_syntax::unrefined(&it) {
+                    let k = self.synth;
+                    self.synth += 1;
+                    let dict = format!("__dict${k}");
+                    let counter = format!("__dict_i${k}");
+                    let sp = || span.clone();
+                    let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), sp());
+                    let unit = || Expr::new(ExprKind::Unit, sp());
+                    let at = |c: Callee| {
+                        Expr::new(
+                            ExprKind::Call(c, vec![id(&dict), id(&counter)], false),
+                            sp(),
+                        )
+                    };
+                    let bump = Expr::new(
+                        ExprKind::Assign(
+                            Box::new(id(&counter)),
+                            Box::new(op_call(
+                                Callee::WrappingAdd,
+                                vec![id(&counter), Expr::new(ExprKind::Num(1), sp())],
+                                sp(),
+                            )),
+                            Box::new(unit()),
+                        ),
+                        sp(),
+                    );
+                    let each = Expr::new(
+                        ExprKind::Let(
+                            var.clone(),
+                            None,
+                            Box::new(at(Callee::DictValueAt)),
+                            Box::new(Expr::new(ExprKind::Seq(body.clone(), Box::new(bump)), sp())),
+                        ),
+                        sp(),
+                    );
+                    // The key is bound outside the value, so a body reading both
+                    // sees them in the order they were written.
+                    let each = match index {
+                        None => each,
+                        Some(i) => Expr::new(
+                            ExprKind::Let(
+                                i.clone(),
+                                None,
+                                Box::new(at(Callee::DictKeyAt)),
+                                Box::new(each),
+                            ),
+                            sp(),
+                        ),
+                    };
+                    let loop_ = Expr::new(
+                        ExprKind::While(
+                            Box::new(op_call(
+                                Callee::LessThan,
+                                vec![
+                                    id(&counter),
+                                    Expr::new(
+                                        ExprKind::Call(Callee::Len, vec![id(&dict)], true),
+                                        sp(),
+                                    ),
+                                ],
+                                sp(),
+                            )),
+                            Box::new(each),
+                        ),
+                        sp(),
+                    );
+                    let counted = Expr::new(
+                        ExprKind::LetMut(
+                            counter,
+                            Some(Type::Primitive(Primitive::U64)),
+                            Box::new(Expr::new(ExprKind::Num(0), sp())),
+                            Box::new(loop_),
+                        ),
+                        sp(),
+                    );
+                    let whole = Expr::new(
+                        ExprKind::Let(dict, None, Box::new(ri), Box::new(counted)),
+                        sp(),
+                    );
+                    return self.infer(&whole, env);
+                }
                 // The two-binder form `for (let i, x : xs)`, now that the
                 // iterable's type is known. Over an array, a `str` or a range an
                 // index is the *position*, so the loop is the plain one over a
@@ -8119,6 +8215,20 @@ fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
         // Internal: a single `char` to a one-char `str`, emitted by variadic
         // `char*` specialization (see `specialize_variadic`).
         Callee::CharToStr => return Some(Type::Primitive(Primitive::Str)),
+        // Internal: the key / value of a dict pair by position, emitted by the
+        // dict loop (see the `For` arm). The dict is the first argument, so each
+        // reads its half straight off it.
+        Callee::DictKeyAt | Callee::DictValueAt => {
+            return match arg_tys.first().map(aipl_syntax::unrefined) {
+                Some(Type::Dict(k, v)) => Some(if *callee == Callee::DictKeyAt {
+                    (**k).clone()
+                } else {
+                    (**v).clone()
+                }),
+                // Not a dict: the error is codegen's to report against the call.
+                _ => Some(Type::Primitive(Primitive::I64)),
+            };
+        }
         // `xs.reverse() -> T[]` / `s.reverse() -> str` — same type as the input.
         // The declared signature is `T[] -> T[]`; a `str` receiver (which
         // `collect_bindings`-style unification would bind as `char[]`) instead

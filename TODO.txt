@@ -186,6 +186,7 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 bugs:
+  return none; in a fn that returns i64? should work
   map over a generic struct's field trips the checker
   Struct-field defaults don't widen an integer literal to u64
   aipl_arr_ensure_heap for a reversed view appears to dec the inner array twice
@@ -216,6 +217,7 @@ bugs:
     It needs the binding held while both a scalar field and the boxed-optional field are read — reading only .next allocates 1 and balances, reading only .val elides the allocation entirely. That's presumably why recursive_struct.aipl and recursive_list.aipl never tripped it. My boxed case is reshaped to cover the boxed store path without hitting it
 
 errors:
+  for (let (k, v) : dict) gives a bad error currently
   attempting to do a top level mut should give a specific error
   report multiple errors when one call site has multiple type errors
   report multiple errors when there is a badly typed let
@@ -268,11 +270,8 @@ syntax:
   add match (v) val if expr => r syntax
   destructuring with renames (let Foo { field as f, .. } = ...)
   module level constants
-  for (let k, v : dct) syntax for dicts
   allow match arm grouping to bind vars with the same type and name, or ignore bindings
   allow types to be defined in scopes (e.g. in tests to avoid leaking the test utilities)
-  implement T+ for intersperse
-  rethink how joining works for strings vs. non-strings. Or maybe add a monad bound?
   some(t) => if (cond) {val1} else {val2},none => val2 <--- to make this work better, allow the if to be on the left of the =>
   allow defining functions in functions so that test utils can live closer to where they are used
   map should take any container and return the same container (then replace map_ok)
@@ -492,7 +491,6 @@ optimizations:
   dead store elimination optimization pass
   Replacing self[end].value_or(' ') == '.' with self[end] == some('.') should not cause a perf decrease
   inline if it would create a fusion opportunity
-  nextest --no-run (build) took 639s which is unusual. Can you investigate why the build is taking so long? use cargo build --timings
   intern static struct literals into the binary too
   extend should create a rope when the value doesn't fit in the existing capacity
   owned spread: { ..var, field: f } should edit var if it's uniquely owned

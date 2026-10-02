@@ -235,6 +235,16 @@ pub enum Callee {
     /// separator, walked by a codegen-stacked split cursor that hands back one
     /// part per iteration, so the array of parts is never built (mono).
     SplitIter,
+    /// `__dict_key_at(d, i)` / `__dict_value_at(d, i)` — the key and the value
+    /// of dict `d`'s `i`th pair, by position in its pair array. What mono lowers
+    /// a `for (let k, v : d)` into (see its `For` arm): a dict is indexed by its
+    /// key, so the loop is the counted walk over the pairs that produces both.
+    ///
+    /// Positional, so neither is reachable from source — a dict's order is not
+    /// promised, and a position is meaningless to write code against. The loop
+    /// that synthesizes them is the only caller, and it keeps `i` to itself.
+    DictKeyAt,
+    DictValueAt,
 
     // ---- names from source ----
     /// A name that is not the compiler's to know: a user function (mangled
@@ -396,6 +406,8 @@ impl Callee {
         Callee::CharToStr,
         Callee::ReverseIter,
         Callee::SplitIter,
+        Callee::DictKeyAt,
+        Callee::DictValueAt,
     ];
 
     /// The canonical name: the reserved `__builtin_*` spelling of a builtin
@@ -546,6 +558,8 @@ impl Callee {
             Callee::CharToStr => "__char_to_str",
             Callee::ReverseIter => "__reverse_iter",
             Callee::SplitIter => "__split_iter",
+            Callee::DictKeyAt => "__dict_key_at",
+            Callee::DictValueAt => "__dict_value_at",
 
             Callee::User(s) => s,
         }

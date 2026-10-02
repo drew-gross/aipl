@@ -3363,10 +3363,17 @@ impl Cx<'_> {
                     // the type of a range's bounds; mono lowers the loop to the
                     // counted `while` it stands for.
                     Type::Named(n) if n == "__builtin_Span" => Type::Primitive(Primitive::U64),
+                    // A dict walks its pairs, binding the *value* — a dict is
+                    // indexed by its key, so its key is the index binder and its
+                    // value the element, exactly as an array's position and
+                    // element are. No order is promised, for the same reason a
+                    // set's is not.
+                    Type::Dict(_, v) => (**v).clone(),
                     other => {
                         return Err(Error::at(
                             format!(
-                                "for-loop iterable must be a str, array, set, or range, got {}",
+                                "for-loop iterable must be a str, array, set, dict, or range, \
+                                 got {}",
                                 tyname(other)
                             ),
                             iter.span.clone(),
@@ -3381,14 +3388,19 @@ impl Cx<'_> {
                         mutable: false,
                     },
                 );
-                // The index binder of `for (let i, x : xs)`. Over everything the
-                // arm above accepts it is the `u64` position; mono is what lowers
-                // it into the counter that produces one.
+                // The index binder of `for (let i, x : xs)`. A dict is indexed
+                // by its key, so there it binds the key; everywhere else an index
+                // is the `u64` position. Mono lowers it into whatever produces
+                // one (see its `For` arm).
                 if let Some(i) = index {
+                    let ity = match unrefined(&it) {
+                        Type::Dict(k, _) => (**k).clone(),
+                        _ => Type::Primitive(Primitive::U64),
+                    };
                     env2.insert(
                         i.clone(),
                         Binding {
-                            ty: Type::Primitive(Primitive::U64),
+                            ty: ity,
                             mutable: false,
                         },
                     );

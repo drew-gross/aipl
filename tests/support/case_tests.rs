@@ -157,6 +157,7 @@ case_tests! {
     cases_dicts_err_container_nesting = "cases/dicts/err_container_nesting",
     cases_dicts_err_key_type = "cases/dicts/err_key_type",
     cases_dicts_err_mixed_literal = "cases/dicts/err_mixed_literal",
+    cases_dicts_iteration = "cases/dicts/iteration",
     cases_dicts_values = "cases/dicts/values",
     cases_docs_doc_comments = "cases/docs/doc_comments",
     cases_docs_err_detached_doc = "cases/docs/err_detached_doc",

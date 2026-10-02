@@ -1,0 +1,171 @@
+# A dict is iterable, and **a dict is indexed by its key**: the two-binder form
+# binds the key and the value, exactly as it binds the position and the element
+# over an array. One binder is the value, the way one binder over an array is the
+# element.
+#
+#   for (let k, v : d)   key and value      for (let i, x : xs)  position, element
+#   for (let v : d)      values             for (let x : xs)     elements
+#
+# No order is promised, for the same reason a set's iteration order is not: a
+# `#{K: V}` says nothing about order, and the representation that gives it one
+# today is not a guarantee to write code against. (Ordered dicts, like ordered
+# sets, are a separate thing.)
+#
+# Underneath, the loop is the counted walk over the dict's `[key][value]` pairs
+# that mono writes (`__dict_key_at` / `__dict_value_at`). The position stays the
+# compiler's: it is meaningless to write code against an order nothing promised,
+# so only the key is handed to the program.
+
+import {
+    extend,
+    len,
+    print,
+    to_str,
+    wrapping_add_assign as +=,
+    wrapping_increment as ++,
+} from builtins;
+
+fn counts() -> #{str: i64} { #{"a": 1, "b": 2, "c": 3} }
+
+fn main() !prints {
+    // Both binders.
+    mut pairs = "";
+    for (let k, v : counts()) {
+        set pairs.extend(`{k}={v};`);
+    }
+    print(pairs);
+
+    // One binder: the values.
+    mut sum = 0;
+    for (let v : counts()) {
+        set sum += v;
+    }
+    print(sum.to_str());
+
+    // Heap keys *and* heap values: each read is a fresh reference the binding
+    // owns, so both outlive the dict they were read from — `label` returns one.
+    print(label(#{"ab": "xy"}));
+
+    // An integer-keyed dict with array values: an element read per iteration.
+    mut cells = 0;
+    mut keys_seen: u64 = 0;
+    for (let n, xs : #{1: [1, 2], 2: [3]}) {
+        set cells += n;
+        set keys_seen += xs.len();
+    }
+    print(`{cells} {keys_seen}`);
+
+    // An empty dict iterates nothing — the walk is bounded by `len`.
+    let empty: #{str: i64} = #{};
+    mut ran = 0;
+    for (let k, v : empty) {
+        print(`{k}{v}`);
+        set ran++;
+    }
+    print(ran.to_str());
+
+    // Nested, over the same dict: the inner loop's own position is declared per
+    // entry, so it restarts rather than carrying over.
+    mut grid = "";
+    for (let a : counts()) {
+        for (let b : counts()) {
+            set grid.extend(`{a}{b} `);
+        }
+    }
+    print(grid);
+
+    // The binders are ordinary immutable bindings, so they shadow and a `mut`
+    // outside is written as usual.
+    let v = 99;
+    mut last = 0;
+    for (let v : counts()) {
+        set last = v;
+    }
+    print(`{v} {last}`);
+}
+
+# The key read out of `d` is the binding's own reference, so it is still good
+# after `d` is gone.
+fn label(d: #{str: str}) -> str {
+    mut out = "";
+    for (let k, v : d) {
+        set out = `{k}->{v}`;
+    }
+    out
+}
+--- stdout ---
+a=1;b=2;c=3;
+6
+ab->xy
+3 3
+0
+11 12 13 21 22 23 31 32 33 
+99 3
+--- performance ---
+allocations: 82
+deallocations: 82
+reallocations: 0
+bytes allocated: 4930
+instructions executed: 2807
+binary size: 11368
+  code: 7076
+  data: 121
+  metadata: 4171
+functions:
+  __dict_drop_i64$i64$arr:
+    calls: 1
+    bytes: 128
+  __dict_drop_str$i64:
+    calls: 7
+    bytes: 132
+  __dict_drop_str$str:
+    calls: 1
+    bytes: 136
+  __dict_retain_i64$i64$arr:
+    calls: 2
+    bytes: 128
+  __dict_retain_str$i64:
+    calls: 21
+    bytes: 132
+  __dict_retain_str$str:
+    calls: 1
+    bytes: 136
+  __to_str_i64:
+    calls: 26
+    bytes: 204
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_arr_elem_ptr:
+    calls: 30
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 4
+    bytes: (external)
+  aipl_array_dec:
+    calls: 13
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 24
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 9
+    bytes: (external)
+  aipl_dict_insert:
+    calls: 24
+    bytes: (external)
+  aipl_i64_len:
+    calls: 52
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_i64:
+    calls: 26
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 5876
