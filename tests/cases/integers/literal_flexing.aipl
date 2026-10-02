@@ -88,36 +88,33 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 198
-instructions executed: 313
-binary size: 2888
-  code: 1284
+instructions executed: 309
+binary size: 2832
+  code: 1256
   data: 1
-  metadata: 1603
+  metadata: 1575
 functions:
   __to_str_i64:
-    calls: 5
+    calls: 6
     bytes: 204
   __to_str_u64:
     calls: 3
     bytes: 204
   __to_str_u8:
-    calls: 3
+    calls: 2
     bytes: 204
   aipl_i64_len:
-    calls: 10
-    bytes: (external)
-  aipl_u64_len:
     calls: 12
     bytes: (external)
-  aipl_write_i64:
-    calls: 5
+  aipl_u64_len:
+    calls: 10
     bytes: (external)
-  aipl_write_u64:
+  aipl_write_i64:
     calls: 6
     bytes: (external)
-  early_return:
-    calls: 1
-    bytes: 20
+  aipl_write_u64:
+    calls: 5
+    bytes: (external)
   main:
     calls: 1
-    bytes: 652
+    bytes: 644

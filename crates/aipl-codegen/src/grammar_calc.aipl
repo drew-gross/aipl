@@ -466,15 +466,15 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 10663
-deallocations: 10663
-reallocations: 1503
-bytes allocated: 1237367
-instructions executed: 2871786
-binary size: 412392
-  code: 273828
+allocations: 10669
+deallocations: 10669
+reallocations: 1502
+bytes allocated: 1238478
+instructions executed: 2871066
+binary size: 412352
+  code: 273572
   data: 5852
-  metadata: 132712
+  metadata: 132928
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -563,10 +563,10 @@ functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 12
     bytes: 304
-  __builtin_any$__m3__Prec$lam$__m13__climb$CalcTok$Calc$lambda0:
+  __builtin_any$__m3__Prec$lam$__m13__climb$CalcTok$Calc$lambda1:
     calls: 156
     bytes: 276
-  __builtin_any$__m3__Prec$lam$__m2__prec_note$lambda2$lambda4:
+  __builtin_any$__m3__Prec$lam$__m2__prod_line$CalcTok$Calc$lambda0$lambda4:
     calls: 3
     bytes: 248
   __builtin_any$__m5__Doc$lam$__m5__has_hard:
@@ -599,7 +599,7 @@ functions:
   __builtin_count_while$char$s0$lam$__m7__dedent$lambda2$lambda0:
     calls: 0
     bytes: 268
-  __builtin_find_if$__m3__Prec$lam$__m13__find_prec$lambda0:
+  __builtin_find_if$__m3__Prec$lam$__m13__climb$CalcTok$Calc$lambda0:
     calls: 141
     bytes: 688
   __builtin_find_index$str$lam$__m13__parse_prepared$CalcTok$Calc$lambda0:
@@ -683,9 +683,6 @@ functions:
   __m11__delimited_len:
     calls: 0
     bytes: 1952
-  __m11__float_len:
-    calls: 0
-    bytes: 824
   __m11__lex$CalcTok:
     calls: 54
     bytes: 392
@@ -694,7 +691,7 @@ functions:
     bytes: 5264
   __m11__lex_step$CalcTok:
     calls: 444
-    bytes: 21208
+    bytes: 22292
   __m11__nested_len:
     calls: 0
     bytes: 1148
@@ -707,9 +704,6 @@ functions:
   __m11__to_eol_len$tail:
     calls: 0
     bytes: 268
-  __m11__to_eol_unless_len:
-    calls: 0
-    bytes: 360
   __m11__up_to_any_len:
     calls: 0
     bytes: 1520
@@ -718,19 +712,13 @@ functions:
     bytes: 324
   __m13__climb$CalcTok$Calc:
     calls: 160
-    bytes: 2956
+    bytes: 3052
   __m13__error_at$CalcTok$Calc:
     calls: 4
     bytes: 2856
   __m13__far_miss:
     calls: 349
     bytes: 1084
-  __m13__far_unclosed:
-    calls: 0
-    bytes: 320
-  __m13__find_prec:
-    calls: 241
-    bytes: 204
   __m13__leaf_at$CalcTok$Calc:
     calls: 286
     bytes: 364
@@ -739,7 +727,7 @@ functions:
     bytes: 6572
   __m13__match_group$CalcTok$Calc:
     calls: 0
-    bytes: 5084
+    bytes: 5420
   __m13__match_leading_sep$CalcTok$Calc:
     calls: 0
     bytes: 1096
@@ -754,7 +742,7 @@ functions:
     bytes: 1492
   __m13__match_prod$CalcTok$Calc:
     calls: 417
-    bytes: 6176
+    bytes: 7364
   __m13__match_reps$CalcTok$Calc:
     calls: 0
     bytes: 4144
@@ -776,9 +764,6 @@ functions:
   __m13__parse_prepared$CalcTok$Calc:
     calls: 53
     bytes: 6476
-  __m13__pruned$CalcTok$Calc:
-    calls: 0
-    bytes: 1236
   __m13__refusal$CalcTok$Calc:
     calls: 0
     bytes: 2756
@@ -848,21 +833,21 @@ functions:
   __m2__merge$CalcTok:
     calls: 24
     bytes: 604
-  __m2__prec_note:
-    calls: 3
-    bytes: 5572
+  __m2__powers_desc:
+    calls: 1
+    bytes: 524
+  __m2__render_climb$CalcTok$map1:
+    calls: 1
+    bytes: 680
   __m2__render_rule$CalcTok:
     calls: 13
-    bytes: 12780
+    bytes: 12220
   __m2__rep_suffix:
     calls: 0
     bytes: 1708
   __m2__rule_first$CalcTok:
     calls: 40
     bytes: 7528
-  __m2__show_first$CalcTok:
-    calls: 3
-    bytes: 3852
   __m2__show_first$CalcTok$filter1$own0:
     calls: 3
     bytes: 452
@@ -871,7 +856,7 @@ functions:
     bytes: 412
   __m2__show_first_sets$CalcTok$Calc$zip1$own0:
     calls: 1
-    bytes: 1176
+    bytes: 4652
   __m3__desugar_opt$CalcTok:
     calls: 0
     bytes: 580
@@ -919,7 +904,7 @@ functions:
     bytes: 192
   __m4__group_doc$CalcTok$Calc$s1$lam$calc_space:
     calls: 0
-    bytes: 1788
+    bytes: 7692
   __m4__inline_doc$lam$calc_space:
     calls: 67
     bytes: 2412
@@ -931,10 +916,7 @@ functions:
     bytes: 3144
   __m4__render_cst$CalcTok$Calc$s1$lam$calc_space:
     calls: 9
-    bytes: 4608
-  __m4__wrapped$lam$calc_space:
-    calls: 0
-    bytes: 6048
+    bytes: 10940
   __m5__col_after:
     calls: 76
     bytes: 628
@@ -956,9 +938,6 @@ functions:
   __m5__has_hard$tail:
     calls: 0
     bytes: 688
-  __m6__reindent_block:
-    calls: 0
-    bytes: 6592
   __rec_drop_Calc:
     calls: 190
     bytes: 132
@@ -991,16 +970,16 @@ functions:
     bytes: 392
   __test$calc_grammar:
     calls: 1
-    bytes: 4044
+    bytes: 9944
   __test$eval_calc:
     calls: 1
     bytes: 2116
   __test$eval_calc$eval:
     calls: 12
-    bytes: 228
+    bytes: 260
   __test$format_calc:
     calls: 1
-    bytes: 4112
+    bytes: 4172
   __test$parse_calc:
     calls: 1
     bytes: 8848
@@ -1026,7 +1005,7 @@ functions:
     calls: 2423
     bytes: (external)
   aipl_arr_inc:
-    calls: 52150
+    calls: 52236
     bytes: (external)
   aipl_arr_reserve:
     calls: 3259
@@ -1038,7 +1017,7 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 67477
+    calls: 67563
     bytes: (external)
   aipl_array_new:
     calls: 1598
@@ -1062,13 +1041,13 @@ functions:
     calls: 4114
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 32467
+    calls: 32410
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 519
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 28353
+    calls: 28296
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 519
@@ -1095,7 +1074,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_write_bytes:
-    calls: 12
+    calls: 24
     bytes: (external)
   aipl_write_i64:
     calls: 31
@@ -1107,11 +1086,8 @@ functions:
     calls: 65
     bytes: 3632
   eval_calc:
-    calls: 0
-    bytes: 32
-  eval_calc$tail:
     calls: 71
-    bytes: 1036
+    bytes: 932
   format_calc:
     calls: 9
     bytes: 336
@@ -1136,12 +1112,6 @@ functions:
   parse_calc:
     calls: 43
     bytes: 332
-  pow:
-    calls: 0
-    bytes: 36
-  pow$tail:
-    calls: 6
-    bytes: 128
   render_calc:
     calls: 57
     bytes: 1008

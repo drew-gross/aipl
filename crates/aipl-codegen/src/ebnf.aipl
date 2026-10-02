@@ -754,15 +754,15 @@ fn fixture() -> Grammar<Tok, Node> {
     }
 }
 --- performance ---
-allocations: 1579
-deallocations: 1579
-reallocations: 352
-bytes allocated: 184735
-instructions executed: 243902
-binary size: 168128
-  code: 111012
+allocations: 1645
+deallocations: 1645
+reallocations: 342
+bytes allocated: 193445
+instructions executed: 245140
+binary size: 169752
+  code: 112008
   data: 4004
-  metadata: 53112
+  metadata: 53740
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -794,7 +794,7 @@ functions:
   __arr_retain___m1__Rule$Tok:
     calls: 189
     bytes: 116
-  __builtin_any$__m1__Prec$lam$prec_note$lambda2$lambda4:
+  __builtin_any$__m1__Prec$lam$prod_line$Tok$Node$lambda0$lambda4:
     calls: 7
     bytes: 248
   __builtin_find_index$str$lam$__m1__link$Tok$Node$lambda0:
@@ -918,7 +918,7 @@ functions:
     calls: 213
     bytes: (external)
   aipl_arr_inc:
-    calls: 3945
+    calls: 3949
     bytes: (external)
   aipl_arr_reserve:
     calls: 328
@@ -927,7 +927,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 5374
+    calls: 5378
     bytes: (external)
   aipl_array_new:
     calls: 62
@@ -984,7 +984,7 @@ functions:
     calls: 8
     bytes: (external)
   aipl_write_bytes:
-    calls: 28
+    calls: 156
     bytes: (external)
   aipl_write_u64:
     calls: 4
@@ -1000,7 +1000,7 @@ functions:
     bytes: 1448
   ebnf$Tok$Node:
     calls: 6
-    bytes: 3604
+    bytes: 9516
   first_precs$Tok:
     calls: 0
     bytes: 32
@@ -1022,12 +1022,15 @@ functions:
   merge$Tok:
     calls: 101
     bytes: 604
-  prec_note:
-    calls: 31
-    bytes: 5572
+  powers_desc:
+    calls: 4
+    bytes: 524
+  render_climb$Tok$map1:
+    calls: 4
+    bytes: 680
   render_rule$Tok:
     calls: 101
-    bytes: 12812
+    bytes: 12264
   rep_suffix:
     calls: 14
     bytes: 1708

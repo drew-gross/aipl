@@ -1,0 +1,115 @@
+import {
+    equal as ==,
+    greater_than as >,
+    less_than as <,
+    print,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
+
+// Inlining a function whose body has an early exit.
+//
+// The inliner used to refuse any body with a `return` in it, which in this
+// language is a lot of bodies: a guard clause is the idiomatic way to deal
+// with the uninteresting case first, and the compiler's own AIPL is written
+// that way throughout.
+//
+// A `return` is only an exit because of where it sits. The value it carries is
+// the value the call produces, and an expression can say that without leaving
+// anything — so the body is rewritten before it is placed:
+//
+//     if (c) { return v; }; rest   ->   if (c) { v } else { rest }
+//
+// The continuation moves into the arm that falls through, which is where it
+// was always going. See `early_exit::without_early_exits`.
+
+// Called from one place, so `inline_single_use` takes it — and `clamped` is
+// gone from the `functions:` block below, guard clause and all.
+fn clamped(x: i64) -> i64 {
+    if (x > 10) {
+        return 10;
+    };
+    x * 2
+}
+
+// Two guards in a row, so the continuation moves twice. Called from three
+// places, which exercises both exits and the fall-through.
+fn graded(x: i64) -> str {
+    if (x < 0) {
+        return "negative";
+    };
+    if (x == 0) {
+        return "zero";
+    };
+    "positive"
+}
+
+// The exit on the `else` side, and a fall-through arm that computes something
+// of its own — which has to survive into the rewritten `if` rather than being
+// dropped with the branch it was in.
+fn floored(x: i64) -> i64 {
+    mut y = 0;
+    if (x > 0) {
+        set y = x + 1;
+    } else {
+        return 0;
+    };
+    y + 100
+}
+
+// A `return` inside a loop leaves the loop *as well as* the function, and an
+// expression has no way to say "stop iterating and be this value" — that wants
+// a `break` carrying a value, which the language does not have. So this one is
+// still refused by the inliner, and still has to work.
+fn first_over(xs: i64[], limit: i64) -> i64 {
+    for (let x : xs) {
+        if (x > limit) {
+            return x;
+        };
+    }
+    0
+}
+
+fn main() !prints {
+    print(`{clamped(3)}`);
+    print(`{graded(-1)} {graded(0)} {graded(7)}`);
+    print(`{floored(5)} {floored(-5)}`);
+    print(`{first_over([1, 9, 4], 3)} {first_over([1, 2], 50)}`);
+}
+--- stdout ---
+6
+negative zero positive
+106 0
+9 0
+--- performance ---
+allocations: 13
+deallocations: 13
+reallocations: 0
+bytes allocated: 791
+instructions executed: 542
+binary size: 4360
+  code: 2296
+  data: 105
+  metadata: 1959
+functions:
+  __to_str_i64:
+    calls: 5
+    bytes: 204
+  aipl_i64_len:
+    calls: 10
+    bytes: (external)
+  aipl_write_i64:
+    calls: 5
+    bytes: (external)
+  first_over:
+    calls: 2
+    bytes: 212
+  floored:
+    calls: 2
+    bytes: 80
+  graded:
+    calls: 3
+    bytes: 304
+  main:
+    calls: 1
+    bytes: 1496

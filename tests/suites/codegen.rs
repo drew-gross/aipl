@@ -128,15 +128,23 @@ fn concat_arg_emits_concat_specialized_instance() {
     // instance (`label$c0`) alongside the plain `label` used for a plain-str arg.
     //
     // `label` has to survive as a real function for there to be an instance to
-    // look at, so it is written past both inlining passes: called more than once,
-    // which `inline_single_use` requires, and with an early `return`, which
-    // `inline_small` refuses regardless of how small the body is (see
-    // `contains_early_exit`). A plain `{ 0 }` body would simply be inlined into
-    // `main` and no `label` instance of either kind would be emitted.
+    // look at, so it is written past both inlining passes: called more than
+    // once, which `inline_single_use` requires, and with a body of nine
+    // non-leaf expressions, which is past `inline_small`'s threshold of four
+    // (`DEFAULT_INLINE_MAX_EXPRS`). A plain `{ 0 }` body would simply be
+    // inlined into `main` and no `label` instance of either kind would be
+    // emitted. The body reads `s`, so constant folding cannot shrink it back
+    // under the threshold for a later round of the pass manager to pick up.
+    //
+    // It used to earn its keep with an early `return` instead, which the
+    // inliner refused outright. That is no longer a reason — a guard clause is
+    // rewritten and inlined like anything else — so the size is the reason
+    // now, and it is the more honest one: it is a property of the body rather
+    // than of a shape the inliner happened not to handle.
     let comp = compile(
-        "import { wrapping_add as +, concat as +++} from builtins;
-         fn label(s: str) -> i64 { if (true) { return 0; }; 0 }
-         fn main() -> i64 {
+        "import { len, wrapping_add as +, concat as +++} from builtins;
+         fn label(s: str) -> u64 { s.len() + s.len() + s.len() + s.len() + s.len() }
+         fn main() -> u64 {
              label(\"abcdefgh\" +++ \"ijklmnop\") + label(\"qrstuvwx\" +++ \"yz012345\")
              + label(\"plainval\") + label(\"another0\")
          }",

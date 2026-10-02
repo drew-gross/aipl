@@ -333,11 +333,11 @@ allocations: 314
 deallocations: 314
 reallocations: 1
 bytes allocated: 21677
-instructions executed: 33161
-binary size: 38176
-  code: 23616
+instructions executed: 33154
+binary size: 37832
+  code: 23332
   data: 881
-  metadata: 13679
+  metadata: 13619
 functions:
   __arr_drop_Doc:
     calls: 10
@@ -360,9 +360,6 @@ functions:
   __builtin_count_while$char$s0$lam$__m2__dedent$lambda2$lambda0:
     calls: 1
     bytes: 268
-  __m1__reindent_block:
-    calls: 1
-    bytes: 6592
   __m5__trim_end_while$lam$__builtin_is_space:
     calls: 34
     bytes: 400
@@ -455,4 +452,4 @@ functions:
     bytes: 108
   print:
     calls: 11
-    bytes: 4448
+    bytes: 10756

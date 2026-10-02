@@ -71,11 +71,11 @@ allocations: 22
 deallocations: 22
 reallocations: 0
 bytes allocated: 1228
-instructions executed: 1750
-binary size: 7832
-  code: 4492
+instructions executed: 1734
+binary size: 7456
+  code: 4284
   data: 33
-  metadata: 3307
+  metadata: 3139
 functions:
   __rec_drop_Calc:
     calls: 11
@@ -96,13 +96,13 @@ functions:
     calls: 11
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 27
+    calls: 19
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 8
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 16
+    calls: 8
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 8
@@ -111,20 +111,11 @@ functions:
     calls: 3
     bytes: (external)
   eval:
-    calls: 0
-    bytes: 32
-  eval$tail:
     calls: 11
-    bytes: 504
+    bytes: 428
   main:
     calls: 1
-    bytes: 2040
+    bytes: 2104
   op:
     calls: 4
     bytes: 1452
-  pow:
-    calls: 0
-    bytes: 36
-  pow$tail:
-    calls: 3
-    bytes: 128

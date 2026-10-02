@@ -315,11 +315,11 @@ allocations: 133
 deallocations: 133
 reallocations: 2
 bytes allocated: 10371
-instructions executed: 37375
-binary size: 26544
-  code: 13964
+instructions executed: 35727
+binary size: 25904
+  code: 13420
   data: 4366
-  metadata: 8214
+  metadata: 8118
 functions:
   __arr_drop_Fill:
     calls: 15
@@ -330,9 +330,6 @@ functions:
   __builtin_find_if$Fill$lam$step$lambda0:
     calls: 29
     bytes: 620
-  __m1__parse_test_section_header:
-    calls: 36
-    bytes: 744
   __test$fill_or_add_sections:
     calls: 1
     bytes: 6620
@@ -366,18 +363,15 @@ functions:
   aipl_write_bytes:
     calls: 16
     bytes: (external)
-  append_missing:
-    calls: 14
-    bytes: 1548
   fill_or_add_sections:
     calls: 14
-    bytes: 1176
+    bytes: 2596
   main:
     calls: 1
     bytes: 128
   step:
     calls: 36
-    bytes: 2424
+    bytes: 2752
   step$filter2:
     calls: 0
     bytes: 424

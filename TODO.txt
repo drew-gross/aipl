@@ -81,6 +81,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  move inlining after type checking so that the type refinement problems don't happen: I think the loss of types after inlining is an architectural problem that shouldn't even have potential to occur. If we move inlining to after type checking, will that solve the problem? So that all types are post-pinning and thus a pin can't be lost? Or maybe we need a separate pinning pass that happens before checking?
   optimizations don't need internal fixpointing, since we now have pass manager. inline_small probably needs a guard against inline itself if recursive and small though.
   figure out why vscode thinks TODO.txt is indented with tabs
   go through and remove all comments that talk about how the code used to work.
@@ -455,7 +456,6 @@ abi:
 
 design:
   determinism is mandatory, it should be impossible to write non-deterministic code in single threaded AIPL (given same host state i.e. if effects have deterministic shims. Also, threading isn't implemented but will obviously have to change this. somehow.)
-  don't repeat information in the docs that can be determined form the signature: whether it's callable as a method, and which arguments are generic.
   backwards compatibility is less important the age of AI: you can get claude to migrade all your code (note: changes that cause code that used to compile to stop is fine, change that silently change behaviour of existing code is still 100% banned)
   representation is not introspectable
   it's safe to call an untrusted function that doesn't declare any effects

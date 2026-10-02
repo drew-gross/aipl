@@ -49,6 +49,8 @@ use move_last_use::{move_field_reads, move_last_uses};
 mod subst;
 pub use subst::inline_single_use_bindings;
 
+mod early_exit;
+
 /// The optimization pass manager: the pass list, and the loop that runs it
 /// until the passes stop finding anything. See the module docs for the
 /// worklist and what a pass may assume about being run twice.
@@ -9064,6 +9066,56 @@ fn mentions_abstract_type(ty: &Type) -> bool {
     }
 }
 
+/// Whether `ty` says something about a set's *ordering* that an inlined body
+/// would not.
+///
+/// A declared return type can carry more than the body's own type does, and
+/// inlining throws the declaration away: codegen types the inlined expression
+/// by compiling it, so what it sees is the body. Set order is where that
+/// bites, and the tree has the case —
+///
+/// ```text
+/// fn powers_desc(precs: Prec[]) -> #>{u64} { precs.map(|pr| pr.power).to_set() }
+/// ```
+///
+/// is checked and correct, but `to_set`'s own type is the *unordered* `#{u64}`;
+/// the ordering is the return type's claim, which the checker verified. Inline
+/// that body into `powers_desc(precs).to_array()` and the receiver is an
+/// unordered set — and `to_array` is the one builtin that insists on the
+/// ordering (`is_ordered`, the only such check in codegen). A call the checker
+/// accepted then fails in codegen.
+///
+/// So such a function is not inlined. The alternative — pinning the inlined
+/// body to the declared type with an annotated `let`, which is how
+/// [`build_inlined`] keeps a parameter's declared type — does not survive the
+/// pipeline here: that binding is read exactly once, so
+/// [`inline_single_use_bindings`] substitutes it straight back out and takes
+/// the annotation with it.
+///
+/// The sibling of [`mentions_abstract_type`], which refuses the same kind of
+/// mismatch from the parameter side.
+fn mentions_ordered_set(ty: &Type) -> bool {
+    match ty {
+        Type::Set(inner, order) => order.is_ordered() || mentions_ordered_set(inner),
+        Type::Case(t) | Type::Optional(t) | Type::Array(t) | Type::Without(t, _) => {
+            mentions_ordered_set(t)
+        }
+        Type::Dict(k, v) | Type::Result(k, v) => mentions_ordered_set(k) || mentions_ordered_set(v),
+        Type::Fn(ps, r) => ps.iter().any(mentions_ordered_set) || mentions_ordered_set(r),
+        Type::Tuple(ts) | Type::Generic(_, ts) => ts.iter().any(mentions_ordered_set),
+        Type::Any
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr
+        | Type::Unknown
+        | Type::Unit
+        | Type::Primitive(_)
+        | Type::Named(_)
+        | Type::TypeVar(_) => false,
+    }
+}
+
 /// A body's size for [`inline_small`]: the number of *non-leaf* expressions in
 /// it — the operations, not their operands.
 ///
@@ -9125,6 +9177,10 @@ pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
                     && f.sig.type_vars.is_empty()
                     && !f.sig.params.iter().any(|p| mentions_abstract_type(&p.ty))
                     && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
+                    // A declared return type that pins a set's ordering is information
+                    // the body need not carry, and inlining keeps only the body — see
+                    // `mentions_ordered_set`.
+                    && !f.sig.return_ty.as_ref().is_some_and(mentions_ordered_set)
                     && !binders.contains(f.name.as_str())
                     && is_inline_shape(
                         f.sig
@@ -9314,6 +9370,10 @@ fn is_inline_candidate(
         // reason and has since been lifted.
         && !f.sig.params.iter().any(|p| mentions_abstract_type(&p.ty))
         && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
+        // A declared return type that pins a set's ordering is information
+        // the body need not carry, and inlining keeps only the body — see
+        // `mentions_ordered_set`.
+        && !f.sig.return_ty.as_ref().is_some_and(mentions_ordered_set)
         && is_inline_shape(
             f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _)) || p.arity.is_variadic()),
             &f.body,
@@ -9337,7 +9397,13 @@ fn is_inline_candidate(
 /// position it can appear.
 fn is_inline_shape(higher_order_or_variadic: bool, body: &Expr, name: &str) -> bool {
     !higher_order_or_variadic
-        && !contains_early_exit(body)
+        // An early exit does not disqualify a body any more, as long as it can
+        // be rewritten into an expression that produces the same value — a
+        // guard clause becoming the `if` it already is. See
+        // `early_exit::without_early_exits`, which `build_inlined` then asks
+        // again to do the rewrite, so the gate and the expansion cannot
+        // disagree about what is inlinable.
+        && early_exit::without_early_exits(body).is_some()
         && !contains_inplace_hof_intrinsic(body)
         && !references_name(body, name)
 }
@@ -9378,6 +9444,12 @@ fn is_inline_candidate_mono(
         && f.name != "__test_main"
         && !skip.contains(f.name.as_str())
         && !binders.contains(f.name.as_str())
+        // As pre-mono: the ordering a declared return type claims is lost with
+        // the declaration. See `mentions_ordered_set`.
+        && !f
+            .return_ty
+            .as_ref()
+            .is_some_and(|ty| mentions_ordered_set(&ty.widen()))
         && is_inline_shape(
             f.params
                 .iter()
@@ -9543,12 +9615,6 @@ pub fn children_mut(e: &mut Expr) -> Vec<&mut Expr> {
         ExprKind::IfLet(arm, s, else_b) => vec![s.as_mut(), &mut arm.body, else_b.as_mut()],
         ExprKind::Lambda(_, b) => vec![b],
     }
-}
-
-/// Whether `e` (or any sub-expression) is an early exit — `return` or `?`.
-fn contains_early_exit(e: &Expr) -> bool {
-    matches!(e.kind, ExprKind::Return(_) | ExprKind::Try(_))
-        || children(e).iter().any(|c| contains_early_exit(c))
 }
 
 /// Whether `e` (or any sub-expression) calls an in-place higher-order intrinsic.
@@ -9793,6 +9859,12 @@ pub(crate) fn next_inline_id() -> usize {
 /// caller name that collides with a parameter would otherwise be captured. (`$`
 /// can't appear in user identifiers, so the fresh names can never collide.)
 fn build_inlined(fparams: &[InlineParam], fbody: &Expr, args: &[Expr], span: Span) -> Expr {
+    // Early exits become ordinary expressions before anything else happens, so
+    // the rest of this builds on a body that cannot leave the caller. Every
+    // path here is gated by `is_inline_shape`, which asked the same question,
+    // so a `None` means the gate and the expansion have come apart.
+    let fbody = &early_exit::without_early_exits(fbody)
+        .expect("the inline gate accepted a body whose early exits cannot be rewritten");
     let mut map: HashMap<String, String> = HashMap::new();
     let fresh: Vec<String> = fparams
         .iter()

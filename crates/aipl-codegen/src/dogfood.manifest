@@ -2,19 +2,19 @@
 ; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).
 ; DO NOT EDIT BY HAND. Regenerate:
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
-; entry parse_test_section_header 470 str -> str?
-; entry strip_test_sections 511 str -> str
-; entry split_test_sections 510 str -> __tuple$str$str
+; entry parse_test_section_header 471 str -> str?
+; entry strip_test_sections 512 str -> str
+; entry split_test_sections 511 str -> __tuple$str$str
 ; entry assert_loc 61 str __builtin_Span -> str
 ; entry caret_block 68 str __builtin_Span str -> str
 ; entry fill_or_add_sections_file 149 str __m13__Fill[] -> unit!Error
-; entry normalize_output 442 str -> str
+; entry normalize_output 443 str -> str
 ; entry int_fits 381 i64 str -> bool
 ; entry is_operator_name 382 str -> bool
-; entry aipl_token_scopes 415 str -> __m19__ScopeSpan[]!__m19__LexError
+; entry aipl_token_scopes 416 str -> __m19__ScopeSpan[]!__m19__LexError
 ; entry find_files 150 str str -> str[]!Error
 ; entry companion_files 70 str -> __m25__Companion[]!str
-; entry parse_spec 467 str -> __m26__Spec!str
+; entry parse_spec 468 str -> __m26__Spec!str
 ; entry aipl_parse_file 342 str -> __m27__ParsedFile!__m39__ParseError
 ; entry format_source 174 str u64 -> str!__m46__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
@@ -308,4 +308,4 @@
 ; data 187 __tostr_lit_94 0800000000000000ffffffffffffff7f52427261636b657400
 
 ; __m10__assert_loc
-; source-fingerprint 11510741206630894484
+; source-fingerprint 7512433896948828461

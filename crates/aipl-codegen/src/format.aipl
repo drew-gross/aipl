@@ -745,10 +745,10 @@ deallocations: 2325
 reallocations: 217
 bytes allocated: 186475
 instructions executed: 296811
-binary size: 256456
-  code: 164996
+binary size: 255704
+  code: 164424
   data: 6076
-  metadata: 85384
+  metadata: 85204
 functions:
   __arr_drop_Item:
     calls: 69
@@ -878,10 +878,7 @@ functions:
     bytes: 688
   __m2__print:
     calls: 51
-    bytes: 4448
-  __m3__reindent_block:
-    calls: 0
-    bytes: 6592
+    bytes: 10756
   __m7__trim_end_while$lam$__builtin_is_space:
     calls: 120
     bytes: 400
@@ -1003,13 +1000,13 @@ functions:
     calls: 1201
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 8879
+    calls: 8885
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 735
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 7678
+    calls: 7684
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 735
@@ -1073,10 +1070,10 @@ functions:
     bytes: 2376
   group_doc$FKind$str$s1$lam$__test$fmt_node$spaced_unless_punct:
     calls: 4
-    bytes: 1788
+    bytes: 7692
   group_doc$FKind$str$s1$lam$__test$render_cst$always_space:
     calls: 0
-    bytes: 1788
+    bytes: 7692
   group_doc$FKind$str$s1$lam$never_space:
     calls: 0
     bytes: 1788
@@ -1122,12 +1119,6 @@ functions:
   render_cst$FKind$str$s1$lam$never_space:
     calls: 1
     bytes: 288
-  wrapped$lam$__test$fmt_node$spaced_unless_punct:
-    calls: 3
-    bytes: 6048
-  wrapped$lam$__test$render_cst$always_space:
-    calls: 0
-    bytes: 6048
   wrapped$lam$never_space:
     calls: 15
     bytes: 2556

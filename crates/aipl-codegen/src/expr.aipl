@@ -241,11 +241,11 @@ allocations: 219
 deallocations: 219
 reallocations: 4
 bytes allocated: 15928
-instructions executed: 11462
-binary size: 86608
-  code: 56244
+instructions executed: 11440
+binary size: 86592
+  code: 56188
   data: 2529
-  metadata: 27835
+  metadata: 27875
 functions:
   __arr_drop_Expr:
     calls: 8
@@ -370,15 +370,9 @@ functions:
   show_arm:
     calls: 1
     bytes: 476
-  show_call:
-    calls: 3
-    bytes: 1560
   show_expr:
     calls: 56
-    bytes: 21984
+    bytes: 24116
   show_exprs:
     calls: 7
     bytes: 1396
-  show_field_init:
-    calls: 0
-    bytes: 628

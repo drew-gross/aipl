@@ -173,13 +173,45 @@ fn inline_keeps_function_value_use() {
 }
 
 #[test]
-fn inline_keeps_early_return() {
-    // An early `return` in the body would escape into the caller if inlined.
+fn inlines_a_tail_return() {
+    // A `return` in tail position is nothing but its value, so the body goes
+    // in as `x`. This used to be refused outright — any `return` anywhere
+    // disqualified a body. See `early_exit::without_early_exits`.
     let names = inlined_names(
         "fn helper(x: i64) -> i64 { return x; }
          fn main() -> i64 { helper(5) }",
     );
-    assert!(names.contains(&"helper".to_string()));
+    assert!(!names.contains(&"helper".to_string()), "got {names:?}");
+}
+
+#[test]
+fn inlines_a_guard_clause() {
+    // The shape the rewrite exists for: `if (c) { return v; }; rest` becomes
+    // `if (c) { v } else { rest }`, with the continuation moving into the arm
+    // that falls through.
+    let names = inlined_names(
+        "import { greater_than as >, wrapping_mul as * } from builtins;
+         fn clamped(x: i64) -> i64 { if (x > 10) { return 10; }; x * 2 }
+         fn main() -> i64 { clamped(3) }",
+    );
+    assert!(!names.contains(&"clamped".to_string()), "got {names:?}");
+}
+
+#[test]
+fn inline_keeps_a_return_inside_a_loop() {
+    // The boundary. A `return` in a loop leaves the loop *as well as* the
+    // function, and an expression has no way to say "stop iterating and be
+    // this value" — that wants a `break` carrying a value, which the language
+    // does not have. So this one is still refused.
+    let names = inlined_names(
+        "import { greater_than as > } from builtins;
+         fn first_over(xs: i64[], limit: i64) -> i64 {
+             for (let x : xs) { if (x > limit) { return x; }; }
+             0
+         }
+         fn main() -> i64 { first_over([1], 0) }",
+    );
+    assert!(names.contains(&"first_over".to_string()), "got {names:?}");
 }
 
 #[test]
