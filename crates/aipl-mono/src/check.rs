@@ -4288,6 +4288,50 @@ impl Cx<'_> {
             // A non-str/array receiver: fall through to report the mismatch
             // against the generic `T[]` signature.
         }
+        // `set xs.extend(src)`: the source is variadic the same way, so it takes
+        // the sequence, a single element, or an optional element. Checked here
+        // for two reasons. One, the signature cannot catch a mismatch on its
+        // own — `T` appears in both parameters, and a repeated type variable is
+        // pinned by the first argument and never compared against the rest (see
+        // `collect_var_bindings`). Two, mono resolves the *shape* onto a
+        // different callee (`push`, `extend_optional`), so a mismatch left to
+        // get past here is reported against that name instead of the `extend`
+        // the caller wrote.
+        if matches!(callee, Callee::Extend) && args.len() == 2 {
+            let recv = self.check_expr(&args[0], env, effects)?;
+            let src = self.check_expr(&args[1], env, effects)?;
+            let seq = match unrefined(&recv) {
+                r if is_str_repr(r) => Some(Type::Primitive(Primitive::Str)),
+                r @ Type::Array(_) => Some(r.clone()),
+                // A non-str/array receiver falls through to the generic
+                // signature's own mismatch, exactly as above.
+                _ => None,
+            };
+            if let Some(seq) = seq {
+                let elem = variadic_elem(&seq);
+                // A bare literal source flexes to the element type, so
+                // `i8_array.extend(-128)` needs no conversion on the literal.
+                let src = self.flex_int(&args[1], &src, &elem)?;
+                // An untyped-empty destination has no element type yet — it
+                // takes one from the source (codegen's `elem_was_none`), so
+                // there is nothing to compare against.
+                if !is_none_inner(&elem) && !variadic_accepts(&src, &seq) {
+                    return Err(Error::at(
+                        format!(
+                            "\"extend\" source expects {}, {}, or {}?, got {}",
+                            tyname(&seq),
+                            tyname(&elem),
+                            tyname(&elem),
+                            tyname(&src)
+                        ),
+                        args[1].span.clone(),
+                    ));
+                }
+                // Mutating, so the call yields its receiver (see the
+                // `is_mutating` arm of `check_call`).
+                return Ok(recv);
+            }
+        }
         // A call *through* a function-typed binding (a lambda parameter or a
         // local bound to one): `f(x)`. Check arity and arguments against the
         // function type and yield its return type. No effect check — the Fn

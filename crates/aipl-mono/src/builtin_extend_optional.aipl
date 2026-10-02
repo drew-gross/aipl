@@ -1,0 +1,123 @@
+# The AIPL implementation of the `extend_optional` builtin — the `T?` shape of
+# `extend`'s variadic source, for an array receiver. Monomorphization registers
+# this function under the canonical name `__builtin_extend_optional` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), and mono's `Extend` arm is what resolves
+# a `set xs.extend(maybe)` onto it; the in-file name is only for this file's own
+# tests, which read exactly like the user code that never spells it.
+#
+# Internal (`INTERNAL_BUILTINS`), so the import is refused everywhere but a
+# `builtin_*.aipl` source: `extend` is the spelling, and a second name for one of
+# its shapes would be the hand-rolled helper this replaced.
+#
+# It is a `push` and not an `extend` of a one-element sequence, which is the
+# whole reason it exists. `extend` sizes the destination to exactly
+# `old + source.len()`, so a one-element source reallocates on *every* append —
+# measured on `lexer.aipl`, 10 reallocations became 112 — while `push` grows
+# geometrically and needs no temporary sequence to hold the one element.
+
+import { equal as ==, push } from builtins;
+
+# Append what `other` holds, if it holds anything; leave `self` alone when it
+# holds nothing.
+pub fn extend_optional<T: any>(mut self: T[], other: T?) {
+    match (other) {
+        some(v) => {
+            set self.push(v);
+        },
+        none => {},
+    };
+}.test({
+    // A `none` leaves the array alone, which is the point of the shape: the
+    // caller has nought or one element and should not have to spell the `match`.
+    mut xs: i64[] = [];
+    set xs.extend_optional(some(1));
+    set xs.extend_optional(none);
+    set xs.extend_optional(some(2));
+    assert(xs == [1, 2]);
+
+    // Nothing at all, onto an array that stays empty.
+    mut empty: i64[] = [];
+    set empty.extend_optional(none);
+    assert(empty == []);
+
+    // Any element type an array holds, including a heap one, whose refcount the
+    // `push` handles exactly as a written-out one would.
+    mut ss: str[] = [];
+    set ss.extend_optional(some("a"));
+    set ss.extend_optional(none);
+    assert(ss == ["a"]);
+    mut cs: char[] = ['x'];
+    set cs.extend_optional(some('y'));
+    assert(cs == ['x', 'y']);
+    mut nested: i64[][] = [];
+    set nested.extend_optional(some([1, 2]));
+    assert(nested == [[1, 2]]);
+
+    // The free-call form, and an existing array it appends onto rather than
+    // replaces.
+    mut ys = [9];
+    set ys.extend_optional(some(8));
+    assert(ys == [9, 8]);
+})
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 1
+bytes allocated: 320
+instructions executed: 1142
+binary size: 6832
+  code: 3648
+  data: 265
+  metadata: 2919
+functions:
+  __eq_i64$arr:
+    calls: 4
+    bytes: 296
+  __eq_i64$arr$arr:
+    calls: 1
+    bytes: 300
+  __eq_str$arr:
+    calls: 1
+    bytes: 364
+  __test$extend_optional:
+    calls: 1
+    bytes: 2568
+  aipl_arr_drop_arr:
+    calls: 2
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 9
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 1
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 30
+    bytes: (external)
+  aipl_array_new:
+    calls: 2
+    bytes: (external)
+  aipl_array_push:
+    calls: 4
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 5
+    bytes: (external)
+  aipl_assert:
+    calls: 6
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 120

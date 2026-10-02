@@ -1,0 +1,153 @@
+# `extend`'s source is variadic in *shape* (`T*`), like `starts_with`'s pattern:
+# the sequence, one element, or an **optional** element. The optional shape is
+# the one worth having — `set xs.extend(maybe)` appends what `maybe` holds and
+# leaves `xs` alone when it holds nothing, which is otherwise a `match` with an
+# empty `none` arm at every call site.
+#
+# None of the three is a distinct lowering. Each is resolved at the call site
+# onto one that already exists (mono's `resolve_extend_shape`), so codegen keeps
+# a single `extend`: a sequence is `extend`, one element is `push`, and an
+# optional is the internal `extend_optional`, whose body is that `push` under the
+# `match`. Neither of the last two builds a one-element sequence first, and
+# `extend`'s own contract is why — see `extend_reserves_once`: it reserves
+# exactly `old + source.len()`, so a one-element source would reallocate on
+# every append where `push` grows geometrically.
+
+import { equal as ==, extend, len, print, to_str } from builtins;
+
+fn main() !prints {
+    mut xs = [1, 2];
+    // The sequence, unchanged.
+    set xs.extend([3, 4]);
+    // One element — the same thing `push` says, and reached by being `push`.
+    set xs.extend(5);
+    // An optional: `some` appends its element, `none` appends nothing.
+    let sixth: i64? = some(6);
+    let nothing: i64? = none;
+    set xs.extend(sixth);
+    set xs.extend(nothing);
+    print(xs.to_str());
+    print(xs.len().to_str());
+
+    // A heap element type, so the appended element's refcount is exercised
+    // rather than a copied scalar.
+    mut names = ["a"];
+    let maybe_b: str? = some("b");
+    set names.extend(maybe_b);
+    set names.extend("c");
+    print(names.to_str());
+
+    // A `str` receiver takes all three too. It has no `push` to reach — a `str`
+    // has no in-place growable form — so one element and a `some` both become
+    // the one-char `str` they already are, which `extend` appends the same way
+    // it appends a longer one.
+    mut s = "ab";
+    set s.extend("cd");
+    set s.extend('e');
+    let f: char? = some('f');
+    let no_char: char? = none;
+    set s.extend(f);
+    set s.extend(no_char);
+    print(s);
+
+    // A `char[]` binding is an *array* binding, not the `str` case: `push` has
+    // its own char path for it.
+    mut cs = ['x'];
+    set cs.extend('y');
+    let z: char? = some('z');
+    set cs.extend(z);
+    print(cs.to_str());
+
+    // An untyped-empty receiver (`mut ys = []`) keeps the *sequence* shape, the
+    // only one it has ever had: the shape is fitted against the destination's
+    // element type, and this destination takes its element type from the source
+    // instead. Whether `ys.extend("ab")` appended two chars or one `str` is
+    // exactly what has not been said yet, so neither of the other two shapes is
+    // available until something pins it — `push` is the spelling for the first
+    // element, and pinning the type is what it is for.
+    mut ys = [];
+    set ys.extend([7]);
+    set ys.extend([8, 9]);
+    print(`{ys} {ys.len() == 3}`);
+
+    // One annotation is all it takes, which is why `lex_all` in `lexer.aipl`
+    // annotates every accumulator it appends an optional to.
+    mut zs: i64[] = [];
+    let seventh: i64? = some(7);
+    set zs.extend(seventh);
+    set zs.extend(8);
+    print(zs.to_str());
+}
+--- stdout ---
+[1, 2, 3, 4, 5, 6]
+6
+["a", "b", "c"]
+abcdef
+['x', 'y', 'z']
+[7, 8, 9] true
+[7, 8]
+--- performance ---
+allocations: 22
+deallocations: 22
+reallocations: 2
+bytes allocated: 1110
+instructions executed: 3226
+binary size: 12688
+  code: 7360
+  data: 479
+  metadata: 4849
+functions:
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  __to_str_char$arr:
+    calls: 1
+    bytes: 768
+  __to_str_i64$arr:
+    calls: 3
+    bytes: 708
+  __to_str_str$arr:
+    calls: 1
+    bytes: 828
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_arr_extend:
+    calls: 3
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 11
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 6
+    bytes: (external)
+  aipl_array_dec:
+    calls: 32
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_array_push:
+    calls: 4
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 3
+    bytes: (external)
+  aipl_i64_len:
+    calls: 22
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 27
+    bytes: (external)
+  aipl_write_i64:
+    calls: 11
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 4620

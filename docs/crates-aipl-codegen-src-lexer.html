@@ -851,20 +851,6 @@
 
 
 
-        <section class="item" id="item-push_optional">
-          <h3>
-            <a class="anchor" href="#item-push_optional">push_optional</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn push_optional&#60;T: any&#62;(self: T[], t: T?)</code></pre>
-
-          <div class="doc"><p>Append what <code>t</code> holds, if it holds anything. A step carries <em>at most</em> one token (see <code>StepResult</code>), so every array <code>lex_all</code> accumulates grows by nought or one per step — and spelling that as a <code>match</code> at each site buried the loop in empty <code>none</code> arms. <code>mut self</code>, so this appends in place like the <code>push</code> it wraps rather than rebuilding the array at every position of every lex.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-scope_span">
           <h3>
             <a class="anchor" href="#item-scope_span">scope_span</a>

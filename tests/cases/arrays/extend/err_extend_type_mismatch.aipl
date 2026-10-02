@@ -2,6 +2,11 @@
 # `push` makes on a single element, one level up. (An untyped-empty destination
 # is the one exception: it takes its element type from the source, which is the
 # last case in `extend.aipl`.)
+#
+# The message names all three shapes the source may take, because the source is
+# variadic — see `extend_variadic_source`. It is also reported against `extend`
+# rather than against the callee the shape resolves onto, which is why the
+# checker makes this check itself rather than leaving it to the signature.
 
 import { extend } from builtins;
 
@@ -10,8 +15,8 @@ fn main() {
     set xs.extend(["a"]);
 }
 --- errors ---
-error: extend source: expected i64[], got str[]
-  --> ./tests/cases/arrays/extend/err_extend_type_mismatch.aipl:10:19
+error: "extend" source expects i64[], i64, or i64?, got str[]
+  --> ./tests/cases/arrays/extend/err_extend_type_mismatch.aipl:15:19
    |
-10 |     set xs.extend(["a"]);
+15 |     set xs.extend(["a"]);
    |                   ^^^^^

@@ -2049,6 +2049,70 @@ fn variadic_elem_ty(seq: &Type) -> Type {
 /// `char*`-backed `str` sequence). Any other variadic parameter is the sequence
 /// form and only has its `variadic` flag cleared. After this, params and body
 /// are fully concrete — codegen never sees a variadic parameter.
+/// The one-element sequence an `Elem`-shaped variadic argument stands for.
+///
+/// `elem` decides the spelling, and the two are the same representation: a
+/// `char` sequence is a `str`, so one `char` is the one-char `str`
+/// `CharToStr(x)` builds (no array block at all); any other element is a
+/// one-element array literal.
+fn elem_variadic_seq(arg: Expr, elem: &Type, span: Span) -> Expr {
+    if *elem == Type::Primitive(Primitive::Char) {
+        Expr::new(ExprKind::Call(Callee::CharToStr, vec![arg], false), span)
+    } else {
+        Expr::new(ExprKind::ArrayLit(vec![arg]), span)
+    }
+}
+
+/// The sequence an `Opt`-shaped variadic argument stands for: a one-element
+/// sequence holding what `scrut` carries when it is `some`, and the empty
+/// sequence when it is `none`. `binder` is the name the `some` arm binds the
+/// payload to — every caller spells it with a `$`, which no user identifier can
+/// contain, so it cannot capture something the scrutinee mentions. `elem` is the
+/// variadic's element type, and it decides the spelling: a `char` sequence is a
+/// `str` (`CharToStr(x)` / `""`), anything else an array literal.
+///
+/// Two callers write the same shape for the same reason. [`specialize_variadic`]
+/// puts it in the prologue of an AIPL body whose variadic parameter arrived as
+/// an optional, so the body only ever sees the sequence form it was written
+/// against. `extend` has no AIPL body to give a prologue to, so its `Opt` shape
+/// is converted at the call site instead (see [`Mono::infer`]'s `Extend` arm).
+fn opt_variadic_seq(scrut: Expr, binder: String, elem: &Type, span: Span) -> Expr {
+    let is_char = *elem == Type::Primitive(Primitive::Char);
+    let x_id = Expr::new(ExprKind::Ident(binder.clone()), span.clone());
+    let some_body = elem_variadic_seq(x_id, elem, span.clone());
+    let none_body = if is_char {
+        Expr::new(ExprKind::Str(String::new()), span.clone())
+    } else {
+        Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())
+    };
+    Expr::new(
+        ExprKind::Match(
+            Box::new(scrut),
+            vec![
+                MatchArm {
+                    pattern: Pattern::Ctor {
+                        name: "some".into(),
+                        bindings: vec![binder],
+                        ignore_payload: false,
+                    },
+                    body: some_body,
+                    span: span.clone(),
+                },
+                MatchArm {
+                    pattern: Pattern::Ctor {
+                        name: "none".into(),
+                        bindings: Vec::new(),
+                        ignore_payload: false,
+                    },
+                    body: none_body,
+                    span: span.clone(),
+                },
+            ],
+        ),
+        span,
+    )
+}
+
 fn specialize_variadic(
     mut params: Vec<Param>,
     body: Expr,
@@ -2064,65 +2128,18 @@ fn specialize_variadic(
         }
         p.arity = Arity::One;
         let elem = variadic_elem_ty(&p.ty);
-        let is_char = elem == Type::Primitive(Primitive::Char);
         let orig = p.name.clone();
         if variadic_elem.contains(&i) {
             let pv = format!("{orig}$v");
             let pv_id = Expr::new(ExprKind::Ident(pv.clone()), span.clone());
-            let convert = if is_char {
-                Expr::new(
-                    ExprKind::Call(Callee::CharToStr, vec![pv_id], false),
-                    span.clone(),
-                )
-            } else {
-                Expr::new(ExprKind::ArrayLit(vec![pv_id]), span.clone())
-            };
+            let convert = elem_variadic_seq(pv_id, &elem, span.clone());
             p.name = pv;
             p.ty = elem;
             prologues.push((orig, convert));
         } else if variadic_opt.contains(&i) {
             let pv = format!("{orig}$v");
-            let xn = format!("{orig}$x");
-            let x_id = Expr::new(ExprKind::Ident(xn.clone()), span.clone());
-            let some_body = if is_char {
-                Expr::new(
-                    ExprKind::Call(Callee::CharToStr, vec![x_id], false),
-                    span.clone(),
-                )
-            } else {
-                Expr::new(ExprKind::ArrayLit(vec![x_id]), span.clone())
-            };
-            let none_body = if is_char {
-                Expr::new(ExprKind::Str(String::new()), span.clone())
-            } else {
-                Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())
-            };
-            let m = Expr::new(
-                ExprKind::Match(
-                    Box::new(Expr::new(ExprKind::Ident(pv.clone()), span.clone())),
-                    vec![
-                        MatchArm {
-                            pattern: Pattern::Ctor {
-                                name: "some".into(),
-                                bindings: vec![xn],
-                                ignore_payload: false,
-                            },
-                            body: some_body,
-                            span: span.clone(),
-                        },
-                        MatchArm {
-                            pattern: Pattern::Ctor {
-                                name: "none".into(),
-                                bindings: Vec::new(),
-                                ignore_payload: false,
-                            },
-                            body: none_body,
-                            span: span.clone(),
-                        },
-                    ],
-                ),
-                span.clone(),
-            );
+            let scrut = Expr::new(ExprKind::Ident(pv.clone()), span.clone());
+            let m = opt_variadic_seq(scrut, format!("{orig}$x"), &elem, span.clone());
             p.name = pv;
             p.ty = Type::Optional(Box::new(elem));
             prologues.push((orig, m));
@@ -4981,6 +4998,125 @@ impl Mono<'_> {
     /// Resolve the concrete return type of a non-generic call (builtin or user
     /// fn). Permissive: an unknown callee falls back to Unit — codegen issues
     /// the real "undefined fn"/missing-import diagnostic.
+    /// Resolve `extend`'s shape-variadic source (`T*`) onto the callee that
+    /// implements that shape, rewriting `rargs`' source in place when it needs
+    /// converting. `None` leaves the call exactly as it was — `callee` is not
+    /// `extend`, or the source is (or may as well be) the sequence form
+    /// `extend` already takes.
+    ///
+    /// The shapes do not each get their own codegen lowering the way
+    /// `starts_with`'s do; each is resolved onto one that already exists, so
+    /// codegen keeps a single `extend`. For an **array** receiver:
+    ///
+    /// - a sequence is `extend` itself, the size-once append;
+    /// - one element *is* [`Callee::Push`] — same receiver, same in-place
+    ///   writeback form, same argument order;
+    /// - an optional is [`Callee::ExtendOptional`], whose AIPL body is that
+    ///   `push` under a `match`.
+    ///
+    /// Neither of the last two goes through a one-element *sequence*, and
+    /// `extend`'s own contract is why: it reserves exactly
+    /// `old + source.len()`, so a one-element source reallocates on every
+    /// append where `push` grows geometrically — measured on `lexer.aipl`, 10
+    /// reallocations became 112.
+    ///
+    /// A **`str`** receiver has no `push` to reach: a `str` binding has no
+    /// element type to refine and no in-place growable form, so `push` only
+    /// takes an array one. There both shapes become the `char` sequence they
+    /// stand for — a one-char `str`, with no array block involved — and
+    /// `extend` appends it through the same `aipl_str_append` a longer source
+    /// takes. That conversion is the one [`specialize_variadic`] writes for an
+    /// AIPL body's variadic parameter; `extend` is native, so there is no body
+    /// to put a prologue in and it happens at the call site. A `char[]` binding
+    /// is an *array* binding, not this case — `push` has its own char path for
+    /// it.
+    ///
+    /// **The shape is read off the types, not off [`variadic_shape`].** That
+    /// function reads the sequence form off the receiver and answers `Elem` for
+    /// anything it cannot place, which is a fallback rather than a finding —
+    /// and mono sees sources it cannot place. A call whose return type is not
+    /// resolved yet arrives here as `Unit`, so `Elem` would rewrite the call
+    /// into a `push` of a value that is no element at all (this is not
+    /// hypothetical: `set groups.extend(group_styles(rule))` in `grammar.aipl`
+    /// is one). So a shape is taken only when the source actually fits it, and
+    /// a tie goes to the sequence: anything `extend` accepts today keeps the
+    /// meaning it has today, and anything that fits no shape keeps the error it
+    /// already had, where it already was.
+    ///
+    /// The optional shape is what retired the hand-rolled `push_optional`
+    /// helper in `lexer.aipl`.
+    fn resolve_extend_shape(
+        &mut self,
+        callee: &Callee,
+        atys: &[Type],
+        rargs: &mut Vec<Expr>,
+    ) -> Option<Callee> {
+        if !matches!(callee, Callee::Extend) || atys.len() != 2 {
+            return None;
+        }
+        let str_recv = is_str_repr(&atys[0]);
+        let (seq_ty, elem) = if str_recv {
+            (
+                Type::Primitive(Primitive::Str),
+                Type::Primitive(Primitive::Char),
+            )
+        } else if let Type::Array(e) = aipl_syntax::unrefined(&atys[0]) {
+            (atys[0].clone(), (**e).clone())
+        } else {
+            // Not a sequence receiver at all: the normal path reports that.
+            return None;
+        };
+        // An untyped-empty destination (`mut buf = []`) takes its element type
+        // *from* the source, so there is no element type for a shape to fit
+        // against — and whether `buf.extend("ab")` appends two chars or one
+        // `str` is exactly what the receiver has not said. Such a receiver
+        // keeps the sequence shape, the only one `extend` has ever had there;
+        // `push` is the spelling for the first element, and pinning the element
+        // type is what it is for.
+        if is_none_inner(&elem) {
+            return None;
+        }
+        let src = &atys[1];
+        // The sequence reading wins any tie, so nothing that compiles today
+        // changes meaning.
+        if check::coerce(src, &seq_ty).is_ok() {
+            return None;
+        }
+        let opt_elem = Type::Optional(Box::new(elem.clone()));
+        let shape = if matches!(aipl_syntax::unrefined(src), Type::Optional(_))
+            && check::coerce(src, &opt_elem).is_ok()
+        {
+            VShape::Opt
+        } else {
+            // A bare literal source flexes to the element's width, so
+            // `u8_array.extend(7)` is an element and not a mismatch.
+            let flexed = aipl_syntax::flex_int_ty(&rargs[1], src, &elem);
+            if check::coerce(&flexed, &elem).is_ok() {
+                VShape::Elem
+            } else {
+                // Fits no shape: leave the call alone and let the error it
+                // already had be reported against `extend`.
+                return None;
+            }
+        };
+        if !str_recv {
+            return Some(match shape {
+                VShape::Elem => Callee::Push,
+                _ => Callee::ExtendOptional,
+            });
+        }
+        let k = self.synth;
+        self.synth += 1;
+        let src = rargs.pop().expect("extend has a source argument");
+        let span = src.span.clone();
+        let char_ty = Type::Primitive(Primitive::Char);
+        rargs.push(match shape {
+            VShape::Elem => elem_variadic_seq(src, &char_ty, span),
+            _ => opt_variadic_seq(src, format!("$opt{k}"), &char_ty, span),
+        });
+        Some(Callee::Extend)
+    }
+
     fn call_return(&self, callee: &Callee, arg_tys: &[Type]) -> Type {
         if let Some(t) = builtin_return(callee, arg_tys) {
             return t;
@@ -6926,6 +7062,15 @@ impl Mono<'_> {
                     rargs.push(ra);
                     atys.push(t);
                 }
+                // `extend`'s source is shape-variadic, and the shape picks a
+                // *different callee* (see `resolve_extend_shape`). Resolved here,
+                // before the dispatch chain below, because one of those callees is
+                // AIPL-implemented and has to specialize through the generic path
+                // exactly as a written call to it would — a late rewrite leaves an
+                // unspecialized template name for codegen to fail on.
+                let resolved_extend = self.resolve_extend_shape(callee, &atys, &mut rargs);
+                let callee: &Callee = resolved_extend.as_ref().unwrap_or(callee);
+                let name = callee.name();
                 // A method call's args aren't move-eligible (a mutating method's
                 // store-back path owns the receiver); only free calls compute the
                 // owned-parameter set used for the move optimization.
@@ -7388,6 +7533,7 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::FindIndex, "builtin_find_index.aipl"),
     (Callee::UnionAll, "builtin_union_all.aipl"),
     (Callee::SetMap, "builtin_set_map.aipl"),
+    (Callee::ExtendOptional, "builtin_extend_optional.aipl"),
     (Callee::IsAllWhitespace, "builtin_is_all_whitespace.aipl"),
     (Callee::IsErrAnd, "builtin_is_err_and.aipl"),
     (Callee::IsSomeAnd, "builtin_is_some_and.aipl"),
@@ -7584,6 +7730,18 @@ fn aipl_builtin(canonical: &str) -> Option<&'static AiplBuiltin> {
 /// keeps the callers (mono's `generics` map, codegen's decl list) free to look
 /// each one up in whatever form they need.
 pub fn aipl_builtin_demand(program: &Program) -> BTreeSet<&'static str> {
+    /// The AIPL-implemented builtins mono may resolve a *shape* of `canonical`
+    /// onto, which no source ever names: `extend`'s `T?` source becomes
+    /// `extend_optional` (see mono's `Extend` arm). A program that only ever
+    /// writes `extend` still needs that one loaded, and this scan runs before the
+    /// rewrite that would otherwise be its only mention.
+    fn synthesized_from(canonical: &str) -> &'static [&'static str] {
+        match canonical {
+            "__builtin_extend" => &["__builtin_extend_optional"],
+            _ => &[],
+        }
+    }
+
     /// Record the builtin `e` names, if it names one and it's new. `pending`
     /// collects the newly-seen ones, whose own bodies still need scanning.
     fn discover(e: &Expr, needed: &mut BTreeSet<&'static str>, pending: &mut Vec<&'static str>) {
@@ -7592,6 +7750,16 @@ pub fn aipl_builtin_demand(program: &Program) -> BTreeSet<&'static str> {
             ExprKind::Ident(name) => name,
             _ => return,
         };
+        // Demanded by the *native* builtin that resolves onto them, so this runs
+        // whether or not `name` is itself AIPL-implemented.
+        for syn in synthesized_from(name) {
+            let (canonical, _) = aipl_builtin_slots()
+                .get_key_value(*syn)
+                .expect("a synthesized demand names an AIPL_BUILTIN_SOURCES entry");
+            if needed.insert(canonical) {
+                pending.push(canonical);
+            }
+        }
         if let Some((canonical, _)) = aipl_builtin_slots().get_key_value(name) {
             if needed.insert(canonical) {
                 pending.push(canonical);

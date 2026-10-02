@@ -2948,21 +2948,30 @@ fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
 // NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
 // `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
-// `set_map`, `tuple_windows`, `union_all`, `value_or`, and `value_or_err` are
+// `extend_optional`, `set_map`, `tuple_windows`, `union_all`, `value_or`, and
+// `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
 // which is the single source of both their body and their signature.
 // `aipl_mono::aipl_builtin_sig_decls()` feeds those signatures to the checker and
 // codegen; see `AIPL_BUILTIN_SOURCES` in aipl-mono.
 fn __builtin_zip_with<T: any, U: any, V: any>(self: T[], other: U[], f: (T, U) -> V) -> V[] { [] }
 fn __builtin_push<T: any>(mut self: T[], x: T) {}
-// Append every element of `other` to `self` — `push` for a whole array, and
-// the way to grow a `str` in place (`set s.extend(t)`; a `str` is its `char`
-// sequence, so it takes a `str` or a `char[]` source). A builtin rather than an
-// AIPL loop over `push` so it can size the destination once: growing by
-// `other.len()` in a single reserve turns N reallocations into at most one, and
-// the elements move as one `memcpy` plus one retain pass. The `extend_longhand`
-// lint sends the rebuild spelling, `set s = s +++ t;`, here.
-fn __builtin_extend<T: any>(mut self: T[], other: T[]) {}
+// Append `other` to `self` — `push` for a whole array, and the way to grow a
+// `str` in place (`set s.extend(t)`; a `str` is its `char` sequence, so it takes
+// a `str` or a `char[]` source). A builtin rather than an AIPL loop over `push`
+// so it can size the destination once: growing by `other.len()` in a single
+// reserve turns N reallocations into at most one, and the elements move as one
+// `memcpy` plus one retain pass. The `extend_longhand` lint sends the rebuild
+// spelling, `set s = s +++ t;`, here.
+//
+// The source is variadic in shape, like `starts_with`'s pattern: the sequence,
+// one element, or an *optional* element — `set xs.extend(maybe)` appends what
+// `maybe` holds and leaves `xs` alone when it holds nothing, which is what a
+// hand-rolled `push_optional` helper used to be for. Mono resolves the shape at
+// the call site (see its `Extend` arm): one element is exactly `push`, and an
+// optional becomes the sequence it stands for, so codegen keeps a single
+// `extend`.
+fn __builtin_extend<T: any>(mut self: T[], other: T*) {}
 // Make room in `self` for `additional` more elements (bytes, for a `str`)
 // without changing its contents, so that many appends fit in one allocation
 // — `set out.reserve(n)` ahead of a loop of `push`/`extend`, where the loop
@@ -3346,8 +3355,15 @@ pub fn is_none_literal_arg(t: &Type) -> bool {
 /// own is an open question, and until it is answered the loader refuses the
 /// import anywhere else ([`is_internal_builtin`]). `assume_nonempty` grants a
 /// `T[] without []` with no test; `ensure_nonempty` is the one caller that
-/// has made the test, and nothing else gets to skip it.
-pub const INTERNAL_BUILTINS: &[Callee] = &[Callee::Reserve, Callee::AssumeNonempty];
+/// has made the test, and nothing else gets to skip it. `extend_optional` is one
+/// *shape* of `extend` rather than an operation of its own — `extend` is the
+/// spelling, and a public second name for the shape would be the hand-rolled
+/// helper it replaced.
+pub const INTERNAL_BUILTINS: &[Callee] = &[
+    Callee::Reserve,
+    Callee::AssumeNonempty,
+    Callee::ExtendOptional,
+];
 
 /// Whether `callee` is one of [`INTERNAL_BUILTINS`].
 pub fn is_internal_builtin(callee: &Callee) -> bool {

@@ -21,6 +21,7 @@ import {
     drop_first,
     drop_last,
     equal as ==,
+    extend,
     filter,
     first,
     has,
@@ -949,35 +950,6 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     ok(self.lex_all(rules, Tokens)?.result)
 }
 
-# Append what `t` holds, if it holds anything. A step carries *at most* one token
-# (see `StepResult`), so every array `lex_all` accumulates grows by nought or one
-# per step — and spelling that as a `match` at each site buried the loop in empty
-# `none` arms. `mut self`, so this appends in place like the `push` it wraps
-# rather than rebuilding the array at every position of every lex.
-fn push_optional<T: any>(mut self: T[], t: T?) {
-    match (t) {
-        some(v) => {
-            set self.push(v);
-        },
-        none => {},
-    };
-}.test({
-    // A `none` leaves the array alone, which is the whole point: a `skip` rule
-    // and a rule that declined both reach this with nothing to add.
-    mut xs: i64[] = [];
-    set xs.push_optional(some(1));
-    set xs.push_optional(none);
-    set xs.push_optional(some(2));
-    assert(xs == [1, 2]);
-
-    // The shape `lex_all` uses it in — a token optional off a `StepResult`.
-    mut ts: Token<Kind>[] = [];
-    let t = Token { kind: Ident("hi"), text: span_str("hi", 0..2) };
-    set ts.push_optional(some(t));
-    set ts.push_optional(none);
-    assert(ts == [t]);
-})
-
 # What the highlighter paints for this step: the span of the token it produced,
 # under the winning rule's scope. A skipped rule produces no token and so paints
 # nothing; a trivia rule paints, since a comment is painted like anything else —
@@ -987,9 +959,12 @@ fn scope_span<K>(self: StepResult<K>) -> ScopeSpan? {
 }
 
 fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexError {
-    // Annotated like `scopes` and `kinds` below: a bare `[]` carries only a
-    // placeholder element type, which `push_optional` would bind its `T` to
-    // ahead of the `Token<K>?` it is handed.
+    // Every one of these is annotated, and `extend` is why: a step carries *at
+    // most* one token (see `StepResult`), so each array grows by nought or one
+    // per step and is appended to with the optional itself. `extend` fits that
+    // optional against the destination's element type, and a bare `[]` has none
+    // — it takes one from whatever is appended — so the optional shape is only
+    // available once the annotation has said what the elements are.
     mut tokens: Token<K>[] = [];
     mut trivia: Token<K>[] = [];
     mut scopes: ScopeSpan[] = [];
@@ -1009,20 +984,20 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
         match (want) {
             Tokens => {
                 if (step.trivia) {
-                    set trivia.push_optional(step.token);
+                    set trivia.extend(step.token);
                 } else {
-                    set tokens.push_optional(step.token);
+                    set tokens.extend(step.token);
                 };
             },
             // Trivia is no part of a kind stream: a parser driven by kinds alone
             // never sees a comment.
             Kinds => {
                 if (!step.trivia) {
-                    set kinds.push_optional(step.token.map(|t| t.kind));
+                    set kinds.extend(step.token.map(|t| t.kind));
                 };
             },
             Scopes => {
-                set scopes.push_optional(step.scope_span());
+                set scopes.extend(step.scope_span());
             },
         };
         set modes = modes.stepped(step, pos);
@@ -1507,15 +1482,15 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 366
-deallocations: 366
-reallocations: 10
-bytes allocated: 76592
-instructions executed: 697710
-binary size: 835552
-  code: 559208
-  data: 9004
-  metadata: 267340
+allocations: 362
+deallocations: 362
+reallocations: 9
+bytes allocated: 76304
+instructions executed: 697024
+binary size: 832296
+  code: 557068
+  data: 8916
+  metadata: 266312
 functions:
   __arr_drop_Kind:
     calls: 88
@@ -1527,7 +1502,7 @@ functions:
     calls: 3
     bytes: 120
   __arr_drop_Token$Kind:
-    calls: 125
+    calls: 123
     bytes: 276
   __arr_drop_TokenRule$Kind:
     calls: 36
@@ -1542,7 +1517,7 @@ functions:
     calls: 3
     bytes: 120
   __arr_retain_Token$Kind:
-    calls: 193
+    calls: 192
     bytes: 276
   __arr_retain_TokenRule$Kind:
     calls: 7
@@ -1587,7 +1562,7 @@ functions:
     calls: 18
     bytes: 96
   __eq_Kind:
-    calls: 104
+    calls: 103
     bytes: 324
   __eq_Kind$arr:
     calls: 36
@@ -1605,20 +1580,17 @@ functions:
     calls: 1
     bytes: 284
   __eq_SpanStr:
-    calls: 50
+    calls: 49
     bytes: 128
   __eq_Token$Kind:
-    calls: 49
+    calls: 48
     bytes: 120
   __eq_Token$Kind$arr:
-    calls: 21
+    calls: 20
     bytes: 284
   __eq___builtin_Span:
-    calls: 70
+    calls: 69
     bytes: 104
-  __eq_i64$arr:
-    calls: 1
-    bytes: 296
   __m1__unescape:
     calls: 4
     bytes: 1628
@@ -1637,9 +1609,6 @@ functions:
   __test$lex_all$nonempty_str:
     calls: 2
     bytes: 1052
-  __test$push_optional:
-    calls: 1
-    bytes: 1768
   __test$span_str:
     calls: 1
     bytes: 2248
@@ -1662,37 +1631,37 @@ functions:
     calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 2502
+    calls: 2497
     bytes: (external)
   aipl_arr_reserve:
-    calls: 25
+    calls: 24
     bytes: (external)
   aipl_arr_slice:
     calls: 20
     bytes: (external)
   aipl_array_dec:
-    calls: 3258
+    calls: 3242
     bytes: (external)
   aipl_array_new:
-    calls: 83
+    calls: 82
     bytes: (external)
   aipl_array_push:
-    calls: 171
+    calls: 169
     bytes: (external)
   aipl_array_push_mut:
-    calls: 34
+    calls: 31
     bytes: (external)
   aipl_array_with_cap:
     calls: 64
     bytes: (external)
   aipl_assert:
-    calls: 92
+    calls: 90
     bytes: (external)
   aipl_test_begin:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_test_end:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -1723,7 +1692,7 @@ functions:
     bytes: 31404
   main:
     calls: 1
-    bytes: 324
+    bytes: 248
   nested_len:
     calls: 3
     bytes: 1148

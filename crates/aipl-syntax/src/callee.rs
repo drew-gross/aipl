@@ -99,6 +99,14 @@ pub enum Callee {
     IsEmpty,
     Push,
     Extend,
+    /// `extend_optional(mut self: T[], other: T?)` — the `T?` shape of
+    /// `extend`'s variadic source, for an array receiver, which mono resolves
+    /// `set xs.extend(maybe)` onto. Internal: `extend` is the spelling, and a
+    /// second public name for one of its shapes is the hand-rolled helper it
+    /// replaced. A `push` rather than an `extend` of a one-element sequence,
+    /// because `extend` reserves exactly what it is given and so reallocates on
+    /// every one-element append.
+    ExtendOptional,
     Reserve,
     IsSome,
     IsSomeAnd,
@@ -290,6 +298,7 @@ impl Callee {
         Callee::IsEmpty,
         Callee::Push,
         Callee::Extend,
+        Callee::ExtendOptional,
         Callee::Reserve,
         Callee::IsSome,
         Callee::IsSomeAnd,
@@ -446,6 +455,7 @@ impl Callee {
             Callee::IsEmpty => "__builtin_is_empty",
             Callee::Push => "__builtin_push",
             Callee::Extend => "__builtin_extend",
+            Callee::ExtendOptional => "__builtin_extend_optional",
             Callee::Reserve => "__builtin_reserve",
             Callee::IsSome => "__builtin_is_some",
             Callee::IsSomeAnd => "__builtin_is_some_and",
