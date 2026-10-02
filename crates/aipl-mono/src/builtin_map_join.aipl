@@ -48,9 +48,8 @@ import {
 # `f(x)` flattened into one sequence with the separators between — computed in
 # a single pass into a single buffer. The three separators are `join`'s (`sep`
 # between consecutive pieces, `final_sep` in the last gap, `only_sep` in the
-# sole gap of a two-piece join), all defaulting to empty. Generic in both the
-# element and what `f` maps it to; for a `str`-valued `f` the result is the
-# string join. Callable as a method; a `str` receiver iterates its chars.
+# sole gap of a two-piece join), all defaulting to empty. For a `str`-valued
+# `f` the result is the string join; a `str` receiver iterates its chars.
 pub fn map_join<T: any, U: any>(
     self: T[],
     f: (T) -> U[],

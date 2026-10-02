@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn union_all&#60;T: any&#62;(self: #{T}[]) -&#62; #{T}</code></pre>
 
-          <div class="doc"><p>Every element of every set in <code>self</code>, collected into one set — <code>union</code> folded across a list. An empty list gives the empty set, and a one-element list gives that set back unchanged. Generic over the element type and callable as a method: <code>xs.union_all()</code>.</p><p>This is the whole content of the <code>mut out = #{}; for (let s : xs) { set out = out.union(s); }</code> longhand, which is why <code>union_loop_union_all</code> flags that shape and points here.</p></div>
+          <div class="doc"><p>Every element of every set in <code>self</code>, collected into one set — <code>union</code> folded across a list. An empty list gives the empty set, and a one-element list gives that set back unchanged.</p><p>This is the whole content of the <code>mut out = #{}; for (let s : xs) { set out = out.union(s); }</code> longhand, which is why <code>union_loop_union_all</code> flags that shape and points here.</p></div>
 
 
         </section>

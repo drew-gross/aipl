@@ -8,8 +8,7 @@ import { equal as ==, filter, greater_than as >, len, union } from builtins;
 
 # Every element of every set in `self`, collected into one set — `union` folded
 # across a list. An empty list gives the empty set, and a one-element list gives
-# that set back unchanged. Generic over the element type and callable as a
-# method: `xs.union_all()`.
+# that set back unchanged.
 #
 # This is the whole content of the `mut out = #{}; for (let s : xs) { set out =
 # out.union(s); }` longhand, which is why `union_loop_union_all` flags that shape

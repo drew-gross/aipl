@@ -19,7 +19,6 @@ import {
 } from builtins;
 
 # Counts how many elements of `self` satisfy `pred`, examining every element.
-# Generic over the element type and callable as a method: `xs.count_if(pred)`.
 # A `str` receiver iterates its chars, since `str` and `char[]` share a
 # representation.
 #

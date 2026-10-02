@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn left_fold&#60;T: any, A: any&#62;(self: T[], init: A, f: (A, T) -&#62; A) -&#62; A</code></pre>
 
-          <div class="doc"><p>Combine the elements left to right, starting from <code>init</code>: for <code>[a, b, c]</code>, <code>f(f(f(init, a), b), c)</code>. Generic over both the element and accumulator types and callable as a method: <code>xs.left_fold(0, |acc, x| acc + x)</code>.</p><p>Import it as plain <code>fold</code> — <code>import { left_fold as fold } from builtins;</code> — in the usual case where a file folds in only one direction; spell it <code>left_fold</code> only in a file that also imports <code>right_fold</code>, where the two need telling apart.</p></div>
+          <div class="doc"><p>Combine the elements left to right, starting from <code>init</code>: for <code>[a, b, c]</code>, <code>f(f(f(init, a), b), c)</code> — <code>xs.left_fold(0, |acc, x| acc + x)</code>.</p><p>Import it as plain <code>fold</code> — <code>import { left_fold as fold } from builtins;</code> — in the usual case where a file folds in only one direction; spell it <code>left_fold</code> only in a file that also imports <code>right_fold</code>, where the two need telling apart.</p></div>
 
 
         </section>

@@ -14,9 +14,8 @@
 import { equal as ==, to_digit } from builtins;
 
 # Turns an optional into a result: `some(v)` becomes `ok(v)`, `none` becomes
-# `err(e)`. Generic over both the value and the error type, and callable as a
-# method: `x.value_or_err(e)`. `e` is evaluated either way. Pairs with `?` to
-# give a `none` a message and propagate it out of a result-returning function.
+# `err(e)`. `e` is evaluated either way. Pairs with `?` to give a `none` a
+# message and propagate it out of a result-returning function.
 pub fn value_or_err<T: any, E: any>(self: T?, e: E) -> T!E {
     match (self) {
         some(v) => ok(v),

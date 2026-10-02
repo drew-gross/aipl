@@ -20,9 +20,8 @@
 import { equal as ==, filter, greater_than as >, logical_not as ! } from builtins;
 
 # The position of the first element of `self` satisfying `pred`, or `none` when
-# none does, stopping at the first match. Generic over the element type and
-# callable as a method: `xs.find_index(pred)`. A `str` receiver iterates its
-# chars, since `str` and `char[]` share a representation.
+# none does, stopping at the first match. A `str` receiver iterates its chars,
+# since `str` and `char[]` share a representation.
 #
 # The counterpart of `find_if`, which hands back the element rather than its
 # position. Reach for this one when the position is the answer — to index a

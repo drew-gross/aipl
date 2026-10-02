@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn find_map&#60;T: any, U: any&#62;(self: T[], f: (T) -&#62; U?) -&#62; U?</code></pre>
 
-          <div class="doc"><p>The first <code>some</code> that <code>f</code> returns over the elements of <code>self</code>, unwrapped one level — <code>some(y)</code> for the first <code>x</code> with <code>f(x) == some(y)</code>, <code>none</code> when every <code>f(x)</code> is <code>none</code> — stopping at that element. Generic over both types and callable as a method; a <code>str</code> receiver iterates its chars.</p><p>See <code>find_if</code> for a predicate on the elements themselves, and <code>map_find_if</code> for a predicate on the mapped values.</p></div>
+          <div class="doc"><p>The first <code>some</code> that <code>f</code> returns over the elements of <code>self</code>, unwrapped one level — <code>some(y)</code> for the first <code>x</code> with <code>f(x) == some(y)</code>, <code>none</code> when every <code>f(x)</code> is <code>none</code> — stopping at that element. A <code>str</code> receiver iterates its chars.</p><p>See <code>find_if</code> for a predicate on the elements themselves, and <code>map_find_if</code> for a predicate on the mapped values.</p></div>
 
 
         </section>

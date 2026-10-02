@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn map_err&#60;T: any, E: any, F: any&#62;(self: T!E, f: (E) -&#62; F) -&#62; T!F</code></pre>
 
-          <div class="doc"><p><code>self</code> with its error side rewritten by <code>f</code>: <code>err(e)</code> becomes <code>err(f(e))</code>, and <code>ok(v)</code> passes through untouched (<code>f</code> is not called). Generic over the ok type and both error types, and callable as a method: <code>r.map_err(f)</code>.</p><p>Bridges a call whose error type differs from the enclosing function's, so <code>?</code> can propagate it.</p></div>
+          <div class="doc"><p><code>self</code> with its error side rewritten by <code>f</code>: <code>err(e)</code> becomes <code>err(f(e))</code>, and <code>ok(v)</code> passes through untouched (<code>f</code> is not called).</p><p>Bridges a call whose error type differs from the enclosing function's, so <code>?</code> can propagate it.</p></div>
 
 
         </section>

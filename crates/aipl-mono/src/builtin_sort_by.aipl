@@ -32,8 +32,7 @@ struct E { key: str, tag: str }
 // the native `sort` builtin.
 # Sorts by a caller-supplied `less` predicate: `less(a, b)` is true when `a`
 # must come before `b`. Stable — elements neither of which precedes the other
-# keep their input order. Generic over the element type and callable as a
-# method: `xs.sort_by(|a, b| a.key < b.key)`.
+# keep their input order.
 pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
     // The annotation is what makes the empty literal usable: untyped, `[]` has
     // element type `__none__`, so `out[k]` below would hand the comparator a

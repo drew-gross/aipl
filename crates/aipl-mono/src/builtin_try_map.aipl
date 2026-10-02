@@ -14,9 +14,7 @@ import { equal as ==, is_err_and, len, less_than as <, push } from builtins;
 
 # `self` with `f` applied to each element, short-circuiting on failure: the
 # result is `ok` of every mapped value, in order, or the *first* `err` that
-# `f` returned — after which no further element is mapped. Generic over the
-# element type, the mapped type and the error type, and callable as a method:
-# `xs.try_map(f)`.
+# `f` returned — after which no further element is mapped.
 #
 # The fallible counterpart of `map`, and what a `for` loop over
 # `set out.push(f(x)?)` is written as.

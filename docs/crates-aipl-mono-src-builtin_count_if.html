@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn count_if&#60;T: any&#62;(self: T[], pred: (T) -&#62; bool) -&#62; u64</code></pre>
 
-          <div class="doc"><p>Counts how many elements of <code>self</code> satisfy <code>pred</code>, examining every element. Generic over the element type and callable as a method: <code>xs.count_if(pred)</code>. A <code>str</code> receiver iterates its chars, since <code>str</code> and <code>char[]</code> share a representation.</p><p>See <code>count</code> for the equal-to-a-value form, and <code>count_while</code> for the leading-run form that stops at the first element failing <code>pred</code>.</p></div>
+          <div class="doc"><p>Counts how many elements of <code>self</code> satisfy <code>pred</code>, examining every element. A <code>str</code> receiver iterates its chars, since <code>str</code> and <code>char[]</code> share a representation.</p><p>See <code>count</code> for the equal-to-a-value form, and <code>count_while</code> for the leading-run form that stops at the first element failing <code>pred</code>.</p></div>
 
 
         </section>

@@ -8,8 +8,7 @@
 import { equal as ==, filter, greater_than as >, logical_not as ! } from builtins;
 
 # True when at least one element satisfies `pred`, short-circuiting at the first
-# element that does; an empty array is false. Generic over the element type and
-# callable as a method: `xs.any(pred)`.
+# element that does; an empty array is false.
 pub fn any<T: any>(self: T[], pred: (T) -> bool) -> bool {
     // `return_loop_any_all` flags this loop, correctly: it is the longhand the
     // lint exists to replace. It is also the *implementation* of the shorthand,

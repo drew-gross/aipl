@@ -26,8 +26,7 @@ import { equal as ==, len, logical_not as !, push, reserve, split, split_len } f
 # `self.split(sep).map(f)` — every `sep`-separated part of `self` mapped through
 # `f` — computed without the array of parts in between. The parts are `split`'s:
 # `n` separators give `n + 1`, including empty ones at either end, and an empty
-# `sep` never matches, so the whole string is the one part. Generic in what `f`
-# maps a part to, and callable as a method.
+# `sep` never matches, so the whole string is the one part.
 pub fn split_map<U: any>(self: str, sep: str, f: (str) -> U) -> U[] {
     mut out: U[] = [];
 

@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn find_if&#60;T: any&#62;(self: T[], pred: (T) -&#62; bool) -&#62; T?</code></pre>
 
-          <div class="doc"><p>The first element of <code>self</code> satisfying <code>pred</code>, or <code>none</code> when none does, stopping at the first match. Generic over the element type and callable as a method: <code>xs.find_if(pred)</code>. A <code>str</code> receiver iterates its chars, since <code>str</code> and <code>char[]</code> share a representation.</p><p>See <code>any</code> for the same scan reporting only whether a match existed, and <code>first</code> for the unconditional first element.</p></div>
+          <div class="doc"><p>The first element of <code>self</code> satisfying <code>pred</code>, or <code>none</code> when none does, stopping at the first match. A <code>str</code> receiver iterates its chars, since <code>str</code> and <code>char[]</code> share a representation.</p><p>See <code>any</code> for the same scan reporting only whether a match existed, and <code>first</code> for the unconditional first element.</p></div>
 
 
         </section>

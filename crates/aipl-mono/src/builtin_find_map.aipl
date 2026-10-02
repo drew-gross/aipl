@@ -13,8 +13,8 @@ import { equal as ==, greater_than as >, to_digit, wrapping_mul as * } from buil
 
 # The first `some` that `f` returns over the elements of `self`, unwrapped
 # one level — `some(y)` for the first `x` with `f(x) == some(y)`, `none` when
-# every `f(x)` is `none` — stopping at that element. Generic over both types and
-# callable as a method; a `str` receiver iterates its chars.
+# every `f(x)` is `none` — stopping at that element. A `str` receiver iterates
+# its chars.
 #
 # See `find_if` for a predicate on the elements themselves, and `map_find_if`
 # for a predicate on the mapped values.

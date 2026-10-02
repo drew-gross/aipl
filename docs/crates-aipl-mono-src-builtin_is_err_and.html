@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn is_err_and&#60;T: any, E: any&#62;(self: T!E, pred: (E) -&#62; bool) -&#62; bool</code></pre>
 
-          <div class="doc"><p>True when <code>self</code> is <code>err(e)</code> and <code>pred(e)</code> holds; <code>false</code> for <code>ok</code> (the predicate is not called). The result-world mirror of <code>is_some_and</code>, generic over both the ok and error types and callable as a method: <code>r.is_err_and(pred)</code>.</p></div>
+          <div class="doc"><p>True when <code>self</code> is <code>err(e)</code> and <code>pred(e)</code> holds; <code>false</code> for <code>ok</code> (the predicate is not called). The result-world mirror of <code>is_some_and</code>.</p></div>
 
 
         </section>

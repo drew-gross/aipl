@@ -25,7 +25,6 @@ import { all, is_whitespace, logical_not as ! } from builtins;
 
 # True when every char of `self` is ASCII whitespace — space, tab, newline,
 # carriage return, vertical tab or form feed — and true for the empty string.
-# Callable as a method: `s.is_all_whitespace()`.
 #
 # See `is_whitespace` for the per-char predicate, and `is_space` for the
 # narrower four-character one.

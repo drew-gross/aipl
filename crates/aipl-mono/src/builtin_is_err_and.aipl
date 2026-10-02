@@ -12,9 +12,7 @@
 import { equal as ==, logical_not as !, value_or_err } from builtins;
 
 # True when `self` is `err(e)` and `pred(e)` holds; `false` for `ok` (the
-# predicate is not called). The result-world mirror of `is_some_and`, generic
-# over both the ok and error types and callable as a method:
-# `r.is_err_and(pred)`.
+# predicate is not called). The result-world mirror of `is_some_and`.
 pub fn is_err_and<T: any, E: any>(self: T!E, pred: (E) -> bool) -> bool {
     match (self) {
         ok(_) => false,

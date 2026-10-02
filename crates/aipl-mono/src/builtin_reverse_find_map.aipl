@@ -15,8 +15,7 @@ import { equal as ==, greater_than as >, reverse, to_digit, wrapping_mul as * } 
 # The first `some` that `f` returns over the elements of `self` taken from the
 # *end* — `some(y)` for the last `x` with `f(x) == some(y)`, `none` when every
 # `f(x)` is `none` — stopping at that element. `find_map` from the other end.
-# Generic over both types and callable as a method; a `str` receiver iterates
-# its chars.
+# A `str` receiver iterates its chars.
 pub fn reverse_find_map<T: any, U: any>(self: T[], f: (T) -> U?) -> U? {
     for (let x : self.reverse()) {
         if (let some(y) = f(x)) {

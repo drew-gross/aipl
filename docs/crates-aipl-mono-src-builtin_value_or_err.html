@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn value_or_err&#60;T: any, E: any&#62;(self: T?, e: E) -&#62; T!E</code></pre>
 
-          <div class="doc"><p>Turns an optional into a result: <code>some(v)</code> becomes <code>ok(v)</code>, <code>none</code> becomes <code>err(e)</code>. Generic over both the value and the error type, and callable as a method: <code>x.value_or_err(e)</code>. <code>e</code> is evaluated either way. Pairs with <code>?</code> to give a <code>none</code> a message and propagate it out of a result-returning function.</p></div>
+          <div class="doc"><p>Turns an optional into a result: <code>some(v)</code> becomes <code>ok(v)</code>, <code>none</code> becomes <code>err(e)</code>. <code>e</code> is evaluated either way. Pairs with <code>?</code> to give a <code>none</code> a message and propagate it out of a result-returning function.</p></div>
 
 
         </section>

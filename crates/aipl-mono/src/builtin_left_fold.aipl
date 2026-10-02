@@ -8,8 +8,7 @@
 import { concat as +++, equal as ==, filter, logical_not as !, wrapping_add as + } from builtins;
 
 # Combine the elements left to right, starting from `init`: for `[a, b, c]`,
-# `f(f(f(init, a), b), c)`. Generic over both the element and accumulator types
-# and callable as a method: `xs.left_fold(0, |acc, x| acc + x)`.
+# `f(f(f(init, a), b), c)` — `xs.left_fold(0, |acc, x| acc + x)`.
 #
 # Import it as plain `fold` — `import { left_fold as fold } from builtins;` — in
 # the usual case where a file folds in only one direction; spell it `left_fold`

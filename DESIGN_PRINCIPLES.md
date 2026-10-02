@@ -324,3 +324,117 @@ checkout on Linux has a file it cannot run. The answer is the same one the
 principle already gives: the project holds what it needs, so a project that
 wants two platforms holds two compilers. Nothing about that is resolved by
 naming a version instead.
+
+---
+
+## 5. The signature is documentation, so the prose does not repeat it
+
+**A `# ..` block says what the declaration cannot.** The signature already
+states the types, the arity, the defaults, the effects, which parameters are
+generic, and whether the function is callable as a method. A sentence that says
+any of that again is not documentation — it is a second copy of the
+declaration, written in a language nothing checks.
+
+Here is the shape it takes, from `builtin_count_if.aipl`:
+
+```
+# Counts how many elements of `self` satisfy `pred`, examining every element.
+# Generic over the element type and callable as a method: `xs.count_if(pred)`.
+# A `str` receiver iterates its chars, since `str` and `char[]` share a
+# representation.
+pub fn count_if<T: any>(self: T[], pred: (T) -> bool) -> u64 {
+```
+
+The second line is the first line of the declaration with the punctuation taken
+out. `<T: any>` is what "generic over the element type" means; `self:` is what
+"callable as a method" means; `xs.count_if(pred)` is the parameter list with a
+receiver moved to the front. Delete the sentence and nothing is lost, because
+the thing it describes is on the next line, and a reader who needs it is
+already looking at it.
+
+Everything else in that block stays. "Examining every element" is a promise
+about *work* that `-> u64` does not make, and it is the whole difference from
+`count_while`, which stops at the first failure. "A `str` receiver iterates its
+chars" is a consequence of two types sharing a representation, which `T[]` does
+not mention. Those are the sentences the block exists for, and they are easier
+to find once they are not behind a restatement.
+
+The failure this avoids is drift. Two statements of one fact do not stay
+agreed: rename a receiver and the signature still compiles while the sentence
+becomes false, add a type parameter and the prose still claims one, make a
+function take `self` and the prose still says it is a free function. The
+compiler checks one of those statements on every build and the other never, so
+when they disagree it is always the prose that is wrong — and a reader who
+believed it has been misled by the half of the documentation that looked more
+authoritative for being written in words.
+
+### What the signature already answers
+
+| Prose that restates it | What says it | Asked in code as |
+|---|---|---|
+| "callable as a method" | the first parameter is named `self` | `Signature::is_method` — `params.first().is_some_and(\|p\| p.name == "self")` |
+| "generic over the element type" | `<T: any>`, or a bare `any` in a parameter | `Signature::is_generic` |
+| "takes a predicate" | `pred: (T) -> bool` | the parameter's `Type::Fn` |
+| "returns a count, never negative" | `-> u64` | the return type |
+| "prints" | `!prints` | `Signature::effects` |
+| "mutates its receiver in place" | `mut self` | `Signature::is_mutating` |
+| "the second argument is optional" | `k: i64 = 0` | the parameter's default |
+
+The method row is the one worth spelling out, because "callable as a method" can
+read like a property a reader could not otherwise know. It is not: it is the
+first parameter's *name*, the compiler enforces exactly that, and it says so in
+the diagnostic — `fn "f" cannot be called as a method (its first parameter must
+be named "self")`. There is nothing behind the sentence that the declaration
+does not show.
+
+### Downstream decisions
+
+| Decision | Shape |
+|---|---|
+| what a `# ..` block opens with | what the declaration *does*, in terms its signature cannot give — not a description of its shape |
+| "callable as a method", "generic over T" | deleted; `self` and `<T: any>` are already on the screen |
+| a receiver's representation behaviour | kept — `str`/`char[]` sharing is not in `T[]` |
+| complexity, short-circuiting, evaluation order | kept — `-> u64` promises a number, not how much work it took |
+| which of several near-identical builtins to reach for | kept, and it is the most valuable thing in the block |
+| a tool that renders a `# ..` block | renders the signature with it |
+
+### A tool that hides the signature is what grows the repetition
+
+The principle only holds if the signature is in front of the reader, so the
+surfaces have to put it there. Two of the three do: `aipl docs` uses the
+rendered declaration (`aipl_index::Symbol::detail`) as each entry's heading, and
+the language server's hover puts it in a code block directly above the prose.
+
+`aipl doc` does not. It prints the bare name and then the block:
+
+```
+count_if
+    Counts how many elements of `self` satisfy `pred`, ...
+```
+
+which is a reader who can see "callable as a method" and cannot see `self`. That
+is a tool problem wearing a documentation problem's clothes, and it is the most
+likely reason 19 builtin sources grew the sentence in the first place. The
+conforming fix is for `aipl doc` to print `detail` under the name; putting the
+signature back into the prose fixes the symptom in the one place it is cheapest
+to get wrong later.
+
+### What it does not mean
+
+It does not mean prose may not name a parameter. Saying what happens *to*
+`self`, or what `pred` is called with and how often, is how behaviour gets
+described — "examining every element" has to say which elements. What is banned
+is restating a parameter's type, its existence, or its position.
+
+It does not mean no examples. A call example earns its place when it shows
+something the signature does not: an unobvious receiver, the shape of a lambda,
+two arguments that are easy to swap. `xs.count_if(pred)` directly after
+`(self: T[], pred: (T) -> bool)` shows none of those.
+
+It does not mean write less. The clause that goes is a clause that was never
+carrying anything; the space it frees is for the sentence about `str`
+representation that a reader actually cannot derive. A block that loses its
+restatement and gains nothing was under-documented before and still is.
+
+It does not apply to the `# ..` block at the top of a file. That one documents
+the *file*, which has no signature — there is nothing for it to repeat.

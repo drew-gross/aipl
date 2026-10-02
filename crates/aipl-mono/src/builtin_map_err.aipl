@@ -15,8 +15,7 @@
 import { equal as ==, is_err_and, logical_not as !, value_or_err } from builtins;
 
 # `self` with its error side rewritten by `f`: `err(e)` becomes `err(f(e))`,
-# and `ok(v)` passes through untouched (`f` is not called). Generic over the
-# ok type and both error types, and callable as a method: `r.map_err(f)`.
+# and `ok(v)` passes through untouched (`f` is not called).
 #
 # Bridges a call whose error type differs from the enclosing function's, so
 # `?` can propagate it.

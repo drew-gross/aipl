@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn map_ok&#60;T: any, U: any, E: any&#62;(self: T!E, f: (T) -&#62; U) -&#62; U!E</code></pre>
 
-          <div class="doc"><p><code>self</code> with its value side rewritten by <code>f</code>: <code>ok(v)</code> becomes <code>ok(f(v))</code>, and <code>err(e)</code> passes through untouched (<code>f</code> is not called). Generic over both value types and the error type, and callable as a method: <code>r.map_ok(f)</code>.</p><p>The mirror of <code>map_err</code>. Where the error is the enclosing function's anyway, <code>f(r?)</code> says the same thing more directly; this is for the result that is returned or stored rather than unwrapped.</p></div>
+          <div class="doc"><p><code>self</code> with its value side rewritten by <code>f</code>: <code>ok(v)</code> becomes <code>ok(f(v))</code>, and <code>err(e)</code> passes through untouched (<code>f</code> is not called).</p><p>The mirror of <code>map_err</code>. Where the error is the enclosing function's anyway, <code>f(r?)</code> says the same thing more directly; this is for the result that is returned or stored rather than unwrapped.</p></div>
 
 
         </section>

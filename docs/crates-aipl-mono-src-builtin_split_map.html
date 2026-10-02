@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn split_map&#60;U: any&#62;(self: str, sep: str, f: (str) -&#62; U) -&#62; U[]</code></pre>
 
-          <div class="doc"><p><code>self.split(sep).map(f)</code> — every <code>sep</code>-separated part of <code>self</code> mapped through <code>f</code> — computed without the array of parts in between. The parts are <code>split</code>'s: <code>n</code> separators give <code>n + 1</code>, including empty ones at either end, and an empty <code>sep</code> never matches, so the whole string is the one part. Generic in what <code>f</code> maps a part to, and callable as a method.</p></div>
+          <div class="doc"><p><code>self.split(sep).map(f)</code> — every <code>sep</code>-separated part of <code>self</code> mapped through <code>f</code> — computed without the array of parts in between. The parts are <code>split</code>'s: <code>n</code> separators give <code>n + 1</code>, including empty ones at either end, and an empty <code>sep</code> never matches, so the whole string is the one part.</p></div>
 
 
         </section>

@@ -17,8 +17,7 @@
 import { equal as ==, filter, greater_than as >, logical_not as ! } from builtins;
 
 # The first element of `self` satisfying `pred`, or `none` when none does,
-# stopping at the first match. Generic over the element type and callable as a
-# method: `xs.find_if(pred)`. A `str` receiver iterates its chars, since `str`
+# stopping at the first match. A `str` receiver iterates its chars, since `str`
 # and `char[]` share a representation.
 #
 # See `any` for the same scan reporting only whether a match existed, and

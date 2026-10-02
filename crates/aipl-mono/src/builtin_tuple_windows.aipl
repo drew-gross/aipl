@@ -21,8 +21,8 @@
 import { equal as ==, is_empty, push } from builtins;
 
 # Every adjacent pair of elements, overlapping: `[1, 2, 3].tuple_windows()` is
-# `[(1, 2), (2, 3)]`. Fewer than two elements give no pairs at all. Generic over
-# the element type and callable as a method; a `str` receiver pairs its chars.
+# `[(1, 2), (2, 3)]`. Fewer than two elements give no pairs at all. A `str`
+# receiver pairs its chars.
 pub fn tuple_windows<T: any>(self: T[]) -> (T, T)[] {
     mut out = [];
     mut prev: T? = none;

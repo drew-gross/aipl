@@ -105,10 +105,9 @@ pub fn span_str(src: str, at: Span) -> SpanStr { text: src[at], span: at }.test(
 # What a token is: its `kind` — a caller-defined value carrying whatever the
 # matched token means, produced by the rule's `emit` (see `Emit`) — and its
 # `text`, the raw source it covers plus the span it covers (see `SpanStr`).
-# `Token` is generic over the kind type `K`, so a language pins `K` to its own
-# `variant` whose arms *are* the token kinds, each carrying that kind's content
-# (`Int(i64)`, `Str(str)`, a bare `Plus`, …) — rather than a stringly-typed
-# label plus a separate value.
+# A language pins `K` to its own `variant` whose arms *are* the token kinds,
+# each carrying that kind's content (`Int(i64)`, `Str(str)`, a bare `Plus`, …) —
+# rather than a stringly-typed label plus a separate value.
 #
 # The text is carried rather than recovered by slicing (`src[t.span]`, as it
 # used to be) so that holding a token is enough: a parser does not thread the
@@ -334,8 +333,8 @@ struct ModeFrame { mode: i64, open: Span, unterminated: str }
 # consumes them but records each in the result's trivia side-channel — for
 # matches a later pass wants located but not parsed, like comments (a formatter
 # re-attaches them) or lint markers (`#[allow]`). Set at most one of the two
-# flags (`skip` wins when both are set). Generic over the kind type `K` — every
-# rule of one set builds the same `K`.
+# flags (`skip` wins when both are set). Every rule of one set builds the same
+# `K`.
 # `unterminated` overrides the message used when this rule's token runs off the
 # end of the source (a `Delimited`/`Between`/`Nested` scan that never closes), or
 # that this rule's mode is still open there (see `Transition`). Empty means "use

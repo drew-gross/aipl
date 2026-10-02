@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn value_or&#60;T: any&#62;(self: T?, default: T) -&#62; T</code></pre>
 
-          <div class="doc"><p>The optional's payload when it has one, otherwise <code>default</code>. Generic over the payload type — including inline structs and variants — and callable as a method: <code>o.value_or(d)</code>.</p><p><code>default</code> is an ordinary argument, so it is evaluated whether or not the optional is empty. Keep it cheap; reach for a <code>match</code> when it isn't.</p></div>
+          <div class="doc"><p>The optional's payload when it has one, otherwise <code>default</code>. Generic over the payload type — including inline structs and variants.</p><p><code>default</code> is an ordinary argument, so it is evaluated whether or not the optional is empty. Keep it cheap; reach for a <code>match</code> when it isn't.</p></div>
 
 
         </section>

@@ -15,8 +15,7 @@ import {
 } from builtins;
 
 # Counts elements from the front while `pred` holds, stopping at the first element
-# that fails it (or at the end). Generic over the element type and callable as a
-# method: `xs.count_while(pred)`.
+# that fails it (or at the end).
 pub fn count_while<T: any>(self: T[], pred: (T) -> bool) -> u64 {
     mut n: u64 = 0;
     for (let x : self) {

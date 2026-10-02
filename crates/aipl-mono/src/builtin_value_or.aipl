@@ -15,8 +15,7 @@
 import { equal as ==, len } from builtins;
 
 # The optional's payload when it has one, otherwise `default`. Generic over the
-# payload type — including inline structs and variants — and callable as a
-# method: `o.value_or(d)`.
+# payload type — including inline structs and variants.
 #
 # `default` is an ordinary argument, so it is evaluated whether or not the
 # optional is empty. Keep it cheap; reach for a `match` when it isn't.

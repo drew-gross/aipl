@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn find_index&#60;T: any&#62;(self: T[], pred: (T) -&#62; bool) -&#62; u64?</code></pre>
 
-          <div class="doc"><p>The position of the first element of <code>self</code> satisfying <code>pred</code>, or <code>none</code> when none does, stopping at the first match. Generic over the element type and callable as a method: <code>xs.find_index(pred)</code>. A <code>str</code> receiver iterates its chars, since <code>str</code> and <code>char[]</code> share a representation.</p><p>The counterpart of <code>find_if</code>, which hands back the element rather than its position. Reach for this one when the position is the answer — to index a parallel array with it, or to record a reference as an offset instead of a name. See <code>any</code> for the same scan reporting only whether a match existed.</p></div>
+          <div class="doc"><p>The position of the first element of <code>self</code> satisfying <code>pred</code>, or <code>none</code> when none does, stopping at the first match. A <code>str</code> receiver iterates its chars, since <code>str</code> and <code>char[]</code> share a representation.</p><p>The counterpart of <code>find_if</code>, which hands back the element rather than its position. Reach for this one when the position is the answer — to index a parallel array with it, or to record a reference as an offset instead of a name. See <code>any</code> for the same scan reporting only whether a match existed.</p></div>
 
 
         </section>

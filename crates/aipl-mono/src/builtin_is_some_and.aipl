@@ -8,8 +8,7 @@
 import { equal as ==, less_than_or_equal as <=, logical_not as ! } from builtins;
 
 # True when `self` is `some(x)` and `pred(x)` holds; `false` for `none` (the
-# predicate is not called). Generic over the inner type and callable as a
-# method: `x.is_some_and(pred)`.
+# predicate is not called).
 pub fn is_some_and<T: any>(self: T?, pred: (T) -> bool) -> bool {
     // The `match_is_some_and` lint points at exactly this shape and advises
     // `is_some_and` — which is what this *is*. Rewriting it in terms of itself

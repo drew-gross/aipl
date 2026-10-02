@@ -25,8 +25,8 @@ import {
 
 # The first `f(x)` over the elements of `self` that satisfies `pred`, or
 # `none` when none does — `self.map(f).find_if(pred)` without the array between,
-# and without mapping the elements after the match. Generic over both types and
-# callable as a method; a `str` receiver iterates its chars.
+# and without mapping the elements after the match. A `str` receiver iterates
+# its chars.
 pub fn map_find_if<T: any, U: any>(self: T[], f: (T) -> U, pred: (U) -> bool) -> U? {
     for (let x : self) {
         let y = f(x);

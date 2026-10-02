@@ -21,8 +21,7 @@ import {
 
 # Combine the elements right to left, starting from `init`: for `[a, b, c]`,
 # `f(a, f(b, f(c, init)))` — note the combiner takes the element first, the
-# accumulator second, the mirror of `left_fold`. Generic over both the element
-# and accumulator types and callable as a method:
+# accumulator second, the mirror of `left_fold`:
 # `xs.right_fold(Nil, |x, acc| Cons(x, acc))`.
 #
 # Prefer `left_fold` (imported as plain `fold`) unless the right-to-left order

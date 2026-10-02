@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn right_fold&#60;T: any, A: any&#62;(self: T[], init: A, f: (T, A) -&#62; A) -&#62; A</code></pre>
 
-          <div class="doc"><p>Combine the elements right to left, starting from <code>init</code>: for <code>[a, b, c]</code>, <code>f(a, f(b, f(c, init)))</code> — note the combiner takes the element first, the accumulator second, the mirror of <code>left_fold</code>. Generic over both the element and accumulator types and callable as a method: <code>xs.right_fold(Nil, |x, acc| Cons(x, acc))</code>.</p><p>Prefer <code>left_fold</code> (imported as plain <code>fold</code>) unless the right-to-left order matters — building a cons list front-to-back from an array is the standard case where it does.</p></div>
+          <div class="doc"><p>Combine the elements right to left, starting from <code>init</code>: for <code>[a, b, c]</code>, <code>f(a, f(b, f(c, init)))</code> — note the combiner takes the element first, the accumulator second, the mirror of <code>left_fold</code>: <code>xs.right_fold(Nil, |x, acc| Cons(x, acc))</code>.</p><p>Prefer <code>left_fold</code> (imported as plain <code>fold</code>) unless the right-to-left order matters — building a cons list front-to-back from an array is the standard case where it does.</p></div>
 
 
         </section>

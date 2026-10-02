@@ -13,8 +13,7 @@
 import { equal as ==, is_err_and, len, logical_not as !, map_err } from builtins;
 
 # `self` with its value side rewritten by `f`: `ok(v)` becomes `ok(f(v))`, and
-# `err(e)` passes through untouched (`f` is not called). Generic over both
-# value types and the error type, and callable as a method: `r.map_ok(f)`.
+# `err(e)` passes through untouched (`f` is not called).
 #
 # The mirror of `map_err`. Where the error is the enclosing function's anyway,
 # `f(r?)` says the same thing more directly; this is for the result that is

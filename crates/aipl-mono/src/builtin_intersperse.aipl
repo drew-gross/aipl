@@ -15,8 +15,8 @@ import { equal as ==, len, less_than as <, push } from builtins;
 # array comes back unchanged — a separator only ever appears *between* two
 # elements, never leading or trailing.
 #
-# Generic over the element type and callable as a method. For `str[]` prefer
-# `join`, which does this and concatenates the result in one step.
+# For `str[]` prefer `join`, which does this and concatenates the result in one
+# step.
 pub fn intersperse<T: any>(self: T[], sep: T) -> T[] {
     mut out = [];
     for (let i, x : self) {
