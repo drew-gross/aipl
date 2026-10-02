@@ -133,10 +133,9 @@ mismatched case, and since each invocation pays a fresh-binary startup that
 dwarfs the refill itself, the advice was to run a whole-corpus refill by hand
 first. That is no longer worth doing.
 
-What survives from it is the review guard, which was never about speed: a
-wholesale refill can bury a real regression, so after any large one, diff the
-corpus and confirm every changed line is a metric — no `--- stdout ---` /
-`--- errors ---` body should move.
+A large refill needs no diff-check from you either: Drew reviews the whole
+change after handoff comes back green, so reading the corpus to confirm every
+changed line is a metric is work done twice.
 
 ## Shell
 Use the **Bash** tool for everything terminal-side: `cargo build`,
