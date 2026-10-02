@@ -1,0 +1,153 @@
+# The AIPL implementation of the `set_map` builtin. Monomorphization registers
+# this function under the canonical name `__builtin_set_map` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `s.set_map(f)` resolves
+# through the ordinary generic / higher-order machinery — the in-file name
+# `set_map` is only for this file's own tests, which read exactly like user code.
+#
+# No lint steers a hand-written loop here, because the shape a lint could match
+# is not the shape this replaces. `push_loop_pipeline` already flags
+# `mut out = []; for (let x : s) { set out.push(f(x)); }`, and that loop builds
+# an *array*; the loop `set_map` replaces builds a set, which means a
+# `mut out = #{}` seed and a `union` per element — and `union_loop_union_all`
+# owns that shape, pointing at `union_all`. Telling the two apart needs the
+# element type of the mapping, which no lint has: they run in `aipl-syntax`, two
+# passes before any type is known.
+
+import {
+    equal as ==,
+    len,
+    push,
+    saturating_remainder as %,
+    to_set,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
+
+# Every element of `self` through `f`, as a set.
+#
+# This is `map` for a set: a set in, a set out. Which means the result can be
+# **smaller** than the receiver — an `f` sending two elements to the same answer
+# yields one element, because that is what a set is. That is the honest reason
+# this is its own builtin rather than another receiver `map` accepts: `map` says
+# "one element out per element in", and over a set it cannot keep that promise,
+# so the set version is spelled differently and a reader sees which one they are
+# looking at.
+#
+# Callable as a method (`chars.set_map(escape)`). The receiver is a set of any
+# order; the result is always unordered, because `f` changes the very values an
+# order would be over. Ask for one explicitly when you want it —
+# `s.to_array().map(f).to_set()` with the binding annotated `#<{U}` — so the
+# re-sorting is written down rather than inferred.
+#
+# See `map` for the array and optional forms.
+pub fn set_map<T: any, U: any>(self: #{T}, f: (T) -> U) -> #{U} {
+    // `push_loop_pipeline` flags this loop, and its advice — `map` — is the one
+    // thing that cannot be taken: `map` has no set form, which is why this
+    // builtin exists. The array is the intermediate; `to_set` below is what
+    // makes the result a set, and what collapses a colliding mapping.
+    mut out: U[] = []; #[allow]
+    for (let x : self) {
+        set out.push(f(x));
+    }
+    out.to_set()
+}.test({
+    fn double(self: i64) -> i64 { self + self }
+    assert(double(4) == 8);
+
+    assert(#{1, 2, 3}.set_map(double) == #{2, 4, 6}); // named function
+    assert(#{1, 2, 3}.set_map(|x| x + 1) == #{2, 3, 4}); // lambda
+    assert(set_map(#{1, 2}, double) == #{2, 4}); // free-call form
+
+    // The result is a set, so a mapping that collides *collapses*: three
+    // elements all going to `0` are one element out. This is the behavior the
+    // separate name exists to advertise — `map`'s promise is one-out-per-in, and
+    // over a set there is no keeping it.
+    assert(#{1, 2, 3}.set_map(|x| 0) == #{0});
+    assert(#{1, 2, 3}.set_map(|x| 0).len() == 1);
+    // A collision-free mapping keeps every element, so the lengths agree.
+    assert(#{1, 2, 3}.set_map(double).len() == #{1, 2, 3}.len());
+
+    // Partial collapse: the two odd elements share an answer, the even one
+    // does not.
+    assert(#{1, 2, 3}.set_map(|x| x * x) == #{1, 4, 9});
+    assert(#{1, 2, 3, 4}.set_map(|x| x % 2) == #{0, 1});
+
+    // An empty set maps to the empty set.
+    let empty: #{i64} = #{};
+    assert(empty.set_map(double) == #{});
+
+    // Generic in both directions: any element type a set holds, and a result
+    // type that need not be the element's.
+    assert(#{'a', 'b'}.set_map(|c| c == 'a') == #{false, true});
+    assert(#{"go", "stop"}.set_map(len) == #{2, 4});
+    assert(#{true}.set_map(|b| b) == #{true});
+    // Two elements mapping to one `bool` is the collapse at its most extreme.
+    assert("abc".to_set().set_map(|c| c == 'z') == #{false});
+
+    // The receiver's own deduplication happens first: the literal is two
+    // elements, so `f` runs twice.
+    assert(#{1, 2, 1}.set_map(double) == #{2, 4});
+
+    // A bound captured from outside the lambda.
+    let scale = 10;
+    assert(#{1, 2}.set_map(|x| x * scale) == #{10, 20});
+})
+--- performance ---
+allocations: 54
+deallocations: 54
+reallocations: 18
+bytes allocated: 2530
+instructions executed: 5378
+binary size: 18400
+  code: 11292
+  data: 1118
+  metadata: 5990
+functions:
+  __eq_set$bool:
+    calls: 3
+    bytes: 256
+  __eq_set$i64:
+    calls: 9
+    bytes: 256
+  __eq_set$u64:
+    calls: 1
+    bytes: 256
+  __test$set_map:
+    calls: 1
+    bytes: 9932
+  aipl_array_dec:
+    calls: 69
+    bytes: (external)
+  aipl_array_push:
+    calls: 14
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 122
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 40
+    bytes: (external)
+  aipl_assert:
+    calls: 16
+    bytes: (external)
+  aipl_set_contains:
+    calls: 119
+    bytes: (external)
+  aipl_set_insert:
+    calls: 95
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 108
+  set_map$i64$i64$lam$__test$set_map$double:
+    calls: 5
+    bytes: 484

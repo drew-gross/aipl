@@ -53,6 +53,7 @@ import {
     logical_and as &&,
     map,
     push,
+    set_map,
     split,
     to_set,
     to_str,
@@ -154,16 +155,15 @@ pub fn re_escape(s: str) -> str {
     assert(re_escape("") == "");
 })
 
+# The same escaping as `re_escape`, for a character *set* rather than a string:
+# every character the engine reads specially is backslash-escaped. `set_map`
+# rather than `map` because the receiver is a set, and `map` has no set form. The
+# escaped pieces then `join` into the class body, in the set's own order.
+#
+# `set_map` may collapse, and here it provably doesn't: escaping is injective, so
+# two distinct characters never produce the same piece.
 pub fn re_escape_set(s: #{char}) -> char[] {
-    mut out: char[] = [];
-    for (let ch : s) {
-        if (RE_META.has(ch)) {
-            set out.extend(`\\{ch}`);
-        } else {
-            set out.push(ch);
-        };
-    }
-    out
+    s.set_map(|ch| if (RE_META.has(ch)) { `\\{ch}` } else { `{ch}` }).join()
 }
 
 pub fn char_class(chars: #{char}) -> str { `[{char_class_body(chars)}]` }
@@ -756,15 +756,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 512
-deallocations: 512
+allocations: 520
+deallocations: 520
 reallocations: 38
-bytes allocated: 39926
-instructions executed: 110788
-binary size: 119872
-  code: 79260
+bytes allocated: 40338
+instructions executed: 111120
+binary size: 120408
+  code: 79556
   data: 5200
-  metadata: 35412
+  metadata: 35652
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -872,19 +872,19 @@ functions:
     calls: 12
     bytes: (external)
   aipl_array_dec:
-    calls: 437
+    calls: 449
     bytes: (external)
   aipl_array_new:
     calls: 48
     bytes: (external)
   aipl_array_push:
-    calls: 9
+    calls: 13
     bytes: (external)
   aipl_array_push_mut:
-    calls: 17
+    calls: 25
     bytes: (external)
   aipl_array_with_cap:
-    calls: 6
+    calls: 10
     bytes: (external)
   aipl_assert:
     calls: 44
@@ -897,6 +897,12 @@ functions:
     bytes: (external)
   aipl_rec_inc_strong:
     calls: 97
+    bytes: (external)
+  aipl_set_contains:
+    calls: 4
+    bytes: (external)
+  aipl_set_insert:
+    calls: 4
     bytes: (external)
   aipl_test_begin:
     calls: 10
@@ -945,7 +951,7 @@ functions:
     bytes: 1928
   re_escape_set:
     calls: 4
-    bytes: 736
+    bytes: 1032
   rule_pats$Kind:
     calls: 2
     bytes: 9428

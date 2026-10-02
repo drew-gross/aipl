@@ -8259,6 +8259,18 @@ fn coercible(actual: &ConcreteType, expected: &ConcreteType) -> bool {
         {
             coercible(a, b)
         }
+        // A set of *any* order fits an unordered-set position: `#{T}` promises
+        // nothing about order, so dropping one loses nothing, and every set is
+        // the same array block underneath. This is what lets an AIPL-implemented
+        // builtin declare `self: #{T}` and take a `#<{T}` the way
+        // `BUILTIN_SIGNATURES` says a signature's `#{T}` does — the checker
+        // already allows the call, and the binding the inliner introduces for
+        // the parameter is what arrives here. Not the other way round: an
+        // unordered set's elements are in no order, so it cannot stand in where
+        // a sorted one is expected.
+        (ConcreteType::Set(a, _), ConcreteType::Set(b, aipl_syntax::ast::SetOrder::Unordered)) => {
+            coercible(a, b)
+        }
         (ConcreteType::Set(a, oa), ConcreteType::Set(b, ob)) => oa == ob && coercible(a, b),
         (ConcreteType::Dict(ak, av), ConcreteType::Dict(bk, bv)) => {
             coercible(ak, bk) && coercible(av, bv)
@@ -16432,7 +16444,14 @@ fn compile_call_expr<M: Module>(
             // Both runtime entry points consume their arguments; the callers here
             // are borrowing, so each gets a compensating pre-inc.
             let inner = match &pt {
-                ConcreteType::Array(e) => (**e).clone(),
+                // A set of parts joins exactly as an array of them: `join` only
+                // reads the sequence, and a set *is* an array block (see
+                // `to_array`, which is free for that reason), so the one walk
+                // serves both. The checker already accepts the receiver — a set
+                // unifies with a `T[]` parameter — so refusing it here was a
+                // codegen-only gap, and the shape it blocked is
+                // `s.set_map(f).join()`.
+                ConcreteType::Array(e) | ConcreteType::Set(e, _) => (**e).clone(),
                 other => {
                     return Err(Error::at(
                         format!(

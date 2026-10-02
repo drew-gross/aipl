@@ -1,0 +1,156 @@
+# `set_map` is `map` for a set: a set in, a set out. So the result can be
+# *smaller* than the receiver — a mapping that sends two elements to the same
+# answer yields one element, because that is what a set is.
+#
+# That is why it is its own builtin rather than another receiver `map` accepts.
+# `map` promises one element out per element in, and over a set it cannot keep
+# that promise; a length that depends on the mapping's collisions is a surprise
+# under the name `map` and the plain reading of the name `set_map`.
+#
+# `map` itself has no set form at all — see `err_map_on_set`. The one set+map
+# spelling that works without this builtin is the fused `s.map(f).join(..)`
+# chain, which is `map_join` in disguise (see `as_sequence`).
+
+import {
+    equal as ==,
+    join,
+    len,
+    map,
+    print,
+    saturating_remainder as %,
+    set_map,
+    to_array,
+    to_set,
+    to_str,
+    wrapping_mul as *,
+    wrapping_sub as -,
+} from builtins;
+
+fn main() !prints {
+    let s = [3, 1, 2, 3].to_set();
+    // Collision-free: every element survives, in the order iterating gives.
+    print(s.set_map(|x| x * 10).to_str());
+    print(s.set_map(to_str).to_str());
+
+    // The headline: three elements all mapping to one answer are one element
+    // out, and the length says so.
+    let flat = s.set_map(|x| 0);
+    print(`{flat} {flat.len()} {s.len()}`);
+
+    // Partial collapse — the two odd elements share an answer, the even one
+    // does not, so three elements give two.
+    print(s.set_map(|x| x % 2).to_str());
+
+    // The receiver may be a set of any order; the result is always unordered,
+    // because `f` changes the very values an order would be over.
+    let asc: #<{i64} = [3, 1, 2].to_set();
+    print(asc.set_map(|x| x * 10).to_str());
+    let desc: #>{i64} = [3, 1, 2].to_set();
+    print(desc.set_map(|x| x * 10).to_str());
+
+    // Asking for an order is a written step, not an inference: take the ordered
+    // set's elements, map them, and say which set to rebuild.
+    let sorted: #<{i64} = asc.to_array().map(|x| 0 - x).to_set();
+    print(sorted.to_str());
+
+    // Generic in both directions: the result type need not be the element's,
+    // and collapsing onto a `bool` is the extreme case.
+    let chars: #{char} = ['a', 'b'].to_set();
+    print(chars.set_map(to_str).to_str());
+    print(chars.set_map(|c| c == 'z').to_str());
+    // A set of parts joins exactly as an array of them would.
+    print(chars.set_map(to_str).join(sep="+"));
+
+    // An empty set maps to the empty set.
+    let empty: #{i64} = #{};
+    print(empty.set_map(|x| x * 2).to_str());
+}
+--- stdout ---
+{30, 10, 20}
+{"3", "1", "2"}
+{0} 1 3
+{1, 0}
+{10, 20, 30}
+{30, 20, 10}
+{-3, -2, -1}
+{"a", "b"}
+{false}
+a+b
+{}
+--- performance ---
+allocations: 44
+deallocations: 44
+reallocations: 14
+bytes allocated: 2025
+instructions executed: 6501
+binary size: 16528
+  code: 10256
+  data: 483
+  metadata: 5789
+functions:
+  __builtin_set_map$char$str$lam$__builtin_to_str:
+    calls: 2
+    bytes: 500
+  __to_str_i64:
+    calls: 3
+    bytes: 204
+  __to_str_set$bool:
+    calls: 1
+    bytes: 708
+  __to_str_set$i64:
+    calls: 6
+    bytes: 708
+  __to_str_set$str:
+    calls: 2
+    bytes: 828
+  __to_str_setasc$i64:
+    calls: 1
+    bytes: 708
+  __to_str_u64:
+    calls: 2
+    bytes: 204
+  aipl_arr_inc:
+    calls: 2
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 36
+    bytes: (external)
+  aipl_array_push:
+    calls: 9
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 56
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 14
+    bytes: (external)
+  aipl_i64_len:
+    calls: 36
+    bytes: (external)
+  aipl_set_contains:
+    calls: 28
+    bytes: (external)
+  aipl_set_insert:
+    calls: 37
+    bytes: (external)
+  aipl_u64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 38
+    bytes: (external)
+  aipl_write_i64:
+    calls: 18
+    bytes: (external)
+  aipl_write_u64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 6104
+  main$map6$own0:
+    calls: 1
+    bytes: 292

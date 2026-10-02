@@ -134,6 +134,10 @@ pub enum Callee {
     ExecuteProgram,
     Union,
     UnionAll,
+    /// `set_map(self: #{T}, f: (T) -> U) -> U[]` — `map` for a set, yielding an
+    /// array so the result's length is always the receiver's. `Map` has no set
+    /// form: a set result would shorten whenever `f` collided two elements.
+    SetMap,
     Get,
     ContainsKey,
     Hash,
@@ -322,6 +326,7 @@ impl Callee {
         Callee::ExecuteProgram,
         Callee::Union,
         Callee::UnionAll,
+        Callee::SetMap,
         Callee::Get,
         Callee::ContainsKey,
         Callee::Hash,
@@ -476,6 +481,7 @@ impl Callee {
             Callee::ExecuteProgram => "__builtin_execute_program",
             Callee::Union => "__builtin_union",
             Callee::UnionAll => "__builtin_union_all",
+            Callee::SetMap => "__builtin_set_map",
             Callee::Get => "__builtin_get",
             Callee::ContainsKey => "__builtin_contains_key",
             Callee::Hash => "__builtin_hash",

@@ -1,0 +1,22 @@
+# `map` has no set form. A set reads as a sequence nearly everywhere else — a
+# generic that only walks a `T[]` takes one (see `as_sequence`) — so reaching
+# for `map` is the natural mistake, and the message names the builtin that does
+# take a set.
+#
+# It is a separate builtin rather than another receiver `map` accepts because
+# `map`'s promise does not survive the change of receiver: `map` gives one
+# element out per element in, while a set result collapses two elements that map
+# to the same answer. `set_map` is the name under which that is expected.
+
+import { len, map, print, to_set, to_str } from builtins;
+
+fn main() !prints {
+    let s: #{i64} = [3, 1, 2].to_set();
+    print(s.map(to_str).len().to_str());
+}
+--- errors ---
+error: map has no set form, so it does not take #{i64} — use "set_map", which maps a set to a set. It is a separate name because the result can be *smaller* than the receiver, when two elements map to the same answer; `map` promises one element out per element in, and over a set it could not keep that promise
+  --> ./tests/cases/sets/err_map_on_set.aipl:15:11
+   |
+15 |     print(s.map(to_str).len().to_str());
+   |           ^

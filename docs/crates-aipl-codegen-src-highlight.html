@@ -109,7 +109,7 @@
           </h3>
           <pre class="signature"><code>pub fn re_escape_set(s: #{char}) -&#62; char[]</code></pre>
 
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p>The same escaping as <code>re_escape</code>, for a character <em>set</em> rather than a string: every character the engine reads specially is backslash-escaped. <code>set_map</code> rather than <code>map</code> because the receiver is a set, and <code>map</code> has no set form. The escaped pieces then <code>join</code> into the class body, in the set's own order.</p><p><code>set_map</code> may collapse, and here it provably doesn't: escaping is injective, so two distinct characters never produce the same piece.</p></div>
 
 
         </section>
@@ -261,7 +261,7 @@
             <a class="anchor" href="#item-tm_json">tm_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn tm_json(__spat$25146: Tm) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn tm_json(__spat$25499: Tm) -&#62; str</code></pre>
 
           <div class="doc"><p><code>g</code> as the <code>.tmLanguage.json</code> text an editor extension ships: two-space indented, one trailing newline. Generated files are read in diffs, so the layout is fixed and deterministic rather than minified.</p></div>
 
@@ -543,7 +543,7 @@
             <a class="anchor" href="#item-entry_json">entry_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn entry_json(__spat$27859: Entry) -&#62; str</code></pre>
+          <pre class="signature"><code>fn entry_json(__spat$28212: Entry) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

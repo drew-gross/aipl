@@ -196,15 +196,15 @@ fn section_tail() -> Pat {
     )
 }
 --- performance ---
-allocations: 3960
-deallocations: 3960
+allocations: 3976
+deallocations: 3976
 reallocations: 329
-bytes allocated: 347879
-instructions executed: 1362629
-binary size: 208184
-  code: 162500
+bytes allocated: 348703
+instructions executed: 1363293
+binary size: 208720
+  code: 162796
   data: 3240
-  metadata: 42444
+  metadata: 42684
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -307,7 +307,7 @@ functions:
     bytes: 1928
   __m1__re_escape_set:
     calls: 8
-    bytes: 736
+    bytes: 1032
   __m2__indent:
     calls: 142
     bytes: 1660
@@ -369,19 +369,19 @@ functions:
     calls: 24
     bytes: (external)
   aipl_array_dec:
-    calls: 1703
+    calls: 1727
     bytes: (external)
   aipl_array_new:
     calls: 204
     bytes: (external)
   aipl_array_push:
-    calls: 25
+    calls: 33
     bytes: (external)
   aipl_array_push_mut:
-    calls: 171
+    calls: 187
     bytes: (external)
   aipl_array_with_cap:
-    calls: 17
+    calls: 25
     bytes: (external)
   aipl_assert:
     calls: 15
@@ -394,6 +394,12 @@ functions:
     bytes: (external)
   aipl_rec_inc_strong:
     calls: 629
+    bytes: (external)
+  aipl_set_contains:
+    calls: 8
+    bytes: (external)
+  aipl_set_insert:
+    calls: 8
     bytes: (external)
   aipl_test_begin:
     calls: 1

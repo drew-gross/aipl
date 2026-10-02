@@ -82,6 +82,8 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  make extend accept T*, then don't need push_optional
+  does set_map().join() make sense? Should there be a set_join?
   prevent untyped expressions from even getting to mono by using a separate type that can't contain them
   move inlining after type checking so that the type refinement problems don't happen
   optimizations don't need internal fixpointing, since we now have pass manager. inline_small probably needs a guard against inline itself if recursive and small though.
@@ -531,6 +533,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    .map().to_set() should fuse
     .join().first() should fuse. also map_join().first()?
     can we make a fully general v.foo().len() fusion? Maybe by monomorphizing?
     to_str().len() should fuse to a a new, super simple/fast function that just computes and returns an int

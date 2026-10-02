@@ -59,6 +59,11 @@ pub(super) fn pipeline_names(program: &Program) -> PipelineNames {
 /// which one this is only becomes known two passes later. A `str` loop that
 /// collects into an array is thus the lint's blind spot, and `#[allow]` is
 /// the answer there.
+///
+/// A *set* is the other receiver the advice is wrong for, and `set_map` is not
+/// the fix: a loop that pushes into an array is building an array, while
+/// `set_map` maps a set to a set. Neither `map` nor `filter` takes a set, so a
+/// collecting loop over one is an `#[allow]` too.
 pub(super) fn push_loop_pipeline(
     e: &Expr,
     src: &str,

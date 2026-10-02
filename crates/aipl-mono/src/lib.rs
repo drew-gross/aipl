@@ -3535,6 +3535,23 @@ impl Mono<'_> {
         let (elem, over_optional) = match &arr_ty {
             Type::Array(elem) => ((**elem).clone(), false),
             Type::Optional(inner) => ((**inner).clone(), true),
+            // A set is the near-miss worth naming: it reads as a sequence
+            // everywhere else (see `collect_var_bindings`), so `map` is the
+            // obvious reach, and `set_map` is the answer — including *why* it is
+            // a separate name rather than another receiver `map` accepts.
+            Type::Set(..) => {
+                return Err(Error::at(
+                    format!(
+                        "map has no set form, so it does not take {} — use \"set_map\", \
+                         which maps a set to a set. It is a separate name because the \
+                         result can be *smaller* than the receiver, when two elements \
+                         map to the same answer; `map` promises one element out per \
+                         element in, and over a set it could not keep that promise",
+                        type_name(&arr_ty)
+                    ),
+                    arr.span.clone(),
+                ));
+            }
             _ => {
                 return Err(Error::at(
                     format!(
@@ -7370,6 +7387,7 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::ReverseFindMap, "builtin_reverse_find_map.aipl"),
     (Callee::FindIndex, "builtin_find_index.aipl"),
     (Callee::UnionAll, "builtin_union_all.aipl"),
+    (Callee::SetMap, "builtin_set_map.aipl"),
     (Callee::IsAllWhitespace, "builtin_is_all_whitespace.aipl"),
     (Callee::IsErrAnd, "builtin_is_err_and.aipl"),
     (Callee::IsSomeAnd, "builtin_is_some_and.aipl"),
