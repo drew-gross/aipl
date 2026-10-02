@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">109 files, 1327 items.</p>
+      <p class="summary">109 files, 1328 items.</p>
 
       <ul class="files">
 
@@ -1387,7 +1387,7 @@
           <p class="file-summary">A small library for building lexers. <code>lex</code> turns source text into a flat <code>Token[]</code>, driven by an ordered <code>TokenRule[]</code> describing the language being lexed. Each rule pairs a caller-chosen <code>kind</code> label with a <code>Matcher</code> — a data-only description of one token shape (a char-class run, a list of fixed spellings, a delimited literal, ...) — so a rule set is plain data and one <code>lex</code> serves many languages; see the JSON and AIPL-flavored rule sets in the tests. At each position the <em>first</em> rule whose matcher matches wins, so order is priority: put keywords before identifiers, floats before ints. Whitespace is an ordinary rule marked <code>skip: true</code> — matched and consumed, but producing nothing. Rules marked <code>trivia: true</code> (comments, lint markers) are consumed the same way but recorded in the result's trivia side-channel, so a formatter or lint pass can find them without them cluttering the token stream. Lexing can fail: a byte no rule matches, or a matcher that matches invalid input outright (an unterminated <code>Delimited</code> token), aborts the lex with a <code>LexError</code> — a message plus the span of the offending source.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lexer.html#private">24 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lexer.html#private">25 private</a></span>
 
 
           <ul class="items">

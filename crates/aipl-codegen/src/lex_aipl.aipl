@@ -877,11 +877,11 @@ allocations: 313
 deallocations: 313
 reallocations: 15
 bytes allocated: 487096
-instructions executed: 2390400
-binary size: 333576
-  code: 239996
+instructions executed: 2236959
+binary size: 304944
+  code: 220284
   data: 7332
-  metadata: 86248
+  metadata: 77328
 functions:
   __arr_drop_AiplTok:
     calls: 69
@@ -1008,7 +1008,7 @@ functions:
     bytes: 348
   __m1__lex_step$AiplTok:
     calls: 129
-    bytes: 30152
+    bytes: 10440
   __m1__nested_len:
     calls: 79
     bytes: 1148

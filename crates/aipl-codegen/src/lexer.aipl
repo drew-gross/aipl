@@ -786,11 +786,45 @@ fn stepped<K>(self: ModeFrame[], step: StepResult<K>, at: u64) -> ModeFrame[] {
     }
 }
 
+# How far this matcher reaches at `at` in `src` — the number of chars it
+# consumes, or 0 for a decline. No matcher matches empty input, so a nonzero
+# length always means progress.
+#
+# This is the whole of what the matchers differ by, which is the point: one arm
+# per matcher naming its own `*_len` helper and nothing else, so adding a matcher
+# is one line here beside one `*_len` function. `unterminated` is the rule's
+# message for a construct still open at the end of the source, which only the
+# bracketing matchers can report; `at` is passed alongside `rest` for the same
+# reason, since a `LexError` is spanned in the whole source rather than in the
+# slice being scanned.
+#
+# The `ok(..)` on the infallible arms is the seam between the two kinds of
+# helper — a length that cannot fail and a `u64!LexError` — in the one place that
+# has to know the difference, exactly as `apply_emit` wraps its `Of` arm.
+fn step_len(self: Matcher, src: str, at: u64, unterminated: str) -> u64!LexError {
+    let rest = src[at..];
+    match (self) {
+        CharRun(cont, first) => ok(rest.char_run_len(first, cont)),
+        OneChar(chars) => ok(rest.one_char_len(chars)),
+        Exact(spelling) => ok(rest.exact_len(spelling)),
+        Keyword(spelling, boundary) => ok(rest.keyword_len(spelling, boundary)),
+        Delimited(delims, escapes) => rest.delimited_len(at, delims, escapes, unterminated),
+        Between(open, close) => rest.between_len(at, open, close, unterminated),
+        Nested(open, close) => rest.nested_len(at, open, close, unterminated),
+        UpToAny(stops, escapes, refuse) => rest.up_to_any_len(at, stops, escapes, refuse),
+        ToEol(marker) => ok(rest.to_eol_len(marker)),
+        ToEolUnless(marker, blocked) => ok(rest.to_eol_unless_len(marker, blocked)),
+        Float => ok(rest.float_len()),
+        Int => ok(rest.int_len()),
+    }
+}
+
 # One lexing step at absolute position `at`: tries each rule of `mode` in order
 # (first match wins) and returns the winning rule's outcome — see `StepResult`.
-# Each arm computes how far its matcher reaches (0 for no match — no matcher
-# matches empty input, so a nonzero length always means progress) and wraps it
-# via `step_result`.
+# Every rule is tried the same way, which is what `step_len` and `step_result`
+# are for: the first says how far this rule's matcher reaches, the second turns
+# that length into the step. Neither the loop nor the first-match-wins rule has
+# anything to say about *which* matcher it is.
 #
 # A rule of another mode is passed over rather than filtered out up front: the
 # check is one comparison inside the loop that already runs, where filtering
@@ -800,55 +834,8 @@ fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[], mode: i64) -> StepResul
         let res = if (r.mode != mode) {
             StepResult { end: at }
         } else {
-            match (r.matcher) {
-                CharRun(cont, first) => step_result(
-                    r,
-                    src,
-                    at,
-                    src[at..].char_run_len(first, cont),
-                )?,
-                OneChar(chars) => step_result(r, src, at, src[at..].one_char_len(chars))?,
-                Exact(spelling) => step_result(r, src, at, src[at..].exact_len(spelling))?,
-                Keyword(spelling, boundary) => step_result(
-                    r,
-                    src,
-                    at,
-                    src[at..].keyword_len(spelling, boundary),
-                )?,
-                Delimited(delims, escapes) => step_result(
-                    r,
-                    src,
-                    at,
-                    src[at..].delimited_len(at, delims, escapes, r.unterminated)?,
-                )?,
-                Between(open, close) => step_result(
-                    r,
-                    src,
-                    at,
-                    src[at..].between_len(at, open, close, r.unterminated)?,
-                )?,
-                Nested(open, close) => step_result(
-                    r,
-                    src,
-                    at,
-                    src[at..].nested_len(at, open, close, r.unterminated)?,
-                )?,
-                UpToAny(stops, escapes, refuse) => step_result(
-                    r,
-                    src,
-                    at,
-                    src[at..].up_to_any_len(at, stops, escapes, refuse)?,
-                )?,
-                ToEol(marker) => step_result(r, src, at, src[at..].to_eol_len(marker))?,
-                ToEolUnless(marker, blocked) => step_result(
-                    r,
-                    src,
-                    at,
-                    src[at..].to_eol_unless_len(marker, blocked),
-                )?,
-                Float => step_result(r, src, at, src[at..].float_len())?,
-                Int => step_result(r, src, at, src[at..].int_len())?,
-            }
+            let n = r.matcher.step_len(src, at, r.unterminated)?;
+            step_result(r, src, at, n)?
         };
         if (at < res.end) {
             return ok(res);
@@ -1486,11 +1473,11 @@ allocations: 362
 deallocations: 362
 reallocations: 9
 bytes allocated: 76304
-instructions executed: 697024
-binary size: 832296
-  code: 557068
+instructions executed: 658343
+binary size: 802208
+  code: 536512
   data: 8916
-  metadata: 266312
+  metadata: 256780
 functions:
   __arr_drop_Kind:
     calls: 88
@@ -1689,7 +1676,7 @@ functions:
     bytes: 348
   lex_step$Kind:
     calls: 224
-    bytes: 31404
+    bytes: 10848
   main:
     calls: 1
     bytes: 248

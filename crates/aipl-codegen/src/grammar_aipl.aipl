@@ -4971,11 +4971,11 @@ allocations: 2105746
 deallocations: 2105746
 reallocations: 299810
 bytes allocated: 406409308
-instructions executed: 627152416
-binary size: 7033328
-  code: 4653848
+instructions executed: 618388537
+binary size: 7004696
+  code: 4634136
   data: 59172
-  metadata: 2320308
+  metadata: 2311388
 functions:
   __arr_drop___m11__ModeFrame:
     calls: 537
@@ -5432,7 +5432,7 @@ functions:
     bytes: 7636
   __m11__lex_step$__m23__AiplTok:
     calls: 5499
-    bytes: 30152
+    bytes: 10440
   __m11__nested_len:
     calls: 3647
     bytes: 1148

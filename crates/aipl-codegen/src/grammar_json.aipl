@@ -511,11 +511,11 @@ allocations: 21407
 deallocations: 21407
 reallocations: 2813
 bytes allocated: 2984039
-instructions executed: 6799897
-binary size: 452912
-  code: 300076
+instructions executed: 6653432
+binary size: 429656
+  code: 283916
   data: 8348
-  metadata: 144488
+  metadata: 137392
 functions:
   __arr_drop_Json:
     calls: 125
@@ -747,7 +747,7 @@ functions:
     bytes: 5884
   __m11__lex_step$JsonTok:
     calls: 485
-    bytes: 25140
+    bytes: 8980
   __m11__nested_len:
     calls: 0
     bytes: 1148

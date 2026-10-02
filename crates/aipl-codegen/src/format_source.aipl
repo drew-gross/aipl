@@ -427,11 +427,11 @@ allocations: 21348
 deallocations: 21348
 reallocations: 2942
 bytes allocated: 4881166
-instructions executed: 12904415
-binary size: 7670224
-  code: 5107580
+instructions executed: 12287930
+binary size: 7641592
+  code: 5087868
   data: 13498
-  metadata: 2549146
+  metadata: 2540226
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -954,7 +954,7 @@ functions:
     bytes: 7636
   __m15__lex_step$__m25__AiplTok:
     calls: 445
-    bytes: 30152
+    bytes: 10440
   __m15__nested_len:
     calls: 274
     bytes: 1148

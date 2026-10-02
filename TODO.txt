@@ -82,6 +82,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  step_result n should be u64 without 0, move 0 check to call site
   make extend accept T*, then don't need push_optional
   does set_map().join() make sense? Should there be a set_join?
   prevent untyped expressions from even getting to mono by using a separate type that can't contain them

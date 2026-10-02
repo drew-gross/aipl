@@ -470,11 +470,11 @@ allocations: 10669
 deallocations: 10669
 reallocations: 1502
 bytes allocated: 1238478
-instructions executed: 2871096
-binary size: 412048
-  code: 273396
+instructions executed: 2828338
+binary size: 391512
+  code: 259348
   data: 5852
-  metadata: 132800
+  metadata: 126312
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -691,7 +691,7 @@ functions:
     bytes: 5264
   __m11__lex_step$CalcTok:
     calls: 444
-    bytes: 22292
+    bytes: 8244
   __m11__nested_len:
     calls: 0
     bytes: 1148

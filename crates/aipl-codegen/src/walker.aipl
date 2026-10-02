@@ -3514,11 +3514,11 @@ allocations: 118636
 deallocations: 118636
 reallocations: 18136
 bytes allocated: 25272436
-instructions executed: 75615432
-binary size: 19410584
-  code: 12511772
+instructions executed: 71955679
+binary size: 19381952
+  code: 12492060
   data: 39532
-  metadata: 6859280
+  metadata: 6850360
 functions:
   __arr_drop_ImportEntry:
     calls: 31
@@ -4077,7 +4077,7 @@ functions:
     bytes: 7636
   __m18__lex_step$__m24__AiplTok:
     calls: 2776
-    bytes: 30152
+    bytes: 10440
   __m18__nested_len:
     calls: 1549
     bytes: 1148

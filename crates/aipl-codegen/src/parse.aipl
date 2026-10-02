@@ -1768,11 +1768,11 @@ allocations: 5902
 deallocations: 5902
 reallocations: 1236
 bytes allocated: 732308
-instructions executed: 2169289
-binary size: 757856
-  code: 462000
+instructions executed: 2111463
+binary size: 732952
+  code: 444796
   data: 12644
-  metadata: 283212
+  metadata: 275512
 functions:
   __arr_drop_Node:
     calls: 18
@@ -2067,7 +2067,7 @@ functions:
     bytes: 6444
   __m4__lex_step$Tok:
     calls: 371
-    bytes: 26640
+    bytes: 9436
   __m4__nested_len:
     calls: 0
     bytes: 1148

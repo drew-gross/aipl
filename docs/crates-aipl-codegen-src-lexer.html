@@ -823,6 +823,20 @@
 
 
 
+        <section class="item" id="item-step_len">
+          <h3>
+            <a class="anchor" href="#item-step_len">step_len</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn step_len(self: Matcher, src: str, at: u64, unterminated: str) -&#62; u64!LexError</code></pre>
+
+          <div class="doc"><p>How far this matcher reaches at <code>at</code> in <code>src</code> — the number of chars it consumes, or 0 for a decline. No matcher matches empty input, so a nonzero length always means progress.</p><p>This is the whole of what the matchers differ by, which is the point: one arm per matcher naming its own <code>*_len</code> helper and nothing else, so adding a matcher is one line here beside one <code>*_len</code> function. <code>unterminated</code> is the rule's message for a construct still open at the end of the source, which only the bracketing matchers can report; <code>at</code> is passed alongside <code>rest</code> for the same reason, since a <code>LexError</code> is spanned in the whole source rather than in the slice being scanned.</p><p>The <code>ok(..)</code> on the infallible arms is the seam between the two kinds of helper — a length that cannot fail and a <code>u64!LexError</code> — in the one place that has to know the difference, exactly as <code>apply_emit</code> wraps its <code>Of</code> arm.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lex_step">
           <h3>
             <a class="anchor" href="#item-lex_step">lex_step</a>
@@ -830,7 +844,7 @@
           </h3>
           <pre class="signature"><code>fn lex_step&#60;K: any&#62;(src: str, at: u64, rules: TokenRule&#60;K&#62;[], mode: i64) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
 
-          <div class="doc"><p>One lexing step at absolute position <code>at</code>: tries each rule of <code>mode</code> in order (first match wins) and returns the winning rule's outcome — see <code>StepResult</code>. Each arm computes how far its matcher reaches (0 for no match — no matcher matches empty input, so a nonzero length always means progress) and wraps it via <code>step_result</code>.</p><p>A rule of another mode is passed over rather than filtered out up front: the check is one comparison inside the loop that already runs, where filtering would build a new array at every position of every lex.</p></div>
+          <div class="doc"><p>One lexing step at absolute position <code>at</code>: tries each rule of <code>mode</code> in order (first match wins) and returns the winning rule's outcome — see <code>StepResult</code>. Every rule is tried the same way, which is what <code>step_len</code> and <code>step_result</code> are for: the first says how far this rule's matcher reaches, the second turns that length into the step. Neither the loop nor the first-match-wins rule has anything to say about <em>which</em> matcher it is.</p><p>A rule of another mode is passed over rather than filtered out up front: the check is one comparison inside the loop that already runs, where filtering would build a new array at every position of every lex.</p></div>
 
 
         </section>
