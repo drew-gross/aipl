@@ -145,6 +145,7 @@ mod builtin_calls {
         b"aipl_dict_contains_key\0",
         b"aipl_dict_get\0",
         b"aipl_dict_insert\0",
+        b"aipl_dict_remove\0",
         b"aipl_execute_program\0",
         b"aipl_i64_len\0",
         b"aipl_inc\0",
@@ -230,58 +231,59 @@ mod builtin_calls {
     pub const AIPL_DICT_CONTAINS_KEY: usize = 26;
     pub const AIPL_DICT_GET: usize = 27;
     pub const AIPL_DICT_INSERT: usize = 28;
-    pub const AIPL_EXECUTE_PROGRAM: usize = 29;
-    pub const AIPL_I64_LEN: usize = 30;
-    pub const AIPL_INC: usize = 31;
-    pub const AIPL_LIST_FILES: usize = 32;
-    pub const AIPL_MONOTONIC_NOW: usize = 33;
-    pub const AIPL_NOW_NANOS: usize = 34;
-    pub const AIPL_PRINT: usize = 35;
-    pub const AIPL_PRINT_ERROR: usize = 36;
-    pub const AIPL_READ_FILE_TO_STRING: usize = 37;
-    pub const AIPL_REC_ALLOC: usize = 38;
-    pub const AIPL_REC_DEC_STRONG: usize = 39;
-    pub const AIPL_REC_DEC_WEAK: usize = 40;
-    pub const AIPL_REC_INC_STRONG: usize = 41;
-    pub const AIPL_REC_INC_WEAK: usize = 42;
-    pub const AIPL_SET_CONTAINS: usize = 43;
-    pub const AIPL_SET_INSERT: usize = 44;
-    pub const AIPL_SET_UNION: usize = 45;
-    pub const AIPL_SET_UNION_MUT: usize = 46;
-    pub const AIPL_SHIM_GET: usize = 47;
-    pub const AIPL_SHIM_SET: usize = 48;
-    pub const AIPL_STR_ALLOC: usize = 49;
-    pub const AIPL_STR_CMP: usize = 50;
-    pub const AIPL_STR_CONTAINS: usize = 51;
-    pub const AIPL_STR_DATA: usize = 52;
-    pub const AIPL_STR_ENDS_WITH: usize = 53;
-    pub const AIPL_STR_ENDS_WITH_CHAR: usize = 54;
-    pub const AIPL_STR_EQ: usize = 55;
-    pub const AIPL_STR_HASH: usize = 56;
-    pub const AIPL_STR_ITER_INIT: usize = 57;
-    pub const AIPL_STR_ITER_NEXT: usize = 58;
-    pub const AIPL_STR_JOIN: usize = 59;
-    pub const AIPL_STR_LEN: usize = 60;
-    pub const AIPL_STR_REPEAT: usize = 61;
-    pub const AIPL_STR_REVERSE: usize = 62;
-    pub const AIPL_STR_SLICE: usize = 63;
-    pub const AIPL_STR_SORT: usize = 64;
-    pub const AIPL_STR_SPLIT: usize = 65;
-    pub const AIPL_STR_STARTS_WITH: usize = 66;
-    pub const AIPL_STR_STARTS_WITH_AT: usize = 67;
-    pub const AIPL_STR_STARTS_WITH_CHAR: usize = 68;
-    pub const AIPL_TEST_BEGIN: usize = 69;
-    pub const AIPL_TEST_END: usize = 70;
-    pub const AIPL_TEST_FAIL: usize = 71;
-    pub const AIPL_TEST_FAIL_NONE: usize = 72;
-    pub const AIPL_TEST_SUMMARY: usize = 73;
-    pub const AIPL_TRIM: usize = 74;
-    pub const AIPL_TRIM_MUT: usize = 75;
-    pub const AIPL_U64_LEN: usize = 76;
-    pub const AIPL_WRITE_BYTES: usize = 77;
-    pub const AIPL_WRITE_I64: usize = 78;
-    pub const AIPL_WRITE_STRING_TO_FILE: usize = 79;
-    pub const AIPL_WRITE_U64: usize = 80;
+    pub const AIPL_DICT_REMOVE: usize = 29;
+    pub const AIPL_EXECUTE_PROGRAM: usize = 30;
+    pub const AIPL_I64_LEN: usize = 31;
+    pub const AIPL_INC: usize = 32;
+    pub const AIPL_LIST_FILES: usize = 33;
+    pub const AIPL_MONOTONIC_NOW: usize = 34;
+    pub const AIPL_NOW_NANOS: usize = 35;
+    pub const AIPL_PRINT: usize = 36;
+    pub const AIPL_PRINT_ERROR: usize = 37;
+    pub const AIPL_READ_FILE_TO_STRING: usize = 38;
+    pub const AIPL_REC_ALLOC: usize = 39;
+    pub const AIPL_REC_DEC_STRONG: usize = 40;
+    pub const AIPL_REC_DEC_WEAK: usize = 41;
+    pub const AIPL_REC_INC_STRONG: usize = 42;
+    pub const AIPL_REC_INC_WEAK: usize = 43;
+    pub const AIPL_SET_CONTAINS: usize = 44;
+    pub const AIPL_SET_INSERT: usize = 45;
+    pub const AIPL_SET_UNION: usize = 46;
+    pub const AIPL_SET_UNION_MUT: usize = 47;
+    pub const AIPL_SHIM_GET: usize = 48;
+    pub const AIPL_SHIM_SET: usize = 49;
+    pub const AIPL_STR_ALLOC: usize = 50;
+    pub const AIPL_STR_CMP: usize = 51;
+    pub const AIPL_STR_CONTAINS: usize = 52;
+    pub const AIPL_STR_DATA: usize = 53;
+    pub const AIPL_STR_ENDS_WITH: usize = 54;
+    pub const AIPL_STR_ENDS_WITH_CHAR: usize = 55;
+    pub const AIPL_STR_EQ: usize = 56;
+    pub const AIPL_STR_HASH: usize = 57;
+    pub const AIPL_STR_ITER_INIT: usize = 58;
+    pub const AIPL_STR_ITER_NEXT: usize = 59;
+    pub const AIPL_STR_JOIN: usize = 60;
+    pub const AIPL_STR_LEN: usize = 61;
+    pub const AIPL_STR_REPEAT: usize = 62;
+    pub const AIPL_STR_REVERSE: usize = 63;
+    pub const AIPL_STR_SLICE: usize = 64;
+    pub const AIPL_STR_SORT: usize = 65;
+    pub const AIPL_STR_SPLIT: usize = 66;
+    pub const AIPL_STR_STARTS_WITH: usize = 67;
+    pub const AIPL_STR_STARTS_WITH_AT: usize = 68;
+    pub const AIPL_STR_STARTS_WITH_CHAR: usize = 69;
+    pub const AIPL_TEST_BEGIN: usize = 70;
+    pub const AIPL_TEST_END: usize = 71;
+    pub const AIPL_TEST_FAIL: usize = 72;
+    pub const AIPL_TEST_FAIL_NONE: usize = 73;
+    pub const AIPL_TEST_SUMMARY: usize = 74;
+    pub const AIPL_TRIM: usize = 75;
+    pub const AIPL_TRIM_MUT: usize = 76;
+    pub const AIPL_U64_LEN: usize = 77;
+    pub const AIPL_WRITE_BYTES: usize = 78;
+    pub const AIPL_WRITE_I64: usize = 79;
+    pub const AIPL_WRITE_STRING_TO_FILE: usize = 80;
+    pub const AIPL_WRITE_U64: usize = 81;
 }
 
 // ---------- Per-AIPL-function call counts (instrumented build only) ----------
@@ -3176,6 +3178,52 @@ pub extern "C" fn aipl_dict_insert(
         }
     }
     aipl_array_push_mut(a, pair_ptr, drop_fn, retain_fn, pair_size)
+}
+
+/// Remove `key_ptr`'s pair from dict `a`, which [`aipl_arr_reserve`] has already
+/// made uniquely owned — so this writes in place, the same contract
+/// [`aipl_arr_extend`] carries.
+///
+/// The removed pair's key and value are released, and the pairs after it shift
+/// down one so the survivors keep the order they were inserted in. Order-
+/// preserving rather than swap-with-last: nothing *promises* a dict's order, but
+/// it is what iterating one hands back, so a removal that quietly permuted the
+/// rest would be a surprise for one saved `memmove`.
+///
+/// Returns 1 when a pair was removed and 0 when the key was absent, in which
+/// case nothing is touched. Mirrors `aipl_dict_remove` in codegen.
+#[no_mangle]
+pub extern "C" fn aipl_dict_remove(
+    a: *const u8,
+    key_ptr: *const u8,
+    drop_fn: i64,
+    pair_size: i64,
+    str_cmp: i64,
+) -> i64 {
+    count_builtin!(builtin_calls::AIPL_DICT_REMOVE);
+    unsafe {
+        let idx = dict_find(a, key_ptr, pair_size, str_cmp);
+        if idx < 0 {
+            return 0;
+        }
+        let idx = idx as usize;
+        let stride = pair_size as usize;
+        let len = array_len(a);
+        let slot = arr_elem_ptr_rt(a, idx, stride) as *mut u8;
+        elem_rc(drop_fn, slot, 1);
+        // The regions overlap when anything follows the hole, so `memmove`.
+        let moved = len - idx - 1;
+        if moved > 0 {
+            let next = arr_elem_ptr_rt(a, idx + 1, stride);
+            memmove(
+                slot as *mut c_void,
+                next as *const c_void,
+                moved * stride,
+            );
+        }
+        *(a.add(ARR_LEN_OFFSET) as *mut i64) = (len - 1) as i64;
+        1
+    }
 }
 
 /// Look up `key_ptr` in dict `a`: a pointer to the matching pair's value slot, or

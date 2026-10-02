@@ -2344,6 +2344,48 @@ extern "C" fn aipl_dict_insert(
     aipl_array_push_mut(a, pair_ptr, drop_fn, retain_fn, pair_size)
 }
 
+/// Remove `key_ptr`'s pair from dict `a`, which `aipl_arr_reserve` has already
+/// made uniquely owned — so this writes in place, the same contract
+/// `aipl_arr_extend` carries.
+///
+/// The removed pair's key and value are released, and the pairs after it shift
+/// down one so the survivors keep the order they were inserted in. Order-
+/// preserving rather than swap-with-last: nothing *promises* a dict's order, but
+/// it is what iterating one hands back, so a removal that quietly permuted the
+/// rest would be a surprise for one saved move.
+///
+/// Returns 1 when a pair was removed and 0 when the key was absent, in which
+/// case nothing is touched. Mirrors `aipl_dict_remove` in the linker runtime.
+#[no_mangle]
+extern "C" fn aipl_dict_remove(
+    a: *const u8,
+    key_ptr: *const u8,
+    drop_fn: i64,
+    pair_size: i64,
+    str_cmp: i64,
+) -> i64 {
+    unsafe {
+        let idx = dict_find(a, key_ptr, pair_size, str_cmp);
+        if idx < 0 {
+            return 0;
+        }
+        let idx = idx as usize;
+        let stride = pair_size as usize;
+        let len = array_len_of(a);
+        let slot = arr_elem_ptr(a, idx, stride) as *mut u8;
+        elem_rc(drop_fn, slot, 1);
+        // The regions overlap when anything follows the hole, so `copy`
+        // (`memmove`) rather than `copy_nonoverlapping`.
+        let moved = len - idx - 1;
+        if moved > 0 {
+            let next = arr_elem_ptr(a, idx + 1, stride);
+            std::ptr::copy(next, slot, moved * stride);
+        }
+        *(a.add(ARR_LEN_OFFSET) as *mut i64) = (len - 1) as i64;
+        1
+    }
+}
+
 /// Look up `key_ptr` in dict `a`: returns a pointer to the matching pair's value
 /// slot (its bytes are read/retained by the caller), or null if absent. Borrows
 /// `a` (no refcount change).
@@ -4488,6 +4530,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_set_union", aipl_set_union as *const u8);
     jit_builder.symbol("aipl_set_union_mut", aipl_set_union_mut as *const u8);
     jit_builder.symbol("aipl_dict_insert", aipl_dict_insert as *const u8);
+    jit_builder.symbol("aipl_dict_remove", aipl_dict_remove as *const u8);
     jit_builder.symbol("aipl_dict_get", aipl_dict_get as *const u8);
     jit_builder.symbol(
         "aipl_dict_contains_key",
@@ -7867,6 +7910,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_arr_reserve"
         | "aipl_arr_extend" => (5, Ret::Word),
         "aipl_dict_insert" | "aipl_arr_slice" => (6, Ret::Word),
+        "aipl_dict_remove" => (5, Ret::Word),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" => (7, Ret::Word),
         // ---- a `str` back, through the out pointer ----
         "aipl_trim" | "aipl_str_reverse" | "aipl_str_sort" | "aipl_str_alloc"
@@ -10135,32 +10179,44 @@ fn mut_str_receiver(
     is_str_repr(&cell.borrow()).then(|| (*slot, cell.clone(), *exclusive))
 }
 
+/// The binding half of resolving an in-place mutation's receiver: its stack
+/// slot, its live type cell, and whether static analysis proved it unaliased.
+/// What the receiver *holds* is the caller's to check — an array for
+/// `push`/`extend`, a dict for `remove_key` — so the three diagnostics a bad
+/// binding earns live here once and the type's own live where it is known.
+fn mut_receiver_slot(
+    env: &Env,
+    receiver: &Expr,
+    what: &str,
+    kind: &str,
+) -> Result<(StackSlot, Rc<RefCell<ConcreteType>>, bool), Error> {
+    let ExprKind::Ident(var) = &receiver.kind else {
+        return Err(Error::at(
+            format!(
+                "\"{what}\" must be called on a mutable {kind} variable, e.g. \"xs.{what}(x)\""
+            ),
+            receiver.span.clone(),
+        ));
+    };
+    match env.get(var) {
+        Some(EnvBinding::Mut(slot, cell, excl)) => Ok((*slot, cell.clone(), *excl)),
+        Some(EnvBinding::Immut(_, _)) => Err(Error::at(
+            format!("cannot \"{what}\" to immutable binding {var:?}; declare it with \"mut\""),
+            receiver.span.clone(),
+        )),
+        None => Err(Error::at(
+            format!("unknown identifier {var:?}"),
+            receiver.span.clone(),
+        )),
+    }
+}
+
 fn mut_array_receiver(
     env: &Env,
     receiver: &Expr,
     what: &str,
 ) -> Result<(StackSlot, Rc<RefCell<ConcreteType>>, bool, ConcreteType), Error> {
-    let ExprKind::Ident(var) = &receiver.kind else {
-        return Err(Error::at(
-            format!("\"{what}\" must be called on a mutable array variable, e.g. \"xs.{what}(x)\""),
-            receiver.span.clone(),
-        ));
-    };
-    let (slot, ty_cell, exclusive) = match env.get(var) {
-        Some(EnvBinding::Mut(slot, cell, excl)) => (*slot, cell.clone(), *excl),
-        Some(EnvBinding::Immut(_, _)) => {
-            return Err(Error::at(
-                format!("cannot \"{what}\" to immutable binding {var:?}; declare it with \"mut\""),
-                receiver.span.clone(),
-            ));
-        }
-        None => {
-            return Err(Error::at(
-                format!("unknown identifier {var:?}"),
-                receiver.span.clone(),
-            ));
-        }
-    };
+    let (slot, ty_cell, exclusive) = mut_receiver_slot(env, receiver, what, "array")?;
     let elem_ty = match &*ty_cell.borrow() {
         ConcreteType::Array(inner) => (**inner).clone(),
         other => {
@@ -10171,6 +10227,35 @@ fn mut_array_receiver(
         }
     };
     Ok((slot, ty_cell, exclusive, elem_ty))
+}
+
+/// As [`mut_array_receiver`], for a mutation whose receiver is a dict: yields
+/// the slot, the type cell, whether it is unaliased, and the key/value types.
+fn mut_dict_receiver(
+    env: &Env,
+    receiver: &Expr,
+    what: &str,
+) -> Result<
+    (
+        StackSlot,
+        Rc<RefCell<ConcreteType>>,
+        bool,
+        ConcreteType,
+        ConcreteType,
+    ),
+    Error,
+> {
+    let (slot, ty_cell, exclusive) = mut_receiver_slot(env, receiver, what, "dict")?;
+    let (key_ty, val_ty) = match &*ty_cell.borrow() {
+        ConcreteType::Dict(k, v) => ((**k).clone(), (**v).clone()),
+        other => {
+            return Err(Error::at(
+                format!("\"{what}\" requires a dict, got {}", type_name(other)),
+                receiver.span.clone(),
+            ));
+        }
+    };
+    Ok((slot, ty_cell, exclusive, key_ty, val_ty))
 }
 
 fn load_arr_len(builder: &mut FunctionBuilder, arr_ptr: Value) -> Value {
@@ -17420,6 +17505,75 @@ fn compile_call_expr<M: Module>(
                 }
                 (sbase, result_ty)
             }
+        }
+        Callee::RemoveKey => {
+            // `set d.remove_key(k);` — the in-place writeback form, the same one
+            // `push`/`extend` reach codegen in: receiver in `args[0]`, the result
+            // stored back into its slot. Mono rewrote every other position into
+            // this one.
+            //
+            // The dict must be ours to write into before anything is removed, so
+            // it goes through `aipl_arr_reserve` first — asking for no extra room,
+            // purely for its ownership contract: it consumes the slot's reference
+            // and hands back one owned block, copying when the block is shared and
+            // keeping it when it is not. That is exactly `extend`'s discipline, so
+            // the bookkeeping below is `extend`'s.
+            if args.len() != 2 {
+                return Err(Error::at(
+                    format!("\"remove_key\" expects 1 argument, got {}", args.len() - 1),
+                    span.clone(),
+                ));
+            }
+            let receiver = &args[0];
+            let (slot, ty_cell, exclusive, key_ty, val_ty) =
+                mut_dict_receiver(env, receiver, "remove_key")?;
+            let dict_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
+            let (key_v, key_t) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let dict_ty = ConcreteType::Dict(Box::new(key_ty.clone()), Box::new(val_ty.clone()));
+            // An empty dict (`__none__` key) holds nothing, so there is nothing
+            // to find and no key type to compare against.
+            if is_none_inner(&key_ty) {
+                return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
+            }
+            let key_t = flex_int_ty(&args[1], &key_t, &key_ty);
+            expect_type(&key_t, &key_ty, "remove_key key", args[1].span.clone())?;
+            // Spilled by key type, not as a bare word — see `get` for why storing
+            // a composite key's *address* into an 8-byte slot reads back wrong.
+            let ks = value_slot(builder, &key_ty, structs);
+            let key_ptr = builder.ins().stack_addr(types::I64, ks, 0);
+            store_array_elem(builder, key_ptr, key_v, &key_ty, structs);
+            let pair_size = dict_pair_size(&key_ty, &val_ty, structs);
+            let psz = builder.ins().iconst(types::I64, pair_size);
+            let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&key_ty));
+            let (drop_fn, retain_fn) = pair_rc_fn_addrs(builder, module, cx, &key_ty, &val_ty);
+            let zero = builder.ins().iconst(types::I64, 0);
+            let owned = builtins.call(
+                module,
+                builder,
+                "aipl_arr_reserve",
+                &[dict_ptr, zero, drop_fn, retain_fn, psz],
+            );
+            let _ = builtins.call(
+                module,
+                builder,
+                "aipl_dict_remove",
+                &[owned, key_ptr, drop_fn, psz, str_cmp],
+            );
+            builder.ins().stack_store(types::I64, owned, slot, 0);
+            if !exclusive {
+                // Possibly shared: the slot's own reference was consumed by the
+                // reserve, so the extra retain plus value-track is this version's
+                // region track, keeping it borrowable to the scope's exit —
+                // `extend`, unchanged.
+                emit_retain(builder, module, builtins, structs, owned, &dict_ty);
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(owned, &dict_ty));
+            }
+            *ty_cell.borrow_mut() = dict_ty;
+            // `remove_key` mutates; it produces no value.
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         Callee::DictKeyAt | Callee::DictValueAt => {
             // `__dict_key_at(d, i)` / `__dict_value_at(d, i)` — the key or the

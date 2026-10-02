@@ -2910,9 +2910,18 @@ fn __builtin_to_array<T: any>(self: #{T}) -> T[] { [] }
 // it, and codegen builds the set in that order (unordered with no context).
 fn __builtin_to_set<T: any>(self: T[]) -> #{T} { #{} }
 
-// Dict ops: lookup (none if absent) and membership.
+// Dict ops: lookup (none if absent), membership, and removal.
 fn __builtin_get<K: any, V: any>(self: #{K: V}, key: K) -> V? { none }
 fn __builtin_contains_key<K: any, V: any>(self: #{K: V}, key: K) -> bool { false }
+// Drop `key`'s entry, in place. A key the dict does not hold is not an error —
+// the point of the call is that the key is gone afterwards, and it already is —
+// so this is the removal counterpart of `push`, not of an indexing read.
+//
+// The surviving entries keep the order they were inserted in, so iterating a
+// dict after a removal hands back what it did before, minus one. A `mut self`
+// receiver, so `set d.remove_key(k);` writes back the way every mutating method
+// does; in expression position it copies-and-modifies like one too.
+fn __builtin_remove_key<K: any, V: any>(mut self: #{K: V}, key: K) {}
 
 // `map` also takes an optional receiver — `opt.map(f)` is `U?`, `some(f(v))`
 // for `some(v)` and `none` for `none` — which the checker and mono dispatch

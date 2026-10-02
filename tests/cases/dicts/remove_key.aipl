@@ -1,0 +1,195 @@
+# `set d.remove_key(k);` drops `k`'s entry in place. The removal counterpart of
+# `push`, not of an indexing read: a key the dict does not hold is **not** an
+# error, because the point of the call is that the key is gone afterwards and it
+# already is.
+#
+# The surviving entries keep the order they were inserted in, so iterating a dict
+# after a removal hands back what it did before, minus one. Nothing *promises* a
+# dict's order — but it is what iterating one gives, so a removal that quietly
+# permuted the rest would be a surprise bought for one saved move.
+#
+# `mut self`, so it writes back like every mutating method, and in expression
+# position it copies-and-modifies like one too.
+
+import {
+    contains_key,
+    equal as ==,
+    extend,
+    get,
+    len,
+    logical_not as !,
+    print,
+    remove_key,
+    to_str,
+    value_or,
+} from builtins;
+
+fn main() !prints {
+    mut d = #{"a": 1, "b": 2, "c": 3};
+
+    // From the middle: the entries around it close up, in order.
+    set d.remove_key("b");
+    print(`{d} {d.len()} {!d.contains_key("b")}`);
+
+    // From the front, and from the back — each keeps the rest's order.
+    mut front = #{1: "x", 2: "y", 3: "z"};
+    set front.remove_key(1);
+    print(front.to_str());
+    mut back = #{1: "x", 2: "y", 3: "z"};
+    set back.remove_key(3);
+    print(back.to_str());
+
+    // A key the dict never held changes nothing.
+    set d.remove_key("zz");
+    print(d.to_str());
+
+    // Down to empty, and still a dict.
+    set d.remove_key("a");
+    set d.remove_key("c");
+    print(`{d} {d.len()} {d.get("a") == none}`);
+
+    // Value semantics: a binding made before the removal keeps what was
+    // removed. The dict is copied first because the removal would otherwise
+    // write into a block `snapshot` is still reading.
+    mut shared = #{"k": "vv", "j": "ww"};
+    let snapshot = shared;
+    set shared.remove_key("k");
+    print(`{shared} {snapshot}`);
+
+    // The removed value is released from `shared` alone — `snapshot`'s copy of
+    // the heap string is still readable.
+    print(`{snapshot.get("k").value_or("gone")} {shared.get("k").value_or("gone")}`);
+
+    // Expression position copies and modifies, leaving the receiver alone.
+    let without_j = shared.remove_key("j");
+    print(`{without_j} {shared}`);
+
+    // Heap *values* of other shapes are released the same way.
+    mut lists = #{1: [1, 2], 2: [3], 3: [4, 5, 6]};
+    set lists.remove_key(2);
+    print(`{lists} {lists.len()}`);
+
+    // Removing every key one at a time, then iterating what is left.
+    mut counts = #{"p": 1, "q": 2, "r": 3};
+    set counts.remove_key("q");
+    mut seen = "";
+    for (let k, v : counts) {
+        set seen.extend(`{k}{v};`);
+    }
+    print(seen);
+}
+--- stdout ---
+{"a": 1, "c": 3} 2 true
+{2: "y", 3: "z"}
+{1: "x", 2: "y"}
+{"a": 1, "c": 3}
+{} 0 true
+{"j": "ww"} {"k": "vv", "j": "ww"}
+vv gone
+{} {"j": "ww"}
+{1: [1, 2], 3: [4, 5, 6]} 2
+p1;r3;
+--- performance ---
+allocations: 55
+deallocations: 55
+reallocations: 0
+bytes allocated: 4036
+instructions executed: 5160
+binary size: 22088
+  code: 13480
+  data: 643
+  metadata: 7965
+functions:
+  __dict_drop_i64$i64$arr:
+    calls: 3
+    bytes: 128
+  __dict_drop_i64$str:
+    calls: 6
+    bytes: 128
+  __dict_drop_str$i64:
+    calls: 11
+    bytes: 132
+  __dict_drop_str$str:
+    calls: 5
+    bytes: 136
+  __dict_retain_i64$i64$arr:
+    calls: 4
+    bytes: 128
+  __dict_retain_i64$str:
+    calls: 8
+    bytes: 128
+  __dict_retain_str$i64:
+    calls: 11
+    bytes: 132
+  __dict_retain_str$str:
+    calls: 4
+    bytes: 136
+  __to_str_bool:
+    calls: 2
+    bytes: 232
+  __to_str_dict$i64$i64$arr:
+    calls: 1
+    bytes: 1216
+  __to_str_dict$i64$str:
+    calls: 2
+    bytes: 840
+  __to_str_dict$str$i64:
+    calls: 3
+    bytes: 844
+  __to_str_dict$str$str:
+    calls: 4
+    bytes: 936
+  __to_str_i64:
+    calls: 2
+    bytes: 204
+  __to_str_u64:
+    calls: 3
+    bytes: 204
+  aipl_arr_elem_ptr:
+    calls: 4
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 23
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 10
+    bytes: (external)
+  aipl_array_dec:
+    calls: 40
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 17
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 6
+    bytes: (external)
+  aipl_dict_contains_key:
+    calls: 1
+    bytes: (external)
+  aipl_dict_get:
+    calls: 3
+    bytes: (external)
+  aipl_dict_insert:
+    calls: 17
+    bytes: (external)
+  aipl_dict_remove:
+    calls: 10
+    bytes: (external)
+  aipl_i64_len:
+    calls: 34
+    bytes: (external)
+  aipl_u64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 65
+    bytes: (external)
+  aipl_write_i64:
+    calls: 17
+    bytes: (external)
+  aipl_write_u64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 7956

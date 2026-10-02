@@ -344,7 +344,8 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_array_push_mut"
         | "aipl_arr_sort"
         | "aipl_arr_reserve"
-        | "aipl_arr_extend" => sig(5, true),
+        | "aipl_arr_extend"
+        | "aipl_dict_remove" => sig(5, true),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert"
         | "aipl_arr_slice" => sig(6, true),
         // The parts, `join`'s three separators, and the element type's three
