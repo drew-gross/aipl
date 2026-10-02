@@ -323,11 +323,8 @@ fn only_call_arguments(
         ExprKind::Lambda(params, body) => {
             params.iter().all(|p| p.name != name) && !mentions(name, body)
         }
-        ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) | ExprKind::For(n, _, _)
-            if n == name =>
-        {
-            false
-        }
+        ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) if n == name => false,
+        ExprKind::For(n, index, _, _) if aipl_syntax::for_binds(n, index, name) => false,
         // The target of `set name = ..` is a place, not a read of the value;
         // a field path (`set name.f = ..`) reads it, and is checked as one.
         ExprKind::Assign(lhs, value, rest) => {
@@ -436,7 +433,7 @@ fn mark(
             }
         }
         // A use inside a loop is followed by the next iteration.
-        ExprKind::For(_, iter, body) => {
+        ExprKind::For(_, _, iter, body) => {
             let t = tail && !mentions(name, body);
             mark(name, iter, t, mutating, alias_outlives);
             mark(name, body, false, mutating, alias_outlives);

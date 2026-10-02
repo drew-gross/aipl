@@ -807,7 +807,7 @@ functions:
   __builtin_count_while$char$s0$lam$__m4__dedent$lambda2$lambda0:
     calls: 0
     bytes: 268
-  __builtin_find_index$str$lam$__m8__link$FKind$str$lambda0:
+  __builtin_find_index$str$lam$__m8__link$FKind$str$lambda1:
     calls: 26
     bytes: 404
   __builtin_find_index$str$lam$__m8__link_rule$FKind$lambda0:

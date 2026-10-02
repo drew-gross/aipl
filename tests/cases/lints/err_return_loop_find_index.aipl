@@ -4,9 +4,9 @@
 # expression. The twin of `return_loop_find_if`, which asks the same of the same
 # loop returning the element instead.
 #
-# The shape reaches the lint desugared: the indexed `for` is folded into a plain
-# loop over a synthetic `__idx$N` counter, so what is matched is that, not what
-# is written here.
+# The lint matches the loop as written: the index binder is carried on the `for`
+# node, and requiring one is the whole of what keeps this lint and the element
+# one apart.
 
 import { equal as ==, less_than as <, print, to_str, wrapping_mul as * } from builtins;
 

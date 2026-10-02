@@ -40,7 +40,10 @@ pub(super) fn return_loop_find_if(
     let ExprKind::Seq(first, rest) = &e.kind else {
         return;
     };
-    let ExprKind::For(var, iterable, loop_body) = &first.kind else {
+    // An *indexed* loop is not this shape: `find_if` passes each element
+    // and has no index to pass with it, so the rewrite would silently drop
+    // whatever the body did with it.
+    let ExprKind::For(var, None, iterable, loop_body) = &first.kind else {
         return;
     };
     if !is_none_answer(rest) {

@@ -797,7 +797,7 @@ functions:
   __builtin_any$__m1__Prec$lam$prod_line$Tok$Node$lambda2$lambda4:
     calls: 7
     bytes: 248
-  __builtin_find_index$str$lam$__m1__link$Tok$Node$lambda0:
+  __builtin_find_index$str$lam$__m1__link$Tok$Node$lambda1:
     calls: 35
     bytes: 404
   __builtin_find_index$str$lam$__m1__link_rule$Tok$lambda0:

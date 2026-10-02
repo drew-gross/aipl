@@ -80,12 +80,12 @@ fn brace_mix_message() -> str {
 allocations: 74
 deallocations: 74
 reallocations: 3
-bytes allocated: 5067
+bytes allocated: 5323
 instructions executed: 4817
-binary size: 74768
-  code: 49088
+binary size: 76088
+  code: 49972
   data: 1420
-  metadata: 24260
+  metadata: 24696
 functions:
   __arr_drop_BraceEntry:
     calls: 5
@@ -113,7 +113,7 @@ functions:
     bytes: 476
   __m1__show_expr:
     calls: 11
-    bytes: 24116
+    bytes: 24968
   __m1__show_exprs:
     calls: 4
     bytes: 1396
@@ -134,7 +134,7 @@ functions:
     bytes: 36
   __rec_drop___m1__ExprKind:
     calls: 16
-    bytes: 1260
+    bytes: 1292
   __rec_drop___tuple$__m1__Expr$__m1__Expr:
     calls: 3
     bytes: 72

@@ -255,12 +255,12 @@ pub fn binder_list(self: str[]) -> str {
 allocations: 142
 deallocations: 142
 reallocations: 6
-bytes allocated: 10177
+bytes allocated: 10273
 instructions executed: 9862
-binary size: 103320
-  code: 66692
+binary size: 104856
+  code: 67732
   data: 2739
-  metadata: 33889
+  metadata: 34385
 functions:
   __arr_drop_Pat:
     calls: 9
@@ -294,7 +294,7 @@ functions:
     bytes: 476
   __m1__show_expr:
     calls: 2
-    bytes: 24116
+    bytes: 24968
   __m1__show_exprs:
     calls: 1
     bytes: 1396
@@ -312,7 +312,7 @@ functions:
     bytes: 36
   __rec_drop___m1__ExprKind:
     calls: 6
-    bytes: 1260
+    bytes: 1292
   __test$binder_list:
     calls: 1
     bytes: 796
@@ -396,13 +396,13 @@ functions:
     bytes: 552
   ident_name:
     calls: 2
-    bytes: 2884
+    bytes: 2960
   is_binder_name:
     calls: 11
     bytes: 244
   is_ident:
     calls: 3
-    bytes: 2764
+    bytes: 2844
   is_plain_binder:
     calls: 4
     bytes: 488

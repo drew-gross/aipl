@@ -83,7 +83,7 @@ highlighter:
 
 misc cleanup:
   step_result n should be u64 without 0, move 0 check to call site
-  make extend accept T*, then don't need push_optional
+  keyword_len and exact_len should accept str without "" for spelling
   does set_map().join() make sense? Should there be a set_join?
   prevent untyped expressions from even getting to mono by using a separate type that can't contain them
   move inlining after type checking so that the type refinement problems don't happen
@@ -92,7 +92,6 @@ misc cleanup:
   go through and remove all comments that talk about how the code used to work.
   Symbol and Import should use SpanStr
   Tpl and Tok should not be abbreviated
-  re_escape_set should use a map of some sort probably
   get rid of convention of using 0..0 span as a substitute for none
   Fill[] should probably be a dict
   unordered set needs some way to convert to array
@@ -245,6 +244,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  allow return v; as the last statement of a function
   add units to the language
   support defaults for struct fields that are variants, structs, or optionals of variants or structs
   link_rule does some weird stuff to prevent the formatter from breaking the tuples. Also it should match on the tuple probably

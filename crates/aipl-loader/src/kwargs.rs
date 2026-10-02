@@ -999,6 +999,15 @@ impl Expander {
             s.insert(name.to_string());
             s
         };
+        // A loop binds its element and, in the two-binder form, its index; both
+        // scope over the body.
+        let with_loop = |name: &str, index: &Option<String>| -> HashSet<String> {
+            let mut s = with(name);
+            if let Some(i) = index {
+                s.insert(i.clone());
+            }
+            s
+        };
         let kind = match &e.kind {
             ExprKind::Num(_)
             | ExprKind::Bool(_)
@@ -1180,10 +1189,11 @@ impl Expander {
                 Box::new(self.expand_expr(value, locals)?),
                 Box::new(self.expand_expr(body, locals)?),
             ),
-            ExprKind::For(var, iterable, body) => ExprKind::For(
+            ExprKind::For(var, index, iterable, body) => ExprKind::For(
                 var.clone(),
+                index.clone(),
                 Box::new(self.expand_expr(iterable, locals)?),
-                Box::new(self.expand_expr(body, &with(var))?),
+                Box::new(self.expand_expr(body, &with_loop(var, index))?),
             ),
             ExprKind::While(cond, body) => ExprKind::While(
                 Box::new(self.expand_expr(cond, locals)?),

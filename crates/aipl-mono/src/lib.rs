@@ -413,12 +413,24 @@ fn lcr_expr(e: &Expr, lcr: &Lcr<'_>, scope: &mut Vec<String>) -> Expr {
                 Box::new(body),
             ))
         }
-        K::For(var, iter, body) => {
+        K::For(var, index, iter, body) => {
             let iter = lcr_expr(iter, lcr, scope);
             scope.push(var.clone());
+            // Both binders scope over the body.
+            if let Some(i) = index {
+                scope.push(i.clone());
+            }
             let body = lcr_expr(body, lcr, scope);
+            if index.is_some() {
+                scope.pop();
+            }
             scope.pop();
-            rw(K::For(var.clone(), Box::new(iter), Box::new(body)))
+            rw(K::For(
+                var.clone(),
+                index.clone(),
+                Box::new(iter),
+                Box::new(body),
+            ))
         }
         K::Assign(lhs, val, body) => rw(K::Assign(
             Box::new(lcr_expr(lhs, lcr, scope)),
@@ -775,7 +787,7 @@ fn lt_ty(
 /// arithmetic and length comparisons are spelled this way because there is only
 /// one shape to spell them in — the operator has no node of its own, so nothing
 /// downstream needs an alternative form to understand.
-fn op_call(canonical: Callee, args: Vec<Expr>, span: Span) -> Expr {
+pub(crate) fn op_call(canonical: Callee, args: Vec<Expr>, span: Span) -> Expr {
     Expr::new(ExprKind::Call(canonical, args, false), span)
 }
 
@@ -851,8 +863,9 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
             Box::new(lt_expr(a, fm, ord)),
             Box::new(lt_expr(b, fm, ord)),
         ),
-        ExprKind::For(v, iter, body) => ExprKind::For(
+        ExprKind::For(v, i, iter, body) => ExprKind::For(
             v.clone(),
+            i.clone(),
             Box::new(lt_expr(iter, fm, ord)),
             Box::new(lt_expr(body, fm, ord)),
         ),
@@ -1309,7 +1322,9 @@ impl GenericLowerer {
             K::Let(n, ty, a, c) => K::Let(n.clone(), ty.clone(), b(self, a)?, b(self, c)?),
             K::LetMut(n, ty, a, c) => K::LetMut(n.clone(), ty.clone(), b(self, a)?, b(self, c)?),
             K::Assign(lhs, a, c) => K::Assign(lhs.clone(), b(self, a)?, b(self, c)?),
-            K::For(v, iter, body) => K::For(v.clone(), b(self, iter)?, b(self, body)?),
+            K::For(v, i, iter, body) => {
+                K::For(v.clone(), i.clone(), b(self, iter)?, b(self, body)?)
+            }
             K::Call(name, args, ms) => K::Call(
                 name.clone(),
                 args.iter()
@@ -3408,7 +3423,12 @@ impl Mono<'_> {
                 span.clone(),
             );
             let loop_ = Expr::new(
-                ExprKind::For("$e".to_string(), Box::new(id("$a")), Box::new(guarded)),
+                ExprKind::For(
+                    "$e".to_string(),
+                    None,
+                    Box::new(id("$a")),
+                    Box::new(guarded),
+                ),
                 span.clone(),
             );
             let trunc = Expr::new(
@@ -3464,7 +3484,12 @@ impl Mono<'_> {
                 span.clone(),
             );
             let loop_ = Expr::new(
-                ExprKind::For("$e".to_string(), Box::new(id("$arr")), Box::new(guarded)),
+                ExprKind::For(
+                    "$e".to_string(),
+                    None,
+                    Box::new(id("$arr")),
+                    Box::new(guarded),
+                ),
                 span.clone(),
             );
             // `with_capacity` pre-sizes only 8-byte-element buffers; an optional
@@ -3739,7 +3764,12 @@ impl Mono<'_> {
                 span.clone(),
             );
             let loop_ = Expr::new(
-                ExprKind::For("$e".to_string(), Box::new(id("$a")), Box::new(for_body)),
+                ExprKind::For(
+                    "$e".to_string(),
+                    None,
+                    Box::new(id("$a")),
+                    Box::new(for_body),
+                ),
                 span.clone(),
             );
             // The reused buffer now holds `U` elements, but `$a`'s static type is
@@ -3778,7 +3808,7 @@ impl Mono<'_> {
             // loop's doubling reallocations into plain stores into spare capacity.
             let push = set_push(id("$out"), call, span.clone());
             let loop_ = Expr::new(
-                ExprKind::For("$e".to_string(), Box::new(id("$arr")), Box::new(push)),
+                ExprKind::For("$e".to_string(), None, Box::new(id("$arr")), Box::new(push)),
                 span.clone(),
             );
             // `with_capacity` pre-sizes only 8-byte-element buffers; an optional
@@ -4126,6 +4156,7 @@ impl Mono<'_> {
             let loop_ = Expr::new(
                 ExprKind::For(
                     reused_el.to_string(),
+                    None,
                     Box::new(id("$z")),
                     Box::new(for_body),
                 ),
@@ -4261,7 +4292,12 @@ impl Mono<'_> {
                 span.clone(),
             );
             let loop_ = Expr::new(
-                ExprKind::For("$e".to_string(), Box::new(id("$a")), Box::new(for_body)),
+                ExprKind::For(
+                    "$e".to_string(),
+                    None,
+                    Box::new(id("$a")),
+                    Box::new(for_body),
+                ),
                 span.clone(),
             );
             // mut $i = 0; { loop; $out }
@@ -4463,7 +4499,12 @@ impl Mono<'_> {
                 span.clone(),
             );
             let loop_ = Expr::new(
-                ExprKind::For("$e".to_string(), Box::new(id("$a")), Box::new(guarded)),
+                ExprKind::For(
+                    "$e".to_string(),
+                    None,
+                    Box::new(id("$a")),
+                    Box::new(guarded),
+                ),
                 span.clone(),
             );
             let trunc = Expr::new(
@@ -4513,7 +4554,12 @@ impl Mono<'_> {
                 span.clone(),
             );
             let loop_ = Expr::new(
-                ExprKind::For("$e".to_string(), Box::new(id("$arr")), Box::new(guarded)),
+                ExprKind::For(
+                    "$e".to_string(),
+                    None,
+                    Box::new(id("$arr")),
+                    Box::new(guarded),
+                ),
                 span.clone(),
             );
             // `with_capacity` pre-sizes only 8-byte-element buffers; an optional
@@ -6587,8 +6633,65 @@ impl Mono<'_> {
                     bt,
                 )
             }
-            ExprKind::For(var, iter, body) => {
+            ExprKind::For(var, index, iter, body) => {
                 let (ri, it) = self.infer(iter, env)?;
+                // The two-binder form `for (let i, x : xs)`, now that the
+                // iterable's type is known. Over an array, a `str` or a range an
+                // index is the *position*, so the loop is the plain one over a
+                // counter declared right at it — re-declared per entry, which is
+                // what resets it when the loop is nested inside another:
+                //
+                //   mut $idx: u64 = 0;
+                //   for (let x : xs) { let i = $idx; body; set $idx = $idx + 1; }
+                //
+                // `i` is re-bound immutably each iteration, so the body cannot
+                // move the counter out from under the loop, and the bump calls
+                // the canonical builtin rather than emitting a `+` — operator use
+                // is gated per file against its imports, and a loop should not
+                // oblige a file to import an operator it never wrote.
+                //
+                // Re-inferred afterwards, so every binding it introduces is typed
+                // like one the program wrote. The inner loop is plain, so a range
+                // still reaches the counted-`while` lowering below.
+                if let Some(idx) = index {
+                    let k = self.synth;
+                    self.synth += 1;
+                    let counter = format!("__idx${k}");
+                    let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
+                    let unit = || Expr::new(ExprKind::Unit, span.clone());
+                    let bump = Expr::new(
+                        ExprKind::Assign(
+                            Box::new(id(&counter)),
+                            Box::new(op_call(
+                                Callee::WrappingAdd,
+                                vec![id(&counter), Expr::new(ExprKind::Num(1), span.clone())],
+                                span.clone(),
+                            )),
+                            Box::new(unit()),
+                        ),
+                        span.clone(),
+                    );
+                    let counted =
+                        Expr::new(ExprKind::Seq(body.clone(), Box::new(bump)), span.clone());
+                    let bound = Expr::new(
+                        ExprKind::Let(idx.clone(), None, Box::new(id(&counter)), Box::new(counted)),
+                        span.clone(),
+                    );
+                    let plain = Expr::new(
+                        ExprKind::For(var.clone(), None, iter.clone(), Box::new(bound)),
+                        span.clone(),
+                    );
+                    let whole = Expr::new(
+                        ExprKind::LetMut(
+                            counter,
+                            Some(Type::Primitive(Primitive::U64)),
+                            Box::new(Expr::new(ExprKind::Num(0), span.clone())),
+                            Box::new(plain),
+                        ),
+                        span.clone(),
+                    );
+                    return self.infer(&whole, env);
+                }
                 // A range: the counted loop it stands for, spelled out —
                 //   let $range = <iter>;
                 //   mut $i: u64 = $range.start;
@@ -6662,7 +6765,12 @@ impl Mono<'_> {
                 env2.insert(var.clone(), elem);
                 let (rb, _) = self.infer(body, &env2)?;
                 (
-                    node(ExprKind::For(var.clone(), Box::new(ri), Box::new(rb))),
+                    node(ExprKind::For(
+                        var.clone(),
+                        index.clone(),
+                        Box::new(ri),
+                        Box::new(rb),
+                    )),
                     Type::Primitive(Primitive::I64),
                 )
             }
@@ -8475,7 +8583,7 @@ fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
         K::Index(a, b) => K::Index(r(a), r(b)),
         K::While(a, b) => K::While(r(a), r(b)),
         K::Assign(lhs, v, b) => K::Assign(lhs.clone(), r(v), r(b)),
-        K::For(v, iter, body) => K::For(v.clone(), r(iter), r(body)),
+        K::For(v, i, iter, body) => K::For(v.clone(), i.clone(), r(iter), r(body)),
         K::Slice(a, b, c) => K::Slice(r(a), r(b), c.as_ref().map(|x| r(x))),
         K::Shim(effect, bindings, body) => K::Shim(effect.clone(), bindings.clone(), r(body)),
         K::Construct(name, fields) => K::Construct(
@@ -8813,10 +8921,15 @@ fn collect_free(
             collect_free(val, bound, env, out, seen);
             collect_free(b, bound, env, out, seen);
         }
-        ExprKind::For(v, iter, b) => {
+        ExprKind::For(v, index, iter, b) => {
             collect_free(iter, bound, env, out, seen);
             let added = bound.insert(v.clone());
+            // The index binder is bound over the body too.
+            let added_index = index.as_ref().is_some_and(|i| bound.insert(i.clone()));
             collect_free(b, bound, env, out, seen);
+            if added_index {
+                bound.remove(index.as_ref().expect("inserted above"));
+            }
             if added {
                 bound.remove(v);
             }
@@ -9003,10 +9116,14 @@ pub(crate) fn count_uses(
             count_uses(val, bound, counts);
             count_uses(b, bound, counts);
         }
-        ExprKind::For(v, iter, b) => {
+        ExprKind::For(v, index, iter, b) => {
             count_uses(iter, bound, counts);
             let added = bound.insert(v.clone());
+            let added_index = index.as_ref().is_some_and(|i| bound.insert(i.clone()));
             count_uses(b, bound, counts);
+            if added_index {
+                bound.remove(index.as_ref().expect("inserted above"));
+            }
             if added {
                 bound.remove(v);
             }
@@ -9621,8 +9738,14 @@ fn collect_binders_mono(program: &MonoProgram) -> HashSet<String> {
 
 fn collect_body_binders(e: &Expr, set: &mut HashSet<String>) {
     match &e.kind {
-        ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) | ExprKind::For(n, _, _) => {
+        ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) => {
             set.insert(n.clone());
+        }
+        ExprKind::For(n, index, _, _) => {
+            set.insert(n.clone());
+            if let Some(i) = index {
+                set.insert(i.clone());
+            }
         }
         ExprKind::Lambda(ps, _) => {
             for p in ps {
@@ -9666,7 +9789,7 @@ pub fn children(e: &Expr) -> Vec<&Expr> {
         | ExprKind::Let(_, _, a, b)
         | ExprKind::LetMut(_, _, a, b)
         | ExprKind::Assign(_, a, b)
-        | ExprKind::For(_, a, b)
+        | ExprKind::For(_, _, a, b)
         | ExprKind::While(a, b) => vec![a, b],
         ExprKind::If(a, b, c) => vec![a, b, c],
         ExprKind::Slice(a, b, c) => {
@@ -9728,7 +9851,7 @@ pub fn children_mut(e: &mut Expr) -> Vec<&mut Expr> {
         | ExprKind::Let(_, _, a, b)
         | ExprKind::LetMut(_, _, a, b)
         | ExprKind::Assign(_, a, b)
-        | ExprKind::For(_, a, b)
+        | ExprKind::For(_, _, a, b)
         | ExprKind::While(a, b) => vec![a, b],
         ExprKind::If(a, b, c) => vec![a, b, c],
         ExprKind::Slice(a, b, c) => {
@@ -9901,8 +10024,9 @@ fn replace_call(
             Box::new(rc(a, replaced)),
             Box::new(rc(b, replaced)),
         ),
-        ExprKind::For(v, a, b) => ExprKind::For(
+        ExprKind::For(v, i, a, b) => ExprKind::For(
             v.clone(),
+            i.clone(),
             Box::new(rc(a, replaced)),
             Box::new(rc(b, replaced)),
         ),
@@ -10180,10 +10304,15 @@ pub(crate) fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
             Box::new(rename_params(a, map)),
             Box::new(rename_params(b, &without(n))),
         ),
-        ExprKind::For(v, iter, b) => ExprKind::For(
+        ExprKind::For(v, index, iter, b) => ExprKind::For(
             v.clone(),
+            index.clone(),
             Box::new(rename_params(iter, map)),
-            Box::new(rename_params(b, &without(v))),
+            // Both binders shadow a parameter of the same name.
+            Box::new(rename_params(
+                b,
+                &without_all(&aipl_syntax::loop_binders(v, index)),
+            )),
         ),
         ExprKind::Match(s, arms) => ExprKind::Match(
             Box::new(rename_params(s, map)),
@@ -10390,7 +10519,7 @@ fn fields_read_once_into(param: &str, e: &Expr, repeats: bool, seen: &mut Vec<St
             true
         }
         ExprKind::Ident(n) => n != param,
-        ExprKind::For(_, iter, fbody) => {
+        ExprKind::For(_, _, iter, fbody) => {
             fields_read_once_into(param, iter, repeats, seen)
                 && fields_read_once_into(param, fbody, true, seen)
         }
@@ -10766,7 +10895,7 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
             };
             lhs_bad || rec_tail(b)
         }
-        ExprKind::For(_, iter, fbody) => {
+        ExprKind::For(_, _, iter, fbody) => {
             if is_n(iter) {
                 aliases_or_unsafe(name, fbody, true, false)
             } else {
@@ -10806,7 +10935,7 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
         | ExprKind::Index(a, b)
         | ExprKind::Let(_, _, a, b)
         | ExprKind::LetMut(_, _, a, b)
-        | ExprKind::For(_, a, b)
+        | ExprKind::For(_, _, a, b)
         | ExprKind::While(a, b) => c(a) + c(b),
         // A bare-ident LHS is an lvalue, not a read; a field-path LHS also
         // *reads* its base (the functional-update desugar copies the struct's
@@ -10849,7 +10978,7 @@ fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
         | ExprKind::Assign(_, a, b)
         | ExprKind::Seq(a, b)
         | ExprKind::Index(a, b)
-        | ExprKind::For(_, a, b)
+        | ExprKind::For(_, _, a, b)
         | ExprKind::While(a, b) => find_move_into(param, a).or_else(|| find_move_into(param, b)),
         ExprKind::If(a, b, d) => find_move_into(param, a)
             .or_else(|| find_move_into(param, b))

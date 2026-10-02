@@ -108,7 +108,10 @@ pub(super) fn union_loop_union_all(e: &Expr, src: &str, names: &UnionNames, hits
     let ExprKind::Seq(first, _) = &body.kind else {
         return;
     };
-    let ExprKind::For(var, iterable, loop_body) = &first.kind else {
+    // An *indexed* loop is not this shape: `union_all` passes each element
+    // and has no index to pass with it, so the rewrite would silently drop
+    // whatever the body did with it.
+    let ExprKind::For(var, None, iterable, loop_body) = &first.kind else {
         return;
     };
     let Some(stmt) = lone_stmt(loop_body) else {

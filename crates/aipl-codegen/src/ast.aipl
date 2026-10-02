@@ -164,19 +164,19 @@ pub fn ast_case_name(self: Ast) -> str {
 allocations: 3
 deallocations: 3
 reallocations: 0
-bytes allocated: 240
+bytes allocated: 256
 instructions executed: 162
-binary size: 5712
-  code: 2788
+binary size: 5760
+  code: 2820
   data: 221
-  metadata: 2703
+  metadata: 2719
 functions:
   __rec_drop___m2__Expr:
     calls: 1
     bytes: 36
   __rec_drop___m2__ExprKind:
     calls: 1
-    bytes: 1260
+    bytes: 1292
   __rec_drop___m5__Ty:
     calls: 1
     bytes: 476

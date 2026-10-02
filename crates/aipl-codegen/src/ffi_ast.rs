@@ -414,7 +414,19 @@ fn expr_kind(v: &FfiValue) -> R<ast::ExprKind> {
             sub(3)?,
         ),
         "Assign" => K::Assign(sub(0)?, sub(1)?, sub(2)?),
-        "For" => K::For(name(0)?, sub(1)?, sub(2)?),
+        // The index binder is the AIPL variant's last slot (see `expr.aipl`),
+        // so an artifact built before it existed has three slots and decodes as
+        // the plain loop it was — which is what lets that artifact compile the
+        // one that has four.
+        "For" => K::For(
+            name(0)?,
+            match payload.get(3) {
+                Some(v) => maybe(v, text)?,
+                None => None,
+            },
+            sub(1)?,
+            sub(2)?,
+        ),
         "While" => K::While(sub(0)?, sub(1)?),
         "Shim" => K::Shim(name(0)?, each(at(payload, 1, case)?, name_pair)?, sub(2)?),
         "None" => K::None,

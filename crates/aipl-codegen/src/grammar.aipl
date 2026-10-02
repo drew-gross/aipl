@@ -1130,7 +1130,7 @@ functions:
   __builtin_find_index$str$lam$__test$link$lambda1:
     calls: 1
     bytes: 416
-  __builtin_find_index$str$lam$link$Kind$Node$lambda0:
+  __builtin_find_index$str$lam$link$Kind$Node$lambda1:
     calls: 26
     bytes: 404
   __builtin_find_index$str$lam$link_rule$Kind$lambda0:

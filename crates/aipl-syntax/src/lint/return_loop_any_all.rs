@@ -77,7 +77,10 @@ pub(super) fn return_loop_any_all(e: &Expr, src: &str, names: &AnyAllNames, hits
     let ExprKind::Seq(first, rest) = &e.kind else {
         return;
     };
-    let ExprKind::For(var, iterable, loop_body) = &first.kind else {
+    // An *indexed* loop is not this shape: `any`/`all` passes each element
+    // and has no index to pass with it, so the rewrite would silently drop
+    // whatever the body did with it.
+    let ExprKind::For(var, None, iterable, loop_body) = &first.kind else {
         return;
     };
     let Some(fell_through) = bool_answer(rest) else {

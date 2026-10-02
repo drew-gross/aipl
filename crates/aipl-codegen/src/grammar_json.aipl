@@ -511,7 +511,7 @@ allocations: 21407
 deallocations: 21407
 reallocations: 2813
 bytes allocated: 2984039
-instructions executed: 6653432
+instructions executed: 6653388
 binary size: 429656
   code: 283916
   data: 8348
@@ -649,7 +649,7 @@ functions:
   __builtin_find_index$str$lam$__m13__parse_prepared$JsonTok$Json$lambda0:
     calls: 57
     bytes: 404
-  __builtin_find_index$str$lam$__m3__link$JsonTok$Json$lambda0:
+  __builtin_find_index$str$lam$__m3__link$JsonTok$Json$lambda1:
     calls: 608
     bytes: 404
   __builtin_find_index$str$lam$__m3__link_rule$JsonTok$lambda0:

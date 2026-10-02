@@ -88,7 +88,10 @@ pub(super) fn push_loop_pipeline(
     let ExprKind::Seq(first, _) = &body.kind else {
         return;
     };
-    let ExprKind::For(var, iterable, loop_body) = &first.kind else {
+    // An *indexed* loop is not this shape: `map`/`filter` passes each element
+    // and has no index to pass with it, so the rewrite would silently drop
+    // whatever the body did with it.
+    let ExprKind::For(var, None, iterable, loop_body) = &first.kind else {
         return;
     };
     // A range (`a..b`, a `__builtin_Span` construction) is not an array: the

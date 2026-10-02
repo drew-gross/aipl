@@ -358,8 +358,9 @@ pub(crate) fn mentions_free(e: &Expr, name: &str) -> bool {
         ExprKind::Let(n, _, value, body) | ExprKind::LetMut(n, _, value, body) => {
             mentions_free(value, name) || (n != name && mentions_free(body, name))
         }
-        ExprKind::For(n, iterable, body) => {
-            mentions_free(iterable, name) || (n != name && mentions_free(body, name))
+        ExprKind::For(n, index, iterable, body) => {
+            mentions_free(iterable, name)
+                || (!aipl_syntax::for_binds(n, index, name) && mentions_free(body, name))
         }
         ExprKind::Match(scrutinee, arms) => {
             mentions_free(scrutinee, name)

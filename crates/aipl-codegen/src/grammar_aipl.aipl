@@ -302,7 +302,7 @@ import {
     pat_label,
     show_pat,
 } from "./pat.aipl";
-import { Char as CharPrim, Str as StrPrim, U64, prim_from_name } from "./prim.aipl";
+import { Char as CharPrim, Str as StrPrim, prim_from_name } from "./prim.aipl";
 import { strip_test_sections } from "./strip_test_sections.aipl";
 import {
     Field as SufField,
@@ -2244,16 +2244,13 @@ fn destructure_struct(
     at(Let(tmp, some(TyNamed(struct_name)), value, inner), outer_span)
 }
 
-# The `for` loop and the rest of the block. An indexed loop is a plain one over
-# a counter declared just *outside* it — introduced here rather than in the
-# production because it has to scope over the rest of the block, and being
-# re-declared per entry is what resets it when the loop is nested inside
-# another. `i` is re-bound immutably each iteration, so the body cannot move the
-# counter out from under the loop.
-#
-# The increment calls the canonical builtin rather than emitting a `+`: operator
-# usage is gated per file against its imports, and a loop should not oblige the
-# file to import an operator it never wrote.
+# The `for` loop and the rest of the block. Both binders are carried on the node
+# — the element one and, for `for (let i, x : xs)`, the index one — and nothing
+# is desugared here: what an index *is* depends on what is being iterated (a
+# position over an array or a `str`, the key over a dict, which is indexed by its
+# key exactly as an array is by its position), and the parser has no types. Mono
+# is the first pass that knows, and `lower_for` there is where the index becomes
+# whatever it is.
 fn for_chain(
     name: str,
     name_span: Span,
@@ -2263,33 +2260,8 @@ fn for_chain(
     for_span: Span,
     acc: Expr,
 ) -> Expr {
-    let idx = index.value_or("");
-    if (!index.is_some()) {
-        let span = join_spans(name_span, acc.span);
-        return seq(at(For(name, iterable, body), for_span), acc, span);
-    };
-    let tmp = `__idx${iterable.span.start}`;
-    let body_span = body.span;
-    let bump = at(
-        Assign(
-            at(Ident(tmp), name_span),
-            at(
-                Call(
-                    "__builtin_wrapping_add",
-                    [at(Ident(tmp), name_span), at(Num(1), name_span)],
-                    false,
-                ),
-                name_span,
-            ),
-            at(Unit, name_span),
-        ),
-        name_span,
-    );
-    let counted = seq(body, bump, body_span);
-    let bound = at(Let(idx, none, at(Ident(tmp), name_span), counted), body_span);
     let span = join_spans(name_span, acc.span);
-    let rest = seq(at(For(name, iterable, bound), for_span), acc, span);
-    at(LetMut(tmp, some(TyPrimitive(U64)), at(Num(0), name_span), rest), span)
+    seq(at(For(name, iterable, body, index=index), for_span), acc, span)
 }
 
 # `while (cond) { body }`. No keyword or paren token carries a span of its own,
@@ -3952,22 +3924,19 @@ pub fn lower_aipl_block(src: str) -> Expr!ParseError {
         ) == "error: a tuple pattern needs at least 2 names, e.g. for (let (a, b) : expr) { ... }",
     );
 
-    // `for (let i, x : xs)` is a plain loop over a counter declared just
-    // *outside* it, so it resets when the loop is nested inside another. The
-    // bump calls the canonical builtin rather than emitting a `+`: a loop
-    // should not oblige the file to import an operator it never wrote.
+    // `for (let i, x : xs)` keeps both binders on the node — the index is
+    // printed in brackets — and is lowered no further here: what an index is
+    // depends on what is iterated, and only mono knows that.
     assert(
-        block_dump(
-            "{ for (let i, x : xs) { f(x); } }",
-        ) == "Mut(__idx$18: u64, 0, Seq(For(x, xs, Let(i, __idx$18, Seq(Seq(f(x), 0), Assign(__idx$18, __builtin_wrapping_add(__idx$18, 1), ())))), ()))",
+        block_dump("{ for (let i, x : xs) { f(x); } }") == "Seq(For([i], x, xs, Seq(f(x), 0)), ())",
     );
 
-    // `for (let i, (a, b) : ps)` composes the two: the counter outside, the
-    // field reads inside, with `i` bound between them.
+    // `for (let i, (a, b) : ps)` composes the two: the index on the node, the
+    // tuple's field reads prepended to the body.
     assert(
         block_dump(
             "{ for (let i, (a, b) : ps) { f(a); } }",
-        ) == "Mut(__idx$23: u64, 0, Seq(For(__fpat$23, ps, Let(i, __idx$23, Seq(Let(a, __fpat$23._0, Let(b, __fpat$23._1, Seq(f(a), 0))), Assign(__idx$23, __builtin_wrapping_add(__idx$23, 1), ())))), ()))",
+        ) == "Seq(For([i], __fpat$23, ps, Let(a, __fpat$23._0, Let(b, __fpat$23._1, Seq(f(a), 0)))), ())",
     );
     assert(
         block_dump(
@@ -4967,15 +4936,15 @@ fn why(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 2105746
-deallocations: 2105746
-reallocations: 299810
-bytes allocated: 406409308
-instructions executed: 618388537
-binary size: 7004696
-  code: 4634136
-  data: 59172
-  metadata: 2311388
+allocations: 2105632
+deallocations: 2105632
+reallocations: 299808
+bytes allocated: 406411066
+instructions executed: 618384083
+binary size: 7001912
+  code: 4632916
+  data: 58740
+  metadata: 2310256
 functions:
   __arr_drop___m11__ModeFrame:
     calls: 537
@@ -5014,7 +4983,7 @@ functions:
     calls: 2601
     bytes: 140
   __arr_drop___m3__Expr:
-    calls: 96
+    calls: 94
     bytes: 116
   __arr_drop___m3__FieldInit:
     calls: 17
@@ -5205,7 +5174,7 @@ functions:
   __builtin_any$__m7__Rule$__m23__AiplTok$lam$__m30__rule_nullable$__m23__AiplTok$lambda1$tail:
     calls: 108
     bytes: 380
-  __builtin_any$__m9__Function$lam$lower_fn_attr$lambda2:
+  __builtin_any$__m9__Function$lam$lower_fn_attr$lambda3:
     calls: 4
     bytes: 512
   __builtin_any$str$lam$__m11__up_to_any_len$lambda0:
@@ -5243,14 +5212,14 @@ functions:
     bytes: 268
   __builtin_find_if$__m3__Expr$lam$is_spread:
     calls: 36
-    bytes: 3064
+    bytes: 3132
   __builtin_find_if$__m7__Prec$lam$__m30__climb$__m23__AiplTok$__m1__Ast$lambda0:
     calls: 394
     bytes: 688
   __builtin_find_index$str$lam$__m30__parse_prepared$__m23__AiplTok$__m1__Ast$lambda0:
     calls: 365
     bytes: 404
-  __builtin_find_index$str$lam$__m7__link$__m23__AiplTok$__m1__Ast$lambda0:
+  __builtin_find_index$str$lam$__m7__link$__m23__AiplTok$__m1__Ast$lambda1:
     calls: 24240
     bytes: 404
   __builtin_find_index$str$lam$__m7__link_rule$__m23__AiplTok$lambda0:
@@ -5349,7 +5318,7 @@ functions:
   __builtin_try_map$__m1__Ast$__m4__Pat$__m7__ParseError$lam$lower_match_arm$lambda2:
     calls: 1
     bytes: 10840
-  __builtin_try_map$__m1__Ast$__m4__Pat$__m7__ParseError$lam$lower_match_arm$lambda4:
+  __builtin_try_map$__m1__Ast$__m4__Pat$__m7__ParseError$lam$lower_match_arm$lambda5:
     calls: 16
     bytes: 10840
   __builtin_try_map$__m1__Ast$__m4__Pat$__m7__ParseError$lam$lower_pattern$lambda2:
@@ -5462,7 +5431,7 @@ functions:
     bytes: 780
   __m14__range_bounds:
     calls: 4
-    bytes: 3524
+    bytes: 3592
   __m15__col_after:
     calls: 220
     bytes: 628
@@ -5679,20 +5648,17 @@ functions:
   __m32__line_at:
     calls: 9
     bytes: 652
-  __m3__at:
-    calls: 4
-    bytes: 152
   __m3__show_ann:
-    calls: 32
+    calls: 28
     bytes: 416
   __m3__show_arm:
     calls: 18
     bytes: 476
   __m3__show_expr:
-    calls: 556
-    bytes: 24116
+    calls: 534
+    bytes: 24968
   __m3__show_exprs:
-    calls: 75
+    calls: 73
     bytes: 1396
   __m4__binder_list:
     calls: 6
@@ -5702,13 +5668,13 @@ functions:
     bytes: 552
   __m4__ident_name:
     calls: 0
-    bytes: 2884
+    bytes: 2960
   __m4__is_binder_name:
     calls: 25
     bytes: 244
   __m4__is_ident:
     calls: 0
-    bytes: 2764
+    bytes: 2844
   __m4__is_plain_binder:
     calls: 18
     bytes: 488
@@ -5734,7 +5700,7 @@ functions:
     calls: 13
     bytes: 1396
   __m6__show_ty:
-    calls: 199
+    calls: 197
     bytes: 5572
   __m6__show_tys:
     calls: 16
@@ -5842,11 +5808,11 @@ functions:
     calls: 1152
     bytes: 84
   __rec_drop___m3__Expr:
-    calls: 862
+    calls: 838
     bytes: 36
   __rec_drop___m3__ExprKind:
-    calls: 701
-    bytes: 1260
+    calls: 677
+    bytes: 1292
   __rec_drop___m3__FieldInit:
     calls: 17
     bytes: 72
@@ -5857,7 +5823,7 @@ functions:
     calls: 90
     bytes: 232
   __rec_drop___m6__Ty:
-    calls: 214
+    calls: 212
     bytes: 476
   __rec_drop___m7__Rule$__m23__AiplTok:
     calls: 1303622
@@ -5947,10 +5913,10 @@ functions:
     calls: 0
     bytes: 836
   __to_str_i64:
-    calls: 110
+    calls: 106
     bytes: 204
   __to_str_u64:
-    calls: 25
+    calls: 23
     bytes: 204
   aipl_arr_drop_arr:
     calls: 2318
@@ -5962,7 +5928,7 @@ functions:
     calls: 1192801
     bytes: (external)
   aipl_arr_inc:
-    calls: 5724067
+    calls: 5724065
     bytes: (external)
   aipl_arr_reserve:
     calls: 1202310
@@ -5977,10 +5943,10 @@ functions:
     calls: 36
     bytes: (external)
   aipl_array_dec:
-    calls: 8508970
+    calls: 8508964
     bytes: (external)
   aipl_array_new:
-    calls: 188594
+    calls: 188592
     bytes: (external)
   aipl_array_push:
     calls: 176174
@@ -5998,7 +5964,7 @@ functions:
     calls: 365
     bytes: 912
   aipl_i64_len:
-    calls: 220
+    calls: 212
     bytes: (external)
   aipl_parse_cst:
     calls: 79
@@ -6010,19 +5976,19 @@ functions:
     calls: 8
     bytes: 748
   aipl_rec_alloc:
-    calls: 1399841
+    calls: 1399791
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 7351793
+    calls: 7351675
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 429215
+    calls: 429169
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 5951952
+    calls: 5951884
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 429215
+    calls: 429169
     bytes: (external)
   aipl_set_contains:
     calls: 123082
@@ -6046,16 +6012,16 @@ functions:
     calls: 1
     bytes: (external)
   aipl_u64_len:
-    calls: 50
+    calls: 46
     bytes: (external)
   aipl_write_bytes:
     calls: 208
     bytes: (external)
   aipl_write_i64:
-    calls: 110
+    calls: 106
     bytes: (external)
   aipl_write_u64:
-    calls: 25
+    calls: 23
     bytes: (external)
   angles:
     calls: 1095
@@ -6227,7 +6193,7 @@ functions:
     bytes: 7912
   lower_assign_stmt:
     calls: 15
-    bytes: 55040
+    bytes: 55112
   lower_atom:
     calls: 294
     bytes: 183828
@@ -6308,7 +6274,7 @@ functions:
     bytes: 33988
   lower_item:
     calls: 52
-    bytes: 64788
+    bytes: 65392
   lower_lambda:
     calls: 3
     bytes: 16820
@@ -6392,8 +6358,8 @@ functions:
     bytes: 8456
   lower_variant_decl:
     calls: 6
-    bytes: 28528
-  lower_variant_decl$filter5$own0:
+    bytes: 28536
+  lower_variant_decl$filter6$own0:
     calls: 14
     bytes: 448
   lower_while_stmt:
@@ -6433,13 +6399,13 @@ functions:
     calls: 1460
     bytes: 376
   repair_block_value:
-    calls: 153
+    calls: 151
     bytes: 2348
   same_bindings:
     calls: 16
-    bytes: 2484
+    bytes: 2492
   seq:
-    calls: 16
+    calls: 14
     bytes: 264
   shim_expr:
     calls: 1
@@ -6470,7 +6436,7 @@ functions:
     bytes: 1012
   wrap_stmt:
     calls: 31
-    bytes: 6636
+    bytes: 3700
   wrong_kind:
     calls: 0
     bytes: 10268

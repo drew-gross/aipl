@@ -1879,7 +1879,7 @@ functions:
   __builtin_find_if$__m3__Prec$lam$climb$Tok$Node$lambda0:
     calls: 11
     bytes: 688
-  __builtin_find_index$str$lam$__m3__link$Tok$Node$lambda0:
+  __builtin_find_index$str$lam$__m3__link$Tok$Node$lambda1:
     calls: 173
     bytes: 404
   __builtin_find_index$str$lam$__m3__link_rule$Tok$lambda0:

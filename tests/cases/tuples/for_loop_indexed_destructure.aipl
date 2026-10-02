@@ -34,11 +34,11 @@ allocations: 46
 deallocations: 46
 reallocations: 0
 bytes allocated: 2921
-instructions executed: 1629
-binary size: 6200
-  code: 3668
+instructions executed: 1626
+binary size: 6208
+  code: 3672
   data: 1
-  metadata: 2531
+  metadata: 2535
 functions:
   __arr_drop___tuple$i64$str:
     calls: 1
@@ -72,4 +72,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3020
+    bytes: 3024

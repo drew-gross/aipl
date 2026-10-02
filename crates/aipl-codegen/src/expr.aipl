@@ -68,7 +68,16 @@ variant ExprKind =
     | Let(name: str, ty: Ty?, value: Expr, body: Expr)
     | LetMut(name: str, ty: Ty?, value: Expr, body: Expr)
     | Assign(lhs: Expr, value: Expr, body: Expr)
-    | For(name: str, iterable: Expr, body: Expr)
+    # The loop's element binder, what it walks, its body, and the *index*
+    # binder of the two-binder form `for (let i, x : xs)` (`none` for the plain
+    # form). What an index is depends on what is iterated — a position over an
+    # array, the key over a dict — so it survives parsing and mono lowers it.
+    #
+    # `index` is deliberately the *last* slot rather than beside `name`: the
+    # artifact that compiles the next one is the previous one, so a slot added
+    # at the end lets the decoder (`ffi_ast.rs`) read an artifact built before
+    # it as the plain loop it was, and the bootstrap costs nothing.
+    | For(name: str, iterable: Expr, body: Expr, index: str? = none)
     | While(cond: Expr, body: Expr)
     | Shim(effect: str, bindings: (str, str)[], body: Expr)
     | None
@@ -110,7 +119,12 @@ pub fn show_expr(self: Expr) -> str {
         Let(name, ty, value, body) => `Let({name}{show_ann(ty)}, {value.show_expr()}, {body.show_expr()})`,
         LetMut(name, ty, value, body) => `Mut({name}{show_ann(ty)}, {value.show_expr()}, {body.show_expr()})`,
         Assign(lhs, value, body) => `Assign({lhs.show_expr()}, {value.show_expr()}, {body.show_expr()})`,
-        For(name, iterable, body) => `For({name}, {iterable.show_expr()}, {body.show_expr()})`,
+        For(name, iterable, body, index) => match (index) {
+            // Bracketed so a plain loop prints exactly as it always has and an
+            // indexed one is unmistakable.
+            some(i) => `For([{i}], {name}, {iterable.show_expr()}, {body.show_expr()})`,
+            none => `For({name}, {iterable.show_expr()}, {body.show_expr()})`,
+        },
         While(cond, body) => `While({cond.show_expr()}, {body.show_expr()})`,
         Shim(effect, bindings, body) => `Shim({effect}, [{show_binds(bindings)}], {body.show_expr()})`,
         None => "none",
@@ -240,12 +254,12 @@ fn show_bind(self: (str, str)) -> str { `{self.0} = {self.1}` }
 allocations: 219
 deallocations: 219
 reallocations: 4
-bytes allocated: 15928
+bytes allocated: 16536
 instructions executed: 11440
-binary size: 86592
-  code: 56188
+binary size: 87904
+  code: 57072
   data: 2529
-  metadata: 27875
+  metadata: 28303
 functions:
   __arr_drop_Expr:
     calls: 8
@@ -294,7 +308,7 @@ functions:
     bytes: 36
   __rec_drop_ExprKind:
     calls: 38
-    bytes: 1260
+    bytes: 1292
   __rec_drop_MatchArm:
     calls: 1
     bytes: 72
@@ -372,7 +386,7 @@ functions:
     bytes: 476
   show_expr:
     calls: 56
-    bytes: 24116
+    bytes: 24968
   show_exprs:
     calls: 7
     bytes: 1396

@@ -1269,7 +1269,7 @@
           </h3>
           <pre class="signature"><code>fn for_chain(name: str, name_span: Span, index: str?, iterable: Expr, body: Expr, for_span: Span, acc: Expr) -&#62; Expr</code></pre>
 
-          <div class="doc"><p>The <code>for</code> loop and the rest of the block. An indexed loop is a plain one over a counter declared just <em>outside</em> it — introduced here rather than in the production because it has to scope over the rest of the block, and being re-declared per entry is what resets it when the loop is nested inside another. <code>i</code> is re-bound immutably each iteration, so the body cannot move the counter out from under the loop.</p><p>The increment calls the canonical builtin rather than emitting a <code>+</code>: operator usage is gated per file against its imports, and a loop should not oblige the file to import an operator it never wrote.</p></div>
+          <div class="doc"><p>The <code>for</code> loop and the rest of the block. Both binders are carried on the node — the element one and, for <code>for (let i, x : xs)</code>, the index one — and nothing is desugared here: what an index <em>is</em> depends on what is being iterated (a position over an array or a <code>str</code>, the key over a dict, which is indexed by its key exactly as an array is by its position), and the parser has no types. Mono is the first pass that knows, and <code>lower_for</code> there is where the index becomes whatever it is.</p></div>
 
 
         </section>
@@ -2023,7 +2023,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$128929: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$127933: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

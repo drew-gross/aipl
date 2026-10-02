@@ -405,7 +405,7 @@ fn bake_asserts(e: &mut Expr, src: &str) {
         | ExprKind::LetMut(_, _, a, b)
         | ExprKind::Assign(_, a, b)
         | ExprKind::Index(a, b)
-        | ExprKind::For(_, a, b)
+        | ExprKind::For(_, _, a, b)
         | ExprKind::While(a, b) => {
             bake_asserts(a, src);
             bake_asserts(b, src);

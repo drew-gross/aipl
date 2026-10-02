@@ -163,7 +163,7 @@ functions:
   __builtin_find_index$str$lam$__m14__parse_prepared$__m1__SexpKind$Sexp$lambda0:
     calls: 6
     bytes: 404
-  __builtin_find_index$str$lam$__m4__link$__m1__SexpKind$Sexp$lambda0:
+  __builtin_find_index$str$lam$__m4__link$__m1__SexpKind$Sexp$lambda1:
     calls: 12
     bytes: 404
   __builtin_find_index$str$lam$__m4__link_rule$__m1__SexpKind$lambda0:

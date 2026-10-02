@@ -1575,7 +1575,16 @@ pub mod ast {
         /// `for (let var : iterable) { body }` — iterates each byte of
         /// `iterable` (a str) until NUL, binding `var: char` per iteration.
         /// Body's value is discarded; the loop expression itself is i64 0.
-        For(String, Box<Expr>, Box<Expr>),
+        ///
+        /// The second field is the *index* binder of the two-binder form
+        /// `for (let i, x : xs)`, or `None` for the plain `for (let x : xs)`.
+        /// What an index is depends on what is being iterated, which is why it
+        /// survives parsing instead of being desugared there: over an array or
+        /// a `str` it is the `u64` position, and over a dict it is the key —
+        /// a dict is indexed by its key exactly as an array is by its
+        /// position. Mono is the first pass that knows which, and it is where
+        /// the index is lowered (`lower_for`).
+        For(String, Option<String>, Box<Expr>, Box<Expr>),
         /// `while (cond) { body }` — re-evaluates `cond` (a bool) before each
         /// iteration and runs `body` while it holds. Body's value is discarded;
         /// the loop expression itself is i64 0 (like `For`).
@@ -2663,7 +2672,7 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
         | K::Let(_, _, a, b)
         | K::LetMut(_, _, a, b)
         | K::Assign(_, a, b)
-        | K::For(_, a, b)
+        | K::For(_, _, a, b)
         | K::While(a, b) => {
             collect_operators(a, out);
             collect_operators(b, out);
@@ -3594,6 +3603,25 @@ fn promote_in_expr(e: &mut ast::Expr, vars: &[String]) {
 /// `t` itself when it carries none. What a refined value *is* at runtime, and
 /// so the type to ask structural questions of: whether it can be indexed,
 /// walked, sliced, matched against `[..]` patterns.
+/// Whether a `for` loop's binders include `name`: the element binder, or the
+/// index binder of the two-binder form. Every pass that asks whether a name is
+/// shadowed inside a loop body asks it here, so neither binder can be forgotten
+/// at one site and remembered at another.
+pub fn for_binds(var: &str, index: &Option<String>, name: &str) -> bool {
+    var == name || index.as_deref() == Some(name)
+}
+
+/// A `for` loop's binders as a list — the element one, plus the index one when
+/// the two-binder form was written. For the passes that take a set of names
+/// rather than ask about one.
+pub fn loop_binders(var: &str, index: &Option<String>) -> Vec<String> {
+    let mut v = vec![var.to_string()];
+    if let Some(i) = index {
+        v.push(i.clone());
+    }
+    v
+}
+
 pub fn unrefined(t: &Type) -> &Type {
     match t {
         Type::Without(base, _) => unrefined(base),
@@ -3781,7 +3809,7 @@ pub fn each_subexpr_mut(e: &mut ast::Expr) -> Vec<&mut ast::Expr> {
         | K::Index(a, b)
         | K::Let(_, _, a, b)
         | K::LetMut(_, _, a, b)
-        | K::For(_, a, b)
+        | K::For(_, _, a, b)
         | K::While(a, b) => vec![a.as_mut(), b.as_mut()],
         K::Assign(a, b, c) | K::If(a, b, c) => vec![a.as_mut(), b.as_mut(), c.as_mut()],
         K::Neg(x)
@@ -3836,7 +3864,7 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
         | K::Index(a, b)
         | K::Let(_, _, a, b)
         | K::LetMut(_, _, a, b)
-        | K::For(_, a, b)
+        | K::For(_, _, a, b)
         | K::While(a, b) => {
             each_subexpr(a, f);
             each_subexpr(b, f);
@@ -3922,9 +3950,14 @@ fn collect_free(
             collect_free(body, bound, out);
             bound.pop();
         }
-        K::For(var, iterable, body) => {
+        K::For(var, index, iterable, body) => {
             collect_free(iterable, bound, out);
             bound.push(var.clone());
+            // The index binder scopes over the body exactly as the element one
+            // does, so a body mentioning it is not mentioning a free variable.
+            if let Some(i) = index {
+                bound.push(i.clone());
+            }
             collect_free(body, bound, out);
             bound.pop();
         }
@@ -3980,7 +4013,7 @@ fn children(e: &ast::Expr) -> Vec<&ast::Expr> {
         | K::Index(a, b)
         | K::Let(_, _, a, b)
         | K::LetMut(_, _, a, b)
-        | K::For(_, a, b)
+        | K::For(_, _, a, b)
         | K::While(a, b) => vec![a, b],
         K::Assign(a, b, c) | K::If(a, b, c) => vec![a, b, c],
         K::Neg(x)

@@ -192,9 +192,9 @@ fn walk_uses(e: &Expr, name: &str, repeated: bool, out: &mut Uses) {
             }
         }
         // The iterable runs once; the body runs per element.
-        ExprKind::For(n, iterable, body) => {
+        ExprKind::For(n, index, iterable, body) => {
             walk_uses(iterable, name, repeated, out);
-            if n != name {
+            if !aipl_syntax::for_binds(n, index, name) {
                 walk_uses(body, name, true, out);
             }
         }
@@ -261,14 +261,14 @@ pub(crate) fn substitute(e: &Expr, name: &str, value: &Expr) -> Expr {
             };
             Expr::rebuilt(kind, e)
         }
-        ExprKind::For(n, iterable, body) => {
+        ExprKind::For(n, index, iterable, body) => {
             let iterable = Box::new(substitute(iterable, name, value));
-            let body = if n == name {
+            let body = if aipl_syntax::for_binds(n, index, name) {
                 body.clone()
             } else {
                 Box::new(substitute(body, name, value))
             };
-            Expr::rebuilt(ExprKind::For(n.clone(), iterable, body), e)
+            Expr::rebuilt(ExprKind::For(n.clone(), index.clone(), iterable, body), e)
         }
         ExprKind::Match(scrutinee, arms) => {
             let scrutinee = Box::new(substitute(scrutinee, name, value));

@@ -580,9 +580,9 @@ fn has_tuple_field(fields: &[String]) -> bool {
 /// arm's payload binders.
 fn rebinds(e: &Expr, name: &str) -> bool {
     match &e.kind {
-        ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) | ExprKind::For(n, _, _) => {
-            n == name
-        }
+        ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) => n == name,
+        // Both of a loop's binders shadow, the element one and the index one.
+        ExprKind::For(n, index, _, _) => n == name || index.as_deref() == Some(name),
         ExprKind::Lambda(params, _) => params.iter().any(|p| p.name == name),
         ExprKind::Match(_, arms) => arms
             .iter()

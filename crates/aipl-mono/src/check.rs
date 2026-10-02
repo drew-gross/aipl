@@ -228,9 +228,12 @@ fn outer_assign(body: &Expr, declared: &HashSet<String>) -> Option<(String, Span
                 outer_assign(rest, &inner)
             })
         }
-        ExprKind::For(var, iter, rest) => outer_assign(iter, declared).or_else(|| {
+        ExprKind::For(var, index, iter, rest) => outer_assign(iter, declared).or_else(|| {
             let mut inner = declared.clone();
             inner.insert(var.clone());
+            if let Some(i) = index {
+                inner.insert(i.clone());
+            }
             outer_assign(rest, &inner)
         }),
         ExprKind::Match(scrut, arms) => outer_assign(scrut, declared).or_else(|| {
@@ -3345,7 +3348,7 @@ impl Cx<'_> {
                 expect(&vt, &expected, "set", val.span.clone())?;
                 self.check_expr_at(body, env, effects, pos)?
             }
-            ExprKind::For(_var, iter, body) => {
+            ExprKind::For(var, index, iter, body) => {
                 let it = self.check_expr(iter, env, effects)?;
                 let elem = match unrefined(&it) {
                     // A set shares the array heap block (see `is_heap` in
@@ -3372,12 +3375,24 @@ impl Cx<'_> {
                 };
                 let mut env2 = env.clone();
                 env2.insert(
-                    _var.clone(),
+                    var.clone(),
                     Binding {
                         ty: elem,
                         mutable: false,
                     },
                 );
+                // The index binder of `for (let i, x : xs)`. Over everything the
+                // arm above accepts it is the `u64` position; mono is what lowers
+                // it into the counter that produces one.
+                if let Some(i) = index {
+                    env2.insert(
+                        i.clone(),
+                        Binding {
+                            ty: Type::Primitive(Primitive::U64),
+                            mutable: false,
+                        },
+                    );
+                }
                 self.check_expr_at(body, &env2, effects, Pos::Discard)?;
                 Type::Primitive(Primitive::I64)
             }

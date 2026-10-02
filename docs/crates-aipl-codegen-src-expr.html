@@ -155,7 +155,9 @@
 
             </li>
 
-            <li id="item-For"><code>For(name: str, iterable: Expr, body: Expr)</code>
+            <li id="item-For"><code>For(name: str, iterable: Expr, body: Expr, index: str? = none)</code>
+
+              <div class="doc"><p>The loop's element binder, what it walks, its body, and the <em>index</em> binder of the two-binder form <code>for (let i, x : xs)</code> (<code>none</code> for the plain form). What an index is depends on what is iterated — a position over an array, the key over a dict — so it survives parsing and mono lowers it.</p><p><code>index</code> is deliberately the <em>last</em> slot rather than beside <code>name</code>: the artifact that compiles the next one is the previous one, so a slot added at the end lets the decoder (<code>ffi_ast.rs</code>) read an artifact built before it as the plain loop it was, and the bootstrap costs nothing.</p></div>
 
 
             </li>

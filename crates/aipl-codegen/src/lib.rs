@@ -20244,7 +20244,16 @@ fn compile_expr_inner<M: Module>(
             // so subsequent Ident lookups will load the new value.
             compile_expr(module, builder, Cx { tail, ..cx }, scopes, body)?
         }
-        ExprKind::For(var, iterable, body) => {
+        ExprKind::For(var, index, iterable, body) => {
+            // An index binder never reaches codegen: what an index *is* depends
+            // on what is being iterated, so mono lowers the two-binder form away
+            // once it knows (`lower_for`), exactly as it lowers a range loop into
+            // the counted `while` it stands for.
+            debug_assert!(
+                index.is_none(),
+                "mono lowers a for-loop's index binder away"
+            );
+            let _ = index;
             // `for (let v : iterable) { body }`. Over a `str` this walks
             // byte-by-byte until NUL (binding `v: char`); over a `T[]` it
             // walks index 0..len (binding `v: T`). Body's value is

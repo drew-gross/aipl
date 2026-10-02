@@ -128,7 +128,7 @@ fn fold_expr(e: &Expr, env: &HashMap<String, ExprKind>) -> Expr {
         ExprKind::LetMut(n, ty, v, b) => ExprKind::LetMut(n.clone(), ty.clone(), f(v), f(b)),
         // The LHS is a place (idents/fields only) — nothing to fold there.
         ExprKind::Assign(lhs, v, b) => ExprKind::Assign(lhs.clone(), f(v), f(b)),
-        ExprKind::For(v, iter, b) => ExprKind::For(v.clone(), f(iter), f(b)),
+        ExprKind::For(v, i, iter, b) => ExprKind::For(v.clone(), i.clone(), f(iter), f(b)),
         ExprKind::While(c, b) => ExprKind::While(f(c), f(b)),
         // Arm patterns are literal-only (checker-enforced) — fold the bodies.
         ExprKind::Match(scrut, arms) => ExprKind::Match(
@@ -227,9 +227,8 @@ fn pattern_binds(pattern: &Pattern, name: &str) -> bool {
 
 fn binds_name(e: &Expr, name: &str) -> bool {
     let here = match &e.kind {
-        ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) | ExprKind::For(n, _, _) => {
-            n == name
-        }
+        ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) => n == name,
+        ExprKind::For(n, index, _, _) => aipl_syntax::for_binds(n, index, name),
         ExprKind::Lambda(params, _) => params.iter().any(|p| p.name == name),
         ExprKind::Match(_, arms) => arms.iter().any(|arm| pattern_binds(&arm.pattern, name)),
         ExprKind::IfLet(arm, _, _) => pattern_binds(&arm.pattern, name),

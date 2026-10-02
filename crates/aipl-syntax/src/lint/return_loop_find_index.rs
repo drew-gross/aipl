@@ -15,21 +15,9 @@ use super::{imported_as, lone_stmt, spans_its_text};
 /// — a loop that hands back the *position* of the first element passing a test,
 /// and `none` when no element does. That is `xs.find_index(|x| matches(x))`.
 /// [`return_loop_find_if`](super::return_loop_find_if()) asks the same of the
-/// same loop shape returning the element; this one is its indexed twin, and the
-/// two are disjoint because a loop returns one or the other.
-///
-/// **The shape arrives desugared.** `for (let i, x : xs)` is folded into a plain
-/// loop over a counter declared just outside it (see `StmtSpec::For` in
-/// `aipl-parser`):
-///
-/// ```text
-/// mut __idx$N: u64 = 0;
-/// for (let x : xs) { let i = __idx$N; <body>; set __idx$N = __idx$N + 1; }
-/// ```
-///
-/// so what is matched here is that, not what was written. The synthetic counter
-/// name is what makes it unmistakable: `$` is not an identifier character, so no
-/// source can spell one, and a match on `__idx$` cannot be a user's own loop.
+/// same loop shape returning the element; this one is its indexed twin. The two
+/// are disjoint by construction: that one matches a loop with no index binder
+/// and this one a loop with one, so no loop is a candidate for both.
 ///
 /// The shape has to be *exactly* this, for the same reasons the element form
 /// gives: the loop body is an else-less `if` around a lone `return`, the
@@ -47,38 +35,20 @@ pub(super) fn return_loop_find_index(
     find_index: Option<&str>,
     hits: &mut Vec<Error>,
 ) {
-    // The counter declaration the fold introduces, and the loop it scopes over.
-    let ExprKind::LetMut(tmp, _, seed, rest) = &e.kind else {
+    // The loop and what it falls through to. An index binder is what makes this
+    // the indexed form rather than `return_loop_find_if`'s, so the pattern
+    // requiring one is the whole of what keeps the two apart.
+    let ExprKind::Seq(first, after) = &e.kind else {
         return;
     };
-    if !tmp.starts_with("__idx$") || !matches!(seed.kind, ExprKind::Num(0)) {
-        return;
-    }
-    let ExprKind::Seq(first, after) = &rest.kind else {
-        return;
-    };
-    let ExprKind::For(var, iterable, loop_body) = &first.kind else {
+    let ExprKind::For(var, Some(index), iterable, loop_body) = &first.kind else {
         return;
     };
     if !is_none_answer(after) {
         return;
     }
-    // `let i = __idx$N;` opening the body, and the `set __idx$N = ..;` closing
-    // it. Both are the fold's, and between them is what was written.
-    let ExprKind::Let(index, index_ty, counter, counted) = &loop_body.kind else {
-        return;
-    };
-    if index_ty.is_some() || !matches!(&counter.kind, ExprKind::Ident(n) if n == tmp) {
-        return;
-    }
-    let ExprKind::Seq(written, bump) = &counted.kind else {
-        return;
-    };
-    if !is_counter_bump(bump, tmp) {
-        return;
-    }
     // From here the shape is `return_loop_find_if`'s, read against the index.
-    let Some(stmt) = lone_stmt(written) else {
+    let Some(stmt) = lone_stmt(loop_body) else {
         return;
     };
     let ExprKind::If(cond, then, els) = &stmt.kind else {
@@ -105,8 +75,8 @@ pub(super) fn return_loop_find_index(
         return;
     }
     // The predicate sees the element, never the position — so a test that reads
-    // either the index or the counter under it has no rewrite here.
-    if mentions(cond, index) || mentions(cond, tmp) {
+    // the index has no rewrite here.
+    if mentions(cond, index) {
         return;
     }
     if !super::lambda_safe(cond) {
@@ -146,27 +116,6 @@ fn is_none_answer(rest: &Expr) -> bool {
         }
         _ => false,
     }
-}
-
-/// Whether `e` is the fold's own `set __idx$N = __idx$N + 1;` — the statement it
-/// appends to every indexed loop body. Anything else there is the user's, and
-/// this is not the shape.
-fn is_counter_bump(e: &Expr, tmp: &str) -> bool {
-    let ExprKind::Assign(lhs, value, _) = &e.kind else {
-        return false;
-    };
-    if !matches!(&lhs.kind, ExprKind::Ident(n) if n == tmp) {
-        return false;
-    }
-    // The fold calls the canonical builtin rather than emitting a `+`, so that
-    // an indexed loop obliges no file to import an operator it never wrote.
-    let ExprKind::Call(add, args, _) = &value.kind else {
-        return false;
-    };
-    *add == Callee::WrappingAdd
-        && args.len() == 2
-        && matches!(&args[0].kind, ExprKind::Ident(n) if n == tmp)
-        && matches!(args[1].kind, ExprKind::Num(1))
 }
 
 /// Whether `name` is read anywhere inside `e`.

@@ -96,12 +96,12 @@ fn two_values(self: FieldInit[]) -> (Expr, Expr)? {
 allocations: 77
 deallocations: 77
 reallocations: 1
-bytes allocated: 5825
+bytes allocated: 6081
 instructions executed: 3637
-binary size: 76816
-  code: 51068
+binary size: 78232
+  code: 52020
   data: 681
-  metadata: 25067
+  metadata: 25531
 functions:
   __arr_drop___m1__Expr:
     calls: 2
@@ -123,7 +123,7 @@ functions:
     bytes: 476
   __m1__show_expr:
     calls: 21
-    bytes: 24116
+    bytes: 24968
   __m1__show_exprs:
     calls: 1
     bytes: 1396
@@ -144,7 +144,7 @@ functions:
     bytes: 36
   __rec_drop___m1__ExprKind:
     calls: 16
-    bytes: 1260
+    bytes: 1292
   __rec_drop___m1__FieldInit:
     calls: 2
     bytes: 72
@@ -219,4 +219,4 @@ functions:
     bytes: 112
   range_bounds:
     calls: 2
-    bytes: 3524
+    bytes: 3592

@@ -893,7 +893,7 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
         | ExprKind::Let(_, _, a, b)
         | ExprKind::LetMut(_, _, a, b)
         | ExprKind::Assign(_, a, b)
-        | ExprKind::For(_, a, b)
+        | ExprKind::For(_, _, a, b)
         | ExprKind::While(a, b) => {
             check_operators(a, view)?;
             check_operators(b, view)?;
@@ -1327,6 +1327,15 @@ fn rewrite_expr(
         s.insert(name.to_string());
         s
     };
+    // A loop binds its element and, in the two-binder form, its index; both
+    // scope over the body.
+    let with_loop = |name: &str, index: &Option<String>| -> HashSet<String> {
+        let mut s = with(name);
+        if let Some(i) = index {
+            s.insert(i.clone());
+        }
+        s
+    };
     let kind = match &e.kind {
         ExprKind::Num(_)
         | ExprKind::Bool(_)
@@ -1508,10 +1517,11 @@ fn rewrite_expr(
             Box::new(rewrite_expr(value, view, sc, locals)),
             Box::new(rewrite_expr(body, view, sc, locals)),
         ),
-        ExprKind::For(var, iterable, body) => ExprKind::For(
+        ExprKind::For(var, index, iterable, body) => ExprKind::For(
             var.clone(),
+            index.clone(),
             Box::new(rewrite_expr(iterable, view, sc, locals)),
-            Box::new(rewrite_expr(body, view, sc, &with(var))),
+            Box::new(rewrite_expr(body, view, sc, &with_loop(var, index))),
         ),
         // `while` binds nothing; both condition and body see the same scope.
         ExprKind::While(cond, body) => ExprKind::While(
