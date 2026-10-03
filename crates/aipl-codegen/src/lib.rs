@@ -8760,12 +8760,19 @@ fn define_fn<M: Module>(
         }
         for (idx, (p, v)) in func.params.iter().zip(bound.iter()).enumerate() {
             if p.mutable {
-                let slot = builder.create_sized_stack_slot(StackSlotData::new(
-                    StackSlotKind::ExplicitSlot,
-                    8,
-                    3,
-                ));
-                builder.ins().stack_store(types::I64, *v, slot, 0);
+                // Through `binding_slot`/`store_binding`, exactly as a `mut`
+                // *local* is — the pair exists so the sizing cannot disagree
+                // with the store and the load, and this site used to skip it.
+                // A hardcoded eight-byte slot holds a `str` handle fine, but a
+                // wide `str`/`char[]` binding *is* its slot's 24 bytes to
+                // everything that reads one (`slot_value`), so reading this
+                // back loaded `ss+8` and `ss+16` from whatever happened to sit
+                // after the slot. A `mut self: str` method therefore returned a
+                // receiver built from stack garbage — a wrong value on one
+                // level of recursion, and `misaligned pointer dereference` in
+                // `aipl_str_len` on three.
+                let slot = binding_slot(&mut builder, &p.ty, structs);
+                store_binding(&mut builder, slot, *v, &p.ty, structs);
                 env.insert(
                     p.name.clone(),
                     EnvBinding::Mut(slot, Rc::new(RefCell::new(p.ty.clone())), false),
@@ -8855,9 +8862,10 @@ fn define_fn<M: Module>(
         // The value actually returned: a mutating method yields its final
         // `self`; a unit `main`, 0; otherwise the body's value.
         let ret_val = if mutating {
-            builder
-                .ins()
-                .stack_load(types::I64, types::I64, self_slot.expect("mut self slot"), 0)
+            // The *handle* for whatever the slot now holds, which for a wide
+            // `str`/`char[]` receiver is the slot's address rather than a word
+            // loaded out of it (`slot_value`).
+            slot_value(&mut builder, self_slot.expect("mut self slot"), &abi_ret)
         } else if unit_main {
             builder.ins().iconst(types::I64, 0)
         } else if error_main {
@@ -12622,9 +12630,9 @@ fn store_binding_str(
     v: Value,
     structs: &HashMap<String, TypeDef>,
 ) {
+    let _ = cx;
     store_binding(
         builder,
-        cx,
         slot,
         v,
         &ConcreteType::Primitive(Primitive::Str),
@@ -12659,13 +12667,11 @@ fn binding_slot(
 /// miscompile rather than a crash.
 fn store_binding(
     builder: &mut FunctionBuilder,
-    cx: Cx,
     slot: StackSlot,
     v: Value,
     ty: &ConcreteType,
     structs: &HashMap<String, TypeDef>,
 ) {
-    let _ = cx;
     if !lives_in_slot(ty) {
         builder.ins().stack_store(types::I64, v, slot, 0);
         return;
@@ -18984,7 +18990,15 @@ fn compile_call_expr<M: Module>(
                 compile_call(module, builder, cx, scopes, name, &info, args, span.clone())?;
             // Store the mutated receiver back, and refine the variable's type
             // to it (e.g. a `mut a = []` receiver pinned by the method's self).
-            builder.ins().stack_store(types::I64, new_self, slot, 0);
+            //
+            // `store_binding`, not a bare word store: a wide `str`/`char[]`
+            // receiver *is* its slot's 24 bytes, and everything that reads one
+            // reads all three words (`slot_value`). Storing only the handle left
+            // the other two holding whatever was in the slot before — which a
+            // recursive `mut self: str` method surfaced as a wrong receiver on
+            // one level and `misaligned pointer dereference` in `aipl_str_len`
+            // on three.
+            store_binding(builder, slot, new_self, &old_ty, structs);
             if let Some(old) = old {
                 // The slot takes its own reference on the mutated receiver (the
                 // call-return value-track stays as the new version's region
@@ -20117,7 +20131,7 @@ fn compile_expr_inner<M: Module>(
             // while the rest of the code still read them the old way — which is
             // the disagreement `binding_slot` exists to make unrepresentable.
             let slot = binding_slot(builder, &t, structs);
-            store_binding(builder, cx, slot, v, &t, structs);
+            store_binding(builder, slot, v, &t, structs);
             // In-place mutation optimization: a heap binding initialized from a
             // fresh literal (an array literal, or a `str` literal for `set s =
             // s + ..`) and never aliased in `body` is "exclusive" — `push` / `+`
@@ -20578,7 +20592,7 @@ fn compile_expr_inner<M: Module>(
                     // wrapper would type the slot as a `str` — copying 24 bytes
                     // where a `#{char}` has 32, and leaving the last word of
                     // the bitfield holding whatever was there before.
-                    store_binding(builder, cx, slot, v, &expected_ty, structs);
+                    store_binding(builder, slot, v, &expected_ty, structs);
                 }
             } else if is_composite(&expected_ty, structs) && !lives_in_slot(&expected_ty) {
                 // The `!is_str_shaped` guard is the same one `LetMut` needs, for
@@ -20626,7 +20640,7 @@ fn compile_expr_inner<M: Module>(
                 // `store_binding`, not a bare word store: a wide `str`/`char[]`
                 // lives in the slot as its whole value. Ownership is unchanged
                 // from the tagged path — this arm takes none.
-                store_binding(builder, cx, slot, v, &expected_ty, structs);
+                store_binding(builder, slot, v, &expected_ty, structs);
             }
             // Body uses the unchanged env; the slot has been updated in-place
             // so subsequent Ident lookups will load the new value.

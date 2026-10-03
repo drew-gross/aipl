@@ -17,18 +17,19 @@
 # made the first failure look like an arithmetic bug.
 #
 # A **`str`** receiver takes a different ownership path — a `str` binding *is*
-# its slot's bytes rather than a pointer to a block — and nothing in the corpus
-# had one at all before this file, recursive or not. The two non-recursive
-# shapes at the end close that. Recursing on one is left out because it does not
-# work today: one level returns the wrong value, and three dereference a
-# misaligned pointer. Asserting a known-broken shape would only turn this file
-# red, so it is reported instead — but the absence is deliberate and named,
-# rather than another hole like the one above.
+# its slot's 24 bytes rather than a pointer to a block — and nothing in the
+# corpus had one at all, recursive or not. Writing this file found out why: two
+# sites stored such a receiver back as a single word, so the other two words
+# kept whatever was in the slot before. One level of recursion returned a
+# receiver built from stack garbage and three dereferenced a misaligned pointer
+# inside `aipl_str_len`. Both now go through `store_binding`, and the `str`
+# shapes below are the regression for it.
 
 import {
     equal as ==,
     extend,
     greater_than as >,
+    len,
     logical_and as &&,
     push,
     wrapping_sub as -,
@@ -128,9 +129,41 @@ fn shout(mut self: str) {
     assert(s == "hi!!!!");
 })
 
+# A `str` receiver recursing, which is the shape that was broken: the receiver
+# is rebuilt from the slot's bytes at every level, so a store that wrote only
+# one of its three words left the rest of the recursion reading stack garbage.
+fn spell(mut self: str, n: i64) {
+    if (n > 0) {
+        set self.spell(n - 1);
+        set self.extend("ab");
+    };
+}.test({
+    mut s = "";
+    set s.spell(3);
+    assert(s == "ababab");
+
+    // Deep enough that the receiver outgrows its inline capacity partway down,
+    // so the recursion spans both representations.
+    mut long = "";
+    set long.spell(20);
+    assert(long.len() == 40);
+})
+
+# A `str` receiver recursing without ever writing: the minimal shape, and the
+# one that aborted. Nothing here mutates, so only the handing back and forth is
+# under test.
+fn unchanged(mut self: str, n: i64) {
+    if (n > 0) {
+        set self.unchanged(n - 1);
+    };
+}.test({
+    mut s = "xy";
+    set s.unchanged(3);
+    assert(s == "xy");
+})
+
 # One `str` receiver method calling another: the receiver crosses a call
-# boundary and comes back, which is the half of the recursive shape that does
-# work.
+# boundary and comes back, which is the non-recursive half of the same shape.
 fn quoted(mut self: str) {
     set self.extend(`"`);
 }
@@ -145,15 +178,15 @@ fn wrap(mut self: str) {
     assert(s == `"x"`);
 })
 --- performance ---
-allocations: 26
-deallocations: 26
+allocations: 49
+deallocations: 49
 reallocations: 0
-bytes allocated: 1382
-instructions executed: 3909
-binary size: 13272
-  code: 7216
-  data: 849
-  metadata: 5207
+bytes allocated: 2182
+instructions executed: 6716
+binary size: 16296
+  code: 9252
+  data: 932
+  metadata: 6112
 functions:
   __eq_i64$arr:
     calls: 7
@@ -173,9 +206,15 @@ functions:
   __test$shout:
     calls: 1
     bytes: 1652
+  __test$spell:
+    calls: 1
+    bytes: 648
   __test$tree:
     calls: 1
     bytes: 236
+  __test$unchanged:
+    calls: 1
+    bytes: 372
   __test$wrap:
     calls: 1
     bytes: 1828
@@ -189,19 +228,19 @@ functions:
     calls: 23
     bytes: (external)
   aipl_assert:
-    calls: 9
+    calls: 12
     bytes: (external)
   aipl_test_begin:
-    calls: 7
+    calls: 9
     bytes: (external)
   aipl_test_end:
-    calls: 7
+    calls: 9
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   aipl_write_bytes:
-    calls: 6
+    calls: 52
     bytes: (external)
   count_down:
     calls: 11
@@ -211,10 +250,16 @@ functions:
     bytes: 316
   main:
     calls: 1
-    bytes: 520
+    bytes: 652
   positives:
     calls: 3
     bytes: 508
+  spell:
+    calls: 25
+    bytes: 612
   tree:
     calls: 15
     bytes: 408
+  unchanged:
+    calls: 4
+    bytes: 272
