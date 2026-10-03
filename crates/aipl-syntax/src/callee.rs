@@ -73,6 +73,10 @@ pub enum Callee {
     DropN,
     DropLastN,
     ToStr,
+    /// `to_str_len(self: T) -> u64` — the length `to_str(self)` would have,
+    /// without building it. What the operation-fusion pass writes for
+    /// `v.to_str().len()`; also callable directly.
+    ToStrLen,
     Map,
     TryMap,
     Filter,
@@ -288,6 +292,7 @@ impl Callee {
         Callee::DropN,
         Callee::DropLastN,
         Callee::ToStr,
+        Callee::ToStrLen,
         Callee::Map,
         Callee::TryMap,
         Callee::Filter,
@@ -447,6 +452,7 @@ impl Callee {
             Callee::DropN => "__builtin_drop_n",
             Callee::DropLastN => "__builtin_drop_last_n",
             Callee::ToStr => "__builtin_to_str",
+            Callee::ToStrLen => "__builtin_to_str_len",
             Callee::Map => "__builtin_map",
             Callee::TryMap => "__builtin_try_map",
             Callee::Filter => "__builtin_filter",

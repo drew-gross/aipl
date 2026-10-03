@@ -15,7 +15,11 @@
 //!   allows, into the source's own buffer. `s.split(sep).map(f)` is the same
 //!   shape over a string: `split` would build a block holding every part — a
 //!   retained view each — for `map` to walk once and drop, so the pair collapses
-//!   into `split_map`, which maps each part as the cut is made.
+//!   into `split_map`, which maps each part as the cut is made. `v.to_str().len()`
+//!   is the shape at its sharpest: `to_str` measures the rendering, allocates
+//!   exactly that, writes it, and hands back a `str` whose only use is to be
+//!   measured again — so the pair collapses into `to_str_len`, the measure pass
+//!   with nothing built behind it.
 //! - [`slice_fusions`] — a call on a sliced receiver. `xs[i..].starts_with(p)`
 //!   builds the whole tail of `xs` — for an array, a fresh block with every
 //!   element copied — only to look at its first few elements, so it collapses

@@ -1,0 +1,52 @@
+# Fusion is refused when it would change what the program does: an effect
+# anywhere in the expression means the pass declines, and the ordinary
+# render-then-measure runs. The value measured here is produced by something
+# that prints, so `to_str(..).len()` cannot be fused; the `functions:` list
+# shows the `__to_str_i64` helper still generated and called, and the output
+# shows the print landing where the source put it.
+
+import { len, print, to_str } from builtins;
+
+fn noisy_value() !prints -> i64 {
+    print("value");
+    12345
+}
+
+fn main() !prints {
+    print(`{noisy_value().to_str().len()}`);
+}
+--- stdout ---
+value
+5
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 38
+instructions executed: 93
+binary size: 1944
+  code: 760
+  data: 1
+  metadata: 1183
+functions:
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 352

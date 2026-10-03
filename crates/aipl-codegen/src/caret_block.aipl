@@ -104,15 +104,15 @@ pub fn caret_block(source: str, Span { start, end }, filename: str) -> str {
     assert(caret_block("a\nb", Span { start: 5000, end: 5006 }, "input").len() < 40);
 })
 --- performance ---
-allocations: 187
-deallocations: 187
+allocations: 179
+deallocations: 179
 reallocations: 0
-bytes allocated: 13008
-instructions executed: 7194
-binary size: 9744
-  code: 4580
+bytes allocated: 12872
+instructions executed: 6922
+binary size: 9688
+  code: 4536
   data: 1740
-  metadata: 3424
+  metadata: 3412
 functions:
   __m1__line_at:
     calls: 8
@@ -121,7 +121,7 @@ functions:
     calls: 1
     bytes: 1772
   __to_str_u64:
-    calls: 32
+    calls: 24
     bytes: 204
   aipl_assert:
     calls: 8
@@ -136,14 +136,14 @@ functions:
     calls: 1
     bytes: (external)
   aipl_u64_len:
-    calls: 64
+    calls: 56
     bytes: (external)
   aipl_write_u64:
-    calls: 32
+    calls: 24
     bytes: (external)
   caret_block:
     calls: 8
-    bytes: 1840
+    bytes: 1796
   main:
     calls: 1
     bytes: 112

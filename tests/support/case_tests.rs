@@ -559,6 +559,8 @@ case_tests! {
     cases_optimizations_split_map_fusion = "cases/optimizations/split_map_fusion",
     cases_optimizations_struct_move_in = "cases/optimizations/struct_move_in",
     cases_optimizations_subst_single_use_binding = "cases/optimizations/subst_single_use_binding",
+    cases_optimizations_to_str_len_fusion = "cases/optimizations/to_str_len_fusion",
+    cases_optimizations_to_str_len_fusion_effects = "cases/optimizations/to_str_len_fusion_effects",
     cases_optimizations_value_or_default_sinks = "cases/optimizations/value_or_default_sinks",
     cases_options_err_match_missing_arrow = "cases/options/err_match_missing_arrow",
     cases_options_err_match_str_literal = "cases/options/err_match_str_literal",

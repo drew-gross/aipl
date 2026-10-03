@@ -1,0 +1,90 @@
+# Operation fusion: `v.to_str().len()` collapses into `to_str_len`, which runs
+# `to_str`'s measuring pass and stops there — instead of reserving a buffer,
+# writing the rendering into it, measuring that, and dropping it again.
+#
+# `to_str` is already two passes: measure the rendered length, reserve exactly
+# that much, then write it. So the fused form is not a new algorithm but the
+# first pass with nothing built behind it.
+#
+# The `functions:` list is the evidence. Five types are measured here — `i64`,
+# `Point`, `str`, `char[]`, `i64?` — and not one has a `__to_str_*` helper
+# generated for it. The single `__to_str_i64` in the list belongs to
+# `built_then_measured` below, which binds the rendering and reads it twice, so
+# that string genuinely has to exist; it is also the unfused answer the fused
+# ones are checked against.
+
+import { len, print, to_str, to_str_len } from builtins;
+
+struct Point { x: i64, y: str }
+
+// Fused, spelled directly: a scalar's rendering is measured by one runtime call
+// and nothing is built.
+fn digits(n: i64) -> u64 { n.to_str().len() }
+
+// Fused through an inlined call, which reaches the pass with its parameter
+// bound ahead of the body (`let self: Point = p; to_str(self)`). The pass looks
+// under that binding for the chain, so a user function of this shape fuses
+// exactly as the direct spelling does.
+fn rendered(self: Point) -> str { self.to_str() }
+
+fn width(p: Point) -> u64 { p.rendered().len() }
+
+// A text scalar renders bare at the top level — `to_str("s")` is `s`, not
+// `"s"` — so measuring one is its own byte length, with no call at all.
+fn text_width(s: str) -> u64 { s.to_str().len() }
+
+// Not fused: the rendering is bound and read twice, so it has to be built.
+fn built_then_measured(n: i64) -> str {
+    let s = n.to_str();
+    `{s} {s.len()}`
+}
+
+fn main() !prints {
+    let p = Point { x: 1, y: "ab" };
+    print(`{digits(12345)} {width(p)} {text_width("hello")}`);
+
+    // A `char[]` keeps its array-bracket rendering rather than a `str`'s, so
+    // this measure is a walk over the elements, not one length field.
+    print(`{['a', 'b'].to_str().len()} {some(5).to_str().len()}`);
+    // The built rendering and its own length agree with the measured one.
+    print(`{built_then_measured(12345)} {digits(12345)}`);
+    // The fused builtin is importable too, and answers the same as the chain.
+    print(`{to_str_len(p)} {width(p)}`);
+}
+--- stdout ---
+5 23 5
+10 7
+12345 5 5
+23 23
+--- performance ---
+allocations: 22
+deallocations: 22
+reallocations: 0
+bytes allocated: 1234
+instructions executed: 744
+binary size: 5328
+  code: 3028
+  data: 1
+  metadata: 2299
+functions:
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  __to_str_u64:
+    calls: 9
+    bytes: 204
+  aipl_i64_len:
+    calls: 8
+    bytes: (external)
+  aipl_u64_len:
+    calls: 18
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  aipl_write_u64:
+    calls: 9
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2620

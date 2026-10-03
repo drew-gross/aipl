@@ -10873,7 +10873,11 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                         // rather than aliasing it — safe unless we're iterating
                         // that very binding.
                         f if builtin_is_mutating(f.name()) => iterating,
-                        Callee::Len | Callee::IsNonempty | Callee::ToStr | Callee::Trim => false,
+                        Callee::Len
+                        | Callee::IsNonempty
+                        | Callee::ToStr
+                        | Callee::ToStrLen
+                        | Callee::Trim => false,
                         _ => !tail,
                     }
                 } else {
@@ -10893,6 +10897,7 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                     Callee::Len
                         | Callee::IsNonempty
                         | Callee::ToStr
+                        | Callee::ToStrLen
                         | Callee::Print
                         | Callee::Trim
                         // In-place-filter/map intrinsics mutate the array in place

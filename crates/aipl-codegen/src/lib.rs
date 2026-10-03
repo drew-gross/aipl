@@ -13943,6 +13943,44 @@ fn emit_to_str<M: Module>(
     Ok(result)
 }
 
+/// The byte length `to_str(value)` would have, without building it — what a
+/// fused `v.to_str().len()` compiles to (see `aipl_mono::fuse`).
+///
+/// `to_str` already works in two passes: [`Sink::Measure`] totals the rendered
+/// length, `aipl_str_alloc` reserves exactly that, and [`Sink::Write`] fills it.
+/// This is the first pass on its own, so there is no buffer, no copy and no
+/// reference to release — and, the result being an integer, nothing for the
+/// caller to track.
+///
+/// The three cases are `to_str`'s own: a text scalar renders *bare* at the top
+/// level, so a `str` measures as its own byte length and a `char` as the single
+/// byte it holds — neither goes through [`emit_render`], which quotes them
+/// (that form is for a scalar nested in a rendered container). Everything else
+/// is the measure pass.
+///
+/// Unlike [`emit_to_str`] this is emitted inline rather than through a cached
+/// per-type helper. What makes the helper worth its call there is the body it
+/// shares — two structural passes, an allocation and the literal data for every
+/// fixed piece — and measuring has none of that: `Sink::Measure` emits no
+/// literal and no write, so a scalar's measure is one runtime call and a
+/// container's is a bare walk. Inlining keeps the common case (a scalar) at
+/// exactly that one call.
+fn emit_to_str_len<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    value: Value,
+    ty: &ConcreteType,
+) -> Result<Value, Error> {
+    if is_str_repr(ty) {
+        return Ok(emit_str_len(builder, value));
+    }
+    if *ty == ConcreteType::Primitive(Primitive::Char) {
+        return Ok(builder.ins().iconst(types::I64, 1));
+    }
+    emit_render(module, builder, cx, value, ty, Sink::Measure)
+}
+
 /// Declare (once, cached) the per-type `__to_str_<n>(value) -> str` rendering
 /// helper for `ty`, recording it to be defined after the main function loop
 /// (when the build context is free). Returns its function id.
@@ -15697,6 +15735,22 @@ fn compile_call_expr<M: Module>(
                 emit_to_str(module, builder, cx, scopes, v, &t)?
             };
             (s, ConcreteType::Primitive(Primitive::Str))
+        }
+        Callee::ToStrLen => {
+            // `to_str_len(x) -> u64`: how long `to_str(x)` would be, without
+            // building it — what the fusion pass writes for `x.to_str().len()`
+            // (see `aipl_mono::fuse`). Nothing is allocated, so there is no
+            // fresh `str` to track and no reference to release; the result is a
+            // plain integer.
+            if args.len() != 1 {
+                return Err(Error::at(
+                    format!("\"to_str_len\" expects 1 argument, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let len = emit_to_str_len(module, builder, cx, v, &t)?;
+            (len, ConcreteType::Primitive(Primitive::U64))
         }
         Callee::Hash => {
             // Generic `hash(x) -> i64`: structural hash by the argument's static

@@ -82,6 +82,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  dict.key_values(|k, v| `{k}: {v}`) should exist, use it in append_missing
   step_result n should be u64 without 0, move 0 check to call site
   keyword_len and exact_len should accept str without "" for spelling
   does set_map().join() make sense? Should there be a set_join?
@@ -93,7 +94,6 @@ misc cleanup:
   Symbol and Import should use SpanStr
   Tpl and Tok should not be abbreviated
   get rid of convention of using 0..0 span as a substitute for none
-  Fill[] should probably be a dict
   unordered set needs some way to convert to array
   class_meta should be a const set
   dedent_segments should be able to do better than a join/split. Maybe a process raw string segments?
@@ -246,6 +246,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  ! is used for both effects and errors, we should switch the syntax for effects
   allow return v; as the last statement of a function
   add units to the language
   support defaults for struct fields that are variants, structs, or optionals of variants or structs
@@ -532,10 +533,23 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+  Suggestions, best first
+        2. Not measured: build into one buffer instead of spreading temporaries. Even with fusion 1, group_styles is still entered 487k times and aipl_arr_extend/reserve run about 615k/653k times. That's [style, ..group_styles(a), ..group_styles(b)] creating fresh arrays only to copy them into the parent. Rewriting the recursive producer to append into a buffer it's handed (a f$into(out, x) variant) applies the idea behind MapJoin to user recursion.
+        3. Measured: reuse the old record when a node is rebuilt. desugar_rule and link_rule rebuild every rule node, including leaves like Term(k) => ok(Term(k)), which drives 1.4M aipl_rec_alloc calls. The measured part is the narrow case: C(x) => C(x) becomes "return the input". The general version reuses the scrutinee's record for the new constructor when the scrutinee is uniquely owned and dies there (Perceus-style reuse). It would also cover the Many/Then rebuilds in link_rule, whose input comes uniquely owned from desugar_rule.
+        4. Not measured, likely the biggest remaining cost: cancel refcount pairs. After the changes above there are still about 23M refcount helper calls (rec_dec 6.6M, array_dec 6.0M, rec_inc 5.7M, arr_inc 4.4M), against 1.5M allocations. Cancelling increment/decrement pairs and moving increments into the branches that actually use the value would cut this. That probably lives in codegen rather than fuse.rs.
+        5. Low priority: more builtin table rows. I counted call pairs across the dogfood sources. The unfused ones are things like opt.map(f).value_or(d) (25 sites) and first().value_or(..) (13), and none of them are hot. More rows in the existing tables won't move your numbers.
+
+        Measure fusions on more than instructions. Track allocations and bytes allocated too, or wall-clock via refresh_perfmon. Fusion 3 alone cut allocations by 23% while instructions moved about 1%.
+
+        For your other optimization effort: parse runs 246 times in that test and relinks the whole grammar every time. Linking once would likely outweigh everything above.
+
+        The two hand-written changes are in .claude/worktrees/fusion-probe (branch worktree-fusion-probe), in crates/aipl-codegen/src/grammar.aipl. They're uncommitted, since your CLAUDE.md says you handle commits. They're there to reproduce the numbers, not to merge, and you can delete the worktree whenever you like.
+
+    apparently, to_str_len still uses to_str() on boxed types to compute the let. We should stop that and use to_str_len.
+    foo.reverse()[x] and foo.reverse()[x..y] should fuse
     .map().to_set() should fuse
     .join().first() should fuse. also map_join().first()?
     can we make a fully general v.foo().len() fusion? Maybe by monomorphizing?
-    to_str().len() should fuse to a a new, super simple/fast function that just computes and returns an int
     .reverse().find_map() should fuse
     .map(f).find(p) should fuse to map_find and not keep mapping after found
     fuse sequential extends

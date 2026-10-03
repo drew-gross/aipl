@@ -71,6 +71,16 @@ const CHAIN_FUSIONS: &[ChainFusion] = &[
         outer: Callee::Len,
         into: Callee::SplitLen,
     },
+    // `v.to_str().len()`: `to_str` measures the rendering, allocates exactly
+    // that, writes it, and hands back a `str` whose only use is to be measured
+    // again and dropped — so the buffer, the copy and the refcount all pay for
+    // a number the first pass already had. `to_str_len` is that measure pass
+    // alone.
+    ChainFusion {
+        inner: Callee::ToStr,
+        outer: Callee::Len,
+        into: Callee::ToStrLen,
+    },
 ];
 
 /// `inner(recv, ..).outer(..)` as a single call to the [`CHAIN_FUSIONS`] row's

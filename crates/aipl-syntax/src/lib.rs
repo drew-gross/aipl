@@ -2828,6 +2828,12 @@ fn __builtin_execute_program(self: str, args: str[] = []) !execute_program -> __
 }
 
 fn __builtin_to_str<T: any>(self: T) -> str { "" }
+// `self.to_str().len()` without building the string: how long the rendering
+// would be, measured rather than materialized. `to_str` already works in two
+// passes — measure the total length, allocate exactly that, then write — so
+// this is the first pass alone: no buffer, no copy, no refcount. Written by the
+// compiler's operation-fusion pass for that chain; also callable directly.
+fn __builtin_to_str_len<T: any>(self: T) -> u64 { 0 }
 // Structural hash, consistent with `==`.
 fn __builtin_hash<T: any>(self: T) -> i64 { 0 }
 fn __builtin_trim(self: str) -> str { self }
