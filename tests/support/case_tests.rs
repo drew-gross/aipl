@@ -526,6 +526,7 @@ case_tests! {
     cases_methods_mutating_counter = "cases/methods/mutating/counter",
     cases_methods_mutating_nonexclusive_loop_regrow = "cases/methods/mutating/nonexclusive_loop_regrow",
     cases_methods_mutating_rebuild_from_loop = "cases/methods/mutating/rebuild_from_loop",
+    cases_methods_mutating_recursive_receiver = "cases/methods/mutating/recursive_receiver",
     cases_methods_mutating_set_writeback_form = "cases/methods/mutating/set_writeback_form",
     cases_optimizations_const_array_literal = "cases/optimizations/const_array_literal",
     cases_optimizations_const_fold = "cases/optimizations/const_fold",

@@ -1,0 +1,220 @@
+# A `mut self` receiver grown by a *recursive* method. The receiver goes into
+# the call, comes back through the writeback, and goes straight into the next
+# call — at every level — so the reference the slot holds crosses the call
+# boundary as many times as the recursion is deep.
+#
+# That is the shape with no coverage before this file, and it is a hole worth
+# naming: the sibling cases here grow a receiver in a *loop* and through an
+# *alias*, both of which keep the mutation inside one frame. Recursion is the
+# one shape where the caller's slot and the callee's slot name the same block at
+# the same time, which is exactly what an ownership change has to get right. An
+# attempt at letting such a method append in place passed all eight of those
+# sibling cases and corrupted memory here (a wrong length, then a bus error), so
+# the shapes below are the ones that would have said so.
+#
+# Each asserts the receiver's whole *contents*, not its length: a mis-accounted
+# reference reads back as a plausible-looking array, and the counts were what
+# made the first failure look like an arithmetic bug.
+#
+# A **`str`** receiver takes a different ownership path — a `str` binding *is*
+# its slot's bytes rather than a pointer to a block — and nothing in the corpus
+# had one at all before this file, recursive or not. The two non-recursive
+# shapes at the end close that. Recursing on one is left out because it does not
+# work today: one level returns the wrong value, and three dereference a
+# misaligned pointer. Asserting a known-broken shape would only turn this file
+# red, so it is reported instead — but the absence is deliberate and named,
+# rather than another hole like the one above.
+
+import {
+    equal as ==,
+    extend,
+    greater_than as >,
+    logical_and as &&,
+    push,
+    wrapping_sub as -,
+} from builtins;
+
+# Appends on the way *down* — one element per level, before recursing.
+fn count_down(mut self: i64[], n: i64) {
+    if (n > 0) {
+        set self.push(n);
+        set self.count_down(n - 1);
+    };
+}.test({
+    mut xs: i64[] = [];
+    set xs.count_down(4);
+    assert(xs == [4, 3, 2, 1]);
+
+    // Re-entering an already-grown receiver: the second call appends to what
+    // the first one left rather than to the empty array it started from.
+    set xs.count_down(2);
+    assert(xs == [4, 3, 2, 1, 2, 1]);
+})
+
+# Appends on the way *back up*, so every level grows a receiver the level below
+# has already reallocated out from under it.
+fn count_up(mut self: i64[], n: i64) {
+    if (n > 0) {
+        set self.count_up(n - 1);
+        set self.push(n);
+    };
+}.test({
+    mut xs: i64[] = [];
+    set xs.count_up(4);
+    assert(xs == [1, 2, 3, 4]);
+})
+
+# Two recursive calls per level: the receiver is handed to the same method
+# twice, and the second call has to see what the first one appended.
+fn tree(mut self: i64[], n: i64) {
+    if (n > 0) {
+        set self.push(n);
+        set self.tree(n - 1);
+        set self.tree(n - 1);
+    };
+}.test({
+    mut xs: i64[] = [];
+    set xs.tree(3);
+    assert(xs == [3, 2, 1, 1, 2, 1, 1]);
+})
+
+# The recursion crosses *two* mutating methods, so neither is its own base case
+# and the receiver passes through both signatures alternately.
+fn positives(mut self: i64[], n: i64) {
+    if (n > 0) {
+        set self.push(n);
+        set self.negatives(n - 1);
+    };
+}
+
+fn negatives(mut self: i64[], n: i64) {
+    if (n > 0) {
+        set self.push(0 - n);
+        set self.positives(n - 1);
+    };
+}.test({
+    mut xs: i64[] = [];
+    set xs.positives(4);
+    assert(xs == [4, 0 - 3, 2, 0 - 1]);
+})
+
+# The counterpart, and the reason none of this may simply append in place: a
+# receiver somebody else still names is copied, and the alias keeps the value it
+# had. Wrapped in a function so both post-conditions are checked on real return
+# values.
+fn grows_alias_untouched() -> bool {
+    mut a = [0];
+    let alias = a;
+    set a.count_down(2);
+    a == [0, 2, 1] && alias == [0]
+}.test({
+    assert(grows_alias_untouched());
+})
+
+# A `str` receiver, mutated in place through `extend`. The writeback is the same
+# one the array shapes use, over a binding whose slot holds the bytes rather
+# than a pointer — the path with no coverage until now.
+fn shout(mut self: str) {
+    set self.extend("!");
+    set self.extend("!");
+}.test({
+    mut s = "hi";
+    set s.shout();
+    assert(s == "hi!!");
+
+    // Again on an already-grown receiver, so the second call appends to what
+    // the first one left.
+    set s.shout();
+    assert(s == "hi!!!!");
+})
+
+# One `str` receiver method calling another: the receiver crosses a call
+# boundary and comes back, which is the half of the recursive shape that does
+# work.
+fn quoted(mut self: str) {
+    set self.extend(`"`);
+}
+
+fn wrap(mut self: str) {
+    set self.quoted();
+    set self.extend("x");
+    set self.quoted();
+}.test({
+    mut s = "";
+    set s.wrap();
+    assert(s == `"x"`);
+})
+--- performance ---
+allocations: 26
+deallocations: 26
+reallocations: 0
+bytes allocated: 1382
+instructions executed: 3909
+binary size: 13272
+  code: 7216
+  data: 849
+  metadata: 5207
+functions:
+  __eq_i64$arr:
+    calls: 7
+    bytes: 296
+  __test$count_down:
+    calls: 1
+    bytes: 392
+  __test$count_up:
+    calls: 1
+    bytes: 236
+  __test$grows_alias_untouched:
+    calls: 1
+    bytes: 272
+  __test$negatives:
+    calls: 1
+    bytes: 236
+  __test$shout:
+    calls: 1
+    bytes: 1652
+  __test$tree:
+    calls: 1
+    bytes: 236
+  __test$wrap:
+    calls: 1
+    bytes: 1828
+  aipl_arr_inc:
+    calls: 163
+    bytes: (external)
+  aipl_array_dec:
+    calls: 191
+    bytes: (external)
+  aipl_array_push:
+    calls: 23
+    bytes: (external)
+  aipl_assert:
+    calls: 9
+    bytes: (external)
+  aipl_test_begin:
+    calls: 7
+    bytes: (external)
+  aipl_test_end:
+    calls: 7
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 6
+    bytes: (external)
+  count_down:
+    calls: 11
+    bytes: 316
+  count_up:
+    calls: 5
+    bytes: 316
+  main:
+    calls: 1
+    bytes: 520
+  positives:
+    calls: 3
+    bytes: 508
+  tree:
+    calls: 15
+    bytes: 408
