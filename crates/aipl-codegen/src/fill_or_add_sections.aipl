@@ -1,29 +1,30 @@
 import {
     equal as ==,
     extend,
-    filter,
-    find_if,
+    get,
     is_empty,
     len,
     less_than as <,
     logical_and as &&,
     logical_or as ||,
     map,
-    not_equal as !=,
+    remove_key,
     value_or,
     wrapping_add as +,
 } from builtins;
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
 
-# One section to write back: the `--- name ---` it belongs under, and the body
-# to put there.
-struct Fill { section: str, body: str }
-
 # The state threaded through the line walk: the rewritten file so far, whether
 # the current line is inside an old body being dropped, and the fills that
 # haven't met their header yet (whatever is left gets appended at the end).
-struct Walk { out: str, skipping: bool, pending: Fill[] }
+#
+# The fills are a dict, section name to body, which is what they *are*: one body
+# per section, looked up by name. They were a `Fill { section, body }[]`, which
+# had to be searched for the name on every line of every file, filtered to drop
+# a match, and could hold two bodies for one section with nothing to say which
+# of them won.
+struct Walk { out: str, skipping: bool, pending: #{str: str} }
 
 # Fold one source line into the walk. A header line named by a pending fill is
 # re-emitted with that fill's body under it, and everything up to the next
@@ -38,24 +39,26 @@ fn step(w: Walk, line: str) -> Walk {
     };
     let kept = `{w.out}{line}\n`;
     w.pending
-        .find_if(|f| f.section == header)
-        .map(|f| Walk {
-            out: `{kept}{f.body}\n`,
-            skipping: true,
-            pending: w.pending.filter(|p| p.section != header),
+        .get(header)
+        .map(|body| {
+            // The fill is spent: drop it, so `append_missing` adds no second
+            // block for a section the file already carried.
+            mut rest = w.pending;
+            set rest.remove_key(header);
+            Walk { out: `{kept}{body}\n`, skipping: true, pending: rest }
         })
         .value_or(Walk { out: kept, skipping: false, pending: w.pending })
 }
 
 # Append a fresh `--- section ---` block for every fill the file carried no
 # header for, after dropping the trailing newlines the walk copied over.
-fn append_missing(out: str, pending: Fill[]) -> str {
+fn append_missing(out: str, pending: #{str: str}) -> str {
     if (pending.is_empty()) {
         return out;
     };
     mut acc = out.trim_end_while(|c| c == '\n' || c == '\r');
-    for (let f : pending) {
-        set acc.extend(`\n--- {f.section} ---\n{f.body}`);
+    for (let section, body : pending) {
+        set acc.extend(`\n--- {section} ---\n{body}`);
     }
     `{acc}\n`
 }
@@ -68,7 +71,7 @@ fn append_missing(out: str, pending: Fill[]) -> str {
 # The whole batch costs one walk, which is the point: a case whose `stdout`,
 # `exit code` and `performance` all went stale is read, rewritten and written
 # back once rather than three times.
-pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
+pub fn fill_or_add_sections(contents: str, fills: #{str: str}) -> str {
     // Walk `contents` line by line (matching Rust's `str::lines()`: no line
     // terminators kept, no trailing empty line for a final `\n`, but the final
     // unterminated line — if any — still counts). Every kept line is re-emitted
@@ -104,7 +107,7 @@ pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
             b
 
         """,
-        [Fill { section: "foo", body: "new" }],
+        #{"foo": "new"},
     ) == """
         a
         --- foo ---
@@ -121,7 +124,7 @@ pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
             old2
 
         """,
-        [Fill { section: "foo", body: "new" }],
+        #{"foo": "new"},
     ) == """
         --- foo ---
         new
@@ -130,7 +133,7 @@ pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
 
     // Section present: the header is the final, unterminated line (no
     // trailing `\n` at all).
-    assert(fill_or_add_sections("--- foo ---", [Fill { section: "foo", body: "new" }]) == """
+    assert(fill_or_add_sections("--- foo ---", #{"foo": "new"}) == """
         --- foo ---
         new
 
@@ -141,7 +144,7 @@ pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
             --- foo ---
             old
         """,
-        [Fill { section: "foo", body: "new" }],
+        #{"foo": "new"},
     ) == """
         --- foo ---
         new
@@ -158,7 +161,7 @@ pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
             X
 
         """,
-        [Fill { section: "foo", body: "new" }],
+        #{"foo": "new"},
     ) == """
         --- foo ---
         new
@@ -173,7 +176,7 @@ pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
             code
 
         """,
-        [Fill { section: "stdout", body: "hi" }],
+        #{"stdout": "hi"},
     ) == """
         code
         --- stdout ---
@@ -188,7 +191,7 @@ pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
 
 
         """,
-        [Fill { section: "stdout", body: "hi" }],
+        #{"stdout": "hi"},
     ) == """
         code
         --- stdout ---
@@ -196,14 +199,14 @@ pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
 
     """);
     // Missing, no trailing newline at all.
-    assert(fill_or_add_sections("code", [Fill { section: "stdout", body: "hi" }]) == """
+    assert(fill_or_add_sections("code", #{"stdout": "hi"}) == """
         code
         --- stdout ---
         hi
 
     """);
     // Empty input, section missing.
-    assert(fill_or_add_sections("", [Fill { section: "stdout", body: "hi" }]) == """
+    assert(fill_or_add_sections("", #{"stdout": "hi"}) == """
 
         --- stdout ---
         hi
@@ -219,7 +222,7 @@ pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
             old
 
         """,
-        [Fill { section: "foo", body: "new" }],
+        #{"foo": "new"},
     ) == """
         code
           --- foo ---
@@ -238,7 +241,7 @@ pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
             old
 
         """,
-        [],
+        #{},
     ) == """
         code
         --- foo ---
@@ -260,10 +263,7 @@ pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
             old perf
 
         """,
-        [
-            Fill { section: "performance", body: "new perf" },
-            Fill { section: "stdout", body: "new out" },
-        ],
+        #{"performance": "new perf", "stdout": "new out"},
     ) == """
         code
         --- stdout ---
@@ -284,10 +284,7 @@ pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
             old
 
         """,
-        [
-            Fill { section: "stdout", body: "new" },
-            Fill { section: "performance", body: "allocations: 0" },
-        ],
+        #{"stdout": "new", "performance": "allocations: 0"},
     ) == """
         code
         --- stdout ---
@@ -298,10 +295,7 @@ pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
     """);
 
     // Several missing sections are appended in the batch's order.
-    assert(fill_or_add_sections(
-        "code",
-        [Fill { section: "stdout", body: "hi" }, Fill { section: "exit code", body: "3" }],
-    ) == """
+    assert(fill_or_add_sections("code", #{"stdout": "hi", "exit code": "3"}) == """
         code
         --- stdout ---
         hi
@@ -313,43 +307,52 @@ pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
 --- performance ---
 allocations: 133
 deallocations: 133
-reallocations: 2
-bytes allocated: 10371
-instructions executed: 35727
-binary size: 25904
-  code: 13420
-  data: 4366
-  metadata: 8118
+reallocations: 0
+bytes allocated: 10771
+instructions executed: 33107
+binary size: 22504
+  code: 11188
+  data: 3912
+  metadata: 7404
 functions:
-  __arr_drop_Fill:
-    calls: 15
-    bytes: 140
-  __arr_retain_Fill:
-    calls: 2
-    bytes: 140
-  __builtin_find_if$Fill$lam$step$lambda0:
+  __dict_drop_str$str:
     calls: 29
-    bytes: 620
+    bytes: 136
+  __dict_retain_str$str:
+    calls: 24
+    bytes: 136
   __test$fill_or_add_sections:
     calls: 1
-    bytes: 6620
+    bytes: 5680
+  aipl_arr_elem_ptr:
+    calls: 16
+    bytes: (external)
   aipl_arr_inc:
-    calls: 204
+    calls: 220
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 8
     bytes: (external)
   aipl_array_dec:
-    calls: 225
-    bytes: (external)
-  aipl_array_new:
-    calls: 13
+    calls: 241
     bytes: (external)
   aipl_array_push_mut:
-    calls: 2
+    calls: 16
     bytes: (external)
   aipl_array_with_cap:
-    calls: 8
+    calls: 13
     bytes: (external)
   aipl_assert:
     calls: 14
+    bytes: (external)
+  aipl_dict_get:
+    calls: 29
+    bytes: (external)
+  aipl_dict_insert:
+    calls: 16
+    bytes: (external)
+  aipl_dict_remove:
+    calls: 8
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -365,13 +368,10 @@ functions:
     bytes: (external)
   fill_or_add_sections:
     calls: 14
-    bytes: 2596
+    bytes: 2496
   main:
     calls: 1
     bytes: 128
   step:
     calls: 36
-    bytes: 2752
-  step$filter2:
-    calls: 0
-    bytes: 424
+    bytes: 2612

@@ -489,12 +489,12 @@ fn sanity_check_entries(_a: &Artifact, comp: &Compilation) {
     // A batch of two: one section the file already has (replaced in place) and
     // one it doesn't (appended) — in a single read/walk/write.
     let fill = |section: &str, body: &str| {
-        FfiValue::Struct(vec![
-            ("section".to_string(), FfiValue::Str(section.to_string())),
-            ("body".to_string(), FfiValue::Str(body.to_string())),
-        ])
+        (
+            FfiValue::Str(section.to_string()),
+            FfiValue::Str(body.to_string()),
+        )
     };
-    let fills = FfiValue::Array(vec![fill("stdout", "new"), fill("exit code", "3")]);
+    let fills = FfiValue::Dict(vec![fill("stdout", "new"), fill("exit code", "3")]);
     let file_result = comp
         .call_values(
             "fill_or_add_sections_file",

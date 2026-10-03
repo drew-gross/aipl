@@ -25,7 +25,7 @@
             <a class="anchor" href="#item-fill_or_add_sections_file">fill_or_add_sections_file</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn fill_or_add_sections_file(path: str, fills: Fill[]) !read_files !write_files -&#62; ()!Error</code></pre>
+          <pre class="signature"><code>pub fn fill_or_add_sections_file(path: str, fills: #{str: str}) !read_files !write_files -&#62; ()!Error</code></pre>
 
           <div class="doc"><p>Reads the file at <code>path</code>, splices every fill in <code>fills</code> into (or appends it to) its <code>--- section ---</code> blocks via <code>fill_or_add_sections</code>, and writes the result back to <code>path</code>. One read and one write for the whole batch.</p></div>
 

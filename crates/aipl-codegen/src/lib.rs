@@ -2726,9 +2726,10 @@ impl TypeDef {
 /// Every variant marshals in *both* directions, and by the same rule in each:
 /// whatever [`check_ffi_return`] accepts as a return type can also be passed as
 /// an argument (built by [`ffi_arg_abi`]), to any nesting depth — a `Note[]` of
-/// `{ message: str, span: Span }` goes in as readily as it comes out. The two
+/// `{ message: str, span: Span }` goes in as readily as it comes out. The
 /// exceptions are a *recursive* (boxed) type, which the host has no way to
-/// allocate, and sets/dicts, which aren't marshalable in either direction.
+/// allocate; a **dict**, which goes *in* ([`FfiValue::Dict`]) but does not come
+/// back; and a set, which does neither.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FfiValue {
     /// A scalar AIPL value at its `i64` ABI.
@@ -2758,6 +2759,16 @@ pub enum FfiValue {
     /// appropriate (a `char[]` is an `Array` of `Int` codepoints, and a `bool[]`
     /// an `Array` of `Int` `0`/`1`, both directions).
     Array(Vec<FfiValue>),
+    /// An AIPL dict `#{K: V}`: its entries, each a `(key, value)`, in the order
+    /// the dict should hold them. A later entry for a key already given replaces
+    /// it, which is the rule a `#{k: v, ..}` literal follows.
+    ///
+    /// Arguments only. A dict is an array block of `[key][value]` pairs, so
+    /// building one is [`build_borrowed_array`]'s job with the pair as the
+    /// element — but *reading* one back would have to hand the host a key order
+    /// nothing promises, so the return direction stays refused until there is a
+    /// reason to decide what it means.
+    Dict(Vec<(FfiValue, FfiValue)>),
 }
 
 pub struct Compilation {
@@ -3569,7 +3580,7 @@ fn caret_block(source: &str, span: Span, filename: &str) -> String {
     })
 }
 
-/// Reads the file at `path`, rewrites each `(section, body)` in `fills` into
+/// Reads the file at `path`, rewrites each `section` → `body` in `fills` into
 /// (or appends it to) the file's `--- section ---` blocks, and writes the result
 /// back — computed by the dogfooded AIPL `fill_or_add_sections_file` via the FFI
 /// (itself doing the file I/O; nothing here touches `std::fs`). Not a parser
@@ -3582,15 +3593,13 @@ fn caret_block(source: &str, span: Span, filename: &str) -> String {
 /// through `FfiValue::Res`. No native fallback; panics if it can't be built or
 /// called.
 pub fn fill_or_add_sections_file(path: &str, fills: &[(String, String)]) -> Result<(), String> {
-    let fills = FfiValue::Array(
+    // Section name to body, which is what the callee takes: one body per
+    // section, looked up by name. A later pair for a name already given wins,
+    // the rule every other way of building a dict follows.
+    let fills = FfiValue::Dict(
         fills
             .iter()
-            .map(|(section, body)| {
-                FfiValue::Struct(vec![
-                    ("section".to_string(), FfiValue::Str(section.clone())),
-                    ("body".to_string(), FfiValue::Str(body.clone())),
-                ])
-            })
+            .map(|(section, body)| (FfiValue::Str(section.clone()), FfiValue::Str(body.clone())))
             .collect(),
     );
     DOGFOOD_ENGINE.with(|comp| {
@@ -4560,9 +4569,10 @@ fn new_jit_module() -> Result<JITModule, Error> {
 /// scalars (any integer width, `bool`, `char`), `str`, `Unit` (the empty-payload side of a `Result`), optionals of
 /// those (a trailing `?` per `Optional` layer, e.g. `str?`), results of those
 /// (`{ok}!{err}`, e.g. `unit!Error`), arrays (a trailing `[]`, e.g.
-/// `Token[]`), and structs/variants (the bare type name, e.g. `Span`, whose
-/// layout is carried separately on a `; struct`/`; variant` manifest line).
-/// Anything else can't cross the FFI and is rejected here.
+/// `Token[]`), dicts (`#{K:V}`, parameters only — see
+/// [`FfiValue::Dict`]), and structs/variants (the bare type name, e.g. `Span`,
+/// whose layout is carried separately on a `; struct`/`; variant` manifest
+/// line). Anything else can't cross the FFI and is rejected here.
 fn ffi_type_tag(t: &ConcreteType) -> Result<String, Error> {
     Ok(match t {
         // Every scalar the FFI marshals — any integer width (`i64`, `u64`, `u8`,
@@ -4582,11 +4592,17 @@ fn ffi_type_tag(t: &ConcreteType) -> Result<String, Error> {
             ))
         }
         ConcreteType::Array(elem) => format!("{}[]", ffi_type_tag(elem)?),
+        // `#{K:V}`, spelled without the source's space so the tag stays one
+        // space-separated field of the `; entry` line. Parameters only in
+        // practice — a dict *return* is refused by `check_ffi_return`, which
+        // explains the asymmetry — but the tag says nothing about direction, so
+        // there is nothing to special-case here.
+        ConcreteType::Dict(k, v) => format!("#{{{}:{}}}", ffi_type_tag(k)?, ffi_type_tag(v)?),
         ConcreteType::Named(n) => n.clone(),
         _ => {
             return Err(Error::msg(format!(
                 "dogfood entry type {} is not FFI-serializable (only i64/bool/char/str, \
-                 optionals/results/arrays of those, and structs/variants)",
+                 optionals/results/arrays/dicts of those, and structs/variants)",
                 type_name(t)
             )))
         }
@@ -4650,6 +4666,10 @@ fn collect_named_types(
             collect_named_types(err, structs, out);
         }
         ConcreteType::Array(elem) => collect_named_types(elem, structs, out),
+        ConcreteType::Dict(k, v) => {
+            collect_named_types(k, structs, out);
+            collect_named_types(v, structs, out);
+        }
         _ => {}
     }
 }
@@ -4663,6 +4683,25 @@ fn collect_named_types(
 /// emitted); a non-keyword tag is a struct/variant type name ([`ConcreteType::Named`])
 /// whose layout the `; struct`/`; variant` lines supply.
 fn ffi_type_from_tag(tag: &str) -> Result<ConcreteType, Error> {
+    // `#{K:V}` is tested first, and by both ends: a dict tag's own `?`/`!`/`[]`
+    // all sit *inside* the braces (`#{str:i64?}`), so the suffix tests below
+    // would bite into it. An optional or array *of* a dict still reaches them
+    // first, since those suffixes land outside the closing brace.
+    //
+    // The split is at the first `:`, which is always the outer one — a dict key
+    // is a scalar or a `str`, and no such spelling contains a colon. So a dict
+    // value that is itself a dict reads back correctly.
+    if let Some(inner) = tag.strip_prefix("#{").and_then(|t| t.strip_suffix('}')) {
+        let (k, v) = inner.split_once(':').ok_or_else(|| {
+            Error::msg(format!(
+                "dict entry type tag {tag:?} has no \":\" between key and value"
+            ))
+        })?;
+        return Ok(ConcreteType::Dict(
+            Box::new(ffi_type_from_tag(k)?),
+            Box::new(ffi_type_from_tag(v)?),
+        ));
+    }
     if let Some(base) = tag.strip_suffix('?') {
         return Ok(ConcreteType::Optional(Box::new(ffi_type_from_tag(base)?)));
     }
@@ -5697,6 +5736,19 @@ fn check_ffi_return_seen(
         // whose element is a scalar — is read specially (str-shaped) but validates
         // the same way.
         ConcreteType::Array(elem) => check_ffi_return_seen(name, elem, structs, seen),
+        // A dict is the one type that marshals in only one direction: the host
+        // can build one (`FfiValue::Dict`) because the entries it gives *are* the
+        // order the dict should hold, but reading one back would mean handing the
+        // host a key order nothing promises. Said here rather than left to the
+        // catch-all below, because "not supported" is the wrong story: it is
+        // supported, one way.
+        ConcreteType::Dict(_, _) => Err(Error::msg(format!(
+            "fn {name:?} returns {}; the FFI can pass a dict *in* (its entries are the \
+             order it should hold) but not back out — a dict's key order is not \
+             promised, so there is nothing to hand the host. Return its entries as an \
+             array of pairs instead",
+            type_name(ty)
+        ))),
         ConcreteType::Named(n) => {
             if !seen.insert(n.clone()) {
                 return Ok(());
@@ -5975,6 +6027,10 @@ fn ffi_arg_word(
             ConcreteType::Array(elem) => build_borrowed_array(abi, elem, elems, structs, bufs),
             _ => Err(mismatch(ty, v)),
         },
+        FfiValue::Dict(entries) => match ty {
+            ConcreteType::Dict(k, val) => build_borrowed_dict(abi, k, val, entries, structs, bufs),
+            _ => Err(mismatch(ty, v)),
+        },
         _ => Err(mismatch(ty, v)),
     }
 }
@@ -5984,7 +6040,7 @@ fn ffi_arg_word(
 fn mismatch(ty: &ConcreteType, v: &FfiValue) -> String {
     format!(
         "is {} but was given an FfiValue::{}; pass the matching variant (Int for \
-         i64/bool/char, Str for str, Array for an array, Struct for a struct, Variant for a \
+         i64/bool/char, Str for str, Array for an array, Dict for a dict, Struct for a struct, Variant for a \
          variant, Opt for an optional, Res for a result)",
         type_name(ty),
         ffi_value_kind(v)
@@ -6001,6 +6057,7 @@ fn ffi_value_kind(v: &FfiValue) -> &'static str {
         FfiValue::Struct(_) => "Struct",
         FfiValue::Variant(_, _) => "Variant",
         FfiValue::Array(_) => "Array",
+        FfiValue::Dict(_) => "Dict",
     }
 }
 
@@ -6071,6 +6128,49 @@ fn build_borrowed_array(
             // SAFETY: the block was sized for `elems.len()` elements of `stride`
             // bytes and zeroed, so this slot is in bounds and initialized.
             unsafe { write_ffi_arg(abi, base.add(i * stride), elem, e, structs, bufs)? };
+        }
+    }
+    Ok(data as i64)
+}
+
+/// Build a borrowed `#{K: V}` value from `entries`: the same array block
+/// [`build_borrowed_array`] builds, with a `[key][value]` pair as the element —
+/// which is all a dict is. Tagged `STATIC_REFCOUNT` like any borrowed block, so
+/// the callee's retains and releases no-op and any path that would write into it
+/// (`remove_key`, through `aipl_arr_reserve`) copies first.
+///
+/// A later entry for a key already given replaces it, so what the callee gets is
+/// a dict with distinct keys — the invariant every other way of building one
+/// keeps, and the rule a `#{k: v, ..}` literal follows. Keys are compared as the
+/// host spelled them, which is exact for the scalars and strings a dict key may
+/// be; anything else is refused by the per-key write below.
+fn build_borrowed_dict(
+    abi: Abi,
+    key: &ConcreteType,
+    val: &ConcreteType,
+    entries: &[(FfiValue, FfiValue)],
+    structs: &HashMap<String, TypeDef>,
+    bufs: &mut ArgBufs,
+) -> Result<i64, String> {
+    let mut distinct: Vec<(&FfiValue, &FfiValue)> = Vec::with_capacity(entries.len());
+    for (k, v) in entries {
+        match distinct.iter_mut().find(|(seen, _)| *seen == k) {
+            Some(slot) => slot.1 = v,
+            None => distinct.push((k, v)),
+        }
+    }
+    let key_size = dict_key_size(key, structs);
+    let pair_size = dict_pair_size(key, val, structs);
+    let data = bufs.array_block(distinct.len(), pair_size);
+    let base = unsafe { data.add(ARR_ELEMS_OFFSET) };
+    let stride = pair_size.max(8) as usize;
+    for (i, (k, v)) in distinct.iter().enumerate() {
+        // SAFETY: the block was sized for `distinct.len()` pairs of `stride`
+        // bytes and zeroed, so both slots are in bounds and initialized.
+        unsafe {
+            let pair = base.add(i * stride);
+            write_ffi_arg(abi, pair, key, k, structs, bufs)?;
+            write_ffi_arg(abi, pair.add(key_size as usize), val, v, structs, bufs)?;
         }
     }
     Ok(data as i64)

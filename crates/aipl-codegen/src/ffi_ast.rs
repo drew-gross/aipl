@@ -570,5 +570,6 @@ fn shape(v: &FfiValue) -> &'static str {
         FfiValue::Struct(_) => "a struct",
         FfiValue::Variant(..) => "a variant",
         FfiValue::Array(_) => "an array",
+        FfiValue::Dict(_) => "a dict",
     }
 }

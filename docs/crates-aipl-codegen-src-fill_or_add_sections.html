@@ -20,20 +20,6 @@
         <h2 id="public">Public</h2>
 
 
-        <section class="item" id="item-Fill">
-          <h3>
-            <a class="anchor" href="#item-Fill">Fill</a>
-            <span class="kind kind-struct">struct</span>
-          </h3>
-          <pre class="signature"><code>struct Fill</code></pre>
-
-          <div class="doc"><p>One section to write back: the <code>--- name ---</code> it belongs under, and the body to put there.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-Walk">
           <h3>
             <a class="anchor" href="#item-Walk">Walk</a>
@@ -41,7 +27,7 @@
           </h3>
           <pre class="signature"><code>struct Walk</code></pre>
 
-          <div class="doc"><p>The state threaded through the line walk: the rewritten file so far, whether the current line is inside an old body being dropped, and the fills that haven't met their header yet (whatever is left gets appended at the end).</p></div>
+          <div class="doc"><p>The state threaded through the line walk: the rewritten file so far, whether the current line is inside an old body being dropped, and the fills that haven't met their header yet (whatever is left gets appended at the end).</p><p>The fills are a dict, section name to body, which is what they <em>are</em>: one body per section, looked up by name. They were a <code>Fill { section, body }[]</code>, which had to be searched for the name on every line of every file, filtered to drop a match, and could hold two bodies for one section with nothing to say which of them won.</p></div>
 
 
         </section>
@@ -53,7 +39,7 @@
             <a class="anchor" href="#item-fill_or_add_sections">fill_or_add_sections</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn fill_or_add_sections(contents: str, fills: Fill[]) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn fill_or_add_sections(contents: str, fills: #{str: str}) -&#62; str</code></pre>
 
           <div class="doc"><p>Rewrites <code>contents</code> so that every section named in <code>fills</code> holds that fill's <code>body</code>: an existing <code>--- section ---</code> block has its old body (up to the next header line or EOF) replaced, and a section the file doesn't carry is appended as a fresh block. Everything else is preserved verbatim.</p><p>The whole batch costs one walk, which is the point: a case whose <code>stdout</code>, <code>exit code</code> and <code>performance</code> all went stale is read, rewritten and written back once rather than three times.</p></div>
 
@@ -88,7 +74,7 @@
             <a class="anchor" href="#item-append_missing">append_missing</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn append_missing(out: str, pending: Fill[]) -&#62; str</code></pre>
+          <pre class="signature"><code>fn append_missing(out: str, pending: #{str: str}) -&#62; str</code></pre>
 
           <div class="doc"><p>Append a fresh <code>--- section ---</code> block for every fill the file carried no header for, after dropping the trailing newlines the walk copied over.</p></div>
 

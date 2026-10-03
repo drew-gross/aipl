@@ -1,10 +1,10 @@
 import { equal as ==, read_file_to_string, write_string_to_file } from builtins;
-import { Fill, fill_or_add_sections } from "./fill_or_add_sections.aipl";
+import { fill_or_add_sections } from "./fill_or_add_sections.aipl";
 
 # Reads the file at `path`, splices every fill in `fills` into (or appends it
 # to) its `--- section ---` blocks via `fill_or_add_sections`, and writes the
 # result back to `path`. One read and one write for the whole batch.
-pub fn fill_or_add_sections_file(path: str, fills: Fill[]) !read_files !write_files -> !Error {
+pub fn fill_or_add_sections_file(path: str, fills: #{str: str}) !read_files !write_files -> !Error {
     let contents = read_file_to_string(path)?;
     write_string_to_file(path, fill_or_add_sections(contents, fills))
 }.test({
@@ -14,47 +14,46 @@ pub fn fill_or_add_sections_file(path: str, fills: Fill[]) !read_files !write_fi
     // nothing on disk — is safe to exercise directly here. The write-failure
     // branch mirrors it exactly, and `write_string_to_file`'s own error
     // behavior is covered in `tests/cases/files/write_file.aipl`.
-    assert(fill_or_add_sections_file(
-        "no_such_file_xyz_12345.aipl",
-        [Fill { section: "foo", body: "bar" }],
-    ) == err("could not read file"));
+    assert(fill_or_add_sections_file("no_such_file_xyz_12345.aipl", #{"foo": "bar"}) == err(
+        "could not read file",
+    ));
 })
 --- performance ---
 allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 108
-instructions executed: 152
-binary size: 13224
-  code: 7756
-  data: 272
-  metadata: 5196
+instructions executed: 133
+binary size: 11152
+  code: 6412
+  data: 241
+  metadata: 4499
 functions:
-  __arr_drop___m1__Fill:
+  __dict_drop_str$str:
     calls: 1
-    bytes: 140
-  __arr_retain___m1__Fill:
-    calls: 0
-    bytes: 140
-  __builtin_find_if$__m1__Fill$lam$__m1__step$lambda0:
-    calls: 0
-    bytes: 620
+    bytes: 136
+  __dict_retain_str$str:
+    calls: 1
+    bytes: 136
   __m1__step:
     calls: 0
-    bytes: 2752
-  __m1__step$filter2:
-    calls: 0
-    bytes: 424
+    bytes: 2612
   __test$fill_or_add_sections_file:
     calls: 1
-    bytes: 564
+    bytes: 516
   aipl_array_dec:
     calls: 1
     bytes: (external)
-  aipl_array_new:
+  aipl_array_push_mut:
+    calls: 1
+    bytes: (external)
+  aipl_array_with_cap:
     calls: 1
     bytes: (external)
   aipl_assert:
+    calls: 1
+    bytes: (external)
+  aipl_dict_insert:
     calls: 1
     bytes: (external)
   aipl_read_file_to_string:
@@ -71,7 +70,7 @@ functions:
     bytes: (external)
   fill_or_add_sections_file:
     calls: 1
-    bytes: 3016
+    bytes: 2912
   main:
     calls: 1
     bytes: 100
