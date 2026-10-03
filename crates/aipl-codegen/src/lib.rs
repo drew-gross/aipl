@@ -4013,6 +4013,24 @@ fn compile_program<M: Module>(
             let effectful = effectful.clone();
             move |program, scope| aipl_mono::fuse_operations(program, &effectful, scope)
         }),
+        // Replace a call whose result only reaches `len` with a call to the
+        // callee's counting variant, and add the variant. Before the folder,
+        // which is what then measures the variant's body — and after fusion, so
+        // the body it copies has already had its chains collapsed (a
+        // `.map(f).join()` the folder measures as one `map_join`, not as two
+        // calls it has no row for).
+        Pass::whole_program("counting_variants", {
+            let effectful = effectful.clone();
+            move |program| aipl_mono::counting_variants(program, &effectful)
+        }),
+        // Push each `len(..)` inward until it reaches a shape that already knows
+        // the answer, so the sequence it measures is never built. Paired with
+        // the pass above, which is how a `len` crosses into another function;
+        // the two alternate across rounds until the family closes.
+        Pass::scoped("fold_lengths", {
+            let effectful = effectful.clone();
+            move |program, scope| aipl_mono::fold_lengths(program, &effectful, scope)
+        }),
         // Fold constant subexpressions (`2 + 3` → `5`). After `check` so
         // diagnostics always report against the unfolded source, and after
         // inlining so bodies folded here are the ones actually emitted.

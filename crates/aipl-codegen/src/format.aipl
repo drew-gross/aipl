@@ -740,15 +740,15 @@ fn colon_space(l: str, r: str) -> bool { l == ":" }
 # A `Doc` at a width, for the assertions above.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 2325
-deallocations: 2325
+allocations: 2297
+deallocations: 2297
 reallocations: 217
-bytes allocated: 186475
-instructions executed: 296835
-binary size: 255752
-  code: 164472
+bytes allocated: 184203
+instructions executed: 293727
+binary size: 259784
+  code: 167404
   data: 6076
-  metadata: 85204
+  metadata: 86304
 functions:
   __arr_drop_Item:
     calls: 69
@@ -823,7 +823,7 @@ functions:
     calls: 0
     bytes: 44
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves$tail:
-    calls: 31
+    calls: 21
     bytes: 1040
   __builtin_map_join$__m8__Rule$FKind$__m8__ListStyle$lam$__m8__group_styles$FKind:
     calls: 0
@@ -852,9 +852,12 @@ functions:
   __m1__token_leaves:
     calls: 0
     bytes: 32
+  __m1__token_leaves$len:
+    calls: 34
+    bytes: 1072
   __m1__token_leaves$tail:
-    calls: 99
-    bytes: 1160
+    calls: 65
+    bytes: 1412
   __m2__col_after:
     calls: 172
     bytes: 628
@@ -895,8 +898,14 @@ functions:
     calls: 0
     bytes: 32
   __m8__group_styles$FKind$tail:
-    calls: 74
-    bytes: 3104
+    calls: 44
+    bytes: 3116
+  __m8__group_styles$len$FKind:
+    calls: 0
+    bytes: 32
+  __m8__group_styles$len$FKind$tail:
+    calls: 30
+    bytes: 1788
   __m8__link$FKind$str:
     calls: 8
     bytes: 3032
@@ -905,12 +914,12 @@ functions:
     bytes: 596
   __m8__link_rule$FKind:
     calls: 44
-    bytes: 6984
+    bytes: 6776
   __m8__link_rules$FKind:
     calls: 0
-    bytes: 604
+    bytes: 588
   __m8__opt_group_styles$FKind:
-    calls: 18
+    calls: 6
     bytes: 152
   __rec_drop___m1__Cst:
     calls: 27
@@ -967,22 +976,22 @@ functions:
     calls: 7
     bytes: 204
   aipl_arr_extend:
-    calls: 228
+    calls: 170
     bytes: (external)
   aipl_arr_inc:
-    calls: 1505
+    calls: 1393
     bytes: (external)
   aipl_arr_reserve:
-    calls: 288
+    calls: 220
     bytes: (external)
   aipl_arr_slice:
     calls: 30
     bytes: (external)
   aipl_array_dec:
-    calls: 3207
+    calls: 2975
     bytes: (external)
   aipl_array_new:
-    calls: 338
+    calls: 320
     bytes: (external)
   aipl_array_push:
     calls: 468
@@ -1000,13 +1009,13 @@ functions:
     calls: 1201
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 8885
+    calls: 8851
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 735
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 7684
+    calls: 7650
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 735

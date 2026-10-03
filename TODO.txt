@@ -186,6 +186,7 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 bugs:
+  array literal spreads evaluate their arguments (including effects) twice. Note: this is to pre-compute the length. But it would be nice to still pre-compute the length, if it can be done cheaply.
   return none; in a fn that returns i64? should work
   map over a generic struct's field trips the checker
   Struct-field defaults don't widen an integer literal to u64
@@ -548,8 +549,8 @@ optimizations:
     apparently, to_str_len still uses to_str() on boxed types to compute the let. We should stop that and use to_str_len.
     foo.reverse()[x] and foo.reverse()[x..y] should fuse
     .map().to_set() should fuse
+    map().join().len() should fuse
     .join().first() should fuse. also map_join().first()?
-    can we make a fully general v.foo().len() fusion? Maybe by monomorphizing?
     .reverse().find_map() should fuse
     .map(f).find(p) should fuse to map_find and not keep mapping after found
     fuse sequential extends
@@ -746,6 +747,7 @@ indent.aipl:
   pre-reserve target*lines + self.len() space
 
 debugging:
+  trace()/dbg_expr() function
   make a debugger
   line numbers on test assertion failures, err/none propagations, etc.
   tools for debugging infinite loops

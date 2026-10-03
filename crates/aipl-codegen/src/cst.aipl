@@ -618,15 +618,15 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(grp.show(gs, names) == "[( (term 1 ~  + ~  2) )]");
 })
 --- performance ---
-allocations: 291
-deallocations: 291
-reallocations: 19
-bytes allocated: 19101
-instructions executed: 46194
-binary size: 67112
-  code: 40340
+allocations: 264
+deallocations: 264
+reallocations: 17
+bytes allocated: 17261
+instructions executed: 44095
+binary size: 71768
+  code: 43932
   data: 3573
-  metadata: 23199
+  metadata: 24263
 functions:
   __arr_drop_Cst:
     calls: 40
@@ -644,13 +644,13 @@ functions:
     calls: 0
     bytes: 44
   __builtin_map_join$Cst$__builtin_Span$lam$leaves$tail:
-    calls: 20
+    calls: 13
     bytes: 1040
   __builtin_map_join$Cst$__builtin_Span$lam$token_leaves:
     calls: 0
     bytes: 44
   __builtin_map_join$Cst$__builtin_Span$lam$token_leaves$tail:
-    calls: 12
+    calls: 9
     bytes: 1040
   __builtin_reverse_find_map$Cst$__builtin_Span$lam$last_leaf:
     calls: 8
@@ -684,24 +684,24 @@ functions:
     bytes: 132
   __test$show:
     calls: 1
-    bytes: 14720
+    bytes: 15660
   __test$through:
     calls: 1
     bytes: 388
   aipl_arr_extend:
-    calls: 125
+    calls: 91
     bytes: (external)
   aipl_arr_inc:
-    calls: 1229
+    calls: 1146
     bytes: (external)
   aipl_arr_reserve:
-    calls: 158
+    calls: 112
     bytes: (external)
   aipl_array_dec:
-    calls: 1640
+    calls: 1488
     bytes: (external)
   aipl_array_new:
-    calls: 92
+    calls: 75
     bytes: (external)
   aipl_array_push:
     calls: 47
@@ -719,10 +719,10 @@ functions:
     calls: 66
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 691
+    calls: 668
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 622
+    calls: 599
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -751,9 +751,12 @@ functions:
   leaves:
     calls: 0
     bytes: 32
+  leaves$len:
+    calls: 15
+    bytes: 1072
   leaves$tail:
-    calls: 48
-    bytes: 1236
+    calls: 32
+    bytes: 1492
   main:
     calls: 1
     bytes: 168
@@ -787,9 +790,12 @@ functions:
   token_leaves:
     calls: 0
     bytes: 32
+  token_leaves$len:
+    calls: 7
+    bytes: 1072
   token_leaves$tail:
-    calls: 38
-    bytes: 1160
+    calls: 31
+    bytes: 1412
   token_span:
     calls: 5
     bytes: 288

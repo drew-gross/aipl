@@ -1,0 +1,91 @@
+# The two ways a measured call keeps its array, and the same counts out of both.
+#
+# `noisy_parts` builds its elements with something that prints. Measuring the
+# literal would mean never evaluating them, so the printing would stop
+# happening — a behaviour change rather than an optimization — and the folder
+# refuses the shape (`can_defer`, the same bar the loop family sets). With
+# nothing to fold, no counting variant is minted either: one that still built
+# the array would be the same work behind one more call.
+#
+# `read_parts` is the other half: its result is measured *and* read, so the
+# array has to exist however the length is obtained. The fusion rewrites the
+# `len` at a call site, not the function, so the one call that reads keeps
+# calling the producer.
+#
+# The `functions:` list shows `aipl_array_new` still reached — the literal
+# `noisy_parts` assembles cannot be folded away, and the one `plain_parts`
+# builds is a constant the compiler can put in the binary instead — and the
+# `stdout` shows each `print` landing exactly where the source put it.
+
+import { len, print, wrapping_add as + } from builtins;
+
+fn noisy(n: i64) !prints -> i64 {
+    print("e");
+    n
+}
+
+fn noisy_parts(n: i64) !prints -> i64[] { [noisy(n), noisy(n + 1), noisy(n + 2)] }
+
+fn plain_parts(n: i64) -> i64[] { [n, n + 1, n + 2] }
+
+fn noisy_count(n: i64) !prints -> u64 { noisy_parts(n).len() }
+
+// Measured and read: the array is needed either way.
+fn read_parts(n: i64) !prints -> u64 {
+    let parts = plain_parts(n);
+    print(`first {parts[0]}`);
+    parts.len()
+}
+
+fn main() !prints {
+    print(`{noisy_count(7)}`);
+    print(`{read_parts(10)}`);
+}
+--- stdout ---
+e
+e
+e
+3
+first some(10)
+3
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 202
+instructions executed: 261
+binary size: 3536
+  code: 1596
+  data: 123
+  metadata: 1817
+functions:
+  __to_str_i64$opt:
+    calls: 1
+    bytes: 388
+  __to_str_u64:
+    calls: 2
+    bytes: 204
+  aipl_array_dec:
+    calls: 1
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_u64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 2
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  aipl_write_u64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1004

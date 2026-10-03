@@ -1,0 +1,127 @@
+# Operation fusion across a function boundary: a call whose result only ever
+# reaches `len` becomes a call to a *counting variant* of the callee, which
+# measures what it would have built instead of building it.
+#
+# `styles` below is `group_styles` from `crates/aipl-codegen/src/grammar.aipl`
+# with the names shortened — a recursive walk that concatenates one array per
+# node so a caller can ask how many groups a rule holds. Nothing ever looks at
+# an element, and the arrays are the entire cost.
+#
+# Two passes split the work. `aipl_mono::counting_variants` mints `styles$len`,
+# whose body is `styles`'s with every result position measured rather than
+# produced; `aipl_mono::fold_lengths` then pushes each `len` inward — `len([])`
+# to `0`, the spread literal to the size the loader already reserved for it,
+# `len(rs.map(styles).join())` to a sum of the parts' lengths — until what is
+# left calls only `styles$len`. The two alternate across the pass manager's
+# rounds, so one `len` at the top closes the whole recursive family.
+#
+# The `functions:` list is the evidence, and it is an absence: no `styles`, and
+# no `map_join` instance. What remains is `styles$len`, called once per node of
+# the tree, plus `deep` and the refcount helpers for the `Rule` tree it builds —
+# which is the only thing in this program that still allocates. Every array
+# `styles`'s source describes is one the compiler never emits code to build.
+#
+# The counts are checkable by hand. A `Many` contributes its own group plus
+# whatever its body and separator hold, and `deep` nests two of them per level,
+# one with a separator and one without — so `c(0) = 0` and
+# `c(n) = 2 + 3 * c(n - 1)`, giving 0, 2, 8, 26, 80.
+
+import { join, len, map, print, value_or, wrapping_sub as - } from builtins;
+
+variant Rule = Then(Rule[]) | Many(Rule, Rule?) | Leaf
+
+fn styles(r: Rule) -> i64[] {
+    match (r) {
+        Then(rs) => rs.map(styles).join(),
+        Many(sub, sep) => [0, ..styles(sub), ..opt_styles(sep)],
+        Leaf => [],
+    }
+}
+
+fn opt_styles(r: Rule?) -> i64[] { r.map(styles).value_or([]) }
+
+fn counted(r: Rule) -> u64 { styles(r).len() }
+
+fn deep(n: i64) -> Rule {
+    match (n) {
+        0 => Leaf,
+        _ => Then([Many(deep(n - 1), some(deep(n - 1))), Many(deep(n - 1), none)]),
+    }
+}
+
+fn main() !prints {
+    // The shapes one at a time: nothing, one bare group, a group with a
+    // separator, and a `Then` that only passes its children through.
+    print(`{counted(Leaf)} {counted(Many(Leaf, none))} {counted(Many(Leaf, some(Leaf)))}`);
+    print(`{counted(Then([]))} {counted(Then([Leaf, Many(Leaf, none)]))}`);
+    // The recurrence above, as a series.
+    print(
+        `{counted(deep(0))} {counted(deep(1))} {counted(deep(2))} {counted(deep(3))} {counted(deep(4))}`,
+    );
+}
+--- stdout ---
+0 1 1
+0 1
+0 2 8 26 80
+--- performance ---
+allocations: 389
+deallocations: 389
+reallocations: 0
+bytes allocated: 23820
+instructions executed: 20434
+binary size: 8408
+  code: 4564
+  data: 33
+  metadata: 3811
+functions:
+  __arr_drop_Rule:
+    calls: 59
+    bytes: 116
+  __arr_retain_Rule:
+    calls: 0
+    bytes: 116
+  __rec_drop_Rule:
+    calls: 306
+    bytes: 124
+  __to_str_u64:
+    calls: 10
+    bytes: 204
+  aipl_arr_inc:
+    calls: 60
+    bytes: (external)
+  aipl_array_dec:
+    calls: 120
+    bytes: (external)
+  aipl_array_new:
+    calls: 59
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 306
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 899
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 178
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 593
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 178
+    bytes: (external)
+  aipl_u64_len:
+    calls: 20
+    bytes: (external)
+  aipl_write_u64:
+    calls: 10
+    bytes: (external)
+  deep:
+    calls: 179
+    bytes: 656
+  main:
+    calls: 1
+    bytes: 2828
+  styles$len:
+    calls: 306
+    bytes: 520

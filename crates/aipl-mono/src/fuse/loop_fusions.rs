@@ -439,7 +439,7 @@ fn build_windows(
 /// with the parameter renamed to `arg`'s name; a bare name becomes a call on
 /// it. Anything else is not a shape `map` accepts, and is left for mono to
 /// report.
-fn apply(func: &Expr, arg: Expr) -> Option<Expr> {
+pub(crate) fn apply(func: &Expr, arg: Expr) -> Option<Expr> {
     let ExprKind::Ident(arg_name) = &arg.kind else {
         unreachable!("the fused loop variable is always a bare identifier");
     };
@@ -461,7 +461,7 @@ fn apply(func: &Expr, arg: Expr) -> Option<Expr> {
 
 /// Whether calling `func` per element can be moved into the loop unobserved —
 /// see the module docs.
-fn is_pure(func: &Expr, blocked: &HashSet<String>) -> bool {
+pub(crate) fn is_pure(func: &Expr, blocked: &HashSet<String>) -> bool {
     match &func.kind {
         ExprKind::Lambda(_, body) => can_defer(body, blocked),
         ExprKind::Ident(g) => !blocked.contains(g),

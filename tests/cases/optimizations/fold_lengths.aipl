@@ -1,0 +1,101 @@
+# The length folder's own table: `len(e)` answered from `e`'s shape, with `e`
+# never built. Every row here is a local rewrite — no counting variant is
+# involved except in the last one, where the mapping function is a producer of
+# its own and `aipl_mono::counting_variants` picks it up.
+#
+# ```text
+# len([])                       →  0
+# len([a, b, c])                →  3
+# len([a, ..xs, ..ys])          →  1 + len(xs) + len(ys)
+# len(xs.map(f))                →  len(xs)
+# len(xs.sort())                →  len(xs)
+# len(xs.reverse())             →  len(xs)
+# len(xs.filter(p))             →  xs.count_if(p)
+# len(xs.filter_map(p, f))      →  xs.count_if(p)
+# len(xs.map(f).join())         →  Σ len(f(x)) for x in xs
+# len(if (c) { a } else { b })  →  if (c) { len(a) } else { len(b) }
+# ```
+#
+# `map`, `sort` and `reverse` answer with their receiver's own length: each
+# promises one element out per element in. `map` can do that only because it has
+# no set form — `set_map` is the separate name for the set case, whose result
+# may be smaller, and it is deliberately not in the table.
+#
+# The `functions:` list is the evidence: `double` and the lambda are never
+# called at all, `pair` is gone entirely — folded through its counting variant
+# and then inlined away — and `is_big` survives only as `count_if`'s predicate,
+# the one row above that still has to walk the elements. No `aipl_array_new`
+# appears, so not one of the arrays these rows measure is ever built.
+
+import {
+    filter,
+    filter_map,
+    greater_than as >,
+    join,
+    len,
+    map,
+    print,
+    reverse,
+    sort,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
+
+fn double(n: i64) -> i64 { n * 2 }
+
+fn is_big(self: i64) -> bool { self > 2 }
+
+// A producer, so the `map(..).join()` row reaches across a function boundary.
+fn pair(n: i64) -> i64[] { [n, n] }
+
+fn source() -> i64[] { [1, 2, 3, 4] }
+
+fn main() !prints {
+    let xs = source();
+    print(`{[].len()} {[7, 8, 9].len()} {[0, ..xs, ..xs].len()}`);
+    print(`{xs.map(double).len()} {xs.sort().len()} {xs.reverse().len()}`);
+    print(`{xs.filter(is_big).len()} {xs.filter_map(is_big, double).len()}`);
+    print(`{xs.map(pair).join().len()}`);
+    print(`{xs.map(|n| n + 1).len()}`);
+}
+--- stdout ---
+0 3 9
+4 4 4
+2 2
+8
+4
+--- performance ---
+allocations: 20
+deallocations: 20
+reallocations: 0
+bytes allocated: 1050
+instructions executed: 968
+binary size: 4904
+  code: 2588
+  data: 97
+  metadata: 2219
+functions:
+  __builtin_count_if$i64$lam$is_big:
+    calls: 2
+    bytes: 208
+  __to_str_i64:
+    calls: 2
+    bytes: 204
+  __to_str_u64:
+    calls: 8
+    bytes: 204
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_u64_len:
+    calls: 16
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  aipl_write_u64:
+    calls: 8
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1972

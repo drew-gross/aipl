@@ -423,27 +423,27 @@ fn is_layout(self: AiplTok) -> bool {
     assert(!StrLit(",", Quoted).is_layout());
 })
 --- performance ---
-allocations: 21348
-deallocations: 21348
-reallocations: 2942
-bytes allocated: 4881230
-instructions executed: 12287894
-binary size: 7637352
-  code: 5085412
+allocations: 19936
+deallocations: 19936
+reallocations: 2926
+bytes allocated: 4464942
+instructions executed: 11882894
+binary size: 7839088
+  code: 5253612
   data: 13498
-  metadata: 2538442
+  metadata: 2571978
 functions:
   __arr_drop___m10__Ty:
     calls: 0
     bytes: 116
   __arr_drop___m11__ListStyle:
-    calls: 2408
+    calls: 1012
     bytes: 120
   __arr_drop___m11__Prec:
     calls: 8
     bytes: 120
   __arr_drop___m11__Production$__m25__AiplTok$__m5__Ast:
-    calls: 40
+    calls: 24
     bytes: 3928
   __arr_drop___m11__Rule$__m25__AiplTok:
     calls: 2552
@@ -542,7 +542,7 @@ functions:
     calls: 0
     bytes: 116
   __arr_retain___m11__ListStyle:
-    calls: 588
+    calls: 408
     bytes: 120
   __arr_retain___m11__Prec:
     calls: 0
@@ -749,7 +749,7 @@ functions:
     calls: 0
     bytes: 44
   __builtin_map_join$__m11__Rule$__m25__AiplTok$__m11__ListStyle$lam$__m11__group_styles$__m25__AiplTok$tail:
-    calls: 1532
+    calls: 692
     bytes: 1072
   __builtin_map_join$__m12__Cst$__builtin_Span$lam$__m12__token_leaves:
     calls: 0
@@ -875,8 +875,14 @@ functions:
     calls: 0
     bytes: 32
   __m11__group_styles$__m25__AiplTok$tail:
-    calls: 13324
-    bytes: 3104
+    calls: 3688
+    bytes: 3116
+  __m11__group_styles$len$__m25__AiplTok:
+    calls: 0
+    bytes: 32
+  __m11__group_styles$len$__m25__AiplTok$tail:
+    calls: 7772
+    bytes: 1788
   __m11__link$__m25__AiplTok$__m5__Ast:
     calls: 4
     bytes: 24760
@@ -885,12 +891,12 @@ functions:
     bytes: 596
   __m11__link_rule$__m25__AiplTok:
     calls: 3688
-    bytes: 6984
+    bytes: 6776
   __m11__link_rules$__m25__AiplTok:
     calls: 692
-    bytes: 604
+    bytes: 588
   __m11__opt_group_styles$__m25__AiplTok:
-    calls: 1988
+    calls: 324
     bytes: 152
   __m11__prod_names$__m25__AiplTok$__m5__Ast:
     calls: 8
@@ -931,9 +937,12 @@ functions:
   __m12__token_leaves:
     calls: 0
     bytes: 32
+  __m12__token_leaves$len:
+    calls: 0
+    bytes: 1072
   __m12__token_leaves$tail:
     calls: 0
-    bytes: 1160
+    bytes: 1412
   __m12__token_span:
     calls: 2
     bytes: 288
@@ -1365,7 +1374,7 @@ functions:
     bytes: 296
   __m36__postfix:
     calls: 0
-    bytes: 12020
+    bytes: 12928
   __m36__postfix_segs:
     calls: 0
     bytes: 3108
@@ -1521,7 +1530,7 @@ functions:
     bytes: 400
   __m4__aipl_grammar:
     calls: 4
-    bytes: 225184
+    bytes: 787408
   __m4__aipl_parse_file:
     calls: 4
     bytes: 9820
@@ -1633,9 +1642,6 @@ functions:
   __m4__else_or_unit:
     calls: 0
     bytes: 15512
-  __m4__expressions:
-    calls: 8
-    bytes: 172204
   __m4__for_tuple:
     calls: 0
     bytes: 2164
@@ -1861,9 +1867,6 @@ functions:
   __m4__parens:
     calls: 128
     bytes: 376
-  __m4__patterns:
-    calls: 8
-    bytes: 39960
   __m4__pipes:
     calls: 16
     bytes: 376
@@ -1885,18 +1888,12 @@ functions:
   __m4__split_doc_lines:
     calls: 2
     bytes: 532
-  __m4__statements:
-    calls: 8
-    bytes: 127856
   __m4__tuple_slot_names:
     calls: 0
     bytes: 548
   __m4__tuple_ty:
     calls: 0
     bytes: 952
-  __m4__types:
-    calls: 8
-    bytes: 57844
   __m4__variadic_seq_ty:
     calls: 0
     bytes: 1012
@@ -2018,13 +2015,13 @@ functions:
     calls: 3
     bytes: (external)
   aipl_arr_extend:
-    calls: 11671
+    calls: 5503
     bytes: (external)
   aipl_arr_inc:
-    calls: 43173
+    calls: 29489
     bytes: (external)
   aipl_arr_reserve:
-    calls: 11622
+    calls: 5682
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 16
@@ -2036,10 +2033,10 @@ functions:
     calls: 84
     bytes: (external)
   aipl_array_dec:
-    calls: 70070
+    calls: 42686
     bytes: (external)
   aipl_array_new:
-    calls: 2100
+    calls: 1728
     bytes: (external)
   aipl_array_push:
     calls: 1901
@@ -2060,13 +2057,13 @@ functions:
     calls: 14542
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 70940
+    calls: 68096
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 4514
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 56398
+    calls: 53554
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 4514

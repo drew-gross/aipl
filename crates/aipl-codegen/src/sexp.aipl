@@ -73,11 +73,11 @@ allocations: 12950
 deallocations: 12950
 reallocations: 502
 bytes allocated: 12377026
-instructions executed: 6276643
-binary size: 218920
-  code: 146552
+instructions executed: 6276295
+binary size: 222960
+  code: 149484
   data: 1716
-  metadata: 70652
+  metadata: 71760
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -325,9 +325,12 @@ functions:
   __m2__token_leaves:
     calls: 0
     bytes: 32
+  __m2__token_leaves$len:
+    calls: 0
+    bytes: 1072
   __m2__token_leaves$tail:
     calls: 39
-    bytes: 1160
+    bytes: 1412
   __m2__token_text:
     calls: 16
     bytes: 1464
@@ -344,8 +347,14 @@ functions:
     calls: 0
     bytes: 32
   __m4__group_styles$__m1__SexpKind$tail:
-    calls: 84
-    bytes: 3104
+    calls: 42
+    bytes: 3116
+  __m4__group_styles$len$__m1__SexpKind:
+    calls: 0
+    bytes: 32
+  __m4__group_styles$len$__m1__SexpKind$tail:
+    calls: 42
+    bytes: 1788
   __m4__link$__m1__SexpKind$Sexp:
     calls: 6
     bytes: 2480
@@ -354,12 +363,12 @@ functions:
     bytes: 596
   __m4__link_rule$__m1__SexpKind:
     calls: 42
-    bytes: 6984
+    bytes: 6776
   __m4__link_rules$__m1__SexpKind:
     calls: 6
-    bytes: 604
+    bytes: 588
   __m4__opt_group_styles$__m1__SexpKind:
-    calls: 18
+    calls: 6
     bytes: 152
   __m4__prod_names$__m1__SexpKind$Sexp:
     calls: 12
@@ -404,7 +413,7 @@ functions:
     calls: 836
     bytes: (external)
   aipl_array_dec:
-    calls: 166882
+    calls: 166828
     bytes: (external)
   aipl_array_new:
     calls: 2510

@@ -68,7 +68,11 @@
 
 mod chain_fusions;
 mod comparison_fusions;
-mod loop_fusions;
+// Crate-visible: `apply` and `is_pure` — how a function-valued argument is
+// applied to one element and whether its per-element calls may be moved — are
+// the loop family's, and `fold_lengths` asks the same two questions of the same
+// arguments (see [`crate::fold_lengths`]).
+pub(crate) mod loop_fusions;
 mod slice_fusions;
 
 use crate::passes::Scope;
@@ -180,10 +184,10 @@ fn try_fuse(e: &Expr, outer: Option<&Callee>, guards: &Guards) -> Option<Expr> {
 }
 
 /// One `let` a fusable expression sits under — see [`through_bindings`].
-pub(super) struct Binding<'a> {
-    pub(super) name: &'a str,
-    pub(super) ty: &'a Option<Type>,
-    pub(super) value: &'a Expr,
+pub(crate) struct Binding<'a> {
+    pub(crate) name: &'a str,
+    pub(crate) ty: &'a Option<Type>,
+    pub(crate) value: &'a Expr,
 }
 
 /// The `let`s leading `e`, outermost first, and the expression under them.
@@ -194,7 +198,7 @@ pub(super) struct Binding<'a> {
 /// `let self: str = s; split(self, "\n")`, and a shape that looks for a call
 /// would miss it at exactly the sites inlining creates. Each family looks under
 /// the bindings and puts its rewrite back beneath them.
-pub(super) fn through_bindings(e: &Expr) -> (Vec<Binding<'_>>, &Expr) {
+pub(crate) fn through_bindings(e: &Expr) -> (Vec<Binding<'_>>, &Expr) {
     let mut bindings = Vec::new();
     let mut e = e;
     while let ExprKind::Let(name, ty, value, body) = &e.kind {
@@ -207,7 +211,7 @@ pub(super) fn through_bindings(e: &Expr) -> (Vec<Binding<'_>>, &Expr) {
 /// `body` wrapped back up in the `let`s [`through_bindings`] peeled off, each
 /// rebuilt against `whole` — the source the user wrote, and what any later
 /// diagnostic should point at.
-pub(super) fn under_bindings(bindings: Vec<Binding<'_>>, whole: &Expr, body: Expr) -> Expr {
+pub(crate) fn under_bindings(bindings: Vec<Binding<'_>>, whole: &Expr, body: Expr) -> Expr {
     bindings.into_iter().rev().fold(body, |body, b| {
         Expr::rebuilt(
             ExprKind::Let(

@@ -106,15 +106,15 @@ some(398)
 100
 some(2)
 --- performance ---
-allocations: 19
-deallocations: 19
+allocations: 17
+deallocations: 17
 reallocations: 49
-bytes allocated: 5467
-instructions executed: 90462
-binary size: 6392
-  code: 3584
+bytes allocated: 2987
+instructions executed: 89638
+binary size: 6824
+  code: 4104
   data: 107
-  metadata: 2701
+  metadata: 2613
 functions:
   __to_str_i64$opt:
     calls: 4
@@ -123,13 +123,13 @@ functions:
     calls: 4
     bytes: 204
   aipl_arr_inc:
-    calls: 13
+    calls: 7
     bytes: (external)
   aipl_arr_reserve:
-    calls: 4
+    calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 29
+    calls: 21
     bytes: (external)
   aipl_array_new:
     calls: 2
@@ -138,10 +138,10 @@ functions:
     calls: 5
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1453
+    calls: 1302
     bytes: (external)
   aipl_array_with_cap:
-    calls: 4
+    calls: 2
     bytes: (external)
   aipl_i64_len:
     calls: 8
@@ -158,21 +158,15 @@ functions:
   aipl_write_u64:
     calls: 4
     bytes: (external)
-  borrowed:
-    calls: 2
-    bytes: 308
   main:
     calls: 1
-    bytes: 1328
+    bytes: 2676
+  main$filter_map11$own0:
+    calls: 1
+    bytes: 328
+  main$filter_map8$own0:
+    calls: 1
+    bytes: 328
   many:
     calls: 5
     bytes: 180
-  owned$filter_map2$own0:
-    calls: 2
-    bytes: 344
-  points:
-    calls: 2
-    bytes: 488
-  spelled_out$filter_map2$own0:
-    calls: 2
-    bytes: 344

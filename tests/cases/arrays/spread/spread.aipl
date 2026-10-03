@@ -34,36 +34,36 @@ fn joined(a: i64[]) -> i64[] { [..a, ..tail(), five(), 6] }.test({
     assert([..a, ..b, ..a] == [1, 2, 3, 1, 2]);
 })
 --- performance ---
-allocations: 12
-deallocations: 12
+allocations: 11
+deallocations: 11
 reallocations: 0
-bytes allocated: 760
-instructions executed: 3032
-binary size: 10592
-  code: 4404
+bytes allocated: 704
+instructions executed: 2993
+binary size: 10192
+  code: 4164
   data: 1397
-  metadata: 4791
+  metadata: 4631
 functions:
   __eq_i64$arr:
     calls: 11
     bytes: 296
   __test$joined:
     calls: 1
-    bytes: 4004
+    bytes: 3764
   aipl_arr_extend:
     calls: 11
     bytes: (external)
   aipl_arr_inc:
-    calls: 47
+    calls: 44
     bytes: (external)
   aipl_arr_reserve:
-    calls: 12
+    calls: 11
     bytes: (external)
   aipl_array_dec:
-    calls: 81
+    calls: 76
     bytes: (external)
   aipl_array_push_mut:
-    calls: 6
+    calls: 5
     bytes: (external)
   aipl_assert:
     calls: 11

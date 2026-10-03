@@ -36,6 +36,12 @@ pub use fold::fold_constants;
 mod fuse;
 pub use fuse::{effectful_fns, fuse_operations};
 
+mod fold_lengths;
+pub use fold_lengths::fold_lengths;
+
+mod counting_variants;
+pub use counting_variants::counting_variants;
+
 mod sink;
 pub use sink::{sink_bindings, sink_bindings_post_mono};
 
