@@ -427,6 +427,64 @@ fn is_spread(fi: &FieldInit) -> bool {
     matches!(fi.value.kind, ExprKind::Spread(_))
 }
 
+/// How long the sequence `e` produces is, as an expression that does **not**
+/// evaluate `e` — or `None` when there is no such expression.
+///
+/// This is what lets an array literal's spread be sized and copied without
+/// being evaluated twice (`desugar_spread`). The length is needed before the
+/// allocation and the elements after it, so either the length can be had some
+/// other way or the operand has to be evaluated into a binding first; this
+/// decides which.
+///
+/// "Does not evaluate `e`" is the whole requirement, and it is met by reaching
+/// a leaf that answers without running anything:
+///
+/// - a **name**, whose length is a read. Reading one twice is free and cannot
+///   have an effect, and nothing in an array literal can write it — an
+///   expression may not assign (see the statement/expression rule), so the
+///   elements around it cannot change what it holds. A field chain rooted at a
+///   name is the same read, one indirection further.
+/// - an **array literal** with no spread of its own, whose length is how many
+///   elements are written. It evaluates none of them: the copy still does that,
+///   exactly once.
+///
+/// and from there through the calls whose result is as long as their receiver
+/// ([`Callee::preserves_length`]), which is the row that matters in practice:
+/// `[..xs.map(f)]` sizes itself from `len(xs)`, so `f` runs once per element
+/// rather than twice.
+///
+/// Anything else — a call, a slice, an index — answers `None`, and the operand
+/// is bound instead. Being wrong in that direction costs a binding; being wrong
+/// in the other would evaluate something twice.
+fn cheap_len(e: &Expr) -> Option<Expr> {
+    let len = |x: &Expr| {
+        Expr::new(
+            ExprKind::Call(Callee::Len, vec![x.clone()], true),
+            e.span.clone(),
+        )
+    };
+    match &e.kind {
+        ExprKind::Ident(_) => Some(len(e)),
+        ExprKind::Field(..) if is_name_path(e) => Some(len(e)),
+        ExprKind::ArrayLit(elems) => elems
+            .iter()
+            .all(|x| !matches!(x.kind, ExprKind::Spread(_)))
+            .then(|| Expr::new(ExprKind::Num(elems.len() as i64), e.span.clone())),
+        ExprKind::Call(callee, args, _) if callee.preserves_length() => cheap_len(args.first()?),
+        _ => None,
+    }
+}
+
+/// Whether `e` is a name or a chain of field reads rooted at one — a *place*
+/// that is read rather than computed, and so free to read again.
+fn is_name_path(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Ident(_) => true,
+        ExprKind::Field(base, _) => is_name_path(base),
+        _ => false,
+    }
+}
+
 impl Expander {
     /// Replace a struct spread — `T { ..base, a: 1 }` — with the fields it
     /// stands for: every field of `T` the literal does not give explicitly is
@@ -556,8 +614,41 @@ impl Expander {
     /// ```
     ///
     /// The literal's final length is known here — a constant for the plain
-    /// elements plus a `len` call per spread — so `reserve` sizes the buffer
-    /// exactly once instead of growing it. `reserve` also hands back a
+    /// elements plus each spread operand's length — so `reserve` sizes the
+    /// buffer exactly once instead of growing it.
+    ///
+    /// # Each element is evaluated once
+    ///
+    /// Which means a spread operand is *needed* twice: the size expression
+    /// above wants its length and the `concat` wants its elements. Writing the
+    /// operand into both is only correct when evaluating it twice is free, and
+    /// this used to do it unconditionally — so `[..a(), ..b()]` called `b`
+    /// twice, and a recursive producer like `grammar.aipl`'s `group_styles`
+    /// paid for its whole subtree twice per level.
+    ///
+    /// So the length comes from [`cheap_len`] when it can, which is what the
+    /// shape above shows: `len(c)` reads a name, and `..xs.map(f)` likewise
+    /// sizes itself from `len(xs)` without running `f`. When it cannot — the
+    /// operand is a call, a slice, anything computed — **every** element is
+    /// evaluated into a binding first and the block is built from those:
+    ///
+    /// ```text
+    /// [p(), ..q(), r()]
+    ///   =>  let $s0 = p(); let $s1 = q(); let $s2 = r();
+    ///       mut $s = __aipl_arr_reserve([$s0], 1 + len($s1));
+    ///       set $s = __aipl_arr_concat($s, $s1);
+    ///       set $s = __aipl_arr_append($s, $s2);
+    ///       $s
+    /// ```
+    ///
+    /// All of them or none, never a mix: binding an element moves its
+    /// evaluation to the front of the block, so hoisting only the operands
+    /// would reorder them against the plain elements left in place. Hoisting
+    /// everything instead gives exactly the order the literal is written in,
+    /// which is more than the old shape managed even when it was not
+    /// duplicating anything. The bindings a single read makes redundant are
+    /// substituted straight back out by `inline_single_use_bindings`, so a
+    /// literal with no effects to order pays nothing for them. `reserve` also hands back a
     /// *uniquely owned* block (reusing the seed's allocation when its refcount
     /// is 1, else copying into a right-sized one), which is what lets the
     /// appends after it write in place without consulting the static
@@ -578,8 +669,59 @@ impl Expander {
     fn desugar_spread(&mut self, elems: Vec<Expr>, span: Span) -> ExprKind {
         let k = self.spreads;
         self.spreads += 1;
-        let acc = format!("__spread${k}");
         let node = |kind| Expr::new(kind, span.clone());
+
+        // Every spread operand is needed twice: once to size the one
+        // allocation, once to copy from. Which of the two forms below is used
+        // depends on whether that is free.
+        //
+        // It is all of one or all of the other, never a mix. Binding an element
+        // moves its evaluation to the front of the block, so hoisting *some*
+        // elements would reorder them against the ones left in place — and the
+        // whole point of hoisting is the literal whose elements are worth
+        // ordering.
+        let measurable = elems.iter().all(|e| match &e.kind {
+            ExprKind::Spread(inner) => cheap_len(inner).is_some(),
+            _ => true,
+        });
+        let (bindings, elems) = match measurable {
+            true => (Vec::new(), elems),
+            false => {
+                let bound: Vec<(String, Expr)> = elems
+                    .iter()
+                    .enumerate()
+                    .map(|(i, e)| (format!("__spread${k}_{i}"), e.clone()))
+                    .collect();
+                // Each element reads as its binding — a spread of the binding
+                // where the element was a spread, so the shape below is the one
+                // it would have built anyway.
+                let reads = bound
+                    .iter()
+                    .zip(&elems)
+                    .map(|((name, _), e)| {
+                        let read = Expr::new(ExprKind::Ident(name.clone()), e.span.clone());
+                        match &e.kind {
+                            ExprKind::Spread(_) => {
+                                Expr::new(ExprKind::Spread(Box::new(read)), e.span.clone())
+                            }
+                            _ => read,
+                        }
+                    })
+                    .collect();
+                // The operand of a `Spread` is what gets bound, not the
+                // `Spread` node, which is not an expression of its own.
+                let bound = bound
+                    .into_iter()
+                    .map(|(name, e)| match e.kind {
+                        ExprKind::Spread(inner) => (name, *inner),
+                        _ => (name, e),
+                    })
+                    .collect::<Vec<_>>();
+                (bound, reads)
+            }
+        };
+
+        let acc = format!("__spread${k}");
         let acc_ref = || node(ExprKind::Ident(acc.clone()));
 
         // The seed, and the elements still to be appended after it.
@@ -594,7 +736,7 @@ impl Expander {
             }
         };
 
-        // How much `rest` adds: one per plain element, `len(operand)` per
+        // How much `rest` adds: one per plain element, the operand's length per
         // spread, summed left to right onto the constant.
         let plain = rest
             .iter()
@@ -602,16 +744,21 @@ impl Expander {
             .count();
         // A bare literal, not a `u64(..)` conversion (that form is gone): this
         // desugaring only runs for a literal that *has* a spread, so the count is
-        // always summed with at least one `len()` below and flexes to its `u64`.
+        // always summed with at least one length below and flexes to its `u64`.
         let mut extra = node(ExprKind::Num(plain as i64));
         for elem in rest {
             let ExprKind::Spread(inner) = &elem.kind else {
                 continue;
             };
-            let len = Expr::new(
-                ExprKind::Call(Callee::Len, vec![(**inner).clone()], true),
-                elem.span.clone(),
-            );
+            // `cheap_len` where it has an answer, which is every spread here
+            // when nothing was hoisted; a plain `len` of the binding otherwise,
+            // the binding being a bare name and so cheap by construction.
+            let len = cheap_len(inner).unwrap_or_else(|| {
+                Expr::new(
+                    ExprKind::Call(Callee::Len, vec![(**inner).clone()], true),
+                    elem.span.clone(),
+                )
+            });
             extra = Expr::new(
                 ExprKind::Call(Callee::WrappingAdd, vec![extra, len], false),
                 elem.span.clone(),
@@ -639,7 +786,25 @@ impl Expander {
             ExprKind::Call(Callee::ArrReserve, vec![seed, extra], false),
             span.clone(),
         );
-        ExprKind::LetMut(acc, None, Box::new(reserved), Box::new(body))
+        let block = node(ExprKind::LetMut(
+            acc,
+            None,
+            Box::new(reserved),
+            Box::new(body),
+        ));
+        // The hoists, outermost first, so the elements are evaluated in the
+        // order they are written.
+        let kind = bindings
+            .into_iter()
+            .rev()
+            .fold(block, |body, (name, value)| {
+                Expr::new(
+                    ExprKind::Let(name, None, Box::new(value), Box::new(body)),
+                    span.clone(),
+                )
+            })
+            .kind;
+        kind
     }
 
     /// The type annotation to keep on a `let T { .. } = value;` scrutinee

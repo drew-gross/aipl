@@ -471,10 +471,10 @@ deallocations: 10543
 reallocations: 1502
 bytes allocated: 1199166
 instructions executed: 2800870
-binary size: 397248
-  code: 263608
+binary size: 393376
+  code: 260720
   data: 5852
-  metadata: 127788
+  metadata: 126804
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -620,9 +620,6 @@ functions:
   __builtin_int_parse$lambda1:
     calls: 107
     bytes: 140
-  __builtin_intersperse$__m5__Doc:
-    calls: 0
-    bytes: 412
   __builtin_map_find_if$__m3__Rule$CalcTok$__m3__Prec[]$lam$__m2__climb_precs$CalcTok$__builtin_is_nonempty:
     calls: 4
     bytes: 436
@@ -788,12 +785,9 @@ functions:
   __m1__leaves:
     calls: 0
     bytes: 32
-  __m1__leaves$len:
-    calls: 0
-    bytes: 1072
   __m1__leaves$tail:
     calls: 31
-    bytes: 1492
+    bytes: 1164
   __m1__own_token_text:
     calls: 308
     bytes: 1456
@@ -806,12 +800,9 @@ functions:
   __m1__token_leaves:
     calls: 0
     bytes: 32
-  __m1__token_leaves$len:
-    calls: 0
-    bytes: 1072
   __m1__token_leaves$tail:
     calls: 530
-    bytes: 1412
+    bytes: 1088
   __m1__token_text:
     calls: 0
     bytes: 1464
@@ -871,7 +862,7 @@ functions:
     bytes: 32
   __m3__group_styles$CalcTok$tail:
     calls: 819
-    bytes: 3116
+    bytes: 3112
   __m3__group_styles$len$CalcTok:
     calls: 0
     bytes: 32
@@ -910,7 +901,7 @@ functions:
     bytes: 192
   __m4__group_doc$CalcTok$Calc$s1$lam$calc_space:
     calls: 0
-    bytes: 7692
+    bytes: 8016
   __m4__inline_doc$lam$calc_space:
     calls: 67
     bytes: 2412

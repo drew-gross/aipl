@@ -92,18 +92,18 @@ pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
     assert(sort_by([2, 1], |a, b| a < b) == [1, 2]);
 })
 --- performance ---
-allocations: 78
-deallocations: 78
+allocations: 58
+deallocations: 58
 reallocations: 22
-bytes allocated: 3464
-instructions executed: 8218
-binary size: 23064
-  code: 13784
+bytes allocated: 2752
+instructions executed: 8002
+binary size: 22624
+  code: 13408
   data: 1210
-  metadata: 8070
+  metadata: 8006
 functions:
   __arr_drop_E:
-    calls: 8
+    calls: 6
     bytes: 140
   __arr_retain_E:
     calls: 5
@@ -116,21 +116,21 @@ functions:
     bytes: 364
   __test$sort_by:
     calls: 1
-    bytes: 12736
+    bytes: 12360
   aipl_arr_extend:
     calls: 27
     bytes: (external)
   aipl_arr_inc:
-    calls: 192
+    calls: 209
     bytes: (external)
   aipl_arr_reserve:
     calls: 27
     bytes: (external)
   aipl_arr_slice:
-    calls: 81
+    calls: 54
     bytes: (external)
   aipl_array_dec:
-    calls: 280
+    calls: 277
     bytes: (external)
   aipl_array_new:
     calls: 4

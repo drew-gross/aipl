@@ -470,6 +470,8 @@ design:
   apis should express intent
 
 optimizations:
+  apply similar lenght optimizations to templates as we do to array literals with spreads
+  spread length pre-computation doesn't have to be all-or-none because operations with no effects can be reordered safely
   pass manager should be a bit smarter about inline small and inline single use. Inlining is powerful, we should work hard to inline more.
   figure out / fix why template literals are peforming worse than concat chains
   make large array-literal construction table-driven rather than unrolled.

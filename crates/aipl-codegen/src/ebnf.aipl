@@ -758,11 +758,11 @@ allocations: 1632
 deallocations: 1632
 reallocations: 342
 bytes allocated: 190341
-instructions executed: 242585
-binary size: 171728
-  code: 113400
+instructions executed: 242405
+binary size: 171704
+  code: 113396
   data: 4004
-  metadata: 54324
+  metadata: 54304
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -853,12 +853,12 @@ functions:
     bytes: 32
   __m1__group_styles$Tok$tail:
     calls: 138
-    bytes: 3116
+    bytes: 3112
   __m1__group_styles$len$Tok:
     calls: 0
     bytes: 32
   __m1__group_styles$len$Tok$tail:
-    calls: 124
+    calls: 118
     bytes: 1788
   __m1__link$Tok$Node:
     calls: 9
@@ -924,7 +924,7 @@ functions:
     calls: 172
     bytes: (external)
   aipl_arr_inc:
-    calls: 3846
+    calls: 3858
     bytes: (external)
   aipl_arr_reserve:
     calls: 280
@@ -933,7 +933,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 5111
+    calls: 5123
     bytes: (external)
   aipl_array_new:
     calls: 62
@@ -954,13 +954,13 @@ functions:
     calls: 490
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 3291
+    calls: 3279
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 120
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2801
+    calls: 2789
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 120

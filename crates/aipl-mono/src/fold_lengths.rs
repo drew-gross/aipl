@@ -58,10 +58,10 @@
 //! obvious than an element:
 //!
 //! - **`len(xs.map(f))` → `len(xs)`** drops every call to `f`. It is sound on
-//!   the count because the language guarantees it: `map` has no set form
-//!   precisely so that it can promise one element out per element in (the
-//!   checker's own message says so, and points a set receiver at `set_map`,
-//!   which may shrink and is therefore *not* in the table here).
+//!   the count because the language guarantees it, and which builtins make that
+//!   promise is [`Callee::preserves_length`] — stated there rather than here
+//!   because the loader's array-spread desugaring needs the same fact for the
+//!   same reason, and the two must not drift.
 //! - **`len(xs.map(f).join())`** keeps every call to `f` — the sum calls it once
 //!   per element, exactly as `map_join` does — and discards only the pieces.
 //!   `f` is still required to be pure, uniformly with the rest of the table,
@@ -163,6 +163,36 @@ pub(crate) fn folds_anything(e: &Expr, blocked: &HashSet<String>) -> bool {
     fold_expr(e, blocked) != *e
 }
 
+/// Whether evaluating `e` may be skipped entirely.
+///
+/// [`can_defer`] is most of it — nothing observable, nothing that leaves the
+/// expression. The extra condition is about a diagnostic rather than about
+/// behaviour: whether a `map` is *legal* depends on its receiver's type, which
+/// nothing before monomorphization knows, and monomorphization refuses a set
+/// receiver (`expand_map`: a set's `map` is the one case whose result can be
+/// shorter than its receiver, so `set_map` is the name for it). A `map` this
+/// pass deleted is a `map` monomorphization never sees — so
+/// `[..s.map(f)].len()` would stop being the error it is and start answering
+/// with a count. Dropping a subtree that holds one is therefore refused, and
+/// `len(xs.map(f))` is not folded at all even though `map` does preserve
+/// length.
+///
+/// The cost is a missed fold wherever a legitimate array's `map` sits inside
+/// something measured. The loader's own use of
+/// [`Callee::preserves_length`](aipl_syntax::ast::Callee::preserves_length) is
+/// not affected: it sizes an allocation from the receiver's length and leaves
+/// the `map` itself in place to be evaluated, so monomorphization still sees
+/// it.
+fn can_drop(e: &Expr, blocked: &HashSet<String>) -> bool {
+    can_defer(e, blocked) && !consumes_a_map(e)
+}
+
+/// Whether `e` holds a `map` call anywhere — see [`can_drop`].
+fn consumes_a_map(e: &Expr) -> bool {
+    matches!(&e.kind, ExprKind::Call(Callee::Map, ..))
+        || crate::children(e).iter().any(|c| consumes_a_map(c))
+}
+
 /// `len(arg)` — `whole` being that call — measured without building `arg`, or
 /// `None` when nothing here recognizes its shape.
 ///
@@ -189,19 +219,6 @@ fn fold_length(
     Some(under_bindings(bindings, whole, counted))
 }
 
-/// Builtins that answer `len` with their receiver's own length, so measuring
-/// one is measuring what it was given. Each is in the table for a stated reason
-/// (see the module docs for `map`); a builtin that may *change* the count —
-/// `set_map`, `filter`, `intersperse` — is deliberately absent.
-///
-/// The `bool` is whether the call's remaining arguments are functions whose
-/// per-element calls the rewrite drops, and so must be pure.
-const LENGTH_PRESERVING: &[(Callee, bool)] = &[
-    (Callee::Map, true),
-    (Callee::Sort, false),
-    (Callee::Reverse, false),
-];
-
 /// The length of `e`, computed from its shape rather than by building it.
 fn count_of(whole: &Expr, e: &Expr, empty: &[String], blocked: &HashSet<String>) -> Option<Expr> {
     let span = || whole.span.clone();
@@ -217,7 +234,7 @@ fn count_of(whole: &Expr, e: &Expr, empty: &[String], blocked: &HashSet<String>)
         ExprKind::ArrayLit(elems) => {
             if elems
                 .iter()
-                .any(|x| matches!(x.kind, ExprKind::Spread(_)) || !can_defer(x, blocked))
+                .any(|x| matches!(x.kind, ExprKind::Spread(_)) || !can_drop(x, blocked))
             {
                 return None;
             }
@@ -227,7 +244,7 @@ fn count_of(whole: &Expr, e: &Expr, empty: &[String], blocked: &HashSet<String>)
         // reserved past the seed stays, being the length they would have added.
         ExprKind::LetMut(..) => {
             let acc = spread_accumulator(e)?;
-            if !acc.appended.iter().all(|x| can_defer(x, blocked)) {
+            if !acc.appended.iter().all(|x| can_drop(x, blocked)) {
                 return None;
             }
             Some(add(measure(acc.seed), acc.extra.clone(), span()))
@@ -293,16 +310,24 @@ fn count_of(whole: &Expr, e: &Expr, empty: &[String], blocked: &HashSet<String>)
                 // result is measured where it is produced instead of being
                 // wrapped, unwrapped and thrown away.
                 Callee::ValueOr => optional_count(whole, args, empty, blocked),
-                _ => {
-                    let (_, needs_pure) = LENGTH_PRESERVING.iter().find(|(c, _)| c == callee)?;
+                // `xs.sort()`, `xs.reverse()` — one element out per element in
+                // ([`Callee::preserves_length`]), so the receiver answers for
+                // the result. Whatever the call does per element is dropped
+                // outright here, so every remaining argument has to be pure;
+                // these two have none and clear that trivially.
+                //
+                // `map` preserves length too and is deliberately not folded
+                // here — see [`consumes_a_map`].
+                _ if callee.preserves_length() && *callee != Callee::Map => {
                     let [xs, fns @ ..] = args.as_slice() else {
                         return None;
                     };
-                    if *needs_pure && !fns.iter().all(|f| is_pure(f, blocked)) {
+                    if !fns.iter().all(|f| is_pure(f, blocked)) {
                         return None;
                     }
                     Some(measure(xs))
                 }
+                _ => None,
             }
         }
         _ => None,

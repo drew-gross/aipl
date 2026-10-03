@@ -69,6 +69,7 @@ case_tests! {
     cases_arrays_spread_err_spread_in_pattern = "cases/arrays/spread/err_spread_in_pattern",
     cases_arrays_spread_spread = "cases/arrays/spread/spread",
     cases_arrays_spread_spread_elem_types = "cases/arrays/spread/spread_elem_types",
+    cases_arrays_spread_spread_evaluates_once = "cases/arrays/spread/spread_evaluates_once",
     cases_arrays_spread_spread_value_semantics = "cases/arrays/spread/spread_value_semantics",
     cases_arrays_starts_ends_with = "cases/arrays/starts_ends_with",
     cases_arrays_str_array = "cases/arrays/str_array",

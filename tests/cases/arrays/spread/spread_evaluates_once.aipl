@@ -1,0 +1,127 @@
+# Every element of an array literal holding a spread is evaluated exactly once,
+# in the order it is written.
+#
+# That is not free, because the desugaring needs each spread operand *twice*:
+# once to size the single allocation it reserves, and once to copy from. The
+# loader picks between two ways of paying for that (`desugar_spread`):
+#
+# - When the operand's length can be had **without evaluating it** — a name, a
+#   literal, or any chain of those through a call whose result is as long as its
+#   receiver, so `..xs.map(f)` sizes itself from `len(xs)` — the literal is built
+#   as written and the operand is evaluated once, by the copy.
+# - Otherwise every element is evaluated into a binding first, and the size
+#   expression and the copy both read the binding. It is all elements or none:
+#   binding one moves its evaluation to the front of the block, so hoisting only
+#   some would reorder them against the ones left in place.
+#
+# The `print`s are what pin this down. `each` spreads three calls, so each is
+# bound; its output is `a b c` and not `a b c b c`. `mapped` spreads a `map`,
+# whose length is its receiver's, so `loud` runs once per element rather than
+# twice. `ordered` interleaves plain elements with spreads and shows the
+# evaluation following the source left to right.
+
+import { len, map, print, wrapping_add as + } from builtins;
+
+fn a() !prints -> i64[] {
+    print("a");
+    [1]
+}
+
+fn b() !prints -> i64[] {
+    print("b");
+    [2]
+}
+
+fn c() !prints -> i64[] {
+    print("c");
+    [3]
+}
+
+fn loud(n: i64) !prints -> i64 {
+    print(`f{n}`);
+    n + 100
+}
+
+fn plain(n: i64) !prints -> i64 {
+    print(`p{n}`);
+    n
+}
+
+fn each() !prints -> i64[] { [..a(), ..b(), ..c()] }
+
+fn mapped(xs: i64[]) !prints -> i64[] { [0, ..xs.map(loud)] }
+
+fn ordered() !prints -> i64[] { [plain(1), ..b(), plain(2), ..c()] }
+
+fn main() !prints {
+    print(`{each().len()}`);
+    print(`{mapped([1, 2, 3]).len()}`);
+    print(`{ordered().len()}`);
+}
+--- stdout ---
+a
+b
+c
+3
+f1
+f2
+f3
+4
+p1
+b
+p2
+c
+4
+--- performance ---
+allocations: 15
+deallocations: 15
+reallocations: 0
+bytes allocated: 696
+instructions executed: 659
+binary size: 4968
+  code: 2308
+  data: 217
+  metadata: 2443
+functions:
+  __to_str_i64:
+    calls: 5
+    bytes: 204
+  __to_str_u64:
+    calls: 3
+    bytes: 204
+  aipl_arr_extend:
+    calls: 1
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 4
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 7
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 3
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
+    bytes: (external)
+  aipl_i64_len:
+    calls: 10
+    bytes: (external)
+  aipl_u64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_i64:
+    calls: 5
+    bytes: (external)
+  aipl_write_u64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1652
+  plain:
+    calls: 2
+    bytes: 248

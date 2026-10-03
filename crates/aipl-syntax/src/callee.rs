@@ -636,6 +636,30 @@ impl Callee {
         }
     }
 
+    /// Whether this builtin's result has exactly as many elements as its
+    /// receiver, so the receiver's length answers for it and the result need
+    /// never be built to be measured.
+    ///
+    /// Two places read this and have to agree. [`crate::fold_lengths`] answers
+    /// `len(xs.map(f))` with `len(xs)`; the loader's array-spread desugaring
+    /// needs a spread's length *without* evaluating the spread, because it
+    /// needs that length to size one allocation and the operand itself to fill
+    /// it (`desugar_spread`). Whichever asks, the fact is the same one, so it
+    /// is stated once.
+    ///
+    /// A builtin that may *change* the count is deliberately absent —
+    /// `filter`, `intersperse`, `split`. `map` can be here only because it has
+    /// no set form: `set_map` is the separate name for a set receiver, whose
+    /// result may be smaller when two elements map alike, and that separation
+    /// is what lets `map` promise one element out per element in.
+    ///
+    /// It says nothing about *evaluating* the call. A caller that drops the
+    /// remaining arguments' per-element calls rather than merely skipping the
+    /// result has its own question to ask about them.
+    pub fn preserves_length(&self) -> bool {
+        matches!(self, Callee::Map | Callee::Sort | Callee::Reverse)
+    }
+
     /// The pattern shape of a shape-variadic sequence builtin, or `None` for
     /// any other arm.
     pub fn seq_shape(&self) -> Option<SeqShape> {

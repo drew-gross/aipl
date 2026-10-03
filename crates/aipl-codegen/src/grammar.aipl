@@ -1094,11 +1094,11 @@ allocations: 746
 deallocations: 746
 reallocations: 101
 bytes allocated: 94193
-instructions executed: 76455
-binary size: 166592
-  code: 103340
+instructions executed: 74915
+binary size: 166560
+  code: 103336
   data: 6668
-  metadata: 56584
+  metadata: 56556
 functions:
   __arr_drop_ListStyle:
     calls: 38
@@ -1206,13 +1206,13 @@ functions:
     calls: 98
     bytes: (external)
   aipl_arr_inc:
-    calls: 371
+    calls: 427
     bytes: (external)
   aipl_arr_reserve:
     calls: 65
     bytes: (external)
   aipl_array_dec:
-    calls: 661
+    calls: 717
     bytes: (external)
   aipl_array_new:
     calls: 54
@@ -1233,13 +1233,13 @@ functions:
     calls: 294
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 1442
+    calls: 1379
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 180
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 1148
+    calls: 1085
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 180
@@ -1279,12 +1279,12 @@ functions:
     bytes: 32
   group_styles$Kind$tail:
     calls: 82
-    bytes: 3116
+    bytes: 3112
   group_styles$len$Kind:
     calls: 0
     bytes: 32
   group_styles$len$Kind$tail:
-    calls: 110
+    calls: 59
     bytes: 1788
   link$Kind$Node:
     calls: 15

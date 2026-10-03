@@ -1768,11 +1768,11 @@ allocations: 5846
 deallocations: 5846
 reallocations: 1235
 bytes allocated: 726268
-instructions executed: 2103858
-binary size: 738680
-  code: 449056
+instructions executed: 2100784
+binary size: 734984
+  code: 446256
   data: 12644
-  metadata: 276980
+  metadata: 276084
 functions:
   __arr_drop_Node:
     calls: 18
@@ -1984,12 +1984,9 @@ functions:
   __m1__leaves:
     calls: 0
     bytes: 32
-  __m1__leaves$len:
-    calls: 11
-    bytes: 1072
   __m1__leaves$tail:
     calls: 59
-    bytes: 1492
+    bytes: 1164
   __m1__show:
     calls: 228
     bytes: 2960
@@ -2002,12 +1999,9 @@ functions:
   __m1__token_leaves:
     calls: 0
     bytes: 32
-  __m1__token_leaves$len:
-    calls: 0
-    bytes: 1072
   __m1__token_leaves$tail:
     calls: 5
-    bytes: 1412
+    bytes: 1088
   __m1__token_text:
     calls: 0
     bytes: 1464
@@ -2040,12 +2034,12 @@ functions:
     bytes: 32
   __m3__group_styles$Tok$tail:
     calls: 601
-    bytes: 3116
+    bytes: 3112
   __m3__group_styles$len$Tok:
     calls: 0
     bytes: 32
   __m3__group_styles$len$Tok$tail:
-    calls: 541
+    calls: 455
     bytes: 1788
   __m3__link$Tok$Node:
     calls: 119
@@ -2150,7 +2144,7 @@ functions:
     calls: 1165
     bytes: (external)
   aipl_arr_inc:
-    calls: 30226
+    calls: 30341
     bytes: (external)
   aipl_arr_reserve:
     calls: 1367
@@ -2165,7 +2159,7 @@ functions:
     calls: 42
     bytes: (external)
   aipl_array_dec:
-    calls: 37645
+    calls: 37760
     bytes: (external)
   aipl_array_new:
     calls: 458
@@ -2186,13 +2180,13 @@ functions:
     calls: 1894
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 12670
+    calls: 12541
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 346
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 10776
+    calls: 10647
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 346

@@ -165,7 +165,18 @@ fn close_over_calls(bodies: &[(&str, &Expr)], effectful: &HashSet<String>) -> Ha
 }
 
 /// Whether evaluating `e` can reach something in `blocked` — a call to one of
-/// them, or a `shim`, which *installs* an effect and so is an effect happening.
+/// them, a *mention* of one, or a `shim`, which *installs* an effect and so is
+/// an effect happening.
+///
+/// A mention counts because a function passed by name is not a call:
+/// `xs.map(loud)` names `loud` as a value, and whatever skips that expression
+/// skips the one call per element `map` would have made. Reading only the calls
+/// said yes to deferring it, and the effects then went missing — the binding
+/// sank into one branch of an `if` and never ran in the other.
+/// [`loop_fusions::is_pure`](crate::fuse::loop_fusions::is_pure) asks this of a
+/// mapping argument it moves; this is the same question asked of a whole
+/// subtree. A local shadowing a blocked function's name reads as the function
+/// here, which costs a missed optimization and never a wrong one.
 ///
 /// `%` used to be listed here structurally (it resolves to the operator, not to
 /// a call) because it trapped on a zero divisor. It is total now, so arithmetic
@@ -173,6 +184,7 @@ fn close_over_calls(bodies: &[(&str, &Expr)], effectful: &HashSet<String>) -> Ha
 fn reaches_blocked(e: &Expr, blocked: &HashSet<String>) -> bool {
     let here = match &e.kind {
         ExprKind::Call(name, _, _) => blocked.contains(name.name()),
+        ExprKind::Ident(name) => blocked.contains(name),
         ExprKind::Shim(..) => true,
         _ => false,
     };

@@ -4,8 +4,16 @@
 #
 # The interleaving below is the assertion: "computing" appears for both calls,
 # including the one that discards the result.
+#
+# `mapped` is the same rule reached a different way, and the way that used to
+# get it wrong: the effect is not in a *call* the value makes but in a function
+# it passes by **name**. `xs.map(noisy)` mentions `noisy` as a value, so a check
+# that reads only the calls found nothing to stop it, sank the binding into the
+# `true` arm, and the `false` call printed nothing at all. A mention counts now
+# (`reaches_blocked` in `aipl-mono`'s `sink`), which is what the second pair of
+# lines below pins down.
 
-import { print, to_str } from builtins;
+import { len, map, print, to_str } from builtins;
 
 fn noisy(n: i64) !prints -> i64 {
     print(`computing {n}`);
@@ -17,38 +25,67 @@ fn size(flag: bool, n: i64) !prints -> i64 {
     if (flag) { v } else { 0 }
 }
 
+fn mapped(flag: bool, xs: i64[]) !prints -> u64 {
+    let all = xs.map(noisy);
+    if (flag) { all.len() } else { 0 }
+}
+
 fn main() !prints {
     print(size(false, 1).to_str());
     print(size(true, 2).to_str());
+    print(mapped(false, [3]).to_str());
+    print(mapped(true, [4]).to_str());
 }
 --- stdout ---
 computing 1
 0
 computing 2
 2
+computing 3
+0
+computing 4
+1
 --- performance ---
-allocations: 6
-deallocations: 6
+allocations: 14
+deallocations: 14
 reallocations: 0
-bytes allocated: 244
-instructions executed: 156
-binary size: 1728
-  code: 660
-  data: 1
-  metadata: 1067
+bytes allocated: 568
+instructions executed: 444
+binary size: 3216
+  code: 1400
+  data: 81
+  metadata: 1735
 functions:
   __to_str_i64:
-    calls: 4
+    calls: 7
     bytes: 204
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_array_dec:
+    calls: 2
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 2
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 2
+    bytes: (external)
   aipl_i64_len:
-    calls: 8
+    calls: 14
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
     bytes: (external)
   aipl_write_i64:
-    calls: 4
+    calls: 7
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 172
-  size:
-    calls: 2
-    bytes: 284
+    bytes: 732
+  noisy:
+    calls: 4
+    bytes: 260
