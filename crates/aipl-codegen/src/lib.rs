@@ -8758,6 +8758,31 @@ fn define_fn<M: Module>(
                 }
             }
         }
+        // Enough of a `Cx` for the one thing the parameter binding below emits
+        // through it: `owned_block_made_unique`, which reads only the struct
+        // table, the builtin registry and the element-helper cache. The real
+        // `Cx` needs the env this loop is still building, so it cannot be used
+        // here — and nothing else in the loop wants one.
+        let no_env: Env = HashMap::new();
+        let unit_ty = ConcreteType::Unit;
+        let entry_cx = Cx {
+            env: &no_env,
+            funcs,
+            structs,
+            builtins,
+            effects: &[],
+            owned_params: &owned_params,
+            lit_ctr,
+            literals,
+            elem_rc,
+            ret_ty: &unit_ty,
+            sret: None,
+            error_main: false,
+            in_test: false,
+            bindings: &bindings,
+            can_tail: false,
+            tail: false,
+        };
         for (idx, (p, v)) in func.params.iter().zip(bound.iter()).enumerate() {
             if p.mutable {
                 // Through `binding_slot`/`store_binding`, exactly as a `mut`
@@ -8772,10 +8797,23 @@ fn define_fn<M: Module>(
                 // level of recursion, and `misaligned pointer dereference` in
                 // `aipl_str_len` on three.
                 let slot = binding_slot(&mut builder, &p.ty, structs);
+                // An *owned* receiver arrived moved rather than lent
+                // (`aipl_mono::mut_receiver_owned`), so the block is made unique
+                // before anything writes it: at a refcount of one — the whole
+                // point of the transfer — that is free, and above one it copies,
+                // which is what keeps a caller's alias intact. The binding is
+                // then the block's sole owner, so every append in the body may
+                // write in place.
+                let owned_receiver = p.owned && mut_binding_owns_slot_ref(&p.ty, structs);
+                let v = &if owned_receiver {
+                    owned_block_made_unique(&mut builder, module, entry_cx, *v, &p.ty)
+                } else {
+                    *v
+                };
                 store_binding(&mut builder, slot, *v, &p.ty, structs);
                 env.insert(
                     p.name.clone(),
-                    EnvBinding::Mut(slot, Rc::new(RefCell::new(p.ty.clone())), false),
+                    EnvBinding::Mut(slot, Rc::new(RefCell::new(p.ty.clone())), owned_receiver),
                 );
                 bindings
                     .borrow_mut()
@@ -8786,8 +8824,18 @@ fn define_fn<M: Module>(
                 // that replaces it inside a loop body stays owned across
                 // iterations; the entry value-track below still keeps the entry
                 // version alive to fn exit for borrows.
+                // The slot's own reference. A *lent* receiver takes one of its
+                // own beside the caller's, so a mutation that replaces it inside
+                // a loop body stays owned across iterations. An *owned* one skips
+                // the retain: the reference it holds is the transferred one, and
+                // retaining would put the refcount above one at exactly the
+                // point `owned_block_made_unique` reads as sharing. Either way
+                // the slot is tracked, so what it ends up holding is released if
+                // the body does not hand it back.
                 if mut_binding_owns_slot_ref(&p.ty, structs) {
-                    emit_retain(&mut builder, module, builtins, structs, *v, &p.ty);
+                    if !owned_receiver {
+                        emit_retain(&mut builder, module, builtins, structs, *v, &p.ty);
+                    }
                     scopes[0].push(Tracked::slot(slot, &p.ty));
                 }
             } else {
@@ -18947,8 +18995,15 @@ fn compile_call_expr<M: Module>(
             // as a mutating call.)
             let info = funcs.get(name).cloned().expect("mutating fn present");
             let disp = display_name(name);
+            // The receiver is the bare binding, or that binding handed over with
+            // `__move` when this instance owns it (`move_owned_receivers`).
+            // Either way the slot it names is where the mutated value goes back.
             let receiver = &args[0];
-            let ExprKind::Ident(var) = &receiver.kind else {
+            let named = match &receiver.kind {
+                ExprKind::Call(Callee::Move, margs, _) => margs.first().unwrap_or(receiver),
+                _ => receiver,
+            };
+            let ExprKind::Ident(var) = &named.kind else {
                 return Err(Error::at(
                     format!("mutating method {disp:?} must be called on a mutable variable"),
                     receiver.span.clone(),
@@ -18972,22 +19027,35 @@ fn compile_call_expr<M: Module>(
                     ));
                 }
             };
-            // For an array receiver, the binding's slot owns a reference on its
-            // current value (see `mut_binding_owns_slot_ref`): snapshot the old
-            // value so the slot's reference on it can be released after the call
-            // replaces it. (The callee borrows the receiver — `compile_call`
-            // retains it for the callee's own drop — so the snapshot stays live
-            // through the call.)
             let old_ty = ty_cell.borrow().clone();
+            // A receiver handed over with `__move` comes back owning the one
+            // reference there is, so the slot *takes it over* rather than adding
+            // a second — the discipline the in-place `str` append states as "no
+            // inc, no dec and no new value-track". Retaining as well left the
+            // block at a refcount of two, which the next call's entry reads as
+            // sharing and copies: the appends went in place and every level
+            // still allocated.
+            let moved_receiver = matches!(&receiver.kind, ExprKind::Call(Callee::Move, ..));
+            let mark = scope_depth(scopes);
+            // `args` is already the effective list `[receiver, method args..]`;
+            // its result is the mutated self.
+            let (new_self, _) =
+                compile_call(module, builder, cx, scopes, name, &info, args, span.clone())?;
+            // For an array receiver, the binding's slot owns a reference on its
+            // current value (see `mut_binding_owns_slot_ref`): snapshot it so
+            // that reference can be released once the call's result replaces it.
+            //
+            // Read *after* the call, for the reason the `set` arm spells out
+            // about the same shape: a `__move`d receiver has had its value taken
+            // out of the slot and the empty one left behind, so a snapshot from
+            // before would release a reference the callee has already consumed.
+            // What is left to release is whatever the slot holds now — nothing,
+            // after a move.
             let old = if mut_binding_owns_slot_ref(&old_ty, structs) {
                 Some(builder.ins().stack_load(types::I64, types::I64, slot, 0))
             } else {
                 None
             };
-            // `args` is already the effective list `[receiver, method args..]`;
-            // its result is the mutated self.
-            let (new_self, _) =
-                compile_call(module, builder, cx, scopes, name, &info, args, span.clone())?;
             // Store the mutated receiver back, and refine the variable's type
             // to it (e.g. a `mut a = []` receiver pinned by the method's self).
             //
@@ -18999,13 +19067,22 @@ fn compile_call_expr<M: Module>(
             // one level and `misaligned pointer dereference` in `aipl_str_len`
             // on three.
             store_binding(builder, slot, new_self, &old_ty, structs);
+            // Taking the returned reference over means untracking it: the slot
+            // owns it now, and leaving the call's own track in place would
+            // release it at the end of this scope. `move_owned_temp` is the same
+            // hand-off a function's return does with a fresh body value, and it
+            // answers false when there is no such track — then the slot retains
+            // as it always did.
+            let took_over = moved_receiver && move_owned_temp(scopes, mark, new_self);
             if let Some(old) = old {
                 // The slot takes its own reference on the mutated receiver (the
                 // call-return value-track stays as the new version's region
                 // track — it dies with the current scope, e.g. a loop body,
                 // while the slot's reference carries the value onward), then
                 // releases its reference on the replaced value.
-                emit_retain(builder, module, builtins, structs, new_self, &old_ty);
+                if !took_over {
+                    emit_retain(builder, module, builtins, structs, new_self, &old_ty);
+                }
                 emit_drop(builder, module, builtins, structs, old, &old_ty);
             }
             *ty_cell.borrow_mut() = info.return_ty.clone();
@@ -20187,8 +20264,14 @@ fn compile_expr_inner<M: Module>(
             // here — its appends refine ownership with `is_unique` already.
             // `allow_tail_move`: a mut binding returned (or moved out) in tail
             // position is a last-use move, not an alias, so it stays exclusive.
-            let exclusive =
-                (fresh_literal || owned_move) && aipl_mono::binding_is_exclusive(name, body, true);
+            // `cx.funcs` is what tells a *user* `mut self` method from an
+            // ordinary call, which the writeback shape `set a = a.f(..)` turns
+            // on (see `binding_is_exclusive`).
+            let exclusive = (fresh_literal || owned_move)
+                && aipl_mono::binding_is_exclusive(name, body, true, &|f| {
+                    aipl_mono::builtin_is_mutating(f)
+                        || cx.funcs.get(f).is_some_and(|info| info.is_mutating)
+                });
             // Only on the exclusive path, where the slot becomes the block's
             // sole owner: a non-exclusive binding retains its value and leaves
             // the value's own ownership in place, and a unique copy made for it
@@ -20356,11 +20439,14 @@ fn compile_expr_inner<M: Module>(
             // `push` / mutating-method arms) writes the mutated result back into
             // `recv`'s slot, so just run it and continue — no separate store, and
             // no type-check against the binding (the call yields unit).
+            // The receiver is the bare binding, or that binding handed over with
+            // `__move` when the callee owns it — `is_receiver` is the one place
+            // that shape is spelled, so this cannot drift from the arm that
+            // compiles the call.
             let is_writeback_call = matches!(
                 &value.kind,
                 ExprKind::Call(f, cargs, true)
-                    if !cargs.is_empty()
-                        && matches!(&cargs[0].kind, ExprKind::Ident(recv) if recv == name)
+                    if cargs.first().is_some_and(|a| aipl_mono::is_receiver(a, name))
                         && (aipl_mono::builtin_is_mutating(f.name())
                             || funcs.get(f.name()).is_some_and(|i| i.is_mutating))
             );

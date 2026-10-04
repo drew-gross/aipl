@@ -1709,6 +1709,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         emitted: HashSet::new(),
         queue: VecDeque::new(),
         cur_fn: String::new(),
+        cur_receiver: None,
         synth: 0,
         cur_effects: Vec::new(),
         cur_lenv: HashMap::new(),
@@ -2474,6 +2475,17 @@ struct Mono<'a> {
     /// Mangled name of the instance currently being processed — the prefix of
     /// every function synthesized while inferring its body (see [`Mono::synth`]).
     cur_fn: String,
+    /// The `mut self` receiver of the instance being processed: its name, and
+    /// whether *this* instance owns it.
+    ///
+    /// It decides whether a call may hand the receiver on. An instance that owns
+    /// its receiver holds the caller's reference outright and can transfer it; a
+    /// *lent* one holds a reference of its own beside the borrow protocol's
+    /// entry track — two owners for one block, deliberately — and handing that
+    /// away loses one of them. Without this, a borrowed instance called the
+    /// owned instance of the same method and the refcount went one release too
+    /// far (a use-after-free, in mutual recursion, where both instances exist).
+    cur_receiver: Option<(String, bool)>,
     /// Ordinal of the next name synthesized for `cur_fn` — a lifted lambda, a
     /// `map`/`filter`/`filter_map`/`zip` loop wrapper, a desugaring temporary.
     /// Reset per instance, so a synthesized function is `<instance>$<kind><n>`:
@@ -2640,6 +2652,10 @@ impl Mono<'_> {
         // Lambdas synthesized while processing this body inherit its effects,
         // and are named under it.
         self.cur_fn = name.to_string();
+        self.cur_receiver = params
+            .first()
+            .filter(|p| p.mutable)
+            .map(|p| (p.name.clone(), specs.first().is_some_and(|s| s.owned)));
         self.synth = 0;
         self.cur_effects = effects.to_vec();
         self.cur_ret = return_ty.clone().unwrap_or(Type::Unit);
@@ -5014,6 +5030,15 @@ impl Mono<'_> {
     /// `type_args`) takes ownership of: every parameter the template is
     /// owned-eligible for whose argument is a fresh, uniquely-owned heap value.
     /// Empty unless an owned instance is warranted.
+    /// Whether `name` is this instance's `mut self` receiver held on *loan* —
+    /// the one binding whose reference it may not hand on (see
+    /// [`Mono::cur_receiver`]).
+    fn lends(&self, name: &str) -> bool {
+        self.cur_receiver
+            .as_ref()
+            .is_some_and(|(recv, owned)| recv == name && !*owned)
+    }
+
     fn owned_for_call(
         &self,
         template: &str,
@@ -5022,10 +5047,42 @@ impl Mono<'_> {
         arg_tys: &[Type],
     ) -> Vec<usize> {
         let (params, return_ty, body) = self.concrete_signature(template, type_args);
-        owned_eligible(template, &params, &return_ty, &body, &|t| self.owns_heap(t))
-            .into_iter()
-            .filter(|&i| i < args.len() && self.owns_heap(&arg_tys[i]) && fresh_tail(&args[i]))
-            .collect()
+        let mutating_receiver = params.first().is_some_and(|p| p.mutable);
+        owned_eligible(
+            template,
+            &params,
+            &return_ty,
+            &body,
+            &|t| self.owns_heap(t),
+            &|f| self.mutating.contains(f),
+        )
+        .into_iter()
+        .filter(|&i| i < args.len() && self.owns_heap(&arg_tys[i]))
+        .filter(|&i| {
+            // An ordinary owned parameter needs a *fresh* argument: the caller
+            // must have a reference of its own to give away, and only a value
+            // nobody else named does.
+            if fresh_tail(&args[i]) {
+                return true;
+            }
+            // A `mut self` receiver is the exception, because the writeback is
+            // what gives it one: `set v.f(x)` names the binding on both sides,
+            // so the reference the slot held goes in and whatever comes back
+            // goes into the same slot. It arrives here as the bare name — the
+            // `__move` that performs the transfer is added after
+            // monomorphization, which is also why it cannot be the test.
+            //
+            // Unless the binding is *this* instance's own lent receiver. Then
+            // there is no reference to give: a lent `mut self` slot holds one
+            // beside the borrow protocol's entry track, and handing it on loses
+            // one of the two owners. Declining keeps a borrowed instance calling
+            // borrowed instances, which is what makes the pairing consistent
+            // instead of mixed.
+            mutating_receiver
+                && i == 0
+                && matches!(&args[0].kind, ExprKind::Ident(n) if !self.lends(n))
+        })
+        .collect()
     }
 
     /// The concrete signature (params, return type, body) of `template` under
@@ -9820,6 +9877,14 @@ fn is_inline_candidate_mono(
         && f.name != "__test_main"
         && !skip.contains(f.name.as_str())
         && !binders.contains(f.name.as_str())
+        // A mutating method that *owns* its receiver is not inlinable: its body
+        // is compiled against a transfer only a real call boundary performs —
+        // the caller hands the slot's reference over (`__move`), the entry makes
+        // the block unique, and the return hands it back. Splicing the body into
+        // the caller reproduces none of that, and the receiver then came back
+        // short of what the writeback expected. An ordinary (lent) mutating
+        // method inlines as before (`optimizations/inline_mutating_method`).
+        && !(f.is_mutating() && f.params.first().is_some_and(|p| p.owned))
         && is_inline_shape(
             f.params
                 .iter()
@@ -10572,6 +10637,40 @@ fn fresh_tail(e: &Expr) -> bool {
 /// not be `main` and must return a heap value. `name` distinguishes `main`.
 ///
 /// Every parameter is judged on its own, so a function may own several
+/// Whether a `mut self` receiver may be *transferred* rather than lent, and so
+/// grown in place by the callee — the parameter's index when it may.
+///
+/// A `mut self` parameter is not an owned parameter on the ordinary shape: the
+/// body never moves it into another binding, it mutates it where it sits. The
+/// question for it is instead the one [`binding_is_exclusive`] asks of a local
+/// `mut` — does anything in the body alias the receiver, so that an in-place
+/// write could be seen through something else?
+///
+/// Marking it owned is what makes the transfer *happen*, through machinery that
+/// already exists: `move_last_use` wraps such a call's receiver in
+/// [`Callee::Move`], whose lowering takes the block out of the binding's slot
+/// and makes it a temporary; codegen's argument hand-off then moves that
+/// temporary in, as it does any fresh value. The callee makes the block unique
+/// on entry, which copies only above a refcount of one — so a caller whose
+/// receiver really is aliased pays a copy and its alias is untouched, and one
+/// whose receiver is its own pays nothing.
+fn mut_receiver_owned(
+    params: &[Param],
+    body: &Expr,
+    owns_heap: &dyn Fn(&Type) -> bool,
+    mutating: &dyn Fn(&str) -> bool,
+) -> Option<usize> {
+    let p = params.first()?;
+    // Only the receiver, and only a block-owning one: a `str` grows through its
+    // own in-place append, whose ownership is the slot-value model's rather than
+    // this one's.
+    (p.mutable
+        && matches!(aipl_syntax::unrefined(&p.ty), Type::Array(_))
+        && owns_heap(&p.ty)
+        && binding_is_exclusive(&p.name, body, true, mutating))
+    .then_some(0)
+}
+
 /// (`merge(a, b)` with `mut xs = a; mut ys = b;`), and a call moves in
 /// whichever of them it has a fresh argument for — see `owned_for_call`, and
 /// `enqueue`, which mangles an instance per owned set.
@@ -10594,8 +10693,16 @@ fn owned_eligible(
     return_ty: &Option<Type>,
     body: &Expr,
     owns_heap: &dyn Fn(&Type) -> bool,
+    mutating: &dyn Fn(&str) -> bool,
 ) -> Vec<usize> {
-    if name == "main" || !return_ty.as_ref().is_some_and(owns_heap) {
+    if name == "main" {
+        return Vec::new();
+    }
+    // A `mut self` receiver is the one owned parameter a *void* function can
+    // have: what it hands back is the receiver, through the writeback, so the
+    // declared return type says nothing about whether anything is owned.
+    let receiver = mut_receiver_owned(params, body, owns_heap, mutating);
+    if receiver.is_none() && !return_ty.as_ref().is_some_and(owns_heap) {
         return Vec::new();
     }
     params
@@ -10605,13 +10712,15 @@ fn owned_eligible(
         .filter(|(_, p)| {
             if is_heap(&p.ty) {
                 count_ident(&p.name, body) == 1
-                    && find_move_into(&p.name, body)
-                        .is_some_and(|(y, body_after)| binding_is_exclusive(y, body_after, true))
+                    && find_move_into(&p.name, body).is_some_and(|(y, body_after)| {
+                        binding_is_exclusive(y, body_after, true, mutating)
+                    })
             } else {
                 fields_read_once(&p.name, body)
             }
         })
         .map(|(i, _)| i)
+        .chain(receiver)
         .collect()
 }
 
@@ -10798,8 +10907,40 @@ pub fn moves_binding(name: &str, body: &Expr) -> bool {
     children(body).into_iter().any(|c| moves_binding(name, c))
 }
 
-pub fn binding_is_exclusive(name: &str, body: &Expr, allow_tail_move: bool) -> bool {
-    !aliases_or_unsafe(name, body, false, allow_tail_move)
+/// Whether `name`'s slot can be treated as the sole owner of its block, so a
+/// `push`/`extend` into it may write in place instead of copying.
+///
+/// `mutating` answers whether a *function* name mutates its receiver — the
+/// caller supplies it because the answer is program-dependent and this module
+/// is asked from both sides of monomorphization. It matters for the
+/// `set a = a.f(x)` writeback shape, which leaves `a` exclusive for a mutating
+/// `f`: reading only the *builtin* mutating names made a binding grown by a
+/// user `mut self` method non-exclusive for its whole scope, so every append
+/// copied the accumulator — and a recursive one paid that at every level.
+pub fn binding_is_exclusive(
+    name: &str,
+    body: &Expr,
+    allow_tail_move: bool,
+    mutating: &dyn Fn(&str) -> bool,
+) -> bool {
+    !aliases_or_unsafe(name, body, false, allow_tail_move, mutating)
+}
+
+/// Whether `e` is the receiver `name` in a writeback: the bare binding, or the
+/// binding handed over with [`Callee::Move`].
+///
+/// Both spellings mean the same thing to the writeback — the slot's value goes
+/// into the call and the result comes back into the slot — and which one a site
+/// carries depends only on whether the callee owns its receiver. Every place
+/// that recognises the shape asks this, so the two cannot drift apart.
+pub fn is_receiver(e: &Expr, name: &str) -> bool {
+    match &e.kind {
+        ExprKind::Ident(n) => n == name,
+        ExprKind::Call(Callee::Move, args, _) => {
+            matches!(args.as_slice(), [a] if matches!(&a.kind, ExprKind::Ident(n) if n == name))
+        }
+        _ => false,
+    }
 }
 
 /// True if `name` is used in `e` in a way that makes in-place mutation unsafe.
@@ -10816,10 +10957,16 @@ pub fn binding_is_exclusive(name: &str, body: &Expr, allow_tail_move: bool) -> b
 /// `push` copied: building a 30,000-element list that way took seventeen
 /// seconds. The forms that *do* run code afterwards — `Let`, `Seq`, `Assign`,
 /// a loop body — pass `tail` only to what comes last.
-fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool {
+fn aliases_or_unsafe(
+    name: &str,
+    e: &Expr,
+    iterating: bool,
+    tail: bool,
+    mutating: &dyn Fn(&str) -> bool,
+) -> bool {
     let is_n = |x: &Expr| matches!(&x.kind, ExprKind::Ident(n) if n == name);
-    let rec = |x: &Expr| aliases_or_unsafe(name, x, iterating, false);
-    let rec_tail = |x: &Expr| aliases_or_unsafe(name, x, iterating, tail);
+    let rec = |x: &Expr| aliases_or_unsafe(name, x, iterating, false, mutating);
+    let rec_tail = |x: &Expr| aliases_or_unsafe(name, x, iterating, tail, mutating);
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
@@ -10993,10 +11140,15 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                     // while `a` is rewritten). Keeping `a` exclusive routes the
                     // mutation through the in-place path (a per-iteration copy in
                     // a loop would free the live buffer — see `set self = out`).
+                    // A *user* `mut self` method counts, not only a builtin
+                    // one: it is the same writeback, the receiver going in and
+                    // coming back into the slot. The receiver may also arrive
+                    // *moved* rather than as a bare name — `move_last_use`
+                    // wraps it where the callee owns it — which is a stronger
+                    // reason for `a` to stay exclusive, not a weaker one.
                     ExprKind::Call(f, cargs, _)
-                        if builtin_is_mutating(f.name())
-                            && !cargs.is_empty()
-                            && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name) =>
+                        if (builtin_is_mutating(f.name()) || mutating(f.name()))
+                            && cargs.first().is_some_and(|a| is_receiver(a, name)) =>
                     {
                         iterating || cargs[1..].iter().any(|a| is_n(a) || rec(a))
                     }
@@ -11018,9 +11170,9 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
         }
         ExprKind::For(_, _, iter, fbody) => {
             if is_n(iter) {
-                aliases_or_unsafe(name, fbody, true, false)
+                aliases_or_unsafe(name, fbody, true, false, mutating)
             } else {
-                rec(iter) || aliases_or_unsafe(name, fbody, iterating, false)
+                rec(iter) || aliases_or_unsafe(name, fbody, iterating, false, mutating)
             }
         }
         // A loop body re-runs, so nothing in it is a tail-move; the condition

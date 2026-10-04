@@ -50,9 +50,13 @@
 //! where it would be a capture. Rebinding the name inside its own scope is
 //! declined too, rather than reasoned about.
 //!
-//! The receiver of a mutating method (`fn f(mut self: ..)`) is left alone: the
-//! `set x = x.f(..)` writeback is recognised by mono on the bare name, and a
-//! wrapped receiver would fall out of that path into the copying one.
+//! The receiver of a mutating method (`fn f(mut self: ..)`) is not a last use
+//! and is left alone by the analysis above — the writeback puts a value straight
+//! back into the binding, so nothing has ended. It gets a mark of its own from
+//! [`move_owned_receivers`], on a different justification: not that the binding
+//! is dead, but that the callee *owns* the receiver and the writeback is what
+//! restores it. Everything downstream reads the two marks identically, which is
+//! the point of spelling both as `__move`.
 //!
 //! Only `Callee::User` calls take a mark: a builtin's per-argument contract is
 //! its own (codegen never moves into one), and the mark would only cost the
@@ -183,17 +187,71 @@ pub fn move_last_uses_post_mono(program: &MonoProgram) -> MonoProgram {
         .filter(|f| f.is_mutating())
         .map(|f| f.name.clone())
         .collect();
+    // The instances that take their receiver rather than borrowing it, which
+    // monomorphization decided (`mut_receiver_owned`). Their call sites hand the
+    // receiver over below.
+    let owns_receiver: HashSet<String> = program
+        .fns
+        .iter()
+        .filter(|f| f.is_mutating() && f.params.first().is_some_and(|p| p.owned))
+        .map(|f| f.name.clone())
+        .collect();
     MonoProgram {
         fns: program
             .fns
             .iter()
             .map(|f| ConcreteFn {
-                body: remark(&strip(&f.body), program, &mutating),
+                body: move_owned_receivers(
+                    &remark(&strip(&f.body), program, &mutating),
+                    &owns_receiver,
+                ),
                 ..f.clone()
             })
             .collect(),
         ..program.clone()
     }
+}
+
+/// Hand the receiver over at every call to a mutating method that owns it.
+///
+/// `set v.f(x)` becomes `set v = f(__move(v), x)`: the slot gives up the
+/// reference it held, and the call's result goes back into the same slot. The
+/// mark is not a claim that `v` is dead — the very store that follows reads it
+/// again — but that nothing in the caller still owns the old value, which the
+/// store is what makes true.
+///
+/// Why spell it this way rather than handle it in codegen: the transfer is
+/// three coordinated things — the slot stops owning, the call skips its retain,
+/// the callee skips its entry retain — and `__move`'s lowering already does the
+/// first, the argument hand-off already does the second for anything fresh, and
+/// an owned parameter already does the third. Wrapping the receiver is what lets
+/// all three fire with no new special case.
+///
+/// Nothing is checked about the *caller* here, because monomorphization has
+/// already made it unnecessary: a call only reaches an owning instance when the
+/// caller had a reference to give (`Mono::lends`), so an owning callee's call
+/// sites are exactly the ones that may transfer.
+fn move_owned_receivers(e: &Expr, owns_receiver: &HashSet<String>) -> Expr {
+    let mut out = e.clone();
+    if let ExprKind::Call(Callee::User(f), args, true) = &mut out.kind {
+        if owns_receiver.contains(f) {
+            if let Some(receiver) = args.first_mut() {
+                // A bare name only. Anything else is not the writeback shape —
+                // codegen refuses it outright — and an already-marked receiver
+                // is one this pass has handled.
+                if matches!(receiver.kind, ExprKind::Ident(_)) {
+                    let span = receiver.span.clone();
+                    let inner =
+                        std::mem::replace(receiver, Expr::new(ExprKind::Unit, span.clone()));
+                    *receiver = Expr::new(ExprKind::Call(Callee::Move, vec![inner], false), span);
+                }
+            }
+        }
+    }
+    for child in crate::children_mut(&mut out) {
+        *child = move_owned_receivers(child, owns_receiver);
+    }
+    out
 }
 
 /// The heap-owning fields of the struct `ty` names, from the finished
