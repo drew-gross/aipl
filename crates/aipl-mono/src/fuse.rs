@@ -1,7 +1,7 @@
 //! Operation fusion: rewriting a composite expression into one builtin that
 //! computes the same answer with less work.
 //!
-//! There are four families, each in its own file with its own table:
+//! There are five families, each in its own file with its own table:
 //!
 //! - [`comparison_fusions`] — a call against a comparison. `xs.count(x)` always
 //!   walks the whole collection, but `xs.count(x) < 4` is settled the moment a
@@ -24,6 +24,11 @@
 //!   builds the whole tail of `xs` — for an array, a fresh block with every
 //!   element copied — only to look at its first few elements, so it collapses
 //!   into `starts_with_at`, which compares in place from `i`.
+//! - [`index_fusions`] — an *index* of a derived array. `xs.map(f)[i]` applies
+//!   `f` to every element and builds the whole mapped array, only to read one
+//!   element back out and drop the rest, so it collapses into `xs[i].map(f)` —
+//!   the optional's `map`, which allocates nothing and calls `f` once. It is the
+//!   shape inlining creates at the dogfooded parser's `own_texts(src)[0]`.
 //! - [`loop_fusions`] — a `for` over a derived array. `for (let x : xs.map(f))`
 //!   builds the whole mapped array only to walk it once, so it collapses into a
 //!   loop over `xs` that applies `f` at the top of each iteration and never
@@ -60,14 +65,19 @@
 //! in the expression disables the rewrite. The check is deliberately syntactic
 //! and conservative: it costs a missed fusion, never a wrong one.
 //!
-//! The loop family draws the line more finely, because a loop *body* is where
-//! effects normally live and an effect check over the whole loop would refuse
-//! the shape every time it matters: there only the mapping function has to be
-//! pure — and free of aborts, since its calls move later, past the body's own
-//! effects. See [`loop_fusions`] for the argument.
+//! Two families draw the line more finely and so guard themselves. The loop
+//! family, because a loop *body* is where effects normally live and an effect
+//! check over the whole loop would refuse the shape every time it matters: there
+//! only the mapping function has to be pure — and free of aborts, since its
+//! calls move later, past the body's own effects. And the index family, because
+//! it *drops* all but one of the mapping calls: the receiver and the index are
+//! evaluated once either way and may do as they like, while `f` faces the same
+//! bar for the stronger reason. See [`loop_fusions`] and [`index_fusions`] for
+//! the arguments.
 
 mod chain_fusions;
 mod comparison_fusions;
+mod index_fusions;
 // Crate-visible: `apply` and `is_pure` — how a function-valued argument is
 // applied to one element and whether its per-element calls may be moved — are
 // the loop family's, and `fold_lengths` asks the same two questions of the same
@@ -176,6 +186,11 @@ fn try_fuse(e: &Expr, outer: Option<&Callee>, guards: &Guards) -> Option<Expr> {
         // the body (see the module docs), so the whole-expression effect check
         // below would be the wrong bar.
         ExprKind::For(..) => return loop_fusions::build(e, guards.blocked),
+        // An index guards itself for the same reason, from the other direction:
+        // it drops all but one of the mapping calls, so its bar on the mapping
+        // function is stricter than an effect check and its bar on the receiver
+        // and the index is looser (see [`index_fusions`]).
+        ExprKind::Index(..) => return index_fusions::build(e, guards.blocked),
         _ => None,
     }?;
     // An effect *anywhere* in `e` rules the rewrite out, wherever the call sits:

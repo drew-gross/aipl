@@ -542,6 +542,8 @@ case_tests! {
     cases_optimizations_fold_extends = "cases/optimizations/fold_extends",
     cases_optimizations_fold_extends_value_or = "cases/optimizations/fold_extends_value_or",
     cases_optimizations_fold_lengths = "cases/optimizations/fold_lengths",
+    cases_optimizations_index_map_fusion = "cases/optimizations/index_map_fusion",
+    cases_optimizations_index_map_fusion_effects = "cases/optimizations/index_map_fusion_effects",
     cases_optimizations_inline_early_exit = "cases/optimizations/inline_early_exit",
     cases_optimizations_inline_mutating_method = "cases/optimizations/inline_mutating_method",
     cases_optimizations_inline_small_stale_body = "cases/optimizations/inline_small_stale_body",

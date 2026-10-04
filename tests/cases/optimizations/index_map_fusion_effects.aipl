@@ -1,0 +1,138 @@
+# The two reasons the index fusion stands aside. Fusing `xs.map(f)[i]` into
+# `xs[i].map(f)` *drops* `f`'s calls for every element but the one read, so it
+# is refused whenever that is observable — and the `stdout` here is the proof,
+# since an unfused `map` prints once per element.
+#
+# `f` faces the loop family's bar rather than the whole-expression effect check:
+# no effects and no aborts, closed over the call graph. The receiver and the
+# index are deliberately *not* held to it — both are evaluated exactly once
+# either way, and the only movement is that the index is evaluated ahead of
+# `f`'s calls instead of after them, which a pure `f` cannot observe. So
+# `noisy_source()` and `noisy_index()` below print exactly where the source puts
+# them *and* the shape still fuses.
+#
+# The second reason is scope rather than effects. The mapped call can sit under
+# the `let`s inlining leaves in front of an inlined body, and the index moves
+# under them with it — so an index naming something those bindings bind would be
+# captured by the wrong one. `scaled` is that collision written down: it has a
+# parameter named `i`, and its caller's `i` is a different variable holding a
+# different value, so reading the parameter instead would answer `10` where the
+# right answer is `30`.
+#
+# The pass guards against it by declining, which mirrors the identical guard in
+# `fuse::chain_fusions`. Measured, though, *this* shape never reaches the guard:
+# `inline_single_use_bindings` runs ahead of fusion and substitutes the binding
+# away, so by the time the index could move there is nothing left to capture
+# (nothing in the whole dogfooded compiler reaches it either). So what the case
+# pins is the answer, not the path — the guard stays because soundness should
+# not depend on an earlier pass happening to run first.
+
+import { len, map, print, value_or, wrapping_mul as * } from builtins;
+
+fn loud(n: i64) !prints -> i64 {
+    print(`f{n}`);
+    n * 2
+}
+
+fn noisy_source() !prints -> i64[] {
+    print("source");
+    [1, 2, 3]
+}
+
+fn noisy_index() !prints -> u64 {
+    print("index");
+    1
+}
+
+# Inlined, this leaves `let xs = ..; let i = ..;` in front of a `map` whose
+# lambda captures the parameter `i` — so a caller indexing the result with its
+# own `i` must not be moved under them.
+fn scaled(xs: i64[], i: i64) -> i64[] { xs.map(|x| x * i) }
+
+fn main() !prints {
+    let v = [1, 2, 3];
+
+    // An effectful named `f`: not fused, so `loud` runs for every element.
+    print(`{v.map(loud)[1]}`);
+
+    // An effectful lambda: the same bar, reached through the lambda's body.
+    print(`{v.map(|x| { print(`g{x}`); x * 3 })[0]}`);
+
+    // An effectful *receiver* is fine — it is evaluated once either way — so
+    // this one fuses and "source" prints once with no `f` output at all.
+    print(`{noisy_source().map(loud2)[2]}`);
+
+    // An effectful *index* is fine for the same reason, even though the fusion
+    // moves it ahead of the mapping calls: `loud2` is pure, so nothing can tell.
+    print(`{v.map(loud2)[noisy_index()]}`);
+
+    // The index names `i`, which `scaled`'s parameter also names: declined.
+    let i = 2;
+    print(`{scaled(v, 10)[i].value_or(0)}`);
+
+    print(`{v.len()}`);
+}
+
+fn loud2(n: i64) -> i64 { n * 2 }
+--- stdout ---
+f1
+f2
+f3
+some(4)
+g1
+g2
+g3
+some(3)
+source
+some(6)
+index
+some(4)
+30
+3
+--- performance ---
+allocations: 20
+deallocations: 20
+reallocations: 0
+bytes allocated: 869
+instructions executed: 1240
+binary size: 6608
+  code: 3820
+  data: 123
+  metadata: 2665
+functions:
+  __to_str_i64:
+    calls: 7
+    bytes: 204
+  __to_str_i64$opt:
+    calls: 4
+    bytes: 388
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_array_dec:
+    calls: 2
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 6
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 2
+    bytes: (external)
+  aipl_i64_len:
+    calls: 22
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 8
+    bytes: (external)
+  aipl_write_i64:
+    calls: 11
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 3024

@@ -3515,10 +3515,10 @@ deallocations: 94923
 reallocations: 18556
 bytes allocated: 22202940
 instructions executed: 68327323
-binary size: 19901984
-  code: 12882556
+binary size: 19896144
+  code: 12878576
   data: 39532
-  metadata: 6979896
+  metadata: 6978036
 functions:
   __arr_drop_ImportEntry:
     calls: 19
@@ -4446,7 +4446,7 @@ functions:
     bytes: 33880
   __m7__lower_const_decl:
     calls: 0
-    bytes: 17544
+    bytes: 17016
   __m7__lower_construct_fields:
     calls: 0
     bytes: 28256
@@ -4458,7 +4458,7 @@ functions:
     bytes: 35180
   __m7__lower_effect:
     calls: 0
-    bytes: 980
+    bytes: 608
   __m7__lower_else_branch:
     calls: 0
     bytes: 15812
@@ -4479,7 +4479,7 @@ functions:
     bytes: 47228
   __m7__lower_fn_attr:
     calls: 0
-    bytes: 23796
+    bytes: 23072
   __m7__lower_fn_body:
     calls: 0
     bytes: 34172
@@ -4488,7 +4488,7 @@ functions:
     bytes: 36316
   __m7__lower_function:
     calls: 0
-    bytes: 64632
+    bytes: 64180
   __m7__lower_if:
     calls: 0
     bytes: 21760
@@ -4503,10 +4503,10 @@ functions:
     bytes: 65392
   __m7__lower_lambda:
     calls: 0
-    bytes: 16820
+    bytes: 16336
   __m7__lower_lambda_param:
     calls: 0
-    bytes: 24740
+    bytes: 24176
   __m7__lower_let_stmt:
     calls: 0
     bytes: 272
@@ -4563,7 +4563,7 @@ functions:
     bytes: 66528
   __m7__lower_ty_core:
     calls: 0
-    bytes: 79792
+    bytes: 79308
   __m7__lower_ty_head:
     calls: 0
     bytes: 187752
@@ -4623,7 +4623,7 @@ functions:
     bytes: 2492
   __m7__shim_expr:
     calls: 0
-    bytes: 2212
+    bytes: 1840
   __m7__slot_expr:
     calls: 0
     bytes: 3892

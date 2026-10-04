@@ -1,0 +1,154 @@
+# An index of a mapped sequence: `xs.map(f)[i]` applies `f` to every element and
+# builds the whole mapped array, only to read one element back out and drop the
+# rest — so it collapses into `xs[i].map(f)`, the optional's `map`, which
+# allocates nothing and calls `f` once.
+#
+# The `functions:` list is what says it fired: a fused shape generates no
+# `aipl_array_with_cap`/`aipl_array_push_mut` pair for the mapped array and
+# calls `dbl` once per index rather than once per element. `walk` below is the
+# unfused counterpart over the same data, so the two sit in one list.
+#
+# Both readings of `recv[i]` fuse, and the pass never finds out which it has:
+# an integer index reads one element (`map` preserves position as well as
+# length, so in-bounds is the same question of either receiver), and a `Span`
+# index slices (`xs.map(f)[span]` and `xs[span].map(f)` are both `f` over the
+# elements in `span`). The element reading is where the win is — an array
+# becomes an optional — and the slice reading still maps `span`'s elements
+# instead of all of them.
+#
+# The motivating site is the dogfooded parser's `own_texts`, which is
+# `self.tokens.map(|t| src[t])` and small enough to inline. `token_texts` here
+# is that shape: once inlined, its caller's `[0]` sits above the `let`s the
+# inliner leaves in front of the body, so the pass has to look under them and
+# put the rewrite back there. Every token in a node was being sliced out of the
+# source text to answer a question about one of them.
+
+import {
+    Span,
+    len,
+    map,
+    print,
+    value_or,
+    wrapping_add_assign as +=,
+    wrapping_mul as *,
+    wrapping_sub as -,
+} from builtins;
+
+struct Node { tokens: Span[] }
+
+fn dbl(n: i64) -> i64 { n * 2 }
+
+fn bracket(c: char) -> str { `[{c}]` }
+
+# The `own_texts` shape: a mapped array whose caller reads one element.
+fn token_texts(self: Node, src: str) -> str[] { self.tokens.map(|t| src[t]) }
+
+# The same elements reached the long way, so the fused and unfused costs are
+# both in the one `functions:` list.
+fn walk(xs: i64[]) -> i64 {
+    mut total = 0;
+    for (let x : xs.map(dbl)) {
+        set total += x;
+    }
+    total
+}
+
+fn main() !prints {
+    let v = [1, 2, 3, 4, 5];
+
+    // A named function, in bounds and out.
+    print(`{v.map(dbl)[1]} {v.map(dbl)[99]}`);
+
+    // A lambda, and the free-call spelling of the same shape.
+    print(`{v.map(|x| x * 10)[3]} {map(v, dbl)[0]}`);
+
+    // The index is an expression, not a literal — it is evaluated once either
+    // way, and the fusion moves it ahead of the (dropped) mapping calls.
+    print(`{v.map(dbl)[v.len() - 2]}`);
+
+    // The `Span` reading: the same node, slicing instead of indexing.
+    print(`{v.map(dbl)[Span { start: 1, end: 3 }]}`);
+
+    // Under the `let`s inlining leaves: `token_texts(n, src)[0]` is the
+    // motivating shape, and only the first token is ever sliced out of `src`.
+    let src = "let x = 1;";
+    let n = Node { tokens: [Span { start: 0, end: 3 }, Span { start: 4, end: 5 }] };
+    print(`{n.token_texts(src)[0].value_or("?")} {n.token_texts(src)[1].value_or("?")}`);
+    print(`{n.token_texts(src)[9].value_or("?")}`);
+
+    // A `str` receiver, which is the `char` sequence and not an array block —
+    // so the fused `s[i]` is a `char?` where the unfused `map` built a `str[]`.
+    print(`{"abc".map(bracket)[1]}`);
+
+    // An empty receiver: `none` either way, and `f` is never called.
+    let empty: i64[] = [];
+    print(`{empty.map(dbl)[0]}`);
+
+    print(`{walk(v)}`);
+}
+--- stdout ---
+some(4) none
+some(40) some(2)
+some(8)
+[4, 6]
+let x
+?
+some("[b]")
+none
+30
+--- performance ---
+allocations: 21
+deallocations: 21
+reallocations: 0
+bytes allocated: 1111
+instructions executed: 1807
+binary size: 11832
+  code: 7352
+  data: 315
+  metadata: 4165
+functions:
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  __to_str_i64$arr:
+    calls: 1
+    bytes: 708
+  __to_str_i64$opt:
+    calls: 6
+    bytes: 388
+  __to_str_str$opt:
+    calls: 1
+    bytes: 472
+  aipl_arr_elem_ptr:
+    calls: 2
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 4
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 7
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 2
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
+    bytes: (external)
+  aipl_i64_len:
+    calls: 14
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 16
+    bytes: (external)
+  aipl_write_i64:
+    calls: 7
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 5580

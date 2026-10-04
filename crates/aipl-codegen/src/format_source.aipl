@@ -423,15 +423,15 @@ fn is_layout(self: AiplTok) -> bool {
     assert(!StrLit(",", Quoted).is_layout());
 })
 --- performance ---
-allocations: 16078
-deallocations: 16078
-reallocations: 3026
-bytes allocated: 4095246
-instructions executed: 11656518
-binary size: 7650936
-  code: 5119552
+allocations: 16076
+deallocations: 16076
+reallocations: 3022
+bytes allocated: 4095118
+instructions executed: 11656068
+binary size: 7645104
+  code: 5115572
   data: 13498
-  metadata: 2517886
+  metadata: 2516034
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -1674,7 +1674,7 @@ functions:
     bytes: 33880
   __m4__lower_const_decl:
     calls: 0
-    bytes: 17544
+    bytes: 17016
   __m4__lower_construct_fields:
     calls: 0
     bytes: 28256
@@ -1686,7 +1686,7 @@ functions:
     bytes: 35180
   __m4__lower_effect:
     calls: 0
-    bytes: 980
+    bytes: 608
   __m4__lower_else_branch:
     calls: 0
     bytes: 15812
@@ -1707,7 +1707,7 @@ functions:
     bytes: 47228
   __m4__lower_fn_attr:
     calls: 0
-    bytes: 23796
+    bytes: 23072
   __m4__lower_fn_body:
     calls: 2
     bytes: 34172
@@ -1716,7 +1716,7 @@ functions:
     bytes: 36316
   __m4__lower_function:
     calls: 2
-    bytes: 64632
+    bytes: 64180
   __m4__lower_if:
     calls: 0
     bytes: 21760
@@ -1731,10 +1731,10 @@ functions:
     bytes: 65392
   __m4__lower_lambda:
     calls: 0
-    bytes: 16820
+    bytes: 16336
   __m4__lower_lambda_param:
     calls: 0
-    bytes: 24740
+    bytes: 24176
   __m4__lower_let_stmt:
     calls: 0
     bytes: 272
@@ -1791,7 +1791,7 @@ functions:
     bytes: 66528
   __m4__lower_ty_core:
     calls: 0
-    bytes: 79792
+    bytes: 79308
   __m4__lower_ty_head:
     calls: 0
     bytes: 187752
@@ -1851,7 +1851,7 @@ functions:
     bytes: 2492
   __m4__shim_expr:
     calls: 0
-    bytes: 2212
+    bytes: 1840
   __m4__slot_expr:
     calls: 0
     bytes: 3892
@@ -2006,7 +2006,7 @@ functions:
     calls: 84
     bytes: (external)
   aipl_array_dec:
-    calls: 33755
+    calls: 33753
     bytes: (external)
   aipl_array_new:
     calls: 1004
@@ -2015,10 +2015,10 @@ functions:
     calls: 1905
     bytes: (external)
   aipl_array_push_mut:
-    calls: 6739
+    calls: 6731
     bytes: (external)
   aipl_array_with_cap:
-    calls: 127
+    calls: 125
     bytes: (external)
   aipl_assert:
     calls: 51
