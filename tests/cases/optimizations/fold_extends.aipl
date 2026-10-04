@@ -1,0 +1,145 @@
+# The extend folder's own table: `set v.extend(src)` answered from `src`'s
+# shape, with `src` never built. Every row here is a *local* rewrite; crossing
+# into another function is `aipl_mono::appending_variants`' half, which
+# `optimizations/appending_variant` covers.
+#
+# ```text
+# set v.extend([]);                      →  (nothing)
+# set v.extend([a, b]);                  →  set v.push(a); set v.push(b);
+# set v.extend([a, ..xs, b]);            →  push a; extend xs; push b;
+# set v.extend(xs.map(f).join());        →  for (let x : xs) { set v.extend(f(x)); }
+# set v.extend(if (c) { a } else { b });  →  if (c) { extend a; } else { extend b; }
+# ```
+#
+# Nothing here has to be pure, which is what sets this pass apart from the
+# length folder: it drops nothing and reorders nothing. Every element the source
+# would have produced is still produced by the same expression in the same
+# order; it just lands in `v` directly instead of in a buffer that is then
+# copied into `v`. `loud` below prints per element and prints exactly as often,
+# in exactly the same order, which is what the `stdout` pins down.
+#
+# The one thing that does change is that the source is no longer *fully*
+# evaluated before `v` grows. Only an expression reading `v` could tell, and
+# `reads_receiver` is that case left alone.
+#
+# A `str` receiver takes `extend` but not `push` ("push requires an array"), and
+# this pass runs before the types are known — so it asks the *declaration*, and
+# `into_str` below keeps its `extend` rather than becoming a push.
+
+import { equal as ==, extend, join, len, map, print, value_or, wrapping_add as + } from builtins;
+
+fn loud(n: i64) !prints -> i64 {
+    print(`e{n}`);
+    n
+}
+
+fn pair(n: i64) -> i64[] { [n, n + 1] }
+
+fn rows(xs: i64[]) !prints -> u64 {
+    mut v: i64[] = [];
+    set v.extend([]);
+    set v.extend([loud(1), loud(2)]);
+    set v.extend([loud(3), ..xs, loud(4)]);
+    set v.extend(if (xs.len() == 2) { xs } else { [] });
+    v.len()
+}
+
+# The rows that reach through a mapping: each piece is appended where it is
+# produced, so `pair` runs once per element and nothing collects its results.
+fn mapped(xs: i64[], opt: i64[]?) -> u64 {
+    mut v: i64[] = [];
+    set v.extend(xs.map(pair).join());
+    set v.extend(opt.map(pair_all).value_or([]));
+    v.len()
+}
+
+fn pair_all(ys: i64[]) -> i64[] { ys.map(pair).join() }
+
+# Not folded: the source reads the receiver, so the appends may not interleave
+# with evaluating it.
+fn reads_receiver() -> u64 {
+    mut v: i64[] = [1];
+    set v.extend([..v, 0]);
+    v.len()
+}
+
+# Not pushed: a `str` receiver takes `extend` and not `push`, so the literal
+# keeps its array.
+fn into_str() -> u64 {
+    mut s = "ab";
+    set s.extend(['c', 'd']);
+    s.len()
+}
+
+fn main() !prints {
+    print(`{rows([7, 8])}`);
+    print(`{mapped([1, 2, 3], some([4, 5]))} {mapped([1], none)}`);
+    print(`{reads_receiver()} {into_str()}`);
+}
+--- stdout ---
+e1
+e2
+e3
+e4
+8
+10 2
+3 4
+--- performance ---
+allocations: 29
+deallocations: 29
+reallocations: 7
+bytes allocated: 1450
+instructions executed: 1354
+binary size: 8224
+  code: 4616
+  data: 225
+  metadata: 3383
+functions:
+  __to_str_i64:
+    calls: 4
+    bytes: 204
+  __to_str_u64:
+    calls: 5
+    bytes: 204
+  aipl_arr_extend:
+    calls: 12
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 20
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 14
+    bytes: (external)
+  aipl_array_dec:
+    calls: 41
+    bytes: (external)
+  aipl_array_new:
+    calls: 6
+    bytes: (external)
+  aipl_array_push:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 5
+    bytes: (external)
+  aipl_i64_len:
+    calls: 8
+    bytes: (external)
+  aipl_u64_len:
+    calls: 10
+    bytes: (external)
+  aipl_write_i64:
+    calls: 4
+    bytes: (external)
+  aipl_write_u64:
+    calls: 5
+    bytes: (external)
+  loud:
+    calls: 4
+    bytes: 248
+  main:
+    calls: 1
+    bytes: 2316
+  mapped:
+    calls: 2
+    bytes: 1644

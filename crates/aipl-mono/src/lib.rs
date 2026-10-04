@@ -42,6 +42,12 @@ pub use fold_lengths::fold_lengths;
 mod counting_variants;
 pub use counting_variants::counting_variants;
 
+mod fold_extends;
+pub use fold_extends::fold_extends;
+
+mod appending_variants;
+pub use appending_variants::appending_variants;
+
 mod sink;
 pub use sink::{sink_bindings, sink_bindings_post_mono};
 

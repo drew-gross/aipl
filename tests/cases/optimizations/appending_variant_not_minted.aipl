@@ -1,0 +1,109 @@
+# When an appending variant is *not* worth minting. A variant the folder cannot
+# take apart is strictly worse than the call it replaced — the same array, built
+# and then copied into the receiver, now behind one more call and one more
+# function in the binary — so each of these keeps its call.
+#
+# `handed_back` returns an array it was given rather than assembling one: there
+# is no shape to append, so the folder finds nothing in the minted body and the
+# candidate is dropped.
+#
+# `maybe_parts` returns `i64[]?`. The wrapper would have to come apart before
+# anything could be appended, and `set v.extend(..)` has nowhere to put the
+# `none` — so only plain `T[]` producers are minted at all.
+#
+# `counted` is the shape the *length* folder takes instead: its result reaches
+# `len`, not `extend`, so `aipl_mono::counting_variants` mints `parts$len` for
+# it. The two families do not collide — they ask different questions of the same
+# producer — and this file is here partly to pin that down.
+#
+# The `functions:` list is the evidence, and it is the absence of any `$into`
+# variant: nothing here was copied. `handed_back` and `parts` are missing for an
+# unrelated reason — they are one-liners, so the inliner folded them into their
+# callers, which is what would have happened without either pass.
+
+import { extend, len, print, value_or, wrapping_add as + } from builtins;
+
+fn parts(n: i64) -> i64[] { [n, n + 1, n + 2] }
+
+# Hands back what it was given: nothing to append elementwise.
+fn handed_back(xs: i64[]) -> i64[] { xs }
+
+fn maybe_parts(n: i64) -> i64[]? {
+    match (n) {
+        0 => none,
+        _ => some(parts(n)),
+    }
+}
+
+fn via_handed_back(xs: i64[]) -> u64 {
+    mut v: i64[] = [];
+    set v.extend(handed_back(xs));
+    v.len()
+}
+
+fn via_optional(n: i64) -> u64 {
+    mut v: i64[] = [];
+    set v.extend(maybe_parts(n).value_or([]));
+    v.len()
+}
+
+# Measured rather than appended, so this is the counting family's shape.
+fn counted(n: i64) -> u64 { parts(n).len() }
+
+fn main() !prints {
+    print(`{via_handed_back([1, 2])} {via_optional(0)} {via_optional(5)}`);
+    print(`{counted(7)}`);
+}
+--- stdout ---
+2 0 3
+3
+--- performance ---
+allocations: 12
+deallocations: 12
+reallocations: 0
+bytes allocated: 620
+instructions executed: 294
+binary size: 3616
+  code: 1624
+  data: 81
+  metadata: 1911
+functions:
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  __to_str_u64:
+    calls: 3
+    bytes: 204
+  aipl_arr_extend:
+    calls: 3
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 1
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 3
+    bytes: (external)
+  aipl_array_dec:
+    calls: 10
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_u64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  aipl_write_u64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 904
+  via_optional:
+    calls: 2
+    bytes: 312

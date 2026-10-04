@@ -536,7 +536,8 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
-  Suggestions, best first
+    set v.extend(opt.map(f).value_or([])) should fuse to a $into extension
+    Suggestions, best first
         2. Not measured: build into one buffer instead of spreading temporaries. Even with fusion 1, group_styles is still entered 487k times and aipl_arr_extend/reserve run about 615k/653k times. That's [style, ..group_styles(a), ..group_styles(b)] creating fresh arrays only to copy them into the parent. Rewriting the recursive producer to append into a buffer it's handed (a f$into(out, x) variant) applies the idea behind MapJoin to user recursion.
         3. Measured: reuse the old record when a node is rebuilt. desugar_rule and link_rule rebuild every rule node, including leaves like Term(k) => ok(Term(k)), which drives 1.4M aipl_rec_alloc calls. The measured part is the narrow case: C(x) => C(x) becomes "return the input". The general version reuses the scrutinee's record for the new constructor when the scrutinee is uniquely owned and dies there (Perceus-style reuse). It would also cover the Many/Then rebuilds in link_rule, whose input comes uniquely owned from desugar_rule.
         4. Not measured, likely the biggest remaining cost: cancel refcount pairs. After the changes above there are still about 23M refcount helper calls (rec_dec 6.6M, array_dec 6.0M, rec_inc 5.7M, arr_inc 4.4M), against 1.5M allocations. Cancelling increment/decrement pairs and moving increments into the branches that actually use the value would cut this. That probably lives in codegen rather than fuse.rs.
@@ -689,6 +690,7 @@ vscode:
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 
 handoff:
+  compiler_aipl_files_are_tested_and_pass_check has become super slow, and seems like it should be redundant? Don't we already `check` every aipl elsewhere?
   add what JS verification we can to handoff
   make handoff compile and install the vscode extension
   fix cargo doc --workspace

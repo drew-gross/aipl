@@ -201,10 +201,10 @@ deallocations: 3976
 reallocations: 329
 bytes allocated: 348703
 instructions executed: 1363293
-binary size: 208720
-  code: 162796
+binary size: 209072
+  code: 163180
   data: 3240
-  metadata: 42684
+  metadata: 42652
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -313,7 +313,7 @@ functions:
     bytes: 1660
   __m5__unescape:
     calls: 0
-    bytes: 1628
+    bytes: 2012
   __m6__aipl_rules$lambda0:
     calls: 0
     bytes: 144

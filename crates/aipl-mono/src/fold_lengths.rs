@@ -244,7 +244,7 @@ fn count_of(whole: &Expr, e: &Expr, empty: &[String], blocked: &HashSet<String>)
         // reserved past the seed stays, being the length they would have added.
         ExprKind::LetMut(..) => {
             let acc = spread_accumulator(e)?;
-            if !acc.appended.iter().all(|x| can_drop(x, blocked)) {
+            if !acc.appended.iter().all(|p| can_drop(p.value, blocked)) {
                 return None;
             }
             Some(add(measure(acc.seed), acc.extra.clone(), span()))
@@ -515,19 +515,31 @@ fn is_empty_sequence(e: &Expr, empty: &[String]) -> bool {
 /// Nothing else can be that shape, and nothing else is accepted — a store that
 /// does not fit, or an operand mentioning the accumulator, keeps the block as
 /// written.
-struct SpreadAccumulator<'a> {
+pub(crate) struct SpreadAccumulator<'a> {
     /// The reserved seed — the literal's leading plain elements, or the first
     /// spread's operand when the literal starts with one.
-    seed: &'a Expr,
+    pub(crate) seed: &'a Expr,
     /// What the appends add past the seed: one per plain element, `len(..)` per
     /// spread, as the loader summed it to size the allocation.
-    extra: &'a Expr,
-    /// Each appended element, in order. The rewrite drops these, so each has to
-    /// be deferrable.
-    appended: Vec<&'a Expr>,
+    pub(crate) extra: &'a Expr,
+    /// Each appended element, in order.
+    pub(crate) appended: Vec<AppendedPiece<'a>>,
 }
 
-fn spread_accumulator(e: &Expr) -> Option<SpreadAccumulator<'_>> {
+/// One element the accumulator appends: the expression, and whether the literal
+/// wrote it as a spread — a whole sequence spliced in — or as a single element.
+///
+/// Which it is decides what may stand in its place: a sequence or one value. So
+/// the distinction travels with the piece rather than being re-derived from the
+/// intrinsic's name at each use. [`crate::fold_lengths`] does not care (a length
+/// is a length), but [`crate::fold_extends`] appends the pieces into another
+/// array and needs `push` for one and `extend` for the other.
+pub(crate) struct AppendedPiece<'a> {
+    pub(crate) spread: bool,
+    pub(crate) value: &'a Expr,
+}
+
+pub(crate) fn spread_accumulator(e: &Expr) -> Option<SpreadAccumulator<'_>> {
     let ExprKind::LetMut(acc, _, reserved, body) = &e.kind else {
         return None;
     };
@@ -541,7 +553,7 @@ fn spread_accumulator(e: &Expr) -> Option<SpreadAccumulator<'_>> {
     if reads_acc(seed) || reads_acc(extra) {
         return None;
     }
-    let mut appended: Vec<&Expr> = Vec::new();
+    let mut appended: Vec<AppendedPiece<'_>> = Vec::new();
     let mut rest = &**body;
     loop {
         match &rest.kind {
@@ -557,8 +569,11 @@ fn spread_accumulator(e: &Expr) -> Option<SpreadAccumulator<'_>> {
                 if !matches!(&lhs.kind, ExprKind::Ident(name) if name == acc) {
                     return None;
                 }
-                let ExprKind::Call(Callee::ArrAppend | Callee::ArrConcat, call_args, _) =
-                    &value.kind
+                let ExprKind::Call(
+                    intrinsic @ (Callee::ArrAppend | Callee::ArrConcat),
+                    call_args,
+                    _,
+                ) = &value.kind
                 else {
                     return None;
                 };
@@ -570,7 +585,10 @@ fn spread_accumulator(e: &Expr) -> Option<SpreadAccumulator<'_>> {
                 {
                     return None;
                 }
-                appended.push(element);
+                appended.push(AppendedPiece {
+                    spread: *intrinsic == Callee::ArrConcat,
+                    value: element,
+                });
                 rest = next;
             }
             _ => return None,

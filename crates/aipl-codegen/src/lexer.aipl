@@ -1473,11 +1473,11 @@ allocations: 362
 deallocations: 362
 reallocations: 9
 bytes allocated: 76304
-instructions executed: 658336
-binary size: 802208
-  code: 536512
+instructions executed: 658322
+binary size: 802560
+  code: 536896
   data: 8916
-  metadata: 256780
+  metadata: 256748
 functions:
   __arr_drop_Kind:
     calls: 88
@@ -1580,7 +1580,7 @@ functions:
     bytes: 104
   __m1__unescape:
     calls: 4
-    bytes: 1628
+    bytes: 2012
   __test$keep_skipped:
     calls: 1
     bytes: 17212

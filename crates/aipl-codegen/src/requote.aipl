@@ -541,11 +541,11 @@ allocations: 626
 deallocations: 626
 reallocations: 8
 bytes allocated: 40594
-instructions executed: 166807
-binary size: 80296
-  code: 47468
+instructions executed: 166691
+binary size: 80736
+  code: 47976
   data: 8001
-  metadata: 24827
+  metadata: 24759
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 20
@@ -699,7 +699,7 @@ functions:
     bytes: 1956
   requote:
     calls: 22
-    bytes: 5368
+    bytes: 5748
   reswap:
     calls: 4
     bytes: 932
@@ -714,4 +714,4 @@ functions:
     bytes: 436
   single_to_raw:
     calls: 4
-    bytes: 1260
+    bytes: 1388

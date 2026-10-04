@@ -507,15 +507,15 @@ pub fn format_json(src: str, width: u64) -> str!ParseError {
 # braces — is a list breaking or not breaking, which the layouts decide.
 fn json_space(l: str, r: str) -> bool { l == ":" }
 --- performance ---
-allocations: 19875
-deallocations: 19875
+allocations: 19419
+deallocations: 19419
 reallocations: 2639
-bytes allocated: 2880103
-instructions executed: 6400047
-binary size: 431520
-  code: 285288
+bytes allocated: 2746343
+instructions executed: 6368686
+binary size: 435552
+  code: 288128
   data: 8348
-  metadata: 137884
+  metadata: 139076
 functions:
   __arr_drop_Json:
     calls: 125
@@ -542,7 +542,7 @@ functions:
     calls: 10
     bytes: 140
   __arr_drop___m3__ListStyle:
-    calls: 532
+    calls: 76
     bytes: 120
   __arr_drop___m3__Prec:
     calls: 0
@@ -680,7 +680,7 @@ functions:
     calls: 0
     bytes: 44
   __builtin_map_join$__m3__Rule$JsonTok$__m3__ListStyle$lam$__m3__group_styles$JsonTok$tail:
-    calls: 304
+    calls: 0
     bytes: 1072
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 0
@@ -762,7 +762,7 @@ functions:
     bytes: 1520
   __m12__unescape:
     calls: 35
-    bytes: 1628
+    bytes: 2012
   __m13__can_reach$JsonTok$Json$map1:
     calls: 0
     bytes: 384
@@ -917,8 +917,11 @@ functions:
     calls: 0
     bytes: 32
   __m3__group_styles$JsonTok$tail:
-    calls: 2280
+    calls: 152
     bytes: 3112
+  __m3__group_styles$into$JsonTok$own0:
+    calls: 2128
+    bytes: 2264
   __m3__group_styles$len$JsonTok:
     calls: 0
     bytes: 32
@@ -927,7 +930,7 @@ functions:
     bytes: 1788
   __m3__link$JsonTok$Json:
     calls: 76
-    bytes: 2480
+    bytes: 2424
   __m3__link_opt$JsonTok:
     calls: 152
     bytes: 596
@@ -969,7 +972,7 @@ functions:
     bytes: 3144
   __m4__render_cst$JsonTok$Json$s1$lam$json_space:
     calls: 18
-    bytes: 10964
+    bytes: 11212
   __m5__col_after:
     calls: 203
     bytes: 628
@@ -1043,13 +1046,13 @@ functions:
     calls: 56
     bytes: (external)
   aipl_arr_extend:
-    calls: 5767
+    calls: 3031
     bytes: (external)
   aipl_arr_inc:
-    calls: 73846
+    calls: 70882
     bytes: (external)
   aipl_arr_reserve:
-    calls: 7065
+    calls: 4481
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 394
@@ -1061,16 +1064,16 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 94591
+    calls: 90487
     bytes: (external)
   aipl_array_new:
-    calls: 2262
+    calls: 2110
     bytes: (external)
   aipl_array_push:
-    calls: 3022
+    calls: 3098
     bytes: (external)
   aipl_array_push_mut:
-    calls: 5710
+    calls: 5862
     bytes: (external)
   aipl_array_with_cap:
     calls: 301
@@ -1082,13 +1085,13 @@ functions:
     calls: 10707
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 68932
+    calls: 67716
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 4068
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 58225
+    calls: 57009
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 4068

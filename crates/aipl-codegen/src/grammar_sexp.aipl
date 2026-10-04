@@ -273,15 +273,15 @@ pub fn format_sexp(src: str, width: u64) -> str!ParseError {
 # and answering "never" is the honest answer here.
 fn sexp_space(l: str, r: str) -> bool { false }
 --- performance ---
-allocations: 5811
-deallocations: 5811
+allocations: 5723
+deallocations: 5723
 reallocations: 653
-bytes allocated: 631730
-instructions executed: 1736253
-binary size: 377624
-  code: 251260
+bytes allocated: 616594
+instructions executed: 1734405
+binary size: 381304
+  code: 253716
   data: 4692
-  metadata: 121672
+  metadata: 122896
 functions:
   __arr_drop_SexpKind:
     calls: 0
@@ -308,7 +308,7 @@ functions:
     calls: 7
     bytes: 140
   __arr_drop___m3__ListStyle:
-    calls: 132
+    calls: 44
     bytes: 120
   __arr_drop___m3__Prec:
     calls: 0
@@ -443,7 +443,7 @@ functions:
     calls: 0
     bytes: 44
   __builtin_map_join$__m3__Rule$SexpKind$__m3__ListStyle$lam$__m3__group_styles$SexpKind$tail:
-    calls: 44
+    calls: 0
     bytes: 1072
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 0
@@ -674,8 +674,11 @@ functions:
     calls: 0
     bytes: 32
   __m3__group_styles$SexpKind$tail:
-    calls: 308
+    calls: 0
     bytes: 3112
+  __m3__group_styles$into$SexpKind$own0:
+    calls: 308
+    bytes: 2264
   __m3__group_styles$len$SexpKind:
     calls: 0
     bytes: 32
@@ -684,7 +687,7 @@ functions:
     bytes: 1788
   __m3__link$SexpKind$__m15__Sexp:
     calls: 44
-    bytes: 2480
+    bytes: 2424
   __m3__link_opt$SexpKind:
     calls: 44
     bytes: 596
@@ -726,7 +729,7 @@ functions:
     bytes: 3144
   __m4__render_cst$SexpKind$__m15__Sexp$s1$lam$sexp_space:
     calls: 12
-    bytes: 10964
+    bytes: 11212
   __m5__col_after:
     calls: 77
     bytes: 628
@@ -794,13 +797,13 @@ functions:
     calls: 30
     bytes: (external)
   aipl_arr_extend:
-    calls: 1626
+    calls: 1274
     bytes: (external)
   aipl_arr_inc:
-    calls: 24512
+    calls: 23940
     bytes: (external)
   aipl_arr_reserve:
-    calls: 2030
+    calls: 1766
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 143
@@ -809,16 +812,16 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 31823
+    calls: 31075
     bytes: (external)
   aipl_array_new:
-    calls: 860
+    calls: 816
     bytes: (external)
   aipl_array_push:
-    calls: 1255
+    calls: 1299
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1258
+    calls: 1302
     bytes: (external)
   aipl_array_with_cap:
     calls: 159
@@ -830,13 +833,13 @@ functions:
     calls: 2524
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 17840
+    calls: 17708
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 1164
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 15316
+    calls: 15184
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 1164

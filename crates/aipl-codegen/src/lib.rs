@@ -4031,6 +4031,16 @@ fn compile_program<M: Module>(
             let effectful = effectful.clone();
             move |program, scope| aipl_mono::fold_lengths(program, &effectful, scope)
         }),
+        // Replace `set v.extend(g(..))` with a call to `g`'s appending variant,
+        // and add the variant. Before the folder, which is what then takes the
+        // variant's body apart — and after fusion, so the body it copies has
+        // already had its chains collapsed.
+        Pass::whole_program("appending_variants", aipl_mono::appending_variants),
+        // Push each `set v.extend(..)` inward until it reaches the elements, so
+        // the sequence it would have copied from is never built. Paired with the
+        // pass above, which is how an `extend` crosses into another function;
+        // the two alternate across rounds until the family closes.
+        Pass::scoped("fold_extends", aipl_mono::fold_extends),
         // Fold constant subexpressions (`2 + 3` → `5`). After `check` so
         // diagnostics always report against the unfolded source, and after
         // inlining so bodies folded here are the ones actually emitted.

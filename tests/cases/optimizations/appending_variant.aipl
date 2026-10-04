@@ -1,0 +1,160 @@
+# Operation fusion across a function boundary: a call whose result is only
+# appended to somebody else's array becomes a call to an *appending variant* of
+# the callee, which puts its elements straight into that array instead of
+# collecting them into one of its own.
+#
+# `styles` below is `group_styles` from `crates/aipl-codegen/src/grammar.aipl`
+# with the names shortened, and `gather` is how `link` calls it: an accumulator
+# fed one producer result per iteration (`set groups.extend(group_styles(rule))`).
+# Every array `styles` builds exists only to be copied into `groups` and freed.
+#
+# Two passes split the work. `aipl_mono::appending_variants` mints
+# `styles$into(mut self: i64[], r: Rule)`, whose body is `styles`'s with every
+# result position appended into the receiver; `aipl_mono::fold_extends` then
+# pushes each `extend` inward — `extend([])` to nothing, the spread literal to
+# pushes, the `map(..).join()` to a loop, and each inner `extend(styles(..))`
+# to another `styles$into(..)`. They alternate across the pass manager's rounds
+# until one array grows in place and no level builds anything.
+#
+# That it grows *in place* is the whole point, and it is not free: a `mut self`
+# array receiver is handed over rather than lent (`mut_receiver_owned`), so the
+# caller's slot gives up its reference and the callee's appends write the block
+# directly. Without that every append would copy the whole receiver, and a
+# recursive variant would pay it per level — far worse than the build-and-copy
+# it replaces.
+#
+# The `functions:` list is the evidence, and it is an absence: no `styles`, no
+# `opt_styles`, no `map_join` instance. What remains is `styles$into$own0` —
+# the variant, with its receiver owned — beside `gather` itself and `deep`,
+# which builds the `Rule` tree the walk reads. Every array the producer's source describes is one the
+# compiler never emits code to build.
+#
+# The counts are checkable by hand. A `Many` contributes its own group plus
+# whatever its body and separator hold, and `deep` nests two per level, one with
+# a separator and one without — so `c(0) = 0` and `c(n) = 2 + 3 * c(n - 1)`,
+# giving 0, 2, 8, 26, 80.
+
+import { extend, join, len, map, print, value_or, wrapping_sub as - } from builtins;
+
+variant Rule = Then(Rule[]) | Many(Rule, Rule?) | Leaf
+
+fn styles(r: Rule) -> i64[] {
+    match (r) {
+        Then(rs) => rs.map(styles).join(),
+        Many(sub, sep) => [0, ..styles(sub), ..opt_styles(sep)],
+        Leaf => [],
+    }
+}
+
+fn opt_styles(r: Rule?) -> i64[] { r.map(styles).value_or([]) }
+
+fn deep(n: i64) -> Rule {
+    match (n) {
+        0 => Leaf,
+        _ => Then([Many(deep(n - 1), some(deep(n - 1))), Many(deep(n - 1), none)]),
+    }
+}
+
+# The `link` shape: one accumulator, fed a producer's result per iteration.
+fn gather(rs: Rule[]) -> u64 {
+    mut groups: i64[] = [];
+    for (let r : rs) {
+        set groups.extend(styles(r));
+    }
+    groups.len()
+}
+
+fn main() !prints {
+    // The shapes one at a time: nothing, one bare group, a group with a
+    // separator, and a `Then` that only passes its children through.
+    print(`{gather([Leaf])} {gather([Many(Leaf, none)])} {gather([Many(Leaf, some(Leaf))])}`);
+    print(`{gather([Then([])])} {gather([Then([Leaf, Many(Leaf, none)])])}`);
+    // Several producers into one accumulator, and the recurrence as a series.
+    print(`{gather([Leaf, Many(Leaf, none), Many(Leaf, none)])}`);
+    print(`{gather([deep(1)])} {gather([deep(2)])} {gather([deep(3)])} {gather([deep(4)])}`);
+}
+--- stdout ---
+0 1 1
+0 1
+2
+2 8 26 80
+--- performance ---
+allocations: 505
+deallocations: 505
+reallocations: 27
+bytes allocated: 29724
+instructions executed: 35634
+binary size: 14552
+  code: 8424
+  data: 73
+  metadata: 6055
+functions:
+  __arr_drop_Rule:
+    calls: 69
+    bytes: 116
+  __arr_retain_Rule:
+    calls: 0
+    bytes: 116
+  __rec_drop_Rule:
+    calls: 310
+    bytes: 124
+  __to_str_u64:
+    calls: 10
+    bytes: 204
+  aipl_arr_extend:
+    calls: 281
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 850
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 256
+    bytes: (external)
+  aipl_array_dec:
+    calls: 1438
+    bytes: (external)
+  aipl_array_new:
+    calls: 69
+    bytes: (external)
+  aipl_array_push:
+    calls: 8
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 57
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 310
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 916
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 180
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 606
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 180
+    bytes: (external)
+  aipl_u64_len:
+    calls: 20
+    bytes: (external)
+  aipl_write_u64:
+    calls: 10
+    bytes: (external)
+  deep:
+    calls: 178
+    bytes: 656
+  gather:
+    calls: 10
+    bytes: 1108
+  main:
+    calls: 1
+    bytes: 3660
+  styles:
+    calls: 187
+    bytes: 1616
+  styles$into$own0:
+    calls: 111
+    bytes: 824

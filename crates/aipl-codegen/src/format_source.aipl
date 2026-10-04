@@ -423,21 +423,21 @@ fn is_layout(self: AiplTok) -> bool {
     assert(!StrLit(",", Quoted).is_layout());
 })
 --- performance ---
-allocations: 16722
-deallocations: 16722
-reallocations: 2926
-bytes allocated: 3881326
-instructions executed: 11758270
-binary size: 7653872
-  code: 5120848
+allocations: 15722
+deallocations: 15722
+reallocations: 2850
+bytes allocated: 3556782
+instructions executed: 11649894
+binary size: 7658016
+  code: 5123824
   data: 13498
-  metadata: 2519526
+  metadata: 2520694
 functions:
   __arr_drop___m10__Ty:
     calls: 0
     bytes: 116
   __arr_drop___m11__ListStyle:
-    calls: 1012
+    calls: 12
     bytes: 120
   __arr_drop___m11__Prec:
     calls: 4
@@ -542,7 +542,7 @@ functions:
     calls: 0
     bytes: 116
   __arr_retain___m11__ListStyle:
-    calls: 408
+    calls: 212
     bytes: 120
   __arr_retain___m11__Prec:
     calls: 0
@@ -749,7 +749,7 @@ functions:
     calls: 0
     bytes: 44
   __builtin_map_join$__m11__Rule$__m25__AiplTok$__m11__ListStyle$lam$__m11__group_styles$__m25__AiplTok$tail:
-    calls: 692
+    calls: 4
     bytes: 1072
   __builtin_map_join$__m12__Cst$__builtin_Span$lam$__m12__token_leaves:
     calls: 0
@@ -866,8 +866,11 @@ functions:
     calls: 0
     bytes: 32
   __m11__group_styles$__m25__AiplTok$tail:
-    calls: 3688
+    calls: 164
     bytes: 3112
+  __m11__group_styles$into$__m25__AiplTok$own0:
+    calls: 3524
+    bytes: 2264
   __m11__group_styles$len$__m25__AiplTok:
     calls: 0
     bytes: 32
@@ -876,7 +879,7 @@ functions:
     bytes: 1788
   __m11__link$__m25__AiplTok$__m5__Ast:
     calls: 4
-    bytes: 24760
+    bytes: 24716
   __m11__link_opt$__m25__AiplTok:
     calls: 324
     bytes: 596
@@ -969,7 +972,7 @@ functions:
     bytes: 1520
   __m16__unescape:
     calls: 8
-    bytes: 1628
+    bytes: 2012
   __m16__unescape_braces:
     calls: 0
     bytes: 988
@@ -1263,7 +1266,7 @@ functions:
     bytes: 10040
   __m36__format_program:
     calls: 7
-    bytes: 15464
+    bytes: 15712
   __m36__hash_opener:
     calls: 0
     bytes: 1708
@@ -1434,7 +1437,7 @@ functions:
     bytes: 736
   __m36__template_scan:
     calls: 0
-    bytes: 5524
+    bytes: 5648
   __m36__template_verbatim:
     calls: 0
     bytes: 668
@@ -2000,13 +2003,13 @@ functions:
     calls: 3
     bytes: (external)
   aipl_arr_extend:
-    calls: 5503
+    calls: 403
     bytes: (external)
   aipl_arr_inc:
-    calls: 30375
+    calls: 22959
     bytes: (external)
   aipl_arr_reserve:
-    calls: 5682
+    calls: 530
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 16
@@ -2018,16 +2021,16 @@ functions:
     calls: 84
     bytes: (external)
   aipl_array_dec:
-    calls: 43039
+    calls: 32963
     bytes: (external)
   aipl_array_new:
-    calls: 1216
+    calls: 1004
     bytes: (external)
   aipl_array_push:
     calls: 1901
     bytes: (external)
   aipl_array_push_mut:
-    calls: 6527
+    calls: 6739
     bytes: (external)
   aipl_array_with_cap:
     calls: 127
@@ -2042,13 +2045,13 @@ functions:
     calls: 11847
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 63549
+    calls: 60689
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 3626
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 51702
+    calls: 48842
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 3626
