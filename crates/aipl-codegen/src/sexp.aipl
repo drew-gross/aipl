@@ -69,15 +69,15 @@ fn depth(self: Sexp) -> u64 {
     }
 }
 --- performance ---
-allocations: 12938
-deallocations: 12938
+allocations: 12944
+deallocations: 12944
 reallocations: 502
-bytes allocated: 12374962
-instructions executed: 6275569
-binary size: 224424
-  code: 150292
+bytes allocated: 12375490
+instructions executed: 6275605
+binary size: 217352
+  code: 146020
   data: 1716
-  metadata: 72416
+  metadata: 69616
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -101,7 +101,7 @@ functions:
     calls: 3342
     bytes: 116
   __arr_drop___m4__ListStyle:
-    calls: 6
+    calls: 12
     bytes: 120
   __arr_drop___m4__Production$__m1__SexpKind$Sexp:
     calls: 12
@@ -131,7 +131,7 @@ functions:
     calls: 2136
     bytes: 116
   __arr_retain___m4__ListStyle:
-    calls: 6
+    calls: 12
     bytes: 120
   __arr_retain___m4__Production$__m1__SexpKind$Sexp:
     calls: 12
@@ -178,12 +178,6 @@ functions:
   __builtin_map_join$__m2__Cst$__builtin_Span$lam$__m2__token_leaves$tail:
     calls: 16
     bytes: 1040
-  __builtin_map_join$__m4__Rule$__m1__SexpKind$__m4__ListStyle$lam$__m4__group_styles$__m1__SexpKind:
-    calls: 0
-    bytes: 44
-  __builtin_map_join$__m4__Rule$__m1__SexpKind$__m4__ListStyle$lam$__m4__group_styles$__m1__SexpKind$tail:
-    calls: 0
-    bytes: 1072
   __builtin_reverse_find_map$__m2__Cst$__builtin_Span$lam$__m2__last_leaf:
     calls: 0
     bytes: 360
@@ -340,15 +334,9 @@ functions:
   __m4__desugar_rule$__m1__SexpKind:
     calls: 42
     bytes: 12048
-  __m4__group_styles$__m1__SexpKind:
-    calls: 0
-    bytes: 32
-  __m4__group_styles$__m1__SexpKind$tail:
-    calls: 0
-    bytes: 3112
   __m4__group_styles$into$__m1__SexpKind$own0:
     calls: 42
-    bytes: 2264
+    bytes: 2404
   __m4__group_styles$len$__m1__SexpKind:
     calls: 0
     bytes: 32
@@ -367,9 +355,6 @@ functions:
   __m4__link_rules$__m1__SexpKind:
     calls: 6
     bytes: 588
-  __m4__opt_group_styles$__m1__SexpKind:
-    calls: 6
-    bytes: 152
   __m4__prod_names$__m1__SexpKind$Sexp:
     calls: 12
     bytes: 552
@@ -401,10 +386,10 @@ functions:
     calls: 6
     bytes: (external)
   aipl_arr_extend:
-    calls: 882
+    calls: 876
     bytes: (external)
   aipl_arr_inc:
-    calls: 149577
+    calls: 149589
     bytes: (external)
   aipl_arr_reserve:
     calls: 1314
@@ -413,7 +398,7 @@ functions:
     calls: 836
     bytes: (external)
   aipl_array_dec:
-    calls: 166750
+    calls: 166762
     bytes: (external)
   aipl_array_new:
     calls: 2504

@@ -471,10 +471,10 @@ deallocations: 10228
 reallocations: 1502
 bytes allocated: 1122054
 instructions executed: 2778631
-binary size: 397056
-  code: 263176
+binary size: 390032
+  code: 258904
   data: 5852
-  metadata: 128028
+  metadata: 125276
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -635,12 +635,6 @@ functions:
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves$tail:
     calls: 322
     bytes: 1040
-  __builtin_map_join$__m3__Rule$CalcTok$__m3__ListStyle$lam$__m3__group_styles$CalcTok:
-    calls: 0
-    bytes: 44
-  __builtin_map_join$__m3__Rule$CalcTok$__m3__ListStyle$lam$__m3__group_styles$CalcTok$tail:
-    calls: 0
-    bytes: 1072
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 2
     bytes: 360
@@ -857,15 +851,9 @@ functions:
   __m3__failure_message:
     calls: 7
     bytes: 488
-  __m3__group_styles$CalcTok:
-    calls: 0
-    bytes: 32
-  __m3__group_styles$CalcTok$tail:
-    calls: 0
-    bytes: 3112
   __m3__group_styles$into$CalcTok$own0:
     calls: 819
-    bytes: 2264
+    bytes: 2404
   __m3__group_styles$len$CalcTok:
     calls: 0
     bytes: 32
@@ -884,9 +872,6 @@ functions:
   __m3__link_rules$CalcTok:
     calls: 252
     bytes: 588
-  __m3__opt_group_styles$CalcTok:
-    calls: 0
-    bytes: 152
   __m3__prod_names$CalcTok$Calc:
     calls: 119
     bytes: 552

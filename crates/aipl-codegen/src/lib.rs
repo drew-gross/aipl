@@ -20256,8 +20256,22 @@ fn compile_expr_inner<M: Module>(
             // `mut y = p` where `p` is a moved-in owned parameter: take ownership
             // (no copy, no extra inc) so `y` is exclusive. The parameter's own
             // drop was suppressed, so there's no value-track to pop.
-            let owned_move =
-                matches!(&value.kind, ExprKind::Ident(n) if cx.owned_params.contains(n));
+            //
+            // An owned **`mut` receiver** is the exception, and it is not a
+            // value-track at all: its reference lives in a slot the entry
+            // *tracks* (see the `mut` parameter entry and
+            // `mut_binding_owns_slot_ref`), so the drop is not suppressed —
+            // whatever the slot holds is released at exit. Taking that
+            // reference over without a retain leaves two slots owning one, and
+            // the second release frees a block the receiver still names. The
+            // shape reaching here is an inlined `mut self` method: the pre-mono
+            // inliner binds the receiver `mut` in the caller (`$inl<N>_self`),
+            // and the caller's own receiver may itself be owned. Falling
+            // through to the non-exclusive arm below gives the new binding its
+            // own reference, which is what a second owner needs.
+            let owned_move = matches!(&value.kind, ExprKind::Ident(n)
+                if cx.owned_params.contains(n)
+                    && !matches!(cx.env.get(n.as_str()), Some(EnvBinding::Mut(..))));
             // Owning the reference is not the same as owning the block. The
             // caller moved the parameter in because its argument looked fresh —
             // a call result — but a callee may return one of its own borrowed

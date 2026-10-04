@@ -740,15 +740,15 @@ fn colon_space(l: str, r: str) -> bool { l == ":" }
 # A `Doc` at a width, for the assertions above.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 2278
-deallocations: 2278
+allocations: 2284
+deallocations: 2284
 reallocations: 184
-bytes allocated: 183451
-instructions executed: 289785
-binary size: 261608
-  code: 168456
+bytes allocated: 183979
+instructions executed: 289821
+binary size: 254600
+  code: 164184
   data: 6076
-  metadata: 87076
+  metadata: 84340
 functions:
   __arr_drop_Item:
     calls: 72
@@ -763,7 +763,7 @@ functions:
     calls: 183
     bytes: 116
   __arr_drop___m8__ListStyle:
-    calls: 7
+    calls: 13
     bytes: 120
   __arr_drop___m8__Production$FKind$str:
     calls: 10
@@ -784,7 +784,7 @@ functions:
     calls: 313
     bytes: 116
   __arr_retain___m8__ListStyle:
-    calls: 6
+    calls: 12
     bytes: 120
   __arr_retain___m8__Production$FKind$str:
     calls: 31
@@ -825,12 +825,6 @@ functions:
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves$tail:
     calls: 21
     bytes: 1040
-  __builtin_map_join$__m8__Rule$FKind$__m8__ListStyle$lam$__m8__group_styles$FKind:
-    calls: 0
-    bytes: 44
-  __builtin_map_join$__m8__Rule$FKind$__m8__ListStyle$lam$__m8__group_styles$FKind$tail:
-    calls: 0
-    bytes: 1072
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 0
     bytes: 360
@@ -891,15 +885,9 @@ functions:
   __m8__failure_message:
     calls: 2
     bytes: 488
-  __m8__group_styles$FKind:
-    calls: 0
-    bytes: 32
-  __m8__group_styles$FKind$tail:
-    calls: 0
-    bytes: 3112
   __m8__group_styles$into$FKind$own0:
     calls: 44
-    bytes: 2264
+    bytes: 2404
   __m8__group_styles$len$FKind:
     calls: 0
     bytes: 32
@@ -918,9 +906,6 @@ functions:
   __m8__link_rules$FKind:
     calls: 0
     bytes: 588
-  __m8__opt_group_styles$FKind:
-    calls: 6
-    bytes: 152
   __rec_drop___m1__Cst:
     calls: 27
     bytes: 132
@@ -976,10 +961,10 @@ functions:
     calls: 7
     bytes: 204
   aipl_arr_extend:
-    calls: 126
+    calls: 120
     bytes: (external)
   aipl_arr_inc:
-    calls: 1385
+    calls: 1397
     bytes: (external)
   aipl_arr_reserve:
     calls: 194
@@ -988,7 +973,7 @@ functions:
     calls: 20
     bytes: (external)
   aipl_array_dec:
-    calls: 2940
+    calls: 2952
     bytes: (external)
   aipl_array_new:
     calls: 314

@@ -18,18 +18,23 @@
 //! set v.extend(xs.map(f).join());        →  for (let x : xs) { set v.extend(f(x)); }
 //! set v.extend(if (c) { a } else { b }); →  if (c) { set v.extend(a); } else { set v.extend(b); }
 //! set v.extend(match (s) { .. });        →  match (s) { .. each arm appended in .. }
+//! set v.extend(opt.map(f).value_or([])); →  match (opt) { some(x) => set v.extend(f(x)), none => () }
 //! ```
 //!
-//! One row a reader will expect and not find is `opt.map(f).value_or([])`,
-//! which the length folder does have. Rewriting it to
-//! `match (opt) { some(x) => set v.extend(f(x)), none => () }` is correct on
-//! paper and over-releases in practice: the arm binds the optional's payload and
-//! hands it to what becomes a *user* call, and the length folder's version does
-//! not because `len` is a builtin and the last-use marker only marks user calls.
-//! The symptom is a refcount reaching zero on a live block (`AIPL_RC_TRACE` in
-//! `aipl-codegen` shows it directly). Until that is understood the row is left
-//! out rather than guessed at — it costs the `sep` branch of a producer like
-//! `group_styles`, and nothing else.
+//! That last row is the one that found a real bug rather than causing one, and
+//! it is worth naming because the symptom pointed away from the cause. It
+//! over-released a live block — a refcount reaching zero under a binding that
+//! still named it — but only for a *generic* producer, and only with
+//! [`crate::appending_variants`] enabled. Neither is the condition it looks
+//! like: what the row actually did was make the minted `$into` variant small
+//! enough for `inline_small` to fold into its caller, and an inlined `mut self`
+//! method binds its receiver `mut` in the caller. Codegen then read that
+//! binding's initializer — an owned parameter — as a transfer whose own drop was
+//! suppressed, which is true of an owned *value* parameter and false of an owned
+//! `mut` **receiver**, whose reference is released by the slot the entry tracks.
+//! Two slots owned one reference and the second release freed it. The fix is in
+//! codegen (`owned_move` in the `LetMut` lowering); nothing here changed, and
+//! `optimizations/fold_extends_value_or` is the case that holds it.
 //!
 //! Every rewrite leaves `extend`s of smaller sources, and the pass re-folds its
 //! own output, so one `extend` walks as deep as the shapes go. Where it stops is
@@ -77,7 +82,9 @@
 //! per iteration where doubling did not. So the rows here end in `push` or in an
 //! `extend` of something smaller, and nothing reserves.
 
-use aipl_syntax::ast::{Callee, Expr, ExprKind, Function, Item, MatchArm, Param, Program, Type};
+use aipl_syntax::ast::{
+    Callee, Expr, ExprKind, Function, Item, MatchArm, Param, Pattern, Program, Type,
+};
 
 use crate::fuse::loop_fusions::apply;
 use crate::passes::Scope;
@@ -396,6 +403,32 @@ fn appends(v: &str, src: &Expr, arrays: &ArrayReceivers) -> Option<Expr> {
             // A loop's own value is an `i64`, so it is sequenced to unit.
             Some(seq(walk, unit()))
         }
+        // `opt.map(f).value_or([])` — the default is what says the result is a
+        // sequence, and the `map` is reached *through* so that `f`'s result is
+        // appended where it is produced.
+        ExprKind::Call(Callee::ValueOr, args, _) => {
+            let [mapped, default] = args.as_slice() else {
+                return None;
+            };
+            if !arrays.is_empty_sequence(default) {
+                return None;
+            }
+            let ExprKind::Call(Callee::Map, map_args, _) = &mapped.kind else {
+                return None;
+            };
+            let [opt, f] = map_args.as_slice() else {
+                return None;
+            };
+            let bound = format!("$ext{}_v", crate::next_inline_id());
+            let piece = apply(f, Expr::new(ExprKind::Ident(bound.clone()), span()))?;
+            Some(like(ExprKind::Match(
+                Box::new(opt.clone()),
+                vec![
+                    arm("some", vec![bound], extend(&piece), span()),
+                    arm("none", Vec::new(), unit(), span()),
+                ],
+            )))
+        }
         // `if`/`match`/`if let` — append in each branch instead of producing a
         // sequence from it. These are what let the rest of the table reach
         // anything: a function that assembles a sequence assembles it per
@@ -444,6 +477,19 @@ fn appends(v: &str, src: &Expr, arrays: &ArrayReceivers) -> Option<Expr> {
             Box::new(extend(body)),
         ))),
         _ => None,
+    }
+}
+
+/// One `some(..)`/`none`-shaped arm.
+fn arm(name: &str, bindings: Vec<String>, body: Expr, span: aipl_syntax::Span) -> MatchArm {
+    MatchArm {
+        pattern: Pattern::Ctor {
+            name: name.to_string(),
+            bindings,
+            ignore_payload: false,
+        },
+        body,
+        span,
     }
 }
 

@@ -85,15 +85,15 @@ e4
 10 2
 3 4
 --- performance ---
-allocations: 29
-deallocations: 29
-reallocations: 7
-bytes allocated: 1450
-instructions executed: 1354
-binary size: 8224
-  code: 4616
+allocations: 28
+deallocations: 28
+reallocations: 8
+bytes allocated: 1386
+instructions executed: 1125
+binary size: 6872
+  code: 3664
   data: 225
-  metadata: 3383
+  metadata: 2983
 functions:
   __to_str_i64:
     calls: 4
@@ -102,16 +102,16 @@ functions:
     calls: 5
     bytes: 204
   aipl_arr_extend:
-    calls: 12
+    calls: 9
     bytes: (external)
   aipl_arr_inc:
-    calls: 20
+    calls: 8
     bytes: (external)
   aipl_arr_reserve:
-    calls: 14
+    calls: 10
     bytes: (external)
   aipl_array_dec:
-    calls: 41
+    calls: 25
     bytes: (external)
   aipl_array_new:
     calls: 6
@@ -142,4 +142,4 @@ functions:
     bytes: 2316
   mapped:
     calls: 2
-    bytes: 1644
+    bytes: 692

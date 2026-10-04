@@ -4936,15 +4936,15 @@ fn why(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1569262
-deallocations: 1569262
-reallocations: 290458
-bytes allocated: 278713130
-instructions executed: 554176215
-binary size: 6958888
-  code: 4607160
+allocations: 1605218
+deallocations: 1605218
+reallocations: 308234
+bytes allocated: 333097994
+instructions executed: 554845239
+binary size: 6951824
+  code: 4602888
   data: 58740
-  metadata: 2292988
+  metadata: 2290196
 functions:
   __arr_drop___m11__ModeFrame:
     calls: 537
@@ -5001,7 +5001,7 @@ functions:
     calls: 23
     bytes: 116
   __arr_drop___m7__ListStyle:
-    calls: 1212
+    calls: 37168
     bytes: 120
   __arr_drop___m7__Prec:
     calls: 365
@@ -5100,7 +5100,7 @@ functions:
     calls: 31
     bytes: 116
   __arr_retain___m7__ListStyle:
-    calls: 21412
+    calls: 58176
     bytes: 120
   __arr_retain___m7__Prec:
     calls: 0
@@ -5242,12 +5242,6 @@ functions:
     bytes: 44
   __builtin_map_join$__m4__Pat$str$lam$__m4__nested_bindings$tail:
     calls: 8
-    bytes: 1072
-  __builtin_map_join$__m7__Rule$__m23__AiplTok$__m7__ListStyle$lam$__m7__group_styles$__m23__AiplTok:
-    calls: 0
-    bytes: 44
-  __builtin_map_join$__m7__Rule$__m23__AiplTok$__m7__ListStyle$lam$__m7__group_styles$__m23__AiplTok$tail:
-    calls: 404
     bytes: 1072
   __builtin_map_join$__m8__Cst$__builtin_Span$lam$__m8__leaves:
     calls: 0
@@ -5699,15 +5693,9 @@ functions:
   __m7__desugar_rule$__m23__AiplTok:
     calls: 372488
     bytes: 12048
-  __m7__group_styles$__m23__AiplTok:
-    calls: 0
-    bytes: 32
-  __m7__group_styles$__m23__AiplTok$tail:
-    calls: 16564
-    bytes: 3112
   __m7__group_styles$into$__m23__AiplTok$own0:
-    calls: 355924
-    bytes: 2264
+    calls: 372488
+    bytes: 2404
   __m7__group_styles$len$__m23__AiplTok:
     calls: 0
     bytes: 32
@@ -5726,9 +5714,6 @@ functions:
   __m7__link_rules$__m23__AiplTok:
     calls: 69892
     bytes: 588
-  __m7__opt_group_styles$__m23__AiplTok:
-    calls: 32724
-    bytes: 152
   __m7__prod_names$__m23__AiplTok$__m1__Ast:
     calls: 769
     bytes: 7944
@@ -5922,13 +5907,13 @@ functions:
     calls: 362
     bytes: (external)
   aipl_arr_extend:
-    calls: 53390
+    calls: 19454
     bytes: (external)
   aipl_arr_inc:
-    calls: 3680411
+    calls: 3742627
     bytes: (external)
   aipl_arr_reserve:
-    calls: 80061
+    calls: 82485
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 16897
@@ -5940,13 +5925,13 @@ functions:
     calls: 36
     bytes: (external)
   aipl_array_dec:
-    calls: 4762839
+    calls: 4842831
     bytes: (external)
   aipl_array_new:
     calls: 82744
     bytes: (external)
   aipl_array_push:
-    calls: 176148
+    calls: 176552
     bytes: (external)
   aipl_array_push_mut:
     calls: 771960
@@ -5976,13 +5961,13 @@ functions:
     calls: 1154511
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 6345551
+    calls: 6328987
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 348139
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 5191040
+    calls: 5174476
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 348139

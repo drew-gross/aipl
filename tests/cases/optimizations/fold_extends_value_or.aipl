@@ -1,0 +1,206 @@
+# The extend folder's `opt.map(f).value_or([])` row: the default is what says
+# the result is a sequence, the `map` is reached *through*, and `f`'s result is
+# appended where it is produced.
+#
+# ```text
+# set v.extend(opt.map(f).value_or([]));  →  match (opt) { some(x) => set v.extend(f(x)), none => () }
+# ```
+#
+# It has its own file because it is the row that found a codegen bug, and the
+# conditions were nothing like what the symptom suggested. The fold itself is
+# local and obviously correct; what it *also* did was shrink the `$into` variant
+# `aipl_mono::appending_variants` mints for the producer until `inline_small`
+# would fold it into its caller. An inlined `mut self` method binds its receiver
+# `mut` in the caller, and codegen read that binding's initializer — an owned
+# parameter — as a transfer whose own drop was suppressed. True of an owned
+# *value* parameter; false of an owned `mut` **receiver**, whose reference is
+# released by the slot the entry tracks. Two slots owned one reference, and the
+# second release freed a block still named — a wrong length, then a crash.
+#
+# So the shapes below are the ones that say so, and they are specific: the
+# producer is **generic**, its payload is **boxed** (a recursive variant, so the
+# optional's payload is refcounted), and the two producers are **mutually
+# recursive**, which is what makes both of their minted variants own their
+# receivers at once. Drop any one of the three and the fold compiled correctly
+# while never reaching the path.
+#
+# Each case prints the receiver's whole *contents* rather than its length: a
+# mis-accounted reference reads back as a plausible-looking array, and a count
+# was exactly what made the first failure look like an arithmetic bug.
+
+import { extend, join, map, print, value_or, wrapping_add as + } from builtins;
+
+variant Rule<K: variant> = Then(Rule<K>[]) | Many(Rule<K>, Rule<K>?) | Leaf(Case<K>)
+
+variant Tok = A | B
+
+fn styles<K: variant>(r: Rule<K>) -> i64[] {
+    match (r) {
+        Then(rs) => rs.map(styles).join(),
+        Many(sub, sep) => [1, ..styles(sub), ..opt_styles(sep)],
+        Leaf(..) => [2],
+    }
+}
+
+# The row under test, and half of a mutually recursive pair with `styles`.
+fn opt_styles<K: variant>(r: Rule<K>?) -> i64[] { r.map(styles).value_or([]) }
+
+fn gather<K: variant>(r: Rule<K>) -> i64[] {
+    mut v: i64[] = [];
+    set v.extend(styles(r));
+    v
+}
+
+# The same row where the optional is empty, so the `none` arm is what runs and
+# `f` is never called.
+fn gather_two<K: variant>(rs: Rule<K>[]) -> i64[] {
+    mut v: i64[] = [];
+    for (let r : rs) {
+        set v.extend(styles(r));
+    }
+    v
+}
+
+# Non-boxed, non-generic, non-recursive: the row on its own, with nothing
+# refcounted in the optional at all.
+fn pair(n: i64) -> i64[] { [n, n + 1] }
+
+fn plain(o: i64?) -> i64[] {
+    mut v: i64[] = [9];
+    set v.extend(o.map(pair).value_or([]));
+    v
+}
+
+# Purity is not required of the mapping function — the fold moves where the
+# elements land, not when `f` runs — so a printing `f` prints exactly once per
+# element it would have produced, and not at all on the `none` arm.
+fn loud(n: i64) !prints -> i64[] {
+    print(`f{n}`);
+    [n]
+}
+
+fn effects(o: i64?) !prints -> i64[] {
+    mut v: i64[] = [];
+    set v.extend(o.map(loud).value_or([]));
+    v
+}
+
+fn main() !prints {
+    let leaf: Rule<Tok> = Leaf(A);
+
+    // `Leaf` alone: the recursion never reaches the row.
+    print(`{gather(leaf)}`);
+
+    // `some` payload, one level: `[1, ..styles(leaf), ..opt_styles(some(leaf))]`.
+    print(`{gather(Many(leaf, some(leaf)))}`);
+
+    // `none` payload: the row's other arm, under the same minted variant.
+    print(`{gather(Many(leaf, none))}`);
+
+    // Two levels, so a minted variant appends into a receiver another level of
+    // itself has already grown.
+    print(`{gather(Many(Many(leaf, some(leaf)), none))}`);
+
+    // Reached through `map(..).join()`, which is its own folder row, so the
+    // `value_or` row runs inside a loop body appending to the same receiver.
+    print(`{gather(Then([Many(leaf, none), leaf]))}`);
+
+    // The receiver crosses the loop *and* the recursion.
+    print(`{gather_two([Many(leaf, some(leaf)), leaf])}`);
+
+    print(`{plain(some(3))} {plain(none)}`);
+
+    print(`{effects(some(7))}`);
+    print(`{effects(none)}`);
+}
+--- stdout ---
+[2]
+[1, 2, 2]
+[1, 2]
+[1, 1, 2, 2]
+[1, 2, 2]
+[1, 2, 2, 2]
+[9, 3, 4] [9]
+f7
+[7]
+[]
+--- performance ---
+allocations: 35
+deallocations: 35
+reallocations: 11
+bytes allocated: 1597
+instructions executed: 5138
+binary size: 11648
+  code: 6648
+  data: 139
+  metadata: 4861
+functions:
+  __arr_drop_Rule$Tok:
+    calls: 2
+    bytes: 116
+  __arr_retain_Rule$Tok:
+    calls: 0
+    bytes: 116
+  __rec_drop_Rule$Tok:
+    calls: 8
+    bytes: 124
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  __to_str_i64$arr:
+    calls: 10
+    bytes: 708
+  aipl_arr_inc:
+    calls: 35
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 3
+    bytes: (external)
+  aipl_array_dec:
+    calls: 76
+    bytes: (external)
+  aipl_array_new:
+    calls: 2
+    bytes: (external)
+  aipl_array_push:
+    calls: 8
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 20
+    bytes: (external)
+  aipl_i64_len:
+    calls: 46
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 8
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 29
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 9
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 21
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 9
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 33
+    bytes: (external)
+  aipl_write_i64:
+    calls: 23
+    bytes: (external)
+  effects:
+    calls: 2
+    bytes: 356
+  main:
+    calls: 1
+    bytes: 3960
+  plain:
+    calls: 2
+    bytes: 208
+  styles$into$Tok$own0:
+    calls: 18
+    bytes: 856
