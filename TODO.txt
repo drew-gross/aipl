@@ -89,7 +89,6 @@ misc cleanup:
   prevent untyped expressions from even getting to mono by using a separate type that can't contain them
   move inlining after type checking so that the type refinement problems don't happen
   optimizations don't need internal fixpointing, since we now have pass manager. inline_small probably needs a guard against inline itself if recursive and small though.
-  figure out why vscode thinks TODO.txt is indented with tabs
   go through and remove all comments that talk about how the code used to work.
   Symbol and Import should use SpanStr
   Tpl and Tok should not be abbreviated
@@ -690,11 +689,9 @@ vscode:
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 
 handoff:
-  compiler_aipl_files_are_tested_and_pass_check has become super slow, and seems like it should be redundant? Don't we already `check` every aipl elsewhere?
   add what JS verification we can to handoff
   make handoff compile and install the vscode extension
   fix cargo doc --workspace
-  figure out why listing takes so long in nextest
   instead of having unfillable(), we should have fillable() since we have better control over the test output and can thus influence fillable() better
   should be able to regenerate syntax highlighter
   display the number of test excluded from handoff

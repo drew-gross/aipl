@@ -576,13 +576,22 @@ The compiler dogfoods AIPL via the FFI: some `.aipl` files under `crates/*/src/`
 are JIT-compiled and called during compilation (e.g.
 `crates/aipl-codegen/src/add.aipl`). Every such function must be well-tested —
 attach `.test({ assert(...) })` blocks covering its real behavior (including the
-shapes the compiler actually calls it with). These tests run via `aipl check`,
-and the `compiler_aipl_files_are_tested_and_pass_check` test in `tests/ffi.rs`
-discovers every `.aipl` under `crates/`, requires each to carry a `.test` block,
-and runs one `aipl check crates` over the whole directory — so an untested or
-failing compiler-FFI function fails the suite. Re-run that check by hand with
-`cargo run -q -- check crates`, or narrow it to one file with
-`cargo run -q -- check <file.aipl>`.
+shapes the compiler actually calls it with). Two tests enforce it, and the split
+matters because one of them used to do both and cost two minutes:
+
+- **That the blocks exist** is `compiler_aipl_files_are_tested` (`tests/ffi.rs`),
+  which discovers every `.aipl` under `crates/` and requires each to carry a
+  `.test` block. Nothing else checks that, and it is pure file reads.
+- **That they pass** is the per-case run. Every `.aipl` under `crates/` is
+  already discovered as a case, and a case whose source holds `.test` spawns
+  `aipl check` on that file and requires success — so a failing compiler-FFI
+  function fails its own named case (`cases_aipl_codegen_src_<file>`) in under a
+  second, rather than somewhere inside a whole-directory batch.
+
+So don't re-add an `aipl check crates` to the suite: it re-ran all of them
+serially for an answer the cases had already given. By hand it is still the
+quickest way to check the whole directory at once — `cargo run -q -- check
+crates`, or one file with `cargo run -q -- check <file.aipl>`.
 
 ## No native fallbacks for dogfooded functions
 A dogfooded AIPL function is the **single source of truth** — never write a

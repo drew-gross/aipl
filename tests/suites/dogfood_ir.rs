@@ -257,8 +257,8 @@ fn blame_dogfood_failure(errs: Vec<aipl::Error>) -> ! {
     if unattributed > 0 || repro.is_empty() {
         // Not attributable to one of this artifact's files — the root source, or
         // an AIPL-implemented builtin in another crate. `check crates` is the
-        // same sweep `compiler_aipl_files_are_tested_and_pass_check` runs, so it
-        // reaches both.
+        // whole-directory sweep, so it reaches both; the suite itself checks
+        // these one file at a time, as the case each one is.
         repro.push(format!(
             "    {}   # {unattributed} error(s) named no file of this artifact",
             check_cmd("crates"),

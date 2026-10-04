@@ -63,8 +63,9 @@ Rules that bite:
 
 ### The `.test` block is not optional
 
-`compiler_aipl_files_are_tested_and_pass_check` (tests/suites/ffi.rs) fails any `.aipl`
-under `crates/` with no `.test`. Cover, at minimum: the ordinary case; the
+`compiler_aipl_files_are_tested` (tests/suites/ffi.rs) fails any `.aipl` under
+`crates/` with no `.test`, and the case each one is (`cases_aipl_mono_src_builtin_<name>`)
+fails if the block does not pass. Cover, at minimum: the ordinary case; the
 not-found / empty case (a *typed* empty is `[1, 2].filter(|x| x > 100)`); the
 short-circuit or ordering guarantee the doc claims (first-vs-last match); the
 free-call form; a non-i64 element type (`char`, `str`) and a `str` receiver if it

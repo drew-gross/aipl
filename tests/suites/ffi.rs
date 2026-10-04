@@ -3,7 +3,6 @@
 
 use aipl::Engine;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 #[test]
 fn calls_a_scalar_function() {
@@ -1229,11 +1228,26 @@ fn collect_aipl(dir: &Path, out: &mut Vec<PathBuf>) {
     out.extend(found.into_iter().map(PathBuf::from));
 }
 
-/// Every `.aipl` file embedded in a compiler crate (used via the FFI) must be
-/// well-tested and pass `aipl check`. This enforces the CLAUDE.md rule: each
-/// such file carries `.test` blocks, and they all pass.
+/// Every `.aipl` file embedded in a compiler crate (used via the FFI) must carry
+/// `.test` blocks — the CLAUDE.md rule that an AIPL function the compiler calls
+/// is tested like any other.
+///
+/// Only the *presence* of the blocks, which is the one thing nothing else
+/// checks. Whether they **pass** is checked once per file, by the case each
+/// `crates/**/*.aipl` already is: `collect_all_cases` discovers them with this
+/// same `find_files` walk, and a case whose source holds `.test` spawns
+/// `aipl check` on it and requires success (see `tests/cases.rs`). This test
+/// used to re-run all of them as one `aipl check crates`, which cost **123
+/// seconds** — a serial long pole the runner cannot parallelize away, for an
+/// answer the per-case tests had already given. Breaking an assert in
+/// `trim_prefix.aipl` fails `cases_aipl_codegen_src_trim_prefix` in under a
+/// second, naming the file and line.
+///
+/// Formatting is covered too, and also not here: `all_aipl_files_stay_formatted`
+/// enforces canonical format over `crates/` among its roots, which is the other
+/// half of what `aipl check` over a directory reports.
 #[test]
-fn compiler_aipl_files_are_tested_and_pass_check() {
+fn compiler_aipl_files_are_tested() {
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("crates");
     let mut files = Vec::new();
     collect_aipl(&crates, &mut files);
@@ -1250,24 +1264,6 @@ fn compiler_aipl_files_are_tested_and_pass_check() {
             f.display()
         );
     }
-    // One `aipl check` over the whole directory rather than one spawn per file:
-    // the dogfood engine links once for the batch instead of ~40 times, and
-    // `check` reports every failing file rather than stopping at the first.
-    // Batch failures name their file, so the report still locates the problem.
-    let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
-        .arg("check")
-        .arg(&crates)
-        .output()
-        .expect("spawn aipl check");
-    assert!(
-        out.status.success(),
-        "`aipl check {}` failed — re-run it with:\n    \
-         cargo run -q -- check crates\n\nor check a single file with:\n    \
-         cargo run -q -- check crates/<crate>/src/<file>.aipl\n\n{}{}",
-        crates.display(),
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr),
-    );
 }
 
 #[test]
