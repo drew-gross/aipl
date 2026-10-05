@@ -8,6 +8,8 @@
 //!
 //! Consequence: test names are module-qualified — `fmt::format_corpus`, not
 //! `format_corpus`. Filter a single suite with `cargo test --test compiler -- fmt::`.
+#[path = "suites/build_cmd.rs"]
+mod build_cmd;
 #[path = "suites/check.rs"]
 mod check;
 #[path = "suites/codegen.rs"]

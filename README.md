@@ -158,10 +158,14 @@ Two things make it convenient, and one makes that safe:
   error, because the call is rewritten before any name could shadow it.
 - **No effect.** It is the only call that prints without one, so dropping a
   trace into a function never makes you restate its signature or its callers'.
-- **`aipl check` refuses it.** A file that still calls `trace` — or that imports
-  one that does — fails `check`, *after* its tests have run, so a trace a test
-  hit has already printed by the time the diagnostic explains itself. That is
-  what keeps the effect-free print from being a hole in the effect system.
+- **`check` and `build` refuse it.** A file that still calls `trace` — or that
+  imports one that does — fails both. `check` reports it *after* its tests have
+  run, so a trace a test hit has already printed by the time the diagnostic
+  explains itself; `build` reports it before writing the executable, so a refused
+  build leaves nothing behind. `run` deliberately allows it: watching a program
+  run is the case `trace` exists for. Between them, a trace can never reach
+  anything you keep — which is what keeps the effect-free print from being a hole
+  in the effect system.
 
 Because it carries no effect, the optimizer is free to treat a trace as
 removable: a call sunk into a branch that isn't taken does not print. That is

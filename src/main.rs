@@ -278,7 +278,7 @@ fn check_file(
 ) -> Result<Checked, String> {
     let render = |e| render_err_at(file, label, e);
     let program = loader::load_program_rooted(file, project_root, dbg).map_err(render)?;
-    let traces = aipl::trace_diagnostics(&program);
+    let traces = aipl::trace_diagnostics(&program, "check");
     let test_program = aipl::codegen::build_test_program(&program);
     // `__test_main` runs each test and returns the exit code (0 ok, 1 failures),
     // printing failures itself. (Runs on `main`'s large-stack worker thread,
@@ -751,6 +751,15 @@ fn build_cmd(args: &[String]) -> Result<(), String> {
     let program = loader::load_program(src_path, dbg).map_err(|e| render_err(file, e))?;
     let comp =
         ObjectCompilation::new(&program, stem, dbg, false).map_err(|e| render_err(file, e))?;
+    // After the compile, so a genuine error is what a broken program hears about,
+    // and before anything is written, so a refused build leaves no executable
+    // behind. `trace` is for watching a program run (`aipl run`), and a binary
+    // that outlives that is exactly what it must not reach — which is what lets it
+    // print without declaring an effect. See `trace_diagnostics`.
+    let traces = aipl::trace_diagnostics(&program, "build");
+    if !traces.is_empty() {
+        return Err(render_err(file, traces));
+    }
     let obj_bytes = comp.emit().map_err(|e| e.to_string())?;
     binary::link(&obj_bytes, &output).map_err(|e| e.to_string())?;
     println!("wrote {}", output.display());

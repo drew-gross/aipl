@@ -570,11 +570,16 @@ so it wraps a subexpression without restructuring anything around it
 only call that prints without one — which is what makes it reachable the moment
 you want it.
 
-**`aipl check` fails on any file that still calls it, or that imports one that
-does** — reported after the tests run, so a trace a test hit has printed before
-the diagnostic appears. So a trace is fine in the dev loop and is never a thing
-to leave behind: `cargo handoff` will not go green while one remains, and that is
-the gate working, not a problem to route around.
+**`aipl check` and `aipl build` both fail on any file that still calls it, or
+that imports one that does.** `check` reports it after the tests run, so a trace a
+test hit has printed before the diagnostic appears; `build` reports it before
+writing the executable, and after the compile, so a program broken for a real
+reason hears about that instead. `aipl run` allows it — watching a program run is
+what `trace` is for.
+
+So a trace is fine in the dev loop and is never a thing to leave behind:
+`cargo handoff` will not go green while one remains, and that is the gate working,
+not a problem to route around.
 
 Two consequences worth knowing:
 
@@ -605,8 +610,9 @@ in for the filename the parser could not know. They now read
 
 The line and text come from **one** dogfooded formatter, `source_loc`
 (`crates/aipl-codegen/src/source_loc.aipl`); the loader prefixes the file name,
-which is why the file is not one of its parameters. `check`'s half of `trace` is
-`aipl_syntax::trace_diagnostics`.
+which is why the file is not one of its parameters. The refusal half of `trace` is
+`aipl_syntax::trace_diagnostics`, which takes the command doing the refusing so
+`check` and `build` each name themselves.
 
 **Renaming or re-arity-ing a hook like this one costs a bootstrap round.**
 Regenerating the artifact parses the compiler's own sources, which bake asserts,

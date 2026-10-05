@@ -2615,14 +2615,22 @@ pub fn mangled_file_index(name: &str) -> Option<u32> {
 /// the file it was written in.
 ///
 /// `trace` prints without declaring an effect, which is what makes it usable
-/// mid-debugging and what makes it unacceptable in checked-in code — so `aipl
-/// check` runs a file's tests and *then* fails on whatever this returns. Running
-/// first is the point: a trace hit by a test has already printed by the time
-/// its diagnostic appears.
+/// mid-debugging and what makes it unacceptable in anything kept. The two
+/// commands that produce something to keep refuse it, and `command` is which one
+/// is asking:
+///
+/// - `aipl check` runs a file's tests and *then* fails on this. Running first is
+///   the point: a trace hit by a test has already printed by the time its
+///   diagnostic appears.
+/// - `aipl build` refuses before writing the executable, since a trace in a
+///   linked binary is the thing this is all meant to prevent.
+///
+/// `aipl run` deliberately does **not** — running a program to watch what it does
+/// is the case `trace` exists for.
 ///
 /// Spans point at the traced expression, not the whole call, so the caret
 /// underlines what was being printed.
-pub fn trace_diagnostics(program: &ast::Program) -> Vec<Error> {
+pub fn trace_diagnostics(program: &ast::Program, command: &str) -> Vec<Error> {
     let mut out = Vec::new();
     for item in &program.items {
         let ast::Item::Fn(f) = item else { continue };
@@ -2630,8 +2638,10 @@ pub fn trace_diagnostics(program: &ast::Program) -> Vec<Error> {
             each_subexpr(body, &mut |e| {
                 if matches!(&e.kind, ast::ExprKind::Call(c, _, _) if *c == ast::Callee::Trace) {
                     let e = Error::at(
-                        "`trace(..)` prints for debugging and declares no effect, so `check` \
-                         refuses a program that still contains one; remove it",
+                        format!(
+                            "`trace(..)` prints for debugging and declares no effect, so \
+                             `{command}` refuses a program that still contains one; remove it"
+                        ),
                         e.span.clone(),
                     );
                     out.push(attribute_to_file(e, &f.name.text, &program.sources));
