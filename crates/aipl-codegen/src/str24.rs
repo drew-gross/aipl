@@ -296,6 +296,44 @@ pub(crate) fn buffer_meta(len: usize) -> u64 {
     meta(len, TAG_BUFFER)
 }
 
+/// A value holding `bytes` that the **host** owns for the length of one FFI call:
+/// inline when it fits, otherwise a buffer whose refcount is [`STATIC_REFCOUNT`].
+///
+/// The static refcount is the point. An AIPL function's `str` parameter is
+/// compiled for one of three ownership protocols — moved in and released by the
+/// callee (`owned`), retained by the caller and released by the callee, or touched
+/// by neither (`inspect_only`) — and which one it got is a property of the body
+/// that the host has no business tracking. A static refcount makes every retain
+/// and release inside the callee a no-op, so all three protocols leave the value
+/// exactly as the host handed it over, and the host frees it itself with
+/// [`free_host_buffer`]. That is how an array argument has always worked
+/// (`ArgBufs::array_block` sets the same refcount), and how a `str` argument
+/// worked under the 8-byte representation.
+///
+/// Getting this wrong is a double free rather than a leak: a callee that consumed
+/// the value would free the host's only reference, and the host would then free
+/// it again.
+pub(crate) fn host_buffer(bytes: &[u8]) -> Str {
+    if bytes.len() <= INLINE_CAP {
+        return from_bytes_inline(bytes);
+    }
+    let s = with_capacity(bytes.len(), bytes);
+    unsafe { *refcount_of(s.w0 as *const u8) = STATIC_REFCOUNT };
+    s
+}
+
+/// Free a [`host_buffer`]. An inline value owns nothing, so this is a no-op for
+/// one; a buffer is freed outright, since its static refcount means no release
+/// inside the callee ever counted down.
+///
+/// SAFETY: `value` must have come from [`host_buffer`] and must not be freed
+/// twice.
+pub(crate) unsafe fn free_host_buffer(value: Str) {
+    if value.tag() == TAG_BUFFER && value.w0 != 0 {
+        unsafe { free_buffer(value.w0 as *const u8) }
+    }
+}
+
 /// Build a value holding `bytes`: inline when it fits, otherwise a fresh buffer
 /// (refcount 1) with no spare capacity.
 pub(crate) fn from_bytes(bytes: &[u8]) -> Str {
@@ -1817,6 +1855,54 @@ mod tests {
             packed.release();
             src.release();
         }
+    }
+
+    /// A host-owned argument buffer survives whatever the callee's parameter
+    /// protocol does to it. This is the invariant behind the FFI's ownership of a
+    /// `str` argument: a callee compiled to *consume* the parameter releases it,
+    /// and if that release could reach zero it would free the host's only
+    /// reference — leaving `ArgBufs::drop` to free it a second time.
+    #[test]
+    fn a_host_buffer_ignores_every_retain_and_release() {
+        let long = b"a string well past the inline capacity";
+        let s = host_buffer(long);
+        assert_eq!(
+            s.tag(),
+            TAG_BUFFER,
+            "past the capacity, so a real allocation"
+        );
+        let rc = || unsafe { *refcount_of(s.w0 as *const u8) };
+        assert_eq!(rc(), STATIC_REFCOUNT);
+
+        // What a consuming (`owned`) parameter does: release without a retain. Twice
+        // over, since a tail-call chain can pass it on and release again.
+        s.release();
+        s.release();
+        assert_eq!(
+            rc(),
+            STATIC_REFCOUNT,
+            "a release must not count a host buffer down"
+        );
+        // What a borrowing parameter does: the caller's retain, the callee's release.
+        s.retain();
+        s.release();
+        assert_eq!(rc(), STATIC_REFCOUNT);
+        // Still readable: none of that freed it.
+        assert_eq!(text(s), "a string well past the inline capacity");
+        unsafe { free_host_buffer(s) };
+    }
+
+    /// Content that fits inline owns no allocation at all, so there is nothing for
+    /// the host to free and nothing a callee could release.
+    #[test]
+    fn a_short_host_buffer_is_inline_and_owns_nothing() {
+        let s = host_buffer(b"hi");
+        assert_eq!(s.tag(), TAG_INLINE);
+        assert!(s.owner().is_null());
+        s.release();
+        s.retain();
+        assert_eq!(text(s), "hi");
+        unsafe { free_host_buffer(s) }; // no-op
     }
 
     #[test]

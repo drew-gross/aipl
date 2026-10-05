@@ -5954,8 +5954,8 @@ enum ArgBuf {
 struct ArgBufs(Vec<ArgBuf>);
 
 impl ArgBufs {
-    /// A wide (24-byte) `str` argument written into a caller buffer: its own
-    /// allocation has to outlive the call, so the release is deferred to here.
+    /// A wide (24-byte) `str` argument written into a caller buffer: the host owns
+    /// its allocation for the length of the call, so the free is deferred to here.
     fn wide_str(&mut self, value: str24::Str) {
         self.0.push(ArgBuf::WideStr(value));
     }
@@ -6021,9 +6021,10 @@ impl Drop for ArgBufs {
                 },
                 // Freed by the `Vec`'s own drop.
                 ArgBuf::Composite(_) => {}
-                // The callee borrowed the value; releasing here is what balances
-                // the allocation `write_ffi_arg` made for it.
-                ArgBuf::WideStr(value) => value.release(),
+                // The host owns this one outright — `str24::host_buffer` gave it a
+                // static refcount so nothing inside the callee could have counted
+                // it down — so free it rather than releasing it.
+                ArgBuf::WideStr(value) => unsafe { str24::free_host_buffer(*value) },
             }
         }
     }
@@ -6267,7 +6268,10 @@ unsafe fn write_ffi_arg(
             FfiValue::Array(elems) if is_char_array(ty) => chars_to_utf8(elems)?,
             _ => return Err(mismatch(ty, v)),
         };
-        let value = str24::from_bytes(text.as_bytes());
+        // `host_buffer`, not `from_bytes`: the host keeps ownership for the length
+        // of the call, and a static refcount is what makes that true whichever
+        // ownership protocol the callee's parameter was compiled for.
+        let value = str24::host_buffer(text.as_bytes());
         unsafe { core::ptr::write(dst as *mut str24::Str, value) };
         bufs.wide_str(value);
         return Ok(());

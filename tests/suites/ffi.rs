@@ -90,17 +90,19 @@ pub fn common_space_prefix(a: str, b: str) -> i64 { go(a, b, 0) }";
         .unwrap(),
         Int(2)
     );
-    // Longer leading-space runs. NOTE: these are still *inline* — at 22 bytes of
-    // inline room every value in this test is, so the buffer argument path is not
-    // covered here. Lengthening them past 22 to cover it reproduces a crash; see
-    // `call_values_marshals_str_return` for the write-up.
+    // Past the 22-byte inline capacity, so these are *buffer* arguments — the path
+    // where the host's ownership of an argument it allocated actually matters. An
+    // inline value owns nothing, so a shorter run exercises none of it.
     assert_eq!(
         e.call_values(
             "common_space_prefix",
-            &[Str("          a".into()), Str("        b".into())]
+            &[
+                Str("                         a".into()),
+                Str("                        b".into())
+            ]
         )
         .unwrap(),
-        Int(8)
+        Int(24)
     );
     // A tab vs a space shares no leading-space prefix.
     assert_eq!(
@@ -115,22 +117,22 @@ pub fn common_space_prefix(a: str, b: str) -> i64 { go(a, b, 0) }";
 
 #[test]
 fn call_values_marshals_str_return() {
-    // Identity returns one of the (borrowed) argument values; concat builds a
+    // Identity hands one of the argument values straight back; concat builds a
     // fresh one. Both must round-trip and free cleanly.
     //
-    // **Every value here is inline**, and the comments used to claim otherwise
-    // ("heap arg", "> 7 bytes") against a 7-byte threshold that has since become
-    // 22. So the *buffer* path is untested: an inline argument owns no allocation,
-    // which makes `ArgBufs`' release of it a no-op and hides whether the release
-    // protocol balances at all.
+    // The long arguments below are the regression test for a double free. A `str`
+    // argument past the 22-byte inline capacity is a real allocation, and the host
+    // owns it for the length of the call — but an AIPL function's `str` parameter
+    // may have been compiled to *consume* it (`ParamInfo::owned`, which is what
+    // `go` in `call_values_marshals_str_args_with_int_return` does), in which case
+    // the callee freed the host's only reference and `ArgBufs::drop` then freed it
+    // again. `str24::host_buffer` is the fix: a static refcount, so no retain or
+    // release inside the callee can count it down, whichever protocol it got.
     //
-    // It does not. Passing any argument past 22 bytes here — e.g. a 40-byte string
-    // to `id` plus a 26-byte one to `shout` — makes this test SIGTRAP reliably,
-    // and it does so at HEAD too, so it is a latent bug and not a regression. The
-    // shape of it: a `str` result that aliases a borrowed argument is released
-    // twice, once by `read_ffi_result` under `owned` and once by `ArgBufs::drop`,
-    // and the second release lands on a freed buffer. Lengthening these strings is
-    // the right fix *after* that is addressed.
+    // These strings have to stay past 22 bytes to cover it. While every value here
+    // was inline — which they all were, under comments claiming "heap arg" and
+    // "> 7 bytes" against a threshold that had become 22 — the bug was invisible,
+    // because an inline argument owns no allocation to free twice.
     let src = "\
 import { concat as +++} from builtins;
 pub fn id(s: str) -> str { s }
@@ -145,14 +147,18 @@ pub fn shout(s: str) -> str { s +++ \" is loud!\" }";
     // A longer arg; identity's return aliases that very value, copied out before
     // it is freed.
     assert_eq!(
-        e.call_values("id", &[Str("a longer string".into())])
-            .unwrap(),
-        Str("a longer string".into())
+        e.call_values(
+            "id",
+            &[Str("a string longer than the inline capacity".into())]
+        )
+        .unwrap(),
+        Str("a string longer than the inline capacity".into())
     );
     // A freshly built return, released after the bytes are copied.
     assert_eq!(
-        e.call_values("shout", &[Str("the alarm".into())]).unwrap(),
-        Str("the alarm is loud!".into())
+        e.call_values("shout", &[Str("the alarm in the east wing".into())])
+            .unwrap(),
+        Str("the alarm in the east wing is loud!".into())
     );
     // Empty argument.
     assert_eq!(
@@ -1021,9 +1027,17 @@ pub fn why(r: i64!str) -> str {
     let e = Engine::compile(src).unwrap();
     use aipl::FfiValue::{Array, Int, Opt, Res, Str, Struct};
 
-    // A struct whose fields are a heap `str`, a nested struct, and an array.
+    // A struct whose fields are a buffer-backed `str`, a nested struct, and an
+    // array. `message` is past the 22-byte inline capacity on purpose: it used to
+    // read "a heap message" at 14 bytes, which is inline and owns no allocation at
+    // all, so the nested-`str` field was never written or freed as one. (None of
+    // these parameters *consumes* its argument, so this is the allocation path
+    // rather than the ownership one `call_values_marshals_str_return` covers.)
     let note = Struct(vec![
-        ("message".into(), Str("a heap message".into())),
+        (
+            "message".into(),
+            Str("a message past the inline capacity".into()),
+        ),
         (
             "span".into(),
             Struct(vec![("start".into(), Int(2)), ("end".into(), Int(5))]),
@@ -1032,7 +1046,7 @@ pub fn why(r: i64!str) -> str {
     ]);
     assert_eq!(
         e.call_values("note_size", &[note.clone()]).unwrap(),
-        Int(14 + 2)
+        Int(34 + 2)
     );
     assert_eq!(
         e.call_values("note_width", &[note.clone()]).unwrap(),
@@ -1040,7 +1054,7 @@ pub fn why(r: i64!str) -> str {
     );
     assert_eq!(
         e.call_values("note_text", &[note]).unwrap(),
-        Str("a heap message".into())
+        Str("a message past the inline capacity".into())
     );
 
     // Optionals: `some(struct)` / `none`, and a nested `i64??` whose tag counts
