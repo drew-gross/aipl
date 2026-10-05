@@ -89,6 +89,21 @@ pub enum Callee {
     OptRightFold,
     ZipWith,
     Trim,
+    /// The `*_str` family: the content of the argument in one **named** runtime
+    /// representation (`crates/aipl-codegen/src/str24.rs`'s `buffer` / `inline` /
+    /// `rope`), rather than whichever one it happens to arrive in.
+    ///
+    /// `PackInline` and `InlineCapacity` are the unchecked halves `inline_str`
+    /// is written from, and are [`crate::INTERNAL_BUILTINS`] — only
+    /// `builtin_inline_str.aipl` may reach them.
+    HeapStr,
+    RopeStr,
+    /// `inline_str(self: str) -> str?` — the one of the family that can fail, so
+    /// the only one written in AIPL (`builtin_inline_str.aipl`): content past the
+    /// inline capacity has no inline form, and the optional says so.
+    InlineStr,
+    PackInline,
+    InlineCapacity,
     IsAllWhitespace,
     /// `starts_with(self: T[], prefix: T*)`, with the pattern shape mono chose.
     StartsWith(SeqShape),
@@ -317,6 +332,11 @@ impl Callee {
         Callee::OptRightFold,
         Callee::ZipWith,
         Callee::Trim,
+        Callee::HeapStr,
+        Callee::RopeStr,
+        Callee::InlineStr,
+        Callee::PackInline,
+        Callee::InlineCapacity,
         Callee::IsAllWhitespace,
         Callee::StartsWith(SeqShape::Seq),
         Callee::StartsWithAt(SeqShape::Seq),
@@ -479,6 +499,11 @@ impl Callee {
             Callee::OptRightFold => "__builtin_opt_right_fold",
             Callee::ZipWith => "__builtin_zip_with",
             Callee::Trim => "__builtin_trim",
+            Callee::HeapStr => "__builtin_heap_str",
+            Callee::RopeStr => "__builtin_rope_str",
+            Callee::InlineStr => "__builtin_inline_str",
+            Callee::PackInline => "__builtin_pack_inline",
+            Callee::InlineCapacity => "__builtin_inline_capacity",
             Callee::IsAllWhitespace => "__builtin_is_all_whitespace",
             Callee::StartsWith(_) => "__builtin_starts_with",
             Callee::StartsWithAt(_) => "__builtin_starts_with_at",

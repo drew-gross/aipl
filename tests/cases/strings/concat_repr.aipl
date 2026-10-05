@@ -5,29 +5,27 @@
 # a `str` parameter. Passing a concat value to a `str` parameter also selects a
 # distinct, concat-specialized monomorphization of the callee (here `label`).
 
-import { concat as +++, equal as ==, len, print, to_str, wrapping_increment as ++ } from builtins;
+import {
+    concat as +++,
+    equal as ==,
+    len,
+    print,
+    rope_str,
+    to_str,
+    wrapping_increment as ++,
+} from builtins;
 
 fn label(s: str) -> str { "[" +++ s +++ "]" }
 
 fn main() !prints {
-    // The leaves are bound with a type annotation because `+++` on two string
-    // literals is constant-folded; the annotation is what keeps the concat a
-    // run-time one (the binding inliner substitutes an unannotated single-use
-    // binding straight back).
-    let foo: str = "foo";
-    let bar: str = "bar";
-    let g = foo +++ bar; // a concat node ("foobar")
+    let g = rope_str("foo", "bar"); // a concat node ("foobar")
     print(g); // foobar
     print(to_str(len(g))); // 6
     print(to_str(g == "foobar")); // true
     print(to_str(g == "nope")); // false
 
     // Nested: a rope of ropes.
-    let a: str = "a";
-    let b: str = "b";
-    let c: str = "c";
-    let d: str = "d";
-    let h = (a +++ b) +++ (c +++ d);
+    let h = rope_str(rope_str("a", "b"), rope_str("c", "d"));
     print(h); // abcd
 
     // Index and slice transparently materialize.
@@ -62,10 +60,10 @@ deallocations: 14
 reallocations: 0
 bytes allocated: 843
 instructions executed: 685
-binary size: 4928
-  code: 2468
+binary size: 4952
+  code: 2460
   data: 115
-  metadata: 2345
+  metadata: 2377
 functions:
   __to_str_bool:
     calls: 2
@@ -96,4 +94,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1448
+    bytes: 1440

@@ -1,7 +1,9 @@
-//! TEMPORARY spike for `STR_REPR.md`: does Cranelift give us the ABI a 24-byte
-//! `str` needs? Delete once its findings are recorded in that document.
+//! Does Cranelift give us the ABI a 24-byte `str` needs? Written as a spike
+//! before that ABI existed and kept as its regression test: the answers below are
+//! what `lower_import_sig` and the three-word `str` parameter lowering now rely
+//! on, so a Cranelift upgrade that changed one would fail here first.
 //!
-//! Four questions, in the order the plan asks them:
+//! Four questions:
 //!   1. can a Cranelift function take and return three words, and can another
 //!      Cranelift function call it (the AIPL-to-AIPL case)?
 //!   2. does that same signature lower for x86-64, not just the aarch64 host?

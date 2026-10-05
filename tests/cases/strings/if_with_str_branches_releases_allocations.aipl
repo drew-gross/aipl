@@ -1,26 +1,31 @@
-# Each branch allocates a fresh string; the merge value must hold
-# exactly one ref so the outer scope can dec safely.
+# Each branch allocates a fresh string; the merge value must hold exactly one ref
+# so the outer scope can dec safely.
+#
+# `heap_str` is what makes that true. The branches were `"left" +++ ""` and
+# `"right" +++ ""`, which allocate *nothing*: `+++` hands the other operand
+# straight back when one side is empty, so neither branch produced an owned value
+# and the case had stopped exercising the merge it is named for.
 
-import { concat as +++, equal as == } from builtins;
+import { equal as ==, heap_str } from builtins;
 
-fn pick(c: bool) -> str { if (c) { "left" +++ "" } else { "right" +++ "" } }.test({
+fn pick(c: bool) -> str { if (c) { heap_str("left") } else { heap_str("right") } }.test({
     assert(pick(true) == "left");
     assert(pick(false) == "right");
 })
 --- performance ---
-allocations: 0
-deallocations: 0
+allocations: 2
+deallocations: 2
 reallocations: 0
-bytes allocated: 0
-instructions executed: 67
-binary size: 1440
-  code: 376
-  data: 176
-  metadata: 888
+bytes allocated: 78
+instructions executed: 73
+binary size: 1656
+  code: 464
+  data: 177
+  metadata: 1015
 functions:
   __test$pick:
     calls: 1
-    bytes: 276
+    bytes: 364
   aipl_assert:
     calls: 2
     bytes: (external)

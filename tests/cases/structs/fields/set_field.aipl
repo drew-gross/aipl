@@ -1,7 +1,7 @@
 # `set p.field = value;` updates one field of a mut struct binding, leaving
 # the other fields unchanged. The old field value may appear on the right.
 
-import { concat as +++, equal as ==, wrapping_add_assign as += } from builtins;
+import { equal as ==, heap_str, wrapping_add_assign as += } from builtins;
 
 struct Point { x: i64, y: i64 }
 
@@ -52,11 +52,8 @@ fn rename(n: Named, name: str) -> Named {
     set m.name = name;
     m
 }.test({
-    // Annotated so the concat survives constant folding: two string literals fold.
-    let old: str = "old";
-    let new: str = "new";
-    let n = Named { name: old +++ "!", x: 5 };
-    let Named { name, x } = rename(n, new +++ "!");
+    let n = Named { name: heap_str("old!"), x: 5 };
+    let Named { name, x } = rename(n, heap_str("new!"));
     assert(name == "new!");
     assert(x == 5);
 })
@@ -64,12 +61,12 @@ fn rename(n: Named, name: str) -> Named {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 176
-instructions executed: 386
-binary size: 3888
-  code: 1696
+bytes allocated: 78
+instructions executed: 372
+binary size: 3840
+  code: 1644
   data: 385
-  metadata: 1807
+  metadata: 1811
 functions:
   __test$alias_unaffected:
     calls: 1
@@ -79,7 +76,7 @@ functions:
     bytes: 308
   __test$rename:
     calls: 1
-    bytes: 664
+    bytes: 612
   __test$set_n:
     calls: 1
     bytes: 240

@@ -3,16 +3,10 @@
 # walking every char allocates only the concat node (1), never a materialized
 # 18-byte buffer. The cursor itself lives on the stack (zero heap allocation).
 
-import { concat as +++, equal as ==, print, to_str, wrapping_increment as ++ } from builtins;
+import { equal as ==, print, rope_str, to_str, wrapping_increment as ++ } from builtins;
 
 fn main() !prints {
-    // The leaves are bound with a type annotation because `+++` on two string
-    // literals is constant-folded; the annotation is what keeps the concat a
-    // run-time one (the binding inliner substitutes an unannotated single-use
-    // binding straight back).
-    let head: str = "Hello, ";
-    let tail: str = "rope world!";
-    let r = head +++ tail; // 18-byte rope (two leaves)
+    let r = rope_str("Hello, ", "rope world!"); // 18-byte rope (two leaves)
     mut n = 0;
     mut last_is_bang = false;
     for (let c : r) {

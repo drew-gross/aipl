@@ -1,40 +1,35 @@
-# An empty leaf on either side of a run-time concat. `+++` on two string literals
-# is constant-folded, so the non-empty leaf is bound with a type annotation: that
-# is what keeps the concat a run-time one (the binding inliner substitutes an
-# unannotated single-use binding straight back).
+# An empty leaf on either side of a run-time `+++`. This is the one concat case
+# that cannot use `rope_str`: an empty operand is where `+++` hands the other side
+# straight back instead of building a node, which is the behaviour under test.
+# `heap_str` keeps the non-empty side a run-time value, so the `+++` is one too —
+# two string literals would be constant-folded.
 
-import { concat as +++, equal as == } from builtins;
+import { concat as +++, equal as ==, heap_str } from builtins;
 
-fn lead_empty() -> str {
-    let s: str = "lone";
-    "" +++ s
-}.test({
+fn lead_empty() -> str { "" +++ heap_str("lone") }.test({
     assert(lead_empty() == "lone");
 })
 
-fn trail_empty() -> str {
-    let s: str = "lone";
-    s +++ ""
-}.test({
+fn trail_empty() -> str { heap_str("lone") +++ "" }.test({
     assert(trail_empty() == "lone");
 })
 --- performance ---
-allocations: 0
-deallocations: 0
+allocations: 2
+deallocations: 2
 reallocations: 0
-bytes allocated: 0
-instructions executed: 102
-binary size: 1872
-  code: 628
+bytes allocated: 78
+instructions executed: 108
+binary size: 2056
+  code: 720
   data: 145
-  metadata: 1099
+  metadata: 1191
 functions:
   __test$lead_empty:
     calls: 1
-    bytes: 224
+    bytes: 276
   __test$trail_empty:
     calls: 1
-    bytes: 224
+    bytes: 264
   aipl_assert:
     calls: 2
     bytes: (external)

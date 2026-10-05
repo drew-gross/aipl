@@ -2,7 +2,7 @@
 # bounds clamp to `[0, len]`, so an out-of-range end gives a shorter string and
 # `start >= end` gives `""`.
 
-import { concat as +++, print } from builtins;
+import { heap_str, print } from builtins;
 
 fn main() !prints {
     let s = "hello, world";
@@ -13,9 +13,7 @@ fn main() !prints {
     print("hello"[3..3]); // "" (empty range)
     print("hello"[4..2]); // "" (start > end)
     print("hi"[..2]); // hi  (SSO source copies)
-    // Annotated so the concat survives constant folding: two string literals fold.
-    let ab: str = "ab";
-    print((ab +++ "cdefgh")[2..7]); // cdefg  (slice of a fresh heap string)
+    print(heap_str("abcdefgh")[2..7]); // cdefg  (slice of a fresh heap string)
 }
 --- stdout ---
 hello
@@ -27,16 +25,16 @@ el
 hi
 cdefg
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 127
-instructions executed: 118
-binary size: 1888
-  code: 884
+bytes allocated: 39
+instructions executed: 111
+binary size: 1864
+  code: 860
   data: 1
   metadata: 1003
 functions:
   main:
     calls: 1
-    bytes: 884
+    bytes: 860

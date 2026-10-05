@@ -3,7 +3,7 @@
 # flat — `{ tag, Core }` — so `Inner?` is a tag plus `Inner`'s own layout, and
 # `Inner??` is no wider than `Inner?`.
 
-import { concat as +++, equal as ==, map, not_equal as !=, value_or } from builtins;
+import { equal as ==, heap_str, map, not_equal as !=, value_or } from builtins;
 
 struct Inner { a: i64, b: str }
 
@@ -15,10 +15,9 @@ struct Holder { lead: i64, mid: Inner?, tag: Tag? = none, deep: Inner?? = none }
 fn absent(n: i64) -> Holder { lead: n, mid: none }
 
 fn present(n: i64) -> Holder {
-    // `he` is annotated so the concat survives constant folding (two string
-    // literals fold), keeping `b` a genuinely heap-allocated str.
-    let he: str = "he";
-    Holder { lead: n, mid: some(Inner { a: n, b: he +++ "re" }), tag: some(Blue(n)) }
+    lead: n,
+    mid: some(Inner { a: n, b: heap_str("here") }),
+    tag: some(Blue(n)),
 }.test({
     let p = present(7);
     let e = absent(7);
@@ -69,12 +68,12 @@ fn present(n: i64) -> Holder {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 176
-instructions executed: 1735
-binary size: 11488
-  code: 6528
+bytes allocated: 78
+instructions executed: 1721
+binary size: 11472
+  code: 6504
   data: 1260
-  metadata: 3700
+  metadata: 3708
 functions:
   __eq_Holder:
     calls: 2
@@ -114,4 +113,4 @@ functions:
     bytes: 108
   present:
     calls: 2
-    bytes: 540
+    bytes: 516

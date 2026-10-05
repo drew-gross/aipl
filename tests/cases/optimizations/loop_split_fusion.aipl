@@ -18,11 +18,11 @@
 # have to, where the unfused case has ten.
 
 import {
-    concat as +++,
     equal as ==,
     extend,
     len,
     print,
+    rope_str,
     split,
     to_str,
     wrapping_increment as ++,
@@ -90,9 +90,7 @@ fn main() !prints {
 
     // A rope source, so the cursor's walk crosses a representation it cannot
     // index directly.
-    // Annotated so the concat survives constant folding: two string literals fold.
-    let head: str = "one\ntw";
-    print(numbered(head +++ "o\nthree"));
+    print(numbered(rope_str("one\ntw", "o\nthree")));
     // Long enough that every part is a heap window rather than an inline value.
     print(widths("first long piece\nsecond long piece", "\n"));
     print(materialized("alpha\nbeta\ngamma"));
@@ -122,10 +120,10 @@ deallocations: 78
 reallocations: 0
 bytes allocated: 4692
 instructions executed: 2411
-binary size: 10072
+binary size: 10096
   code: 6220
   data: 123
-  metadata: 3729
+  metadata: 3753
 functions:
   __to_str_i64:
     calls: 9

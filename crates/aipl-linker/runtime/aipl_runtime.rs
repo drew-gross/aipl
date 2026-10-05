@@ -112,9 +112,15 @@ static INSN_COUNT: AtomicU64 = AtomicU64::new(0);
 mod builtin_calls {
     use core::sync::atomic::AtomicU64;
 
-    /// Every counted entry point, NUL-terminated for `fputs` and sorted so the
-    /// reported breakdown has a stable order. The `IDX_*` constants below index
-    /// this list; both are generated from the `pub extern "C" fn aipl_*` set.
+    /// The entry points this table has a slot for, NUL-terminated for `fputs` and
+    /// sorted so the reported breakdown has a stable order, with the `AIPL_*`
+    /// constants below indexing it.
+    ///
+    /// Maintained by hand, and *not* the set that is actually counted: a slot is
+    /// only ever bumped by a `count_builtin!` at the entry point itself, and the
+    /// `str` entry points moved into the shared `str24` module without one — which
+    /// is why `AIPL_CONCAT`, `AIPL_INC` and their neighbours read as unused, and
+    /// why no `aipl_str_*` row appears in a `--- performance ---` breakdown.
     pub const NAMES: &[&[u8]] = &[
         b"aipl_arr_drop_arr\0",
         b"aipl_arr_drop_opt_arr\0",
@@ -351,13 +357,17 @@ unsafe fn rt_free(ptr: *mut c_void) {
     unsafe { free(ptr) }
 }
 
-// STAGED (STR_REPR.md stage 1): the 24-byte `str` layout, **shared verbatim**
-// with the JIT runtime instead of mirrored by hand. This is the one piece where
-// a divergence between the two runtimes would be silent memory corruption rather
+// The 24-byte `str` layout — the live representation — **shared verbatim** with
+// the JIT runtime instead of mirrored by hand. This is the one piece where a
+// divergence between the two runtimes would be silent memory corruption rather
 // than a failing test, so it lives in one file that both compile — which is also
 // why that file is `no_std`-safe and calls `super::rt_alloc`/`super::rt_free`
 // (just above) rather than allocating for itself.
-#[allow(dead_code)] // staged: wired up by the Stage 1 switch
+//
+// `dead_code` is allowed because the file serves two hosts: a helper reached only
+// from the JIT's side is genuinely unused *here*, and the warning would be about
+// which host you are compiling rather than about the code.
+#[allow(dead_code)]
 mod str24 {
     include!("../../aipl-codegen/src/str24.rs");
 }
@@ -445,11 +455,18 @@ unsafe fn heap_len(ptr: *const u8) -> usize {
     unsafe { *(ptr.sub(STR_HEADER_SIZE) as *const i64) as usize }
 }
 
-// ---------- Small-string optimization (SSO) ----------
+// ---------- The retired 8-byte `str` value ----------
 //
-// Mirror of the JIT runtime (see crates/aipl-codegen/src/lib.rs for the full
-// description). A `str` value is either a heap/static pointer (8-byte aligned, so
-// low two bits 0) or an inline small string tagged `0b01`: byte0 = (len<<2)|1
+// **Not the live representation.** A `str` is the 24-byte value in `str24.rs`
+// (included above); everything from here to the end of the dispatch section below
+// is the 8-byte tagged pointer it replaced. It is still compiled but no longer
+// reached, which is what the dead-code warnings on `HEAP_TAG` / `INLINE_TAG` /
+// `CONCAT_TAG` and the constants around them are telling you. Kept because
+// deleting it is its own change; read it as history.
+//
+// Mirror of the JIT runtime (see crates/aipl-codegen/src/lib.rs). A `str` value
+// was either a heap/static pointer (8-byte aligned, so low two bits 0) or an
+// inline small string tagged `0b01`: byte0 = (len<<2)|1
 // with len in 0..=7, bytes 1..=7 = content. The low two bits are the repr tag:
 // 00 = heap/static, 01 = inline, 10 = view, 11 = concat. inc/dec no-op on inline;
 // consumers materialize, so correctness never depends on the "<=7 is inline"
@@ -509,13 +526,18 @@ fn concat_obj(v: *const u8) -> *mut u8 {
 
 // ---------- Representation dispatch ----------
 //
-// Mirror of the JIT runtime. Classify a `str` value with `str_repr`, then
-// `match` — prefer that over scattered `is_*` checks so adding a `StrRepr`
-// variant makes the compiler flag every site that doesn't handle it. Variants
-// that genuinely share handling may share an arm (e.g. `Null | Heap`), but spell
-// them out rather than using a bare `_`.
+// The rule outlives the representation it was written for, and the wide value
+// follows it too: classify a `str` once, then `match` — prefer that over
+// scattered `is_*` checks, so adding a representation makes the compiler flag
+// every site that doesn't handle it. Variants that genuinely share handling may
+// share an arm (e.g. `Null | Heap`), but spell them out rather than using a bare
+// `_`. CLAUDE.md states it under "Multiple runtime representations".
 
-/// The active runtime representation of a (non-poisoned) `str` value.
+/// The active representation of a (non-poisoned) 8-byte `str` value — the
+/// retired scheme. The live value's three are `TAG_BUFFER` / `TAG_INLINE` /
+/// `TAG_ROPE` in `str24.rs`; note that `View` is *not* among them, because a
+/// window into a buffer is an ordinary buffer value there (its `data` points
+/// inside its `base`), which is the simplification the wide layout bought.
 enum StrRepr {
     /// Null pointer — the empty string, no storage.
     Null,

@@ -2,7 +2,7 @@
 # retains the payload, dropping the struct releases it (the asserted
 # alloc/dealloc balance below proves ownership is threaded through the field).
 
-import { concat as +++, print, to_str } from builtins;
+import { heap_str, print, to_str } from builtins;
 
 variant Name = Anon | Named(str)
 
@@ -18,9 +18,7 @@ fn label(Person { name }) -> str {
 fn rename(Person { age }, n: str) -> Person { name: Named(n), age }
 
 fn main() !prints {
-    // Annotated so the concat survives constant folding: two string literals fold.
-    let al: str = "al";
-    let p = Person { name: Named(al +++ "ice"), age: 30 };
+    let p = Person { name: Named(heap_str("alice")), age: 30 };
     print(label(p));
     print(label(Person { name: Anon, age: 1 }));
     // Struct with a variant field round-trips through a function return.
@@ -38,10 +36,10 @@ Person { name: Named("bob"), age: 30 }
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 142
-instructions executed: 443
-binary size: 4288
-  code: 2120
+bytes allocated: 93
+instructions executed: 436
+binary size: 4264
+  code: 2096
   data: 220
   metadata: 1948
 functions:
@@ -59,4 +57,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1284
+    bytes: 1260

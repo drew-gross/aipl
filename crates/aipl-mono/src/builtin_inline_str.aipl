@@ -1,0 +1,85 @@
+# The AIPL implementation of the `inline_str` builtin. Monomorphization registers
+# this under the canonical name `__builtin_inline_str` (see `AIPL_BUILTIN_SOURCES`
+# in `lib.rs`), so a user's `s.inline_str()` resolves through the ordinary
+# machinery.
+#
+# It is the one member of the `*_str` family written in AIPL rather than as a
+# runtime entry point, because it is the one that can fail: an inline value holds
+# its content in the value's own words, so content past that capacity has no
+# inline form at all. The two halves it is built from — `pack_inline`, which packs
+# without checking, and `inline_capacity`, the bound — are internal for that
+# reason: each is only sound behind the other.
+#
+# **No lint.** The shape this replaces is a *reliance*, not a spelling: a short
+# literal is already inline, so the longhand is an ordinary literal plus a reader
+# who knows the capacity. There is no syntax to match on.
+
+import {
+    equal as ==,
+    greater_than as >,
+    heap_str,
+    inline_capacity,
+    len,
+    pack_inline,
+    rope_str,
+} from builtins;
+
+# The content of `self` packed into the value's own words — no allocation and no
+# refcount — or `none` when it is longer than an inline value can hold.
+#
+# The optional is the capacity: `heap_str` and `rope_str` answer at every length,
+# and this one cannot, so it says so rather than quietly handing back the
+# representation `self` already had. Asking for an inline value and getting a
+# buffer is the failure the whole family exists to rule out.
+pub fn inline_str(self: str) -> str? {
+    if (self.len() > inline_capacity()) { none } else { some(pack_inline(self)) }
+}.test({
+    assert(inline_str("hi") == some("hi"));
+    // Empty content is inline too — there is nothing to store.
+    assert(inline_str("") == some(""));
+    // Exactly at the capacity still fits; one byte past it has no inline form.
+    assert(inline_str("1234567890123456789012") == some("1234567890123456789012"));
+    assert(inline_str("12345678901234567890123") == none);
+
+    // Content that arrives in another representation is repacked, not copied
+    // through: a rope and a buffer both come back as the same value.
+    assert(inline_str(rope_str("abc", "def")) == some("abcdef"));
+    assert(inline_str(heap_str("abc")) == some("abc"));
+    // A string too long to be inline is still too long once it is a rope.
+    assert(inline_str(rope_str("12345678901234567890", "123")) == none);
+})
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 254
+instructions executed: 685
+binary size: 5392
+  code: 2476
+  data: 687
+  metadata: 2229
+functions:
+  __test$inline_str:
+    calls: 1
+    bytes: 1744
+  aipl_assert:
+    calls: 7
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  inline_str:
+    calls: 5
+    bytes: 312
+  inline_str$c0:
+    calls: 2
+    bytes: 312
+  main:
+    calls: 1
+    bytes: 108

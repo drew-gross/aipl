@@ -683,6 +683,14 @@ site. Reserve a plain `is_*`/`matches!` boolean only where a `match` genuinely
 doesn't fit and the advantage is clear. This pattern is meant to generalize to
 future multi-representation types, not just `str`.
 
+**A test that wants a particular representation asks for it by name.** `heap_str`,
+`rope_str` and `inline_str` each return their content in one representation, and
+they are the only correct way to pin one — `"a" +++ "b"` is *not* a way to obtain a
+rope, because constant folding joins two literals (it voided twenty-eight cases
+that relied on it, all of them still green, since only the representation changed).
+`tests/cases/strings/named_representations.aipl` is the worked example, and
+DESIGN_PRINCIPLES.md's "Just say what you want" is why the family exists.
+
 ## Test `main` style: prefer a void `main`
 When a test case's `main` exists only to drive the program (its return value
 isn't the thing under test), write a **void** `main` — `fn main() { ... }` — not

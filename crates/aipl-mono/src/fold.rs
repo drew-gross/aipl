@@ -26,11 +26,14 @@
 //! not propagate a `str` literal through a binding (see [`propagatable`]).
 //! A plain `let s = "a"; s +++ "b"` does still fold, but one step earlier —
 //! [`crate::inline_single_use_bindings`] substitutes a single-use binding back
-//! into its use site, which is exactly its job. What survives is an **annotated**
-//! binding, which that pass refuses. So `let s: str = "a"; s +++ "b"` is a
-//! run-time concat, and that is load-bearing for the corpus: the cases that test
-//! the concat representation (`tests/cases/strings/concat/`) annotate their
-//! leaves for this reason, as does `concat_arg_emits_concat_specialized_instance`.
+//! into its use site, which is exactly its job.
+//!
+//! So a `+++` between two literals is **not** a way to obtain a run-time concat,
+//! and nothing in the corpus should use it as one. The `rope_str` builtin is how
+//! a program asks for that representation by name; `heap_str` and `inline_str`
+//! are its siblings. See `tests/cases/strings/named_representations.aipl`, and
+//! DESIGN_PRINCIPLES.md's "Just say what you want" for why naming the result
+//! beats arranging for an optimization to miss.
 //!
 //! **A template literal does not fold**, even when it is constant throughout.
 //! It lowers to a concat chain over *rendered* pieces (`__template_interp`), and

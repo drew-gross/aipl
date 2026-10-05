@@ -1,7 +1,7 @@
 # Sets of strings: deduplicated and tested for membership by *content* (not
 # pointer identity), and freed/retained like a `str[]`.
 
-import { concat as +++, equal as ==, has, len, logical_not as !, not_equal as != } from builtins;
+import { equal as ==, has, heap_str, len, logical_not as !, not_equal as != } from builtins;
 
 fn distinct(xs: #{str}) -> u64 { len(xs) }.test({
     assert(distinct(#{"apple", "banana", "apple", "cherry"}) == 3);
@@ -17,9 +17,7 @@ fn build() -> #{str} {
     assert(!s.has("grape"));
 
     // Membership is by content: a freshly built "banana" still matches.
-    // Annotated so the concat survives constant folding: two string literals fold.
-    let ba: str = "ba";
-    let key = ba +++ "nana";
+    let key = heap_str("banana");
     assert(s.has(key));
 
     // Equality is order-independent and by content.
@@ -30,10 +28,10 @@ fn build() -> #{str} {
 allocations: 8
 deallocations: 8
 reallocations: 0
-bytes allocated: 768
-instructions executed: 906
-binary size: 6600
-  code: 3540
+bytes allocated: 719
+instructions executed: 899
+binary size: 6576
+  code: 3516
   data: 504
   metadata: 2556
 functions:
@@ -42,7 +40,7 @@ functions:
     bytes: 304
   __test$build:
     calls: 1
-    bytes: 2508
+    bytes: 2484
   __test$distinct:
     calls: 1
     bytes: 556

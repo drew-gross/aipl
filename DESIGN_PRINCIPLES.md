@@ -438,3 +438,78 @@ restatement and gains nothing was under-documented before and still is.
 
 It does not apply to the `# ..` block at the top of a file. That one documents
 the *file*, which has no signature — there is nothing for it to repeat.
+
+---
+
+## 6. Just say what you want
+
+**A name beats a recipe.** When a caller wants a particular result, the API's job
+is to let them ask for *that result* — not to make them assemble an operation
+whose side effect happens to produce it. An idiom or a trick is never as clear as
+a function that names the thing, because a reader of the idiom has to re-derive
+the intent from the mechanism, and they can be wrong.
+
+The type case is the `str` representations. A `str` is stored one of three ways —
+packed inline into the value's own words, in a refcounted buffer, or as a rope
+node joining two values lazily — and a test that cares *which* used to say so
+like this:
+
+```
+let r = "Hello, " +++ "rope world!";   →   let r = rope_str("Hello, ", "rope world!");
+let name = "Ad" +++ "a";                   let name = heap_str("Ada");
+let short = "hi";                          let short = inline_str("hi").value_or("");
+```
+
+The left column is three different tricks. `"a" +++ "b"` is a concatenation
+written not to concatenate but because concatenation *allocates*, so the result
+is a rope — or a buffer, depending which you were after. The bare literal is
+inline because it is short enough, which the reader has to know. None of the
+three lines says what it is for, and the only way to find out is to read the
+comment above it and trust it.
+
+### Why the trick is worse than verbose
+
+It reads as something it is not. `"Ad" +++ "a"` is, on its face, a pointless
+concatenation — the kind of line a reader simplifies to `"Ada"` on sight. That is
+not a hypothetical: constant folding did exactly that, correctly, and voided the
+subject of twenty-eight cases at once. Every one still passed, because what they
+asserted was the content, and only the representation had changed — so the suite
+reported nothing, and the only clue was a shifted allocation count in a
+`--- performance ---` section that a refill would have absorbed.
+
+**That is the failure mode the principle is about.** A trick is a claim the
+compiler does not check and the name does not state, so nothing defends it.
+`heap_str("Ada")` cannot be folded away by an optimizer that does not know what
+it is for, because the call *is* the request; there is nothing left to infer.
+
+### Downstream decisions
+
+| Want | Trick it replaces | Says it |
+|---|---|---|
+| a rope | `a +++ b` on two literals | `rope_str(a, b)` |
+| a heap buffer | `"Ad" +++ "a"`, `reverse(reverse(s))` | `heap_str(s)` |
+| an inline value | a literal short enough to fit | `inline_str(s)` |
+| a run-time `str` an optimizer will not fold | a `let` with a type annotation | any of the three above |
+
+`rope_str` earns its keep over `+++` twice over: `+++` hands the other operand
+straight back when one side is empty, so it cannot promise a node at all, and it
+is subject to constant folding, so it cannot promise a run-time anything.
+
+### What it does not mean
+
+It does not mean every composition deserves a name. `xs.filter(p).map(f)` is two
+operations that each say what they do, and `filter_map` exists because *that*
+pair is worth naming, not because composition is suspect. The principle bites
+when the spelling and the intent come apart — when the operation on the page is
+not the one the author cared about.
+
+It does not mean naming a result excuses an unsound one. `inline_str` returns
+`str?` rather than `str` precisely because the thing it names cannot always be
+delivered: content past the inline capacity has no inline form. A name that
+*might* deliver what it says is the trick again with better marketing — the
+signature has to carry the limit.
+
+It does not mean a named result must be a builtin. A function in the file that
+needs it is the same answer at a smaller scale; what matters is that the call
+site reads as the request. These three are builtins because the representations
+are the runtime's, so no AIPL-level function could construct one.

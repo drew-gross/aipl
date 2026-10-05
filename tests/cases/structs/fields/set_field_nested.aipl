@@ -1,7 +1,7 @@
 # `set l.start.x = v;` rewrites one nested field, leaving every other field —
 # at both levels — unchanged.
 
-import { concat as +++, equal as ==, wrapping_add_assign as += } from builtins;
+import { equal as ==, heap_str, wrapping_add_assign as += } from builtins;
 
 struct Point { x: i64, y: i64 }
 
@@ -12,12 +12,10 @@ fn shift_start_x(l: Line, by: i64) -> Line {
     set m.start.x += by;
     m
 }.test({
-    // Annotated so the concat survives constant folding: two string literals fold.
-    let diag: str = "diag";
     let l = Line {
         start: Point { x: 1, y: 2 },
         end: Point { x: 10, y: 20 },
-        label: diag +++ "onal",
+        label: heap_str("diagonal"),
     };
     let m = shift_start_x(l, 100);
     assert(m.start.x == 101); // updated nested field
@@ -38,14 +36,15 @@ fn retag(s: Seg, tag: str, y: i64) -> Seg {
     set t.line.label = tag;
     t
 }.test({
-    // Annotated so the concat survives constant folding: two string literals fold.
-    let old: str = "old";
-    let new: str = "new";
     let s = Seg {
-        line: Line { start: Point { x: 1, y: 2 }, end: Point { x: 10, y: 20 }, label: old +++ "!" },
+        line: Line {
+            start: Point { x: 1, y: 2 },
+            end: Point { x: 10, y: 20 },
+            label: heap_str("old!"),
+        },
         id: 5,
     };
-    let t = retag(s, new +++ "!", 9);
+    let t = retag(s, heap_str("new!"), 9);
     assert(t.line.start.y == 9); // updated three levels down
     assert(t.line.start.x == 1); // deep sibling unchanged
     assert(t.line.label == "new!"); // replaced heap field
@@ -56,19 +55,19 @@ fn retag(s: Seg, tag: str, y: i64) -> Seg {
 allocations: 3
 deallocations: 3
 reallocations: 0
-bytes allocated: 264
-instructions executed: 735
-binary size: 5880
-  code: 2944
+bytes allocated: 117
+instructions executed: 714
+binary size: 5792
+  code: 2856
   data: 605
   metadata: 2331
 functions:
   __test$retag:
     calls: 1
-    bytes: 1872
+    bytes: 1816
   __test$shift_start_x:
     calls: 1
-    bytes: 892
+    bytes: 860
   aipl_assert:
     calls: 10
     bytes: (external)

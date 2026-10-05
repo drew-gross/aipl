@@ -13,16 +13,24 @@ use std::{
     rc::Rc,
 };
 
-// TEMPORARY: 24-byte-`str` ABI spike (STR_REPR.md). Delete with the file.
+// The Cranelift-level questions the 24-byte `str` ABI depends on — three-word
+// signatures, an out pointer for a composite result — asked directly, with no
+// AIPL in the loop. Written as a spike before that ABI existed; it is live now
+// (see `str24`), so these are regression tests for the lowerings it rests on.
 #[cfg(test)]
 mod abi_spike;
 pub mod ffi_ast;
 
-// STAGED: the 24-byte `str` layout (STR_REPR.md stage 1), proven on its own
-// before the switch wires it up. `str24` is **shared verbatim** with the AOT
-// runtime, which `include!`s the same file, so it is `no_std`-safe and asks its
-// host for two things: the allocator below, and the I/O in `str24_host`.
-#[allow(dead_code)] // staged: wired up by the Stage 1 switch
+// The 24-byte `str` layout — the live representation of every `str` in a
+// compiled program. `str24` is **shared verbatim** with the AOT runtime, which
+// `include!`s the same file, so it is `no_std`-safe and asks its host for two
+// things: the allocator below, and the I/O in `str24_host`.
+//
+// `dead_code` is allowed because the file serves two hosts: a helper reached only
+// from the AOT runtime's own wrappers (`join`, `split_each`) is genuinely unused
+// *here*, and the warning would be about which host you are compiling rather than
+// about the code.
+#[allow(dead_code)]
 mod str24;
 mod str24_host;
 
@@ -168,14 +176,23 @@ unsafe fn header_of(ptr: *const u8) -> *mut i64 {
 
 // ---------- Small-string optimization (SSO) ----------
 //
-// A `str` value is either a heap/static pointer (8-byte aligned, so its low bits
+// ---------- The retired 8-byte `str` value ----------
+//
+// **Not the live representation.** A `str` is the 24-byte value in `str24.rs`;
+// what follows is the 8-byte tagged pointer it replaced, still compiled but no
+// longer reached — the AOT runtime's dead-code warnings name its constants
+// (`HEAP_TAG`, `INLINE_TAG`, `CONCAT_TAG`), 39 of them at the time of writing.
+// Kept because deleting it is its own change; read it as history, and read
+// `str24.rs` for how a `str` actually works.
+//
+// A `str` value was either a heap/static pointer (8-byte aligned, so its low bits
 // are 0) or an *inline* small string tagged `0b01` in the low two bits. Inline
 // layout, as the value's bytes in memory (little-endian, like the rest of the
 // runtime):
 //   byte0 = (len << 2) | 1   with len in 0..=7   (low two bits are always 0b01)
 //   bytes 1..=7 = content    (unused trailing bytes are 0)
-// Strings of length <= 7 are stored inline — no allocation, no refcount; length
-// >= 8 stay heap. The low two bits form the representation tag: 00 = heap/static,
+// Strings of length <= 7 were stored inline — no allocation, no refcount; length
+// >= 8 stayed heap. The low two bits form the representation tag: 00 = heap/static,
 // 01 = inline, 10 = view, 11 = concat. Shifting `len` by two (not one) keeps the
 // inline tag exactly `0b01` regardless of the length's parity, which frees the
 // `0b11` slot for the concat representation. `aipl_inc`/`aipl_dec` no-op on inline
@@ -184,25 +201,25 @@ unsafe fn header_of(ptr: *const u8) -> *mut i64 {
 // bytes from any representation), so correctness never depends on the invariant;
 // the "<=7 is always inline" invariant is purely what makes those strings free.
 
-// The representation discriminant lives in the low two bits of every `str`
-// value; `str_repr` decodes it into a [`StrRepr`]. Branch on a value's
-// representation by `match`ing `str_repr(..)` (NOT ad-hoc `is_*` checks), so
-// adding a representation here forces every dispatch site to handle it.
+// The discriminant lived in the low two bits. In the wide value it is the top
+// byte of `w2` instead, and `Str::tag` is what reads it.
 const TAG_MASK: usize = 0b11;
 const INLINE_TAG: usize = 0b01;
 
 // ---------- Representation dispatch ----------
 //
-// The canonical way to branch on a `str` value's active representation: classify
-// it once with `str_repr`, then `match`. Prefer this over scattered `is_*`
-// boolean checks — a `match` is exhaustive, so adding a `StrRepr` variant (a new
-// representation) makes the compiler flag every site that doesn't yet handle it,
-// instead of silently falling through to a heap/`else` arm. A representation
-// whose handling genuinely coincides with another's may share an arm (e.g.
-// `Null | Heap`), but spell the variants out rather than using a bare `_` so the
-// next representation still forces a decision.
+// Still the rule, and it applies to the wide value just as it did here: classify
+// a `str` once (`Str::tag`), then `match`. Prefer that over scattered `is_*`
+// boolean checks — a `match` is exhaustive, so adding a representation makes the
+// compiler flag every site that doesn't yet handle it, instead of silently
+// falling through to a buffer/`else` arm. Variants whose handling genuinely
+// coincides may share an arm, but spell them out rather than using a bare `_` so
+// the next representation still forces a decision. CLAUDE.md states it under
+// "Multiple runtime representations".
 
-/// Pack <= 7 content bytes into an inline str value (`bytes.len()` must be <= 7).
+/// Pack <= 7 content bytes into a *retired-representation* inline str value
+/// (`bytes.len()` must be <= 7). `str24::inline_words` is the live counterpart,
+/// and its capacity is 22.
 fn pack_inline(bytes: &[u8]) -> *const u8 {
     debug_assert!(bytes.len() <= 7);
     let mut val: u64 = ((bytes.len() as u64) << 2) | 1;
@@ -4460,9 +4477,9 @@ fn new_jit_module() -> Result<JITModule, Error> {
     let isa = host_isa()?;
     let mut jit_builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
     // Expose builtins to the JIT linker.
-    // The second ABI (`STR_REPR.md` stage 1): 24-byte `str` values passed by
-    // pointer. Registered alongside the originals — an artifact links whichever
-    // it names, which is what lets the switch be tested one case at a time.
+    // The wide ABI: 24-byte `str` values passed by pointer. Registered alongside
+    // the 8-byte originals, which an artifact may still name — that is what let
+    // the switch be tested one case at a time, and codegen now emits only these.
     jit_builder.symbol("aipl_print", str24_host::aipl_print as *const u8);
     jit_builder.symbol(
         "aipl_print_error",
@@ -4478,6 +4495,16 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_str_slice", str24::aipl_str_slice as *const u8);
     jit_builder.symbol("aipl_concat", str24::aipl_concat as *const u8);
     jit_builder.symbol("aipl_trim", str24::aipl_trim as *const u8);
+    jit_builder.symbol("aipl_str_heap", str24::aipl_str_heap as *const u8);
+    jit_builder.symbol("aipl_str_rope", str24::aipl_str_rope as *const u8);
+    jit_builder.symbol(
+        "aipl_str_pack_inline",
+        str24::aipl_str_pack_inline as *const u8,
+    );
+    jit_builder.symbol(
+        "aipl_str_inline_capacity",
+        str24::aipl_str_inline_capacity as *const u8,
+    );
     jit_builder.symbol("aipl_str_data", str24::aipl_str_data as *const u8);
     jit_builder.symbol("aipl_str_contains", str24::aipl_str_contains as *const u8);
     jit_builder.symbol(
@@ -5605,7 +5632,7 @@ impl Compilation {
         // from the word return further down gets the value's first field, which
         // decodes as an empty array. Only the decoding differs — codepoints
         // rather than text.
-        if is_str_shaped(&info.return_ty) && true {
+        if is_str_shaped(&info.return_ty) {
             let words = str24::STR_SIZE.div_ceil(8);
             let mut sret_buf = vec![0i64; words];
             let mut sret_abi = Vec::with_capacity(1 + abi.len());
@@ -6136,7 +6163,7 @@ fn build_borrowed_array(
         let s = chars_to_utf8(elems)?;
         return Ok(bufs.str_value(&s));
     }
-    let elem_size = if is_str_repr(elem) && true {
+    let elem_size = if is_str_repr(elem) {
         // A wide `str` element is the value itself, 24 bytes in the block.
         abi.str_size()
     } else {
@@ -6234,7 +6261,7 @@ unsafe fn write_ffi_arg(
     // written here rather than falling through to `ffi_arg_word`, whose own
     // assertion catches exactly that mistake. The two differ only in how the host
     // spells the value — a `str` arrives as text, a `char[]` as codepoints.
-    if is_str_shaped(ty) && true {
+    if is_str_shaped(ty) {
         let text = match v {
             FfiValue::Str(text) if is_str_repr(ty) => text.clone(),
             FfiValue::Array(elems) if is_char_array(ty) => chars_to_utf8(elems)?,
@@ -6431,7 +6458,7 @@ unsafe fn read_ffi_borrowed(
         // one — the same shape the `str` arm below reads, differing only in how
         // the text is handed back (codepoints rather than a string). Reading it
         // as a word yields the value's first field and decodes as empty.
-        ConcreteType::Array(_) if is_char_array(ty) && true => {
+        ConcreteType::Array(_) if is_char_array(ty) => {
             let value = unsafe { core::ptr::read(at as *const str24::Str) };
             let mut scratch = [0u8; str24::INLINE_CAP];
             let text = String::from_utf8_lossy(value.bytes(&mut scratch)).into_owned();
@@ -7878,7 +7905,7 @@ struct Builtins {
 ///
 /// The two are the same width today, which is why this table used to count
 /// parameters instead of naming them — and exactly why it can't any more. A
-/// 24-byte `str` (`STR_REPR.md`) passes as three scalar words and returns
+/// 24-byte `str` passes as three scalar words and returns
 /// through a leading out pointer, because multi-value returns of three words are
 /// refused on x86-64 (`abi_spike::q2_three_word_returns_are_refused_on_x86_64`;
 /// the working shape is pinned by `q2b`). Naming the kinds now makes that flip a
@@ -8003,7 +8030,8 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         // (`str24::SplitIter`), written into the caller's stack slot.
         "aipl_str_split_iter_init" => (3, Ret::None),
         // ---- a scalar back ----
-        "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now" => (0, Ret::Word),
+        "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now"
+        | "aipl_str_inline_capacity" => (0, Ret::Word),
         "aipl_shim_get" | "aipl_str_len" | "aipl_str_hash" | "aipl_str_iter_next"
         | "aipl_str_write_ptr" | "aipl_i64_len" | "aipl_u64_len" | "aipl_list_files" => {
             (1, Ret::Word)
@@ -8048,8 +8076,8 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" => (7, Ret::Word),
         // ---- a `str` back, through the out pointer ----
         "aipl_trim" | "aipl_str_reverse" | "aipl_str_sort" | "aipl_str_alloc"
-        | "aipl_char_to_str" => (1, Ret::Str),
-        "aipl_concat" | "aipl_str_repeat" => (2, Ret::Str),
+        | "aipl_char_to_str" | "aipl_str_heap" | "aipl_str_pack_inline" => (1, Ret::Str),
+        "aipl_concat" | "aipl_str_repeat" | "aipl_str_rope" => (2, Ret::Str),
         "aipl_str_slice" => (3, Ret::Str),
         // The parts plus `join`'s three separators.
         "aipl_str_join" => (4, Ret::Str),
@@ -8101,7 +8129,7 @@ impl Builtins {
     ///
     /// **Every runtime call should come through here or [`Builtins::call_void`].**
     /// Today the helper is only boilerplate removal — import, call, read the one
-    /// result — but it is also the seam a 24-byte `str` needs (`STR_REPR.md`):
+    /// result — but it is also the seam a 24-byte `str` needs:
     /// when an [`ArgKind::Str`] argument becomes three words and an [`Ret::Str`]
     /// result becomes a leading out pointer, this is the function that expands
     /// them. The arity assertion is what keeps a call site honest in the
@@ -8246,6 +8274,13 @@ fn register_builtins(
         (Callee::ExecuteProgram, "aipl_execute_program"),
         (Callee::Trim, "aipl_trim"),
         (Callee::Repeat, "aipl_str_repeat"),
+        // The `*_str` family — each one entry point, so there is no custom
+        // codegen arm: the ordinary-call path reads the signature registered
+        // here and the ABI above, exactly as it does for `trim`.
+        (Callee::HeapStr, "aipl_str_heap"),
+        (Callee::RopeStr, "aipl_str_rope"),
+        (Callee::PackInline, "aipl_str_pack_inline"),
+        (Callee::InlineCapacity, "aipl_str_inline_capacity"),
         // `trace(expr)`'s print. The same runtime entry point `print` uses —
         // only the declared effects differ (see `__trace` in
         // `BUILTIN_SIGNATURES`), so there is nothing new to implement in either
@@ -11101,7 +11136,7 @@ fn emit_charset_union(builder: &mut FunctionBuilder, a: Value, b: Value) -> Valu
 /// tags, accumulated results, and the *addresses* composites travel as.
 ///
 /// The distinction is invisible today, since every non-composite value is one
-/// i64 — and it is exactly what a 24-byte `str` (`STR_REPR.md`) needs, because
+/// i64 — and it is exactly what a 24-byte `str` needs, because
 /// then "one value" and "one word" stop being the same thing.
 fn value_slot(
     builder: &mut FunctionBuilder,
@@ -13072,7 +13107,7 @@ fn emit_const_str<M: Module>(
     cx: Cx,
     content: &[u8],
 ) -> Result<(Value, bool), Error> {
-    // A `str` is a 24-byte composite (`STR_REPR.md`), so a literal is three
+    // A `str` is a 24-byte composite (see `str24.rs`), so a literal is three
     // words materialized into a stack slot, and what flows is that slot's
     // address — exactly like a struct constant.
     //
@@ -18507,7 +18542,7 @@ fn compile_call_expr<M: Module>(
                     // spare capacity when there is some, grows the block under
                     // itself when there isn't, and only copies when the dynamic
                     // refcount says the static proof isn't enough on its own
-                    // (`STR_REPR.md`). It takes over the slot's reference and
+                    // (see `str24.rs`). It takes over the slot's reference and
                     // writes the result back, so — as in the in-place concat —
                     // there is nothing to release and no new track to add.
                     builtins.call_void(module, builder, "aipl_str_push_byte", &[arr_ptr, x_v]);

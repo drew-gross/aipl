@@ -1,14 +1,15 @@
 // NOTE: plain `//` comments, not `//!` module docs, and no inner attributes:
 // this file is `include!`d by the AOT runtime, which can carry neither.
 //
-// The 24-byte `str` value — `STR_REPR.md`'s layout, implemented and tested on
-// its own before anything is switched over to it.
+// The 24-byte `str` value: the layout every `str` in a compiled AIPL program
+// has, and the operations that read and build it.
 //
-// **Not wired up yet.** Stage 1 of that plan is an atomic change: the runtime,
-// codegen, and every checked-in `.clif` have to agree on the layout, so there
-// is no way to land it a piece at a time. What *can* be de-risked first is
-// this: the layout itself, its invariants, and the operations that read and
-// build it, proven by ordinary Rust tests with no compiler in the loop.
+// **This is the live representation.** Codegen emits a literal as three words
+// through it (`emit_str_literal`), arrays stride by `STR_SIZE`, and every
+// `aipl_str_*` runtime symbol both runtimes export is one of the entry points at
+// the bottom of this file. The older 8-byte tagged value it replaced is still
+// compiled in `aipl-codegen/src/lib.rs` and the AOT runtime, behind branches the
+// wide ABI no longer reaches; those two files say so where they define it.
 //
 // # One copy, two runtimes
 //
@@ -39,8 +40,9 @@
 //
 // The tag is the **top byte** of `w2` in every representation, so classifying a
 // value is one shift on a register the length already needed, and `base`/`data`
-// are dereferenced without masking. See `STR_REPR.md` for why that beats
-// low-bit tagging.
+// are dereferenced without masking — which is what this buys over the low-bit
+// tagging of the 8-byte value, where every dereference had to mask first and the
+// length had to be fetched from the allocation's header.
 //
 // # The buffer
 //
@@ -140,7 +142,8 @@ impl Str {
     }
 
     /// A buffer's content bytes. Panics on any other representation — callers
-    /// classify first (`STR_REPR.md`'s "classify + match" rule).
+    /// classify first (CLAUDE.md's "Multiple runtime representations" rule:
+    /// classify once, then `match`).
     fn buffer_bytes(self) -> &'static [u8] {
         debug_assert_eq!(self.tag(), TAG_BUFFER);
         if self.w1 == 0 {
@@ -196,8 +199,8 @@ impl Str {
     }
 
     /// How many bytes could be appended in place, if this value owns its buffer
-    /// exclusively (the ownership rule in `STR_REPR.md`, which this does *not*
-    /// check — it is the capacity half of the question only).
+    /// exclusively (the ownership rule [`append_owned`] states, which this does
+    /// *not* check — it is the capacity half of the question only).
     pub(crate) fn spare_capacity(self) -> usize {
         if self.tag() != TAG_BUFFER || self.w0 == 0 {
             return 0;
@@ -244,7 +247,8 @@ impl Str {
     /// Whether this value is the sole reference to its allocation. **Necessary
     /// but not sufficient** for mutating in place: retain elision means a
     /// borrowed argument can read `1` while its caller still holds the value, so
-    /// this only ever refines static ownership (`STR_REPR.md`).
+    /// this only ever refines static ownership — see [`append_owned`], which is
+    /// the one caller allowed to act on it.
     pub(crate) fn is_unique(self) -> bool {
         let owner = self.owner();
         !owner.is_null() && unsafe { *refcount_of(owner) } == 1
@@ -365,6 +369,9 @@ const ROPE_SIZE: usize = ROPE_RIGHT + STR_SIZE;
 
 /// `a + b` in O(1): a node holding both, flattened only if someone reads it.
 /// Takes ownership of the caller's references to `a` and `b`.
+///
+/// An empty operand is nothing to join, so the other side is handed straight
+/// back and no node is built. [`rope`] is the half that always builds one.
 pub(crate) fn concat(a: Str, b: Str) -> Str {
     if a.is_empty() {
         a.release();
@@ -374,6 +381,13 @@ pub(crate) fn concat(a: Str, b: Str) -> Str {
         b.release();
         return a;
     }
+    rope(a, b)
+}
+
+/// A rope node over `a` and `b`, built **unconditionally** — `concat` without
+/// its empty-operand short-circuit, which is what `rope_str` promises a caller
+/// who asked for this representation by name. Takes ownership of both.
+pub(crate) fn rope(a: Str, b: Str) -> Str {
     let len = a.len() + b.len();
     let raw = unsafe { super::rt_alloc(ROPE_SIZE) } as *mut u8;
     assert!(!raw.is_null(), "out of memory");
@@ -434,7 +448,7 @@ fn rope_materialize(s: Str) -> Str {
 //
 // The operations codegen calls, written against the layout above. Everything
 // here is length-delimited and representation-agnostic: it classifies once (the
-// `STR_REPR.md` rule) and never assumes a contiguous buffer, so a rope is
+// classify-once rule) and never assumes a contiguous buffer, so a rope is
 // streamed rather than flattened wherever the answer allows it.
 
 /// Visit the value's bytes as contiguous chunks, left to right, stopping early
@@ -633,7 +647,7 @@ pub(crate) fn ends_with_char(s: Str, c: u8) -> bool {
     s.len() > 0 && char_at(s, s.len() - 1) == Some(c)
 }
 
-// ---------- In-place append (`STR_REPR.md` stage 2) ----------
+// ---------- In-place append ----------
 
 /// Capacity for an append that has to allocate: enough for what is being
 /// written, and otherwise double, so a builder loop pays amortized O(1) rather
@@ -663,8 +677,8 @@ fn overlaps(s: Str, add: &[u8]) -> bool {
 /// **The caller must have established *static* ownership** — an `exclusive` `mut`
 /// binding or an `owned` parameter. The `is_unique` test below only *refines*
 /// that: retain elision lets a borrowed value read `refcount == 1` while its
-/// caller is still holding it, so on its own it proves nothing (`STR_REPR.md`,
-/// "`refcount == 1` is not ownership").
+/// caller is still holding it, so on its own it proves nothing: `refcount == 1`
+/// is not ownership.
 ///
 /// Three outcomes, cheapest first:
 ///   - **inline, still fits** — the whole thing is a value computation. An inline
@@ -872,7 +886,7 @@ impl Builder {
     }
 
     /// Double until `extra` more bytes fit, then copy across — amortized O(1)
-    /// per byte, the growth `STR_REPR.md`'s Stage 4 gives `+` for owned values.
+    /// per byte, which is what makes a `+=` loop over an owned value linear.
     fn grow(&mut self, extra: usize) {
         let need = self.s.len() + extra;
         let cap = (buffer_cap(self.s.w0 as *const u8) * 2).max(need);
@@ -1278,8 +1292,9 @@ pub(crate) unsafe fn join_from(
 // every old `aipl_*` symbol keeps working unchanged. An artifact is therefore
 // self-consistent with whichever runtime its symbols name: the checked-in IR
 // keeps running on the old one while new codegen emits calls to these, which is
-// what makes the switch testable at all. `STR_REPR.md`'s Stage 1 ends by
-// regenerating the artifacts against `aipl_*` and deleting the old half.
+// what made the switch testable at all. What remains of that transition is the
+// old half: it is no longer reached (see this file's header), and deleting it is
+// its own change.
 //
 // Both runtimes define these, since the file is shared; they are separate
 // binaries, so the duplicate symbol names never meet.
@@ -1429,6 +1444,73 @@ pub(crate) extern "C" fn aipl_str_sort(out: *mut Str, s: *const Str) {
 #[no_mangle]
 pub(crate) extern "C" fn aipl_str_repeat(out: *mut Str, s: *const Str, n: i64) {
     unsafe { *out = repeat(read(s), n.max(0) as usize) };
+}
+
+// ---------- Naming a representation ----------
+//
+// The `*_str` builtins, which hand back the content of their argument in one
+// named representation instead of whichever one it happens to arrive in. They
+// exist because every *other* way to reach a representation is a side effect of
+// some operation chosen for a different reason — `"a" +++ "b"` for a rope,
+// `reverse(reverse(s))` for a buffer, a short literal for an inline value — and
+// a reader cannot tell such a line from one that means what it says. See
+// DESIGN_PRINCIPLES.md's "Just say what you want".
+
+/// `heap_str(s)` — the content in a **fresh buffer**, whatever its length and
+/// whatever `s` already was.
+///
+/// Always allocates, which is the point: a caller asking for this
+/// representation by name wants a refcounted allocation of its own, not a
+/// static literal's buffer and not an inline value. [`Builder::finish`] would
+/// repack a short result inline, so this goes through [`owned_copy`], whose
+/// `into_buffer` does not.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_str_heap(out: *mut Str, s: *const Str) {
+    unsafe { *out = owned_copy(read(s)) };
+}
+
+/// `rope_str(a, b)` — a **rope node** over the two, built unconditionally.
+///
+/// [`concat`] hands back the other operand when one side is empty, so it cannot
+/// promise the representation; [`rope`] always builds the node. Borrows both,
+/// like every entry point, so the retains happen here — `rope` itself takes
+/// ownership (the same split `aipl_concat` documents).
+#[no_mangle]
+pub(crate) extern "C" fn aipl_str_rope(out: *mut Str, a: *const Str, b: *const Str) {
+    let (a, b) = unsafe { (read(a), read(b)) };
+    a.retain();
+    b.retain();
+    unsafe { *out = rope(a, b) };
+}
+
+/// The largest content an inline value can hold, for `inline_str`'s own length
+/// check. A number rather than a predicate so the check reads as the comparison
+/// it is, and so nothing has to hardcode 22.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_str_inline_capacity() -> i64 {
+    INLINE_CAP as i64
+}
+
+/// `pack_inline(s)` — the content packed into the value's own words, with no
+/// allocation and no refcount.
+///
+/// Internal, and unchecked: content longer than [`INLINE_CAP`] has no inline
+/// form at all, so the caller does the length check. `inline_str` is that
+/// caller, and it is the only one — it answers `none` rather than calling this
+/// with content that cannot fit. Oversized content comes back untouched, which
+/// keeps the unchecked path total (the language cannot abort) without inventing
+/// a truncation nobody asked for.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_str_pack_inline(out: *mut Str, s: *const Str) {
+    let s = unsafe { read(s) };
+    if s.len() > INLINE_CAP {
+        s.retain();
+        unsafe { *out = s };
+        return;
+    }
+    let mut scratch = [0u8; INLINE_CAP];
+    let packed = from_bytes_inline(s.bytes(&mut scratch));
+    unsafe { *out = packed };
 }
 
 /// Build a value over `len` bytes the caller then fills — the allocate-then-write
@@ -1640,6 +1722,103 @@ mod tests {
         String::from_utf8(s.bytes(&mut scratch).to_vec()).unwrap()
     }
 
+    /// Each `*_str` entry point hands back the representation it names, for every
+    /// representation the content could have arrived in. This is the whole
+    /// contract — the builtins exist so a caller does not have to infer it.
+    #[test]
+    fn representation_builtins_answer_in_the_representation_they_name() {
+        let short = b"hi"; // inline on arrival
+        let long = b"a string well past the inline capacity"; // buffer on arrival
+        for content in [&short[..], &long[..]] {
+            let src = from_bytes(content);
+
+            let mut heaped = Str::empty();
+            aipl_str_heap(&mut heaped, &src);
+            assert_eq!(heaped.tag(), TAG_BUFFER, "heap_str of {content:?}");
+            assert_eq!(text(heaped), text(src));
+            heaped.release();
+
+            // `pack_inline` only where the content fits; the oversized case has
+            // no inline form and is its own test below.
+            if content.len() <= INLINE_CAP {
+                let mut packed = Str::empty();
+                aipl_str_pack_inline(&mut packed, &src);
+                assert_eq!(packed.tag(), TAG_INLINE, "pack_inline of {content:?}");
+                assert_eq!(text(packed), text(src));
+                packed.release();
+            }
+
+            let mut roped = Str::empty();
+            aipl_str_rope(&mut roped, &src, &src);
+            assert_eq!(roped.tag(), TAG_ROPE, "rope_str of {content:?}");
+            assert_eq!(text(roped), format!("{}{}", text(src), text(src)));
+            roped.release();
+
+            src.release();
+        }
+    }
+
+    /// `pack_inline` is the unchecked half — `inline_str` does the length check
+    /// and answers `none` instead of calling it. Oversized content comes back as
+    /// it was rather than truncated, and the returned reference is its own.
+    #[test]
+    fn pack_inline_leaves_content_that_cannot_fit() {
+        let src = from_bytes(b"a string well past the inline capacity");
+        let mut packed = Str::empty();
+        aipl_str_pack_inline(&mut packed, &src);
+        assert_eq!(packed.tag(), TAG_BUFFER);
+        assert_eq!(text(packed), text(src));
+        packed.release();
+        // The source is still readable: `pack_inline` took its own reference.
+        assert_eq!(text(src), "a string well past the inline capacity");
+        src.release();
+    }
+
+    /// `rope_str` builds a node even where `concat` would short-circuit — the
+    /// difference that makes it able to promise the representation at all.
+    #[test]
+    fn rope_str_builds_a_node_an_empty_operand_would_skip() {
+        let empty = from_bytes(b"");
+        let word = from_bytes(b"lone");
+
+        let mut roped = Str::empty();
+        aipl_str_rope(&mut roped, &empty, &word);
+        assert_eq!(roped.tag(), TAG_ROPE);
+        assert_eq!(text(roped), "lone");
+        roped.release();
+
+        // `concat` hands the other operand straight back, so it is *not* a rope.
+        empty.retain();
+        word.retain();
+        let joined = concat(empty, word);
+        assert_ne!(joined.tag(), TAG_ROPE);
+        assert_eq!(text(joined), "lone");
+        joined.release();
+
+        empty.release();
+        word.release();
+    }
+
+    #[test]
+    fn inline_capacity_is_the_bound_pack_inline_uses() {
+        assert_eq!(aipl_str_inline_capacity(), INLINE_CAP as i64);
+        let exact: Vec<u8> = core::iter::repeat_n(b'x', INLINE_CAP).collect();
+        let over: Vec<u8> = core::iter::repeat_n(b'x', INLINE_CAP + 1).collect();
+        for (content, want_inline) in [(&exact, true), (&over, false)] {
+            let src = from_bytes(content);
+            let mut packed = Str::empty();
+            aipl_str_pack_inline(&mut packed, &src);
+            assert_eq!(
+                packed.tag() == TAG_INLINE,
+                want_inline,
+                "len {}",
+                content.len()
+            );
+            packed.release();
+            src.release();
+        }
+    }
+
     #[test]
     fn value_is_three_words() {
         assert_eq!(core::mem::size_of::<Str>(), STR_SIZE);
@@ -1685,7 +1864,8 @@ mod tests {
         let src = from_bytes(b"the quick brown fox jumps over it");
         assert_eq!(src.tag(), TAG_BUFFER);
         // A one-byte slice is still a view — this is the guarantee today's
-        // `aipl_str_slice` cannot make, since it copies at <= 7 bytes.
+        // the 8-byte `aipl_str_slice` could not make, since it copied at
+        // <= 7 bytes.
         let one = src.slice(4, 5);
         assert_eq!(one.tag(), TAG_BUFFER);
         assert_eq!(one.base(), src.base());
@@ -2309,8 +2489,8 @@ mod tests {
         s.release();
     }
 
-    /// `refcount == 1` is what refines static ownership into "safe to write"
-    /// (`STR_REPR.md`), so a second live reference has to force the copy — the
+    /// `refcount == 1` is what refines static ownership into "safe to write", so
+    /// a second live reference has to force the copy — the
     /// other holder's bytes must not move under it.
     #[test]
     fn a_shared_buffer_is_copied_rather_than_written_into() {

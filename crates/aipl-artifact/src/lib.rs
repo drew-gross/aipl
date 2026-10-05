@@ -324,7 +324,8 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         // returns the exit code.
         "aipl_test_end" | "aipl_test_fail_none" => sig(0, false),
         // Takes nothing, returns the reading.
-        "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now" => sig(0, true),
+        "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now"
+        | "aipl_str_inline_capacity" => sig(0, true),
         // Shim slots: read one, or write one (returns nothing).
         "aipl_shim_get" => sig(1, true),
         "aipl_shim_set" => sig(2, false),
@@ -376,6 +377,8 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_trim"
         | "aipl_str_reverse"
         | "aipl_str_sort"
+        | "aipl_str_heap"
+        | "aipl_str_pack_inline"
         | "aipl_str_alloc" => sig(2, false),
         "aipl_str_eq"
         | "aipl_str_cmp"
@@ -385,7 +388,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_contains"
         | "aipl_char_at"
         | "aipl_str_data" => sig(2, true),
-        "aipl_concat" | "aipl_str_repeat" => sig(3, false),
+        "aipl_concat" | "aipl_str_repeat" | "aipl_str_rope" => sig(3, false),
         // The out pointer, the parts, and `join`'s three separators.
         "aipl_str_join" => sig(5, false),
         "aipl_str_split"

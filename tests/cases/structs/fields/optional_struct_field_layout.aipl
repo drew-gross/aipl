@@ -6,9 +6,9 @@
 # payload rather than after it.
 
 import {
-    concat as +++,
     equal as ==,
     greater_than as >,
+    heap_str,
     len,
     push,
     wrapping_add_assign as +=,
@@ -21,17 +21,10 @@ struct Aaa { lead: i64, mid: Zzz?, tail: str, last: i64 }
 // The opaque `n` keeps the constructor out of reach of known-constructor
 // elimination, so the value really does round-trip through the field's storage.
 fn build(n: i64) -> Aaa {
-    // `inner`/`tail` are built by concatenation to be genuinely heap-allocated;
-    // the leaves are annotated so the concats survive constant folding (two
-    // string literals fold).
-    let i: str = "in";
-    let t: str = "t";
-    Aaa {
-        lead: 11,
-        mid: if (n > 0) { some(Zzz { p: 22, q: 33, r: i +++ "ner" }) } else { none },
-        tail: t +++ "ail",
-        last: 44,
-    }
+    lead: 11,
+    mid: if (n > 0) { some(Zzz { p: 22, q: 33, r: heap_str("inner") }) } else { none },
+    tail: heap_str("tail"),
+    last: 44,
 }.test({
     let full = build(1);
     let empty = build(0);
@@ -75,10 +68,10 @@ fn build(n: i64) -> Aaa {
 allocations: 14
 deallocations: 14
 reallocations: 2
-bytes allocated: 1264
-instructions executed: 2032
-binary size: 8576
-  code: 4384
+bytes allocated: 627
+instructions executed: 1920
+binary size: 8496
+  code: 4304
   data: 1033
   metadata: 3159
 functions:
@@ -123,7 +116,7 @@ functions:
     bytes: (external)
   build:
     calls: 8
-    bytes: 640
+    bytes: 560
   main:
     calls: 1
     bytes: 104

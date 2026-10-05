@@ -1,11 +1,9 @@
 # Shapes that look close but are deliberately left alone.
 
-import { concat as +++, print } from builtins;
+import { concat as +++, heap_str, print } from builtins;
 
 fn main() !prints {
-    // Annotated so the concat below stays one: an unannotated single-use
-    // binding is substituted into its use site, and two string literals fold.
-    let s: str = "x";
+    let s = heap_str("x");
 
     // A literal that is *part* of the interpolation's expression computes
     // something; only a literal standing alone is the template's own text.
@@ -23,16 +21,16 @@ ax
 back\slash
 c
 --- performance ---
-allocations: 1
-deallocations: 1
+allocations: 2
+deallocations: 2
 reallocations: 0
-bytes allocated: 88
-instructions executed: 96
-binary size: 1560
-  code: 684
+bytes allocated: 127
+instructions executed: 99
+binary size: 1680
+  code: 736
   data: 1
-  metadata: 875
+  metadata: 943
 functions:
   main:
     calls: 1
-    bytes: 684
+    bytes: 736

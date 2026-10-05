@@ -5,7 +5,7 @@
 # struct, since layouts resolve alphabetically — and only when the case had a
 # slot after the optional for the undersizing to displace.
 
-import { concat as +++, equal as ==, greater_than as > } from builtins;
+import { equal as ==, greater_than as >, heap_str } from builtins;
 
 struct Zzz { p: i64, q: i64, r: str }
 
@@ -14,9 +14,7 @@ variant Aaa = Nothing | Has(Zzz?, i64, str)
 // Opaque so the constructor survives known-constructor elimination and the
 // payload is really read back out of the variant's storage.
 fn build(n: i64) -> Aaa {
-    // Annotated so the concat survives constant folding: two string literals fold.
-    let i: str = "in";
-    if (n > 0) { Has(some(Zzz { p: 22, q: 33, r: i +++ "ner" }), 99, "tl") } else { Nothing }
+    if (n > 0) { Has(some(Zzz { p: 22, q: 33, r: heap_str("inner") }), 99, "tl") } else { Nothing }
 }.test({
     match (build(1)) {
         Nothing => assert(false),
@@ -40,12 +38,12 @@ fn build(n: i64) -> Aaa {
 allocations: 3
 deallocations: 3
 reallocations: 0
-bytes allocated: 264
-instructions executed: 906
-binary size: 4984
-  code: 2504
+bytes allocated: 117
+instructions executed: 885
+binary size: 4968
+  code: 2480
   data: 453
-  metadata: 2027
+  metadata: 2035
 functions:
   __eq_Aaa:
     calls: 1
@@ -73,7 +71,7 @@ functions:
     bytes: (external)
   build:
     calls: 4
-    bytes: 772
+    bytes: 748
   main:
     calls: 1
     bytes: 104

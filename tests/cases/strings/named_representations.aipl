@@ -1,0 +1,65 @@
+# `heap_str`, `rope_str` and `inline_str` each hand back their content in the one
+# runtime representation their name says, whatever representation it arrived in.
+# A `str` has three (see the layout at the top of
+# `crates/aipl-codegen/src/str24.rs`): the content packed *inline* into the value's
+# own words, a refcounted *buffer*, or a *rope* node joining two values lazily.
+#
+# The allocation count below is the proof, and it is the whole arithmetic: of the
+# three calls in `main`, `heap_str` allocates its buffer and `rope_str` allocates
+# its node, while `inline_str` allocates nothing, because an inline value has
+# nowhere to allocate. Every argument is a short literal, which arrives *inline*
+# already — so neither allocation would happen if either call were a pass-through.
+# (`main` renders nothing, which would allocate a buffer of its own; the optional
+# `inline_str` returns is unwrapped rather than printed for that reason.)
+
+import { equal as ==, heap_str, inline_str, print, rope_str, value_or } from builtins;
+
+fn main() !prints {
+    print(heap_str("hi")); // a fresh buffer, though "hi" would fit inline
+    print(rope_str("ba", "nana")); // a node over the two, flattened only to print
+    print(inline_str("hi").value_or("?")); // already inline; repacked, not allocated
+}
+
+# Content survives every conversion, in both directions — the representation is
+# the only thing that changes.
+fn round_trips(s: str) -> bool { heap_str(s) == s }.test({
+    assert(round_trips("banana"));
+    assert(heap_str("banana") == "banana");
+    assert(rope_str("ba", "nana") == "banana");
+    assert(inline_str("banana") == some("banana"));
+
+    // Each one accepts what the others produce, so a representation is never a
+    // dead end: all three spellings of "banana" compare equal.
+    assert(heap_str(rope_str("ba", "nana")) == "banana");
+    assert(rope_str(heap_str("ba"), inline_str("nana").value_or("")) == "banana");
+    assert(inline_str(heap_str("banana")) == some("banana"));
+
+    // Only `inline_str` can fail to deliver: content past the inline capacity has
+    // no inline form at all, and the optional says so rather than quietly handing
+    // back the representation the content already had. That silent substitution is
+    // the failure the whole family exists to rule out.
+    assert(inline_str("twenty-three bytes long") == none);
+
+    // `rope_str` builds its node even where `+++` would hand the other operand
+    // straight back, which is what lets it promise the representation at all.
+    assert(rope_str("", "lone") == "lone");
+    assert(rope_str("lone", "") == "lone");
+})
+--- stdout ---
+hi
+banana
+hi
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 127
+instructions executed: 63
+binary size: 1312
+  code: 432
+  data: 1
+  metadata: 879
+functions:
+  main:
+    calls: 1
+    bytes: 432

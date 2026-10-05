@@ -4,20 +4,16 @@
 # heap fields, so the balanced alloc/dealloc count below proves each string is
 # retained on construction and released exactly once when the struct drops.
 
-import { concat as +++, equal as == } from builtins;
+import { equal as ==, heap_str } from builtins;
 
 struct Name { first: str, last: str }
 
 struct Contact { name: Name, nick: str? }
 
 fn full_first(Contact { name }) -> str { name.first }.test({
-    // Annotated so the concat survives constant folding: two string literals fold.
-    let ad: str = "Ad";
-    let love: str = "Love";
-    let count: str = "Count";
     let c = Contact {
-        name: Name { first: ad +++ "a", last: love +++ "lace" },
-        nick: some(count +++ "ess"),
+        name: Name { first: heap_str("Ada"), last: heap_str("Lovelace") },
+        nick: some(heap_str("Countess")),
     };
     assert(full_first(c) == "Ada"); // heap str through two struct levels
     assert(c.name.last == "Lovelace");
@@ -27,16 +23,16 @@ fn full_first(Contact { name }) -> str { name.first }.test({
 allocations: 3
 deallocations: 3
 reallocations: 0
-bytes allocated: 264
-instructions executed: 268
-binary size: 2992
-  code: 1328
+bytes allocated: 117
+instructions executed: 247
+binary size: 2912
+  code: 1244
   data: 214
-  metadata: 1450
+  metadata: 1454
 functions:
   __test$full_first:
     calls: 1
-    bytes: 1220
+    bytes: 1136
   aipl_assert:
     calls: 3
     bytes: (external)

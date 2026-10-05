@@ -3,15 +3,13 @@
 # `value_or`, and the whole struct (optionals and all) is returned by value.
 # The `str?` field holds a freshly allocated string to exercise refcounting.
 
-import { concat as +++, equal as ==, value_or, wrapping_add as + } from builtins;
+import { equal as ==, heap_str, value_or, wrapping_add as + } from builtins;
 
 struct Box { item: str?, count: i64? }
 
 fn make(present: bool) -> Box {
     if (present) {
-        // Annotated so the concat survives constant folding: two string literals fold.
-        let he: str = "he";
-        Box { item: some(he +++ "re"), count: some(7) }
+        Box { item: some(heap_str("here")), count: some(7) }
     } else {
         Box { item: none, count: none }
     }
@@ -26,10 +24,10 @@ fn make(present: bool) -> Box {
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 88
-instructions executed: 287
-binary size: 2808
-  code: 1252
+bytes allocated: 39
+instructions executed: 280
+binary size: 2784
+  code: 1228
   data: 231
   metadata: 1325
 functions:
@@ -53,4 +51,4 @@ functions:
     bytes: 100
   make:
     calls: 2
-    bytes: 564
+    bytes: 540

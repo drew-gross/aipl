@@ -81,7 +81,7 @@ fn go(a: str, b: str, i: i64) -> i64 { if (both_spaces(a, b, i)) { go(a, b, i + 
 pub fn common_space_prefix(a: str, b: str) -> i64 { go(a, b, 0) }";
     let e = Engine::compile(src).unwrap();
     use aipl::FfiValue::{Int, Str};
-    // Inline (<= 7-byte) arguments.
+    // Inline (<= 22-byte) arguments.
     assert_eq!(
         e.call_values(
             "common_space_prefix",
@@ -90,7 +90,10 @@ pub fn common_space_prefix(a: str, b: str) -> i64 { go(a, b, 0) }";
         .unwrap(),
         Int(2)
     );
-    // Long (heap, > 7-byte) leading-space runs exercise the heap arg buffer.
+    // Longer leading-space runs. NOTE: these are still *inline* — at 22 bytes of
+    // inline room every value in this test is, so the buffer argument path is not
+    // covered here. Lengthening them past 22 to cover it reproduces a crash; see
+    // `call_values_marshals_str_return` for the write-up.
     assert_eq!(
         e.call_values(
             "common_space_prefix",
@@ -112,8 +115,22 @@ pub fn common_space_prefix(a: str, b: str) -> i64 { go(a, b, 0) }";
 
 #[test]
 fn call_values_marshals_str_return() {
-    // Identity returns one of the (borrowed) argument buffers; concat builds a
-    // fresh heap string. Both must round-trip and free cleanly.
+    // Identity returns one of the (borrowed) argument values; concat builds a
+    // fresh one. Both must round-trip and free cleanly.
+    //
+    // **Every value here is inline**, and the comments used to claim otherwise
+    // ("heap arg", "> 7 bytes") against a 7-byte threshold that has since become
+    // 22. So the *buffer* path is untested: an inline argument owns no allocation,
+    // which makes `ArgBufs`' release of it a no-op and hides whether the release
+    // protocol balances at all.
+    //
+    // It does not. Passing any argument past 22 bytes here — e.g. a 40-byte string
+    // to `id` plus a 26-byte one to `shout` — makes this test SIGTRAP reliably,
+    // and it does so at HEAD too, so it is a latent bug and not a regression. The
+    // shape of it: a `str` result that aliases a borrowed argument is released
+    // twice, once by `read_ffi_result` under `owned` and once by `ArgBufs::drop`,
+    // and the second release lands on a freed buffer. Lengthening these strings is
+    // the right fix *after* that is addressed.
     let src = "\
 import { concat as +++} from builtins;
 pub fn id(s: str) -> str { s }
@@ -125,13 +142,14 @@ pub fn shout(s: str) -> str { s +++ \" is loud!\" }";
         e.call_values("id", &[Str("hi".into())]).unwrap(),
         Str("hi".into())
     );
-    // Heap arg; identity's return aliases that very buffer (copied out before free).
+    // A longer arg; identity's return aliases that very value, copied out before
+    // it is freed.
     assert_eq!(
         e.call_values("id", &[Str("a longer string".into())])
             .unwrap(),
         Str("a longer string".into())
     );
-    // Freshly built heap return (> 7 bytes), released after the bytes are copied.
+    // A freshly built return, released after the bytes are copied.
     assert_eq!(
         e.call_values("shout", &[Str("the alarm".into())]).unwrap(),
         Str("the alarm is loud!".into())

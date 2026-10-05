@@ -2786,8 +2786,9 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
     }
 }
 
-/// The builtin error type. For now it's represented exactly like `str` (an
-/// 8-byte heap pointer to a refcounted, NUL-terminated string) and behaves like
+/// The builtin error type. For now it's represented exactly like `str` (the
+/// 24-byte value in `aipl-codegen/src/str24.rs` — inline, a refcounted buffer, or
+/// a rope, with no NUL terminator in any of them) and behaves like
 /// one everywhere — but it's a *distinct* named type so error-specific
 /// functionality can be hung on it later. It's the Err payload of every
 /// error-returning builtin (e.g. the file functions' `str!Error` / `!Error`).
@@ -2897,6 +2898,24 @@ fn __builtin_to_str_len<T: any>(self: T) -> u64 { 0 }
 // Structural hash, consistent with `==`.
 fn __builtin_hash<T: any>(self: T) -> i64 { 0 }
 fn __builtin_trim(self: str) -> str { self }
+// The content of `self` in one *named* runtime representation, instead of
+// whichever one it arrived in. What they are for, and why naming the result beats
+// the operation that happens to produce it, is DESIGN_PRINCIPLES.md's "Just say
+// what you want"; the representations themselves are described at the top of
+// `crates/aipl-codegen/src/str24.rs`.
+//
+// A fresh refcounted buffer, at every length — so it allocates even where the
+// content would have fit inline, which is the request.
+fn __builtin_heap_str(self: str) -> str { self }
+// A rope node over the two, built even when an operand is empty (where `+++`
+// hands the other side back instead, and so cannot promise a rope).
+fn __builtin_rope_str(self: str, other: str) -> str { self }
+// Internal: `inline_str`'s unchecked half. Content past the inline capacity has
+// no inline form and comes back untouched, so `inline_str` does the length check
+// and answers `none` rather than calling this with content that cannot fit.
+fn __builtin_pack_inline(self: str) -> str { self }
+// Internal: the bound `inline_str` checks against, so nothing hardcodes it.
+fn __builtin_inline_capacity() -> u64 { 0 }
 // Concatenate `self` with itself `n` times; returns `""` for `n == 0`. The count
 // is unsigned, matching `len`: a repeat count is never negative, and its usual
 // source is length/column arithmetic (`" ".repeat(indent)`).
@@ -3032,8 +3051,8 @@ fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
 // NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
 // `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
-// `extend_optional`, `range`, `set_map`, `tuple_windows`, `union_all`, `value_or`,
-// and `value_or_err` are
+// `extend_optional`, `inline_str`, `range`, `set_map`, `tuple_windows`, `union_all`,
+// `value_or`, and `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
 // which is the single source of both their body and their signature.
 // `aipl_mono::aipl_builtin_sig_decls()` feeds those signatures to the checker and
@@ -3455,6 +3474,11 @@ pub const INTERNAL_BUILTINS: &[Callee] = &[
     Callee::Reserve,
     Callee::AssumeNonempty,
     Callee::ExtendOptional,
+    // The unchecked halves of `inline_str`: `pack_inline` has no answer for
+    // content past the inline capacity, and the capacity is the bound its one
+    // caller checks against. `inline_str` is the spelling.
+    Callee::PackInline,
+    Callee::InlineCapacity,
 ];
 
 /// Whether `callee` is one of [`INTERNAL_BUILTINS`].

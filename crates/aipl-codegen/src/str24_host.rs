@@ -1,10 +1,9 @@
-//! The JIT runtime's half of the 24-byte `str` (`STR_REPR.md`): the pieces that
-//! genuinely differ between the two runtimes, so the layout itself can be shared
-//! verbatim (see `str24.rs`).
+//! The JIT runtime's half of the 24-byte `str`: the pieces that genuinely differ
+//! between the two runtimes, so the layout itself can be shared verbatim (see
+//! `str24.rs`).
 //!
 //! That is I/O, and only I/O — `std::io`/`std::fs` here, `libc` in the AOT
 //! runtime.
-#![allow(dead_code)] // staged: wired up by the Stage 1 switch
 
 use super::str24::{for_each_chunk, from_bytes, Str, INLINE_CAP};
 

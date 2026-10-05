@@ -3,9 +3,9 @@
 # time, so `main` concatenating and allocating nothing means the join happened at
 # compile time. The asserts pin the folded values; `main` is what is measured.
 #
-# Only literals *in place* fold, so the cases that test the run-time concat
-# representation (`tests/cases/strings/concat/`) keep theirs by binding each leaf
-# with a type annotation — which the binding inliner refuses to substitute.
+# Only literals *in place* fold. A case that wants a run-time concat says so with
+# `rope_str` (see `tests/cases/strings/named_representations.aipl`) rather than
+# arranging for a `+++` to survive this pass.
 
 import { concat, concat as +++, equal as ==, print } from builtins;
 

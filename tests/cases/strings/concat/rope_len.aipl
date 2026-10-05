@@ -3,16 +3,10 @@
 # rope. Building an 18-byte rope and only measuring it allocates just the concat
 # node (1 allocation) — not a flattened 18-byte buffer (which would be a 2nd).
 
-import { concat as +++, len, print, to_str } from builtins;
+import { len, print, rope_str, to_str } from builtins;
 
 fn main() !prints {
-    // The leaves are bound with a type annotation because `+++` on two string
-    // literals is constant-folded; the annotation is what keeps the concat a
-    // run-time one (the binding inliner substitutes an unannotated single-use
-    // binding straight back).
-    let head: str = "Hello, ";
-    let tail: str = "rope world!";
-    let r = head +++ tail; // 18 bytes; never read as bytes
+    let r = rope_str("Hello, ", "rope world!"); // 18 bytes; never read as bytes
     print(to_str(len(r))); // 18
 }
 --- stdout ---

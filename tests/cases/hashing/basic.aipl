@@ -2,7 +2,7 @@
 # equal values hash equal. It recurses over every type. Set/dict hashing is
 # order-INDEPENDENT (matching their `==`); array hashing is order-sensitive.
 
-import { concat as +++, equal as ==, hash, not_equal as != } from builtins;
+import { equal as ==, hash, heap_str, not_equal as != } from builtins;
 
 fn h(x: i64) -> i64 { hash(x) }.test({
     assert(h(42) == hash(42)); // deterministic: same value, same hash
@@ -13,9 +13,7 @@ fn h(x: i64) -> i64 { hash(x) }.test({
 
 fn hs(s: str) -> i64 { hash(s) }.test({
     // By content — a heap-built string hashes like its literal.
-    // Annotated so the concat survives constant folding: two string literals fold.
-    let hel: str = "hel";
-    assert(hs("hello") == hash(hel +++ "lo"));
+    assert(hs("hello") == hash(heap_str("hello")));
     assert(hs("hello") != hs("world"));
 })
 
@@ -49,12 +47,12 @@ fn opt(b: bool) -> i64? { if (b) { some(5) } else { none } }.test({
 allocations: 9
 deallocations: 9
 reallocations: 0
-bytes allocated: 624
-instructions executed: 2776
-binary size: 14456
-  code: 9608
-  data: 1122
-  metadata: 3726
+bytes allocated: 575
+instructions executed: 2769
+binary size: 14432
+  code: 9572
+  data: 1130
+  metadata: 3730
 functions:
   __dict_drop_i64$str:
     calls: 4
@@ -73,7 +71,7 @@ functions:
     bytes: 808
   __test$hs:
     calls: 1
-    bytes: 436
+    bytes: 400
   __test$opt:
     calls: 1
     bytes: 1016

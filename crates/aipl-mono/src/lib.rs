@@ -7521,6 +7521,16 @@ impl Mono<'_> {
                         node(ExprKind::Call(callee.clone(), rargs, method_style)),
                         ret,
                     )
+                } else if *callee == Callee::RopeStr && atys.len() == 2 {
+                    // `rope_str(a, b)` builds a rope node, so it carries the
+                    // *concat-str* representation exactly as `+++` does below —
+                    // which is what lets a downstream `fn(s: str)` call pick the
+                    // concat-specialized instance. Naming the representation would
+                    // buy nothing if the type then forgot it.
+                    (
+                        node(ExprKind::Call(callee.clone(), rargs, method_style)),
+                        concat_str_ty(),
+                    )
                 } else if let Some(op) =
                     aipl_syntax::binop_for_builtin(callee).filter(|_| atys.len() == 2)
                 {
@@ -7867,6 +7877,7 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::TrimWhile, "builtin_trim_while.aipl"),
     (Callee::ValueOr, "builtin_value_or.aipl"),
     (Callee::ValueOrErr, "builtin_value_or_err.aipl"),
+    (Callee::InlineStr, "builtin_inline_str.aipl"),
 ];
 
 /// One [`AIPL_BUILTIN_SOURCES`] entry's `pub fn`, loaded through the real

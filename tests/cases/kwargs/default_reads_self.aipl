@@ -2,7 +2,7 @@
 # other — which is what lets a width, a limit, or a separator default to
 # something derived from the value the method was called on.
 
-import { concat as +++, equal as ==, len, print } from builtins;
+import { equal as ==, heap_str, len, print } from builtins;
 
 fn head(self: str, n: u64 = self.len()) -> str { self[..n] }.test({
     assert("hello".head() == "hello");
@@ -15,25 +15,23 @@ fn main() !prints {
 
     // A receiver that isn't already a name is evaluated once, into the binding
     // the default reads.
-    // Annotated so the concat survives constant folding: two string literals fold.
-    let he: str = "he";
-    print((he +++ "llo").head());
+    print(heap_str("hello").head());
 }
 --- stdout ---
 hello
 he
 hello
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 127
-instructions executed: 84
-binary size: 1256
-  code: 492
+bytes allocated: 39
+instructions executed: 77
+binary size: 1232
+  code: 468
   data: 1
   metadata: 763
 functions:
   main:
     calls: 1
-    bytes: 492
+    bytes: 468

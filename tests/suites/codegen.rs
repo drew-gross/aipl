@@ -142,21 +142,16 @@ fn concat_arg_emits_concat_specialized_instance() {
     // now, and it is the more honest one: it is a property of the body rather
     // than of a shape the inliner happened not to handle.
     //
-    // The concat leaves come through *annotated* bindings rather than being
-    // written as `"abcdefgh" +++ "ijklmnop"` in place: constant folding joins
-    // two `str` literals into one, and then there is no concat value left to
-    // specialize on. The annotation is what holds a literal out of reach — an
-    // unannotated single-use binding is substituted back to the concat site by
-    // `inline_single_use_bindings`, which refuses an annotated one.
+    // `rope_str` rather than `+++`: constant folding joins two `str` literals
+    // into one, and then there is no concat value left to specialize on. Naming
+    // the representation is the point — the argument here *is* "a concat-str", so
+    // the fixture says that instead of arranging for a `+++` to survive.
     let comp = compile(
-        "import { len, wrapping_add as +, concat as +++} from builtins;
+        "import { len, wrapping_add as +, rope_str } from builtins;
          fn label(s: str) -> u64 { s.len() + s.len() + s.len() + s.len() + s.len() }
          fn main() -> u64 {
-             let a: str = \"abcdefgh\";
-             let b: str = \"ijklmnop\";
-             let c: str = \"qrstuvwx\";
-             let d: str = \"yz012345\";
-             label(a +++ b) + label(c +++ d)
+             label(rope_str(\"abcdefgh\", \"ijklmnop\"))
+             + label(rope_str(\"qrstuvwx\", \"yz012345\"))
              + label(\"plainval\") + label(\"another0\")
          }",
     );

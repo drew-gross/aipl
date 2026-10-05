@@ -82,7 +82,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
-  I merged it anyway. Even if it doesn't help now, it forms a foundation for future improvements. That said: lets add some builtins: heap_str(), rope_str(), and lets also say inline_str() and so on. The tests that care about the specific string representation can use those functions. Actually, with that in mind, also add a new DESIGN_PRINCIPLE: just say what you want. Idioms and tricks to achieve a particular result are never as clear as calling functions that just name the result you want, and APIs should be designed with that in mind.
+  heap_str, rope_str, inline_str should probably be test-only or internal-only
   dict.key_values(|k, v| `{k}: {v}`) should exist, use it in append_missing
   step_result n should be u64 without 0, move 0 check to call site
   keyword_len and exact_len should accept str without "" for spelling
@@ -180,6 +180,7 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 bugs:
+  tests/suites/ffi.rs labelled its values "heap, > 7-byte" and "Freshly built heap return (> 7 bytes)". At a 22-byte inline capacity every string in those tests is inline, so the FFI buffer path was untested. I lengthened them past 22 to close that — and it SIGTRAPs, 15/15, deterministically <--- fix this bug
   array literal spreads evaluate their arguments (including effects) twice. Note: this is to pre-compute the length. But it would be nice to still pre-compute the length, if it can be done cheaply.
   return none; in a fn that returns i64? should work
   map over a generic struct's field trips the checker
@@ -685,6 +686,7 @@ vscode:
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 
 handoff:
+  do a better job of showing failures when a non-auto-fixable failure is found
   add what JS verification we can to handoff
   make handoff compile and install the vscode extension
   fix cargo doc --workspace

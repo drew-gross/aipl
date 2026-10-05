@@ -1,17 +1,9 @@
 # String materialized inline as a fn argument; lifetime must survive
 # the call.
 
-# `+++` on two string literals is constant-folded, so each leaf is bound with a
-# type annotation: that is what keeps the concat a run-time one (the binding
-# inliner substitutes an unannotated single-use binding straight back).
+import { equal as ==, rope_str } from builtins;
 
-import { concat as +++, equal as == } from builtins;
-
-fn joined() -> str {
-    let left: str = "hello, ";
-    let right: str = "world";
-    left +++ right
-}.test({
+fn joined() -> str { rope_str("hello, ", "world") }.test({
     assert(joined() == "hello, world");
 })
 --- performance ---
@@ -19,15 +11,12 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 88
-instructions executed: 52
-binary size: 1328
-  code: 356
-  data: 76
-  metadata: 896
+instructions executed: 49
+binary size: 1264
+  code: 332
+  data: 75
+  metadata: 857
 functions:
-  __test$joined:
-    calls: 1
-    bytes: 252
   aipl_assert:
     calls: 1
     bytes: (external)
@@ -42,4 +31,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 104
+    bytes: 332
