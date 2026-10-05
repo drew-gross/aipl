@@ -37,7 +37,6 @@
 # word-character set, which is the only case any rule set here has.
 
 import {
-    concat as +++,
     count_while,
     drop_last,
     equal as ==,
@@ -620,29 +619,28 @@ pub fn tm_json(Tm { note, name, scope_name, file_types, top, repo }) -> str {
         top: [Include("main")],
         repo: [Entry { name: "main", pats: [Match("""\bfn\b""", "keyword.toy")] }],
     };
-    assert(
-        tm_json(g) == """
-            {
-              "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-              "name": "Toy",
-              "scopeName": "source.toy",
-              "fileTypes": ["toy"],
+    assert(tm_json(g) == """
+        {
+          "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+          "name": "Toy",
+          "scopeName": "source.toy",
+          "fileTypes": ["toy"],
+          "patterns": [
+            { "include": "#main" }
+          ],
+          "repository": {
+            "main": {
               "patterns": [
-                { "include": "#main" }
-              ],
-              "repository": {
-                "main": {
-                  "patterns": [
-                    {
-                      "match": "\\bfn\\b",
-                      "name": "keyword.toy"
-                    }
-                  ]
+                {
+                  "match": "\\bfn\\b",
+                  "name": "keyword.toy"
                 }
-              }
+              ]
             }
-        """ +++ "\n",
-    );
+          }
+        }
+
+    """);
 })
 
 fn SCHEMA() -> str {
@@ -756,15 +754,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 520
-deallocations: 520
+allocations: 519
+deallocations: 519
 reallocations: 38
-bytes allocated: 40338
-instructions executed: 111120
-binary size: 120760
-  code: 79556
-  data: 5552
-  metadata: 35652
+bytes allocated: 40250
+instructions executed: 111110
+binary size: 120568
+  code: 79484
+  data: 5464
+  metadata: 35620
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -849,7 +847,7 @@ functions:
     bytes: 8556
   __test$tm_json:
     calls: 1
-    bytes: 4876
+    bytes: 4804
   __test$word_pat:
     calls: 1
     bytes: 2196
