@@ -13,7 +13,9 @@ fn h(x: i64) -> i64 { hash(x) }.test({
 
 fn hs(s: str) -> i64 { hash(s) }.test({
     // By content — a heap-built string hashes like its literal.
-    assert(hs("hello") == hash("hel" +++ "lo"));
+    // Annotated so the concat survives constant folding: two string literals fold.
+    let hel: str = "hel";
+    assert(hs("hello") == hash(hel +++ "lo"));
     assert(hs("hello") != hs("world"));
 })
 
@@ -50,9 +52,9 @@ reallocations: 0
 bytes allocated: 624
 instructions executed: 2776
 binary size: 14456
-  code: 9596
-  data: 1130
-  metadata: 3730
+  code: 9608
+  data: 1122
+  metadata: 3726
 functions:
   __dict_drop_i64$str:
     calls: 4
@@ -71,7 +73,7 @@ functions:
     bytes: 808
   __test$hs:
     calls: 1
-    bytes: 424
+    bytes: 436
   __test$opt:
     calls: 1
     bytes: 1016

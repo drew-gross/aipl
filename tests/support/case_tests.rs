@@ -540,6 +540,7 @@ case_tests! {
     cases_optimizations_appending_variant_not_minted = "cases/optimizations/appending_variant_not_minted",
     cases_optimizations_const_array_literal = "cases/optimizations/const_array_literal",
     cases_optimizations_const_fold = "cases/optimizations/const_fold",
+    cases_optimizations_const_fold_concat = "cases/optimizations/const_fold_concat",
     cases_optimizations_const_fold_saturating = "cases/optimizations/const_fold_saturating",
     cases_optimizations_count_fusion = "cases/optimizations/count_fusion",
     cases_optimizations_count_fusion_effects = "cases/optimizations/count_fusion_effects",

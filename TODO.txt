@@ -82,6 +82,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  I merged it anyway. Even if it doesn't help now, it forms a foundation for future improvements. That said: lets add some builtins: heap_str(), rope_str(), and lets also say inline_str() and so on. The tests that care about the specific string representation can use those functions. Actually, with that in mind, also add a new DESIGN_PRINCIPLE: just say what you want. Idioms and tricks to achieve a particular result are never as clear as calling functions that just name the result you want, and APIs should be designed with that in mind.
   dict.key_values(|k, v| `{k}: {v}`) should exist, use it in append_missing
   step_result n should be u64 without 0, move 0 check to call site
   keyword_len and exact_len should accept str without "" for spelling
@@ -464,12 +465,12 @@ design:
   apis should express intent
 
 optimizations:
+  concat("", v) should fold to v
   apply similar length optimizations to templates as we do to array literals with spreads
   spread length pre-computation doesn't have to be all-or-none because operations with no effects can be reordered safely
   pass manager should be a bit smarter about inline small and inline single use. Inlining is powerful, we should work hard to inline more.
   figure out / fix why template literals are peforming worse than concat chains
   make large array-literal construction table-driven rather than unrolled.
-  template literals should constant fold in their parts if constant
   string interning? replaing let tq = `"""`; f(tq, tq) with f(`"""`, `"""`); was slower, which I wouldn't expect
   for move-in detection:
       need a "last use before overwrite" flag

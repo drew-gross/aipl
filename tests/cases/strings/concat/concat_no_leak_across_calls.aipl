@@ -1,9 +1,17 @@
 # Allocate many short-lived concat results; if refcounts are right,
 # no leak, no double free.
 
+# `+++` on two string literals is constant-folded, so each leaf is bound with a
+# type annotation: that is what keeps the concat a run-time one (the binding
+# inliner substitutes an unannotated single-use binding straight back).
+
 import { concat as +++, equal as == } from builtins;
 
-fn build(n: i64) -> str { "x" +++ "y" }.test({
+fn build(n: i64) -> str {
+    let left: str = "x";
+    let right: str = "y";
+    left +++ right
+}.test({
     assert(build(0) == "xy");
 })
 --- performance ---
@@ -14,8 +22,8 @@ bytes allocated: 88
 instructions executed: 52
 binary size: 1280
   code: 320
-  data: 68
-  metadata: 892
+  data: 69
+  metadata: 891
 functions:
   __test$build:
     calls: 1

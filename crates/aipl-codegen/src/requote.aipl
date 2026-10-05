@@ -537,15 +537,15 @@ fn join_template(raw: bool, segs: str[], interps: str[]) -> str {
     assert(join_template(true, ["", ""], ["x"]) == "```{x}```");
 })
 --- performance ---
-allocations: 626
-deallocations: 626
+allocations: 622
+deallocations: 622
 reallocations: 8
-bytes allocated: 40594
-instructions executed: 166691
-binary size: 81440
-  code: 47976
+bytes allocated: 40242
+instructions executed: 166651
+binary size: 81048
+  code: 47708
   data: 8705
-  metadata: 24759
+  metadata: 24635
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 20
@@ -615,13 +615,13 @@ functions:
     bytes: 1756
   __test$requote:
     calls: 1
-    bytes: 3896
+    bytes: 3760
   __test$reswap:
     calls: 1
     bytes: 540
   __test$retemplate:
     calls: 1
-    bytes: 6084
+    bytes: 5952
   __test$single_cost:
     calls: 1
     bytes: 532

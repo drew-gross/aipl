@@ -21,10 +21,17 @@ struct Aaa { lead: i64, mid: Zzz?, tail: str, last: i64 }
 // The opaque `n` keeps the constructor out of reach of known-constructor
 // elimination, so the value really does round-trip through the field's storage.
 fn build(n: i64) -> Aaa {
-    lead: 11,
-    mid: if (n > 0) { some(Zzz { p: 22, q: 33, r: "in" +++ "ner" }) } else { none },
-    tail: "t" +++ "ail",
-    last: 44,
+    // `inner`/`tail` are built by concatenation to be genuinely heap-allocated;
+    // the leaves are annotated so the concats survive constant folding (two
+    // string literals fold).
+    let i: str = "in";
+    let t: str = "t";
+    Aaa {
+        lead: 11,
+        mid: if (n > 0) { some(Zzz { p: 22, q: 33, r: i +++ "ner" }) } else { none },
+        tail: t +++ "ail",
+        last: 44,
+    }
 }.test({
     let full = build(1);
     let empty = build(0);
@@ -69,11 +76,11 @@ allocations: 14
 deallocations: 14
 reallocations: 2
 bytes allocated: 1264
-instructions executed: 2011
-binary size: 8552
-  code: 4356
+instructions executed: 2032
+binary size: 8576
+  code: 4384
   data: 1033
-  metadata: 3163
+  metadata: 3159
 functions:
   __arr_drop_Aaa:
     calls: 1
@@ -116,7 +123,7 @@ functions:
     bytes: (external)
   build:
     calls: 8
-    bytes: 612
+    bytes: 640
   main:
     calls: 1
     bytes: 104

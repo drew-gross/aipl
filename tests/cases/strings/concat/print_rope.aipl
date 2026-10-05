@@ -7,12 +7,22 @@
 import { concat as +++, print } from builtins;
 
 fn main() !prints {
+    // The leaves are bound with a type annotation because `+++` on two string
+    // literals is constant-folded; the annotation is what keeps the concat a
+    // run-time one (the binding inliner substitutes an unannotated single-use
+    // binding straight back).
     // 18 bytes: materializing would heap-allocate a flattened buffer.
-    let greeting = "Hello, " +++ "rope world!";
+    let head: str = "Hello, ";
+    let tail: str = "rope world!";
+    let greeting = head +++ tail;
     print(greeting); // Hello, rope world!
 
     // A rope of ropes — printed leaf-by-leaf, no node flattened.
-    print(("aaaa" +++ "bbbb") +++ ("cccc" +++ "dddd")); // aaaabbbbccccdddd
+    let a: str = "aaaa";
+    let b: str = "bbbb";
+    let c: str = "cccc";
+    let d: str = "dddd";
+    print((a +++ b) +++ (c +++ d)); // aaaabbbbccccdddd
 }
 --- stdout ---
 Hello, rope world!
@@ -23,11 +33,11 @@ deallocations: 4
 reallocations: 0
 bytes allocated: 352
 instructions executed: 61
-binary size: 1176
-  code: 456
+binary size: 1184
+  code: 464
   data: 1
   metadata: 719
 functions:
   main:
     calls: 1
-    bytes: 456
+    bytes: 464

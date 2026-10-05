@@ -11,9 +11,13 @@ struct Name { first: str, last: str }
 struct Contact { name: Name, nick: str? }
 
 fn full_first(Contact { name }) -> str { name.first }.test({
+    // Annotated so the concat survives constant folding: two string literals fold.
+    let ad: str = "Ad";
+    let love: str = "Love";
+    let count: str = "Count";
     let c = Contact {
-        name: Name { first: "Ad" +++ "a", last: "Love" +++ "lace" },
-        nick: some("Count" +++ "ess"),
+        name: Name { first: ad +++ "a", last: love +++ "lace" },
+        nick: some(count +++ "ess"),
     };
     assert(full_first(c) == "Ada"); // heap str through two struct levels
     assert(c.name.last == "Lovelace");
@@ -25,14 +29,14 @@ deallocations: 3
 reallocations: 0
 bytes allocated: 264
 instructions executed: 268
-binary size: 2984
-  code: 1320
+binary size: 2992
+  code: 1328
   data: 214
   metadata: 1450
 functions:
   __test$full_first:
     calls: 1
-    bytes: 1212
+    bytes: 1220
   aipl_assert:
     calls: 3
     bytes: (external)

@@ -15,7 +15,9 @@ fn main() !prints {
 
     // A receiver that isn't already a name is evaluated once, into the binding
     // the default reads.
-    print(("he" +++ "llo").head());
+    // Annotated so the concat survives constant folding: two string literals fold.
+    let he: str = "he";
+    print((he +++ "llo").head());
 }
 --- stdout ---
 hello

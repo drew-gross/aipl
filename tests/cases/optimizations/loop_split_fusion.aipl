@@ -90,7 +90,9 @@ fn main() !prints {
 
     // A rope source, so the cursor's walk crosses a representation it cannot
     // index directly.
-    print(numbered("one\ntw" +++ "o\nthree"));
+    // Annotated so the concat survives constant folding: two string literals fold.
+    let head: str = "one\ntw";
+    print(numbered(head +++ "o\nthree"));
     // Long enough that every part is a heap window rather than an inline value.
     print(widths("first long piece\nsecond long piece", "\n"));
     print(materialized("alpha\nbeta\ngamma"));

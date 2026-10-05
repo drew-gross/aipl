@@ -19,9 +19,29 @@
 //!   (`__builtin_wrapping_add` etc.) with two `Num` arguments — only the
 //!   `__builtin_*` names, since an operator aliased to a *user* function is an
 //!   ordinary call
+//! - concatenation of two `Str` literals, written either way: `"a" +++ "b"` and
+//!   `concat("a", "b")` are one call after import resolution
 //!
-//! String concat, constant branch elimination, and propagation through
-//! bindings are out of scope for now.
+//! Only a concat whose operands are literals *in place* folds: this pass does
+//! not propagate a `str` literal through a binding (see [`propagatable`]).
+//! A plain `let s = "a"; s +++ "b"` does still fold, but one step earlier —
+//! [`crate::inline_single_use_bindings`] substitutes a single-use binding back
+//! into its use site, which is exactly its job. What survives is an **annotated**
+//! binding, which that pass refuses. So `let s: str = "a"; s +++ "b"` is a
+//! run-time concat, and that is load-bearing for the corpus: the cases that test
+//! the concat representation (`tests/cases/strings/concat/`) annotate their
+//! leaves for this reason, as does `concat_arg_emits_concat_specialized_instance`.
+//!
+//! **A template literal does not fold**, even when it is constant throughout.
+//! It lowers to a concat chain over *rendered* pieces (`__template_interp`), and
+//! folding one of those would mean a second implementation of the renderer —
+//! `aipl_write_i64`'s formatting, `"true"`/`"false"`, a `char`'s single raw
+//! byte — living here, agreeing byte-for-byte with the run-time one forever,
+//! with the fold itself removing the cases that would have caught a divergence
+//! (`strings/int_to_str/negatives` renders `i64::MIN` through `fmt_i64` only so
+//! long as that call survives to run time). The joiner the chain is built from
+//! (`__aipl_concat`) is deliberately not folded here either: without a rendered
+//! piece folding first, it never has two literals to join.
 
 use crate::passes::Scope;
 use std::collections::HashMap;
@@ -338,6 +358,16 @@ fn fold_binop(l: &Expr, op: BinOp, r: &Expr) -> Option<ExprKind> {
                 BinOp::Ne => ExprKind::Bool(a != b),
                 _ => return None,
             })
+        }
+        // Two `str` literals concatenate to one. At run time this is an
+        // allocation — codegen builds a lazy concat node holding both sides —
+        // so the fold trades two literals and a heap value for a single
+        // literal. Only `Str` on both sides: `+++` also accepts a `char[]`
+        // (same representation as `str`, see `is_char_array`), but an array
+        // literal of chars folded into a `Str` would change the expression's
+        // *type* from `char[]` to `str`, which is not folding.
+        (ExprKind::Str(a), ExprKind::Str(b)) if op == BinOp::Concat => {
+            Some(ExprKind::Str(format!("{a}{b}")))
         }
         // With both sides literal, `&&`/`||` short-circuiting is unobservable.
         (ExprKind::Bool(a), ExprKind::Bool(b)) => Some(match op {

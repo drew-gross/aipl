@@ -8,7 +8,10 @@
 import { concat as +++, print, to_str, trim } from builtins;
 
 fn main() !prints {
-    let greeting = "hi"; // inline literal (2 bytes)
+    // The annotation is what keeps the concat below a run-time one: an
+    // unannotated single-use binding is substituted into its use site, and
+    // `"hi" +++ "!"` is then two string literals, which constant-fold.
+    let greeting: str = "hi"; // inline literal (2 bytes)
     let banged = greeting +++ "!"; // inline concat -> "hi!" (3 bytes)
     print(banged);
     print(trim("  ok  ")); // inline trim result -> "ok" (2 bytes)

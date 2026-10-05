@@ -14,7 +14,9 @@ variant Aaa = Nothing | Has(Zzz?, i64, str)
 // Opaque so the constructor survives known-constructor elimination and the
 // payload is really read back out of the variant's storage.
 fn build(n: i64) -> Aaa {
-    if (n > 0) { Has(some(Zzz { p: 22, q: 33, r: "in" +++ "ner" }), 99, "tl") } else { Nothing }
+    // Annotated so the concat survives constant folding: two string literals fold.
+    let i: str = "in";
+    if (n > 0) { Has(some(Zzz { p: 22, q: 33, r: i +++ "ner" }), 99, "tl") } else { Nothing }
 }.test({
     match (build(1)) {
         Nothing => assert(false),

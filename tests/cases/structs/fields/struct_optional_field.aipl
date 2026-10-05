@@ -9,7 +9,9 @@ struct Box { item: str?, count: i64? }
 
 fn make(present: bool) -> Box {
     if (present) {
-        Box { item: some("he" +++ "re"), count: some(7) }
+        // Annotated so the concat survives constant folding: two string literals fold.
+        let he: str = "he";
+        Box { item: some(he +++ "re"), count: some(7) }
     } else {
         Box { item: none, count: none }
     }

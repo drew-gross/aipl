@@ -12,10 +12,12 @@ fn shift_start_x(l: Line, by: i64) -> Line {
     set m.start.x += by;
     m
 }.test({
+    // Annotated so the concat survives constant folding: two string literals fold.
+    let diag: str = "diag";
     let l = Line {
         start: Point { x: 1, y: 2 },
         end: Point { x: 10, y: 20 },
-        label: "diag" +++ "onal",
+        label: diag +++ "onal",
     };
     let m = shift_start_x(l, 100);
     assert(m.start.x == 101); // updated nested field
@@ -36,15 +38,14 @@ fn retag(s: Seg, tag: str, y: i64) -> Seg {
     set t.line.label = tag;
     t
 }.test({
+    // Annotated so the concat survives constant folding: two string literals fold.
+    let old: str = "old";
+    let new: str = "new";
     let s = Seg {
-        line: Line {
-            start: Point { x: 1, y: 2 },
-            end: Point { x: 10, y: 20 },
-            label: "old" +++ "!",
-        },
+        line: Line { start: Point { x: 1, y: 2 }, end: Point { x: 10, y: 20 }, label: old +++ "!" },
         id: 5,
     };
-    let t = retag(s, "new" +++ "!", 9);
+    let t = retag(s, new +++ "!", 9);
     assert(t.line.start.y == 9); // updated three levels down
     assert(t.line.start.x == 1); // deep sibling unchanged
     assert(t.line.label == "new!"); // replaced heap field
@@ -58,13 +59,13 @@ reallocations: 0
 bytes allocated: 264
 instructions executed: 735
 binary size: 5880
-  code: 2940
+  code: 2944
   data: 605
-  metadata: 2335
+  metadata: 2331
 functions:
   __test$retag:
     calls: 1
-    bytes: 1868
+    bytes: 1872
   __test$shift_start_x:
     calls: 1
     bytes: 892

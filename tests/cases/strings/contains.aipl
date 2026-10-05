@@ -23,7 +23,9 @@ fn first_char(s: str) -> char? { s[0] }.test({
     assert("".contains(""));
 
     // A rope receiver (built by `+++`) is searched across the join.
-    let rope = "abc" +++ "def";
+    // Annotated so the concat survives constant folding: two string literals fold.
+    let abc: str = "abc";
+    let rope = abc +++ "def";
     assert(rope.contains("cd"));
     assert(!rope.contains("ce"));
 

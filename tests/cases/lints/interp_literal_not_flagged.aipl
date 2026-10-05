@@ -3,7 +3,9 @@
 import { concat as +++, print } from builtins;
 
 fn main() !prints {
-    let s = "x";
+    // Annotated so the concat below stays one: an unannotated single-use
+    // binding is substituted into its use site, and two string literals fold.
+    let s: str = "x";
 
     // A literal that is *part* of the interpolation's expression computes
     // something; only a literal standing alone is the template's own text.

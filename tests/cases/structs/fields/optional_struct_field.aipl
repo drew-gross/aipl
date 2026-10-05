@@ -15,9 +15,10 @@ struct Holder { lead: i64, mid: Inner?, tag: Tag? = none, deep: Inner?? = none }
 fn absent(n: i64) -> Holder { lead: n, mid: none }
 
 fn present(n: i64) -> Holder {
-    lead: n,
-    mid: some(Inner { a: n, b: "he" +++ "re" }),
-    tag: some(Blue(n)),
+    // `he` is annotated so the concat survives constant folding (two string
+    // literals fold), keeping `b` a genuinely heap-allocated str.
+    let he: str = "he";
+    Holder { lead: n, mid: some(Inner { a: n, b: he +++ "re" }), tag: some(Blue(n)) }
 }.test({
     let p = present(7);
     let e = absent(7);

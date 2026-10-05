@@ -1,0 +1,46 @@
+# Concatenating two string literals folds to a single literal. The allocation
+# count below is the proof: a `+++` builds a lazy concat node on the heap at run
+# time, so `main` concatenating and allocating nothing means the join happened at
+# compile time. The asserts pin the folded values; `main` is what is measured.
+#
+# Only literals *in place* fold, so the cases that test the run-time concat
+# representation (`tests/cases/strings/concat/`) keep theirs by binding each leaf
+# with a type annotation — which the binding inliner refuses to substitute.
+
+import { concat, concat as +++, equal as ==, print } from builtins;
+
+fn chain() -> str { "a" +++ "b" +++ "c" }.test({
+    assert(chain() == "abc");
+})
+
+// The operator and the named builtin are the same call — the alias is the only
+// difference — so both fold.
+fn named() -> str { concat("x", "y") }.test({
+    assert(named() == "xy");
+})
+
+// An empty operand is still just a literal: nothing special-cases it, the two
+// literals simply join.
+fn empty() -> str { ("" +++ "lone") +++ "" }.test({
+    assert(empty() == "lone");
+})
+
+fn main() !prints {
+    print("folded" +++ "!");
+}
+--- stdout ---
+folded!
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 12
+binary size: 600
+  code: 84
+  data: 1
+  metadata: 515
+functions:
+  main:
+    calls: 1
+    bytes: 84

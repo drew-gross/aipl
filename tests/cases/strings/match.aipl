@@ -27,7 +27,9 @@ fn main() !prints {
     print(classify("bar")); // got bar
     print(classify("")); // empty
     print(classify("baz")); // other
-    print(classify("f" +++ "oo")); // got foo  (a rope scrutinee compares by content)
+    // Annotated so the concat survives constant folding: two string literals fold.
+    let f: str = "f";
+    print(classify(f +++ "oo")); // got foo  (a rope scrutinee compares by content)
     print(to_str(code("a"))); // 1
     print(to_str(code("bb"))); // 2
     print(to_str(code("zzz"))); // 0

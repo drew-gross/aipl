@@ -28,7 +28,11 @@ fn struct_values() -> #{str: Point} { #{"o": Point { x: 1, y: 2 }} }.test({
 
 fn heap_str_values() -> #{str: str} {
     // Non-static (heap) string keys and values: the dict co-owns and frees them.
-    #{"k" +++ "1": "a" +++ "b", "k" +++ "2": "c" +++ "d"}
+    // Annotated so the concat survives constant folding: two string literals fold.
+    let k: str = "k";
+    let a: str = "a";
+    let c: str = "c";
+    #{k +++ "1": a +++ "b", k +++ "2": c +++ "d"}
 }.test({
     let d = heap_str_values();
     assert(d.get("k1") == some("ab"));
@@ -45,11 +49,11 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 1072
-instructions executed: 1555
-binary size: 12648
-  code: 7260
+instructions executed: 1548
+binary size: 12640
+  code: 7256
   data: 850
-  metadata: 4538
+  metadata: 4534
 functions:
   __dict_drop_bool$str:
     calls: 1
@@ -101,7 +105,7 @@ functions:
     bytes: 908
   __test$heap_str_values:
     calls: 1
-    bytes: 1060
+    bytes: 1056
   __test$optional_values:
     calls: 1
     bytes: 876

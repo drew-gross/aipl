@@ -17,7 +17,9 @@ fn build() -> #{str} {
     assert(!s.has("grape"));
 
     // Membership is by content: a freshly built "banana" still matches.
-    let key = "ba" +++ "nana";
+    // Annotated so the concat survives constant folding: two string literals fold.
+    let ba: str = "ba";
+    let key = ba +++ "nana";
     assert(s.has(key));
 
     // Equality is order-independent and by content.

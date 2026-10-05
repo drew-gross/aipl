@@ -42,8 +42,10 @@ fn clamp_low(x: i64, lo: i64) -> i64 { x.max(lo) }.test({
 
     // Freshly allocated (non-static) strings, so the losing operand is freed and
     // the winner is retained — the balanced counts below are what proves it.
-    let a = "x" +++ "yz";
-    let b = "x" +++ "ya";
+    // Annotated so the concat survives constant folding: two string literals fold.
+    let x: str = "x";
+    let a = x +++ "yz";
+    let b = x +++ "ya";
     assert(min(a, b) == "xya");
     assert(max(a, b) == "xyz");
 })
@@ -52,15 +54,15 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 176
-instructions executed: 504
-binary size: 6232
-  code: 2500
+instructions executed: 497
+binary size: 6208
+  code: 2480
   data: 1067
-  metadata: 2665
+  metadata: 2661
 functions:
   __test$clamp_low:
     calls: 1
-    bytes: 2392
+    bytes: 2372
   aipl_assert:
     calls: 20
     bytes: (external)

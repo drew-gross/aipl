@@ -18,7 +18,9 @@ fn label(Person { name }) -> str {
 fn rename(Person { age }, n: str) -> Person { name: Named(n), age }
 
 fn main() !prints {
-    let p = Person { name: Named("al" +++ "ice"), age: 30 };
+    // Annotated so the concat survives constant folding: two string literals fold.
+    let al: str = "al";
+    let p = Person { name: Named(al +++ "ice"), age: 30 };
     print(label(p));
     print(label(Person { name: Anon, age: 1 }));
     // Struct with a variant field round-trips through a function return.

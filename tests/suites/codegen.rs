@@ -141,11 +141,22 @@ fn concat_arg_emits_concat_specialized_instance() {
     // rewritten and inlined like anything else — so the size is the reason
     // now, and it is the more honest one: it is a property of the body rather
     // than of a shape the inliner happened not to handle.
+    //
+    // The concat leaves come through *annotated* bindings rather than being
+    // written as `"abcdefgh" +++ "ijklmnop"` in place: constant folding joins
+    // two `str` literals into one, and then there is no concat value left to
+    // specialize on. The annotation is what holds a literal out of reach — an
+    // unannotated single-use binding is substituted back to the concat site by
+    // `inline_single_use_bindings`, which refuses an annotated one.
     let comp = compile(
         "import { len, wrapping_add as +, concat as +++} from builtins;
          fn label(s: str) -> u64 { s.len() + s.len() + s.len() + s.len() + s.len() }
          fn main() -> u64 {
-             label(\"abcdefgh\" +++ \"ijklmnop\") + label(\"qrstuvwx\" +++ \"yz012345\")
+             let a: str = \"abcdefgh\";
+             let b: str = \"ijklmnop\";
+             let c: str = \"qrstuvwx\";
+             let d: str = \"yz012345\";
+             label(a +++ b) + label(c +++ d)
              + label(\"plainval\") + label(\"another0\")
          }",
     );

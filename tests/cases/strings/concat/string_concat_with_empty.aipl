@@ -1,10 +1,21 @@
+# An empty leaf on either side of a run-time concat. `+++` on two string literals
+# is constant-folded, so the non-empty leaf is bound with a type annotation: that
+# is what keeps the concat a run-time one (the binding inliner substitutes an
+# unannotated single-use binding straight back).
+
 import { concat as +++, equal as == } from builtins;
 
-fn lead_empty() -> str { "" +++ "lone" }.test({
+fn lead_empty() -> str {
+    let s: str = "lone";
+    "" +++ s
+}.test({
     assert(lead_empty() == "lone");
 })
 
-fn trail_empty() -> str { "lone" +++ "" }.test({
+fn trail_empty() -> str {
+    let s: str = "lone";
+    s +++ ""
+}.test({
     assert(trail_empty() == "lone");
 })
 --- performance ---
@@ -12,12 +23,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 96
-binary size: 1720
-  code: 572
-  data: 144
-  metadata: 1004
+instructions executed: 102
+binary size: 1872
+  code: 628
+  data: 145
+  metadata: 1099
 functions:
+  __test$lead_empty:
+    calls: 1
+    bytes: 224
+  __test$trail_empty:
+    calls: 1
+    bytes: 224
   aipl_assert:
     calls: 2
     bytes: (external)
@@ -32,4 +49,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 572
+    bytes: 180
