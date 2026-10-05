@@ -1,0 +1,73 @@
+# `map`'s third receiver is a `Span`, so a range of positions maps to one element
+# per position, with the lambda handed the index — a `u64`, like every other bound
+# and length. (The other two are an array and an optional.)
+#
+# This is what `range` was added for: `xs.range().map(|i| ..)` replaces a `mut acc`
+# plus a counted `for`. A bare `a..b` works the same way, with no array in sight.
+
+import { map, print, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
+
+fn label(i: u64) -> str { `_{i}` }
+
+fn main() !prints {
+    print((0..4).map(|i| i * i).to_str());
+    // A non-zero start maps the positions it names, not `0..count`.
+    print((2..5).map(|i| i).to_str());
+
+    // Empty, and backwards — both map to nothing rather than erroring, matching
+    // what `for (let i : 5..2)` iterates and what `s[5..2]` slices.
+    print((0..0).map(|i| i).to_str());
+    print((5..2).map(|i| i).to_str());
+    // A named function, and a captured binding, exactly as over an array.
+    print((0..3).map(label).to_str());
+    let base: u64 = 100;
+    print((0..3).map(|i| i + base).to_str());
+}
+--- stdout ---
+[0, 1, 4, 9]
+[2, 3, 4]
+[]
+[]
+["_0", "_1", "_2"]
+[100, 101, 102]
+--- performance ---
+allocations: 21
+deallocations: 21
+reallocations: 2
+bytes allocated: 882
+instructions executed: 2649
+binary size: 5920
+  code: 3320
+  data: 139
+  metadata: 2461
+functions:
+  __to_str_str$arr:
+    calls: 1
+    bytes: 828
+  __to_str_u64:
+    calls: 3
+    bytes: 204
+  __to_str_u64$arr:
+    calls: 5
+    bytes: 708
+  aipl_array_dec:
+    calls: 6
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 13
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 6
+    bytes: (external)
+  aipl_u64_len:
+    calls: 26
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 24
+    bytes: (external)
+  aipl_write_u64:
+    calls: 13
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1580

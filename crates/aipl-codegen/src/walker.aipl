@@ -3515,10 +3515,10 @@ deallocations: 94923
 reallocations: 18556
 bytes allocated: 22202940
 instructions executed: 68327324
-binary size: 19897432
-  code: 12878572
+binary size: 19897256
+  code: 12878444
   data: 40764
-  metadata: 6978096
+  metadata: 6978048
 functions:
   __arr_drop_ImportEntry:
     calls: 19
@@ -4635,7 +4635,7 @@ functions:
     bytes: 532
   __m7__tuple_slot_names:
     calls: 0
-    bytes: 548
+    bytes: 420
   __m7__tuple_ty:
     calls: 0
     bytes: 952

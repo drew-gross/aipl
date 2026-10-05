@@ -99,6 +99,9 @@ pub enum Callee {
     /// `contains(self: T[], needle: T*)`, likewise.
     Contains(SeqShape),
     Len,
+    /// `range(self: T[]) -> Span` — `0..len`, the index range the receiver's
+    /// elements sit in. AIPL-implemented (`builtin_range.aipl`).
+    Range,
     IsNonempty,
     IsEmpty,
     Push,
@@ -319,6 +322,7 @@ impl Callee {
         Callee::StartsWithAt(SeqShape::Seq),
         Callee::EndsWith(SeqShape::Seq),
         Callee::Len,
+        Callee::Range,
         Callee::IsNonempty,
         Callee::IsEmpty,
         Callee::Push,
@@ -481,6 +485,7 @@ impl Callee {
             Callee::EndsWith(_) => "__builtin_ends_with",
             Callee::Contains(_) => "__builtin_contains",
             Callee::Len => "__builtin_len",
+            Callee::Range => "__builtin_range",
             Callee::IsNonempty => "__builtin_is_nonempty",
             Callee::IsEmpty => "__builtin_is_empty",
             Callee::Push => "__builtin_push",

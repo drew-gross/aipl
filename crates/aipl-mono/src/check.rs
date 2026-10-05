@@ -29,7 +29,7 @@ use aipl_syntax::ast::{
 };
 use aipl_syntax::{
     binop_spelling, is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr,
-    type_name, unrefined, Error, Span,
+    type_name, unrefined, Error, Span, SPAN_TYPE,
 };
 
 /// A lambda body's type with its error side filled in from a `?` the body
@@ -3362,7 +3362,7 @@ impl Cx<'_> {
                     // `a` up to but not including `b`. The variable is a `u64`,
                     // the type of a range's bounds; mono lowers the loop to the
                     // counted `while` it stands for.
-                    Type::Named(n) if n == "__builtin_Span" => Type::Primitive(Primitive::U64),
+                    Type::Named(n) if n == SPAN_TYPE => Type::Primitive(Primitive::U64),
                     // A dict walks its pairs, binding the *value* — a dict is
                     // indexed by its key, so its key is the index binder and its
                     // value the element, exactly as an array's position and
@@ -3565,7 +3565,7 @@ impl Cx<'_> {
                 // `s[span]` — a `Span` index is slice sugar for
                 // `s[span.start..span.end]`, so it takes the slice rules:
                 // a `str` or array receiver, sliced to its own type.
-                if matches!(&it, Type::Named(n) if n == "__builtin_Span") {
+                if matches!(&it, Type::Named(n) if n == SPAN_TYPE) {
                     return self.slice_receiver_ty(&ot, obj.span.clone());
                 }
                 expect_len_operand(&it, "array index", idx.span.clone())?;
@@ -3676,7 +3676,7 @@ impl Cx<'_> {
                     // `start..end` desugars to a `__builtin_Span` construction, so
                     // its two fields are slice bounds by another name — accept
                     // either signedness there, exactly as `xs[a..b]` does.
-                    if name == "__builtin_Span" {
+                    if name == SPAN_TYPE {
                         expect_len_operand(&vt, &ctx, fi.value.span.clone())?;
                     } else {
                         // A bare literal takes the field's int type.
@@ -4467,17 +4467,30 @@ impl Cx<'_> {
                 span.clone(),
             ));
         }
-        // `map` over an optional: the declared signature is the array form
-        // (`self: T[]` to `U[]`), and an optional receiver takes the same
-        // signature with `?` for `[]` at both ends — `some(v)` maps to
-        // `some(f(v))`, `none` to `none`. The lambda is then checked against
-        // the optional's payload type exactly as it is against an element.
-        let over_optional;
-        let sig = if *callee == Callee::Map
-            && matches!(self.check_expr(&args[0], env, effects)?, Type::Optional(_))
-        {
-            over_optional = optional_map_signature(sig);
-            &over_optional
+        // `map`'s other two receivers. The declared signature is the array form
+        // (`self: T[]` to `U[]`); each of these takes that same signature with
+        // the receiver and result rewritten, and the lambda is then checked
+        // against the element type the rewrite names exactly as it is against an
+        // array's.
+        //
+        // - An **optional**: `?` for `[]` at both ends — `some(v)` maps to
+        //   `some(f(v))`, `none` to `none`.
+        // - A **`Span`**: the receiver is the span, the element is the `u64`
+        //   index, and the result is still an array — one element per position in
+        //   `start..end` (see `span_map_signature`).
+        let rewritten;
+        let sig = if *callee == Callee::Map {
+            match self.check_expr(&args[0], env, effects)? {
+                Type::Optional(_) => {
+                    rewritten = optional_map_signature(sig);
+                    &rewritten
+                }
+                ty if is_span(&ty) => {
+                    rewritten = span_map_signature(sig);
+                    &rewritten
+                }
+                _ => sig,
+            }
         } else {
             sig
         };
@@ -4561,10 +4574,11 @@ impl Cx<'_> {
                 // possible, and "arg 0" for it would name a position the reader
                 // never wrote. The wording then matches the check
                 // monomorphization still makes behind this one.
-                // `map` takes either container; the optional form was not
-                // selected above, so name both rather than the one that was.
+                // `map` takes any of three receivers; none of the rewrites was
+                // selected above, so name them all rather than the array form
+                // the declaration happens to spell.
                 let shape = if *callee == Callee::Map && i == 0 {
-                    "an array or an optional"
+                    "an array, an optional or a Span"
                 } else {
                     shape_name(pty)
                 };
@@ -5247,6 +5261,40 @@ fn optional_map_signature(array_form: &Signature) -> Signature {
     }
     sig.return_ty = sig.return_ty.as_ref().map(as_optional);
     sig
+}
+
+/// `map` over a [`Span`]: the array form with the span as the receiver and the
+/// `u64` index as the element, keeping the array result.
+///
+/// A `Span` is a *range of positions*, so mapping it yields one element per
+/// position — `0..3` gives three — and the element handed to the lambda is the
+/// index itself, `u64` like every other length and bound in the language. The
+/// result stays an array: positions are a sequence, unlike the optional form,
+/// where the receiver's shape is what the result has to mirror.
+///
+/// [`Span`]: aipl_syntax::Span
+fn span_map_signature(array_form: &Signature) -> Signature {
+    let mut sig = array_form.clone();
+    if let Some(receiver) = sig.params.first_mut() {
+        receiver.ty = Type::Named(SPAN_TYPE.to_string());
+    }
+    // `f: (T) -> U` becomes `f: (u64) -> U`: the index replaces the element, and
+    // `U` stays the variable the return type is built from.
+    if let Some(f) = sig.params.get_mut(1) {
+        if let Type::Fn(params, _) = &mut f.ty {
+            if let Some(p) = params.first_mut() {
+                *p = Type::Primitive(Primitive::U64);
+            }
+        }
+    }
+    sig
+}
+
+/// Whether `ty` is the builtin `Span` struct — `map`'s third receiver, and the
+/// one type whose *name* decides a dispatch, so the comparison is here rather
+/// than spelled out at each site.
+fn is_span(ty: &Type) -> bool {
+    matches!(ty, Type::Named(n) if n == SPAN_TYPE)
 }
 
 /// Strip the internal `__builtin_` prefix for diagnostics.

@@ -10,7 +10,7 @@ variant Kind = Word | Num
 // `Step<K>` reaches monomorphization as a `Generic` application, not a named
 // type. Reading a field off one used to fall through to a default of `i64`, so
 // `s.tok` inferred as `i64` however it was declared — and the failure surfaced
-// at the *use*, as "map expects an array or an optional, got i64", rather than
+// at the *use*, as "map expects an array, an optional or a Span, got i64", rather than
 // at the field. The checker resolves the same field correctly, so only code
 // past type-checking saw it.
 struct Step<K> { tok: Tok<K>?, plain: Tok<K>, label: str }

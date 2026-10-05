@@ -86,6 +86,7 @@ import {
     min,
     not_equal as !=,
     push,
+    range,
     right_fold,
     same_case,
     starts_with,
@@ -2185,13 +2186,7 @@ fn seq(head: Expr, rest: Expr, span: Span) -> Expr { at(Seq(head, rest), span) }
 
 # The field names a tuple pattern reads: `_0`, `_1`, ... one per binder, which is
 # how the AST spells a tuple's slots.
-fn tuple_slot_names(names: str[]) -> str[] {
-    mut slots: str[] = [];
-    for (let i, n : names) {
-        set slots.push(`_{i}`);
-    }
-    slots
-}
+fn tuple_slot_names(names: str[]) -> str[] { names.range().map(|i| `_{i}`) }
 
 # `let a = <tmp>.<field0>; let b = <tmp>.<field1>; rest`, innermost last — the
 # body of both destructuring forms, which differ only in the field names they
@@ -4938,13 +4933,13 @@ fn why(src: str) -> str {
 --- performance ---
 allocations: 1605151
 deallocations: 1605151
-reallocations: 308103
-bytes allocated: 333093658
-instructions executed: 554829900
-binary size: 6949960
-  code: 4598908
+reallocations: 308106
+bytes allocated: 333093634
+instructions executed: 554829771
+binary size: 6949784
+  code: 4598780
   data: 62708
-  metadata: 2288344
+  metadata: 2288296
 functions:
   __arr_drop___m11__ModeFrame:
     calls: 537
@@ -5904,7 +5899,7 @@ functions:
     calls: 2318
     bytes: (external)
   aipl_arr_elem_ptr:
-    calls: 362
+    calls: 360
     bytes: (external)
   aipl_arr_extend:
     calls: 19454
@@ -5925,19 +5920,19 @@ functions:
     calls: 36
     bytes: (external)
   aipl_array_dec:
-    calls: 4842764
+    calls: 4842761
     bytes: (external)
   aipl_array_new:
     calls: 82744
     bytes: (external)
   aipl_array_push:
-    calls: 176552
+    calls: 176549
     bytes: (external)
   aipl_array_push_mut:
     calls: 771686
     bytes: (external)
   aipl_array_with_cap:
-    calls: 40486
+    calls: 40489
     bytes: (external)
   aipl_assert:
     calls: 365
@@ -6397,7 +6392,7 @@ functions:
     bytes: 532
   tuple_slot_names:
     calls: 3
-    bytes: 548
+    bytes: 420
   tuple_ty:
     calls: 15
     bytes: 952

@@ -3032,8 +3032,8 @@ fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
 // NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
 // `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
-// `extend_optional`, `set_map`, `tuple_windows`, `union_all`, `value_or`, and
-// `value_or_err` are
+// `extend_optional`, `range`, `set_map`, `tuple_windows`, `union_all`, `value_or`,
+// and `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
 // which is the single source of both their body and their signature.
 // `aipl_mono::aipl_builtin_sig_decls()` feeds those signatures to the checker and
@@ -3509,6 +3509,11 @@ pub const SHIM_SLOT_COUNT: usize = 2;
 /// and mapped to a reserved canonical name so a user's own type of the same
 /// name can never silently collide.
 pub const IMPORTABLE_BUILTIN_TYPES: &[&str] = &["Span", "ExecResult"];
+
+/// The canonical name of the builtin `Span` struct — what an imported `Span`
+/// resolves to, and the name every pass that dispatches on "is this a range?"
+/// compares against (iterating one, slicing by one, `map`ping one).
+pub const SPAN_TYPE: &str = "__builtin_Span";
 
 /// Canonical internal name for an importable builtin type, or `None` if
 /// `name` isn't one. Mirrors [`builtin_canonical`] for types: the loader

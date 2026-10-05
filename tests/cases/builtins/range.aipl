@@ -1,0 +1,81 @@
+# `xs.range()` is `0..xs.len()` as a `Span`: every index the receiver's elements
+# sit in. A `Span` rather than a type of its own because the language already has
+# one for a half-open range — which is what makes `xs[xs.range()]` the identity
+# slice, and `xs.range().map(..)` the index-wise counterpart of `xs.map(..)`.
+
+import { equal as ==, map, print, range, to_str } from builtins;
+
+fn main() !prints {
+    print([10, 20, 30].range().to_str());
+    // Empty in, empty out — not an error, and not a one-element range.
+    print([1, 2][..0].range().to_str());
+    // Only the length is read, so the element type never reaches the result.
+    print(range(["a", "b"]).to_str()); // free-call form
+    // The whole receiver, by the span that names it.
+    let xs = ["a", "b", "c"];
+    print((xs[xs.range()] == xs).to_str());
+    // What it is for: the positions, mapped.
+    print(xs.range().map(|i| `_{i}`).to_str());
+}
+--- stdout ---
+Span { start: 0, end: 3 }
+Span { start: 0, end: 0 }
+Span { start: 0, end: 2 }
+true
+["_0", "_1", "_2"]
+--- performance ---
+allocations: 18
+deallocations: 18
+reallocations: 2
+bytes allocated: 881
+instructions executed: 1480
+binary size: 6976
+  code: 3540
+  data: 339
+  metadata: 3097
+functions:
+  __eq_str$arr:
+    calls: 1
+    bytes: 364
+  __to_str___builtin_Span:
+    calls: 3
+    bytes: 484
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  __to_str_str$arr:
+    calls: 1
+    bytes: 828
+  __to_str_u64:
+    calls: 3
+    bytes: 204
+  aipl_arr_inc:
+    calls: 1
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 5
+    bytes: (external)
+  aipl_array_new:
+    calls: 2
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 3
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
+    bytes: (external)
+  aipl_u64_len:
+    calls: 18
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 23
+    bytes: (external)
+  aipl_write_u64:
+    calls: 9
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1428

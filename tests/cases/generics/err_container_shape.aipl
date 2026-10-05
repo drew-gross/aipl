@@ -42,19 +42,19 @@ fn main() !prints {
     print(to_str(scalar().len()));
 }
 --- errors ---
-error: map expects an array or an optional, got i64
+error: map expects an array, an optional or a Span, got i64
   --> ./tests/cases/generics/err_container_shape.aipl:23:5
    |
 23 |     n.map(|x| x + 1)
    |     ^
 
-error: map expects an array or an optional, got P
+error: map expects an array, an optional or a Span, got P
   --> ./tests/cases/generics/err_container_shape.aipl:28:30
    |
 28 | fn a_struct(p: P) -> i64[] { p.map(|x| x + 1) }
    |                              ^
 
-error: map expects an array or an optional, got V
+error: map expects an array, an optional or a Span, got V
   --> ./tests/cases/generics/err_container_shape.aipl:30:31
    |
 30 | fn a_variant(v: V) -> i64[] { v.map(|x| x + 1) }

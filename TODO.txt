@@ -90,18 +90,13 @@ misc cleanup:
   move inlining after type checking so that the type refinement problems don't happen
   optimizations don't need internal fixpointing, since we now have pass manager. inline_small probably needs a guard against inline itself if recursive and small though.
   go through and remove all comments that talk about how the code used to work.
-  Symbol and Import should use SpanStr
   Tpl and Tok should not be abbreviated
   get rid of convention of using 0..0 span as a substitute for none
   unordered set needs some way to convert to array
-  class_meta should be a const set
-  dedent_segments should be able to do better than a join/split. Maybe a process raw string segments?
-  match_arm parser in patterns looks like it can be simpler, the => arm_body part is non-DRY
   fn nest and fn one have a lot of overlap
   link should return a Grammar without Named, rule_first and rule_labels should use it
   sep_spelling should use _ matches
   there are lots of functions in binaries with zero calls. Maybe due to inlining? They mostly shouldn't show up in the binary.
-  tuple_slot_names should be a range->map I think?
   Mk/TryMk should maybe have single-kid variants? Or Kids+ variants? Or maybe Build should have a OneKid variant?
   make Rule =='able again, maybe by separating the refuse renderers from the rule structure? Since the problem is that it contains a function. Or maybe make functions == comparable?
   bind_fields_mut looks like it can be a zip->reverse->for, also maybe mutable can default to false and then bind_fields doens't need to exist (or only it exists)

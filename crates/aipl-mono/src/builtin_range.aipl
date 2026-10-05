@@ -1,0 +1,98 @@
+# The AIPL implementation of the `range` builtin. Monomorphization registers this
+# under the canonical name `__builtin_range` (see `AIPL_BUILTIN_SOURCES` in
+# `lib.rs`), so a user's `xs.range()` resolves through the ordinary generic
+# machinery.
+#
+# A `Span` rather than a type of its own, because the language already has one for
+# exactly this: `recv[span]` slices by a `Span`, so `0..len` is the span that names
+# the whole receiver — which is what makes `xs[xs.range()]` the identity slice.
+#
+# **Array receivers only.** `self: T[]` does not unify with `str`, a set or a dict,
+# the other three things `len` accepts, so `s.range()` is not available — giving it
+# them means the checker/codegen receiver dispatch `len` and `is_nonempty` carry,
+# not a change here.
+#
+# **No lint.** The shape this replaces is an indexed `for` whose body reads only
+# the index, and `tuple_slot_names` in `grammar_aipl.aipl` was the sole instance in
+# the whole corpus — every other indexed loop reads its element too, which
+# `range().map` cannot express on its own. One site does not pay for a lint that
+# would have to tell those apart.
+
+import { Span, equal as ==, len, map } from builtins;
+
+# Every index of `self`, as the `Span` `0..self.len()` — the half-open range its
+# elements sit in, empty for an empty receiver.
+#
+# Its reason to exist is `map`: a `Span` is mappable, so `xs.range().map(|i| ..)`
+# is the index-wise counterpart of `xs.map(|x| ..)`, and replaces the `mut acc`
+# plus counted-`for` longhand. `self` is unread apart from its length — the point
+# is the *positions*, so the element type never reaches the result.
+pub fn range<T: any>(self: T[]) -> Span { start: 0, end: self.len() }.test({
+    assert([10, 20, 30].range() == Span { start: 0, end: 3 });
+    // Empty in, empty out — not an error, and not a one-element range.
+    assert([1, 2][..0].range() == Span { start: 0, end: 0 });
+    // Only the length is read, so the element type is irrelevant.
+    assert(range(["a", "b"]) == Span { start: 0, end: 2 }); // free-call form
+
+    // What it is for, and why a `Span` is the right answer: it maps to the
+    // positions, and it slices the whole receiver.
+    assert([10, 20, 30].range().map(|i| i) == [0, 1, 2]);
+    let xs = [10, 20, 30];
+    assert(xs[xs.range()] == xs);
+})
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 168
+instructions executed: 734
+binary size: 4296
+  code: 1812
+  data: 571
+  metadata: 1913
+functions:
+  __eq___builtin_Span:
+    calls: 3
+    bytes: 104
+  __eq_i64$arr:
+    calls: 1
+    bytes: 296
+  __eq_u64$arr:
+    calls: 1
+    bytes: 296
+  __test$range:
+    calls: 1
+    bytes: 1012
+  aipl_arr_inc:
+    calls: 1
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 4
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 3
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
+    bytes: (external)
+  aipl_assert:
+    calls: 5
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 104

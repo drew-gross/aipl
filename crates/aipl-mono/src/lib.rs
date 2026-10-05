@@ -77,7 +77,7 @@ use aipl_syntax::{
         SeqShape, Signature, StructDecl, Type, TypeParam, VariantCase, VariantDecl,
     },
     concat_str_ty, is_concat_str, is_empty_array_arg, is_error, is_none_inner, is_none_literal_arg,
-    is_str_repr, type_name, DebugOptions, Error, Span, BUILTIN_SIGNATURES,
+    is_str_repr, type_name, DebugOptions, Error, Span, BUILTIN_SIGNATURES, SPAN_TYPE,
 };
 
 /// Hard cap on the number of generic instances monomorphization will emit.
@@ -3602,9 +3602,21 @@ impl Mono<'_> {
         span: Span,
     ) -> Result<(Expr, Type), Error> {
         let (rarr, arr_ty) = self.infer(arr, env)?;
-        let (elem, over_optional) = match &arr_ty {
-            Type::Array(elem) => ((**elem).clone(), false),
-            Type::Optional(inner) => ((**inner).clone(), true),
+        let (elem, over_optional, over_span) = match &arr_ty {
+            Type::Array(elem) => ((**elem).clone(), false, false),
+            Type::Optional(inner) => ((**inner).clone(), true, false),
+            // A `Span` is a range of positions, so mapping one yields an element
+            // per position and the lambda is handed the index — a `u64`, like
+            // every other bound and length. `xs.range().map(..)` is the
+            // index-wise counterpart of `xs.map(..)`, and the whole reason
+            // `range` exists.
+            //
+            // The copying path below needs no new loop for this: a `for` over a
+            // `Span` already walks `start..end` binding a `u64` (mono lowers it to
+            // the counted `while` it stands for — see `lower_for`), so the only
+            // differences are the element type here and the accumulator's initial
+            // capacity.
+            Type::Named(n) if n == SPAN_TYPE => (Type::Primitive(Primitive::U64), false, true),
             // A set is the near-miss worth naming: it reads as a sequence
             // everywhere else (see `collect_var_bindings`), so `map` is the
             // obvious reach, and `set_map` is the answer — including *why* it is
@@ -3625,7 +3637,7 @@ impl Mono<'_> {
             _ => {
                 return Err(Error::at(
                     format!(
-                        "map expects an array or an optional, got {}",
+                        "map expects an array, an optional or a Span, got {}",
                         type_name(&arr_ty)
                     ),
                     arr.span.clone(),
@@ -3697,7 +3709,9 @@ impl Mono<'_> {
                     || self.syn_structs.contains_key(n)
                     || self.variants.contains_key(n))
         };
+        // A `Span` owns no buffer, so there is nothing to overwrite in place.
         let in_place = !over_optional
+            && !over_span
             && is_fresh_heap(&rarr, &arr_ty)
             && reusable(&elem)
             && reusable(&u)
@@ -3847,15 +3861,30 @@ impl Mono<'_> {
             {
                 Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())
             } else {
-                Expr::new(
-                    ExprKind::Call(
-                        Callee::WithCapacity,
-                        vec![Expr::new(
-                            ExprKind::Call(Callee::Len, vec![id("$arr")], false),
+                // How many elements are coming: a sequence's `len`, or — for a
+                // `Span`, which has none — the width of the range it is. The
+                // subtraction saturates, so a backwards span reserves nothing,
+                // which is also how many iterations it runs for.
+                let count = if over_span {
+                    let field = |f: &str| {
+                        Expr::new(
+                            ExprKind::Field(Box::new(id("$arr")), f.to_string()),
                             span.clone(),
-                        )],
-                        false,
-                    ),
+                        )
+                    };
+                    op_call(
+                        Callee::SaturatingSub,
+                        vec![field("end"), field("start")],
+                        span.clone(),
+                    )
+                } else {
+                    Expr::new(
+                        ExprKind::Call(Callee::Len, vec![id("$arr")], false),
+                        span.clone(),
+                    )
+                };
+                Expr::new(
+                    ExprKind::Call(Callee::WithCapacity, vec![count], false),
                     span.clone(),
                 )
             };
@@ -7788,6 +7817,7 @@ const BUILTIN_SRC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src");
 
 const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::All, "builtin_all.aipl"),
+    (Callee::Range, "builtin_range.aipl"),
     (Callee::SortBy, "builtin_sort_by.aipl"),
     (Callee::Any, "builtin_any.aipl"),
     (Callee::LeftFold, "builtin_left_fold.aipl"),

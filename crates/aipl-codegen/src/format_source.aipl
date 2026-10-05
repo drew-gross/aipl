@@ -428,10 +428,10 @@ deallocations: 16076
 reallocations: 3022
 bytes allocated: 4095118
 instructions executed: 11656068
-binary size: 7645680
-  code: 5115572
+binary size: 7645504
+  code: 5115444
   data: 14074
-  metadata: 2516034
+  metadata: 2515986
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -1863,7 +1863,7 @@ functions:
     bytes: 532
   __m4__tuple_slot_names:
     calls: 0
-    bytes: 548
+    bytes: 420
   __m4__tuple_ty:
     calls: 0
     bytes: 952
