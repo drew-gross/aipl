@@ -23,10 +23,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 138
-binary size: 1960
+binary size: 2032
   code: 632
-  data: 201
-  metadata: 1127
+  data: 275
+  metadata: 1125
 functions:
   __test$round_trip:
     calls: 1

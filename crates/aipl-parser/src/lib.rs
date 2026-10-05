@@ -251,42 +251,30 @@ pub fn parse_with_allows(input: &str) -> Result<(Program, Vec<Span>), Error> {
         .get()
         .expect("parse hook not installed before parsing (call install_parser_hooks)");
     let (mut program, allows) = hook(input)?;
-    post_parse(&mut program, strip_test_sections(input));
+    post_parse(&mut program);
     Ok((program, allows))
 }
 
 /// The two rewrites that follow a parse but are no part of one.
 ///
-/// Neither belongs to a grammar. `bake_asserts` needs the source text, and
-/// `promote_type_vars` needs a declaration's own signature, so both are things
-/// done *to* a `Program` once it exists — which is why they stayed on this side
-/// of the hook when the parser moved to AIPL, and why they are a named function:
-/// [`parse_with_allows`] calls it on what the hook hands back.
+/// Neither belongs to a grammar. `hoist_test_fns` restructures a `.test` block's
+/// own declarations, and `promote_type_vars` needs a declaration's own signature,
+/// so both are things done *to* a `Program` once it exists — which is why they
+/// stayed on this side of the hook when the parser moved to AIPL, and why they
+/// are a named function: [`parse_with_allows`] calls it on what the hook hands
+/// back.
 ///
-/// `src` must be the string the program's spans are relative to — the
-/// section-stripped source, not the whole file.
-pub fn post_parse(program: &mut Program, src: &str) {
-    // Functions declared inside a `.test` block become top-level items first,
-    // so everything below — and every later pass — sees them as ordinary
-    // private functions.
+/// What is *not* here is the pair of source-text rewrites, `assert(cond)` and
+/// `trace(expr)`. Both bake a source location into the program, and a location
+/// names a file — which `parse` is never told, since it takes a `&str`. They live
+/// in the loader instead, the first place that holds a source and its path
+/// together; see `aipl_loader::bake`. `assert`'s rewrite used to be here, and its
+/// locations read `input:LINE:` for exactly that reason.
+pub fn post_parse(program: &mut Program) {
+    // Functions declared inside a `.test` block become top-level items, so
+    // everything after this — the loader's rewrites included, which is how they
+    // recognize test code — sees them as ordinary private functions.
     hoist_test_fns(program);
-
-    // Bake `assert(cond)` calls inside `.test({ .. })` bodies into
-    // `__assert(cond, "input:LINE: TEXT")`, capturing each assertion's source
-    // location while the source is in hand, for the `check` failure report.
-    // Only test bodies — and the functions declared inside them, which are test
-    // code too — are rewritten, so a bare `assert(..)` elsewhere stays an
-    // unknown call — `assert` is effectively test-only.
-    for item in &mut program.items {
-        if let Item::Fn(f) = item {
-            if let Some(test_body) = &mut f.test_body {
-                bake_asserts(test_body, src);
-            }
-            if aipl_syntax::is_test_helper(&f.name) {
-                bake_asserts(&mut f.body, src);
-            }
-        }
-    }
 
     // A declaration's own type parameters stop being ordinary names here, at the
     // one point every path shares: source files reach the checker through the
@@ -360,122 +348,4 @@ fn rename_uses(e: &mut Expr, renames: &HashMap<String, String>) {
     for child in aipl_syntax::each_subexpr_mut(e) {
         rename_uses(child, renames);
     }
-}
-
-/// Rewrite each `assert(cond)` within `e` into `__assert(cond, "input:LINE:
-/// TEXT")`, where the location string is computed from `src` and the condition's
-/// span. Recurses through the whole expression so nested asserts are caught.
-fn bake_asserts(e: &mut Expr, src: &str) {
-    // Rewrite an `assert(cond)` in place, then recurse into the condition.
-    if let ExprKind::Call(name, args, _) = &e.kind {
-        if name == "assert" && args.len() == 1 {
-            let ExprKind::Call(_, mut args, _) = std::mem::replace(&mut e.kind, ExprKind::Unit)
-            else {
-                unreachable!()
-            };
-            let mut cond = args.pop().expect("one arg");
-            bake_asserts(&mut cond, src);
-            let loc = Expr::new(
-                ExprKind::Str(assert_loc(src, cond.span.clone())),
-                cond.span.clone(),
-            );
-            e.kind = ExprKind::Call(Callee::Assert, vec![cond, loc], false);
-            return;
-        }
-    }
-    match &mut e.kind {
-        // A shim's bindings are names; asserts can only be in its body.
-        ExprKind::Shim(_, _, body) => bake_asserts(body, src),
-        ExprKind::Call(_, args, _)
-        | ExprKind::ArrayLit(args)
-        | ExprKind::SetLit(args, _)
-        | ExprKind::TupleLit(args) => {
-            for a in args {
-                bake_asserts(a, src);
-            }
-        }
-        ExprKind::DictLit(pairs) => {
-            for (k, v) in pairs {
-                bake_asserts(k, src);
-                bake_asserts(v, src);
-            }
-        }
-        ExprKind::Seq(a, b)
-        | ExprKind::Let(_, _, a, b)
-        | ExprKind::LetMut(_, _, a, b)
-        | ExprKind::Assign(_, a, b)
-        | ExprKind::Index(a, b)
-        | ExprKind::For(_, _, a, b)
-        | ExprKind::While(a, b) => {
-            bake_asserts(a, src);
-            bake_asserts(b, src);
-        }
-        ExprKind::If(a, b, c) => {
-            bake_asserts(a, src);
-            bake_asserts(b, src);
-            bake_asserts(c, src);
-        }
-        ExprKind::Slice(a, b, c) => {
-            bake_asserts(a, src);
-            bake_asserts(b, src);
-            if let Some(c) = c {
-                bake_asserts(c, src);
-            }
-        }
-        ExprKind::Neg(x)
-        | ExprKind::Field(x, _)
-        | ExprKind::Try(x)
-        | ExprKind::Return(x)
-        | ExprKind::KwArg(_, x, _)
-        | ExprKind::Spread(x) => bake_asserts(x, src),
-        ExprKind::Construct(_, inits) => {
-            for fi in inits {
-                bake_asserts(&mut fi.value, src);
-            }
-        }
-        ExprKind::Match(scrut, arms) => {
-            bake_asserts(scrut, src);
-            for arm in arms {
-                bake_asserts(&mut arm.body, src);
-            }
-        }
-        ExprKind::IfLet(arm, scrut, else_b) => {
-            bake_asserts(scrut, src);
-            bake_asserts(&mut arm.body, src);
-            bake_asserts(else_b, src);
-        }
-        ExprKind::Lambda(_, body) => bake_asserts(body, src),
-        ExprKind::Num(_)
-        | ExprKind::Bool(_)
-        | ExprKind::Str(_)
-        | ExprKind::Char(_)
-        | ExprKind::Ident(_)
-        | ExprKind::None
-        | ExprKind::Unit => {}
-    }
-}
-
-/// Format an assertion's source location as `input:LINE: TEXT` (1-based line,
-/// the condition's trimmed source text), matching the `input:` filename the rest
-/// of the compiler's diagnostics use. Dogfooded: the AIPL `assert_loc`, run
-/// through the embedding FFI via the installed hook. There is **no native
-/// fallback**: it panics if the hook isn't installed, so install it (via
-/// `install_parser_hooks`) before parsing.
-fn assert_loc(src: &str, span: Span) -> String {
-    let hook = ASSERT_LOC_HOOK
-        .get()
-        .expect("assert-loc hook not installed before parsing (call install_parser_hooks)");
-    hook(src, span)
-}
-
-/// The assertion-location formatter, installed by the compiler (via
-/// [`set_assert_loc_hook`]) to dogfood the AIPL `assert_loc`. Required — see
-/// [`assert_loc`].
-static ASSERT_LOC_HOOK: std::sync::OnceLock<fn(&str, Span) -> String> = std::sync::OnceLock::new();
-
-/// Install the assertion-location formatter. The compiler points this at the
-/// dogfooded AIPL `assert_loc`, run through the embedding FFI. First install
-/// wins (the hook is process-global).
-pub fn set_assert_loc_hook(f: fn(&str, Span) -> String) {
-    let _ = ASSERT_LOC_HOOK.set(f);
 }

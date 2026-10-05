@@ -82,9 +82,9 @@ deallocations: 74
 reallocations: 3
 bytes allocated: 5323
 instructions executed: 4817
-binary size: 76088
+binary size: 76160
   code: 49972
-  data: 1420
+  data: 1492
   metadata: 24696
 functions:
   __arr_drop_BraceEntry:

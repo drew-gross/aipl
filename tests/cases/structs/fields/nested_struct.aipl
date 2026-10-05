@@ -29,15 +29,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 180
-binary size: 1672
-  code: 672
-  data: 83
-  metadata: 917
+instructions executed: 182
+binary size: 1856
+  code: 616
+  data: 209
+  metadata: 1031
 functions:
   __test$shift:
     calls: 1
-    bytes: 552
+    bytes: 496
   __test$shift$dx:
     calls: 2
     bytes: 16

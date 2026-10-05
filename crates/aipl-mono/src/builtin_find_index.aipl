@@ -66,15 +66,15 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 128
-instructions executed: 1661
-binary size: 10184
-  code: 5436
-  data: 1193
-  metadata: 3555
+instructions executed: 1663
+binary size: 10528
+  code: 5368
+  data: 1498
+  metadata: 3662
 functions:
   __test$find_index:
     calls: 1
-    bytes: 1536
+    bytes: 1468
   __test$find_index$filter9$own0:
     calls: 1
     bytes: 308

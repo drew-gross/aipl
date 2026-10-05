@@ -49,10 +49,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 668
-binary size: 5832
+binary size: 6040
   code: 3156
-  data: 408
-  metadata: 2268
+  data: 612
+  metadata: 2272
 functions:
   __test$step:
     calls: 1

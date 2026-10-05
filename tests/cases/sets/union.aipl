@@ -42,11 +42,11 @@ allocations: 14
 deallocations: 14
 reallocations: 1
 bytes allocated: 920
-instructions executed: 1030
-binary size: 7920
-  code: 4520
-  data: 267
-  metadata: 3133
+instructions executed: 1032
+binary size: 8088
+  code: 4464
+  data: 383
+  metadata: 3241
 functions:
   __eq_set$i64:
     calls: 2
@@ -56,7 +56,7 @@ functions:
     bytes: 304
   __test$basic:
     calls: 1
-    bytes: 1212
+    bytes: 1156
   __test$empty_union:
     calls: 1
     bytes: 1292

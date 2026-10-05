@@ -301,12 +301,29 @@ fn a_failing_assert_reports_and_exits_one() {
         "expected a FAIL header, got:\n{stdout}"
     );
     // The location is the asserted condition's line and source text (line 8 of
-    // the canonically-formatted source above).
+    // the canonically-formatted source above). Only the tail is pinned: the file
+    // half is a path relative to the working directory, and this fixture lives
+    // under `CARGO_TARGET_TMPDIR`, which moves with `CARGO_TARGET_DIR` — see
+    // `a_failure_location_names_its_file` for the test that does pin it.
     assert!(
-        stdout.contains("assert failed at input:8: bar() == 6"),
+        stdout.contains(":8 bar() == 6"),
         "expected the assert location, got:\n{stdout}"
     );
     assert!(stdout.contains("2 tests: 1 passed, 1 failed"));
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_failure_location_names_its_file_relative_to_where_check_was_invoked() {
+    // `assert` and `trace` bake their locations through one formatter, so a
+    // failure names its file the same way a trace does — which it could not do
+    // while the rewrite lived in the parser, where the filename was the
+    // placeholder `input`.
+    let (stdout, _stderr, code) = check_tree("assert_label", &[("sub/fails.aipl", FAILS)], &[]);
+    assert!(
+        stdout.contains("assert failed at sub/fails.aipl:4 b() == 6"),
+        "expected a project-relative assert location, got:\n{stdout}"
+    );
     assert_eq!(code, 1);
 }
 
@@ -318,8 +335,8 @@ fn all_asserts_in_a_test_run_and_each_failure_is_reported() {
          fn bar() -> i64 { 5 }.test({\n    assert(bar() == 6);\n    assert(bar() == 7);\n})\n",
     );
     // Both failing asserts report — the first failure doesn't abort the test.
-    assert!(stdout.contains("input:4: bar() == 6"), "got:\n{stdout}");
-    assert!(stdout.contains("input:5: bar() == 7"), "got:\n{stdout}");
+    assert!(stdout.contains(":4 bar() == 6"), "got:\n{stdout}");
+    assert!(stdout.contains(":5 bar() == 7"), "got:\n{stdout}");
     assert!(stdout.contains("1 tests: 0 passed, 1 failed"));
     assert_eq!(code, 1);
 }

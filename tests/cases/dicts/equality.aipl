@@ -17,10 +17,10 @@ deallocations: 12
 reallocations: 0
 bytes allocated: 800
 instructions executed: 963
-binary size: 7304
+binary size: 7352
   code: 3844
-  data: 442
-  metadata: 3018
+  data: 489
+  metadata: 3019
 functions:
   __dict_drop_i64$i64$arr:
     calls: 4

@@ -74,10 +74,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 1626
-binary size: 10072
+binary size: 10368
   code: 5152
-  data: 1342
-  metadata: 3578
+  data: 1639
+  metadata: 3577
 functions:
   __test$is_err_and:
     calls: 1

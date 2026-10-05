@@ -428,9 +428,9 @@ deallocations: 16076
 reallocations: 3022
 bytes allocated: 4095118
 instructions executed: 11656068
-binary size: 7645104
+binary size: 7645680
   code: 5115572
-  data: 13498
+  data: 14074
   metadata: 2516034
 functions:
   __arr_drop___m10__Ty:

@@ -11,10 +11,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 28
-binary size: 976
+binary size: 992
   code: 176
-  data: 41
-  metadata: 759
+  data: 61
+  metadata: 755
 functions:
   __test$prec:
     calls: 1

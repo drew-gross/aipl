@@ -47,10 +47,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 88
 instructions executed: 193
-binary size: 2768
+binary size: 2832
   code: 976
-  data: 272
-  metadata: 1520
+  data: 333
+  metadata: 1523
 functions:
   __test$heap_field:
     calls: 1

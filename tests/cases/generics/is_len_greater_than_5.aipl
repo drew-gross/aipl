@@ -18,10 +18,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 96
-binary size: 1792
+binary size: 1864
   code: 468
-  data: 288
-  metadata: 1036
+  data: 356
+  metadata: 1040
 functions:
   __test$is_len_greater_than_5:
     calls: 1

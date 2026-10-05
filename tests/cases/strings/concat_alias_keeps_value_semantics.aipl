@@ -31,10 +31,10 @@ deallocations: 6
 reallocations: 0
 bytes allocated: 120
 instructions executed: 468
-binary size: 4976
+binary size: 5040
   code: 2680
-  data: 94
-  metadata: 2202
+  data: 159
+  metadata: 2201
 functions:
   __test$grown:
     calls: 1

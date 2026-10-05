@@ -64,10 +64,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 941
-binary size: 5096
+binary size: 5128
   code: 2648
-  data: 609
-  metadata: 1839
+  data: 644
+  metadata: 1836
 functions:
   __test$prim_from_name:
     calls: 1

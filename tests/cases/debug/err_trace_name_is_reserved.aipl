@@ -9,7 +9,7 @@ fn main() {
     trace(1);
 }
 --- errors ---
-error: `trace` is the name of the debugging intrinsic, so a function may not be called that: `trace(expr)` prints the expression and its value and yields it, and is rewritten before any name can shadow it
+error: `trace` is reserved for a compiler intrinsic (`trace(expr)` prints the expression and its value, and yields it), so a function may not be called that: the call is rewritten before any name could shadow it, so the declaration would never be reached
  --> ./tests/cases/debug/err_trace_name_is_reserved.aipl:6:4
   |
 6 | fn trace(x: i64) -> i64 { x }

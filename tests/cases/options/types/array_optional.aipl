@@ -16,10 +16,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 104
 instructions executed: 190
-binary size: 3024
+binary size: 3048
   code: 1384
-  data: 138
-  metadata: 1502
+  data: 167
+  metadata: 1497
 functions:
   __test$pick:
     calls: 1

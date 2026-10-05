@@ -11,9 +11,9 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 42
-binary size: 1120
+binary size: 1152
   code: 260
-  data: 53
+  data: 85
   metadata: 807
 functions:
   __test$b:

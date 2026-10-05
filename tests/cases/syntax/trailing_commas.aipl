@@ -19,10 +19,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 40
-binary size: 1032
+binary size: 1048
   code: 220
-  data: 44
-  metadata: 768
+  data: 58
+  metadata: 770
 functions:
   __test$sum_point:
     calls: 1

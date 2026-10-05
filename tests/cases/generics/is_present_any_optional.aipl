@@ -18,10 +18,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 81
-binary size: 1528
+binary size: 1600
   code: 404
-  data: 165
-  metadata: 959
+  data: 235
+  metadata: 961
 functions:
   __test$is_present:
     calls: 1

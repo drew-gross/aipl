@@ -69,11 +69,11 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 176
-instructions executed: 1733
-binary size: 10928
-  code: 6608
-  data: 785
-  metadata: 3535
+instructions executed: 1735
+binary size: 11488
+  code: 6528
+  data: 1260
+  metadata: 3700
 functions:
   __eq_Holder:
     calls: 2
@@ -95,7 +95,7 @@ functions:
     bytes: 92
   __test$present:
     calls: 1
-    bytes: 5292
+    bytes: 5212
   aipl_assert:
     calls: 16
     bytes: (external)

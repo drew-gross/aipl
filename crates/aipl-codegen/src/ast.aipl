@@ -166,10 +166,10 @@ deallocations: 3
 reallocations: 0
 bytes allocated: 256
 instructions executed: 162
-binary size: 5760
+binary size: 5768
   code: 2820
-  data: 221
-  metadata: 2719
+  data: 231
+  metadata: 2717
 functions:
   __rec_drop___m2__Expr:
     calls: 1

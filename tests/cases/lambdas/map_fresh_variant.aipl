@@ -22,9 +22,9 @@ deallocations: 4
 reallocations: 2
 bytes allocated: 200
 instructions executed: 553
-binary size: 2952
+binary size: 2984
   code: 1324
-  data: 203
+  data: 235
   metadata: 1425
 functions:
   __eq_V:

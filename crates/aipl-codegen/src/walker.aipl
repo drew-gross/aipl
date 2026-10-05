@@ -3514,11 +3514,11 @@ allocations: 94923
 deallocations: 94923
 reallocations: 18556
 bytes allocated: 22202940
-instructions executed: 68327323
-binary size: 19896144
-  code: 12878576
-  data: 39532
-  metadata: 6978036
+instructions executed: 68327324
+binary size: 19897432
+  code: 12878572
+  data: 40764
+  metadata: 6978096
 functions:
   __arr_drop_ImportEntry:
     calls: 19
@@ -4692,7 +4692,7 @@ functions:
     bytes: 7868
   __test$new_walker:
     calls: 1
-    bytes: 12772
+    bytes: 12768
   __test$struct_pattern:
     calls: 1
     bytes: 2188

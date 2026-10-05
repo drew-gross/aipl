@@ -87,9 +87,9 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 2700
-binary size: 21584
+binary size: 21824
   code: 12352
-  data: 1639
+  data: 1879
   metadata: 7593
 functions:
   __test$map_err:

@@ -27,11 +27,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 242
-binary size: 2232
-  code: 976
-  data: 192
-  metadata: 1064
+instructions executed: 243
+binary size: 2416
+  code: 948
+  data: 339
+  metadata: 1129
 functions:
   __eq_Cell:
     calls: 1
@@ -44,7 +44,7 @@ functions:
     bytes: 92
   __test$weight:
     calls: 1
-    bytes: 504
+    bytes: 476
   aipl_assert:
     calls: 4
     bytes: (external)

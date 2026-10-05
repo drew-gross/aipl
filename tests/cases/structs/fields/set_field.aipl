@@ -62,24 +62,24 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 176
-instructions executed: 380
-binary size: 3408
-  code: 1836
-  data: 97
-  metadata: 1475
+instructions executed: 386
+binary size: 3888
+  code: 1692
+  data: 385
+  metadata: 1811
 functions:
   __test$alias_unaffected:
     calls: 1
     bytes: 172
   __test$bump_x:
     calls: 1
-    bytes: 384
+    bytes: 308
   __test$rename:
     calls: 1
-    bytes: 680
+    bytes: 660
   __test$set_n:
     calls: 1
-    bytes: 288
+    bytes: 240
   aipl_assert:
     calls: 8
     bytes: (external)

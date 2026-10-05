@@ -29,18 +29,18 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 768
-instructions executed: 904
-binary size: 6392
-  code: 3600
-  data: 349
-  metadata: 2443
+instructions executed: 906
+binary size: 6600
+  code: 3540
+  data: 504
+  metadata: 2556
 functions:
   __eq_set$str:
     calls: 3
     bytes: 304
   __test$build:
     calls: 1
-    bytes: 2568
+    bytes: 2508
   __test$distinct:
     calls: 1
     bytes: 556

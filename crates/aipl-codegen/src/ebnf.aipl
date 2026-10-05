@@ -759,9 +759,9 @@ deallocations: 1585
 reallocations: 342
 bytes allocated: 179541
 instructions executed: 240190
-binary size: 168024
+binary size: 168088
   code: 111332
-  data: 4004
+  data: 4068
   metadata: 52688
 functions:
   __arr_drop_First$Tok:

@@ -32,11 +32,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 288
-binary size: 3664
-  code: 1832
-  data: 370
-  metadata: 1462
+instructions executed: 289
+binary size: 3808
+  code: 1800
+  data: 491
+  metadata: 1517
 functions:
   __eq_Kind:
     calls: 1
@@ -46,7 +46,7 @@ functions:
     bytes: 128
   __test$describe:
     calls: 1
-    bytes: 1532
+    bytes: 1500
   aipl_assert:
     calls: 6
     bytes: (external)

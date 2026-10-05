@@ -42,9 +42,9 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 1042
-binary size: 3760
+binary size: 3904
   code: 1416
-  data: 689
+  data: 833
   metadata: 1655
 functions:
   __builtin_count_is_at_least$i64:

@@ -49,10 +49,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 9135
-binary size: 6792
+binary size: 6968
   code: 3176
-  data: 870
-  metadata: 2746
+  data: 1048
+  metadata: 2744
 functions:
   __m1__parse_test_section_header:
     calls: 17

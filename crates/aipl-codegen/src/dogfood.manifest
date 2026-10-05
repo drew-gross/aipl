@@ -2,21 +2,21 @@
 ; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).
 ; DO NOT EDIT BY HAND. Regenerate:
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
-; entry parse_test_section_header 474 str -> str?
+; entry parse_test_section_header 473 str -> str?
 ; entry strip_test_sections 515 str -> str
 ; entry split_test_sections 514 str -> __tuple$str$str
-; entry assert_loc 63 str __builtin_Span -> str
-; entry caret_block 70 str __builtin_Span str -> str
-; entry fill_or_add_sections_file 151 str #{str:str} -> unit!Error
-; entry normalize_output 446 str -> str
-; entry int_fits 383 i64 str -> bool
-; entry is_operator_name 384 str -> bool
-; entry aipl_token_scopes 418 str -> __m19__ScopeSpan[]!__m19__LexError
-; entry find_files 152 str str -> str[]!Error
-; entry companion_files 72 str -> __m25__Companion[]!str
-; entry parse_spec 471 str -> __m26__Spec!str
-; entry aipl_parse_file 344 str -> __m27__ParsedFile!__m39__ParseError
-; entry format_source 176 str u64 -> str!__m46__FmtError
+; entry source_loc 513 str __builtin_Span -> str
+; entry caret_block 69 str __builtin_Span str -> str
+; entry fill_or_add_sections_file 150 str #{str:str} -> unit!Error
+; entry normalize_output 445 str -> str
+; entry int_fits 382 i64 str -> bool
+; entry is_operator_name 383 str -> bool
+; entry aipl_token_scopes 417 str -> __m19__ScopeSpan[]!__m19__LexError
+; entry find_files 151 str str -> str[]!Error
+; entry companion_files 71 str -> __m25__Companion[]!str
+; entry parse_spec 470 str -> __m26__Spec!str
+; entry aipl_parse_file 343 str -> __m27__ParsedFile!__m39__ParseError
+; entry format_source 175 str u64 -> str!__m46__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
 ; struct __m19__ScopeSpan 40 span@0:__builtin_Span scope@16:str
@@ -308,5 +308,5 @@
 ; data 186 __tostr_lit_93 0800000000000000ffffffffffffff7f4c427261636b657400
 ; data 187 __tostr_lit_94 0800000000000000ffffffffffffff7f52427261636b657400
 
-; __m10__assert_loc
-; source-fingerprint 6514203495874687472
+; __m28__ast_case_name
+; source-fingerprint 8546600082195228727

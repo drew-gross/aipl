@@ -12,10 +12,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 40
-binary size: 1024
+binary size: 1056
   code: 212
-  data: 56
-  metadata: 756
+  data: 86
+  metadata: 758
 functions:
   __test$mul:
     calls: 1

@@ -12,10 +12,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 39
-binary size: 1160
+binary size: 1208
   code: 228
-  data: 94
-  metadata: 838
+  data: 140
+  metadata: 840
 functions:
   __test$not_lt:
     calls: 1

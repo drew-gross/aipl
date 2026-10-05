@@ -1,0 +1,16 @@
+# `assert` is reserved exactly as `trace` is, and for the same reason: both are
+# one-argument calls the loader rewrites before any name is resolved, so a
+# declaration of either name would never be reached rather than shadowing the
+# intrinsic. See `err_trace_name_is_reserved.aipl` — one check covers both.
+
+fn assert(c: bool) -> bool { c }
+
+fn main() {
+    assert(true);
+}
+--- errors ---
+error: `assert` is reserved for a compiler intrinsic (`assert(cond)` records a test failure against the line it is written on), so a function may not be called that: the call is rewritten before any name could shadow it, so the declaration would never be reached
+ --> ./tests/cases/debug/err_assert_name_is_reserved.aipl:6:4
+  |
+6 | fn assert(c: bool) -> bool { c }
+  |    ^^^^^^

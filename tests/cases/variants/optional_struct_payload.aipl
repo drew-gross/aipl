@@ -39,11 +39,11 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 264
-instructions executed: 903
-binary size: 4480
-  code: 2612
-  data: 119
-  metadata: 1749
+instructions executed: 906
+binary size: 4984
+  code: 2504
+  data: 453
+  metadata: 2027
 functions:
   __eq_Aaa:
     calls: 1
@@ -56,7 +56,7 @@ functions:
     bytes: 92
   __test$build:
     calls: 1
-    bytes: 1316
+    bytes: 1208
   aipl_assert:
     calls: 5
     bytes: (external)

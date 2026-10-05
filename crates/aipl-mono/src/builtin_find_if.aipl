@@ -58,15 +58,15 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 128
-instructions executed: 1525
-binary size: 10072
-  code: 5324
-  data: 1174
-  metadata: 3574
+instructions executed: 1527
+binary size: 10392
+  code: 5272
+  data: 1436
+  metadata: 3684
 functions:
   __test$find_if:
     calls: 1
-    bytes: 1640
+    bytes: 1588
   __test$find_if$filter9$own0:
     calls: 1
     bytes: 308

@@ -33,10 +33,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 162
-binary size: 1928
+binary size: 1952
   code: 608
-  data: 131
-  metadata: 1189
+  data: 156
+  metadata: 1188
 functions:
   __test$shrink:
     calls: 1

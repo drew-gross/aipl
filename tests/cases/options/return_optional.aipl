@@ -14,10 +14,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 77
-binary size: 1528
+binary size: 1568
   code: 420
-  data: 193
-  metadata: 915
+  data: 239
+  metadata: 909
 functions:
   __test$divide:
     calls: 1

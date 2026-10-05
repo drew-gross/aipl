@@ -44,10 +44,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 71
 instructions executed: 610
-binary size: 5016
+binary size: 5208
   code: 1948
-  data: 823
-  metadata: 2245
+  data: 1014
+  metadata: 2246
 functions:
   __test$reverse_find_map:
     calls: 1

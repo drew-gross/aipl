@@ -42,11 +42,11 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 176
-instructions executed: 192
-binary size: 2832
-  code: 1184
-  data: 140
-  metadata: 1508
+instructions executed: 194
+binary size: 3040
+  code: 1128
+  data: 289
+  metadata: 1623
 functions:
   __test$heap_values:
     calls: 1
@@ -56,7 +56,7 @@ functions:
     bytes: 108
   __test$scalar_values:
     calls: 1
-    bytes: 320
+    bytes: 264
   __test$scalar_values$dbl:
     calls: 1
     bytes: 8

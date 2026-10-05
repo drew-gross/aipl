@@ -48,10 +48,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 322
-binary size: 4592
+binary size: 4696
   code: 1744
-  data: 676
-  metadata: 2172
+  data: 779
+  metadata: 2173
 functions:
   __test$all_defaults:
     calls: 1

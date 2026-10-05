@@ -52,9 +52,9 @@ deallocations: 21
 reallocations: 0
 bytes allocated: 1320
 instructions executed: 5484
-binary size: 17320
+binary size: 17704
   code: 9444
-  data: 1745
+  data: 2129
   metadata: 6131
 functions:
   __m1__operator_named_forms:

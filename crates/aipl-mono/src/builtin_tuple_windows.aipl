@@ -54,10 +54,10 @@ deallocations: 11
 reallocations: 4
 bytes allocated: 712
 instructions executed: 2578
-binary size: 9632
+binary size: 9792
   code: 5244
-  data: 761
-  metadata: 3627
+  data: 925
+  metadata: 3623
 functions:
   __arr_drop___tuple$str$str:
     calls: 2

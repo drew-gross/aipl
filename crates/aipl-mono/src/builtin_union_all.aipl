@@ -45,9 +45,9 @@ deallocations: 51
 reallocations: 0
 bytes allocated: 2469
 instructions executed: 2885
-binary size: 13232
+binary size: 13392
   code: 7616
-  data: 716
+  data: 876
   metadata: 4900
 functions:
   __eq_set$bool:

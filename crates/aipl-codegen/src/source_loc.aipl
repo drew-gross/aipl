@@ -1,0 +1,79 @@
+# Where an expression is and what was written there — `12 v + 2` — which is the
+# one thing the compiler's two source-text rewrites both need. The loader calls
+# this through the FFI (see `install_parser_hooks`) while baking `assert(cond)`
+# into `__assert(cond, loc)` and `trace(expr)` into `__trace(msg)`, and prefixes
+# the file's own name to what comes back: `sub/lib.aipl:12 v + 2`.
+#
+# The file is *not* a parameter. A line and a span are properties of one text, so
+# this takes the text and the span and nothing else; which file that text came
+# from is the caller's to know, and the caller — unlike this — holds the path.
+#
+# `span` is the expression's half-open byte range within `src`; both bounds clamp
+# to `[0, len]` (and an out-of-order range collapses to "") via ordinary
+# string-slicing semantics, so no manual clamping is needed here.
+
+import { Span, equal as ==, len, trim } from builtins;
+import { lines } from "./lines.aipl";
+
+pub fn source_loc(src: str, span: Span) -> str {
+    // Splitting on "\n" always yields (newline count + 1) parts, so the
+    // prefix's line count is just its number of lines. No array is built for
+    // it: the fusion pass collapses `lines().len()` into `split_len`, the
+    // counting pass alone — this runs once per rewritten call over the whole
+    // prefix.
+    let line = src[..span.start].lines().len();
+    let text = src[span].trim();
+    `{line} {text}`
+}.test({
+    assert(source_loc("assert(x == 1)", Span { start: 7, end: 13 }) == "1 x == 1");
+    // Line number counts newlines strictly before the span's start.
+    assert(source_loc("a\nassert(y)", Span { start: 9, end: 10 }) == "2 y");
+    assert(source_loc("a\nb\nassert(z)", Span { start: 11, end: 12 }) == "3 z");
+    // The expression's text is trimmed of surrounding whitespace.
+    assert(source_loc("assert(  x  )", Span { start: 7, end: 12 }) == "1 x");
+    // A span past the end of `src` clamps to the whole remainder (empty here).
+    assert(source_loc("short", Span { start: 5, end: 10 }) == "1 ");
+    // An empty source with a zero-width span at 0.
+    assert(source_loc("", Span { start: 0, end: 0 }) == "1 ");
+})
+--- performance ---
+allocations: 16
+deallocations: 16
+reallocations: 0
+bytes allocated: 982
+instructions executed: 725
+binary size: 4720
+  code: 2008
+  data: 605
+  metadata: 2107
+functions:
+  __test$source_loc:
+    calls: 1
+    bytes: 1144
+  __to_str_u64:
+    calls: 6
+    bytes: 204
+  aipl_assert:
+    calls: 6
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_u64_len:
+    calls: 12
+    bytes: (external)
+  aipl_write_u64:
+    calls: 6
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 108
+  source_loc:
+    calls: 6
+    bytes: 552

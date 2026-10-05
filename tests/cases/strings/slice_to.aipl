@@ -21,10 +21,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 268
-binary size: 3696
+binary size: 3760
   code: 1556
-  data: 400
-  metadata: 1740
+  data: 463
+  metadata: 1741
 functions:
   __test$take_prefix:
     calls: 1

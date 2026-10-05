@@ -27,10 +27,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 168
-binary size: 2280
+binary size: 2336
   code: 940
-  data: 97
-  metadata: 1243
+  data: 160
+  metadata: 1236
 functions:
   __test$snapshot:
     calls: 1

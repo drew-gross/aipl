@@ -27,10 +27,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 106
-binary size: 1552
+binary size: 1624
   code: 468
-  data: 169
-  metadata: 915
+  data: 243
+  metadata: 913
 functions:
   __test$describe:
     calls: 1

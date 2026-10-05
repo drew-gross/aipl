@@ -2989,7 +2989,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./strip_test_sections.aipl",
     "./split_test_sections.aipl",
     "./find_trailing_whitespace.aipl",
-    "./assert_loc.aipl",
+    "./source_loc.aipl",
     "./line_at.aipl",
     "./caret_block.aipl",
     "./fill_or_add_sections.aipl",
@@ -3089,7 +3089,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "parse_test_section_header",
     "strip_test_sections",
     "split_test_sections",
-    "assert_loc",
+    "source_loc",
     "caret_block",
     "fill_or_add_sections_file",
     "normalize_output",
@@ -3532,16 +3532,17 @@ pub fn format_source(src: &str, width: usize) -> Result<String, Error> {
     })
 }
 
-/// The parser's assert-location hook (see [`install_parser_hooks`]): formats an
-/// assertion's source location as `input:LINE: TEXT` (1-based line, the
-/// condition's trimmed source text) — computed by the dogfooded AIPL
-/// `assert_loc` via the FFI, with `span` marshaled as an [`FfiValue::Struct`] of
-/// its `start`/`end` fields (mirroring [`caret_block`]). No native fallback;
-/// panics if it can't be built or called.
-fn assert_loc(source: &str, span: Span) -> String {
+/// The loader's source-location hook (see [`install_parser_hooks`]): formats
+/// `LINE TEXT` (1-based line, the expression's trimmed source text) for the span
+/// of a rewritten `assert`/`trace` argument — computed by the dogfooded AIPL
+/// `source_loc` via the FFI, with `span` marshaled as an [`FfiValue::Struct`] of
+/// its `start`/`end` fields (mirroring [`caret_block`]). The file's name is the loader's to prefix; see the AIPL
+/// source for why it is not a parameter. No native fallback; panics if it can't
+/// be built or called.
+fn source_loc(source: &str, span: Span) -> String {
     DOGFOOD_ENGINE.with(|comp| {
         match comp.call_values(
-            "assert_loc",
+            "source_loc",
             &[
                 FfiValue::Str(source.to_string()),
                 FfiValue::Struct(vec![
@@ -3551,7 +3552,7 @@ fn assert_loc(source: &str, span: Span) -> String {
             ],
         ) {
             Ok(FfiValue::Str(s)) => s,
-            other => panic!("dogfooded assert_loc() call: {other:?}"),
+            other => panic!("dogfooded source_loc() call: {other:?}"),
         }
     })
 }
@@ -3776,7 +3777,7 @@ fn marshal_token_scopes(src: &str) -> Result<Vec<aipl_parser::ScopeSpan>, aipl_p
 /// test-section-header parser at
 /// [`parse_test_section_header`], the section stripper at [`strip_test_sections`],
 /// the trailing-whitespace finder at [`find_trailing_whitespace`], the
-/// assertion-location formatter at [`assert_loc`], the error-renderer's
+/// loader's source-location formatter at [`source_loc`], the error-renderer's
 /// caret-block formatter at [`caret_block`], the checker's flexible-literal
 /// range check at [`int_fits`], the loader's operator-import gate at
 /// [`is_operator_name`], and the highlighting oracle's scope spans at
@@ -3798,7 +3799,7 @@ pub fn install_parser_hooks() {
     aipl_parser::set_split_test_sections_hook(split_test_sections);
     aipl_parser::set_companion_files_hook(companion_files);
     aipl_parser::set_parse_hook(parse_file);
-    aipl_parser::set_assert_loc_hook(assert_loc);
+    aipl_loader::set_source_loc_hook(source_loc);
     aipl_parser::set_token_scopes_hook(marshal_token_scopes);
     aipl_syntax::set_caret_block_hook(caret_block);
     aipl_syntax::set_int_fits_hook(int_fits);
@@ -4755,7 +4756,7 @@ fn ffi_type_from_tag(tag: &str) -> Result<ConcreteType, Error> {
     })
 }
 
-/// Resolve a dogfood `entries` name (e.g. `"assert_loc"`) to its compiled
+/// Resolve a dogfood `entries` name (e.g. `"source_loc"`) to its compiled
 /// [`FuncInfo`] in `funcs`, regardless of which file in `sources` declared it.
 /// `aipl_loader::load_program_sources` treats `sources`' first file as root and
 /// leaves its top-level names unmangled, but renames every other file's to

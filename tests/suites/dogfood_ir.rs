@@ -412,21 +412,23 @@ fn sanity_check_entries(_a: &Artifact, comp: &Compilation) {
         "a syntax error must come back as one"
     );
 
-    // Formats `input:LINE: TEXT` (1-based line, trimmed condition text).
+    // Formats `LINE TEXT` (1-based line, the trimmed source text of the span).
+    // The file's name is not here: the loader prefixes it, since it is the only
+    // thing that knows it — see `aipl_loader::bake`.
     let loc = comp
         .call_values(
-            "assert_loc",
+            "source_loc",
             &[FfiValue::Str("assert(x == 1)".to_string()), span(7, 13)],
         )
         .unwrap();
-    assert_eq!(loc, FfiValue::Str("input:1: x == 1".to_string()));
+    assert_eq!(loc, FfiValue::Str("1 x == 1".to_string()));
     let loc2 = comp
         .call_values(
-            "assert_loc",
+            "source_loc",
             &[FfiValue::Str("a\nassert(y)".to_string()), span(9, 10)],
         )
         .unwrap();
-    assert_eq!(loc2, FfiValue::Str("input:2: y".to_string()));
+    assert_eq!(loc2, FfiValue::Str("2 y".to_string()));
 
     // Returns the rustc-style location + caret underline block for a span.
     // Third arg is the filename that appears in the ` --> ` line.

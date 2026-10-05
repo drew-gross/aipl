@@ -32,8 +32,8 @@ bytes allocated: 0
 instructions executed: 227
 binary size: 1520
   code: 424
-  data: 139
-  metadata: 957
+  data: 142
+  metadata: 954
 functions:
   __test$triangle:
     calls: 1

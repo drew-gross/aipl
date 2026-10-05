@@ -46,9 +46,9 @@ deallocations: 14
 reallocations: 21
 bytes allocated: 864
 instructions executed: 2434
-binary size: 8072
+binary size: 8240
   code: 4256
-  data: 745
+  data: 913
   metadata: 3071
 functions:
   __test$intersperse:

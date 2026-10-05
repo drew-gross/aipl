@@ -61,10 +61,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 152
 instructions executed: 2166
-binary size: 12304
+binary size: 12432
   code: 6596
-  data: 1501
-  metadata: 4207
+  data: 1630
+  metadata: 4206
 functions:
   __builtin_find_index$char$lam$__test$first_big$lambda4:
     calls: 1

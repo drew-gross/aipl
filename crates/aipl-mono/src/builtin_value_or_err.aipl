@@ -94,10 +94,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 966
-binary size: 8720
+binary size: 8984
   code: 4680
-  data: 1066
-  metadata: 2974
+  data: 1333
+  metadata: 2971
 functions:
   __test$value_or_err:
     calls: 1

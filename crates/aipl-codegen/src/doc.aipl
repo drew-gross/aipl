@@ -334,9 +334,9 @@ deallocations: 314
 reallocations: 1
 bytes allocated: 21677
 instructions executed: 33153
-binary size: 38200
+binary size: 38208
   code: 23592
-  data: 881
+  data: 889
   metadata: 13727
 functions:
   __arr_drop_Doc:

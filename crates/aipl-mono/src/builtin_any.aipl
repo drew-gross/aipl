@@ -41,15 +41,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 1129
-binary size: 6632
-  code: 3080
-  data: 812
-  metadata: 2740
+instructions executed: 1131
+binary size: 6856
+  code: 3020
+  data: 982
+  metadata: 2854
 functions:
   __test$any:
     calls: 1
-    bytes: 824
+    bytes: 764
   __test$any$filter6$own0:
     calls: 1
     bytes: 308

@@ -16,7 +16,7 @@ import { join, len, print, split, split_len } from builtins;
 
 fn lines(self: str) -> str[] { self.split("\n") }
 
-// Fused, through the inlined `lines`: the shape the compiler's own `assert_loc`
+// Fused, through the inlined `lines`: the shape the compiler's own `source_loc`
 // computes an assertion's line number with.
 fn line_of(src: str, at: u64) -> u64 { src[..at].lines().len() }
 

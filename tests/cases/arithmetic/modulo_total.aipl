@@ -68,15 +68,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 382
-binary size: 3888
-  code: 1328
-  data: 705
-  metadata: 1855
+instructions executed: 383
+binary size: 4136
+  code: 1296
+  data: 932
+  metadata: 1908
 functions:
   __test$identity:
     calls: 1
-    bytes: 1032
+    bytes: 1000
   aipl_assert:
     calls: 16
     bytes: (external)

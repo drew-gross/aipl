@@ -23,10 +23,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 88
 instructions executed: 277
-binary size: 3064
+binary size: 3112
   code: 1332
-  data: 286
-  metadata: 1446
+  data: 329
+  metadata: 1451
 functions:
   __test$add2:
     calls: 1

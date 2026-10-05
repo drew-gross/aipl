@@ -13,9 +13,9 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 87
-binary size: 1624
+binary size: 1704
   code: 520
-  data: 96
+  data: 176
   metadata: 1008
 functions:
   __test$pick:

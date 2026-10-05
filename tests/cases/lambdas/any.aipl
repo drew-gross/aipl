@@ -34,8 +34,8 @@ bytes allocated: 48
 instructions executed: 936
 binary size: 6064
   code: 2560
-  data: 806
-  metadata: 2698
+  data: 808
+  metadata: 2696
 functions:
   __builtin_any$char$lam$__test$has_big$lambda3:
     calls: 1

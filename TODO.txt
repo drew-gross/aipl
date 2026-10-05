@@ -82,7 +82,6 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
-  unify bake_asserts and bake_traces
   dict.key_values(|k, v| `{k}: {v}`) should exist, use it in append_missing
   step_result n should be u64 without 0, move 0 check to call site
   keyword_len and exact_len should accept str without "" for spelling

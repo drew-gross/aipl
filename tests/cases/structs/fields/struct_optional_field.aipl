@@ -26,10 +26,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 88
 instructions executed: 287
-binary size: 2744
+binary size: 2808
   code: 1252
-  data: 163
-  metadata: 1329
+  data: 231
+  metadata: 1325
 functions:
   __test$make:
     calls: 1

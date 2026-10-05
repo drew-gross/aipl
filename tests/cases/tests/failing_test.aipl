@@ -17,8 +17,8 @@ fn answer() -> i64 { 41 }.test({
 fn main() {}
 --- check ---
 test answer ... FAIL
-  assert failed at input:13: answer() == 42
-  assert failed at input:14: answer() > 100
+  assert failed at tests/cases/tests/failing_test.aipl:13 answer() == 42
+  assert failed at tests/cases/tests/failing_test.aipl:14 answer() > 100
 2 tests: 1 passed, 1 failed
 --- performance ---
 allocations: 0

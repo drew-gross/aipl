@@ -18,24 +18,6 @@
       <ul class="files">
 
         <li>
-          <a class="file" href="crates-aipl-codegen-src-assert_loc.html">crates/aipl-codegen/src/assert_loc.aipl</a>
-
-          <p class="file-summary">The <code>assert(cond)</code> location formatter: the compiler calls this through the FFI (see <code>install_parser_hooks</code>) while baking <code>assert(cond)</code> calls inside <code>.test({ .. })</code> bodies into <code>__assert(cond, loc)</code>, capturing each assertion's source location for the <code>check</code> failure report. <code>span</code> is the condition's half-open byte range within <code>src</code>; both bounds clamp to <code>[0, len]</code> (and an out-of-order range collapses to &quot;&quot;) via ordinary string-slicing semantics, so no manual clamping is needed here.</p>
-
-
-
-          <ul class="items">
-
-            <li>
-              <a href="crates-aipl-codegen-src-assert_loc.html#item-assert_loc"><code>assert_loc</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-          </ul>
-
-        </li>
-
-        <li>
           <a class="file" href="crates-aipl-codegen-src-ast.html">crates/aipl-codegen/src/ast.aipl</a>
 
           <p class="file-summary">The AST <code>grammar_aipl.aipl</code> lowers to — AIPL's own syntax tree, declared in AIPL. It mirrors <code>aipl_syntax::ast</code> (<code>crates/aipl-syntax/src/lib.rs</code>), which is the type the compiler's passes actually run on: the bridge marshals a value of this shape across the FFI and the Rust side rebuilds an <code>ast::Program</code> from it.</p>
@@ -1880,6 +1862,24 @@
 
             <li>
               <a href="crates-aipl-codegen-src-sexp.html#item-render_sexp"><code>render_sexp</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-source_loc.html">crates/aipl-codegen/src/source_loc.aipl</a>
+
+          <p class="file-summary">Where an expression is and what was written there — <code>12 v + 2</code> — which is the one thing the compiler's two source-text rewrites both need. The loader calls this through the FFI (see <code>install_parser_hooks</code>) while baking <code>assert(cond)</code> into <code>__assert(cond, loc)</code> and <code>trace(expr)</code> into <code>__trace(msg)</code>, and prefixes the file's own name to what comes back: <code>sub/lib.aipl:12 v + 2</code>.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-source_loc.html#item-source_loc"><code>source_loc</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

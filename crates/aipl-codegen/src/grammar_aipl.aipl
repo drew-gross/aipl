@@ -4941,9 +4941,9 @@ deallocations: 1605151
 reallocations: 308103
 bytes allocated: 333093658
 instructions executed: 554829900
-binary size: 6945992
+binary size: 6949960
   code: 4598908
-  data: 58740
+  data: 62708
   metadata: 2288344
 functions:
   __arr_drop___m11__ModeFrame:

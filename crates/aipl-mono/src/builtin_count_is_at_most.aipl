@@ -45,10 +45,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 1627
-binary size: 3688
+binary size: 3832
   code: 1356
-  data: 688
-  metadata: 1644
+  data: 831
+  metadata: 1645
 functions:
   __builtin_count_is_at_most$i64:
     calls: 5

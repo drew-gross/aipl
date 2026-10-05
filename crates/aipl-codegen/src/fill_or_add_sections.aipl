@@ -310,10 +310,10 @@ deallocations: 133
 reallocations: 0
 bytes allocated: 10771
 instructions executed: 33107
-binary size: 22504
+binary size: 22752
   code: 11188
-  data: 3912
-  metadata: 7404
+  data: 4155
+  metadata: 7409
 functions:
   __dict_drop_str$str:
     calls: 29

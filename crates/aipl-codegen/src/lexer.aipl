@@ -1474,9 +1474,9 @@ deallocations: 362
 reallocations: 9
 bytes allocated: 76304
 instructions executed: 658322
-binary size: 802560
-  code: 536896
-  data: 8916
+binary size: 802760
+  code: 536824
+  data: 9188
   metadata: 256748
 functions:
   __arr_drop_Kind:
@@ -1586,7 +1586,7 @@ functions:
     bytes: 17212
   __test$lex_all:
     calls: 1
-    bytes: 464400
+    bytes: 464328
   __test$lex_all$esc_str:
     calls: 2
     bytes: 140

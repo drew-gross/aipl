@@ -512,9 +512,9 @@ deallocations: 19723
 reallocations: 2639
 bytes allocated: 2781607
 instructions executed: 6375070
-binary size: 428528
+binary size: 429248
   code: 283856
-  data: 8348
+  data: 9068
   metadata: 136324
 functions:
   __arr_drop_Json:

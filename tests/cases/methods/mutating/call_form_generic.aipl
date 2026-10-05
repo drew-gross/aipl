@@ -18,9 +18,9 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 56
 instructions executed: 381
-binary size: 2256
+binary size: 2288
   code: 768
-  data: 192
+  data: 224
   metadata: 1296
 functions:
   __eq_i64$arr:

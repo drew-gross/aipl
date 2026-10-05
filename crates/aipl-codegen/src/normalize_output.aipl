@@ -28,10 +28,10 @@ deallocations: 16
 reallocations: 0
 bytes allocated: 880
 instructions executed: 2734
-binary size: 4472
+binary size: 4600
   code: 1968
-  data: 509
-  metadata: 1995
+  data: 636
+  metadata: 1996
 functions:
   __test$normalize_output:
     calls: 1

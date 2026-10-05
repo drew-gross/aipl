@@ -182,11 +182,11 @@ allocations: 34
 deallocations: 34
 reallocations: 9
 bytes allocated: 1230
-instructions executed: 7050
-binary size: 15296
-  code: 8740
-  data: 932
-  metadata: 5624
+instructions executed: 7053
+binary size: 15696
+  code: 8648
+  data: 1263
+  metadata: 5785
 functions:
   __eq_i64$arr:
     calls: 7
@@ -205,7 +205,7 @@ functions:
     bytes: 236
   __test$shout:
     calls: 1
-    bytes: 1652
+    bytes: 1620
   __test$spell:
     calls: 1
     bytes: 648
@@ -214,10 +214,10 @@ functions:
     bytes: 172
   __test$unchanged:
     calls: 1
-    bytes: 372
+    bytes: 344
   __test$wrap:
     calls: 1
-    bytes: 1828
+    bytes: 1796
   aipl_arr_inc:
     calls: 51
     bytes: (external)

@@ -15,10 +15,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 51
-binary size: 1216
+binary size: 1264
   code: 288
-  data: 93
-  metadata: 835
+  data: 140
+  metadata: 836
 functions:
   __test$maybe:
     calls: 1

@@ -5,7 +5,7 @@ fn main() {
     trace(1, 2);
 }
 --- errors ---
-error: `trace` prints one expression and its value, so it takes exactly one argument (got 2)
+error: `trace` takes exactly one argument: the expression to print (got 2)
  --> ./tests/cases/debug/err_trace_takes_one_argument.aipl:5:5
   |
 5 |     trace(1, 2);

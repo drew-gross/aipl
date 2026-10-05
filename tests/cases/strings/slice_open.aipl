@@ -25,10 +25,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 293
-binary size: 3464
+binary size: 3528
   code: 1496
-  data: 352
-  metadata: 1616
+  data: 409
+  metadata: 1623
 functions:
   __test$drop_prefix:
     calls: 1

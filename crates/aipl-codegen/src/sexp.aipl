@@ -74,9 +74,9 @@ deallocations: 12944
 reallocations: 502
 bytes allocated: 12375490
 instructions executed: 6275605
-binary size: 217352
+binary size: 217376
   code: 146020
-  data: 1716
+  data: 1740
   metadata: 69616
 functions:
   __arr_drop_Sexp:

@@ -11,10 +11,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 67
-binary size: 1384
+binary size: 1424
   code: 340
-  data: 137
-  metadata: 907
+  data: 181
+  metadata: 903
 functions:
   __test$flag:
     calls: 1

@@ -10,10 +10,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 91
-binary size: 1464
+binary size: 1488
   code: 464
-  data: 97
-  metadata: 903
+  data: 125
+  metadata: 899
 functions:
   __test$second_is_e:
     calls: 1

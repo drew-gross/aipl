@@ -52,9 +52,9 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 1472
-binary size: 7216
+binary size: 7528
   code: 3364
-  data: 1104
+  data: 1416
   metadata: 2748
 functions:
   __test$parse_test_section_header:

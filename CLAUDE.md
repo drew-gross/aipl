@@ -578,17 +578,44 @@ the gate working, not a problem to route around.
 
 Two consequences worth knowing:
 
-- **The name is reserved.** A function, constant or imported name spelled `trace`
-  is a compile error, because the call is rewritten (the loader's `bake_traces`)
-  before any name could shadow it.
+- **The name is reserved**, exactly as `assert` is. A function, constant or
+  imported name spelled either is a compile error, because the call is rewritten
+  before any name could shadow it — see the next section.
 - **A trace may be optimized away.** Carrying no effect means code sinking can
   drop one into a branch that isn't taken. That is accepted by design — if a
   trace doesn't print, move it rather than treating it as a compiler bug.
 
-The lowering lives in `bake_traces` (`aipl-loader`), which is where both halves of
-the location are known: the parser is handed a source with no name attached, so
-unlike `assert`'s twin `bake_asserts` this one cannot live there. `check`'s half
-is `aipl_syntax::trace_diagnostics`.
+## `assert` and `trace` are one mechanism (`aipl-loader`'s `bake`)
+Both are **reserved one-argument calls**: a name the language keeps for itself,
+rewritten in place into an intrinsic carrying the argument's source location as a
+baked string. They live together in `crates/aipl-loader/src/bake.rs` and share
+every piece — the `Reserved` descriptor both diagnostics read, the
+reserved-name-not-bound check, how a file's name reaches the string
+(`location_label`), the location string itself (`Baker::location`), and the walk
+that finds the calls (`rewrite_reserved_call`, over `each_subexpr_mut`). The one
+asymmetry is deliberate and is each feature's point: `trace` is honoured in every
+body, `assert` only in test code.
+
+**They are in the loader because a location names a file**, and `parse` takes a
+`&str` — it is never told one. The loader is the first place that holds a source
+and its path together. `assert`'s rewrite used to live in the parser's
+`post_parse`, which is exactly why its locations read `input:13:` — `input` stood
+in for the filename the parser could not know. They now read
+`sub/lib.aipl:13 answer() == 42`.
+
+The line and text come from **one** dogfooded formatter, `source_loc`
+(`crates/aipl-codegen/src/source_loc.aipl`); the loader prefixes the file name,
+which is why the file is not one of its parameters. `check`'s half of `trace` is
+`aipl_syntax::trace_diagnostics`.
+
+**Renaming or re-arity-ing a hook like this one costs a bootstrap round.**
+Regenerating the artifact parses the compiler's own sources, which bake asserts,
+which call the hook — so the entry has to exist in the *live* artifact before
+anything switches to it. `fill_staged_ir` fails with
+`no callable fn "<name>"` otherwise. The escape is the one the staged-IR section
+describes: make the call resolvable for one round trip, run
+`fill_staged_ir` → `validate_staged_ir` → `promote_staged_ir`, undo the stopgap,
+then hand off.
 
 ## Predicate methods (`is_*` functions)
 Boolean predicates should be written as methods on their receiver, not

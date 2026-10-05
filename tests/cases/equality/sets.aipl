@@ -14,11 +14,11 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 424
-instructions executed: 584
-binary size: 4456
-  code: 2236
-  data: 249
-  metadata: 1971
+instructions executed: 585
+binary size: 4520
+  code: 2208
+  data: 296
+  metadata: 2016
 functions:
   __eq_set$i64:
     calls: 4
@@ -28,7 +28,7 @@ functions:
     bytes: 32
   __test$eq_set:
     calls: 1
-    bytes: 1844
+    bytes: 1816
   aipl_array_dec:
     calls: 8
     bytes: (external)

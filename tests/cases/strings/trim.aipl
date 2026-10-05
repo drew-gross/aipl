@@ -19,8 +19,8 @@ bytes allocated: 0
 instructions executed: 129
 binary size: 2288
   code: 812
-  data: 209
-  metadata: 1267
+  data: 212
+  metadata: 1264
 functions:
   __test$trim_spaces:
     calls: 1

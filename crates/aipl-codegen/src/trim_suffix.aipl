@@ -18,10 +18,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 351
-binary size: 2752
+binary size: 2784
   code: 1128
-  data: 241
-  metadata: 1383
+  data: 275
+  metadata: 1381
 functions:
   __test$trim_suffix:
     calls: 1

@@ -25,8 +25,8 @@ bytes allocated: 0
 instructions executed: 185
 binary size: 1496
   code: 400
-  data: 139
-  metadata: 957
+  data: 142
+  metadata: 954
 functions:
   __test$count_to:
     calls: 1

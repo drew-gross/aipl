@@ -215,10 +215,10 @@ deallocations: 18
 reallocations: 2
 bytes allocated: 1338
 instructions executed: 1595
-binary size: 99728
+binary size: 99736
   code: 69676
-  data: 423
-  metadata: 29629
+  data: 426
+  metadata: 29634
 functions:
   __arr_drop_FieldDecl:
     calls: 1

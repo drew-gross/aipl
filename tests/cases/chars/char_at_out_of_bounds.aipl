@@ -15,10 +15,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 87
-binary size: 1424
+binary size: 1472
   code: 424
-  data: 94
-  metadata: 906
+  data: 138
+  metadata: 910
 functions:
   __test$past_end_is_some:
     calls: 1

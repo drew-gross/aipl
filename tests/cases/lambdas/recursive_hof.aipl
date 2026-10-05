@@ -20,10 +20,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 62
-binary size: 1184
+binary size: 1192
   code: 252
-  data: 52
-  metadata: 880
+  data: 64
+  metadata: 876
 functions:
   __test$rec:
     calls: 1

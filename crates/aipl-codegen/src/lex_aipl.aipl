@@ -878,9 +878,9 @@ deallocations: 313
 reallocations: 15
 bytes allocated: 487096
 instructions executed: 2236833
-binary size: 305296
+binary size: 305672
   code: 220668
-  data: 7332
+  data: 7708
   metadata: 77296
 functions:
   __arr_drop_AiplTok:

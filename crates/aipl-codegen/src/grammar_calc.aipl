@@ -471,9 +471,9 @@ deallocations: 10228
 reallocations: 1502
 bytes allocated: 1122054
 instructions executed: 2778631
-binary size: 390032
+binary size: 390560
   code: 258904
-  data: 5852
+  data: 6380
   metadata: 125276
 functions:
   __arr_drop_Calc:

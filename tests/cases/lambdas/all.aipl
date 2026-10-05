@@ -32,10 +32,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 48
 instructions executed: 1092
-binary size: 6088
+binary size: 6096
   code: 2656
-  data: 767
-  metadata: 2665
+  data: 769
+  metadata: 2671
 functions:
   __builtin_all$char$lam$__test$positive$lambda3:
     calls: 1

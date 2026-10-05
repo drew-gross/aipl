@@ -1769,9 +1769,9 @@ deallocations: 5597
 reallocations: 1235
 bytes allocated: 678988
 instructions executed: 2092328
-binary size: 731304
+binary size: 731696
   code: 444192
-  data: 12644
+  data: 13036
   metadata: 274468
 functions:
   __arr_drop_Node:

@@ -116,10 +116,10 @@ deallocations: 6
 reallocations: 0
 bytes allocated: 528
 instructions executed: 10529
-binary size: 18448
+binary size: 18640
   code: 10788
-  data: 1741
-  metadata: 5919
+  data: 1932
+  metadata: 5920
 functions:
   __test$escape_text:
     calls: 1

@@ -46,10 +46,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 144
 instructions executed: 542
-binary size: 4016
+binary size: 4080
   code: 1612
-  data: 369
-  metadata: 2035
+  data: 439
+  metadata: 2029
 functions:
   __ctor$Tok$Int:
     calls: 1

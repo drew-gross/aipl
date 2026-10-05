@@ -45,10 +45,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 32
 instructions executed: 571
-binary size: 4328
+binary size: 4440
   code: 1756
-  data: 662
-  metadata: 1910
+  data: 773
+  metadata: 1911
 functions:
   __test$find_map:
     calls: 1

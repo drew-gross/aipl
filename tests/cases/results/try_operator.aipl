@@ -36,14 +36,14 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 229
-binary size: 2472
-  code: 1084
-  data: 174
-  metadata: 1214
+binary size: 2584
+  code: 1064
+  data: 249
+  metadata: 1271
 functions:
   __test$unwrap_or:
     calls: 1
-    bytes: 572
+    bytes: 552
   __test$unwrap_or$sum_pos:
     calls: 3
     bytes: 404

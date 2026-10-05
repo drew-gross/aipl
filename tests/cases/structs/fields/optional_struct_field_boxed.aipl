@@ -34,11 +34,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 112
-instructions executed: 275
-binary size: 3600
-  code: 1636
-  data: 236
-  metadata: 1728
+instructions executed: 276
+binary size: 3792
+  code: 1604
+  data: 406
+  metadata: 1782
 functions:
   __eq_Wide:
     calls: 0
@@ -51,7 +51,7 @@ functions:
     bytes: 112
   __test$make:
     calls: 1
-    bytes: 1164
+    bytes: 1132
   aipl_assert:
     calls: 5
     bytes: (external)
