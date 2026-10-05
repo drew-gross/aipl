@@ -29,11 +29,39 @@ use aipl_syntax::{DebugOptions, Error, Span};
 
 /// Parse `root`, recursively resolve every `import`, and return a single
 /// merged [`Program`] ready for codegen.
+///
+/// The project root — what a `trace(..)` names its file relative to — is the
+/// current working directory. That is right for every command that compiles
+/// where it was invoked; `aipl check` runs its tests from a scratch directory
+/// and so passes its own, through [`load_program_rooted`].
 pub fn load_program(root: &Path, dbg: DebugOptions) -> Result<Program, Vec<Error>> {
+    let here = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    load_program_rooted(root, &here, dbg)
+}
+
+/// [`load_program`] with the project root given rather than taken from the
+/// working directory.
+///
+/// `project_root` decides one thing: how a `trace(expr)` names the file it sits
+/// in (`subdir/file.aipl:5 v + 2 = 7`). A caller that changes directory between
+/// being invoked and compiling — `aipl check`, which stages each file's
+/// `--- file: ---` companions into a scratch directory and runs the tests
+/// there — must pass the directory the *user* named paths relative to, or every
+/// trace would be labelled against the scratch directory instead.
+pub fn load_program_rooted(
+    root: &Path,
+    project_root: &Path,
+    dbg: DebugOptions,
+) -> Result<Program, Vec<Error>> {
     let root_canon = canonicalize(root)?;
     let mut loader = Loader {
         dbg,
         entry: Some(root_canon.clone()),
+        // Canonicalized so it shares a spelling with the file paths it is
+        // stripped from — those are canonical, and on macOS a working
+        // directory under `/var` or `/tmp` is a symlink into `/private`, which
+        // would otherwise never match.
+        project_root: project_root.canonicalize().ok(),
         ..Loader::default()
     };
     loader.load(&root_canon)?;
@@ -195,6 +223,10 @@ struct Loader {
     /// (`is_builtin_impl_path`), so `aipl check` over `crates/` reaches the same
     /// sources the same way.
     builtin_impl: bool,
+    /// The directory a `trace(expr)` names its file relative to — see
+    /// [`load_program_rooted`]. `None` for the in-memory entry points, whose
+    /// files are named by the caller already.
+    project_root: Option<PathBuf>,
 }
 
 /// Whether `path` is an AIPL-implemented builtin's source —
@@ -209,6 +241,180 @@ fn is_builtin_impl_path(path: &Path) -> bool {
         .parent()
         .is_some_and(|d| d.ends_with(Path::new("aipl-mono").join("src")));
     named_like_one && in_mono_src
+}
+
+/// The name `trace(expr)` is reserved for the debugging intrinsic — see
+/// [`bake_traces`].
+const TRACE: &str = "trace";
+
+/// What a `trace(expr)` in `path` names its file: `path` relative to the project
+/// root, with forward slashes so the output reads the same on every platform.
+///
+/// A file outside the project root — or one loaded with no project root known,
+/// which is every in-memory entry point — falls back to its bare name, the same
+/// thing [`file_label`] shows a diagnostic about it. An absolute path would be
+/// both noisy and particular to one machine.
+fn trace_file_label(path: &Path, project_root: Option<&Path>) -> String {
+    // A virtual source's key *is* the name the caller gave it (`"./util.aipl"`),
+    // so there is nothing to make it relative to.
+    let rel = if path.is_relative() {
+        path.strip_prefix(".").unwrap_or(path)
+    } else {
+        match project_root.and_then(|root| path.strip_prefix(root).ok()) {
+            Some(rel) => rel,
+            None => return file_label(path),
+        }
+    };
+    rel.components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+/// Reject a file that binds `trace` to anything of its own.
+///
+/// A call to `trace` is rewritten before any name resolution happens, so a
+/// declaration of that name would not shadow the intrinsic — it would simply
+/// never be reached, which is the kind of silence worth a diagnostic. Covers the
+/// item-level bindings (a function, a constant, an import's local name); a local
+/// `let trace = ..` used as a callable is beyond what the rewrite can see.
+fn check_trace_not_bound(program: &Program) -> Result<(), Error> {
+    // `what` carries its own article: "a function", "an imported name".
+    let reserved = |what: &str, span: Span| {
+        Error::at(
+            format!(
+                "`{TRACE}` is the name of the debugging intrinsic, so {what} may not be called \
+                 that: `{TRACE}(expr)` prints the expression and its value and yields it, and \
+                 is rewritten before any name can shadow it"
+            ),
+            span,
+        )
+    };
+    for item in &program.items {
+        match item {
+            Item::Fn(f) if f.name == TRACE => {
+                return Err(reserved("a function", f.name.span.clone()))
+            }
+            Item::Const(c) if c.name == TRACE => {
+                return Err(reserved("a constant", c.name.span.clone()))
+            }
+            Item::Import(ImportDecl { names, .. }) => {
+                if let Some(n) = names.iter().find(|n| n.local() == TRACE) {
+                    return Err(reserved("an imported name", n.span.clone()));
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+/// Rewrite every `trace(expr)` in `items` into the block it stands for.
+///
+/// `trace(expr)` evaluates to `expr`, so that a trace can be wrapped around a
+/// subexpression in place rather than restructuring the code around it. The
+/// value is therefore bound once and handed back:
+///
+/// ```text
+/// trace(v + 2)
+///
+/// // becomes, for line 5 of subdir/file.aipl:
+/// let __trace_value_0 = v + 2;
+/// __trace(`subdir/file.aipl:5 v + 2 = {__trace_value_0}`);
+/// __trace_value_0
+/// ```
+///
+/// Baked here rather than in the parser, where `assert(cond)`'s twin
+/// `bake_asserts` lives, because only the loader holds both halves of the
+/// location: the parser is handed a source with no name attached to it.
+///
+/// `src` must be the text `items`' spans index, and `label` the name the file
+/// goes by (see [`trace_file_label`]).
+fn bake_traces(items: &mut [Item], src: &str, label: &str) -> Result<(), Error> {
+    let mut next = 0u32;
+    for item in items {
+        // A `.test` block's own functions were hoisted to top level by
+        // `post_parse`, so a function has exactly two bodies to walk.
+        let Item::Fn(f) = item else { continue };
+        bake_traces_in(&mut f.body, src, label, &mut next)?;
+        if let Some(test_body) = &mut f.test_body {
+            bake_traces_in(test_body, src, label, &mut next)?;
+        }
+    }
+    Ok(())
+}
+
+fn bake_traces_in(e: &mut Expr, src: &str, label: &str, next: &mut u32) -> Result<(), Error> {
+    if let ExprKind::Call(callee, args, _) = &e.kind {
+        if *callee == TRACE {
+            if args.len() != 1 {
+                return Err(Error::at(
+                    format!(
+                        "`{TRACE}` prints one expression and its value, so it takes exactly one \
+                         argument (got {})",
+                        args.len()
+                    ),
+                    e.span.clone(),
+                ));
+            }
+            let ExprKind::Call(_, mut args, _) = std::mem::replace(&mut e.kind, ExprKind::Unit)
+            else {
+                unreachable!("matched a call just above")
+            };
+            let mut traced = args.pop().expect("one argument");
+            // `trace(trace(x))` is two traces, the inner one reported first.
+            bake_traces_in(&mut traced, src, label, next)?;
+            e.kind = trace_block(traced, src, label, next);
+            return Ok(());
+        }
+    }
+    for child in aipl_syntax::each_subexpr_mut(e) {
+        bake_traces_in(child, src, label, next)?;
+    }
+    Ok(())
+}
+
+/// The `let`/print/yield block one `trace(traced)` becomes — see [`bake_traces`].
+fn trace_block(traced: Expr, src: &str, label: &str, next: &mut u32) -> ExprKind {
+    let span = traced.span.clone();
+    // Unique per file, and `__`-prefixed like every other synthesized binding,
+    // so nested and sibling traces cannot collide with each other or with a
+    // name from source.
+    let value_name = format!("__trace_value_{next}");
+    *next += 1;
+    // Everything but the value: the location, then the expression as written.
+    // Whitespace runs collapse so that a trace of an expression the formatter
+    // broke across lines still prints as one line.
+    let text: Vec<&str> = src
+        .get(span.clone())
+        .unwrap_or("")
+        .split_whitespace()
+        .collect();
+    // `get` rather than slicing: a span that is not on a UTF-8 boundary (or runs
+    // past the end) is a bug elsewhere, and reporting line 1 is a better way to
+    // learn of it than panicking inside the loader.
+    let line = 1 + src.get(..span.start).unwrap_or("").matches('\n').count();
+    let prefix = format!("{label}:{line} {} = ", text.join(" "));
+
+    let at = |kind| Expr::new(kind, span.clone());
+    let value = || at(ExprKind::Ident(value_name.clone()));
+    let message = at(ExprKind::Call(
+        Callee::TemplateConcat,
+        vec![
+            at(ExprKind::Str(prefix)),
+            at(ExprKind::Call(Callee::TemplateInterp, vec![value()], false)),
+        ],
+        false,
+    ));
+    ExprKind::Let(
+        value_name.clone(),
+        None,
+        Box::new(traced),
+        Box::new(at(ExprKind::Seq(
+            Box::new(at(ExprKind::Call(Callee::Trace, vec![message], false))),
+            Box::new(value()),
+        ))),
+    )
 }
 
 struct LoadedFile {
@@ -260,11 +466,19 @@ impl Loader {
         // Keep the original Error (including span) so `render()` can show
         // the caret pointing into the imported file's source. The path
         // tied to that source is implicit from the source line itself.
-        let (program, allows) = parse_with_allows(src)?;
+        let (mut program, allows) = parse_with_allows(src)?;
         // Lints run right after the parse, per file, while the source (for
-        // line-scoped `#[allow]` squelching) is in hand.
+        // line-scoped `#[allow]` squelching) is in hand. Before the `trace`
+        // rewrite below, so a lint sees what the author wrote rather than the
+        // block it desugars to.
         aipl_syntax::lint::check(&program, src, &allows)?;
         check_no_duplicate_import_sources(&program)?;
+        check_trace_not_bound(&program)?;
+        bake_traces(
+            &mut program.items,
+            src,
+            &trace_file_label(path, self.project_root.as_deref()),
+        )?;
 
         let mut items = Vec::new();
         let mut imports = Vec::new();
@@ -323,7 +537,7 @@ impl Loader {
     }
 
     fn register_virtual_inner(&mut self, key: PathBuf, src: &str) -> Result<(), Vec<Error>> {
-        let (program, allows) = parse_with_allows(src)?;
+        let (mut program, allows) = parse_with_allows(src)?;
         aipl_syntax::lint::check(&program, src, &allows)?;
         // A caller-supplied name, so a wrong one is a caller error to report,
         // not an invariant to assert: `load_program_sources` returns a `Result`
@@ -340,6 +554,12 @@ impl Loader {
             .into());
         }
         check_no_duplicate_import_sources(&program)?;
+        check_trace_not_bound(&program)?;
+        bake_traces(
+            &mut program.items,
+            src,
+            &trace_file_label(&key, self.project_root.as_deref()),
+        )?;
         let mut items = Vec::new();
         let mut imports = Vec::new();
         let mut builtin_imports = Vec::new();

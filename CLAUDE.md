@@ -563,6 +563,33 @@ reaching that builtin dies. One such lint took out 66 cases at once.
   compiler output); it is the wrong form when the exact leading whitespace
   matters, where an ordinary escaped literal is predictable.
 
+## Debugging a program: `trace(expr)`, and removing it before handoff
+`trace(expr)` prints `path/to/file.aipl:12 expr = value` and evaluates to `expr`,
+so it wraps a subexpression without restructuring anything around it
+(`trace(w) * trace(h)`). It needs no import and declares no effect — it is the
+only call that prints without one — which is what makes it reachable the moment
+you want it.
+
+**`aipl check` fails on any file that still calls it, or that imports one that
+does** — reported after the tests run, so a trace a test hit has printed before
+the diagnostic appears. So a trace is fine in the dev loop and is never a thing
+to leave behind: `cargo handoff` will not go green while one remains, and that is
+the gate working, not a problem to route around.
+
+Two consequences worth knowing:
+
+- **The name is reserved.** A function, constant or imported name spelled `trace`
+  is a compile error, because the call is rewritten (the loader's `bake_traces`)
+  before any name could shadow it.
+- **A trace may be optimized away.** Carrying no effect means code sinking can
+  drop one into a branch that isn't taken. That is accepted by design — if a
+  trace doesn't print, move it rather than treating it as a compiler bug.
+
+The lowering lives in `bake_traces` (`aipl-loader`), which is where both halves of
+the location are known: the parser is handed a source with no name attached, so
+unlike `assert`'s twin `bake_asserts` this one cannot live there. `check`'s half
+is `aipl_syntax::trace_diagnostics`.
+
 ## Predicate methods (`is_*` functions)
 Boolean predicates should be written as methods on their receiver, not
 free functions — `c.is_digit()` reads more naturally than `is_digit(c)`.

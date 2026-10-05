@@ -373,3 +373,108 @@ fn a_type_error_in_a_test_body_is_reported() {
     assert!(!stderr.is_empty(), "expected a type error on stderr");
     assert_eq!(code, 1);
 }
+
+// ---------- trace(..) ----------
+
+/// A trace inside a `.test` body: the test passes, so nothing but `trace` itself
+/// stands between this file and a green run.
+const TRACED: &str = "import { equal as ==, wrapping_add as + } from builtins;\n\n\
+     fn bump(v: i64) -> i64 { trace(v + 2) }.test({\n    assert(bump(5) == 7);\n})\n";
+
+#[test]
+fn a_trace_fails_check_only_after_its_tests_have_run() {
+    let (stdout, stderr, code) = check("traced", TRACED);
+    // The tests ran, and the trace printed while they did — which is the whole
+    // reason the failure waits until afterwards.
+    assert!(
+        stdout.contains(" v + 2 = 7"),
+        "expected the trace's own output, got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("1 tests: 1 passed, 0 failed"),
+        "got:\n{stdout}"
+    );
+    assert!(
+        stderr.contains("`trace(..)` prints for debugging"),
+        "expected the trace diagnostic, got:\n{stderr}"
+    );
+    // Pointed at the traced expression, not the whole call.
+    assert!(stderr.contains("trace(v + 2)"), "got:\n{stderr}");
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_trace_names_its_file_relative_to_where_check_was_invoked() {
+    // The regression this guards: `check` stages each file's companions into a
+    // scratch directory and runs the tests from *there*, so a label taken from
+    // the working directory at load time would name the scratch directory
+    // instead of the project.
+    let (stdout, _stderr, code) = check_tree("trace_label", &[("sub/traced.aipl", TRACED)], &[]);
+    assert!(
+        stdout.contains("sub/traced.aipl:3 v + 2 = 7"),
+        "expected a project-relative trace label, got:\n{stdout}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_trace_in_an_imported_file_fails_the_importing_files_check() {
+    // "the file or any file it imports": the trace is nowhere in `importer.aipl`,
+    // and checking it still fails.
+    let (stdout, stderr, code) = check_tree(
+        "trace_imported",
+        &[
+            (
+                "importer.aipl",
+                "import { equal as == } from builtins;\n\
+                 import { bump } from \"./sub/lib.aipl\";\n\n\
+                 fn use_bump() -> i64 { bump(5) }.test({\n    assert(use_bump() == 7);\n})\n",
+            ),
+            (
+                "sub/lib.aipl",
+                "import { wrapping_add as + } from builtins;\n\n\
+                 pub fn bump(v: i64) -> i64 { trace(v + 2) }\n",
+            ),
+        ],
+        &["importer.aipl"],
+    );
+    assert!(
+        stdout.contains("sub/lib.aipl:3 v + 2 = 7"),
+        "expected the imported file's trace output, got:\n{stdout}"
+    );
+    assert!(
+        stderr.contains("`trace(..)` prints for debugging"),
+        "expected the trace diagnostic, got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_trace_does_not_stop_the_batch_and_is_counted_separately() {
+    let (stdout, stderr, code) = check_tree(
+        "trace_keep_going",
+        &[
+            ("a_traced.aipl", TRACED),
+            ("b_ok.aipl", PASSES),
+            ("c_fails.aipl", FAILS),
+        ],
+        &[],
+    );
+    // The traced file sorts first, so the run would end there if it aborted.
+    assert!(
+        stdout.contains("test ./c_fails.aipl::b ... FAIL"),
+        "the run should continue past the traced file, got:\n{stdout}"
+    );
+    assert!(
+        stderr.contains("`trace(..)` prints for debugging"),
+        "got:\n{stderr}"
+    );
+    // Called out separately for the same reason "needs formatting" is: the traced
+    // file's own tests passed, so the tallies give no hint why this exits
+    // non-zero.
+    assert!(
+        stdout.contains("1 file still calls trace()"),
+        "got:\n{stdout}"
+    );
+    assert_eq!(code, 1);
+}

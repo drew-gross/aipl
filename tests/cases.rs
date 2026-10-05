@@ -868,6 +868,20 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
     }
 }
 
+/// Load a case, rooted at its own directory.
+///
+/// A case is a one-file project (plus whatever its `--- file: ---` companions
+/// stage beside it), so its directory *is* its project root — which is what a
+/// `trace(..)` names its file relative to. Rooting it anywhere else would make
+/// that name depend on where the staging directory happens to sit, and
+/// `CARGO_TARGET_TMPDIR` moves with `CARGO_TARGET_DIR`: the baked label is in the
+/// program's data section, so a case's `binary size` would stop being a property
+/// of the case.
+fn load_case(src_path: &Path) -> Result<Program, Vec<Error>> {
+    let root = src_path.parent().unwrap_or(Path::new("."));
+    loader::load_program_rooted(src_path, root, debug_opts())
+}
+
 /// Check (or refresh) the `--- errors ---` section of a case that is expected
 /// not to compile. Fill mode records the rendered diagnostic through the same
 /// [`check_or_fill`] every other section goes through, so there is no second
@@ -879,8 +893,8 @@ fn run_error_case(
     spec: &Spec,
     fills: &mut Fills,
 ) -> Outcome {
-    let result = loader::load_program(src_path, debug_opts())
-        .and_then(|prog| Compilation::new(&prog, debug_opts()).map(|_| ()));
+    let result =
+        load_case(src_path).and_then(|prog| Compilation::new(&prog, debug_opts()).map(|_| ()));
     let errs = match result {
         Err(e) => e,
         Ok(()) => {
@@ -968,8 +982,7 @@ fn measured_program(program: &Program) -> Program {
 
 /// Build the production (non-instrumented) binary for a case, returning its path.
 fn build_case_binary(src_path: &Path, stem: &str, case_dir: &Path) -> Result<PathBuf, String> {
-    let program =
-        loader::load_program(src_path, debug_opts()).map_err(|e| Error::display_all(&e))?;
+    let program = load_case(src_path).map_err(|e| Error::display_all(&e))?;
     let measured = measured_program(&program);
     let comp = ObjectCompilation::new(&measured, stem, debug_opts(), false)
         .map_err(|e| Error::display_all(&e))?;
@@ -1322,7 +1335,7 @@ fn run_success_case(
     // an absent one, so a fill never adds that section to an example.
     require_metrics: bool,
 ) -> Outcome {
-    let program = match loader::load_program(src_path, debug_opts()) {
+    let program = match load_case(src_path) {
         Ok(p) => p,
         Err(e) => {
             return Outcome::Fail(format!(

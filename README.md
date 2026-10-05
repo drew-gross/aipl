@@ -132,3 +132,38 @@ accepted because together with `(lo, some(hi))` it covers everything; a missing
 shape is named in the error (`(_, none) is not matched`), an arm no value can
 reach is refused, and a match on a literal column needs a `_` or binder arm.
 `if (let (1, some(x)) = pair) { .. }` takes the same patterns.
+
+## Debugging: `trace(expr)`
+
+`trace(expr)` prints where it is, what was written there, and what it evaluated
+to, then **evaluates to `expr`** — so it wraps a subexpression in place instead
+of making you restructure the code around it:
+
+```
+fn area(w: i64, h: i64) -> i64 { trace(w) * trace(h) }
+```
+
+```
+subdir/shapes.aipl:4 w = 3
+subdir/shapes.aipl:4 h = 4
+```
+
+The file is named relative to the directory the compiler was invoked from, so a
+trace locates itself in a tree rather than only in a file.
+
+Two things make it convenient, and one makes that safe:
+
+- **No import.** `trace` is ambient, like `assert`. Nothing else may be called
+  that — a function, constant or imported name spelled `trace` is a compile
+  error, because the call is rewritten before any name could shadow it.
+- **No effect.** It is the only call that prints without one, so dropping a
+  trace into a function never makes you restate its signature or its callers'.
+- **`aipl check` refuses it.** A file that still calls `trace` — or that imports
+  one that does — fails `check`, *after* its tests have run, so a trace a test
+  hit has already printed by the time the diagnostic explains itself. That is
+  what keeps the effect-free print from being a hole in the effect system.
+
+Because it carries no effect, the optimizer is free to treat a trace as
+removable: a call sunk into a branch that isn't taken does not print. That is
+accepted — the point of `trace` is the ten minutes you spend with it, not
+reliable logging.

@@ -246,24 +246,49 @@ fn collect_aipl(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Load, compile, and run one file's `__test_main` driver, returning its exit
-/// code (0 = every test passed). `Err` is a rendered load/compile failure.
+/// What checking one file found: the `__test_main` driver's exit code (0 = every
+/// test passed), and the rendered `trace(..)` diagnostics if the program still
+/// holds any.
+struct Checked {
+    exit_code: i64,
+    traces: Option<String>,
+}
+
+/// Load, compile, and run one file's `__test_main` driver. `Err` is a rendered
+/// load/compile failure.
 ///
 /// `file` is absolute (so loading and its relative imports resolve no matter
 /// what the working directory is); `label` is the path as the user typed or as
-/// discovery found it, and is what diagnostics show.
+/// discovery found it, and is what diagnostics show. `project_root` is the
+/// directory those labels are relative to — the working directory this
+/// invocation started in, which is *not* the one the tests run from (see
+/// [`in_staged_dir`]), and which is what a `trace(..)` names its file against.
+///
+/// The `trace` report is returned rather than printed: a trace is only a failure
+/// once the tests have had their chance to hit it and print, so the caller
+/// reports it after this returns.
 ///
 /// The pass/fail tallies live in the test runtime and accumulate across calls,
 /// which is what lets a batch run report one aggregate at the end.
-fn check_file(file: &Path, label: &str, dbg: DebugOptions) -> Result<i64, String> {
+fn check_file(
+    file: &Path,
+    label: &str,
+    project_root: &Path,
+    dbg: DebugOptions,
+) -> Result<Checked, String> {
     let render = |e| render_err_at(file, label, e);
-    let program = loader::load_program(file, dbg).map_err(render)?;
+    let program = loader::load_program_rooted(file, project_root, dbg).map_err(render)?;
+    let traces = aipl::trace_diagnostics(&program);
     let test_program = aipl::codegen::build_test_program(&program);
     // `__test_main` runs each test and returns the exit code (0 ok, 1 failures),
     // printing failures itself. (Runs on `main`'s large-stack worker thread,
     // which gives codegen room for deep `.test` driver/expression trees.)
     let comp = Compilation::new(&test_program, dbg).map_err(render)?;
-    comp.run_0("__test_main").map_err(|e| e.to_string())
+    let exit_code = comp.run_0("__test_main").map_err(|e| e.to_string())?;
+    Ok(Checked {
+        exit_code,
+        traces: (!traces.is_empty()).then(|| render(traces)),
+    })
 }
 
 /// Run `f` with the process working directory pointed at a fresh scratch
@@ -382,6 +407,11 @@ fn check_cmd(args: &[String]) -> ExitCode {
         return ExitCode::FAILURE;
     }
 
+    // Captured before anything stages a scratch directory: this is the root the
+    // discovered labels are relative to, and so what a `trace(..)` names its
+    // file against (see `check_file`).
+    let project_root = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
     // Resolve up front: the tests below run from a scratch directory, so a
     // relative path would no longer find its file. Diagnostics keep naming the
     // path as discovery found it.
@@ -398,18 +428,25 @@ fn check_cmd(args: &[String]) -> ExitCode {
         // Reported before the tests run, and either way: the point is to end the
         // invocation knowing about every problem, not just the first kind.
         let unformatted = check_formatting(path, label);
-        let outcome = match in_staged_dir(path, || check_file(path, label, dbg)) {
+        let outcome = match in_staged_dir(path, || check_file(path, label, &project_root, dbg)) {
             Ok(o) => o,
             Err(msg) => Err(msg),
         };
-        let tests_ok = match outcome {
-            Ok(code) => code == 0,
+        let (tests_ok, traced) = match outcome {
+            // Reported after the run, so a trace the tests hit has already
+            // printed its value by the time the diagnostic explains itself.
+            Ok(checked) => {
+                if let Some(report) = &checked.traces {
+                    eprintln!("{report}");
+                }
+                (checked.exit_code == 0, checked.traces.is_some())
+            }
             Err(msg) => {
                 eprintln!("{msg}");
-                false
+                (false, false)
             }
         };
-        return if tests_ok && !unformatted {
+        return if tests_ok && !unformatted && !traced {
             ExitCode::SUCCESS
         } else {
             ExitCode::FAILURE
@@ -419,18 +456,27 @@ fn check_cmd(args: &[String]) -> ExitCode {
     aipl::codegen::set_quiet_summary(true);
     let mut broken = 0usize;
     let mut unformatted = 0usize;
+    let mut traced = 0usize;
     for (path, label) in &resolved {
         if check_formatting(path, label) {
             unformatted += 1;
         }
         aipl::codegen::set_test_file(Some(label));
-        let outcome = match in_staged_dir(path, || check_file(path, label, dbg)) {
+        let outcome = match in_staged_dir(path, || check_file(path, label, &project_root, dbg)) {
             Ok(o) => o,
             Err(msg) => Err(msg),
         };
-        if let Err(msg) = outcome {
-            eprintln!("{msg}");
-            broken += 1;
+        match outcome {
+            Ok(checked) => {
+                if let Some(report) = &checked.traces {
+                    eprintln!("{report}");
+                    traced += 1;
+                }
+            }
+            Err(msg) => {
+                eprintln!("{msg}");
+                broken += 1;
+            }
         }
     }
     aipl::codegen::set_test_file(None);
@@ -455,7 +501,17 @@ fn check_cmd(args: &[String]) -> ExitCode {
         };
         println!("{unformatted} {word} formatting");
     }
-    if failed > 0 || broken > 0 || unformatted > 0 {
+    if traced > 0 {
+        // And likewise: `trace(..)` is a debugging aid, so its files' tests
+        // pass — the run still fails, and this is what says why.
+        let phrase = if traced == 1 {
+            "file still calls"
+        } else {
+            "files still call"
+        };
+        println!("{traced} {phrase} trace()");
+    }
+    if failed > 0 || broken > 0 || unformatted > 0 || traced > 0 {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS

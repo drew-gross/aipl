@@ -196,6 +196,15 @@ pub enum Callee {
     /// `assert(cond)` inside a `.test({ .. })` body, with its source location
     /// (the parser's `post_parse` rewrite).
     Assert,
+    /// `trace(expr)` anywhere in a program: the message to print, already
+    /// composed from the expression's source location, its own text and its
+    /// rendered value (the loader's `bake_traces`).
+    ///
+    /// Prints, but deliberately carries no `!prints` effect, so a trace can be
+    /// dropped into any function without restating its signature. That is what
+    /// `aipl check` refusing a program containing one buys back: the escape
+    /// hatch stays a debugging one.
+    Trace,
     /// The `__test_main` driver's per-test bracketing and final summary.
     TestBegin,
     TestEnd,
@@ -394,6 +403,7 @@ impl Callee {
         Callee::Ok,
         Callee::Err,
         Callee::Assert,
+        Callee::Trace,
         Callee::TestBegin,
         Callee::TestEnd,
         Callee::TestSummary,
@@ -548,6 +558,7 @@ impl Callee {
             Callee::Err => "err",
 
             Callee::Assert => "__assert",
+            Callee::Trace => "__trace",
             Callee::TestBegin => "__test_begin",
             Callee::TestEnd => "__test_end",
             Callee::TestSummary => "__test_summary",

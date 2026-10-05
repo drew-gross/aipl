@@ -1,0 +1,52 @@
+# `trace(expr)` prints where it is, what was written there, and what it came out
+# as — `subdir/file.aipl:2 v + 2 = 7`. The file is named relative to the project
+# root, so a trace locates itself in a tree rather than just in a file.
+#
+# It then evaluates to `expr`, so a trace can be wrapped around a subexpression
+# in place rather than restructuring the code around it: `trace(w) * trace(h)`
+# prints both operands and still multiplies them.
+#
+# No import, and no effect: it is the one call that prints without one, which is
+# what makes it usable the moment you want it. `aipl check` is what keeps that
+# from being a hole — it fails on a program that still contains a trace, after
+# running the tests, so a trace a test hit has printed before it is reported.
+
+import { wrapping_mul as * } from builtins;
+import { bump } from "./subdir/file.aipl";
+
+fn area(w: i64, h: i64) -> i64 { trace(w) * trace(h) }
+
+fn main() {
+    bump(5);
+    area(3, 4);
+}
+--- file: subdir/file.aipl ---
+import { wrapping_add as + } from builtins;
+pub fn bump(v: i64) -> i64 { trace(v + 2) }
+--- stdout ---
+subdir/file.aipl:2 v + 2 = 7
+trace.aipl:17 w = 3
+trace.aipl:17 h = 4
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 315
+instructions executed: 117
+binary size: 1856
+  code: 696
+  data: 44
+  metadata: 1116
+functions:
+  __to_str_i64:
+    calls: 3
+    bytes: 204
+  aipl_i64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_i64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 492

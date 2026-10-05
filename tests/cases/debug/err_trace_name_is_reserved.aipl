@@ -1,0 +1,16 @@
+# `trace` names the debugging intrinsic, so nothing else may be called that. A
+# declaration of the name would not shadow it — a `trace(..)` call is rewritten
+# before any name is resolved, so the declaration would simply never be
+# reached — which is worth a diagnostic rather than silence.
+
+fn trace(x: i64) -> i64 { x }
+
+fn main() {
+    trace(1);
+}
+--- errors ---
+error: `trace` is the name of the debugging intrinsic, so a function may not be called that: `trace(expr)` prints the expression and its value and yields it, and is rewritten before any name can shadow it
+ --> ./tests/cases/debug/err_trace_name_is_reserved.aipl:6:4
+  |
+6 | fn trace(x: i64) -> i64 { x }
+  |    ^^^^^

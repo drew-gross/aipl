@@ -8240,6 +8240,11 @@ fn register_builtins(
         (Callee::ExecuteProgram, "aipl_execute_program"),
         (Callee::Trim, "aipl_trim"),
         (Callee::Repeat, "aipl_str_repeat"),
+        // `trace(expr)`'s print. The same runtime entry point `print` uses —
+        // only the declared effects differ (see `__trace` in
+        // `BUILTIN_SIGNATURES`), so there is nothing new to implement in either
+        // runtime.
+        (Callee::Trace, "aipl_print"),
         // Test-runner hooks (used only by the `check` driver / `assert` lowering).
         (Callee::Assert, "aipl_assert"),
         (Callee::TestBegin, "aipl_test_begin"),

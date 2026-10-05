@@ -2611,6 +2611,56 @@ pub fn mangled_file_index(name: &str) -> Option<u32> {
     digits.parse().ok()
 }
 
+/// Every `trace(expr)` left in `program`, as a diagnostic apiece, attributed to
+/// the file it was written in.
+///
+/// `trace` prints without declaring an effect, which is what makes it usable
+/// mid-debugging and what makes it unacceptable in checked-in code — so `aipl
+/// check` runs a file's tests and *then* fails on whatever this returns. Running
+/// first is the point: a trace hit by a test has already printed by the time
+/// its diagnostic appears.
+///
+/// Spans point at the traced expression, not the whole call, so the caret
+/// underlines what was being printed.
+pub fn trace_diagnostics(program: &ast::Program) -> Vec<Error> {
+    let mut out = Vec::new();
+    for item in &program.items {
+        let ast::Item::Fn(f) = item else { continue };
+        for body in [Some(&f.body), f.test_body.as_ref()].into_iter().flatten() {
+            each_subexpr(body, &mut |e| {
+                if matches!(&e.kind, ast::ExprKind::Call(c, _, _) if *c == ast::Callee::Trace) {
+                    let e = Error::at(
+                        "`trace(..)` prints for debugging and declares no effect, so `check` \
+                         refuses a program that still contains one; remove it",
+                        e.span.clone(),
+                    );
+                    out.push(attribute_to_file(e, &f.name.text, &program.sources));
+                }
+            });
+        }
+    }
+    out
+}
+
+/// Tag `e` with the source of the file the function named `name` came from, so
+/// the caret lands in *that* file rather than in whatever source the caller
+/// holds.
+///
+/// The post-load half of the loader's `tag_origin`, and the same trick
+/// `aipl-mono`'s checker plays: after flattening, a function's origin survives
+/// only in the `__m<N>__` its name was mangled with. A root-file item carries no
+/// such prefix and is already rendered correctly by its caller, so it is left
+/// alone.
+fn attribute_to_file(e: Error, name: &str, sources: &[ast::FileSource]) -> Error {
+    let Some(idx) = mangled_file_index(name) else {
+        return e;
+    };
+    match sources.get(idx as usize) {
+        Some(f) if !f.source.is_empty() => e.in_file(&f.label, &f.source),
+        _ => e,
+    }
+}
+
 /// The canonical operator spelling for a [`BinOp`] — what a diagnostic prints,
 /// and what the operator-import gate looks up. This is the *only* place the
 /// mapping from operator to spelling lives; a pass that wants to know which
@@ -3019,6 +3069,14 @@ fn __assert(cond: bool, loc: str) {}
 fn __test_begin(name: str) {}
 fn __test_end() {}
 fn __test_summary() -> i64 { 0 }
+// The debugging hook. `trace(expr)` lowers to `__trace(msg)` (the loader's
+// `bake_traces`), where `msg` already holds the expression's location, its own
+// source text and its rendered value. Shares `print`'s runtime symbol but
+// declares **no** `!prints` effect, which is the whole point: a trace can go
+// anywhere without changing a signature. `aipl check` is what keeps that from
+// being a hole — it fails, after running the tests, on a program that still
+// contains one (`trace_diagnostics`).
+fn __trace(self: str) {}
 // Internal: emitted by the compiler for array-literal spreads (`[..xs, y]`).
 // `reserve` sizes the accumulator for the whole literal up front and makes it
 // uniquely owned; `append`/`concat` then write into that reserved capacity in

@@ -82,6 +82,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  unify bake_asserts and bake_traces
   dict.key_values(|k, v| `{k}: {v}`) should exist, use it in append_missing
   step_result n should be u64 without 0, move 0 check to call site
   keyword_len and exact_len should accept str without "" for spelling
@@ -751,7 +752,6 @@ indent.aipl:
   pre-reserve target*lines + self.len() space
 
 debugging:
-  Lets make some debugging utilities for aipl. What I want is a trace() function. It will need compiler support since it will rely on the textual form of the expression. It should print the file name (relative to project root), line number textual form of the expression, and value of the expression. E.g. trace(v + 2) on line 3 of file subdir/file.aipl when v has value 5 will print: "subdir/file.aipl:5 v + 2 = 7". This is NOT an effect, so that it's possible to use it quickly and conveniently while debugging, but in order to ensure it's ONLY used for debugging, any invocation of `check` should fail if trace() is used in the file or any file it imports. (it should fail after actually running the tests, of course, so that the output of traces hit in the test can be seen). This also means that optimizations such as code sinking can eliminate calls to trace(), which is acceptable.
   trace()/dbg_expr() function
   make a debugger
   line numbers on test assertion failures, err/none propagations, etc.

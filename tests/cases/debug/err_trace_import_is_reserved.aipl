@@ -1,0 +1,15 @@
+# The reservation covers what an import binds, not just what a declaration
+# does: aliasing another name to `trace` would be shadowed by the intrinsic the
+# same way. See `err_trace_name_is_reserved.aipl`.
+
+import { print as trace } from builtins;
+
+fn main() {
+    trace("hi");
+}
+--- errors ---
+error: `trace` is the name of the debugging intrinsic, so an imported name may not be called that: `trace(expr)` prints the expression and its value and yields it, and is rewritten before any name can shadow it
+ --> ./tests/cases/debug/err_trace_import_is_reserved.aipl:5:10
+  |
+5 | import { print as trace } from builtins;
+  |          ^^^^^
