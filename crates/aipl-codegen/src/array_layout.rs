@@ -40,7 +40,22 @@
 // 0b00  Heap   — the block above
 // 0b01  Rev    — a reversed view: a thin wrapper reading an inner array backwards
 // 0b10  Slice  — a slice view: a window `[start, start + len)` into an inner array
+// 0b11  Inline — no block at all: the value *is* the array
 // ```
+//
+// # Inline
+//
+// The array counterpart of an inline `str`: a value that owns no allocation, so
+// there is nothing to refcount and nothing to free. An 8-byte value leaves 62
+// bits beside the tag, which is room for a length and a few bytes of elements —
+// but the only inline value anything constructs today is the **empty** array, the
+// bare tag `0b11`. That is the case worth having first: it is the one an empty
+// `filter`, a zero-length slice and a `map` over nothing all produce, and each of
+// those allocates a block for a value with no elements in it.
+//
+// The length is therefore not encoded yet. When elements arrive the encoding to
+// reach for is the inline `str`'s — a length field beside the tag and the element
+// bytes above it — and `arr_inline_len` is the one place that would change.
 //
 // Every place that uses an array pointer as a memory base strips the tag
 // first (`arr_untag`), and every place that reads elements classifies once
@@ -72,6 +87,51 @@ pub(crate) const ARR_TAG_MASK: usize = 0b11;
 pub(crate) const ARR_HEAP_TAG: usize = 0b00;
 pub(crate) const ARR_REV_TAG: usize = 0b01;
 pub(crate) const ARR_SLICE_TAG: usize = 0b10;
+pub(crate) const ARR_INLINE_TAG: usize = 0b11;
+
+/// The empty array, as a value: no allocation, no refcount, nothing to free.
+///
+/// The `Inline` tag sits over [`ARR_EMPTY_BLOCK`] rather than over nothing, and
+/// that is deliberate: *every* reader that untags an array pointer and reads the
+/// header — and there are dozens, for the length, the capacity and the element
+/// drop-fn — then finds zeroes instead of needing to learn a new case. So this
+/// representation costs generated code nothing, and the tag is what the few places
+/// that *own* an array (inc, dec, free) dispatch on to do nothing at all.
+///
+/// A later inline array that genuinely carries its elements in the value cannot
+/// borrow that trick: it has no block to point at, so those readers would have to
+/// be taught the case. [`arr_inline_len`] is where that starts, and the branch it
+/// would need in codegen's `load_arr_len` is the cost to weigh then.
+pub(crate) fn arr_inline_empty() -> *const u8 {
+    (arr_empty_block() as usize | ARR_INLINE_TAG) as *const u8
+}
+
+/// How many elements an inline value holds. Always zero for now — the empty array
+/// is the only inline value constructed (see the header).
+pub(crate) fn arr_inline_len(_ptr: *const u8) -> usize {
+    0
+}
+
+/// `[refcount][len][cap][drop_fn][-]` for an array that is permanently empty.
+///
+/// A handful of entry points need a *block* — they hand a pointer to something
+/// that reads the header, or materialize a view before writing — and an inline
+/// value has none. Rather than teach each of them the inline case, they reach for
+/// this: a real heap-shaped block that happens to be static and empty, so the
+/// reads find `len = 0` and the refcount makes every inc/dec a no-op. The fifth
+/// word is slack so that an element address computed past the header (never read,
+/// since the length is zero) stays inside the object.
+///
+/// `i64::MAX` is `str24::STATIC_REFCOUNT`, spelled out because this file is shared
+/// and cannot reach into its host's modules.
+static ARR_EMPTY_BLOCK: [i64; 5] = [i64::MAX, 0, 0, 0, 0];
+
+/// The data pointer of [`ARR_EMPTY_BLOCK`] — a `Heap`-tagged empty array.
+pub(crate) fn arr_empty_block() -> *const u8 {
+    // The refcount sits one word before the data pointer, which is what
+    // `header_of` reads, so the data pointer is the *second* word.
+    unsafe { (ARR_EMPTY_BLOCK.as_ptr() as *const u8).add(8) }
+}
 
 /// A view block, relative to its data pointer. `len` is at [`ARR_LEN_OFFSET`].
 pub(crate) const REV_INNER_OFFSET: usize = 8; // tagged pointer to the wrapped array
@@ -96,6 +156,8 @@ pub(crate) enum ArrRepr {
     Heap,
     Reversed,
     Sliced,
+    /// The value is the array; it addresses no block. See the header.
+    Inline,
 }
 
 /// Classify an array pointer by its tag.
@@ -104,6 +166,7 @@ pub(crate) fn arr_repr(ptr: *const u8) -> ArrRepr {
         ARR_HEAP_TAG => ArrRepr::Heap,
         ARR_REV_TAG => ArrRepr::Reversed,
         ARR_SLICE_TAG => ArrRepr::Sliced,
+        ARR_INLINE_TAG => ArrRepr::Inline,
         tag => unreachable!("unknown array repr tag {tag}"),
     }
 }

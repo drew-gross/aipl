@@ -251,10 +251,10 @@ fn show_binds(self: (str, str)[]) -> str { self.map(show_bind).join(sep=", ") }
 
 fn show_bind(self: (str, str)) -> str { `{self.0} = {self.1}` }
 --- performance ---
-allocations: 219
-deallocations: 219
+allocations: 218
+deallocations: 218
 reallocations: 4
-bytes allocated: 16536
+bytes allocated: 16504
 instructions executed: 11440
 binary size: 87976
   code: 57072
@@ -262,7 +262,7 @@ binary size: 87976
   metadata: 28303
 functions:
   __arr_drop_Expr:
-    calls: 8
+    calls: 7
     bytes: 116
   __arr_drop_LambdaParam:
     calls: 2
@@ -337,7 +337,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 41
+    calls: 40
     bytes: (external)
   aipl_array_new:
     calls: 13

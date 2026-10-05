@@ -59,10 +59,10 @@ true
 [2, 1, 0]
 ["beta", "gamma"]
 --- performance ---
-allocations: 42
-deallocations: 42
+allocations: 41
+deallocations: 41
 reallocations: 10
-bytes allocated: 2292
+bytes allocated: 2260
 instructions executed: 79651
 binary size: 10456
   code: 6156
@@ -97,7 +97,7 @@ functions:
     calls: 11
     bytes: (external)
   aipl_array_dec:
-    calls: 31
+    calls: 30
     bytes: (external)
   aipl_array_new:
     calls: 1

@@ -82,6 +82,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  use template literals more than concat
   heap_str, rope_str, inline_str should probably be test-only or internal-only
   dict.key_values(|k, v| `{k}: {v}`) should exist, use it in append_missing
   step_result n should be u64 without 0, move 0 check to call site
@@ -737,8 +738,6 @@ match:
     }
   rest/spread in match
 
-use template literals more than concat
-
 make a function composition operator
 
 errors should contain stack traces
@@ -779,7 +778,6 @@ docs:
   integrate the readme into the docs
   reflow docs
   make docs renderer part of check
-  doc comments for struct fields
   make the types and etc. into links
   the docs are showing a mangled name for tm_json, please fix
 

@@ -35,6 +35,7 @@ case_tests! {
     cases_arrays_extend_extend_variadic_source = "cases/arrays/extend/extend_variadic_source",
     cases_arrays_extend_push_loop_reallocates = "cases/arrays/extend/push_loop_reallocates",
     cases_arrays_index_optional = "cases/arrays/index_optional",
+    cases_arrays_inline_empty = "cases/arrays/inline_empty",
     cases_arrays_intersperse = "cases/arrays/intersperse",
     cases_arrays_list_utils = "cases/arrays/list_utils",
     cases_arrays_match = "cases/arrays/match",

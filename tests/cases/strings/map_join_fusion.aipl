@@ -32,10 +32,10 @@ fn main() !prints {
 3: 0123456789abcdefghijklmnopqrstuvwxyz
 [1, 1, 0, 2, 2]
 --- performance ---
-allocations: 46
-deallocations: 46
+allocations: 45
+deallocations: 45
 reallocations: 3
-bytes allocated: 1922
+bytes allocated: 1890
 instructions executed: 4349
 binary size: 11272
   code: 7300
@@ -64,7 +64,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 21
+    calls: 20
     bytes: (external)
   aipl_array_new:
     calls: 5

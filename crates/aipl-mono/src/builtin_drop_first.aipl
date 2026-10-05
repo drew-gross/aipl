@@ -12,10 +12,10 @@ pub fn drop_first<T: any>(self: T[]) -> T[] { self.drop_n(1) }.test({
     assert(drop_first(["a", "b"]).first() == some("b")); // free-call form
 })
 --- performance ---
-allocations: 7
-deallocations: 7
+allocations: 4
+deallocations: 4
 reallocations: 0
-bytes allocated: 344
+bytes allocated: 248
 instructions executed: 278
 binary size: 4056
   code: 1564
@@ -35,7 +35,7 @@ functions:
     calls: 6
     bytes: (external)
   aipl_array_dec:
-    calls: 10
+    calls: 7
     bytes: (external)
   aipl_array_new:
     calls: 1

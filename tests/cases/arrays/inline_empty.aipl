@@ -1,0 +1,73 @@
+# An array has a fourth runtime representation: **inline**, the counterpart of an
+# inline `str` — a value that owns no allocation, so there is nothing to refcount
+# and nothing to free. Only the empty array is inline so far, which is the case
+# worth having first: a zero-length slice, an empty `filter` result and a `map`
+# over nothing all produce one, and each used to allocate a block to hold no
+# elements.
+#
+# The allocation count below is the proof, and it is the whole arithmetic: 6, one
+# per `to_str` buffer, and **none for an array**. `xs` is a literal (a static
+# block, so no allocation either), and each of the three zero-length slices is
+# inline — before this, every one of them was a freshly allocated block.
+
+import { equal as ==, is_empty, len, logical_not as !, print, to_str } from builtins;
+
+fn main() !prints {
+    let xs = [1, 2, 3];
+
+    // A zero-length slice of a non-empty array.
+    let mid = xs[1..1];
+    print(to_str(len(mid))); // 0
+    print(to_str(mid.is_empty())); // true
+
+    // It compares and reads like any other empty array — the representation is not
+    // visible to the program, exactly as an inline `str` is not.
+    print(to_str(mid == [])); // true
+    print(to_str(!(mid == xs))); // true
+
+    // A slice past the end clamps to empty, and so does a backwards one.
+    print(to_str(len(xs[3..3]))); // 0
+    print(to_str(len(xs[2..1]))); // 0
+}
+--- stdout ---
+0
+true
+true
+true
+0
+0
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 111
+instructions executed: 271
+binary size: 3128
+  code: 1336
+  data: 135
+  metadata: 1657
+functions:
+  __eq_i64$arr:
+    calls: 2
+    bytes: 296
+  __to_str_bool:
+    calls: 3
+    bytes: 232
+  __to_str_u64:
+    calls: 3
+    bytes: 204
+  aipl_arr_slice:
+    calls: 3
+    bytes: (external)
+  aipl_u64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 3
+    bytes: (external)
+  aipl_write_u64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 604

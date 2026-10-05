@@ -754,10 +754,10 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 519
-deallocations: 519
+allocations: 518
+deallocations: 518
 reallocations: 38
-bytes allocated: 40250
+bytes allocated: 40218
 instructions executed: 111110
 binary size: 120568
   code: 79484
@@ -861,7 +861,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 45
+    calls: 44
     bytes: (external)
   aipl_arr_reserve:
     calls: 1
@@ -870,7 +870,7 @@ functions:
     calls: 12
     bytes: (external)
   aipl_array_dec:
-    calls: 449
+    calls: 447
     bytes: (external)
   aipl_array_new:
     calls: 48

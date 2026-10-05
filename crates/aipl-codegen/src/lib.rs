@@ -795,7 +795,8 @@ extern "C" fn aipl_arr_slice(
     let hi = end.clamp(0, len) as usize;
     let n = hi.saturating_sub(lo);
     if n == 0 {
-        return alloc_array(0, 0, drop_fn, elem_size);
+        let _ = (drop_fn, elem_size);
+        return arr_inline_empty();
     }
     if lo == 0 && n == len as usize {
         aipl_arr_inc(a);
@@ -809,6 +810,9 @@ extern "C" fn aipl_arr_slice(
             (inner, base + lo)
         }
         ArrRepr::Heap | ArrRepr::Reversed => (a, lo),
+        // An inline array is empty, so `n` above was zero and the early return
+        // has already fired.
+        ArrRepr::Inline => unreachable!("a non-empty slice of an empty array"),
     };
     aipl_arr_inc(source);
     alloc_slice_view(source, start, n, drop_fn, retain_fn, elem_size)
@@ -977,6 +981,9 @@ unsafe fn view_fields(a: *const u8) -> (*const u8, i64, i64, i64) {
 fn with_heap<R>(a: *const u8, f: impl FnOnce(*const u8) -> R) -> R {
     match arr_repr(a) {
         ArrRepr::Heap => f(a),
+        // No block of its own, and nothing to materialize: the permanently-empty
+        // block reads as the same array.
+        ArrRepr::Inline => f(arr_empty_block()),
         ArrRepr::Reversed | ArrRepr::Sliced => {
             aipl_arr_inc(a);
             let heap = aipl_arr_ensure_heap(a);
@@ -992,6 +999,9 @@ fn with_heap<R>(a: *const u8, f: impl FnOnce(*const u8) -> R) -> R {
 fn aipl_arr_ensure_heap(a: *const u8) -> *const u8 {
     match arr_repr(a) {
         ArrRepr::Heap => a,
+        // Already as materialized as an empty array gets; the static block carries
+        // no reference for the caller to release.
+        ArrRepr::Inline => arr_empty_block(),
         ArrRepr::Reversed => {
             let (inner, drop_fn, retain_fn, elem_size) = unsafe { view_fields(a) };
             let heap = do_arr_reverse(inner, drop_fn, retain_fn, elem_size);
@@ -1112,6 +1122,9 @@ unsafe fn arr_elem_ptr(a: *const u8, idx: usize, elem_size: usize) -> *const u8 
             let start = unsafe { std::ptr::read(u.add(SLICE_START_OFFSET) as *const i64) as usize };
             unsafe { arr_elem_ptr(inner, start + idx, elem_size) }
         }
+        // An inline array holds no elements, so every index is out of bounds and
+        // the bounds check upstream has already answered.
+        ArrRepr::Inline => unreachable!("element {idx} of an empty array"),
     }
 }
 
@@ -1134,6 +1147,8 @@ unsafe fn arr_load_bit(a: *const u8, idx: usize) -> bool {
             let start = unsafe { std::ptr::read(u.add(SLICE_START_OFFSET) as *const i64) as usize };
             unsafe { arr_load_bit(inner, start + idx) }
         }
+        // No elements, so no bits; the bounds check upstream has answered.
+        ArrRepr::Inline => unreachable!("bit {idx} of an empty array"),
     }
 }
 
@@ -1151,6 +1166,9 @@ unsafe fn write_packed_bit(data: *mut u8, idx: usize, val: bool) {
 }
 
 unsafe fn array_len_of(ptr: *const u8) -> usize {
+    if matches!(arr_repr(ptr), ArrRepr::Inline) {
+        return arr_inline_len(ptr);
+    }
     unsafe { std::ptr::read(arr_untag(ptr).add(ARR_LEN_OFFSET) as *const i64) as usize }
 }
 
@@ -1202,9 +1220,17 @@ fn alloc_array(len: usize, cap: usize, drop_fn: i64, elem_size: i64) -> *const u
 /// Allocate an array of `len` uninitialized elements (refcount 1, cap == len)
 /// with the given element `drop_fn` (0 for scalar elements) and `elem_size`.
 /// Codegen stores each element immediately after.
+///
+/// A zero-length result is the **inline** empty array, which allocates nothing.
+/// Only the finished-value producers do this — `aipl_array_with_cap` keeps
+/// allocating even at capacity zero, because what it returns is an accumulator
+/// something is about to push into, and no write path handles an inline array.
 #[no_mangle]
 extern "C" fn aipl_array_new(len: i64, drop_fn: i64, elem_size: i64) -> *const u8 {
     let len = len.max(0) as usize;
+    if len == 0 {
+        return arr_inline_empty();
+    }
     alloc_array(len, len, drop_fn, elem_size)
 }
 
@@ -1223,6 +1249,12 @@ extern "C" fn aipl_array_dec(ptr: *const u8) {
     if ptr.is_null() {
         return;
     }
+    // An inline array owns no allocation, so there is no refcount to touch — the
+    // same no-op `release` is for an inline `str`. This has to come before the
+    // header read below, which would dereference the value as a pointer.
+    if matches!(arr_repr(ptr), ArrRepr::Inline) {
+        return;
+    }
     let u = arr_untag(ptr);
     unsafe {
         let h = header_of(u);
@@ -1232,6 +1264,10 @@ extern "C" fn aipl_array_dec(ptr: *const u8) {
         *h -= 1;
         if *h == 0 {
             match arr_repr(ptr) {
+                // Unreachable: an inline value owns no allocation, so the header
+                // read above would have had nothing to count down. The early
+                // return at the top of this function is what keeps it out.
+                ArrRepr::Inline => unreachable!("freeing an inline array"),
                 ArrRepr::Heap => {
                     let len = array_len_of(u);
                     let cap_bytes = array_cap_bytes_of(u);
@@ -1253,6 +1289,7 @@ extern "C" fn aipl_array_dec(ptr: *const u8) {
                     let inner = std::ptr::read(u.add(REV_INNER_OFFSET) as *const *const u8);
                     aipl_array_dec(inner);
                     let data_size = match arr_repr(ptr) {
+                        ArrRepr::Inline => unreachable!("freeing an inline array"),
                         ArrRepr::Reversed => REV_BLOCK_DATA_SIZE,
                         ArrRepr::Sliced => SLICE_BLOCK_DATA_SIZE,
                         ArrRepr::Heap => unreachable!("matched above"),
@@ -1275,6 +1312,9 @@ extern "C" fn aipl_array_dec(ptr: *const u8) {
 #[no_mangle]
 extern "C" fn aipl_arr_inc(ptr: *const u8) {
     if ptr.is_null() {
+        return;
+    }
+    if matches!(arr_repr(ptr), ArrRepr::Inline) {
         return;
     }
     let u = arr_untag(ptr);
@@ -10492,6 +10532,12 @@ fn mut_dict_receiver(
     Ok((slot, ty_cell, exclusive, key_ty, val_ty))
 }
 
+/// An array's length: one load, no dispatch.
+///
+/// Every representation keeps `len` at offset 0 of whatever the pointer addresses
+/// — a heap block, either view block, or (for `Inline`) the shared static empty
+/// block `arr_inline_empty` tags. That is what lets a length read stay a single
+/// load now that there are four representations rather than three.
 fn load_arr_len(builder: &mut FunctionBuilder, arr_ptr: Value) -> Value {
     let u = arr_base(builder, arr_ptr);
     builder.ins().load(

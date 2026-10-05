@@ -423,10 +423,10 @@ fn is_layout(self: AiplTok) -> bool {
     assert(!StrLit(",", Quoted).is_layout());
 })
 --- performance ---
-allocations: 16076
-deallocations: 16076
+allocations: 16047
+deallocations: 16047
 reallocations: 3022
-bytes allocated: 4095118
+bytes allocated: 4094190
 instructions executed: 11656068
 binary size: 7645504
   code: 5115444
@@ -476,7 +476,7 @@ functions:
     calls: 0
     bytes: 208
   __arr_drop___m15__ModeFrame:
-    calls: 59
+    calls: 30
     bytes: 120
   __arr_drop___m15__ScopeSpan:
     calls: 0
@@ -1991,7 +1991,7 @@ functions:
     calls: 67
     bytes: (external)
   aipl_arr_inc:
-    calls: 23575
+    calls: 23283
     bytes: (external)
   aipl_arr_reserve:
     calls: 554
@@ -2006,7 +2006,7 @@ functions:
     calls: 84
     bytes: (external)
   aipl_array_dec:
-    calls: 33753
+    calls: 33434
     bytes: (external)
   aipl_array_new:
     calls: 1004

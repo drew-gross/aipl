@@ -110,10 +110,10 @@ pub fn map_join<T: any, U: any>(
     assert([1, 2].map_join(|x| [x, x], sep=0) == [1, 1, 0, 2, 2]);
 })
 --- performance ---
-allocations: 31
-deallocations: 31
+allocations: 30
+deallocations: 30
 reallocations: 2
-bytes allocated: 1241
+bytes allocated: 1209
 instructions executed: 5185
 binary size: 19688
   code: 12900
@@ -145,7 +145,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 30
+    calls: 29
     bytes: (external)
   aipl_array_new:
     calls: 7

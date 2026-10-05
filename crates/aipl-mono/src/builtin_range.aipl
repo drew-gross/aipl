@@ -41,10 +41,10 @@ pub fn range<T: any>(self: T[]) -> Span { start: 0, end: self.len() }.test({
     assert(xs[xs.range()] == xs);
 })
 --- performance ---
-allocations: 3
-deallocations: 3
+allocations: 2
+deallocations: 2
 reallocations: 0
-bytes allocated: 168
+bytes allocated: 136
 instructions executed: 734
 binary size: 4296
   code: 1812
@@ -70,7 +70,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_array_new:
     calls: 1

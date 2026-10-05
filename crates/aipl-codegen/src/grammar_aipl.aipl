@@ -4931,10 +4931,10 @@ fn why(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1605151
-deallocations: 1605151
+allocations: 1604615
+deallocations: 1604615
 reallocations: 308106
-bytes allocated: 333093634
+bytes allocated: 333076482
 instructions executed: 554829771
 binary size: 6949784
   code: 4598780
@@ -4942,7 +4942,7 @@ binary size: 6949784
   metadata: 2288296
 functions:
   __arr_drop___m11__ModeFrame:
-    calls: 537
+    calls: 298
     bytes: 120
   __arr_drop___m11__ScopeSpan:
     calls: 0
@@ -4960,10 +4960,10 @@ functions:
     calls: 414
     bytes: 116
   __arr_drop___m1__Ast:
-    calls: 2453
+    calls: 2184
     bytes: 3824
   __arr_drop___m22__Item:
-    calls: 65
+    calls: 47
     bytes: 148
   __arr_drop___m22__Piece:
     calls: 330
@@ -4978,7 +4978,7 @@ functions:
     calls: 2601
     bytes: 140
   __arr_drop___m3__Expr:
-    calls: 94
+    calls: 93
     bytes: 116
   __arr_drop___m3__FieldInit:
     calls: 13
@@ -5017,7 +5017,7 @@ functions:
     calls: 4
     bytes: 196
   __arr_drop___m9__Function:
-    calls: 6
+    calls: 4
     bytes: 116
   __arr_drop___m9__ImportName:
     calls: 5
@@ -5905,7 +5905,7 @@ functions:
     calls: 19454
     bytes: (external)
   aipl_arr_inc:
-    calls: 3742627
+    calls: 3740829
     bytes: (external)
   aipl_arr_reserve:
     calls: 82485
@@ -5920,7 +5920,7 @@ functions:
     calls: 36
     bytes: (external)
   aipl_array_dec:
-    calls: 4842761
+    calls: 4840471
     bytes: (external)
   aipl_array_new:
     calls: 82744

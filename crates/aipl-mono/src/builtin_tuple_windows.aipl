@@ -49,10 +49,10 @@ pub fn tuple_windows<T: any>(self: T[]) -> (T, T)[] {
     assert(w[1] == some((20, 30)));
 })
 --- performance ---
-allocations: 11
-deallocations: 11
+allocations: 10
+deallocations: 10
 reallocations: 4
-bytes allocated: 712
+bytes allocated: 680
 instructions executed: 2578
 binary size: 9792
   code: 5244
@@ -93,7 +93,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 26
+    calls: 25
     bytes: (external)
   aipl_array_new:
     calls: 5

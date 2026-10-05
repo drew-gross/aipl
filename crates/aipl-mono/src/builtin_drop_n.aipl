@@ -18,10 +18,10 @@ pub fn drop_n<T: any>(self: T[], n: u64) -> T[] { self[n..] }.test({
     assert(drop_n(["a", "b"], 1).first() == some("b")); // free-call form
 })
 --- performance ---
-allocations: 6
-deallocations: 6
+allocations: 4
+deallocations: 4
 reallocations: 0
-bytes allocated: 312
+bytes allocated: 248
 instructions executed: 297
 binary size: 4080
   code: 1632
@@ -41,7 +41,7 @@ functions:
     calls: 6
     bytes: (external)
   aipl_array_dec:
-    calls: 10
+    calls: 8
     bytes: (external)
   aipl_array_new:
     calls: 1

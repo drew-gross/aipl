@@ -1823,7 +1823,7 @@ pub extern "C" fn aipl_arr_slice(
         let hi = end.clamp(0, len) as usize;
         let n = hi.saturating_sub(lo);
         if n == 0 {
-            return array_alloc(0, 0, drop_fn, elem_size) as *const u8;
+            return arr_inline_empty();
         }
         if lo == 0 && n == len as usize {
             aipl_arr_inc(a);
@@ -1837,6 +1837,9 @@ pub extern "C" fn aipl_arr_slice(
                 (inner, base + lo)
             }
             ArrRepr::Heap | ArrRepr::Reversed => (a, lo),
+            // An inline array is empty, so `n` was zero and the early return
+            // above has already fired.
+            ArrRepr::Inline => unreachable!("a non-empty slice of an empty array"),
         };
         aipl_arr_inc(source);
         alloc_slice_view(source, start, n, drop_fn, retain_fn, elem_size)
@@ -2042,6 +2045,9 @@ unsafe fn do_arr_reverse(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: 
 fn with_heap<R>(a: *const u8, f: impl FnOnce(*const u8) -> R) -> R {
     match arr_repr(a) {
         ArrRepr::Heap => f(a),
+        // No block of its own, and nothing to materialize: the permanently-empty
+        // block reads as the same array.
+        ArrRepr::Inline => f(arr_empty_block()),
         ArrRepr::Reversed | ArrRepr::Sliced => {
             aipl_arr_inc(a);
             let heap = aipl_arr_ensure_heap(a);
@@ -2060,6 +2066,9 @@ fn aipl_arr_ensure_heap(a: *const u8) -> *const u8 {
     }
     match arr_repr(a) {
         ArrRepr::Heap => a,
+        // Already as materialized as an empty array gets; the static block carries
+        // no reference for the caller to release.
+        ArrRepr::Inline => arr_empty_block(),
         ArrRepr::Reversed => {
             let u = arr_untag(a);
             let (inner, drop_fn, retain_fn, elem_size) = unsafe {
@@ -2116,6 +2125,9 @@ unsafe fn arr_elem_ptr_rt(a: *const u8, idx: usize, elem_size: usize) -> *const 
             let start = unsafe { *(u.add(SLICE_START_OFFSET) as *const i64) as usize };
             unsafe { arr_elem_ptr_rt(inner, start + idx, elem_size) }
         }
+        // An inline array holds no elements, so the bounds check upstream has
+        // already answered.
+        ArrRepr::Inline => unreachable!("element {idx} of an empty array"),
     }
 }
 
@@ -2137,6 +2149,8 @@ unsafe fn arr_load_bit_rt(a: *const u8, idx: usize) -> bool {
             let start = unsafe { *(u.add(SLICE_START_OFFSET) as *const i64) as usize };
             unsafe { arr_load_bit_rt(inner, start + idx) }
         }
+        // No elements, so no bits; the bounds check upstream has answered.
+        ArrRepr::Inline => unreachable!("bit {idx} of an empty array"),
     }
 }
 
@@ -2210,6 +2224,12 @@ pub extern "C" fn aipl_array_with_cap(cap: i64, drop_fn: i64, elem_size: i64) ->
 
 #[no_mangle]
 pub extern "C" fn aipl_array_dec(ptr: *const u8) {
+    // An inline array owns no allocation, so there is no refcount to touch — the
+    // same no-op `release` is for an inline `str`. Before the header read below,
+    // which would dereference the value as a pointer.
+    if !ptr.is_null() && matches!(arr_repr(ptr), ArrRepr::Inline) {
+        return;
+    }
     count_builtin!(builtin_calls::AIPL_ARRAY_DEC);
     if ptr.is_null() {
         return;
@@ -2223,6 +2243,10 @@ pub extern "C" fn aipl_array_dec(ptr: *const u8) {
         *h -= 1;
         if *h == 0 {
             match arr_repr(ptr) {
+                // Unreachable: an inline value owns no allocation, so the header
+                // read above had nothing to count down. The early return at the
+                // top of this function is what keeps it out.
+                ArrRepr::Inline => unreachable!("freeing an inline array"),
                 ArrRepr::Heap => {
                     let len = array_len(u);
                     let drop_fn = *(u.add(ARR_DROPFN_OFFSET) as *const i64);
@@ -2248,6 +2272,9 @@ pub extern "C" fn aipl_array_dec(ptr: *const u8) {
 /// representation tag before touching the refcount.
 #[no_mangle]
 pub extern "C" fn aipl_arr_inc(ptr: *const u8) {
+    if !ptr.is_null() && matches!(arr_repr(ptr), ArrRepr::Inline) {
+        return;
+    }
     count_builtin!(builtin_calls::AIPL_ARR_INC);
     if ptr.is_null() {
         return;
