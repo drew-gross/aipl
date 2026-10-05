@@ -3395,6 +3395,16 @@ pub fn parse_spec(src: &str) -> Result<SpecFields, String> {
             other => panic!("dogfooded parse_spec() Spec.{name}: {other:?}"),
         }
     }
+    fn opt_int(f: &[(String, FfiValue)], name: &str) -> Option<i32> {
+        match get(f, name) {
+            FfiValue::Opt(None) => None,
+            FfiValue::Opt(Some(inner)) => match &**inner {
+                FfiValue::Int(n) => Some(*n as i32),
+                other => panic!("dogfooded parse_spec() Spec.{name} payload: {other:?}"),
+            },
+            other => panic!("dogfooded parse_spec() Spec.{name}: {other:?}"),
+        }
+    }
     fn str_array(f: &[(String, FfiValue)], name: &str) -> Vec<String> {
         match get(f, name) {
             FfiValue::Array(items) => items
@@ -3429,18 +3439,12 @@ pub fn parse_spec(src: &str) -> Result<SpecFields, String> {
                     expect_files: entries(&f, "expect_files"),
                     stdout: opt_str(&f, "stdout"),
                     stderr: opt_str(&f, "stderr"),
-                    exit_code: match get(&f, "exit_code") {
-                        FfiValue::Opt(None) => None,
-                        FfiValue::Opt(Some(inner)) => match &**inner {
-                            FfiValue::Int(n) => Some(*n as i32),
-                            other => panic!("dogfooded parse_spec() Spec.exit_code: {other:?}"),
-                        },
-                        other => panic!("dogfooded parse_spec() Spec.exit_code: {other:?}"),
-                    },
+                    exit_code: opt_int(&f, "exit_code"),
                     errors: opt_str(&f, "errors"),
                     performance: opt_str(&f, "performance"),
                     cli: str_array(&f, "cli"),
                     check: opt_str(&f, "check"),
+                    check_exit_code: opt_int(&f, "check_exit_code"),
                 })
             }
             Ok(FfiValue::Res(Err(e))) => match *e {
@@ -3466,6 +3470,7 @@ pub struct SpecFields {
     pub performance: Option<String>,
     pub cli: Vec<String>,
     pub check: Option<String>,
+    pub check_exit_code: Option<i32>,
 }
 
 /// The parser's trailing-whitespace hook (see [`install_parser_hooks`]): the

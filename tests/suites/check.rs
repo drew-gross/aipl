@@ -395,30 +395,14 @@ fn a_type_error_in_a_test_body_is_reported() {
 
 /// A trace inside a `.test` body: the test passes, so nothing but `trace` itself
 /// stands between this file and a green run.
+///
+/// That `check` prints the trace, reports the passing test, and *still* exits
+/// non-zero is pinned in the corpus — `tests/cases/debug/trace_fails_check.aipl`,
+/// whose `--- check ---` and `--- check exit code ---` sections are that claim
+/// written out. What stays here is everything a case cannot reach: `check`'s
+/// stderr, and the working directory it was invoked from.
 const TRACED: &str = "import { equal as ==, wrapping_add as + } from builtins;\n\n\
      fn bump(v: i64) -> i64 { trace(v + 2) }.test({\n    assert(bump(5) == 7);\n})\n";
-
-#[test]
-fn a_trace_fails_check_only_after_its_tests_have_run() {
-    let (stdout, stderr, code) = check("traced", TRACED);
-    // The tests ran, and the trace printed while they did — which is the whole
-    // reason the failure waits until afterwards.
-    assert!(
-        stdout.contains(" v + 2 = 7"),
-        "expected the trace's own output, got:\n{stdout}"
-    );
-    assert!(
-        stdout.contains("1 tests: 1 passed, 0 failed"),
-        "got:\n{stdout}"
-    );
-    assert!(
-        stderr.contains("`trace(..)` prints for debugging"),
-        "expected the trace diagnostic, got:\n{stderr}"
-    );
-    // Pointed at the traced expression, not the whole call.
-    assert!(stderr.contains("trace(v + 2)"), "got:\n{stderr}");
-    assert_eq!(code, 1);
-}
 
 #[test]
 fn a_trace_names_its_file_relative_to_where_check_was_invoked() {
@@ -463,6 +447,8 @@ fn a_trace_in_an_imported_file_fails_the_importing_files_check() {
         stderr.contains("`trace(..)` prints for debugging"),
         "expected the trace diagnostic, got:\n{stderr}"
     );
+    // The caret underlines the traced expression, not the whole `trace(..)` call.
+    assert!(stderr.contains("trace(v + 2)"), "got:\n{stderr}");
     assert_eq!(code, 1);
 }
 

@@ -2,10 +2,10 @@
 ; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).
 ; DO NOT EDIT BY HAND. Regenerate:
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
-; entry parse_test_section_header 473 str -> str?
-; entry strip_test_sections 515 str -> str
-; entry split_test_sections 514 str -> __tuple$str$str
-; entry source_loc 513 str __builtin_Span -> str
+; entry parse_test_section_header 474 str -> str?
+; entry strip_test_sections 516 str -> str
+; entry split_test_sections 515 str -> __tuple$str$str
+; entry source_loc 514 str __builtin_Span -> str
 ; entry caret_block 69 str __builtin_Span str -> str
 ; entry fill_or_add_sections_file 150 str #{str:str} -> unit!Error
 ; entry normalize_output 445 str -> str
@@ -22,7 +22,7 @@
 ; struct __m19__ScopeSpan 40 span@0:__builtin_Span scope@16:str
 ; struct __m19__LexError 40 message@0:str span@24:__builtin_Span
 ; struct __m25__Companion 48 path@0:str contents@24:str
-; struct __m26__Spec 224 source@0:str extra_files@24:__m26__Entry[] expect_files@32:__m26__Entry[] stdout@40:str? stderr@72:str? exit_code@104:i64? errors@120:str? performance@152:str? cli@184:str[] check@192:str?
+; struct __m26__Spec 240 source@0:str extra_files@24:__m26__Entry[] expect_files@32:__m26__Entry[] stdout@40:str? stderr@72:str? exit_code@104:i64? errors@120:str? performance@152:str? cli@184:str[] check@192:str? check_exit_code@224:i64?
 ; struct __m26__Entry 48 path@0:str contents@24:str
 ; struct __m27__ParsedFile 48 program@0:__m36__Program allows@40:__builtin_Span[]
 ; struct __m36__Program 40 items@0:__m36__Item[] doc@8:str?
@@ -192,7 +192,7 @@
 ; data 70 __str_6fd22677a41fd3d9 1c00000000000000ffffffffffffff7f756e7465726d696e617465642064656c696d6974656420746f6b656e
 ; data 71 __str_e71c94988f5982d3 1800000000000000ffffffffffffff7f73617475726174696e675f6469766964655f61737369676e
 ; data 72 __str_8450deb1cdc382a2 1a00000000000000ffffffffffffff7f6162636465666768696a6b6c6d6e6f707172737475767778797a
-; data 73 __str_e8f19ae9044614c1 2f00000000000000ffffffffffffff7f6578697420636f64652073656374696f6e206d75737420636f6e7461696e20612073696e676c6520696e7465676572
+; data 73 __str_92cce96f218a0a3a 2600000000000000ffffffffffffff7f2073656374696f6e206d75737420636f6e7461696e20612073696e676c6520696e7465676572
 ; data 74 __str_2a33050ca4e89cfe 1d00000000000000ffffffffffffff7f222073656374696f6e206e65656473206120706174683a20222d2d2d20
 ; data 75 __str_2c129c68db9628c1 9d00000000000000ffffffffffffff7f223a206120607b206669656c643a2076616c75652c202e2e207d6020626f6479206e656564732061207374727563742072657475726e207479706520746f206e616d652c2062757420746869732066756e6374696f6e206465636c61726573206e6f2072657475726e20747970653b2061646420602d3e20537472756374602c206f72206769766520746865206c69746572616c206974732074797065
 ; data 76 __str_a793fb087ff3408e 5f00000000000000ffffffffffffff7f223a206120607b206669656c643a2076616c75652c202e2e207d6020626f6479206e656564732061207374727563742072657475726e207479706520746f206e616d652c2062757420746869732066756e6374696f6e2072657475726e7320
@@ -309,4 +309,4 @@
 ; data 187 __tostr_lit_94 0800000000000000ffffffffffffff7f52427261636b657400
 
 ; __m28__ast_case_name
-; source-fingerprint 8546600082195228727
+; source-fingerprint 8545122901754221662

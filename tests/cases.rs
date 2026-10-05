@@ -59,9 +59,16 @@
 //!   `--- check ---`      — expected stdout of `aipl check` (the in-language
 //!                          `.test` runner) for this case, byte-for-byte. Lets a
 //!                          *failing* test be a documented fixture.
-//!                          When absent, a case with `.test` blocks must instead
-//!                          pass cleanly (the harness requires `check` to exit 0).
 //!                          Mutually exclusive with `errors`.
+//!   `--- check exit code ---` — the status that same `aipl check` run exits
+//!                          with. The other half of `check`: a `--- check ---`
+//!                          section pins only stdout, so a case whose point is
+//!                          that `check` *fails* while its tests pass needs this
+//!                          to say so.
+//!
+//! Both read one `aipl check` run, so pinning either, both or neither costs the
+//! same single subprocess (`check_plan`). With *neither*, a case that has `.test`
+//! blocks must instead pass cleanly — the harness requires `check` to exit 0.
 //!   `--- file: rel/path.aipl ---` — additional source files, staged
 //!                          alongside the entry source so `import`s
 //!                          resolve as written.
@@ -194,6 +201,12 @@ struct Spec {
     /// *failing* test can be a documented fixture); when absent, a case with
     /// `.test` blocks must instead pass cleanly (`check` exits 0).
     check: Option<String>,
+    /// Expected exit status of `aipl check` for this case. The other half of
+    /// `check`: a `--- check ---` section alone says nothing about the status, so
+    /// a case whose point is that `check` *fails* while its tests pass — the
+    /// `trace` fixtures — needs this to say so. Compared against the same single
+    /// run; see [`check_plan`].
+    check_exit_code: Option<i32>,
 }
 
 /// Parse a case file into its [`Spec`].
@@ -220,7 +233,49 @@ fn parse_spec(contents: &str) -> Spec {
         performance: f.performance,
         cli: f.cli,
         check: f.check,
+        check_exit_code: f.check_exit_code,
     }
+}
+
+/// What one `aipl check` run for a case is compared against.
+///
+/// There is exactly **one** of these, or none — never two — which is how "check
+/// runs at most once per case" is stated in the types rather than left to the
+/// shape of an `if`/`else`. Both sections are served by the same run's output, so
+/// pinning the report, the exit code, both, or neither all cost the one
+/// subprocess. See [`check_plan`].
+struct CheckPlan<'a> {
+    /// The `--- check ---` body: `check`'s stdout, byte-for-byte.
+    report: Option<&'a str>,
+    /// The `--- check exit code ---` body: the status `check` exits with.
+    exit_code: Option<i32>,
+    /// Nothing is pinned, so the only expectation left is that the case's
+    /// in-language tests pass. False as soon as either section says what to
+    /// expect — a fixture documenting a *failing* `check` must not also be
+    /// required to succeed.
+    require_success: bool,
+}
+
+/// Whether `aipl check` has to run for this case, and what its one run is
+/// compared against.
+///
+/// `None` is the testless majority of the corpus, which pays nothing. Otherwise
+/// the run happens because the source carries `.test` blocks, or because a
+/// section pins something about `check` — a case may pin a report with no tests
+/// of its own (a compile failure's report, say), which is why the sections count
+/// on their own.
+fn check_plan(spec: &Spec) -> Option<CheckPlan<'_>> {
+    let report = spec.check.as_deref();
+    let exit_code = spec.check_exit_code;
+    let pinned = report.is_some() || exit_code.is_some();
+    if !pinned && !spec.source.contains(".test") {
+        return None;
+    }
+    Some(CheckPlan {
+        report,
+        exit_code,
+        require_success: !pinned,
+    })
 }
 
 /// The result of running a single case.
@@ -1461,18 +1516,17 @@ fn run_success_case(
     } // end `if has_main` (behavior run)
 
     // Run the case's in-language `.test({ .. })` blocks via the real `aipl
-    // check` binary. A subprocess (not in-process) because the test runner keeps
-    // process-global pass/fail counters — a fresh process gives each case its
-    // own clean state and avoids races between parallel shards. Run when the
-    // source has `.test` blocks, or when a `--- check ---` section pins the
-    // expected report (so the testless majority of cases pay nothing).
+    // check` binary — at most once, whichever of its two sections are in play
+    // (see `check_plan`). A subprocess (not in-process) because the test runner
+    // keeps process-global pass/fail counters — a fresh process gives each case
+    // its own clean state and avoids races between parallel shards.
     //
     // Pointed at the *original* case file, not the staged copy: `check` stages
     // each file's `--- file: ---` companions into a scratch directory and runs
     // the tests there (so writes never land in the tree), and it can only read
     // those sections from the unstripped source. That keeps one staging
     // implementation — `check`'s — rather than a second one here.
-    if spec.check.is_some() || spec.source.contains(".test") {
+    if let Some(plan) = check_plan(spec) {
         let output = match Command::new(env!("CARGO_BIN_EXE_aipl"))
             .arg("check")
             .arg(orig_path)
@@ -1482,25 +1536,33 @@ fn run_success_case(
             Err(e) => return Outcome::Fail(format!("{ctx}: `aipl check` spawn failed: {e}")),
         };
         let report = normalize_output(&String::from_utf8_lossy(&output.stdout));
-        match &spec.check {
-            // A `--- check ---` section pins the expected report exactly (this is
-            // how a *failing* test is documented).
-            Some(expected) => {
-                check_section!(check_or_fill(fills, ctx, "check", &report, expected));
-            }
-            // No pinned report: the in-language tests must simply pass.
-            None => {
-                if !output.status.success() {
-                    let errs = normalize_output(&String::from_utf8_lossy(&output.stderr));
-                    return Outcome::Fail(format!(
-                        "{ctx}: `aipl check` (in-language tests) failed:\n{report}{errs}\n\
-                         Run just this case's tests with `aipl check {}`,\n\
-                         or through this harness with `{}`.",
-                        render_path(orig_path),
-                        scoped_run_cmd(ctx),
-                    ));
-                }
-            }
+        let exit = output.status.code().unwrap_or(-1) & 0xff;
+        // A `--- check ---` section pins the report byte-for-byte and a
+        // `--- check exit code ---` section pins the status, each independently —
+        // that a *failing* `check` can be a documented fixture is the point of
+        // both.
+        if let Some(expected) = plan.report {
+            check_section!(check_or_fill(fills, ctx, "check", &report, expected));
+        }
+        if let Some(expected) = plan.exit_code {
+            check_section!(check_or_fill(
+                fills,
+                ctx,
+                "check exit code",
+                &exit.to_string(),
+                &expected.to_string(),
+            ));
+        }
+        // Neither pinned: the in-language tests must simply pass.
+        if plan.require_success && !output.status.success() {
+            let errs = normalize_output(&String::from_utf8_lossy(&output.stderr));
+            return Outcome::Fail(format!(
+                "{ctx}: `aipl check` (in-language tests) failed:\n{report}{errs}\n\
+                 Run just this case's tests with `aipl check {}`,\n\
+                 or through this harness with `{}`.",
+                render_path(orig_path),
+                scoped_run_cmd(ctx),
+            ));
         }
     }
 
@@ -2000,4 +2062,67 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
 /// fallback — see `aipl::codegen::normalize_output`.
 fn normalize_output(s: &str) -> String {
     aipl::codegen::normalize_output(s)
+}
+
+/// `aipl check` runs **at most once** per case, whichever of its two sections are
+/// in play — the property [`CheckPlan`] exists to make statable.
+///
+/// Reading "pin the report" and "pin the exit code" as two independent
+/// expectations is the obvious implementation and the wrong one: it spawns the
+/// compiler twice for a case that uses both, and the corpus runs `check` hundreds
+/// of times. `check_plan` returns one plan or none, so there is no shape that can
+/// yield two runs, and this walks every combination to show the count never
+/// changes — only what that one run is compared against.
+#[test]
+fn check_runs_at_most_once_whichever_sections_are_used() {
+    const TESTS: &str = "fn f() -> i64 { 1 }.test({ assert(true); })\n";
+    const REPORT: &str = "--- check ---\n1 tests: 1 passed, 0 failed\n";
+    const EXIT: &str = "--- check exit code ---\n1\n";
+    // Owned, because a `CheckPlan` borrows the `Spec` it was read from: what is
+    // under test is the plan's content, not its lifetime.
+    let plan = |src: &str| {
+        let spec = parse_spec(src);
+        check_plan(&spec).map(|p| (p.report.map(str::to_string), p.exit_code, p.require_success))
+    };
+
+    // Neither section and no `.test` blocks: nothing to ask `check`, so it never
+    // runs — which is what keeps the testless majority of the corpus free.
+    for src in ["fn main() {}\n", "fn main() {}\n--- stdout ---\nhi\n"] {
+        assert!(plan(src).is_none(), "should not run check: {src:?}");
+    }
+
+    // Every other combination is exactly one run. Two of the three reasons to run
+    // are the sections themselves, so a case may pin `check` with no tests of its
+    // own.
+    for src in [
+        TESTS.to_string(),
+        format!("fn main() {{}}\n{REPORT}"),
+        format!("fn main() {{}}\n{EXIT}"),
+        format!("fn main() {{}}\n{REPORT}{EXIT}"),
+        format!("{TESTS}{REPORT}"),
+        format!("{TESTS}{EXIT}"),
+        format!("{TESTS}{REPORT}{EXIT}"),
+    ] {
+        assert!(plan(&src).is_some(), "should run check once: {src:?}");
+    }
+
+    // What that one run is compared against, per combination.
+    let pinned_report = Some("1 tests: 1 passed, 0 failed".to_string());
+    // Nothing pinned, so the one expectation left is that the tests pass.
+    assert_eq!(plan(TESTS), Some((None, None, true)));
+    // Each section pins its own half and leaves the other unasked. Either one
+    // turns `require_success` off: a fixture whose point is that `check` *fails*
+    // while its tests pass could not otherwise exist.
+    assert_eq!(
+        plan(&format!("{TESTS}{REPORT}")),
+        Some((pinned_report.clone(), None, false))
+    );
+    assert_eq!(
+        plan(&format!("{TESTS}{EXIT}")),
+        Some((None, Some(1), false))
+    );
+    assert_eq!(
+        plan(&format!("{TESTS}{REPORT}{EXIT}")),
+        Some((pinned_report, Some(1), false))
+    );
 }

@@ -39,6 +39,7 @@ struct Spec {
     performance: str?,
     cli: str[],
     check: str?,
+    check_exit_code: i64?,
 }
 
 # Parses a case file into its `Spec`: the entry-point source (everything before
@@ -59,6 +60,7 @@ pub fn parse_spec(src: str) -> Spec!str {
         performance: none,
         cli: [],
         check: none,
+        check_exit_code: none,
     };
 
     // The section currently being collected, or `""` for the entry-point source
@@ -98,6 +100,21 @@ pub fn parse_spec(src: str) -> Spec!str {
     assert(parse_spec("x\n--- exit code ---\n3\n")?.exit_code == some(3));
     assert(parse_spec("x\n--- exit code ---\n-1\n")?.exit_code == some(-1));
     assert(parse_spec("x\n--- exit code ---\nnope\n").is_err_and(|e| e.contains("integer")));
+
+    // `check exit code` is the same shape for a different run, and the two are
+    // independent fields — a case may pin either, both, or neither.
+    assert(parse_spec("x\n--- check exit code ---\n1\n")?.check_exit_code == some(1));
+    assert(parse_spec("x\n--- exit code ---\n2\n")?.check_exit_code == none);
+    assert(parse_spec("x\n--- check exit code ---\n1\n")?.exit_code == none);
+    let Spec { exit_code, check_exit_code } = parse_spec(
+        "x\n--- exit code ---\n2\n--- check exit code ---\n1\n",
+    )?;
+    assert(exit_code == some(2));
+    assert(check_exit_code == some(1));
+    // A bad body names the section it was written under, not the other one.
+    assert(parse_spec("x\n--- check exit code ---\nnope\n").is_err_and(|e| e.contains(
+        "check exit code section",
+    )));
 
     // `cli` is one argument per line — and an *empty* section is no arguments,
     // not one empty argument (`lines("")` is `[""]`, unlike Rust's `str::lines`).
@@ -148,15 +165,19 @@ fn finalize(spec: Spec, name: str, buf: str) -> Spec!str {
         // One argument per line. An empty section is *no* arguments: `lines("")`
         // yields a single empty element, which would become one empty argument.
         "cli" => ok(Spec { ..spec, cli: if (body == "") { [] } else { body.split_lines() } }),
-        "exit code" => {
-            let n = body
-                .trim()
-                .int_parse()
-                .value_or_err("exit code section must contain a single integer")?;
-            ok(Spec { ..spec, exit_code: some(n) })
-        },
+        // The program's own exit status, and `aipl check`'s for the same case —
+        // two different runs, one body shape, so one parse.
+        "exit code" => ok(Spec { ..spec, exit_code: some(whole_number(name, body)?) }),
+        "check exit code" => ok(Spec { ..spec, check_exit_code: some(whole_number(name, body)?) }),
         _ => err(`unknown section name "{name}"`),
     }
+}
+
+# The single integer an exit-code section's body must be, named by its own
+# section in the error so a bad `--- check exit code ---` doesn't report itself as
+# `--- exit code ---`.
+fn whole_number(section: str, body: str) -> i64!str {
+    body.trim().int_parse().value_or_err(`{section} section must contain a single integer`)
 }
 
 # The path a `file:`-style marker carries, validated. `\` is a path-separator
@@ -173,15 +194,15 @@ fn companion_path(name: str, prefix: str) -> str!str {
     ok(path)
 }
 --- performance ---
-allocations: 93
-deallocations: 93
+allocations: 129
+deallocations: 129
 reallocations: 0
-bytes allocated: 2873
-instructions executed: 38147
-binary size: 89736
-  code: 60256
-  data: 1950
-  metadata: 27530
+bytes allocated: 3763
+instructions executed: 56988
+binary size: 127632
+  code: 86088
+  data: 2751
+  metadata: 38793
 functions:
   __arr_drop_Entry:
     calls: 2
@@ -190,20 +211,20 @@ functions:
     calls: 2
     bytes: 140
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
-    calls: 3
+    calls: 9
     bytes: 268
   __builtin_int_parse:
-    calls: 3
+    calls: 9
     bytes: 1096
   __builtin_int_parse$lambda1:
-    calls: 3
+    calls: 9
     bytes: 140
   __eq_str$arr:
     calls: 1
     bytes: 364
   __test$parse_spec:
     calls: 1
-    bytes: 27852
+    bytes: 49864
   __test_try_fail_str:
     calls: 0
     bytes: 84
@@ -211,10 +232,10 @@ functions:
     calls: 0
     bytes: 300
   aipl_arr_inc:
-    calls: 301
+    calls: 447
     bytes: (external)
   aipl_array_dec:
-    calls: 347
+    calls: 508
     bytes: (external)
   aipl_array_new:
     calls: 2
@@ -223,7 +244,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_assert:
-    calls: 18
+    calls: 24
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -235,17 +256,20 @@ functions:
     calls: 1
     bytes: (external)
   aipl_write_bytes:
-    calls: 152
+    calls: 216
     bytes: (external)
   companion_path:
     calls: 4
     bytes: 1300
   finalize:
-    calls: 25
-    bytes: 21700
+    calls: 36
+    bytes: 24920
   main:
     calls: 1
     bytes: 108
   parse_spec:
-    calls: 13
-    bytes: 6764
+    calls: 18
+    bytes: 6880
+  whole_number:
+    calls: 9
+    bytes: 484

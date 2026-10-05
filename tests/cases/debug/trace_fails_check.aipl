@@ -1,0 +1,61 @@
+# A `trace` makes `aipl check` fail — *after* running the tests, so a trace a
+# test hit has already printed by the time the diagnostic explains itself.
+#
+# The two sections below are the two halves of that, and they are why
+# `--- check exit code ---` exists: `--- check ---` pins the report and says
+# nothing about the status, so on its own it cannot tell "the tests ran and
+# passed" apart from "and the run failed anyway". Here the test *passes* — the
+# report says so — and `check` still exits 1. Nothing but the trace stands
+# between this file and a green run.
+#
+# The diagnostic itself goes to stderr, which `--- check ---` does not capture;
+# its wording is covered in `tests/suites/check.rs`.
+
+import { equal as ==, wrapping_add as + } from builtins;
+
+fn bump(v: i64) -> i64 { trace(v + 2) }.test({
+    assert(bump(5) == 7);
+})
+--- check ---
+tests/cases/debug/trace_fails_check.aipl:16 v + 2 = 7
+1 tests: 1 passed, 0 failed
+--- check exit code ---
+1
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 105
+instructions executed: 68
+binary size: 1904
+  code: 532
+  data: 111
+  metadata: 1261
+functions:
+  __test$bump:
+    calls: 1
+    bytes: 228
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  aipl_assert:
+    calls: 1
+    bytes: (external)
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 100
