@@ -390,6 +390,11 @@ mod charset {
 
 // The array layout — block, representation tags, view blocks — shared the
 // same way and for the same reason; see the file's own header.
+//
+// `dead_code` is allowed on the same grounds as `str24`'s and `arr24`'s: the file
+// serves two hosts, and a helper only the JIT reaches (`arr_inline_len`) is
+// genuinely unused here.
+#[allow(dead_code)]
 mod array_layout {
     include!("../../aipl-codegen/src/array_layout.rs");
 }

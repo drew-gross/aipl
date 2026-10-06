@@ -57,8 +57,11 @@ point at a time; this needs the same.
   [ ] 2b-flip. `Abi::active` answers `SeqRepr::Wide`. One line, and the atomic
           moment: it moves struct field offsets, nested-array strides and the
           calling convention together, so it only makes sense with 2c-2e done.
-          Sets and dicts are array-backed but still sized as a plain word; decide
-          whether they follow arrays in the same flip or a later one.
+          **Arrays only.** Sets and dicts are array-backed and will want the same
+          treatment, but they get their own `SeqRepr` field and their own flip —
+          decided, so that each change stays a reviewable size. Until then they
+          are sized as a plain word, which is what `abi_elem_size` already does
+          for them.
   [ ] 2c. array locals, parameters and returns: passed by pointer, returned
           through a leading out pointer (`Ret::Str`'s shape, which already
           exists for exactly this).
@@ -131,12 +134,98 @@ Stage 6 — the block header, and where unification stops         [blocked on 2]
       value's `len`: a window's `len` is the window's, so releasing through a
       window would leak the elements outside it. `arr24`'s
       `a_window_releases_every_element_of_its_block` pins this.
+      Stage 8 asks whether `init` can be dropped in favour of `cap` — settle that
+      before building this header, since it is the same edit either way.
   [ ] `drop_fn` has to stay in the block: `aipl_arr_drop_arr(elems, len)` walks
       a nested array's elements without knowing their element type, so it cannot
       be handed the inner helper by codegen.
   [ ] those two words are the whole of what a `str` buffer does not need. Decide
       whether to say so in `DESIGN_PRINCIPLES.md` or leave it in the two file
       headers.
+
+
+Stage 7 — delete what the switch leaves behind              [blocked on 2f]
+---------------------------------------------------------------------------------
+A representation switch leaves its predecessor compiled but unreachable, and the
+`str24` switch is the proof: the 8-byte `str` is still in the tree, behind
+`#[allow(dead_code)]`, and the AOT runtime reports **39 dead-code warnings** for it
+when compiled directly (`rustc --crate-type=staticlib runtime/aipl_runtime.rs`).
+Those warnings are the checklist — that is what makes this stage mechanical rather
+than archaeological, and it is worth doing for `str` at the same time as for
+arrays, since the two switches leave the same kind of residue.
+
+Already identified, from `str`:
+  [ ] the retired 8-byte `str` block in `aipl-codegen/src/lib.rs` and in
+      `aipl-linker/runtime/aipl_runtime.rs` — both are labelled as retired, so
+      the labels are the extent of it
+  [ ] its `StrRepr` enum and `str_repr` classifier, and the tag constants
+      (`TAG_MASK`, `INLINE_TAG`, `HEAP_TAG`, `VIEW_TAG`, `CONCAT_TAG`)
+  [ ] the old FFI `str` path: `build_borrowed_str`, `ArgBufs::str_value`,
+      `ArgBuf::Str`, `alloc_dynamic_string`, `free_dynamic_string`,
+      `STR_HEADER_SIZE`, the 8-byte `pack_inline`
+  [ ] `Ret::Str` → `Ret::Wide`: it is what lowers *any* 24-byte sequence result
+      through a leading out pointer, and reads as the wrong name now that an
+      array result uses it too
+  [ ] `abi_spike.rs` — a spike for the `str` ABI, kept as a regression test for
+      the Cranelift lowerings it proved. Confirm that is still what it is, or
+      delete it
+  [ ] the `builtin_calls` counter table: its `AIPL_*` index constants for the
+      `str` entry points are never bumped, because those moved into the shared
+      `str24` module without a `count_builtin!`. Either count them or drop the
+      rows — today a `--- performance ---` breakdown silently has no `aipl_str_*`
+      line
+  [ ] `aipl_concat_lazy` / `aipl_concat_mut` / `__aipl_trim_mut`-style aliases
+      that now all resolve to one entry point
+
+And what this switch will add:
+  [ ] `array_layout.rs` in its entirety, once nothing reads the 8-byte layout
+  [ ] `ArrRepr` and its `Heap`/`Reversed`/`Sliced` arms, with the view blocks
+  [ ] `ARR_INLINE_TAG` and the shared static empty block — the stand-in for
+      stage 3, which exists only because it can point at a block
+  [ ] `SeqRepr::Tagged` itself, and the `Abi` field, if arrays end up being the
+      last type to have a choice
+
+  Do this as its own change, after 2f is green. Mixing deletion into the switch
+  is how a switch stops being reviewable.
+
+
+Stage 8 — can `init` go away?                                   [decide later]
+---------------------------------------------------------------------------------
+Stage 6 gives the block an `init` word — its own initialized element count —
+because `release` has to drop every element the block owns and the value's `len`
+cannot say how many (a window's `len` is the window's). It is the one word that
+makes an array block more than a `str` buffer, so it is worth asking whether it is
+really needed.
+
+  [ ] Could `cap` serve instead? It is the block's byte capacity, so
+      `cap / elem_size` is an upper bound on the elements — and dropping the
+      whole capacity would be correct *if* dropping a never-initialized slot were
+      valid and a no-op.
+  [ ] What would make that true: the element region is zero-filled on allocation,
+      and every element drop helper treats an all-zeroes slot as nothing to
+      release. That is already true of the shapes that matter — a zeroed `str` is
+      `Str::empty()`, a zeroed array is `Arr::empty()`, a zeroed refcounted
+      pointer is null, and a zeroed inline composite is a struct of those — and
+      `ArgBufs::array_block` already zeroes for a related reason ("a partially
+      written inline composite element must read back as zeroes").
+  [ ] What to check before believing it:
+        - the cost of zeroing. `alloc_zeroed`/`calloc` gets fresh zero pages from
+          the OS for a large block, so it may be free where it matters and a
+          `memset` only for small ones. Measure, do not assume.
+        - whether any element type has a valid all-zeroes value that *does* own
+          something. A boxed (recursive) value is a pointer, so zero is null; a
+          variant's zero tag is its first case, whose payload would also be
+          zeroes. Enumerate rather than reason by example.
+        - `cap` is bytes and `elem_size` is not stored in the block, so the
+          drop helper would have to be handed the stride, or the count, or stay
+          per-element-type. That may just move `init`'s cost rather than remove
+          it.
+  [ ] If it works, Stage 6's header is `[drop_fn][cap][refcount]` and the only
+      difference from a `str` buffer is `drop_fn` — which is a much better place
+      for the unification to stop.
+
+  Not now. Decide after 2f, when the block layout is the thing being changed
+  anyway.
 
 
 Open questions
