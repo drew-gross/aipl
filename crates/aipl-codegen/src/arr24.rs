@@ -383,6 +383,108 @@ pub(crate) fn elems_in_order<'a>(a: Arr, elem_size: usize, out: &'a mut [u8]) ->
     &out[..n]
 }
 
+/// How many elements of stride `elem_size` fit inline. A stride of
+/// [`ELEM_BITPACKED`](super::array_layout::ELEM_BITPACKED) — zero, for `bool[]` —
+/// means one bit each, so 22 bytes holds 176.
+///
+/// NOTE: the rest of this file does not handle the bit-packed stride yet;
+/// `elem_ptr` multiplies by it and `spare_capacity` divides by it. See
+/// `arr24_todo.txt`, stage 3e.
+pub(crate) fn inline_cap(elem_size: usize) -> usize {
+    if elem_size == 0 {
+        ARR_INLINE_CAP * 8
+    } else {
+        ARR_INLINE_CAP / elem_size
+    }
+}
+
+// ---------- The wide-array entry points ----------
+//
+// The ABI codegen will call once the array value widens: an array argument is a
+// `*const Arr`, and an array *result* is written through a leading `*mut Arr`,
+// exactly as `str24`'s entry points take and return a `str`. They carry an
+// `aipl_arrw_` prefix so they can be registered beside the 8-byte `aipl_arr_*` /
+// `aipl_array_*` set and moved onto one at a time — the dual-ABI period
+// `arr24_todo.txt` stage 2f ends by deleting the old half.
+//
+// **Nothing calls these yet.** They are here so that each later step is a change
+// of caller rather than a change of caller *and* callee.
+//
+// Every one of them **borrows** its arguments, the rule `str24`'s entry points
+// follow: an entry point reads what it is given and takes its own reference if the
+// result needs to outlive the call. That is what makes a host-built array safe to
+// hand over whatever ownership protocol the callee was compiled for — the lesson
+// the `str` FFI double-free taught (stage 2d).
+
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrw_len(a: *const Arr) -> i64 {
+    unsafe { (*a).len() as i64 }
+}
+
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrw_inline_cap(elem_size: i64) -> i64 {
+    inline_cap(elem_size.max(0) as usize) as i64
+}
+
+/// Address of element `i`. Only meaningful for a value that addresses a block —
+/// an inline value's elements live in the value's own words, so codegen reads
+/// those directly rather than through a pointer.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrw_elem_ptr(a: *const Arr, i: i64, elem_size: i64) -> *const u8 {
+    let a = unsafe { *a };
+    a.elem_ptr(i.max(0) as usize, elem_size.max(0) as usize)
+}
+
+/// `a[lo..hi]`, as a window. Allocates nothing — the whole point of the wide
+/// value. Retained, like `aipl_str_slice`, because the result shares `a`'s block
+/// and this entry point only borrows `a`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrw_slice(
+    out: *mut Arr,
+    a: *const Arr,
+    lo: i64,
+    hi: i64,
+    elem_size: i64,
+) {
+    let a = unsafe { *a };
+    let sliced = a.slice(
+        lo.max(0) as usize,
+        hi.max(0) as usize,
+        elem_size.max(0) as usize,
+    );
+    sliced.retain();
+    unsafe { *out = sliced };
+}
+
+/// The same elements back to front. Also allocation-free, and retained for the
+/// same reason as a slice.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrw_reversed(out: *mut Arr, a: *const Arr) {
+    let reversed = unsafe { *a }.reversed();
+    reversed.retain();
+    unsafe { *out = reversed };
+}
+
+/// A block with room for `cap` elements and none in it — the accumulator a push
+/// loop fills. Deliberately *not* inline even at `cap == 0`: what it returns is
+/// about to be written into, and an inline value has no block to write to.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrw_with_cap(out: *mut Arr, cap: i64, elem_size: i64, drop_fn: i64) {
+    unsafe {
+        *out = with_capacity(cap.max(0) as usize, elem_size.max(0) as usize, drop_fn);
+    }
+}
+
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrw_inc(a: *const Arr) {
+    unsafe { *a }.retain();
+}
+
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrw_dec(a: *const Arr) {
+    unsafe { *a }.release();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -530,6 +632,62 @@ mod tests {
             10,
             "all ten, not the window's three"
         );
+    }
+
+    /// The inline capacity is in *elements*, so it falls out of the stride — and a
+    /// bit-packed `bool[]` (stride 0) gets eight to the byte.
+    #[test]
+    fn inline_capacity_follows_the_stride() {
+        assert_eq!(inline_cap(8), 2); // i64
+        assert_eq!(inline_cap(4), 5); // i32
+        assert_eq!(inline_cap(1), 22); // i8
+        assert_eq!(inline_cap(0), 176); // bit-packed bool
+        assert_eq!(aipl_arrw_inline_cap(8), 2);
+        assert_eq!(aipl_arrw_inline_cap(-1), inline_cap(0) as i64);
+    }
+
+    /// The entry points are the ABI codegen will call: an array in through a
+    /// pointer, an array out through a leading out pointer. Each borrows what it
+    /// is given and retains what it hands back, so a caller that releases its own
+    /// reference does not invalidate the result.
+    #[test]
+    fn the_wide_entry_points_borrow_and_retain() {
+        let vals: Vec<u32> = (0..10).collect();
+        let a = from_elems(&bytes_of(&vals), 10, E, 0);
+        assert_eq!(aipl_arrw_len(&a), 10);
+
+        let mut window = Arr::empty();
+        aipl_arrw_slice(&mut window, &a, 4, 8, E as i64);
+        assert_eq!(aipl_arrw_len(&window), 4);
+        assert_eq!(read_back(window), vec![4, 5, 6, 7]);
+
+        let mut rev = Arr::empty();
+        aipl_arrw_reversed(&mut rev, &window);
+        assert_eq!(read_back(rev), vec![7, 6, 5, 4]);
+
+        // Both results took their own reference, so the source can go.
+        aipl_arrw_dec(&a);
+        assert_eq!(read_back(window), vec![4, 5, 6, 7]);
+        assert_eq!(read_back(rev), vec![7, 6, 5, 4]);
+
+        let elem2 = aipl_arrw_elem_ptr(&window, 2, E as i64);
+        let got = unsafe { core::ptr::read(elem2 as *const u32) };
+        assert_eq!(got, 6);
+
+        aipl_arrw_dec(&window);
+        aipl_arrw_dec(&rev);
+    }
+
+    /// An accumulator stays a block even when empty: a push has to have somewhere
+    /// to write, and an inline value has no block.
+    #[test]
+    fn with_cap_is_a_block_even_at_zero() {
+        let mut a = Arr::empty();
+        aipl_arrw_with_cap(&mut a, 0, E as i64, 0);
+        assert_eq!(a.tag(), ATAG_BLOCK);
+        assert!(!a.owner().is_null());
+        assert_eq!(a.len(), 0);
+        aipl_arrw_dec(&a);
     }
 
     #[test]

@@ -4544,6 +4544,19 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_concat", str24::aipl_concat as *const u8);
     jit_builder.symbol("aipl_trim", str24::aipl_trim as *const u8);
     jit_builder.symbol("aipl_str_heap", str24::aipl_str_heap as *const u8);
+    // The wide-array ABI. Nothing emits a call to these yet; registering them now
+    // is what makes each later step a change of caller rather than of both ends.
+    jit_builder.symbol("aipl_arrw_len", arr24::aipl_arrw_len as *const u8);
+    jit_builder.symbol(
+        "aipl_arrw_inline_cap",
+        arr24::aipl_arrw_inline_cap as *const u8,
+    );
+    jit_builder.symbol("aipl_arrw_elem_ptr", arr24::aipl_arrw_elem_ptr as *const u8);
+    jit_builder.symbol("aipl_arrw_slice", arr24::aipl_arrw_slice as *const u8);
+    jit_builder.symbol("aipl_arrw_reversed", arr24::aipl_arrw_reversed as *const u8);
+    jit_builder.symbol("aipl_arrw_with_cap", arr24::aipl_arrw_with_cap as *const u8);
+    jit_builder.symbol("aipl_arrw_inc", arr24::aipl_arrw_inc as *const u8);
+    jit_builder.symbol("aipl_arrw_dec", arr24::aipl_arrw_dec as *const u8);
     jit_builder.symbol("aipl_str_rope", str24::aipl_str_rope as *const u8);
     jit_builder.symbol(
         "aipl_str_pack_inline",
@@ -8084,6 +8097,19 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         // ---- a scalar back ----
         "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now"
         | "aipl_str_inline_capacity" => (0, Ret::Word),
+        // ---- the wide-array ABI (`arr24`), registered ahead of its callers ----
+        //
+        // An array argument is a `*const Arr` — one word, like a `str`'s — and an
+        // array *result* goes through a leading out pointer, which is what
+        // `Ret::Str` lowers. It reads as the wrong name here and is the right
+        // behaviour: both are 24-byte sequence values written into a caller slot.
+        // `arr24_todo.txt` 2f renames it `Ret::Wide` once the 8-byte half is gone.
+        "aipl_arrw_len" | "aipl_arrw_inline_cap" => (1, Ret::Word),
+        "aipl_arrw_inc" | "aipl_arrw_dec" => (1, Ret::None),
+        "aipl_arrw_elem_ptr" => (3, Ret::Word),
+        "aipl_arrw_reversed" => (1, Ret::Str),
+        "aipl_arrw_with_cap" => (3, Ret::Str),
+        "aipl_arrw_slice" => (4, Ret::Str),
         "aipl_shim_get" | "aipl_str_len" | "aipl_str_hash" | "aipl_str_iter_next"
         | "aipl_str_write_ptr" | "aipl_i64_len" | "aipl_u64_len" | "aipl_list_files" => {
             (1, Ret::Word)

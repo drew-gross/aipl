@@ -1,0 +1,133 @@
+Unifying the `str` and array representations
+============================================
+
+Goal: one 24-byte sequence value, `{base, data, len|tag}`, for both. `str24.rs`
+already is that for `str`; `arr24.rs` is the array half. The payoff is that a
+window into a sequence becomes a *value* rather than an allocation — arrays today
+build a 48-byte view block for every slice and every reversal.
+
+Ordering is not a preference. Stage 2 is atomic (see below), and stages 3-6 each
+need the wide value to exist, so none of them can land before it.
+
+
+Stage 1 — the layout, proven on its own                                    [done]
+---------------------------------------------------------------------------------
+  [x] `arr24.rs`: the value, its reads, windows, reversal, inline, refcounting
+  [x] shared verbatim with the AOT runtime, compiles under no_std
+  [x] tests: inline boundary, windows share a block, windows compose and clamp,
+      reversal and sub-windowing a reversal, a window outliving its source,
+      `release` walking the block's count, spare capacity
+  [x] asserts the shared half is byte-identical to `str24` so they cannot drift
+
+
+Stage 2 — widen the value                                           [in progress]
+---------------------------------------------------------------------------------
+The atomic one, and the reason: the checked-in `dogfood.o` is *called* with
+arrays crossing the FFI boundary (`lex_aipl` returns `str[]`, the parser returns
+an AST full of arrays), and its compiled code embeds the old layout. A compiler
+that disagrees with the artifact cannot parse its own sources to regenerate it.
+`str24` solved this by registering both ABIs side by side and moving one entry
+point at a time; this needs the same.
+
+  [x] 2a. wide entry points over `arr24`, registered alongside the 8-byte ones
+          and not yet called by anything — the scaffolding every later step
+          calls into. Additive, so it lands green.
+          `aipl_arrw_{len,inline_cap,elem_ptr,slice,reversed,with_cap,inc,dec}`,
+          in `arr24.rs`; in codegen's `import_abi` and JIT symbol table so that
+          2b-2e are each a change of *caller* only.
+          Two notes for 2f: `Ret::Str` is what lowers an array result through a
+          leading out pointer (both are 24-byte values written into a caller
+          slot) and wants renaming `Ret::Wide`; and `aipl-artifact`'s signature
+          table has no `aipl_arrw_*` rows yet, which it needs before any artifact
+          references one.
+  [ ] 2b. `elem_size_of` / `abi_elem_size`: an array value is 24 bytes, not 8.
+          This is the line where it becomes atomic — it moves struct field
+          offsets, nested-array element strides, and the ABI, all at once.
+  [ ] 2c. array locals, parameters and returns: passed by pointer, returned
+          through a leading out pointer (`Ret::Str`'s shape, which already
+          exists for exactly this).
+  [ ] 2d. FFI marshalling (`write_ffi_arg`, `read_ffi_*`). Keep the lesson from
+          the `str` double-free: a host-built block gets `STATIC_REFCOUNT` so no
+          protocol inside the callee can count it down. `ArgBufs::array_block`
+          already does this — do not regress it.
+  [ ] 2e. codegen's inlined fast paths (`load_arr_len`, `load_array_elem`,
+          element stores) read the value's words instead of the block header.
+  [ ] 2f. regenerate the dogfood artifact against the wide entry points, then
+          delete the 8-byte half: `array_layout.rs`, and the `ArrRepr` arms that
+          go with it.
+
+  Intermediate state worth knowing: while 2b-2e are in flight the *blocks* can
+  stay exactly as they are. `len` is then carried twice (value and block header),
+  the view blocks still exist, and stages 4-6 remove the redundancy one piece at
+  a time. That is what keeps each step reviewable.
+
+
+Stage 3 — inline arrays                                        [blocked on 2]
+---------------------------------------------------------------------------------
+Elements in the value's own 22 bytes: no allocation, no refcount, exactly as a
+short `str` is inline. 22 bytes is 2 `i64`s, 5 `i32`s, 22 `i8`s, or 176
+bit-packed `bool`s.
+
+  [ ] 3a. construct one wherever a small array is built: a literal that fits, a
+          `map`/`filter` result that fits, a `split` with few parts.
+  [ ] 3b. teach element reads and writes the inline case. This is the one that
+          bites: the 8-byte attempt SIGSEGV'd because `load_arr_len` and dozens
+          of header reads dereference unconditionally, and a value with no block
+          has nothing to dereference.
+  [ ] 3c. materialize into a block on push/grow past the inline capacity.
+  [ ] 3d. decide the boundary per element size, and whether a `drop_fn` element
+          type may be inline at all (it needs somewhere to record the count —
+          see Stage 6).
+  [ ] 3e. bit-packed `bool[]` (`ELEM_BITPACKED`, a stride of 0). `arr24` does not
+          handle it yet: `elem_ptr` multiplies by the stride and `spare_capacity`
+          divides by it, neither of which is right for bits. `inline_cap` does
+          answer for it (22 bytes is 176 bools), so the gap is the accessors.
+
+  Today's `ARR_INLINE_TAG` (8-byte, the empty array over a shared static block)
+  is a stand-in for 3 and goes away with 2f. It is not a step toward this: it
+  works *because* it points at a block, which is the one thing a real inline
+  value cannot do.
+
+
+Stage 4 — slices as values                                     [blocked on 2]
+---------------------------------------------------------------------------------
+  [ ] delete the Slice view block and `ARR_SLICE_TAG`; `Arr::slice` is already
+      the replacement and allocates nothing
+  [ ] remove the `Sliced` arm from every dispatch site (the exhaustive `match`
+      will name them)
+  [ ] a case proving a slice allocates nothing, the way
+      `strings/named_representations.aipl` proves a rope does
+
+
+Stage 5 — reversed as values                                   [blocked on 2]
+---------------------------------------------------------------------------------
+  [ ] delete the Rev view block; `Arr::reversed` flips a tag and copies nothing
+  [ ] note that reversal keeps a *tag* where a slice does not, because no
+      pointer arithmetic reads a run backwards
+
+
+Stage 6 — the block header, and where unification stops         [blocked on 2]
+---------------------------------------------------------------------------------
+  [ ] `[drop_fn][init][cap][refcount][elements]`; `len` leaves the block, since
+      the value carries it
+  [ ] `init` is the block's own initialized element count, and it is *not* the
+      value's `len`: a window's `len` is the window's, so releasing through a
+      window would leak the elements outside it. `arr24`'s
+      `a_window_releases_every_element_of_its_block` pins this.
+  [ ] `drop_fn` has to stay in the block: `aipl_arr_drop_arr(elems, len)` walks
+      a nested array's elements without knowing their element type, so it cannot
+      be handed the inner helper by codegen.
+  [ ] those two words are the whole of what a `str` buffer does not need. Decide
+      whether to say so in `DESIGN_PRINCIPLES.md` or leave it in the two file
+      headers.
+
+
+Open questions
+---------------------------------------------------------------------------------
+  [ ] Is one `Seq` type better than two that match shape? The tags differ (`str`
+      has a rope, arrays have a reversal) and the element stride is compile-time
+      for arrays and always 1 for `str`. Sharing the *type* may cost more than
+      sharing the layout, which is already enforced by a test.
+  [ ] `char[]` already rides `str`'s representation, so it gets inline for free
+      today. After Stage 3 it has two possible answers — check nothing depends
+      on which.
