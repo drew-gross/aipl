@@ -22427,12 +22427,11 @@ fn str_cmp_width(ty: &ConcreteType) -> i64 {
 /// explicit forms, so each rule has one implementation and no second copy to
 /// drift.
 ///
-/// `str` was the first type to have a choice and, for now, the last: it settled
-/// on the 24-byte value, so today there is exactly one ABI and this carries no
-/// information. The threading stayed anyway, because **the threading is the
-/// expensive part and the field is not** — when the next type gains a
-/// representation choice it becomes a field here, and nothing downstream is
-/// re-plumbed.
+/// `str` was the first type to have a choice: it settled on the 24-byte value, so
+/// it has no field here. **Arrays are the second**, and are mid-switch — the
+/// field below is the one this doc used to anticipate, and the reason the
+/// threading was kept after `str` stopped needing it. Nothing downstream had to be
+/// re-plumbed to add it, which was the bet.
 ///
 /// The shape is load-bearing history, not speculation: while `str` had two
 /// representations, the FFI genuinely met both at once — the compiler calls its
@@ -22440,15 +22439,50 @@ fn str_cmp_width(ty: &ConcreteType) -> i64 {
 /// to call a program it just compiled. "Is a `str` composite?" had two answers
 /// simultaneously, and the marshaling layer had to ask with the callee in hand.
 /// That is why the explicit form is primary and the global one is a convenience.
+/// Which representation a sequence value has under an ABI.
+///
+/// The two are not variations on a theme: a `Tagged` value is one word that
+/// *addresses* a block and reads its length out of the block's header, while a
+/// `Wide` value carries `{base, data, len|tag}` itself — which is what lets a
+/// window into a sequence be a value rather than an allocation. See `arr24.rs`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-pub struct Abi {}
+enum SeqRepr {
+    /// An 8-byte tagged pointer to a block.
+    #[default]
+    Tagged,
+    /// The 24-byte `{base, data, len|tag}` value.
+    ///
+    /// Not constructed outside the tests yet: [`Abi::active`] answers `Tagged`
+    /// until the switch lands. The rules below are written for both anyway, so
+    /// throwing it is one line rather than a hunt — which is the whole value of
+    /// landing this step on its own.
+    #[allow(dead_code)]
+    Wide,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct Abi {
+    /// Which representation an **array** value has.
+    ///
+    /// `Tagged` today, so every answer below is the one it has always been and
+    /// this change is inert. Flipping it to `Wide` is the atomic switch — it moves
+    /// struct field offsets, nested-array strides and the calling convention in
+    /// one step, which is why `arr24_todo.txt` 2c-2f carry it out rather than this
+    /// commit. A `str` has no counterpart field because it has no choice left.
+    arrays: SeqRepr,
+}
 
 impl Abi {
     /// The ABI this compilation selected, for the majority of callers asking
     /// about the code they are emitting right now rather than about some other
     /// callee.
     fn active() -> Abi {
-        Abi {}
+        // The one place the array switch is thrown: `SeqRepr::Wide` here is what
+        // `arr24_todo.txt` 2c-2f are working towards, and until they land it would
+        // size arrays as 24 bytes while codegen still moves them as one word.
+        Abi {
+            arrays: SeqRepr::Tagged,
+        }
     }
 
     /// Bytes one `str` value occupies under this ABI.
@@ -22461,6 +22495,65 @@ impl Abi {
     /// answer again if it ever gets a second.
     fn str_is_composite(self) -> bool {
         true
+    }
+
+    /// Bytes one array value occupies under this ABI.
+    fn arr_size(self) -> i64 {
+        match self.arrays {
+            SeqRepr::Tagged => 8,
+            SeqRepr::Wide => arr24::ARR_SIZE as i64,
+        }
+    }
+
+    /// Whether an array travels by address under this ABI — the array counterpart
+    /// of [`Abi::str_is_composite`], and now the knob that has two answers, since
+    /// `str`'s has settled on one.
+    fn arr_is_composite(self) -> bool {
+        matches!(self.arrays, SeqRepr::Wide)
+    }
+}
+
+#[cfg(test)]
+mod abi_tests {
+    use super::*;
+
+    /// The array representation knob, both ways. `Abi::active` is `Tagged`, so
+    /// nothing in a build today takes the `Wide` answers — this is what makes them
+    /// a checked claim rather than code nobody has run.
+    #[test]
+    fn the_array_representation_decides_size_and_composite_ness() {
+        let tagged = Abi {
+            arrays: SeqRepr::Tagged,
+        };
+        let wide = Abi {
+            arrays: SeqRepr::Wide,
+        };
+        let structs = HashMap::new();
+        let i64s = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::I64)));
+
+        assert_eq!(abi_elem_size(tagged, &i64s, &structs), 8);
+        assert_eq!(abi_elem_size(wide, &i64s, &structs), arr24::ARR_SIZE as i64);
+        assert!(!abi_is_composite(tagged, &i64s, &structs));
+        assert!(abi_is_composite(wide, &i64s, &structs));
+
+        // Today's compilation is still the tagged one; this is the line 2c-2f flip.
+        assert_eq!(Abi::active(), tagged);
+
+        // A `char[]` rides `str`'s representation, not an array block's, so the
+        // knob must not touch it — it is wide under both.
+        let chars = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::Char)));
+        for abi in [tagged, wide] {
+            assert_eq!(abi_elem_size(abi, &chars, &structs), abi.str_size());
+            assert!(abi_is_composite(abi, &chars, &structs));
+        }
+
+        // An optional carries its core's size, so it tracks the knob too.
+        let opt = ConcreteType::Optional(Box::new(i64s.clone()));
+        assert_eq!(abi_elem_size(tagged, &opt, &structs), 16);
+        assert_eq!(
+            abi_elem_size(wide, &opt, &structs),
+            OPT_VALUE_OFFSET as i64 + arr24::ARR_SIZE as i64
+        );
     }
 }
 
@@ -22478,6 +22571,12 @@ fn abi_is_composite(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeD
     // meant here.
     if is_char_set(ty) {
         return true;
+    }
+    // An array's answer now depends on the representation too, exactly as a
+    // `str`'s did. `char[]` never reaches here — `is_str_shaped` above claims it,
+    // since it rides `str`'s representation rather than an array block's.
+    if matches!(ty, ConcreteType::Array(_)) {
+        return abi.arr_is_composite();
     }
     matches!(ty, ConcreteType::Optional(_) | ConcreteType::Result(_, _))
         || matches!(ty, ConcreteType::Named(n) if structs.get(n).is_some_and(|d| !d.boxed()))
@@ -22517,6 +22616,11 @@ fn abi_elem_size(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeDef>
                 .get(n)
                 .map_or(8, |t| if t.boxed() { 8 } else { t.size() as i64 })
         }
+        // A `char[]` is claimed by `is_str_shaped` above; every other array is
+        // sized by the array representation in force. Sets and dicts are still a
+        // plain word — they are array-backed, so they follow arrays, but not in
+        // this step (see `arr24_todo.txt`).
+        ConcreteType::Array(_) => abi.arr_size(),
         _ => 8,
     }
 }

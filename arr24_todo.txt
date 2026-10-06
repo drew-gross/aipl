@@ -40,9 +40,25 @@ point at a time; this needs the same.
           slot) and wants renaming `Ret::Wide`; and `aipl-artifact`'s signature
           table has no `aipl_arrw_*` rows yet, which it needs before any artifact
           references one.
-  [ ] 2b. `elem_size_of` / `abi_elem_size`: an array value is 24 bytes, not 8.
-          This is the line where it becomes atomic — it moves struct field
-          offsets, nested-array element strides, and the ABI, all at once.
+  [x] 2b. the representation knob. `Abi` gained an `arrays: SeqRepr` field —
+          `Tagged` (8-byte pointer) or `Wide` (24-byte value) — with `arr_size`
+          and `arr_is_composite` beside `str`'s pair, and `abi_elem_size` /
+          `abi_is_composite` consulting them for `ConcreteType::Array`.
+          `Abi::active` answers `Tagged`, so this step is **inert**: every answer
+          is the one it has always been.
+          This is the payoff of the `Abi` threading that was kept after `str`
+          stopped needing it — its own doc predicted "when the next type gains a
+          representation choice it becomes a field here, and nothing downstream
+          is re-plumbed", and nothing was.
+          `abi_tests` pins both answers, including that a `char[]` is wide under
+          *both* (it rides `str`'s representation, not an array block's) and that
+          an optional's size tracks its core.
+
+  [ ] 2b-flip. `Abi::active` answers `SeqRepr::Wide`. One line, and the atomic
+          moment: it moves struct field offsets, nested-array strides and the
+          calling convention together, so it only makes sense with 2c-2e done.
+          Sets and dicts are array-backed but still sized as a plain word; decide
+          whether they follow arrays in the same flip or a later one.
   [ ] 2c. array locals, parameters and returns: passed by pointer, returned
           through a leading out pointer (`Ret::Str`'s shape, which already
           exists for exactly this).
@@ -109,7 +125,8 @@ Stage 5 — reversed as values                                   [blocked on 2]
 Stage 6 — the block header, and where unification stops         [blocked on 2]
 ---------------------------------------------------------------------------------
   [ ] `[drop_fn][init][cap][refcount][elements]`; `len` leaves the block, since
-      the value carries it
+      the value carries it. NOTE: we have static typing so we should be able to
+      avoid the drop_fn for primitives like ints/chars/bools that don't have a drop.
   [ ] `init` is the block's own initialized element count, and it is *not* the
       value's `len`: a window's `len` is the window's, so releasing through a
       window would leak the elements outside it. `arr24`'s
