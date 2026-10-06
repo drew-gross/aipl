@@ -372,6 +372,13 @@ mod str24 {
     include!("../../aipl-codegen/src/str24.rs");
 }
 
+// STAGED the same way, and for the same reason: the 24-byte array value, shared
+// verbatim rather than mirrored by hand. See the file's header.
+#[allow(dead_code)] // staged: wired up when the array value widens
+mod arr24 {
+    include!("../../aipl-codegen/src/arr24.rs");
+}
+
 // STAGED the same way: the 256-bit `#{char}` value. Shared from the start
 // rather than mirrored later, so the two runtimes cannot drift apart while it
 // is being wired up — the same reasoning as `str24` above, and cheaper here

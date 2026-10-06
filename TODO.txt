@@ -181,6 +181,7 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 bugs:
+  Where the unification stops, and why — this is the one real finding. An array block needs two header words a str buffer doesn't: drop_fn, and init, the block's own initialized element count. The second is the interesting one. A str's content is bytes, so freeing a buffer is freeing memory; an array's elements may own heap, so refcount zero has to release each of them — and the value's len cannot say how many, because a window's len is the window's, and dropping only the windowed elements would leak the rest. There's a test for exactly that: a 10-element block, sliced to 3, the source released — releasing the window drops all ten, not three.
   array literal spreads evaluate their arguments (including effects) twice. Note: this is to pre-compute the length. But it would be nice to still pre-compute the length, if it can be done cheaply.
   return none; in a fn that returns i64? should work
   map over a generic struct's field trips the checker

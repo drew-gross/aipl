@@ -32,6 +32,14 @@ pub mod ffi_ast;
 // about the code.
 #[allow(dead_code)]
 mod str24;
+
+// STAGED: the 24-byte *array* value — the array half of unifying `str` and array
+// into one sequence representation, and `str24`'s shape on purpose. Shared with the
+// AOT runtime from the start, for the same reason `str24` is: a divergence in a
+// layout constant is silent memory corruption rather than a failing test. Nothing
+// is wired up to it; see the file's header for why that switch is atomic.
+#[allow(dead_code)] // staged: wired up when the array value widens
+mod arr24;
 mod str24_host;
 
 // STAGED, the same way and for the same reason: the 256-bit `#{char}` value,
