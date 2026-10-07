@@ -52,7 +52,7 @@ import {
     Quoted,
     Semi,
     StrLit,
-    TplOpen,
+    TemplateOpen,
     TplText,
     TripleBacktick,
     TripleQuoted,
@@ -230,7 +230,7 @@ fn token_value(kind: AiplTok) -> str {
     // A template's opener likewise: which delimiter it was written with is not
     // part of the token, since `retemplate` moves a literal between the two.
     // Its text segments need no such arm — both forms lex to one `TplText`.
-    if (let TplOpen(_) = kind) {
+    if (let TemplateOpen(_) = kind) {
         return TPL_OPEN;
     };
     if (let TplClose = kind) {
@@ -254,7 +254,7 @@ fn token_value(kind: AiplTok) -> str {
     assert(token_value(StrLit("a", Quoted)) == token_value(StrLit("a", Backtick)));
     assert(token_value(StrLit("a", Quoted)) == token_value(StrLit("a", TripleQuoted)));
     assert(token_value(StrLit("a", Quoted)) != token_value(StrLit("b", Quoted)));
-    assert(token_value(TplOpen(Backtick)) == token_value(TplOpen(TripleBacktick)));
+    assert(token_value(TemplateOpen(Backtick)) == token_value(TemplateOpen(TripleBacktick)));
     assert(token_value(TplText("a")) != token_value(TplText("b")));
 })
 
@@ -428,9 +428,9 @@ deallocations: 16047
 reallocations: 3022
 bytes allocated: 4094190
 instructions executed: 11656068
-binary size: 7645504
-  code: 5115444
-  data: 14074
+binary size: 7645528
+  code: 5115452
+  data: 14090
   metadata: 2515986
 functions:
   __arr_drop___m10__Ty:
@@ -1116,7 +1116,7 @@ functions:
     bytes: 4144
   __m32__match_rule$__m25__AiplTok$__m5__Ast:
     calls: 472
-    bytes: 13696
+    bytes: 13704
   __m32__match_sep$__m25__AiplTok$__m5__Ast:
     calls: 2
     bytes: 952

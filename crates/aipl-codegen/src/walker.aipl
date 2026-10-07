@@ -84,7 +84,7 @@ variant FmtKind =
     | CharTok
     | Op
     | Punct
-    | TplOpenTok
+    | TemplateOpenTok
     | TplTextTok
     | TplCloseTok
     // A `# text` doc comment. A real token, not trivia, because the grammar
@@ -493,7 +493,7 @@ pub fn format_program(src: str, width: u64) -> str!FmtError {
 fn fmt_kind(k: AiplTok) -> FmtKind {
     match (k) {
         DocComment(..) => DocTok,
-        TplOpen(..) => TplOpenTok,
+        TemplateOpen(..) => TemplateOpenTok,
         TplText(..) => TplTextTok,
         TplClose => TplCloseTok,
         Fn | If | Else | Struct | Variant | Import | From | As => Keyword,
@@ -1949,7 +1949,7 @@ fn chain_docs(segs: Seg[]) -> Doc[] {
 fn atom(self: W) -> WDoc!FmtError {
     // Kind-dispatched forms first: a template literal is copied verbatim, and a
     // string / number / char / constant is its own text.
-    if (self.peek_is(TplOpenTok)) {
+    if (self.peek_is(TemplateOpenTok)) {
         return self.template_verbatim();
     };
     if (self.peek_is(StrTok)) {
@@ -2306,7 +2306,7 @@ fn pattern(self: W) -> WDoc!FmtError {
     // pattern can hold no other kind of template — it matches a value, and an
     // interpolation computes one. `template_verbatim` respells it through
     // `requote`, exactly as `str_atom` does for the quoted spelling.
-    if (self.peek_is(TplOpenTok)) {
+    if (self.peek_is(TemplateOpenTok)) {
         return self.template_verbatim();
     };
     if (self.peek_is(CharTok) || self.peek_is(Num)) {
@@ -2502,7 +2502,7 @@ fn template_scan(self: W, start: u64, depth0: u64) -> WDoc!FmtError {
         let FmtTok { span, kind } = w.cur_tok();
         let stepped = w.advance(span.end);
         let text = self.src[span];
-        if (kind == TplOpenTok) {
+        if (kind == TemplateOpenTok) {
             set depth++;
             if (depth == 1) {
                 set piece_start = span.end;
@@ -2704,7 +2704,7 @@ fn template_head(self: W, i: u64) -> u64 {
     while (0 < j) {
         if (self.toks[j].is_some_and(|t| t.kind == TplCloseTok)) {
             set depth++;
-        } else if (self.toks[j].is_some_and(|t| t.kind == TplOpenTok)) {
+        } else if (self.toks[j].is_some_and(|t| t.kind == TemplateOpenTok)) {
             set depth--;
             if (depth == 0) {
                 return j;
@@ -3515,8 +3515,8 @@ deallocations: 94767
 reallocations: 18556
 bytes allocated: 22197948
 instructions executed: 68327324
-binary size: 19897256
-  code: 12878444
+binary size: 19897264
+  code: 12878452
   data: 40764
   metadata: 6978048
 functions:
@@ -4221,7 +4221,7 @@ functions:
     bytes: 4144
   __m31__match_rule$__m24__AiplTok$__m8__Ast:
     calls: 248
-    bytes: 13696
+    bytes: 13704
   __m31__match_sep$__m24__AiplTok$__m8__Ast:
     calls: 18
     bytes: 952

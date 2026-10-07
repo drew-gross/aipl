@@ -80,7 +80,7 @@ variant AiplTok =
     | IntLit(i64)
     | StrLit(str, StrStyle)
     | CharTok(char)
-    | TplOpen(StrStyle)
+    | TemplateOpen(StrStyle)
     | TplText(str)
     | TplClose
     | True
@@ -560,13 +560,13 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // template region by hand instead, which is where that policy belongs.
         TokenRule {
             matcher: Exact("```"),
-            emit: Bare(TplOpen(TripleBacktick)),
+            emit: Bare(TemplateOpen(TripleBacktick)),
             unterminated: "unterminated triple-backtick template literal",
             push: M_RAW_TEMPLATE,
         },
         TokenRule {
             matcher: Exact("`"),
-            emit: Bare(TplOpen(Backtick)),
+            emit: Bare(TemplateOpen(Backtick)),
             unterminated: "unterminated template literal",
             push: M_TEMPLATE,
         },
@@ -812,7 +812,7 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // `x` is an ordinary `Name`.
     let interp = "`a{x}b`";
     assert(lex_aipl_kinds(interp)? == [
-        TplOpen(Backtick),
+        TemplateOpen(Backtick),
         TplText("a"),
         LBrace,
         Name("x"),
@@ -826,12 +826,12 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // a matcher that declines on a `{` it has not reached yet; the parser folds
     // it instead, where the whole literal is in hand.
     let bare = "`hi`";
-    assert(lex_aipl_kinds(bare)? == [TplOpen(Backtick), TplText("hi"), TplClose]);
+    assert(lex_aipl_kinds(bare)? == [TemplateOpen(Backtick), TplText("hi"), TplClose]);
 
     // A triple-backtick raw template scans verbatim, and wins over the
     // single-backtick rule (longest delimiter first).
     let raw = "```hi```";
-    assert(lex_aipl_kinds(raw)? == [TplOpen(TripleBacktick), TplText("hi"), TplClose]);
+    assert(lex_aipl_kinds(raw)? == [TemplateOpen(TripleBacktick), TplText("hi"), TplClose]);
 
     // A brace inside an interpolation closes itself, not the interpolation: its
     // `{` pushed the base mode and its `}` pops that, leaving the template mode
@@ -878,9 +878,9 @@ deallocations: 309
 reallocations: 15
 bytes allocated: 486968
 instructions executed: 2236833
-binary size: 305672
+binary size: 305696
   code: 220668
-  data: 7708
+  data: 7732
   metadata: 77296
 functions:
   __arr_drop_AiplTok:

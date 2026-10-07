@@ -255,8 +255,8 @@ import {
     IntLit,
     Name,
     StrLit,
+    TemplateOpen,
     TplClose,
-    TplOpen,
     TplText,
     aipl_rules,
     char_lit_value,
@@ -1010,10 +1010,10 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     // `` `{x}` `` is open, brace, expr, brace, close — and the lowering fills the
     // two empty slots back in.
     //
-    // One rule covers both flavours: `TplOpen` carries which one it is, and the
+    // One rule covers both flavours: `TemplateOpen` carries which one it is, and the
     // mode stack already guaranteed the close matches the open.
     let template: Rule<AiplTok> = Then([
-        Term(TplOpen),
+        Term(TemplateOpen),
         Maybe(Term(TplText)),
         Many(Then([Lit("{"), Named("expr"), Lit("}"), Maybe(Term(TplText))])),
         Term(TplClose),
@@ -1139,7 +1139,7 @@ fn patterns() -> Production<AiplTok, Ast>[] {
         // rather than naming a kind. With no braces in it there is nothing to
         // interpolate — which is the only form a pattern can hold, since a
         // pattern matches a value and an interpolation computes one.
-        Then([Term(TplOpen), Maybe(Term(TplText)), Term(TplClose)]),
+        Then([Term(TemplateOpen), Maybe(Term(TplText)), Term(TplClose)]),
         Term(CharTok),
         Term(IntLit),
         nest("(", Many(Named("pattern"), min=2, sep=Lit(","), trailing_sep=false), ")", strict()),
@@ -4936,10 +4936,10 @@ deallocations: 1604615
 reallocations: 308106
 bytes allocated: 333076482
 instructions executed: 554829771
-binary size: 6949784
-  code: 4598780
+binary size: 6949792
+  code: 4598792
   data: 62708
-  metadata: 2288296
+  metadata: 2288292
 functions:
   __arr_drop___m11__ModeFrame:
     calls: 298
@@ -5561,7 +5561,7 @@ functions:
     bytes: 4144
   __m30__match_rule$__m23__AiplTok$__m1__Ast:
     calls: 115252
-    bytes: 13696
+    bytes: 13704
   __m30__match_sep$__m23__AiplTok$__m1__Ast:
     calls: 1151
     bytes: 952
@@ -5588,7 +5588,7 @@ functions:
     bytes: 44
   __m30__rule_labels$__m23__AiplTok$__m1__Ast$tail:
     calls: 21168
-    bytes: 22976
+    bytes: 22980
   __m30__rule_nullable$__m23__AiplTok:
     calls: 0
     bytes: 36
