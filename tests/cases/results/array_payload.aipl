@@ -42,24 +42,24 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 304
-instructions executed: 1465
-binary size: 7920
-  code: 3468
+instructions executed: 1704
+binary size: 8256
+  code: 3808
   data: 926
-  metadata: 3526
+  metadata: 3522
 functions:
   __eq_i64$arr:
     calls: 4
-    bytes: 296
+    bytes: 288
   __test$below:
     calls: 1
-    bytes: 776
+    bytes: 872
   __test$nothing:
     calls: 1
-    bytes: 412
+    bytes: 484
   __test$tail_below:
     calls: 1
-    bytes: 480
+    bytes: 536
   __test_try_fail_str:
     calls: 0
     bytes: 84
@@ -98,10 +98,10 @@ functions:
     bytes: (external)
   below:
     calls: 5
-    bytes: 596
+    bytes: 716
   main:
     calls: 1
     bytes: 240
   tail_below:
     calls: 2
-    bytes: 284
+    bytes: 288

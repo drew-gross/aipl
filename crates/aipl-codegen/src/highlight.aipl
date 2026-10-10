@@ -758,15 +758,15 @@ allocations: 518
 deallocations: 518
 reallocations: 38
 bytes allocated: 41178
-instructions executed: 111174
-binary size: 120832
-  code: 79752
+instructions executed: 113446
+binary size: 122816
+  code: 81640
   data: 5464
-  metadata: 35616
+  metadata: 35712
 functions:
   __arr_drop_Entry:
     calls: 3
-    bytes: 148
+    bytes: 156
   __arr_drop_Item:
     calls: 7
     bytes: 172
@@ -775,10 +775,10 @@ functions:
     bytes: 116
   __arr_drop___m3__TokenRule$Kind:
     calls: 2
-    bytes: 388
+    bytes: 392
   __arr_retain_Entry:
     calls: 1
-    bytes: 148
+    bytes: 156
   __arr_retain_Item:
     calls: 15
     bytes: 172
@@ -787,70 +787,70 @@ functions:
     bytes: 116
   __arr_retain___m3__TokenRule$Kind:
     calls: 0
-    bytes: 388
+    bytes: 392
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 38
     bytes: 304
   __builtin_count_while$Item$lam$rule_pats$Kind$lambda0:
     calls: 0
-    bytes: 528
+    bytes: 520
   __builtin_count_while$Item$lam$rule_pats$Kind$lambda1$lambda0:
     calls: 4
-    bytes: 528
+    bytes: 520
   __eq_Entry:
     calls: 1
     bytes: 128
   __eq_Entry$arr:
     calls: 2
-    bytes: 284
+    bytes: 276
   __eq_Pat:
     calls: 12
     bytes: 480
   __eq_Pat$arr:
     calls: 9
-    bytes: 300
+    bytes: 292
   __eq_set$char:
     calls: 3
     bytes: 84
   __eq_str$arr:
     calls: 1
-    bytes: 364
+    bytes: 356
   __m1__indent:
     calls: 12
-    bytes: 1660
+    bytes: 1684
   __rec_drop_Pat:
     calls: 57
     bytes: 268
   __test$brace_group_entry:
     calls: 1
-    bytes: 1988
+    bytes: 2080
   __test$char_class_body:
     calls: 1
     bytes: 1892
   __test$decl_pat:
     calls: 1
-    bytes: 992
+    bytes: 1032
   __test$json_str:
     calls: 1
     bytes: 852
   __test$matcher_pat:
     calls: 1
-    bytes: 9212
+    bytes: 9348
   __test$matcher_regex:
     calls: 1
-    bytes: 5744
+    bytes: 5764
   __test$re_escape:
     calls: 1
     bytes: 1104
   __test$rule_pats:
     calls: 1
-    bytes: 8596
+    bytes: 8172
   __test$tm_json:
     calls: 1
-    bytes: 4832
+    bytes: 5388
   __test$word_pat:
     calls: 1
-    bytes: 2196
+    bytes: 2224
   __to_str_u64:
     calls: 0
     bytes: 204
@@ -861,7 +861,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 44
+    calls: 56
     bytes: (external)
   aipl_arr_reserve:
     calls: 1
@@ -913,43 +913,43 @@ functions:
     bytes: (external)
   arr_fld:
     calls: 2
-    bytes: 1900
+    bytes: 1956
   caps_fld:
     calls: 0
-    bytes: 788
+    bytes: 880
   char_class_body:
     calls: 16
-    bytes: 1996
+    bytes: 2024
   entry_name:
     calls: 5
-    bytes: 444
+    bytes: 492
   fld:
     calls: 6
     bytes: 348
   json_str:
     calls: 21
-    bytes: 2224
+    bytes: 2264
   main:
     calls: 1
     bytes: 760
   matcher_pat:
     calls: 24
-    bytes: 8132
+    bytes: 8212
   obj_fld:
     calls: 1
-    bytes: 1900
+    bytes: 1956
   obj_of:
     calls: 2
-    bytes: 1540
+    bytes: 1576
   pat_json:
     calls: 2
-    bytes: 3112
+    bytes: 3348
   re_escape:
     calls: 32
-    bytes: 1928
+    bytes: 1960
   re_escape_set:
     calls: 4
-    bytes: 1032
+    bytes: 1148
   rule_pats$Kind:
     calls: 2
-    bytes: 9460
+    bytes: 10072

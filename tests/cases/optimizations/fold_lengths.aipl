@@ -83,15 +83,15 @@ allocations: 23
 deallocations: 23
 reallocations: 0
 bytes allocated: 1250
-instructions executed: 1420
-binary size: 6192
-  code: 3280
+instructions executed: 1539
+binary size: 6632
+  code: 3692
   data: 137
-  metadata: 2775
+  metadata: 2803
 functions:
   __builtin_count_if$i64$lam$is_big:
     calls: 2
-    bytes: 208
+    bytes: 200
   __to_str_i64:
     calls: 2
     bytes: 204
@@ -102,7 +102,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 4
+    calls: 5
     bytes: (external)
   aipl_arr_reserve:
     calls: 1
@@ -130,4 +130,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2664
+    bytes: 3084

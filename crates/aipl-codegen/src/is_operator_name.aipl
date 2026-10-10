@@ -51,20 +51,20 @@ allocations: 21
 deallocations: 21
 reallocations: 0
 bytes allocated: 1320
-instructions executed: 5484
-binary size: 17704
-  code: 9444
+instructions executed: 6197
+binary size: 18608
+  code: 10332
   data: 2129
-  metadata: 6131
+  metadata: 6147
 functions:
   __m1__operator_named_forms:
     calls: 31
-    bytes: 5580
+    bytes: 6384
   __test$is_operator_name:
     calls: 1
-    bytes: 3744
+    bytes: 3828
   aipl_arr_inc:
-    calls: 21
+    calls: 31
     bytes: (external)
   aipl_array_dec:
     calls: 52

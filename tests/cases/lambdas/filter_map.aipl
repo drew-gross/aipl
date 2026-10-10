@@ -85,47 +85,47 @@ allocations: 29
 deallocations: 29
 reallocations: 1
 bytes allocated: 1962
-instructions executed: 6189
-binary size: 15384
-  code: 7580
+instructions executed: 7271
+binary size: 16968
+  code: 9336
   data: 1716
-  metadata: 6088
+  metadata: 5916
 functions:
   __eq_i64$arr:
     calls: 12
-    bytes: 296
+    bytes: 288
   __eq_str$arr:
     calls: 5
-    bytes: 364
+    bytes: 356
   __test$between:
     calls: 1
-    bytes: 252
+    bytes: 340
   __test$from_call:
     calls: 1
-    bytes: 996
+    bytes: 1332
   __test$from_call$filter_map2$own0:
     calls: 1
-    bytes: 328
+    bytes: 516
   __test$from_call$filter_map5$own0:
     calls: 1
-    bytes: 328
+    bytes: 516
   __test$from_call$scaled_above:
     calls: 5
-    bytes: 308
+    bytes: 420
   __test$labels:
     calls: 1
-    bytes: 840
+    bytes: 904
   __test$widened:
     calls: 1
-    bytes: 940
+    bytes: 1184
   __test$xs_of:
     calls: 1
-    bytes: 472
+    bytes: 580
   __to_str_i64:
     calls: 2
     bytes: 204
   aipl_arr_inc:
-    calls: 16
+    calls: 17
     bytes: (external)
   aipl_arr_reserve:
     calls: 9
@@ -162,31 +162,19 @@ functions:
     bytes: (external)
   between:
     calls: 2
-    bytes: 308
+    bytes: 428
   from_call:
-    calls: 0
-    bytes: 36
+    calls: 4
+    bytes: 208
   from_call$filter_map2$own0:
-    calls: 0
-    bytes: 36
-  from_call$filter_map2$own0$tail:
     calls: 4
-    bytes: 352
-  from_call$tail:
-    calls: 4
-    bytes: 148
+    bytes: 524
   labels:
-    calls: 0
-    bytes: 32
+    calls: 3
+    bytes: 388
   labels$filter_map2$own0:
-    calls: 0
-    bytes: 36
-  labels$filter_map2$own0$tail:
     calls: 3
-    bytes: 596
-  labels$tail:
-    calls: 3
-    bytes: 336
+    bytes: 776
   main:
     calls: 1
     bytes: 372

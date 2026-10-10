@@ -44,38 +44,38 @@ allocations: 10
 deallocations: 10
 reallocations: 4
 bytes allocated: 475
-instructions executed: 2174
-binary size: 7400
-  code: 3488
+instructions executed: 2439
+binary size: 8288
+  code: 4344
   data: 736
-  metadata: 3176
+  metadata: 3208
 functions:
   __eq_i64$arr:
     calls: 4
-    bytes: 296
+    bytes: 288
   __eq_str$arr:
     calls: 1
-    bytes: 364
+    bytes: 356
   __test$apply:
     calls: 1
-    bytes: 1388
+    bytes: 1728
   __test$apply$map2$own0:
     calls: 1
-    bytes: 288
+    bytes: 452
   __test$each:
     calls: 1
-    bytes: 304
+    bytes: 440
   __test$inc:
     calls: 1
-    bytes: 132
+    bytes: 200
   __test$inc$map0$own0:
     calls: 1
-    bytes: 288
+    bytes: 452
   __to_str_i64:
     calls: 3
     bytes: 204
   aipl_arr_inc:
-    calls: 3
+    calls: 5
     bytes: (external)
   aipl_arr_reserve:
     calls: 2

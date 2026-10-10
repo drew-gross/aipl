@@ -109,11 +109,11 @@ allocations: 78
 deallocations: 78
 reallocations: 2
 bytes allocated: 6238
-instructions executed: 4955
-binary size: 23352
-  code: 13360
+instructions executed: 5050
+binary size: 23496
+  code: 13500
   data: 1568
-  metadata: 8424
+  metadata: 8428
 functions:
   __arr_drop_Ty:
     calls: 5
@@ -129,10 +129,10 @@ functions:
     bytes: 396
   __test$show_ty:
     calls: 1
-    bytes: 4100
+    bytes: 4180
   __test$show_tys:
     calls: 1
-    bytes: 760
+    bytes: 796
   aipl_arr_inc:
     calls: 3
     bytes: (external)
@@ -174,7 +174,7 @@ functions:
     bytes: 428
   show_ty:
     calls: 34
-    bytes: 5572
+    bytes: 5568
   show_tys:
     calls: 6
-    bytes: 1396
+    bytes: 1424

@@ -68,20 +68,20 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 608
-instructions executed: 1957
-binary size: 8328
-  code: 4392
+instructions executed: 2064
+binary size: 8640
+  code: 4688
   data: 1023
-  metadata: 2913
+  metadata: 2929
 functions:
   __test$right_fold:
     calls: 1
-    bytes: 3704
+    bytes: 3808
   __test$right_fold$filter2$own0:
     calls: 1
-    bytes: 308
+    bytes: 496
   aipl_arr_inc:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_arr_reserve:
     calls: 1
@@ -109,4 +109,4 @@ functions:
     bytes: 108
   right_fold$i64$i64$lam$__test$right_fold$add:
     calls: 2
-    bytes: 272
+    bytes: 276

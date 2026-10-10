@@ -47,11 +47,11 @@ allocations: 17
 deallocations: 17
 reallocations: 0
 bytes allocated: 1288
-instructions executed: 2134
-binary size: 9736
-  code: 5276
+instructions executed: 2200
+binary size: 9808
+  code: 5352
   data: 863
-  metadata: 3597
+  metadata: 3593
 functions:
   __builtin_right_fold$i64$List$lam$__ctor$List$Cons:
     calls: 3
@@ -61,7 +61,7 @@ functions:
     bytes: 44
   __test$to_list_keeps_order:
     calls: 1
-    bytes: 4604
+    bytes: 4680
   aipl_array_dec:
     calls: 3
     bytes: (external)

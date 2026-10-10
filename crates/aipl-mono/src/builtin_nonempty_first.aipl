@@ -34,17 +34,17 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 56
-instructions executed: 298
-binary size: 3816
-  code: 1608
+instructions executed: 310
+binary size: 3616
+  code: 1532
   data: 354
-  metadata: 1854
+  metadata: 1730
 functions:
   __test$nonempty_first:
     calls: 1
-    bytes: 544
+    bytes: 584
   aipl_array_dec:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_array_new:
     calls: 1
@@ -71,11 +71,8 @@ functions:
     calls: 1
     bytes: 164
   nonempty_first$i64:
-    calls: 0
-    bytes: 32
-  nonempty_first$i64$tail:
     calls: 2
-    bytes: 288
+    bytes: 204
   nonempty_first$str:
     calls: 1
     bytes: 424

@@ -78,24 +78,24 @@ allocations: 45
 deallocations: 45
 reallocations: 6
 bytes allocated: 2485
-instructions executed: 4440
-binary size: 21344
-  code: 11816
+instructions executed: 4811
+binary size: 22488
+  code: 12860
   data: 1707
-  metadata: 7821
+  metadata: 7921
 functions:
   __eq_i64$arr:
     calls: 1
-    bytes: 296
+    bytes: 288
   __eq_str$arr:
     calls: 4
-    bytes: 364
+    bytes: 356
   __eq_u64$arr:
     calls: 1
-    bytes: 296
+    bytes: 288
   __test$try_map:
     calls: 1
-    bytes: 5560
+    bytes: 5996
   __test$try_map$label:
     calls: 16
     bytes: 680
@@ -124,7 +124,7 @@ functions:
     calls: 0
     bytes: 300
   aipl_arr_inc:
-    calls: 6
+    calls: 17
     bytes: (external)
   aipl_array_dec:
     calls: 30
@@ -161,19 +161,19 @@ functions:
     bytes: 108
   try_map$i64$i64$str$lam$__test$try_map$lambda8:
     calls: 1
-    bytes: 504
+    bytes: 608
   try_map$i64$i64$str$lam$__test$try_map$lambda9:
     calls: 1
-    bytes: 504
+    bytes: 608
   try_map$i64$str$str$lam$__test$try_map$label:
     calls: 6
-    bytes: 468
+    bytes: 572
   try_map$i64$str$str$lam$__test$try_map$lambda5:
     calls: 1
-    bytes: 468
+    bytes: 572
   try_map$i64$str$str$lam$__test$try_map$lambda6:
     calls: 1
-    bytes: 468
+    bytes: 572
   try_map$str$u64$char$lam$__test$try_map$width:
     calls: 1
-    bytes: 552
+    bytes: 664

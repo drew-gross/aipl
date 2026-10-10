@@ -185,8 +185,21 @@ bit-packed `bool`s.
   value cannot do.
 
 
-Stage 4 — slices as values                                     [blocked on 2]
+Stage 4 — slices as values                                   [4a done; 4b next]
 ---------------------------------------------------------------------------------
+  [x] 4a: arrays travel by address. `Abi::arr_is_composite` is
+      `matches!(Wide)`, so every array value in codegen is the address of its
+      24 bytes; their content is still `{block, 0, 0}`. Helpers in lib.rs:
+      `arr_ptr` (value -> block), `arr_val` (block -> fresh value),
+      `seq_ptr`/`seq_val` (the same, passing sets/dicts through — they stay one
+      word). The host side follows: the CLI `str[]` (JIT `run_cli`, AOT
+      `main`), FFI params (`write_ffi_arg`) and FFI returns (sret).
+      Allocations are unchanged corpus-wide; instructions and binary size are
+      ~+4.8%, the cost of the extra words before 4b gives them a use.
+  [ ] 4b: a slice is a value `{block, data + lo * stride, n}` — nothing
+      allocated. Runtime entry points that still want a block materialize one.
+  [ ] `is_wide_array` and `is_padded_array` now answer the same question;
+      fold them into one (Stage 7 if not sooner)
   [ ] delete the Slice view block and `ARR_SLICE_TAG`; `Arr::slice` is already
       the replacement and allocates nothing
   [ ] remove the `Sliced` arm from every dispatch site (the exhaustive `match`

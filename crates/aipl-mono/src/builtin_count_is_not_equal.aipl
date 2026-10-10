@@ -42,18 +42,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1662
-binary size: 3880
-  code: 1384
+instructions executed: 1728
+binary size: 4088
+  code: 1588
   data: 843
-  metadata: 1653
+  metadata: 1657
 functions:
   __builtin_count_is_not_equal$i64:
     calls: 5
-    bytes: 292
+    bytes: 284
   __test$count_is_not_equal:
     calls: 1
-    bytes: 676
+    bytes: 896
   aipl_assert:
     calls: 6
     bytes: (external)
@@ -68,7 +68,7 @@ functions:
     bytes: (external)
   count_is_not_equal$i64:
     calls: 6
-    bytes: 292
+    bytes: 284
   main:
     calls: 1
     bytes: 124

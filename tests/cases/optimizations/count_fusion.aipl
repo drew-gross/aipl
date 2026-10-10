@@ -84,35 +84,35 @@ allocations: 21
 deallocations: 21
 reallocations: 28
 bytes allocated: 538
-instructions executed: 25535
-binary size: 6368
-  code: 3548
+instructions executed: 25743
+binary size: 6744
+  code: 3908
   data: 159
-  metadata: 2661
+  metadata: 2677
 functions:
   __builtin_count_is_at_least$i64:
     calls: 3
-    bytes: 308
+    bytes: 300
   __builtin_count_is_at_most$i64:
     calls: 2
-    bytes: 280
+    bytes: 272
   __builtin_count_is_equal$i64:
     calls: 2
-    bytes: 288
+    bytes: 280
   __builtin_count_is_greater_than$i64:
     calls: 2
-    bytes: 280
+    bytes: 272
   __builtin_count_is_less_than$i64:
     calls: 5
-    bytes: 308
+    bytes: 300
   __builtin_count_is_not_equal$i64:
     calls: 3
-    bytes: 292
+    bytes: 284
   __to_str_bool:
     calls: 17
     bytes: 232
   aipl_arr_inc:
-    calls: 4
+    calls: 8
     bytes: (external)
   aipl_array_dec:
     calls: 12
@@ -128,7 +128,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1380
+    bytes: 1672
   many:
     calls: 4
-    bytes: 180
+    bytes: 296

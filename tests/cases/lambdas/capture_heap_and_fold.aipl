@@ -35,24 +35,27 @@ allocations: 6
 deallocations: 6
 reallocations: 1
 bytes allocated: 346
-instructions executed: 573
-binary size: 4080
-  code: 1676
+instructions executed: 616
+binary size: 4264
+  code: 1812
   data: 349
-  metadata: 2055
+  metadata: 2103
 functions:
   __eq_str$arr:
     calls: 1
-    bytes: 364
+    bytes: 356
   __test$reduce:
     calls: 1
-    bytes: 244
+    bytes: 264
   __test$tag:
     calls: 1
-    bytes: 700
+    bytes: 824
   __to_str_i64:
     calls: 2
     bytes: 204
+  aipl_arr_inc:
+    calls: 1
+    bytes: (external)
   aipl_array_dec:
     calls: 3
     bytes: (external)

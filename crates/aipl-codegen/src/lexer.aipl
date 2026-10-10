@@ -1473,11 +1473,11 @@ allocations: 353
 deallocations: 353
 reallocations: 9
 bytes allocated: 76016
-instructions executed: 662562
-binary size: 803584
-  code: 537644
+instructions executed: 693289
+binary size: 827968
+  code: 561836
   data: 9188
-  metadata: 256752
+  metadata: 256944
 functions:
   __arr_drop_Kind:
     calls: 88
@@ -1493,7 +1493,7 @@ functions:
     bytes: 276
   __arr_drop_TokenRule$Kind:
     calls: 36
-    bytes: 564
+    bytes: 568
   __arr_retain_Kind:
     calls: 77
     bytes: 252
@@ -1508,10 +1508,10 @@ functions:
     bytes: 276
   __arr_retain_TokenRule$Kind:
     calls: 7
-    bytes: 564
+    bytes: 568
   __builtin_any$str$lam$up_to_any_len$lambda0:
     calls: 47
-    bytes: 324
+    bytes: 316
   __builtin_count_while$char$lam$lex_step$Kind$lambda1:
     calls: 88
     bytes: 308
@@ -1553,7 +1553,7 @@ functions:
     bytes: 324
   __eq_Kind$arr:
     calls: 36
-    bytes: 284
+    bytes: 276
   __eq_LexError:
     calls: 15
     bytes: 128
@@ -1565,7 +1565,7 @@ functions:
     bytes: 128
   __eq_ScopeSpan$arr:
     calls: 1
-    bytes: 284
+    bytes: 276
   __eq_SpanStr:
     calls: 49
     bytes: 128
@@ -1574,7 +1574,7 @@ functions:
     bytes: 120
   __eq_Token$Kind$arr:
     calls: 20
-    bytes: 284
+    bytes: 276
   __eq___builtin_Span:
     calls: 69
     bytes: 104
@@ -1583,10 +1583,10 @@ functions:
     bytes: 2012
   __test$keep_skipped:
     calls: 1
-    bytes: 17212
+    bytes: 17936
   __test$lex_all:
     calls: 1
-    bytes: 464756
+    bytes: 486332
   __test$lex_all$esc_str:
     calls: 2
     bytes: 140
@@ -1598,7 +1598,7 @@ functions:
     bytes: 1052
   __test$span_str:
     calls: 1
-    bytes: 2248
+    bytes: 2252
   __test_try_fail_LexError:
     calls: 0
     bytes: 84
@@ -1618,7 +1618,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 2461
+    calls: 2848
     bytes: (external)
   aipl_arr_reserve:
     calls: 24
@@ -1661,22 +1661,22 @@ functions:
     bytes: 1952
   keep_skipped$Kind:
     calls: 3
-    bytes: 3516
+    bytes: 3676
   lex$Kind:
     calls: 39
-    bytes: 480
+    bytes: 532
   lex_all$Kind:
     calls: 76
-    bytes: 8472
+    bytes: 9904
   lex_kinds$Kind:
     calls: 36
-    bytes: 792
+    bytes: 868
   lex_scoped$Kind:
     calls: 1
-    bytes: 360
+    bytes: 412
   lex_step$Kind:
     calls: 224
-    bytes: 10848
+    bytes: 10916
   main:
     calls: 1
     bytes: 248
@@ -1685,7 +1685,7 @@ functions:
     bytes: 1148
   step_result$Kind:
     calls: 661
-    bytes: 9948
+    bytes: 10020
   to_eol_len:
     calls: 0
     bytes: 52

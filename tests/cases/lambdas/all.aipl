@@ -31,44 +31,44 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 1092
-binary size: 6096
-  code: 2656
+instructions executed: 1181
+binary size: 6416
+  code: 2956
   data: 769
-  metadata: 2671
+  metadata: 2691
 functions:
   __builtin_all$char$lam$__test$positive$lambda3:
     calls: 1
     bytes: 244
   __builtin_all$i64$lam$__test$positive$is_pos:
     calls: 1
-    bytes: 204
+    bytes: 196
   __builtin_all$i64$lam$__test$positive$lambda0:
     calls: 1
-    bytes: 204
+    bytes: 196
   __builtin_all$i64$lam$__test$positive$lambda1:
     calls: 1
-    bytes: 204
+    bytes: 196
   __builtin_all$i64$lam$__test$positive$lambda2:
     calls: 1
-    bytes: 204
+    bytes: 196
   __builtin_all$i64$lam$__test$positive$lambda6:
     calls: 1
-    bytes: 204
+    bytes: 196
   __builtin_all$i64$lam$__test$positive$lambda7:
     calls: 1
-    bytes: 204
+    bytes: 196
   __builtin_all$i64$lam$__test$positive$lambda8:
     calls: 1
-    bytes: 204
+    bytes: 196
   __test$positive:
     calls: 1
-    bytes: 568
+    bytes: 736
   __test$positive$filter5$own0:
     calls: 1
-    bytes: 308
+    bytes: 496
   aipl_arr_inc:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_arr_reserve:
     calls: 1

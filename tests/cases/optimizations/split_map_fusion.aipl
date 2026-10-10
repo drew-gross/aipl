@@ -60,21 +60,21 @@ allocations: 35
 deallocations: 35
 reallocations: 1
 bytes allocated: 2533
-instructions executed: 1929
-binary size: 8760
-  code: 5096
+instructions executed: 2111
+binary size: 9072
+  code: 5376
   data: 151
-  metadata: 3513
+  metadata: 3545
 functions:
   __builtin_split_map$str$s0$s1$lam$tagged:
     calls: 3
-    bytes: 456
+    bytes: 576
   __builtin_split_map$u64$s0$s1$lam$__builtin_len:
     calls: 2
-    bytes: 324
+    bytes: 444
   __eq_str$arr:
     calls: 1
-    bytes: 364
+    bytes: 356
   __to_str_bool:
     calls: 1
     bytes: 232
@@ -83,9 +83,9 @@ functions:
     bytes: 204
   __to_str_u64$arr:
     calls: 2
-    bytes: 708
+    bytes: 716
   aipl_arr_inc:
-    calls: 5
+    calls: 10
     bytes: (external)
   aipl_arr_reserve:
     calls: 5
@@ -110,4 +110,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2808
+    bytes: 2848

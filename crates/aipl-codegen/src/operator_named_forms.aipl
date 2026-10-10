@@ -58,20 +58,20 @@ allocations: 16
 deallocations: 16
 reallocations: 0
 bytes allocated: 1040
-instructions executed: 3058
-binary size: 15056
-  code: 8868
+instructions executed: 3375
+binary size: 16080
+  code: 9880
   data: 1186
-  metadata: 5002
+  metadata: 5014
 functions:
   __eq_str$arr:
     calls: 11
-    bytes: 364
+    bytes: 356
   __test$operator_named_forms:
     calls: 1
-    bytes: 2796
+    bytes: 3012
   aipl_arr_inc:
-    calls: 8
+    calls: 11
     bytes: (external)
   aipl_array_dec:
     calls: 27
@@ -96,4 +96,4 @@ functions:
     bytes: 128
   operator_named_forms:
     calls: 11
-    bytes: 5580
+    bytes: 6384

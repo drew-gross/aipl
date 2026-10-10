@@ -5437,7 +5437,9 @@ impl Compilation {
     pub fn run_cli(&self, name: &str, args: &[String]) -> Result<i64, Error> {
         let ptr = self.code_ptr(name)?;
         let f: extern "C" fn(*const u8) -> i64 = unsafe { std::mem::transmute(ptr) };
-        Ok(f(build_cli_array(args)))
+        // An array is passed by the address of its value, `{block, 0, 0}`.
+        let value: [i64; 3] = [build_cli_array(args) as i64, 0, 0];
+        Ok(f(value.as_ptr() as *const u8))
     }
 
     /// Call an AIPL function by name from Rust (the embedding FFI). `args` and
@@ -5754,13 +5756,37 @@ impl Compilation {
             return Ok(FfiValue::Str(text));
         }
 
+        // An array returned by value comes back through a hidden sret pointer
+        // like any composite; its block is the value's first word. The callee
+        // handed us one reference on it, which `read_ffi_array` releases.
+        if let ConcreteType::Array(elem) = &info.return_ty {
+            if abi_is_composite(abi_kind, &info.return_ty, &self.structs) {
+                let words =
+                    (abi_elem_size(abi_kind, &info.return_ty, &self.structs) as usize).div_ceil(8);
+                let mut sret_buf = vec![0i64; words];
+                let mut sret_abi = Vec::with_capacity(1 + abi.len());
+                sret_abi.push(sret_buf.as_mut_ptr() as i64);
+                sret_abi.extend_from_slice(&abi);
+                if sret_abi.len() > 6 {
+                    return Err(Error::msg(format!(
+                        "fn {name:?} has too many parameters for an array return; the FFI \
+                         supports up to 5 (plus the hidden return pointer)"
+                    )));
+                }
+                // SAFETY: as the `str` path above, with an array-sized buffer.
+                let _ = unsafe { invoke(ptr, &sret_abi) };
+                let block = sret_buf[0];
+                return Ok(unsafe { read_ffi_array(abi_kind, block, elem, true, &self.structs) });
+            }
+        }
+
         // SAFETY: arity (<= 6) and per-argument types are validated above; every
         // scalar and `str` lowers to one `i64`, so the finalized code matches the
         // transmuted signature.
         let r = unsafe { invoke(ptr, &abi) };
 
-        // An array is pointer-like (a single `i64` return, not sret): the callee
-        // handed us one reference on the block, which `read_ffi_array` releases.
+        // An array under the `Tagged` ABI is one word — its block, returned in
+        // a register.
         if let ConcreteType::Array(elem) = &info.return_ty {
             let result = unsafe { read_ffi_array(abi_kind, r, elem, true, &self.structs) };
             return Ok(result);
@@ -6123,10 +6149,10 @@ impl Drop for ArgBufs {
 }
 
 /// Marshal `v` into the single `i64` the ABI passes for a parameter of type
-/// `ty`. An inline composite (struct, variant, optional, result) is written into
-/// a host buffer and passed by *pointer*, exactly as codegen passes one from a
-/// stack slot; everything else — scalars, `str`, arrays — is the value word
-/// itself. Any buffer this needs is recorded in `bufs` and outlives the call.
+/// `ty`. An inline composite (struct, variant, optional, result, and a wide
+/// `str` or array) is written into a host buffer and passed by *pointer*,
+/// exactly as codegen passes one from a stack slot; everything else is the value
+/// word itself. Any buffer this needs is recorded in `bufs` and outlives the call.
 ///
 /// The `Err` describes the mismatch without naming the function or parameter
 /// index; [`Compilation::call_values`] prefixes those.
@@ -6149,8 +6175,8 @@ fn ffi_arg_abi(
 }
 
 /// Marshal `v` into the 8-byte word a value of the *pointer-like* type `ty` — a
-/// scalar, a `str`, or an array — is represented by. Composites don't come here;
-/// see [`ffi_arg_abi`].
+/// scalar, a tagged `str`, or an array under an ABI that passes one as its block
+/// — is represented by. Composites don't come here; see [`ffi_arg_abi`].
 fn ffi_arg_word(
     abi: Abi,
     ty: &ConcreteType,
@@ -6483,6 +6509,16 @@ unsafe fn write_ffi_arg(
                 bufs,
             )
         };
+    }
+    // An array value is `{block, 0, 0}`: the block is its first word, and the
+    // zeroed buffer already holds the rest.
+    if let ConcreteType::Array(elem) = ty {
+        let FfiValue::Array(elems) = v else {
+            return Err(mismatch(ty, v));
+        };
+        let block = build_borrowed_array(abi, elem, elems, structs, bufs)?;
+        unsafe { std::ptr::write(dst as *mut i64, block) };
+        return Ok(());
     }
     let word = ffi_arg_word(abi, ty, v, structs, bufs)?;
     unsafe { std::ptr::write(dst as *mut i64, word) };
@@ -9752,8 +9788,8 @@ fn hand_off_arg<M: Module>(
     }
 }
 
-/// Take the field at `offset` (of type `fty`, a pointer-word block or a wide
-/// `str`) out of the struct at `obj_ptr`: its reference goes to the returned
+/// Take the field at `offset` (of type `fty`, a block, an array value or a
+/// wide `str`) out of the struct at `obj_ptr`: its reference goes to the returned
 /// value, and the field is left holding the empty value of its type — a null
 /// block pointer, or the inline empty `str` — which any later release of the
 /// struct passes over.
@@ -9780,7 +9816,8 @@ fn take_field<M: Module>(
         builder
             .ins()
             .store(MemFlagsData::trusted(), null, obj_ptr, offset as i32);
-        Ok(v)
+        // An array value carries its block out of the field it is emptying.
+        Ok(seq_val(builder, v, fty, structs))
     }
 }
 
@@ -9799,6 +9836,25 @@ fn take_field<M: Module>(
 /// pointer and the header word is at `-8`, for a view as for a heap block
 /// (`array_layout`).
 fn owned_block_made_unique<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    cx: Cx,
+    v: Value,
+    ty: &ConcreteType,
+) -> Value {
+    // The check and the copy work on the block; an array *value* is unwrapped
+    // to it first and re-wrapped after, a set or a dict already is one.
+    let block = seq_ptr(builder, v, ty, cx.structs);
+    let unique = owned_block_made_unique_ptr(builder, module, cx, block, ty);
+    if is_padded_array(ty, cx.structs) {
+        arr_val(builder, unique)
+    } else {
+        unique
+    }
+}
+
+/// [`owned_block_made_unique`] on the block pointer itself.
+fn owned_block_made_unique_ptr<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
     cx: Cx,
@@ -10026,6 +10082,82 @@ fn is_padded_array(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> boo
     matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty) && elem_size_of(ty, structs) > 8
 }
 
+/// The tagged block pointer an array value carries — its first word.
+///
+/// Under the wide layout an array *value* is the address of its 24 bytes, as a
+/// `str`'s is, while everything that reads an array's elements or calls into
+/// the runtime still works on the 8-byte tagged pointer underneath (and so do
+/// sets and dicts, which are still a plain word). This is the one step between
+/// the two, so every site that hands an array to one of those does it here.
+fn arr_ptr(builder: &mut FunctionBuilder, value: Value) -> Value {
+    builder
+        .ins()
+        .load(types::I64, MemFlagsData::trusted(), value, 0)
+}
+
+/// The tagged block pointer behind a value of an array-*backed* type `ty`: an
+/// array's first word ([`arr_ptr`]), or a set or a dict, which is still the
+/// pointer itself.
+///
+/// For the sites that share one path across all three — `len`, refcounting,
+/// iteration, rendering — and so would otherwise each have to spell out which of
+/// them is an address. A set or dict reaching one of those sites with
+/// [`arr_ptr`] applied would read its block's first word as a pointer.
+fn seq_ptr(
+    builder: &mut FunctionBuilder,
+    v: Value,
+    ty: &ConcreteType,
+    structs: &HashMap<String, TypeDef>,
+) -> Value {
+    if is_padded_array(ty, structs) {
+        arr_ptr(builder, v)
+    } else {
+        v
+    }
+}
+
+/// The value for a block pointer `ptr` of an array-backed type `ty`: a fresh
+/// [`arr_val`] for an array, the pointer itself for a set or a dict — the
+/// inverse of [`seq_ptr`].
+///
+/// For a site that got a block back from the runtime and has to *track* or
+/// *retain* it as a value of `ty`: both go through `emit_rc`, which reads an
+/// array as the address of its value, so handing it the bare block would release
+/// whatever the block's first word happens to be.
+fn seq_val(
+    builder: &mut FunctionBuilder,
+    ptr: Value,
+    ty: &ConcreteType,
+    structs: &HashMap<String, TypeDef>,
+) -> Value {
+    if is_padded_array(ty, structs) {
+        arr_val(builder, ptr)
+    } else {
+        ptr
+    }
+}
+
+/// A fresh array value for the tagged block pointer `ptr`: a 24-byte stack slot
+/// holding `{ptr, 0, 0}`, and its address — the inverse of [`arr_ptr`], for a
+/// site that produced an array as a pointer (a runtime call, a literal) and has
+/// to hand codegen a value.
+///
+/// The padding is written for the same reason [`store_array_elem`] writes it:
+/// an array value is copied and compared as bytes in places.
+fn arr_val(builder: &mut FunctionBuilder, ptr: Value) -> Value {
+    let slot = builder.create_sized_stack_slot(StackSlotData::new(
+        StackSlotKind::ExplicitSlot,
+        arr24::ARR_SIZE as u32,
+        3,
+    ));
+    let a = builder.ins().stack_addr(types::I64, slot, 0);
+    builder.ins().store(MemFlagsData::trusted(), ptr, a, 0);
+    let zero = builder.ins().iconst(types::I64, 0);
+    builder.ins().store(MemFlagsData::trusted(), zero, a, 8);
+    builder.ins().store(MemFlagsData::trusted(), zero, a, 16);
+    a
+}
+
 /// Write `some(x)` into the flattened optional slot at `slot` (size
 /// `8 + sizeof(Core)`), where `x_val`/`x_ty` is the wrapped value. If `x` is
 /// itself an optional, the tag is its tag + 1 and the shared core value is
@@ -10167,7 +10299,19 @@ fn is_char_set(ty: &ConcreteType) -> bool {
 /// rather than deciding for itself: a slot written one way and read the other
 /// is a silent miscompile rather than a crash.
 fn lives_in_slot(ty: &ConcreteType) -> bool {
-    is_str_shaped(ty) || is_inline_optional(ty) || is_char_set(ty)
+    is_str_shaped(ty) || is_inline_optional(ty) || is_char_set(ty) || is_wide_array(ty)
+}
+
+/// Whether `ty` is an array held as the 24-byte wide value — [`is_padded_array`]
+/// without the layout table, for the places that only have the type.
+///
+/// Such an array lives *in* its binding's slot, as a `str` does, rather than the
+/// slot holding a pointer to it. That is what keeps `push` and `extend` on a
+/// `mut` binding working unchanged: they write the new block pointer into the
+/// first word of the slot they are given, and when the slot *is* the value,
+/// that word is exactly the one to replace.
+fn is_wide_array(ty: &ConcreteType) -> bool {
+    matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty) && Abi::active().arr_size() > 8
 }
 
 /// An optional of a scalar — `i64?`, `bool?`, `char?`. Sixteen bytes (the tag
@@ -10222,7 +10366,8 @@ fn coerce_empty_to_char_array<M: Module>(
     }
     let is_empty_placeholder = matches!(actual, ConcreteType::Array(inner) if is_none_inner(inner));
     if is_char_array(expected) && is_empty_placeholder {
-        builtins.call_void(module, builder, "aipl_array_dec", &[v]);
+        let block = arr_ptr(builder, v);
+        builtins.call_void(module, builder, "aipl_array_dec", &[block]);
         // The empty `[]` was a freshly allocated, tracked temporary; we've just
         // consumed (dec'd) it in favor of the empty str, so drop its tracking
         // entry — otherwise scope exit decs it a second time, a double-free
@@ -10758,6 +10903,10 @@ fn load_char_array_byte<M: Module>(
 fn seq_len(builder: &mut FunctionBuilder, ptr: Value, ty: &ConcreteType) -> Value {
     if is_char_array(ty) {
         emit_str_len(builder, ptr)
+    } else if is_wide_array(ty) {
+        // `ptr` is the array *value*; its length is read from the block under it.
+        let block = arr_ptr(builder, ptr);
+        load_arr_len(builder, block)
     } else {
         load_arr_len(builder, ptr)
     }
@@ -10778,7 +10927,9 @@ fn seq_elem<M: Module>(
     if is_char_array(arr_ty) {
         load_char_array_byte(module, builder, builtins, ptr, idx)
     } else if let ConcreteType::Array(elem) = arr_ty {
-        load_array_elem(module, builder, builtins, ptr, idx, elem, structs)
+        // `ptr` is the array *value*; the element is read from the block under it.
+        let block = seq_ptr(builder, ptr, arr_ty, structs);
+        load_array_elem(module, builder, builtins, block, idx, elem, structs)
     } else {
         unreachable!("seq_elem called with a non-array type")
     }
@@ -10861,14 +11012,17 @@ fn emit_rc_w<M: Module>(
             // A constant array literal (`emit_const_array`) is skipped exactly
             // as a static `str` literal is above: the runtime would ignore the
             // call anyway.
-            if rc_statically_noop(builder.func, v, HEADER_SIZE) {
+            // An array value is an address now; a set or dict is still the
+            // tagged pointer itself.
+            let ptr = seq_ptr(builder, v, ty, structs);
+            if rc_statically_noop(builder.func, ptr, HEADER_SIZE) {
                 return;
             }
             let sym = match op {
                 RcOp::Retain => "aipl_arr_inc",
                 RcOp::Drop => "aipl_array_dec",
             };
-            builtins.call_void(module, builder, sym, &[v]);
+            builtins.call_void(module, builder, sym, &[ptr]);
         }
         ConcreteType::Named(n) => match structs.get(n) {
             // A boxed (recursive) value counts as one reference to its heap
@@ -11276,9 +11430,8 @@ fn emit_charset_union(builder: &mut FunctionBuilder, a: Value, b: Value) -> Valu
 /// tags, accumulated results, and the *addresses* composites travel as.
 ///
 /// The distinction is not academic: a 24-byte `str` is one value and three
-/// words, and so is an array under the wide layout — which, unlike a `str`, is
-/// *not* composite (see `Abi::arr_is_composite`), so "non-composite" no longer
-/// implies "one word" either. Size the slot from the type, always.
+/// words, and so is an array under the wide layout. Size the slot from the
+/// type, always.
 fn value_slot(
     builder: &mut FunctionBuilder,
     ty: &ConcreteType,
@@ -11542,6 +11695,10 @@ fn emit_eq_body<M: Module>(
             builder.ins().stack_load(types::I64, types::I64, res, 0)
         }
         ConcreteType::Array(elem) => {
+            // An array value is the address of its 24 bytes; what follows reads
+            // the block through the tagged pointer in its first word.
+            let lv = arr_ptr(builder, lv);
+            let rv = arr_ptr(builder, rv);
             let ll = load_arr_len(builder, lv);
             let rl = load_arr_len(builder, rv);
             let len_eq = builder.ins().icmp(IntCC::Equal, ll, rl);
@@ -12023,6 +12180,9 @@ fn emit_hash<M: Module>(
             builder.ins().stack_load(types::I64, types::I64, acc, 0)
         }
         ConcreteType::Array(elem) => {
+            // An array value is the address of its 24 bytes; what follows reads
+            // the block through the tagged pointer in its first word.
+            let v = arr_ptr(builder, v);
             let len = load_arr_len(builder, v);
             let seed = emit_scalar_hash(builder, len);
             if is_none_inner(elem) {
@@ -13126,7 +13286,8 @@ fn emit_render<M: Module>(
         // `value` is a real `str` underneath, not a generic array block.
         _ if is_char_array(ty) => emit_render_char_array(module, builder, cx, value, sink)?,
         ConcreteType::Array(elem) => {
-            emit_render_seq(module, builder, cx, value, elem, sink, b'[', b']')?
+            let block = arr_ptr(builder, value);
+            emit_render_seq(module, builder, cx, block, elem, sink, b'[', b']')?
         }
         ConcreteType::Set(elem, order) if **elem == ConcreteType::Primitive(Primitive::Char) => {
             let descending = *order == aipl_syntax::ast::SetOrder::Desc;
@@ -13483,7 +13644,8 @@ fn emit_file_result<M: Module>(
     // `str` payload arrives through an out pointer that is never null and the
     // flag has to be carried separately.
     let is_ok = builder.ins().icmp_imm_s(IntCC::NotEqual, raw, 0);
-    let payload = ok_ty.map(|t| (raw, t));
+    // A returned array is a block pointer; the payload is a value wrapping it.
+    let payload = ok_ty.map(|t| (seq_val(builder, raw, &t, cx.structs), t));
     emit_file_result_split(module, builder, cx, is_ok, payload, err_msg)
 }
 
@@ -13505,10 +13667,9 @@ fn emit_file_result_split<M: Module>(
 ) -> Result<Value, Error> {
     let str_ty = ConcreteType::Primitive(Primitive::Str);
     // The payload region is sized to the *wider* side, as any result is. That
-    // only started to matter here when a `str` stopped being one word: the err
-    // side is always an `Error` (a `str`), so for `str[]!Error` — where the ok
-    // side is an 8-byte array pointer — the err side is now the larger one, and
-    // sizing from the ok side would put the message past the end of the slot.
+    // started to matter here when a `str` stopped being one word: the err side
+    // is always an `Error` (a `str`), and sizing from an ok side narrower than
+    // it would put the message past the end of the slot.
     let ok_size = payload
         .as_ref()
         .map_or(8, |(_, t)| elem_size_of(t, cx.structs));
@@ -15754,16 +15915,35 @@ fn compile_call<M: Module>(
     for (idx, copy_addr) in copied {
         arg_values[idx] = copy_addr;
     }
+    // A runtime builtin speaks the *runtime's* array ABI, not the AIPL one: it
+    // takes an array as its block pointer and returns one in a register. An
+    // AIPL array value is the address of its 24 bytes, so each array argument is
+    // handed over as the block in its first word, and an array result is wrapped
+    // back into a value below. (A `str` needs no such step: the runtime's `str`
+    // entry points take and return the 24-byte value itself.)
+    let to_runtime = matches!(info.link, FuncLink::Builtin(_));
+    let arr_result = to_runtime && is_padded_array(&info.return_ty, structs);
+    if to_runtime {
+        for (idx, p) in info.params.iter().enumerate() {
+            if is_padded_array(&p.ty, structs) {
+                arg_values[idx] = arr_ptr(builder, arg_values[idx]);
+            }
+        }
+    }
     // A composite result (struct or optional) is returned through a caller-
     // provided pointer (sret): allocate a slot of its size and pass its address.
-    let sret = sret_size(&info.return_ty, structs).map(|size| {
-        let slot = builder.create_sized_stack_slot(StackSlotData::new(
-            StackSlotKind::ExplicitSlot,
-            size,
-            3,
-        ));
-        builder.ins().stack_addr(types::I64, slot, 0)
-    });
+    // Not for a runtime builtin's array result, which comes back in a register.
+    let sret = (!arr_result)
+        .then(|| sret_size(&info.return_ty, structs))
+        .flatten()
+        .map(|size| {
+            let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                StackSlotKind::ExplicitSlot,
+                size,
+                3,
+            ));
+            builder.ins().stack_addr(types::I64, slot, 0)
+        });
     let call_args: Vec<Value> = match sret {
         Some(s) => std::iter::once(s).chain(arg_values).collect(),
         None => arg_values,
@@ -15836,6 +16016,9 @@ fn compile_call<M: Module>(
         s
     } else if is_unit(&info.return_ty) {
         builder.ins().iconst(types::I64, 0)
+    } else if arr_result {
+        let block = builder.inst_results(inst)[0];
+        arr_val(builder, block)
     } else {
         builder.inst_results(inst)[0]
     };
@@ -16269,6 +16452,8 @@ fn compile_call_expr<M: Module>(
             // Tagged `aipl_str_split` consumes both; `aipl_str_split` borrows.
             let result = builtins.call(module, builder, "aipl_str_split", &[s_v, sep_v]);
             let ty = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::Str)));
+            // The runtime hands back the parts' block; the value is a slot over it.
+            let result = arr_val(builder, result);
             scopes
                 .last_mut()
                 .expect("scope")
@@ -16387,8 +16572,8 @@ fn compile_call_expr<M: Module>(
                 builder,
                 cx,
                 raw,
-                // A `str[]` payload: an 8-byte array pointer under either
-                // representation — it is the *err* side that widened.
+                // A `str[]` payload: the runtime hands back the block, which
+                // `emit_file_result` wraps into the array's value.
                 Some(ConcreteType::Array(Box::new(ConcreteType::Primitive(
                     Primitive::Str,
                 )))),
@@ -16814,7 +16999,8 @@ fn compile_call_expr<M: Module>(
             ) {
                 // A set/dict shares the array layout, so its element/pair count is
                 // the same `len` field.
-                load_arr_len(builder, ptr)
+                let block = seq_ptr(builder, ptr, &t, structs);
+                load_arr_len(builder, block)
             } else {
                 return Err(Error::at(
                     format!(
@@ -16909,6 +17095,9 @@ fn compile_call_expr<M: Module>(
                     ));
                 }
             };
+            // The runtime sorts a block, so from here on `ptr` is the block
+            // under the value; the sorted result comes back as a block too.
+            let ptr = seq_ptr(builder, ptr, &t, structs);
             // See the note at `reverse`'s array arm: an array retains through
             // `aipl_arr_inc`, never the str-tagged `aipl_inc`.
             builtins.call_void(module, builder, "aipl_arr_inc", &[ptr]);
@@ -16925,6 +17114,7 @@ fn compile_call_expr<M: Module>(
                 &[ptr, drop_fn, retain_fn, esz, kind_v],
             );
             let arr_ty = ConcreteType::Array(Box::new(elem));
+            let out = arr_val(builder, out);
             scopes
                 .last_mut()
                 .expect("scope")
@@ -16951,6 +17141,9 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (parts, pt) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            // `parts` stays the value (it is retained as one, below); the runtime
+            // joins read the block under it.
+            let parts_block = seq_ptr(builder, parts, &pt, structs);
             let mut seps: Vec<(Value, ConcreteType)> = Vec::with_capacity(3);
             for a in &args[1..] {
                 seps.push(compile_expr(module, builder, cx, scopes, a)?);
@@ -17047,7 +17240,7 @@ fn compile_call_expr<M: Module>(
                     module,
                     builder,
                     "aipl_str_join",
-                    &[parts, vals[0], vals[1], vals[2]],
+                    &[parts_block, vals[0], vals[1], vals[2]],
                 );
                 let out_ty = ConcreteType::Primitive(Primitive::Str);
                 scopes
@@ -17086,7 +17279,7 @@ fn compile_call_expr<M: Module>(
                     let sep = *sep;
                     vals.push(if matches!(t, ConcreteType::Array(_)) {
                         emit_retain(builder, module, builtins, structs, sep, &out_ty);
-                        sep
+                        seq_ptr(builder, sep, t, structs)
                     } else {
                         let slot = if is_composite(&elem, structs) {
                             sep
@@ -17108,11 +17301,12 @@ fn compile_call_expr<M: Module>(
                             "aipl_array_push",
                             &[empty, slot, drop_fn, retain_fn, esz],
                         );
+                        let one_v = arr_val(builder, one);
                         scopes
                             .last_mut()
                             .expect("scope")
-                            .push(Tracked::new(one, &out_ty));
-                        emit_retain(builder, module, builtins, structs, one, &out_ty);
+                            .push(Tracked::new(one_v, &out_ty));
+                        emit_retain(builder, module, builtins, structs, one_v, &out_ty);
                         one
                     });
                 }
@@ -17120,8 +17314,17 @@ fn compile_call_expr<M: Module>(
                     module,
                     builder,
                     "aipl_arr_join",
-                    &[parts, vals[0], vals[1], vals[2], drop_fn, retain_fn, esz],
+                    &[
+                        parts_block,
+                        vals[0],
+                        vals[1],
+                        vals[2],
+                        drop_fn,
+                        retain_fn,
+                        esz,
+                    ],
                 );
+                let out = arr_val(builder, out);
                 scopes
                     .last_mut()
                     .expect("scope")
@@ -17245,6 +17448,9 @@ fn compile_call_expr<M: Module>(
             let ord = builder
                 .ins()
                 .iconst(types::I64, set_order_code(&elem, order));
+            // Past the `char[]` case, the source is an array value; the walk
+            // below reads the block under it.
+            let arr_ptr = seq_ptr(builder, arr_ptr, &t, structs);
             let len = load_arr_len(builder, arr_ptr);
             let first = builtins.call(
                 module,
@@ -17331,13 +17537,15 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             // Sets are array blocks — see the note at `reverse`'s array arm.
+            // The block is shared, and the array is a value wrapping it.
             builtins.call_void(module, builder, "aipl_arr_inc", &[ptr]);
             let arr_ty = ConcreteType::Array(elem.clone());
+            let v = seq_val(builder, ptr, &arr_ty, structs);
             scopes
                 .last_mut()
                 .expect("scope")
-                .push(Tracked::new(ptr, &arr_ty));
-            (ptr, arr_ty)
+                .push(Tracked::new(v, &arr_ty));
+            (v, arr_ty)
         }
         Callee::Reverse => {
             // `xs.reverse() -> T[]` / `s.reverse() -> str` — new sequence with
@@ -17379,6 +17587,10 @@ fn compile_call_expr<M: Module>(
                 // array — both find the refcount at `ptr - 8` — which is why this was
                 // survivable; under the wide `str` it reads 24 bytes of array header
                 // as a value instead.
+                //
+                // The runtime builds the reversed view over a block, so `ptr`
+                // is the block under the value from here on.
+                let ptr = seq_ptr(builder, ptr, &t, structs);
                 builtins.call_void(module, builder, "aipl_arr_inc", &[ptr]);
                 let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
                 let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
@@ -17392,6 +17604,7 @@ fn compile_call_expr<M: Module>(
                     &[ptr, drop_fn, retain_fn, esz],
                 );
                 let arr_ty = ConcreteType::Array(Box::new(elem));
+                let view = arr_val(builder, view);
                 scopes
                     .last_mut()
                     .expect("scope")
@@ -17516,6 +17729,15 @@ fn compile_call_expr<M: Module>(
                         (_, ConcreteType::Array(e) | ConcreteType::Optional(e)) => (**e).clone(),
                         (_, t) => t.clone(),
                     }
+                };
+                // The helpers below read blocks: `recv` is the receiver value,
+                // and a `Seq` pattern is an array value too. An element or an
+                // optional element is not an array and is passed as it is.
+                let recv = seq_ptr(builder, recv, &recv_ty, structs);
+                let pat_v = if matches!(shape, SeShape::Seq) {
+                    seq_ptr(builder, pat_v, &pat_ty, structs)
+                } else {
+                    pat_v
                 };
                 match shape {
                     SeShape::Seq => {
@@ -17644,6 +17866,15 @@ fn compile_call_expr<M: Module>(
                         (_, ConcreteType::Array(e) | ConcreteType::Optional(e)) => (**e).clone(),
                         (_, t) => t.clone(),
                     }
+                };
+                // The helpers below read blocks: `recv` is the receiver value,
+                // and a `Seq` pattern is an array value too. An element or an
+                // optional element is not an array and is passed as it is.
+                let recv = seq_ptr(builder, recv, &recv_ty, structs);
+                let ndl_v = if matches!(shape, SeShape::Seq) {
+                    seq_ptr(builder, ndl_v, &ndl_ty, structs)
+                } else {
+                    ndl_v
                 };
                 match shape {
                     SeShape::Seq => emit_arr_contains_seq(module, builder, cx, recv, ndl_v, &elem)?,
@@ -18124,7 +18355,8 @@ fn compile_call_expr<M: Module>(
             // Internal (in-place `filter`): `__filter_keep(arr, w, e)` stores
             // element `e` at slot `w` with a raw pointer copy — no refcount
             // change, since ownership relocates from `e`'s read slot to slot `w`.
-            let (a_ptr, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let (a_val, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let a_ptr = arr_ptr(builder, a_val);
             let (w, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
             let (e, ety) = compile_expr(module, builder, cx, scopes, &args[2])?;
             let base = builder.ins().iadd_imm_s(a_ptr, ARR_ELEMS_OFFSET as i64);
@@ -18151,7 +18383,8 @@ fn compile_call_expr<M: Module>(
             // Internal (in-place `filter`): set the array's length to `w`. The
             // dead tail `[w, old_len)` holds relocated/stale pointers and is
             // never released (the block is later freed by its capacity).
-            let (a_ptr, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let (a_val, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let a_ptr = arr_ptr(builder, a_val);
             let (w, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
             builder
                 .ins()
@@ -18170,7 +18403,8 @@ fn compile_call_expr<M: Module>(
             // allocated with. When `T != U` the array's stored element drop-fn
             // (set for `T` when the buffer was built) is now wrong, so patch it to
             // `U`'s here.
-            let (a_ptr, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let (a_val, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let a_ptr = arr_ptr(builder, a_val);
             let (i_val, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
             let (new_val, new_ty) = compile_expr(module, builder, cx, scopes, &args[2])?;
             let (old_val, old_ty) = compile_expr(module, builder, cx, scopes, &args[3])?;
@@ -18317,7 +18551,10 @@ fn compile_call_expr<M: Module>(
                         scopes.last_mut().expect("scope").push(Tracked::new(v, &t));
                         (v, t)
                     } else if mut_binding_owns_slot_ref(&t, structs) {
-                        let v = builder.ins().stack_load(types::I64, types::I64, *slot, 0);
+                        // An array value is re-wrapped around the block it
+                        // carried, since the slot it lived in is emptied next.
+                        let block = builder.ins().stack_load(types::I64, types::I64, *slot, 0);
+                        let v = seq_val(builder, block, &t, structs);
                         let null = builder.ins().iconst(types::I64, 0);
                         builder.ins().stack_store(types::I64, null, *slot, 0);
                         scopes.last_mut().expect("scope").push(Tracked::new(v, &t));
@@ -18386,12 +18623,14 @@ fn compile_call_expr<M: Module>(
                 .ins()
                 .iconst(types::I64, runtime_elem_size(&elem, structs));
             let zero = builder.ins().iconst(types::I64, 0);
+            let block = seq_ptr(builder, arr_ptr, &arr_ty, structs);
             let owned = builtins.call(
                 module,
                 builder,
                 "aipl_arr_reserve",
-                &[arr_ptr, zero, drop_fn, retain_fn, esz],
+                &[block, zero, drop_fn, retain_fn, esz],
             );
+            let owned = arr_val(builder, owned);
             scopes
                 .last_mut()
                 .expect("scope")
@@ -18428,11 +18667,12 @@ fn compile_call_expr<M: Module>(
             let esz = builder.ins().iconst(types::I64, 8); // elem_size
             let ptr = builtins.call(module, builder, "aipl_array_with_cap", &[cap, zero, esz]);
             let arr_ty = ConcreteType::Array(Box::new(ConcreteType::NoneInner));
+            let value = arr_val(builder, ptr);
             scopes
                 .last_mut()
                 .expect("scope")
-                .push(Tracked::new(ptr, &arr_ty));
-            (ptr, arr_ty)
+                .push(Tracked::new(value, &arr_ty));
+            (value, arr_ty)
         }
         // Array-literal spread. `[..a, b, ..c]` lowers to
         //   mut $s = __aipl_arr_reserve(a, 1 + len(c));
@@ -18536,13 +18776,16 @@ fn compile_call_expr<M: Module>(
             let esz = builder
                 .ins()
                 .iconst(types::I64, runtime_elem_size(&elem, structs));
+            // The runtime works on block pointers. `arr_ptr` itself stays the
+            // value: ownership above is tracked by matching it.
+            let arr_block = seq_ptr(builder, arr_ptr, &arr_ty, structs);
             let out = if *callee == Callee::ArrReserve {
                 let (extra, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
                 builtins.call(
                     module,
                     builder,
                     "aipl_arr_reserve",
-                    &[arr_ptr, extra, drop_fn, retain_fn, esz],
+                    &[arr_block, extra, drop_fn, retain_fn, esz],
                 )
             } else if *callee == Callee::ArrConcat {
                 let mark = scope_depth(scopes);
@@ -18552,11 +18795,12 @@ fn compile_call_expr<M: Module>(
                 } else {
                     emit_retain(builder, module, builtins, structs, src, &src_ty);
                 }
+                let src_block = seq_ptr(builder, src, &src_ty, structs);
                 builtins.call(
                     module,
                     builder,
                     "aipl_arr_extend",
-                    &[arr_ptr, src, drop_fn, retain_fn, esz],
+                    &[arr_block, src_block, drop_fn, retain_fn, esz],
                 )
             } else {
                 // One element. After `reserve` the block is uniquely owned with
@@ -18585,9 +18829,10 @@ fn compile_call_expr<M: Module>(
                     module,
                     builder,
                     sym,
-                    &[arr_ptr, x_slot, drop_fn, retain_fn, esz],
+                    &[arr_block, x_slot, drop_fn, retain_fn, esz],
                 )
             };
+            let out = arr_val(builder, out);
             let scope = scopes.last_mut().expect("scope");
             scope.retain(|t| !matches!(t.owned, Owned::Value(x) if moved.contains(&x)));
             scope.push(Tracked::new(out, &arr_ty));
@@ -18757,11 +19002,14 @@ fn compile_call_expr<M: Module>(
                     &[arr_ptr, x_ptr, drop_fn, retain_fn, esz],
                 );
                 builder.ins().stack_store(types::I64, new_ptr, slot, 0);
-                emit_retain(builder, module, builtins, structs, new_ptr, &new_arr_ty);
+                // The region track holds the *new version* as a value of its own:
+                // the binding's slot is overwritten by the next push or extend.
+                let new_v = seq_val(builder, new_ptr, &new_arr_ty, structs);
+                emit_retain(builder, module, builtins, structs, new_v, &new_arr_ty);
                 scopes
                     .last_mut()
                     .expect("scope")
-                    .push(Tracked::new(new_ptr, &new_arr_ty));
+                    .push(Tracked::new(new_v, &new_arr_ty));
             }
             // Refine the binding's element type (e.g. `mut a = []` → `i64[]`).
             *ty_cell.borrow_mut() = new_arr_ty;
@@ -18854,11 +19102,14 @@ fn compile_call_expr<M: Module>(
             );
             builder.ins().stack_store(types::I64, new_ptr, slot, 0);
             if !exclusive {
-                emit_retain(builder, module, builtins, structs, new_ptr, &arr_ty);
+                // The region track holds the *new version* as a value of its own:
+                // the binding's slot is overwritten by the next push or extend.
+                let new_v = seq_val(builder, new_ptr, &arr_ty, structs);
+                emit_retain(builder, module, builtins, structs, new_v, &arr_ty);
                 scopes
                     .last_mut()
                     .expect("scope")
-                    .push(Tracked::new(new_ptr, &arr_ty));
+                    .push(Tracked::new(new_v, &arr_ty));
             }
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
@@ -19023,7 +19274,8 @@ fn compile_call_expr<M: Module>(
             let grown = if is_bit_packed(&result_elem) {
                 arr_ptr
             } else {
-                let len_v = load_arr_len(builder, src_ptr);
+                let src_block = seq_ptr(builder, src_ptr, &src_ty, structs);
+                let len_v = load_arr_len(builder, src_block);
                 builtins.call(
                     module,
                     builder,
@@ -19031,11 +19283,14 @@ fn compile_call_expr<M: Module>(
                     &[arr_ptr, len_v, drop_fn, retain_fn, esz],
                 )
             };
+            // `src_ptr` stays the value (ownership above matches on it); the
+            // runtime reads the block under it.
+            let src_block = seq_ptr(builder, src_ptr, &src_ty, structs);
             let new_ptr = builtins.call(
                 module,
                 builder,
                 "aipl_arr_extend",
-                &[grown, src_ptr, drop_fn, retain_fn, esz],
+                &[grown, src_block, drop_fn, retain_fn, esz],
             );
             builder.ins().stack_store(types::I64, new_ptr, slot, 0);
             if !exclusive {
@@ -19043,11 +19298,14 @@ fn compile_call_expr<M: Module>(
                 // reserve above (as `push` has it consumed by `aipl_array_push`);
                 // the extra retain plus value-track is the new version's region
                 // track, keeping it borrowable to this scope's exit.
-                emit_retain(builder, module, builtins, structs, new_ptr, &new_arr_ty);
+                // The region track holds the *new version* as a value of its own:
+                // the binding's slot is overwritten by the next push or extend.
+                let new_v = seq_val(builder, new_ptr, &new_arr_ty, structs);
+                emit_retain(builder, module, builtins, structs, new_v, &new_arr_ty);
                 scopes
                     .last_mut()
                     .expect("scope")
-                    .push(Tracked::new(new_ptr, &new_arr_ty));
+                    .push(Tracked::new(new_v, &new_arr_ty));
             }
             *ty_cell.borrow_mut() = new_arr_ty;
             // `extend` mutates; it produces no value.
@@ -19265,21 +19523,10 @@ fn compile_call_expr<M: Module>(
             // What is left to release is whatever the slot holds now — nothing,
             // after a move.
             let old = if mut_binding_owns_slot_ref(&old_ty, structs) {
-                Some(builder.ins().stack_load(types::I64, types::I64, slot, 0))
+                Some(slot_value(builder, slot, &old_ty))
             } else {
                 None
             };
-            // Store the mutated receiver back, and refine the variable's type
-            // to it (e.g. a `mut a = []` receiver pinned by the method's self).
-            //
-            // `store_binding`, not a bare word store: a wide `str`/`char[]`
-            // receiver *is* its slot's 24 bytes, and everything that reads one
-            // reads all three words (`slot_value`). Storing only the handle left
-            // the other two holding whatever was in the slot before — which a
-            // recursive `mut self: str` method surfaced as a wrong receiver on
-            // one level and `misaligned pointer dereference` in `aipl_str_len`
-            // on three.
-            store_binding(builder, slot, new_self, &old_ty, structs);
             // Taking the returned reference over means untracking it: the slot
             // owns it now, and leaving the call's own track in place would
             // release it at the end of this scope. `move_owned_temp` is the same
@@ -19292,12 +19539,24 @@ fn compile_call_expr<M: Module>(
                 // call-return value-track stays as the new version's region
                 // track — it dies with the current scope, e.g. a loop body,
                 // while the slot's reference carries the value onward), then
-                // releases its reference on the replaced value.
+                // releases its reference on the replaced value — before the
+                // store, since a wide array's `old` is the slot's own address.
                 if !took_over {
                     emit_retain(builder, module, builtins, structs, new_self, &old_ty);
                 }
                 emit_drop(builder, module, builtins, structs, old, &old_ty);
             }
+            // Store the mutated receiver back, and refine the variable's type
+            // to it (e.g. a `mut a = []` receiver pinned by the method's self).
+            //
+            // `store_binding`, not a bare word store: a wide `str`/`char[]`
+            // receiver *is* its slot's 24 bytes, and everything that reads one
+            // reads all three words (`slot_value`). Storing only the handle left
+            // the other two holding whatever was in the slot before — which a
+            // recursive `mut self: str` method surfaced as a wrong receiver on
+            // one level and `misaligned pointer dereference` in `aipl_str_len`
+            // on three.
+            store_binding(builder, slot, new_self, &old_ty, structs);
             *ty_cell.borrow_mut() = info.return_ty.clone();
             // A mutating method yields nothing.
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
@@ -19398,12 +19657,17 @@ fn emit_slice<M: Module>(
             .ins()
             .iconst(types::I64, runtime_elem_size(&elem, structs));
         let b_v = b_v.unwrap_or_else(|| builder.ins().iconst(types::I64, i64::MAX));
+        // Still a view *block* in this stage — the runtime builds one over the
+        // block under the value, and hands back its pointer. Stage 4b replaces
+        // this with a window carried in the value itself (`arr24::Arr::slice`).
+        let block = seq_ptr(builder, recv_v, recv_ty, structs);
         let result = builtins.call(
             module,
             builder,
             "aipl_arr_slice",
-            &[recv_v, a_v, b_v, drop_fn, retain_fn, esz],
+            &[block, a_v, b_v, drop_fn, retain_fn, esz],
         );
+        let result = arr_val(builder, result);
         scopes
             .last_mut()
             .expect("scope")
@@ -20507,7 +20771,6 @@ fn compile_expr_inner<M: Module>(
             // binding that is only read has no use for a block of its own.
             let v = if exclusive
                 && (owned_move || moved_binding)
-                && !lives_in_slot(&t)
                 && mut_binding_owns_slot_ref(&t, structs)
                 && aipl_mono::assigns_binding(name, body)
             {
@@ -20528,10 +20791,12 @@ fn compile_expr_inner<M: Module>(
             } else {
                 v
             };
-            // Stored again below for the str-shaped slot; a tagged binding's
-            // slot takes the (possibly new) pointer here.
+            // The slot takes the (possibly new) value again: a one-word binding
+            // its pointer, a wide array its value's bytes.
             if !lives_in_slot(&t) {
                 builder.ins().stack_store(types::I64, v, slot, 0);
+            } else if mut_binding_owns_slot_ref(&t, structs) {
+                store_binding(builder, slot, v, &t, structs);
             }
             if lives_in_slot(&t) {
                 // A `str` binding's slot owns one reference to its current
@@ -20861,9 +21126,12 @@ fn compile_expr_inner<M: Module>(
                     // preserving borrows of it), then releases its reference on
                     // the replaced value. Aliases of the old value keep it alive
                     // through its own creation-scope track.
+                    // Release before the store, for the reason the `str` arm
+                    // below gives: a wide array's `old` is the slot's own
+                    // address, so after the store it would name the new value.
                     emit_retain(builder, module, builtins, structs, v, &expected_ty);
-                    builder.ins().stack_store(types::I64, v, slot, 0);
                     emit_drop(builder, module, builtins, structs, old, &expected_ty);
+                    store_binding(builder, slot, v, &expected_ty, structs);
                 } else {
                     // `str`: own the new value for the slot, then release the
                     // reference the slot held before — preserving the
@@ -21016,6 +21284,11 @@ fn compile_expr_inner<M: Module>(
                 it_ptr
             };
             let reverse = reverse && !is_str_shaped(&it_ty);
+            // Every later use of `it_ptr` reads the iterable — never tracks or
+            // releases it — and for an array those reads want the tagged block
+            // pointer, not the address of the value. A `str`, a char set, a set
+            // or a dict is untouched.
+            let it_ptr = seq_ptr(builder, it_ptr, &it_ty, cx.structs);
 
             // The split cursor, and the buffer its parts land in. The separator
             // is compiled here, after the source — the order `split` evaluated
@@ -21704,7 +21977,10 @@ fn compile_expr_inner<M: Module>(
                     debug_assert!(!tracked, "a literal str is never tracked");
                     v
                 } else {
-                    emit_const_array(module, builder, cx, &words, &elem)?
+                    // A static block, so not tracked; the value is a fresh slot
+                    // over its pointer.
+                    let ptr = emit_const_array(module, builder, cx, &words, &elem)?;
+                    arr_val(builder, ptr)
                 };
                 return Ok((value, arr_ty));
             }
@@ -21824,11 +22100,14 @@ fn compile_expr_inner<M: Module>(
                     scope.retain(|t| !matches!(t.owned, Owned::Value(x) if moved.contains(&x)));
                 }
             }
+            // Track the *value*: scope exit releases through it, and the value
+            // is the address of the 24 bytes, not the block pointer under them.
+            let value = arr_val(builder, ptr);
             scopes
                 .last_mut()
                 .expect("scope")
-                .push(Tracked::new(ptr, &arr_ty));
-            (ptr, arr_ty)
+                .push(Tracked::new(value, &arr_ty));
+            (value, arr_ty)
         }
         ExprKind::SetLit(elems, order) => {
             // An empty `#{}` is `__none__`-typed and coerces to any `T{}` — and
@@ -22093,7 +22372,7 @@ fn compile_expr_inner<M: Module>(
                 ));
             }
 
-            let arr_ptr = recv_v;
+            let arr_ptr = seq_ptr(builder, recv_v, &recv_ty, structs);
             let elem_ty = match &recv_ty {
                 ConcreteType::Array(inner) => (**inner).clone(),
                 _ => {
@@ -22618,19 +22897,13 @@ impl Abi {
     /// Whether an array travels by address under this ABI — the array counterpart
     /// of [`Abi::str_is_composite`].
     ///
-    /// **Not yet, even under `Wide`.** In this stage an array value's 24 bytes are
-    /// the 8-byte tagged pointer it has always been, in the first word, and two
-    /// zero words after it (see [`store_array_elem`]). Only the first word carries
-    /// anything, so passing the value *is* passing that word, and sending it by
-    /// address would cost a stack slot at every call for no information.
-    ///
-    /// So `Wide` currently changes where arrays sit in memory — struct field
-    /// offsets, nested-array strides, optionals, the FFI layout, which is the part
-    /// the artifact has to agree on — and not how they are passed. This becomes
-    /// `matches!(self.arrays, SeqRepr::Wide)` in the stage that first puts
-    /// information in the other two words (`arr24_todo.txt`, 2c).
+    /// Under `Wide` it does: the value is 24 bytes, passed and returned by
+    /// address like any composite, so the words after the block are free to
+    /// carry a view's data pointer and length (`arr24_todo.txt`, stage 4). Their
+    /// content is still `{block, 0, 0}` for now — everything that reads the
+    /// value takes the block from its first word (`arr_ptr`).
     fn arr_is_composite(self) -> bool {
-        false
+        matches!(self.arrays, SeqRepr::Wide)
     }
 }
 
@@ -22638,9 +22911,9 @@ impl Abi {
 mod abi_tests {
     use super::*;
 
-    /// The array representation knob, both ways. `Abi::active` is `Tagged`, so
-    /// nothing in a build today takes the `Wide` answers — this is what makes them
-    /// a checked claim rather than code nobody has run.
+    /// The array representation knob, both ways. `Abi::active` is `Wide`, so
+    /// nothing in a build today takes the `Tagged` answers — this is what keeps
+    /// them a checked claim, for the artifacts compiled before the switch.
     #[test]
     fn the_array_representation_decides_size_and_composite_ness() {
         let tagged = Abi {
@@ -22655,13 +22928,10 @@ mod abi_tests {
         assert_eq!(abi_elem_size(tagged, &i64s, &structs), 8);
         assert_eq!(abi_elem_size(wide, &i64s, &structs), arr24::ARR_SIZE as i64);
 
-        // Under `Wide` an array occupies 24 bytes in memory but still travels as
-        // one word: in this stage its value is the 8-byte tagged pointer and two
-        // words of padding, so passing it by address would carry nothing extra.
-        // Both answers flip to `true` together in the stage that first puts
-        // information in the padding (see `Abi::arr_is_composite`).
+        // Under `Wide` an array is 24 bytes that travel by address; under
+        // `Tagged` it is the one-word pointer it always was.
         assert!(!abi_is_composite(tagged, &i64s, &structs));
-        assert!(!abi_is_composite(wide, &i64s, &structs));
+        assert!(abi_is_composite(wide, &i64s, &structs));
 
         // The switch is thrown: freshly compiled code uses the wide layout.
         assert_eq!(Abi::active(), wide);

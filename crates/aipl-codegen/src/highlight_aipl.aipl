@@ -200,15 +200,15 @@ allocations: 3976
 deallocations: 3976
 reallocations: 329
 bytes allocated: 351535
-instructions executed: 1363370
-binary size: 209512
-  code: 163408
+instructions executed: 1371955
+binary size: 213976
+  code: 167776
   data: 3456
-  metadata: 42648
+  metadata: 42744
 functions:
   __arr_drop___m1__Entry:
     calls: 2
-    bytes: 148
+    bytes: 156
   __arr_drop___m1__Item:
     calls: 16
     bytes: 172
@@ -217,10 +217,10 @@ functions:
     bytes: 116
   __arr_drop___m4__TokenRule$__m6__AiplTok:
     calls: 1
-    bytes: 536
+    bytes: 540
   __arr_retain___m1__Entry:
     calls: 2
-    bytes: 148
+    bytes: 156
   __arr_retain___m1__Item:
     calls: 98
     bytes: 172
@@ -229,16 +229,16 @@ functions:
     bytes: 116
   __arr_retain___m4__TokenRule$__m6__AiplTok:
     calls: 0
-    bytes: 536
+    bytes: 540
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 922
     bytes: 304
   __builtin_count_while$__m1__Item$lam$__m1__rule_pats$__m6__AiplTok$lambda0:
     calls: 0
-    bytes: 528
+    bytes: 520
   __builtin_count_while$__m1__Item$lam$__m1__rule_pats$__m6__AiplTok$lambda1$lambda0:
     calls: 11
-    bytes: 528
+    bytes: 520
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 0
     bytes: 268
@@ -268,19 +268,19 @@ functions:
     bytes: 356
   __m1__arr_fld:
     calls: 14
-    bytes: 1900
+    bytes: 1956
   __m1__caps_fld:
     calls: 4
-    bytes: 788
+    bytes: 880
   __m1__char_class_body:
     calls: 11
-    bytes: 1996
+    bytes: 2024
   __m1__decl_pat:
     calls: 2
-    bytes: 576
+    bytes: 600
   __m1__entry_name:
     calls: 3
-    bytes: 444
+    bytes: 492
   __m1__escape_pat:
     calls: 6
     bytes: 456
@@ -289,28 +289,28 @@ functions:
     bytes: 348
   __m1__json_str:
     calls: 174
-    bytes: 2224
+    bytes: 2264
   __m1__matcher_pat:
     calls: 74
-    bytes: 7720
+    bytes: 7884
   __m1__obj_fld:
     calls: 5
-    bytes: 1900
+    bytes: 1956
   __m1__obj_of:
     calls: 31
-    bytes: 1540
+    bytes: 1576
   __m1__pat_json:
     calls: 40
-    bytes: 3112
+    bytes: 3348
   __m1__re_escape:
     calls: 89
-    bytes: 1928
+    bytes: 1960
   __m1__re_escape_set:
     calls: 8
-    bytes: 1032
+    bytes: 1148
   __m2__indent:
     calls: 142
-    bytes: 1660
+    bytes: 1684
   __m5__unescape:
     calls: 0
     bytes: 2012
@@ -343,13 +343,13 @@ functions:
     bytes: 148
   __m7__process_raw_string:
     calls: 0
-    bytes: 2760
+    bytes: 2864
   __rec_drop___m1__Pat:
     calls: 173
     bytes: 268
   __test$aipl_tmlanguage:
     calls: 1
-    bytes: 119052
+    bytes: 122324
   __to_str_u64:
     calls: 7
     bytes: 204
@@ -360,7 +360,7 @@ functions:
     calls: 3
     bytes: (external)
   aipl_arr_inc:
-    calls: 91
+    calls: 108
     bytes: (external)
   aipl_arr_reserve:
     calls: 3
@@ -421,4 +421,4 @@ functions:
     bytes: 120
   template_pat:
     calls: 2
-    bytes: 1380
+    bytes: 1412

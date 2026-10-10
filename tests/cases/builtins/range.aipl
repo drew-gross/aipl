@@ -28,15 +28,15 @@ allocations: 17
 deallocations: 17
 reallocations: 2
 bytes allocated: 849
-instructions executed: 1480
-binary size: 6976
-  code: 3540
+instructions executed: 1546
+binary size: 7168
+  code: 3732
   data: 339
   metadata: 3097
 functions:
   __eq_str$arr:
     calls: 1
-    bytes: 364
+    bytes: 356
   __to_str___builtin_Span:
     calls: 3
     bytes: 484
@@ -45,7 +45,7 @@ functions:
     bytes: 232
   __to_str_str$arr:
     calls: 1
-    bytes: 828
+    bytes: 848
   __to_str_u64:
     calls: 3
     bytes: 204
@@ -78,4 +78,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1428
+    bytes: 1608

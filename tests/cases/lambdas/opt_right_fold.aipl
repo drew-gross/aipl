@@ -40,18 +40,18 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 952
-instructions executed: 2665
-binary size: 9824
-  code: 5464
+instructions executed: 2721
+binary size: 9912
+  code: 5548
   data: 931
-  metadata: 3429
+  metadata: 3433
 functions:
   __rec_drop_List:
     calls: 7
     bytes: 44
   __test$to_list_keeps_order:
     calls: 1
-    bytes: 4276
+    bytes: 4356
   aipl_array_dec:
     calls: 2
     bytes: (external)
@@ -90,4 +90,4 @@ functions:
     bytes: 128
   to_list:
     calls: 3
-    bytes: 1016
+    bytes: 1020

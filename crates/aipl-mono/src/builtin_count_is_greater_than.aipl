@@ -38,18 +38,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1627
-binary size: 3904
-  code: 1368
+instructions executed: 1693
+binary size: 4112
+  code: 1572
   data: 880
-  metadata: 1656
+  metadata: 1660
 functions:
   __builtin_count_is_greater_than$i64:
     calls: 5
-    bytes: 280
+    bytes: 272
   __test$count_is_greater_than:
     calls: 1
-    bytes: 676
+    bytes: 896
   aipl_assert:
     calls: 6
     bytes: (external)
@@ -64,7 +64,7 @@ functions:
     bytes: (external)
   count_is_greater_than$i64:
     calls: 6
-    bytes: 280
+    bytes: 272
   main:
     calls: 1
     bytes: 132

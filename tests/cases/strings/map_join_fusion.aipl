@@ -36,26 +36,26 @@ allocations: 45
 deallocations: 45
 reallocations: 3
 bytes allocated: 1890
-instructions executed: 4349
-binary size: 11272
-  code: 7300
+instructions executed: 4543
+binary size: 11768
+  code: 7780
   data: 299
-  metadata: 3673
+  metadata: 3689
 functions:
   __builtin_map_join$i64$char$s2$s3$s4$rs$lam$__builtin_to_str:
     calls: 5
-    bytes: 1304
+    bytes: 1324
   __to_str_i64:
     calls: 15
     bytes: 204
   __to_str_i64$arr:
     calls: 1
-    bytes: 708
+    bytes: 716
   aipl_arr_extend:
     calls: 3
     bytes: (external)
   aipl_arr_inc:
-    calls: 3
+    calls: 4
     bytes: (external)
   aipl_arr_reserve:
     calls: 4
@@ -80,4 +80,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 5084
+    bytes: 5536

@@ -20,15 +20,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 80
-instructions executed: 304
-binary size: 3552
-  code: 1500
+instructions executed: 340
+binary size: 3648
+  code: 1600
   data: 408
-  metadata: 1644
+  metadata: 1640
 functions:
   __test$last:
     calls: 1
-    bytes: 1400
+    bytes: 1500
   aipl_arr_slice:
     calls: 1
     bytes: (external)

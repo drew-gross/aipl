@@ -79,11 +79,11 @@ allocations: 41
 deallocations: 41
 reallocations: 0
 bytes allocated: 2212
-instructions executed: 2705
-binary size: 11376
-  code: 6012
+instructions executed: 2774
+binary size: 11448
+  code: 6088
   data: 499
-  metadata: 4865
+  metadata: 4861
 functions:
   __arr_drop_Rule$Tok:
     calls: 5
@@ -96,7 +96,7 @@ functions:
     bytes: 208
   __eq_Rule$Tok$arr:
     calls: 1
-    bytes: 300
+    bytes: 292
   __eq_Tok:
     calls: 1
     bytes: 104
@@ -153,13 +153,13 @@ functions:
     bytes: (external)
   grammar:
     calls: 4
-    bytes: 436
+    bytes: 448
   main:
     calls: 1
     bytes: 580
   shift$Tok:
     calls: 4
-    bytes: 992
+    bytes: 1072
   size$Tok:
     calls: 4
-    bytes: 468
+    bytes: 460

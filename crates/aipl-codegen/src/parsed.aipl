@@ -103,9 +103,9 @@ allocations: 40
 deallocations: 40
 reallocations: 2
 bytes allocated: 2981
-instructions executed: 2273
-binary size: 75024
-  code: 49640
+instructions executed: 2335
+binary size: 75408
+  code: 50024
   data: 1292
   metadata: 24092
 functions:
@@ -138,22 +138,22 @@ functions:
     bytes: 476
   __m1__show_expr:
     calls: 5
-    bytes: 24968
+    bytes: 25200
   __m1__show_exprs:
     calls: 0
-    bytes: 1396
+    bytes: 1424
   __m2__show_pat:
     calls: 0
-    bytes: 2812
+    bytes: 2844
   __m2__show_pats:
     calls: 0
-    bytes: 1396
+    bytes: 1424
   __m4__show_ty:
     calls: 1
-    bytes: 5572
+    bytes: 5568
   __m4__show_tys:
     calls: 0
-    bytes: 1396
+    bytes: 1424
   __rec_drop___m1__Expr:
     calls: 4
     bytes: 36
@@ -168,7 +168,7 @@ functions:
     bytes: 476
   __test$resolve_body:
     calls: 1
-    bytes: 3576
+    bytes: 3620
   __test_try_fail___m5__ParseError:
     calls: 0
     bytes: 84
@@ -222,10 +222,10 @@ functions:
     bytes: (external)
   construct_ty_name:
     calls: 4
-    bytes: 2916
+    bytes: 2924
   main:
     calls: 1
     bytes: 112
   resolve_body:
     calls: 5
-    bytes: 804
+    bytes: 792

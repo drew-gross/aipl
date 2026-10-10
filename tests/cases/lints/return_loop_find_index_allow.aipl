@@ -43,24 +43,24 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 152
-instructions executed: 1179
-binary size: 5032
-  code: 2808
+instructions executed: 1192
+binary size: 5016
+  code: 2788
   data: 175
-  metadata: 2049
+  metadata: 2053
 functions:
   __builtin_find_index$i64$lam$main$lambda0:
     calls: 1
-    bytes: 300
+    bytes: 292
   __builtin_find_index$i64$lam$main$lambda1:
     calls: 1
-    bytes: 300
+    bytes: 292
   __builtin_find_index$i64$lam$main$lambda2:
     calls: 1
-    bytes: 300
+    bytes: 292
   __builtin_find_index$i64$lam$main$lambda3:
     calls: 1
-    bytes: 300
+    bytes: 292
   __eq_u64$opt:
     calls: 1
     bytes: 100
@@ -81,7 +81,7 @@ functions:
     bytes: (external)
   index_of_big_loop:
     calls: 4
-    bytes: 308
+    bytes: 300
   main:
     calls: 1
-    bytes: 580
+    bytes: 600

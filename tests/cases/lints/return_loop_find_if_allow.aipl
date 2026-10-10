@@ -39,18 +39,18 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 86
-instructions executed: 561
-binary size: 3344
-  code: 1568
+instructions executed: 585
+binary size: 3400
+  code: 1624
   data: 171
   metadata: 1605
 functions:
   __builtin_find_if$i64$lam$main$lambda0:
     calls: 1
-    bytes: 272
+    bytes: 264
   __builtin_find_if$i64$lam$main$lambda1:
     calls: 1
-    bytes: 272
+    bytes: 264
   __to_str_i64$opt:
     calls: 4
     bytes: 388
@@ -65,7 +65,7 @@ functions:
     bytes: (external)
   first_big:
     calls: 2
-    bytes: 280
+    bytes: 272
   main:
     calls: 1
-    bytes: 356
+    bytes: 436

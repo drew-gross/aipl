@@ -32,24 +32,24 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 192
-instructions executed: 764
-binary size: 4880
-  code: 1820
+instructions executed: 864
+binary size: 5168
+  code: 2108
   data: 766
   metadata: 2294
 functions:
   __eq_i64$arr:
     calls: 4
-    bytes: 296
+    bytes: 288
   __test$reversed_eq:
     calls: 1
-    bytes: 732
+    bytes: 956
   __test$reversed_len:
     calls: 1
-    bytes: 180
+    bytes: 220
   __test$sum_reversed:
     calls: 1
-    bytes: 172
+    bytes: 212
   aipl_arr_elem_ptr:
     calls: 5
     bytes: (external)
@@ -79,4 +79,4 @@ functions:
     bytes: 256
   sum_reversed:
     calls: 2
-    bytes: 184
+    bytes: 176

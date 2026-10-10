@@ -45,24 +45,24 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 136
-instructions executed: 734
-binary size: 4296
-  code: 1812
+instructions executed: 809
+binary size: 4504
+  code: 2024
   data: 571
-  metadata: 1913
+  metadata: 1909
 functions:
   __eq___builtin_Span:
     calls: 3
     bytes: 104
   __eq_i64$arr:
     calls: 1
-    bytes: 296
+    bytes: 288
   __eq_u64$arr:
     calls: 1
-    bytes: 296
+    bytes: 288
   __test$range:
     calls: 1
-    bytes: 1012
+    bytes: 1240
   aipl_arr_inc:
     calls: 1
     bytes: (external)

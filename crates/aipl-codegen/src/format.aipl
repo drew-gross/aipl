@@ -744,11 +744,11 @@ allocations: 2269
 deallocations: 2269
 reallocations: 184
 bytes allocated: 184795
-instructions executed: 290599
-binary size: 255640
-  code: 164972
+instructions executed: 314833
+binary size: 267424
+  code: 176524
   data: 6324
-  metadata: 84344
+  metadata: 84576
 functions:
   __arr_drop_Item:
     calls: 57
@@ -796,11 +796,8 @@ functions:
     calls: 17
     bytes: 304
   __builtin_any$__m2__Doc$lam$__m2__has_hard:
-    calls: 0
-    bytes: 32
-  __builtin_any$__m2__Doc$lam$__m2__has_hard$tail:
     calls: 103
-    bytes: 324
+    bytes: 268
   __builtin_count_while$char$s0$lam$__m4__dedent$lambda1:
     calls: 0
     bytes: 268
@@ -809,55 +806,49 @@ functions:
     bytes: 268
   __builtin_find_index$str$lam$__m8__link$FKind$str$lambda1:
     calls: 26
-    bytes: 404
+    bytes: 396
   __builtin_find_index$str$lam$__m8__link_rule$FKind$lambda0:
     calls: 0
-    bytes: 404
+    bytes: 396
   __builtin_find_map$__m1__Cst$__builtin_Span$lam$__m1__first_leaf:
     calls: 1
-    bytes: 364
+    bytes: 356
   __builtin_intersperse$__m2__Doc:
     calls: 14
-    bytes: 412
+    bytes: 536
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves:
-    calls: 0
-    bytes: 44
-  __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves$tail:
     calls: 21
-    bytes: 1040
+    bytes: 1144
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 0
-    bytes: 360
+    bytes: 352
   __builtin_try_map$__m8__Rule$FKind$__m8__Rule$FKind$__m8__ParseError$lam$__m8__desugar_rule$FKind:
     calls: 0
-    bytes: 548
+    bytes: 640
   __eq_str$arr:
     calls: 10
-    bytes: 364
+    bytes: 356
   __m1__extent:
     calls: 1
     bytes: 252
   __m1__first_leaf:
     calls: 1
-    bytes: 788
+    bytes: 812
   __m1__last_leaf:
     calls: 0
-    bytes: 788
+    bytes: 812
   __m1__token_leaves:
-    calls: 0
-    bytes: 32
-  __m1__token_leaves$tail:
     calls: 65
-    bytes: 1088
+    bytes: 1404
   __m2__col_after:
     calls: 172
-    bytes: 628
+    bytes: 636
   __m2__fits:
     calls: 0
     bytes: 36
   __m2__fits$tail:
     calls: 250
-    bytes: 2708
+    bytes: 2704
   __m2__fits_atom:
     calls: 0
     bytes: 52
@@ -869,10 +860,10 @@ functions:
     bytes: 32
   __m2__has_hard$tail:
     calls: 259
-    bytes: 688
+    bytes: 628
   __m2__print:
     calls: 51
-    bytes: 11016
+    bytes: 11588
   __m7__trim_end_while$lam$__builtin_is_space:
     calls: 120
     bytes: 400
@@ -881,22 +872,22 @@ functions:
     bytes: 580
   __m8__desugar_rule$FKind:
     calls: 44
-    bytes: 12072
+    bytes: 12108
   __m8__failure_message:
     calls: 2
     bytes: 488
   __m8__group_styles$into$FKind$own0:
     calls: 44
-    bytes: 2404
+    bytes: 3104
   __m8__group_styles$len$FKind:
     calls: 0
     bytes: 32
   __m8__group_styles$len$FKind$tail:
     calls: 12
-    bytes: 1788
+    bytes: 1860
   __m8__link$FKind$str:
     calls: 8
-    bytes: 3068
+    bytes: 3412
   __m8__link_opt$FKind:
     calls: 6
     bytes: 596
@@ -905,7 +896,7 @@ functions:
     bytes: 6816
   __m8__link_rules$FKind:
     calls: 0
-    bytes: 604
+    bytes: 716
   __rec_drop___m1__Cst:
     calls: 27
     bytes: 132
@@ -929,28 +920,28 @@ functions:
     bytes: 444
   __test$fmt_node:
     calls: 1
-    bytes: 4152
+    bytes: 4360
   __test$fmt_node$kv:
     calls: 2
-    bytes: 300
+    bytes: 316
   __test$inline_doc:
     calls: 1
-    bytes: 4184
+    bytes: 4360
   __test$item_key:
     calls: 1
-    bytes: 2104
+    bytes: 2164
   __test$list_items:
     calls: 1
-    bytes: 19520
+    bytes: 21964
   __test$render_cst:
     calls: 1
-    bytes: 1192
+    bytes: 1236
   __test$tight:
     calls: 1
-    bytes: 4380
+    bytes: 4764
   __test$wrapped:
     calls: 1
-    bytes: 10512
+    bytes: 10864
   __test_try_fail___m8__ParseError:
     calls: 0
     bytes: 84
@@ -964,7 +955,7 @@ functions:
     calls: 120
     bytes: (external)
   aipl_arr_inc:
-    calls: 1382
+    calls: 1647
     bytes: (external)
   aipl_arr_reserve:
     calls: 194
@@ -973,7 +964,7 @@ functions:
     calls: 20
     bytes: (external)
   aipl_array_dec:
-    calls: 2937
+    calls: 2765
     bytes: (external)
   aipl_array_new:
     calls: 314
@@ -994,13 +985,13 @@ functions:
     calls: 1201
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 8726
+    calls: 8661
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 735
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 7525
+    calls: 7460
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 735
@@ -1031,22 +1022,22 @@ functions:
     bytes: 236
   fmt_node$FKind$str$s1$lam$__test$fmt_node$spaced_unless_punct:
     calls: 17
-    bytes: 3752
+    bytes: 3824
   fmt_node$FKind$str$s1$lam$__test$render_cst$always_space:
     calls: 1
-    bytes: 3752
+    bytes: 3824
   fmt_node$FKind$str$s1$lam$never_space:
     calls: 1
-    bytes: 3752
+    bytes: 3824
   format_cst$FKind$str$s1$lam$__test$fmt_node$spaced_unless_punct:
     calls: 6
-    bytes: 264
+    bytes: 272
   format_cst$FKind$str$s1$lam$__test$render_cst$always_space:
     calls: 1
-    bytes: 264
+    bytes: 272
   format_cst$FKind$str$s1$lam$never_space:
     calls: 1
-    bytes: 264
+    bytes: 272
   gap_wanted$lam$__test$fmt_node$spaced_unless_punct:
     calls: 32
     bytes: 468
@@ -1061,49 +1052,49 @@ functions:
     bytes: 144
   grammar_of:
     calls: 2
-    bytes: 2404
+    bytes: 2580
   group_doc$FKind$str$s1$lam$__test$fmt_node$spaced_unless_punct:
     calls: 4
-    bytes: 7768
+    bytes: 9332
   group_doc$FKind$str$s1$lam$__test$render_cst$always_space:
     calls: 0
-    bytes: 7768
+    bytes: 9332
   group_doc$FKind$str$s1$lam$never_space:
     calls: 0
-    bytes: 1788
+    bytes: 1784
   inline_doc$lam$__test$fmt_node$spaced_unless_punct:
     calls: 20
-    bytes: 2424
+    bytes: 2512
   inline_doc$lam$__test$render_cst$always_space:
     calls: 1
-    bytes: 2424
+    bytes: 2512
   inline_doc$lam$colon_space:
     calls: 8
-    bytes: 2424
+    bytes: 2512
   inline_doc$lam$never_space:
     calls: 68
-    bytes: 2424
+    bytes: 2512
   item_key:
     calls: 52
-    bytes: 1072
+    bytes: 1068
   list_items$lam$never_space:
     calls: 23
-    bytes: 3544
+    bytes: 4576
   main:
     calls: 1
     bytes: 644
   piece_doc:
     calls: 14
-    bytes: 832
+    bytes: 844
   pieces$FKind$str$s1$lam$__test$fmt_node$spaced_unless_punct:
     calls: 20
-    bytes: 2768
+    bytes: 2832
   pieces$FKind$str$s1$lam$__test$render_cst$always_space:
     calls: 1
-    bytes: 2768
+    bytes: 2832
   pieces$FKind$str$s1$lam$never_space:
     calls: 1
-    bytes: 2768
+    bytes: 2832
   render_cst$FKind$str$s1$lam$__test$fmt_node$spaced_unless_punct:
     calls: 6
     bytes: 304
@@ -1115,4 +1106,4 @@ functions:
     bytes: 304
   wrapped$lam$never_space:
     calls: 15
-    bytes: 2608
+    bytes: 3092

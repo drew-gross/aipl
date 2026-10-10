@@ -38,11 +38,11 @@ allocations: 13
 deallocations: 13
 reallocations: 8
 bytes allocated: 840
-instructions executed: 1966
-binary size: 8584
-  code: 4532
+instructions executed: 2225
+binary size: 9280
+  code: 5212
   data: 713
-  metadata: 3339
+  metadata: 3355
 functions:
   __arr_drop_Shape:
     calls: 12
@@ -55,18 +55,18 @@ functions:
     bytes: 220
   __eq_Shape$arr:
     calls: 6
-    bytes: 284
+    bytes: 276
   __test$circles:
     calls: 1
-    bytes: 1632
+    bytes: 2040
   __test$labels:
     calls: 1
-    bytes: 996
+    bytes: 1096
   __test$pair_up:
     calls: 1
-    bytes: 552
+    bytes: 616
   aipl_arr_inc:
-    calls: 2
+    calls: 4
     bytes: (external)
   aipl_array_dec:
     calls: 17
@@ -100,4 +100,4 @@ functions:
     bytes: 240
   pair_up$lam$__ctor$Shape$Rect:
     calls: 2
-    bytes: 328
+    bytes: 444

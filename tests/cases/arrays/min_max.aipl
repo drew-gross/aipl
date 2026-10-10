@@ -22,20 +22,20 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 919
-binary size: 5768
-  code: 2952
+instructions executed: 1015
+binary size: 6104
+  code: 3272
   data: 737
-  metadata: 2079
+  metadata: 2095
 functions:
   __test$smallest:
     calls: 1
-    bytes: 2536
+    bytes: 2668
   __test$smallest$filter1$own0:
     calls: 1
-    bytes: 308
+    bytes: 496
   aipl_arr_inc:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_arr_reserve:
     calls: 1

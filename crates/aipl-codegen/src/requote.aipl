@@ -541,30 +541,30 @@ allocations: 622
 deallocations: 622
 reallocations: 8
 bytes allocated: 40242
-instructions executed: 166651
-binary size: 81048
-  code: 47708
+instructions executed: 168109
+binary size: 81720
+  code: 48384
   data: 8705
-  metadata: 24635
+  metadata: 24631
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 20
     bytes: 304
   __builtin_all$str$lam$raw_seg_fits_single:
     calls: 5
-    bytes: 292
+    bytes: 284
   __builtin_all$str$lam$single_seg_fits_raw:
     calls: 5
-    bytes: 292
+    bytes: 284
   __builtin_any$str$lam$retemplate$lambda0:
     calls: 11
-    bytes: 324
+    bytes: 316
   __builtin_any$str$lam$retemplate$lambda1:
     calls: 11
-    bytes: 324
+    bytes: 316
   __builtin_any$str$lam$single_seg_saves:
     calls: 5
-    bytes: 324
+    bytes: 316
   __builtin_count_while$char$s0$lam$__m5__dedent$lambda1:
     calls: 0
     bytes: 268
@@ -573,7 +573,7 @@ functions:
     bytes: 268
   __m4__process_raw_string:
     calls: 9
-    bytes: 2760
+    bytes: 2864
   __m8__trim_prefix:
     calls: 18
     bytes: 252
@@ -603,7 +603,7 @@ functions:
     bytes: 404
   __test$join_template:
     calls: 1
-    bytes: 1024
+    bytes: 1104
   __test$needs_escape:
     calls: 1
     bytes: 552
@@ -621,7 +621,7 @@ functions:
     bytes: 540
   __test$retemplate:
     calls: 1
-    bytes: 5952
+    bytes: 6324
   __test$single_cost:
     calls: 1
     bytes: 532
@@ -672,10 +672,10 @@ functions:
     bytes: 736
   brace_escaped:
     calls: 18
-    bytes: 1888
+    bytes: 1928
   encode:
     calls: 43
-    bytes: 2068
+    bytes: 2100
   escape_cost:
     calls: 21
     bytes: 360
@@ -705,7 +705,7 @@ functions:
     bytes: 932
   retemplate:
     calls: 11
-    bytes: 708
+    bytes: 796
   single_cost:
     calls: 43
     bytes: 316

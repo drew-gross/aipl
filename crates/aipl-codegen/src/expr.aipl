@@ -255,9 +255,9 @@ allocations: 218
 deallocations: 218
 reallocations: 4
 bytes allocated: 16536
-instructions executed: 11479
-binary size: 88064
-  code: 57160
+instructions executed: 11723
+binary size: 88696
+  code: 57792
   data: 2601
   metadata: 28303
 functions:
@@ -293,16 +293,16 @@ functions:
     bytes: 140
   __m1__show_pat:
     calls: 1
-    bytes: 2812
+    bytes: 2844
   __m1__show_pats:
     calls: 0
-    bytes: 1396
+    bytes: 1424
   __m3__show_ty:
     calls: 2
-    bytes: 5572
+    bytes: 5568
   __m3__show_tys:
     calls: 0
-    bytes: 1396
+    bytes: 1424
   __rec_drop_Expr:
     calls: 38
     bytes: 36
@@ -323,7 +323,7 @@ functions:
     bytes: 72
   __test$show_expr:
     calls: 1
-    bytes: 14916
+    bytes: 15204
   __to_str_i64:
     calls: 19
     bytes: 204
@@ -386,7 +386,7 @@ functions:
     bytes: 476
   show_expr:
     calls: 56
-    bytes: 24968
+    bytes: 25200
   show_exprs:
     calls: 7
-    bytes: 1396
+    bytes: 1424

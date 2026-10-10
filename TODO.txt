@@ -648,6 +648,7 @@ allocator:
   make own allocator
 
 perfmon:
+  move the performance sections out of the .aipl files, it's getting hard to review
   show call-sites of each function in the final binary
   show regression and improvements
   improve it in some way that it allows you to prove that an optimzation did or did not happen

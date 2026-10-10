@@ -132,11 +132,11 @@ allocations: 139
 deallocations: 139
 reallocations: 0
 bytes allocated: 4689
-instructions executed: 12081
-binary size: 18616
-  code: 9440
+instructions executed: 12293
+binary size: 18992
+  code: 9752
   data: 1309
-  metadata: 7867
+  metadata: 7931
 functions:
   __arr_drop_List:
     calls: 1
@@ -175,7 +175,7 @@ functions:
     calls: 3
     bytes: 1664
   aipl_arr_inc:
-    calls: 14
+    calls: 18
     bytes: (external)
   aipl_array_dec:
     calls: 21
@@ -215,7 +215,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2544
+    bytes: 2856
   sum:
     calls: 9
     bytes: 104

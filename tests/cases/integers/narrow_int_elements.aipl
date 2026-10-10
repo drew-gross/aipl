@@ -128,23 +128,23 @@ allocations: 10
 deallocations: 10
 reallocations: 0
 bytes allocated: 430
-instructions executed: 2076
-binary size: 6824
-  code: 3140
+instructions executed: 2157
+binary size: 7080
+  code: 3360
   data: 619
-  metadata: 3065
+  metadata: 3101
 functions:
   __to_str_i64$arr:
     calls: 4
-    bytes: 708
+    bytes: 716
   __to_str_i64$arr$arr:
     calls: 1
-    bytes: 1160
+    bytes: 1148
   __to_str_u16$opt:
     calls: 1
     bytes: 388
   aipl_arr_inc:
-    calls: 3
+    calls: 5
     bytes: (external)
   aipl_arr_sort:
     calls: 3
@@ -172,4 +172,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 884
+    bytes: 1108

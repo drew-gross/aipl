@@ -160,11 +160,11 @@ allocations: 47
 deallocations: 47
 reallocations: 10
 bytes allocated: 1165
-instructions executed: 6179
-binary size: 10464
-  code: 6352
+instructions executed: 6714
+binary size: 12264
+  code: 7976
   data: 377
-  metadata: 3735
+  metadata: 3911
 functions:
   __to_str_i64:
     calls: 20
@@ -176,7 +176,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 8
+    calls: 19
     bytes: (external)
   aipl_arr_reserve:
     calls: 2
@@ -204,13 +204,13 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2888
+    bytes: 4268
   main$filter_map2$own0:
     calls: 1
-    bytes: 328
+    bytes: 516
   show:
     calls: 8
-    bytes: 1364
+    bytes: 1392
   show_u:
     calls: 2
-    bytes: 1364
+    bytes: 1392

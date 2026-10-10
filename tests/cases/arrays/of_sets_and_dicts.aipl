@@ -92,11 +92,11 @@ allocations: 31
 deallocations: 31
 reallocations: 2
 bytes allocated: 1585
-instructions executed: 1868
-binary size: 11552
-  code: 6844
+instructions executed: 1954
+binary size: 11776
+  code: 7036
   data: 147
-  metadata: 4561
+  metadata: 4593
 functions:
   __dict_drop_str$i64:
     calls: 1
@@ -109,7 +109,7 @@ functions:
     bytes: 304
   __eq_set$str$arr:
     calls: 1
-    bytes: 300
+    bytes: 292
   __to_str_bool:
     calls: 3
     bytes: 232
@@ -123,7 +123,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_arr_inc:
-    calls: 18
+    calls: 20
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 3
@@ -172,7 +172,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 4916
+    bytes: 5124
   total_size:
     calls: 2
-    bytes: 236
+    bytes: 228

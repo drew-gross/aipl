@@ -3431,8 +3431,11 @@ extern "C" {
 
 #[no_mangle]
 pub extern "C" fn main(argc: c_int, argv: *const *const c_char) -> c_int {
+    // An array is passed by the address of its value, `{block, 0, 0}`.
+    let mut value: [i64; 3] = [0; 3];
     let args = if unsafe { __aipl_main_wants_args } != 0 {
-        unsafe { build_cli_args(argc, argv) }
+        value[0] = unsafe { build_cli_args(argc, argv) } as i64;
+        value.as_ptr() as *const u8
     } else {
         core::ptr::null()
     };

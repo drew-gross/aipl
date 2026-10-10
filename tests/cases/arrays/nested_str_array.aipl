@@ -30,21 +30,21 @@ allocations: 8
 deallocations: 8
 reallocations: 1
 bytes allocated: 664
-instructions executed: 1502
-binary size: 6200
-  code: 3540
+instructions executed: 1596
+binary size: 6448
+  code: 3776
   data: 294
-  metadata: 2366
+  metadata: 2378
 functions:
   __eq_str$arr:
     calls: 3
-    bytes: 364
+    bytes: 356
   __eq_str$arr$arr:
     calls: 1
-    bytes: 300
+    bytes: 276
   __test$grid3:
     calls: 1
-    bytes: 2772
+    bytes: 3040
   aipl_arr_inc:
     calls: 7
     bytes: (external)

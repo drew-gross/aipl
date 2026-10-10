@@ -38,15 +38,15 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 609
-instructions executed: 1169
-binary size: 5128
-  code: 2380
+instructions executed: 1217
+binary size: 5200
+  code: 2452
   data: 347
   metadata: 2401
 functions:
   __ctor$Tagged$Nums:
     calls: 3
-    bytes: 140
+    bytes: 152
   __to_str_Tagged:
     calls: 3
     bytes: 1208
@@ -70,4 +70,4 @@ functions:
     bytes: 496
   main:
     calls: 1
-    bytes: 536
+    bytes: 596
