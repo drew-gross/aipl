@@ -2,6 +2,7 @@
 ; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).
 ; DO NOT EDIT BY HAND. Regenerate:
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
+; array-abi tagged
 ; entry parse_test_section_header 474 str -> str?
 ; entry strip_test_sections 516 str -> str
 ; entry split_test_sections 515 str -> __tuple$str$str
@@ -309,4 +310,4 @@
 ; data 187 __tostr_lit_94 0800000000000000ffffffffffffff7f52427261636b657400
 
 ; __m28__ast_case_name
-; source-fingerprint 13255793477556235668
+; source-fingerprint 11993008446232067779

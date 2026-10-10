@@ -72,7 +72,23 @@ pub struct Manifest {
     pub data: Vec<DataObject>,
     /// `; struct` / `; variant` lines, in manifest order, unparsed.
     pub types: Vec<TypeLine>,
+    /// The `; array-abi` line's value — which array representation the
+    /// artifact's code was compiled for — or `None` for an artifact that
+    /// predates the line, which means the 8-byte one.
+    ///
+    /// Kept as the text rather than a type, because this crate does not know
+    /// codegen's representation enum and should not have to: `aipl-codegen`'s
+    /// `abi_of_manifest` maps it, and refuses a value it does not recognise.
+    pub array_abi: Option<String>,
 }
+
+/// The `; array-abi <repr>` header line. Written by the artifact generator for
+/// the representation it emitted, and read back by an engine loaded from the
+/// artifact, so that it marshals with the ABI the artifact's code actually
+/// speaks rather than the one the running compiler would emit. See
+/// `arr24_todo.txt` 2c: without it, switching the compiler's array
+/// representation would also relabel every artifact compiled before the switch.
+pub const ARRAY_ABI_PREFIX: &str = "array-abi ";
 
 /// Parse the `;`-comment manifest at the head of an artifact.
 ///
@@ -93,7 +109,9 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
             continue;
         };
         let body = body.trim();
-        if let Some(rest) = body.strip_prefix("struct ") {
+        if let Some(rest) = body.strip_prefix(ARRAY_ABI_PREFIX) {
+            m.array_abi = Some(rest.trim().to_string());
+        } else if let Some(rest) = body.strip_prefix("struct ") {
             m.types.push(TypeLine::Struct(rest.to_string()));
         } else if let Some(rest) = body.strip_prefix("variant ") {
             m.types.push(TypeLine::Variant(rest.to_string()));

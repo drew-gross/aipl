@@ -62,9 +62,46 @@ point at a time; this needs the same.
           decided, so that each change stays a reviewable size. Until then they
           are sized as a plain word, which is what `abi_elem_size` already does
           for them.
+  [x] 2c-0. an artifact records the array ABI its code was compiled for, and an
+          engine loaded from it marshals with *that*. Missing from the original
+          plan, and the thing that would have made the flip break everything:
+          `from_artifact` and `from_prebuilt` took `abi: Abi::active()`, so
+          flipping it would have relabelled the checked-in artifact — compiled
+          `Tagged` — as `Wide`, and the parser would have read 24-byte arrays as
+          8-byte pointers. Now the generator writes `; array-abi <repr>` into the
+          header (covered by the source fingerprint, so a representation change
+          forces regeneration) and `abi_of_manifest` reads it; no line means
+          `Tagged`, an unknown one is refused. Only `Compilation::new`, which
+          describes code it just emitted, still uses `Abi::active()`.
   [ ] 2c. array locals, parameters and returns: passed by pointer, returned
           through a leading out pointer (`Ret::Str`'s shape, which already
           exists for exactly this).
+
+          PROBE (2026-10-09, `Abi::active` flipped to `Wide` locally, reverted):
+          the compiler survives the flip — 2c-0 is what makes that true, since the
+          artifact keeps marshalling `Tagged` — and a plain `[1, 2, 3]` program
+          runs. `cases_arrays` went 62 → 49 passing, with **no crashes and no
+          compile errors**: 6 wrong `stdout`, 1 `exit code`, 1 `performance`.
+          The 13:
+            extend_extend, intersperse, list_utils, min_max,
+            nested_array_annotation, nested_array_to_str, nested_str_array,
+            nonempty, of_sets_and_dicts, push_aliased_array,
+            push_push_none_element, starts_ends_with, tuple_windows
+          Nearly all are an array *held as an element* — nested arrays, arrays
+          of sets/dicts, `tuple_windows`, `intersperse`. `nested_array_to_str`
+          prints `[[1, 8], [3], [0, 24, 1]`: codegen strides the outer array at
+          24 bytes while the runtime still lays its elements out 8 apart, so
+          `8` and `24` are block-header words read as elements.
+
+          What that means for ordering: **2c, 2d and 2e cannot land as separate
+          green changes.** The knob flips `arr_size` and `arr_is_composite`
+          together, so under `Wide` the *stride* is already 24 while nothing
+          below the knob yet stores a 24-byte value. Each step is only checkable
+          with the flip on, and with the flip on the tree is red until all three
+          are done. So the next change is the flip itself — 2c+2d+2e+2b-flip as
+          one unit, driven by this failure list and then the full corpus under
+          `Wide` — with 2f (artifact regeneration, delete the 8-byte half)
+          following as its own change.
   [ ] 2d. FFI marshalling (`write_ffi_arg`, `read_ffi_*`). Keep the lesson from
           the `str` double-free: a host-built block gets `STATIC_REFCOUNT` so no
           protocol inside the callee can count it down. `ArgBufs::array_block`

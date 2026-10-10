@@ -5034,6 +5034,14 @@ pub fn generate_dogfood_artifact(
     out.push_str("; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).\n");
     out.push_str("; DO NOT EDIT BY HAND. Regenerate:\n");
     out.push_str(";   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir\n");
+    // Which array representation this artifact's code speaks. An engine loaded
+    // from it marshals with *this*, not with whatever the running compiler would
+    // emit — see `abi_of_manifest`.
+    out.push_str(&format!(
+        "; {}{}\n",
+        aipl_artifact::ARRAY_ABI_PREFIX,
+        Abi::active().arrays.name()
+    ));
     // Struct types any entry references (param or return), so the inverse can
     // rebuild their layouts and marshal a struct return — collected here, emitted
     // as `; struct` lines after the entries.
@@ -5334,7 +5342,9 @@ impl Compilation {
             // Struct layouts recovered from the `; struct` manifest lines, so a
             // struct-returning entry marshals back through `call_values`.
             structs: manifest_structs(&manifest)?,
-            abi: Abi::active(),
+            // The artifact's own ABI, not the active one: its code was compiled
+            // before this compiler ran and may predate a representation switch.
+            abi: abi_of_manifest(&manifest)?,
             code: Code::Jit(module),
             ir: text.to_string(),
         })
@@ -5364,7 +5374,9 @@ impl Compilation {
             // is the honest value, and it keeps `FuncInfo` uniform across both.
             funcs: entry_funcs(&manifest, |id| FuncLink::User(FuncId::from_u32(id)))?,
             structs: manifest_structs(&manifest)?,
-            abi: Abi::active(),
+            // The artifact's own ABI, not the active one: its code was compiled
+            // before this compiler ran and may predate a representation switch.
+            abi: abi_of_manifest(&manifest)?,
             code: Code::Prebuilt(entries),
             ir: manifest_text.to_string(),
         })
@@ -22460,6 +22472,51 @@ enum SeqRepr {
     Wide,
 }
 
+impl SeqRepr {
+    /// How an artifact's `; array-abi` line spells this representation.
+    fn name(self) -> &'static str {
+        match self {
+            SeqRepr::Tagged => "tagged",
+            SeqRepr::Wide => "wide",
+        }
+    }
+
+    /// The representation an artifact's `; array-abi` line names.
+    fn from_name(name: &str) -> Option<SeqRepr> {
+        [SeqRepr::Tagged, SeqRepr::Wide]
+            .into_iter()
+            .find(|r| r.name() == name)
+    }
+}
+
+/// The ABI an artifact's code was compiled for, read from its manifest.
+///
+/// The point is that this is **not** [`Abi::active`]. The compiler calls the
+/// engines in its checked-in artifact through the same marshaling code it uses
+/// for a program it has just compiled, and the two need not agree: once arrays
+/// switch representation, freshly compiled code will speak `Wide` while the
+/// artifact — compiled before the switch — still speaks `Tagged` until it is
+/// regenerated. Marshaling the artifact with the active ABI would build 24-byte
+/// arrays for code that reads 8-byte pointers. `Abi`'s own doc names this case:
+/// the marshaling layer has to ask "with the callee in hand".
+///
+/// An artifact with no `; array-abi` line predates it, and every such artifact
+/// was compiled `Tagged`. A line naming something unknown is refused rather than
+/// guessed at — marshaling with the wrong layout is memory corruption, not a
+/// wrong answer, so there is no safe default to fall back on.
+fn abi_of_manifest(manifest: &aipl_artifact::Manifest) -> Result<Abi, Error> {
+    let arrays = match manifest.array_abi.as_deref() {
+        None => SeqRepr::Tagged,
+        Some(name) => SeqRepr::from_name(name).ok_or_else(|| {
+            Error::msg(format!(
+                "artifact manifest names array ABI {name:?}, which this compiler does not \
+                 know; regenerate the artifact"
+            ))
+        })?,
+    };
+    Ok(Abi { arrays })
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct Abi {
     /// Which representation an **array** value has.
@@ -22546,7 +22603,52 @@ mod abi_tests {
             assert_eq!(abi_elem_size(abi, &chars, &structs), abi.str_size());
             assert!(abi_is_composite(abi, &chars, &structs));
         }
+    }
 
+    /// An artifact says which array representation its code speaks, and an
+    /// engine loaded from it believes the artifact rather than the running
+    /// compiler. That is what lets the compiler switch representation while its
+    /// checked-in engines, compiled before the switch, keep working.
+    #[test]
+    fn an_artifact_names_its_own_array_abi() {
+        let read = |line: &str| {
+            let text = format!("; dogfood-ir v1\n{line}\n");
+            abi_of_manifest(&aipl_artifact::parse_manifest(&text).unwrap())
+        };
+        let tagged = Abi {
+            arrays: SeqRepr::Tagged,
+        };
+        let wide = Abi {
+            arrays: SeqRepr::Wide,
+        };
+
+        // Every artifact built before the line existed was compiled `Tagged`.
+        assert_eq!(read("").unwrap(), tagged);
+        assert_eq!(read("; array-abi tagged").unwrap(), tagged);
+        assert_eq!(read("; array-abi wide").unwrap(), wide);
+
+        // A representation this compiler does not know is refused, not guessed:
+        // marshaling with the wrong layout corrupts memory rather than answering
+        // wrongly, so no default is safe.
+        let err = read("; array-abi sideways").unwrap_err().to_string();
+        assert!(err.contains("sideways"), "{err}");
+
+        // The writer and the reader agree on every spelling.
+        for r in [SeqRepr::Tagged, SeqRepr::Wide] {
+            assert_eq!(SeqRepr::from_name(r.name()), Some(r));
+        }
+    }
+
+    #[test]
+    fn the_array_representation_decides_size_and_composite_ness_for_optionals() {
+        let tagged = Abi {
+            arrays: SeqRepr::Tagged,
+        };
+        let wide = Abi {
+            arrays: SeqRepr::Wide,
+        };
+        let structs = HashMap::new();
+        let i64s = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::I64)));
         // An optional carries its core's size, so it tracks the knob too.
         let opt = ConcreteType::Optional(Box::new(i64s.clone()));
         assert_eq!(abi_elem_size(tagged, &opt, &structs), 16);
