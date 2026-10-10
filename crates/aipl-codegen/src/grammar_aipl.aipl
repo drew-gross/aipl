@@ -3174,6 +3174,14 @@ fn lower_variant_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     for (let i, k : kids[1..]) {
         let c = as_variant_case(k, sp)?;
         let at = case_nodes[i].map(child_span).value_or(sp);
+        for (let case : cases) {
+            if (c.name.text == case.name.text) {
+                return err(ParseError {
+                    message: `duplicate case "{c.name.text}"`,
+                    span: c.name.span,
+                });
+            };
+        }
         set cases.push(VariantCase {
             ..c,
             doc: doc_block(doc_lines_between(src, node, after, at.start)),
@@ -4935,11 +4943,11 @@ allocations: 1604615
 deallocations: 1604615
 reallocations: 308106
 bytes allocated: 333076482
-instructions executed: 554829771
-binary size: 6949792
-  code: 4598792
+instructions executed: 554830697
+binary size: 6957384
+  code: 4603760
   data: 62708
-  metadata: 2288292
+  metadata: 2290916
 functions:
   __arr_drop___m11__ModeFrame:
     calls: 298
@@ -5905,7 +5913,7 @@ functions:
     calls: 19454
     bytes: (external)
   aipl_arr_inc:
-    calls: 3740829
+    calls: 3740841
     bytes: (external)
   aipl_arr_reserve:
     calls: 82485
@@ -5920,7 +5928,7 @@ functions:
     calls: 36
     bytes: (external)
   aipl_array_dec:
-    calls: 4840471
+    calls: 4840483
     bytes: (external)
   aipl_array_new:
     calls: 82744
@@ -6332,7 +6340,7 @@ functions:
     bytes: 8456
   lower_variant_decl:
     calls: 6
-    bytes: 28536
+    bytes: 33504
   lower_variant_decl$filter6$own0:
     calls: 14
     bytes: 448

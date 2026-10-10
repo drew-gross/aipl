@@ -1,0 +1,17 @@
+# Two cases of one variant may not share a name, whatever their payloads: a
+# constructor names a case, so `Whoops` would be ambiguous between the two. The
+# error points at the second one, the case that repeats a name already taken.
+#
+# Its own fixture, not a line in `err_variants.aipl`: a duplicate case is a
+# *parse* error, and a file that fails to parse reports nothing else, so it would
+# have hidden every type error that fixture exists to check.
+
+variant Invalid = Whoops(i64) | Whoops
+
+fn main() {}
+--- errors ---
+error: duplicate case "Whoops"
+ --> ./tests/cases/variants/err_duplicate_case.aipl:9:33
+  |
+9 | variant Invalid = Whoops(i64) | Whoops
+  |                                 ^^^^^^

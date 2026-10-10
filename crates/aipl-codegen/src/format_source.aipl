@@ -428,10 +428,10 @@ deallocations: 16047
 reallocations: 3022
 bytes allocated: 4094190
 instructions executed: 11656068
-binary size: 7645528
-  code: 5115452
+binary size: 7653120
+  code: 5120420
   data: 14090
-  metadata: 2515986
+  metadata: 2518610
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -1812,7 +1812,7 @@ functions:
     bytes: 8456
   __m4__lower_variant_decl:
     calls: 0
-    bytes: 28536
+    bytes: 33504
   __m4__lower_variant_decl$filter6$own0:
     calls: 0
     bytes: 448

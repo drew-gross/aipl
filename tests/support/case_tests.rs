@@ -808,6 +808,7 @@ case_tests! {
     cases_variants_ctor_as_fn_value = "cases/variants/ctor_as_fn_value",
     cases_variants_err_case_name_not_variant = "cases/variants/err_case_name_not_variant",
     cases_variants_err_case_of_non_variant = "cases/variants/err_case_of_non_variant",
+    cases_variants_err_duplicate_case = "cases/variants/err_duplicate_case",
     cases_variants_err_payload_ctor_as_value = "cases/variants/err_payload_ctor_as_value",
     cases_variants_err_payload_default_self_ref = "cases/variants/err_payload_default_self_ref",
     cases_variants_err_payload_default_type_mismatch = "cases/variants/err_payload_default_type_mismatch",
