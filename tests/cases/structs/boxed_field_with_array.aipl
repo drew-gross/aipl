@@ -131,12 +131,12 @@ Node { v: 1, next: some(Node { v: 2, next: none, kids: [] }), kids: [Node { v: 3
 allocations: 139
 deallocations: 139
 reallocations: 0
-bytes allocated: 4609
-instructions executed: 12045
-binary size: 18560
-  code: 9380
+bytes allocated: 4689
+instructions executed: 12081
+binary size: 18616
+  code: 9440
   data: 1309
-  metadata: 7871
+  metadata: 7867
 functions:
   __arr_drop_List:
     calls: 1
@@ -215,7 +215,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2484
+    bytes: 2544
   sum:
     calls: 9
     bytes: 104

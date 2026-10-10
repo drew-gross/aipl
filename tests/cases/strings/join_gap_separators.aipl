@@ -42,19 +42,16 @@ red, green, or blue
 allocations: 10
 deallocations: 10
 reallocations: 0
-bytes allocated: 672
-instructions executed: 1063
-binary size: 4272
-  code: 2224
+bytes allocated: 720
+instructions executed: 1072
+binary size: 4344
+  code: 2284
   data: 67
-  metadata: 1981
+  metadata: 1993
 functions:
   __to_str_str$arr:
     calls: 1
     bytes: 828
-  aipl_arr_drop_arr:
-    calls: 1
-    bytes: (external)
   aipl_arr_inc:
     calls: 10
     bytes: (external)
@@ -72,4 +69,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1396
+    bytes: 1456

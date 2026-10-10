@@ -213,12 +213,12 @@ fn show_import_source(self: ImportSource) -> str {
 allocations: 18
 deallocations: 18
 reallocations: 2
-bytes allocated: 1338
-instructions executed: 1595
-binary size: 99736
-  code: 69676
+bytes allocated: 1354
+instructions executed: 1607
+binary size: 99824
+  code: 69768
   data: 426
-  metadata: 29634
+  metadata: 29630
 functions:
   __arr_drop_FieldDecl:
     calls: 1
@@ -270,7 +270,7 @@ functions:
     bytes: 364
   __test$show_item:
     calls: 1
-    bytes: 2388
+    bytes: 2428
   __to_str_i64:
     calls: 0
     bytes: 204
@@ -315,7 +315,7 @@ functions:
     bytes: 384
   show_fn:
     calls: 0
-    bytes: 8784
+    bytes: 8836
   show_item:
     calls: 2
     bytes: 14912

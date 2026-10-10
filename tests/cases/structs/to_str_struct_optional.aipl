@@ -34,11 +34,11 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 218
-instructions executed: 999
-binary size: 8944
-  code: 4172
+instructions executed: 1002
+binary size: 8960
+  code: 4184
   data: 763
-  metadata: 4009
+  metadata: 4013
 functions:
   __to_str_Person:
     calls: 1
@@ -75,4 +75,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 828
+    bytes: 840

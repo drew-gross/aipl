@@ -108,10 +108,10 @@ pub fn show_tys(self: Ty[]) -> str { self.map(show_ty).join(sep=", ") }.test({
 allocations: 78
 deallocations: 78
 reallocations: 2
-bytes allocated: 5806
-instructions executed: 4946
-binary size: 23320
-  code: 13328
+bytes allocated: 6238
+instructions executed: 4955
+binary size: 23352
+  code: 13360
   data: 1568
   metadata: 8424
 functions:
@@ -129,7 +129,7 @@ functions:
     bytes: 396
   __test$show_ty:
     calls: 1
-    bytes: 4068
+    bytes: 4100
   __test$show_tys:
     calls: 1
     bytes: 760

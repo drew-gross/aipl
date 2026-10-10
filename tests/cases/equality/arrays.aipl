@@ -20,12 +20,12 @@ fn eq_arrays(a: i64[], b: i64[]) -> bool { a == b }.test({
 allocations: 8
 deallocations: 8
 reallocations: 0
-bytes allocated: 512
-instructions executed: 1760
-binary size: 6688
-  code: 2972
+bytes allocated: 640
+instructions executed: 1784
+binary size: 6848
+  code: 3136
   data: 785
-  metadata: 2931
+  metadata: 2927
 functions:
   __eq_i64$arr:
     calls: 8
@@ -41,10 +41,7 @@ functions:
     bytes: 364
   __test$eq_arrays:
     calls: 1
-    bytes: 1872
-  aipl_arr_drop_arr:
-    calls: 4
-    bytes: (external)
+    bytes: 2036
   aipl_array_dec:
     calls: 16
     bytes: (external)

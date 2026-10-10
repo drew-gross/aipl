@@ -255,12 +255,12 @@ pub fn binder_list(self: str[]) -> str {
 allocations: 142
 deallocations: 142
 reallocations: 6
-bytes allocated: 10273
-instructions executed: 9862
-binary size: 104968
-  code: 67732
+bytes allocated: 10945
+instructions executed: 9949
+binary size: 105296
+  code: 68064
   data: 2851
-  metadata: 34385
+  metadata: 34381
 functions:
   __arr_drop_Pat:
     calls: 9
@@ -321,16 +321,16 @@ functions:
     bytes: 432
   __test$nested_or_ctor:
     calls: 1
-    bytes: 1624
+    bytes: 1672
   __test$pat_bindings:
     calls: 1
-    bytes: 3516
+    bytes: 3624
   __test$pat_label:
     calls: 1
-    bytes: 1848
+    bytes: 1888
   __test$show_pat:
     calls: 1
-    bytes: 3756
+    bytes: 3864
   __to_str_i64:
     calls: 4
     bytes: 204
@@ -417,7 +417,7 @@ functions:
     bytes: 812
   nested_or_ctor:
     calls: 4
-    bytes: 616
+    bytes: 644
   pat_bindings:
     calls: 0
     bytes: 32

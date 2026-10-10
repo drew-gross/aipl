@@ -757,12 +757,12 @@ variant Kind = Punct
 allocations: 518
 deallocations: 518
 reallocations: 38
-bytes allocated: 40218
-instructions executed: 111110
-binary size: 120568
-  code: 79484
+bytes allocated: 41178
+instructions executed: 111174
+binary size: 120832
+  code: 79752
   data: 5464
-  metadata: 35620
+  metadata: 35616
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -823,7 +823,7 @@ functions:
     bytes: 268
   __test$brace_group_entry:
     calls: 1
-    bytes: 1948
+    bytes: 1988
   __test$char_class_body:
     calls: 1
     bytes: 1892
@@ -835,7 +835,7 @@ functions:
     bytes: 852
   __test$matcher_pat:
     calls: 1
-    bytes: 9192
+    bytes: 9212
   __test$matcher_regex:
     calls: 1
     bytes: 5744
@@ -844,10 +844,10 @@ functions:
     bytes: 1104
   __test$rule_pats:
     calls: 1
-    bytes: 8556
+    bytes: 8596
   __test$tm_json:
     calls: 1
-    bytes: 4804
+    bytes: 4832
   __test$word_pat:
     calls: 1
     bytes: 2196
@@ -934,7 +934,7 @@ functions:
     bytes: 760
   matcher_pat:
     calls: 24
-    bytes: 8024
+    bytes: 8132
   obj_fld:
     calls: 1
     bytes: 1900
@@ -952,4 +952,4 @@ functions:
     bytes: 1032
   rule_pats$Kind:
     calls: 2
-    bytes: 9428
+    bytes: 9460

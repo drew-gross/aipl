@@ -90,12 +90,12 @@ a,b,c b,c
 allocations: 39
 deallocations: 39
 reallocations: 4
-bytes allocated: 2061
-instructions executed: 4984
-binary size: 13944
-  code: 7380
+bytes allocated: 2141
+instructions executed: 4993
+binary size: 14016
+  code: 7448
   data: 715
-  metadata: 5849
+  metadata: 5853
 functions:
   __arr_drop_Tree:
     calls: 2
@@ -118,9 +118,6 @@ functions:
   __to_str_i64$arr$arr:
     calls: 1
     bytes: 1160
-  aipl_arr_drop_arr:
-    calls: 3
-    bytes: (external)
   aipl_arr_extend:
     calls: 12
     bytes: (external)
@@ -129,9 +126,6 @@ functions:
     bytes: (external)
   aipl_arr_reserve:
     calls: 11
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 2
     bytes: (external)
   aipl_array_dec:
     calls: 41
@@ -168,7 +162,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3888
+    bytes: 3956
   sum:
     calls: 2
     bytes: 236

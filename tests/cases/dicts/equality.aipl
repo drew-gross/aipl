@@ -15,10 +15,10 @@ fn eq() -> bool { #{1: "a", 2: "b"} == #{2: "b", 1: "a"} }.test({
 allocations: 12
 deallocations: 12
 reallocations: 0
-bytes allocated: 800
-instructions executed: 963
-binary size: 7352
-  code: 3844
+bytes allocated: 864
+instructions executed: 975
+binary size: 7400
+  code: 3892
   data: 489
   metadata: 3019
 functions:
@@ -45,7 +45,7 @@ functions:
     bytes: 296
   __test$eq:
     calls: 1
-    bytes: 2428
+    bytes: 2476
   aipl_arr_inc:
     calls: 4
     bytes: (external)

@@ -254,10 +254,10 @@ fn show_bind(self: (str, str)) -> str { `{self.0} = {self.1}` }
 allocations: 218
 deallocations: 218
 reallocations: 4
-bytes allocated: 16504
-instructions executed: 11440
-binary size: 87976
-  code: 57072
+bytes allocated: 16536
+instructions executed: 11479
+binary size: 88064
+  code: 57160
   data: 2601
   metadata: 28303
 functions:
@@ -323,7 +323,7 @@ functions:
     bytes: 72
   __test$show_expr:
     calls: 1
-    bytes: 14828
+    bytes: 14916
   __to_str_i64:
     calls: 19
     bytes: 204

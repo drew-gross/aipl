@@ -93,10 +93,10 @@ p1;r3;
 allocations: 55
 deallocations: 55
 reallocations: 0
-bytes allocated: 4036
-instructions executed: 5160
-binary size: 22088
-  code: 13480
+bytes allocated: 4132
+instructions executed: 5169
+binary size: 22128
+  code: 13520
   data: 643
   metadata: 7965
 functions:
@@ -192,4 +192,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 7956
+    bytes: 7996

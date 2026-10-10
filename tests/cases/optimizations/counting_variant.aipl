@@ -68,9 +68,9 @@ allocations: 389
 deallocations: 389
 reallocations: 0
 bytes allocated: 23820
-instructions executed: 20434
-binary size: 8408
-  code: 4564
+instructions executed: 20614
+binary size: 8440
+  code: 4596
   data: 33
   metadata: 3811
 functions:
@@ -118,10 +118,10 @@ functions:
     bytes: (external)
   deep:
     calls: 179
-    bytes: 656
+    bytes: 668
   main:
     calls: 1
-    bytes: 2828
+    bytes: 2848
   styles$len:
     calls: 306
     bytes: 520

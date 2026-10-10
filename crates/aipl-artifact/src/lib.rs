@@ -350,7 +350,11 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_arr_drop_arr"
         | "aipl_arr_retain_ptr"
         | "aipl_arr_drop_opt_arr"
-        | "aipl_arr_retain_opt" => sig(2, false),
+        | "aipl_arr_retain_opt"
+        | "aipl_arr_drop_warr"
+        | "aipl_arr_retain_warr"
+        | "aipl_arr_drop_opt_warr"
+        | "aipl_arr_retain_opt_warr" => sig(2, false),
         "aipl_arr_load_bit" => sig(2, true),
         "aipl_arr_elem_ptr" => sig(3, true),
         "aipl_i64_len" | "aipl_u64_len" => sig(1, true),

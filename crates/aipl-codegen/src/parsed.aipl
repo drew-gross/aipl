@@ -102,12 +102,12 @@ fn construct_ty_name(name: str, return_ty: Ty?, span: Span) -> str!ParseError {
 allocations: 40
 deallocations: 40
 reallocations: 2
-bytes allocated: 2917
-instructions executed: 2261
-binary size: 74976
-  code: 49588
+bytes allocated: 2981
+instructions executed: 2273
+binary size: 75024
+  code: 49640
   data: 1292
-  metadata: 24096
+  metadata: 24092
 functions:
   __arr_drop___m1__Expr:
     calls: 0
@@ -168,7 +168,7 @@ functions:
     bytes: 476
   __test$resolve_body:
     calls: 1
-    bytes: 3548
+    bytes: 3576
   __test_try_fail___m5__ParseError:
     calls: 0
     bytes: 84
@@ -228,4 +228,4 @@ functions:
     bytes: 112
   resolve_body:
     calls: 5
-    bytes: 780
+    bytes: 804

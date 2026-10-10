@@ -32,9 +32,9 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 56
-instructions executed: 253
-binary size: 3808
-  code: 1444
+instructions executed: 259
+binary size: 3840
+  code: 1476
   data: 502
   metadata: 1862
 functions:
@@ -46,7 +46,7 @@ functions:
     bytes: 288
   __test$ensure_nonempty:
     calls: 1
-    bytes: 1004
+    bytes: 1036
   aipl_arr_inc:
     calls: 4
     bytes: (external)

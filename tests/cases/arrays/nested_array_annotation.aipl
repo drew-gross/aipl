@@ -18,10 +18,10 @@ fn first(grid: str[][]) -> str[]? { grid[0] }.test({
 allocations: 11
 deallocations: 11
 reallocations: 0
-bytes allocated: 632
-instructions executed: 831
-binary size: 6376
-  code: 3328
+bytes allocated: 760
+instructions executed: 846
+binary size: 6464
+  code: 3416
   data: 303
   metadata: 2745
 functions:
@@ -33,18 +33,12 @@ functions:
     bytes: 300
   __test$first:
     calls: 1
-    bytes: 2560
-  aipl_arr_drop_arr:
-    calls: 5
-    bytes: (external)
+    bytes: 2648
   aipl_arr_inc:
     calls: 15
     bytes: (external)
   aipl_arr_reserve:
     calls: 2
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 4
     bytes: (external)
   aipl_array_dec:
     calls: 26

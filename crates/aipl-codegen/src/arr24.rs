@@ -475,6 +475,63 @@ pub(crate) extern "C" fn aipl_arrw_with_cap(out: *mut Arr, cap: i64, elem_size: 
     }
 }
 
+// ---------- Element helpers for an array *of arrays* ----------
+//
+// An outer array's elements are themselves array values, and at refcount zero
+// (or when the outer array's elements are copied) each one has to be released
+// (or retained). The 8-byte helpers (`aipl_arr_drop_arr`, `aipl_arr_retain_ptr`)
+// walk 8-byte slots; a padded array value is 24 bytes, its tagged pointer in the
+// first word. They cannot simply change stride, because sets and dicts share
+// them and are still a plain word — so arrays get their own pair, chosen by
+// codegen's `array_drop_fn_addr` / `array_retain_fn_addr`.
+//
+// Each reads only the first word, which is all a padded value carries in this
+// stage. They call the host's `aipl_array_dec` / `aipl_arr_inc` through
+// `super::`, the way `str24` reaches its host's allocator.
+
+/// Release each of `len` padded array elements starting at `elems`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arr_drop_warr(elems: *const u8, len: i64) {
+    for i in 0..len.max(0) as usize {
+        let ptr = unsafe { core::ptr::read(elems.add(i * ARR_SIZE) as *const *const u8) };
+        super::aipl_array_dec(ptr);
+    }
+}
+
+/// Retain each of `len` padded array elements starting at `elems`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arr_retain_warr(elems: *const u8, len: i64) {
+    for i in 0..len.max(0) as usize {
+        let ptr = unsafe { core::ptr::read(elems.add(i * ARR_SIZE) as *const *const u8) };
+        super::aipl_arr_inc(ptr);
+    }
+}
+
+/// An optional padded array, `{tag, value}`: the tag word, then the 24 bytes.
+const OPT_ARR_SIZE: usize = 8 + ARR_SIZE;
+
+/// Release the inner array of each present element of a `T[]?[]`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arr_drop_opt_warr(elems: *const u8, len: i64) {
+    for i in 0..len.max(0) as usize {
+        let e = unsafe { elems.add(i * OPT_ARR_SIZE) };
+        if unsafe { core::ptr::read(e as *const i64) } != 0 {
+            super::aipl_array_dec(unsafe { core::ptr::read(e.add(8) as *const *const u8) });
+        }
+    }
+}
+
+/// Retain the inner array of each present element of a `T[]?[]`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arr_retain_opt_warr(elems: *const u8, len: i64) {
+    for i in 0..len.max(0) as usize {
+        let e = unsafe { elems.add(i * OPT_ARR_SIZE) };
+        if unsafe { core::ptr::read(e as *const i64) } != 0 {
+            super::aipl_arr_inc(unsafe { core::ptr::read(e.add(8) as *const *const u8) });
+        }
+    }
+}
+
 #[no_mangle]
 pub(crate) extern "C" fn aipl_arrw_inc(a: *const Arr) {
     unsafe { *a }.retain();

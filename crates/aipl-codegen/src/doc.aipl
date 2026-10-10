@@ -333,11 +333,11 @@ allocations: 314
 deallocations: 314
 reallocations: 1
 bytes allocated: 21677
-instructions executed: 33153
-binary size: 38208
-  code: 23592
+instructions executed: 33183
+binary size: 38336
+  code: 23716
   data: 889
-  metadata: 13727
+  metadata: 13731
 functions:
   __arr_drop_Doc:
     calls: 10
@@ -371,7 +371,7 @@ functions:
     bytes: 84
   __test$cleanup:
     calls: 1
-    bytes: 5900
+    bytes: 6024
   aipl_arr_inc:
     calls: 76
     bytes: (external)

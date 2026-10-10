@@ -757,12 +757,12 @@ fn fixture() -> Grammar<Tok, Node> {
 allocations: 1585
 deallocations: 1585
 reallocations: 342
-bytes allocated: 179541
-instructions executed: 240190
-binary size: 168088
-  code: 111332
+bytes allocated: 179621
+instructions executed: 241465
+binary size: 168768
+  code: 112016
   data: 4068
-  metadata: 52688
+  metadata: 52684
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -805,19 +805,19 @@ functions:
     bytes: 404
   __builtin_map_find_if$__m1__Rule$Tok$__m1__Prec[]$lam$climb_precs$Tok$__builtin_is_nonempty:
     calls: 19
-    bytes: 436
+    bytes: 464
   __builtin_try_map$__m1__Production$Tok$Node$First<Tok>$__m1__ParseError$lam$linked_first_sets$Tok$Node$lambda2:
     calls: 17
-    bytes: 836
+    bytes: 864
   __builtin_try_map$__m1__Rule$Tok$First<Tok>$__m1__ParseError$lam$rule_first$Tok$lambda0:
     calls: 14
-    bytes: 552
+    bytes: 580
   __builtin_try_map$__m1__Rule$Tok$__m1__Rule$Tok$__m1__ParseError$lam$__m1__desugar_rule$Tok:
     calls: 46
-    bytes: 508
+    bytes: 548
   __ctor$Node$List:
     calls: 0
-    bytes: 112
+    bytes: 124
   __eq_First$Tok:
     calls: 36
     bytes: 160
@@ -841,7 +841,7 @@ functions:
     bytes: 580
   __m1__desugar_rule$Tok:
     calls: 240
-    bytes: 12048
+    bytes: 12072
   __m1__group_styles$into$Tok$own0:
     calls: 138
     bytes: 2404
@@ -853,16 +853,16 @@ functions:
     bytes: 1788
   __m1__link$Tok$Node:
     calls: 9
-    bytes: 2424
+    bytes: 2516
   __m1__link_opt$Tok:
     calls: 12
     bytes: 596
   __m1__link_rule$Tok:
     calls: 139
-    bytes: 6776
+    bytes: 6816
   __m1__link_rules$Tok:
     calls: 27
-    bytes: 588
+    bytes: 604
   __m1__prod_names$Tok$Node:
     calls: 20
     bytes: 552
@@ -880,13 +880,13 @@ functions:
     bytes: 932
   __test$ebnf:
     calls: 1
-    bytes: 13712
+    bytes: 13832
   __test$first_sets:
     calls: 1
-    bytes: 4904
+    bytes: 4940
   __test$rule_first:
     calls: 1
-    bytes: 5036
+    bytes: 5068
   __test$rule_first$first_msg:
     calls: 2
     bytes: 596
@@ -1006,10 +1006,10 @@ functions:
     bytes: 236
   fixture:
     calls: 2
-    bytes: 5352
+    bytes: 5496
   linked_first_sets$Tok$Node:
     calls: 6
-    bytes: 996
+    bytes: 1024
   main:
     calls: 1
     bytes: 452
@@ -1024,7 +1024,7 @@ functions:
     bytes: 1708
   rule_first$Tok:
     calls: 235
-    bytes: 7528
+    bytes: 7544
   show_first$Tok:
     calls: 27
     bytes: 3892

@@ -1,5 +1,6 @@
-# A struct field may be an array (`str[]`), an 8-byte heap pointer. The
-# field is retained on construction and released when the struct drops.
+# A struct field may be an array (`str[]`) — a 24-byte value under the wide array
+# layout, the block pointer in its first word. The field is retained on
+# construction and released when the struct drops.
 
 import { equal as ==, len, push, wrapping_add as +, wrapping_mul as * } from builtins;
 
@@ -21,15 +22,15 @@ allocations: 1
 deallocations: 1
 reallocations: 1
 bytes allocated: 56
-instructions executed: 274
-binary size: 3104
-  code: 1316
+instructions executed: 278
+binary size: 3112
+  code: 1324
   data: 210
   metadata: 1578
 functions:
   __test$make:
     calls: 1
-    bytes: 1216
+    bytes: 1224
   aipl_arr_inc:
     calls: 1
     bytes: (external)

@@ -44,15 +44,15 @@ fn boxed_first<T: any>(x: T) -> T { x }
 3
 s
 --- performance ---
-allocations: 16
-deallocations: 16
-reallocations: 2
-bytes allocated: 670
-instructions executed: 3328
-binary size: 14672
-  code: 8444
+allocations: 15
+deallocations: 15
+reallocations: 4
+bytes allocated: 678
+instructions executed: 3338
+binary size: 14848
+  code: 8548
   data: 707
-  metadata: 5521
+  metadata: 5593
 functions:
   __arr_drop___tuple$i64$str:
     calls: 1
@@ -75,20 +75,14 @@ functions:
   __to_str_str$arr$arr:
     calls: 1
     bytes: 1300
-  aipl_arr_drop_arr:
-    calls: 3
-    bytes: (external)
   aipl_arr_inc:
     calls: 8
     bytes: (external)
   aipl_arr_reserve:
     calls: 2
     bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 25
+    calls: 23
     bytes: (external)
   aipl_array_new:
     calls: 6
@@ -97,7 +91,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_push_mut:
-    calls: 5
+    calls: 6
     bytes: (external)
   aipl_array_with_cap:
     calls: 1
@@ -113,10 +107,10 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3108
+    bytes: 3032
   main$filter2$own0:
     calls: 1
-    bytes: 380
-  main$map0$own0:
+    bytes: 400
+  main$map1$own0:
     calls: 1
-    bytes: 376
+    bytes: 536

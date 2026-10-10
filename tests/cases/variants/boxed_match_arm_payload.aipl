@@ -60,9 +60,9 @@ allocations: 23
 deallocations: 23
 reallocations: 0
 bytes allocated: 1439
-instructions executed: 1978
-binary size: 8000
-  code: 5160
+instructions executed: 1987
+binary size: 8032
+  code: 5192
   data: 33
   metadata: 2807
 functions:
@@ -101,10 +101,10 @@ functions:
     bytes: (external)
   copy_or:
     calls: 8
-    bytes: 656
+    bytes: 676
   main:
     calls: 1
-    bytes: 1088
+    bytes: 1100
   render:
     calls: 3
     bytes: 1572

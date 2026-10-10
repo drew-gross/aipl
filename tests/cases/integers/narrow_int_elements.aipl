@@ -127,10 +127,10 @@ some(65535)
 allocations: 10
 deallocations: 10
 reallocations: 0
-bytes allocated: 398
-instructions executed: 2070
-binary size: 6784
-  code: 3100
+bytes allocated: 430
+instructions executed: 2076
+binary size: 6824
+  code: 3140
   data: 619
   metadata: 3065
 functions:
@@ -143,9 +143,6 @@ functions:
   __to_str_u16$opt:
     calls: 1
     bytes: 388
-  aipl_arr_drop_arr:
-    calls: 1
-    bytes: (external)
   aipl_arr_inc:
     calls: 3
     bytes: (external)
@@ -175,4 +172,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 844
+    bytes: 884

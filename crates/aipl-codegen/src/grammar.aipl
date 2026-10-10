@@ -1093,12 +1093,12 @@ fn echo(matched: str) -> str { matched }
 allocations: 735
 deallocations: 735
 reallocations: 101
-bytes allocated: 92497
-instructions executed: 75131
-binary size: 163120
-  code: 101272
+bytes allocated: 92529
+instructions executed: 75473
+binary size: 163544
+  code: 101692
   data: 6884
-  metadata: 54964
+  metadata: 54968
 functions:
   __arr_drop_ListStyle:
     calls: 27
@@ -1141,10 +1141,10 @@ functions:
     bytes: 1336
   __builtin_try_map$Rule$Kind$Rule$Kind$ParseError$lam$desugar_rule$Kind:
     calls: 6
-    bytes: 508
+    bytes: 548
   __ctor$Node$List:
     calls: 0
-    bytes: 112
+    bytes: 124
   __eq_ListStyle:
     calls: 10
     bytes: 232
@@ -1174,13 +1174,13 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 47540
+    bytes: 47692
   __test$link$shown_rule$Kind$Node:
     calls: 13
     bytes: 1008
   __test$show_rule:
     calls: 1
-    bytes: 4156
+    bytes: 4200
   __test$show_style:
     calls: 1
     bytes: 756
@@ -1258,7 +1258,7 @@ functions:
     bytes: 580
   desugar_rule$Kind:
     calls: 89
-    bytes: 12048
+    bytes: 12072
   echo:
     calls: 0
     bytes: 28
@@ -1276,16 +1276,16 @@ functions:
     bytes: 1788
   link$Kind$Node:
     calls: 15
-    bytes: 2424
+    bytes: 2516
   link_opt$Kind:
     calls: 17
     bytes: 596
   link_rule$Kind:
     calls: 87
-    bytes: 6776
+    bytes: 6816
   link_rules$Kind:
     calls: 6
-    bytes: 588
+    bytes: 604
   main:
     calls: 1
     bytes: 316

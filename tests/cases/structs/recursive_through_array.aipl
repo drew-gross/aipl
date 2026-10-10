@@ -60,12 +60,12 @@ Tree { label: 1, kids: [Tree { label: 2, kids: [] }, Tree { label: 3, kids: [] }
 allocations: 21
 deallocations: 21
 reallocations: 0
-bytes allocated: 972
-instructions executed: 1801
-binary size: 5608
-  code: 2640
+bytes allocated: 1116
+instructions executed: 1828
+binary size: 5664
+  code: 2700
   data: 220
-  metadata: 2748
+  metadata: 2744
 functions:
   __arr_drop_Tree:
     calls: 5
@@ -111,7 +111,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 820
+    bytes: 880
   total:
     calls: 5
     bytes: 276

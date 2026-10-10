@@ -164,7 +164,7 @@ pub fn ast_case_name(self: Ast) -> str {
 allocations: 3
 deallocations: 3
 reallocations: 0
-bytes allocated: 256
+bytes allocated: 272
 instructions executed: 162
 binary size: 5768
   code: 2820

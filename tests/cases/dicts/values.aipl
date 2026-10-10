@@ -44,10 +44,10 @@ fn char_keys() -> #{char: i64} { #{'a': 1, 'b': 2} }.test({
 allocations: 13
 deallocations: 13
 reallocations: 0
-bytes allocated: 876
-instructions executed: 1527
-binary size: 12528
-  code: 7140
+bytes allocated: 940
+instructions executed: 1545
+binary size: 12600
+  code: 7212
   data: 850
   metadata: 4538
 functions:
@@ -95,7 +95,7 @@ functions:
     bytes: 100
   __test$array_values:
     calls: 1
-    bytes: 1032
+    bytes: 1104
   __test$char_keys:
     calls: 1
     bytes: 908

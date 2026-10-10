@@ -20,10 +20,10 @@ fn main() !prints {
 allocations: 14
 deallocations: 14
 reallocations: 0
-bytes allocated: 700
-instructions executed: 4689
-binary size: 12424
-  code: 6748
+bytes allocated: 876
+instructions executed: 4722
+binary size: 12640
+  code: 6964
   data: 987
   metadata: 4689
 functions:
@@ -39,9 +39,6 @@ functions:
   __to_str_str$arr$arr:
     calls: 1
     bytes: 1300
-  aipl_arr_drop_arr:
-    calls: 5
-    bytes: (external)
   aipl_array_dec:
     calls: 16
     bytes: (external)
@@ -59,4 +56,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1352
+    bytes: 1568

@@ -63,12 +63,12 @@ pub fn extend_optional<T: any>(mut self: T[], other: T?) {
 allocations: 7
 deallocations: 7
 reallocations: 1
-bytes allocated: 320
-instructions executed: 1146
-binary size: 7216
-  code: 3520
+bytes allocated: 352
+instructions executed: 1149
+binary size: 7240
+  code: 3540
   data: 557
-  metadata: 3139
+  metadata: 3143
 functions:
   __eq_i64$arr:
     calls: 4
@@ -81,17 +81,11 @@ functions:
     bytes: 364
   __test$extend_optional:
     calls: 1
-    bytes: 2440
-  aipl_arr_drop_arr:
-    calls: 2
-    bytes: (external)
+    bytes: 2460
   aipl_arr_inc:
     calls: 9
     bytes: (external)
   aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
-  aipl_arr_retain_ptr:
     calls: 1
     bytes: (external)
   aipl_array_dec:

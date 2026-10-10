@@ -42,9 +42,9 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 304
-instructions executed: 1446
-binary size: 7872
-  code: 3420
+instructions executed: 1465
+binary size: 7920
+  code: 3468
   data: 926
   metadata: 3526
 functions:
@@ -56,7 +56,7 @@ functions:
     bytes: 776
   __test$nothing:
     calls: 1
-    bytes: 400
+    bytes: 412
   __test$tail_below:
     calls: 1
     bytes: 480
@@ -98,10 +98,10 @@ functions:
     bytes: (external)
   below:
     calls: 5
-    bytes: 584
+    bytes: 596
   main:
     calls: 1
     bytes: 240
   tail_below:
     calls: 2
-    bytes: 260
+    bytes: 284

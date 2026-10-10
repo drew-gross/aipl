@@ -198,11 +198,11 @@ allocations: 129
 deallocations: 129
 reallocations: 0
 bytes allocated: 3763
-instructions executed: 56988
-binary size: 127632
-  code: 86088
+instructions executed: 58836
+binary size: 129376
+  code: 87828
   data: 2751
-  metadata: 38793
+  metadata: 38797
 functions:
   __arr_drop_Entry:
     calls: 2
@@ -224,7 +224,7 @@ functions:
     bytes: 364
   __test$parse_spec:
     calls: 1
-    bytes: 49864
+    bytes: 50060
   __test_try_fail_str:
     calls: 0
     bytes: 84
@@ -263,13 +263,13 @@ functions:
     bytes: 1300
   finalize:
     calls: 36
-    bytes: 24920
+    bytes: 26228
   main:
     calls: 1
     bytes: 108
   parse_spec:
     calls: 18
-    bytes: 6880
+    bytes: 7116
   whole_number:
     calls: 9
     bytes: 484

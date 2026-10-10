@@ -3065,8 +3065,14 @@ pub extern "C" fn aipl_arr_join(
 /// `inc` before `aipl_arr_ensure_heap` is what makes both representations
 /// balance — see codegen's `part_at`.
 unsafe fn part_at_rt(parts: *const u8, i: usize) -> *const u8 {
-    let elems = unsafe { parts.add(ARR_ELEMS_OFFSET) as *const i64 };
-    let p = unsafe { *elems.add(i) } as *const u8;
+    // The parts are a `T[][]`, so each is a padded 24-byte array value with its
+    // tagged pointer in the first word — hence the `ARR_SIZE` stride. Safe for
+    // the one caller compiled before the switch: the checked-in artifact does
+    // not import `aipl_arr_join` (only `aipl_arr_drop_arr` / `_retain_ptr`,
+    // which keep the 8-byte stride for sets and dicts), and an artifact
+    // regenerated after it is `Wide` itself.
+    let elems = unsafe { parts.add(ARR_ELEMS_OFFSET) };
+    let p = unsafe { *(elems.add(i * arr24::ARR_SIZE) as *const i64) } as *const u8;
     if p.is_null() {
         return p;
     }

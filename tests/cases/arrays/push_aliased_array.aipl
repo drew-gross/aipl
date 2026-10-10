@@ -30,10 +30,10 @@ fn appended(xs: i64[], x: i64) -> i64[] {
 allocations: 4
 deallocations: 4
 reallocations: 2
-bytes allocated: 216
-instructions executed: 1929
-binary size: 4008
-  code: 1524
+bytes allocated: 328
+instructions executed: 1950
+binary size: 4160
+  code: 1676
   data: 474
   metadata: 2010
 functions:
@@ -45,15 +45,9 @@ functions:
     bytes: 300
   __test$appended:
     calls: 1
-    bytes: 820
-  aipl_arr_drop_arr:
-    calls: 3
-    bytes: (external)
+    bytes: 972
   aipl_arr_inc:
     calls: 3
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 2
     bytes: (external)
   aipl_array_dec:
     calls: 15

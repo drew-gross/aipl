@@ -3260,9 +3260,10 @@ impl Mono<'_> {
     ///
     /// Reuse needs both halves of "owned and sized right". Ownership is
     /// [`is_fresh_heap`]: an array literal or a call result, which nothing else
-    /// holds a reference to. Sizing is the same `reusable` predicate `map` uses
-    /// on both `T` and `U` — 8-byte non-composites, excluding `bool` (bit-packed)
-    /// and `char` (which makes the array str-shaped, 1 byte per element).
+    /// holds a reference to. Sizing is the same pair of tests `map` uses on `T`
+    /// and `U`: both `reusable` (no optional, struct or variant, no bit-packed
+    /// `bool`, no `char`, which makes the array str-shaped) and of equal slot
+    /// width ([`slot_fits`]).
     /// `__map_set` writes the slot and patches the array's stored element
     /// drop-fn, which is what lets `U` differ from `T`; it releases the `old`
     /// value it is *handed* rather than whatever occupied the slot, so it serves
@@ -3685,10 +3686,11 @@ impl Mono<'_> {
 
         // When the source array is a fresh, uniquely-owned heap value, map can
         // overwrite each slot in place and reuse the same allocation — as long as
-        // each mapped `U` fits where a `T` was (`size(U) <= size(T)`) and neither
-        // is a composite. Both `T` and `U` non-composite means both are 8-byte
-        // (scalars, `str`, arrays), so `U` fits in `T`'s slot and the stored
-        // element drop-fn (which differs when `T != U`) is patched per slot. A
+        // each mapped `U` occupies exactly the width a `T` did ([`slot_fits`]:
+        // one word for a scalar, three for a `str` or an array), so `U` fits in
+        // `T`'s slot and the stored element drop-fn (which differs when
+        // `T != U`) is patched per slot. "Non-composite" used to stand in for
+        // "one word" here, and stopped being true once arrays became 24 bytes. A
         // composite *input* is excluded because the loop variable would be an
         // interior pointer into the buffer that the in-place write could clobber
         // before it's read; a composite *output* (an optional/struct, 16+ bytes)
@@ -4038,9 +4040,9 @@ impl Mono<'_> {
         // Like `map`, zip_with can consume a fresh, uniquely-owned input and
         // overwrite its slots in place instead of allocating a fresh output. The
         // reused array is both iterated and overwritten, so its element type and
-        // the result type must be 8-byte non-composites (see `expand_map` for
-        // the full rationale); the *other* array is only indexed, so its element
-        // type is unconstrained.
+        // the result type must be `reusable` and of equal width (`slot_fits`; see
+        // `expand_map` for the full rationale); the *other* array is only
+        // indexed, so its element type is unconstrained.
         // `char` is excluded too — it makes the array str-shaped (see
         // `is_char_array` in aipl-codegen), 1 byte per element, not the
         // generic 8-byte slot these intrinsics move.
@@ -10633,14 +10635,35 @@ fn str_shaped(t: &Type) -> bool {
         || matches!(t, Type::Array(e) if matches!(**e, Type::Primitive(Primitive::Char)))
 }
 
+/// How many words a `reusable` element of type `t` occupies in an array slot.
+///
+/// Monomorphization does not know codegen's layout table, but this one fact it
+/// has to: a `str` is a 24-byte value, and so — under the wide array layout — is
+/// an array, whose 24 bytes are its tagged pointer and two words of padding
+/// (`aipl-codegen`'s `is_padded_array`). Every other type `reusable` admits is
+/// one word: the integers, and a set or a dict, which are still a plain word
+/// until they switch representation on their own (`arr24_todo.txt`).
+///
+/// A `char[]` is `str`-shaped, so it is three words either way.
+fn slot_words(t: &Type) -> usize {
+    if str_shaped(t) || matches!(t, Type::Array(_)) {
+        3
+    } else {
+        1
+    }
+}
+
 /// Whether an array of `from` can have its buffer reused to hold `to`.
 ///
-/// This is the one place monomorphization has to know a representation: a `str`
-/// is 24 bytes and everything else reusable is one word, so a slot sized for an
-/// `i64` cannot hold one. `[1, 2].map(to_str)` reused an `i64[]` buffer for
-/// `str` elements and wrote three words into each one-word slot.
+/// This is where monomorphization has to know a representation: the buffer is
+/// sized for `from`'s slots, so `to` has to fit in them exactly. It is a question
+/// of *width*, and twice the answer has been wrong because it was asked as
+/// something narrower. `[1, 2].map(to_str)` reused an `i64[]` buffer for `str`
+/// elements and wrote three words into each one-word slot — which is what the
+/// old `str`-shape test fixed — and `[1, 2].map(|x| [x])` then did the same with
+/// array elements, once arrays became 24 bytes and that test had no way to know.
 fn slot_fits(from: &Type, to: &Type) -> bool {
-    str_shaped(from) == str_shaped(to)
+    slot_words(from) == slot_words(to)
 }
 
 /// Whether `arg` evaluates to a freshly-allocated, uniquely-owned heap value, so

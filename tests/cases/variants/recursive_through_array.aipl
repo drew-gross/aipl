@@ -49,12 +49,12 @@ CTree("a", [CLeaf(1), CTree("b", [CLeaf(2), CLeaf(3)]), CLeaf(4)])
 allocations: 24
 deallocations: 24
 reallocations: 0
-bytes allocated: 1019
-instructions executed: 2765
-binary size: 5984
-  code: 3004
+bytes allocated: 1115
+instructions executed: 2771
+binary size: 6008
+  code: 3032
   data: 235
-  metadata: 2745
+  metadata: 2741
 functions:
   __arr_drop_Cst:
     calls: 2
@@ -100,7 +100,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 712
+    bytes: 740
   size:
     calls: 6
     bytes: 352

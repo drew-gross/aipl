@@ -29,12 +29,12 @@ fn grid3() -> str[][] {
 allocations: 8
 deallocations: 8
 reallocations: 1
-bytes allocated: 584
-instructions executed: 1484
-binary size: 6072
-  code: 3416
+bytes allocated: 664
+instructions executed: 1502
+binary size: 6200
+  code: 3540
   data: 294
-  metadata: 2362
+  metadata: 2366
 functions:
   __eq_str$arr:
     calls: 3
@@ -44,15 +44,9 @@ functions:
     bytes: 300
   __test$grid3:
     calls: 1
-    bytes: 2648
-  aipl_arr_drop_arr:
-    calls: 2
-    bytes: (external)
+    bytes: 2772
   aipl_arr_inc:
     calls: 7
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 1
     bytes: (external)
   aipl_array_dec:
     calls: 15

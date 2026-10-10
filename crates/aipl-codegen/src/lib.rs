@@ -1966,8 +1966,14 @@ extern "C" fn aipl_arr_join(
 /// into an owned one, and a reversed view is consumed and replaced by a fresh
 /// array — either way the caller releases exactly one reference.
 unsafe fn part_at(parts: *const u8, i: usize) -> *const u8 {
-    let elems = unsafe { parts.add(ARR_ELEMS_OFFSET) as *const i64 };
-    let p = unsafe { std::ptr::read(elems.add(i)) } as *const u8;
+    // The parts are a `T[][]`, so each is a padded 24-byte array value with its
+    // tagged pointer in the first word — hence the `ARR_SIZE` stride. Safe for
+    // the one caller compiled before the switch: the checked-in artifact does
+    // not import `aipl_arr_join` (only `aipl_arr_drop_arr` / `_retain_ptr`,
+    // which keep the 8-byte stride for sets and dicts), and an artifact
+    // regenerated after it is `Wide` itself.
+    let elems = unsafe { parts.add(ARR_ELEMS_OFFSET) };
+    let p = unsafe { std::ptr::read(elems.add(i * arr24::ARR_SIZE) as *const i64) } as *const u8;
     if p.is_null() {
         return p;
     }
@@ -4556,6 +4562,19 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_arrw_reversed", arr24::aipl_arrw_reversed as *const u8);
     jit_builder.symbol("aipl_arrw_with_cap", arr24::aipl_arrw_with_cap as *const u8);
     jit_builder.symbol("aipl_arrw_inc", arr24::aipl_arrw_inc as *const u8);
+    jit_builder.symbol("aipl_arr_drop_warr", arr24::aipl_arr_drop_warr as *const u8);
+    jit_builder.symbol(
+        "aipl_arr_retain_warr",
+        arr24::aipl_arr_retain_warr as *const u8,
+    );
+    jit_builder.symbol(
+        "aipl_arr_drop_opt_warr",
+        arr24::aipl_arr_drop_opt_warr as *const u8,
+    );
+    jit_builder.symbol(
+        "aipl_arr_retain_opt_warr",
+        arr24::aipl_arr_retain_opt_warr as *const u8,
+    );
     jit_builder.symbol("aipl_arrw_dec", arr24::aipl_arrw_dec as *const u8);
     jit_builder.symbol("aipl_str_rope", str24::aipl_str_rope as *const u8);
     jit_builder.symbol(
@@ -8118,6 +8137,10 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         // `arr24_todo.txt` 2f renames it `Ret::Wide` once the 8-byte half is gone.
         "aipl_arrw_len" | "aipl_arrw_inline_cap" => (1, Ret::Word),
         "aipl_arrw_inc" | "aipl_arrw_dec" => (1, Ret::None),
+        "aipl_arr_drop_warr"
+        | "aipl_arr_retain_warr"
+        | "aipl_arr_drop_opt_warr"
+        | "aipl_arr_retain_opt_warr" => (2, Ret::None),
         "aipl_arrw_elem_ptr" => (3, Ret::Word),
         "aipl_arrw_reversed" => (1, Ret::Str),
         "aipl_arrw_with_cap" => (3, Ret::Str),
@@ -9948,7 +9971,9 @@ fn contains_scc_ref(ty: &ConcreteType, scc: u32, structs: &HashMap<String, TypeD
 }
 
 /// Read the component of type `ty` at `base + offset`: an inline composite is
-/// addressed (`base + offset`); a scalar/str/array is loaded as an i64.
+/// addressed (`base + offset`); anything else is loaded as an i64. For a padded
+/// array that i64 is the value's first word — its tagged pointer — which is all
+/// a padded array carries (see [`store_array_elem`]).
 fn component(
     builder: &mut FunctionBuilder,
     base: Value,
@@ -9966,8 +9991,9 @@ fn component(
 }
 
 /// Store a value `v` of static type `src_ty` into the slot at address `slot`. A
-/// composite (an optional) is addressed by `v`, so copy its bytes; a scalar or
-/// pointer is a single 8-byte value. Mirrors how `component` reads it back.
+/// composite is addressed by `v`, so copy its bytes; a scalar is a single 8-byte
+/// value; a padded array is its tagged pointer followed by two zero words.
+/// Mirrors how `component` reads it back.
 fn store_array_elem(
     builder: &mut FunctionBuilder,
     slot: Value,
@@ -9979,7 +10005,25 @@ fn store_array_elem(
         copy_composite(builder, slot, v, src_ty, structs);
     } else {
         builder.ins().store(MemFlagsData::trusted(), v, slot, 0);
+        if is_padded_array(src_ty, structs) {
+            // The other two words of a wide array value. Nothing reads them in
+            // this stage, and they are written anyway: a struct or optional
+            // holding an array is copied and compared as bytes in places, and a
+            // value whose padding is whatever the slot last held would make two
+            // equal arrays differ.
+            let zero = builder.ins().iconst(types::I64, 0);
+            builder.ins().store(MemFlagsData::trusted(), zero, slot, 8);
+            builder.ins().store(MemFlagsData::trusted(), zero, slot, 16);
+        }
     }
+}
+
+/// Whether `ty` is an array whose in-memory value is the padded 24-byte form —
+/// the 8-byte tagged pointer in the first word and two zero words after it (see
+/// [`Abi::arr_is_composite`]). A `char[]` rides `str`'s representation instead,
+/// and is a composite in its own right.
+fn is_padded_array(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
+    matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty) && elem_size_of(ty, structs) > 8
 }
 
 /// Write `some(x)` into the flattened optional slot at `slot` (size
@@ -11231,9 +11275,10 @@ fn emit_charset_union(builder: &mut FunctionBuilder, a: Value, b: Value) -> Valu
 /// through pointers), and [`i64_slot`] only for machine words: loop counters,
 /// tags, accumulated results, and the *addresses* composites travel as.
 ///
-/// The distinction is invisible today, since every non-composite value is one
-/// i64 — and it is exactly what a 24-byte `str` needs, because
-/// then "one value" and "one word" stop being the same thing.
+/// The distinction is not academic: a 24-byte `str` is one value and three
+/// words, and so is an array under the wide layout — which, unlike a `str`, is
+/// *not* composite (see `Abi::arr_is_composite`), so "non-composite" no longer
+/// implies "one word" either. Size the slot from the type, always.
 fn value_slot(
     builder: &mut FunctionBuilder,
     ty: &ConcreteType,
@@ -12337,6 +12382,12 @@ fn array_drop_fn_addr<M: Module>(
         // A set or a dict *is* an array block (see `is_heap`), so the element
         // drop for a nested array serves them unchanged: it decs each element's
         // block pointer, and that is what one of these is.
+        // A nested array is a padded 24-byte value under the wide layout, so it
+        // needs the 24-stride helper; a set or a dict is still a plain word and
+        // keeps the 8-byte one (they switch representation separately).
+        ConcreteType::Array(_) if is_padded_array(elem, cx.structs) => {
+            Some(b.id(module, "aipl_arr_drop_warr"))
+        }
         ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => {
             Some(b.id(module, "aipl_arr_drop_arr"))
         }
@@ -12344,6 +12395,9 @@ fn array_drop_fn_addr<M: Module>(
             if matches!(inner.as_ref(), ConcreteType::Primitive(Primitive::Str)) =>
         {
             Some(b.id(module, "aipl_arr_drop_opt_str"))
+        }
+        ConcreteType::Optional(inner) if is_padded_array(inner, cx.structs) => {
+            Some(b.id(module, "aipl_arr_drop_opt_warr"))
         }
         ConcreteType::Optional(inner) if matches!(inner.as_ref(), ConcreteType::Array(_)) => {
             Some(b.id(module, "aipl_arr_drop_opt_arr"))
@@ -12375,16 +12429,22 @@ fn array_retain_fn_addr<M: Module>(
         // As in `array_drop_fn_addr`: a char-set element owns nothing, so
         // there is no reference to take on it.
         _ if is_char_set(elem) => None,
+        ConcreteType::Array(_) if is_padded_array(elem, cx.structs) => {
+            Some(b.id(module, "aipl_arr_retain_warr"))
+        }
         ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => {
             Some(b.id(module, "aipl_arr_retain_ptr"))
         }
         ConcreteType::Optional(inner)
             if matches!(inner.as_ref(), ConcreteType::Primitive(Primitive::Str)) =>
         {
-            // The wide form cannot share `aipl_arr_retain_opt` with `T[]?[]`
-            // below: an array element is still an 8-byte pointer, so only the
-            // `str?` case changes shape.
+            // Its own helper rather than `aipl_arr_retain_opt`: a `str?` element
+            // is the optional tag followed by a 24-byte `str`, and the inner value
+            // is retained as a `str`, not as an array block.
             Some(b.id(module, "aipl_arr_retain_opt_str"))
+        }
+        ConcreteType::Optional(inner) if is_padded_array(inner, cx.structs) => {
+            Some(b.id(module, "aipl_arr_retain_opt_warr"))
         }
         ConcreteType::Optional(inner) if matches!(inner.as_ref(), ConcreteType::Array(_)) => {
             Some(b.id(module, "aipl_arr_retain_opt"))
@@ -18105,10 +18165,11 @@ fn compile_call_expr<M: Module>(
             // for release at the iteration's end, so retain it for the slot —
             // exactly `push`'s discipline. Retain/drop are no-ops for scalars.
             //
-            // `T` and `U` are both 8-byte (non-composite — the in-place gate),
-            // so the slot stride is 8 and a plain store fits. When `T != U` the
-            // array's stored element drop-fn (set for `T` when the buffer was
-            // built) is now wrong, so patch it to `U`'s here.
+            // `T` and `U` have equal slot width — mono's in-place gate
+            // (`slot_fits`) guarantees it — so `U` fits the stride the buffer was
+            // allocated with. When `T != U` the array's stored element drop-fn
+            // (set for `T` when the buffer was built) is now wrong, so patch it to
+            // `U`'s here.
             let (a_ptr, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let (i_val, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
             let (new_val, new_ty) = compile_expr(module, builder, cx, scopes, &args[2])?;
@@ -22462,13 +22523,7 @@ enum SeqRepr {
     /// An 8-byte tagged pointer to a block.
     #[default]
     Tagged,
-    /// The 24-byte `{base, data, len|tag}` value.
-    ///
-    /// Not constructed outside the tests yet: [`Abi::active`] answers `Tagged`
-    /// until the switch lands. The rules below are written for both anyway, so
-    /// throwing it is one line rather than a hunt — which is the whole value of
-    /// landing this step on its own.
-    #[allow(dead_code)]
+    /// The 24-byte `{base, data, len|tag}` value — what [`Abi::active`] answers.
     Wide,
 }
 
@@ -22521,11 +22576,11 @@ fn abi_of_manifest(manifest: &aipl_artifact::Manifest) -> Result<Abi, Error> {
 pub struct Abi {
     /// Which representation an **array** value has.
     ///
-    /// `Tagged` today, so every answer below is the one it has always been and
-    /// this change is inert. Flipping it to `Wide` is the atomic switch — it moves
-    /// struct field offsets, nested-array strides and the calling convention in
-    /// one step, which is why `arr24_todo.txt` 2c-2f carry it out rather than this
-    /// commit. A `str` has no counterpart field because it has no choice left.
+    /// `Wide` for freshly compiled code ([`Abi::active`]). `Tagged` survives for an
+    /// artifact compiled before the switch, which [`abi_of_manifest`] reads back
+    /// from its `; array-abi` line — that is the one thing keeping the old layout
+    /// reachable, and it goes with `arr24_todo.txt` stage 7. A `str` has no
+    /// counterpart field because it has no choice left.
     arrays: SeqRepr,
 }
 
@@ -22534,11 +22589,9 @@ impl Abi {
     /// about the code they are emitting right now rather than about some other
     /// callee.
     fn active() -> Abi {
-        // The one place the array switch is thrown: `SeqRepr::Wide` here is what
-        // `arr24_todo.txt` 2c-2f are working towards, and until they land it would
-        // size arrays as 24 bytes while codegen still moves them as one word.
+        // The one place the array switch is thrown (`arr24_todo.txt` 2b-flip).
         Abi {
-            arrays: SeqRepr::Tagged,
+            arrays: SeqRepr::Wide,
         }
     }
 
@@ -22563,10 +22616,21 @@ impl Abi {
     }
 
     /// Whether an array travels by address under this ABI — the array counterpart
-    /// of [`Abi::str_is_composite`], and now the knob that has two answers, since
-    /// `str`'s has settled on one.
+    /// of [`Abi::str_is_composite`].
+    ///
+    /// **Not yet, even under `Wide`.** In this stage an array value's 24 bytes are
+    /// the 8-byte tagged pointer it has always been, in the first word, and two
+    /// zero words after it (see [`store_array_elem`]). Only the first word carries
+    /// anything, so passing the value *is* passing that word, and sending it by
+    /// address would cost a stack slot at every call for no information.
+    ///
+    /// So `Wide` currently changes where arrays sit in memory — struct field
+    /// offsets, nested-array strides, optionals, the FFI layout, which is the part
+    /// the artifact has to agree on — and not how they are passed. This becomes
+    /// `matches!(self.arrays, SeqRepr::Wide)` in the stage that first puts
+    /// information in the other two words (`arr24_todo.txt`, 2c).
     fn arr_is_composite(self) -> bool {
-        matches!(self.arrays, SeqRepr::Wide)
+        false
     }
 }
 
@@ -22590,11 +22654,17 @@ mod abi_tests {
 
         assert_eq!(abi_elem_size(tagged, &i64s, &structs), 8);
         assert_eq!(abi_elem_size(wide, &i64s, &structs), arr24::ARR_SIZE as i64);
-        assert!(!abi_is_composite(tagged, &i64s, &structs));
-        assert!(abi_is_composite(wide, &i64s, &structs));
 
-        // Today's compilation is still the tagged one; this is the line 2c-2f flip.
-        assert_eq!(Abi::active(), tagged);
+        // Under `Wide` an array occupies 24 bytes in memory but still travels as
+        // one word: in this stage its value is the 8-byte tagged pointer and two
+        // words of padding, so passing it by address would carry nothing extra.
+        // Both answers flip to `true` together in the stage that first puts
+        // information in the padding (see `Abi::arr_is_composite`).
+        assert!(!abi_is_composite(tagged, &i64s, &structs));
+        assert!(!abi_is_composite(wide, &i64s, &structs));
+
+        // The switch is thrown: freshly compiled code uses the wide layout.
+        assert_eq!(Abi::active(), wide);
 
         // A `char[]` rides `str`'s representation, not an array block's, so the
         // knob must not touch it — it is wide under both.

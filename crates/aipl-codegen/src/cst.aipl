@@ -621,12 +621,12 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
 allocations: 264
 deallocations: 264
 reallocations: 17
-bytes allocated: 17261
-instructions executed: 43078
-binary size: 69704
-  code: 42208
+bytes allocated: 20429
+instructions executed: 44748
+binary size: 70680
+  code: 43180
   data: 3703
-  metadata: 23793
+  metadata: 23797
 functions:
   __arr_drop_Cst:
     calls: 40
@@ -684,7 +684,7 @@ functions:
     bytes: 132
   __test$show:
     calls: 1
-    bytes: 15660
+    bytes: 16076
   __test$through:
     calls: 1
     bytes: 388
@@ -765,22 +765,22 @@ functions:
     bytes: 1456
   parts:
     calls: 15
-    bytes: 956
+    bytes: 1116
   show:
     calls: 23
     bytes: 2960
   slot_walk:
     calls: 3
-    bytes: 728
+    bytes: 800
   slot_walk_kids:
     calls: 3
-    bytes: 1384
+    bytes: 1480
   slots$own0:
     calls: 3
     bytes: 224
   split_kids:
     calls: 32
-    bytes: 2284
+    bytes: 2512
   text:
     calls: 5
     bytes: 1464

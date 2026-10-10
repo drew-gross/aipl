@@ -20,7 +20,7 @@ Stage 1 — the layout, proven on its own                                    [do
   [x] asserts the shared half is byte-identical to `str24` so they cannot drift
 
 
-Stage 2 — widen the value                                           [in progress]
+Stage 2 — widen the value                                     [done, but see 2c]
 ---------------------------------------------------------------------------------
 The atomic one, and the reason: the checked-in `dogfood.o` is *called* with
 arrays crossing the FFI boundary (`lex_aipl` returns `str[]`, the parser returns
@@ -54,7 +54,7 @@ point at a time; this needs the same.
           *both* (it rides `str`'s representation, not an array block's) and that
           an optional's size tracks its core.
 
-  [ ] 2b-flip. `Abi::active` answers `SeqRepr::Wide`. One line, and the atomic
+  [x] 2b-flip. `Abi::active` answers `SeqRepr::Wide`. One line, and the atomic
           moment: it moves struct field offsets, nested-array strides and the
           calling convention together, so it only makes sense with 2c-2e done.
           **Arrays only.** Sets and dicts are array-backed and will want the same
@@ -73,9 +73,26 @@ point at a time; this needs the same.
           forces regeneration) and `abi_of_manifest` reads it; no line means
           `Tagged`, an unknown one is refused. Only `Compilation::new`, which
           describes code it just emitted, still uses `Abi::active()`.
-  [ ] 2c. array locals, parameters and returns: passed by pointer, returned
+  [~] 2c. array locals, parameters and returns: passed by pointer, returned
           through a leading out pointer (`Ret::Str`'s shape, which already
           exists for exactly this).
+
+          **Deliberately not done, and the plan changed.** Under `Wide` an
+          array's 24 bytes are the 8-byte tagged pointer it always was, in the
+          first word, and two zero words of padding. Only the first word carries
+          anything, so passing the value *is* passing that word — sending it by
+          address would cost a stack slot at every call for no information. So
+          `Abi::arr_is_composite` stays `false` even under `Wide`, and `Wide`
+          changes where arrays sit **in memory** (struct field offsets,
+          nested-array strides, optionals, the FFI layout — the part the
+          artifact has to agree on), not how they are passed.
+          This is the step to take in whichever stage first puts information
+          in the padding (3 inline, or 4 slices): flip `arr_is_composite` to
+          `matches!(self.arrays, Wide)` then, and every array value becomes a
+          slot address in codegen, as a `str` already is.
+          It is also what made the switch tractable: the alternative was making
+          every array value in codegen a slot address now, a far larger rewrite
+          that buys nothing until the padding means something.
 
           PROBE (2026-10-09, `Abi::active` flipped to `Wide` locally, reverted):
           the compiler survives the flip — 2c-0 is what makes that true, since the
@@ -102,15 +119,38 @@ point at a time; this needs the same.
           one unit, driven by this failure list and then the full corpus under
           `Wide` — with 2f (artifact regeneration, delete the 8-byte half)
           following as its own change.
-  [ ] 2d. FFI marshalling (`write_ffi_arg`, `read_ffi_*`). Keep the lesson from
+  [x] 2d. FFI marshalling (`write_ffi_arg`, `read_ffi_*`). Keep the lesson from
           the `str` double-free: a host-built block gets `STATIC_REFCOUNT` so no
           protocol inside the callee can count it down. `ArgBufs::array_block`
           already does this — do not regress it.
-  [ ] 2e. codegen's inlined fast paths (`load_arr_len`, `load_array_elem`,
-          element stores) read the value's words instead of the block header.
-  [ ] 2f. regenerate the dogfood artifact against the wide entry points, then
-          delete the 8-byte half: `array_layout.rs`, and the `ArrRepr` arms that
-          go with it.
+  [x] 2e. the memory side of the switch, which is what this stage turned out to
+          be. What it took, found by running the corpus under `Wide` (145
+          failures → 0):
+            - `store_array_elem` writes a padded array as `{ptr, 0, 0}`. The
+              zeros are load-bearing: set membership compares elements
+              bytewise (`str_cmp_width`), so garbage padding would break a set
+              of arrays.
+            - 24-stride element helpers for an array *of arrays*
+              (`aipl_arr_{drop,retain}_warr` and the `opt` pair), in the shared
+              `arr24.rs`. The 8-byte ones could not just change stride, because
+              sets and dicts share them and are still a plain word.
+            - `aipl_arr_join` reads its parts at the padded stride. Safe for the
+              pre-switch artifact, which never imported it.
+            - mono's `slot_fits`, the one behavioural bug: in-place `map` reuses
+              its input buffer, and the gate took "non-composite" to mean "one
+              word". A padded array is non-composite *and* 24 bytes, so
+              `[1, 2].map(|x| [x])` wrote 24-byte values into 8-byte slots and
+              segfaulted. It compares width now. The same assumption had bitten
+              once before, for `str` (`map(to_str)`).
+          The inlined fast paths (`load_arr_len`, `load_array_elem`) needed no
+          change: they read through the first word, which is still the tagged
+          pointer. They change with 2c.
+  [~] 2f. regenerate the dogfood artifact under `Wide` — **done**: the
+          checked-in manifest reads `; array-abi wide`, and the compiler parses
+          its own sources through it. Deleting the 8-byte half
+          (`array_layout.rs`, the `ArrRepr` arms) is **not** done and cannot be
+          yet: it is still the live layout of every array *block*. That is
+          stage 4-6 work, and the cleanup is stage 7.
 
   Intermediate state worth knowing: while 2b-2e are in flight the *blocks* can
   stay exactly as they are. `len` is then carried twice (value and block header),
