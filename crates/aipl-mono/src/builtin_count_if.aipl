@@ -62,18 +62,18 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 152
-instructions executed: 2386
-binary size: 8808
-  code: 4316
+instructions executed: 2313
+binary size: 9184
+  code: 4648
   data: 1491
-  metadata: 3001
+  metadata: 3045
 functions:
   __test$count_if:
     calls: 1
-    bytes: 3712
+    bytes: 3936
   __test$count_if$filter10$own0:
     calls: 1
-    bytes: 496
+    bytes: 604
   aipl_arr_inc:
     calls: 2
     bytes: (external)

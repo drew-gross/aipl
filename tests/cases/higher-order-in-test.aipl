@@ -37,15 +37,15 @@ allocations: 2
 deallocations: 2
 reallocations: 2
 bytes allocated: 80
-instructions executed: 937
-binary size: 3192
-  code: 1204
+instructions executed: 902
+binary size: 3280
+  code: 1292
   data: 457
   metadata: 1531
 functions:
   __eq_i64$arr:
     calls: 2
-    bytes: 288
+    bytes: 344
   __test$filter_evens:
     calls: 1
     bytes: 324
@@ -75,7 +75,7 @@ functions:
     bytes: (external)
   filter_evens$lam$__test$filter_evens$is_even:
     calls: 2
-    bytes: 480
+    bytes: 512
   main:
     calls: 1
     bytes: 112

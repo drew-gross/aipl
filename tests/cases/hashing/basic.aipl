@@ -48,9 +48,9 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 575
-instructions executed: 2793
-binary size: 14504
-  code: 9644
+instructions executed: 2733
+binary size: 14544
+  code: 9684
   data: 1130
   metadata: 3730
 functions:
@@ -62,7 +62,7 @@ functions:
     bytes: 128
   __test$arr:
     calls: 1
-    bytes: 1448
+    bytes: 1520
   __test$dict:
     calls: 1
     bytes: 2136
@@ -80,7 +80,7 @@ functions:
     bytes: 1104
   __test$triple:
     calls: 1
-    bytes: 2024
+    bytes: 1992
   aipl_array_dec:
     calls: 8
     bytes: (external)

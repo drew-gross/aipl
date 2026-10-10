@@ -79,11 +79,11 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 672
-instructions executed: 2375
-binary size: 10512
-  code: 6856
+instructions executed: 2381
+binary size: 10528
+  code: 6876
   data: 51
-  metadata: 3605
+  metadata: 3601
 functions:
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 4
@@ -117,4 +117,4 @@ functions:
     bytes: 456
   main:
     calls: 1
-    bytes: 2856
+    bytes: 2876

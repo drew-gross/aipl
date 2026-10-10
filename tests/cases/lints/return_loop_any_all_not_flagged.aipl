@@ -108,9 +108,9 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 124
-instructions executed: 750
-binary size: 4960
-  code: 2636
+instructions executed: 749
+binary size: 5176
+  code: 2852
   data: 251
   metadata: 2073
 functions:
@@ -131,22 +131,22 @@ functions:
     bytes: (external)
   always_true:
     calls: 1
-    bytes: 208
+    bytes: 244
   counted:
     calls: 1
-    bytes: 244
+    bytes: 280
   falls_through_to_work:
     calls: 1
-    bytes: 264
+    bytes: 300
   first_big:
     calls: 1
-    bytes: 272
+    bytes: 308
   main:
     calls: 1
     bytes: 600
   none_zero:
     calls: 1
-    bytes: 180
+    bytes: 216
   with_else:
     calls: 1
-    bytes: 248
+    bytes: 284

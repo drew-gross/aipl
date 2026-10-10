@@ -27,9 +27,9 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 56
-instructions executed: 338
-binary size: 3664
-  code: 1588
+instructions executed: 386
+binary size: 3744
+  code: 1668
   data: 352
   metadata: 1724
 functions:
@@ -65,7 +65,7 @@ functions:
     bytes: 196
   nonempty_last$i64:
     calls: 2
-    bytes: 216
+    bytes: 256
   nonempty_last$str:
     calls: 1
-    bytes: 436
+    bytes: 476

@@ -91,9 +91,9 @@ allocations: 25
 deallocations: 25
 reallocations: 0
 bytes allocated: 1037
-instructions executed: 3604
-binary size: 26072
-  code: 14312
+instructions executed: 3596
+binary size: 26144
+  code: 14384
   data: 1755
   metadata: 10005
 functions:
@@ -138,10 +138,10 @@ functions:
     bytes: 592
   __to_str_set$i64$err$Error:
     calls: 1
-    bytes: 1072
+    bytes: 1080
   __to_str_str$arr$opt$err$Error:
     calls: 1
-    bytes: 1396
+    bytes: 1460
   __to_str_u64$err$Error:
     calls: 1
     bytes: 592

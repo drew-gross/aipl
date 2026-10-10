@@ -58,18 +58,18 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 128
-instructions executed: 1623
-binary size: 10712
-  code: 5572
+instructions executed: 1621
+binary size: 11160
+  code: 5976
   data: 1436
-  metadata: 3704
+  metadata: 3748
 functions:
   __test$find_if:
     calls: 1
     bytes: 1760
   __test$find_if$filter9$own0:
     calls: 1
-    bytes: 496
+    bytes: 604
   aipl_arr_inc:
     calls: 2
     bytes: (external)
@@ -96,7 +96,7 @@ functions:
     bytes: (external)
   find_if$char$lam$__test$find_if$lambda4:
     calls: 1
-    bytes: 304
+    bytes: 312
   find_if$char$s0$lam$__test$find_if$lambda6:
     calls: 1
     bytes: 304
@@ -105,28 +105,28 @@ functions:
     bytes: 304
   find_if$i64$lam$__test$find_if$is_nine:
     calls: 1
-    bytes: 260
+    bytes: 296
   find_if$i64$lam$__test$find_if$lambda0:
     calls: 1
-    bytes: 260
+    bytes: 296
   find_if$i64$lam$__test$find_if$lambda1:
     calls: 1
-    bytes: 260
+    bytes: 296
   find_if$i64$lam$__test$find_if$lambda10:
     calls: 1
-    bytes: 260
+    bytes: 296
   find_if$i64$lam$__test$find_if$lambda2:
     calls: 1
-    bytes: 260
+    bytes: 296
   find_if$i64$lam$__test$find_if$lambda3:
     calls: 1
-    bytes: 260
+    bytes: 296
   find_if$i64$lam$__test$find_if$lambda8:
     calls: 1
-    bytes: 260
+    bytes: 296
   find_if$str$lam$__test$find_if$lambda5:
     calls: 1
-    bytes: 476
+    bytes: 512
   main:
     calls: 1
     bytes: 108

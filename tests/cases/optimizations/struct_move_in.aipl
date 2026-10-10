@@ -77,9 +77,9 @@ allocations: 48
 deallocations: 48
 reallocations: 3
 bytes allocated: 2930
-instructions executed: 6641
-binary size: 19192
-  code: 11668
+instructions executed: 6670
+binary size: 19320
+  code: 11796
   data: 604
   metadata: 6920
 functions:
@@ -94,7 +94,7 @@ functions:
     bytes: 1772
   __to_str_Named:
     calls: 6
-    bytes: 1208
+    bytes: 1256
   __to_str_u64:
     calls: 2
     bytes: 204
@@ -145,7 +145,7 @@ functions:
     bytes: (external)
   fold:
     calls: 2
-    bytes: 1240
+    bytes: 1272
   main:
     calls: 1
-    bytes: 6964
+    bytes: 7012

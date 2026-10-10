@@ -30,15 +30,15 @@ allocations: 2
 deallocations: 2
 reallocations: 7
 bytes allocated: 80
-instructions executed: 1627
-binary size: 3968
-  code: 1716
+instructions executed: 1527
+binary size: 4136
+  code: 1828
   data: 505
-  metadata: 1747
+  metadata: 1803
 functions:
   __eq_i64$arr:
     calls: 2
-    bytes: 288
+    bytes: 344
   __test$double_each:
     calls: 1
     bytes: 724
@@ -68,7 +68,7 @@ functions:
     bytes: (external)
   double_each:
     calls: 2
-    bytes: 592
+    bytes: 648
   main:
     calls: 1
     bytes: 112

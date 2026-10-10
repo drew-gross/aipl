@@ -185,7 +185,7 @@ bit-packed `bool`s.
   value cannot do.
 
 
-Stage 4 — slices as values                                   [4a done; 4b next]
+Stage 4 — slices as values                                 [4a, 4b done; see 4c]
 ---------------------------------------------------------------------------------
   [x] 4a: arrays travel by address. `Abi::arr_is_composite` is
       `matches!(Wide)`, so every array value in codegen is the address of its
@@ -196,16 +196,32 @@ Stage 4 — slices as values                                   [4a done; 4b next
       `main`), FFI params (`write_ffi_arg`) and FFI returns (sret).
       Allocations are unchanged corpus-wide; instructions and binary size are
       ~+4.8%, the cost of the extra words before 4b gives them a use.
-  [ ] 4b: a slice is a value `{block, data + lo * stride, n}` — nothing
-      allocated. Runtime entry points that still want a block materialize one.
+  [x] 4b: a slice is a value `{block, data + lo * stride, n}` over a heap
+      block — nothing allocated (`arr24::aipl_arr_window`; the shape is
+      `arr24::ArrValue`, "Windows over the 8-byte block"). Over the *old* block,
+      not `Arr`'s: the block changes in stage 6.
+        - readers learn the window: `ArrView` in codegen (length, element
+          reads, `for`, `==`, hash, render, starts/ends/contains, `to_set`),
+          `join`'s parts and the FFI reader in the runtime and host.
+        - every other runtime entry still takes a block, and gets one only when
+          the value really is a window: `arr_block` (borrowed, a view tracked as
+          `Owned::View`), `consumed_block` (for an entry that consumes), and
+          `settle_array_slot` (an owning slot about to be mutated through).
+        - a reversed or bit-packed source has nothing to point into, so slicing
+          one still builds the view block.
+      Corpus vs 4a: allocations down in 26 cases and up in none; instructions
+      -3.5%, binary +0.9%.
+  [x] a case proving a slice allocates nothing, the way
+      `strings/named_representations.aipl` proves a rope does
+      (`arrays/slice_allocates_nothing.aipl`)
+  [ ] 4c. delete the Slice view block and `ARR_SLICE_TAG`, and the `Sliced`
+      arm at every dispatch site. **Not yet possible**: the view block is still
+      what a window lends a runtime entry that wants a block, and what slicing a
+      reversed or bit-packed array builds. It goes once the entry points take
+      values rather than blocks (or stage 5 makes reversal a value too, which
+      removes the reversed-source case).
   [ ] `is_wide_array` and `is_padded_array` now answer the same question;
       fold them into one (Stage 7 if not sooner)
-  [ ] delete the Slice view block and `ARR_SLICE_TAG`; `Arr::slice` is already
-      the replacement and allocates nothing
-  [ ] remove the `Sliced` arm from every dispatch site (the exhaustive `match`
-      will name them)
-  [ ] a case proving a slice allocates nothing, the way
-      `strings/named_representations.aipl` proves a rope does
 
 
 Stage 5 — reversed as values                                   [blocked on 2]

@@ -109,11 +109,11 @@ allocations: 78
 deallocations: 78
 reallocations: 2
 bytes allocated: 6238
-instructions executed: 5050
-binary size: 23496
-  code: 13500
+instructions executed: 5125
+binary size: 23552
+  code: 13560
   data: 1568
-  metadata: 8428
+  metadata: 8424
 functions:
   __arr_drop_Ty:
     calls: 5
@@ -177,4 +177,4 @@ functions:
     bytes: 5568
   show_tys:
     calls: 6
-    bytes: 1424
+    bytes: 1484

@@ -75,11 +75,11 @@ allocations: 26
 deallocations: 26
 reallocations: 2
 bytes allocated: 1036
-instructions executed: 4368
-binary size: 15464
-  code: 10696
+instructions executed: 4481
+binary size: 17120
+  code: 12100
   data: 545
-  metadata: 4223
+  metadata: 4475
 functions:
   __to_str_i64:
     calls: 15
@@ -113,28 +113,28 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2408
+    bytes: 2496
   main$zip1$own0$own1:
     calls: 1
-    bytes: 1392
+    bytes: 1628
   main$zip11$own0$own1:
     calls: 1
-    bytes: 1392
+    bytes: 1628
   main$zip15$own0$own1:
     calls: 1
-    bytes: 2044
+    bytes: 2340
   main$zip3$own0$own1:
     calls: 1
-    bytes: 1392
+    bytes: 1628
   main$zip5$own0:
     calls: 1
-    bytes: 692
+    bytes: 816
   main$zip7$own1:
     calls: 1
-    bytes: 692
+    bytes: 816
   show:
     calls: 5
-    bytes: 224
+    bytes: 256
   show_strs:
     calls: 2
-    bytes: 256
+    bytes: 288

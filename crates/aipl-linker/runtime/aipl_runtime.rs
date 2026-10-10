@@ -1815,7 +1815,8 @@ pub extern "C" fn aipl_arr_reverse(
 /// a slice view sharing `xs`'s elements (see `ARR_SLICE_TAG`), a slice of a
 /// slice looking through to the source, an empty window as a fresh empty
 /// array, and the whole array as itself, retained. Mirrors the JIT runtime's
-/// `aipl_arr_slice`.
+/// `aipl_arr_slice`, including what reaches it now that a slice is a window
+/// carried in the value (`arr24::aipl_arr_window`).
 #[no_mangle]
 pub extern "C" fn aipl_arr_slice(
     a: *const u8,
@@ -2979,7 +2980,7 @@ pub extern "C" fn aipl_arr_join(
                         k += 1;
                     }
                 }
-                let part = part_at_rt(parts_heap, i);
+                let part = part_at_rt(parts_heap, i, drop_fn, retain_fn, elem_size);
                 let plen = if part.is_null() { 0 } else { array_len(part) };
                 let mut k = 0;
                 while k < plen {
@@ -3012,7 +3013,7 @@ pub extern "C" fn aipl_arr_join(
             if i > 0 {
                 total += gap_len(i);
             }
-            let part = part_at_rt(parts_heap, i);
+            let part = part_at_rt(parts_heap, i, drop_fn, retain_fn, elem_size);
             if !part.is_null() {
                 total += array_len(part);
             }
@@ -3035,7 +3036,7 @@ pub extern "C" fn aipl_arr_join(
                 );
                 pos += sep_len;
             }
-            let part = part_at_rt(parts_heap, i);
+            let part = part_at_rt(parts_heap, i, drop_fn, retain_fn, elem_size);
             let plen = if part.is_null() { 0 } else { array_len(part) };
             if plen > 0 {
                 let from = part.add(ARR_ELEMS_OFFSET);
@@ -3061,22 +3062,24 @@ pub extern "C" fn aipl_arr_join(
     }
 }
 
-/// Part `i` of a `T[][]`, materialized to a heap array the caller owns. The
-/// `inc` before `aipl_arr_ensure_heap` is what makes both representations
-/// balance — see codegen's `part_at`.
-unsafe fn part_at_rt(parts: *const u8, i: usize) -> *const u8 {
-    // The parts are a `T[][]`, so each is a padded 24-byte array value with its
-    // tagged pointer in the first word — hence the `ARR_SIZE` stride. Safe for
-    // the one caller compiled before the switch: the checked-in artifact does
-    // not import `aipl_arr_join` (only `aipl_arr_drop_arr` / `_retain_ptr`,
-    // which keep the 8-byte stride for sets and dicts), and an artifact
-    // regenerated after it is `Wide` itself.
+/// Part `i` of a `T[][]`, materialized to a heap array the caller owns. Taking
+/// a reference first is what makes every representation balance in
+/// `aipl_arr_ensure_heap` — see codegen's `part_at`.
+unsafe fn part_at_rt(
+    parts: *const u8,
+    i: usize,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    // The parts are a `T[][]`, so each is a 24-byte array value — hence the
+    // `ARR_SIZE` stride — and may be a window, which lends a view block.
     let elems = unsafe { parts.add(ARR_ELEMS_OFFSET) };
-    let p = unsafe { *(elems.add(i * arr24::ARR_SIZE) as *const i64) } as *const u8;
+    let value = unsafe { elems.add(i * arr24::ARR_SIZE) } as *const arr24::ArrValue;
+    let p = arr24::owned_block_of(value, drop_fn, retain_fn, elem_size);
     if p.is_null() {
         return p;
     }
-    aipl_arr_inc(p);
     aipl_arr_ensure_heap(p)
 }
 

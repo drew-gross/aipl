@@ -51,9 +51,9 @@ allocations: 21
 deallocations: 21
 reallocations: 0
 bytes allocated: 1320
-instructions executed: 6197
-binary size: 18608
-  code: 10332
+instructions executed: 6507
+binary size: 19104
+  code: 10828
   data: 2129
   metadata: 6147
 functions:
@@ -62,7 +62,7 @@ functions:
     bytes: 6384
   __test$is_operator_name:
     calls: 1
-    bytes: 3828
+    bytes: 4324
   aipl_arr_inc:
     calls: 31
     bytes: (external)

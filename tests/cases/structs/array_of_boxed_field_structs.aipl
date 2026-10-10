@@ -47,11 +47,11 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 359
-instructions executed: 559
-binary size: 4344
-  code: 2136
+instructions executed: 567
+binary size: 4408
+  code: 2204
   data: 1
-  metadata: 2207
+  metadata: 2203
 functions:
   __arr_drop_Holder:
     calls: 1
@@ -103,10 +103,10 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 972
+    bytes: 1008
   sum_holders:
     calls: 2
-    bytes: 272
+    bytes: 304
   total:
     calls: 9
     bytes: 160

@@ -62,24 +62,24 @@ allocations: 8
 deallocations: 8
 reallocations: 7
 bytes allocated: 1958
-instructions executed: 22758
-binary size: 5216
-  code: 2860
+instructions executed: 20571
+binary size: 5488
+  code: 3080
   data: 155
-  metadata: 2201
+  metadata: 2253
 functions:
   __builtin_find_if$i64$lam$is_big:
     calls: 1
-    bytes: 264
+    bytes: 300
   __builtin_find_if$i64$lam$main$lambda1:
     calls: 1
-    bytes: 264
+    bytes: 300
   __builtin_map_find_if$i64$i64$lam$stepped$is_big:
     calls: 1
-    bytes: 272
+    bytes: 308
   __builtin_map_find_if$i64$i64$lam$stepped$main$lambda2:
     calls: 1
-    bytes: 272
+    bytes: 308
   __to_str_i64$opt:
     calls: 4
     bytes: 388
@@ -109,4 +109,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1400
+    bytes: 1476

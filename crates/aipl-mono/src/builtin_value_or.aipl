@@ -71,9 +71,9 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 520
-binary size: 6344
-  code: 2256
+instructions executed: 556
+binary size: 6424
+  code: 2336
   data: 1636
   metadata: 2452
 functions:
@@ -82,7 +82,7 @@ functions:
     bytes: 104
   __test$value_or:
     calls: 1
-    bytes: 2044
+    bytes: 2124
   aipl_assert:
     calls: 18
     bytes: (external)

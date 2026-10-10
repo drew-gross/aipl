@@ -329,15 +329,15 @@ fn cleanup(out: str) -> str {
     assert(raw.print(100) == `x = """\n    hi\n"""\n`);
 })
 --- performance ---
-allocations: 314
-deallocations: 314
+allocations: 313
+deallocations: 313
 reallocations: 1
-bytes allocated: 21677
-instructions executed: 34594
-binary size: 38808
-  code: 24284
+bytes allocated: 21621
+instructions executed: 36136
+binary size: 40712
+  code: 25448
   data: 889
-  metadata: 13635
+  metadata: 14375
 functions:
   __arr_drop_Doc:
     calls: 10
@@ -350,7 +350,7 @@ functions:
     bytes: 304
   __builtin_any$Doc$lam$has_hard:
     calls: 5
-    bytes: 268
+    bytes: 304
   __builtin_count_while$char$s0$lam$__m2__dedent$lambda1:
     calls: 0
     bytes: 268
@@ -370,13 +370,13 @@ functions:
     calls: 1
     bytes: 6164
   aipl_arr_inc:
-    calls: 93
+    calls: 94
     bytes: (external)
   aipl_arr_reserve:
     calls: 11
     bytes: (external)
   aipl_arr_slice:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_array_dec:
     calls: 191
@@ -425,13 +425,13 @@ functions:
     bytes: (external)
   col_after:
     calls: 28
-    bytes: 636
+    bytes: 668
   fits:
     calls: 0
     bytes: 36
   fits$tail:
     calls: 42
-    bytes: 2704
+    bytes: 2764
   fits_atom:
     calls: 0
     bytes: 52
@@ -449,4 +449,4 @@ functions:
     bytes: 108
   print:
     calls: 11
-    bytes: 11588
+    bytes: 12624

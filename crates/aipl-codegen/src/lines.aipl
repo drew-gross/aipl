@@ -30,15 +30,15 @@ allocations: 12
 deallocations: 12
 reallocations: 0
 bytes allocated: 1008
-instructions executed: 1431
-binary size: 5752
-  code: 3000
+instructions executed: 1447
+binary size: 5808
+  code: 3056
   data: 541
   metadata: 2211
 functions:
   __eq_str$arr:
     calls: 6
-    bytes: 356
+    bytes: 412
   __test$lines:
     calls: 1
     bytes: 2540

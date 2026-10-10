@@ -146,15 +146,15 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 277
-instructions executed: 1858
-binary size: 9096
-  code: 5616
+instructions executed: 1862
+binary size: 9432
+  code: 5952
   data: 407
   metadata: 3073
 functions:
   __builtin_find_if$i64$lam$main$lambda0:
     calls: 1
-    bytes: 264
+    bytes: 300
   __to_str_bool:
     calls: 1
     bytes: 232
@@ -178,28 +178,28 @@ functions:
     bytes: (external)
   first_big_after:
     calls: 1
-    bytes: 352
+    bytes: 388
   first_big_doubled:
     calls: 1
-    bytes: 280
+    bytes: 316
   first_big_logged:
     calls: 1
-    bytes: 332
+    bytes: 368
   first_big_or_first:
     calls: 1
-    bytes: 428
+    bytes: 476
   first_multiple:
     calls: 1
     bytes: 152
   has_big:
     calls: 1
-    bytes: 208
+    bytes: 244
   head_sign:
     calls: 1
-    bytes: 284
+    bytes: 308
   lo_if_any_big:
     calls: 1
-    bytes: 272
+    bytes: 308
   main:
     calls: 1
-    bytes: 2220
+    bytes: 2268

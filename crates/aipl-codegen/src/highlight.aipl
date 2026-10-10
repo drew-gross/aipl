@@ -754,15 +754,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 518
-deallocations: 518
+allocations: 514
+deallocations: 514
 reallocations: 38
-bytes allocated: 41178
-instructions executed: 113446
-binary size: 122816
-  code: 81640
+bytes allocated: 40954
+instructions executed: 114879
+binary size: 125968
+  code: 83852
   data: 5464
-  metadata: 35712
+  metadata: 36652
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -793,37 +793,37 @@ functions:
     bytes: 304
   __builtin_count_while$Item$lam$rule_pats$Kind$lambda0:
     calls: 0
-    bytes: 520
+    bytes: 556
   __builtin_count_while$Item$lam$rule_pats$Kind$lambda1$lambda0:
     calls: 4
-    bytes: 520
+    bytes: 556
   __eq_Entry:
     calls: 1
     bytes: 128
   __eq_Entry$arr:
     calls: 2
-    bytes: 276
+    bytes: 332
   __eq_Pat:
     calls: 12
     bytes: 480
   __eq_Pat$arr:
     calls: 9
-    bytes: 292
+    bytes: 348
   __eq_set$char:
     calls: 3
     bytes: 84
   __eq_str$arr:
     calls: 1
-    bytes: 356
+    bytes: 412
   __m1__indent:
     calls: 12
-    bytes: 1684
+    bytes: 1748
   __rec_drop_Pat:
     calls: 57
     bytes: 268
   __test$brace_group_entry:
     calls: 1
-    bytes: 2080
+    bytes: 2092
   __test$char_class_body:
     calls: 1
     bytes: 1892
@@ -844,30 +844,27 @@ functions:
     bytes: 1104
   __test$rule_pats:
     calls: 1
-    bytes: 8172
+    bytes: 8212
   __test$tm_json:
     calls: 1
-    bytes: 5388
+    bytes: 5988
   __test$word_pat:
     calls: 1
-    bytes: 2224
+    bytes: 2280
   __to_str_u64:
     calls: 0
     bytes: 204
-  aipl_arr_elem_ptr:
-    calls: 15
-    bytes: (external)
   aipl_arr_extend:
     calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 56
+    calls: 60
     bytes: (external)
   aipl_arr_reserve:
     calls: 1
     bytes: (external)
   aipl_arr_slice:
-    calls: 12
+    calls: 4
     bytes: (external)
   aipl_array_dec:
     calls: 447
@@ -913,16 +910,16 @@ functions:
     bytes: (external)
   arr_fld:
     calls: 2
-    bytes: 1956
+    bytes: 2000
   caps_fld:
     calls: 0
-    bytes: 880
+    bytes: 972
   char_class_body:
     calls: 16
-    bytes: 2024
+    bytes: 2040
   entry_name:
     calls: 5
-    bytes: 492
+    bytes: 608
   fld:
     calls: 6
     bytes: 348
@@ -934,22 +931,22 @@ functions:
     bytes: 760
   matcher_pat:
     calls: 24
-    bytes: 8212
+    bytes: 8276
   obj_fld:
     calls: 1
-    bytes: 1956
+    bytes: 2000
   obj_of:
     calls: 2
-    bytes: 1576
+    bytes: 1628
   pat_json:
     calls: 2
-    bytes: 3348
+    bytes: 3644
   re_escape:
     calls: 32
     bytes: 1960
   re_escape_set:
     calls: 4
-    bytes: 1148
+    bytes: 1216
   rule_pats$Kind:
     calls: 2
-    bytes: 10072
+    bytes: 10480

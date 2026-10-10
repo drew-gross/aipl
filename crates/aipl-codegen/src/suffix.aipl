@@ -93,15 +93,15 @@ fn two_values(self: FieldInit[]) -> (Expr, Expr)? {
     }
 }
 --- performance ---
-allocations: 77
-deallocations: 77
+allocations: 76
+deallocations: 76
 reallocations: 1
-bytes allocated: 6081
-instructions executed: 3745
-binary size: 78856
-  code: 52608
+bytes allocated: 6025
+instructions executed: 3812
+binary size: 80096
+  code: 53508
   data: 721
-  metadata: 25527
+  metadata: 25867
 functions:
   __arr_drop___m1__Expr:
     calls: 2
@@ -123,22 +123,22 @@ functions:
     bytes: 476
   __m1__show_expr:
     calls: 21
-    bytes: 25200
+    bytes: 25548
   __m1__show_exprs:
     calls: 1
-    bytes: 1424
+    bytes: 1484
   __m2__show_pat:
     calls: 0
-    bytes: 2844
+    bytes: 2956
   __m2__show_pats:
     calls: 0
-    bytes: 1424
+    bytes: 1484
   __m4__show_ty:
     calls: 0
     bytes: 5568
   __m4__show_tys:
     calls: 0
-    bytes: 1424
+    bytes: 1484
   __rec_drop___m1__Expr:
     calls: 16
     bytes: 36
@@ -157,9 +157,6 @@ functions:
   __to_str_i64:
     calls: 7
     bytes: 204
-  aipl_arr_elem_ptr:
-    calls: 1
-    bytes: (external)
   aipl_arr_extend:
     calls: 1
     bytes: (external)
@@ -169,11 +166,8 @@ functions:
   aipl_arr_reserve:
     calls: 1
     bytes: (external)
-  aipl_arr_slice:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 14
+    calls: 13
     bytes: (external)
   aipl_array_new:
     calls: 3
@@ -213,10 +207,10 @@ functions:
     bytes: (external)
   apply_suffix:
     calls: 7
-    bytes: 3236
+    bytes: 3416
   main:
     calls: 1
     bytes: 112
   range_bounds:
     calls: 2
-    bytes: 3596
+    bytes: 3676

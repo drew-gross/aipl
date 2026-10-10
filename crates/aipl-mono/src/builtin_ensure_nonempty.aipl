@@ -32,18 +32,18 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 56
-instructions executed: 304
-binary size: 3712
-  code: 1464
+instructions executed: 350
+binary size: 3800
+  code: 1552
   data: 502
   metadata: 1746
 functions:
   __builtin_nonempty_first$i64:
     calls: 1
-    bytes: 204
+    bytes: 228
   __test$ensure_nonempty:
     calls: 1
-    bytes: 1140
+    bytes: 1204
   aipl_arr_inc:
     calls: 4
     bytes: (external)

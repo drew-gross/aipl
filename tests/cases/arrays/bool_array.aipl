@@ -23,18 +23,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 626
-binary size: 2848
-  code: 1244
+instructions executed: 622
+binary size: 3000
+  code: 1396
   data: 321
   metadata: 1283
 functions:
   __eq_bool$arr:
     calls: 1
-    bytes: 288
+    bytes: 344
   __test$count_true:
     calls: 1
-    bytes: 848
+    bytes: 944
   aipl_assert:
     calls: 5
     bytes: (external)

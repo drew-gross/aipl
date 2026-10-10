@@ -56,15 +56,15 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 88
-instructions executed: 282
-binary size: 4328
-  code: 1560
+instructions executed: 290
+binary size: 4544
+  code: 1632
   data: 669
-  metadata: 2099
+  metadata: 2243
 functions:
   __test$elapsed_over_a_one_second_sleep:
     calls: 1
-    bytes: 1116
+    bytes: 1188
   __test$readings_never_go_backwards:
     calls: 1
     bytes: 284

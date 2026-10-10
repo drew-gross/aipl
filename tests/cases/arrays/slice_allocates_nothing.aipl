@@ -1,0 +1,53 @@
+# A slice is a value, not an allocation: `xs[a..b]` is the source's own block
+# with a window — where its elements start, and how many — carried in the
+# value's other two words (see "Windows over the 8-byte block" in
+# `crates/aipl-codegen/src/arr24.rs`). Reading one allocates nothing either: its
+# length, an element, a walk over it, or a slice of it, which is a window of the
+# same block rather than a view of a view.
+#
+# The allocation count below is the proof. Every array here windows a constant
+# literal, which lives in the data section, so there is nothing in the program
+# to allocate unless a slice does — and `main` returns its answer as the exit
+# code rather than printing it, since rendering would allocate a buffer.
+
+import { value_or, wrapping_add as +, wrapping_add_assign as += } from builtins;
+
+fn total(xs: i64[]) -> i64 {
+    mut n = 0;
+    for (let x : xs) {
+        set n += x;
+    }
+    n
+}
+
+fn main() -> i64 {
+    let xs = [1, 2, 3, 4, 5, 6, 7, 8];
+    let mid = xs[2..6]; // 3, 4, 5, 6
+    let inner = mid[1..3]; // 4, 5: a window of a window, still over `xs`
+    total(mid) + total(inner) + inner[0].value_or(0) // 18 + 9 + 4
+}
+--- exit code ---
+31
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 312
+binary size: 1472
+  code: 612
+  data: 97
+  metadata: 763
+functions:
+  aipl_arr_inc:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 400
+  total:
+    calls: 2
+    bytes: 212

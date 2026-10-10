@@ -40,27 +40,27 @@ fn main() !prints {
 [false, true, true]
 [40, 30]
 --- performance ---
-allocations: 19
-deallocations: 19
+allocations: 14
+deallocations: 14
 reallocations: 0
-bytes allocated: 856
-instructions executed: 3687
-binary size: 7448
-  code: 3940
+bytes allocated: 576
+instructions executed: 3835
+binary size: 7712
+  code: 4128
   data: 371
-  metadata: 3137
+  metadata: 3213
 functions:
   __to_str_bool$arr:
     calls: 1
-    bytes: 724
+    bytes: 792
   __to_str_i64$arr:
     calls: 7
-    bytes: 716
+    bytes: 764
   __to_str_str$arr:
     calls: 2
-    bytes: 848
+    bytes: 904
   aipl_arr_elem_ptr:
-    calls: 28
+    calls: 4
     bytes: (external)
   aipl_arr_inc:
     calls: 8
@@ -72,10 +72,10 @@ functions:
     calls: 1
     bytes: (external)
   aipl_arr_slice:
-    calls: 8
+    calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 17
+    calls: 12
     bytes: (external)
   aipl_array_new:
     calls: 1
@@ -91,4 +91,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1652
+    bytes: 1668

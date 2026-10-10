@@ -44,18 +44,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 602
-binary size: 4504
-  code: 1824
+instructions executed: 601
+binary size: 4584
+  code: 1896
   data: 773
-  metadata: 1907
+  metadata: 1915
 functions:
   __test$find_map:
     calls: 1
     bytes: 848
-  aipl_arr_slice:
-    calls: 1
-    bytes: (external)
   aipl_assert:
     calls: 7
     bytes: (external)
@@ -73,10 +70,10 @@ functions:
     bytes: 344
   find_map$i64$i64$lam$__test$find_map$lambda0:
     calls: 1
-    bytes: 268
+    bytes: 304
   find_map$i64$i64$lam$__test$find_map$nonzero:
     calls: 3
-    bytes: 256
+    bytes: 292
   main:
     calls: 1
     bytes: 108

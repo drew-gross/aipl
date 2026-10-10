@@ -69,11 +69,11 @@ allocations: 14
 deallocations: 14
 reallocations: 2
 bytes allocated: 627
-instructions executed: 1955
-binary size: 8624
-  code: 4428
+instructions executed: 1952
+binary size: 9040
+  code: 4720
   data: 1033
-  metadata: 3163
+  metadata: 3287
 functions:
   __arr_drop_Aaa:
     calls: 1
@@ -92,7 +92,7 @@ functions:
     bytes: 92
   __test$build:
     calls: 1
-    bytes: 2992
+    bytes: 3284
   aipl_array_dec:
     calls: 1
     bytes: (external)

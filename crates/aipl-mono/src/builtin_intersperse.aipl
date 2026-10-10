@@ -45,15 +45,15 @@ allocations: 14
 deallocations: 14
 reallocations: 21
 bytes allocated: 864
-instructions executed: 2790
-binary size: 8656
-  code: 4640
+instructions executed: 2862
+binary size: 9096
+  code: 4976
   data: 913
-  metadata: 3103
+  metadata: 3207
 functions:
   __test$intersperse:
     calls: 1
-    bytes: 3484
+    bytes: 3676
   aipl_arr_inc:
     calls: 18
     bytes: (external)
@@ -83,10 +83,10 @@ functions:
     bytes: (external)
   intersperse$i64:
     calls: 4
-    bytes: 488
+    bytes: 556
   intersperse$str:
     calls: 5
-    bytes: 556
+    bytes: 632
   main:
     calls: 1
     bytes: 112

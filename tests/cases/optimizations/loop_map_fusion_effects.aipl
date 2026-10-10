@@ -51,11 +51,11 @@ allocations: 20
 deallocations: 20
 reallocations: 0
 bytes allocated: 850
-instructions executed: 1298
-binary size: 3952
-  code: 2228
+instructions executed: 1247
+binary size: 4336
+  code: 2540
   data: 57
-  metadata: 1667
+  metadata: 1739
 functions:
   __to_str_i64:
     calls: 12
@@ -77,10 +77,10 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 904
+    bytes: 984
   main$map0$own0:
     calls: 1
-    bytes: 660
+    bytes: 768
   main$map2$own0:
     calls: 1
-    bytes: 460
+    bytes: 584

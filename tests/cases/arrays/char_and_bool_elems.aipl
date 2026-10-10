@@ -23,11 +23,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 614
-binary size: 3200
-  code: 1152
+instructions executed: 650
+binary size: 3240
+  code: 1188
   data: 489
-  metadata: 1559
+  metadata: 1563
 functions:
   __test$count_h:
     calls: 1
@@ -49,10 +49,10 @@ functions:
     bytes: (external)
   count_h:
     calls: 2
-    bytes: 244
+    bytes: 252
   first_true:
     calls: 3
-    bytes: 208
+    bytes: 236
   main:
     calls: 1
     bytes: 176

@@ -60,57 +60,57 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 152
-instructions executed: 2283
-binary size: 12816
-  code: 6964
+instructions executed: 2259
+binary size: 13440
+  code: 7544
   data: 1630
-  metadata: 4222
+  metadata: 4266
 functions:
   __builtin_find_index$char$lam$__test$first_big$lambda4:
     calls: 1
-    bytes: 332
+    bytes: 340
   __builtin_find_index$char$s0$lam$__test$first_big$lambda5:
     calls: 1
     bytes: 332
   __builtin_find_index$i64$lam$__test$first_big$is_neg:
     calls: 1
-    bytes: 288
+    bytes: 324
   __builtin_find_index$i64$lam$__test$first_big$lambda0:
     calls: 1
-    bytes: 288
+    bytes: 324
   __builtin_find_index$i64$lam$__test$first_big$lambda1:
     calls: 1
-    bytes: 288
+    bytes: 324
   __builtin_find_index$i64$lam$__test$first_big$lambda10:
     calls: 1
-    bytes: 288
+    bytes: 324
   __builtin_find_index$i64$lam$__test$first_big$lambda11:
     calls: 1
-    bytes: 288
+    bytes: 324
   __builtin_find_index$i64$lam$__test$first_big$lambda12:
     calls: 1
-    bytes: 288
+    bytes: 324
   __builtin_find_index$i64$lam$__test$first_big$lambda2:
     calls: 1
-    bytes: 288
+    bytes: 324
   __builtin_find_index$i64$lam$__test$first_big$lambda3:
     calls: 1
-    bytes: 288
+    bytes: 324
   __builtin_find_index$i64$lam$__test$first_big$lambda8:
     calls: 1
-    bytes: 288
+    bytes: 324
   __builtin_find_index$i64$lam$__test$first_big$lambda9:
     calls: 1
-    bytes: 288
+    bytes: 324
   __builtin_find_index$str$lam$__test$first_big$value_for$lambda0:
     calls: 2
-    bytes: 396
+    bytes: 432
   __test$first_big:
     calls: 1
-    bytes: 2420
+    bytes: 2488
   __test$first_big$filter7$own0:
     calls: 1
-    bytes: 496
+    bytes: 604
   aipl_arr_inc:
     calls: 2
     bytes: (external)

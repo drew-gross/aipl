@@ -42,15 +42,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1728
-binary size: 4088
-  code: 1588
+instructions executed: 1626
+binary size: 4168
+  code: 1668
   data: 843
   metadata: 1657
 functions:
   __builtin_count_is_not_equal$i64:
     calls: 5
-    bytes: 284
+    bytes: 324
   __test$count_is_not_equal:
     calls: 1
     bytes: 896
@@ -68,7 +68,7 @@ functions:
     bytes: (external)
   count_is_not_equal$i64:
     calls: 6
-    bytes: 284
+    bytes: 324
   main:
     calls: 1
     bytes: 124

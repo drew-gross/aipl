@@ -54,11 +54,11 @@ allocations: 32
 deallocations: 32
 reallocations: 6
 bytes allocated: 1589
-instructions executed: 15157
-binary size: 9624
-  code: 4556
+instructions executed: 15306
+binary size: 9680
+  code: 4608
   data: 1729
-  metadata: 3339
+  metadata: 3343
 functions:
   __test$clean_trailing_whitespace:
     calls: 1
@@ -83,7 +83,7 @@ functions:
     bytes: (external)
   clean_trailing_whitespace:
     calls: 16
-    bytes: 1800
+    bytes: 1852
   main:
     calls: 1
     bytes: 100

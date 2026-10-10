@@ -34,45 +34,45 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 1214
-binary size: 8080
-  code: 4092
+instructions executed: 1202
+binary size: 8528
+  code: 4496
   data: 1040
-  metadata: 2948
+  metadata: 2992
 functions:
   __builtin_find_if$char$lam$__test$first_big$lambda4:
     calls: 1
-    bytes: 304
+    bytes: 312
   __builtin_find_if$i64$lam$__test$first_big$is_neg:
     calls: 1
-    bytes: 260
+    bytes: 296
   __builtin_find_if$i64$lam$__test$first_big$lambda0:
     calls: 1
-    bytes: 260
+    bytes: 296
   __builtin_find_if$i64$lam$__test$first_big$lambda1:
     calls: 1
-    bytes: 260
+    bytes: 296
   __builtin_find_if$i64$lam$__test$first_big$lambda2:
     calls: 1
-    bytes: 260
+    bytes: 296
   __builtin_find_if$i64$lam$__test$first_big$lambda3:
     calls: 1
-    bytes: 260
+    bytes: 296
   __builtin_find_if$i64$lam$__test$first_big$lambda7:
     calls: 1
-    bytes: 260
+    bytes: 296
   __builtin_find_if$i64$lam$__test$first_big$lambda8:
     calls: 1
-    bytes: 260
+    bytes: 296
   __builtin_find_if$i64$lam$__test$first_big$lambda9:
     calls: 1
-    bytes: 260
+    bytes: 296
   __test$first_big:
     calls: 1
     bytes: 1104
   __test$first_big$filter6$own0:
     calls: 1
-    bytes: 496
+    bytes: 604
   aipl_arr_inc:
     calls: 2
     bytes: (external)

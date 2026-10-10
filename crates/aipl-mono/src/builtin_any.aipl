@@ -41,18 +41,18 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 1214
-binary size: 7160
-  code: 3308
+instructions executed: 1207
+binary size: 7536
+  code: 3640
   data: 982
-  metadata: 2870
+  metadata: 2914
 functions:
   __test$any:
     calls: 1
     bytes: 912
   __test$any$filter6$own0:
     calls: 1
-    bytes: 496
+    bytes: 604
   aipl_arr_inc:
     calls: 2
     bytes: (external)
@@ -76,7 +76,7 @@ functions:
     bytes: (external)
   any$char$lam$__test$any$lambda3:
     calls: 1
-    bytes: 232
+    bytes: 240
   any$char$s0$lam$__test$any$lambda4:
     calls: 1
     bytes: 232
@@ -85,22 +85,22 @@ functions:
     bytes: 232
   any$i64$lam$__test$any$is_nine:
     calls: 1
-    bytes: 184
+    bytes: 220
   any$i64$lam$__test$any$lambda0:
     calls: 1
-    bytes: 184
+    bytes: 220
   any$i64$lam$__test$any$lambda1:
     calls: 1
-    bytes: 184
+    bytes: 220
   any$i64$lam$__test$any$lambda2:
     calls: 1
-    bytes: 184
+    bytes: 220
   any$i64$lam$__test$any$lambda7:
     calls: 1
-    bytes: 184
+    bytes: 220
   any$i64$lam$__test$any$lambda8:
     calls: 1
-    bytes: 184
+    bytes: 220
   main:
     calls: 1
     bytes: 100

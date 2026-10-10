@@ -29,7 +29,7 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 18
-instructions executed: 155
+instructions executed: 157
 binary size: 1968
   code: 916
   data: 1

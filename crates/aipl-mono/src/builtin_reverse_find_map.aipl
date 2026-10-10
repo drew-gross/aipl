@@ -43,18 +43,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 39
-instructions executed: 647
-binary size: 5296
-  code: 2036
+instructions executed: 668
+binary size: 5344
+  code: 2084
   data: 1014
   metadata: 2246
 functions:
   __test$reverse_find_map:
     calls: 1
     bytes: 964
-  aipl_arr_slice:
-    calls: 1
-    bytes: (external)
   aipl_assert:
     calls: 8
     bytes: (external)
@@ -75,7 +72,7 @@ functions:
     bytes: 436
   reverse_find_map$i64$i64$lam$__test$reverse_find_map$lambda0:
     calls: 1
-    bytes: 264
+    bytes: 288
   reverse_find_map$i64$i64$lam$__test$reverse_find_map$nonzero:
     calls: 4
-    bytes: 252
+    bytes: 276

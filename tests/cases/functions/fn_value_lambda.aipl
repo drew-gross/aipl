@@ -45,18 +45,18 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 144
-instructions executed: 615
-binary size: 4320
-  code: 1836
+instructions executed: 602
+binary size: 4544
+  code: 2016
   data: 439
-  metadata: 2045
+  metadata: 2089
 functions:
   __ctor$Tok$Int:
     calls: 1
     bytes: 60
   __eq_i64$arr:
     calls: 1
-    bytes: 288
+    bytes: 344
   __test$heap_lambda:
     calls: 1
     bytes: 220
@@ -77,7 +77,7 @@ functions:
     bytes: 8
   __test$probe$map7$own0:
     calls: 1
-    bytes: 452
+    bytes: 576
   aipl_arr_inc:
     calls: 2
     bytes: (external)

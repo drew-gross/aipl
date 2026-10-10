@@ -256,11 +256,11 @@ allocations: 142
 deallocations: 142
 reallocations: 6
 bytes allocated: 10945
-instructions executed: 10882
-binary size: 107440
-  code: 70084
+instructions executed: 11574
+binary size: 109296
+  code: 71504
   data: 2851
-  metadata: 34505
+  metadata: 34941
 functions:
   __arr_drop_Pat:
     calls: 9
@@ -276,13 +276,13 @@ functions:
     bytes: 116
   __builtin_all$Pat$lam$is_plain_binder:
     calls: 4
-    bytes: 256
+    bytes: 292
   __builtin_map_join$Pat$str$lam$nested_bindings:
     calls: 3
-    bytes: 1176
+    bytes: 1668
   __eq_str$arr:
     calls: 7
-    bytes: 356
+    bytes: 412
   __m1__show_ann:
     calls: 0
     bytes: 416
@@ -291,16 +291,16 @@ functions:
     bytes: 476
   __m1__show_expr:
     calls: 2
-    bytes: 25200
+    bytes: 25548
   __m1__show_exprs:
     calls: 1
-    bytes: 1424
+    bytes: 1484
   __m3__show_ty:
     calls: 0
     bytes: 5568
   __m3__show_tys:
     calls: 0
-    bytes: 1424
+    bytes: 1484
   __rec_drop_Pat:
     calls: 42
     bytes: 232
@@ -387,7 +387,7 @@ functions:
     bytes: (external)
   binder_list:
     calls: 3
-    bytes: 1704
+    bytes: 1768
   binder_name:
     calls: 2
     bytes: 536
@@ -402,25 +402,25 @@ functions:
     bytes: 2836
   is_plain_binder:
     calls: 4
-    bytes: 508
+    bytes: 524
   main:
     calls: 1
     bytes: 472
   nested_bindings:
     calls: 5
-    bytes: 872
+    bytes: 896
   nested_or_ctor:
     calls: 4
-    bytes: 760
+    bytes: 804
   pat_bindings:
     calls: 9
-    bytes: 1612
+    bytes: 1660
   pat_label:
     calls: 6
     bytes: 1440
   show_pat:
     calls: 22
-    bytes: 2844
+    bytes: 2956
   show_pats:
     calls: 5
-    bytes: 1424
+    bytes: 1484

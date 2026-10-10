@@ -1094,11 +1094,11 @@ allocations: 735
 deallocations: 735
 reallocations: 101
 bytes allocated: 92529
-instructions executed: 81861
-binary size: 169256
-  code: 107052
+instructions executed: 83297
+binary size: 173088
+  code: 109420
   data: 6884
-  metadata: 55320
+  metadata: 56784
 functions:
   __arr_drop_ListStyle:
     calls: 27
@@ -1126,22 +1126,22 @@ functions:
     bytes: 116
   __builtin_find_index$str$lam$__test$link$lambda0:
     calls: 1
-    bytes: 408
+    bytes: 444
   __builtin_find_index$str$lam$__test$link$lambda1:
     calls: 1
-    bytes: 408
+    bytes: 444
   __builtin_find_index$str$lam$link$Kind$Node$lambda1:
     calls: 26
-    bytes: 396
+    bytes: 432
   __builtin_find_index$str$lam$link_rule$Kind$lambda0:
     calls: 11
-    bytes: 396
+    bytes: 432
   __builtin_map_join$Rule$Kind$char$s2$s3$s4$rs$lam$show_rule$Kind:
     calls: 7
-    bytes: 1356
+    bytes: 1408
   __builtin_try_map$Rule$Kind$Rule$Kind$ParseError$lam$desugar_rule$Kind:
     calls: 6
-    bytes: 640
+    bytes: 720
   __ctor$Node$List:
     calls: 0
     bytes: 136
@@ -1150,7 +1150,7 @@ functions:
     bytes: 232
   __eq_ListStyle$arr:
     calls: 6
-    bytes: 276
+    bytes: 332
   __eq_ParseError:
     calls: 5
     bytes: 128
@@ -1159,7 +1159,7 @@ functions:
     bytes: 104
   __eq_str$arr:
     calls: 2
-    bytes: 356
+    bytes: 412
   __rec_drop_Node:
     calls: 0
     bytes: 72
@@ -1174,10 +1174,10 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 51040
+    bytes: 51056
   __test$link$shown_rule$Kind$Node:
     calls: 13
-    bytes: 1020
+    bytes: 1036
   __test$show_rule:
     calls: 1
     bytes: 4284
@@ -1192,7 +1192,7 @@ functions:
     bytes: 836
   __to_str_Prec$arr:
     calls: 2
-    bytes: 1776
+    bytes: 1916
   __to_str_u64:
     calls: 40
     bytes: 204
@@ -1267,16 +1267,16 @@ functions:
     bytes: 488
   group_styles$into$Kind$own0:
     calls: 82
-    bytes: 3104
+    bytes: 3376
   group_styles$len$Kind:
     calls: 0
     bytes: 32
   group_styles$len$Kind$tail:
     calls: 59
-    bytes: 1860
+    bytes: 1932
   link$Kind$Node:
     calls: 15
-    bytes: 2788
+    bytes: 2908
   link_opt$Kind:
     calls: 17
     bytes: 596
@@ -1285,16 +1285,16 @@ functions:
     bytes: 6816
   link_rules$Kind:
     calls: 6
-    bytes: 716
+    bytes: 808
   main:
     calls: 1
     bytes: 316
   prod_names$Kind$Node:
     calls: 19
-    bytes: 652
+    bytes: 704
   show_rule$Kind:
     calls: 71
-    bytes: 8036
+    bytes: 8908
   show_style$own0:
     calls: 3
-    bytes: 1672
+    bytes: 2000

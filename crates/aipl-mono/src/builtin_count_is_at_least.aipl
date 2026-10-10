@@ -41,15 +41,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1103
-binary size: 4112
-  code: 1620
+instructions executed: 1049
+binary size: 4200
+  code: 1708
   data: 833
   metadata: 1659
 functions:
   __builtin_count_is_at_least$i64:
     calls: 5
-    bytes: 300
+    bytes: 344
   __test$count_is_at_least:
     calls: 1
     bytes: 896
@@ -67,7 +67,7 @@ functions:
     bytes: (external)
   count_is_at_least$i64:
     calls: 6
-    bytes: 300
+    bytes: 344
   main:
     calls: 1
     bytes: 124

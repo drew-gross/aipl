@@ -1,8 +1,10 @@
 # An array slice is a window onto its source, the way a `str`'s slice is a
-# window onto its bytes: `xs[a..b]` allocates one small view block, never a
-# copy of the elements. So its cost does not grow with the window — the
-# `bytes allocated` below would be thousands if any of these copied — and
-# slicing a slice looks through to the source rather than stacking views.
+# window onto its bytes: `xs[a..b]` is the source's block with the window's
+# bounds carried in the value, never a copy of the elements. So its cost does not
+# grow with the window — the `bytes allocated` below would be thousands if any
+# of these copied — and slicing a slice is a window of the same block rather
+# than a view stacked on a view. (A reversed source still lends a view block:
+# there is no forward run of it to point into.)
 #
 # A window is read-only in the sense that matters: writing into it would write
 # into the source, so the first mutation (`push`, `extend`, an in-place `map`)
@@ -59,45 +61,45 @@ true
 [2, 1, 0]
 ["beta", "gamma"]
 --- performance ---
-allocations: 41
-deallocations: 41
+allocations: 35
+deallocations: 35
 reallocations: 10
-bytes allocated: 2260
-instructions executed: 79816
-binary size: 10840
-  code: 6524
+bytes allocated: 1924
+instructions executed: 75016
+binary size: 11480
+  code: 6996
   data: 219
-  metadata: 4097
+  metadata: 4265
 functions:
   __eq_u64$arr:
     calls: 1
-    bytes: 288
+    bytes: 344
   __to_str_bool:
     calls: 1
     bytes: 232
   __to_str_str$arr:
     calls: 1
-    bytes: 848
+    bytes: 904
   __to_str_u64:
     calls: 8
     bytes: 204
   __to_str_u64$arr:
     calls: 4
-    bytes: 716
+    bytes: 764
   aipl_arr_elem_ptr:
-    calls: 28
+    calls: 12
     bytes: (external)
   aipl_arr_inc:
-    calls: 15
+    calls: 17
     bytes: (external)
   aipl_arr_reverse:
     calls: 2
     bytes: (external)
   aipl_arr_slice:
-    calls: 11
+    calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 30
+    calls: 26
     bytes: (external)
   aipl_array_new:
     calls: 1
@@ -119,4 +121,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 4236
+    bytes: 4548

@@ -61,11 +61,11 @@ allocations: 21
 deallocations: 21
 reallocations: 0
 bytes allocated: 1116
-instructions executed: 1943
-binary size: 5936
-  code: 2908
+instructions executed: 2069
+binary size: 6024
+  code: 2992
   data: 220
-  metadata: 2808
+  metadata: 2812
 functions:
   __arr_drop_Tree:
     calls: 5
@@ -78,7 +78,7 @@ functions:
     bytes: 36
   __to_str_Tree:
     calls: 6
-    bytes: 1072
+    bytes: 1124
   __to_str_i64:
     calls: 1
     bytes: 204
@@ -114,4 +114,4 @@ functions:
     bytes: 1084
   total:
     calls: 5
-    bytes: 280
+    bytes: 312

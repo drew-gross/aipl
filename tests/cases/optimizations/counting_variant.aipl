@@ -68,9 +68,9 @@ allocations: 389
 deallocations: 389
 reallocations: 0
 bytes allocated: 23820
-instructions executed: 21576
-binary size: 8576
-  code: 4700
+instructions executed: 21350
+binary size: 8608
+  code: 4732
   data: 33
   metadata: 3843
 functions:
@@ -124,4 +124,4 @@ functions:
     bytes: 2932
   styles$len:
     calls: 306
-    bytes: 528
+    bytes: 560

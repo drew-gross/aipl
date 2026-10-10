@@ -38,9 +38,9 @@ allocations: 13
 deallocations: 13
 reallocations: 8
 bytes allocated: 840
-instructions executed: 2225
-binary size: 9280
-  code: 5212
+instructions executed: 2323
+binary size: 9584
+  code: 5516
   data: 713
   metadata: 3355
 functions:
@@ -55,13 +55,13 @@ functions:
     bytes: 220
   __eq_Shape$arr:
     calls: 6
-    bytes: 276
+    bytes: 332
   __test$circles:
     calls: 1
-    bytes: 2040
+    bytes: 2216
   __test$labels:
     calls: 1
-    bytes: 1096
+    bytes: 1136
   __test$pair_up:
     calls: 1
     bytes: 616
@@ -100,4 +100,4 @@ functions:
     bytes: 240
   pair_up$lam$__ctor$Shape$Rect:
     calls: 2
-    bytes: 444
+    bytes: 476

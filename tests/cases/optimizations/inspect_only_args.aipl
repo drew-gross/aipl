@@ -59,9 +59,9 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 21
-instructions executed: 1761
-binary size: 4032
-  code: 1488
+instructions executed: 1725
+binary size: 4064
+  code: 1520
   data: 538
   metadata: 2006
 functions:
@@ -70,7 +70,7 @@ functions:
     bytes: 740
   __test$count_via_copy$total:
     calls: 2
-    bytes: 180
+    bytes: 212
   __to_str_i64:
     calls: 1
     bytes: 204

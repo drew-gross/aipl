@@ -1469,15 +1469,15 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 353
-deallocations: 353
+allocations: 342
+deallocations: 342
 reallocations: 9
-bytes allocated: 76016
-instructions executed: 693289
-binary size: 827968
-  code: 561836
+bytes allocated: 75400
+instructions executed: 698657
+binary size: 829792
+  code: 563140
   data: 9188
-  metadata: 256944
+  metadata: 257464
 functions:
   __arr_drop_Kind:
     calls: 88
@@ -1511,10 +1511,10 @@ functions:
     bytes: 568
   __builtin_any$str$lam$up_to_any_len$lambda0:
     calls: 47
-    bytes: 316
+    bytes: 352
   __builtin_count_while$char$lam$lex_step$Kind$lambda1:
     calls: 88
-    bytes: 308
+    bytes: 316
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 12
     bytes: 268
@@ -1553,7 +1553,7 @@ functions:
     bytes: 324
   __eq_Kind$arr:
     calls: 36
-    bytes: 276
+    bytes: 332
   __eq_LexError:
     calls: 15
     bytes: 128
@@ -1565,7 +1565,7 @@ functions:
     bytes: 128
   __eq_ScopeSpan$arr:
     calls: 1
-    bytes: 276
+    bytes: 332
   __eq_SpanStr:
     calls: 49
     bytes: 128
@@ -1574,7 +1574,7 @@ functions:
     bytes: 120
   __eq_Token$Kind$arr:
     calls: 20
-    bytes: 276
+    bytes: 332
   __eq___builtin_Span:
     calls: 69
     bytes: 104
@@ -1583,10 +1583,10 @@ functions:
     bytes: 2012
   __test$keep_skipped:
     calls: 1
-    bytes: 17936
+    bytes: 18052
   __test$lex_all:
     calls: 1
-    bytes: 486332
+    bytes: 486824
   __test$lex_all$esc_str:
     calls: 2
     bytes: 140
@@ -1598,7 +1598,7 @@ functions:
     bytes: 1052
   __test$span_str:
     calls: 1
-    bytes: 2252
+    bytes: 2276
   __test_try_fail_LexError:
     calls: 0
     bytes: 84
@@ -1611,9 +1611,6 @@ functions:
   __to_str_str:
     calls: 0
     bytes: 300
-  aipl_arr_elem_ptr:
-    calls: 19
-    bytes: (external)
   aipl_arr_extend:
     calls: 1
     bytes: (external)
@@ -1623,11 +1620,8 @@ functions:
   aipl_arr_reserve:
     calls: 24
     bytes: (external)
-  aipl_arr_slice:
-    calls: 20
-    bytes: (external)
   aipl_array_dec:
-    calls: 3197
+    calls: 3186
     bytes: (external)
   aipl_array_new:
     calls: 82
@@ -1661,13 +1655,13 @@ functions:
     bytes: 1952
   keep_skipped$Kind:
     calls: 3
-    bytes: 3676
+    bytes: 3724
   lex$Kind:
     calls: 39
     bytes: 532
   lex_all$Kind:
     calls: 76
-    bytes: 9904
+    bytes: 10284
   lex_kinds$Kind:
     calls: 36
     bytes: 868
@@ -1676,7 +1670,7 @@ functions:
     bytes: 412
   lex_step$Kind:
     calls: 224
-    bytes: 10916
+    bytes: 10948
   main:
     calls: 1
     bytes: 248

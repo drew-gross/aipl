@@ -182,24 +182,24 @@ allocations: 34
 deallocations: 34
 reallocations: 9
 bytes allocated: 1230
-instructions executed: 8267
-binary size: 17240
-  code: 10112
+instructions executed: 8398
+binary size: 17928
+  code: 10636
   data: 1263
-  metadata: 5865
+  metadata: 6029
 functions:
   __eq_i64$arr:
     calls: 7
-    bytes: 288
+    bytes: 344
   __test$count_down:
     calls: 1
-    bytes: 520
+    bytes: 544
   __test$count_up:
     calls: 1
-    bytes: 328
+    bytes: 340
   __test$grows_alias_untouched:
     calls: 1
-    bytes: 416
+    bytes: 428
   __test$negatives:
     calls: 1
     bytes: 388
@@ -211,7 +211,7 @@ functions:
     bytes: 648
   __test$tree:
     calls: 1
-    bytes: 328
+    bytes: 340
   __test$unchanged:
     calls: 1
     bytes: 344
@@ -247,22 +247,22 @@ functions:
     bytes: (external)
   count_down$own0:
     calls: 11
-    bytes: 364
+    bytes: 472
   count_up$own0:
     calls: 5
-    bytes: 364
+    bytes: 472
   main:
     calls: 1
     bytes: 652
   positives:
     calls: 3
-    bytes: 724
+    bytes: 796
   spell:
     calls: 25
     bytes: 612
   tree$own0:
     calls: 15
-    bytes: 448
+    bytes: 568
   unchanged:
     calls: 4
     bytes: 272

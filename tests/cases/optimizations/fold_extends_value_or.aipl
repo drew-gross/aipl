@@ -129,11 +129,11 @@ allocations: 35
 deallocations: 35
 reallocations: 11
 bytes allocated: 1597
-instructions executed: 6128
-binary size: 13232
-  code: 8092
+instructions executed: 6276
+binary size: 13792
+  code: 8520
   data: 139
-  metadata: 5001
+  metadata: 5133
 functions:
   __arr_drop_Rule$Tok:
     calls: 2
@@ -149,7 +149,7 @@ functions:
     bytes: 204
   __to_str_i64$arr:
     calls: 10
-    bytes: 716
+    bytes: 764
   aipl_arr_inc:
     calls: 45
     bytes: (external)
@@ -194,13 +194,13 @@ functions:
     bytes: (external)
   effects:
     calls: 2
-    bytes: 492
+    bytes: 528
   main:
     calls: 1
-    bytes: 4820
+    bytes: 4916
   plain:
     calls: 2
-    bytes: 336
+    bytes: 404
   styles$into$Tok$own0:
     calls: 18
-    bytes: 1168
+    bytes: 1348
