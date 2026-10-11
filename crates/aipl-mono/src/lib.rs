@@ -10635,21 +10635,26 @@ fn str_shaped(t: &Type) -> bool {
         || matches!(t, Type::Array(e) if matches!(**e, Type::Primitive(Primitive::Char)))
 }
 
-/// How many words a `reusable` element of type `t` occupies in an array slot.
+/// How many bytes a `reusable` element of type `t` occupies in an array slot.
 ///
 /// Monomorphization does not know codegen's layout table, but this one fact it
 /// has to: a `str` is a 24-byte value, and so — under the wide array layout — is
 /// an array, whose 24 bytes are its block and, for a window, where its elements
-/// start and how many (`aipl-codegen`'s `is_wide_array`). Every other type `reusable` admits is
-/// one word: the integers, and a set or a dict, which are still a plain word
-/// until they switch representation on their own (`arr24_todo.txt`).
+/// start and how many (`aipl-codegen`'s `is_wide_array`). A narrow integer is
+/// packed at its own width in an array (`aipl-codegen`'s `array_elem_size`), so
+/// an `i64[]` buffer has no room to be reused for a `u8[]` or the other way
+/// round. Every other type `reusable` admits is one word: the 64-bit integers,
+/// and a set or a dict, which are still a plain word until they switch
+/// representation on their own (`arr24_todo.txt`).
 ///
-/// A `char[]` is `str`-shaped, so it is three words either way.
-fn slot_words(t: &Type) -> usize {
+/// A `char[]` is `str`-shaped, so it is 24 bytes either way.
+fn slot_bytes(t: &Type) -> usize {
     if str_shaped(t) || matches!(t, Type::Array(_)) {
-        3
+        24
+    } else if let Type::Primitive(p) = t {
+        p.int_bits().map_or(8, |bits| (bits / 8) as usize)
     } else {
-        1
+        8
     }
 }
 
@@ -10663,7 +10668,7 @@ fn slot_words(t: &Type) -> usize {
 /// old `str`-shape test fixed — and `[1, 2].map(|x| [x])` then did the same with
 /// array elements, once arrays became 24 bytes and that test had no way to know.
 fn slot_fits(from: &Type, to: &Type) -> bool {
-    slot_words(from) == slot_words(to)
+    slot_bytes(from) == slot_bytes(to)
 }
 
 /// Whether `arg` evaluates to a freshly-allocated, uniquely-owned heap value, so

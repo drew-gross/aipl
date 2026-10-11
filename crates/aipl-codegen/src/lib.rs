@@ -606,10 +606,11 @@ extern "C" fn aipl_write_bytes(dst: *const u8, src: *const u8, n: i64) -> *const
     }
 }
 
-/// How [`aipl_arr_sort`] orders its elements. Every `ord` element type is an
-/// 8-byte scalar, so the only question is how to read the word: as a signed
-/// integer, as an unsigned one (`u8`..`u64`, and `char` — a byte value), or as a
-/// `str` pointer to compare lexicographically by bytes.
+/// How [`aipl_arr_sort`] orders its elements. Every `ord` element type is a
+/// scalar — a word, or a narrow integer packed at its own width — or a `str`, so
+/// the only question is how to read one: as a signed integer, as an unsigned one
+/// (`u8`..`u64`, and `char` — a byte value), or as a `str` to compare
+/// lexicographically by bytes.
 const SORT_KIND_SIGNED: i64 = 0;
 const SORT_KIND_UNSIGNED: i64 = 1;
 const SORT_KIND_STR: i64 = 2;
@@ -619,9 +620,9 @@ const SORT_KIND_STR: i64 = 2;
 ///
 /// Unlike [`aipl_arr_reverse`] this cannot be a lazy view: the order isn't a
 /// function of the index, so the result has to be materialized. Only `ord`
-/// element types reach here and all of them are 8-byte scalars, so the block is
-/// a flat run of words and sorting is a permutation of those words — which moves
-/// no ownership, hence the single blanket retain before sorting.
+/// element types reach here, so the block is a flat run of scalars (or of `str`
+/// values) and sorting is a permutation of them — which moves no ownership,
+/// hence the single blanket retain before sorting.
 ///
 /// Mirrors `aipl_arr_sort` in the linker runtime.
 #[no_mangle]
@@ -642,7 +643,7 @@ extern "C" fn aipl_arr_sort(
         let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
         if len > 0 {
             let src = a.add(ARR_ELEMS_OFFSET);
-            std::ptr::copy_nonoverlapping(src, dst, len * elem_size.max(8) as usize);
+            std::ptr::copy_nonoverlapping(src, dst, len * elem_stride(elem_size));
             // The new array co-owns every element. Done before the sort because
             // reordering elements neither creates nor destroys a reference.
             elem_rc(retain_fn, dst, len);
@@ -652,6 +653,10 @@ extern "C" fn aipl_arr_sort(
             if kind == SORT_KIND_STR && elem_size == str24::STR_SIZE as i64 {
                 let vals = std::slice::from_raw_parts_mut(dst as *mut str24::Str, len);
                 str24::sort_values(vals);
+            } else if elem_stride(elem_size) < 8 {
+                // A narrow integer element is packed at its own width.
+                let unsigned = kind == SORT_KIND_UNSIGNED;
+                sort_narrow(dst, len, elem_stride(elem_size), unsigned);
             } else {
                 let words = std::slice::from_raw_parts_mut(dst as *mut i64, len);
                 sort_words(words, kind);
@@ -995,7 +1000,7 @@ fn do_arr_slice_copy(
         }
         return raw;
     }
-    let es = elem_size.max(8) as usize;
+    let es = elem_stride(elem_size);
     let raw = alloc_array(n, n, drop_fn, elem_size);
     unsafe {
         let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
@@ -1024,7 +1029,7 @@ fn do_arr_reverse(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: i64) ->
         }
         return raw;
     }
-    let es = elem_size.max(8) as usize;
+    let es = elem_stride(elem_size);
     let raw = alloc_array(len, len, drop_fn, elem_size);
     unsafe {
         let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
@@ -1452,7 +1457,7 @@ extern "C" fn aipl_array_push(
         aipl_array_dec(a);
         return raw;
     }
-    let elem_size = elem_size.max(8) as usize;
+    let elem_size = elem_stride(elem_size);
     let old_len = if a.is_null() {
         0
     } else {
@@ -1556,7 +1561,7 @@ extern "C" fn aipl_array_push_mut(
         unsafe { write_packed_bit(data.add(ARR_ELEMS_OFFSET) as *mut u8, old_len, val) };
         return data;
     }
-    let elem_size = elem_size.max(8) as usize;
+    let elem_size = elem_stride(elem_size);
     let (old_len, cap_bytes) = if a.is_null() {
         (0, 0)
     } else {
@@ -1643,7 +1648,7 @@ extern "C" fn aipl_arr_reserve(
     elem_size: i64,
 ) -> *const u8 {
     let a = aipl_arr_ensure_heap(a);
-    let elem_size = elem_size.max(8) as usize;
+    let elem_size = elem_stride(elem_size);
     let old_len = if a.is_null() {
         0
     } else {
@@ -1725,7 +1730,7 @@ extern "C" fn aipl_arr_extend(
         aipl_array_dec(src_heap);
         return out;
     }
-    let elem_size = elem_size.max(8) as usize;
+    let elem_size = elem_stride(elem_size);
     let add = if src_heap.is_null() {
         0
     } else {
@@ -1840,7 +1845,7 @@ extern "C" fn aipl_arr_join(
         }
         return out;
     }
-    let esz = elem_size.max(8) as usize;
+    let esz = elem_stride(elem_size);
     // Measure first — this is the whole point of the builtin being native.
     let mut total = 0usize;
     let mut lens: Vec<(usize, *const u8)> = Vec::with_capacity(n);
@@ -4513,6 +4518,10 @@ fn new_jit_module() -> Result<JITModule, Error> {
         arr24::aipl_arr_window_block as *const u8,
     );
     jit_builder.symbol("aipl_arr_settle", arr24::aipl_arr_settle as *const u8);
+    jit_builder.symbol(
+        "aipl_arr_from_set_words",
+        arr24::aipl_arr_from_set_words as *const u8,
+    );
     jit_builder.symbol("aipl_str_rope", str24::aipl_str_rope as *const u8);
     jit_builder.symbol(
         "aipl_str_pack_inline",
@@ -6222,7 +6231,7 @@ fn build_borrowed_array(
         // A wide `str` element is the value itself, 24 bytes in the block.
         abi.str_size()
     } else {
-        runtime_elem_size(elem, structs)
+        abi_array_elem_size(abi, elem, structs)
     };
     let data = bufs.array_block(elems.len(), elem_size);
     let base = unsafe { data.add(ARR_ELEMS_OFFSET) };
@@ -6239,11 +6248,20 @@ fn build_borrowed_array(
             }
         }
     } else {
-        let stride = elem_size.max(8) as usize;
+        let stride = elem_size as usize;
         for (i, e) in elems.iter().enumerate() {
-            // SAFETY: the block was sized for `elems.len()` elements of `stride`
-            // bytes and zeroed, so this slot is in bounds and initialized.
-            unsafe { write_ffi_arg(abi, base.add(i * stride), elem, e, structs, bufs)? };
+            let dst = unsafe { base.add(i * stride) };
+            match e {
+                // A narrow integer element is its own width, so it is written as
+                // its low bytes — which, for an in-range value, are all of it —
+                // rather than as the word `write_ffi_arg` writes.
+                FfiValue::Int(n) if stride < 8 => unsafe {
+                    core::ptr::copy_nonoverlapping(n.to_le_bytes().as_ptr(), dst, stride)
+                },
+                // SAFETY: the block was sized for `elems.len()` elements of
+                // `stride` bytes and zeroed, so this slot is in bounds.
+                _ => unsafe { write_ffi_arg(abi, dst, elem, e, structs, bufs)? },
+            }
         }
     }
     Ok(data as i64)
@@ -6575,6 +6593,30 @@ unsafe fn read_ffi_boxed_payload(
     )
 }
 
+/// One element of an array, `stride` bytes wide at `ep`, borrowed from the block
+/// that owns it. A narrow integer is read at its own width and widened the way
+/// its type says (see `load_scalar_elem`); everything else is
+/// [`read_ffi_borrowed`].
+///
+/// SAFETY: `ep` must hold a valid `elem` element of that width.
+unsafe fn read_ffi_array_elem(
+    abi: Abi,
+    ep: *const u8,
+    elem: &ConcreteType,
+    stride: usize,
+    structs: &HashMap<String, TypeDef>,
+) -> FfiValue {
+    if stride >= 8 {
+        return unsafe { read_ffi_borrowed(abi, ep, elem, false, structs) };
+    }
+    let mut word = [0u8; 8];
+    unsafe { core::ptr::copy_nonoverlapping(ep, word.as_mut_ptr(), stride) };
+    let raw = i64::from_le_bytes(word);
+    let shift = 64 - 8 * stride as u32;
+    let signed = matches!(elem, ConcreteType::Primitive(p) if p.int_signed());
+    FfiValue::Int(if signed { (raw << shift) >> shift } else { raw })
+}
+
 /// Read the array value stored at `at` (of element type `elem`) — its first
 /// word under the `Tagged` ABI, its 24 bytes under `Wide`, where it may be a
 /// window (`arr24::ArrValue`), whose elements are read off the value rather
@@ -6599,10 +6641,10 @@ unsafe fn read_ffi_array_at(
     }
     // A window is never bit-packed (`arr24`'s header says why), so every
     // element is byte-addressable at the element stride.
-    let stride = abi_elem_size(abi, elem, structs) as usize;
+    let stride = abi_array_elem_size(abi, elem, structs) as usize;
     let out = (0..value.len)
         .map(|i| unsafe {
-            read_ffi_borrowed(abi, value.data.add(i * stride), elem, false, structs)
+            read_ffi_array_elem(abi, value.data.add(i * stride), elem, stride, structs)
         })
         .collect();
     if owned {
@@ -6649,11 +6691,11 @@ unsafe fn read_ffi_array(
             out.push(FfiValue::Int(i64::from(unsafe { arr_load_bit(a, i) })));
         }
     } else {
-        let stride = abi_elem_size(abi, elem, structs) as usize;
+        let stride = abi_array_elem_size(abi, elem, structs) as usize;
         for i in 0..len {
             let ep = unsafe { arr_elem_ptr(a, i, stride) };
             // Elements are borrowed: the block owns their references.
-            out.push(unsafe { read_ffi_borrowed(abi, ep, elem, false, structs) });
+            out.push(unsafe { read_ffi_array_elem(abi, ep, elem, stride, structs) });
         }
     }
     if owned {
@@ -8193,6 +8235,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         // the caller already holds the slot it wants filled.
         "aipl_arr_window" => (7, Ret::None),
         "aipl_arr_window_block" => (4, Ret::Word),
+        "aipl_arr_from_set_words" => (2, Ret::Word),
         "aipl_arr_settle" => (4, Ret::None),
         "aipl_dict_remove" => (5, Ret::Word),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" => (7, Ret::Word),
@@ -9869,7 +9912,12 @@ fn owned_block_made_unique_ptr<M: Module>(
 ) -> Value {
     let structs = cx.structs;
     let (drop_fn, retain_fn, esz) = match ty {
-        ConcreteType::Array(elem) | ConcreteType::Set(elem, _) => (
+        ConcreteType::Array(elem) => (
+            array_drop_fn_addr(builder, module, cx, elem),
+            array_retain_fn_addr(builder, module, cx, elem),
+            array_elem_size(elem, structs),
+        ),
+        ConcreteType::Set(elem, _) => (
             array_drop_fn_addr(builder, module, cx, elem),
             array_retain_fn_addr(builder, module, cx, elem),
             runtime_elem_size(elem, structs),
@@ -10301,7 +10349,7 @@ fn array_descriptors<M: Module>(
     let retain_fn = array_retain_fn_addr(builder, module, cx, elem);
     let esz = builder
         .ins()
-        .iconst(types::I64, runtime_elem_size(elem, cx.structs));
+        .iconst(types::I64, array_elem_size(elem, cx.structs));
     (drop_fn, retain_fn, esz)
 }
 
@@ -10826,8 +10874,10 @@ fn emit_str_iter_next<M: Module>(
     builder.ins().stack_load(types::I64, types::I64, out, 0)
 }
 
-/// The `elem_size` argument handed to the array runtime: a byte stride, or the
-/// sentinel 0 for a bit-packed `bool` array.
+/// The `elem_size` argument handed to the set runtime (and the array runtime's
+/// shared entries, for a set): a byte stride with a word per scalar, or the
+/// sentinel 0 for a bit-packed `bool` set. An *array's* stride is
+/// [`array_elem_size`], which packs narrow integers.
 fn runtime_elem_size(elem: &ConcreteType, structs: &HashMap<String, TypeDef>) -> i64 {
     if is_bit_packed(elem) {
         0
@@ -10980,7 +11030,10 @@ fn load_array_elem<M: Module>(
 ) -> Value {
     let untagged = arr_base(builder, arr_ptr);
     let base = builder.ins().iadd_imm_s(untagged, ARR_ELEMS_OFFSET as i64);
-    load_elem_at(module, builder, builtins, arr_ptr, base, idx, elem, structs)
+    let stride = elem_size_of(elem, structs);
+    load_elem_at(
+        module, builder, builtins, arr_ptr, base, idx, elem, stride, structs,
+    )
 }
 
 /// Where an array's elements are, read once off its value: the tagged pointer
@@ -11000,6 +11053,10 @@ struct ArrView {
     /// (the fast path); computed regardless, since it is two instructions.
     base: Value,
     len: Value,
+    /// Whether these are an *array's* elements, whose stride is
+    /// [`array_elem_size`] — a narrow integer at its own width — rather than a
+    /// set's or a dict's, a word per scalar.
+    array: bool,
 }
 
 /// [`ArrView`] of a tagged block pointer — a whole array, a set or a dict.
@@ -11007,7 +11064,12 @@ fn block_view(builder: &mut FunctionBuilder, ptr: Value) -> ArrView {
     let untagged = arr_base(builder, ptr);
     let base = builder.ins().iadd_imm_s(untagged, ARR_ELEMS_OFFSET as i64);
     let len = load_arr_len(builder, ptr);
-    ArrView { ptr, base, len }
+    ArrView {
+        ptr,
+        base,
+        len,
+        array: false,
+    }
 }
 
 /// [`ArrView`] of a value of an array-backed type `ty`: an array value, whole or
@@ -11024,7 +11086,12 @@ fn arr_view(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> ArrVi
     let is_window = builder.ins().icmp_imm_s(IntCC::NotEqual, data, 0);
     let base = builder.ins().select(is_window, data, whole.base);
     let len = builder.ins().select(is_window, window_len, whole.len);
-    ArrView { ptr, base, len }
+    ArrView {
+        ptr,
+        base,
+        len,
+        array: true,
+    }
 }
 
 /// Element `idx` of the array `view` describes (`idx` trusted in bounds).
@@ -11037,13 +11104,19 @@ fn load_view_elem<M: Module>(
     elem: &ConcreteType,
     structs: &HashMap<String, TypeDef>,
 ) -> Value {
+    let stride = if view.array {
+        array_elem_size(elem, structs)
+    } else {
+        elem_size_of(elem, structs)
+    };
     load_elem_at(
-        module, builder, builtins, view.ptr, view.base, idx, elem, structs,
+        module, builder, builtins, view.ptr, view.base, idx, elem, stride, structs,
     )
 }
 
 /// Element `idx` of the array whose tagged pointer is `arr_ptr` and whose
-/// elements start at `base` when that pointer is a heap block.
+/// elements start at `base` when that pointer is a heap block, `stride` bytes
+/// apart (a bit-packed `bool`'s stride is not read).
 #[allow(clippy::too_many_arguments)]
 fn load_elem_at<M: Module>(
     module: &mut M,
@@ -11053,6 +11126,7 @@ fn load_elem_at<M: Module>(
     base: Value,
     idx: Value,
     elem: &ConcreteType,
+    stride: i64,
     structs: &HashMap<String, TypeDef>,
 ) -> Value {
     // Inline tag check: fast heap path, slow extern path for non-heap reprs.
@@ -11084,7 +11158,6 @@ fn load_elem_at<M: Module>(
         let shifted = builder.ins().ushr(byte, bit_idx);
         builder.ins().band_imm_u(shifted, 1)
     } else {
-        let stride = elem_size_of(elem, structs);
         let off = builder.ins().imul_imm_s(idx, stride);
         let addr = builder.ins().iadd(base, off);
         if is_str_shaped(elem) {
@@ -11101,9 +11174,7 @@ fn load_elem_at<M: Module>(
         } else if is_composite(elem, structs) {
             addr
         } else {
-            builder
-                .ins()
-                .load(types::I64, MemFlagsData::trusted(), addr, 0)
+            load_scalar_elem(builder, addr, elem, stride)
         }
     };
     builder.ins().stack_store(types::I64, heap_val, val_slot, 0);
@@ -11115,9 +11186,7 @@ fn load_elem_at<M: Module>(
     let slow_val = if is_bit_packed(elem) {
         builtins.call(module, builder, "aipl_arr_load_bit", &[arr_ptr, idx])
     } else {
-        let stride_v = builder
-            .ins()
-            .iconst(types::I64, elem_size_of(elem, structs));
+        let stride_v = builder.ins().iconst(types::I64, stride);
         let addr = builtins.call(
             module,
             builder,
@@ -11127,9 +11196,7 @@ fn load_elem_at<M: Module>(
         if is_composite(elem, structs) {
             addr
         } else {
-            builder
-                .ins()
-                .load(types::I64, MemFlagsData::trusted(), addr, 0)
+            load_scalar_elem(builder, addr, elem, stride)
         }
     };
     builder.ins().stack_store(types::I64, slow_val, val_slot, 0);
@@ -11140,6 +11207,60 @@ fn load_elem_at<M: Module>(
     builder
         .ins()
         .stack_load(types::I64, types::I64, val_slot, 0)
+}
+
+/// A scalar element of type `elem` stored `width` bytes wide at `addr`, as the
+/// canonical `i64` every integer lives in (see [`canon_int`]): sign-extended
+/// for a signed narrow type, zero-extended for an unsigned one. A word is just
+/// loaded.
+fn load_scalar_elem(
+    builder: &mut FunctionBuilder,
+    addr: Value,
+    elem: &ConcreteType,
+    width: i64,
+) -> Value {
+    let flags = MemFlagsData::trusted();
+    let signed = matches!(elem, ConcreteType::Primitive(p) if p.int_signed());
+    match (width, signed) {
+        (1, true) => builder.ins().sload8(types::I64, flags, addr, 0),
+        (1, false) => builder.ins().uload8(types::I64, flags, addr, 0),
+        (2, true) => builder.ins().sload16(types::I64, flags, addr, 0),
+        (2, false) => builder.ins().uload16(types::I64, flags, addr, 0),
+        (4, true) => builder.ins().sload32(flags, addr, 0),
+        (4, false) => builder.ins().uload32(flags, addr, 0),
+        _ => builder.ins().load(types::I64, flags, addr, 0),
+    }
+}
+
+/// Store `v` (of static type `src_ty`) as an array element `stride` bytes wide
+/// at `addr`: a narrow integer at its own width, anything else as
+/// [`store_array_elem`] stores it.
+fn store_elem(
+    builder: &mut FunctionBuilder,
+    addr: Value,
+    v: Value,
+    src_ty: &ConcreteType,
+    stride: i64,
+    structs: &HashMap<String, TypeDef>,
+) {
+    if stride < 8 && !is_composite(src_ty, structs) {
+        store_scalar_elem(builder, v, addr, stride);
+    } else {
+        store_array_elem(builder, addr, v, src_ty, structs);
+    }
+}
+
+/// Store the canonical `i64` scalar `v` as an element `width` bytes wide at
+/// `addr` — its low bytes, which for a canonical narrow integer are the whole
+/// value. The counterpart of [`load_scalar_elem`].
+fn store_scalar_elem(builder: &mut FunctionBuilder, v: Value, addr: Value, width: i64) {
+    let flags = MemFlagsData::trusted();
+    match width {
+        1 => builder.ins().istore8(flags, v, addr, 0),
+        2 => builder.ins().istore16(flags, v, addr, 0),
+        4 => builder.ins().istore32(flags, v, addr, 0),
+        _ => builder.ins().store(flags, v, addr, 0),
+    };
 }
 
 /// Byte `idx` of a str-shaped `char[]` (see `is_char_array`), without consuming
@@ -13855,7 +13976,7 @@ fn emit_const_array<M: Module>(
     elem: &ConcreteType,
 ) -> Result<Value, Error> {
     let len = words.len();
-    let cap_bytes = cap_bytes_for(runtime_elem_size(elem, cx.structs), len);
+    let cap_bytes = cap_bytes_for(array_elem_size(elem, cx.structs), len);
     let mut content = Vec::with_capacity(HEADER_SIZE + ARR_ELEMS_OFFSET + cap_bytes);
     content.extend_from_slice(&STATIC_REFCOUNT.to_le_bytes());
     content.extend_from_slice(&(len as i64).to_le_bytes());
@@ -13873,8 +13994,11 @@ fn emit_const_array<M: Module>(
             content.push(byte);
         }
     } else {
+        // Each element at the array's stride for it — a narrow integer's low
+        // bytes, which for an in-range literal are the whole value.
+        let width = array_elem_size(elem, cx.structs) as usize;
         for w in words {
-            content.extend_from_slice(&w.to_le_bytes());
+            content.extend_from_slice(&w.to_le_bytes()[..width]);
         }
     }
     debug_assert_eq!(content.len(), HEADER_SIZE + ARR_ELEMS_OFFSET + cap_bytes);
@@ -17294,7 +17418,8 @@ fn compile_call_expr<M: Module>(
             // `xs.sort() -> T[]` — a fresh array, elements ascending. Consumes
             // `self` (callers pre-inc). The `ord` bound has already restricted the
             // element type to an integer, `char`, or `str`; which of those decides
-            // how the runtime reads each 8-byte word.
+            // how the runtime reads each element (`SORT_KIND_*`), and the stride
+            // says how wide it is.
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("\"sort\" expects 1 argument, got {}", args.len()),
@@ -17369,7 +17494,7 @@ fn compile_call_expr<M: Module>(
             let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
             let esz = builder
                 .ins()
-                .iconst(types::I64, runtime_elem_size(&elem, structs));
+                .iconst(types::I64, array_elem_size(&elem, structs));
             let kind_v = builder.ins().iconst(types::I64, kind);
             let out = builtins.call(
                 module,
@@ -17534,7 +17659,7 @@ fn compile_call_expr<M: Module>(
                 let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
                 let esz = builder
                     .ins()
-                    .iconst(types::I64, runtime_elem_size(&elem, structs));
+                    .iconst(types::I64, array_elem_size(&elem, structs));
                 // See the str path: a native builtin gets no `specialize_variadic`
                 // prologue, so a bare element is wrapped into a one-item sequence
                 // here — once per separator. An `Array` argument is already the
@@ -17773,8 +17898,9 @@ fn compile_call_expr<M: Module>(
         Callee::ToArray => {
             // `s.to_array() -> T[]` on an ordered set: the elements in the set's
             // order. A set *is* an array block kept sorted, so the result is the
-            // same block, retained, seen as an array — no copy. The checker has
-            // already refused an unordered receiver.
+            // same block, retained, seen as an array — no copy, except for a
+            // narrow integer element (below). The checker has already refused
+            // an unordered receiver.
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("\"to_array\" expects 1 argument, got {}", args.len()),
@@ -17801,10 +17927,20 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             // Sets are array blocks — see the note at `reverse`'s array arm.
-            // The block is shared, and the array is a value wrapping it.
-            builtins.call_void(module, builder, "aipl_arr_inc", &[ptr]);
+            // The block is shared, and the array is a value wrapping it — unless
+            // the elements are a narrow integer, which a set keeps as a word
+            // and an array packs, so the two layouts part and the elements are
+            // copied across.
             let arr_ty = ConcreteType::Array(elem.clone());
-            let v = seq_val(builder, ptr, &arr_ty);
+            let width = array_elem_size(elem, structs);
+            let block = if width == runtime_elem_size(elem, structs) {
+                builtins.call_void(module, builder, "aipl_arr_inc", &[ptr]);
+                ptr
+            } else {
+                let w = builder.ins().iconst(types::I64, width);
+                builtins.call(module, builder, "aipl_arr_from_set_words", &[ptr, w])
+            };
+            let v = seq_val(builder, block, &arr_ty);
             scopes
                 .last_mut()
                 .expect("scope")
@@ -17861,7 +17997,7 @@ fn compile_call_expr<M: Module>(
                 let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
                 let esz = builder
                     .ins()
-                    .iconst(types::I64, runtime_elem_size(&elem, structs));
+                    .iconst(types::I64, array_elem_size(&elem, structs));
                 let view = builtins.call(
                     module,
                     builder,
@@ -18624,9 +18760,10 @@ fn compile_call_expr<M: Module>(
             // is never composite — true until a wide `str` became one. A
             // composite store is still a bit copy, so the "ownership relocates"
             // reasoning above is unchanged.
-            let off = builder.ins().imul_imm_s(w, elem_size_of(&ety, structs));
+            let stride = array_elem_size(&ety, structs);
+            let off = builder.ins().imul_imm_s(w, stride);
             let addr = builder.ins().iadd(base, off);
-            store_array_elem(builder, addr, e, &ety, structs);
+            store_elem(builder, addr, e, &ety, stride, structs);
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         Callee::FilterDrop => {
@@ -18671,9 +18808,8 @@ fn compile_call_expr<M: Module>(
             // The block's stride is the *old* element type's — that is what it
             // was allocated with — while the value written is the new one. Both
             // were a fixed 8 until a wide `str` made an element composite.
-            let off = builder
-                .ins()
-                .imul_imm_s(i_val, elem_size_of(&old_ty, structs));
+            let stride = array_elem_size(&old_ty, structs);
+            let off = builder.ins().imul_imm_s(i_val, stride);
             let addr = builder.ins().iadd(base, off);
             // Retain the new value, release the old, *then* write the slot.
             //
@@ -18686,7 +18822,7 @@ fn compile_call_expr<M: Module>(
             // holds its own reference by then.
             emit_retain(builder, module, builtins, structs, new_val, &new_ty);
             emit_drop(builder, module, builtins, structs, old_val, &old_ty);
-            store_array_elem(builder, addr, new_val, &new_ty, structs);
+            store_elem(builder, addr, new_val, &new_ty, stride, structs);
             let new_drop = array_drop_fn_addr(builder, module, cx, &new_ty);
             builder.ins().store(
                 MemFlagsData::trusted(),
@@ -18884,7 +19020,7 @@ fn compile_call_expr<M: Module>(
             let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
             let esz = builder
                 .ins()
-                .iconst(types::I64, runtime_elem_size(&elem, structs));
+                .iconst(types::I64, array_elem_size(&elem, structs));
             let zero = builder.ins().iconst(types::I64, 0);
             // The parameter's reference is this site's to consume, so a window
             // may be settled in place into a copy, which the reserve keeps.
@@ -19043,7 +19179,7 @@ fn compile_call_expr<M: Module>(
             let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
             let esz = builder
                 .ins()
-                .iconst(types::I64, runtime_elem_size(&elem, structs));
+                .iconst(types::I64, array_elem_size(&elem, structs));
             let out = if *callee == Callee::ArrReserve {
                 let (extra, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
                 builtins.call(
@@ -19149,7 +19285,7 @@ fn compile_call_expr<M: Module>(
             let retain_fn = array_retain_fn_addr(builder, module, cx, &result_elem);
             let esz = builder
                 .ins()
-                .iconst(types::I64, runtime_elem_size(&result_elem, structs));
+                .iconst(types::I64, array_elem_size(&result_elem, structs));
             // The runtime copies `elem_size` bytes from `x_ptr` (or packs a bit
             // for a `bool` array). A composite element (an optional) is already
             // addressed; a scalar/pointer value is spilled to a slot for its
@@ -19354,7 +19490,7 @@ fn compile_call_expr<M: Module>(
             let retain_fn = array_retain_fn_addr(builder, module, cx, &elem_ty);
             let esz = builder
                 .ins()
-                .iconst(types::I64, runtime_elem_size(&elem_ty, structs));
+                .iconst(types::I64, array_elem_size(&elem_ty, structs));
             // `aipl_arr_reserve` consumes the slot's reference and hands back
             // one owned reference — `push`'s contract, so the bookkeeping is
             // `extend`'s.
@@ -19514,7 +19650,7 @@ fn compile_call_expr<M: Module>(
             let retain_fn = array_retain_fn_addr(builder, module, cx, &result_elem);
             let esz = builder
                 .ins()
-                .iconst(types::I64, runtime_elem_size(&result_elem, structs));
+                .iconst(types::I64, array_elem_size(&result_elem, structs));
             // `aipl_arr_extend` consumes `src`. An owned temporary is moved in
             // (its scope track has to go, or the block is dropped twice); a
             // borrowed one gets the compensating pre-inc.
@@ -19916,7 +20052,7 @@ fn emit_slice<M: Module>(
         let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
         let esz = builder
             .ins()
-            .iconst(types::I64, runtime_elem_size(&elem, structs));
+            .iconst(types::I64, array_elem_size(&elem, structs));
         let b_v = b_v.unwrap_or_else(|| builder.ins().iconst(types::I64, i64::MAX));
         // A window carried in the value itself: the runtime writes the result
         // straight into a fresh value, allocating nothing unless the source is
@@ -19941,18 +20077,6 @@ fn emit_slice<M: Module>(
     ))
 }
 
-/// Compile `expr`, preferring the type the checker recorded on it over the one
-/// derived here.
-///
-/// Codegen derives types from the AST just as the checker and monomorphizer do,
-/// so a context-dependent expression — a bare `none`, an empty `[]` — derives a
-/// `__none__`-style placeholder once whatever pinned it is out of view. Inlining
-/// puts expressions in exactly that position, which is why the answer is
-/// recorded at check time (see `Expr::ty`) and read back here.
-///
-/// Only a *placeholder* derivation is replaced: everywhere else what is derived
-/// here is at least as good, and a recorded type is not a licence to override a
-/// real one.
 /// Compile one binary operator: `l <op> r`, with `span` the whole operation.
 ///
 /// Reached only through a resolved call to the operator's canonical
@@ -20182,6 +20306,20 @@ fn compile_binop<M: Module>(
     })
 }
 
+/// Compile `expr`, preferring the type the checker recorded on it over the one
+/// derived here.
+///
+/// Codegen derives types from the AST just as the checker and monomorphizer do,
+/// so a context-dependent expression — a bare `none`, an empty `[]` — derives a
+/// `__none__`-style placeholder once whatever pinned it is out of view. Inlining
+/// puts expressions in exactly that position, which is why the answer is
+/// recorded at check time (see `Expr::ty`) and read back here.
+///
+/// Only a *placeholder* derivation is replaced: everywhere else what is derived
+/// here is at least as good, and a recorded type is not a licence to override a
+/// real one. (An array literal reads its own recorded type before this, since
+/// for one of narrow integers the type decides the bytes — see the `ArrayLit`
+/// arm.)
 fn compile_expr<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
@@ -22231,7 +22369,26 @@ fn compile_expr_inner<M: Module>(
             // (`emit_const_str`'s rule). Everything a fresh literal could be
             // used for still works, because every path that writes into an
             // array's own block copies a static one first (`emit_const_array`).
+            // The element type the checker fitted this literal to, when that was
+            // not the one its elements derive on their own (`let b: u8[] = [3]`
+            // derives `i64[]`). It decides the *bytes* — a `u8` element is one
+            // byte of the block, an `i64` eight — so the literal is built at it
+            // rather than relabelled afterwards (see the checker's
+            // `lock_flexed`).
+            let fitted_elem = match expr.ty.as_ref().and_then(|t| t.to_concrete()) {
+                Some(ConcreteType::Array(inner)) if !has_placeholder_ty(&inner) => Some(*inner),
+                _ => None,
+            };
             if let Some((words, elem)) = const_array_words(elems) {
+                let elem = match &fitted_elem {
+                    Some(f @ ConcreteType::Primitive(p))
+                        if p.is_int()
+                            && matches!(&elem, ConcreteType::Primitive(q) if q.is_int()) =>
+                    {
+                        f.clone()
+                    }
+                    _ => elem,
+                };
                 let arr_ty = ConcreteType::Array(Box::new(elem.clone()));
                 let value = if is_char_array(&arr_ty) {
                     let bytes: Vec<u8> = words.iter().map(|w| *w as u8).collect();
@@ -22249,7 +22406,7 @@ fn compile_expr_inner<M: Module>(
             // All elements must share one primitive type. An empty
             // literal has element type `__none__` and coerces to any
             // concrete `T[]` (mirrors bare `none`).
-            let mut elem_ty: Option<ConcreteType> = None;
+            let mut elem_ty: Option<ConcreteType> = fitted_elem;
             // Each element carries whether it's a fresh temporary we exclusively
             // own: true when compiling it grew the scope and left its result as the
             // last-tracked entry (a call result, constructor, …). The store loop
@@ -22322,7 +22479,7 @@ fn compile_expr_inner<M: Module>(
             let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
             let esz_v = builder
                 .ins()
-                .iconst(types::I64, runtime_elem_size(&elem, structs));
+                .iconst(types::I64, array_elem_size(&elem, structs));
             let ptr = builtins.call(module, builder, "aipl_array_new", &[len, drop_fn, esz_v]);
             let elems_base = builder.ins().iadd_imm_s(ptr, ARR_ELEMS_OFFSET as i64);
             if is_bit_packed(&elem) {
@@ -22340,13 +22497,13 @@ fn compile_expr_inner<M: Module>(
                         .istore8(MemFlagsData::trusted(), byte, addr, 0);
                 }
             } else {
-                let esz = elem_size_of(&elem, structs);
+                let esz = array_elem_size(&elem, structs);
                 let mut moved: Vec<Value> = Vec::new();
                 for (i, (v, src_ty, owned_temp)) in vals.into_iter().enumerate() {
                     let slot = builder.ins().iadd_imm_s(elems_base, i as i64 * esz);
                     // Copy the element's own size (a `none` is narrower than a
                     // wider optional element slot — its unread tail is don't-care).
-                    store_array_elem(builder, slot, v, &src_ty, structs);
+                    store_elem(builder, slot, v, &src_ty, esz, structs);
                     if owned_temp {
                         // Move: the array inherits the temporary's ref, so no retain
                         // — and untrack it below so it isn't dropped again at scope
@@ -23064,8 +23221,13 @@ enum SeqRepr {
     /// An 8-byte tagged pointer to a block.
     #[default]
     Tagged,
-    /// The 24-byte `{base, data, len|tag}` value — what [`Abi::active`] answers.
+    /// The 24-byte value (`arr24::ArrValue`), every scalar element a word.
     Wide,
+    /// [`SeqRepr::Wide`], with an array's narrow integer elements stored at
+    /// their own width — an `i8` in one byte, a `u32` in four — rather than a
+    /// word each. What [`Abi::active`] answers. Only arrays: a set's or a dict's
+    /// scalars are still a word (see [`abi_array_elem_size`]).
+    Narrow,
 }
 
 impl SeqRepr {
@@ -23074,12 +23236,13 @@ impl SeqRepr {
         match self {
             SeqRepr::Tagged => "tagged",
             SeqRepr::Wide => "wide",
+            SeqRepr::Narrow => "narrow",
         }
     }
 
     /// The representation an artifact's `; array-abi` line names.
     fn from_name(name: &str) -> Option<SeqRepr> {
-        [SeqRepr::Tagged, SeqRepr::Wide]
+        [SeqRepr::Tagged, SeqRepr::Wide, SeqRepr::Narrow]
             .into_iter()
             .find(|r| r.name() == name)
     }
@@ -23130,9 +23293,10 @@ impl Abi {
     /// about the code they are emitting right now rather than about some other
     /// callee.
     fn active() -> Abi {
-        // The one place the array switch is thrown (`arr24_todo.txt` 2b-flip).
+        // The one place the array switch is thrown (`arr24_todo.txt` 2b-flip,
+        // and the narrow element strides that stage 3 builds on).
         Abi {
-            arrays: SeqRepr::Wide,
+            arrays: SeqRepr::Narrow,
         }
     }
 
@@ -23152,18 +23316,24 @@ impl Abi {
     fn arr_size(self) -> i64 {
         match self.arrays {
             SeqRepr::Tagged => 8,
-            SeqRepr::Wide => arr24::ARR_SIZE as i64,
+            SeqRepr::Wide | SeqRepr::Narrow => arr24::ARR_SIZE as i64,
         }
+    }
+
+    /// Whether an array's narrow integer elements are stored at their own width
+    /// under this ABI (see [`SeqRepr::Narrow`]).
+    fn narrow_elems(self) -> bool {
+        matches!(self.arrays, SeqRepr::Narrow)
     }
 
     /// Whether an array travels by address under this ABI — the array counterpart
     /// of [`Abi::str_is_composite`].
     ///
-    /// Under `Wide` it does: the value is 24 bytes, passed and returned by
-    /// address like any composite, and the words after the block carry a
-    /// window's data pointer and length (`arr24::ArrValue`).
+    /// Under `Wide` (and `Narrow`) it does: the value is 24 bytes, passed and
+    /// returned by address like any composite, and the words after the block
+    /// carry a window's data pointer and length (`arr24::ArrValue`).
     fn arr_is_composite(self) -> bool {
-        matches!(self.arrays, SeqRepr::Wide)
+        matches!(self.arrays, SeqRepr::Wide | SeqRepr::Narrow)
     }
 }
 
@@ -23193,8 +23363,17 @@ mod abi_tests {
         assert!(!abi_is_composite(tagged, &i64s, &structs));
         assert!(abi_is_composite(wide, &i64s, &structs));
 
-        // The switch is thrown: freshly compiled code uses the wide layout.
-        assert_eq!(Abi::active(), wide);
+        // The switch is thrown: freshly compiled code uses the wide layout, with
+        // narrow integers packed (`SeqRepr::Narrow`), which is the same value.
+        let narrow = Abi {
+            arrays: SeqRepr::Narrow,
+        };
+        assert_eq!(Abi::active(), narrow);
+        assert_eq!(
+            abi_elem_size(narrow, &i64s, &structs),
+            arr24::ARR_SIZE as i64
+        );
+        assert!(abi_is_composite(narrow, &i64s, &structs));
 
         // A `char[]` rides `str`'s representation, not an array block's, so the
         // knob must not touch it — it is wide under both.
@@ -23234,9 +23413,40 @@ mod abi_tests {
         assert!(err.contains("sideways"), "{err}");
 
         // The writer and the reader agree on every spelling.
-        for r in [SeqRepr::Tagged, SeqRepr::Wide] {
+        for r in [SeqRepr::Tagged, SeqRepr::Wide, SeqRepr::Narrow] {
             assert_eq!(SeqRepr::from_name(r.name()), Some(r));
         }
+    }
+
+    /// Only `Narrow` packs an array's narrow integers, and only an array's: the
+    /// element size a set or a dict is told is still a word, and a `bool` is
+    /// bit-packed under every ABI.
+    #[test]
+    fn narrow_integers_pack_only_in_arrays_under_narrow() {
+        let wide = Abi {
+            arrays: SeqRepr::Wide,
+        };
+        let narrow = Abi {
+            arrays: SeqRepr::Narrow,
+        };
+        let structs = HashMap::new();
+        let p = |p| ConcreteType::Primitive(p);
+        for (prim, width) in [
+            (Primitive::U8, 1),
+            (Primitive::I8, 1),
+            (Primitive::I16, 2),
+            (Primitive::U32, 4),
+            (Primitive::I64, 8),
+        ] {
+            assert_eq!(abi_array_elem_size(narrow, &p(prim), &structs), width);
+            assert_eq!(abi_array_elem_size(wide, &p(prim), &structs), 8);
+            assert_eq!(abi_elem_size(narrow, &p(prim), &structs), 8);
+        }
+        assert_eq!(
+            abi_array_elem_size(narrow, &p(Primitive::Bool), &structs),
+            ELEM_BITPACKED
+        );
+        assert_eq!(runtime_elem_size(&p(Primitive::U8), &structs), 8);
     }
 
     #[test]
@@ -23282,6 +23492,38 @@ fn abi_is_composite(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeD
     }
     matches!(ty, ConcreteType::Optional(_) | ConcreteType::Result(_, _))
         || matches!(ty, ConcreteType::Named(n) if structs.get(n).is_some_and(|d| !d.boxed()))
+}
+
+/// Bytes one element of `elem` occupies in an *array's* block for a callee
+/// speaking `abi` — the stride the array runtime is told, and every element
+/// read and write uses. A narrow integer under [`SeqRepr::Narrow`] is its own
+/// width; a `bool` is bit-packed ([`ELEM_BITPACKED`]); anything else is its
+/// value size ([`abi_elem_size`]).
+///
+/// Arrays only. A set or a dict keeps a word per scalar element — its runtime
+/// compares and orders elements as words, and a dict's value sits right after
+/// its key — so those ask [`abi_elem_size`] (or [`runtime_elem_size`]).
+fn abi_array_elem_size(abi: Abi, elem: &ConcreteType, structs: &HashMap<String, TypeDef>) -> i64 {
+    if is_bit_packed(elem) {
+        return ELEM_BITPACKED;
+    }
+    match narrow_int_width(elem) {
+        Some(width) if abi.narrow_elems() => width,
+        _ => abi_elem_size(abi, elem, structs),
+    }
+}
+
+/// [`abi_array_elem_size`] at [`Abi::active`].
+fn array_elem_size(elem: &ConcreteType, structs: &HashMap<String, TypeDef>) -> i64 {
+    abi_array_elem_size(Abi::active(), elem, structs)
+}
+
+/// The width in bytes of a narrower-than-a-word integer type, else `None`.
+fn narrow_int_width(ty: &ConcreteType) -> Option<i64> {
+    match ty {
+        ConcreteType::Primitive(p) => p.int_bits().filter(|b| *b < 64).map(|b| i64::from(b / 8)),
+        _ => None,
+    }
 }
 
 /// Bytes one value of `ty` occupies inline for a callee speaking `abi`.

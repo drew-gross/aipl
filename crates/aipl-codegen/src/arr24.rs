@@ -722,6 +722,28 @@ pub(crate) extern "C" fn aipl_arr_settle(
     unsafe { core::ptr::write(a, ArrValue::whole(own)) };
 }
 
+/// The set `set`'s elements as a fresh array block of `width`-byte elements —
+/// `to_array` on a set of a narrow integer. A set keeps a word per scalar and an
+/// array packs a narrow integer at its own width, so the two stop sharing a
+/// block there; each word's low bytes are the element. (Every other element
+/// type is laid out alike in both, and `to_array` shares the block.) Borrows
+/// `set`; the result carries one reference.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arr_from_set_words(set: *const u8, width: i64) -> *const u8 {
+    let len = tagged_len(set);
+    let out = super::aipl_array_new(len as i64, 0, width);
+    let w = width as usize;
+    let src = super::array_layout::arr_untag(set);
+    for i in 0..len {
+        unsafe {
+            let from = src.add(super::array_layout::ARR_ELEMS_OFFSET + i * 8);
+            let to = (out as *mut u8).add(super::array_layout::ARR_ELEMS_OFFSET + i * w);
+            core::ptr::copy_nonoverlapping(from, to, w);
+        }
+    }
+    out
+}
+
 #[no_mangle]
 pub(crate) extern "C" fn aipl_arrw_inc(a: *const Arr) {
     unsafe { *a }.retain();

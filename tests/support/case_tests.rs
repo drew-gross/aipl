@@ -41,6 +41,7 @@ case_tests! {
     cases_arrays_match = "cases/arrays/match",
     cases_arrays_match_binders = "cases/arrays/match_binders",
     cases_arrays_min_max = "cases/arrays/min_max",
+    cases_arrays_narrow_elements_packed = "cases/arrays/narrow_elements_packed",
     cases_arrays_nested_array_annotation = "cases/arrays/nested_array_annotation",
     cases_arrays_nested_array_to_str = "cases/arrays/nested_array_to_str",
     cases_arrays_nested_optional_deep_none = "cases/arrays/nested_optional_deep_none",

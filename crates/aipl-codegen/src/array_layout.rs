@@ -172,13 +172,47 @@ pub(crate) fn arr_untag(ptr: *const u8) -> *const u8 {
     (ptr as usize & !ARR_TAG_MASK) as *const u8
 }
 
+/// The byte stride of an array element, from the `elem_size` codegen passes:
+/// exactly that — a narrow integer is its own width, 1, 2 or 4 — except for the
+/// bit-packed sentinel, which a byte-stride path treats as the word it always
+/// did. (Those paths are not reached with a `bool[]`; the floor only keeps the
+/// sentinel from reading as a zero stride.)
+pub(crate) fn elem_stride(elem_size: i64) -> usize {
+    if elem_size == ELEM_BITPACKED {
+        8
+    } else {
+        elem_size as usize
+    }
+}
+
+/// Sort `len` narrow integer elements (`width` 1, 2 or 4 bytes) in place,
+/// ascending — the `sort` of an array whose elements are packed at their own
+/// width, which `sort_words` cannot read as words. `unsigned` is the element
+/// type's signedness, which decides where a value with its top bit set sorts.
+///
+/// SAFETY: `base` must address `len` initialized elements of `width` bytes,
+/// aligned for that width (an array's elements start 8-aligned).
+pub(crate) unsafe fn sort_narrow(base: *mut u8, len: usize, width: usize, unsigned: bool) {
+    unsafe {
+        match (width, unsigned) {
+            (1, true) => core::slice::from_raw_parts_mut(base, len).sort_unstable(),
+            (1, false) => core::slice::from_raw_parts_mut(base as *mut i8, len).sort_unstable(),
+            (2, true) => core::slice::from_raw_parts_mut(base as *mut u16, len).sort_unstable(),
+            (2, false) => core::slice::from_raw_parts_mut(base as *mut i16, len).sort_unstable(),
+            (4, true) => core::slice::from_raw_parts_mut(base as *mut u32, len).sort_unstable(),
+            (4, false) => core::slice::from_raw_parts_mut(base as *mut i32, len).sort_unstable(),
+            _ => unreachable!("a narrow element is 1, 2 or 4 bytes, not {width}"),
+        }
+    }
+}
+
 /// Bytes needed to hold `count` elements: `ceil(count/8)` when bit-packed
-/// (`elem_size == 0`), else `count * elem_size` (with the historic 8-byte
-/// floor).
+/// (`elem_size == 0`), else `count * elem_size` — which for an array of a narrow
+/// integer is its own width, not a word.
 pub(crate) fn cap_bytes_for(elem_size: i64, count: usize) -> usize {
     if elem_size == ELEM_BITPACKED {
         count.div_ceil(8)
     } else {
-        count * (elem_size.max(8) as usize)
+        count * elem_size as usize
     }
 }

@@ -1729,10 +1729,11 @@ fn is_ascii_ws(b: u8) -> bool {
 
 
 
-/// How [`aipl_arr_sort`] orders its elements. Every `ord` element type is an
-/// 8-byte scalar, so the only question is how to read the word: as a signed
-/// integer, as an unsigned one (`u8`..`u64`, and `char` — a byte value), or as a
-/// `str` pointer to compare lexicographically by bytes.
+/// How [`aipl_arr_sort`] orders its elements. Every `ord` element type is a
+/// scalar — a word, or a narrow integer packed at its own width — or a `str`, so
+/// the only question is how to read one: as a signed integer, as an unsigned one
+/// (`u8`..`u64`, and `char` — a byte value), or as a `str` to compare
+/// lexicographically by bytes.
 const SORT_KIND_STR: i64 = 2;
 const SORT_KIND_UNSIGNED: i64 = 1;
 
@@ -1768,7 +1769,7 @@ pub extern "C" fn aipl_arr_sort(
         let len = array_len(a);
         let raw = array_alloc(len, len, drop_fn, elem_size) as *const u8;
         if len > 0 {
-            let es = elem_size.max(8) as usize;
+            let es = elem_stride(elem_size);
             let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
             let src = a.add(ARR_ELEMS_OFFSET);
             memcpy(dst as *mut c_void, src as *const c_void, len * es);
@@ -1778,6 +1779,10 @@ pub extern "C" fn aipl_arr_sort(
             if kind == SORT_KIND_STR && elem_size == str24::STR_SIZE as i64 {
                 let vals = core::slice::from_raw_parts_mut(dst as *mut str24::Str, len);
                 str24::sort_values(vals);
+            } else if elem_stride(elem_size) < 8 {
+                // A narrow integer element is packed at its own width.
+                let unsigned = kind == SORT_KIND_UNSIGNED;
+                sort_narrow(dst, len, elem_stride(elem_size), unsigned);
             } else {
                 let words = core::slice::from_raw_parts_mut(dst as *mut i64, len);
                 sort_words(words, kind);
@@ -1968,7 +1973,7 @@ unsafe fn do_arr_slice_copy(
             }
             return raw;
         }
-        let es = elem_size.max(8) as usize;
+        let es = elem_stride(elem_size);
         let raw = array_alloc(n, n, drop_fn, elem_size) as *const u8;
         let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
         for i in 0..n {
@@ -1996,7 +2001,7 @@ unsafe fn do_arr_reverse(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: 
             }
             raw
         } else {
-            let es = (elem_size.max(8)) as usize;
+            let es = elem_stride(elem_size);
             let raw = array_alloc(len, len, drop_fn, elem_size) as *const u8;
             let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
             for i in 0..len {
@@ -2402,7 +2407,7 @@ pub extern "C" fn aipl_array_push(
             aipl_array_dec(a);
             return raw;
         }
-        let elem_size = if elem_size < 8 { 8 } else { elem_size as usize };
+        let elem_size = elem_stride(elem_size);
         let raw = array_alloc(old_len + 1, old_len + 1, drop_fn, elem_size as i64);
         let dst = raw.add(ARR_ELEMS_OFFSET);
         if old_len > 0 && !a.is_null() {
@@ -2486,7 +2491,7 @@ pub extern "C" fn aipl_array_push_mut(
             write_packed_bit(data.add(ARR_ELEMS_OFFSET) as *mut u8, old_len, val);
             return data;
         }
-        let elem_size = if elem_size < 8 { 8 } else { elem_size as usize };
+        let elem_size = elem_stride(elem_size);
         if !a.is_null() && (old_len + 1) * elem_size <= cap_bytes {
             // Spare capacity: append in place, no allocation.
             let elems = a.add(ARR_ELEMS_OFFSET);
@@ -2735,7 +2740,7 @@ pub extern "C" fn aipl_arr_reserve(
     count_builtin!(builtin_calls::AIPL_ARR_RESERVE);
     unsafe {
         let a = aipl_arr_ensure_heap(a);
-        let elem_size = core::cmp::max(elem_size, 8) as usize;
+        let elem_size = elem_stride(elem_size);
         let old_len = if a.is_null() { 0 } else { array_len(a) };
         let want = old_len + if extra > 0 { extra as usize } else { 0 };
         let need_bytes = want * elem_size;
@@ -2819,7 +2824,7 @@ pub extern "C" fn aipl_arr_extend(
             aipl_array_dec(src_heap);
             return out;
         }
-        let elem_size = core::cmp::max(elem_size, 8) as usize;
+        let elem_size = elem_stride(elem_size);
         let add = if src_heap.is_null() {
             0
         } else {
@@ -2933,7 +2938,7 @@ pub extern "C" fn aipl_arr_join(
             }
             return out;
         }
-        let esz = core::cmp::max(elem_size, 8) as usize;
+        let esz = elem_stride(elem_size);
         // Measure first — this is the whole point of the builtin being native.
         let mut total = 0usize;
         let mut i = 0;

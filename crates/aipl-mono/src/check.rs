@@ -524,6 +524,64 @@ impl<'a> Cx<'a> {
         }
     }
 
+    /// Lock every array literal a successful [`Cx::flex_int`] re-typed, at the
+    /// type it was fitted to — following the same descent `flex_fit` takes
+    /// (through a block's tail, both arms of an `if`, `some`/`ok`/`err`
+    /// payloads, a dict's halves, and nested literals).
+    ///
+    /// Flexing used to be a relabel and nothing more: `[3, 255]` was built as an
+    /// `i64[]` and called a `u8[]` wherever it was fitted to one, which was the
+    /// same bytes while every element was a word. An array's narrow integers are
+    /// packed at their own width now, so the literal has to be *built* at the
+    /// type it lands in — and the literal itself, not the wrapper `flex_int` was
+    /// asked about, is what codegen builds.
+    fn lock_flexed(&self, e: &Expr, target: &Type) {
+        use aipl_syntax::ast::Exclusion;
+        match &e.kind {
+            ExprKind::Seq(_, tail)
+            | ExprKind::Let(_, _, _, tail)
+            | ExprKind::LetMut(_, _, _, tail)
+            | ExprKind::Assign(_, _, tail) => return self.lock_flexed(tail, target),
+            ExprKind::If(_, a, b) => {
+                self.lock_flexed(a, target);
+                self.lock_flexed(b, target);
+                return;
+            }
+            _ => {}
+        }
+        match (target, &e.kind) {
+            // An empty literal is included: as an element of a literal that was
+            // fitted, it may already hold the answer its siblings derived before
+            // the fit (`[[1], []]` as a `u8[][]` locks the `[]` at `i64[]` first),
+            // and the fitted answer has to correct that rather than lose to it.
+            (Type::Array(inner), ExprKind::ArrayLit(elems)) => {
+                self.lock_node(node_id(e), target);
+                for el in elems {
+                    self.lock_flexed(el, inner);
+                }
+            }
+            (Type::Without(base, Exclusion::EmptyArray), ExprKind::ArrayLit(_)) => {
+                self.lock_flexed(e, base);
+            }
+            (Type::Optional(inner), ExprKind::Call(Callee::Some, args, _)) if args.len() == 1 => {
+                self.lock_flexed(&args[0], inner);
+            }
+            (Type::Result(ok, err), ExprKind::Call(c @ (Callee::Ok | Callee::Err), args, _))
+                if args.len() == 1 =>
+            {
+                let side = if *c == Callee::Ok { ok } else { err };
+                self.lock_flexed(&args[0], side);
+            }
+            (Type::Dict(kt, vt), ExprKind::DictLit(entries)) => {
+                for (k, v) in entries {
+                    self.lock_flexed(k, kt);
+                    self.lock_flexed(v, vt);
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// [`Cx::lock`] by node id, for a resolution reached without the `Expr` in
     /// hand — a generic constructor, whose whole call is what gets an instance.
     fn lock_node(&self, key: usize, ty: &Type) {
@@ -5039,7 +5097,10 @@ impl Cx<'_> {
     /// [`aipl_syntax::flex_int_values`].
     fn flex_int(&self, e: &Expr, ety: &Type, other: &Type) -> Result<Type, Error> {
         match aipl_syntax::flex_fit(e, ety, other) {
-            Ok(Some(t)) => Ok(t),
+            Ok(Some(t)) => {
+                self.lock_flexed(e, &t);
+                Ok(t)
+            }
             Ok(None) => Ok(ety.clone()),
             Err((v, name)) => Err(Error::at(
                 format!("integer literal {v} does not fit in {name}"),

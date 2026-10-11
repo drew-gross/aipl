@@ -82,6 +82,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  unify flat sets and flat dicts repr with arrays
   use set membership in duplicate case name check (with ad-hoc set)
   use template literals more than concat
   heap_str, rope_str, inline_str should probably be test-only or internal-only
@@ -185,6 +186,8 @@ lsp:
   IT'S SOOOO SLOW!!!!
 
 bugs:
+  An inlined fn wrapped() -> u8[]? { some([200, 1]) } makes wrapped().value_or([]) fail in monomorphization with "conflicting types for T: i64[] vs u8[]". The build without my changes fails the same way.
+  An array literal used as an extend source isn't fitted to the receiver's type: set xs.extend([100000, -1]) on an i32[] is rejected by the checker
   Where the unification stops, and why — this is the one real finding. An array block needs two header words a str buffer doesn't: drop_fn, and init, the block's own initialized element count. The second is the interesting one. A str's content is bytes, so freeing a buffer is freeing memory; an array's elements may own heap, so refcount zero has to release each of them — and the value's len cannot say how many, because a window's len is the window's, and dropping only the windowed elements would leak the rest. There's a test for exactly that: a 10-element block, sliced to 3, the source released — releasing the window drops all ten, not three.
   array literal spreads evaluate their arguments (including effects) twice. Note: this is to pre-compute the length. But it would be nice to still pre-compute the length, if it can be done cheaply.
   return none; in a fn that returns i64? should work

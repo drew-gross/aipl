@@ -1,11 +1,13 @@
 # Every integer width — not just the 64-bit pair — is a legal array and
-# optional element. An element slot is 8 bytes and a narrow value is *already*
-# canonicalized to its width before it is stored (sign-extended for `i*`,
-# zero-extended for `u*`), so a full 8-byte store/load round-trips it
-# unchanged; nothing has to be truncated on store or re-extended on load. Only
-# the *interpretation* differs, and everything that reads an element —
-# rendering, equality, `sort`, `minimum`/`maximum` — already dispatches on the
-# element type's width and signedness.
+# optional element. An array packs a narrow integer at its own width — an `i8[]`
+# is a byte per element, an `i32[]` four — so a store keeps the value's low
+# bytes and a load widens them back, sign-extending for `i*` and zero-extending
+# for `u*`. Everything that reads an element — rendering, equality, `sort`,
+# `minimum`/`maximum` — dispatches on the element type's width and signedness.
+# (An optional's payload, like a struct field, is still a word.)
+#
+# A literal is *built* at the type it is fitted to: `[3, -128, 127]` returned as
+# an `i8[]` is three bytes, not three words relabelled.
 #
 # The values below are chosen to catch a lost extension: each width's extreme
 # (`i8::MIN`, `u32::MAX`, …) has bits set outside every narrower width, and a
@@ -127,22 +129,31 @@ some(65535)
 allocations: 10
 deallocations: 10
 reallocations: 0
-bytes allocated: 430
+bytes allocated: 380
 instructions executed: 2207
-binary size: 7656
-  code: 3804
-  data: 619
-  metadata: 3233
+binary size: 11168
+  code: 6096
+  data: 779
+  metadata: 4293
 functions:
-  __to_str_i64$arr:
-    calls: 4
+  __to_str_i32$arr:
+    calls: 1
     bytes: 764
-  __to_str_i64$arr$arr:
+  __to_str_i8$arr:
+    calls: 1
+    bytes: 764
+  __to_str_i8$arr$arr:
     calls: 1
     bytes: 1256
   __to_str_u16$opt:
     calls: 1
     bytes: 388
+  __to_str_u32$arr:
+    calls: 1
+    bytes: 764
+  __to_str_u8$arr:
+    calls: 1
+    bytes: 764
   aipl_arr_inc:
     calls: 5
     bytes: (external)
@@ -156,19 +167,19 @@ functions:
     calls: 1
     bytes: (external)
   aipl_i64_len:
-    calls: 26
+    calls: 16
     bytes: (external)
   aipl_u64_len:
-    calls: 2
+    calls: 12
     bytes: (external)
   aipl_write_bytes:
     calls: 24
     bytes: (external)
   aipl_write_i64:
-    calls: 13
+    calls: 8
     bytes: (external)
   aipl_write_u64:
-    calls: 1
+    calls: 6
     bytes: (external)
   main:
     calls: 1

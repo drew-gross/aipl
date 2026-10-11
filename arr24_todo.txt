@@ -158,11 +158,37 @@ point at a time; this needs the same.
   a time. That is what keeps each step reviewable.
 
 
-Stage 3 — inline arrays                                        [blocked on 2]
+Stage 3 — inline arrays                                   [3-0 done; 3a next]
 ---------------------------------------------------------------------------------
 Elements in the value's own 22 bytes: no allocation, no refcount, exactly as a
 short `str` is inline. 22 bytes is 2 `i64`s, 5 `i32`s, 22 `i8`s, or 176
 bit-packed `bool`s.
+
+  [x] 3-0. narrow element strides, the prerequisite that makes those numbers
+          true: until it, *every* scalar element was a word, so 22 bytes held 2
+          of anything and inline would not have paid for its branch.
+          An array packs a narrow integer at its own width (`i8`/`u8` 1, `i16`/
+          `u16` 2, `i32`/`u32` 4) — `SeqRepr::Narrow`, which the artifact
+          records as `; array-abi narrow`. Arrays only: a set's and a dict's
+          scalars stay a word, so their runtime and the dict pair layout did not
+          move (`abi_array_elem_size` vs `runtime_elem_size`).
+            - codegen loads/stores at the width (`load_scalar_elem`,
+              `store_elem`); the runtime's word floors became `elem_stride`;
+              `sort` sorts packed elements (`sort_narrow`); the FFI marshals at
+              the width both ways; mono's in-place gate compares bytes
+              (`slot_bytes`), so an `i64[]` buffer is no longer reused for a
+              `u8[]`.
+            - a set → array `to_array` copies for a narrow element
+              (`aipl_arr_from_set_words`); every other element type still
+              shares the block.
+            - a literal is *built* at the type it is fitted to. Flexing used to
+              be a relabel (`[3, 255]` built as `i64[]`, called `u8[]`), which
+              is the same bytes only while every element is a word. The
+              checker now locks each array literal `flex_int` re-types
+              (`lock_flexed`, following `flex_fit`'s descent), and codegen's
+              `ArrayLit` builds at the recorded element type.
+          Proof: `arrays/narrow_elements_packed.aipl` (a 1000-element `u8[]`
+          allocates ~1KB, not ~8KB).
 
   [ ] 3a. construct one wherever a small array is built: a literal that fits, a
           `map`/`filter` result that fits, a `split` with few parts.
@@ -174,6 +200,10 @@ bit-packed `bool`s.
   [ ] 3d. decide the boundary per element size, and whether a `drop_fn` element
           type may be inline at all (it needs somewhere to record the count —
           see Stage 6).
+  [ ] 3f. make the inline capacity vary by type, rather than one fixed 22-byte
+          region for every element type: a type whose elements are wide (or
+          whose arrays are typically a little longer than 22 bytes allow) may
+          want a different trade-off, and the encoding should not rule that out.
   [ ] 3e. bit-packed `bool[]` (`ELEM_BITPACKED`, a stride of 0). `arr24` does not
           handle it yet: `elem_ptr` multiplies by the stride and `spare_capacity`
           divides by it, neither of which is right for bits. `inline_cap` does

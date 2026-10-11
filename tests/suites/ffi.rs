@@ -830,6 +830,36 @@ pub fn appended(xs: i64[], v: i64) -> i64[] {
     ys
 }";
 
+/// A narrow integer is packed at its own width in an array, so the FFI has to
+/// write and read it at that width both ways — a word apiece would overrun a
+/// one-byte-per-element block and read its neighbours as the high bytes.
+#[test]
+fn call_values_marshals_narrow_integer_arrays() {
+    let e = Engine::compile(
+        "\
+import { value_or } from builtins;
+fn third(xs: u8[]) -> u8 { xs[2].value_or(0) }
+fn swings() -> i16[] { [-32768, 5, 32767] }
+fn echo(xs: i8[]) -> i8[] { xs }",
+    )
+    .unwrap();
+    use aipl::FfiValue::{Array, Int};
+    assert_eq!(
+        e.call_values("third", &[Array(vec![Int(255), Int(1), Int(7)])])
+            .unwrap(),
+        Int(7)
+    );
+    assert_eq!(
+        e.call_values("swings", &[]).unwrap(),
+        Array(vec![Int(-32768), Int(5), Int(32767)])
+    );
+    assert_eq!(
+        e.call_values("echo", &[Array(vec![Int(-128), Int(0), Int(127)])])
+            .unwrap(),
+        Array(vec![Int(-128), Int(0), Int(127)])
+    );
+}
+
 #[test]
 fn call_values_marshals_array_params() {
     // An array argument is a host-built block the callee borrows: `STATIC_REFCOUNT`
