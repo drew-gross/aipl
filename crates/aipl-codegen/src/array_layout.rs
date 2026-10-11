@@ -39,7 +39,8 @@
 // ```text
 // 0b00  Heap   — the block above
 // 0b01  Rev    — a reversed view: a thin wrapper reading an inner array backwards
-// 0b10  Slice  — a slice view: a window `[start, start + len)` into an inner array
+// 0b10  —        unused: a slice view lived here, before a slice became a window
+//                carried in the 24-byte value (`arr24::ArrValue`)
 // 0b11  Inline — no block at all: the value *is* the array
 // ```
 //
@@ -63,18 +64,17 @@
 // set, so that a new representation is a compile error at each site that
 // does not yet handle it rather than a silent fall-through.
 //
-// # The view blocks
+// # The view block
 //
 // ```text
 // [refcount][len][inner: ptr][drop_fn][retain_fn][elem_size]          (Rev)
-// [refcount][len][inner: ptr][drop_fn][retain_fn][elem_size][start]   (Slice)
 //             ^ data pointer, tagged
 // ```
 //
 // `len` sits where a heap block's does, so a length read never dispatches.
-// A view holds one reference on `inner` (any representation — views
-// compose) and records the drop/retain helpers and element size it needs to
-// materialize itself into a heap block when something wants to write.
+// A view holds one reference on `inner` (any representation — a reversed view
+// can wrap another) and records the drop/retain helpers and element size it
+// needs to materialize itself into a heap block when something wants to write.
 
 /// The heap block, relative to the data pointer.
 pub(crate) const ARR_LEN_OFFSET: usize = 0; // length, in elements
@@ -86,7 +86,6 @@ pub(crate) const ARR_ELEMS_OFFSET: usize = 24; // first element
 pub(crate) const ARR_TAG_MASK: usize = 0b11;
 pub(crate) const ARR_HEAP_TAG: usize = 0b00;
 pub(crate) const ARR_REV_TAG: usize = 0b01;
-pub(crate) const ARR_SLICE_TAG: usize = 0b10;
 pub(crate) const ARR_INLINE_TAG: usize = 0b11;
 
 /// The empty array, as a value: no allocation, no refcount, nothing to free.
@@ -133,15 +132,13 @@ pub(crate) fn arr_empty_block() -> *const u8 {
     unsafe { (ARR_EMPTY_BLOCK.as_ptr() as *const u8).add(8) }
 }
 
-/// A view block, relative to its data pointer. `len` is at [`ARR_LEN_OFFSET`].
+/// The view block, relative to its data pointer. `len` is at [`ARR_LEN_OFFSET`].
 pub(crate) const REV_INNER_OFFSET: usize = 8; // tagged pointer to the wrapped array
 pub(crate) const REV_DROP_OFFSET: usize = 16; // element drop fn, for materializing
 pub(crate) const REV_RETAIN_OFFSET: usize = 24; // element retain fn, likewise
 pub(crate) const REV_ELEMSIZE_OFFSET: usize = 32; // element stride; `ELEM_BITPACKED` for `bool[]`
-pub(crate) const SLICE_START_OFFSET: usize = 40; // slice view only: the window's first element
-/// Bytes after the refcount header, per view.
+/// Bytes after the refcount header.
 pub(crate) const REV_BLOCK_DATA_SIZE: usize = 40;
-pub(crate) const SLICE_BLOCK_DATA_SIZE: usize = 48;
 
 /// `bool[]` is bit-packed (8 elements per byte, like `std::vector<bool>` but
 /// with the ordinary array interface). Codegen signals it with an element size
@@ -155,7 +152,6 @@ pub(crate) const ELEM_BITPACKED: i64 = 0;
 pub(crate) enum ArrRepr {
     Heap,
     Reversed,
-    Sliced,
     /// The value is the array; it addresses no block. See the header.
     Inline,
 }
@@ -165,7 +161,6 @@ pub(crate) fn arr_repr(ptr: *const u8) -> ArrRepr {
     match ptr as usize & ARR_TAG_MASK {
         ARR_HEAP_TAG => ArrRepr::Heap,
         ARR_REV_TAG => ArrRepr::Reversed,
-        ARR_SLICE_TAG => ArrRepr::Sliced,
         ARR_INLINE_TAG => ArrRepr::Inline,
         tag => unreachable!("unknown array repr tag {tag}"),
     }

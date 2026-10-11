@@ -10639,8 +10639,8 @@ fn str_shaped(t: &Type) -> bool {
 ///
 /// Monomorphization does not know codegen's layout table, but this one fact it
 /// has to: a `str` is a 24-byte value, and so — under the wide array layout — is
-/// an array, whose 24 bytes are its tagged pointer and two words of padding
-/// (`aipl-codegen`'s `is_padded_array`). Every other type `reusable` admits is
+/// an array, whose 24 bytes are its block and, for a window, where its elements
+/// start and how many (`aipl-codegen`'s `is_wide_array`). Every other type `reusable` admits is
 /// one word: the integers, and a set or a dict, which are still a plain word
 /// until they switch representation on their own (`arr24_todo.txt`).
 ///

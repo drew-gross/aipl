@@ -196,10 +196,10 @@ fn section_tail() -> Pat {
     )
 }
 --- performance ---
-allocations: 3957
-deallocations: 3957
+allocations: 3954
+deallocations: 3954
 reallocations: 329
-bytes allocated: 350471
+bytes allocated: 350303
 instructions executed: 1377232
 binary size: 217976
   code: 170516
@@ -357,7 +357,7 @@ functions:
     calls: 3
     bytes: (external)
   aipl_arr_inc:
-    calls: 111
+    calls: 105
     bytes: (external)
   aipl_arr_reserve:
     calls: 3
@@ -366,7 +366,7 @@ functions:
     calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 1711
+    calls: 1702
     bytes: (external)
   aipl_array_new:
     calls: 204

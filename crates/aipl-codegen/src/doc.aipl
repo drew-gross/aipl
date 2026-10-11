@@ -329,10 +329,10 @@ fn cleanup(out: str) -> str {
     assert(raw.print(100) == `x = """\n    hi\n"""\n`);
 })
 --- performance ---
-allocations: 313
-deallocations: 313
+allocations: 312
+deallocations: 312
 reallocations: 1
-bytes allocated: 21621
+bytes allocated: 21565
 instructions executed: 36136
 binary size: 40712
   code: 25448
@@ -370,7 +370,7 @@ functions:
     calls: 1
     bytes: 6164
   aipl_arr_inc:
-    calls: 94
+    calls: 92
     bytes: (external)
   aipl_arr_reserve:
     calls: 11
@@ -379,7 +379,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 191
+    calls: 188
     bytes: (external)
   aipl_array_new:
     calls: 41

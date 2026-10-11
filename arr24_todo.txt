@@ -185,7 +185,7 @@ bit-packed `bool`s.
   value cannot do.
 
 
-Stage 4 — slices as values                                 [4a, 4b done; see 4c]
+Stage 4 — slices as values                                                 [done]
 ---------------------------------------------------------------------------------
   [x] 4a: arrays travel by address. `Abi::arr_is_composite` is
       `matches!(Wide)`, so every array value in codegen is the address of its
@@ -214,14 +214,18 @@ Stage 4 — slices as values                                 [4a, 4b done; see 4
   [x] a case proving a slice allocates nothing, the way
       `strings/named_representations.aipl` proves a rope does
       (`arrays/slice_allocates_nothing.aipl`)
-  [ ] 4c. delete the Slice view block and `ARR_SLICE_TAG`, and the `Sliced`
-      arm at every dispatch site. **Not yet possible**: the view block is still
-      what a window lends a runtime entry that wants a block, and what slicing a
-      reversed or bit-packed array builds. It goes once the entry points take
-      values rather than blocks (or stage 5 makes reversal a value too, which
-      removes the reversed-source case).
-  [ ] `is_wide_array` and `is_padded_array` now answer the same question;
-      fold them into one (Stage 7 if not sooner)
+  [x] 4c. the Slice view block, `ARR_SLICE_TAG`, `SLICE_START_OFFSET` and the
+      `Sliced` arm at every dispatch site are gone, from both runtimes and the
+      shared layout (tag `0b10` is unused). What used to need a view now
+      *copies*: a window lent to an entry that wants a block
+      (`aipl_arr_window_block`), and a slice of a reversed or bit-packed array
+      (`aipl_arr_slice`, which no longer has a codegen caller or an import
+      row). That came out ahead, not behind: settling a window before a write
+      is now one copy where it was a view and then a copy, so allocations went
+      down in 9 cases and up in none.
+  [x] `is_padded_array` folded into `is_wide_array` (it needed the layout
+      table only to ask what `Abi::active` already says), and `seq_ptr` /
+      `seq_val` lost the `structs` they no longer read.
 
 
 Stage 5 — reversed as values                                   [blocked on 2]
@@ -285,7 +289,8 @@ Already identified, from `str`:
 
 And what this switch will add:
   [ ] `array_layout.rs` in its entirety, once nothing reads the 8-byte layout
-  [ ] `ArrRepr` and its `Heap`/`Reversed`/`Sliced` arms, with the view blocks
+  [ ] `ArrRepr` and its `Heap`/`Reversed` arms, with the reversed view block
+      (`Sliced` went in 4c)
   [ ] `ARR_INLINE_TAG` and the shared static empty block — the stand-in for
       stage 3, which exists only because it can point at a block
   [ ] `SeqRepr::Tagged` itself, and the `Abi` field, if arrays end up being the

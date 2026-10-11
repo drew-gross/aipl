@@ -49,7 +49,7 @@ mod str24_host;
 #[allow(dead_code)] // staged: wired up when `#{char}` switches representation
 mod charset;
 
-// The array layout — block, representation tags, view blocks — shared with
+// The array layout — block, representation tags, reversed view — shared with
 // the AOT runtime the same way; see the file's own header.
 mod array_layout;
 
@@ -779,19 +779,13 @@ extern "C" fn aipl_arr_reverse(
 /// out-of-range end yields a shorter array; `start >= end` yields `[]`).
 /// *Borrows* `xs` (does not drop it) and returns an array the caller owns.
 ///
-/// Like a `str`'s slice, this shares rather than copies: the result is a
-/// slice view (`ArrRepr::Sliced`) over `xs`, holding its own reference on it,
-/// and the elements stay where they are. Slicing a slice looks through to
-/// the source, so a chain of slices is one view, not a chain of them. The two
-/// degenerate windows skip the view: an empty one is a fresh empty array (a
-/// view would keep the whole source alive for nothing), and the whole array
-/// is the array itself, retained.
-///
-/// Compiled code no longer slices through this: `xs[a..b]` is a window carried
-/// in the value (`arr24::aipl_arr_window`), which comes here only for a source
-/// it cannot point into — a reversed or bit-packed one — and to lend a window
-/// a block when something that needs one is reached
-/// (`arr24::aipl_arr_window_block`).
+/// The elements are *copied* into a fresh heap block, each retained: a slice
+/// that shares is a window carried in the value (`arr24::aipl_arr_window`), and
+/// this is what that reaches for when sharing is impossible — a source it cannot
+/// point into (reversed, or bit-packed), or a window lent to a runtime entry
+/// that wants a block of exactly its elements (`arr24::aipl_arr_window_block`).
+/// The two degenerate windows copy nothing: an empty one is the empty array,
+/// and the whole array is the array itself, retained.
 #[no_mangle]
 extern "C" fn aipl_arr_slice(
     a: *const u8,
@@ -816,20 +810,7 @@ extern "C" fn aipl_arr_slice(
         aipl_arr_inc(a);
         return a;
     }
-    let (source, start) = match arr_repr(a) {
-        ArrRepr::Sliced => {
-            let u = arr_untag(a);
-            let inner = unsafe { std::ptr::read(u.add(REV_INNER_OFFSET) as *const *const u8) };
-            let base = unsafe { std::ptr::read(u.add(SLICE_START_OFFSET) as *const i64) } as usize;
-            (inner, base + lo)
-        }
-        ArrRepr::Heap | ArrRepr::Reversed => (a, lo),
-        // An inline array is empty, so `n` above was zero and the early return
-        // has already fired.
-        ArrRepr::Inline => unreachable!("a non-empty slice of an empty array"),
-    };
-    aipl_arr_inc(source);
-    alloc_slice_view(source, start, n, drop_fn, retain_fn, elem_size)
+    do_arr_slice_copy(a, lo, n, drop_fn, retain_fn, elem_size)
 }
 
 /// `join(parts: str[], sep: str) -> str` — concatenate the parts with `sep`
@@ -889,7 +870,7 @@ fn iter_state_size() -> u32 {
 
 // ---------- Refcounted array runtime ----------
 //
-// The block, the representation tags and the view blocks are `array_layout`
+// The block, the representation tags and the reversed view are `array_layout`
 // (shared verbatim with the AOT runtime); this is the JIT side's allocation,
 // accounting and element traffic over that layout. Elements are 8 bytes each
 // (a scalar, or a heap pointer for `str`/array elements) unless the element
@@ -942,38 +923,6 @@ fn alloc_reversed_view(
     }
 }
 
-/// Allocate a slice-view block over `inner` (tagged): the window of `len`
-/// elements starting at `start`. Steals the caller's reference to `inner`.
-fn alloc_slice_view(
-    inner: *const u8,
-    start: usize,
-    len: usize,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    let layout = std::alloc::Layout::from_size_align(
-        HEADER_SIZE + SLICE_BLOCK_DATA_SIZE,
-        std::mem::align_of::<i64>(),
-    )
-    .expect("slice-view layout");
-    let raw = unsafe { std::alloc::alloc(layout) };
-    if raw.is_null() {
-        std::alloc::handle_alloc_error(layout);
-    }
-    unsafe {
-        std::ptr::write(raw as *mut i64, 1); // refcount = 1
-        let data = raw.add(HEADER_SIZE);
-        std::ptr::write(data as *mut i64, len as i64);
-        std::ptr::write(data.add(REV_INNER_OFFSET) as *mut *const u8, inner);
-        std::ptr::write(data.add(REV_DROP_OFFSET) as *mut i64, drop_fn);
-        std::ptr::write(data.add(REV_RETAIN_OFFSET) as *mut i64, retain_fn);
-        std::ptr::write(data.add(REV_ELEMSIZE_OFFSET) as *mut i64, elem_size);
-        std::ptr::write(data.add(SLICE_START_OFFSET) as *mut i64, start as i64);
-        (data as usize | ARR_SLICE_TAG) as *const u8
-    }
-}
-
 /// The five words every view block records, read back off a view pointer.
 unsafe fn view_fields(a: *const u8) -> (*const u8, i64, i64, i64) {
     let u = arr_untag(a);
@@ -998,7 +947,7 @@ fn with_heap<R>(a: *const u8, f: impl FnOnce(*const u8) -> R) -> R {
         // No block of its own, and nothing to materialize: the permanently-empty
         // block reads as the same array.
         ArrRepr::Inline => f(arr_empty_block()),
-        ArrRepr::Reversed | ArrRepr::Sliced => {
+        ArrRepr::Reversed => {
             aipl_arr_inc(a);
             let heap = aipl_arr_ensure_heap(a);
             let out = f(heap);
@@ -1019,15 +968,6 @@ fn aipl_arr_ensure_heap(a: *const u8) -> *const u8 {
         ArrRepr::Reversed => {
             let (inner, drop_fn, retain_fn, elem_size) = unsafe { view_fields(a) };
             let heap = do_arr_reverse(inner, drop_fn, retain_fn, elem_size);
-            aipl_array_dec(a);
-            heap
-        }
-        ArrRepr::Sliced => {
-            let (inner, drop_fn, retain_fn, elem_size) = unsafe { view_fields(a) };
-            let u = arr_untag(a);
-            let start = unsafe { std::ptr::read(u.add(SLICE_START_OFFSET) as *const i64) } as usize;
-            let len = unsafe { array_len_of(a) };
-            let heap = do_arr_slice_copy(inner, start, len, drop_fn, retain_fn, elem_size);
             aipl_array_dec(a);
             heap
         }
@@ -1130,12 +1070,6 @@ unsafe fn arr_elem_ptr(a: *const u8, idx: usize, elem_size: usize) -> *const u8 
             let j = len - 1 - idx;
             unsafe { arr_elem_ptr(inner, j, elem_size) }
         }
-        ArrRepr::Sliced => {
-            let u = arr_untag(a);
-            let inner = unsafe { std::ptr::read(u.add(REV_INNER_OFFSET) as *const *const u8) };
-            let start = unsafe { std::ptr::read(u.add(SLICE_START_OFFSET) as *const i64) as usize };
-            unsafe { arr_elem_ptr(inner, start + idx, elem_size) }
-        }
         // An inline array holds no elements, so every index is out of bounds and
         // the bounds check upstream has already answered.
         ArrRepr::Inline => unreachable!("element {idx} of an empty array"),
@@ -1154,12 +1088,6 @@ unsafe fn arr_load_bit(a: *const u8, idx: usize) -> bool {
             let inner = unsafe { std::ptr::read(u.add(REV_INNER_OFFSET) as *const *const u8) };
             let len = unsafe { std::ptr::read(u as *const i64) as usize };
             unsafe { arr_load_bit(inner, len - 1 - idx) }
-        }
-        ArrRepr::Sliced => {
-            let u = arr_untag(a);
-            let inner = unsafe { std::ptr::read(u.add(REV_INNER_OFFSET) as *const *const u8) };
-            let start = unsafe { std::ptr::read(u.add(SLICE_START_OFFSET) as *const i64) as usize };
-            unsafe { arr_load_bit(inner, start + idx) }
         }
         // No elements, so no bits; the bounds check upstream has answered.
         ArrRepr::Inline => unreachable!("bit {idx} of an empty array"),
@@ -1299,17 +1227,11 @@ extern "C" fn aipl_array_dec(ptr: *const u8) {
                 }
                 // A view owns one reference on its inner array and nothing
                 // else; the elements are the inner's to release.
-                ArrRepr::Reversed | ArrRepr::Sliced => {
+                ArrRepr::Reversed => {
                     let inner = std::ptr::read(u.add(REV_INNER_OFFSET) as *const *const u8);
                     aipl_array_dec(inner);
-                    let data_size = match arr_repr(ptr) {
-                        ArrRepr::Inline => unreachable!("freeing an inline array"),
-                        ArrRepr::Reversed => REV_BLOCK_DATA_SIZE,
-                        ArrRepr::Sliced => SLICE_BLOCK_DATA_SIZE,
-                        ArrRepr::Heap => unreachable!("matched above"),
-                    };
                     let layout = std::alloc::Layout::from_size_align(
-                        HEADER_SIZE + data_size,
+                        HEADER_SIZE + REV_BLOCK_DATA_SIZE,
                         std::mem::align_of::<i64>(),
                     )
                     .expect("view layout");
@@ -1980,7 +1902,7 @@ unsafe fn part_at(
     elem_size: i64,
 ) -> *const u8 {
     // The parts are a `T[][]`, so each is a 24-byte array value — hence the
-    // `ARR_SIZE` stride — and may be a window, which lends a view block.
+    // `ARR_SIZE` stride — and may be a window, which lends a copy.
     let elems = unsafe { parts.add(ARR_ELEMS_OFFSET) };
     let value = unsafe { elems.add(i * arr24::ARR_SIZE) } as *const arr24::ArrValue;
     let p = arr24::owned_block_of(value, drop_fn, retain_fn, elem_size);
@@ -4671,7 +4593,6 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_shim_set", aipl_shim_set as *const u8);
     jit_builder.symbol("aipl_arr_reverse", aipl_arr_reverse as *const u8);
     jit_builder.symbol("aipl_arr_sort", aipl_arr_sort as *const u8);
-    jit_builder.symbol("aipl_arr_slice", aipl_arr_slice as *const u8);
     jit_builder.symbol("aipl_array_new", aipl_array_new as *const u8);
     jit_builder.symbol("aipl_array_with_cap", aipl_array_with_cap as *const u8);
     jit_builder.symbol("aipl_array_push", aipl_array_push as *const u8);
@@ -8266,7 +8187,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_arr_sort"
         | "aipl_arr_reserve"
         | "aipl_arr_extend" => (5, Ret::Word),
-        "aipl_dict_insert" | "aipl_arr_slice" => (6, Ret::Word),
+        "aipl_dict_insert" => (6, Ret::Word),
         // Array windows (`arr24`, stage 4b). `aipl_arr_window` takes its out
         // value as an explicit first argument rather than through `Ret::Str`:
         // the caller already holds the slot it wants filled.
@@ -9685,7 +9606,7 @@ fn emit_char_at<M: Module>(
 /// exclusive mutable array, whose pointer can change under in-place `push`
 /// (a grow relocates the block), so we must drop whatever it points at *now*.
 ///
-/// `View` is the view block [`arr_block`] made for a window — or a null word,
+/// `View` is the block [`arr_block`] lent a window — or a null word,
 /// when the value it was asked about was not one, which is the common case and
 /// releases nothing. It is a word rather than a value of the array's type
 /// because only the window path ever puts anything in it.
@@ -9929,9 +9850,9 @@ fn owned_block_made_unique<M: Module>(
     // value is owned — that is what moving it in meant — so a window may be
     // settled in place first, and then the copy below makes it unique.
     settle_array_slot(builder, module, cx, v, ty);
-    let block = seq_ptr(builder, v, ty, cx.structs);
+    let block = seq_ptr(builder, v, ty);
     let unique = owned_block_made_unique_ptr(builder, module, cx, block, ty);
-    if is_padded_array(ty, cx.structs) {
+    if is_wide_array(ty) {
         arr_val(builder, unique)
     } else {
         unique
@@ -10149,14 +10070,6 @@ fn store_array_elem(
     }
 }
 
-/// Whether `ty` is an array whose in-memory value is the padded 24-byte form —
-/// the 8-byte tagged pointer in the first word and two zero words after it (see
-/// [`Abi::arr_is_composite`]). A `char[]` rides `str`'s representation instead,
-/// and is a composite in its own right.
-fn is_padded_array(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
-    matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty) && elem_size_of(ty, structs) > 8
-}
-
 /// The tagged block pointer an array value carries — its first word.
 ///
 /// Under the wide layout an array *value* is the address of its 24 bytes, as a
@@ -10180,13 +10093,8 @@ fn arr_ptr(builder: &mut FunctionBuilder, value: Value) -> Value {
 /// to spell out which of them is an address. A set or dict reaching one of those
 /// sites with [`arr_ptr`] applied would read its block's first word as a
 /// pointer. Like [`arr_ptr`], it does not see a window.
-fn seq_ptr(
-    builder: &mut FunctionBuilder,
-    v: Value,
-    ty: &ConcreteType,
-    structs: &HashMap<String, TypeDef>,
-) -> Value {
-    if is_padded_array(ty, structs) {
+fn seq_ptr(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> Value {
+    if is_wide_array(ty) {
         arr_ptr(builder, v)
     } else {
         v
@@ -10198,8 +10106,8 @@ fn seq_ptr(
 ///
 /// A whole array is its first word, as [`seq_ptr`] reads it, and a set or a
 /// dict is the pointer itself. A window has no block of exactly its elements,
-/// so one is made — the view block a slice used to allocate up front, now
-/// allocated only when something that needs a block is reached — and tracked
+/// so one is made — a copy of them, allocated only when something that needs a
+/// block is reached (`arr24::aipl_arr_window_block`) — and tracked
 /// for release (`Owned::View`). The track goes to the *bottom* of the scope:
 /// the retain-elision recognizers read the top entry as "the value just
 /// produced", and this is not one.
@@ -10220,7 +10128,7 @@ fn arr_block<M: Module>(
     };
     // An untyped empty array was never sliced, so it is never a window.
     if !is_wide_array(ty) || is_none_inner(elem) {
-        return seq_ptr(builder, v, ty, cx.structs);
+        return seq_ptr(builder, v, ty);
     }
     let flags = MemFlagsData::trusted();
     let whole = builder.ins().load(types::I64, flags, v, 0);
@@ -10263,7 +10171,7 @@ fn arr_block<M: Module>(
 /// has to be taken for the entry.
 ///
 /// A whole array hands over its first word, retained when borrowed. A window
-/// hands over a view block of its own, which already carries the reference the
+/// hands over a copy of its elements, which already carries the reference the
 /// entry consumes; an owned window then releases the one it held on the source,
 /// so either way exactly one reference changes hands.
 fn consumed_block<M: Module>(
@@ -10285,7 +10193,7 @@ fn consumed_block<M: Module>(
         if !owned {
             emit_retain(builder, module, builtins, structs, v, ty);
         }
-        return seq_ptr(builder, v, ty, structs);
+        return seq_ptr(builder, v, ty);
     }
     let flags = MemFlagsData::trusted();
     let data = builder.ins().load(types::I64, flags, v, 8);
@@ -10324,8 +10232,8 @@ fn consumed_block<M: Module>(
 
 /// Make the array an *owning* slot holds a whole value before something writes
 /// through its first word: a window is replaced, in place, by a whole value over
-/// a view block of its own (`arr24::aipl_arr_settle`), which the in-place
-/// entries then copy on their first write as they would any view. The slot's
+/// a copy of its elements (`arr24::aipl_arr_settle`), uniquely owned, so the
+/// in-place entries then write straight into it. The slot's
 /// reference moves with it, so its owner's bookkeeping is unchanged. A whole
 /// value costs a load and a branch.
 fn settle_array_slot<M: Module>(
@@ -10405,13 +10313,8 @@ fn array_descriptors<M: Module>(
 /// *retain* it as a value of `ty`: both go through `emit_rc`, which reads an
 /// array as the address of its value, so handing it the bare block would release
 /// whatever the block's first word happens to be.
-fn seq_val(
-    builder: &mut FunctionBuilder,
-    ptr: Value,
-    ty: &ConcreteType,
-    structs: &HashMap<String, TypeDef>,
-) -> Value {
-    if is_padded_array(ty, structs) {
+fn seq_val(builder: &mut FunctionBuilder, ptr: Value, ty: &ConcreteType) -> Value {
+    if is_wide_array(ty) {
         arr_val(builder, ptr)
     } else {
         ptr
@@ -10583,8 +10486,10 @@ fn lives_in_slot(ty: &ConcreteType) -> bool {
     is_str_shaped(ty) || is_inline_optional(ty) || is_char_set(ty) || is_wide_array(ty)
 }
 
-/// Whether `ty` is an array held as the 24-byte wide value — [`is_padded_array`]
-/// without the layout table, for the places that only have the type.
+/// Whether `ty` is an array held as the 24-byte wide value (`arr24::ArrValue`:
+/// the block, and a window's bounds when it is one — see
+/// [`Abi::arr_is_composite`]). A `char[]` rides `str`'s representation instead,
+/// and is a composite in its own right; a set or a dict is still one word.
 ///
 /// Such an array lives *in* its binding's slot, as a `str` does, rather than the
 /// slot holding a pointer to it. That is what keeps `push` and `extend` on a
@@ -11366,7 +11271,7 @@ fn emit_rc_w<M: Module>(
             // An array value is an address now; a set or dict is still the
             // tagged pointer itself. A window holds its one reference on the
             // block in the same first word, so it needs nothing more.
-            let ptr = seq_ptr(builder, v, ty, structs);
+            let ptr = seq_ptr(builder, v, ty);
             if rc_statically_noop(builder.func, ptr, HEADER_SIZE) {
                 return;
             }
@@ -12893,9 +12798,7 @@ fn array_drop_fn_addr<M: Module>(
         // A nested array is a padded 24-byte value under the wide layout, so it
         // needs the 24-stride helper; a set or a dict is still a plain word and
         // keeps the 8-byte one (they switch representation separately).
-        ConcreteType::Array(_) if is_padded_array(elem, cx.structs) => {
-            Some(b.id(module, "aipl_arr_drop_warr"))
-        }
+        ConcreteType::Array(_) if is_wide_array(elem) => Some(b.id(module, "aipl_arr_drop_warr")),
         ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => {
             Some(b.id(module, "aipl_arr_drop_arr"))
         }
@@ -12904,7 +12807,7 @@ fn array_drop_fn_addr<M: Module>(
         {
             Some(b.id(module, "aipl_arr_drop_opt_str"))
         }
-        ConcreteType::Optional(inner) if is_padded_array(inner, cx.structs) => {
+        ConcreteType::Optional(inner) if is_wide_array(inner) => {
             Some(b.id(module, "aipl_arr_drop_opt_warr"))
         }
         ConcreteType::Optional(inner) if matches!(inner.as_ref(), ConcreteType::Array(_)) => {
@@ -12937,9 +12840,7 @@ fn array_retain_fn_addr<M: Module>(
         // As in `array_drop_fn_addr`: a char-set element owns nothing, so
         // there is no reference to take on it.
         _ if is_char_set(elem) => None,
-        ConcreteType::Array(_) if is_padded_array(elem, cx.structs) => {
-            Some(b.id(module, "aipl_arr_retain_warr"))
-        }
+        ConcreteType::Array(_) if is_wide_array(elem) => Some(b.id(module, "aipl_arr_retain_warr")),
         ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => {
             Some(b.id(module, "aipl_arr_retain_ptr"))
         }
@@ -12951,7 +12852,7 @@ fn array_retain_fn_addr<M: Module>(
             // is retained as a `str`, not as an array block.
             Some(b.id(module, "aipl_arr_retain_opt_str"))
         }
-        ConcreteType::Optional(inner) if is_padded_array(inner, cx.structs) => {
+        ConcreteType::Optional(inner) if is_wide_array(inner) => {
             Some(b.id(module, "aipl_arr_retain_opt_warr"))
         }
         ConcreteType::Optional(inner) if matches!(inner.as_ref(), ConcreteType::Array(_)) => {
@@ -14007,7 +13908,7 @@ fn emit_file_result<M: Module>(
     // flag has to be carried separately.
     let is_ok = builder.ins().icmp_imm_s(IntCC::NotEqual, raw, 0);
     // A returned array is a block pointer; the payload is a value wrapping it.
-    let payload = ok_ty.map(|t| (seq_val(builder, raw, &t, cx.structs), t));
+    let payload = ok_ty.map(|t| (seq_val(builder, raw, &t), t));
     emit_file_result_split(module, builder, cx, is_ok, payload, err_msg)
 }
 
@@ -16280,15 +16181,15 @@ fn compile_call<M: Module>(
     // A runtime builtin speaks the *runtime's* array ABI, not the AIPL one: it
     // takes an array as its block pointer and returns one in a register. An
     // AIPL array value is the address of its 24 bytes, so each array argument is
-    // handed over as a block (`arr_block`: its first word, or a view block for a
+    // handed over as a block (`arr_block`: its first word, or a copy for a
     // window — every such parameter borrows, see `borrowed_param`), and an array
     // result is wrapped back into a value below. (A `str` needs no such step:
     // the runtime's `str` entry points take and return the 24-byte value itself.)
     let to_runtime = matches!(info.link, FuncLink::Builtin(_));
-    let arr_result = to_runtime && is_padded_array(&info.return_ty, structs);
+    let arr_result = to_runtime && is_wide_array(&info.return_ty);
     if to_runtime {
         for (idx, p) in info.params.iter().enumerate() {
-            if is_padded_array(&p.ty, structs) {
+            if is_wide_array(&p.ty) {
                 arg_values[idx] = arr_block(builder, module, cx, scopes, arg_values[idx], &p.ty);
             }
         }
@@ -17596,7 +17497,7 @@ fn compile_call_expr<M: Module>(
                         *sep
                     });
                 }
-                // Borrowed, so a window of parts lends a view block.
+                // Borrowed, so a window of parts lends a copy.
                 let parts_block = arr_block(builder, module, cx, scopes, parts, &pt);
                 let out = builtins.call(
                     module,
@@ -17903,7 +17804,7 @@ fn compile_call_expr<M: Module>(
             // The block is shared, and the array is a value wrapping it.
             builtins.call_void(module, builder, "aipl_arr_inc", &[ptr]);
             let arr_ty = ConcreteType::Array(elem.clone());
-            let v = seq_val(builder, ptr, &arr_ty, structs);
+            let v = seq_val(builder, ptr, &arr_ty);
             scopes
                 .last_mut()
                 .expect("scope")
@@ -17952,8 +17853,8 @@ fn compile_call_expr<M: Module>(
                 // as a value instead.
                 //
                 // The runtime builds the reversed view over a block, so `ptr`
-                // is the block under the value from here on — a view block of
-                // its own when the value is a window.
+                // is the block under the value from here on — a copy of its
+                // elements when the value is a window.
                 let ptr = arr_block(builder, module, cx, scopes, ptr, &t);
                 builtins.call_void(module, builder, "aipl_arr_inc", &[ptr]);
                 let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
@@ -18986,9 +18887,9 @@ fn compile_call_expr<M: Module>(
                 .iconst(types::I64, runtime_elem_size(&elem, structs));
             let zero = builder.ins().iconst(types::I64, 0);
             // The parameter's reference is this site's to consume, so a window
-            // may be settled in place into a view, which the reserve copies.
+            // may be settled in place into a copy, which the reserve keeps.
             settle_array_slot(builder, module, cx, arr_ptr, &arr_ty);
-            let block = seq_ptr(builder, arr_ptr, &arr_ty, structs);
+            let block = seq_ptr(builder, arr_ptr, &arr_ty);
             let owned = builtins.call(
                 module,
                 builder,
@@ -19367,7 +19268,7 @@ fn compile_call_expr<M: Module>(
                 builder.ins().stack_store(types::I64, new_ptr, slot, 0);
                 // The region track holds the *new version* as a value of its own:
                 // the binding's slot is overwritten by the next push or extend.
-                let new_v = seq_val(builder, new_ptr, &new_arr_ty, structs);
+                let new_v = seq_val(builder, new_ptr, &new_arr_ty);
                 emit_retain(builder, module, builtins, structs, new_v, &new_arr_ty);
                 scopes
                     .last_mut()
@@ -19467,7 +19368,7 @@ fn compile_call_expr<M: Module>(
             if !exclusive {
                 // The region track holds the *new version* as a value of its own:
                 // the binding's slot is overwritten by the next push or extend.
-                let new_v = seq_val(builder, new_ptr, &arr_ty, structs);
+                let new_v = seq_val(builder, new_ptr, &arr_ty);
                 emit_retain(builder, module, builtins, structs, new_v, &arr_ty);
                 scopes
                     .last_mut()
@@ -19660,7 +19561,7 @@ fn compile_call_expr<M: Module>(
                 // track, keeping it borrowable to this scope's exit.
                 // The region track holds the *new version* as a value of its own:
                 // the binding's slot is overwritten by the next push or extend.
-                let new_v = seq_val(builder, new_ptr, &new_arr_ty, structs);
+                let new_v = seq_val(builder, new_ptr, &new_arr_ty);
                 emit_retain(builder, module, builtins, structs, new_v, &new_arr_ty);
                 scopes
                     .last_mut()

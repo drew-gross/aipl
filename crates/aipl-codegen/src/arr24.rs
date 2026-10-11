@@ -31,13 +31,12 @@
 //
 // # What this buys over the 8-byte tagged pointer
 //
-// **A slice stops being an allocation.** Today an array value is one tagged
-// pointer, so a window into an array has nowhere to put its bounds and needs a
-// *view block* — `[refcount][len][inner][drop_fn][retain_fn][elem_size][start]`,
-// 48 bytes on the heap, holding a reference on the array it windows. Here a window
-// is just a value: `data` moved forward and `len` cut short, tag still `block`.
-// `ARR_SLICE_TAG` and its block disappear, and so does the `Sliced` arm at every
-// dispatch site.
+// **A slice stops being an allocation.** An 8-byte array value is one tagged
+// pointer, so a window into an array had nowhere to put its bounds and needed a
+// *view block* — 48 bytes on the heap, holding a reference on the array it
+// windowed. Here a window is just a value: `data` moved forward and `len` cut
+// short, tag still `block`. (The bridge value below already does this over the
+// old block, which is why that view block and its tag are gone.)
 //
 // `reversed` cannot go the same way — there is no pointer arithmetic that reads a
 // run backwards — so it keeps a tag. But it too loses its block: it is the same
@@ -161,6 +160,7 @@ impl Arr {
     /// `self[lo..hi]` — **free**: a window into the same allocation, no copy and no
     /// allocation at any length. This is the whole reason for the wide value; the
     /// 8-byte representation had to allocate a view block here.
+    /// (`aipl_arr_window` is this over the old block.)
     ///
     /// Bounds clamp like `aipl_arr_slice`'s. Borrows `self`; the caller retains the
     /// result if it outlives the source.
@@ -551,13 +551,17 @@ pub(crate) extern "C" fn aipl_arr_retain_opt_warr(elems: *const u8, len: i64) {
 //
 // Windows are only ever made over a `Heap` block of byte-addressable elements.
 // A reversed view has no forward run to point into, and a bit-packed `bool[]`
-// no byte to point at, so slicing either still builds a view block
-// (`aipl_arr_slice`) and yields a whole value around it.
+// no byte to point at, so slicing either *copies* the window into a block of its
+// own (`aipl_arr_slice`) and yields a whole value around it.
 //
 // Code that reads elements learns the window shape (length, indexing,
-// iteration); every other runtime entry still takes a block, and gets one from
-// [`aipl_arr_window_block`] — the view block a slice used to allocate up front,
-// now allocated only when something that needs it is reached.
+// iteration, and the runtime's nested reads); every other runtime entry still
+// takes a block, and gets one from [`aipl_arr_window_block`] — a copy of the
+// window's elements, made only when something that needs a block is reached.
+// The copy is the one thing a slice view saved, and it is paid only where a
+// block is wanted: an in-place write copied a view on its first write anyway,
+// and the entries that take a block (`sort`, `reverse`, `join`'s separators,
+// `execute_program`'s arguments) read every element of it regardless.
 
 /// An array value as compiled code holds it in this stage — see above.
 #[repr(C)]
@@ -602,8 +606,8 @@ fn tagged_len(block: *const u8) -> usize {
 /// Bounds clamp to `[0, len]`, as every slice does. Borrows `a`.
 ///
 /// Nothing is allocated for a window over a heap block, a window of a window, an
-/// empty result or the whole array; a reversed or bit-packed source falls back
-/// to the view block (see the header).
+/// empty result or the whole array; a reversed or bit-packed source is copied
+/// (see the header).
 #[no_mangle]
 pub(crate) extern "C" fn aipl_arr_window(
     out: *mut ArrValue,
@@ -656,8 +660,8 @@ pub(crate) extern "C" fn aipl_arr_window(
     unsafe { core::ptr::write(out, result) };
 }
 
-/// A block holding exactly the elements of the window `a` — a view block
-/// sharing them — carrying one new reference for the caller to release.
+/// A block holding exactly the elements of the window `a` — a fresh copy, each
+/// element retained — carrying the one reference for the caller to release.
 /// Borrows `a`, which must be a window.
 #[no_mangle]
 pub(crate) extern "C" fn aipl_arr_window_block(
@@ -680,7 +684,7 @@ pub(crate) extern "C" fn aipl_arr_window_block(
 
 /// A reference to a block holding exactly the elements of the array value at
 /// `a`, for a runtime walk that reads nested arrays (`join`'s parts): a whole
-/// value's own block, retained, or a window's view block. The caller releases it.
+/// value's own block, retained, or a copy of a window's. The caller releases it.
 pub(crate) fn owned_block_of(
     a: *const ArrValue,
     drop_fn: i64,
@@ -697,10 +701,11 @@ pub(crate) fn owned_block_of(
     v.block
 }
 
-/// Turn the window an *owning* slot holds into a whole value over a view block
-/// of its own, in place, so that code which mutates through the first word
-/// finds a block there. The slot's reference moves from the source block to the
-/// view, which holds one on the source in turn. A whole value is left alone.
+/// Turn the window an *owning* slot holds into a whole value over a copy of its
+/// elements, in place, so that code which mutates through the first word finds
+/// a block of its own there — uniquely owned, so the write that follows goes in
+/// place. The slot's reference moves from the source block to the copy. A whole
+/// value is left alone.
 #[no_mangle]
 pub(crate) extern "C" fn aipl_arr_settle(
     a: *mut ArrValue,
@@ -712,9 +717,9 @@ pub(crate) extern "C" fn aipl_arr_settle(
     if !v.is_window() {
         return;
     }
-    let view = aipl_arr_window_block(a, drop_fn, retain_fn, elem_size);
+    let own = aipl_arr_window_block(a, drop_fn, retain_fn, elem_size);
     super::aipl_array_dec(v.block);
-    unsafe { core::ptr::write(a, ArrValue::whole(view)) };
+    unsafe { core::ptr::write(a, ArrValue::whole(own)) };
 }
 
 #[no_mangle]
@@ -982,19 +987,23 @@ mod tests {
         assert!(!out.is_window());
         assert_eq!(tagged_len(out.block), 0);
 
-        // A block is lent on demand: a view of exactly the window's elements.
-        let view = aipl_arr_window_block(&inner, 0, 0, 8);
-        assert_eq!(tagged_len(view), 2);
-        assert_eq!(refcount(block), 4);
-        super::super::aipl_array_dec(view);
+        // A block is lent on demand: a copy of exactly the window's elements,
+        // which leaves the source's count alone.
+        let copy = aipl_arr_window_block(&inner, 0, 0, 8);
+        assert_ne!(copy, block);
+        assert_eq!(tagged_len(copy), 2);
+        assert_eq!(unsafe { *(copy.add(root) as *const i64) }, 12);
         assert_eq!(refcount(block), 3);
+        super::super::aipl_array_dec(copy);
 
-        // Settling moves the slot's reference from the block to a view of it.
+        // Settling moves the slot's reference from the source to a copy of its
+        // own, which nothing else holds.
         let mut slot = mid;
         aipl_arr_settle(&mut slot, 0, 0, 8);
         assert!(!slot.is_window());
         assert_eq!(tagged_len(slot.block), 3);
-        assert_eq!(refcount(block), 3);
+        assert_eq!(refcount(slot.block), 1);
+        assert_eq!(refcount(block), 2);
 
         super::super::aipl_array_dec(slot.block);
         super::super::aipl_array_dec(inner.block);

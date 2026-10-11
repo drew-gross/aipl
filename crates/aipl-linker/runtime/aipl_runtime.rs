@@ -388,7 +388,7 @@ mod charset {
     include!("../../aipl-codegen/src/charset.rs");
 }
 
-// The array layout — block, representation tags, view blocks — shared the
+// The array layout — block, representation tags, reversed view — shared the
 // same way and for the same reason; see the file's own header.
 //
 // `dead_code` is allowed on the same grounds as `str24`'s and `arr24`'s: the file
@@ -1811,12 +1811,11 @@ pub extern "C" fn aipl_arr_reverse(
 
 /// `xs[start..end]` — array slice. Both bounds are clamped to `[0, len]` (an
 /// out-of-range end yields a shorter array; `start >= end` yields `[]`).
-/// *Borrows* `xs` (does not drop it) and returns an array the caller owns:
-/// a slice view sharing `xs`'s elements (see `ARR_SLICE_TAG`), a slice of a
-/// slice looking through to the source, an empty window as a fresh empty
-/// array, and the whole array as itself, retained. Mirrors the JIT runtime's
-/// `aipl_arr_slice`, including what reaches it now that a slice is a window
-/// carried in the value (`arr24::aipl_arr_window`).
+/// *Borrows* `xs` (does not drop it) and returns an array the caller owns: the
+/// window's elements copied into a fresh heap block, an empty window as the
+/// empty array, and the whole array as itself, retained. Mirrors the JIT
+/// runtime's `aipl_arr_slice`, which says what still reaches it now that a
+/// slice that shares is a window carried in the value.
 #[no_mangle]
 pub extern "C" fn aipl_arr_slice(
     a: *const u8,
@@ -1842,20 +1841,7 @@ pub extern "C" fn aipl_arr_slice(
             aipl_arr_inc(a);
             return a;
         }
-        let (source, start) = match arr_repr(a) {
-            ArrRepr::Sliced => {
-                let u = arr_untag(a);
-                let inner = *(u.add(REV_INNER_OFFSET) as *const *const u8);
-                let base = *(u.add(SLICE_START_OFFSET) as *const i64) as usize;
-                (inner, base + lo)
-            }
-            ArrRepr::Heap | ArrRepr::Reversed => (a, lo),
-            // An inline array is empty, so `n` was zero and the early return
-            // above has already fired.
-            ArrRepr::Inline => unreachable!("a non-empty slice of an empty array"),
-        };
-        aipl_arr_inc(source);
-        alloc_slice_view(source, start, n, drop_fn, retain_fn, elem_size)
+        do_arr_slice_copy(a, lo, n, drop_fn, retain_fn, elem_size)
     }
 }
 
@@ -1930,7 +1916,7 @@ const ITER_SCRATCH: usize = 48;
 
 // ---------- Refcounted array runtime ----------
 //
-// The block, the representation tags and the view blocks are `array_layout`
+// The block, the representation tags and the reversed view are `array_layout`
 // (shared verbatim with the JIT runtime); this is the AOT side's allocation,
 // accounting and element traffic over that layout, mirroring the JIT
 // runtime's function for function.
@@ -1959,34 +1945,6 @@ unsafe fn alloc_reversed_view(
         *(data.add(REV_RETAIN_OFFSET) as *mut i64) = retain_fn;
         *(data.add(REV_ELEMSIZE_OFFSET) as *mut i64) = elem_size;
         (data as usize | ARR_REV_TAG) as *const u8
-    }
-}
-
-/// Allocate a slice-view block: the window of `len` elements of `inner`
-/// starting at `start`. Transfers ownership of `inner` into the view (no
-/// drop, no retain on `inner`). Returns data_ptr | ARR_SLICE_TAG.
-unsafe fn alloc_slice_view(
-    inner: *const u8,
-    start: usize,
-    len: usize,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    unsafe {
-        let raw = rt_alloc(HEADER_SIZE + SLICE_BLOCK_DATA_SIZE) as *mut u8;
-        if raw.is_null() {
-            abort();
-        }
-        *(raw as *mut i64) = 1; // refcount
-        let data = raw.add(HEADER_SIZE);
-        *(data.add(ARR_LEN_OFFSET) as *mut i64) = len as i64;
-        *(data.add(REV_INNER_OFFSET) as *mut *const u8) = inner;
-        *(data.add(REV_DROP_OFFSET) as *mut i64) = drop_fn;
-        *(data.add(REV_RETAIN_OFFSET) as *mut i64) = retain_fn;
-        *(data.add(REV_ELEMSIZE_OFFSET) as *mut i64) = elem_size;
-        *(data.add(SLICE_START_OFFSET) as *mut i64) = start as i64;
-        (data as usize | ARR_SLICE_TAG) as *const u8
     }
 }
 
@@ -2061,7 +2019,7 @@ fn with_heap<R>(a: *const u8, f: impl FnOnce(*const u8) -> R) -> R {
         // No block of its own, and nothing to materialize: the permanently-empty
         // block reads as the same array.
         ArrRepr::Inline => f(arr_empty_block()),
-        ArrRepr::Reversed | ArrRepr::Sliced => {
+        ArrRepr::Reversed => {
             aipl_arr_inc(a);
             let heap = aipl_arr_ensure_heap(a);
             let out = f(heap);
@@ -2098,24 +2056,6 @@ fn aipl_arr_ensure_heap(a: *const u8) -> *const u8 {
             aipl_array_dec(inner);
             heap
         }
-        ArrRepr::Sliced => {
-            let u = arr_untag(a);
-            let (inner, drop_fn, retain_fn, elem_size, start, len) = unsafe {
-                (
-                    *(u.add(REV_INNER_OFFSET) as *const *const u8),
-                    *(u.add(REV_DROP_OFFSET) as *const i64),
-                    *(u.add(REV_RETAIN_OFFSET) as *const i64),
-                    *(u.add(REV_ELEMSIZE_OFFSET) as *const i64),
-                    *(u.add(SLICE_START_OFFSET) as *const i64) as usize,
-                    *(u.add(ARR_LEN_OFFSET) as *const i64) as usize,
-                )
-            };
-            let heap = unsafe { do_arr_slice_copy(inner, start, len, drop_fn, retain_fn, elem_size) };
-            // The view held the one reference this path owns on `inner`;
-            // releasing the view releases it.
-            aipl_array_dec(a);
-            heap
-        }
     }
 }
 
@@ -2131,12 +2071,6 @@ unsafe fn arr_elem_ptr_rt(a: *const u8, idx: usize, elem_size: usize) -> *const 
             let inner = unsafe { *(u.add(REV_INNER_OFFSET) as *const *const u8) };
             let len = unsafe { *(u as *const i64) as usize };
             unsafe { arr_elem_ptr_rt(inner, len - 1 - idx, elem_size) }
-        }
-        ArrRepr::Sliced => {
-            let u = arr_untag(a);
-            let inner = unsafe { *(u.add(REV_INNER_OFFSET) as *const *const u8) };
-            let start = unsafe { *(u.add(SLICE_START_OFFSET) as *const i64) as usize };
-            unsafe { arr_elem_ptr_rt(inner, start + idx, elem_size) }
         }
         // An inline array holds no elements, so the bounds check upstream has
         // already answered.
@@ -2155,12 +2089,6 @@ unsafe fn arr_load_bit_rt(a: *const u8, idx: usize) -> bool {
             let inner = unsafe { *(u.add(REV_INNER_OFFSET) as *const *const u8) };
             let len = unsafe { *(u as *const i64) as usize };
             unsafe { arr_load_bit_rt(inner, len - 1 - idx) }
-        }
-        ArrRepr::Sliced => {
-            let u = arr_untag(a);
-            let inner = unsafe { *(u.add(REV_INNER_OFFSET) as *const *const u8) };
-            let start = unsafe { *(u.add(SLICE_START_OFFSET) as *const i64) as usize };
-            unsafe { arr_load_bit_rt(inner, start + idx) }
         }
         // No elements, so no bits; the bounds check upstream has answered.
         ArrRepr::Inline => unreachable!("bit {idx} of an empty array"),
@@ -2271,7 +2199,7 @@ pub extern "C" fn aipl_array_dec(ptr: *const u8) {
                 }
                 // A view owns one reference on its inner array and nothing
                 // else; the elements are the inner's to release.
-                ArrRepr::Reversed | ArrRepr::Sliced => {
+                ArrRepr::Reversed => {
                     let inner = *(u.add(REV_INNER_OFFSET) as *const *const u8);
                     aipl_array_dec(inner);
                     rt_free(h as *mut c_void);
@@ -3073,7 +3001,7 @@ unsafe fn part_at_rt(
     elem_size: i64,
 ) -> *const u8 {
     // The parts are a `T[][]`, so each is a 24-byte array value — hence the
-    // `ARR_SIZE` stride — and may be a window, which lends a view block.
+    // `ARR_SIZE` stride — and may be a window, which lends a copy.
     let elems = unsafe { parts.add(ARR_ELEMS_OFFSET) };
     let value = unsafe { elems.add(i * arr24::ARR_SIZE) } as *const arr24::ArrValue;
     let p = arr24::owned_block_of(value, drop_fn, retain_fn, elem_size);

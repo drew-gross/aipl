@@ -61,11 +61,11 @@ true
 [2, 1, 0]
 ["beta", "gamma"]
 --- performance ---
-allocations: 35
-deallocations: 35
+allocations: 34
+deallocations: 34
 reallocations: 10
-bytes allocated: 1924
-instructions executed: 75016
+bytes allocated: 1868
+instructions executed: 75022
 binary size: 11480
   code: 6996
   data: 219
@@ -87,10 +87,10 @@ functions:
     calls: 4
     bytes: 764
   aipl_arr_elem_ptr:
-    calls: 12
+    calls: 6
     bytes: (external)
   aipl_arr_inc:
-    calls: 17
+    calls: 14
     bytes: (external)
   aipl_arr_reverse:
     calls: 2
@@ -99,7 +99,7 @@ functions:
     calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 26
+    calls: 22
     bytes: (external)
   aipl_array_new:
     calls: 1

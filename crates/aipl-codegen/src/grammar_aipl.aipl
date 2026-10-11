@@ -4939,10 +4939,10 @@ fn why(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1604500
-deallocations: 1604500
+allocations: 1604487
+deallocations: 1604487
 reallocations: 308106
-bytes allocated: 334199674
+bytes allocated: 334198946
 instructions executed: 573506459
 binary size: 7078520
   code: 4712016
@@ -5871,7 +5871,7 @@ functions:
     calls: 19454
     bytes: (external)
   aipl_arr_inc:
-    calls: 3944895
+    calls: 3944882
     bytes: (external)
   aipl_arr_reserve:
     calls: 82485
@@ -5886,7 +5886,7 @@ functions:
     calls: 36
     bytes: (external)
   aipl_array_dec:
-    calls: 4750349
+    calls: 4750323
     bytes: (external)
   aipl_array_new:
     calls: 82744

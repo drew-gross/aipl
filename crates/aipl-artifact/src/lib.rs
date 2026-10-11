@@ -369,8 +369,9 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_arr_reserve"
         | "aipl_arr_extend"
         | "aipl_dict_remove" => sig(5, true),
-        "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert"
-        | "aipl_arr_slice" => sig(6, true),
+        "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert" => {
+            sig(6, true)
+        }
         // Array windows (`arr24`, stage 4b): the out value, the source value, the
         // bounds and the element type's three descriptors; a window's view block;
         // a slot settled in place.
