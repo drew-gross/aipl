@@ -145,12 +145,32 @@ point at a time; this needs the same.
           The inlined fast paths (`load_arr_len`, `load_array_elem`) needed no
           change: they read through the first word, which is still the tagged
           pointer. They change with 2c.
-  [~] 2f. regenerate the dogfood artifact under `Wide` — **done**: the
-          checked-in manifest reads `; array-abi wide`, and the compiler parses
-          its own sources through it. Deleting the 8-byte half
-          (`array_layout.rs`, the `ArrRepr` arms) is **not** done and cannot be
-          yet: it is still the live layout of every array *block*. That is
-          stage 4-6 work, and the cleanup is stage 7.
+  [x] 2f. regenerate the dogfood artifact under `Wide`, and delete the 8-byte
+          half. The regeneration came first (the manifest read `; array-abi
+          wide`, then `narrow`); the deletion had to wait for stages 4-6, which
+          is when the last thing keeping the one-word array alive — the block
+          layout — moved. Done:
+            - `SeqRepr` is gone, and `Abi` has no fields, as it had none for `str`
+              once `str` settled. The manifest's `; array-abi narrow` and
+              `; set-abi wide` lines stay as a guard: an artifact that names
+              anything else (or nothing) is refused with "regenerate the
+              artifact", because marshaling with the wrong layout corrupts memory.
+            - `arr_size`, `arr_is_composite`, `sets_wide` and `narrow_elems` are
+              gone with the answers they chose between, and `is_wide_array` /
+              `_set` / `_seq` are `is_block_array` / `_set` / `_seq` — they ask
+              "a block value, not a `char[]` or a `#{char}`", not "wide".
+            - the one-word FFI paths (the array and dict arms of `ffi_arg_word`,
+              the register return of an array) and the `Tagged` arm of every
+              element-helper chooser.
+            - the 8-byte element helpers `aipl_arr_drop_arr`,
+              `aipl_arr_retain_ptr`, `aipl_arr_drop_opt_arr`,
+              `aipl_arr_retain_opt`, in both runtimes and in the artifact's
+              signature table.
+          `array_layout.rs` and `ArrRepr` stay: they are the *new* block layout
+          (stage 6c) and no longer have anything 8-byte in them. The 2a note that
+          `Ret::Str` wants renaming `Ret::Wide` no longer applies — an array
+          result is written through an explicit out argument (`Ret::None`), so
+          `Ret::Str` means exactly the `str` it says.
 
   Intermediate state worth knowing: while 2b-2e are in flight the *blocks* can
   stay exactly as they are. `len` is then carried twice (value and block header),
@@ -532,7 +552,7 @@ window, a reversal or inline (lent as a copy).
       headers.
 
 
-Stage 7 — delete what the switch leaves behind              [blocked on 2f]
+Stage 7 — delete what the switch leaves behind
 ---------------------------------------------------------------------------------
 A representation switch leaves its predecessor compiled but unreachable, and the
 `str24` switch is the proof: the 8-byte `str` is still in the tree, behind
@@ -551,9 +571,6 @@ Already identified, from `str`:
   [ ] the old FFI `str` path: `build_borrowed_str`, `ArgBufs::str_value`,
       `ArgBuf::Str`, `alloc_dynamic_string`, `free_dynamic_string`,
       `STR_HEADER_SIZE`, the 8-byte `pack_inline`
-  [ ] `Ret::Str` → `Ret::Wide`: it is what lowers *any* 24-byte sequence result
-      through a leading out pointer, and reads as the wrong name now that an
-      array result uses it too
   [ ] `abi_spike.rs` — a spike for the `str` ABI, kept as a regression test for
       the Cranelift lowerings it proved. Confirm that is still what it is, or
       delete it
@@ -574,15 +591,14 @@ And what this switch will add:
       the shared `arr24` entries that replaced it are not counted at all)
   [ ] `ARR_INLINE_TAG` and the shared static empty block — the stand-in for
       stage 3, which exists only because it can point at a block
-  [ ] `SeqRepr::Tagged` itself, and the `Abi` field, if arrays end up being the
-      last type to have a choice
+  [x] `SeqRepr::Tagged` itself, and the `Abi` field: gone with 2f.
   [x] the block-taking entries 6a replaced: deleted in 6c-2.
   [ ] the `v` in the names that replaced them (`aipl_arrv_*`, `aipl_setv_*`,
       `aipl_dictv_*`, `aipl_strv_*`) now that nothing shares the plain name — a
       rename across the runtime, the codegen tables and the artifact manifest, so
       its own change
 
-  Do this as its own change, after 2f is green. Mixing deletion into the switch
+  Do this as its own change. Mixing deletion into the switch
   is how a switch stops being reviewable.
 
 

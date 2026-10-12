@@ -2001,60 +2001,6 @@ fn rec_release(b: *mut i64) {
 const SET_ORDER_NONE: i64 = 0;
 
 
-/// Element drop-fn for an array of arrays (`T[][]`): release each element
-/// array (which recursively releases its own elements).
-#[no_mangle]
-pub extern "C" fn aipl_arr_drop_arr(elems: *const u8, len: i64) {
-    count_builtin!(builtin_calls::AIPL_ARR_DROP_ARR);
-    unsafe {
-        let elems = elems as *const i64;
-        for i in 0..len as usize {
-            aipl_array_dec(*elems.add(i) as *const u8);
-        }
-    }
-}
-
-/// Element retain-fn for `str[]`/`T[][]`: inc each element pointer.
-#[no_mangle]
-pub extern "C" fn aipl_arr_retain_ptr(elems: *const u8, len: i64) {
-    count_builtin!(builtin_calls::AIPL_ARR_RETAIN_PTR);
-    unsafe {
-        let elems = elems as *const i64;
-        for i in 0..len as usize {
-            aipl_arr_inc(*elems.add(i) as *const u8);
-        }
-    }
-}
-
-
-/// Element drop-fn for `T[]?[]`: release the inner array of each present element.
-#[no_mangle]
-pub extern "C" fn aipl_arr_drop_opt_arr(elems: *const u8, len: i64) {
-    count_builtin!(builtin_calls::AIPL_ARR_DROP_OPT_ARR);
-    unsafe {
-        for i in 0..len as usize {
-            let e = elems.add(i * 16);
-            if *(e as *const i64) != 0 {
-                aipl_array_dec(*(e.add(8) as *const i64) as *const u8);
-            }
-        }
-    }
-}
-
-/// Element retain-fn for `str?[]`/`T[]?[]`: inc the inner heap pointer of each
-/// present element (tag != 0).
-#[no_mangle]
-pub extern "C" fn aipl_arr_retain_opt(elems: *const u8, len: i64) {
-    count_builtin!(builtin_calls::AIPL_ARR_RETAIN_OPT);
-    unsafe {
-        for i in 0..len as usize {
-            let e = elems.add(i * 16);
-            if *(e as *const i64) != 0 {
-                aipl_arr_inc(*(e.add(8) as *const i64) as *const u8);
-            }
-        }
-    }
-}
 
 /// Allocate an AIPL `str` (refcounted, NUL-terminated) holding a copy of the
 /// C string `cstr` (e.g. a CLI argument). Goes through `make_str`, so the result

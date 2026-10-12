@@ -1061,60 +1061,6 @@ extern "C" fn aipl_test_summary() -> i64 {
 // pointers compared by content, with the array's `str` drop/retain helpers
 // stored so the block frees/retains its strings like a `str[]`.
 
-/// Element drop-fn for an array of arrays (`T[][]`): release each element
-/// array, which recursively releases its own elements via its own drop-fn.
-#[no_mangle]
-extern "C" fn aipl_arr_drop_arr(elems: *const u8, len: i64) {
-    unsafe {
-        let elems = elems as *const i64;
-        for i in 0..len as usize {
-            aipl_array_dec(std::ptr::read(elems.add(i)) as *const u8);
-        }
-    }
-}
-
-/// Element retain-fn for `T[][]`: inc each element array (the outer array's
-/// co-ownership). `str` elements have their own helper — they are 24-byte values
-/// now, not pointers — so this is the array case alone.
-#[no_mangle]
-extern "C" fn aipl_arr_retain_ptr(elems: *const u8, len: i64) {
-    unsafe {
-        let elems = elems as *const i64;
-        for i in 0..len as usize {
-            aipl_arr_inc(std::ptr::read(elems.add(i)) as *const u8);
-        }
-    }
-}
-
-/// Element drop-fn for `T[]?[]`: release the inner array of each present element.
-#[no_mangle]
-extern "C" fn aipl_arr_drop_opt_arr(elems: *const u8, len: i64) {
-    unsafe {
-        for i in 0..len as usize {
-            let e = elems.add(i * 16);
-            let tag = std::ptr::read(e as *const i64);
-            if tag != 0 {
-                aipl_array_dec(std::ptr::read(e.add(8) as *const i64) as *const u8);
-            }
-        }
-    }
-}
-
-/// Element retain-fn for `str?[]`/`T[]?[]`: inc the inner heap pointer of each
-/// present element (tag != 0). Both inner kinds share the `inc` protocol.
-#[no_mangle]
-extern "C" fn aipl_arr_retain_opt(elems: *const u8, len: i64) {
-    unsafe {
-        for i in 0..len as usize {
-            let e = elems.add(i * 16);
-            let tag = std::ptr::read(e as *const i64);
-            if tag != 0 {
-                aipl_arr_inc(std::ptr::read(e.add(8) as *const i64) as *const u8);
-            }
-        }
-    }
-}
-
 /// Build a `str[]` from `args` using the JIT's own allocators (so the JIT'd
 /// callee can free it through the matching runtime). Mirrors what the AOT
 /// runtime's `build_cli_args` does for a native binary.
@@ -3281,10 +3227,6 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_test_fail_none", aipl_test_fail_none as *const u8);
     jit_builder.symbol("aipl_test_end", aipl_test_end as *const u8);
     jit_builder.symbol("aipl_test_summary", aipl_test_summary as *const u8);
-    jit_builder.symbol("aipl_arr_drop_arr", aipl_arr_drop_arr as *const u8);
-    jit_builder.symbol("aipl_arr_retain_ptr", aipl_arr_retain_ptr as *const u8);
-    jit_builder.symbol("aipl_arr_drop_opt_arr", aipl_arr_drop_opt_arr as *const u8);
-    jit_builder.symbol("aipl_arr_retain_opt", aipl_arr_retain_opt as *const u8);
     jit_builder.symbol("aipl_i64_len", aipl_i64_len as *const u8);
     jit_builder.symbol("aipl_write_i64", aipl_write_i64 as *const u8);
     jit_builder.symbol("aipl_u64_len", aipl_u64_len as *const u8);
@@ -3640,19 +3582,15 @@ pub fn generate_dogfood_artifact(
     out.push_str("; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).\n");
     out.push_str("; DO NOT EDIT BY HAND. Regenerate:\n");
     out.push_str(";   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir\n");
-    // Which array representation this artifact's code speaks. An engine loaded
-    // from it marshals with *this*, not with whatever the running compiler would
-    // emit — see `abi_of_manifest`.
+    // Which array and set representations this artifact's code speaks. An engine
+    // loaded from it is refused unless they are the compiler's own — see
+    // `abi_of_manifest`.
     out.push_str(&format!(
         "; {}{}\n",
         aipl_artifact::ARRAY_ABI_PREFIX,
-        Abi::active().arrays.name()
+        ARRAY_ABI
     ));
-    out.push_str(&format!(
-        "; {}{}\n",
-        aipl_artifact::SET_ABI_PREFIX,
-        Abi::active().sets.name()
-    ));
+    out.push_str(&format!("; {}{}\n", aipl_artifact::SET_ABI_PREFIX, SET_ABI));
     // Struct types any entry references (param or return), so the inverse can
     // rebuild their layouts and marshal a struct return — collected here, emitted
     // as `; struct` lines after the entries.
@@ -4771,8 +4709,8 @@ fn ffi_arg_abi(
 }
 
 /// Marshal `v` into the 8-byte word a value of the *pointer-like* type `ty` — a
-/// scalar, a tagged `str`, or an array under an ABI that passes one as its block
-/// — is represented by. Composites don't come here; see [`ffi_arg_abi`].
+/// scalar or a boxed value — is represented by. Composites (a `str`, an array, a
+/// set, a dict, a struct...) don't come here; see [`ffi_arg_abi`].
 fn ffi_arg_word(
     abi: Abi,
     ty: &ConcreteType,
@@ -4799,18 +4737,6 @@ fn ffi_arg_word(
     match v {
         FfiValue::Int(n) if is_ffi_scalar(ty) => Ok(*n),
         FfiValue::Str(s) if is_str_repr(ty) => Ok(bufs.str_value(s)),
-        FfiValue::Array(elems) => match ty {
-            ConcreteType::Array(elem) => {
-                build_borrowed_array(abi, elem, elems, structs, bufs).map(|(word, _)| word)
-            }
-            _ => Err(mismatch(ty, v)),
-        },
-        FfiValue::Dict(entries) => match ty {
-            ConcreteType::Dict(k, val) => {
-                build_borrowed_dict(abi, k, val, entries, structs, bufs).map(|(word, _)| word)
-            }
-            _ => Err(mismatch(ty, v)),
-        },
         _ => Err(mismatch(ty, v)),
     }
 }
@@ -5127,24 +5053,20 @@ unsafe fn write_ffi_arg(
             return Err(mismatch(ty, v));
         };
         let (block, len) = build_borrowed_array(abi, elem, elems, structs, bufs)?;
-        if abi.arr_is_composite() && !is_char_array(ty) {
+        if !is_char_array(ty) {
             unsafe { write_whole_value(dst, block as *const u8, len) };
         } else {
             unsafe { std::ptr::write(dst as *mut i64, block) };
         }
         return Ok(());
     }
-    // A dict value is the same three words, under an ABI where it is wide.
+    // A dict value is the same three words.
     if let ConcreteType::Dict(k, val) = ty {
         let FfiValue::Dict(entries) = v else {
             return Err(mismatch(ty, v));
         };
         let (block, len) = build_borrowed_dict(abi, k, val, entries, structs, bufs)?;
-        if abi.sets_wide() {
-            unsafe { write_whole_value(dst, block as *const u8, len) };
-        } else {
-            unsafe { std::ptr::write(dst as *mut i64, block) };
-        }
+        unsafe { write_whole_value(dst, block as *const u8, len) };
         return Ok(());
     }
     let word = ffi_arg_word(abi, ty, v, structs, bufs)?;
@@ -6803,12 +6725,8 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_str_append"
         | "aipl_str_reserve"
         | "aipl_arr_drop_str"
-        | "aipl_arr_drop_arr"
-        | "aipl_arr_retain_ptr"
         | "aipl_arr_retain_str"
         | "aipl_arr_drop_opt_str"
-        | "aipl_arr_drop_opt_arr"
-        | "aipl_arr_retain_opt"
         | "aipl_arr_retain_opt_str" => (2, Ret::None),
         "aipl_execute_program" => (3, Ret::None),
         // The cursor, the source, and the separator: a split walk's whole state
@@ -8467,7 +8385,7 @@ fn take_field<M: Module>(
         let (empty, _) = emit_const_str(module, builder, cx, b"")?;
         copy_composite(builder, src, empty, fty, structs);
         Ok(v)
-    } else if is_wide_seq(fty) {
+    } else if is_block_seq(fty) {
         let src = builder.ins().iadd_imm_s(obj_ptr, offset as i64);
         Ok(take_array_value(builder, src))
     } else {
@@ -8575,7 +8493,7 @@ fn owned_block_made_unique_ptr<M: Module>(
         }
         _ => return value,
     };
-    if !is_wide_seq(ty) {
+    if !is_block_seq(ty) {
         return value;
     }
     let copy_block = builder.create_block();
@@ -8794,7 +8712,7 @@ fn arr_ptr(builder: &mut FunctionBuilder, value: Value) -> Value {
 /// few that already know the value is whole. Like [`arr_ptr`], it does not see
 /// a window.
 fn seq_ptr(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> Value {
-    if is_wide_seq(ty) {
+    if is_block_seq(ty) {
         arr_ptr(builder, v)
     } else {
         v
@@ -8843,7 +8761,7 @@ fn settle_array_slot<M: Module>(
     let ConcreteType::Array(elem) = ty else {
         return;
     };
-    if !is_wide_array(ty) || is_none_inner(elem) {
+    if !is_block_array(ty) || is_none_inner(elem) {
         return;
     }
     let lend = emit_needs_block(builder, addr);
@@ -8901,7 +8819,7 @@ fn writable_place<M: Module>(
     if let ExprKind::Ident(name) = &arg.kind {
         if let Some(EnvBinding::Mut(slot, ty, _)) = cx.env.get(name) {
             let ty = ty.borrow().clone();
-            if is_wide_array(&ty) {
+            if is_block_array(&ty) {
                 return Ok((builder.ins().stack_addr(types::I64, *slot, 0), ty));
             }
         }
@@ -8952,8 +8870,8 @@ fn new_seq_with_cap<M: Module>(
     elem_size: Value,
 ) -> Value {
     debug_assert!(
-        is_wide_seq(ty),
-        "a tagged set or dict has no value to build into"
+        is_block_set(ty),
+        "only a set or a dict is built into a value"
     );
     let out = array_value_slot(builder);
     builtins.call_void(
@@ -9138,36 +9056,33 @@ fn is_char_set(ty: &ConcreteType) -> bool {
 /// rather than deciding for itself: a slot written one way and read the other
 /// is a silent miscompile rather than a crash.
 fn lives_in_slot(ty: &ConcreteType) -> bool {
-    is_str_shaped(ty) || is_inline_optional(ty) || is_char_set(ty) || is_wide_seq(ty)
+    is_str_shaped(ty) || is_inline_optional(ty) || is_char_set(ty) || is_block_seq(ty)
 }
 
-/// Whether `ty` is an array held as the 24-byte wide value (`arr24::ArrValue`:
-/// the block, and a window's bounds when it is one — see
-/// [`Abi::arr_is_composite`]). A `char[]` rides `str`'s representation instead,
-/// and is a composite in its own right. A set or a dict is [`is_wide_set`].
+/// Whether `ty` is an array held as the 24-byte value (`arr24::ArrValue`: the
+/// block, and its run). A `char[]` rides `str`'s representation instead, and is a
+/// composite in its own right. A set or a dict is [`is_block_set`].
 ///
 /// Such an array lives *in* its binding's slot, as a `str` does, rather than the
 /// slot holding a pointer to it. That is what keeps `push` and `extend` on a
 /// `mut` binding working unchanged: they write the new block pointer into the
 /// first word of the slot they are given, and when the slot *is* the value,
 /// that word is exactly the one to replace.
-fn is_wide_array(ty: &ConcreteType) -> bool {
-    matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty) && Abi::active().arr_size() > 8
+fn is_block_array(ty: &ConcreteType) -> bool {
+    matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty)
 }
 
 /// Whether `ty` is a set or a dict held as the 24-byte value `{block, data, len}`
-/// ([`Abi::sets_wide`], `arr24_todo.txt` 6d) — never a window, a reversal or
-/// inline, so its block is always its first word. A `#{char}` is its bitfield.
-fn is_wide_set(ty: &ConcreteType) -> bool {
-    matches!(ty, ConcreteType::Set(..) | ConcreteType::Dict(..))
-        && !is_char_set(ty)
-        && Abi::active().sets_wide()
+/// — never a window, a reversal or inline, so its block is always its first word.
+/// A `#{char}` is its bitfield.
+fn is_block_set(ty: &ConcreteType) -> bool {
+    matches!(ty, ConcreteType::Set(..) | ConcreteType::Dict(..)) && !is_char_set(ty)
 }
 
-/// Whether `ty`'s value is the 24-byte value over a block: a wide array, set or
-/// dict. Its block is the first word ([`seq_ptr`]).
-fn is_wide_seq(ty: &ConcreteType) -> bool {
-    is_wide_array(ty) || is_wide_set(ty)
+/// Whether `ty`'s value is the 24-byte value over a block: an array, set or dict
+/// (not a `char[]` or a `#{char}`). Its block is the first word ([`seq_ptr`]).
+fn is_block_seq(ty: &ConcreteType) -> bool {
+    is_block_array(ty) || is_block_set(ty)
 }
 
 /// Whether `n` elements of `elem` make an inline array: an integer element type
@@ -9225,7 +9140,7 @@ fn emit_inline_array(builder: &mut FunctionBuilder, vals: &[Value], width: i64) 
 /// inline value into it — which the release of the old value and the retain
 /// of the new one then see through the placeholder type.
 fn may_be_inline(ty: &ConcreteType) -> bool {
-    is_wide_array(ty)
+    is_block_array(ty)
         && matches!(ty, ConcreteType::Array(e) if is_none_inner(e)
             || matches!(**e, ConcreteType::Primitive(p) if p.is_int()))
 }
@@ -9738,8 +9653,8 @@ struct ArrView {
 /// carries (`arr24::ArrValue`), read off the value rather than its block.
 fn value_view(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> ArrView {
     debug_assert!(
-        is_wide_seq(ty),
-        "a tagged set or dict has no value to read a run from"
+        is_block_set(ty),
+        "only a set or a dict is read as a value's run"
     );
     let flags = MemFlagsData::trusted();
     ArrView {
@@ -9754,9 +9669,9 @@ fn value_view(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> Arr
 /// [`ArrView`] of a value of an array-backed type `ty`: an array value — whole,
 /// a window, reversed or inline — or a set or a dict, which is always whole.
 fn arr_view_shape(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> ArrView {
-    if !is_wide_array(ty) {
+    if !is_block_array(ty) {
         // A set or a dict: whole, and carrying its run all the same.
-        if is_wide_seq(ty) {
+        if is_block_seq(ty) {
             return value_view(builder, v, ty);
         }
         // Anything else is str-shaped (a `char[]`), whose readers go through the
@@ -11612,10 +11527,7 @@ fn array_drop_fn_addr<M: Module>(
 ) -> Value {
     let b = cx.builtins;
     // These are *stored* in the array header and called by the runtime, not
-    // emitted as calls, so they never pass through `active_sym` — the wide
-    // counterpart has to be named here. It is picked per element type rather than
-    // per symbol because `aipl_arr_retain_ptr` below serves `str` *and* array
-    // elements, and only the `str` use changes representation.
+    // emitted as calls, so they are named here, per element type.
     let drop_str = "aipl_arr_drop_str";
     let id = match elem {
         // `is_str_repr`, not the exact `Primitive::Str`: `Error` and the
@@ -11624,7 +11536,6 @@ fn array_drop_fn_addr<M: Module>(
         // generated per-type one that walks 8-byte slots. `map(|s| s +++ x)`
         // produces concat-str elements, which is how this surfaced.
         _ if is_str_repr(elem) => Some(b.id(module, drop_str)),
-        ConcreteType::Primitive(Primitive::Str) => Some(b.id(module, drop_str)),
         // `char[]` shares `str`'s representation (see `is_char_array`), so a
         // nested `char[]` element (e.g. in `char[][]`) is freed the same way
         // a `str` element is, not via the generic array-element drop-fn.
@@ -11636,23 +11547,16 @@ fn array_drop_fn_addr<M: Module>(
         // A set or a dict *is* an array block (see `is_heap`), so the element
         // drop for a nested array serves them unchanged: it decs each element's
         // block pointer, and that is what one of these is.
-        // A nested array, set or dict is a 24-byte value under the wide layout,
-        // so it needs the 24-stride helper; under an artifact's `Tagged` layout
-        // it is a plain word and keeps the 8-byte one.
-        _ if is_wide_seq(elem) => Some(b.id(module, "aipl_arr_drop_warr")),
-        ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => {
-            Some(b.id(module, "aipl_arr_drop_arr"))
-        }
+        // A nested array, set or dict is a 24-byte value, so it needs the
+        // 24-stride helper.
+        _ if is_block_seq(elem) => Some(b.id(module, "aipl_arr_drop_warr")),
         ConcreteType::Optional(inner)
             if matches!(inner.as_ref(), ConcreteType::Primitive(Primitive::Str)) =>
         {
             Some(b.id(module, "aipl_arr_drop_opt_str"))
         }
-        ConcreteType::Optional(inner) if is_wide_array(inner) => {
+        ConcreteType::Optional(inner) if is_block_array(inner) => {
             Some(b.id(module, "aipl_arr_drop_opt_warr"))
-        }
-        ConcreteType::Optional(inner) if matches!(inner.as_ref(), ConcreteType::Array(_)) => {
-            Some(b.id(module, "aipl_arr_drop_opt_arr"))
         }
         _ if needs_drop(elem, cx.structs) => Some(elem_rc_ids(module, cx, elem).0),
         _ => None,
@@ -11671,20 +11575,12 @@ fn array_retain_fn_addr<M: Module>(
 ) -> Value {
     let b = cx.builtins;
     let id = match elem {
-        // See `array_drop_fn_addr` for why this is chosen per element type: the
-        // array case below keeps the 8-byte-pointer helper either way.
         _ if is_str_repr(elem) => Some(b.id(module, "aipl_arr_retain_str")),
         ConcreteType::Array(_) if is_char_array(elem) => Some(b.id(module, "aipl_arr_retain_str")),
-        ConcreteType::Primitive(Primitive::Str) => Some(b.id(module, "aipl_arr_retain_ptr")),
-        // As in `array_drop_fn_addr`: a set or dict element is a block pointer
-        // like a nested array's, and `aipl_arr_retain_ptr` incs exactly that.
         // As in `array_drop_fn_addr`: a char-set element owns nothing, so
         // there is no reference to take on it.
         _ if is_char_set(elem) => None,
-        _ if is_wide_seq(elem) => Some(b.id(module, "aipl_arr_retain_warr")),
-        ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => {
-            Some(b.id(module, "aipl_arr_retain_ptr"))
-        }
+        _ if is_block_seq(elem) => Some(b.id(module, "aipl_arr_retain_warr")),
         ConcreteType::Optional(inner)
             if matches!(inner.as_ref(), ConcreteType::Primitive(Primitive::Str)) =>
         {
@@ -11693,11 +11589,8 @@ fn array_retain_fn_addr<M: Module>(
             // is retained as a `str`, not as an array block.
             Some(b.id(module, "aipl_arr_retain_opt_str"))
         }
-        ConcreteType::Optional(inner) if is_wide_array(inner) => {
+        ConcreteType::Optional(inner) if is_block_array(inner) => {
             Some(b.id(module, "aipl_arr_retain_opt_warr"))
-        }
-        ConcreteType::Optional(inner) if matches!(inner.as_ref(), ConcreteType::Array(_)) => {
-            Some(b.id(module, "aipl_arr_retain_opt"))
         }
         _ if needs_drop(elem, cx.structs) => Some(elem_rc_ids(module, cx, elem).1),
         _ => None,
@@ -15020,7 +14913,7 @@ fn compile_call<M: Module>(
     // such step: the runtime's `str` entry points take and return the 24-byte
     // value itself.)
     debug_assert!(
-        !(matches!(info.link, FuncLink::Builtin(_)) && is_wide_array(&info.return_ty)),
+        !(matches!(info.link, FuncLink::Builtin(_)) && is_block_array(&info.return_ty)),
         "a runtime builtin has no array result to wrap"
     );
     // A composite result (struct or optional) is returned through a caller-
@@ -17609,7 +17502,7 @@ fn compile_call_expr<M: Module>(
                         copy_composite(builder, src, empty, &t, structs);
                         scopes.last_mut().expect("scope").push(Tracked::new(v, &t));
                         (v, t)
-                    } else if is_wide_seq(&t) {
+                    } else if is_block_seq(&t) {
                         // Copied out whole — it may be a window — since the
                         // slot it lived in is emptied.
                         let src = builder.ins().stack_addr(types::I64, *slot, 0);
@@ -21193,11 +21086,7 @@ fn compile_expr_inner<M: Module>(
                 let value = emit_const_empty(module, builder, cx)?;
                 let set_ty = ConcreteType::Set(Box::new(ConcreteType::NoneInner), *order);
                 let no_elems = builder.ins().iconst(types::I64, 0);
-                let value = if is_wide_seq(&set_ty) {
-                    arr_val_of_len(builder, value, no_elems)
-                } else {
-                    value
-                };
+                let value = arr_val_of_len(builder, value, no_elems);
                 return Ok((value, set_ty));
             }
             // Every element a literal `char`: the four words are known *now*, so
@@ -21327,11 +21216,7 @@ fn compile_expr_inner<M: Module>(
                     Box::new(ConcreteType::NoneInner),
                 );
                 let no_elems = builder.ins().iconst(types::I64, 0);
-                let value = if is_wide_seq(&dict_ty) {
-                    arr_val_of_len(builder, value, no_elems)
-                } else {
-                    value
-                };
+                let value = arr_val_of_len(builder, value, no_elems);
                 return Ok((value, dict_ty));
             }
             let mut key_ty: Option<ConcreteType> = None;
@@ -21862,102 +21747,51 @@ fn str_cmp_width(ty: &ConcreteType) -> i64 {
 /// explicit forms, so each rule has one implementation and no second copy to
 /// drift.
 ///
-/// `str` was the first type to have a choice: it settled on the 24-byte value, so
-/// it has no field here. **Arrays are the second**, and are mid-switch — the
-/// field below is the one this doc used to anticipate, and the reason the
-/// threading was kept after `str` stopped needing it. Nothing downstream had to be
-/// re-plumbed to add it, which was the bet.
-///
-/// The shape is load-bearing history, not speculation: while `str` had two
-/// representations, the FFI genuinely met both at once — the compiler calls its
-/// dogfooded engines, compiled earlier, through the same marshaling code it uses
-/// to call a program it just compiled. "Is a `str` composite?" had two answers
-/// simultaneously, and the marshaling layer had to ask with the callee in hand.
-/// That is why the explicit form is primary and the global one is a convenience.
-/// Which representation a sequence value has under an ABI.
-///
-/// The two are not variations on a theme: a `Tagged` value is one word that
-/// *addresses* a block and reads its length out of the block's header, while a
-/// `Wide` value carries `{base, data, len|tag}` itself — which is what lets a
-/// window into a sequence be a value rather than an allocation. See `arr24.rs`.
+/// Every type has settled: a `str` is the 24-byte value (`str24.rs`), an array
+/// is the 24-byte value with narrow integers packed at their own width
+/// (`arr24.rs`), and a set or a dict is the same value over the same block. Each
+/// switched on its own, and for as long as one had two representations the FFI
+/// genuinely met both at once — the compiler called its dogfooded engines,
+/// compiled earlier, through the same marshaling code it uses to call a program
+/// it just compiled — so "is an array composite?" had two answers simultaneously
+/// and the marshaling layer had to ask with the callee in hand. That history is
+/// why the explicit form is primary and the global one a convenience, and why the
+/// threading outlived the fields: the next type to gain a choice becomes a field
+/// here, and nothing downstream is re-plumbed.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-enum SeqRepr {
-    /// An 8-byte tagged pointer to a block.
-    #[default]
-    Tagged,
-    /// The 24-byte value (`arr24::ArrValue`), every scalar element a word.
-    Wide,
-    /// [`SeqRepr::Wide`], with an array's narrow integer elements stored at
-    /// their own width — an `i8` in one byte, a `u32` in four — rather than a
-    /// word each. What [`Abi::active`] answers. Only arrays: a set's or a dict's
-    /// scalars are still a word (see [`abi_array_elem_size`]).
-    Narrow,
-}
+pub struct Abi;
 
-impl SeqRepr {
-    /// How an artifact's `; array-abi` line spells this representation.
-    fn name(self) -> &'static str {
-        match self {
-            SeqRepr::Tagged => "tagged",
-            SeqRepr::Wide => "wide",
-            SeqRepr::Narrow => "narrow",
-        }
-    }
+/// How an artifact's `; array-abi` line spells the one array representation this
+/// compiler speaks: the 24-byte value, narrow integers packed (`arr24.rs`).
+const ARRAY_ABI: &str = "narrow";
+/// How an artifact's `; set-abi` line spells the set and dict representation: the
+/// 24-byte value over the array block.
+const SET_ABI: &str = "wide";
 
-    /// The representation an artifact's `; array-abi` line names.
-    fn from_name(name: &str) -> Option<SeqRepr> {
-        [SeqRepr::Tagged, SeqRepr::Wide, SeqRepr::Narrow]
-            .into_iter()
-            .find(|r| r.name() == name)
-    }
-}
-
-/// The ABI an artifact's code was compiled for, read from its manifest.
+/// The ABI an artifact's code was compiled for, checked against its manifest.
 ///
-/// The point is that this is **not** [`Abi::active`]. The compiler calls the
-/// engines in its checked-in artifact through the same marshaling code it uses
-/// for a program it has just compiled, and the two need not agree: once arrays
-/// switch representation, freshly compiled code will speak `Wide` while the
-/// artifact — compiled before the switch — still speaks `Tagged` until it is
-/// regenerated. Marshaling the artifact with the active ABI would build 24-byte
-/// arrays for code that reads 8-byte pointers. `Abi`'s own doc names this case:
-/// the marshaling layer has to ask "with the callee in hand".
-///
-/// An artifact with no `; array-abi` line predates it, and every such artifact
-/// was compiled `Tagged`. A line naming something unknown is refused rather than
-/// guessed at — marshaling with the wrong layout is memory corruption, not a
-/// wrong answer, so there is no safe default to fall back on.
+/// The point is that the compiler calls the engines in its checked-in artifact
+/// through the same marshaling code it uses for a program it has just compiled,
+/// so an artifact has to speak the ABI the compiler does — and an artifact that
+/// does not is **refused rather than guessed at**: marshaling with the wrong
+/// layout is memory corruption, not a wrong answer, so there is no safe default
+/// to fall back on. The lines are what catch an artifact left behind by a change
+/// of representation, which the checked-in one has been more than once.
 fn abi_of_manifest(manifest: &aipl_artifact::Manifest) -> Result<Abi, Error> {
-    let read = |line: Option<&str>, what: &str| match line {
-        None => Ok(SeqRepr::Tagged),
-        Some(name) => SeqRepr::from_name(name).ok_or_else(|| {
-            Error::msg(format!(
-                "artifact manifest names {what} ABI {name:?}, which this compiler does not \
-                 know; regenerate the artifact"
-            ))
-        }),
+    let check = |line: Option<&str>, what: &str, want: &str| match line {
+        Some(name) if name == want => Ok(()),
+        Some(name) => Err(Error::msg(format!(
+            "artifact manifest names {what} ABI {name:?}, but this compiler speaks {want:?}; \
+             regenerate the artifact"
+        ))),
+        None => Err(Error::msg(format!(
+            "artifact manifest names no {what} ABI, so it predates the one this compiler \
+             speaks ({want:?}); regenerate the artifact"
+        ))),
     };
-    let arrays = read(manifest.array_abi.as_deref(), "array")?;
-    let sets = read(manifest.set_abi.as_deref(), "set")?;
-    Ok(Abi { arrays, sets })
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-pub struct Abi {
-    /// Which representation an **array** value has.
-    ///
-    /// `Wide` for freshly compiled code ([`Abi::active`]). `Tagged` survives for an
-    /// artifact compiled before the switch, which [`abi_of_manifest`] reads back
-    /// from its `; array-abi` line — that is the one thing keeping the old layout
-    /// reachable, and it goes with `arr24_todo.txt` stage 7. A `str` has no
-    /// counterpart field because it has no choice left.
-    arrays: SeqRepr,
-    /// Which representation a **set** or a **dict** value has (a `#{char}` is
-    /// its 32-byte bitfield under either): `Tagged`, the block pointer, or
-    /// `Wide`, the 24-byte value `{block, data, len}` passed by address as an array
-    /// is. They flipped on their own, after arrays (`arr24_todo.txt` 6d), and an
-    /// artifact records which with its `; set-abi` line.
-    sets: SeqRepr,
+    check(manifest.array_abi.as_deref(), "array", ARRAY_ABI)?;
+    check(manifest.set_abi.as_deref(), "set", SET_ABI)?;
+    Ok(Abi)
 }
 
 impl Abi {
@@ -21965,12 +21799,7 @@ impl Abi {
     /// about the code they are emitting right now rather than about some other
     /// callee.
     fn active() -> Abi {
-        // The one place the array switch is thrown (`arr24_todo.txt` 2b-flip,
-        // and the narrow element strides that stage 3 builds on).
-        Abi {
-            arrays: SeqRepr::Narrow,
-            sets: SeqRepr::Wide,
-        }
+        Abi
     }
 
     /// Bytes one `str` value occupies under this ABI.
@@ -21984,179 +21813,84 @@ impl Abi {
     fn str_is_composite(self) -> bool {
         true
     }
-
-    /// Bytes one array value occupies under this ABI.
-    fn arr_size(self) -> i64 {
-        match self.arrays {
-            SeqRepr::Tagged => 8,
-            SeqRepr::Wide | SeqRepr::Narrow => arr24::ARR_SIZE as i64,
-        }
-    }
-
-    /// Whether an array's narrow integer elements are stored at their own width
-    /// under this ABI (see [`SeqRepr::Narrow`]).
-    fn narrow_elems(self) -> bool {
-        matches!(self.arrays, SeqRepr::Narrow)
-    }
-
-    /// Whether an array travels by address under this ABI — the array counterpart
-    /// of [`Abi::str_is_composite`].
-    ///
-    /// Under `Wide` (and `Narrow`) it does: the value is 24 bytes, passed and
-    /// returned by address like any composite, and the words after the block
-    /// carry a window's data pointer and length (`arr24::ArrValue`).
-    fn arr_is_composite(self) -> bool {
-        matches!(self.arrays, SeqRepr::Wide | SeqRepr::Narrow)
-    }
-
-    /// Whether a set or a dict is the 24-byte value under this ABI — which is
-    /// then both its size and whether it travels by address.
-    fn sets_wide(self) -> bool {
-        !matches!(self.sets, SeqRepr::Tagged)
-    }
 }
 
 #[cfg(test)]
 mod abi_tests {
     use super::*;
 
-    /// The array representation knob, both ways. `Abi::active` is `Wide`, so
-    /// nothing in a build today takes the `Tagged` answers — this is what keeps
-    /// them a checked claim, for the artifacts compiled before the switch.
+    /// An array, a set and a dict are each the 24-byte value that travels by
+    /// address; a `char[]` rides `str`'s representation and a `#{char}` is its
+    /// 32-byte bitfield.
     #[test]
-    fn the_array_representation_decides_size_and_composite_ness() {
-        let tagged = Abi {
-            arrays: SeqRepr::Tagged,
-            sets: SeqRepr::Tagged,
-        };
-        let wide = Abi {
-            arrays: SeqRepr::Wide,
-            sets: SeqRepr::Tagged,
-        };
+    fn sequences_are_24_byte_values_that_travel_by_address() {
+        let abi = Abi::active();
         let structs = HashMap::new();
         let i64s = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::I64)));
-
-        assert_eq!(abi_elem_size(tagged, &i64s, &structs), 8);
-        assert_eq!(abi_elem_size(wide, &i64s, &structs), arr24::ARR_SIZE as i64);
-
-        // Under `Wide` an array is 24 bytes that travel by address; under
-        // `Tagged` it is the one-word pointer it always was.
-        assert!(!abi_is_composite(tagged, &i64s, &structs));
-        assert!(abi_is_composite(wide, &i64s, &structs));
-
-        // The switch is thrown: freshly compiled code uses the wide layout, with
-        // narrow integers packed (`SeqRepr::Narrow`), which is the same value —
-        // and sets and dicts are the 24-byte value too.
-        let narrow = Abi {
-            arrays: SeqRepr::Narrow,
-            sets: SeqRepr::Wide,
-        };
-        assert_eq!(Abi::active(), narrow);
-        assert_eq!(
-            abi_elem_size(narrow, &i64s, &structs),
-            arr24::ARR_SIZE as i64
-        );
-        assert!(abi_is_composite(narrow, &i64s, &structs));
-
-        // A `char[]` rides `str`'s representation, not an array block's, so the
-        // knob must not touch it — it is wide under both.
-        let chars = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::Char)));
-        for abi in [tagged, wide] {
-            assert_eq!(abi_elem_size(abi, &chars, &structs), abi.str_size());
-            assert!(abi_is_composite(abi, &chars, &structs));
-        }
-    }
-
-    /// An artifact says which array representation its code speaks, and an
-    /// engine loaded from it believes the artifact rather than the running
-    /// compiler. That is what lets the compiler switch representation while its
-    /// checked-in engines, compiled before the switch, keep working.
-    #[test]
-    fn an_artifact_names_its_own_array_abi() {
-        let read = |line: &str| {
-            let text = format!("; dogfood-ir v1\n{line}\n");
-            abi_of_manifest(&aipl_artifact::parse_manifest(&text).unwrap())
-        };
-        let tagged = Abi {
-            arrays: SeqRepr::Tagged,
-            sets: SeqRepr::Tagged,
-        };
-        let wide = Abi {
-            arrays: SeqRepr::Wide,
-            sets: SeqRepr::Tagged,
-        };
-
-        // Every artifact built before the line existed was compiled `Tagged`.
-        assert_eq!(read("").unwrap(), tagged);
-        assert_eq!(read("; array-abi tagged").unwrap(), tagged);
-        assert_eq!(read("; array-abi wide").unwrap(), wide);
-
-        // A representation this compiler does not know is refused, not guessed:
-        // marshaling with the wrong layout corrupts memory rather than answering
-        // wrongly, so no default is safe.
-        let err = read("; array-abi sideways").unwrap_err().to_string();
-        assert!(err.contains("sideways"), "{err}");
-
-        // The writer and the reader agree on every spelling.
-        for r in [SeqRepr::Tagged, SeqRepr::Wide, SeqRepr::Narrow] {
-            assert_eq!(SeqRepr::from_name(r.name()), Some(r));
-        }
-    }
-
-    /// The set knob, both ways: a set or a dict is a word under `Tagged` and the
-    /// 24-byte value under `Wide`, while a `#{char}` is its 32-byte bitfield
-    /// under either. And an artifact names its own, as it does its arrays.
-    #[test]
-    fn the_set_representation_decides_size_and_composite_ness() {
-        let structs = HashMap::new();
         let ints = ConcreteType::Set(
             Box::new(ConcreteType::Primitive(Primitive::I64)),
-            aipl_syntax::ast::SetOrder::Unordered,
-        );
-        let chars = ConcreteType::Set(
-            Box::new(ConcreteType::Primitive(Primitive::Char)),
             aipl_syntax::ast::SetOrder::Unordered,
         );
         let dict = ConcreteType::Dict(
             Box::new(ConcreteType::Primitive(Primitive::Str)),
             Box::new(ConcreteType::Primitive(Primitive::I64)),
         );
-        for (sets, size, composite) in [(SeqRepr::Tagged, 8, false), (SeqRepr::Wide, 24, true)] {
-            let abi = Abi {
-                arrays: SeqRepr::Narrow,
-                sets,
-            };
-            for t in [&ints, &dict] {
-                assert_eq!(abi_elem_size(abi, t, &structs), size);
-                assert_eq!(abi_is_composite(abi, t, &structs), composite);
-            }
-            assert_eq!(
-                abi_elem_size(abi, &chars, &structs),
-                charset::CHARSET_SIZE as i64
-            );
+        for t in [&i64s, &ints, &dict] {
+            assert_eq!(abi_elem_size(abi, t, &structs), arr24::ARR_SIZE as i64);
+            assert!(abi_is_composite(abi, t, &structs));
         }
-        let read = |text: &str| {
-            abi_of_manifest(&aipl_artifact::parse_manifest(text).unwrap())
-                .unwrap()
-                .sets
-        };
-        assert_eq!(read("; dogfood-ir v1\n"), SeqRepr::Tagged);
-        assert_eq!(read("; dogfood-ir v1\n; set-abi wide\n"), SeqRepr::Wide);
+        let chars = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::Char)));
+        assert_eq!(abi_elem_size(abi, &chars, &structs), abi.str_size());
+        assert!(abi_is_composite(abi, &chars, &structs));
+        let charset = ConcreteType::Set(
+            Box::new(ConcreteType::Primitive(Primitive::Char)),
+            aipl_syntax::ast::SetOrder::Unordered,
+        );
+        assert_eq!(
+            abi_elem_size(abi, &charset, &structs),
+            charset::CHARSET_SIZE as i64
+        );
+        // An optional carries its core's size.
+        let opt = ConcreteType::Optional(Box::new(i64s.clone()));
+        assert_eq!(
+            abi_elem_size(abi, &opt, &structs),
+            OPT_VALUE_OFFSET as i64 + arr24::ARR_SIZE as i64
+        );
     }
 
-    /// Only `Narrow` packs an array's narrow integers, and only an array's: the
-    /// element size a set or a dict is told is still a word, and a `bool` is
-    /// bit-packed under every ABI.
+    /// An artifact says which representations its code speaks, and one that does
+    /// not speak this compiler's is refused: marshaling with the wrong layout
+    /// corrupts memory rather than answering wrongly, so no default is safe.
     #[test]
-    fn narrow_integers_pack_only_in_arrays_under_narrow() {
-        let wide = Abi {
-            arrays: SeqRepr::Wide,
-            sets: SeqRepr::Tagged,
+    fn an_artifact_must_speak_the_abi_of_the_compiler_loading_it() {
+        let read = |text: &str| {
+            abi_of_manifest(&aipl_artifact::parse_manifest(text).unwrap())
+                .map_err(|e| e.to_string())
         };
-        let narrow = Abi {
-            arrays: SeqRepr::Narrow,
-            sets: SeqRepr::Tagged,
-        };
+        let ours = format!("; dogfood-ir v1\n; array-abi {ARRAY_ABI}\n; set-abi {SET_ABI}\n");
+        assert_eq!(read(&ours), Ok(Abi::active()));
+
+        // One compiled before the lines existed predates every representation here.
+        let err = read("; dogfood-ir v1\n").unwrap_err();
+        assert!(err.contains("regenerate"), "{err}");
+        // So does one that names another.
+        let err = read(&format!(
+            "; dogfood-ir v1\n; array-abi tagged\n; set-abi {SET_ABI}\n"
+        ))
+        .unwrap_err();
+        assert!(err.contains("tagged"), "{err}");
+        let err = read(&format!(
+            "; dogfood-ir v1\n; array-abi {ARRAY_ABI}\n; set-abi sideways\n"
+        ))
+        .unwrap_err();
+        assert!(err.contains("sideways"), "{err}");
+    }
+
+    /// A narrow integer packs at its own width in an array — and only there: a
+    /// set's or a dict's scalars are still a word, and a `bool` is a bit.
+    #[test]
+    fn narrow_integers_pack_only_in_arrays() {
+        let abi = Abi::active();
         let structs = HashMap::new();
         let p = |p| ConcreteType::Primitive(p);
         for (prim, width) in [
@@ -22166,45 +21900,21 @@ mod abi_tests {
             (Primitive::U32, 4),
             (Primitive::I64, 8),
         ] {
-            assert_eq!(abi_array_elem_size(narrow, &p(prim), &structs), width);
-            assert_eq!(abi_array_elem_size(wide, &p(prim), &structs), 8);
-            assert_eq!(abi_elem_size(narrow, &p(prim), &structs), 8);
+            assert_eq!(abi_array_elem_size(abi, &p(prim), &structs), width);
+            assert_eq!(abi_elem_size(abi, &p(prim), &structs), 8);
         }
         assert_eq!(
-            abi_array_elem_size(narrow, &p(Primitive::Bool), &structs),
+            abi_array_elem_size(abi, &p(Primitive::Bool), &structs),
             ELEM_BITPACKED
         );
         assert_eq!(runtime_elem_size(&p(Primitive::U8), &structs), 8);
-    }
-
-    #[test]
-    fn the_array_representation_decides_size_and_composite_ness_for_optionals() {
-        let tagged = Abi {
-            arrays: SeqRepr::Tagged,
-            sets: SeqRepr::Tagged,
-        };
-        let wide = Abi {
-            arrays: SeqRepr::Wide,
-            sets: SeqRepr::Tagged,
-        };
-        let structs = HashMap::new();
-        let i64s = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::I64)));
-        // An optional carries its core's size, so it tracks the knob too.
-        let opt = ConcreteType::Optional(Box::new(i64s.clone()));
-        assert_eq!(abi_elem_size(tagged, &opt, &structs), 16);
-        assert_eq!(
-            abi_elem_size(wide, &opt, &structs),
-            OPT_VALUE_OFFSET as i64 + arr24::ARR_SIZE as i64
-        );
     }
 }
 
 /// Whether a value of `ty` travels by address for a callee speaking `abi`.
 ///
 /// The single implementation of the rule; [`is_composite`] is this at
-/// [`Abi::active`]. A `str` is the only type whose answer depends on the
-/// representation — under `Tagged` it is a plain word, under `Wide` it is 24
-/// bytes that live in memory, which is what "composite" already meant here.
+/// [`Abi::active`].
 fn abi_is_composite(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
     if is_str_shaped(ty) {
         return abi.str_is_composite();
@@ -22214,16 +21924,15 @@ fn abi_is_composite(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeD
     if is_char_set(ty) {
         return true;
     }
-    // An array's answer now depends on the representation too, exactly as a
-    // `str`'s did. `char[]` never reaches here — `is_str_shaped` above claims it,
-    // since it rides `str`'s representation rather than an array block's.
-    if matches!(ty, ConcreteType::Array(_)) {
-        return abi.arr_is_composite();
-    }
-    // A set or a dict too, on its own knob — the bitfield `#{char}` is claimed
-    // above.
-    if matches!(ty, ConcreteType::Set(..) | ConcreteType::Dict(..)) {
-        return abi.sets_wide();
+    // An array, a set and a dict are each 24 bytes that live in memory.
+    // `char[]` never reaches here — `is_str_shaped` above claims it, since it
+    // rides `str`'s representation rather than an array block's — and the bitfield
+    // `#{char}` is claimed above.
+    if matches!(
+        ty,
+        ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(..)
+    ) {
+        return true;
     }
     matches!(ty, ConcreteType::Optional(_) | ConcreteType::Result(_, _))
         || matches!(ty, ConcreteType::Named(n) if structs.get(n).is_some_and(|d| !d.boxed()))
@@ -22231,8 +21940,7 @@ fn abi_is_composite(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeD
 
 /// Bytes one element of `elem` occupies in an *array's* block for a callee
 /// speaking `abi` — the stride the array runtime is told, and every element
-/// read and write uses. A narrow integer under [`SeqRepr::Narrow`] is its own
-/// width; a `bool` is bit-packed ([`ELEM_BITPACKED`]); anything else is its
+/// read and write uses. A narrow integer is its own width; a `bool` is bit-packed ([`ELEM_BITPACKED`]); anything else is its
 /// value size ([`abi_elem_size`]).
 ///
 /// Arrays only. A set or a dict keeps a word per scalar element — its runtime
@@ -22243,8 +21951,8 @@ fn abi_array_elem_size(abi: Abi, elem: &ConcreteType, structs: &HashMap<String, 
         return ELEM_BITPACKED;
     }
     match narrow_int_width(elem) {
-        Some(width) if abi.narrow_elems() => width,
-        _ => abi_elem_size(abi, elem, structs),
+        Some(width) => width,
+        None => abi_elem_size(abi, elem, structs),
     }
 }
 
@@ -22269,8 +21977,7 @@ fn narrow_int_width(ty: &ConcreteType) -> Option<i64> {
 /// asked three times, and used to be three `match`es that agreed by coincidence.
 ///
 /// Recurses through optionals and results so one carrying a `str` is sized for
-/// the right representation: `str?` is 16 bytes under `Tagged` and 32 under
-/// `Wide`.
+/// the right representation: `str?` is a tag and a 24-byte `str`.
 fn abi_elem_size(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> i64 {
     match ty {
         _ if is_str_shaped(ty) => abi.str_size(),
@@ -22295,11 +22002,11 @@ fn abi_elem_size(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeDef>
                 .get(n)
                 .map_or(8, |t| if t.boxed() { 8 } else { t.size() as i64 })
         }
-        // A `char[]` is claimed by `is_str_shaped` above; every other array is
-        // sized by the array representation in force, and a set (a `#{char}` is
-        // claimed above too) or a dict by the set representation.
-        ConcreteType::Array(_) => abi.arr_size(),
-        ConcreteType::Set(..) | ConcreteType::Dict(..) if abi.sets_wide() => arr24::ARR_SIZE as i64,
+        // A `char[]` is claimed by `is_str_shaped` above, and a `#{char}` too;
+        // every other array, set or dict is the 24-byte value.
+        ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(..) => {
+            arr24::ARR_SIZE as i64
+        }
         _ => 8,
     }
 }

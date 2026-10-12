@@ -74,15 +74,16 @@ pub struct Manifest {
     pub types: Vec<TypeLine>,
     /// The `; array-abi` line's value — which array representation the
     /// artifact's code was compiled for — or `None` for an artifact that
-    /// predates the line, which means the 8-byte one.
+    /// predates the line.
     ///
     /// Kept as the text rather than a type, because this crate does not know
-    /// codegen's representation enum and should not have to: `aipl-codegen`'s
-    /// `abi_of_manifest` maps it, and refuses a value it does not recognise.
+    /// codegen's representations and should not have to: `aipl-codegen`'s
+    /// `abi_of_manifest` checks it against the one it speaks, and refuses an
+    /// artifact that names another.
     pub array_abi: Option<String>,
     /// The `; set-abi` line's value — which representation a **set** or **dict**
-    /// has in the artifact's code — or `None` for one that predates the line,
-    /// which means the 8-byte one. Kept as text for the reason `array_abi` is.
+    /// has in the artifact's code — or `None` for one that predates the line.
+    /// Kept as text for the reason `array_abi` is.
     pub set_abi: Option<String>,
 }
 
@@ -358,11 +359,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         // Shim slots: read one, or write one (returns nothing).
         "aipl_shim_get" => sig(1, true),
         "aipl_shim_set" => sig(2, false),
-        "aipl_arr_drop_arr"
-        | "aipl_arr_retain_ptr"
-        | "aipl_arr_drop_opt_arr"
-        | "aipl_arr_retain_opt"
-        | "aipl_arr_drop_warr"
+        "aipl_arr_drop_warr"
         | "aipl_arr_retain_warr"
         | "aipl_arr_drop_opt_warr"
         | "aipl_arr_retain_opt_warr" => sig(2, false),
