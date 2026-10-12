@@ -470,11 +470,11 @@ allocations: 10175
 deallocations: 10175
 reallocations: 1504
 bytes allocated: 1175670
-instructions executed: 3615307
-binary size: 438536
-  code: 300212
+instructions executed: 3611915
+binary size: 437224
+  code: 299480
   data: 6380
-  metadata: 131944
+  metadata: 131364
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -622,10 +622,10 @@ functions:
     bytes: 552
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__leaves:
     calls: 15
-    bytes: 1672
+    bytes: 1572
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves:
     calls: 322
-    bytes: 1672
+    bytes: 1572
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 2
     bytes: 428
@@ -694,7 +694,7 @@ functions:
     bytes: 324
   __m13__climb$CalcTok$Calc:
     calls: 160
-    bytes: 4348
+    bytes: 4324
   __m13__error_at$CalcTok$Calc:
     calls: 4
     bytes: 3196
@@ -727,7 +727,7 @@ functions:
     bytes: 9056
   __m13__match_reps$CalcTok$Calc:
     calls: 0
-    bytes: 5752
+    bytes: 5572
   __m13__match_rule$CalcTok$Calc:
     calls: 1375
     bytes: 7708
@@ -736,7 +736,7 @@ functions:
     bytes: 1300
   __m13__match_then$CalcTok$Calc:
     calls: 206
-    bytes: 3792
+    bytes: 3712
   __m13__parse$CalcTok$Calc:
     calls: 42
     bytes: 284
@@ -745,7 +745,7 @@ functions:
     bytes: 496
   __m13__parse_prepared$CalcTok$Calc:
     calls: 53
-    bytes: 8328
+    bytes: 8396
   __m13__refusal$CalcTok$Calc:
     calls: 0
     bytes: 3040
@@ -769,19 +769,19 @@ functions:
     bytes: 812
   __m1__leaves:
     calls: 31
-    bytes: 1772
+    bytes: 1740
   __m1__own_token_text:
     calls: 308
     bytes: 1608
   __m1__show:
     calls: 12
-    bytes: 4412
+    bytes: 4332
   __m1__split_kids:
     calls: 447
     bytes: 2948
   __m1__token_leaves:
     calls: 530
-    bytes: 1736
+    bytes: 1708
   __m1__token_text:
     calls: 0
     bytes: 1580
@@ -868,7 +868,7 @@ functions:
     bytes: 192
   __m4__group_doc$CalcTok$Calc$s1$lam$calc_space:
     calls: 0
-    bytes: 11828
+    bytes: 11712
   __m4__inline_doc$lam$calc_space:
     calls: 67
     bytes: 3020
@@ -934,7 +934,7 @@ functions:
     bytes: 396
   __test$calc_grammar:
     calls: 1
-    bytes: 12376
+    bytes: 12316
   __test$eval_calc:
     calls: 1
     bytes: 2116
@@ -964,9 +964,6 @@ functions:
     bytes: 204
   aipl_arr_drop_arr:
     calls: 1
-    bytes: (external)
-  aipl_arr_extend:
-    calls: 848
     bytes: (external)
   aipl_arr_inc:
     calls: 54929

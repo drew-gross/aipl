@@ -622,11 +622,11 @@ allocations: 262
 deallocations: 262
 reallocations: 15
 bytes allocated: 20389
-instructions executed: 61572
-binary size: 79880
-  code: 51504
+instructions executed: 61208
+binary size: 79448
+  code: 51164
   data: 3703
-  metadata: 24673
+  metadata: 24581
 functions:
   __arr_drop_Cst:
     calls: 40
@@ -642,10 +642,10 @@ functions:
     bytes: 432
   __builtin_map_join$Cst$__builtin_Span$lam$leaves:
     calls: 13
-    bytes: 1672
+    bytes: 1572
   __builtin_map_join$Cst$__builtin_Span$lam$token_leaves:
     calls: 9
-    bytes: 1672
+    bytes: 1572
   __builtin_reverse_find_map$Cst$__builtin_Span$lam$last_leaf:
     calls: 8
     bytes: 428
@@ -682,9 +682,6 @@ functions:
   __test$through:
     calls: 1
     bytes: 388
-  aipl_arr_extend:
-    calls: 91
-    bytes: (external)
   aipl_arr_inc:
     calls: 1209
     bytes: (external)
@@ -744,7 +741,7 @@ functions:
     bytes: 780
   leaves:
     calls: 32
-    bytes: 1772
+    bytes: 1740
   leaves$len:
     calls: 5
     bytes: 1392
@@ -759,7 +756,7 @@ functions:
     bytes: 1232
   show:
     calls: 23
-    bytes: 4412
+    bytes: 4332
   slot_walk:
     calls: 3
     bytes: 820
@@ -780,7 +777,7 @@ functions:
     bytes: 236
   token_leaves:
     calls: 31
-    bytes: 1736
+    bytes: 1708
   token_span:
     calls: 5
     bytes: 288

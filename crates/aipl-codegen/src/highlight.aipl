@@ -758,11 +758,11 @@ allocations: 509
 deallocations: 509
 reallocations: 34
 bytes allocated: 40794
-instructions executed: 116303
-binary size: 128568
-  code: 86068
+instructions executed: 116299
+binary size: 128424
+  code: 85976
   data: 5464
-  metadata: 37036
+  metadata: 36984
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -847,16 +847,13 @@ functions:
     bytes: 8216
   __test$tm_json:
     calls: 1
-    bytes: 6724
+    bytes: 6632
   __test$word_pat:
     calls: 1
     bytes: 2332
   __to_str_u64:
     calls: 0
     bytes: 204
-  aipl_arr_extend:
-    calls: 1
-    bytes: (external)
   aipl_arr_inc:
     calls: 52
     bytes: (external)

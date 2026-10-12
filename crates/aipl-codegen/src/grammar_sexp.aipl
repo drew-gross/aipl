@@ -277,11 +277,11 @@ allocations: 5735
 deallocations: 5735
 reallocations: 564
 bytes allocated: 641866
-instructions executed: 2191962
-binary size: 422560
-  code: 290688
+instructions executed: 2187042
+binary size: 421232
+  code: 289932
   data: 5028
-  metadata: 126844
+  metadata: 126272
 functions:
   __arr_drop_SexpKind:
     calls: 0
@@ -426,10 +426,10 @@ functions:
     bytes: 552
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__leaves:
     calls: 7
-    bytes: 1672
+    bytes: 1572
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves:
     calls: 397
-    bytes: 1672
+    bytes: 1572
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 0
     bytes: 428
@@ -507,7 +507,7 @@ functions:
     bytes: 384
   __m13__climb$SexpKind$__m15__Sexp:
     calls: 0
-    bytes: 4348
+    bytes: 4324
   __m13__error_at$SexpKind$__m15__Sexp:
     calls: 4
     bytes: 3376
@@ -540,7 +540,7 @@ functions:
     bytes: 9444
   __m13__match_reps$SexpKind$__m15__Sexp:
     calls: 38
-    bytes: 5752
+    bytes: 5572
   __m13__match_rule$SexpKind$__m15__Sexp:
     calls: 673
     bytes: 7908
@@ -549,7 +549,7 @@ functions:
     bytes: 1300
   __m13__match_then$SexpKind$__m15__Sexp:
     calls: 0
-    bytes: 3792
+    bytes: 3712
   __m13__parse$SexpKind$__m15__Sexp:
     calls: 13
     bytes: 284
@@ -558,7 +558,7 @@ functions:
     bytes: 496
   __m13__parse_prepared$SexpKind$__m15__Sexp:
     calls: 31
-    bytes: 8524
+    bytes: 8568
   __m13__refusal$SexpKind$__m15__Sexp:
     calls: 0
     bytes: 3692
@@ -585,16 +585,16 @@ functions:
     bytes: 812
   __m1__leaves:
     calls: 15
-    bytes: 1772
+    bytes: 1740
   __m1__show:
     calls: 41
-    bytes: 4412
+    bytes: 4332
   __m1__split_kids:
     calls: 86
     bytes: 2948
   __m1__token_leaves:
     calls: 740
-    bytes: 1736
+    bytes: 1708
   __m1__token_text:
     calls: 21
     bytes: 1580
@@ -681,7 +681,7 @@ functions:
     bytes: 144
   __m4__group_doc$SexpKind$__m15__Sexp$s1$lam$sexp_space:
     calls: 18
-    bytes: 11828
+    bytes: 11712
   __m4__inline_doc$lam$sexp_space:
     calls: 148
     bytes: 3020
@@ -747,7 +747,7 @@ functions:
     bytes: 396
   __test$sexp_grammar:
     calls: 1
-    bytes: 12376
+    bytes: 12316
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -757,9 +757,6 @@ functions:
   __to_str_u64:
     calls: 1
     bytes: 204
-  aipl_arr_extend:
-    calls: 1230
-    bytes: (external)
   aipl_arr_inc:
     calls: 26094
     bytes: (external)

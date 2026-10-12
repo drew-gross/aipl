@@ -511,11 +511,11 @@ allocations: 19622
 deallocations: 19622
 reallocations: 2649
 bytes allocated: 2825055
-instructions executed: 7622056
-binary size: 477520
-  code: 325384
+instructions executed: 7610540
+binary size: 476192
+  code: 324628
   data: 9068
-  metadata: 143068
+  metadata: 142496
 functions:
   __arr_drop_Json:
     calls: 125
@@ -663,10 +663,10 @@ functions:
     bytes: 1452
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__leaves:
     calls: 15
-    bytes: 1672
+    bytes: 1572
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves:
     calls: 955
-    bytes: 1672
+    bytes: 1572
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 0
     bytes: 428
@@ -753,7 +753,7 @@ functions:
     bytes: 384
   __m13__climb$JsonTok$Json:
     calls: 0
-    bytes: 4348
+    bytes: 4324
   __m13__error_at$JsonTok$Json:
     calls: 7
     bytes: 3376
@@ -786,7 +786,7 @@ functions:
     bytes: 9444
   __m13__match_reps$JsonTok$Json:
     calls: 62
-    bytes: 5752
+    bytes: 5572
   __m13__match_rule$JsonTok$Json:
     calls: 2429
     bytes: 8076
@@ -795,7 +795,7 @@ functions:
     bytes: 1300
   __m13__match_then$JsonTok$Json:
     calls: 158
-    bytes: 3792
+    bytes: 3712
   __m13__parse$JsonTok$Json:
     calls: 34
     bytes: 284
@@ -804,7 +804,7 @@ functions:
     bytes: 496
   __m13__parse_prepared$JsonTok$Json:
     calls: 57
-    bytes: 8524
+    bytes: 8568
   __m13__refusal$JsonTok$Json:
     calls: 0
     bytes: 3692
@@ -828,16 +828,16 @@ functions:
     bytes: 812
   __m1__leaves:
     calls: 28
-    bytes: 1772
+    bytes: 1740
   __m1__show:
     calls: 34
-    bytes: 4412
+    bytes: 4332
   __m1__split_kids:
     calls: 247
     bytes: 2948
   __m1__token_leaves:
     calls: 1693
-    bytes: 1736
+    bytes: 1708
   __m1__token_text:
     calls: 37
     bytes: 1580
@@ -924,7 +924,7 @@ functions:
     bytes: 200
   __m4__group_doc$JsonTok$Json$s1$lam$json_space:
     calls: 26
-    bytes: 11828
+    bytes: 11712
   __m4__inline_doc$lam$json_space:
     calls: 229
     bytes: 3020
@@ -990,7 +990,7 @@ functions:
     bytes: 396
   __test$json_grammar:
     calls: 1
-    bytes: 12376
+    bytes: 12316
   __test$parse_json:
     calls: 1
     bytes: 17232
@@ -1006,9 +1006,6 @@ functions:
   __to_str_u64:
     calls: 1
     bytes: 204
-  aipl_arr_extend:
-    calls: 2879
-    bytes: (external)
   aipl_arr_inc:
     calls: 76597
     bytes: (external)
@@ -1019,7 +1016,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 87653
+    calls: 87633
     bytes: (external)
   aipl_array_new:
     calls: 2110

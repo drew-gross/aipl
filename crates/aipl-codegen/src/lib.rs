@@ -4439,6 +4439,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
         arr24::aipl_arr_push_small as *const u8,
     );
     jit_builder.symbol("aipl_arr_reversed", arr24::aipl_arr_reversed as *const u8);
+    jit_builder.symbol("aipl_arrv_extend", arr24::aipl_arrv_extend as *const u8);
     jit_builder.symbol("aipl_str_rope", str24::aipl_str_rope as *const u8);
     jit_builder.symbol(
         "aipl_str_pack_inline",
@@ -8165,6 +8166,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         "aipl_arr_from_set_words" => (2, Ret::Word),
         "aipl_arr_push_small" => (3, Ret::Word),
         "aipl_arr_reversed" => (5, Ret::None),
+        "aipl_arrv_extend" => (5, Ret::Word),
         "aipl_arr_settle" => (4, Ret::None),
         "aipl_dict_remove" => (5, Ret::Word),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" => (7, Ret::Word),
@@ -19565,16 +19567,35 @@ fn compile_call_expr<M: Module>(
                 let mark = scope_depth(scopes);
                 let (src, src_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
                 let src_owned = owned_temp_since(scopes, mark, src);
-                if src_owned {
-                    moved.push(src);
+                if is_wide_array(&src_ty) {
+                    // Borrowed and read in place, pinned across the call — the
+                    // same contract `Callee::Extend` states — and an owned
+                    // temporary keeps its own track.
+                    if !src_owned {
+                        emit_retain(builder, module, builtins, structs, src, &src_ty);
+                    }
+                    let out = builtins.call(
+                        module,
+                        builder,
+                        "aipl_arrv_extend",
+                        &[arr_block, src, drop_fn, retain_fn, esz],
+                    );
+                    if !src_owned {
+                        emit_drop(builder, module, builtins, structs, src, &src_ty);
+                    }
+                    out
+                } else {
+                    if src_owned {
+                        moved.push(src);
+                    }
+                    let src_block = consumed_block(builder, module, cx, src, &src_ty, src_owned);
+                    builtins.call(
+                        module,
+                        builder,
+                        "aipl_arr_extend",
+                        &[arr_block, src_block, drop_fn, retain_fn, esz],
+                    )
                 }
-                let src_block = consumed_block(builder, module, cx, src, &src_ty, src_owned);
-                builtins.call(
-                    module,
-                    builder,
-                    "aipl_arr_extend",
-                    &[arr_block, src_block, drop_fn, retain_fn, esz],
-                )
             } else {
                 // One element. After `reserve` the block is uniquely owned with
                 // spare capacity, so `push_mut` is a plain write; a bit-packed
@@ -20035,28 +20056,38 @@ fn compile_call_expr<M: Module>(
             let esz = builder
                 .ins()
                 .iconst(types::I64, array_elem_size(&result_elem, structs));
-            // `aipl_arr_extend` consumes `src`. An owned temporary is moved in
-            // (its scope track has to go, or the block is dropped twice); a
-            // borrowed one gets the compensating pre-inc.
-            if src_owned {
-                let scope = scopes.last_mut().expect("scope");
-                scope.retain(|t| !matches!(t.owned, Owned::Value(x) if x == src_ptr));
-            }
-            // `src_ptr` stays the value (ownership above matches on it); the
-            // runtime reads the block that carries the reference it consumes.
+            // An array source is *borrowed* by `aipl_arrv_extend`, which reads
+            // its elements off the value whatever its shape — a window, a
+            // reversal and an inline value are not copied into a block first.
+            // A borrowed source is pinned across the call: it may be the
+            // receiver's own block (`a.extend(a)`), and the pin is what makes
+            // that block shared, so the reserve below copies it before anything
+            // is written. An owned temporary cannot be the receiver's and keeps
+            // its own track. A set source still goes through the block entry,
+            // which consumes it.
+            let src_value = is_wide_array(&src_ty);
+            let src_block = if src_value {
+                if !src_owned {
+                    emit_retain(builder, module, builtins, structs, src_ptr, &src_ty);
+                }
+                src_ptr
+            } else {
+                if src_owned {
+                    let scope = scopes.last_mut().expect("scope");
+                    scope.retain(|t| !matches!(t.owned, Owned::Value(x) if x == src_ptr));
+                }
+                consumed_block(builder, module, cx, src_ptr, &src_ty, src_owned)
+            };
             let src_len = seq_len(builder, src_ptr, &src_ty);
-            let src_block = consumed_block(builder, module, cx, src_ptr, &src_ty, src_owned);
             // `aipl_arr_reserve` has `aipl_array_push`'s ownership contract: it
             // consumes one reference to the array and hands back one owned
             // reference, growing in place when the block is uniquely owned and
             // copying when it isn't. So the bookkeeping below is `push`'s,
-            // unchanged — including the aliasing case `a.extend(a)`, where the
-            // source's own retain is what makes the block shared and so forces
-            // the copy before anything is written.
+            // unchanged.
             //
             // A bit-packed `bool[]` has no pre-sized form (`reserve` measures in
-            // whole elements), so it skips straight to `aipl_arr_extend`, which
-            // appends bit by bit through the copying push.
+            // whole elements), so it skips straight to the extend, which appends
+            // bit by bit through the copying push.
             let grown = if is_bit_packed(&result_elem) {
                 arr_ptr
             } else {
@@ -20067,12 +20098,20 @@ fn compile_call_expr<M: Module>(
                     &[arr_ptr, src_len, drop_fn, retain_fn, esz],
                 )
             };
+            let sym = if src_value {
+                "aipl_arrv_extend"
+            } else {
+                "aipl_arr_extend"
+            };
             let new_ptr = builtins.call(
                 module,
                 builder,
-                "aipl_arr_extend",
+                sym,
                 &[grown, src_block, drop_fn, retain_fn, esz],
             );
+            if src_value && !src_owned {
+                emit_drop(builder, module, builtins, structs, src_ptr, &src_ty);
+            }
             builder.ins().stack_store(types::I64, new_ptr, slot, 0);
             if !exclusive {
                 // Possibly shared: the slot's own reference was consumed by the

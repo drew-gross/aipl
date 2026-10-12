@@ -97,11 +97,11 @@ allocations: 76
 deallocations: 76
 reallocations: 1
 bytes allocated: 6025
-instructions executed: 3892
-binary size: 80544
-  code: 53960
+instructions executed: 3888
+binary size: 80472
+  code: 53916
   data: 721
-  metadata: 25863
+  metadata: 25835
 functions:
   __arr_drop___m1__Expr:
     calls: 2
@@ -157,9 +157,6 @@ functions:
   __to_str_i64:
     calls: 7
     bytes: 204
-  aipl_arr_extend:
-    calls: 1
-    bytes: (external)
   aipl_arr_inc:
     calls: 9
     bytes: (external)
@@ -207,7 +204,7 @@ functions:
     bytes: (external)
   apply_suffix:
     calls: 7
-    bytes: 3416
+    bytes: 3372
   main:
     calls: 1
     bytes: 112

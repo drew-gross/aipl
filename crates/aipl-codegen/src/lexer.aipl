@@ -1473,11 +1473,11 @@ allocations: 283
 deallocations: 283
 reallocations: 4
 bytes allocated: 74128
-instructions executed: 712099
-binary size: 831080
-  code: 564300
+instructions executed: 712095
+binary size: 830784
+  code: 564040
   data: 9188
-  metadata: 257592
+  metadata: 257556
 functions:
   __arr_drop_Kind:
     calls: 88
@@ -1586,7 +1586,7 @@ functions:
     bytes: 18112
   __test$lex_all:
     calls: 1
-    bytes: 486904
+    bytes: 486644
   __test$lex_all$esc_str:
     calls: 2
     bytes: 140
@@ -1611,9 +1611,6 @@ functions:
   __to_str_str:
     calls: 0
     bytes: 300
-  aipl_arr_extend:
-    calls: 1
-    bytes: (external)
   aipl_arr_inc:
     calls: 2848
     bytes: (external)

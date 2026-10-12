@@ -315,21 +315,75 @@ Stage 5 — reversed as values                                               [do
   7 cases (`arrays/reverse` 4 → 0) and up in none.
 
 
-Stage 6 — the block header, and where unification stops         [blocked on 2]
+Stage 6 — the block header, two shapes, and the `str` buffer       [6a next]
 ---------------------------------------------------------------------------------
-  [ ] `[drop_fn][init][cap][refcount][elements]`; `len` leaves the block, since
-      the value carries it. NOTE: we have static typing so we should be able to
-      avoid the drop_fn for primitives like ints/chars/bools that don't have a drop.
-  [ ] `init` is the block's own initialized element count, and it is *not* the
-      value's `len`: a window's `len` is the window's, so releasing through a
-      window would leak the elements outside it. `arr24`'s
-      `a_window_releases_every_element_of_its_block` pins this.
-      Stage 8 asks whether `init` can be dropped in favour of `cap` — settle that
-      before building this header, since it is the same edit either way.
-  [ ] `drop_fn` has to stay in the block: `aipl_arr_drop_arr(elems, len)` walks
-      a nested array's elements without knowing their element type, so it cannot
-      be handed the inner helper by codegen.
-  [ ] those two words are the whole of what a `str` buffer does not need. Decide
+The target. `base` is the first element, and the length lives only in the value:
+
+```text
+plain block (elements need no drop):  [cap][refcount][elem0]...          16 bytes
+drop block (`str[]`, `T[][]`, ...):    [drop_fn][init][cap][refcount][elem0]...
+                                                              ^ base
+```
+
+The plain block *is* a `str24` buffer — `refcount` at `base - 8`, `cap` at
+`base - 16` — and that is the unification: refcounting and growing are one code
+path for both, and the two words in front of a drop block are the only
+difference, used only when its count reaches zero. An integer array pays for
+neither (`drop_fn` would be null and `init` never read), so it has neither. (Today
+every block is `[refcount][len][cap][drop_fn]`, 32 bytes.)
+
+Whatever frees or grows a block has to know which shape it is. Codegen does,
+from the static element type. The runtime's type-erased walks — the inner arrays
+of a `T[][]` (`drop_warr`), `join`'s parts, the FFI — read it off the *value*: a
+bit in the tag byte every array value already carries, nested ones included. An
+untyped array (`with_capacity`, `mut a = []`) starts plain, and the first push of
+a dropping element type moves it to a drop block — cheap, since it is empty then.
+
+The order is forced by one fact: the runtime's array entries take a *block* and
+read its length out of the header. Until they take values, `len` cannot leave the
+block — and a value has to say whether it is the whole block (lent as is) or a
+window, a reversal or inline (lent as a copy).
+
+  [ ] 6a. the array entries take values (`*const ArrValue`) and read `data`/`len`
+          off them — one entry at a time, each green. The old block-taking entry
+          stays registered beside each new one until the checked-in artifact no
+          longer imports it (it is *called* through those symbols while it is
+          regenerated), then goes in Stage 7. Each conversion also retires that
+          entry's lending: a window, a reversal or an inline value passed to it
+          stops being copied into a block first. Read-only inputs first (`extend`
+          and spread sources, `join`, `sort`), then the mutating receivers
+          (`push`, `reserve`, `extend`), which take the slot and write the value
+          back.
+            [x] `extend`'s and the spread's source: `arr24::aipl_arrv_extend`
+                borrows the value and reads it in place (pinned across the call
+                when it may be the receiver's own block). A set source, and the
+                bit-packed path, still use `aipl_arr_extend`. Allocations down in
+                5 cases, instructions down in 33, nothing up.
+            [ ] `join`'s parts and separators, `sort`'s input,
+                `execute_program`'s arguments
+            [ ] the mutating receivers
+  [ ] 6b. a whole value carries `data` and `len` too, so every block value has
+          the window's shape; `ArrView`'s whole-vs-window select and its block
+          length load go (most of the per-view cost stages 3 and 5 added).
+  [ ] 6c. `len` leaves the block; the header becomes base-relative, in the two
+          shapes above, with the tag bit for the drop shape. Release walks `init`
+          elements of a drop block. `init` is the block's own initialized count,
+          not a value's `len`: a window's `len` is the window's, so releasing
+          through one would leak the elements outside it (`arr24`'s
+          `a_window_releases_every_element_of_its_block` pins this). Stage 8's
+          question — can `cap` stand in for `init` — is now only about drop blocks.
+  [ ] 6d. **sets and dicts.** They share the array block and its runtime today
+          but are still one-word values, so they cannot carry a length — which
+          6c takes out of the block. Either they flip to 24-byte values first
+          (deferred earlier: "flip dicts and sets later") or they keep a header
+          of their own that still holds `len`. To decide before 6c.
+  [ ] 6e. share the refcount and capacity code with `str24`'s buffer, now that a
+          plain block is one.
+  [ ] `drop_fn` stays in a drop block: `aipl_arr_drop_arr(elems, len)` walks a
+      nested array's elements without knowing their element type. (Codegen could
+      generate a release helper per element type instead and drop the word
+      entirely; not worth it yet.)
+  [ ] the two words are the whole of what a `str` buffer does not need. Decide
       whether to say so in `DESIGN_PRINCIPLES.md` or leave it in the two file
       headers.
 

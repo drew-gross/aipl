@@ -73,11 +73,11 @@ allocations: 12738
 deallocations: 12738
 reallocations: 490
 bytes allocated: 12468490
-instructions executed: 8098351
-binary size: 244984
-  code: 170752
+instructions executed: 8094847
+binary size: 244328
+  code: 170384
   data: 1740
-  metadata: 72492
+  metadata: 72204
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -174,7 +174,7 @@ functions:
     bytes: 432
   __builtin_map_join$__m2__Cst$__builtin_Span$lam$__m2__token_leaves:
     calls: 16
-    bytes: 1672
+    bytes: 1572
   __builtin_reverse_find_map$__m2__Cst$__builtin_Span$lam$__m2__last_leaf:
     calls: 0
     bytes: 428
@@ -231,7 +231,7 @@ functions:
     bytes: 384
   __m14__climb$__m1__SexpKind$Sexp:
     calls: 0
-    bytes: 4348
+    bytes: 4324
   __m14__error_at$__m1__SexpKind$Sexp:
     calls: 0
     bytes: 3376
@@ -264,7 +264,7 @@ functions:
     bytes: 9444
   __m14__match_reps$__m1__SexpKind$Sexp:
     calls: 410
-    bytes: 5752
+    bytes: 5572
   __m14__match_rule$__m1__SexpKind$Sexp:
     calls: 5372
     bytes: 7908
@@ -273,7 +273,7 @@ functions:
     bytes: 1300
   __m14__match_then$__m1__SexpKind$Sexp:
     calls: 0
-    bytes: 3792
+    bytes: 3712
   __m14__parse$__m1__SexpKind$Sexp:
     calls: 6
     bytes: 284
@@ -282,7 +282,7 @@ functions:
     bytes: 496
   __m14__parse_prepared$__m1__SexpKind$Sexp:
     calls: 6
-    bytes: 8524
+    bytes: 8568
   __m14__refusal$__m1__SexpKind$Sexp:
     calls: 0
     bytes: 3692
@@ -315,7 +315,7 @@ functions:
     bytes: 2948
   __m2__token_leaves:
     calls: 39
-    bytes: 1736
+    bytes: 1708
   __m2__token_text:
     calls: 16
     bytes: 1580
@@ -376,9 +376,6 @@ functions:
   __to_str_u64:
     calls: 0
     bytes: 204
-  aipl_arr_extend:
-    calls: 876
-    bytes: (external)
   aipl_arr_inc:
     calls: 158387
     bytes: (external)

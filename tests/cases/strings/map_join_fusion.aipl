@@ -32,15 +32,15 @@ fn main() !prints {
 3: 0123456789abcdefghijklmnopqrstuvwxyz
 [1, 1, 0, 2, 2]
 --- performance ---
-allocations: 43
-deallocations: 43
+allocations: 40
+deallocations: 40
 reallocations: 3
-bytes allocated: 1810
-instructions executed: 5215
-binary size: 13496
-  code: 9480
+bytes allocated: 1674
+instructions executed: 5206
+binary size: 13296
+  code: 9336
   data: 299
-  metadata: 3717
+  metadata: 3661
 functions:
   __builtin_map_join$i64$char$s2$s3$s4$rs$lam$__builtin_to_str:
     calls: 5
@@ -51,20 +51,14 @@ functions:
   __to_str_i64$arr:
     calls: 1
     bytes: 908
-  aipl_arr_extend:
-    calls: 3
-    bytes: (external)
   aipl_arr_inc:
-    calls: 2
+    calls: 4
     bytes: (external)
   aipl_arr_reserve:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 16
-    bytes: (external)
-  aipl_array_new:
-    calls: 3
+    calls: 15
     bytes: (external)
   aipl_i64_len:
     calls: 40
@@ -77,4 +71,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 6896
+    bytes: 6752

@@ -381,6 +381,8 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_arr_window_block" => sig(4, true),
         "aipl_arr_from_set_words" => sig(2, true),
         "aipl_arr_push_small" => sig(3, true),
+        "aipl_arr_reversed" => sig(5, false),
+        "aipl_arrv_extend" => sig(5, true),
         "aipl_arr_settle" => sig(4, false),
         // The parts, `join`'s three separators, and the element type's three
         // descriptors; the joined array comes back in a register.

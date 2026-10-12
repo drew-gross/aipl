@@ -936,6 +936,84 @@ pub(crate) extern "C" fn aipl_arr_settle(
     unsafe { core::ptr::write(a, ArrValue::whole(own)) };
 }
 
+// # Entries that take values (stage 6a)
+//
+// The block-taking entries read an array's length out of its block, which is
+// why a window, a reversal or an inline value has to be lent a block of its own
+// before reaching one. These take the value and read `data` and the length off
+// it, whatever its shape — the step toward taking the length out of the block
+// (`arr24_todo.txt`, stage 6). Each replaces one block-taking entry, which stays
+// registered until the checked-in artifact no longer calls it.
+
+/// The elements of the array value `v`, in its order, as a run of `width`-byte
+/// elements starting at `first` and `step` bytes apart (negative for a reversed
+/// value), with their count. A whole value's are its block's.
+fn elements(v: &ArrValue, width: usize) -> (*const u8, isize, usize) {
+    if v.is_inline() {
+        return (
+            v as *const ArrValue as *const u8,
+            width as isize,
+            v.inline_len(),
+        );
+    }
+    if v.is_reversed() {
+        let n = v.run_len();
+        let last = if n == 0 {
+            v.data
+        } else {
+            unsafe { v.data.add((n - 1) * width) }
+        };
+        return (last, -(width as isize), n);
+    }
+    if v.is_window() {
+        return (v.data, width as isize, v.run_len());
+    }
+    let u = super::array_layout::arr_untag(v.block);
+    let first = unsafe { u.add(super::array_layout::ARR_ELEMS_OFFSET) };
+    (first, width as isize, tagged_len(v.block))
+}
+
+/// Append every element of the array value at `src` to the block `dst`, which
+/// `aipl_arr_reserve` has already made uniquely owned and large enough — a copy
+/// plus one retain pass, never a reallocation. *Borrows* `src` (the caller keeps
+/// its reference, and pins the block when `src` might be `dst`'s own); `dst`
+/// keeps its identity. A bit-packed `bool[]` source — never a window, a reversal
+/// or inline — goes through the bit-at-a-time block entry, as before.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrv_extend(
+    dst: *const u8,
+    src: *const ArrValue,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    let v = unsafe { *src };
+    if elem_size == super::array_layout::ELEM_BITPACKED {
+        super::aipl_arr_inc(v.block);
+        return super::aipl_arr_extend(dst, v.block, drop_fn, retain_fn, elem_size);
+    }
+    let w = elem_size as usize;
+    let (first, step, add) = elements(&v, w);
+    if add == 0 || dst.is_null() {
+        return dst;
+    }
+    unsafe {
+        let len_at = dst.add(super::array_layout::ARR_LEN_OFFSET) as *mut i64;
+        let dst_len = core::ptr::read(len_at) as usize;
+        let at = (dst as *mut u8).add(super::array_layout::ARR_ELEMS_OFFSET + dst_len * w);
+        if step > 0 {
+            core::ptr::copy_nonoverlapping(first, at, add * w);
+        } else {
+            for i in 0..add {
+                core::ptr::copy_nonoverlapping(first.offset(step * i as isize), at.add(i * w), w);
+            }
+        }
+        super::elem_rc(retain_fn, at, add);
+        core::ptr::write(len_at, (dst_len + add) as i64);
+    }
+    dst
+}
+
 /// What [`aipl_arr_push_small`] did — see its doc.
 pub(crate) const PUSH_SMALL_NOT_HANDLED: i64 = 0;
 pub(crate) const PUSH_SMALL_INLINE: i64 = 1;

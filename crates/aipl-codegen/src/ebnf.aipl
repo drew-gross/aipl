@@ -758,11 +758,11 @@ allocations: 1581
 deallocations: 1581
 reallocations: 332
 bytes allocated: 179677
-instructions executed: 270343
-binary size: 180304
-  code: 121856
+instructions executed: 270315
+binary size: 180144
+  code: 121772
   data: 4068
-  metadata: 54380
+  metadata: 54304
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -908,9 +908,6 @@ functions:
   aipl_arr_drop_arr:
     calls: 4
     bytes: (external)
-  aipl_arr_extend:
-    calls: 7
-    bytes: (external)
   aipl_arr_inc:
     calls: 3972
     bytes: (external)
@@ -991,7 +988,7 @@ functions:
     bytes: 1880
   ebnf$Tok$Node:
     calls: 6
-    bytes: 11976
+    bytes: 11892
   first_precs$Tok:
     calls: 19
     bytes: 276
