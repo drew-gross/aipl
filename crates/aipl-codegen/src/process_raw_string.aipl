@@ -54,11 +54,11 @@ pub fn process_raw_string(s: str) -> str {
 allocations: 15
 deallocations: 15
 reallocations: 0
-bytes allocated: 682
+bytes allocated: 666
 instructions executed: 17705
-binary size: 9504
+binary size: 9480
   code: 5664
-  data: 657
+  data: 633
   metadata: 3183
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
@@ -84,9 +84,6 @@ functions:
     bytes: (external)
   aipl_array_new:
     calls: 7
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 2
     bytes: (external)
   aipl_array_with_cap:
     calls: 1

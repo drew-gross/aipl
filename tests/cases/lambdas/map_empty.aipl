@@ -18,11 +18,11 @@ fn empty_ints() -> i64[] { [] }.test({
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 40
+bytes allocated: 24
 instructions executed: 774
-binary size: 5672
+binary size: 5648
   code: 3184
-  data: 289
+  data: 265
   metadata: 2199
 functions:
   __eq_i64$arr:
@@ -43,11 +43,8 @@ functions:
   aipl_arr_inc:
     calls: 2
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 6
+    calls: 5
     bytes: (external)
   aipl_assert:
     calls: 4

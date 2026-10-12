@@ -70,11 +70,11 @@ true
 allocations: 35
 deallocations: 35
 reallocations: 0
-bytes allocated: 1731
+bytes allocated: 1555
 instructions executed: 4099
-binary size: 18064
+binary size: 18040
   code: 11084
-  data: 579
+  data: 555
   metadata: 6401
 functions:
   __eq_setdesc$i64:
@@ -116,23 +116,11 @@ functions:
   aipl_array_dec:
     calls: 24
     bytes: (external)
-  aipl_array_push_mut:
-    calls: 32
-    bytes: (external)
   aipl_array_with_cap:
     calls: 12
     bytes: (external)
   aipl_i64_len:
     calls: 40
-    bytes: (external)
-  aipl_set_contains:
-    calls: 5
-    bytes: (external)
-  aipl_set_insert:
-    calls: 35
-    bytes: (external)
-  aipl_set_union:
-    calls: 3
     bytes: (external)
   aipl_u64_len:
     calls: 8

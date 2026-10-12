@@ -41,9 +41,9 @@ deallocations: 4
 reallocations: 0
 bytes allocated: 210
 instructions executed: 1297
-binary size: 8328
+binary size: 8256
   code: 4484
-  data: 714
+  data: 642
   metadata: 3130
 functions:
   __test$joined:

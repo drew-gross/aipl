@@ -20,9 +20,9 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 301
-binary size: 2704
+binary size: 2680
   code: 1272
-  data: 333
+  data: 309
   metadata: 1099
 functions:
   __test$at:

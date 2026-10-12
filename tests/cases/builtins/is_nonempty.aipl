@@ -53,11 +53,11 @@ fn dicts(d: #{str: i64}) -> bool { d.is_nonempty() }.test({
 allocations: 5
 deallocations: 5
 reallocations: 0
-bytes allocated: 304
+bytes allocated: 288
 instructions executed: 786
-binary size: 8168
+binary size: 8072
   code: 3572
-  data: 1200
+  data: 1104
   metadata: 3396
 functions:
   __dict_drop_str$i64:
@@ -93,23 +93,11 @@ functions:
   aipl_array_new:
     calls: 3
     bytes: (external)
-  aipl_array_push_mut:
-    calls: 3
-    bytes: (external)
   aipl_array_with_cap:
     calls: 2
     bytes: (external)
   aipl_assert:
     calls: 17
-    bytes: (external)
-  aipl_dict_insert:
-    calls: 1
-    bytes: (external)
-  aipl_set_contains:
-    calls: 2
-    bytes: (external)
-  aipl_set_insert:
-    calls: 2
     bytes: (external)
   aipl_test_begin:
     calls: 6

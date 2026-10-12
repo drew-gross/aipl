@@ -16,11 +16,11 @@ fn extend(mut self: i64[], a: i64, b: i64) {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 104
+bytes allocated: 72
 instructions executed: 403
-binary size: 2512
+binary size: 2464
   code: 1068
-  data: 211
+  data: 163
   metadata: 1233
 functions:
   __eq_i64$arr:
@@ -33,10 +33,7 @@ functions:
     calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 5
-    bytes: (external)
-  aipl_array_push:
-    calls: 2
+    calls: 3
     bytes: (external)
   aipl_assert:
     calls: 2

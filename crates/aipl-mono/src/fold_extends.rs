@@ -2,7 +2,7 @@
 //! sequence it was going to copy from is never built.
 //!
 //! `extend` is already the efficient way to append a whole sequence —
-//! `aipl_arr_reserve` sizes the destination once and the elements move as a
+//! `array_ops::reserve` sizes the destination once and the elements move as a
 //! single `memcpy`. What it cannot avoid is its *source*: `set v.extend([a, b])`
 //! allocates a two-element array, fills it, copies it into `v`, and frees it.
 //! The elements were always going to end up in `v`, so the array between them

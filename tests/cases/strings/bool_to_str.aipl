@@ -28,11 +28,11 @@ flags: [false, true]
 allocations: 9
 deallocations: 9
 reallocations: 0
-bytes allocated: 293
+bytes allocated: 277
 instructions executed: 1186
-binary size: 4288
+binary size: 4192
   code: 1864
-  data: 340
+  data: 244
   metadata: 2084
 functions:
   __to_str_bool:
@@ -48,12 +48,6 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 2
-    bytes: (external)
-  aipl_array_push:
-    calls: 1
-    bytes: (external)
-  aipl_array_push_mut:
     calls: 1
     bytes: (external)
   aipl_write_bytes:

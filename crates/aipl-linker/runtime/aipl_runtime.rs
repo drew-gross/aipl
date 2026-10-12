@@ -915,12 +915,13 @@ pub extern "C" fn aipl_arrv_list_files(out: *mut arr24::ArrValue, dir: *const st
     count_builtin!(builtin_calls::AIPL_LIST_FILES);
     #[cfg(unix)]
     unsafe {
-        let block = list_unix::list_files_wide(*dir);
-        if block.is_null() {
-            return 0;
+        match list_unix::list_files_wide(*dir) {
+            Some(listing) => {
+                core::ptr::write(out, listing);
+                1
+            }
+            None => 0,
         }
-        core::ptr::write(out, arr24::ArrValue::whole(block));
-        1
     }
     #[cfg(not(unix))]
     {
@@ -944,9 +945,7 @@ unsafe fn list_files_impl(_dir: *const u8) -> *const u8 {
 /// than the portable-libc style the rest of the runtime uses.
 #[cfg(unix)]
 mod list_unix {
-    use super::{
-        aipl_array_dec, aipl_array_push_mut, aipl_array_with_cap, memcpy, str24, strlen,
-    };
+    use super::{aipl_array_dec, aipl_array_with_cap, memcpy, str24, strlen};
     use core::ffi::{c_char, c_int, c_void};
 
     // On x86_64 macOS the plain `opendir`/`readdir` symbols are the legacy
@@ -996,6 +995,8 @@ mod list_unix {
     struct Walk {
         path: [u8; PATH_CAP],
         out: *const u8,
+        /// How many elements `out` holds.
+        len: usize,
         /// Byte width of one element — 8 for a tagged `str` pointer,
         /// `str24::STR_SIZE` for a wide value stored inline. The walk itself is
         /// identical; only how a name becomes an element differs.
@@ -1005,20 +1006,25 @@ mod list_unix {
 
     /// [`list_files`] for a wide `str` directory argument, producing 24-byte
     /// elements and the matching element drop-fn.
-    pub unsafe fn list_files_wide(dir: str24::Str) -> *const u8 {
+    pub unsafe fn list_files_wide(dir: str24::Str) -> Option<super::arr24::ArrValue> {
         let mut scratch = [0u8; str24::INLINE_CAP];
         let bytes = dir.bytes(&mut scratch);
         let drop_fn = str24::aipl_arr_drop_str as *const () as usize as i64;
         unsafe { walk_from(bytes, drop_fn, str24::STR_SIZE as i64) }
     }
 
-    unsafe fn walk_from(bytes: &[u8], drop_fn: i64, elem_size: i64) -> *const u8 {
+    unsafe fn walk_from(
+        bytes: &[u8],
+        drop_fn: i64,
+        elem_size: i64,
+    ) -> Option<super::arr24::ArrValue> {
         if bytes.is_empty() || bytes.len() >= PATH_CAP {
-            return core::ptr::null();
+            return None;
         }
         let mut w = Walk {
             path: [0u8; PATH_CAP],
             out: aipl_array_with_cap(0, drop_fn, elem_size),
+            len: 0,
             elem_size,
         };
         unsafe {
@@ -1029,10 +1035,10 @@ mod list_unix {
             );
             if !walk(&mut w, bytes.len(), drop_fn) {
                 aipl_array_dec(w.out);
-                return core::ptr::null();
+                return None;
             }
         }
-        w.out
+        Some(super::arr24::ArrValue::whole_of(w.out, w.len))
     }
 
     /// Descend into the directory named by the first `len` bytes of `w.path`,
@@ -1099,16 +1105,18 @@ mod list_unix {
         }
         // retain-fn 0 either way: the fresh string's one reference moves into
         // the array.
-        w.out = unsafe {
+        w.out = {
             let v = str24::from_bytes(bytes);
-            aipl_array_push_mut(
+            super::array_ops::push_mut(
                 w.out,
+                w.len,
                 &v as *const str24::Str as *const u8,
                 drop_fn,
                 0,
                 w.elem_size,
             )
         };
+        w.len += 1;
         true
     }
 
@@ -1306,8 +1314,8 @@ pub extern "C" fn aipl_execute_program(
 #[cfg(unix)]
 mod exec_unix {
     use super::{
-        array_len, fail_msg, fclose, fmt_i64, fopen, fread, fseek,
-        ftell, rt_alloc, rt_free, ARR_ELEMS_OFFSET, SEEK_END,
+        fail_msg, fclose, fmt_i64, fopen, fread, fseek,
+        ftell, rt_alloc, rt_free, SEEK_END,
         SEEK_SET,
         str24,
         write_ok_wide,
@@ -1743,133 +1751,7 @@ fn sort_words(words: &mut [i64], kind: i64) {
     }
 }
 
-/// `xs.sort() -> T[]` — a fresh array with the same elements in ascending order.
-/// Consumes `a` (callers pre-inc) and co-owns the elements it copies. Unlike a
-/// reversal (`arr24::aipl_arr_reversed`) this cannot be a value: the order is
-/// not a function of the index. Mirrors the JIT runtime's `aipl_arr_sort`.
-#[no_mangle]
-pub extern "C" fn aipl_arr_sort(
-    a: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-    kind: i64,
-) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_ARR_SORT);
-    let a = aipl_arr_ensure_heap(a);
-    if a.is_null() {
-        return a;
-    }
-    unsafe {
-        let len = array_len(a);
-        let raw = array_alloc(len, len, drop_fn, elem_size) as *const u8;
-        if len > 0 {
-            let es = elem_stride(elem_size);
-            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-            let src = a.add(ARR_ELEMS_OFFSET);
-            memcpy(dst as *mut c_void, src as *const c_void, len * es);
-            // The new array co-owns every element. Done before the sort because
-            // reordering words neither creates nor destroys a reference.
-            elem_rc(retain_fn, dst, len);
-            if kind == SORT_KIND_STR && elem_size == str24::STR_SIZE as i64 {
-                let vals = core::slice::from_raw_parts_mut(dst as *mut str24::Str, len);
-                str24::sort_values(vals);
-            } else if elem_stride(elem_size) < 8 {
-                // A narrow integer element is packed at its own width.
-                let unsigned = kind == SORT_KIND_UNSIGNED;
-                sort_narrow(dst, len, elem_stride(elem_size), unsigned);
-            } else {
-                let words = core::slice::from_raw_parts_mut(dst as *mut i64, len);
-                sort_words(words, kind);
-            }
-        }
-        aipl_array_dec(a);
-        raw
-    }
-}
 
-
-/// `xs[start..end]` — array slice. Both bounds are clamped to `[0, len]` (an
-/// out-of-range end yields a shorter array; `start >= end` yields `[]`).
-/// *Borrows* `xs` (does not drop it) and returns an array the caller owns: the
-/// window's elements copied into a fresh heap block, an empty window as the
-/// empty array, and the whole array as itself, retained. Mirrors the JIT
-/// runtime's `aipl_arr_slice`, which says what still reaches it now that a
-/// slice that shares is a window carried in the value.
-#[no_mangle]
-pub extern "C" fn aipl_arr_slice(
-    a: *const u8,
-    start: i64,
-    end: i64,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_ARR_SLICE);
-    if a.is_null() {
-        return a;
-    }
-    unsafe {
-        let len = array_len(a) as i64;
-        let lo = start.clamp(0, len) as usize;
-        let hi = end.clamp(0, len) as usize;
-        let n = hi.saturating_sub(lo);
-        if n == 0 {
-            return arr_inline_empty();
-        }
-        if lo == 0 && n == len as usize {
-            aipl_arr_inc(a);
-            return a;
-        }
-        do_arr_slice_copy(a, lo, n, drop_fn, retain_fn, elem_size)
-    }
-}
-
-
-/// `join(parts: str[], sep: str) -> str` — concatenate the parts with `sep`
-/// between consecutive elements (`[]` -> `""`, `[x]` -> `x`). Two passes: measure
-/// the total length, then fill a single fresh buffer (inline when <= 7 bytes).
-/// Consumes both args (the array drop releases its element strings). Mirrors the
-/// JIT runtime.
-/// `split` under the wide ABI — the array half only. Where the cuts fall is
-/// `str24::for_each_split`, shared with the JIT runtime; only these few lines
-/// (which allocate an array and address its elements) are per-runtime, because
-/// the array runtime is. Two passes over the shared splitter: count, allocate,
-/// fill. Each part is a window into `s`, retained because the array owns it.
-#[no_mangle]
-pub extern "C" fn aipl_str_split(s: *const str24::Str, sep: *const str24::Str) -> *const u8 {
-    let (sv, sepv) = unsafe { (*s, *sep) };
-    let mut count = 0usize;
-    str24::for_each_split(sv, sepv, &mut |_| count += 1);
-    let drop_fn = str24::aipl_arr_drop_str as *const () as usize as i64;
-    let arr = aipl_array_new(count as i64, drop_fn, str24::STR_SIZE as i64);
-    let elems = unsafe { arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str };
-    let mut k = 0usize;
-    str24::for_each_split(sv, sepv, &mut |part| {
-        part.retain();
-        unsafe { core::ptr::write(elems.add(k), part) };
-        k += 1;
-    });
-    arr
-}
-
-/// `join` under the wide ABI — the array half only; the streaming is
-/// `str24::join_from`. Borrows the array and all three separators (see
-/// `str24::gap_sep` for which one lands in which gap).
-#[no_mangle]
-pub extern "C" fn aipl_str_join(
-    out: *mut str24::Str,
-    arr: *const u8,
-    sep: *const str24::Str,
-    final_sep: *const str24::Str,
-    only_sep: *const str24::Str,
-) {
-    with_heap(arr, |arr| unsafe {
-        let len = array_len(arr);
-        let elems = arr.add(ARR_ELEMS_OFFSET) as *const str24::Str;
-        *out = str24::join_from(elems, len, *sep, *final_sep, *only_sep);
-    })
-}
 
 
 
@@ -1903,136 +1785,9 @@ const ITER_SCRATCH: usize = 48;
 
 type ArrDropFn = extern "C" fn(*const u8, i64);
 
-/// A fresh heap array holding copies of `a`'s elements in `[start, start + n)`
-/// (any repr), each retained via `retain_fn`. Does NOT drop `a`. Mirrors the
-/// JIT runtime's `do_arr_slice_copy`.
-unsafe fn do_arr_slice_copy(
-    a: *const u8,
-    start: usize,
-    n: usize,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    unsafe {
-        if elem_size == ELEM_BITPACKED {
-            let raw = array_alloc(n, n, drop_fn, ELEM_BITPACKED) as *const u8;
-            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-            for i in 0..n {
-                write_packed_bit(dst, i, arr_load_bit_rt(a, start + i));
-            }
-            return raw;
-        }
-        let es = elem_stride(elem_size);
-        let raw = array_alloc(n, n, drop_fn, elem_size) as *const u8;
-        let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-        for i in 0..n {
-            let src = arr_elem_ptr_rt(a, start + i, es);
-            memcpy(dst_base.add(i * es) as *mut c_void, src as *const c_void, es);
-        }
-        elem_rc(retain_fn, dst_base, n);
-        raw
-    }
-}
-
-/// A new heap array whose elements are those of the block `a` in reverse
-/// order, each retained. Does NOT drop `a`. Mirrors the JIT runtime's
-/// `do_arr_reverse` — reversing a bit-packed `bool[]`, reached through
-/// [`arr_reverse_copy`].
-unsafe fn do_arr_reverse(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: i64) -> *const u8 {
-    unsafe {
-        let inner = a;
-        let len = array_len(a);
-        if elem_size == ELEM_BITPACKED {
-            let raw = array_alloc(len, len, drop_fn, ELEM_BITPACKED) as *const u8;
-            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-            for i in 0..len {
-                let j = len - 1 - i;
-                write_packed_bit(dst, i, arr_load_bit_rt(inner, j));
-            }
-            raw
-        } else {
-            let es = elem_stride(elem_size);
-            let raw = array_alloc(len, len, drop_fn, elem_size) as *const u8;
-            let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-            for i in 0..len {
-                let j = len - 1 - i;
-                let src = arr_elem_ptr_rt(inner, j, es);
-                memcpy(dst_base.add(i * es) as *mut c_void, src as *const c_void, es);
-            }
-            elem_rc(retain_fn, dst_base, len);
-            raw
-        }
-    }
-}
-
-/// [`do_arr_reverse`] under the name both runtimes give it, for the shared
-/// `arr24::aipl_arr_reversed`.
-fn arr_reverse_copy(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: i64) -> *const u8 {
-    unsafe { do_arr_reverse(a, drop_fn, retain_fn, elem_size) }
-}
-
-/// A *borrowed* array as a heap block for the duration of `f`: a heap array
-/// is handed over as is, and the shared empty array as the empty block.
-/// Mirrors the JIT runtime's `with_heap`.
-fn with_heap<R>(a: *const u8, f: impl FnOnce(*const u8) -> R) -> R {
-    match arr_repr(a) {
-        ArrRepr::Heap => f(a),
-        // No block of its own, and nothing to materialize: the permanently-empty
-        // block reads as the same array.
-        ArrRepr::Inline => f(arr_empty_block()),
-    }
-}
-
-/// The block an array pointer names, as a heap block: itself, or the shared
-/// empty block for the inline empty array. Consumes `a`'s reference.
-fn aipl_arr_ensure_heap(a: *const u8) -> *const u8 {
-    if a.is_null() {
-        return a;
-    }
-    match arr_repr(a) {
-        ArrRepr::Heap => a,
-        // Already as materialized as an empty array gets; the static block carries
-        // no reference for the caller to release.
-        ArrRepr::Inline => arr_empty_block(),
-    }
-}
-
-unsafe fn heap_elem_ptr_rt(base: *const u8, idx: usize, elem_size: usize) -> *const u8 {
-    unsafe { base.add(ARR_ELEMS_OFFSET).add(idx * elem_size) }
-}
-
-unsafe fn arr_elem_ptr_rt(a: *const u8, idx: usize, elem_size: usize) -> *const u8 {
-    match arr_repr(a) {
-        ArrRepr::Heap => unsafe { heap_elem_ptr_rt(arr_untag(a), idx, elem_size) },
-        // An inline array holds no elements, so the bounds check upstream has
-        // already answered.
-        ArrRepr::Inline => unreachable!("element {idx} of an empty array"),
-    }
-}
-
-unsafe fn arr_load_bit_rt(a: *const u8, idx: usize) -> bool {
-    match arr_repr(a) {
-        ArrRepr::Heap => {
-            let base = unsafe { arr_untag(a).add(ARR_ELEMS_OFFSET) };
-            unsafe { (*base.add(idx >> 3) >> (idx & 7)) & 1 != 0 }
-        }
-        // No elements, so no bits; the bounds check upstream has answered.
-        ArrRepr::Inline => unreachable!("bit {idx} of an empty array"),
-    }
-}
-
 // Element size is known at compile time, so codegen passes it to these fns as a
 // constant rather than storing it in the header. The header keeps the element-
 // region capacity in *bytes* so `aipl_array_dec` can free without it.
-
-unsafe fn array_len(ptr: *const u8) -> usize {
-    unsafe { *(arr_untag(ptr) as *const i64) as usize }
-}
-
-unsafe fn array_cap_bytes(ptr: *const u8) -> usize {
-    unsafe { *(arr_untag(ptr).add(ARR_CAP_OFFSET) as *const i64) as usize }
-}
 
 /// Retain/drop `count` elements at `at` via a helper-fn pointer, if non-null.
 unsafe fn elem_rc(fn_ptr: i64, at: *const u8, count: usize) {
@@ -2042,111 +1797,77 @@ unsafe fn elem_rc(fn_ptr: i64, at: *const u8, count: usize) {
     }
 }
 
-unsafe fn write_packed_bit(data: *mut u8, idx: usize, val: bool) {
-    unsafe {
-        let byte = data.add(idx >> 3);
-        let mask = 1u8 << (idx & 7);
-        if val {
-            *byte |= mask;
-        } else {
-            *byte &= !mask;
-        }
-    }
+// The operations over a block (push, reserve, the set and dict operations, the
+// release at refcount zero) are `array_ops`, shared verbatim with the JIT runtime.
+// What it asks of its host is the allocator below, with this runtime's accounting
+// (`rt_alloc`/`rt_realloc`/`rt_free`, which ignore the size a JIT allocator needs).
+#[allow(dead_code)]
+mod array_ops {
+    include!("../../aipl-codegen/src/array_ops.rs");
 }
 
-/// Allocate an array block holding `cap` slots of `elem_size` bytes (or
-/// bit-packed bools when `elem_size == 0`), with `len` and `drop_fn` set and the
-/// byte-capacity recorded (refcount 1).
-unsafe fn array_alloc(len: usize, cap: usize, drop_fn: i64, elem_size: i64) -> *mut u8 {
-    unsafe {
-        let cap_bytes = cap_bytes_for(elem_size, cap);
-        let raw = rt_alloc(HEADER_SIZE + ARR_ELEMS_OFFSET + cap_bytes) as *mut u8;
-        if raw.is_null() {
-            abort();
-        }
-        *(raw as *mut i64) = 1; // refcount
-        *(raw.add(HEADER_SIZE) as *mut i64) = len as i64;
-        *(raw.add(HEADER_SIZE + ARR_CAP_OFFSET) as *mut i64) = cap_bytes as i64;
-        *(raw.add(HEADER_SIZE + ARR_DROPFN_OFFSET) as *mut i64) = drop_fn;
-        raw.add(HEADER_SIZE)
+/// A new allocation of `size` bytes for a block (`array_ops`).
+unsafe fn raw_alloc(size: usize) -> *mut u8 {
+    let raw = unsafe { rt_alloc(size) } as *mut u8;
+    if raw.is_null() {
+        abort();
     }
+    raw
 }
 
+/// `ptr`, an allocation from [`raw_alloc`], resized to `new_size`.
+unsafe fn raw_realloc(ptr: *mut u8, _old_size: usize, new_size: usize) -> *mut u8 {
+    let raw = unsafe { rt_realloc(ptr as *mut c_void, new_size) } as *mut u8;
+    if raw.is_null() {
+        abort();
+    }
+    raw
+}
+
+/// Free an allocation from [`raw_alloc`].
+unsafe fn raw_free(ptr: *mut u8, _size: usize) {
+    unsafe { rt_free(ptr as *mut c_void) };
+}
+
+/// Allocate an array of `len` uninitialized elements, refcount 1, cap == len. A
+/// fresh literal is allocated to exactly its length, even at zero.
 #[no_mangle]
 pub extern "C" fn aipl_array_new(len: i64, drop_fn: i64, elem_size: i64) -> *const u8 {
     count_builtin!(builtin_calls::AIPL_ARRAY_NEW);
     let len = if len < 0 { 0 } else { len as usize };
-    // A fresh literal is allocated to exactly its length (cap == len).
-    unsafe { array_alloc(len, len, drop_fn, elem_size) }
+    array_ops::alloc_block(len, len, drop_fn, elem_size)
 }
 
-/// Allocate an empty array (len 0, refcount 1) reserved to `cap` slots of
-/// `elem_size` bytes with the given element `drop_fn`. Used by `map`/`filter` to
-/// pre-size their output.
+/// Allocate an empty array (refcount 1) reserved to `cap` slots of `elem_size`
+/// bytes with the given element `drop_fn`. Used by `map`/`filter` to pre-size
+/// their output.
 #[no_mangle]
 pub extern "C" fn aipl_array_with_cap(cap: i64, drop_fn: i64, elem_size: i64) -> *const u8 {
     count_builtin!(builtin_calls::AIPL_ARRAY_WITH_CAP);
     let cap = if cap < 0 { 0 } else { cap as usize };
-    unsafe { array_alloc(0, cap, drop_fn, elem_size) }
+    array_ops::alloc_block(0, cap, drop_fn, elem_size)
 }
 
 #[no_mangle]
 pub extern "C" fn aipl_array_dec(ptr: *const u8) {
-    // An inline array owns no allocation, so there is no refcount to touch — the
-    // same no-op `release` is for an inline `str`. Before the header read below,
-    // which would dereference the value as a pointer.
-    if !ptr.is_null() && matches!(arr_repr(ptr), ArrRepr::Inline) {
+    // The empty array owns no allocation, so there is no refcount to touch — the
+    // same no-op `release` is for an inline `str`. Before anything is counted.
+    if !ptr.is_null() && arr_repr(ptr) == ArrRepr::Empty {
         return;
     }
     count_builtin!(builtin_calls::AIPL_ARRAY_DEC);
-    if ptr.is_null() {
-        return;
-    }
-    let u = arr_untag(ptr);
-    unsafe {
-        let h = header_of(u);
-        if *h == STATIC_REFCOUNT {
-            return;
-        }
-        *h -= 1;
-        if *h == 0 {
-            match arr_repr(ptr) {
-                // Unreachable: an inline value owns no allocation, so the header
-                // read above had nothing to count down. The early return at the
-                // top of this function is what keeps it out.
-                ArrRepr::Inline => unreachable!("freeing an inline array"),
-                ArrRepr::Heap => {
-                    let len = array_len(u);
-                    let drop_fn = *(u.add(ARR_DROPFN_OFFSET) as *const i64);
-                    if drop_fn != 0 {
-                        let f: ArrDropFn = core::mem::transmute(drop_fn);
-                        f(u.add(ARR_ELEMS_OFFSET), len as i64);
-                    }
-                    rt_free(h as *mut c_void);
-                }
-            }
-        }
-    }
+    array_ops::release(ptr);
 }
 
 /// Retain an array value (any representation). Uses `arr_untag` to strip the
 /// representation tag before touching the refcount.
 #[no_mangle]
 pub extern "C" fn aipl_arr_inc(ptr: *const u8) {
-    if !ptr.is_null() && matches!(arr_repr(ptr), ArrRepr::Inline) {
+    if !ptr.is_null() && arr_repr(ptr) == ArrRepr::Empty {
         return;
     }
     count_builtin!(builtin_calls::AIPL_ARR_INC);
-    if ptr.is_null() {
-        return;
-    }
-    let u = arr_untag(ptr);
-    unsafe {
-        let h = header_of(u);
-        if *h != STATIC_REFCOUNT {
-            *h += 1;
-        }
-    }
+    array_ops::retain(ptr);
 }
 
 // ---------- Recursive (boxed) type runtime ----------
@@ -2276,185 +1997,6 @@ fn rec_release(b: *mut i64) {
     }
 }
 
-/// Copy-and-grow push (value semantics): returns a fresh array holding `a`'s
-/// elements followed by the `elem_size`-byte element at `x`, then drops `a`.
-/// Repr-aware element pointer for use from AOT-compiled code.
-/// Returns a pointer to element `idx`, handling reversed views via recursion.
-/// `elem_size` must be > 0 (not bit-packed — use `aipl_arr_load_bit` for bools).
-#[no_mangle]
-pub extern "C" fn aipl_arr_elem_ptr(a: *const u8, idx: i64, elem_size: i64) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_ARR_ELEM_PTR);
-    unsafe { arr_elem_ptr_rt(a, idx as usize, elem_size as usize) }
-}
-
-/// Repr-aware bit load for AOT-compiled code. Returns 0 or 1 as i64.
-#[no_mangle]
-pub extern "C" fn aipl_arr_load_bit(a: *const u8, idx: i64) -> i64 {
-    count_builtin!(builtin_calls::AIPL_ARR_LOAD_BIT);
-    i64::from(unsafe { arr_load_bit_rt(a, idx as usize) })
-}
-
-/// `retain_fn` retains the copied elements (the new array co-owns them).
-#[no_mangle]
-pub extern "C" fn aipl_array_push(
-    a: *const u8,
-    x: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_ARRAY_PUSH);
-    let a = aipl_arr_ensure_heap(a);
-    unsafe {
-        let old_len = if a.is_null() { 0 } else { array_len(a) };
-        if elem_size == ELEM_BITPACKED {
-            // Bit-packed `bool[]`: copy the old bits, set the new one, drop `a`.
-            let raw = array_alloc(old_len + 1, old_len + 1, drop_fn, ELEM_BITPACKED);
-            let dst = raw.add(ARR_ELEMS_OFFSET);
-            if old_len > 0 && !a.is_null() {
-                memcpy(
-                    dst as *mut c_void,
-                    a.add(ARR_ELEMS_OFFSET) as *const c_void,
-                    cap_bytes_for(ELEM_BITPACKED, old_len),
-                );
-            }
-            write_packed_bit(dst, old_len, *(x as *const i64) != 0);
-            aipl_array_dec(a);
-            return raw;
-        }
-        let elem_size = elem_stride(elem_size);
-        let raw = array_alloc(old_len + 1, old_len + 1, drop_fn, elem_size as i64);
-        let dst = raw.add(ARR_ELEMS_OFFSET);
-        if old_len > 0 && !a.is_null() {
-            let src = a.add(ARR_ELEMS_OFFSET);
-            memcpy(
-                dst as *mut c_void,
-                src as *const c_void,
-                old_len * elem_size,
-            );
-            elem_rc(retain_fn, dst, old_len);
-        }
-        let slot = dst.add(old_len * elem_size);
-        memcpy(slot as *mut c_void, x as *const c_void, elem_size);
-        elem_rc(retain_fn, slot, 1);
-        aipl_array_dec(a);
-        raw
-    }
-}
-
-/// In-place push for a *uniquely owned* array (codegen calls this only when its
-/// static analysis proves the array isn't aliased). Appends without copying when
-/// there's spare capacity; otherwise grows to a doubled byte-capacity by
-/// `realloc`. Returns the (possibly relocated) data pointer.
-#[no_mangle]
-pub extern "C" fn aipl_array_push_mut(
-    a: *const u8,
-    x: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_ARRAY_PUSH_MUT);
-    let a = aipl_arr_ensure_heap(a);
-    // A `STATIC_REFCOUNT` block is not ours to grow or write into, however
-    // unaliased codegen proved the binding to be: it has no owner to answer to
-    // and may live in read-only data. Copy instead, exactly as `aipl_concat_mut`
-    // does for a static string literal. Mirrors the JIT runtime's guard, which
-    // is what keeps a host-lent FFI argument array off this path. The refcount
-    // is deliberately not consulted here — see the JIT runtime's note: a
-    // uniquely-owned block reads more than one inside a function, and the
-    // boundary where a higher count means sharing is the owned-parameter
-    // move-in, guarded there by `aipl_arr_reserve`.
-    if !a.is_null() && unsafe { *header_of(a) } == STATIC_REFCOUNT {
-        return aipl_array_push(a, x, drop_fn, retain_fn, elem_size);
-    }
-    unsafe {
-        let old_len = if a.is_null() { 0 } else { array_len(a) };
-        let cap_bytes = if a.is_null() { 0 } else { array_cap_bytes(a) };
-        if elem_size == ELEM_BITPACKED {
-            // Bit-packed `bool[]`, in place: set bit `old_len`, growing the byte
-            // capacity (doubling) only when the next bit needs a new byte.
-            let val = *(x as *const i64) != 0;
-            if !a.is_null() && cap_bytes_for(ELEM_BITPACKED, old_len + 1) <= cap_bytes {
-                write_packed_bit(a.add(ARR_ELEMS_OFFSET) as *mut u8, old_len, val);
-                *(a as *mut i64) = (old_len + 1) as i64;
-                *(a.add(ARR_DROPFN_OFFSET) as *mut i64) = drop_fn;
-                return a;
-            }
-            let mut new_cap_bytes = cap_bytes_for(ELEM_BITPACKED, old_len + 1);
-            if cap_bytes * 2 > new_cap_bytes {
-                new_cap_bytes = cap_bytes * 2;
-            }
-            if new_cap_bytes == 0 {
-                new_cap_bytes = 1;
-            }
-            let data = if a.is_null() {
-                array_alloc(old_len + 1, new_cap_bytes * 8, drop_fn, ELEM_BITPACKED)
-            } else {
-                let block = a.sub(HEADER_SIZE) as *mut c_void;
-                let raw =
-                    rt_realloc(block, HEADER_SIZE + ARR_ELEMS_OFFSET + new_cap_bytes) as *mut u8;
-                if raw.is_null() {
-                    abort();
-                }
-                let data = raw.add(HEADER_SIZE);
-                *(data.add(ARR_CAP_OFFSET) as *mut i64) = new_cap_bytes as i64;
-                *(data.add(ARR_DROPFN_OFFSET) as *mut i64) = drop_fn;
-                *(data as *mut i64) = (old_len + 1) as i64;
-                data
-            };
-            write_packed_bit(data.add(ARR_ELEMS_OFFSET) as *mut u8, old_len, val);
-            return data;
-        }
-        let elem_size = elem_stride(elem_size);
-        if !a.is_null() && (old_len + 1) * elem_size <= cap_bytes {
-            // Spare capacity: append in place, no allocation.
-            let elems = a.add(ARR_ELEMS_OFFSET);
-            let slot = elems.add(old_len * elem_size);
-            memcpy(slot as *mut c_void, x as *const c_void, elem_size);
-            elem_rc(retain_fn, slot, 1);
-            *(a as *mut i64) = (old_len + 1) as i64; // len += 1
-                                                     // Keep the stored drop-fn in sync: an array reserved via
-                                                     // `aipl_array_with_cap` (or an empty `[]`) starts with none (0) and
-                                                     // first learns its element type here when it has spare capacity and
-                                                     // never hits the realloc path that would otherwise set it.
-            *(a.add(ARR_DROPFN_OFFSET) as *mut i64) = drop_fn;
-            return a;
-        }
-        // At capacity: grow to a doubled byte-capacity. `realloc` preserves the
-        // header and existing elements (refcounts unchanged), so no element is
-        // re-retained and there's no old block to free — only the new one.
-        let new_cap_bytes = core::cmp::max((old_len + 1) * elem_size, cap_bytes * 2);
-        let data = if a.is_null() {
-            // No block to grow (defensive; exclusive arrays start non-null).
-            array_alloc(
-                old_len + 1,
-                new_cap_bytes / elem_size,
-                drop_fn,
-                elem_size as i64,
-            )
-        } else {
-            let block = a.sub(HEADER_SIZE) as *mut c_void;
-            let raw = rt_realloc(block, HEADER_SIZE + ARR_ELEMS_OFFSET + new_cap_bytes) as *mut u8;
-            if raw.is_null() {
-                abort();
-            }
-            let data = raw.add(HEADER_SIZE);
-            *(data.add(ARR_CAP_OFFSET) as *mut i64) = new_cap_bytes as i64;
-            // Refresh drop_fn: an empty `[]` is created with none (0) and only
-            // learns its element type on the first push.
-            *(data.add(ARR_DROPFN_OFFSET) as *mut i64) = drop_fn;
-            *(data as *mut i64) = (old_len + 1) as i64; // len
-            data
-        };
-        let elems = data.add(ARR_ELEMS_OFFSET);
-        let slot = elems.add(old_len * elem_size);
-        memcpy(slot as *mut c_void, x as *const c_void, elem_size);
-        elem_rc(retain_fn, slot, 1);
-        data
-    }
-}
-
 // ---------- Set runtime ----------
 //
 // A set reuses the array heap block verbatim; only construction differs
@@ -2471,709 +2013,10 @@ pub extern "C" fn aipl_array_push_mut(
 
 
 
-/// Whether `a` already contains the element at `x` (1/0). `str_cmp != 0` compares
-/// `str` elements by content; otherwise by value (bit-packed for a `bool` set).
-/// A null/empty set is never a member.
-#[no_mangle]
-pub extern "C" fn aipl_set_contains(
-    a: *const u8,
-    x: *const u8,
-    elem_size: i64,
-    str_cmp: i64,
-) -> i64 {
-    count_builtin!(builtin_calls::AIPL_SET_CONTAINS);
-    if a.is_null() {
-        return 0;
-    }
-    unsafe {
-        let len = array_len(a);
-        if str_cmp == str24::STR_SIZE as i64 {
-            // Wide `str` elements: the element *is* the 24-byte value, so there
-            // is no pointer to load — compare the values in place.
-            let target = *(x as *const str24::Str);
-            for i in 0..len {
-                let ep = arr_elem_ptr_rt(a, i, str24::STR_SIZE);
-                if str24::eq(*(ep as *const str24::Str), target) {
-                    return 1;
-                }
-            }
-            0
-        } else if elem_size == ELEM_BITPACKED {
-            let target = *(x as *const i64) != 0;
-            for i in 0..len {
-                if arr_load_bit_rt(a, i) == target {
-                    return 1;
-                }
-            }
-            0
-        } else {
-            let stride = (elem_size.max(8)) as usize;
-            let target = *(x as *const i64);
-            for i in 0..len {
-                let ep = arr_elem_ptr_rt(a, i, stride);
-                if *(ep as *const i64) == target {
-                    return 1;
-                }
-            }
-            0
-        }
-    }
-}
-
-/// Dedup-insert the element at `x` into the uniquely-owned array-backed set `a`
-/// (membership per `str_cmp`); returns the (possibly relocated) set. `drop_fn`/
-/// `retain_fn` are the element helpers for `str`, else 0. A non-zero `order`
-/// keeps the block sorted (an ordered set): the element is appended and then
-/// moved down to its position. Mirrors codegen's `aipl_set_insert`.
-#[no_mangle]
-pub extern "C" fn aipl_set_insert(
-    a: *const u8,
-    x: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-    str_cmp: i64,
-    order: i64,
-) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_SET_INSERT);
-    if order == SET_ORDER_NONE {
-        if aipl_set_contains(a, x, elem_size, str_cmp) != 0 {
-            return a;
-        }
-        return aipl_array_push_mut(a, x, drop_fn, retain_fn, elem_size);
-    }
-    let at = if a.is_null() {
-        0
-    } else {
-        match unsafe { ordered_set_position(a, x, elem_size, str_cmp, order) } {
-            None => return a,
-            Some(i) => i,
-        }
-    };
-    let grown = aipl_array_push_mut(a, x, drop_fn, retain_fn, elem_size);
-    unsafe { shift_last_to(grown, at, elem_size) };
-    grown
-}
-
 /// The unordered set's `order` argument; see codegen's `SET_ORDER_NONE`, whose
 /// encoding this mirrors: the sign is the direction, the magnitude the word
 /// comparison (`1` signed, `2` unsigned).
 const SET_ORDER_NONE: i64 = 0;
-
-/// Where the element at `x` goes in the ordered set `a`, or `None` when an
-/// equal element is already there. Byte-for-byte the JIT runtime's.
-///
-/// # Safety
-/// `a` is a non-null array block whose elements are `elem_size` bytes, and `x`
-/// addresses one such element.
-unsafe fn ordered_set_position(
-    a: *const u8,
-    x: *const u8,
-    elem_size: i64,
-    str_cmp: i64,
-    order: i64,
-) -> Option<usize> {
-    use core::cmp::Ordering;
-    let len = unsafe { array_len(a) };
-    let width = elem_size.max(8) as usize;
-    let cmp = |i: usize| -> Ordering {
-        let ep = unsafe { arr_elem_ptr_rt(a, i, width) };
-        let natural = if str_cmp == str24::STR_SIZE as i64 {
-            let e = unsafe { core::ptr::read(ep as *const str24::Str) };
-            let n = unsafe { core::ptr::read(x as *const str24::Str) };
-            str24::cmp(e, n).cmp(&0)
-        } else if order.abs() == 2 {
-            let e = unsafe { core::ptr::read(ep as *const u64) };
-            let n = unsafe { core::ptr::read(x as *const u64) };
-            e.cmp(&n)
-        } else {
-            let e = unsafe { core::ptr::read(ep as *const i64) };
-            let n = unsafe { core::ptr::read(x as *const i64) };
-            e.cmp(&n)
-        };
-        if order < 0 {
-            natural.reverse()
-        } else {
-            natural
-        }
-    };
-    for i in 0..len {
-        match cmp(i) {
-            Ordering::Less => {}
-            Ordering::Equal => return None,
-            Ordering::Greater => return Some(i),
-        }
-    }
-    Some(len)
-}
-
-/// Move the last element of `a` down to index `at`, shifting `[at, len - 1)`
-/// up by one. Byte-for-byte the JIT runtime's.
-///
-/// # Safety
-/// `a` is a non-null array block with at least one element of `elem_size`
-/// bytes, and `at` is at most `len - 1`.
-unsafe fn shift_last_to(a: *const u8, at: usize, elem_size: i64) {
-    let len = unsafe { array_len(a) };
-    let last = len - 1;
-    if at >= last {
-        return;
-    }
-    let width = elem_size.max(8) as usize;
-    let base = unsafe { arr_elem_ptr_rt(a, at, width) } as *mut u8;
-    let mut moved = [0u8; 32];
-    unsafe {
-        let last_ptr = arr_elem_ptr_rt(a, last, width);
-        core::ptr::copy_nonoverlapping(last_ptr, moved.as_mut_ptr(), width);
-        core::ptr::copy(base, base.add(width), (last - at) * width);
-        core::ptr::copy_nonoverlapping(moved.as_ptr(), base, width);
-    }
-}
-
-/// Make `a` uniquely owned with room for `extra` more elements, so the appends
-/// an array-literal spread emits afterwards are plain in-place writes. Two
-/// cases, mirroring `aipl_set_union_mut` vs `aipl_set_union`:
-///
-/// - refcount 1 (nothing else can observe the block): keep it. Already-large
-///   enough capacity is returned untouched; otherwise `realloc` to exactly what
-///   is needed — the header and elements move with the block, so no element is
-///   re-retained and there is no old block to free.
-/// - shared: allocate one right-sized block, copy the elements in and retain
-///   each, then release the input.
-///
-/// Either way the result has refcount 1 and capacity for `old_len + extra`.
-/// Sizing is exact rather than doubling: the spread knows its final length up
-/// front. Mirrors `aipl_arr_reserve` in codegen.
-#[no_mangle]
-pub extern "C" fn aipl_arr_reserve(
-    a: *const u8,
-    extra: i64,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_ARR_RESERVE);
-    unsafe {
-        let a = aipl_arr_ensure_heap(a);
-        let elem_size = elem_stride(elem_size);
-        let old_len = if a.is_null() { 0 } else { array_len(a) };
-        let want = old_len + if extra > 0 { extra as usize } else { 0 };
-        let need_bytes = want * elem_size;
-        if !a.is_null() {
-            let cap_bytes = array_cap_bytes(a);
-            let rc = *header_of(a);
-            if rc == 1 {
-                if need_bytes <= cap_bytes {
-                    *(a.add(ARR_DROPFN_OFFSET) as *mut i64) = drop_fn;
-                    return a;
-                }
-                let block = a.sub(HEADER_SIZE) as *mut c_void;
-                let raw = rt_realloc(block, HEADER_SIZE + ARR_ELEMS_OFFSET + need_bytes) as *mut u8;
-                if raw.is_null() {
-                    abort();
-                }
-                let data = raw.add(HEADER_SIZE);
-                *(data.add(ARR_CAP_OFFSET) as *mut i64) = need_bytes as i64;
-                *(data.add(ARR_DROPFN_OFFSET) as *mut i64) = drop_fn;
-                return data as *const u8;
-            }
-        }
-        let raw = array_alloc(
-            old_len,
-            core::cmp::max(want, 1),
-            drop_fn,
-            elem_size as i64,
-        );
-        let dst = raw.add(ARR_ELEMS_OFFSET);
-        if old_len > 0 && !a.is_null() {
-            let src = a.add(ARR_ELEMS_OFFSET);
-            memcpy(
-                dst as *mut c_void,
-                src as *const c_void,
-                old_len * elem_size,
-            );
-            elem_rc(retain_fn, dst, old_len);
-        }
-        aipl_array_dec(a);
-        raw as *const u8
-    }
-}
-
-/// Append every element of `src` to `dst`, which `aipl_arr_reserve` has already
-/// made uniquely owned and large enough — so this is a single `memcpy` plus one
-/// retain pass, never a reallocation. Consumes (decs) `src`; `dst` keeps its
-/// identity. Mirrors `aipl_arr_extend` in codegen.
-#[no_mangle]
-pub extern "C" fn aipl_arr_extend(
-    dst: *const u8,
-    src: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_ARR_EXTEND);
-    unsafe {
-        let src_heap = aipl_arr_ensure_heap(src);
-        if elem_size == ELEM_BITPACKED {
-            // Bit-packed `bool[]` opts out of the pre-sized path (`reserve` is a
-            // no-op for it), so `dst` may be shared: append one bit at a time
-            // with the *copying* push, which is correct either way.
-            let add = if src_heap.is_null() {
-                0
-            } else {
-                array_len(src_heap)
-            };
-            let mut out = dst;
-            let mut i = 0;
-            while i < add {
-                let bit = i64::from(arr_load_bit_rt(src_heap, i));
-                out = aipl_array_push(
-                    out,
-                    &bit as *const i64 as *const u8,
-                    drop_fn,
-                    retain_fn,
-                    ELEM_BITPACKED,
-                );
-                i += 1;
-            }
-            aipl_array_dec(src_heap);
-            return out;
-        }
-        let elem_size = elem_stride(elem_size);
-        let add = if src_heap.is_null() {
-            0
-        } else {
-            array_len(src_heap)
-        };
-        if add == 0 || dst.is_null() {
-            aipl_array_dec(src_heap);
-            return dst;
-        }
-        let dst_len = array_len(dst);
-        let at = dst.add(ARR_ELEMS_OFFSET).add(dst_len * elem_size) as *mut u8;
-        let from = src_heap.add(ARR_ELEMS_OFFSET);
-        memcpy(at as *mut c_void, from as *const c_void, add * elem_size);
-        elem_rc(retain_fn, at, add);
-        *(dst as *mut i64) = (dst_len + add) as i64;
-        aipl_array_dec(src_heap);
-        dst
-    }
-}
-
-/// Join a `T[][]` into a `T[]`, placing a separator's elements between
-/// consecutive parts. The array counterpart of `aipl_str_join`, and native for
-/// the same reason: the output length is known before anything is written, so
-/// the result is one exact-size allocation and each part moves as a single block
-/// copy. `drop_fn`/`retain_fn`/`elem_size` describe the *inner* element `T`.
-/// Consumes every argument. Which of the three separators lands in which gap is
-/// `str24::gap_sep`'s rule, shared with the string half. Mirrors `aipl_arr_join`
-/// in codegen.
-#[no_mangle]
-pub extern "C" fn aipl_arr_join(
-    parts: *const u8,
-    sep: *const u8,
-    final_sep: *const u8,
-    only_sep: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_ARR_JOIN);
-    unsafe {
-        let parts_heap = aipl_arr_ensure_heap(parts);
-        let seps = [
-            aipl_arr_ensure_heap(sep),
-            aipl_arr_ensure_heap(final_sep),
-            aipl_arr_ensure_heap(only_sep),
-        ];
-        let n = if parts_heap.is_null() {
-            0
-        } else {
-            array_len(parts_heap)
-        };
-        // The separator heading the gap before part `i` — the array-side
-        // reading of `str24::gap_sep`.
-        let gap = |i: usize| -> *const u8 {
-            if n == 2 {
-                seps[2]
-            } else if i == n - 1 {
-                seps[1]
-            } else {
-                seps[0]
-            }
-        };
-        let gap_len = |i: usize| -> usize {
-            let s = gap(i);
-            if s.is_null() { 0 } else { array_len(s) }
-        };
-        // A bit-packed `bool[]` has no byte-addressable elements to copy, so it
-        // appends one bit at a time through the copying push.
-        if elem_size == ELEM_BITPACKED {
-            let mut out = aipl_array_new(0, drop_fn, ELEM_BITPACKED);
-            let mut i = 0;
-            while i < n {
-                if i > 0 {
-                    let sep_heap = gap(i);
-                    let sep_len = gap_len(i);
-                    let mut k = 0;
-                    while k < sep_len {
-                        let bit = i64::from(arr_load_bit_rt(sep_heap, k));
-                        out = aipl_array_push(
-                            out,
-                            &bit as *const i64 as *const u8,
-                            drop_fn,
-                            retain_fn,
-                            ELEM_BITPACKED,
-                        );
-                        k += 1;
-                    }
-                }
-                let part = part_at_rt(parts_heap, i, drop_fn, retain_fn, elem_size);
-                let plen = if part.is_null() { 0 } else { array_len(part) };
-                let mut k = 0;
-                while k < plen {
-                    let bit = i64::from(arr_load_bit_rt(part, k));
-                    out = aipl_array_push(
-                        out,
-                        &bit as *const i64 as *const u8,
-                        drop_fn,
-                        retain_fn,
-                        ELEM_BITPACKED,
-                    );
-                    k += 1;
-                }
-                aipl_array_dec(part);
-                i += 1;
-            }
-            aipl_array_dec(parts_heap);
-            let mut s = 0;
-            while s < seps.len() {
-                aipl_array_dec(seps[s]);
-                s += 1;
-            }
-            return out;
-        }
-        let esz = elem_stride(elem_size);
-        // Measure first — this is the whole point of the builtin being native.
-        let mut total = 0usize;
-        let mut i = 0;
-        while i < n {
-            if i > 0 {
-                total += gap_len(i);
-            }
-            let part = part_at_rt(parts_heap, i, drop_fn, retain_fn, elem_size);
-            if !part.is_null() {
-                total += array_len(part);
-            }
-            aipl_array_dec(part);
-            i += 1;
-        }
-        // One allocation, sized exactly.
-        let out = array_alloc(total, core::cmp::max(total, 1), drop_fn, elem_size);
-        let dst = out.add(ARR_ELEMS_OFFSET) as *mut u8;
-        let mut pos = 0usize;
-        i = 0;
-        while i < n {
-            let sep_len = if i > 0 { gap_len(i) } else { 0 };
-            if sep_len > 0 {
-                let from = gap(i).add(ARR_ELEMS_OFFSET);
-                memcpy(
-                    dst.add(pos * esz) as *mut c_void,
-                    from as *const c_void,
-                    sep_len * esz,
-                );
-                pos += sep_len;
-            }
-            let part = part_at_rt(parts_heap, i, drop_fn, retain_fn, elem_size);
-            let plen = if part.is_null() { 0 } else { array_len(part) };
-            if plen > 0 {
-                let from = part.add(ARR_ELEMS_OFFSET);
-                memcpy(
-                    dst.add(pos * esz) as *mut c_void,
-                    from as *const c_void,
-                    plen * esz,
-                );
-                pos += plen;
-            }
-            aipl_array_dec(part);
-            i += 1;
-        }
-        // Every element was copied by value; the result co-owns each one.
-        elem_rc(retain_fn, dst, total);
-        aipl_array_dec(parts_heap);
-        let mut s = 0;
-        while s < seps.len() {
-            aipl_array_dec(seps[s]);
-            s += 1;
-        }
-        out
-    }
-}
-
-/// Part `i` of a `T[][]`, materialized to a heap array the caller owns. Taking
-/// a reference first is what makes every representation balance in
-/// `aipl_arr_ensure_heap` — see codegen's `part_at`.
-unsafe fn part_at_rt(
-    parts: *const u8,
-    i: usize,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    // The parts are a `T[][]`, so each is a 24-byte array value — hence the
-    // `ARR_SIZE` stride — and may be a window, which lends a copy.
-    let elems = unsafe { parts.add(ARR_ELEMS_OFFSET) };
-    let value = unsafe { elems.add(i * arr24::ARR_SIZE) } as *const arr24::ArrValue;
-    let p = arr24::owned_block_of(value, drop_fn, retain_fn, elem_size);
-    if p.is_null() {
-        return p;
-    }
-    aipl_arr_ensure_heap(p)
-}
-
-/// Read element `i` of set/array `src` as an i64 (bit-unpacked `bool` when
-/// `elem_size == 0`, else the 8-byte value). Repr-aware. Mirrors codegen's `read_set_elem`.
-/// The address to hand `aipl_set_insert` for element `i` of `src`, and a
-/// one-word scratch backing it. Mirrors codegen's `set_elem_ptr`: anything wider
-/// than a word — a wide `str` among them — must be passed in place, and only the
-/// bit-packed `bool` case has no address of its own to give.
-unsafe fn set_elem_ptr(src: *const u8, i: usize, elem_size: i64, scratch: &mut i64) -> *const u8 {
-    if elem_size == ELEM_BITPACKED {
-        *scratch = i64::from(unsafe { arr_load_bit_rt(src, i) });
-        return scratch as *const i64 as *const u8;
-    }
-    unsafe { arr_elem_ptr_rt(src, i, (elem_size.max(8)) as usize) }
-}
-
-/// `a.union(b)` (copy): a fresh set with every distinct element of `a` then `b`;
-/// consumes (decs) both inputs. Mirrors codegen.
-#[no_mangle]
-pub extern "C" fn aipl_set_union(
-    a: *const u8,
-    b: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-    str_cmp: i64,
-    order: i64,
-) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_SET_UNION);
-    unsafe {
-        let a_len = if a.is_null() { 0 } else { array_len(a) };
-        let b_len = if b.is_null() { 0 } else { array_len(b) };
-        let mut dest = aipl_array_with_cap((a_len + b_len) as i64, drop_fn, elem_size);
-        for i in 0..a_len {
-            let mut scratch = 0i64;
-            let v = set_elem_ptr(a, i, elem_size, &mut scratch);
-            dest = aipl_set_insert(
-                dest,
-                v,
-                drop_fn,
-                retain_fn,
-                elem_size,
-                str_cmp,
-                order,
-            );
-        }
-        for i in 0..b_len {
-            let mut scratch = 0i64;
-            let v = set_elem_ptr(b, i, elem_size, &mut scratch);
-            dest = aipl_set_insert(
-                dest,
-                v,
-                drop_fn,
-                retain_fn,
-                elem_size,
-                str_cmp,
-                order,
-            );
-        }
-        aipl_array_dec(a);
-        aipl_array_dec(b);
-        dest
-    }
-}
-
-/// `set a = a.union(b)` for an exclusive `a`: extend `a` in place with `b`'s
-/// distinct elements and return the (possibly relocated) set; consumes (decs)
-/// `b`, reuses `a`. Mirrors codegen.
-#[no_mangle]
-pub extern "C" fn aipl_set_union_mut(
-    a: *const u8,
-    b: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-    str_cmp: i64,
-    order: i64,
-) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_SET_UNION_MUT);
-    unsafe {
-        let mut a = a;
-        let b_len = if b.is_null() { 0 } else { array_len(b) };
-        for i in 0..b_len {
-            let mut scratch = 0i64;
-            let v = set_elem_ptr(b, i, elem_size, &mut scratch);
-            a = aipl_set_insert(
-                a,
-                v,
-                drop_fn,
-                retain_fn,
-                elem_size,
-                str_cmp,
-                order,
-            );
-        }
-        aipl_array_dec(b);
-        a
-    }
-}
-
-/// The byte width of a dict key, which is also the offset of its value: a pair is
-/// `[key][value]` back to back. `str_cmp` carries the width for a `str` key (see
-/// codegen's `str_cmp_width`); every other key is one word. Mirrors codegen.
-fn dict_key_width(str_cmp: i64) -> usize {
-    if str_cmp != 0 {
-        str_cmp as usize
-    } else {
-        8
-    }
-}
-
-/// Index of the pair in dict `a` whose key matches the key at `pair_ptr`, or -1.
-/// Mirrors codegen's `dict_find`.
-unsafe fn dict_find(a: *const u8, pair_ptr: *const u8, pair_size: i64, str_cmp: i64) -> i64 {
-    if a.is_null() {
-        return -1;
-    }
-    unsafe {
-        let len = array_len(a);
-        let stride = pair_size as usize;
-        let wide = str_cmp == str24::STR_SIZE as i64;
-        let want_wide = if wide {
-            *(pair_ptr as *const str24::Str)
-        } else {
-            str24::Str::empty()
-        };
-        let want = *(pair_ptr as *const i64);
-        for i in 0..len {
-            let ep = arr_elem_ptr_rt(a, i, stride);
-            let eq = if wide {
-                str24::eq(*(ep as *const str24::Str), want_wide)
-            } else {
-                *(ep as *const i64) == want
-            };
-            if eq {
-                return i as i64;
-            }
-        }
-        -1
-    }
-}
-
-/// Insert (or, on a duplicate key, replace) the `[key][value]` pair at `pair_ptr`
-/// into the uniquely-owned dict `a`; returns the (possibly relocated) dict. The
-/// pair helpers release/retain a pair's key and value. Mirrors codegen.
-#[no_mangle]
-pub extern "C" fn aipl_dict_insert(
-    a: *const u8,
-    pair_ptr: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    pair_size: i64,
-    str_cmp: i64,
-) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_DICT_INSERT);
-    unsafe {
-        let idx = dict_find(a, pair_ptr, pair_size, str_cmp);
-        if idx >= 0 {
-            let stride = pair_size as usize;
-            let slot = arr_elem_ptr_rt(a, idx as usize, stride) as *mut u8;
-            elem_rc(drop_fn, slot, 1);
-            core::ptr::copy_nonoverlapping(pair_ptr, slot, stride);
-            elem_rc(retain_fn, slot, 1);
-            return a;
-        }
-    }
-    aipl_array_push_mut(a, pair_ptr, drop_fn, retain_fn, pair_size)
-}
-
-/// Remove `key_ptr`'s pair from dict `a`, which [`aipl_arr_reserve`] has already
-/// made uniquely owned — so this writes in place, the same contract
-/// [`aipl_arr_extend`] carries.
-///
-/// The removed pair's key and value are released, and the pairs after it shift
-/// down one so the survivors keep the order they were inserted in. Order-
-/// preserving rather than swap-with-last: nothing *promises* a dict's order, but
-/// it is what iterating one hands back, so a removal that quietly permuted the
-/// rest would be a surprise for one saved `memmove`.
-///
-/// Returns 1 when a pair was removed and 0 when the key was absent, in which
-/// case nothing is touched. Mirrors `aipl_dict_remove` in codegen.
-#[no_mangle]
-pub extern "C" fn aipl_dict_remove(
-    a: *const u8,
-    key_ptr: *const u8,
-    drop_fn: i64,
-    pair_size: i64,
-    str_cmp: i64,
-) -> i64 {
-    count_builtin!(builtin_calls::AIPL_DICT_REMOVE);
-    unsafe {
-        let idx = dict_find(a, key_ptr, pair_size, str_cmp);
-        if idx < 0 {
-            return 0;
-        }
-        let idx = idx as usize;
-        let stride = pair_size as usize;
-        let len = array_len(a);
-        let slot = arr_elem_ptr_rt(a, idx, stride) as *mut u8;
-        elem_rc(drop_fn, slot, 1);
-        // The regions overlap when anything follows the hole, so `memmove`.
-        let moved = len - idx - 1;
-        if moved > 0 {
-            let next = arr_elem_ptr_rt(a, idx + 1, stride);
-            memmove(
-                slot as *mut c_void,
-                next as *const c_void,
-                moved * stride,
-            );
-        }
-        *(a.add(ARR_LEN_OFFSET) as *mut i64) = (len - 1) as i64;
-        1
-    }
-}
-
-/// Look up `key_ptr` in dict `a`: a pointer to the matching pair's value slot, or
-/// null if absent. Borrows `a`. Mirrors codegen.
-#[no_mangle]
-pub extern "C" fn aipl_dict_get(
-    a: *const u8,
-    key_ptr: *const u8,
-    pair_size: i64,
-    str_cmp: i64,
-) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_DICT_GET);
-    unsafe {
-        let idx = dict_find(a, key_ptr, pair_size, str_cmp);
-        if idx < 0 {
-            return core::ptr::null();
-        }
-        arr_elem_ptr_rt(a, idx as usize, pair_size as usize).add(dict_key_width(str_cmp))
-    }
-}
-
-/// `d.contains_key(k)`: whether `key_ptr` is a key of dict `a`. Borrows `a`.
-#[no_mangle]
-pub extern "C" fn aipl_dict_contains_key(
-    a: *const u8,
-    key_ptr: *const u8,
-    pair_size: i64,
-    str_cmp: i64,
-) -> i64 {
-    count_builtin!(builtin_calls::AIPL_DICT_CONTAINS_KEY);
-    (unsafe { dict_find(a, key_ptr, pair_size, str_cmp) } >= 0) as i64
-}
 
 
 /// Element drop-fn for an array of arrays (`T[][]`): release each element
@@ -3253,7 +2096,7 @@ unsafe fn build_cli_args(argc: c_int, argv: *const *const c_char) -> *const u8 {
         // type to consult.
         let drop_fn = str24::aipl_arr_drop_str as *const () as usize as i64;
         let arr = aipl_array_new(n, drop_fn, str24::STR_SIZE as i64);
-        let elems = arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str;
+        let elems = arr_untag(arr).add(ARR_ELEMS_OFFSET) as *mut str24::Str;
         for i in 0..n as usize {
             let c = *argv.add(i + 1);
             let bytes = core::slice::from_raw_parts(c as *const u8, strlen(c));
@@ -3289,7 +2132,7 @@ pub extern "C" fn main(argc: c_int, argv: *const *const c_char) -> c_int {
         let block = unsafe { build_cli_args(argc, argv) };
         value[0] = block as i64;
         value[1] = unsafe { arr_untag(block).add(ARR_ELEMS_OFFSET) } as i64;
-        value[2] = unsafe { array_len(block) } as i64;
+        value[2] = if argc > 1 { (argc - 1) as i64 } else { 0 };
         value.as_ptr() as *const u8
     } else {
         core::ptr::null()

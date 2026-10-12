@@ -62,9 +62,9 @@ deallocations: 21
 reallocations: 0
 bytes allocated: 1116
 instructions executed: 2023
-binary size: 5768
+binary size: 5744
   code: 2820
-  data: 220
+  data: 196
   metadata: 2728
 functions:
   __arr_drop_Tree:

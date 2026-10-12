@@ -88,11 +88,11 @@ e4
 allocations: 22
 deallocations: 22
 reallocations: 5
-bytes allocated: 1138
+bytes allocated: 1058
 instructions executed: 1646
-binary size: 8240
+binary size: 8120
   code: 4980
-  data: 225
+  data: 105
   metadata: 3035
 functions:
   __to_str_i64:
@@ -104,14 +104,8 @@ functions:
   aipl_arr_inc:
     calls: 20
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 10
-    bytes: (external)
   aipl_array_dec:
-    calls: 25
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 2
+    calls: 21
     bytes: (external)
   aipl_array_with_cap:
     calls: 1

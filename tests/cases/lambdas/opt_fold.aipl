@@ -43,9 +43,9 @@ deallocations: 3
 reallocations: 0
 bytes allocated: 280
 instructions executed: 2394
-binary size: 7216
+binary size: 7144
   code: 3848
-  data: 983
+  data: 911
   metadata: 2385
 functions:
   __test$parses_a_digit_run:

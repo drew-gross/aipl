@@ -31,14 +31,14 @@ fn main() !prints {
 ["_0", "_1", "_2"]
 [100, 101, 102]
 --- performance ---
-allocations: 19
-deallocations: 19
+allocations: 20
+deallocations: 20
 reallocations: 2
-bytes allocated: 818
+bytes allocated: 810
 instructions executed: 2682
-binary size: 6776
+binary size: 6752
   code: 4120
-  data: 171
+  data: 147
   metadata: 2485
 functions:
   __to_str_str$arr:
@@ -52,9 +52,6 @@ functions:
     bytes: 716
   aipl_array_dec:
     calls: 6
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 13
     bytes: (external)
   aipl_array_with_cap:
     calls: 4

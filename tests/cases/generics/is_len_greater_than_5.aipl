@@ -18,9 +18,9 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 132
-binary size: 1936
+binary size: 1888
   code: 544
-  data: 356
+  data: 308
   metadata: 1036
 functions:
   __test$is_len_greater_than_5:

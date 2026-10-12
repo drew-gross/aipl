@@ -61,11 +61,11 @@ none
 allocations: 8
 deallocations: 8
 reallocations: 7
-bytes allocated: 1958
+bytes allocated: 1926
 instructions executed: 15168
-binary size: 5168
+binary size: 5096
   code: 2844
-  data: 187
+  data: 115
   metadata: 2137
 functions:
   __builtin_find_if$i64$lam$is_big:
@@ -87,13 +87,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 3
-    bytes: (external)
-  aipl_array_push:
-    calls: 1
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 401
+    calls: 2
     bytes: (external)
   aipl_array_with_cap:
     calls: 1

@@ -1090,14 +1090,14 @@ variant Node = Leaf(str) | List(Node[])
 # A message function for the `Refuse(Fn(..))` fixtures: what was matched, back.
 fn echo(matched: str) -> str { matched }
 --- performance ---
-allocations: 735
-deallocations: 735
+allocations: 736
+deallocations: 736
 reallocations: 83
-bytes allocated: 92737
+bytes allocated: 92801
 instructions executed: 80190
-binary size: 167656
+binary size: 167632
   code: 105808
-  data: 6884
+  data: 6860
   metadata: 54964
 functions:
   __arr_drop_ListStyle:
@@ -1199,20 +1199,11 @@ functions:
   aipl_arr_inc:
     calls: 346
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 15
-    bytes: (external)
   aipl_array_dec:
-    calls: 567
+    calls: 495
     bytes: (external)
   aipl_array_new:
     calls: 41
-    bytes: (external)
-  aipl_array_push:
-    calls: 57
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 142
     bytes: (external)
   aipl_array_with_cap:
     calls: 1

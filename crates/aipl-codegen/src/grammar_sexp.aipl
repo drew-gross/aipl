@@ -273,14 +273,14 @@ pub fn format_sexp(src: str, width: u64) -> str!ParseError {
 # and answering "never" is the honest answer here.
 fn sexp_space(l: str, r: str) -> bool { false }
 --- performance ---
-allocations: 5735
-deallocations: 5735
+allocations: 5747
+deallocations: 5747
 reallocations: 564
-bytes allocated: 642090
+bytes allocated: 630578
 instructions executed: 1990120
-binary size: 399032
+binary size: 399008
   code: 274588
-  data: 5028
+  data: 5004
   metadata: 119416
 functions:
   __arr_drop_SexpKind:
@@ -760,20 +760,11 @@ functions:
   aipl_arr_inc:
     calls: 26112
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1766
-    bytes: (external)
   aipl_array_dec:
-    calls: 29773
+    calls: 27765
     bytes: (external)
   aipl_array_new:
     calls: 820
-    bytes: (external)
-  aipl_array_push:
-    calls: 1408
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 1302
     bytes: (external)
   aipl_array_with_cap:
     calls: 18
@@ -795,15 +786,6 @@ functions:
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 1164
-    bytes: (external)
-  aipl_set_contains:
-    calls: 19
-    bytes: (external)
-  aipl_set_insert:
-    calls: 14
-    bytes: (external)
-  aipl_set_union_mut:
-    calls: 18
     bytes: (external)
   aipl_test_begin:
     calls: 4

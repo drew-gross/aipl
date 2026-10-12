@@ -14,11 +14,11 @@ fn pushed_len() -> u64 {
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 56
+bytes allocated: 40
 instructions executed: 111
-binary size: 1528
+binary size: 1504
   code: 452
-  data: 106
+  data: 82
   metadata: 970
 functions:
   __test$pushed_len:
@@ -28,12 +28,6 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 2
-    bytes: (external)
-  aipl_array_push:
-    calls: 1
-    bytes: (external)
-  aipl_array_push_mut:
     calls: 1
     bytes: (external)
   aipl_assert:

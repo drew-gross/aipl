@@ -29,11 +29,11 @@ fn double_each(mut self: i64[]) {
 allocations: 2
 deallocations: 2
 reallocations: 1
-bytes allocated: 160
+bytes allocated: 128
 instructions executed: 1333
-binary size: 4304
+binary size: 4184
   code: 2144
-  data: 505
+  data: 385
   metadata: 1655
 functions:
   __eq_i64$arr:
@@ -47,9 +47,6 @@ functions:
     bytes: (external)
   aipl_array_dec:
     calls: 16
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 10
     bytes: (external)
   aipl_array_with_cap:
     calls: 2

@@ -22,11 +22,11 @@ fn extended(xs: bool[]) -> bool[] {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 66
+bytes allocated: 34
 instructions executed: 582
-binary size: 3104
+binary size: 3008
   code: 1172
-  data: 400
+  data: 304
   metadata: 1532
 functions:
   __eq_bool$arr:
@@ -39,13 +39,7 @@ functions:
     calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 5
-    bytes: (external)
-  aipl_array_push:
-    calls: 2
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 1
+    calls: 3
     bytes: (external)
   aipl_assert:
     calls: 3

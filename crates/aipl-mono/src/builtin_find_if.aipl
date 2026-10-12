@@ -57,11 +57,11 @@ pub fn find_if<T: any>(self: T[], pred: (T) -> bool) -> T? {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 128
+bytes allocated: 112
 instructions executed: 1554
-binary size: 10344
+binary size: 10176
   code: 5332
-  data: 1436
+  data: 1268
   metadata: 3576
 functions:
   __test$find_if:
@@ -73,11 +73,8 @@ functions:
   aipl_arr_inc:
     calls: 2
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_array_new:
     calls: 1

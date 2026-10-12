@@ -29,9 +29,9 @@ deallocations: 15
 reallocations: 6
 bytes allocated: 639
 instructions executed: 1313
-binary size: 5448
+binary size: 5400
   code: 2824
-  data: 340
+  data: 292
   metadata: 2284
 functions:
   __eq_str$arr:
@@ -47,16 +47,10 @@ functions:
     calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 9
+    calls: 6
     bytes: (external)
   aipl_array_new:
     calls: 3
-    bytes: (external)
-  aipl_array_push:
-    calls: 3
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 9
     bytes: (external)
   aipl_assert:
     calls: 3

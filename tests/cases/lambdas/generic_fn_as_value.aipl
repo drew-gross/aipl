@@ -49,9 +49,9 @@ deallocations: 12
 reallocations: 2
 bytes allocated: 566
 instructions executed: 3557
-binary size: 15616
+binary size: 15496
   code: 9476
-  data: 707
+  data: 587
   metadata: 5433
 functions:
   __arr_drop___tuple$i64$str:
@@ -78,19 +78,10 @@ functions:
   aipl_arr_inc:
     calls: 11
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 2
-    bytes: (external)
   aipl_array_dec:
-    calls: 20
+    calls: 18
     bytes: (external)
   aipl_array_new:
-    calls: 4
-    bytes: (external)
-  aipl_array_push:
-    calls: 2
-    bytes: (external)
-  aipl_array_push_mut:
     calls: 4
     bytes: (external)
   aipl_i64_len:

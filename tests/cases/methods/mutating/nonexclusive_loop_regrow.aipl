@@ -39,11 +39,11 @@ fn grow_aliased_matches() -> bool {
 allocations: 4
 deallocations: 4
 reallocations: 0
-bytes allocated: 248
+bytes allocated: 184
 instructions executed: 1063
-binary size: 4328
+binary size: 4184
   code: 2168
-  data: 448
+  data: 304
   metadata: 1712
 functions:
   __eq_i64$arr:
@@ -59,13 +59,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 13
-    bytes: (external)
-  aipl_array_push:
-    calls: 3
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 1
+    calls: 10
     bytes: (external)
   aipl_array_with_cap:
     calls: 1

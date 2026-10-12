@@ -18,11 +18,11 @@ fn main() !prints {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 105
+bytes allocated: 89
 instructions executed: 413
-binary size: 2544
+binary size: 2520
   code: 1132
-  data: 99
+  data: 75
   metadata: 1313
 functions:
   __to_str_i64$arr:

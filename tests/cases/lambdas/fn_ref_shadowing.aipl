@@ -21,11 +21,11 @@ fn double(x: i64) -> i64 { x * 2 }.test({
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 56
+bytes allocated: 40
 instructions executed: 425
-binary size: 2768
+binary size: 2720
   code: 1176
-  data: 308
+  data: 260
   metadata: 1284
 functions:
   __eq_i64$arr:
@@ -40,11 +40,8 @@ functions:
   aipl_arr_inc:
     calls: 2
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_assert:
     calls: 3

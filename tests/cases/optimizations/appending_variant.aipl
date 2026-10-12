@@ -82,11 +82,11 @@ fn main() !prints {
 allocations: 404
 deallocations: 404
 reallocations: 8
-bytes allocated: 24556
+bytes allocated: 24508
 instructions executed: 51347
-binary size: 12896
+binary size: 12872
   code: 7804
-  data: 33
+  data: 9
   metadata: 5059
 functions:
   __arr_drop_Rule:
@@ -109,9 +109,6 @@ functions:
     bytes: (external)
   aipl_array_new:
     calls: 69
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 105
     bytes: (external)
   aipl_array_with_cap:
     calls: 3

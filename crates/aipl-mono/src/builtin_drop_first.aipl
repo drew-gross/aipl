@@ -17,9 +17,9 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 80
 instructions executed: 424
-binary size: 4224
+binary size: 4152
   code: 1808
-  data: 551
+  data: 479
   metadata: 1865
 functions:
   __test$drop_first:

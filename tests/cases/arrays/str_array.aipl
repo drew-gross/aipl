@@ -48,13 +48,10 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 10
+    calls: 8
     bytes: (external)
   aipl_array_new:
     calls: 4
-    bytes: (external)
-  aipl_array_push:
-    calls: 2
     bytes: (external)
   aipl_assert:
     calls: 7

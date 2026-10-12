@@ -28,9 +28,9 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 56
 instructions executed: 375
-binary size: 3568
+binary size: 3544
   code: 1564
-  data: 352
+  data: 328
   metadata: 1652
 functions:
   __test$nonempty_last:

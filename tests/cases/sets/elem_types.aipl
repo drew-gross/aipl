@@ -31,7 +31,7 @@ fn chars() -> #{char} {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 66
+bytes allocated: 34
 instructions executed: 320
 binary size: 3632
   code: 1604
@@ -53,20 +53,11 @@ functions:
   aipl_array_dec:
     calls: 2
     bytes: (external)
-  aipl_array_push_mut:
-    calls: 4
-    bytes: (external)
   aipl_array_with_cap:
     calls: 2
     bytes: (external)
   aipl_assert:
     calls: 7
-    bytes: (external)
-  aipl_set_contains:
-    calls: 9
-    bytes: (external)
-  aipl_set_insert:
-    calls: 6
     bytes: (external)
   aipl_test_begin:
     calls: 2

@@ -24,11 +24,11 @@ fn appended(xs: i64[], x: i64) -> i64[] {
 allocations: 3
 deallocations: 3
 reallocations: 0
-bytes allocated: 208
+bytes allocated: 160
 instructions executed: 929
-binary size: 3880
+binary size: 3808
   code: 1852
-  data: 387
+  data: 315
   metadata: 1641
 functions:
   __eq_i64$arr:
@@ -41,10 +41,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 10
-    bytes: (external)
-  aipl_array_push:
-    calls: 2
+    calls: 8
     bytes: (external)
   aipl_array_with_cap:
     calls: 1

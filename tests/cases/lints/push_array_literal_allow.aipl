@@ -32,11 +32,11 @@ fn main() !prints {
 allocations: 15
 deallocations: 15
 reallocations: 0
-bytes allocated: 372
+bytes allocated: 324
 instructions executed: 2177
-binary size: 5984
+binary size: 5936
   code: 3752
-  data: 81
+  data: 33
   metadata: 2151
 functions:
   __to_str_i64:
@@ -45,17 +45,8 @@ functions:
   aipl_arr_inc:
     calls: 10
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 2
-    bytes: (external)
   aipl_array_dec:
-    calls: 18
-    bytes: (external)
-  aipl_array_push:
-    calls: 1
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 3
+    calls: 15
     bytes: (external)
   aipl_i64_len:
     calls: 16

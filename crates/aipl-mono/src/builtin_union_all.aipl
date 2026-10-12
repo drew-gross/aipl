@@ -43,11 +43,11 @@ pub fn union_all<T: any>(self: #{T}[]) -> #{T} {
 allocations: 51
 deallocations: 51
 reallocations: 0
-bytes allocated: 2773
+bytes allocated: 2181
 instructions executed: 3288
-binary size: 14512
+binary size: 14488
   code: 8768
-  data: 876
+  data: 852
   metadata: 4868
 functions:
   __eq_set$bool:
@@ -71,32 +71,17 @@ functions:
   aipl_arr_inc:
     calls: 93
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
     calls: 144
     bytes: (external)
   aipl_array_new:
     calls: 10
     bytes: (external)
-  aipl_array_push_mut:
-    calls: 62
-    bytes: (external)
   aipl_array_with_cap:
     calls: 41
     bytes: (external)
   aipl_assert:
     calls: 10
-    bytes: (external)
-  aipl_set_contains:
-    calls: 81
-    bytes: (external)
-  aipl_set_insert:
-    calls: 66
-    bytes: (external)
-  aipl_set_union:
-    calls: 18
     bytes: (external)
   aipl_test_begin:
     calls: 1

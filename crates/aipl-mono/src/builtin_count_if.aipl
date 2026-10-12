@@ -61,11 +61,11 @@ pub fn count_if<T: any>(self: T[], pred: (T) -> bool) -> u64 {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 152
+bytes allocated: 136
 instructions executed: 2162
-binary size: 8720
+binary size: 8552
   code: 4372
-  data: 1491
+  data: 1323
   metadata: 2857
 functions:
   __test$count_if:
@@ -77,11 +77,8 @@ functions:
   aipl_arr_inc:
     calls: 2
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_array_new:
     calls: 1

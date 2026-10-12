@@ -37,11 +37,11 @@ fn joined(a: i64[]) -> i64[] { [..a, ..tail(), five(), 6] }.test({
 allocations: 11
 deallocations: 11
 reallocations: 0
-bytes allocated: 704
+bytes allocated: 528
 instructions executed: 3919
-binary size: 16272
+binary size: 15936
   code: 9632
-  data: 1498
+  data: 1162
   metadata: 5142
 functions:
   __eq_i64$arr:
@@ -53,14 +53,8 @@ functions:
   aipl_arr_inc:
     calls: 65
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 11
-    bytes: (external)
   aipl_array_dec:
-    calls: 76
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 5
+    calls: 65
     bytes: (external)
   aipl_assert:
     calls: 11

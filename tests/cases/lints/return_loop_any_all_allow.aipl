@@ -70,9 +70,9 @@ deallocations: 12
 reallocations: 0
 bytes allocated: 246
 instructions executed: 1253
-binary size: 5192
+binary size: 5072
   code: 2780
-  data: 279
+  data: 159
   metadata: 2133
 functions:
   __builtin_all$i64$lam$main$lambda2:

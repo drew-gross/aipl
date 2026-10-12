@@ -35,11 +35,11 @@ fn sums_an_array() -> i64 { sum([1, 2, 3]) }.test({
 allocations: 4
 deallocations: 4
 reallocations: 0
-bytes allocated: 328
+bytes allocated: 312
 instructions executed: 1426
-binary size: 6768
+binary size: 6672
   code: 3492
-  data: 827
+  data: 731
   metadata: 2449
 functions:
   __test$sums_an_array:
@@ -51,11 +51,8 @@ functions:
   aipl_arr_inc:
     calls: 2
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_array_new:
     calls: 1

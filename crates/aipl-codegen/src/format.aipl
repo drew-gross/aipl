@@ -740,14 +740,14 @@ fn colon_space(l: str, r: str) -> bool { l == ":" }
 # A `Doc` at a width, for the assertions above.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 2265
-deallocations: 2265
+allocations: 2275
+deallocations: 2275
 reallocations: 195
-bytes allocated: 184595
+bytes allocated: 184067
 instructions executed: 307548
-binary size: 264920
+binary size: 264896
   code: 174724
-  data: 6324
+  data: 6300
   metadata: 83872
 functions:
   __arr_drop_Item:
@@ -954,20 +954,11 @@ functions:
   aipl_arr_inc:
     calls: 1647
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 194
-    bytes: (external)
   aipl_array_dec:
-    calls: 2797
+    calls: 2209
     bytes: (external)
   aipl_array_new:
     calls: 314
-    bytes: (external)
-  aipl_array_push:
-    calls: 498
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 507
     bytes: (external)
   aipl_array_with_cap:
     calls: 10

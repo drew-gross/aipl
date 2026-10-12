@@ -62,11 +62,11 @@ pub fn dedent(self: str) -> str {
 allocations: 22
 deallocations: 22
 reallocations: 2
-bytes allocated: 1149
+bytes allocated: 1117
 instructions executed: 21907
-binary size: 8952
+binary size: 8928
   code: 4960
-  data: 873
+  data: 849
   metadata: 3119
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
@@ -86,9 +86,6 @@ functions:
     bytes: (external)
   aipl_array_new:
     calls: 10
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 4
     bytes: (external)
   aipl_array_with_cap:
     calls: 2

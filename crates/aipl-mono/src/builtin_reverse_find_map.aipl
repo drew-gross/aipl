@@ -44,9 +44,9 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 39
 instructions executed: 684
-binary size: 5216
+binary size: 5096
   code: 2024
-  data: 1014
+  data: 894
   metadata: 2178
 functions:
   __test$reverse_find_map:

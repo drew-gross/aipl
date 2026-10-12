@@ -1764,14 +1764,14 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 5488
-deallocations: 5488
+allocations: 5529
+deallocations: 5529
 reallocations: 975
-bytes allocated: 708588
+bytes allocated: 706844
 instructions executed: 2414752
-binary size: 798352
+binary size: 798328
   code: 512448
-  data: 13036
+  data: 13012
   metadata: 272868
 functions:
   __arr_drop_Node:
@@ -2107,20 +2107,11 @@ functions:
   aipl_arr_inc:
     calls: 32076
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 593
-    bytes: (external)
   aipl_array_dec:
-    calls: 36343
+    calls: 34361
     bytes: (external)
   aipl_array_new:
     calls: 482
-    bytes: (external)
-  aipl_array_push:
-    calls: 1665
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 2355
     bytes: (external)
   aipl_array_with_cap:
     calls: 266
@@ -2142,18 +2133,6 @@ functions:
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 346
-    bytes: (external)
-  aipl_set_contains:
-    calls: 500
-    bytes: (external)
-  aipl_set_insert:
-    calls: 353
-    bytes: (external)
-  aipl_set_union:
-    calls: 81
-    bytes: (external)
-  aipl_set_union_mut:
-    calls: 192
     bytes: (external)
   aipl_test_begin:
     calls: 2

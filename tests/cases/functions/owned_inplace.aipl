@@ -23,11 +23,11 @@ fn extended(xs: i64[]) -> i64[] {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 120
+bytes allocated: 88
 instructions executed: 639
-binary size: 3384
+binary size: 3288
   code: 1420
-  data: 431
+  data: 335
   metadata: 1533
 functions:
   __eq_i64$arr:
@@ -40,13 +40,7 @@ functions:
     calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 5
-    bytes: (external)
-  aipl_array_push:
-    calls: 2
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 1
+    calls: 3
     bytes: (external)
   aipl_assert:
     calls: 3

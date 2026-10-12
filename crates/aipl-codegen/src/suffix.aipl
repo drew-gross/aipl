@@ -98,9 +98,9 @@ deallocations: 76
 reallocations: 1
 bytes allocated: 6025
 instructions executed: 3730
-binary size: 78648
+binary size: 78624
   code: 52584
-  data: 721
+  data: 697
   metadata: 25343
 functions:
   __arr_drop___m1__Expr:
@@ -159,9 +159,6 @@ functions:
     bytes: 204
   aipl_arr_inc:
     calls: 9
-    bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
     bytes: (external)
   aipl_array_dec:
     calls: 13

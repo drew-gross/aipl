@@ -35,11 +35,11 @@ fn main() !prints {
 allocations: 40
 deallocations: 40
 reallocations: 3
-bytes allocated: 1674
+bytes allocated: 1658
 instructions executed: 4487
-binary size: 11800
+binary size: 11704
   code: 8088
-  data: 299
+  data: 203
   metadata: 3413
 functions:
   __builtin_map_join$i64$char$s2$s3$s4$rs$lam$__builtin_to_str:
@@ -54,11 +54,8 @@ functions:
   aipl_arr_inc:
     calls: 4
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 4
-    bytes: (external)
   aipl_array_dec:
-    calls: 15
+    calls: 14
     bytes: (external)
   aipl_i64_len:
     calls: 40

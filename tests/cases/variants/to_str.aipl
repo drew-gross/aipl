@@ -37,9 +37,9 @@ deallocations: 10
 reallocations: 0
 bytes allocated: 370
 instructions executed: 1983
-binary size: 21032
+binary size: 21008
   code: 10452
-  data: 2139
+  data: 2115
   metadata: 8441
 functions:
   __arr_drop_V:

@@ -40,11 +40,11 @@ pub fn any<T: any>(self: T[], pred: (T) -> bool) -> bool {
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 48
+bytes allocated: 32
 instructions executed: 1160
-binary size: 7088
+binary size: 6944
   code: 3336
-  data: 982
+  data: 838
   metadata: 2770
 functions:
   __test$any:
@@ -56,11 +56,8 @@ functions:
   aipl_arr_inc:
     calls: 2
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_assert:
     calls: 11

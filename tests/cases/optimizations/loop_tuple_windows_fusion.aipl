@@ -107,11 +107,11 @@ c2
 allocations: 11
 deallocations: 11
 reallocations: 15
-bytes allocated: 361
+bytes allocated: 329
 instructions executed: 31706
-binary size: 8304
+binary size: 8208
   code: 4984
-  data: 235
+  data: 139
   metadata: 3085
 functions:
   __to_str_i64:
@@ -127,13 +127,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 4
-    bytes: (external)
-  aipl_array_push:
     calls: 2
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 400
     bytes: (external)
   aipl_i64_len:
     calls: 4

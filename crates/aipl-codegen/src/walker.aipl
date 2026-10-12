@@ -3510,14 +3510,14 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(self?.doc.prin
 # something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 94322
-deallocations: 94322
+allocations: 94373
+deallocations: 94373
 reallocations: 18543
-bytes allocated: 22208740
+bytes allocated: 22230740
 instructions executed: 64478212
-binary size: 20719792
+binary size: 20719768
   code: 13700756
-  data: 40764
+  data: 40740
   metadata: 6978272
 functions:
   __arr_drop_ImportEntry:
@@ -4693,20 +4693,11 @@ functions:
   aipl_arr_inc:
     calls: 148394
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 3481
-    bytes: (external)
   aipl_array_dec:
-    calls: 195068
+    calls: 179269
     bytes: (external)
   aipl_array_new:
     calls: 5598
-    bytes: (external)
-  aipl_array_push:
-    calls: 12942
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 40180
     bytes: (external)
   aipl_array_with_cap:
     calls: 216

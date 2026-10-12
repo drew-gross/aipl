@@ -65,11 +65,11 @@ pub fn find_index<T: any>(self: T[], pred: (T) -> bool) -> u64? {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 128
+bytes allocated: 112
 instructions executed: 1690
-binary size: 10496
+binary size: 10328
   code: 5448
-  data: 1498
+  data: 1330
   metadata: 3550
 functions:
   __test$find_index:
@@ -81,11 +81,8 @@ functions:
   aipl_arr_inc:
     calls: 2
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_array_new:
     calls: 1

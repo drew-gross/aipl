@@ -67,11 +67,11 @@ pub fn right_fold<T: any, A: any>(self: T[], init: A, f: (T, A) -> A) -> A {
 allocations: 7
 deallocations: 7
 reallocations: 0
-bytes allocated: 608
+bytes allocated: 592
 instructions executed: 2189
-binary size: 8584
+binary size: 8512
   code: 4728
-  data: 1023
+  data: 951
   metadata: 2833
 functions:
   __test$right_fold:
@@ -83,11 +83,8 @@ functions:
   aipl_arr_inc:
     calls: 2
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 5
+    calls: 4
     bytes: (external)
   aipl_array_new:
     calls: 2

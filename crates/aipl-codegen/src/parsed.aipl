@@ -104,9 +104,9 @@ deallocations: 40
 reallocations: 2
 bytes allocated: 2981
 instructions executed: 2327
-binary size: 75240
+binary size: 75216
   code: 50028
-  data: 1292
+  data: 1268
   metadata: 23920
 functions:
   __arr_drop___m1__Expr:

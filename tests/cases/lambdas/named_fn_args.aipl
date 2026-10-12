@@ -40,14 +40,14 @@ fn each(self: i64[], f: (i64) -> i64) -> i64[] {
     assert(xs.each(inc) == [2, 3, 4]);
 })
 --- performance ---
-allocations: 10
-deallocations: 10
+allocations: 11
+deallocations: 11
 reallocations: 2
-bytes allocated: 515
+bytes allocated: 475
 instructions executed: 2085
-binary size: 8496
+binary size: 8376
   code: 4700
-  data: 736
+  data: 616
   metadata: 3060
 functions:
   __eq_i64$arr:
@@ -77,17 +77,11 @@ functions:
   aipl_arr_inc:
     calls: 5
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 2
-    bytes: (external)
   aipl_array_dec:
-    calls: 12
+    calls: 10
     bytes: (external)
   aipl_array_new:
     calls: 1
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 9
     bytes: (external)
   aipl_array_with_cap:
     calls: 4

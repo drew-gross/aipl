@@ -466,14 +466,14 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 10175
-deallocations: 10175
-reallocations: 1507
-bytes allocated: 1176054
+allocations: 10300
+deallocations: 10300
+reallocations: 1503
+bytes allocated: 1168990
 instructions executed: 3277642
-binary size: 414584
+binary size: 414560
   code: 283680
-  data: 6380
+  data: 6356
   metadata: 124524
 functions:
   __arr_drop_Calc:
@@ -965,20 +965,11 @@ functions:
   aipl_arr_inc:
     calls: 54976
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1306
-    bytes: (external)
   aipl_array_dec:
-    calls: 62616
+    calls: 59300
     bytes: (external)
   aipl_array_new:
     calls: 1602
-    bytes: (external)
-  aipl_array_push:
-    calls: 2790
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 2968
     bytes: (external)
   aipl_array_with_cap:
     calls: 145
@@ -1003,18 +994,6 @@ functions:
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 519
-    bytes: (external)
-  aipl_set_contains:
-    calls: 65
-    bytes: (external)
-  aipl_set_insert:
-    calls: 60
-    bytes: (external)
-  aipl_set_union:
-    calls: 3
-    bytes: (external)
-  aipl_set_union_mut:
-    calls: 48
     bytes: (external)
   aipl_test_begin:
     calls: 6

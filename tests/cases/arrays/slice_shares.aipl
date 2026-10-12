@@ -65,11 +65,11 @@ true
 allocations: 30
 deallocations: 30
 reallocations: 8
-bytes allocated: 1700
+bytes allocated: 1652
 instructions executed: 48884
-binary size: 10792
+binary size: 10768
   code: 6740
-  data: 219
+  data: 195
   metadata: 3833
 functions:
   __eq_u64$arr:
@@ -90,20 +90,11 @@ functions:
   aipl_arr_inc:
     calls: 15
     bytes: (external)
-  aipl_arr_slice:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 19
+    calls: 18
     bytes: (external)
   aipl_array_new:
-    calls: 1
-    bytes: (external)
-  aipl_array_push:
-    calls: 1
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 997
+    calls: 2
     bytes: (external)
   aipl_array_with_cap:
     calls: 1

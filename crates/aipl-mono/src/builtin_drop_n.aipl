@@ -23,9 +23,9 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 80
 instructions executed: 465
-binary size: 4312
+binary size: 4288
   code: 1924
-  data: 506
+  data: 482
   metadata: 1882
 functions:
   __test$drop_n:

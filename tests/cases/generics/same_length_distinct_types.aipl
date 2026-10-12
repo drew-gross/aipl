@@ -18,9 +18,9 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 195
-binary size: 2200
+binary size: 2128
   code: 688
-  data: 437
+  data: 365
   metadata: 1075
 functions:
   __test$same_length:

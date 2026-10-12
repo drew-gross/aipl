@@ -366,24 +366,10 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_arr_retain_warr"
         | "aipl_arr_drop_opt_warr"
         | "aipl_arr_retain_opt_warr" => sig(2, false),
-        "aipl_arr_load_bit" => sig(2, true),
-        "aipl_arr_elem_ptr" => sig(3, true),
         "aipl_arrv_elem_ptr" => sig(3, true),
         "aipl_i64_len" | "aipl_u64_len" => sig(1, true),
         "aipl_rec_alloc" | "aipl_write_i64" | "aipl_write_u64" => sig(2, true),
         "aipl_write_bytes" | "aipl_array_new" | "aipl_array_with_cap" => sig(3, true),
-        "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" | "aipl_arr_reverse" => {
-            sig(4, true)
-        }
-        "aipl_array_push"
-        | "aipl_array_push_mut"
-        | "aipl_arr_sort"
-        | "aipl_arr_reserve"
-        | "aipl_arr_extend"
-        | "aipl_dict_remove" => sig(5, true),
-        "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert" => {
-            sig(6, true)
-        }
         // The bridge array value's entries (`arr24`): a window (the out value,
         // the source value, the bounds and the element type's three
         // descriptors); the block lent a window or an inline value; a slot
@@ -396,7 +382,6 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_arrv_truncate" | "aipl_arrv_set_drop" => sig(2, false),
         "aipl_arr_push_small" => sig(3, true),
         "aipl_arr_reversed" => sig(5, false),
-        "aipl_arrv_extend" => sig(5, true),
         "aipl_arrv_sort" => sig(6, false),
         "aipl_arrv_push" => sig(7, false),
         "aipl_arrv_push_from"
@@ -414,7 +399,6 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_arr_settle" => sig(4, false),
         // The parts, `join`'s three separators, and the element type's three
         // descriptors; the joined array comes back in a register.
-        "aipl_arr_join" => sig(7, true),
         // The `str` entry points, mirroring `builtin_import_sig` in
         // `aipl-codegen`. A `str` argument is a `*const Str`, so it is one word
         // like any other; a `str` *result* is written through a leading out
@@ -453,9 +437,8 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_data" => sig(2, true),
         "aipl_concat" | "aipl_str_repeat" | "aipl_str_rope" => sig(3, false),
         // The out pointer, the parts, and `join`'s three separators.
-        "aipl_str_join" | "aipl_strv_join" => sig(5, false),
-        "aipl_str_split"
-        | "aipl_str_split_len"
+        "aipl_strv_join" => sig(5, false),
+        "aipl_str_split_len"
         | "aipl_read_file_to_string"
         | "aipl_write_string_to_file"
         // The part out pointer and the split cursor; the flag comes back in a
@@ -463,7 +446,6 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_split_iter_next" => sig(2, true),
         // The cursor, the source, and the separator.
         "aipl_str_split_iter_init" => sig(3, false),
-        "aipl_list_files" => sig(1, true),
         "aipl_arrv_list_files" => sig(2, true),
         "aipl_char_to_str" => sig(2, false),
         "aipl_execute_program" => sig(3, false),

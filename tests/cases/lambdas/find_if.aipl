@@ -33,11 +33,11 @@ fn first_big(xs: i64[]) -> i64? { xs.find_if(|x| x > 10) }.test({
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 48
+bytes allocated: 32
 instructions executed: 1141
-binary size: 7736
+binary size: 7568
   code: 3876
-  data: 1040
+  data: 872
   metadata: 2820
 functions:
   __builtin_find_if$char$lam$__test$first_big$lambda4:
@@ -76,11 +76,8 @@ functions:
   aipl_arr_inc:
     calls: 2
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_assert:
     calls: 9

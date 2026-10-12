@@ -43,9 +43,9 @@ deallocations: 36
 reallocations: 3
 bytes allocated: 2010
 instructions executed: 4177
-binary size: 5800
+binary size: 5776
   code: 3128
-  data: 441
+  data: 417
   metadata: 2231
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:

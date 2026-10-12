@@ -878,9 +878,9 @@ deallocations: 269
 reallocations: 13
 bytes allocated: 485504
 instructions executed: 2192356
-binary size: 296432
+binary size: 296408
   code: 211568
-  data: 7732
+  data: 7708
   metadata: 77132
 functions:
   __arr_drop_AiplTok:
@@ -1075,20 +1075,11 @@ functions:
   aipl_arr_inc:
     calls: 1416
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 15
-    bytes: (external)
   aipl_array_dec:
-    calls: 1724
+    calls: 1618
     bytes: (external)
   aipl_array_new:
     calls: 138
-    bytes: (external)
-  aipl_array_push:
-    calls: 91
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 22
     bytes: (external)
   aipl_assert:
     calls: 52

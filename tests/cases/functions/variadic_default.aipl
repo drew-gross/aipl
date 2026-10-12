@@ -47,9 +47,9 @@ deallocations: 11
 reallocations: 0
 bytes allocated: 265
 instructions executed: 592
-binary size: 3848
+binary size: 3776
   code: 1916
-  data: 129
+  data: 57
   metadata: 1803
 functions:
   __to_str_u64:

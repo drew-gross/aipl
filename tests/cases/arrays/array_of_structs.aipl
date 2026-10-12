@@ -34,7 +34,7 @@ some(Point { x: 3, y: 4 })
 allocations: 6
 deallocations: 6
 reallocations: 1
-bytes allocated: 322
+bytes allocated: 306
 instructions executed: 1263
 binary size: 8240
   code: 4148
@@ -64,9 +64,6 @@ functions:
     bytes: (external)
   aipl_array_new:
     calls: 2
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 1
     bytes: (external)
   aipl_i64_len:
     calls: 18

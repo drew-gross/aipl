@@ -62,9 +62,9 @@ deallocations: 10
 reallocations: 0
 bytes allocated: 596
 instructions executed: 730
-binary size: 5304
+binary size: 5232
   code: 3060
-  data: 153
+  data: 81
   metadata: 2091
 functions:
   __builtin_nonempty_first$i64:

@@ -100,11 +100,11 @@ none
 allocations: 19
 deallocations: 19
 reallocations: 0
-bytes allocated: 1007
+bytes allocated: 991
 instructions executed: 1910
-binary size: 11872
+binary size: 11824
   code: 7628
-  data: 315
+  data: 267
   metadata: 3929
 functions:
   __to_str_i64:

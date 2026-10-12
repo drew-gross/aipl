@@ -41,9 +41,9 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 104
 instructions executed: 963
-binary size: 5880
+binary size: 5808
   code: 2744
-  data: 785
+  data: 713
   metadata: 2351
 functions:
   __test$count_while:

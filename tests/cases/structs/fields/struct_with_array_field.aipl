@@ -40,9 +40,6 @@ functions:
   aipl_array_new:
     calls: 1
     bytes: (external)
-  aipl_array_push_mut:
-    calls: 1
-    bytes: (external)
   aipl_assert:
     calls: 3
     bytes: (external)

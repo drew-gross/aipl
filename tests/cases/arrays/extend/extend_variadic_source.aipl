@@ -90,11 +90,11 @@ abcdef
 allocations: 20
 deallocations: 20
 reallocations: 2
-bytes allocated: 1022
+bytes allocated: 926
 instructions executed: 3548
-binary size: 14840
+binary size: 14720
   code: 9416
-  data: 479
+  data: 359
   metadata: 4945
 functions:
   __to_str_bool:
@@ -115,20 +115,11 @@ functions:
   aipl_arr_inc:
     calls: 17
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 6
-    bytes: (external)
   aipl_array_dec:
-    calls: 31
+    calls: 23
     bytes: (external)
   aipl_array_new:
     calls: 1
-    bytes: (external)
-  aipl_array_push:
-    calls: 2
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 2
     bytes: (external)
   aipl_i64_len:
     calls: 22

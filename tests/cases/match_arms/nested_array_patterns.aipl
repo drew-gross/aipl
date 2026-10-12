@@ -111,11 +111,11 @@ other
 allocations: 33
 deallocations: 33
 reallocations: 0
-bytes allocated: 2329
+bytes allocated: 2265
 instructions executed: 2747
-binary size: 22232
+binary size: 22208
   code: 16368
-  data: 33
+  data: 9
   metadata: 5831
 functions:
   __arr_drop_Slot:

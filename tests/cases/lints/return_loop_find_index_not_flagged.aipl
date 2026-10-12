@@ -128,9 +128,9 @@ deallocations: 10
 reallocations: 0
 bytes allocated: 218
 instructions executed: 1267
-binary size: 6360
+binary size: 6336
   code: 3864
-  data: 195
+  data: 171
   metadata: 2301
 functions:
   __builtin_find_index$i64$lam$main$lambda0:

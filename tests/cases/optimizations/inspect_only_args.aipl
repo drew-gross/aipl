@@ -60,9 +60,9 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 21
 instructions executed: 1663
-binary size: 3984
+binary size: 3960
   code: 1488
-  data: 538
+  data: 514
   metadata: 1958
 functions:
   __test$count_via_copy:

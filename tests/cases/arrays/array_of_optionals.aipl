@@ -61,7 +61,7 @@ some(none)
 allocations: 11
 deallocations: 11
 reallocations: 0
-bytes allocated: 391
+bytes allocated: 375
 instructions executed: 1033
 binary size: 6504
   code: 3660

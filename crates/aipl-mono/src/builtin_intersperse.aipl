@@ -44,11 +44,11 @@ pub fn intersperse<T: any>(self: T[], sep: T) -> T[] {
 allocations: 14
 deallocations: 14
 reallocations: 10
-bytes allocated: 1024
+bytes allocated: 960
 instructions executed: 2755
-binary size: 8584
+binary size: 8512
   code: 4720
-  data: 913
+  data: 841
   metadata: 2951
 functions:
   __test$intersperse:
@@ -58,16 +58,10 @@ functions:
     calls: 18
     bytes: (external)
   aipl_array_dec:
-    calls: 32
+    calls: 27
     bytes: (external)
   aipl_array_new:
     calls: 5
-    bytes: (external)
-  aipl_array_push:
-    calls: 5
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 23
     bytes: (external)
   aipl_array_with_cap:
     calls: 4

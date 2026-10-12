@@ -44,11 +44,11 @@ fn heap_lambda() -> str {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 144
+bytes allocated: 128
 instructions executed: 549
-binary size: 4272
+binary size: 4224
   code: 1872
-  data: 439
+  data: 391
   metadata: 1961
 functions:
   __ctor$Tok$Int:
@@ -81,11 +81,8 @@ functions:
   aipl_arr_inc:
     calls: 2
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_assert:
     calls: 5

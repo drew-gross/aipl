@@ -79,7 +79,7 @@ reset
 allocations: 5
 deallocations: 5
 reallocations: 0
-bytes allocated: 236
+bytes allocated: 220
 instructions executed: 548
 binary size: 3288
   code: 1696

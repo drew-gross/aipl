@@ -66,9 +66,9 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 938
-binary size: 6808
+binary size: 6712
   code: 2932
-  data: 1237
+  data: 1141
   metadata: 2639
 functions:
   __test$map_find_if:

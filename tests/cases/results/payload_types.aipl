@@ -90,7 +90,7 @@ some(2)
 allocations: 25
 deallocations: 25
 reallocations: 0
-bytes allocated: 1037
+bytes allocated: 941
 instructions executed: 3491
 binary size: 25784
   code: 14136
@@ -154,26 +154,11 @@ functions:
   aipl_array_new:
     calls: 1
     bytes: (external)
-  aipl_array_push_mut:
-    calls: 22
-    bytes: (external)
   aipl_array_with_cap:
     calls: 8
     bytes: (external)
-  aipl_dict_get:
-    calls: 1
-    bytes: (external)
-  aipl_dict_insert:
-    calls: 4
-    bytes: (external)
   aipl_i64_len:
     calls: 26
-    bytes: (external)
-  aipl_set_contains:
-    calls: 24
-    bytes: (external)
-  aipl_set_insert:
-    calls: 18
     bytes: (external)
   aipl_u64_len:
     calls: 2

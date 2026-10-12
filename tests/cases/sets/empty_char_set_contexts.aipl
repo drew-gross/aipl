@@ -89,11 +89,11 @@ empty argument: 3
 allocations: 29
 deallocations: 29
 reallocations: 0
-bytes allocated: 1578
+bytes allocated: 1562
 instructions executed: 1477
-binary size: 10272
+binary size: 10248
   code: 6764
-  data: 191
+  data: 167
   metadata: 3317
 functions:
   __eq_set$char:

@@ -39,9 +39,9 @@ deallocations: 9
 reallocations: 0
 bytes allocated: 609
 instructions executed: 1289
-binary size: 5256
+binary size: 5184
   code: 2568
-  data: 347
+  data: 275
   metadata: 2341
 functions:
   __ctor$Tagged$Nums:

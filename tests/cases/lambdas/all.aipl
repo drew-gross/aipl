@@ -30,11 +30,11 @@ fn positive(xs: i64[]) -> bool { xs.all(|x| x > 0) }.test({
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 48
+bytes allocated: 32
 instructions executed: 1092
-binary size: 6336
+binary size: 6192
   code: 2988
-  data: 769
+  data: 625
   metadata: 2579
 functions:
   __builtin_all$char$lam$__test$positive$lambda3:
@@ -70,11 +70,8 @@ functions:
   aipl_arr_inc:
     calls: 2
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_assert:
     calls: 8

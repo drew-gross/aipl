@@ -17,11 +17,11 @@ fn probe() -> bool {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 104
+bytes allocated: 72
 instructions executed: 658
-binary size: 3408
+binary size: 3288
   code: 1656
-  data: 288
+  data: 168
   metadata: 1464
 functions:
   __eq_i64$arr:
@@ -33,11 +33,8 @@ functions:
   aipl_arr_inc:
     calls: 7
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 2
-    bytes: (external)
   aipl_array_dec:
-    calls: 9
+    calls: 7
     bytes: (external)
   aipl_assert:
     calls: 1

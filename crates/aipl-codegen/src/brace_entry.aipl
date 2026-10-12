@@ -82,9 +82,9 @@ deallocations: 74
 reallocations: 3
 bytes allocated: 5323
 instructions executed: 5416
-binary size: 76744
+binary size: 76720
   code: 50728
-  data: 1492
+  data: 1468
   metadata: 24524
 functions:
   __arr_drop_BraceEntry:
@@ -154,16 +154,10 @@ functions:
     calls: 19
     bytes: (external)
   aipl_array_dec:
-    calls: 40
+    calls: 34
     bytes: (external)
   aipl_array_new:
     calls: 5
-    bytes: (external)
-  aipl_array_push:
-    calls: 6
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 8
     bytes: (external)
   aipl_assert:
     calls: 7

@@ -93,9 +93,9 @@ deallocations: 31
 reallocations: 2
 bytes allocated: 1873
 instructions executed: 1876
-binary size: 12080
+binary size: 12056
   code: 7440
-  data: 147
+  data: 123
   metadata: 4493
 functions:
   __dict_drop_str$i64:
@@ -123,34 +123,16 @@ functions:
     calls: 26
     bytes: (external)
   aipl_array_dec:
-    calls: 45
+    calls: 44
     bytes: (external)
   aipl_array_new:
     calls: 7
     bytes: (external)
-  aipl_array_push:
-    calls: 1
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 20
-    bytes: (external)
   aipl_array_with_cap:
     calls: 11
     bytes: (external)
-  aipl_dict_get:
-    calls: 1
-    bytes: (external)
-  aipl_dict_insert:
-    calls: 2
-    bytes: (external)
   aipl_i64_len:
     calls: 2
-    bytes: (external)
-  aipl_set_contains:
-    calls: 19
-    bytes: (external)
-  aipl_set_insert:
-    calls: 15
     bytes: (external)
   aipl_u64_len:
     calls: 12

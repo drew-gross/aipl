@@ -36,11 +36,11 @@ true
 allocations: 16
 deallocations: 16
 reallocations: 6
-bytes allocated: 816
+bytes allocated: 768
 instructions executed: 1952
-binary size: 6264
+binary size: 6192
   code: 3504
-  data: 183
+  data: 111
   metadata: 2577
 functions:
   __builtin_intersperse$i64:
@@ -59,16 +59,10 @@ functions:
     calls: 14
     bytes: (external)
   aipl_array_dec:
-    calls: 23
+    calls: 20
     bytes: (external)
   aipl_array_new:
     calls: 3
-    bytes: (external)
-  aipl_array_push:
-    calls: 3
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 15
     bytes: (external)
   aipl_array_with_cap:
     calls: 3

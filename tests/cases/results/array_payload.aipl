@@ -41,11 +41,11 @@ fn tail_below(xs: i64[], cap: i64) -> i64[]!str {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 120
+bytes allocated: 88
 instructions executed: 2042
-binary size: 8736
+binary size: 8544
   code: 4356
-  data: 926
+  data: 734
   metadata: 3454
 functions:
   __eq_i64$arr:
@@ -71,9 +71,6 @@ functions:
     bytes: (external)
   aipl_array_dec:
     calls: 17
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 4
     bytes: (external)
   aipl_array_with_cap:
     calls: 2

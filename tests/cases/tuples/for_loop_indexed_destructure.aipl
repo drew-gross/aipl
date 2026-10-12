@@ -33,7 +33,7 @@ fn main() !prints {
 allocations: 46
 deallocations: 46
 reallocations: 0
-bytes allocated: 2921
+bytes allocated: 2873
 instructions executed: 1560
 binary size: 6056
   code: 3604

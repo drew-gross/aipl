@@ -37,9 +37,9 @@ deallocations: 5
 reallocations: 0
 bytes allocated: 99
 instructions executed: 547
-binary size: 4096
+binary size: 4072
   code: 1964
-  data: 187
+  data: 163
   metadata: 1945
 functions:
   __eq___builtin_Span:

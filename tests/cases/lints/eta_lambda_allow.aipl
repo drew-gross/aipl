@@ -9,14 +9,14 @@ fn stringify(xs: i64[]) -> str[] {
     assert(stringify([1, 2, 3]) == ["1", "2", "3"]);
 })
 --- performance ---
-allocations: 5
-deallocations: 5
+allocations: 6
+deallocations: 6
 reallocations: 2
-bytes allocated: 211
+bytes allocated: 251
 instructions executed: 458
-binary size: 3312
+binary size: 3264
   code: 1448
-  data: 168
+  data: 120
   metadata: 1696
 functions:
   __eq_str$arr:
@@ -33,9 +33,6 @@ functions:
     bytes: (external)
   aipl_array_new:
     calls: 1
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 3
     bytes: (external)
   aipl_array_with_cap:
     calls: 1

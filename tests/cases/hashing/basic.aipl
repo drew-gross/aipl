@@ -47,11 +47,11 @@ fn opt(b: bool) -> i64? { if (b) { some(5) } else { none } }.test({
 allocations: 9
 deallocations: 9
 reallocations: 0
-bytes allocated: 575
+bytes allocated: 511
 instructions executed: 2527
-binary size: 14104
+binary size: 14056
   code: 9404
-  data: 1130
+  data: 1082
   metadata: 3570
 functions:
   __dict_drop_i64$str:
@@ -84,23 +84,11 @@ functions:
   aipl_array_dec:
     calls: 8
     bytes: (external)
-  aipl_array_push_mut:
-    calls: 17
-    bytes: (external)
   aipl_array_with_cap:
     calls: 8
     bytes: (external)
   aipl_assert:
     calls: 16
-    bytes: (external)
-  aipl_dict_insert:
-    calls: 6
-    bytes: (external)
-  aipl_set_contains:
-    calls: 11
-    bytes: (external)
-  aipl_set_insert:
-    calls: 11
     bytes: (external)
   aipl_test_begin:
     calls: 7

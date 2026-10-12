@@ -1472,11 +1472,11 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
 allocations: 283
 deallocations: 283
 reallocations: 4
-bytes allocated: 74128
+bytes allocated: 74112
 instructions executed: 685848
-binary size: 813904
+binary size: 813880
   code: 547984
-  data: 9188
+  data: 9164
   metadata: 256732
 functions:
   __arr_drop_Kind:
@@ -1614,20 +1614,11 @@ functions:
   aipl_arr_inc:
     calls: 2848
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 24
-    bytes: (external)
   aipl_array_dec:
-    calls: 3191
+    calls: 2994
     bytes: (external)
   aipl_array_new:
     calls: 82
-    bytes: (external)
-  aipl_array_push:
-    calls: 174
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 31
     bytes: (external)
   aipl_assert:
     calls: 90

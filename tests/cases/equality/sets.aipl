@@ -13,11 +13,11 @@ fn eq_set(a: #{i64}, b: #{i64}) -> bool { a == b }.test({
 allocations: 8
 deallocations: 8
 reallocations: 0
-bytes allocated: 424
+bytes allocated: 296
 instructions executed: 497
-binary size: 4576
+binary size: 4552
   code: 2308
-  data: 296
+  data: 272
   metadata: 1972
 functions:
   __eq_set$i64:
@@ -32,20 +32,11 @@ functions:
   aipl_array_dec:
     calls: 8
     bytes: (external)
-  aipl_array_push_mut:
-    calls: 21
-    bytes: (external)
   aipl_array_with_cap:
     calls: 8
     bytes: (external)
   aipl_assert:
     calls: 5
-    bytes: (external)
-  aipl_set_contains:
-    calls: 29
-    bytes: (external)
-  aipl_set_insert:
-    calls: 21
     bytes: (external)
   aipl_test_begin:
     calls: 1

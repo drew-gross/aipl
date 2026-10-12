@@ -66,11 +66,11 @@ false
 allocations: 18
 deallocations: 18
 reallocations: 0
-bytes allocated: 812
+bytes allocated: 796
 instructions executed: 1293
-binary size: 5272
+binary size: 5224
   code: 2872
-  data: 223
+  data: 175
   metadata: 2177
 functions:
   __to_str_bool:

@@ -48,9 +48,9 @@ deallocations: 22
 reallocations: 1
 bytes allocated: 1359
 instructions executed: 921
-binary size: 7400
+binary size: 7376
   code: 4500
-  data: 79
+  data: 55
   metadata: 2821
 functions:
   __arr_drop_Tok:
@@ -66,16 +66,10 @@ functions:
     calls: 1
     bytes: 204
   aipl_array_dec:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_array_new:
     calls: 1
-    bytes: (external)
-  aipl_array_push:
-    calls: 1
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 2
     bytes: (external)
   aipl_u64_len:
     calls: 2

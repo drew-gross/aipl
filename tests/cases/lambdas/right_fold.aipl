@@ -48,9 +48,9 @@ deallocations: 17
 reallocations: 0
 bytes allocated: 1288
 instructions executed: 2274
-binary size: 9608
+binary size: 9512
   code: 5276
-  data: 863
+  data: 767
   metadata: 3469
 functions:
   __builtin_right_fold$i64$List$lam$__ctor$List$Cons:

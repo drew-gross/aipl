@@ -76,11 +76,11 @@ Named { name: "k=", tags: ["s", "t", "u"] }
 allocations: 48
 deallocations: 48
 reallocations: 3
-bytes allocated: 3090
+bytes allocated: 2930
 instructions executed: 7158
-binary size: 20272
+binary size: 20248
   code: 12764
-  data: 604
+  data: 580
   metadata: 6904
 functions:
   __arr_drop_First:
@@ -101,35 +101,17 @@ functions:
   aipl_arr_inc:
     calls: 73
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 4
-    bytes: (external)
   aipl_array_dec:
-    calls: 112
+    calls: 104
     bytes: (external)
   aipl_array_new:
     calls: 5
-    bytes: (external)
-  aipl_array_push:
-    calls: 4
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 15
     bytes: (external)
   aipl_array_with_cap:
     calls: 8
     bytes: (external)
   aipl_i64_len:
     calls: 10
-    bytes: (external)
-  aipl_set_contains:
-    calls: 15
-    bytes: (external)
-  aipl_set_insert:
-    calls: 15
-    bytes: (external)
-  aipl_set_union_mut:
-    calls: 12
     bytes: (external)
   aipl_u64_len:
     calls: 4

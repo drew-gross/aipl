@@ -25,11 +25,11 @@ fn pipe(xs: i64[], g: (i64) -> i64) -> i64[] { map(xs, g) }.test({
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 80
+bytes allocated: 64
 instructions executed: 619
-binary size: 3128
+binary size: 3008
   code: 1372
-  data: 392
+  data: 272
   metadata: 1364
 functions:
   __eq_i64$arr:

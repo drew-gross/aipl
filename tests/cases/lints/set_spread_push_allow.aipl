@@ -46,11 +46,11 @@ true
 allocations: 8
 deallocations: 8
 reallocations: 0
-bytes allocated: 333
+bytes allocated: 269
 instructions executed: 2068
-binary size: 8352
+binary size: 8304
   code: 5320
-  data: 211
+  data: 163
   metadata: 2821
 functions:
   __eq_i64$arr:
@@ -65,17 +65,8 @@ functions:
   aipl_arr_inc:
     calls: 22
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 3
-    bytes: (external)
   aipl_array_dec:
-    calls: 30
-    bytes: (external)
-  aipl_array_push:
-    calls: 1
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 2
+    calls: 26
     bytes: (external)
   aipl_i64_len:
     calls: 14

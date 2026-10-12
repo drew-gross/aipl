@@ -24,11 +24,11 @@ fn map(xs: i64[], f: (i64) -> i64) -> i64[] {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 160
+bytes allocated: 128
 instructions executed: 660
-binary size: 3048
+binary size: 2952
   code: 1364
-  data: 355
+  data: 259
   metadata: 1329
 functions:
   __eq_i64$arr:

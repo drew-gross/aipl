@@ -61,9 +61,9 @@ deallocations: 23
 reallocations: 2
 bytes allocated: 1423
 instructions executed: 2009
-binary size: 8056
+binary size: 8032
   code: 5288
-  data: 33
+  data: 9
   metadata: 2735
 functions:
   __arr_drop_R:
@@ -79,16 +79,10 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 15
+    calls: 13
     bytes: (external)
   aipl_array_new:
     calls: 1
-    bytes: (external)
-  aipl_array_push:
-    calls: 2
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 4
     bytes: (external)
   aipl_rec_alloc:
     calls: 11

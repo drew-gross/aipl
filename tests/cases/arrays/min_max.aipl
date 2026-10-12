@@ -21,11 +21,11 @@ fn smallest(xs: i64[]) -> i64 { xs.minimum().value_or(0) }.test({
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 48
+bytes allocated: 32
 instructions executed: 1227
-binary size: 6320
+binary size: 6224
   code: 3680
-  data: 737
+  data: 641
   metadata: 1903
 functions:
   __test$smallest:
@@ -37,11 +37,8 @@ functions:
   aipl_arr_inc:
     calls: 2
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_assert:
     calls: 8

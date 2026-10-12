@@ -62,9 +62,9 @@ deallocations: 6
 reallocations: 0
 bytes allocated: 217
 instructions executed: 1199
-binary size: 8352
+binary size: 8304
   code: 5076
-  data: 292
+  data: 244
   metadata: 2984
 functions:
   __eq_none$arr:

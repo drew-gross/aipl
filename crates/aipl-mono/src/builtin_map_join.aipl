@@ -113,11 +113,11 @@ pub fn map_join<T: any, U: any>(
 allocations: 24
 deallocations: 24
 reallocations: 2
-bytes allocated: 937
+bytes allocated: 921
 instructions executed: 5309
-binary size: 20048
+binary size: 19904
   code: 13508
-  data: 1440
+  data: 1296
   metadata: 5100
 functions:
   __eq_i64$arr:
@@ -132,11 +132,8 @@ functions:
   aipl_arr_inc:
     calls: 5
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 4
-    bytes: (external)
   aipl_array_dec:
-    calls: 23
+    calls: 22
     bytes: (external)
   aipl_array_new:
     calls: 2

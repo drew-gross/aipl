@@ -24,14 +24,14 @@ Span { start: 0, end: 2 }
 true
 ["_0", "_1", "_2"]
 --- performance ---
-allocations: 17
-deallocations: 17
+allocations: 18
+deallocations: 18
 reallocations: 2
-bytes allocated: 849
+bytes allocated: 889
 instructions executed: 1453
-binary size: 7072
+binary size: 7000
   code: 3648
-  data: 371
+  data: 299
   metadata: 3053
 functions:
   __eq_str$arr:
@@ -57,9 +57,6 @@ functions:
     bytes: (external)
   aipl_array_new:
     calls: 2
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 3
     bytes: (external)
   aipl_array_with_cap:
     calls: 1

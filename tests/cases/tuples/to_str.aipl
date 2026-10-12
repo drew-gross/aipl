@@ -23,11 +23,11 @@ some((true, "yes"))
 allocations: 6
 deallocations: 6
 reallocations: 0
-bytes allocated: 215
+bytes allocated: 199
 instructions executed: 1351
-binary size: 9456
+binary size: 9432
   code: 4756
-  data: 683
+  data: 659
   metadata: 4017
 functions:
   __to_str___tuple$bool$str$opt:

@@ -129,11 +129,11 @@ some(65535)
 allocations: 10
 deallocations: 10
 reallocations: 0
-bytes allocated: 380
+bytes allocated: 332
 instructions executed: 2031
-binary size: 10200
+binary size: 10032
   code: 5552
-  data: 779
+  data: 611
   metadata: 3869
 functions:
   __to_str_i32$arr:

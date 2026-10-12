@@ -315,7 +315,7 @@ Stage 5 — reversed as values                                               [do
   7 cases (`arrays/reverse` 4 → 0) and up in none.
 
 
-Stage 6 — the block header, two shapes, and the `str` buffer       [6c next]
+Stage 6 — the block header, two shapes, and the `str` buffer       [6e next]
 ---------------------------------------------------------------------------------
 The target. `base` is the first element, and the length lives only in the value:
 
@@ -419,7 +419,7 @@ window, a reversal or inline (lent as a copy).
             [ ] after the next handoff the artifact is in the new shape: drop the
                 `data.is_null()` branches (`ArrValue::run`, the FFI reader) and
                 the older-shape unit test.
-  [ ] 6c. `len` leaves the block; the header becomes base-relative, in the two
+  [x] 6c. `len` leaves the block; the header becomes base-relative, in the two
           shapes above, with the tag bit for the drop shape. Release walks `init`
           elements of a drop block. `init` is the block's own initialized count,
           not a value's `len`: a window's `len` is the window's, so releasing
@@ -446,15 +446,50 @@ window, a reversal or inline (lent as a copy).
                 dict `==` / hash / render read the value's run. Static literals
                 are still emitted in the old layout; only this module reads them.
                 Corpus: allocations unchanged, instructions -9.3%, binary -0.9%.
-            [ ] 6c-2. move the layout, in the runtimes and in static emission
-                only: base-relative header, plain `[cap][refcount]` and drop
-                `[drop_fn][init][cap][refcount]` blocks told apart by a tag in the
-                pointer's low bits (`0b01` plain, `0b10` drop; `0b00` is the old
-                layout, which only the artifact's own static blocks still use and
-                which nothing may read past its refcount), `len` gone from the
-                block (`ArrValue::whole` takes the length it is given; every block
-                function takes `(block, len)`). The artifact needs no
-                regeneration to survive it, which is what 6c-1 bought.
+            [x] 6c-2. the layout moved, in the runtimes and in static emission
+                only. Base-relative header in two shapes — plain `[cap][refcount]`
+                (16 bytes) and drop `[drop_fn][init][cap][refcount]` (32) — told
+                apart by the tag in the pointer's low bits (`0b01` plain, `0b10`
+                drop, `0b00` a block somebody else owns: a literal in the data
+                section or an array the host lent, of which the runtime reads the
+                refcount and no more, `0b11` the shared empty array). `len` is
+                gone from the block: every block function takes the length it is
+                given (`array_ops`), and `ArrValue::whole_of` takes the length
+                its caller knows. `ARR_ELEMS_OFFSET` is 0 — the base is the
+                first element.
+                  - `array_ops.rs` (new, shared by both runtimes): alloc, release,
+                    push, push_mut, reserve, the set operations and the dict
+                    operations, written once. Each runtime keeps only its allocator
+                    hooks (`raw_alloc`/`raw_realloc`/`raw_free`) and the entries
+                    compiled code calls by name (`aipl_array_new`, `_with_cap`,
+                    `_dec`, `aipl_arr_inc`). The block-taking entries
+                    (`aipl_arr_sort`, `aipl_array_push*`, `aipl_arr_reserve`,
+                    `aipl_arr_extend`, `aipl_arr_join`, `aipl_str_join`,
+                    `aipl_str_split`, `aipl_set_*`, `aipl_dict_*`,
+                    `aipl_arr_elem_ptr`, `aipl_arr_load_bit`, `aipl_arr_slice`,
+                    `aipl_arr_window_block`, `aipl_list_files`) are deleted; the
+                    artifact stopped importing them with 6c-1.
+                  - a plain block that gets a heap element (`mut a = []`, a `map`'s
+                    `with_capacity` before the output type is known) is moved into a
+                    drop block (`array_ops::into_drop_shape`), once, at the
+                    capacity the push wants.
+                  - static literals are `[refcount][elements]` (no capacity, no
+                    length); the artifact's own old-layout literals read the same
+                    way, which is why it needed no regeneration to survive this.
+                  - the host's lent argument blocks are plain blocks with a static
+                    refcount (`ArgBufs::array_block`).
+                Corpus: instructions unchanged, binary size -0.05%, bytes allocated
+                down for every plain block (16 bytes each).
+                Known cost: +1 allocation in the `map`/`filter` cases whose output
+                holds heap values (23 cases, 0.18% of allocations). Their
+                `with_capacity` accumulator is allocated before the element type is
+                known, as a plain block, and the first heap push moves it into a
+                drop block. Fixing it means `with_capacity` handing back a
+                reservation that the first push allocates from (or mono giving the
+                intrinsic its element type).
+            [ ] after the next handoff the artifact is regenerated by this
+                compiler: drop the `data.is_null()` tolerance, if any is left, and
+                the `Heap`/`Inline` names that survived in comments.
   [x] 6d. **sets and dicts flip to 24-byte values** (decided: rather than keep
           a header of their own). They share the array block and its runtime but
           are still one-word values, so they could not carry a length once 6c
@@ -527,12 +562,11 @@ And what this switch will add:
       stage 3, which exists only because it can point at a block
   [ ] `SeqRepr::Tagged` itself, and the `Abi` field, if arrays end up being the
       last type to have a choice
-  [ ] the block-taking entries 6a replaced, once the checked-in artifact stops
-      importing them: `aipl_arr_sort`, `aipl_str_join`, `aipl_arr_join`,
-      `aipl_arr_push*`, `aipl_set_contains` / `_insert` / `_union`,
-      `aipl_dict_get` / `_contains_key` / `_insert` / `_remove`, and the old
-      `aipl_arr_reserve` / `aipl_arr_extend` call shapes; then the `v` drops out
-      of the new names
+  [x] the block-taking entries 6a replaced: deleted in 6c-2.
+  [ ] the `v` in the names that replaced them (`aipl_arrv_*`, `aipl_setv_*`,
+      `aipl_dictv_*`, `aipl_strv_*`) now that nothing shares the plain name — a
+      rename across the runtime, the codegen tables and the artifact manifest, so
+      its own change
 
   Do this as its own change, after 2f is green. Mixing deletion into the switch
   is how a switch stops being reviewable.

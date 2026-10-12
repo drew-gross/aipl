@@ -27,11 +27,11 @@ fn grown() -> bool[] {
 allocations: 4
 deallocations: 4
 reallocations: 1
-bytes allocated: 171
+bytes allocated: 107
 instructions executed: 1726
-binary size: 4776
+binary size: 4584
   code: 2052
-  data: 791
+  data: 599
   metadata: 1933
 functions:
   __eq_bool$arr:
@@ -44,13 +44,7 @@ functions:
     calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 7
-    bytes: (external)
-  aipl_array_push:
-    calls: 3
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 15
+    calls: 4
     bytes: (external)
   aipl_array_with_cap:
     calls: 1

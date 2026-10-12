@@ -40,6 +40,7 @@ mod str24;
 // is wired up to it; see the file's header for why that switch is atomic.
 #[allow(dead_code)] // staged: wired up when the array value widens
 mod arr24;
+mod array_ops;
 mod str24_host;
 
 // STAGED, the same way and for the same reason: the 256-bit `#{char}` value,
@@ -263,38 +264,13 @@ unsafe fn free_dynamic_string(block: *mut u8, content_len: usize) {
     }
 }
 
-/// `list_files(dir) -> str[]?` runtime: every file at or below `dir`, walked
-/// recursively, as a fresh `str[]` of `dir`-prefixed paths — or null on
-/// any failure (unreadable directory, non-UTF-8 name, unknowable entry kind),
-/// which codegen wraps into `err`. Order is whatever the filesystem yields;
-/// callers that need determinism sort. A directory is descended into rather than
-/// listed, and a symlink counts as a file (`file_type` doesn't follow it), so the
-/// walk can't cycle. Decrements `dir` per the refcount protocol (callers pre-inc,
-/// as with any str-taking fn). Mirrors `aipl_list_files` in the linker runtime.
-/// `list_files(dir)` under the wide ABI: a `str[]` of 24-byte elements, or null
-/// on failure. Only the array half is per-runtime — the directory walk is shared
-/// with the tagged version. Borrows `dir`.
-///
-/// Returns the block, or null on failure. The checked-in artifact calls this one;
-/// compiled code calls [`aipl_arrv_list_files`].
-#[no_mangle]
-extern "C" fn aipl_list_files(dir: *const str24::Str) -> *const u8 {
-    let Some(files) = list_files_paths(dir) else {
-        return std::ptr::null();
-    };
-    let drop_fn = str24::aipl_arr_drop_str as *const () as usize as i64;
-    let arr = aipl_array_new(files.len() as i64, drop_fn, str24::STR_SIZE as i64);
-    unsafe {
-        let elems = arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str;
-        for (i, f) in files.iter().enumerate() {
-            std::ptr::write(elems.add(i), str24::from_bytes(f.as_bytes()));
-        }
-    }
-    arr
-}
-
-/// [`aipl_list_files`] writing the listing to `out` as an array value and
-/// returning 1, or returning 0 and writing nothing.
+/// `list_files(dir) -> str[]`: every file at or below `dir`, walked recursively,
+/// each path `dir`-prefixed and in directory order (callers that need determinism
+/// sort). A directory is descended into rather than listed, and a symlink counts
+/// as a file (`file_type` doesn't follow it), so the walk can't cycle. Writes the
+/// listing to `out` as an array value and returns 1, or returns 0 and writes
+/// nothing on any failure. Borrows `dir`. Mirrors `aipl_arrv_list_files` in the
+/// linker runtime.
 #[no_mangle]
 extern "C" fn aipl_arrv_list_files(out: *mut arr24::ArrValue, dir: *const str24::Str) -> i64 {
     let Some(files) = list_files_paths(dir) else {
@@ -628,7 +604,7 @@ extern "C" fn aipl_write_bytes(dst: *const u8, src: *const u8, n: i64) -> *const
     }
 }
 
-/// How [`aipl_arr_sort`] orders its elements. Every `ord` element type is a
+/// How [`aipl_arrv_sort`] orders its elements. Every `ord` element type is a
 /// scalar — a word, or a narrow integer packed at its own width — or a `str`, so
 /// the only question is how to read one: as a signed integer, as an unsigned one
 /// (`u8`..`u64`, and `char` — a byte value), or as a `str` to compare
@@ -637,60 +613,7 @@ const SORT_KIND_SIGNED: i64 = 0;
 const SORT_KIND_UNSIGNED: i64 = 1;
 const SORT_KIND_STR: i64 = 2;
 
-/// `xs.sort() -> T[]` — a fresh array with the same elements in ascending order.
-/// Consumes `xs` (callers pre-inc) and co-owns the elements it copies.
-///
-/// Unlike a reversal (`arr24::aipl_arr_reversed`) this cannot be a value: the
-/// order isn't a function of the index, so the result has to be materialized.
-/// Only `ord`
-/// element types reach here, so the block is a flat run of scalars (or of `str`
-/// values) and sorting is a permutation of them — which moves no ownership,
-/// hence the single blanket retain before sorting.
-///
-/// Mirrors `aipl_arr_sort` in the linker runtime.
-#[no_mangle]
-extern "C" fn aipl_arr_sort(
-    a: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-    kind: i64,
-) -> *const u8 {
-    let a = aipl_arr_ensure_heap(a);
-    if a.is_null() {
-        return a;
-    }
-    let len = unsafe { array_len_of(a) };
-    let raw = alloc_array(len, len, drop_fn, elem_size);
-    unsafe {
-        let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-        if len > 0 {
-            let src = a.add(ARR_ELEMS_OFFSET);
-            std::ptr::copy_nonoverlapping(src, dst, len * elem_stride(elem_size));
-            // The new array co-owns every element. Done before the sort because
-            // reordering elements neither creates nor destroys a reference.
-            elem_rc(retain_fn, dst, len);
-            // A wide `str` element is the whole 24-byte value, not a word, so it
-            // is both moved and compared differently — `sort_words` would
-            // reorder thirds of values and compare their first fields.
-            if kind == SORT_KIND_STR && elem_size == str24::STR_SIZE as i64 {
-                let vals = std::slice::from_raw_parts_mut(dst as *mut str24::Str, len);
-                str24::sort_values(vals);
-            } else if elem_stride(elem_size) < 8 {
-                // A narrow integer element is packed at its own width.
-                let unsigned = kind == SORT_KIND_UNSIGNED;
-                sort_narrow(dst, len, elem_stride(elem_size), unsigned);
-            } else {
-                let words = std::slice::from_raw_parts_mut(dst as *mut i64, len);
-                sort_words(words, kind);
-            }
-        }
-    }
-    aipl_array_dec(a);
-    raw
-}
-
-/// How an ordered set's `aipl_set_insert` places an element — the `order`
+/// How an ordered set's `array_ops::set_insert` places an element — the `order`
 /// argument of the set runtime entries. Zero is the unordered set (append);
 /// otherwise the sign is the direction (positive smallest first, negative
 /// largest first) and the magnitude the word comparison: `1` signed, `2`
@@ -719,61 +642,8 @@ fn set_order_code(elem: &ConcreteType, order: aipl_syntax::ast::SetOrder) -> i64
     }
 }
 
-/// Where the element at `x` goes in the ordered set `a`, or `None` when an
-/// equal element is already there: the index of the first element that should
-/// follow it. Shared by both runtimes' `aipl_set_insert` and kept byte-for-byte
-/// identical, like [`sort_words`]. Linear — an ordered set is small and its
-/// insert shifts the tail anyway, so a binary search would not change the cost
-/// class.
-///
-/// # Safety
-/// `a` is a non-null array block whose elements are `elem_size` bytes (a word
-/// for scalars, the wide value for a `str`), and `x` addresses one such element.
-unsafe fn ordered_set_position(
-    a: *const u8,
-    x: *const u8,
-    elem_size: i64,
-    str_cmp: i64,
-    order: i64,
-) -> Option<usize> {
-    use core::cmp::Ordering;
-    let len = unsafe { array_len_of(a) };
-    let width = elem_size.max(8) as usize;
-    // `cmp(existing, new)` in the set's own direction: `Less` means the
-    // existing element comes first.
-    let cmp = |i: usize| -> Ordering {
-        let ep = unsafe { arr_elem_ptr(a, i, width) };
-        let natural = if str_cmp == str24::STR_SIZE as i64 {
-            let e = unsafe { core::ptr::read(ep as *const str24::Str) };
-            let n = unsafe { core::ptr::read(x as *const str24::Str) };
-            str24::cmp(e, n).cmp(&0)
-        } else if order.abs() == 2 {
-            let e = unsafe { core::ptr::read(ep as *const u64) };
-            let n = unsafe { core::ptr::read(x as *const u64) };
-            e.cmp(&n)
-        } else {
-            let e = unsafe { core::ptr::read(ep as *const i64) };
-            let n = unsafe { core::ptr::read(x as *const i64) };
-            e.cmp(&n)
-        };
-        if order < 0 {
-            natural.reverse()
-        } else {
-            natural
-        }
-    };
-    for i in 0..len {
-        match cmp(i) {
-            Ordering::Less => {}
-            Ordering::Equal => return None,
-            Ordering::Greater => return Some(i),
-        }
-    }
-    Some(len)
-}
-
 /// Order `words` in place by [`SORT_KIND_SIGNED`]/`_UNSIGNED`/`_STR`. Shared by
-/// both runtimes' `aipl_arr_sort`; kept byte-for-byte identical, which is why it
+/// both runtimes' `aipl_arrv_sort`; kept byte-for-byte identical, which is why it
 /// uses `sort_unstable_by` — the stable sorts need an allocation, and the linker
 /// runtime is `#![no_std]`. Unstable is enough here: `ord` elements are compared
 /// by value, so equal ones are indistinguishable.
@@ -784,91 +654,6 @@ fn sort_words(words: &mut [i64], kind: i64) {
         // three above).
         _ => words.sort_unstable(),
     }
-}
-
-/// `xs[start..end]` — array slice. Both bounds are clamped to `[0, len]` (an
-/// out-of-range end yields a shorter array; `start >= end` yields `[]`).
-/// *Borrows* `xs` (does not drop it) and returns an array the caller owns.
-///
-/// The elements are *copied* into a fresh heap block, each retained: a slice
-/// that shares is a window carried in the value (`arr24::aipl_arr_window`), and
-/// this is what that reaches for when sharing is impossible — a bit-packed
-/// source, which has no byte to point into, or a window lent to a runtime entry
-/// that wants a block of exactly its elements (`arr24::aipl_arr_window_block`).
-/// The two degenerate windows copy nothing: an empty one is the empty array,
-/// and the whole array is the array itself, retained.
-#[no_mangle]
-extern "C" fn aipl_arr_slice(
-    a: *const u8,
-    start: i64,
-    end: i64,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    if a.is_null() {
-        return a;
-    }
-    let len = unsafe { array_len_of(a) } as i64;
-    let lo = start.clamp(0, len) as usize;
-    let hi = end.clamp(0, len) as usize;
-    let n = hi.saturating_sub(lo);
-    if n == 0 {
-        let _ = (drop_fn, elem_size);
-        return arr_inline_empty();
-    }
-    if lo == 0 && n == len as usize {
-        aipl_arr_inc(a);
-        return a;
-    }
-    do_arr_slice_copy(a, lo, n, drop_fn, retain_fn, elem_size)
-}
-
-/// `join(parts: str[], sep: str) -> str` — concatenate the parts with `sep`
-/// between consecutive elements (`[]` -> `""`, `[x]` -> `x`). Two passes: measure
-/// the total length, then fill a single fresh buffer (inline when <= 7 bytes).
-/// Consumes both args (the array drop releases its element strings), like the
-/// other str builtins.
-/// `split` under the wide ABI. Only the array half lives here — where the cuts
-/// fall is `str24::for_each_split`, shared with the linker runtime, because that
-/// is the part that would diverge silently. Two passes over the same shared
-/// splitter: count, allocate, fill.
-///
-/// Each part is a window into `s`, retained because the array owns it. Borrows
-/// both arguments, like every `aipl_*` entry point.
-#[no_mangle]
-extern "C" fn aipl_str_split(s: *const str24::Str, sep: *const str24::Str) -> *const u8 {
-    let (sv, sepv) = unsafe { (*s, *sep) };
-    let mut count = 0usize;
-    str24::for_each_split(sv, sepv, &mut |_| count += 1);
-    let drop_fn = str24::aipl_arr_drop_str as *const () as usize as i64;
-    let arr = aipl_array_new(count as i64, drop_fn, str24::STR_SIZE as i64);
-    let elems = unsafe { arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str };
-    let mut k = 0usize;
-    str24::for_each_split(sv, sepv, &mut |part| {
-        part.retain();
-        unsafe { std::ptr::write(elems.add(k), part) };
-        k += 1;
-    });
-    arr
-}
-
-/// `join` under the wide ABI — the array half only; the streaming is
-/// `str24::join_from`. Borrows the array and all three separators (see
-/// `str24::gap_sep` for which one lands in which gap).
-#[no_mangle]
-extern "C" fn aipl_str_join(
-    out: *mut str24::Str,
-    arr: *const u8,
-    sep: *const str24::Str,
-    final_sep: *const str24::Str,
-    only_sep: *const str24::Str,
-) {
-    with_heap(arr, |arr| unsafe {
-        let len = array_len_of(arr);
-        let elems = arr.add(ARR_ELEMS_OFFSET) as *const str24::Str;
-        *out = str24::join_from(elems, len, *sep, *final_sep, *only_sep);
-    })
 }
 
 /// Bytes codegen reserves for a `for (let c : s)` cursor, for whichever
@@ -898,176 +683,38 @@ type ArrDropFn = extern "C" fn(*const u8, i64);
 // element-region capacity in *bytes* (not slots) so `aipl_array_dec` can size
 // the block for free() without needing the element size — important because it
 // also serves as the generic drop-fn for nested arrays, where the inner array's
-// element size isn't known to the caller.
+// element size isn't known to the caller. The operations over a block are
+// `array_ops`, shared with the AOT runtime; what is here is the allocator they
+// ask for and the entry points compiled code calls.
 
-fn array_block_size(cap_bytes: usize) -> usize {
-    HEADER_SIZE + ARR_ELEMS_OFFSET + cap_bytes
-}
-
-/// A *borrowed* array as a heap block for the duration of `f`: a heap array is
-/// handed over as is, and the shared empty array as the empty block. (A view
-/// used to be materialized here; a slice and a reversal are values now, lent a
-/// block by codegen before they reach the runtime.) For the entry points that read every element of
-/// an argument they do not own (`join`, `execute_program`'s argument list),
-/// where dispatching per element would gain nothing over one copy.
-fn with_heap<R>(a: *const u8, f: impl FnOnce(*const u8) -> R) -> R {
-    match arr_repr(a) {
-        ArrRepr::Heap => f(a),
-        // No block of its own, and nothing to materialize: the permanently-empty
-        // block reads as the same array.
-        ArrRepr::Inline => f(arr_empty_block()),
-    }
-}
-
-/// The block an array pointer names, as a heap block: itself, or the shared
-/// empty block for the inline empty array. Consumes the input's reference.
-fn aipl_arr_ensure_heap(a: *const u8) -> *const u8 {
-    match arr_repr(a) {
-        ArrRepr::Heap => a,
-        // Already as materialized as an empty array gets; the static block carries
-        // no reference for the caller to release.
-        ArrRepr::Inline => arr_empty_block(),
-    }
-}
-
-/// A fresh heap array holding copies of `a`'s elements in `[start, start + n)`
-/// (any repr), each retained via `retain_fn`. Does NOT drop `a`.
-fn do_arr_slice_copy(
-    a: *const u8,
-    start: usize,
-    n: usize,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    if elem_size == ELEM_BITPACKED {
-        let raw = alloc_array(n, n, drop_fn, ELEM_BITPACKED);
-        unsafe {
-            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-            for i in 0..n {
-                let bit = arr_load_bit(a, start + i);
-                write_packed_bit(dst, i, bit);
-            }
-        }
-        return raw;
-    }
-    let es = elem_stride(elem_size);
-    let raw = alloc_array(n, n, drop_fn, elem_size);
-    unsafe {
-        let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-        for i in 0..n {
-            let src = arr_elem_ptr(a, start + i, es);
-            std::ptr::copy_nonoverlapping(src, dst_base.add(i * es), es);
-        }
-        elem_rc(retain_fn, dst_base, n);
+/// A new allocation of `size` bytes, 8-aligned, for a block (`array_ops`).
+unsafe fn raw_alloc(size: usize) -> *mut u8 {
+    let layout = std::alloc::Layout::from_size_align(size, std::mem::align_of::<i64>())
+        .expect("array layout");
+    let raw = unsafe { std::alloc::alloc(layout) };
+    if raw.is_null() {
+        std::alloc::handle_alloc_error(layout);
     }
     raw
 }
 
-/// A new heap array whose elements are those of the block `a` in reverse order,
-/// each retained. Does NOT drop `a`. What reversing a bit-packed `bool[]` is —
-/// it has no byte run for a reversed value to walk (see `arr24`) — reached
-/// through [`arr_reverse_copy`].
-fn do_arr_reverse(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: i64) -> *const u8 {
-    let len = unsafe { array_len_of(arr_untag(a)) };
-    if elem_size == ELEM_BITPACKED {
-        let raw = alloc_array(len, len, drop_fn, ELEM_BITPACKED);
-        unsafe {
-            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-            for i in 0..len {
-                let j = len - 1 - i;
-                let bit = arr_load_bit(a, j);
-                write_packed_bit(dst, i, bit);
-            }
-        }
-        return raw;
-    }
-    let es = elem_stride(elem_size);
-    let raw = alloc_array(len, len, drop_fn, elem_size);
-    unsafe {
-        let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-        for i in 0..len {
-            let j = len - 1 - i;
-            let src = arr_elem_ptr(a, j, es);
-            std::ptr::copy_nonoverlapping(src, dst_base.add(i * es), es);
-        }
-        elem_rc(retain_fn, dst_base, len);
+/// `ptr`, an allocation of `old_size` bytes from [`raw_alloc`], resized to
+/// `new_size`.
+unsafe fn raw_realloc(ptr: *mut u8, old_size: usize, new_size: usize) -> *mut u8 {
+    let layout = std::alloc::Layout::from_size_align(old_size, std::mem::align_of::<i64>())
+        .expect("array layout");
+    let raw = unsafe { std::alloc::realloc(ptr, layout, new_size) };
+    if raw.is_null() {
+        std::alloc::handle_alloc_error(layout);
     }
     raw
 }
 
-/// [`do_arr_reverse`] under the name both runtimes give it, for the shared
-/// `arr24::aipl_arr_reversed`.
-fn arr_reverse_copy(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: i64) -> *const u8 {
-    do_arr_reverse(a, drop_fn, retain_fn, elem_size)
-}
-
-/// Return a pointer to element `idx` in a heap array (assumes tag already stripped
-/// by `arr_elem_ptr`).
-unsafe fn heap_elem_ptr(base: *const u8, idx: usize, elem_size: usize) -> *const u8 {
-    unsafe { base.add(ARR_ELEMS_OFFSET).add(idx * elem_size) }
-}
-
-/// Repr-aware element pointer for use from JIT-compiled code (non-heap fast
-/// path). Returns a pointer to element `idx` in any array representation.
-/// `elem_size` is the stride in bytes (0 = bit-packed, NOT valid here — use
-/// `aipl_arr_load_bit` for bit-packed arrays).
-#[no_mangle]
-extern "C" fn aipl_arr_elem_ptr(a: *const u8, idx: i64, elem_size: i64) -> *const u8 {
-    unsafe { arr_elem_ptr(a, idx as usize, elem_size as usize) }
-}
-
-/// Repr-aware bit load for JIT-compiled code. Returns 0 or 1.
-#[no_mangle]
-extern "C" fn aipl_arr_load_bit(a: *const u8, idx: i64) -> i64 {
-    i64::from(unsafe { arr_load_bit(a, idx as usize) })
-}
-
-/// Compute the address of element `idx`, dispatching on representation.
-unsafe fn arr_elem_ptr(a: *const u8, idx: usize, elem_size: usize) -> *const u8 {
-    match arr_repr(a) {
-        ArrRepr::Heap => unsafe { heap_elem_ptr(arr_untag(a), idx, elem_size) },
-        // An inline array holds no elements, so every index is out of bounds and
-        // the bounds check upstream has already answered.
-        ArrRepr::Inline => unreachable!("element {idx} of an empty array"),
-    }
-}
-
-/// Read bit `idx` from an array (any repr).
-unsafe fn arr_load_bit(a: *const u8, idx: usize) -> bool {
-    match arr_repr(a) {
-        ArrRepr::Heap => {
-            let base = arr_untag(a).add(ARR_ELEMS_OFFSET);
-            unsafe { (*base.add(idx >> 3) >> (idx & 7)) & 1 != 0 }
-        }
-        // No elements, so no bits; the bounds check upstream has answered.
-        ArrRepr::Inline => unreachable!("bit {idx} of an empty array"),
-    }
-}
-
-/// Write bit `idx` of a bit-packed data region (reads happen in codegen IR).
-unsafe fn write_packed_bit(data: *mut u8, idx: usize, val: bool) {
-    unsafe {
-        let byte = data.add(idx >> 3);
-        let mask = 1u8 << (idx & 7);
-        if val {
-            *byte |= mask;
-        } else {
-            *byte &= !mask;
-        }
-    }
-}
-
-unsafe fn array_len_of(ptr: *const u8) -> usize {
-    if matches!(arr_repr(ptr), ArrRepr::Inline) {
-        return arr_inline_len(ptr);
-    }
-    unsafe { std::ptr::read(arr_untag(ptr).add(ARR_LEN_OFFSET) as *const i64) as usize }
-}
-
-unsafe fn array_cap_bytes_of(ptr: *const u8) -> usize {
-    // Only valid for heap arrays; callers must ensure the ptr is untagged/Heap.
-    unsafe { std::ptr::read(arr_untag(ptr).add(ARR_CAP_OFFSET) as *const i64) as usize }
+/// Free an allocation of `size` bytes from [`raw_alloc`].
+unsafe fn raw_free(ptr: *mut u8, size: usize) {
+    let layout = std::alloc::Layout::from_size_align(size, std::mem::align_of::<i64>())
+        .expect("array layout");
+    unsafe { std::alloc::dealloc(ptr, layout) };
 }
 
 /// Retain (`inc`) or drop one element via a retain/drop helper-fn pointer, if
@@ -1079,106 +726,40 @@ unsafe fn elem_rc(fn_ptr: i64, at: *const u8, count: usize) {
     }
 }
 
-/// Allocate an array block holding `cap` element slots of `elem_size` bytes,
-/// with `len`/`drop_fn` set and the byte-capacity recorded (refcount 1).
-fn alloc_array(len: usize, cap: usize, drop_fn: i64, elem_size: i64) -> *const u8 {
-    let cap_bytes = cap_bytes_for(elem_size, cap);
-    let layout = std::alloc::Layout::from_size_align(
-        array_block_size(cap_bytes),
-        std::mem::align_of::<i64>(),
-    )
-    .expect("array layout");
-    let raw = unsafe { std::alloc::alloc(layout) };
-    if raw.is_null() {
-        std::alloc::handle_alloc_error(layout);
-    }
-    unsafe {
-        std::ptr::write(raw as *mut i64, 1); // refcount
-        std::ptr::write(
-            raw.add(HEADER_SIZE + ARR_LEN_OFFSET) as *mut i64,
-            len as i64,
-        );
-        std::ptr::write(
-            raw.add(HEADER_SIZE + ARR_CAP_OFFSET) as *mut i64,
-            cap_bytes as i64,
-        );
-        std::ptr::write(
-            raw.add(HEADER_SIZE + ARR_DROPFN_OFFSET) as *mut i64,
-            drop_fn,
-        );
-        raw.add(HEADER_SIZE)
-    }
-}
-
 /// Allocate an array of `len` uninitialized elements (refcount 1, cap == len)
 /// with the given element `drop_fn` (0 for scalar elements) and `elem_size`.
 /// Codegen stores each element immediately after.
 ///
-/// A zero-length result is the **inline** empty array, which allocates nothing.
-/// Only the finished-value producers do this — `aipl_array_with_cap` keeps
-/// allocating even at capacity zero, because what it returns is an accumulator
-/// something is about to push into, and no write path handles an inline array.
+/// A zero-length result is the **empty** array, which allocates nothing. Only the
+/// finished-value producers do this — `aipl_array_with_cap` keeps allocating even
+/// at capacity zero, because what it returns is an accumulator something is about
+/// to push into.
 #[no_mangle]
 extern "C" fn aipl_array_new(len: i64, drop_fn: i64, elem_size: i64) -> *const u8 {
     let len = len.max(0) as usize;
     if len == 0 {
         return arr_inline_empty();
     }
-    alloc_array(len, len, drop_fn, elem_size)
+    array_ops::alloc_block(len, len, drop_fn, elem_size)
 }
 
-/// Allocate an empty array (len 0, refcount 1) reserved to `cap` slots of
-/// `elem_size` bytes with the given element `drop_fn`. Used by `map`/`filter` to
-/// pre-size their output. Mirrors `aipl_array_with_cap` in the linker runtime.
+/// Allocate an empty array (refcount 1) reserved to `cap` slots of `elem_size`
+/// bytes with the given element `drop_fn`. Used by `map`/`filter` to pre-size
+/// their output. Mirrors `aipl_array_with_cap` in the linker runtime.
 #[no_mangle]
 extern "C" fn aipl_array_with_cap(cap: i64, drop_fn: i64, elem_size: i64) -> *const u8 {
-    alloc_array(0, cap.max(0) as usize, drop_fn, elem_size)
+    array_ops::alloc_block(0, cap.max(0) as usize, drop_fn, elem_size)
 }
 
-/// Decrement an array's refcount; at zero, release each element via the
-/// stored `drop_fn` (if any) and free the block (sized by its byte-capacity).
+/// Decrement an array's refcount; at zero, release each element it owns via the
+/// recorded `drop_fn` (if any) and free the block.
 #[no_mangle]
 extern "C" fn aipl_array_dec(ptr: *const u8) {
-    if ptr.is_null() {
+    // The empty array owns no allocation, so there is no refcount to count down.
+    if ptr.is_null() || arr_repr(ptr) == ArrRepr::Empty {
         return;
     }
-    // An inline array owns no allocation, so there is no refcount to touch — the
-    // same no-op `release` is for an inline `str`. This has to come before the
-    // header read below, which would dereference the value as a pointer.
-    if matches!(arr_repr(ptr), ArrRepr::Inline) {
-        return;
-    }
-    let u = arr_untag(ptr);
-    unsafe {
-        let h = header_of(u);
-        if *h == STATIC_REFCOUNT {
-            return;
-        }
-        *h -= 1;
-        if *h == 0 {
-            match arr_repr(ptr) {
-                // Unreachable: an inline value owns no allocation, so the header
-                // read above would have had nothing to count down. The early
-                // return at the top of this function is what keeps it out.
-                ArrRepr::Inline => unreachable!("freeing an inline array"),
-                ArrRepr::Heap => {
-                    let len = array_len_of(u);
-                    let cap_bytes = array_cap_bytes_of(u);
-                    let drop_fn = std::ptr::read(u.add(ARR_DROPFN_OFFSET) as *const i64);
-                    if drop_fn != 0 {
-                        let f: ArrDropFn = std::mem::transmute(drop_fn);
-                        f(u.add(ARR_ELEMS_OFFSET), len as i64);
-                    }
-                    let layout = std::alloc::Layout::from_size_align(
-                        array_block_size(cap_bytes),
-                        std::mem::align_of::<i64>(),
-                    )
-                    .expect("array layout");
-                    std::alloc::dealloc(h as *mut u8, layout);
-                }
-            }
-        }
-    }
+    array_ops::release(ptr);
 }
 
 /// Retain an array value (any representation).  Arrays use this instead of
@@ -1186,19 +767,10 @@ extern "C" fn aipl_array_dec(ptr: *const u8) {
 /// would misinterpret an array's representation tag.
 #[no_mangle]
 extern "C" fn aipl_arr_inc(ptr: *const u8) {
-    if ptr.is_null() {
+    if ptr.is_null() || arr_repr(ptr) == ArrRepr::Empty {
         return;
     }
-    if matches!(arr_repr(ptr), ArrRepr::Inline) {
-        return;
-    }
-    let u = arr_untag(ptr);
-    unsafe {
-        let h = header_of(u);
-        if *h != STATIC_REFCOUNT {
-            *h += 1;
-        }
-    }
+    array_ops::retain(ptr);
 }
 
 // ---------- Recursive (boxed) type runtime ----------
@@ -1356,499 +928,6 @@ fn rec_release(b: *mut i64) {
         }
     }
     REC_DRAINING.with(|d| d.set(false));
-}
-
-/// Copy-and-grow push (value semantics): a fresh array of `a`'s elements plus
-/// the element at `x` (`elem_size` bytes), then drop `a`. Used when the array
-/// may be aliased. `retain_fn` retains the copied elements (the new array
-/// co-owns them).
-#[no_mangle]
-extern "C" fn aipl_array_push(
-    a: *const u8,
-    x: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    let a = aipl_arr_ensure_heap(a);
-    if elem_size == ELEM_BITPACKED {
-        // Bit-packed `bool[]`: fresh block of old_len+1 bits, copy the old bits,
-        // set the new one, drop the input. No element refcounting (bools).
-        let old_len = if a.is_null() {
-            0
-        } else {
-            unsafe { array_len_of(a) }
-        };
-        let raw = alloc_array(old_len + 1, old_len + 1, drop_fn, ELEM_BITPACKED);
-        unsafe {
-            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-            if old_len > 0 && !a.is_null() {
-                let src = a.add(ARR_ELEMS_OFFSET);
-                std::ptr::copy_nonoverlapping(src, dst, cap_bytes_for(ELEM_BITPACKED, old_len));
-            }
-            write_packed_bit(dst, old_len, std::ptr::read(x as *const i64) != 0);
-        }
-        aipl_array_dec(a);
-        return raw;
-    }
-    let elem_size = elem_stride(elem_size);
-    let old_len = if a.is_null() {
-        0
-    } else {
-        unsafe { array_len_of(a) }
-    };
-    let raw = alloc_array(old_len + 1, old_len + 1, drop_fn, elem_size as i64);
-    unsafe {
-        let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-        if old_len > 0 && !a.is_null() {
-            let src = a.add(ARR_ELEMS_OFFSET);
-            std::ptr::copy_nonoverlapping(src, dst, old_len * elem_size);
-            elem_rc(retain_fn, dst, old_len);
-        }
-        let slot = dst.add(old_len * elem_size);
-        std::ptr::copy_nonoverlapping(x, slot, elem_size);
-        elem_rc(retain_fn, slot, 1);
-    }
-    aipl_array_dec(a);
-    raw
-}
-
-/// In-place push for a uniquely owned array (codegen emits this only when its
-/// static analysis proves the array is unaliased). Appends without copying when
-/// there's spare capacity, else grows to a doubled capacity by `realloc`.
-/// Mirrors `aipl_array_push_mut` in the linker runtime.
-#[no_mangle]
-extern "C" fn aipl_array_push_mut(
-    a: *const u8,
-    x: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    let a = aipl_arr_ensure_heap(a);
-    // A `STATIC_REFCOUNT` block belongs to someone else — a constant literal in
-    // the data section, or an array the *host* lent us as an FFI argument (see
-    // [`ArgBufs::array_block`]) and frees itself after the call — so it can
-    // neither be written into nor `realloc`ed here. Copy instead, exactly as
-    // `aipl_concat_mut` does for a static string literal.
-    //
-    // The refcount is deliberately *not* consulted beyond that. Static
-    // ownership — an exclusive `mut` binding, an owned parameter — is what
-    // brought the caller here, and inside a function a uniquely-owned block
-    // routinely reads two or three: a `mut` parameter's slot and its entry
-    // track, the caller's reference under the `set x = x.f(..)` writeback,
-    // all one owner's bookkeeping. Treating those as sharing turned every such
-    // push into a copy and broke the accounting around it. The one place a
-    // refcount above one *does* mean sharing is a call boundary, and that is
-    // where it is checked: an owned parameter is made unique on its way into
-    // `mut y = p` (`aipl_arr_reserve`, see the `LetMut` arm), as the in-place
-    // `map`/`filter` bodies already do through `__arr_writable`.
-    if !a.is_null() && unsafe { *header_of(a) } == STATIC_REFCOUNT {
-        return aipl_array_push(a, x, drop_fn, retain_fn, elem_size);
-    }
-    if elem_size == ELEM_BITPACKED {
-        // Bit-packed `bool[]`, in place: set bit `old_len`, growing the byte
-        // capacity (doubling) only when the next bit needs a new byte.
-        let (old_len, cap_bytes) = if a.is_null() {
-            (0, 0)
-        } else {
-            unsafe { (array_len_of(a), array_cap_bytes_of(a)) }
-        };
-        let val = unsafe { std::ptr::read(x as *const i64) != 0 };
-        if !a.is_null() && cap_bytes_for(ELEM_BITPACKED, old_len + 1) <= cap_bytes {
-            unsafe {
-                write_packed_bit(a.add(ARR_ELEMS_OFFSET) as *mut u8, old_len, val);
-                std::ptr::write(a as *mut i64, (old_len + 1) as i64);
-                std::ptr::write(a.add(ARR_DROPFN_OFFSET) as *mut i64, drop_fn);
-            }
-            return a;
-        }
-        let new_cap_bytes = cap_bytes_for(ELEM_BITPACKED, old_len + 1)
-            .max(cap_bytes * 2)
-            .max(1);
-        let data: *const u8 = if a.is_null() {
-            alloc_array(
-                old_len + 1,
-                (new_cap_bytes * 8).max(1),
-                drop_fn,
-                ELEM_BITPACKED,
-            )
-        } else {
-            unsafe {
-                let block = a.sub(HEADER_SIZE) as *mut u8;
-                let old_layout = std::alloc::Layout::from_size_align(
-                    array_block_size(cap_bytes),
-                    std::mem::align_of::<i64>(),
-                )
-                .expect("array layout");
-                let raw = std::alloc::realloc(block, old_layout, array_block_size(new_cap_bytes));
-                if raw.is_null() {
-                    std::alloc::handle_alloc_error(old_layout);
-                }
-                let data = raw.add(HEADER_SIZE);
-                std::ptr::write(data.add(ARR_CAP_OFFSET) as *mut i64, new_cap_bytes as i64);
-                std::ptr::write(data.add(ARR_DROPFN_OFFSET) as *mut i64, drop_fn);
-                std::ptr::write(data as *mut i64, (old_len + 1) as i64);
-                data as *const u8
-            }
-        };
-        unsafe { write_packed_bit(data.add(ARR_ELEMS_OFFSET) as *mut u8, old_len, val) };
-        return data;
-    }
-    let elem_size = elem_stride(elem_size);
-    let (old_len, cap_bytes) = if a.is_null() {
-        (0, 0)
-    } else {
-        unsafe { (array_len_of(a), array_cap_bytes_of(a)) }
-    };
-    if !a.is_null() && (old_len + 1) * elem_size <= cap_bytes {
-        unsafe {
-            let elems = a.add(ARR_ELEMS_OFFSET) as *mut u8;
-            let slot = elems.add(old_len * elem_size);
-            std::ptr::copy_nonoverlapping(x, slot, elem_size);
-            elem_rc(retain_fn, slot, 1);
-            std::ptr::write(a as *mut i64, (old_len + 1) as i64); // len += 1
-                                                                  // Keep the stored drop-fn in sync: an array reserved via
-                                                                  // `aipl_array_with_cap` (or an empty `[]`) starts with none (0) and
-                                                                  // first learns its element type here when it has spare capacity and
-                                                                  // never hits the realloc path that would otherwise set it.
-            std::ptr::write(a.add(ARR_DROPFN_OFFSET) as *mut i64, drop_fn);
-        }
-        return a;
-    }
-    // At capacity: `realloc` to a doubled byte-capacity. It preserves the header
-    // and existing elements (refcounts unchanged), so no element is re-retained
-    // and there's no old block to free — only the new element is retained.
-    let new_cap_bytes = ((old_len + 1) * elem_size).max(cap_bytes * 2);
-    let data: *const u8 = if a.is_null() {
-        // No block to grow (defensive; exclusive arrays start non-null).
-        alloc_array(
-            old_len + 1,
-            new_cap_bytes / elem_size,
-            drop_fn,
-            elem_size as i64,
-        )
-    } else {
-        unsafe {
-            let block = a.sub(HEADER_SIZE) as *mut u8;
-            let old_layout = std::alloc::Layout::from_size_align(
-                array_block_size(cap_bytes),
-                std::mem::align_of::<i64>(),
-            )
-            .expect("array layout");
-            let raw = std::alloc::realloc(block, old_layout, array_block_size(new_cap_bytes));
-            if raw.is_null() {
-                std::alloc::handle_alloc_error(old_layout);
-            }
-            let data = raw.add(HEADER_SIZE);
-            std::ptr::write(data.add(ARR_CAP_OFFSET) as *mut i64, new_cap_bytes as i64);
-            // Refresh drop_fn: an empty `[]` starts with none and only learns its
-            // element type on the first push.
-            std::ptr::write(data.add(ARR_DROPFN_OFFSET) as *mut i64, drop_fn);
-            std::ptr::write(data as *mut i64, (old_len + 1) as i64); // len
-            data as *const u8
-        }
-    };
-    unsafe {
-        let elems = data.add(ARR_ELEMS_OFFSET) as *mut u8;
-        let slot = elems.add(old_len * elem_size);
-        std::ptr::copy_nonoverlapping(x, slot, elem_size);
-        elem_rc(retain_fn, slot, 1);
-    }
-    data
-}
-
-/// Make `a` uniquely owned with room for `extra` more elements, so the appends
-/// an array-literal spread emits afterwards are plain in-place writes. Two
-/// cases, mirroring `aipl_set_union_mut` vs `aipl_set_union`:
-///
-/// - refcount 1 (nothing else can observe the block): keep it. Already-large
-///   enough capacity is returned untouched; otherwise `realloc` to exactly what
-///   is needed — the header and elements move with the block, so no element is
-///   re-retained and there is no old block to free.
-/// - shared: allocate one right-sized block, copy the elements in and retain
-///   each (the source keeps its own refs), then release the input.
-///
-/// Either way the result has refcount 1 and capacity for `old_len + extra`, so
-/// `aipl_array_push_mut` / `aipl_arr_extend` can write straight into it. Sizing
-/// is exact rather than doubling: the spread knows its final length up front.
-/// Mirrors `aipl_arr_reserve` in the linker runtime.
-#[no_mangle]
-extern "C" fn aipl_arr_reserve(
-    a: *const u8,
-    extra: i64,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    let a = aipl_arr_ensure_heap(a);
-    let elem_size = elem_stride(elem_size);
-    let old_len = if a.is_null() {
-        0
-    } else {
-        unsafe { array_len_of(a) }
-    };
-    let want = old_len + extra.max(0) as usize;
-    let need_bytes = want * elem_size;
-    if !a.is_null() {
-        let (cap_bytes, rc) = unsafe { (array_cap_bytes_of(a), *header_of(a)) };
-        if rc == 1 {
-            if need_bytes <= cap_bytes {
-                unsafe { std::ptr::write(a.add(ARR_DROPFN_OFFSET) as *mut i64, drop_fn) };
-                return a;
-            }
-            unsafe {
-                let block = a.sub(HEADER_SIZE) as *mut u8;
-                let old_layout = std::alloc::Layout::from_size_align(
-                    array_block_size(cap_bytes),
-                    std::mem::align_of::<i64>(),
-                )
-                .expect("array layout");
-                let raw = std::alloc::realloc(block, old_layout, array_block_size(need_bytes));
-                if raw.is_null() {
-                    std::alloc::handle_alloc_error(old_layout);
-                }
-                let data = raw.add(HEADER_SIZE);
-                std::ptr::write(data.add(ARR_CAP_OFFSET) as *mut i64, need_bytes as i64);
-                std::ptr::write(data.add(ARR_DROPFN_OFFSET) as *mut i64, drop_fn);
-                return data as *const u8;
-            }
-        }
-    }
-    let raw = alloc_array(old_len, want.max(1), drop_fn, elem_size as i64);
-    unsafe {
-        let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-        if old_len > 0 && !a.is_null() {
-            let src = a.add(ARR_ELEMS_OFFSET);
-            std::ptr::copy_nonoverlapping(src, dst, old_len * elem_size);
-            elem_rc(retain_fn, dst, old_len);
-        }
-    }
-    aipl_array_dec(a);
-    raw
-}
-
-/// Append every element of `src` to `dst`, which `aipl_arr_reserve` has already
-/// made uniquely owned and large enough — so this is a single `memcpy` plus one
-/// retain pass, never a reallocation. Consumes (decs) `src`; `dst` keeps its
-/// identity. Mirrors `aipl_arr_extend` in the linker runtime.
-#[no_mangle]
-extern "C" fn aipl_arr_extend(
-    dst: *const u8,
-    src: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    let src_heap = aipl_arr_ensure_heap(src);
-    if elem_size == ELEM_BITPACKED {
-        // Bit-packed `bool[]` opts out of the pre-sized path (`reserve` is a
-        // no-op for it), so `dst` may be shared: append one bit at a time with
-        // the *copying* push, which is correct either way.
-        let add = if src_heap.is_null() {
-            0
-        } else {
-            unsafe { array_len_of(src_heap) }
-        };
-        let mut out = dst;
-        for i in 0..add {
-            let bit = i64::from(aipl_arr_load_bit(src_heap, i as i64) != 0);
-            out = aipl_array_push(
-                out,
-                &bit as *const i64 as *const u8,
-                drop_fn,
-                retain_fn,
-                ELEM_BITPACKED,
-            );
-        }
-        aipl_array_dec(src_heap);
-        return out;
-    }
-    let elem_size = elem_stride(elem_size);
-    let add = if src_heap.is_null() {
-        0
-    } else {
-        unsafe { array_len_of(src_heap) }
-    };
-    if add == 0 || dst.is_null() {
-        aipl_array_dec(src_heap);
-        return dst;
-    }
-    unsafe {
-        let dst_len = array_len_of(dst);
-        let elems = dst.add(ARR_ELEMS_OFFSET) as *mut u8;
-        let at = elems.add(dst_len * elem_size);
-        let from = src_heap.add(ARR_ELEMS_OFFSET);
-        std::ptr::copy_nonoverlapping(from, at, add * elem_size);
-        elem_rc(retain_fn, at, add);
-        std::ptr::write(dst as *mut i64, (dst_len + add) as i64);
-    }
-    aipl_array_dec(src_heap);
-    dst
-}
-
-/// Join a `T[][]` into a `T[]`, placing `sep`'s elements between consecutive
-/// parts. The array counterpart of `aipl_str_join`, and native for the same
-/// reason: the output length is known before anything is written — every part's
-/// length is O(1) and the separator appears exactly `n - 1` times — so the whole
-/// result is *one* exact-size allocation with no growth chain, and each part
-/// moves as a single block copy.
-///
-/// `drop_fn`/`retain_fn`/`elem_size` describe the *inner* element `T`, not the
-/// parts. Consumes (decs) `parts` and all three separators, as `aipl_str_join`
-/// does. Which separator lands in which gap is `str24::gap_sep`'s rule, shared
-/// with the string half. Mirrors `aipl_arr_join` in the linker runtime.
-#[no_mangle]
-extern "C" fn aipl_arr_join(
-    parts: *const u8,
-    sep: *const u8,
-    final_sep: *const u8,
-    only_sep: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    let parts_heap = aipl_arr_ensure_heap(parts);
-    let seps = [
-        aipl_arr_ensure_heap(sep),
-        aipl_arr_ensure_heap(final_sep),
-        aipl_arr_ensure_heap(only_sep),
-    ];
-    let n = if parts_heap.is_null() {
-        0
-    } else {
-        unsafe { array_len_of(parts_heap) }
-    };
-    // The separator heading the gap before part `i`, and its length — the
-    // array-side reading of `str24::gap_sep`.
-    let gap = |i: usize| -> (*const u8, usize) {
-        let s = if n == 2 {
-            seps[2]
-        } else if i == n - 1 {
-            seps[1]
-        } else {
-            seps[0]
-        };
-        let len = if s.is_null() {
-            0
-        } else {
-            unsafe { array_len_of(s) }
-        };
-        (s, len)
-    };
-    // A bit-packed `bool[]` has no byte-addressable elements to memcpy, so it
-    // falls back to appending one bit at a time through the copying push. Rare
-    // enough not to be worth a packed fast path; correct either way.
-    if elem_size == ELEM_BITPACKED {
-        let mut out = aipl_array_new(0, drop_fn, ELEM_BITPACKED);
-        for i in 0..n {
-            if i > 0 {
-                let (s, sep_len) = gap(i);
-                for k in 0..sep_len {
-                    let bit = i64::from(aipl_arr_load_bit(s, k as i64) != 0);
-                    out = aipl_array_push(
-                        out,
-                        &bit as *const i64 as *const u8,
-                        drop_fn,
-                        retain_fn,
-                        ELEM_BITPACKED,
-                    );
-                }
-            }
-            let part = unsafe { part_at(parts_heap, i, drop_fn, retain_fn, elem_size) };
-            let plen = if part.is_null() {
-                0
-            } else {
-                unsafe { array_len_of(part) }
-            };
-            for k in 0..plen {
-                let bit = i64::from(aipl_arr_load_bit(part, k as i64) != 0);
-                out = aipl_array_push(
-                    out,
-                    &bit as *const i64 as *const u8,
-                    drop_fn,
-                    retain_fn,
-                    ELEM_BITPACKED,
-                );
-            }
-            aipl_array_dec(part);
-        }
-        aipl_array_dec(parts_heap);
-        for s in seps {
-            aipl_array_dec(s);
-        }
-        return out;
-    }
-    let esz = elem_stride(elem_size);
-    // Measure first — this is the whole point of the builtin being native.
-    let mut total = 0usize;
-    let mut lens: Vec<(usize, *const u8)> = Vec::with_capacity(n);
-    for i in 0..n {
-        if i > 0 {
-            total += gap(i).1;
-        }
-        let part = unsafe { part_at(parts_heap, i, drop_fn, retain_fn, elem_size) };
-        let plen = if part.is_null() {
-            0
-        } else {
-            unsafe { array_len_of(part) }
-        };
-        total += plen;
-        lens.push((plen, part));
-    }
-    // One allocation, sized exactly.
-    let out = alloc_array(total, total.max(1), drop_fn, elem_size);
-    unsafe {
-        let dst = out.add(ARR_ELEMS_OFFSET) as *mut u8;
-        let mut pos = 0usize;
-        for (i, (plen, part)) in lens.iter().enumerate() {
-            let (s, sep_len) = gap(i);
-            if i > 0 && sep_len > 0 {
-                let from = s.add(ARR_ELEMS_OFFSET);
-                std::ptr::copy_nonoverlapping(from, dst.add(pos * esz), sep_len * esz);
-                pos += sep_len;
-            }
-            if *plen > 0 {
-                let from = part.add(ARR_ELEMS_OFFSET);
-                std::ptr::copy_nonoverlapping(from, dst.add(pos * esz), plen * esz);
-                pos += plen;
-            }
-        }
-        // Every element was copied by value; the result co-owns each one.
-        elem_rc(retain_fn, dst, total);
-    }
-    for (_, part) in lens {
-        aipl_array_dec(part);
-    }
-    aipl_array_dec(parts_heap);
-    for s in seps {
-        aipl_array_dec(s);
-    }
-    out
-}
-
-/// Part `i` of a `T[][]`, materialized to a heap array the caller owns. Taking
-/// a reference first (`arr24::owned_block_of`) is what makes every
-/// representation balance in `aipl_arr_ensure_heap`: a heap part comes back as
-/// itself with the borrowed reference turned into an owned one, and a view — a
-/// reversed part, or a window's — is consumed and replaced by a fresh array.
-/// Either way the caller releases exactly one reference.
-unsafe fn part_at(
-    parts: *const u8,
-    i: usize,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    // The parts are a `T[][]`, so each is a 24-byte array value — hence the
-    // `ARR_SIZE` stride — and may be a window, which lends a copy.
-    let elems = unsafe { parts.add(ARR_ELEMS_OFFSET) };
-    let value = unsafe { elems.add(i * arr24::ARR_SIZE) } as *const arr24::ArrValue;
-    let p = arr24::owned_block_of(value, drop_fn, retain_fn, elem_size);
-    if p.is_null() {
-        return p;
-    }
-    aipl_arr_ensure_heap(p)
 }
 
 /// Executed-instruction counter hook. Codegen emits one call per basic block
@@ -2016,347 +1095,6 @@ extern "C" fn aipl_test_summary() -> i64 {
 // pointers compared by content, with the array's `str` drop/retain helpers
 // stored so the block frees/retains its strings like a `str[]`.
 
-/// Whether `a` already contains the element at `x`. `str_cmp != 0` compares
-/// `str` elements by content and carries their width (see `str_cmp_width`);
-/// otherwise a bit-packed `bool` set (`elem_size == 0`) compares unpacked bits
-/// and every other scalar set compares the 8-byte value. Returns 1 (present) or
-/// 0 (absent); a null/empty set is never a member.
-#[no_mangle]
-extern "C" fn aipl_set_contains(a: *const u8, x: *const u8, elem_size: i64, str_cmp: i64) -> i64 {
-    if a.is_null() {
-        return 0;
-    }
-    let len = unsafe { array_len_of(a) };
-    if str_cmp == str24::STR_SIZE as i64 {
-        // Wide `str` elements: the element *is* the 24-byte value, so there is
-        // no pointer to load — compare the values in place.
-        let target = unsafe { std::ptr::read(x as *const str24::Str) };
-        for i in 0..len {
-            let sp = unsafe { arr_elem_ptr(a, i, str24::STR_SIZE) };
-            let s = unsafe { std::ptr::read(sp as *const str24::Str) };
-            if str24::eq(s, target) {
-                return 1;
-            }
-        }
-        0
-    } else if elem_size == ELEM_BITPACKED {
-        let target = unsafe { std::ptr::read(x as *const i64) } != 0;
-        for i in 0..len {
-            if unsafe { arr_load_bit(a, i) } == target {
-                return 1;
-            }
-        }
-        0
-    } else {
-        let stride = elem_size.max(8) as usize;
-        let target = unsafe { std::ptr::read(x as *const i64) };
-        for i in 0..len {
-            let ep = unsafe { arr_elem_ptr(a, i, stride) };
-            let v = unsafe { std::ptr::read(ep as *const i64) };
-            if v == target {
-                return 1;
-            }
-        }
-        0
-    }
-}
-
-/// Insert the element at `x` into `a` (a uniquely-owned, array-backed set),
-/// skipping it if already present (membership per `str_cmp`, see
-/// `aipl_set_contains`). Returns the (possibly relocated) set pointer. For heap
-/// elements (`str`), `drop_fn`/`retain_fn` are the element helpers so the block
-/// frees/retains its strings; for scalars they're 0.
-///
-/// `order` (see `SET_ORDER_NONE`) is what makes an ordered set: a non-zero order
-/// keeps the block sorted, so the element is placed at its position and the
-/// tail shifted up — an append followed by a move of the elements after it, so
-/// the block grows exactly as an unordered insert does.
-#[no_mangle]
-extern "C" fn aipl_set_insert(
-    a: *const u8,
-    x: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-    str_cmp: i64,
-    order: i64,
-) -> *const u8 {
-    if order == SET_ORDER_NONE {
-        if aipl_set_contains(a, x, elem_size, str_cmp) != 0 {
-            return a;
-        }
-        return aipl_array_push_mut(a, x, drop_fn, retain_fn, elem_size);
-    }
-    let at = if a.is_null() {
-        0
-    } else {
-        match unsafe { ordered_set_position(a, x, elem_size, str_cmp, order) } {
-            None => return a,
-            Some(i) => i,
-        }
-    };
-    let grown = aipl_array_push_mut(a, x, drop_fn, retain_fn, elem_size);
-    unsafe { shift_last_to(grown, at, elem_size) };
-    grown
-}
-
-/// Move the last element of `a` down to index `at`, shifting `[at, len - 1)` up
-/// by one. Elements are plain bytes to this — an ordered set's elements are
-/// words or wide `str` values, and moving a value moves its ownership with it.
-/// Shared by both runtimes, byte for byte.
-///
-/// # Safety
-/// `a` is a non-null array block with at least one element of `elem_size`
-/// bytes, and `at` is at most `len - 1`.
-unsafe fn shift_last_to(a: *const u8, at: usize, elem_size: i64) {
-    let len = unsafe { array_len_of(a) };
-    let last = len - 1;
-    if at >= last {
-        return;
-    }
-    let width = elem_size.max(8) as usize;
-    let base = unsafe { arr_elem_ptr(a, at, width) } as *mut u8;
-    let mut moved = [0u8; 32];
-    unsafe {
-        let last_ptr = arr_elem_ptr(a, last, width);
-        core::ptr::copy_nonoverlapping(last_ptr, moved.as_mut_ptr(), width);
-        core::ptr::copy(base, base.add(width), (last - at) * width);
-        core::ptr::copy_nonoverlapping(moved.as_ptr(), base, width);
-    }
-}
-
-/// The address to hand `aipl_set_insert` for element `i` of `src`, and a
-/// one-word scratch backing it.
-///
-/// Every element wider than a word — a wide `str` among them — must be passed
-/// *in place*: copying it into a local `i64` first keeps only its first word,
-/// which is then read back as a whole value. Only the bit-packed `bool` case has
-/// no address to give (its element is one bit), so that one is materialized into
-/// the scratch and its address returned.
-unsafe fn set_elem_ptr(src: *const u8, i: usize, elem_size: i64, scratch: &mut i64) -> *const u8 {
-    if elem_size == ELEM_BITPACKED {
-        *scratch = i64::from(unsafe { arr_load_bit(src, i) });
-        return scratch as *const i64 as *const u8;
-    }
-    unsafe { arr_elem_ptr(src, i, elem_size.max(8) as usize) }
-}
-
-/// `a.union(b)` (copy): a fresh set with every distinct element of `a` then `b`.
-/// Consumes (decs) both inputs, like `aipl_concat`. Inserted elements are
-/// retained by `aipl_set_insert`, so they outlive the inputs' release.
-#[no_mangle]
-extern "C" fn aipl_set_union(
-    a: *const u8,
-    b: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-    str_cmp: i64,
-    order: i64,
-) -> *const u8 {
-    let a_len = if a.is_null() {
-        0
-    } else {
-        unsafe { array_len_of(a) }
-    };
-    let b_len = if b.is_null() {
-        0
-    } else {
-        unsafe { array_len_of(b) }
-    };
-    // Pre-size to the upper bound (|a| + |b|) so the insert loop never reallocs.
-    let mut dest = aipl_array_with_cap((a_len + b_len) as i64, drop_fn, elem_size);
-    for i in 0..a_len {
-        let mut scratch = 0i64;
-        let vp = unsafe { set_elem_ptr(a, i, elem_size, &mut scratch) };
-        dest = aipl_set_insert(dest, vp, drop_fn, retain_fn, elem_size, str_cmp, order);
-    }
-    for i in 0..b_len {
-        let mut scratch = 0i64;
-        let vp = unsafe { set_elem_ptr(b, i, elem_size, &mut scratch) };
-        dest = aipl_set_insert(dest, vp, drop_fn, retain_fn, elem_size, str_cmp, order);
-    }
-    aipl_array_dec(a);
-    aipl_array_dec(b);
-    dest
-}
-
-/// `set a = a.union(b)` for an exclusive `a`: extend `a` in place with `b`'s
-/// distinct elements (reusing `a`'s allocation) and return the (possibly
-/// relocated) set. Consumes (decs) `b`; `a` is reused, not dec'd.
-#[no_mangle]
-extern "C" fn aipl_set_union_mut(
-    a: *const u8,
-    b: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-    str_cmp: i64,
-    order: i64,
-) -> *const u8 {
-    let mut a = a;
-    let b_len = if b.is_null() {
-        0
-    } else {
-        unsafe { array_len_of(b) }
-    };
-    for i in 0..b_len {
-        let mut scratch = 0i64;
-        let vp = unsafe { set_elem_ptr(b, i, elem_size, &mut scratch) };
-        a = aipl_set_insert(a, vp, drop_fn, retain_fn, elem_size, str_cmp, order);
-    }
-    aipl_array_dec(b);
-    a
-}
-
-/// The byte width of a dict key, which is also the offset of its value: a pair
-/// is `[key][value]` laid out back to back. `str_cmp` carries the width for a
-/// `str` key (see `str_cmp_width`) precisely so this is answerable without a
-/// second argument; every other key is one word.
-fn dict_key_width(str_cmp: i64) -> usize {
-    if str_cmp != 0 {
-        str_cmp as usize
-    } else {
-        8
-    }
-}
-
-/// Index of the pair in dict `a` whose key matches the key at `pair_ptr`, or -1.
-/// Keys compare by `str_cmp`: a 24-byte value compare for a `str` key, else the
-/// raw 8-byte value.
-unsafe fn dict_find(a: *const u8, pair_ptr: *const u8, pair_size: i64, str_cmp: i64) -> i64 {
-    if a.is_null() {
-        return -1;
-    }
-    let len = unsafe { array_len_of(a) };
-    let stride = pair_size as usize;
-    let wide = str_cmp == str24::STR_SIZE as i64;
-    let want_wide = if wide {
-        unsafe { std::ptr::read(pair_ptr as *const str24::Str) }
-    } else {
-        str24::Str::empty()
-    };
-    let want = unsafe { std::ptr::read(pair_ptr as *const i64) };
-    for i in 0..len {
-        let ep = unsafe { arr_elem_ptr(a, i, stride) };
-        let eq = if wide {
-            str24::eq(
-                unsafe { std::ptr::read(ep as *const str24::Str) },
-                want_wide,
-            )
-        } else {
-            let k: i64 = unsafe { std::ptr::read(ep as *const i64) };
-            k == want
-        };
-        if eq {
-            return i as i64;
-        }
-    }
-    -1
-}
-
-/// Insert (or, on a duplicate key, replace) the `[key][value]` pair at `pair_ptr`
-/// into dict `a` (a uniquely-owned, array-backed dict of `pair_size`-byte pairs).
-/// `drop_fn`/`retain_fn` are the pair helpers (they release/retain a pair's key
-/// *and* value). On a key collision the whole existing pair is released and the
-/// new one stored in its place (last-binding-wins); otherwise the pair is
-/// appended. Returns the (possibly relocated) dict pointer. Like the set/array
-/// inserters, the stored pair is retained, so the caller keeps its originals.
-#[no_mangle]
-extern "C" fn aipl_dict_insert(
-    a: *const u8,
-    pair_ptr: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    pair_size: i64,
-    str_cmp: i64,
-) -> *const u8 {
-    let idx = unsafe { dict_find(a, pair_ptr, pair_size, str_cmp) };
-    if idx >= 0 {
-        let stride = pair_size as usize;
-        unsafe {
-            let slot = arr_elem_ptr(a, idx as usize, stride) as *mut u8;
-            elem_rc(drop_fn, slot, 1); // release the old key+value
-            std::ptr::copy_nonoverlapping(pair_ptr, slot, stride);
-            elem_rc(retain_fn, slot, 1); // co-own the new key+value
-        }
-        return a;
-    }
-    aipl_array_push_mut(a, pair_ptr, drop_fn, retain_fn, pair_size)
-}
-
-/// Remove `key_ptr`'s pair from dict `a`, which `aipl_arr_reserve` has already
-/// made uniquely owned — so this writes in place, the same contract
-/// `aipl_arr_extend` carries.
-///
-/// The removed pair's key and value are released, and the pairs after it shift
-/// down one so the survivors keep the order they were inserted in. Order-
-/// preserving rather than swap-with-last: nothing *promises* a dict's order, but
-/// it is what iterating one hands back, so a removal that quietly permuted the
-/// rest would be a surprise for one saved move.
-///
-/// Returns 1 when a pair was removed and 0 when the key was absent, in which
-/// case nothing is touched. Mirrors `aipl_dict_remove` in the linker runtime.
-#[no_mangle]
-extern "C" fn aipl_dict_remove(
-    a: *const u8,
-    key_ptr: *const u8,
-    drop_fn: i64,
-    pair_size: i64,
-    str_cmp: i64,
-) -> i64 {
-    unsafe {
-        let idx = dict_find(a, key_ptr, pair_size, str_cmp);
-        if idx < 0 {
-            return 0;
-        }
-        let idx = idx as usize;
-        let stride = pair_size as usize;
-        let len = array_len_of(a);
-        let slot = arr_elem_ptr(a, idx, stride) as *mut u8;
-        elem_rc(drop_fn, slot, 1);
-        // The regions overlap when anything follows the hole, so `copy`
-        // (`memmove`) rather than `copy_nonoverlapping`.
-        let moved = len - idx - 1;
-        if moved > 0 {
-            let next = arr_elem_ptr(a, idx + 1, stride);
-            std::ptr::copy(next, slot, moved * stride);
-        }
-        *(a.add(ARR_LEN_OFFSET) as *mut i64) = (len - 1) as i64;
-        1
-    }
-}
-
-/// Look up `key_ptr` in dict `a`: returns a pointer to the matching pair's value
-/// slot (its bytes are read/retained by the caller), or null if absent. Borrows
-/// `a` (no refcount change).
-#[no_mangle]
-extern "C" fn aipl_dict_get(
-    a: *const u8,
-    key_ptr: *const u8,
-    pair_size: i64,
-    str_cmp: i64,
-) -> *const u8 {
-    let idx = unsafe { dict_find(a, key_ptr, pair_size, str_cmp) };
-    if idx < 0 {
-        return std::ptr::null();
-    }
-    // The key occupies the first `dict_key_width` bytes of the pair; the value
-    // follows immediately.
-    unsafe { arr_elem_ptr(a, idx as usize, pair_size as usize).add(dict_key_width(str_cmp)) }
-}
-
-/// `d.contains_key(k)`: whether `key_ptr` is a key of dict `a`. Borrows `a`.
-#[no_mangle]
-extern "C" fn aipl_dict_contains_key(
-    a: *const u8,
-    key_ptr: *const u8,
-    pair_size: i64,
-    str_cmp: i64,
-) -> i64 {
-    i64::from(unsafe { dict_find(a, key_ptr, pair_size, str_cmp) } >= 0)
-}
-
 /// Element drop-fn for an array of arrays (`T[][]`): release each element
 /// array, which recursively releases its own elements via its own drop-fn.
 #[no_mangle]
@@ -2420,7 +1158,7 @@ fn build_cli_array(args: &[String]) -> *const u8 {
     let drop_fn = str24::aipl_arr_drop_str as *const () as usize as i64;
     let arr = aipl_array_new(args.len() as i64, drop_fn, str24::STR_SIZE as i64);
     unsafe {
-        let elems = arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str;
+        let elems = arr_untag(arr).add(ARR_ELEMS_OFFSET) as *mut str24::Str;
         for (i, a) in args.iter().enumerate() {
             core::ptr::write(elems.add(i), str24::from_bytes(a.as_bytes()));
         }
@@ -4447,10 +3185,6 @@ fn new_jit_module() -> Result<JITModule, Error> {
     );
     jit_builder.symbol("aipl_arrw_dec", arr24::aipl_arrw_dec as *const u8);
     jit_builder.symbol("aipl_arr_window", arr24::aipl_arr_window as *const u8);
-    jit_builder.symbol(
-        "aipl_arr_window_block",
-        arr24::aipl_arr_window_block as *const u8,
-    );
     jit_builder.symbol("aipl_arr_settle", arr24::aipl_arr_settle as *const u8);
     jit_builder.symbol(
         "aipl_arrv_from_set_words",
@@ -4461,7 +3195,6 @@ fn new_jit_module() -> Result<JITModule, Error> {
         arr24::aipl_arr_push_small as *const u8,
     );
     jit_builder.symbol("aipl_arr_reversed", arr24::aipl_arr_reversed as *const u8);
-    jit_builder.symbol("aipl_arrv_extend", arr24::aipl_arrv_extend as *const u8);
     jit_builder.symbol("aipl_arrv_sort", arr24::aipl_arrv_sort as *const u8);
     jit_builder.symbol("aipl_arrv_push", arr24::aipl_arrv_push as *const u8);
     jit_builder.symbol(
@@ -4555,10 +3288,8 @@ fn new_jit_module() -> Result<JITModule, Error> {
         "aipl_write_string_to_file",
         str24_host::aipl_write_string_to_file as *const u8,
     );
-    jit_builder.symbol("aipl_list_files", aipl_list_files as *const u8);
     jit_builder.symbol("aipl_arrv_list_files", aipl_arrv_list_files as *const u8);
     jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
-    jit_builder.symbol("aipl_str_split", aipl_str_split as *const u8);
     jit_builder.symbol("aipl_str_split_len", str24::aipl_str_split_len as *const u8);
     jit_builder.symbol(
         "aipl_str_split_iter_init",
@@ -4568,7 +3299,6 @@ fn new_jit_module() -> Result<JITModule, Error> {
         "aipl_str_split_iter_next",
         str24::aipl_str_split_iter_next as *const u8,
     );
-    jit_builder.symbol("aipl_str_join", aipl_str_join as *const u8);
     jit_builder.symbol("aipl_arr_drop_str", str24::aipl_arr_drop_str as *const u8);
     jit_builder.symbol(
         "aipl_arr_retain_str",
@@ -4578,14 +3308,8 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_monotonic_now", aipl_monotonic_now as *const u8);
     jit_builder.symbol("aipl_shim_get", aipl_shim_get as *const u8);
     jit_builder.symbol("aipl_shim_set", aipl_shim_set as *const u8);
-    jit_builder.symbol("aipl_arr_sort", aipl_arr_sort as *const u8);
     jit_builder.symbol("aipl_array_new", aipl_array_new as *const u8);
     jit_builder.symbol("aipl_array_with_cap", aipl_array_with_cap as *const u8);
-    jit_builder.symbol("aipl_array_push", aipl_array_push as *const u8);
-    jit_builder.symbol("aipl_array_push_mut", aipl_array_push_mut as *const u8);
-    jit_builder.symbol("aipl_arr_reserve", aipl_arr_reserve as *const u8);
-    jit_builder.symbol("aipl_arr_extend", aipl_arr_extend as *const u8);
-    jit_builder.symbol("aipl_arr_join", aipl_arr_join as *const u8);
     jit_builder.symbol("aipl_array_dec", aipl_array_dec as *const u8);
     jit_builder.symbol("aipl_arr_inc", aipl_arr_inc as *const u8);
     jit_builder.symbol("aipl_rec_alloc", aipl_rec_alloc as *const u8);
@@ -4593,21 +3317,8 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_rec_dec_strong", aipl_rec_dec_strong as *const u8);
     jit_builder.symbol("aipl_rec_inc_weak", aipl_rec_inc_weak as *const u8);
     jit_builder.symbol("aipl_rec_dec_weak", aipl_rec_dec_weak as *const u8);
-    jit_builder.symbol("aipl_arr_elem_ptr", aipl_arr_elem_ptr as *const u8);
-    jit_builder.symbol("aipl_arr_load_bit", aipl_arr_load_bit as *const u8);
-    jit_builder.symbol("aipl_set_contains", aipl_set_contains as *const u8);
     jit_builder.symbol("aipl_charset_next", charset::aipl_charset_next as *const u8);
     jit_builder.symbol("aipl_charset_prev", charset::aipl_charset_prev as *const u8);
-    jit_builder.symbol("aipl_set_insert", aipl_set_insert as *const u8);
-    jit_builder.symbol("aipl_set_union", aipl_set_union as *const u8);
-    jit_builder.symbol("aipl_set_union_mut", aipl_set_union_mut as *const u8);
-    jit_builder.symbol("aipl_dict_insert", aipl_dict_insert as *const u8);
-    jit_builder.symbol("aipl_dict_remove", aipl_dict_remove as *const u8);
-    jit_builder.symbol("aipl_dict_get", aipl_dict_get as *const u8);
-    jit_builder.symbol(
-        "aipl_dict_contains_key",
-        aipl_dict_contains_key as *const u8,
-    );
     jit_builder.symbol("aipl_count_insns", aipl_count_insns as *const u8);
     jit_builder.symbol("aipl_count_call", aipl_count_call as *const u8);
     jit_builder.symbol("aipl_test_begin", aipl_test_begin as *const u8);
@@ -5370,7 +4081,7 @@ impl Compilation {
         let value: [i64; 3] = [
             block as i64,
             unsafe { arr_untag(block).add(ARR_ELEMS_OFFSET) } as i64,
-            unsafe { array_len_of(block) } as i64,
+            args.len() as i64,
         ];
         Ok(f(value.as_ptr() as *const u8))
     }
@@ -5718,13 +4429,6 @@ impl Compilation {
         // transmuted signature.
         let r = unsafe { invoke(ptr, &abi) };
 
-        // An array under the `Tagged` ABI is one word — its block, returned in
-        // a register.
-        if let ConcreteType::Array(elem) = &info.return_ty {
-            let result = unsafe { read_ffi_array(abi_kind, r, elem, true, &self.structs) };
-            return Ok(result);
-        }
-
         // A `str` return took the sret path above, so anything reaching here
         // came back in a register.
         Ok(FfiValue::Int(r))
@@ -5978,7 +4682,7 @@ fn build_borrowed_str(bytes: &[u8]) -> (i64, Option<(*mut u8, usize)>) {
 // keeps ownership and frees the lot when [`ArgBufs`] drops — after the call, and
 // after the return value has been copied out (an identity `fn(s) -> s` hands
 // back an argument). The one thing a static block forbids is *in-place*
-// mutation, which the runtime's `aipl_array_push_mut` / `aipl_concat_mut` /
+// mutation, which the runtime's `array_ops::push_mut` / `aipl_concat_mut` /
 // `aipl_trim_mut` guards already redirect to their copying counterparts.
 // ---------------------------------------------------------------------------
 
@@ -5986,9 +4690,9 @@ fn build_borrowed_str(bytes: &[u8]) -> (i64, Option<(*mut u8, usize)>) {
 enum ArgBuf {
     /// A heap `str` block from [`build_borrowed_str`]: its base and content length.
     Str(*mut u8, usize),
-    /// An array block from [`ArgBufs::array_block`]: its *data* pointer (the base
-    /// plus [`HEADER_SIZE`]) and the byte capacity that sizes the deallocation.
-    Array(*mut u8, usize),
+    /// An array block from [`ArgBufs::array_block`]: its tagged base pointer and
+    /// the byte capacity that sizes the deallocation.
+    Array(*const u8, usize),
     /// An inline composite (struct/variant/optional/result) the callee receives a
     /// pointer to. Owned by the `Vec`, so it just has to stay alive.
     Composite(Vec<u8>),
@@ -6033,25 +4737,24 @@ impl ArgBufs {
     }
 
     /// Allocate a zeroed, borrowed array block of `len` elements of `elem_size`
-    /// bytes (0 = bit-packed) and return its data pointer — the array value
-    /// itself, since a fresh block is untagged (`ArrRepr::Heap`).
+    /// bytes (0 = bit-packed) and return its tagged base pointer — the array
+    /// value's first word.
     ///
-    /// The element drop-fn is 0, and unused: the header's drop-fn only runs when
-    /// `aipl_array_dec` frees the block, which `STATIC_REFCOUNT` prevents, and
-    /// every path that *copies* an array (`push`, `slice`, `sort`, `reserve`)
-    /// takes the drop-fn for the copy from codegen rather than from this header.
-    fn array_block(&mut self, len: usize, elem_size: i64) -> *mut u8 {
-        let data = alloc_array(len, len, 0, elem_size) as *mut u8;
+    /// The element drop-fn is 0, so it is a plain block, and the refcount is
+    /// `STATIC_REFCOUNT`, which every path that would write into it or release it
+    /// reads first: it is copied from, never freed by the callee.
+    fn array_block(&mut self, len: usize, elem_size: i64) -> *const u8 {
+        let block = array_ops::alloc_block(len, len, 0, elem_size);
         let cap_bytes = cap_bytes_for(elem_size, len);
         unsafe {
             // Zero the element region: a partially-written inline composite
             // element (a `none`'s slack, a nullary variant case's payload) must
-            // read back as zeroes, and `alloc_array` leaves it uninitialized.
-            std::ptr::write_bytes(data.add(ARR_ELEMS_OFFSET), 0, cap_bytes);
-            *header_of(data) = STATIC_REFCOUNT;
+            // read back as zeroes, and `alloc_block` leaves it uninitialized.
+            std::ptr::write_bytes(arr_untag(block) as *mut u8, 0, cap_bytes);
+            *header_of(arr_untag(block)) = STATIC_REFCOUNT;
         }
-        self.0.push(ArgBuf::Array(data, cap_bytes));
-        data
+        self.0.push(ArgBuf::Array(block, cap_bytes));
+        block
     }
 }
 
@@ -6062,13 +4765,11 @@ impl Drop for ArgBufs {
                 ArgBuf::Str(block, content_len) => unsafe {
                     free_dynamic_string(*block, *content_len)
                 },
-                ArgBuf::Array(data, cap_bytes) => unsafe {
-                    let layout = std::alloc::Layout::from_size_align(
-                        array_block_size(*cap_bytes),
-                        std::mem::align_of::<i64>(),
-                    )
-                    .expect("array layout");
-                    std::alloc::dealloc(data.sub(HEADER_SIZE), layout);
+                ArgBuf::Array(block, cap_bytes) => unsafe {
+                    raw_free(
+                        block_start(*block),
+                        block_header_bytes(arr_repr(*block)) + *cap_bytes,
+                    );
                 },
                 // Freed by the `Vec`'s own drop.
                 ArgBuf::Composite(_) => {}
@@ -6081,20 +4782,18 @@ impl Drop for ArgBufs {
     }
 }
 
-/// Write the 24-byte value for the whole of `block` at `dst`
-/// (`arr24::ArrValue::whole`: the block, the address of its first element, its
-/// length).
+/// Write the 24-byte value for the whole of `block`, which holds `len` elements,
+/// at `dst` (`arr24::ArrValue::whole_of`: the block, the address of its first
+/// element, its length).
 ///
 /// SAFETY: `dst` must be 24 writable bytes and `block` a valid array block.
-unsafe fn write_whole_value(dst: *mut u8, block: *const u8) {
+unsafe fn write_whole_value(dst: *mut u8, block: *const u8, len: usize) {
     unsafe {
-        std::ptr::write(dst as *mut i64, block as i64);
         std::ptr::write(
-            dst.add(8) as *mut i64,
-            arr_untag(block).add(ARR_ELEMS_OFFSET) as i64,
-        );
-        std::ptr::write(dst.add(16) as *mut i64, array_len_of(block) as i64);
-    }
+            dst as *mut arr24::ArrValue,
+            arr24::ArrValue::whole_of(block, len),
+        )
+    };
 }
 
 /// Marshal `v` into the single `i64` the ABI passes for a parameter of type
@@ -6153,11 +4852,15 @@ fn ffi_arg_word(
         FfiValue::Int(n) if is_ffi_scalar(ty) => Ok(*n),
         FfiValue::Str(s) if is_str_repr(ty) => Ok(bufs.str_value(s)),
         FfiValue::Array(elems) => match ty {
-            ConcreteType::Array(elem) => build_borrowed_array(abi, elem, elems, structs, bufs),
+            ConcreteType::Array(elem) => {
+                build_borrowed_array(abi, elem, elems, structs, bufs).map(|(word, _)| word)
+            }
             _ => Err(mismatch(ty, v)),
         },
         FfiValue::Dict(entries) => match ty {
-            ConcreteType::Dict(k, val) => build_borrowed_dict(abi, k, val, entries, structs, bufs),
+            ConcreteType::Dict(k, val) => {
+                build_borrowed_dict(abi, k, val, entries, structs, bufs).map(|(word, _)| word)
+            }
             _ => Err(mismatch(ty, v)),
         },
         _ => Err(mismatch(ty, v)),
@@ -6226,10 +4929,10 @@ fn build_borrowed_array(
     elems: &[FfiValue],
     structs: &HashMap<String, TypeDef>,
     bufs: &mut ArgBufs,
-) -> Result<i64, String> {
+) -> Result<(i64, usize), String> {
     if matches!(elem, ConcreteType::Primitive(Primitive::Char)) {
         let s = chars_to_utf8(elems)?;
-        return Ok(bufs.str_value(&s));
+        return Ok((bufs.str_value(&s), 0));
     }
     let elem_size = if is_str_repr(elem) {
         // A wide `str` element is the value itself, 24 bytes in the block.
@@ -6238,11 +4941,11 @@ fn build_borrowed_array(
         abi_array_elem_size(abi, elem, structs)
     };
     let data = bufs.array_block(elems.len(), elem_size);
-    let base = unsafe { data.add(ARR_ELEMS_OFFSET) };
+    let base = arr_untag(data) as *mut u8;
     if elem_size == ELEM_BITPACKED {
         for (i, e) in elems.iter().enumerate() {
             match e {
-                FfiValue::Int(b) => unsafe { write_packed_bit(base, i, *b != 0) },
+                FfiValue::Int(b) => unsafe { array_ops::write_packed_bit(base, i, *b != 0) },
                 other => {
                     return Err(format!(
                         "bool[] element must be an FfiValue::Int 0/1, got FfiValue::{}",
@@ -6268,14 +4971,14 @@ fn build_borrowed_array(
             }
         }
     }
-    Ok(data as i64)
+    Ok((data as i64, elems.len()))
 }
 
 /// Build a borrowed `#{K: V}` value from `entries`: the same array block
 /// [`build_borrowed_array`] builds, with a `[key][value]` pair as the element —
 /// which is all a dict is. Tagged `STATIC_REFCOUNT` like any borrowed block, so
 /// the callee's retains and releases no-op and any path that would write into it
-/// (`remove_key`, through `aipl_arr_reserve`) copies first.
+/// (`remove_key`, through `array_ops::reserve`) copies first.
 ///
 /// A later entry for a key already given replaces it, so what the callee gets is
 /// a dict with distinct keys — the invariant every other way of building one
@@ -6289,7 +4992,7 @@ fn build_borrowed_dict(
     entries: &[(FfiValue, FfiValue)],
     structs: &HashMap<String, TypeDef>,
     bufs: &mut ArgBufs,
-) -> Result<i64, String> {
+) -> Result<(i64, usize), String> {
     let mut distinct: Vec<(&FfiValue, &FfiValue)> = Vec::with_capacity(entries.len());
     for (k, v) in entries {
         match distinct.iter_mut().find(|(seen, _)| *seen == k) {
@@ -6300,7 +5003,7 @@ fn build_borrowed_dict(
     let key_size = dict_key_size(key, structs);
     let pair_size = dict_pair_size(key, val, structs);
     let data = bufs.array_block(distinct.len(), pair_size);
-    let base = unsafe { data.add(ARR_ELEMS_OFFSET) };
+    let base = arr_untag(data) as *mut u8;
     let stride = pair_size.max(8) as usize;
     for (i, (k, v)) in distinct.iter().enumerate() {
         // SAFETY: the block was sized for `distinct.len()` pairs of `stride`
@@ -6311,7 +5014,7 @@ fn build_borrowed_dict(
             write_ffi_arg(abi, pair.add(key_size as usize), val, v, structs, bufs)?;
         }
     }
-    Ok(data as i64)
+    Ok((data as i64, distinct.len()))
 }
 
 /// Write `v`, a value of type `ty`, at `dst` in the callee's inline
@@ -6475,9 +5178,9 @@ unsafe fn write_ffi_arg(
         let FfiValue::Array(elems) = v else {
             return Err(mismatch(ty, v));
         };
-        let block = build_borrowed_array(abi, elem, elems, structs, bufs)?;
+        let (block, len) = build_borrowed_array(abi, elem, elems, structs, bufs)?;
         if abi.arr_is_composite() && !is_char_array(ty) {
-            unsafe { write_whole_value(dst, block as *const u8) };
+            unsafe { write_whole_value(dst, block as *const u8, len) };
         } else {
             unsafe { std::ptr::write(dst as *mut i64, block) };
         }
@@ -6488,9 +5191,9 @@ unsafe fn write_ffi_arg(
         let FfiValue::Dict(entries) = v else {
             return Err(mismatch(ty, v));
         };
-        let block = build_borrowed_dict(abi, k, val, entries, structs, bufs)?;
+        let (block, len) = build_borrowed_dict(abi, k, val, entries, structs, bufs)?;
         if abi.sets_wide() {
-            unsafe { write_whole_value(dst, block as *const u8) };
+            unsafe { write_whole_value(dst, block as *const u8, len) };
         } else {
             unsafe { std::ptr::write(dst as *mut i64, block) };
         }
@@ -6639,11 +5342,15 @@ unsafe fn read_ffi_array_elem(
     FfiValue::Int(if signed { (raw << shift) >> shift } else { raw })
 }
 
-/// Read the array value stored at `at` (of element type `elem`) — its first
-/// word under the `Tagged` ABI, its 24 bytes under `Wide`, where it may be a
-/// window, reversed or inline (`arr24::ArrValue`), whose elements are read off
-/// the value rather than the block. `owned` as for [`read_ffi_array`]: the value's one reference
-/// is on its first word either way.
+/// Read the array value stored at `at` (of element type `elem`) — 24 bytes, where
+/// it may be whole, a window, reversed or inline (`arr24::ArrValue`) — into an
+/// [`FfiValue::Array`] of its elements in order, read off the value's run rather
+/// than the block. `owned`: the value carries the one reference the callee
+/// retained on return, which is released after the read (a `dec` cascades to the
+/// elements). Elements are read by *borrowing*: the block owns their references.
+///
+/// A `char[]` never arrives here: it is str-shaped, and both callers
+/// (`read_ffi_borrowed` and the `call_values` return path) peel it off first.
 ///
 /// SAFETY: `at` must hold a valid array value of element type `elem` for `abi`.
 unsafe fn read_ffi_array_at(
@@ -6653,10 +5360,10 @@ unsafe fn read_ffi_array_at(
     owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
-    let raw = unsafe { *(at as *const i64) };
-    if !abi.arr_is_composite() {
-        return unsafe { read_ffi_array(abi, raw, elem, owned, structs) };
-    }
+    debug_assert!(
+        !matches!(elem, ConcreteType::Primitive(Primitive::Char)),
+        "a `char[]` is read through the str-shaped path, not as an array block"
+    );
     let value = unsafe { *(at as *const arr24::ArrValue) };
     if value.is_inline() {
         // The elements are the value's own bytes, and it owns nothing to release.
@@ -6666,75 +5373,29 @@ unsafe fn read_ffi_array_at(
             .collect();
         return FfiValue::Array(out);
     }
-    // The older whole shape names a block; so does a bit-packed `bool[]`, whose
-    // run is bits rather than bytes at a stride (`read_ffi_array` reads them).
-    if value.data.is_null() || (is_bit_packed(elem) && !value.is_reversed()) {
-        return unsafe { read_ffi_array(abi, raw, elem, owned, structs) };
-    }
-    // A window — or a reversed one — is never bit-packed (`arr24`'s header says
-    // why), so every element is byte-addressable at the element stride.
-    let stride = abi_array_elem_size(abi, elem, structs) as usize;
     let n = value.run_len();
-    let reversed = value.is_reversed();
-    let out = (0..n)
-        .map(|i| if reversed { n - 1 - i } else { i })
-        .map(|i| unsafe {
-            read_ffi_array_elem(abi, value.data.add(i * stride), elem, stride, structs)
-        })
-        .collect();
+    let out = if is_bit_packed(elem) {
+        // `bool[]` packs one bit per element, and is never reversed (`arr24`'s
+        // header says why).
+        (0..n)
+            .map(|i| {
+                let byte = unsafe { *value.data.add(i >> 3) };
+                FfiValue::Int(i64::from((byte >> (i & 7)) & 1))
+            })
+            .collect()
+    } else {
+        // Every other element is byte-addressable at the element stride.
+        let stride = abi_array_elem_size(abi, elem, structs) as usize;
+        let reversed = value.is_reversed();
+        (0..n)
+            .map(|i| if reversed { n - 1 - i } else { i })
+            .map(|i| unsafe {
+                read_ffi_array_elem(abi, value.data.add(i * stride), elem, stride, structs)
+            })
+            .collect()
+    };
     if owned {
         aipl_array_dec(value.block);
-    }
-    FfiValue::Array(out)
-}
-
-/// Read an array value `raw` (of element type `elem`) into an [`FfiValue::Array`]
-/// of its elements in order. `char[]` is special-cased: it shares `str`'s
-/// representation (packed UTF-8 bytes, not an array block), so it's read as its
-/// bytes decoded to codepoints. Every other array is a heap/reversed block —
-/// elements read by *borrowing* (the block owns their references); when `owned`,
-/// the block's own reference is released after the read (`dec` cascades to the
-/// elements), balancing the retain the callee did on return.
-///
-/// SAFETY: `raw` must be a valid array value of element type `elem` (a `char[]`
-/// str value, or a heap/reversed array block whose elements are `elem`-shaped),
-/// carrying one reference when `owned`.
-unsafe fn read_ffi_array(
-    abi: Abi,
-    raw: i64,
-    elem: &ConcreteType,
-    owned: bool,
-    structs: &HashMap<String, TypeDef>,
-) -> FfiValue {
-    // `char[]` never arrives here: it is str-shaped, so it is a 24-byte value
-    // rather than the `i64` this takes, and both callers (`read_ffi_borrowed`
-    // and the `call_values` return path) peel it off first.
-    debug_assert!(
-        !matches!(elem, ConcreteType::Primitive(Primitive::Char)),
-        "a `char[]` is read through the str-shaped path, not as an array block"
-    );
-    let a = raw as *const u8;
-    // A null pointer stands for an empty array (never allocated).
-    if a.is_null() {
-        return FfiValue::Array(Vec::new());
-    }
-    let len = unsafe { array_len_of(a) };
-    let mut out = Vec::with_capacity(len);
-    if is_bit_packed(elem) {
-        // `bool[]` packs one bit per element.
-        for i in 0..len {
-            out.push(FfiValue::Int(i64::from(unsafe { arr_load_bit(a, i) })));
-        }
-    } else {
-        let stride = abi_array_elem_size(abi, elem, structs) as usize;
-        for i in 0..len {
-            let ep = unsafe { arr_elem_ptr(a, i, stride) };
-            // Elements are borrowed: the block owns their references.
-            out.push(unsafe { read_ffi_array_elem(abi, ep, elem, stride, structs) });
-        }
-    }
-    if owned {
-        aipl_array_dec(a);
     }
     FfiValue::Array(out)
 }
@@ -8076,7 +6737,7 @@ struct Builtins {
 /// [`ArgKind::Word`] is anything that travels in a single `i64` register: a pointer,
 /// an integer, a `bool`/`char`, a function-pointer constant, a raw byte cursor,
 /// an array/set/dict handle, or a pointer *to* an element rather than the
-/// element itself (`aipl_array_push`'s `x`, `aipl_dict_get`'s `key_ptr`).
+/// element itself (`array_ops::push`'s `x`, `array_ops::dict_get`'s `key_ptr`).
 /// [`ArgKind::Str`] is a `str` *value*.
 ///
 /// The two are the same width today, which is why this table used to count
@@ -8226,7 +6887,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         "aipl_arrw_with_cap" => (3, Ret::Str),
         "aipl_arrw_slice" => (4, Ret::Str),
         "aipl_shim_get" | "aipl_str_len" | "aipl_str_hash" | "aipl_str_iter_next"
-        | "aipl_str_write_ptr" | "aipl_i64_len" | "aipl_u64_len" | "aipl_list_files" => {
+        | "aipl_str_write_ptr" | "aipl_i64_len" | "aipl_u64_len" => {
             (1, Ret::Word)
         }
         "aipl_char_at"
@@ -8237,11 +6898,9 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_str_ends_with_char"
         | "aipl_str_contains"
         | "aipl_str_data"
-        | "aipl_arr_load_bit"
         | "aipl_charset_next"
         | "aipl_charset_prev"
         | "aipl_write_string_to_file"
-        | "aipl_str_split"
         | "aipl_str_split_len"
         // The part out pointer and the cursor; the `1`/`0` the loop header
         // branches on is what comes back, so this is not a `Ret::Str`.
@@ -8252,19 +6911,9 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_write_u64" => (2, Ret::Word),
         "aipl_str_starts_with_at"
         | "aipl_str_starts_with_char"
-        | "aipl_arr_elem_ptr"
         | "aipl_write_bytes"
         | "aipl_array_new"
         | "aipl_array_with_cap" => (3, Ret::Word),
-        "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" => {
-            (4, Ret::Word)
-        }
-        "aipl_array_push"
-        | "aipl_array_push_mut"
-        | "aipl_arr_sort"
-        | "aipl_arr_reserve"
-        | "aipl_arr_extend" => (5, Ret::Word),
-        "aipl_dict_insert" => (6, Ret::Word),
         // Array windows (`arr24`, stage 4b). `aipl_arr_window` takes its out
         // value as an explicit first argument rather than through `Ret::Str`:
         // the caller already holds the slot it wants filled.
@@ -8276,7 +6925,6 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         "aipl_arrv_truncate" | "aipl_arrv_set_drop" => (2, Ret::None),
         "aipl_arr_push_small" => (3, Ret::Word),
         "aipl_arr_reversed" => (5, Ret::None),
-        "aipl_arrv_extend" => (5, Ret::Word),
         "aipl_arrv_elem_ptr" => (3, Ret::Word),
         "aipl_arrv_sort" => (6, Ret::None),
         "aipl_arrv_push" => (7, Ret::None),
@@ -8293,24 +6941,14 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         "aipl_dictv_insert" | "aipl_dictv_remove" => (6, Ret::None),
         "aipl_arrv_join" => (8, Ret::None),
         // The parts and `join`'s three separators; the `str` comes back through
-        // the out pointer, as `aipl_str_join`'s does.
+        // the out pointer, as `aipl_strv_join`'s does.
         "aipl_strv_join" => (4, Ret::Str),
         "aipl_arr_settle" => (4, Ret::None),
-        "aipl_dict_remove" => (5, Ret::Word),
-        "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" => (7, Ret::Word),
         // ---- a `str` back, through the out pointer ----
         "aipl_trim" | "aipl_str_reverse" | "aipl_str_sort" | "aipl_str_alloc"
         | "aipl_char_to_str" | "aipl_str_heap" | "aipl_str_pack_inline" => (1, Ret::Str),
         "aipl_concat" | "aipl_str_repeat" | "aipl_str_rope" => (2, Ret::Str),
         "aipl_str_slice" => (3, Ret::Str),
-        // The parts plus `join`'s three separators.
-        "aipl_str_join" => (4, Ret::Str),
-        // Joins `T[][]` into a `T[]` — an *array* back in a register, not a
-        // `str`. It was labelled `Ret::Str` while every result was one word and
-        // the two were indistinguishable; they no longer are, and a `Ret::Str`
-        // here would have codegen prepend an out pointer for a value that comes
-        // back in a register.
-        "aipl_arr_join" => (7, Ret::Word),
         other => panic!("unknown builtin import symbol {other:?}"),
     }
 }
@@ -8488,11 +7126,11 @@ fn register_builtins(
     // arguments — see `borrowed_param` — so there is nothing else to record.
     const SIG_REGS: &[(Callee, &str)] = &[
         (Callee::Print, "aipl_print"),
-        (Callee::Split, "aipl_str_split"),
+        (Callee::Split, "aipl_strv_split"),
         (Callee::SplitLen, "aipl_str_split_len"),
         (Callee::ReadFileToString, "aipl_read_file_to_string"),
         (Callee::WriteStringToFile, "aipl_write_string_to_file"),
-        (Callee::ListFiles, "aipl_list_files"),
+        (Callee::ListFiles, "aipl_arrv_list_files"),
         (Callee::NowNanos, "aipl_now_nanos"),
         (Callee::MonotonicNow, "aipl_monotonic_now"),
         (Callee::ExecuteProgram, "aipl_execute_program"),
@@ -9909,11 +8547,11 @@ fn take_field<M: Module>(
 /// as one this function holds the sole reference to — or, for an inline array,
 /// the value itself, which owns no block to share. A block whose refcount
 /// is above one is *shared* — the one case a move cannot make its own — and
-/// goes through `aipl_arr_reserve` with nothing extra, which copies it and
+/// goes through `array_ops::reserve` with nothing extra, which copies it and
 /// releases the shared original. Everything else is handed back untouched:
 /// a refcount-one block is already unique, and a `STATIC_REFCOUNT` block, a
 /// null one, or a view is left for the first in-place write to copy lazily
-/// (`aipl_array_push_mut` does exactly that), so a binding that never writes
+/// (`array_ops::push_mut` does exactly that), so a binding that never writes
 /// pays nothing — which a `mut acc = acc0` seeded with an empty literal and
 /// pushed to zero times is.
 ///
@@ -9968,9 +8606,10 @@ fn owned_block_made_unique_whole<M: Module>(
 }
 
 /// [`owned_block_made_unique`] given the block pointer as well as the value it
-/// came from. A wide value that is shared is copied by `aipl_arrv_reserve_from`
-/// into a value of its own, whose address this returns; an unshared one is
-/// handed back as it is. Anything else is the block pointer, copied or not.
+/// came from. A value that is shared is copied by `aipl_arrv_reserve_from` into
+/// a value of its own, whose address this returns; an unshared one is handed
+/// back as it is. (A type with no block — a `#{char}`'s bitfield — has nothing to
+/// copy.)
 fn owned_block_made_unique_ptr<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
@@ -9995,16 +8634,18 @@ fn owned_block_made_unique_ptr<M: Module>(
             let (d, r) = pair_rc_fn_addrs(builder, module, cx, key, val);
             (d, r, dict_pair_size(key, val, structs))
         }
-        _ => return v,
+        _ => return value,
     };
+    if !is_wide_seq(ty) {
+        return value;
+    }
     let copy_block = builder.create_block();
     let merge = builder.create_block();
     builder.append_block_param(merge, types::I64);
     // Null: nothing to share. Otherwise read the refcount behind the untagged
     // pointer; `1` and `STATIC_REFCOUNT` both mean "not shared with anyone
     // who could be hurt by an in-place write" here.
-    let wide = is_wide_seq(ty);
-    let unchanged = if wide { value } else { v };
+    let unchanged = value;
     let is_null = builder.ins().icmp_imm_s(IntCC::Equal, v, 0);
     let check = builder.create_block();
     builder
@@ -10029,24 +8670,14 @@ fn owned_block_made_unique_ptr<M: Module>(
     builder.seal_block(copy_block);
     let esz = builder.ins().iconst(types::I64, esz);
     let zero = builder.ins().iconst(types::I64, 0);
-    let copied = if wide {
-        let out_slot = value_slot(builder, ty, cx.structs);
-        let out = builder.ins().stack_addr(types::I64, out_slot, 0);
-        cx.builtins.call_void(
-            module,
-            builder,
-            "aipl_arrv_reserve_from",
-            &[out, value, zero, drop_fn, retain_fn, esz],
-        );
-        out
-    } else {
-        cx.builtins.call(
-            module,
-            builder,
-            "aipl_arr_reserve",
-            &[v, zero, drop_fn, retain_fn, esz],
-        )
-    };
+    let out_slot = value_slot(builder, ty, cx.structs);
+    let copied = builder.ins().stack_addr(types::I64, out_slot, 0);
+    cx.builtins.call_void(
+        module,
+        builder,
+        "aipl_arrv_reserve_from",
+        &[copied, value, zero, drop_fn, retain_fn, esz],
+    );
     builder.ins().jump(merge, &[BlockArg::Value(copied)]);
     builder.switch_to_block(merge);
     builder.seal_block(merge);
@@ -10381,14 +9012,10 @@ fn new_seq_with_cap<M: Module>(
     drop_fn: Value,
     elem_size: Value,
 ) -> Value {
-    if !is_wide_seq(ty) {
-        return builtins.call(
-            module,
-            builder,
-            "aipl_array_with_cap",
-            &[cap, drop_fn, elem_size],
-        );
-    }
+    debug_assert!(
+        is_wide_seq(ty),
+        "a tagged set or dict has no value to build into"
+    );
     let out = array_value_slot(builder);
     builtins.call_void(
         module,
@@ -14090,8 +12717,8 @@ fn static_block<M: Module>(
 /// block for all three, because they *are* one block — a set and a dict are
 /// array blocks with a different insert — and an empty one has no element
 /// type to lay out. Every writer copies a `STATIC_REFCOUNT` block before
-/// touching it (`aipl_set_insert` and `aipl_dict_insert` both bottom out in
-/// `aipl_array_push_mut`), so the value behaves as a fresh empty collection
+/// touching it (`array_ops::set_insert` and `array_ops::dict_insert` both bottom out in
+/// `array_ops::push_mut`), so the value behaves as a fresh empty collection
 /// in every respect except that reading it costs no allocation — the same
 /// deal a short `str` gets from its inline form.
 ///
@@ -14106,17 +12733,17 @@ fn emit_const_empty<M: Module>(
 }
 
 /// Materialize a constant array literal as a static data object and return its
-/// data pointer — the array value, an untagged `ArrRepr::Heap` pointer into the
-/// binary's data section. The block is laid out exactly as `alloc_array` would
-/// lay it out on the heap, `[refcount][len][cap][drop_fn][elems]`, except that
-/// the refcount is `STATIC_REFCOUNT`: every `aipl_arr_inc`/`aipl_array_dec`
-/// no-ops on it, it is never freed, and every path that would write into an
-/// array's own block — `aipl_array_push_mut`, `aipl_arr_reserve`, the in-place
-/// `map`/`filter` reuse behind `__arr_writable` — sees the refcount and copies
-/// first, exactly as `aipl_concat_mut` does for a static `str` literal. So the
-/// value behaves as a fresh array in every respect except that reading it costs
-/// no allocation, which is the point: `"1a2b"` never allocated, and now
-/// `[0, 3, 5]` doesn't either.
+/// data pointer — the array value's first word, an untagged (`ArrRepr::Static`)
+/// pointer into the binary's data section. The block is `[refcount][elements]`:
+/// the refcount is `STATIC_REFCOUNT`, so every `aipl_arr_inc`/`aipl_array_dec`
+/// no-ops on it, and it is never freed. It has no capacity word because nothing
+/// grows it — every path that would write into an array's own block
+/// (`array_ops::push_mut`, `array_ops::reserve`, the in-place `map`/`filter` reuse
+/// behind `__arr_writable`) sees the refcount first and copies, exactly as
+/// `aipl_concat_mut` does for a static `str` literal — and no length, which is the
+/// value's. So the value behaves as a fresh array in every respect except that
+/// reading it costs no allocation, which is the point: `"1a2b"` never allocated,
+/// and now `[0, 3, 5]` doesn't either.
 ///
 /// Like `emit_const_str`, the result needs no scope tracking — a release at
 /// scope exit would be a no-op.
@@ -14134,12 +12761,11 @@ fn emit_const_array<M: Module>(
 ) -> Result<Value, Error> {
     let len = words.len();
     let cap_bytes = cap_bytes_for(array_elem_size(elem, cx.structs), len);
-    let mut content = Vec::with_capacity(HEADER_SIZE + ARR_ELEMS_OFFSET + cap_bytes);
+    // `[refcount][elements]`, and nothing else: a static block carries the static
+    // tag (`array_layout`), which says the runtime reads its refcount and no more
+    // — the length is the value's, and it is never grown or freed.
+    let mut content = Vec::with_capacity(HEADER_SIZE + cap_bytes);
     content.extend_from_slice(&STATIC_REFCOUNT.to_le_bytes());
-    content.extend_from_slice(&(len as i64).to_le_bytes());
-    content.extend_from_slice(&(cap_bytes as i64).to_le_bytes());
-    // Scalar elements: no drop-fn.
-    content.extend_from_slice(&0i64.to_le_bytes());
     if is_bit_packed(elem) {
         // Pack 8 bools per byte, bit `i & 7` of byte `i >> 3` — the layout
         // `write_packed_bit` produces.
@@ -14158,7 +12784,7 @@ fn emit_const_array<M: Module>(
             content.extend_from_slice(&w.to_le_bytes()[..width]);
         }
     }
-    debug_assert_eq!(content.len(), HEADER_SIZE + ARR_ELEMS_OFFSET + cap_bytes);
+    debug_assert_eq!(content.len(), HEADER_SIZE + cap_bytes);
     static_block(
         module,
         builder,
@@ -18555,7 +17181,7 @@ fn compile_call_expr<M: Module>(
                 // which reuses the block. Owning the reference is not owning the
                 // block — a moved-out field may still be shared with whatever
                 // built the struct — so the block is first made unique
-                // (`aipl_arr_reserve`: kept at refcount one, copied otherwise),
+                // (`array_ops::reserve`: kept at refcount one, copied otherwise),
                 // as at every other in-place entry. The result is a fresh value,
                 // tracked below like the allocating union's. An `#{}` receiver
                 // has no element type to grow under and takes the copying path,
@@ -18688,7 +17314,7 @@ fn compile_call_expr<M: Module>(
             // this one.
             //
             // The dict must be ours to write into before anything is removed, so
-            // it goes through `aipl_arr_reserve` first — asking for no extra room,
+            // it goes through `array_ops::reserve` first — asking for no extra room,
             // purely for its ownership contract: it consumes the slot's reference
             // and hands back one owned block, copying when the block is shared and
             // keeping it when it is not. That is exactly `extend`'s discipline, so
@@ -19091,7 +17717,7 @@ fn compile_call_expr<M: Module>(
             // and a moved-in argument isn't always one: a constant literal
             // (`[1, 2, 3].map(f)`) or a function returning one is a
             // `STATIC_REFCOUNT` block in the data section, and `xs.reverse()`
-            // is a view over another array's block. `aipl_arr_reserve` with
+            // is a view over another array's block. `array_ops::reserve` with
             // nothing extra is exactly the guard: a unique heap block comes
             // back as is, anything else is copied (and the original released),
             // so the body's stores land in memory it owns — the same
@@ -19211,7 +17837,7 @@ fn compile_call_expr<M: Module>(
         // literal, so the appends after it are plain in-place writes that never
         // reallocate and never consult the static exclusivity analysis. All
         // three consume their array argument, so a borrowed one is retained
-        // first (the same compensating pre-inc `aipl_array_push` needs).
+        // first (the same compensating pre-inc `array_ops::push` needs).
         //
         // Only the generic 8-byte-element representation takes this path.
         // `char[]` is str-shaped and `bool[]` is bit-packed; both keep the
@@ -19291,7 +17917,7 @@ fn compile_call_expr<M: Module>(
                 return Ok((arr_ptr, arr_ty));
             }
             // All three consume their array argument. A borrowed one needs a
-            // compensating pre-inc (the same one `aipl_array_push` needs); an
+            // compensating pre-inc (the same one `array_ops::push` needs); an
             // owned temporary is *moved* in instead — its scope track has to go,
             // or the block is dropped twice once the result's track drops it.
             let mut moved: Vec<Value> = Vec::new();
@@ -19441,7 +18067,7 @@ fn compile_call_expr<M: Module>(
                 // `str` (old bytes + the new byte) rather than growing in
                 // place — but the *ownership bookkeeping* still follows the
                 // same `exclusive`-vs-shared split as a real array push below,
-                // just swapping in `str` construction for `aipl_array_push[_mut]`.
+                // just swapping in `str` construction for `array_ops::push[_mut]`.
                 //
                 // `mut cs = []` starts as the generic (array-shaped) empty
                 // placeholder — see `coerce_empty_to_char_array` — since an
@@ -19543,7 +18169,7 @@ fn compile_call_expr<M: Module>(
             // type is untouched too: an untyped empty literal stays untyped, and
             // there is no element to pin it with. Sizing is the whole point —
             // the appends that follow then fit without growing (see
-            // `aipl_arr_reserve`, which sizes exactly; the `str` runtime's
+            // `array_ops::reserve`, which sizes exactly; the `str` runtime's
             // `aipl_str_reserve` does the same for bytes).
             if args.len() != 2 {
                 return Err(Error::at(
@@ -19626,7 +18252,7 @@ fn compile_call_expr<M: Module>(
             // rewritten into this one by mono, exactly as for `push`.
             //
             // The reason this is a builtin rather than an AIPL loop over `push`
-            // is the sizing: `aipl_arr_reserve` grows the destination once, to
+            // is the sizing: `array_ops::reserve` grows the destination once, to
             // its final length, so appending N elements costs at most one
             // reallocation instead of the log N a repeated `push` pays — and the
             // elements then move as a single `memcpy` plus one retain pass.
@@ -21222,7 +19848,7 @@ fn compile_expr_inner<M: Module>(
             // arguments, retained (`fn same(xs) { xs }`), and then this block is
             // still read through the caller's binding. Exclusive `push`
             // mutates in place without asking, so the block is made unique here,
-            // once, on its way into the slot: `aipl_arr_reserve` keeps a block
+            // once, on its way into the slot: `array_ops::reserve` keeps a block
             // at refcount one and copies any other, static and views included —
             // the same guard `__arr_writable` gives the in-place `map`/`filter`
             // bodies, for the same reason. A call boundary is the one place a
@@ -22674,7 +21300,7 @@ fn compile_expr_inner<M: Module>(
             }
             // A set reuses the array heap block. Pre-size to the literal length
             // (an upper bound), then insert each element deduplicated via
-            // `aipl_set_insert`. For `str` elements the block carries the array
+            // `array_ops::set_insert`. For `str` elements the block carries the array
             // `str` drop/retain helpers (so it frees/retains its strings) and
             // membership compares by content; scalars need neither.
             let mut elem_ty: Option<ConcreteType> = None;
@@ -22725,7 +21351,7 @@ fn compile_expr_inner<M: Module>(
             let set_ty = ConcreteType::Set(Box::new(elem.clone()), *order);
             let ptr = new_seq_with_cap(builder, module, builtins, &set_ty, cap, drop_fn, esz_v);
             for v in vals {
-                // `aipl_set_insert` reads the element through a pointer; spill
+                // `array_ops::set_insert` reads the element through a pointer; spill
                 // the value (a `bool` is read back as i64, a `str` as its
                 // pointer) and pass its address.
                 let s = value_slot(builder, &elem, structs);
@@ -22748,7 +21374,7 @@ fn compile_expr_inner<M: Module>(
             // A dict reuses the array heap block, one element per `(key, value)`
             // pair laid out as `[key: 8][value: sizeof(V)]`. Pre-size to the
             // literal length (an upper bound — duplicate keys collapse), then
-            // insert each pair via `aipl_dict_insert` (last-binding-wins). The
+            // insert each pair via `array_ops::dict_insert` (last-binding-wins). The
             // block carries the pair drop/retain helpers so it frees/retains each
             // pair's key and value; key membership compares by content for `str`.
             // An empty dict literal is `__none__`-typed and coerces to any

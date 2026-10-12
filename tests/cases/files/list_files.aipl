@@ -64,9 +64,6 @@ functions:
   aipl_array_new:
     calls: 2
     bytes: (external)
-  aipl_array_push_mut:
-    calls: 8
-    bytes: (external)
   aipl_array_with_cap:
     calls: 5
     bytes: (external)

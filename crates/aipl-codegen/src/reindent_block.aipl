@@ -107,11 +107,11 @@ pub fn reindent_block(self: str, base: u64) -> str {
 allocations: 90
 deallocations: 90
 reallocations: 5
-bytes allocated: 5162
+bytes allocated: 5146
 instructions executed: 14578
-binary size: 15576
+binary size: 15552
   code: 9684
-  data: 921
+  data: 897
   metadata: 4971
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
@@ -134,9 +134,6 @@ functions:
     bytes: (external)
   aipl_array_new:
     calls: 19
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 2
     bytes: (external)
   aipl_array_with_cap:
     calls: 1

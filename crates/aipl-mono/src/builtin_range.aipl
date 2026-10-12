@@ -44,11 +44,11 @@ pub fn range<T: any>(self: T[]) -> Span { start: 0, end: self.len() }.test({
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 136
+bytes allocated: 120
 instructions executed: 788
-binary size: 4600
+binary size: 4504
   code: 2136
-  data: 603
+  data: 507
   metadata: 1861
 functions:
   __eq___builtin_Span:
@@ -71,9 +71,6 @@ functions:
     bytes: (external)
   aipl_array_new:
     calls: 1
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 3
     bytes: (external)
   aipl_array_with_cap:
     calls: 1

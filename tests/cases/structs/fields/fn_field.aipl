@@ -32,7 +32,7 @@ fn dispatch() -> i64 {
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 48
+bytes allocated: 32
 instructions executed: 167
 binary size: 1824
   code: 620

@@ -69,9 +69,9 @@ deallocations: 389
 reallocations: 0
 bytes allocated: 23820
 instructions executed: 20181
-binary size: 8496
+binary size: 8472
   code: 4668
-  data: 33
+  data: 9
   metadata: 3795
 functions:
   __arr_drop_Rule:

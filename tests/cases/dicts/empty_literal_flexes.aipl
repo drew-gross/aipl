@@ -72,9 +72,9 @@ deallocations: 11
 reallocations: 0
 bytes allocated: 215
 instructions executed: 621
-binary size: 4320
+binary size: 4296
   code: 2256
-  data: 79
+  data: 55
   metadata: 1985
 functions:
   __eq_dict$str$i64:
@@ -89,9 +89,6 @@ functions:
   __to_str_u64:
     calls: 1
     bytes: 204
-  aipl_dict_get:
-    calls: 2
-    bytes: (external)
   aipl_i64_len:
     calls: 2
     bytes: (external)

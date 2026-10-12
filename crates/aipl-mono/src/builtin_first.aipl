@@ -22,9 +22,9 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 80
 instructions executed: 360
-binary size: 3536
+binary size: 3464
   code: 1568
-  data: 418
+  data: 346
   metadata: 1550
 functions:
   __test$first:

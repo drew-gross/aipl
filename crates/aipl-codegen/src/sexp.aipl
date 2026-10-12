@@ -72,11 +72,11 @@ fn depth(self: Sexp) -> u64 {
 allocations: 12738
 deallocations: 12738
 reallocations: 490
-bytes allocated: 12468490
+bytes allocated: 12454602
 instructions executed: 7635967
-binary size: 234024
+binary size: 234000
   code: 162860
-  data: 1740
+  data: 1716
   metadata: 69424
 functions:
   __arr_drop_Sexp:
@@ -379,20 +379,11 @@ functions:
   aipl_arr_inc:
     calls: 158387
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1314
-    bytes: (external)
   aipl_array_dec:
-    calls: 166925
+    calls: 161843
     bytes: (external)
   aipl_array_new:
     calls: 2504
-    bytes: (external)
-  aipl_array_push:
-    calls: 4230
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 2148
     bytes: (external)
   aipl_assert:
     calls: 8

@@ -23,12 +23,12 @@ fn chars() -> char[] { [..['a', 'b'], 'c'] }.test({
 allocations: 9
 deallocations: 9
 reallocations: 2
-bytes allocated: 379
+bytes allocated: 283
 instructions executed: 1386
-binary size: 8936
+binary size: 8784
   code: 4800
-  data: 689
-  metadata: 3447
+  data: 577
+  metadata: 3407
 functions:
   __eq_P:
     calls: 2
@@ -48,19 +48,10 @@ functions:
   aipl_arr_inc:
     calls: 20
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 5
-    bytes: (external)
   aipl_array_dec:
-    calls: 27
+    calls: 23
     bytes: (external)
   aipl_array_new:
-    calls: 3
-    bytes: (external)
-  aipl_array_push:
-    calls: 1
-    bytes: (external)
-  aipl_array_push_mut:
     calls: 3
     bytes: (external)
   aipl_assert:

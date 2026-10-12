@@ -66,11 +66,11 @@ fn main() !prints {
 allocations: 7
 deallocations: 7
 reallocations: 0
-bytes allocated: 399
+bytes allocated: 383
 instructions executed: 1439
-binary size: 5688
+binary size: 5664
   code: 3008
-  data: 267
+  data: 243
   metadata: 2413
 functions:
   __to_str_char$arr:

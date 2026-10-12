@@ -51,11 +51,11 @@ ab-cd
 allocations: 30
 deallocations: 30
 reallocations: 0
-bytes allocated: 1349
+bytes allocated: 1253
 instructions executed: 3239
-binary size: 11136
+binary size: 11040
   code: 6648
-  data: 387
+  data: 291
   metadata: 4101
 functions:
   __builtin_all$i64$k0$lam$main$lambda0:
@@ -91,23 +91,11 @@ functions:
   aipl_array_new:
     calls: 2
     bytes: (external)
-  aipl_array_push_mut:
-    calls: 21
-    bytes: (external)
   aipl_array_with_cap:
     calls: 7
     bytes: (external)
   aipl_i64_len:
     calls: 30
-    bytes: (external)
-  aipl_set_contains:
-    calls: 15
-    bytes: (external)
-  aipl_set_insert:
-    calls: 23
-    bytes: (external)
-  aipl_set_union:
-    calls: 2
     bytes: (external)
   aipl_u64_len:
     calls: 2

@@ -8203,7 +8203,7 @@ pub fn builtin_is_mutating(name: &str) -> bool {
 /// retained on its own; the buffer itself is not), whereas a slice, a
 /// `reverse`, or a `str` concat hands back a view or a rope that keeps
 /// pointing into its operand, and a user function may store its argument
-/// anywhere. The in-place runtime (`aipl_array_push_mut`) never checks for a
+/// anywhere. The in-place runtime (`array_ops::push_mut`) never checks for a
 /// second reference — this analysis is the only guard — so an argument is
 /// added here only once its runtime has been read.
 fn builtin_reads_arg(f: &Callee, i: usize) -> bool {
@@ -10615,7 +10615,7 @@ pub(crate) fn is_heap_concrete(t: &ConcreteType) -> bool {
 /// stores would write into memory that isn't its own. The `push`/`extend`
 /// runtime already copies such a block before growing it; this intrinsic is
 /// the same copy-on-first-write for the in-place bodies (codegen lowers it to
-/// `aipl_arr_reserve` with nothing extra: a unique heap block comes back
+/// `array_ops::reserve` with nothing extra: a unique heap block comes back
 /// untouched, anything else is copied).
 fn writable(param: &str, span: &Span) -> Expr {
     Expr::new(
@@ -10683,7 +10683,7 @@ fn slot_fits(from: &Type, to: &Type) -> bool {
 /// "Fresh" is about ownership, not about where the bytes live: a constant
 /// literal is a static block, and a call may return one or a view. That is
 /// fine for a move — the owned instance never writes into a moved-in block
-/// without going through a guard (`aipl_array_push_mut`, `aipl_arr_reserve`,
+/// without going through a guard (`array_ops::push_mut`, `array_ops::reserve`,
 /// [`writable`]) that copies a block it must not write.
 fn is_fresh_heap(arg: &Expr, arg_ty: &Type) -> bool {
     is_heap(arg_ty) && fresh_tail(arg)

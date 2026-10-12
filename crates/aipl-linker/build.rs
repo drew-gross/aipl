@@ -14,6 +14,7 @@ fn main() {
     // new entry point in it then failed to link with no stale build to blame.
     println!("cargo:rerun-if-changed=../aipl-codegen/src/str24.rs");
     println!("cargo:rerun-if-changed=../aipl-codegen/src/arr24.rs");
+    println!("cargo:rerun-if-changed=../aipl-codegen/src/array_ops.rs");
     println!("cargo:rerun-if-changed=../aipl-codegen/src/charset.rs");
     println!("cargo:rerun-if-changed=../aipl-codegen/src/array_layout.rs");
     println!("cargo:rerun-if-changed=build.rs");

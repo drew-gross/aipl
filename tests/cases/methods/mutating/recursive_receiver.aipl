@@ -181,11 +181,11 @@ fn wrap(mut self: str) {
 allocations: 32
 deallocations: 32
 reallocations: 2
-bytes allocated: 1286
+bytes allocated: 1190
 instructions executed: 8891
-binary size: 18576
+binary size: 18384
   code: 11460
-  data: 1263
+  data: 1071
   metadata: 5853
 functions:
   __eq_i64$arr:
@@ -222,13 +222,7 @@ functions:
     calls: 56
     bytes: (external)
   aipl_array_dec:
-    calls: 93
-    bytes: (external)
-  aipl_array_push:
-    calls: 2
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 10
+    calls: 91
     bytes: (external)
   aipl_array_with_cap:
     calls: 4
