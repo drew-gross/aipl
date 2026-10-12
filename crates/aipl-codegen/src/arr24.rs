@@ -549,16 +549,28 @@ pub(crate) extern "C" fn aipl_arr_retain_opt_warr(elems: *const u8, len: i64) {
 
 // # Windows over the 8-byte block (stage 4b)
 //
-// Until the block itself changes (stage 6), an array value in compiled code is
-// one of two shapes over the *old* block (`array_layout`):
+// Until the block itself changes (stage 6c), an array value in compiled code is
+// one of these shapes over the *old* block (`array_layout`):
 //
 // ```text
 //            w0                          w1                 w2
-// whole      tagged pointer (any repr)   0                  0
-// window     untagged heap block         data: *const u8    len
+// block      tagged pointer (any repr)   data: *const u8    len
 // reversed   untagged heap block         data: *const u8    [ len : 56 ][ tag:8 ]
 // inline     elems[0..8]                 elems[8..16]       [ elems[16..22] ][ len:8 ][ tag:8 ]
 // ```
+//
+// A *block* value carries its run — `data` and `len` — whether it is the whole
+// block or a window of it (stage 6b), so a reader never has to ask which: the
+// elements are `data` and `len`, always. A whole value is the window that
+// happens to cover the block (`data` at the first element, `len` the block's),
+// which is what [`ArrValue::is_window`] tests when something needs to know — a
+// window must be copied before an in-place write, and a whole value need not.
+//
+// A value whose `data` is null is the older whole shape, `{block, 0, 0}`, still
+// read as the block it names: the checked-in artifact's compiled code builds
+// them, and so does zeroed memory (the empty array). Nothing new writes one.
+// Reading either shape as a window is correct, which is what lets the artifact
+// run beside the code that replaced it.
 //
 // A *reversed* value (`ATAG_REVERSED`) is a window walked from its far end:
 // `data` and the length name a forward run of the block, exactly as a window's
@@ -576,15 +588,17 @@ pub(crate) extern "C" fn aipl_arr_retain_opt_warr(elems: *const u8, len: i64) {
 // A whole value and a window have a top byte of zero, since a window's length
 // is far below 2^56.
 //
-// Otherwise a nonzero `w1` is what makes a window, and it is always nonzero
-// when set: it points at an element inside the block. (An inline value's `w1`
-// is element bytes, so the tag is read first.) A window holds one reference on
+// Otherwise `w1` points at an element inside the block, and is never null for a
+// value that carries its run. (An inline value's `w1` is element bytes, so the
+// tag is read first.) A window holds one reference on
 // its block, exactly as a whole value does, so retaining or releasing either is
 // the first word alone — which is all `aipl_arr_{drop,retain}_warr` read, once
 // they have passed over an inline element, which holds none.
 //
 // Windows are only ever made over a `Heap` block of byte-addressable elements.
-// A bit-packed `bool[]` has no byte to point at, so slicing one *copies* the
+// A bit-packed `bool[]` has no byte to point at (its whole value still carries a
+// `data` and a length, but the run is bits, which only the block's readers walk),
+// so slicing one *copies* the
 // window into a block of its own (`aipl_arr_slice`) and yields a whole value
 // around it. (A reversed value is sliced into a reversed value — see below.)
 //
@@ -607,11 +621,27 @@ pub(crate) struct ArrValue {
 }
 
 impl ArrValue {
+    /// A run `data`/`len` of `block`, whole or not.
+    fn whole_run(block: *const u8, data: *const u8, len: usize) -> ArrValue {
+        ArrValue { block, data, len }
+    }
+
+    /// The value for the whole of `block`: its run is the block's elements, at
+    /// the length the block holds now. (Null: the zeroed empty value.)
     fn whole(block: *const u8) -> ArrValue {
+        if block.is_null() {
+            return ArrValue {
+                block,
+                data: core::ptr::null(),
+                len: 0,
+            };
+        }
         ArrValue {
             block,
-            data: core::ptr::null(),
-            len: 0,
+            data: unsafe {
+                super::array_layout::arr_untag(block).add(super::array_layout::ARR_ELEMS_OFFSET)
+            },
+            len: tagged_len(block),
         }
     }
 
@@ -632,8 +662,35 @@ impl ArrValue {
         (self.len as u64 >> ARR_TAG_SHIFT) as u8 == ATAG_REVERSED
     }
 
+    /// Whether the value is a *window* of its block — a run that is not the whole
+    /// of it — and so cannot be written through or handed to something that
+    /// takes the block as it is. A whole value, either shape, is not.
     fn is_window(&self) -> bool {
-        !self.is_inline() && !self.is_reversed() && !self.data.is_null()
+        if self.is_inline() || self.is_reversed() || self.data.is_null() {
+            return false;
+        }
+        let first = unsafe {
+            super::array_layout::arr_untag(self.block).add(super::array_layout::ARR_ELEMS_OFFSET)
+        };
+        self.data != first || self.len != tagged_len(self.block)
+    }
+
+    /// The run of a value that is neither inline nor reversed: `data` and the
+    /// length for a value that carries them, the block's own elements for one in
+    /// the older whole shape.
+    fn run(&self) -> (*const u8, usize) {
+        if self.data.is_null() {
+            let first = if self.block.is_null() {
+                core::ptr::null()
+            } else {
+                unsafe {
+                    super::array_layout::arr_untag(self.block)
+                        .add(super::array_layout::ARR_ELEMS_OFFSET)
+                }
+            };
+            return (first, tagged_len(self.block));
+        }
+        (self.data, self.len)
     }
 
     /// A window or a reversed value's element count.
@@ -702,12 +759,6 @@ impl ArrValue {
         };
         block
     }
-
-    /// The window's first element, as an index into its block.
-    fn start(&self, elem_size: i64) -> usize {
-        let elems = self.block as usize + super::array_layout::ARR_ELEMS_OFFSET;
-        (self.data as usize - elems) / elem_size as usize
-    }
 }
 
 /// The element count of the array a tagged pointer names (null: empty). Every
@@ -766,11 +817,7 @@ pub(crate) extern "C" fn aipl_arr_window(
         unsafe { core::ptr::write(out, result) };
         return;
     }
-    let len = if a.is_window() {
-        a.len
-    } else {
-        tagged_len(a.block)
-    };
+    let (first, len) = a.run();
     let lo = start.clamp(0, len as i64) as usize;
     let hi = end.clamp(0, len as i64) as usize;
     let n = hi.saturating_sub(lo);
@@ -778,26 +825,14 @@ pub(crate) extern "C" fn aipl_arr_window(
         ArrValue::whole(super::array_layout::arr_inline_empty())
     } else if lo == 0 && n == len {
         super::aipl_arr_inc(a.block);
-        a
-    } else if a.is_window() {
-        super::aipl_arr_inc(a.block);
-        ArrValue {
-            block: a.block,
-            data: unsafe { a.data.add(lo * elem_size as usize) },
-            len: n,
-        }
+        ArrValue::whole_run(a.block, first, len)
     } else {
         match super::array_layout::arr_repr(a.block) {
             super::array_layout::ArrRepr::Heap
                 if elem_size != super::array_layout::ELEM_BITPACKED =>
             {
                 super::aipl_arr_inc(a.block);
-                let elems = unsafe { a.block.add(super::array_layout::ARR_ELEMS_OFFSET) };
-                ArrValue {
-                    block: a.block,
-                    data: unsafe { elems.add(lo * elem_size as usize) },
-                    len: n,
-                }
+                ArrValue::whole_run(a.block, unsafe { first.add(lo * elem_size as usize) }, n)
             }
             _ => ArrValue::whole(super::aipl_arr_slice(
                 a.block, lo as i64, hi as i64, drop_fn, retain_fn, elem_size,
@@ -829,22 +864,11 @@ pub(crate) extern "C" fn aipl_arr_reversed(
         }
         ArrValue::inline(&rev[..n * w], n)
     } else if a.is_reversed() {
+        // Reversing a reversal is the forward run it walks.
         super::aipl_arr_inc(a.block);
-        let elems = unsafe { a.block.add(super::array_layout::ARR_ELEMS_OFFSET) };
-        if a.data == elems && a.run_len() == tagged_len(a.block) {
-            ArrValue::whole(a.block)
-        } else {
-            ArrValue {
-                block: a.block,
-                data: a.data,
-                len: a.run_len(),
-            }
-        }
-    } else if a.is_window() {
-        super::aipl_arr_inc(a.block);
-        ArrValue::reversed(a.block, a.data, a.len)
+        ArrValue::whole_run(a.block, a.data, a.run_len())
     } else {
-        let len = tagged_len(a.block);
+        let (first, len) = a.run();
         if len == 0 {
             ArrValue::whole(super::array_layout::arr_inline_empty())
         } else if elem_size == super::array_layout::ELEM_BITPACKED {
@@ -853,8 +877,7 @@ pub(crate) extern "C" fn aipl_arr_reversed(
             ))
         } else {
             super::aipl_arr_inc(a.block);
-            let elems = unsafe { a.block.add(super::array_layout::ARR_ELEMS_OFFSET) };
-            ArrValue::reversed(a.block, elems, len)
+            ArrValue::reversed(a.block, first, len)
         }
     };
     unsafe { core::ptr::write(out, result) };
@@ -877,11 +900,19 @@ pub(crate) extern "C" fn aipl_arr_window_block(
     if a.is_reversed() {
         return a.run_to_block(drop_fn, retain_fn, elem_size);
     }
-    let lo = a.start(elem_size);
+    let (first, len) = a.run();
+    let lo = if elem_size == super::array_layout::ELEM_BITPACKED {
+        0
+    } else {
+        (first as usize
+            - (super::array_layout::arr_untag(a.block) as usize
+                + super::array_layout::ARR_ELEMS_OFFSET))
+            / elem_size as usize
+    };
     super::aipl_arr_slice(
         a.block,
         lo as i64,
-        (lo + a.len) as i64,
+        (lo + len) as i64,
         drop_fn,
         retain_fn,
         elem_size,
@@ -965,12 +996,8 @@ fn elements(v: &ArrValue, width: usize) -> (*const u8, isize, usize) {
         };
         return (last, -(width as isize), n);
     }
-    if v.is_window() {
-        return (v.data, width as isize, v.run_len());
-    }
-    let u = super::array_layout::arr_untag(v.block);
-    let first = unsafe { u.add(super::array_layout::ARR_ELEMS_OFFSET) };
-    (first, width as isize, tagged_len(v.block))
+    let (first, len) = v.run();
+    (first, width as isize, len)
 }
 
 /// Append every element of the array value at `src` to the block `dst`, which
@@ -1808,6 +1835,45 @@ mod tests {
         assert_eq!(a.reversed().spare_capacity(E), 0);
         assert_eq!(from_elems(&bytes_of(&[1, 2]), 2, E, 0).spare_capacity(E), 0);
         a.release();
+    }
+
+    /// Stage 6b: a whole value carries its run like any window, and the two
+    /// differ only in whether the run is the block's. The older whole shape
+    /// (`data` null), which the artifact still builds, reads as the same run.
+    #[test]
+    fn a_whole_value_carries_its_run() {
+        let root = super::super::array_layout::ARR_ELEMS_OFFSET;
+        let block = super::super::aipl_array_new(4, 0, 8);
+        let whole = ArrValue::whole(block);
+        assert_eq!(whole.data as usize, block as usize + root);
+        assert_eq!(whole.len, 4);
+        assert!(!whole.is_window());
+
+        // The same run, in the older shape: nothing carried, still not a window,
+        // and read as the block's elements.
+        let older = ArrValue {
+            block,
+            data: core::ptr::null(),
+            len: 0,
+        };
+        assert!(!older.is_window());
+        assert_eq!(older.run(), (whole.data, 4));
+        assert_eq!(elements(&older, 8), elements(&whole, 8));
+
+        // A prefix shares `data` with the whole value but not its length; a
+        // suffix shares its end but not `data`. Neither is the block's run.
+        let prefix = ArrValue::whole_run(block, whole.data, 3);
+        let suffix = ArrValue::whole_run(block, unsafe { whole.data.add(8) }, 3);
+        assert!(prefix.is_window());
+        assert!(suffix.is_window());
+
+        // The empty array and the zeroed value are both empty and neither a window.
+        let empty = ArrValue::whole(super::super::array_layout::arr_inline_empty());
+        assert_eq!(empty.len, 0);
+        assert!(!empty.is_window());
+        let zeroed = ArrValue::whole(core::ptr::null());
+        assert_eq!(elements(&zeroed, 8).2, 0);
+        super::super::aipl_array_dec(block);
     }
 
     /// The stage-4b bridge over the old block: a slice is a window sharing its

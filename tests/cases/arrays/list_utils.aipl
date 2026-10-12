@@ -65,15 +65,15 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 265
-instructions executed: 1791
-binary size: 8408
-  code: 5276
+instructions executed: 1553
+binary size: 7912
+  code: 4780
   data: 203
   metadata: 2929
 functions:
   __builtin_drop_last_n$i64:
     calls: 4
-    bytes: 428
+    bytes: 380
   __to_str_char$opt:
     calls: 1
     bytes: 380
@@ -106,4 +106,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3876
+    bytes: 3428

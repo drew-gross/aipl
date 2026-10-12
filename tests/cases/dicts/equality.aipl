@@ -16,9 +16,9 @@ allocations: 12
 deallocations: 12
 reallocations: 0
 bytes allocated: 864
-instructions executed: 1191
-binary size: 7968
-  code: 4464
+instructions executed: 1229
+binary size: 8096
+  code: 4592
   data: 489
   metadata: 3015
 functions:
@@ -36,16 +36,16 @@ functions:
     bytes: 128
   __eq_dict$i64$i64$arr:
     calls: 2
-    bytes: 244
+    bytes: 248
   __eq_dict$i64$str:
     calls: 4
-    bytes: 252
+    bytes: 256
   __eq_i64$arr:
     calls: 2
-    bytes: 496
+    bytes: 432
   __test$eq:
     calls: 1
-    bytes: 2816
+    bytes: 3000
   aipl_arr_inc:
     calls: 4
     bytes: (external)

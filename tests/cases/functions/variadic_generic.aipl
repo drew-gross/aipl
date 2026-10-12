@@ -34,9 +34,9 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 197
-instructions executed: 1236
-binary size: 5136
-  code: 3232
+instructions executed: 1162
+binary size: 4936
+  code: 3032
   data: 129
   metadata: 1775
 functions:
@@ -60,7 +60,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2236
+    bytes: 2108
   total$i64$vo1:
     calls: 2
-    bytes: 792
+    bytes: 720

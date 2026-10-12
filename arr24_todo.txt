@@ -315,7 +315,7 @@ Stage 5 — reversed as values                                               [do
   7 cases (`arrays/reverse` 4 → 0) and up in none.
 
 
-Stage 6 — the block header, two shapes, and the `str` buffer       [6b next]
+Stage 6 — the block header, two shapes, and the `str` buffer       [6c next]
 ---------------------------------------------------------------------------------
 The target. `base` is the first element, and the length lives only in the value:
 
@@ -393,9 +393,32 @@ window, a reversal or inline (lent as a copy).
             block any more. What still reads a block is codegen itself — `ArrView`'s
             length load, set and dict `==` / hash / render, the clone and drop
             walks — which is 6b's and 6c's.
-  [ ] 6b. a whole value carries `data` and `len` too, so every block value has
-          the window's shape; `ArrView`'s whole-vs-window select and its block
-          length load go (most of the per-view cost stages 3 and 5 added).
+  [x] 6b. a whole value carries `data` and `len` too, so every block value has
+          the window's shape — arrays, sets and dicts alike (`arr_val` and
+          `ArrValue::whole` build `{block, first element, length}`). `ArrView`
+          reads `data` and the length off the value with nothing to select
+          between; a set or dict view (`value_view`) does the same, and set and
+          dict `==` / hash read the length off the value.
+            - "whole" is now "the window that covers its block", and the test
+              is `ArrValue::is_window` (runtime) / `emit_needs_block` (codegen):
+              `data` off the first element, or a length short of the block's.
+              It is paid only where something is about to write through a
+              value (`settle_array_slot`), no longer on every read.
+            - no ABI bump: a whole value in the new shape is a legal window to
+              the checked-in artifact's code, and the runtime still reads the
+              older `{block, 0, 0}` it builds (`ArrValue::run`). The host writes
+              the new shape (`write_whole_value`, `main`'s arguments) and reads
+              either (`read_ffi_array_at`; a bit-packed `bool[]` is read off its
+              block, since its run is bits).
+            - a codegen site that changes a block's length in place has to say
+              so in the value too: `FilterTruncate` does; every runtime entry
+              hands back a fresh `whole()`.
+            - `emit_file_result` can see a null block (a failed read), so it
+              builds its value with `arr_val_or_null`.
+            Corpus: allocations unchanged, instructions -1.6%, binary size -1.5%.
+            [ ] after the next handoff the artifact is in the new shape: drop the
+                `data.is_null()` branches (`ArrValue::run`, the FFI reader) and
+                the older-shape unit test.
   [ ] 6c. `len` leaves the block; the header becomes base-relative, in the two
           shapes above, with the tag bit for the drop shape. Release walks `init`
           elements of a drop block. `init` is the block's own initialized count,

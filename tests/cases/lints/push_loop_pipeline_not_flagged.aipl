@@ -160,9 +160,9 @@ allocations: 40
 deallocations: 40
 reallocations: 1
 bytes allocated: 957
-instructions executed: 7625
-binary size: 14464
-  code: 10148
+instructions executed: 7335
+binary size: 14136
+  code: 9820
   data: 377
   metadata: 3939
 functions:
@@ -207,13 +207,13 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 6008
+    bytes: 5796
   main$filter_map2$own0:
     calls: 1
-    bytes: 628
+    bytes: 600
   show:
     calls: 8
-    bytes: 1552
+    bytes: 1508
   show_u:
     calls: 2
-    bytes: 1552
+    bytes: 1508

@@ -40,18 +40,18 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 248
-instructions executed: 1373
-binary size: 4816
-  code: 2556
+instructions executed: 1324
+binary size: 4792
+  code: 2536
   data: 448
-  metadata: 1812
+  metadata: 1808
 functions:
   __eq_i64$arr:
     calls: 3
-    bytes: 496
+    bytes: 432
   __test$addtwo:
     calls: 1
-    bytes: 1092
+    bytes: 1136
   __test$grow_aliased_matches:
     calls: 1
     bytes: 776

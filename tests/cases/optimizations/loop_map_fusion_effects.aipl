@@ -51,9 +51,9 @@ allocations: 20
 deallocations: 20
 reallocations: 0
 bytes allocated: 850
-instructions executed: 1374
-binary size: 4608
-  code: 2876
+instructions executed: 1331
+binary size: 4464
+  code: 2732
   data: 57
   metadata: 1675
 functions:
@@ -77,10 +77,10 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1300
+    bytes: 1220
   main$map0$own0:
     calls: 1
-    bytes: 792
+    bytes: 760
   main$map2$own0:
     calls: 1
-    bytes: 580
+    bytes: 548

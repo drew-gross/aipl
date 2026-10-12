@@ -200,9 +200,9 @@ allocations: 3951
 deallocations: 3951
 reallocations: 315
 bytes allocated: 350239
-instructions executed: 1356541
-binary size: 217032
-  code: 170656
+instructions executed: 1355044
+binary size: 216448
+  code: 170072
   data: 3456
   metadata: 42920
 functions:
@@ -235,10 +235,10 @@ functions:
     bytes: 304
   __builtin_count_while$__m1__Item$lam$__m1__rule_pats$__m6__AiplTok$lambda0:
     calls: 0
-    bytes: 596
+    bytes: 564
   __builtin_count_while$__m1__Item$lam$__m1__rule_pats$__m6__AiplTok$lambda1$lambda0:
     calls: 11
-    bytes: 596
+    bytes: 564
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 0
     bytes: 268
@@ -268,19 +268,19 @@ functions:
     bytes: 356
   __m1__arr_fld:
     calls: 14
-    bytes: 2048
+    bytes: 2004
   __m1__caps_fld:
     calls: 4
-    bytes: 988
+    bytes: 972
   __m1__char_class_body:
     calls: 11
-    bytes: 2024
+    bytes: 2044
   __m1__decl_pat:
     calls: 2
-    bytes: 600
+    bytes: 612
   __m1__entry_name:
     calls: 3
-    bytes: 504
+    bytes: 484
   __m1__escape_pat:
     calls: 6
     bytes: 456
@@ -289,28 +289,28 @@ functions:
     bytes: 348
   __m1__json_str:
     calls: 174
-    bytes: 2244
+    bytes: 2272
   __m1__matcher_pat:
     calls: 74
-    bytes: 7868
+    bytes: 7872
   __m1__obj_fld:
     calls: 5
-    bytes: 2048
+    bytes: 2004
   __m1__obj_of:
     calls: 31
-    bytes: 1668
+    bytes: 1628
   __m1__pat_json:
     calls: 40
-    bytes: 3516
+    bytes: 3524
   __m1__re_escape:
     calls: 89
-    bytes: 1952
+    bytes: 1972
   __m1__re_escape_set:
     calls: 8
-    bytes: 1232
+    bytes: 1228
   __m2__indent:
     calls: 142
-    bytes: 1780
+    bytes: 1760
   __m5__unescape:
     calls: 0
     bytes: 2004
@@ -343,13 +343,13 @@ functions:
     bytes: 148
   __m7__process_raw_string:
     calls: 0
-    bytes: 3328
+    bytes: 3184
   __rec_drop___m1__Pat:
     calls: 173
     bytes: 268
   __test$aipl_tmlanguage:
     calls: 1
-    bytes: 123900
+    bytes: 123596
   __to_str_u64:
     calls: 7
     bytes: 204
@@ -412,4 +412,4 @@ functions:
     bytes: 120
   template_pat:
     calls: 2
-    bytes: 1412
+    bytes: 1436

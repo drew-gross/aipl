@@ -70,21 +70,21 @@ allocations: 36
 deallocations: 36
 reallocations: 0
 bytes allocated: 2082
-instructions executed: 7259
-binary size: 16288
-  code: 10220
+instructions executed: 7009
+binary size: 16016
+  code: 9952
   data: 615
-  metadata: 5453
+  metadata: 5449
 functions:
   __eq_i64$arr:
     calls: 1
-    bytes: 496
+    bytes: 432
   __to_str_bool:
     calls: 2
     bytes: 232
   __to_str_bool$arr:
     calls: 1
-    bytes: 800
+    bytes: 724
   __to_str_char$arr:
     calls: 1
     bytes: 768
@@ -93,10 +93,10 @@ functions:
     bytes: 204
   __to_str_i64$arr:
     calls: 9
-    bytes: 908
+    bytes: 844
   __to_str_none$arr:
     calls: 1
-    bytes: 252
+    bytes: 212
   aipl_arr_inc:
     calls: 13
     bytes: (external)
@@ -123,16 +123,16 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 4156
+    bytes: 4292
   main$filter3$own0:
     calls: 1
-    bytes: 636
+    bytes: 588
   main$filter7$own0:
     calls: 1
-    bytes: 636
+    bytes: 588
   main$map1$own0:
     calls: 1
-    bytes: 564
+    bytes: 532
   main$map5$own0:
     calls: 1
-    bytes: 568
+    bytes: 536

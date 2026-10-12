@@ -758,9 +758,9 @@ allocations: 505
 deallocations: 505
 reallocations: 34
 bytes allocated: 40474
-instructions executed: 114066
-binary size: 125600
-  code: 84388
+instructions executed: 113805
+binary size: 125088
+  code: 83876
   data: 5464
   metadata: 35748
 functions:
@@ -793,49 +793,49 @@ functions:
     bytes: 304
   __builtin_count_while$Item$lam$rule_pats$Kind$lambda0:
     calls: 0
-    bytes: 596
+    bytes: 564
   __builtin_count_while$Item$lam$rule_pats$Kind$lambda1$lambda0:
     calls: 4
-    bytes: 596
+    bytes: 564
   __eq_Entry:
     calls: 1
     bytes: 128
   __eq_Entry$arr:
     calls: 2
-    bytes: 420
+    bytes: 356
   __eq_Pat:
     calls: 12
     bytes: 480
   __eq_Pat$arr:
     calls: 9
-    bytes: 436
+    bytes: 372
   __eq_set$char:
     calls: 3
     bytes: 84
   __eq_str$arr:
     calls: 1
-    bytes: 500
+    bytes: 436
   __m1__indent:
     calls: 12
-    bytes: 1780
+    bytes: 1760
   __rec_drop_Pat:
     calls: 57
     bytes: 268
   __test$brace_group_entry:
     calls: 1
-    bytes: 2092
+    bytes: 2144
   __test$char_class_body:
     calls: 1
     bytes: 1892
   __test$decl_pat:
     calls: 1
-    bytes: 1032
+    bytes: 1056
   __test$json_str:
     calls: 1
     bytes: 852
   __test$matcher_pat:
     calls: 1
-    bytes: 9348
+    bytes: 9392
   __test$matcher_regex:
     calls: 1
     bytes: 5764
@@ -844,13 +844,13 @@ functions:
     bytes: 1104
   __test$rule_pats:
     calls: 1
-    bytes: 8216
+    bytes: 8292
   __test$tm_json:
     calls: 1
-    bytes: 6136
+    bytes: 5972
   __test$word_pat:
     calls: 1
-    bytes: 2324
+    bytes: 2296
   __to_str_u64:
     calls: 0
     bytes: 204
@@ -904,22 +904,22 @@ functions:
     bytes: (external)
   arr_fld:
     calls: 2
-    bytes: 2048
+    bytes: 2004
   caps_fld:
     calls: 0
-    bytes: 988
+    bytes: 972
   char_class_body:
     calls: 16
-    bytes: 2024
+    bytes: 2044
   entry_name:
     calls: 5
-    bytes: 504
+    bytes: 484
   fld:
     calls: 6
     bytes: 348
   json_str:
     calls: 21
-    bytes: 2244
+    bytes: 2272
   main:
     calls: 1
     bytes: 760
@@ -928,19 +928,19 @@ functions:
     bytes: 8280
   obj_fld:
     calls: 1
-    bytes: 2048
+    bytes: 2004
   obj_of:
     calls: 2
-    bytes: 1668
+    bytes: 1628
   pat_json:
     calls: 2
-    bytes: 3516
+    bytes: 3524
   re_escape:
     calls: 32
-    bytes: 1952
+    bytes: 1972
   re_escape_set:
     calls: 4
-    bytes: 1232
+    bytes: 1228
   rule_pats$Kind:
     calls: 2
-    bytes: 10548
+    bytes: 10400

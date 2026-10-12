@@ -54,11 +54,11 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 304
-instructions executed: 881
-binary size: 8408
-  code: 3816
+instructions executed: 854
+binary size: 8392
+  code: 3796
   data: 1200
-  metadata: 3392
+  metadata: 3396
 functions:
   __dict_drop_str$i64:
     calls: 1
@@ -68,19 +68,19 @@ functions:
     bytes: 132
   __test$arrays:
     calls: 1
-    bytes: 624
+    bytes: 544
   __test$char_sets:
     calls: 1
-    bytes: 416
+    bytes: 424
   __test$dicts:
     calls: 1
-    bytes: 396
+    bytes: 416
   __test$nested:
     calls: 1
-    bytes: 816
+    bytes: 828
   __test$sets:
     calls: 1
-    bytes: 404
+    bytes: 424
   __test$strings:
     calls: 1
     bytes: 468

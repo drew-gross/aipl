@@ -35,9 +35,9 @@ allocations: 6
 deallocations: 6
 reallocations: 1
 bytes allocated: 322
-instructions executed: 1455
-binary size: 8912
-  code: 4696
+instructions executed: 1401
+binary size: 8744
+  code: 4528
   data: 595
   metadata: 3621
 functions:
@@ -49,10 +49,10 @@ functions:
     bytes: 120
   __to_str_Named$arr:
     calls: 1
-    bytes: 1220
+    bytes: 1156
   __to_str_Point$arr:
     calls: 1
-    bytes: 1140
+    bytes: 1076
   __to_str_Point$opt:
     calls: 1
     bytes: 700
@@ -79,4 +79,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1192
+    bytes: 1152

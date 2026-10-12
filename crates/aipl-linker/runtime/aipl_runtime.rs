@@ -3276,10 +3276,14 @@ extern "C" {
 
 #[no_mangle]
 pub extern "C" fn main(argc: c_int, argv: *const *const c_char) -> c_int {
-    // An array is passed by the address of its value, `{block, 0, 0}`.
+    // An array is passed by the address of its value, `{block, first element,
+    // length}`.
     let mut value: [i64; 3] = [0; 3];
     let args = if unsafe { __aipl_main_wants_args } != 0 {
-        value[0] = unsafe { build_cli_args(argc, argv) } as i64;
+        let block = unsafe { build_cli_args(argc, argv) };
+        value[0] = block as i64;
+        value[1] = unsafe { arr_untag(block).add(ARR_ELEMS_OFFSET) } as i64;
+        value[2] = unsafe { array_len(block) } as i64;
         value.as_ptr() as *const u8
     } else {
         core::ptr::null()

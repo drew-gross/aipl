@@ -127,15 +127,15 @@ allocations: 10
 deallocations: 10
 reallocations: 0
 bytes allocated: 218
-instructions executed: 1540
-binary size: 7768
-  code: 5116
+instructions executed: 1445
+binary size: 7504
+  code: 4848
   data: 195
-  metadata: 2457
+  metadata: 2461
 functions:
   __builtin_find_index$i64$lam$main$lambda0:
     calls: 1
-    bytes: 400
+    bytes: 368
   __to_str_i64:
     calls: 2
     bytes: 204
@@ -162,25 +162,25 @@ functions:
     bytes: (external)
   count_to_big:
     calls: 1
-    bytes: 420
+    bytes: 388
   first_big:
     calls: 1
-    bytes: 420
+    bytes: 388
   head_sign:
     calls: 1
-    bytes: 392
+    bytes: 360
   index_or_len:
     calls: 1
-    bytes: 500
+    bytes: 448
   later_big:
     calls: 1
-    bytes: 448
+    bytes: 416
   main:
     calls: 1
-    bytes: 644
+    bytes: 652
   noisy:
     calls: 1
-    bytes: 488
+    bytes: 456
   one_past_big:
     calls: 1
-    bytes: 424
+    bytes: 392

@@ -40,15 +40,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 104
-instructions executed: 1161
-binary size: 6752
-  code: 3488
+instructions executed: 1121
+binary size: 6632
+  code: 3368
   data: 785
   metadata: 2479
 functions:
   __test$count_while:
     calls: 1
-    bytes: 980
+    bytes: 1052
   aipl_array_dec:
     calls: 1
     bytes: (external)
@@ -72,22 +72,22 @@ functions:
     bytes: 276
   count_while$i64$lam$__test$count_while$lambda0:
     calls: 1
-    bytes: 340
+    bytes: 308
   count_while$i64$lam$__test$count_while$lambda1:
     calls: 1
-    bytes: 340
+    bytes: 308
   count_while$i64$lam$__test$count_while$lambda2:
     calls: 1
-    bytes: 340
+    bytes: 308
   count_while$i64$lam$__test$count_while$lambda3:
     calls: 1
-    bytes: 340
+    bytes: 308
   count_while$i64$lam$__test$count_while$lambda4:
     calls: 1
-    bytes: 340
+    bytes: 308
   count_while$str$lam$__test$count_while$lambda6:
     calls: 1
-    bytes: 420
+    bytes: 388
   main:
     calls: 1
     bytes: 112

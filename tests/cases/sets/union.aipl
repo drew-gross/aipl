@@ -42,27 +42,27 @@ allocations: 14
 deallocations: 14
 reallocations: 1
 bytes allocated: 920
-instructions executed: 1188
-binary size: 8648
-  code: 5052
+instructions executed: 1238
+binary size: 8792
+  code: 5196
   data: 383
   metadata: 3213
 functions:
   __eq_set$i64:
     calls: 2
-    bytes: 252
+    bytes: 256
   __eq_set$str:
     calls: 1
-    bytes: 300
+    bytes: 304
   __test$basic:
     calls: 1
-    bytes: 1276
+    bytes: 1312
   __test$empty_union:
     calls: 1
-    bytes: 1472
+    bytes: 1524
   __test$in_place:
     calls: 1
-    bytes: 1508
+    bytes: 1556
   aipl_arr_inc:
     calls: 12
     bytes: (external)

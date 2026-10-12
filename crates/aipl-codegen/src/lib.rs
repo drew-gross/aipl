@@ -5332,8 +5332,14 @@ impl Compilation {
     pub fn run_cli(&self, name: &str, args: &[String]) -> Result<i64, Error> {
         let ptr = self.code_ptr(name)?;
         let f: extern "C" fn(*const u8) -> i64 = unsafe { std::mem::transmute(ptr) };
-        // An array is passed by the address of its value, `{block, 0, 0}`.
-        let value: [i64; 3] = [build_cli_array(args) as i64, 0, 0];
+        // An array is passed by the address of its value, `{block, first
+        // element, length}`.
+        let block = build_cli_array(args);
+        let value: [i64; 3] = [
+            block as i64,
+            unsafe { arr_untag(block).add(ARR_ELEMS_OFFSET) } as i64,
+            unsafe { array_len_of(block) } as i64,
+        ];
         Ok(f(value.as_ptr() as *const u8))
     }
 
@@ -6043,6 +6049,22 @@ impl Drop for ArgBufs {
     }
 }
 
+/// Write the 24-byte value for the whole of `block` at `dst`
+/// (`arr24::ArrValue::whole`: the block, the address of its first element, its
+/// length).
+///
+/// SAFETY: `dst` must be 24 writable bytes and `block` a valid array block.
+unsafe fn write_whole_value(dst: *mut u8, block: *const u8) {
+    unsafe {
+        std::ptr::write(dst as *mut i64, block as i64);
+        std::ptr::write(
+            dst.add(8) as *mut i64,
+            arr_untag(block).add(ARR_ELEMS_OFFSET) as i64,
+        );
+        std::ptr::write(dst.add(16) as *mut i64, array_len_of(block) as i64);
+    }
+}
+
 /// Marshal `v` into the single `i64` the ABI passes for a parameter of type
 /// `ty`. An inline composite (struct, variant, optional, result, and a wide
 /// `str` or array) is written into a host buffer and passed by *pointer*,
@@ -6414,23 +6436,32 @@ unsafe fn write_ffi_arg(
             )
         };
     }
-    // An array value is `{block, 0, 0}`: the block is its first word, and the
-    // zeroed buffer already holds the rest.
+    // An array value is `{block, data, len}` over the borrowed block: the whole
+    // of it, as `arr24::ArrValue::whole` makes one. (A `char[]` is a `str`, whose
+    // value is the single word `build_borrowed_array` hands back.)
     if let ConcreteType::Array(elem) = ty {
         let FfiValue::Array(elems) = v else {
             return Err(mismatch(ty, v));
         };
         let block = build_borrowed_array(abi, elem, elems, structs, bufs)?;
-        unsafe { std::ptr::write(dst as *mut i64, block) };
+        if abi.arr_is_composite() && !is_char_array(ty) {
+            unsafe { write_whole_value(dst, block as *const u8) };
+        } else {
+            unsafe { std::ptr::write(dst as *mut i64, block) };
+        }
         return Ok(());
     }
-    // A dict value is `{block, 0, 0}` too, under an ABI where it is wide.
+    // A dict value is the same three words, under an ABI where it is wide.
     if let ConcreteType::Dict(k, val) = ty {
         let FfiValue::Dict(entries) = v else {
             return Err(mismatch(ty, v));
         };
         let block = build_borrowed_dict(abi, k, val, entries, structs, bufs)?;
-        unsafe { std::ptr::write(dst as *mut i64, block) };
+        if abi.sets_wide() {
+            unsafe { write_whole_value(dst, block as *const u8) };
+        } else {
+            unsafe { std::ptr::write(dst as *mut i64, block) };
+        }
         return Ok(());
     }
     let word = ffi_arg_word(abi, ty, v, structs, bufs)?;
@@ -6603,7 +6634,9 @@ unsafe fn read_ffi_array_at(
             .collect();
         return FfiValue::Array(out);
     }
-    if value.data.is_null() {
+    // The older whole shape names a block; so does a bit-packed `bool[]`, whose
+    // run is bits rather than bytes at a stride (`read_ffi_array` reads them).
+    if value.data.is_null() || (is_bit_packed(elem) && !value.is_reversed()) {
         return unsafe { read_ffi_array(abi, raw, elem, owned, structs) };
     }
     // A window — or a reversed one — is never bit-packed (`arr24`'s header says
@@ -10209,7 +10242,7 @@ fn settle_array_slot<M: Module>(
     if !is_wide_array(ty) || is_none_inner(elem) {
         return;
     }
-    let lend = emit_needs_block(builder, addr, ty);
+    let lend = emit_needs_block(builder, addr);
     let window = builder.create_block();
     let done = builder.create_block();
     builder.ins().brif(lend, window, &[], done, &[]);
@@ -10318,23 +10351,69 @@ fn seq_val(builder: &mut FunctionBuilder, ptr: Value, ty: &ConcreteType) -> Valu
 }
 
 /// A fresh array value for the tagged block pointer `ptr`: a 24-byte stack slot
-/// holding `{ptr, 0, 0}`, and its address — the inverse of [`arr_ptr`], for a
-/// site that produced an array as a pointer (a runtime call, a literal) and has
-/// to hand codegen a value.
+/// holding `{ptr, first element, length}` — the whole of the block, as
+/// `arr24::ArrValue::whole` makes one — and its address. The inverse of
+/// [`arr_ptr`], for a site that produced an array as a pointer (a runtime call,
+/// a literal) and has to hand codegen a value.
 ///
-/// The padding is written for the same reason [`store_array_elem`] writes it:
-/// an array value is copied and compared as bytes in places.
+/// The length is read from the block *now*: the value carries its own from here
+/// on, so a site that changes the block's length afterwards has to say so in the
+/// value too (`FilterTruncate`), or hand the block back through an entry that
+/// writes a new one.
+///
+/// Every word is written, so an array value copied or compared as bytes has no
+/// stale padding to trip on.
 fn arr_val(builder: &mut FunctionBuilder, ptr: Value) -> Value {
+    let flags = MemFlagsData::trusted();
+    let block = arr_base(builder, ptr);
+    let len = builder
+        .ins()
+        .load(types::I64, flags, block, ARR_LEN_OFFSET as i32);
+    arr_val_of_len(builder, ptr, len)
+}
+
+/// [`arr_val`] for a pointer that may be null (a runtime call's failure): the
+/// value is then the zeroed empty one, and the block is never read.
+fn arr_val_or_null(builder: &mut FunctionBuilder, ptr: Value) -> Value {
+    let flags = MemFlagsData::trusted();
     let slot = builder.create_sized_stack_slot(StackSlotData::new(
         StackSlotKind::ExplicitSlot,
         arr24::ARR_SIZE as u32,
         3,
     ));
     let a = builder.ins().stack_addr(types::I64, slot, 0);
-    builder.ins().store(MemFlagsData::trusted(), ptr, a, 0);
+    let null = builder.ins().icmp_imm_s(IntCC::Equal, ptr, 0);
+    let block = arr_base(builder, ptr);
+    // Read through the value's own address when there is no block.
+    let readable = builder.ins().select(null, a, block);
+    let loaded = builder
+        .ins()
+        .load(types::I64, flags, readable, ARR_LEN_OFFSET as i32);
     let zero = builder.ins().iconst(types::I64, 0);
-    builder.ins().store(MemFlagsData::trusted(), zero, a, 8);
-    builder.ins().store(MemFlagsData::trusted(), zero, a, 16);
+    let len = builder.ins().select(null, zero, loaded);
+    let first = builder.ins().iadd_imm_s(block, ARR_ELEMS_OFFSET as i64);
+    let data = builder.ins().select(null, zero, first);
+    builder.ins().store(flags, ptr, a, 0);
+    builder.ins().store(flags, data, a, 8);
+    builder.ins().store(flags, len, a, 16);
+    a
+}
+
+/// [`arr_val`] for a block whose length is already in hand — a static literal's,
+/// known at compile time.
+fn arr_val_of_len(builder: &mut FunctionBuilder, ptr: Value, len: Value) -> Value {
+    let flags = MemFlagsData::trusted();
+    let slot = builder.create_sized_stack_slot(StackSlotData::new(
+        StackSlotKind::ExplicitSlot,
+        arr24::ARR_SIZE as u32,
+        3,
+    ));
+    let a = builder.ins().stack_addr(types::I64, slot, 0);
+    let block = arr_base(builder, ptr);
+    let data = builder.ins().iadd_imm_s(block, ARR_ELEMS_OFFSET as i64);
+    builder.ins().store(flags, ptr, a, 0);
+    builder.ins().store(flags, data, a, 8);
+    builder.ins().store(flags, len, a, 16);
     a
 }
 
@@ -10496,7 +10575,7 @@ fn is_wide_array(ty: &ConcreteType) -> bool {
     matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty) && Abi::active().arr_size() > 8
 }
 
-/// Whether `ty` is a set or a dict held as the 24-byte value `{block, 0, 0}`
+/// Whether `ty` is a set or a dict held as the 24-byte value `{block, data, len}`
 /// ([`Abi::sets_wide`], `arr24_todo.txt` 6d) — never a window, a reversal or
 /// inline, so its block is always its first word. A `#{char}` is its bitfield.
 fn is_wide_set(ty: &ConcreteType) -> bool {
@@ -10583,20 +10662,33 @@ fn emit_is_inline(builder: &mut FunctionBuilder, v: Value) -> Value {
         .icmp_imm_s(IntCC::Equal, tag, arr24::ATAG_INLINE as i64)
 }
 
-/// Whether the array value at `v` (of type `ty`) is not a whole block — a
-/// window, or an inline value — and so has to be lent a block of its own
-/// elements before a runtime entry that takes a block sees it.
-fn emit_needs_block(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> Value {
-    let data = builder
+/// Whether the array value at `v` (of type `ty`) is not the whole of its block —
+/// a window, a reversal or an inline value — and so has to be given a block of
+/// its own before anything writes through it (`aipl_arr_settle`).
+///
+/// A tag says so for a reversal or an inline value. A block value says so by
+/// not being its block's run: `data` off the first element, or a length short of
+/// the block's. The block is read through the value's own address when the tag
+/// says its first word is no block (an inline value's elements), or it is null.
+fn emit_needs_block(builder: &mut FunctionBuilder, v: Value) -> Value {
+    let flags = MemFlagsData::trusted();
+    let w0 = builder.ins().load(types::I64, flags, v, 0);
+    let data = builder.ins().load(types::I64, flags, v, 8);
+    let w2 = builder.ins().load(types::I64, flags, v, 16);
+    let tag = builder.ins().ushr_imm_u(w2, arr24::ARR_TAG_SHIFT as i64);
+    let tagged = builder.ins().icmp_imm_s(IntCC::NotEqual, tag, 0);
+    let block = arr_base(builder, w0);
+    let no_block = builder.ins().icmp_imm_s(IntCC::Equal, w0, 0);
+    let borrowed = builder.ins().bor(tagged, no_block);
+    let readable = builder.ins().select(borrowed, v, block);
+    let block_len = builder
         .ins()
-        .load(types::I64, MemFlagsData::trusted(), v, 8);
-    let window = builder.ins().icmp_imm_s(IntCC::NotEqual, data, 0);
-    if may_be_inline(ty) {
-        let inline = emit_is_inline(builder, v);
-        builder.ins().bor(window, inline)
-    } else {
-        window
-    }
+        .load(types::I64, flags, readable, ARR_LEN_OFFSET as i32);
+    let first = builder.ins().iadd_imm_s(block, ARR_ELEMS_OFFSET as i64);
+    let off_start = builder.ins().icmp(IntCC::NotEqual, data, first);
+    let short = builder.ins().icmp(IntCC::NotEqual, w2, block_len);
+    let window = builder.ins().bor(off_start, short);
+    builder.ins().bor(tagged, window)
 }
 
 /// An optional of a scalar — `i64?`, `bool?`, `char?`. Sixteen bytes (the tag
@@ -11133,57 +11225,67 @@ fn block_view(builder: &mut FunctionBuilder, ptr: Value) -> ArrView {
     }
 }
 
+/// [`ArrView`] of a set or a dict value: its run is the `data` and length it
+/// carries (`arr24::ArrValue`), read off the value rather than its block.
+fn value_view(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> ArrView {
+    if !is_wide_seq(ty) {
+        return block_view(builder, v);
+    }
+    let flags = MemFlagsData::trusted();
+    ArrView {
+        ptr: builder.ins().load(types::I64, flags, v, 0),
+        base: builder.ins().load(types::I64, flags, v, 8),
+        len: builder.ins().load(types::I64, flags, v, 16),
+        array: false,
+        reversed: None,
+        step: None,
+    }
+}
+
 /// [`ArrView`] of a value of an array-backed type `ty`: an array value — whole,
 /// a window, reversed or inline — or a set or a dict, which is always whole.
 fn arr_view_shape(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> ArrView {
     if !is_wide_array(ty) {
-        // A set or a dict: whole, so its view is its block's.
-        let block = seq_ptr(builder, v, ty);
-        return block_view(builder, block);
+        // A set or a dict: whole, and carrying its run all the same.
+        return value_view(builder, v, ty);
     }
+    // A block value carries its run (`arr24::ArrValue`): `data` and the length
+    // are the elements, whole or windowed, so there is nothing to select between
+    // and no block to read. A reversed value's run is the same, walked from its
+    // far end, and an inline value's elements are its own bytes.
     let flags = MemFlagsData::trusted();
     let ptr = builder.ins().load(types::I64, flags, v, 0);
     let data = builder.ins().load(types::I64, flags, v, 8);
     let w2 = builder.ins().load(types::I64, flags, v, 16);
-    // A window and a reversed value both carry a run — `data` and a length —
-    // and differ only in the tag above the length, which a reversed value sets.
-    let is_window = builder.ins().icmp_imm_s(IntCC::NotEqual, data, 0);
     let run_len = builder.ins().band_imm_u(w2, arr24::ARR_LEN_MASK as i64);
     let tag = builder.ins().ushr_imm_u(w2, arr24::ARR_TAG_SHIFT as i64);
     let reversed = builder
         .ins()
         .icmp_imm_s(IntCC::Equal, tag, arr24::ATAG_REVERSED as i64);
     if !may_be_inline(ty) {
-        let whole = block_view(builder, ptr);
-        let base = builder.ins().select(is_window, data, whole.base);
-        let len = builder.ins().select(is_window, run_len, whole.len);
         return ArrView {
             ptr,
-            base,
-            len,
+            base: data,
+            len: run_len,
             array: true,
             reversed: Some(reversed),
             step: None,
         };
     }
     // An inline value's first word is element bytes, not a pointer, so the
-    // block reads below go through the value's own address instead — memory
-    // that is certainly there, read and then not used. That address is 8-aligned,
-    // so its tag bits read `Heap` and the element reads take the fast path, whose
-    // `base` is the value itself.
+    // element reads go through the value's own address instead — memory that is
+    // certainly there. That address is 8-aligned, so its tag bits read `Heap`
+    // and the element reads take the fast path, whose `base` is the value itself.
     let is_inline = builder
         .ins()
         .icmp_imm_s(IntCC::Equal, tag, arr24::ATAG_INLINE as i64);
     let ptr = builder.ins().select(is_inline, v, ptr);
-    let whole = block_view(builder, ptr);
-    let base = builder.ins().select(is_window, data, whole.base);
-    let base = builder.ins().select(is_inline, v, base);
-    let len = builder.ins().select(is_window, run_len, whole.len);
+    let base = builder.ins().select(is_inline, v, data);
     let inline_len = builder
         .ins()
         .ushr_imm_u(w2, arr24::ARR_INLINE_LEN_SHIFT as i64);
     let inline_len = builder.ins().band_imm_u(inline_len, 0xFF);
-    let len = builder.ins().select(is_inline, inline_len, len);
+    let len = builder.ins().select(is_inline, inline_len, run_len);
     ArrView {
         ptr,
         base,
@@ -12285,10 +12387,9 @@ fn emit_eq_body<M: Module>(
             // What follows reads the blocks under the two values; the right one
             // is asked membership as a value.
             let rv_value = rv;
+            let ll = value_view(builder, lv, ty).len;
+            let rl = value_view(builder, rv, ty).len;
             let lv = seq_ptr(builder, lv, ty);
-            let rv = seq_ptr(builder, rv, ty);
-            let ll = load_arr_len(builder, lv);
-            let rl = load_arr_len(builder, rv);
             let len_eq = builder.ins().icmp(IntCC::Equal, ll, rl);
             if is_none_inner(elem) {
                 builder.ins().uextend(types::I64, len_eq)
@@ -12440,10 +12541,9 @@ fn emit_eq_body<M: Module>(
             // What follows reads the blocks under the two values; the right one
             // is asked membership as a value.
             let rv_value = rv;
+            let ll = value_view(builder, lv, ty).len;
+            let rl = value_view(builder, rv, ty).len;
             let lv = seq_ptr(builder, lv, ty);
-            let rv = seq_ptr(builder, rv, ty);
-            let ll = load_arr_len(builder, lv);
-            let rl = load_arr_len(builder, rv);
             let len_eq = builder.ins().icmp(IntCC::Equal, ll, rl);
             if is_none_inner(k) {
                 builder.ins().uextend(types::I64, len_eq)
@@ -12727,8 +12827,7 @@ fn emit_hash<M: Module>(
             }
         }
         ConcreteType::Set(elem, _) => {
-            let block = seq_ptr(builder, v, ty);
-            let view = block_view(builder, block);
+            let view = value_view(builder, v, ty);
             let seed = emit_scalar_hash(builder, view.len);
             if is_none_inner(elem) {
                 seed
@@ -12816,8 +12915,8 @@ fn emit_hash<M: Module>(
             // Order-independent over pairs (matching dict `==`): fold each pair's
             // (key, value) combine commutatively. Within a pair the combine is
             // order-sensitive so `{1: 2}` and `{2: 1}` differ.
+            let len = value_view(builder, v, ty).len;
             let v = seq_ptr(builder, v, ty);
-            let len = load_arr_len(builder, v);
             let seed = emit_scalar_hash(builder, len);
             if is_none_inner(key_ty) {
                 seed
@@ -13840,8 +13939,7 @@ fn emit_render<M: Module>(
             emit_render_charset(module, builder, cx, value, descending, sink)?
         }
         ConcreteType::Set(elem, _) => {
-            let block = seq_ptr(builder, value, ty);
-            let view = block_view(builder, block);
+            let view = value_view(builder, value, ty);
             emit_render_seq(module, builder, cx, view, elem, sink, b'{', b'}')?
         }
         ConcreteType::Dict(k, v) => {
@@ -14199,7 +14297,14 @@ fn emit_file_result<M: Module>(
     // flag has to be carried separately.
     let is_ok = builder.ins().icmp_imm_s(IntCC::NotEqual, raw, 0);
     // A returned array is a block pointer; the payload is a value wrapping it.
-    let payload = ok_ty.map(|t| (seq_val(builder, raw, &t), t));
+    let payload = ok_ty.map(|t| {
+        let v = if is_wide_seq(&t) {
+            arr_val_or_null(builder, raw)
+        } else {
+            raw
+        };
+        (v, t)
+    });
     emit_file_result_split(module, builder, cx, is_ok, payload, err_msg)
 }
 
@@ -18897,9 +19002,12 @@ fn compile_call_expr<M: Module>(
             let (a_val, a_ty) = writable_place(module, builder, cx, scopes, &args[0])?;
             let (w, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
             let flags = MemFlagsData::trusted();
+            // The block's length, and the value's: a block value carries its own
+            // (`arr24::ArrValue`), which the block's no longer speaks for.
             let set_block_len = |builder: &mut FunctionBuilder| {
                 let a_ptr = arr_ptr(builder, a_val);
                 builder.ins().store(flags, w, a_ptr, ARR_LEN_OFFSET as i32);
+                builder.ins().store(flags, w, a_val, 16);
             };
             if may_be_inline(&a_ty) {
                 // An inline buffer's length is its byte 22, not a block's word.
@@ -19234,7 +19342,9 @@ fn compile_call_expr<M: Module>(
             builder.seal_block(merge);
             let ptr = builder.block_params(merge)[0];
             let arr_ty = ConcreteType::Array(Box::new(ConcreteType::NoneInner));
-            let value = arr_val(builder, ptr);
+            // Either block is empty: the shared static one, or a reservation.
+            let no_elems = builder.ins().iconst(types::I64, 0);
+            let value = arr_val_of_len(builder, ptr, no_elems);
             scopes
                 .last_mut()
                 .expect("scope")
@@ -22517,7 +22627,8 @@ fn compile_expr_inner<M: Module>(
                     // A static block, so not tracked; the value is a fresh slot
                     // over its pointer.
                     let ptr = emit_const_array(module, builder, cx, &words, &elem)?;
-                    arr_val(builder, ptr)
+                    let len = builder.ins().iconst(types::I64, words.len() as i64);
+                    arr_val_of_len(builder, ptr, len)
                 };
                 return Ok((value, arr_ty));
             }
@@ -22663,7 +22774,12 @@ fn compile_expr_inner<M: Module>(
             if elems.is_empty() {
                 let value = emit_const_empty(module, builder, cx)?;
                 let set_ty = ConcreteType::Set(Box::new(ConcreteType::NoneInner), *order);
-                let value = seq_val(builder, value, &set_ty);
+                let no_elems = builder.ins().iconst(types::I64, 0);
+                let value = if is_wide_seq(&set_ty) {
+                    arr_val_of_len(builder, value, no_elems)
+                } else {
+                    value
+                };
                 return Ok((value, set_ty));
             }
             // Every element a literal `char`: the four words are known *now*, so
@@ -22798,7 +22914,12 @@ fn compile_expr_inner<M: Module>(
                     Box::new(ConcreteType::NoneInner),
                     Box::new(ConcreteType::NoneInner),
                 );
-                let value = seq_val(builder, value, &dict_ty);
+                let no_elems = builder.ins().iconst(types::I64, 0);
+                let value = if is_wide_seq(&dict_ty) {
+                    arr_val_of_len(builder, value, no_elems)
+                } else {
+                    value
+                };
                 return Ok((value, dict_ty));
             }
             let mut key_ty: Option<ConcreteType> = None;
@@ -23423,7 +23544,7 @@ pub struct Abi {
     arrays: SeqRepr,
     /// Which representation a **set** or a **dict** value has (a `#{char}` is
     /// its 32-byte bitfield under either): `Tagged`, the block pointer, or
-    /// `Wide`, the 24-byte value `{block, 0, 0}` passed by address as an array
+    /// `Wide`, the 24-byte value `{block, data, len}` passed by address as an array
     /// is. They flipped on their own, after arrays (`arr24_todo.txt` 6d), and an
     /// artifact records which with its `; set-abi` line.
     sets: SeqRepr,

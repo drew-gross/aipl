@@ -19,24 +19,24 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 40
-instructions executed: 911
-binary size: 6720
-  code: 4068
+instructions executed: 797
+binary size: 6456
+  code: 3808
   data: 289
-  metadata: 2363
+  metadata: 2359
 functions:
   __eq_i64$arr:
     calls: 2
-    bytes: 496
+    bytes: 432
   __eq_str$arr:
     calls: 1
-    bytes: 500
+    bytes: 436
   __test$empty_ints:
     calls: 1
-    bytes: 2196
+    bytes: 2096
   __test$empty_ints$map5$own0:
     calls: 1
-    bytes: 564
+    bytes: 532
   __to_str_i64:
     calls: 0
     bytes: 204

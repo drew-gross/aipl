@@ -44,18 +44,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1823
-binary size: 4272
-  code: 1800
+instructions executed: 1746
+binary size: 4304
+  code: 1832
   data: 831
   metadata: 1641
 functions:
   __builtin_count_is_at_most$i64:
     calls: 5
-    bytes: 392
+    bytes: 360
   __test$count_is_at_most:
     calls: 1
-    bytes: 896
+    bytes: 992
   aipl_assert:
     calls: 6
     bytes: (external)
@@ -70,7 +70,7 @@ functions:
     bytes: (external)
   count_is_at_most$i64:
     calls: 6
-    bytes: 392
+    bytes: 360
   main:
     calls: 1
     bytes: 120

@@ -32,39 +32,39 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 512
-instructions executed: 3163
-binary size: 10504
-  code: 6628
+instructions executed: 3036
+binary size: 10200
+  code: 6324
   data: 808
   metadata: 3068
 functions:
   __eq_i64$arr:
     calls: 4
-    bytes: 496
+    bytes: 432
   __eq_str$arr:
     calls: 1
-    bytes: 500
+    bytes: 436
   __test$keep_gt3:
     calls: 1
-    bytes: 1740
+    bytes: 1828
   __test$keep_gt3$filter1$own0:
     calls: 1
-    bytes: 636
+    bytes: 588
   __test$keep_gt3$filter11$own0:
     calls: 1
-    bytes: 636
+    bytes: 588
   __test$keep_gt3$filter3$own0:
     calls: 1
-    bytes: 636
+    bytes: 588
   __test$keep_gt3$filter5$own0:
     calls: 1
-    bytes: 636
+    bytes: 588
   __test$keep_gt3$filter7$own0:
     calls: 1
-    bytes: 672
+    bytes: 632
   __test$keep_gt3$map9$own0:
     calls: 1
-    bytes: 568
+    bytes: 536
   aipl_arr_inc:
     calls: 10
     bytes: (external)

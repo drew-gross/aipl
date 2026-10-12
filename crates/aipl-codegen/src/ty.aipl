@@ -109,9 +109,9 @@ allocations: 78
 deallocations: 78
 reallocations: 2
 bytes allocated: 6238
-instructions executed: 5210
-binary size: 23600
-  code: 13604
+instructions executed: 5136
+binary size: 23616
+  code: 13620
   data: 1568
   metadata: 8428
 functions:
@@ -129,10 +129,10 @@ functions:
     bytes: 396
   __test$show_ty:
     calls: 1
-    bytes: 4180
+    bytes: 4208
   __test$show_tys:
     calls: 1
-    bytes: 796
+    bytes: 828
   aipl_arr_inc:
     calls: 3
     bytes: (external)
@@ -177,4 +177,4 @@ functions:
     bytes: 5568
   show_tys:
     calls: 6
-    bytes: 1528
+    bytes: 1484

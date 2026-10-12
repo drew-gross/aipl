@@ -37,18 +37,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1081
-binary size: 3600
-  code: 1620
+instructions executed: 1039
+binary size: 3568
+  code: 1588
   data: 457
   metadata: 1523
 functions:
   __eq_i64$arr:
     calls: 2
-    bytes: 496
+    bytes: 432
   __test$filter_evens:
     calls: 1
-    bytes: 364
+    bytes: 400
   aipl_arr_inc:
     calls: 4
     bytes: (external)
@@ -69,7 +69,7 @@ functions:
     bytes: (external)
   filter_evens$lam$__test$filter_evens$is_even:
     calls: 2
-    bytes: 648
+    bytes: 644
   main:
     calls: 1
     bytes: 112

@@ -309,9 +309,9 @@ allocations: 133
 deallocations: 133
 reallocations: 0
 bytes allocated: 10771
-instructions executed: 35007
-binary size: 23272
-  code: 11760
+instructions executed: 34944
+binary size: 23440
+  code: 11928
   data: 4155
   metadata: 7357
 functions:
@@ -323,7 +323,7 @@ functions:
     bytes: 136
   __test$fill_or_add_sections:
     calls: 1
-    bytes: 5960
+    bytes: 6128
   aipl_arr_inc:
     calls: 220
     bytes: (external)

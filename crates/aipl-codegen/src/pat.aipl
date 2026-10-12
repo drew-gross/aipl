@@ -256,9 +256,9 @@ allocations: 141
 deallocations: 141
 reallocations: 5
 bytes allocated: 10921
-instructions executed: 12053
-binary size: 109200
-  code: 71808
+instructions executed: 11499
+binary size: 108984
+  code: 71592
   data: 2851
   metadata: 34541
 functions:
@@ -276,13 +276,13 @@ functions:
     bytes: 116
   __builtin_all$Pat$lam$is_plain_binder:
     calls: 4
-    bytes: 332
+    bytes: 300
   __builtin_map_join$Pat$str$lam$nested_bindings:
     calls: 3
-    bytes: 1308
+    bytes: 1204
   __eq_str$arr:
     calls: 7
-    bytes: 500
+    bytes: 436
   __m1__show_ann:
     calls: 0
     bytes: 416
@@ -291,16 +291,16 @@ functions:
     bytes: 476
   __m1__show_expr:
     calls: 2
-    bytes: 25804
+    bytes: 25608
   __m1__show_exprs:
     calls: 1
-    bytes: 1528
+    bytes: 1484
   __m3__show_ty:
     calls: 0
     bytes: 5568
   __m3__show_tys:
     calls: 0
-    bytes: 1528
+    bytes: 1484
   __rec_drop_Pat:
     calls: 42
     bytes: 232
@@ -312,22 +312,22 @@ functions:
     bytes: 1292
   __test$binder_list:
     calls: 1
-    bytes: 852
+    bytes: 884
   __test$is_binder_name:
     calls: 1
     bytes: 432
   __test$nested_or_ctor:
     calls: 1
-    bytes: 1884
+    bytes: 1964
   __test$pat_bindings:
     calls: 1
-    bytes: 4092
+    bytes: 4236
   __test$pat_label:
     calls: 1
-    bytes: 1968
+    bytes: 2000
   __test$show_pat:
     calls: 1
-    bytes: 4104
+    bytes: 4196
   __to_str_i64:
     calls: 4
     bytes: 204
@@ -387,7 +387,7 @@ functions:
     bytes: (external)
   binder_list:
     calls: 3
-    bytes: 1816
+    bytes: 1760
   binder_name:
     calls: 2
     bytes: 536
@@ -402,25 +402,25 @@ functions:
     bytes: 2836
   is_plain_binder:
     calls: 4
-    bytes: 528
+    bytes: 512
   main:
     calls: 1
     bytes: 472
   nested_bindings:
     calls: 5
-    bytes: 908
+    bytes: 912
   nested_or_ctor:
     calls: 4
-    bytes: 884
+    bytes: 864
   pat_bindings:
     calls: 9
-    bytes: 1756
+    bytes: 1788
   pat_label:
     calls: 6
     bytes: 1440
   show_pat:
     calls: 22
-    bytes: 2864
+    bytes: 2852
   show_pats:
     calls: 5
-    bytes: 1528
+    bytes: 1484

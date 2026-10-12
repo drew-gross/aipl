@@ -26,15 +26,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 80
-instructions executed: 823
-binary size: 3600
-  code: 1748
+instructions executed: 781
+binary size: 3536
+  code: 1684
   data: 392
   metadata: 1460
 functions:
   __eq_i64$arr:
     calls: 2
-    bytes: 496
+    bytes: 432
   __test$pipe:
     calls: 1
     bytes: 1152

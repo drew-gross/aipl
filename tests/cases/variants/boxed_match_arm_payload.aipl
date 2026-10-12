@@ -60,11 +60,11 @@ allocations: 23
 deallocations: 23
 reallocations: 2
 bytes allocated: 1423
-instructions executed: 2212
-binary size: 8456
-  code: 5604
+instructions executed: 2128
+binary size: 8336
+  code: 5488
   data: 33
-  metadata: 2819
+  metadata: 2815
 functions:
   __arr_drop_R:
     calls: 3
@@ -101,13 +101,13 @@ functions:
     bytes: (external)
   copy_or:
     calls: 8
-    bytes: 888
+    bytes: 848
   main:
     calls: 1
-    bytes: 1116
+    bytes: 1128
   render:
     calls: 3
-    bytes: 1660
+    bytes: 1616
   render_plain:
     calls: 6
-    bytes: 1636
+    bytes: 1592

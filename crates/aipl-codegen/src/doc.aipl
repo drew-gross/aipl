@@ -333,11 +333,11 @@ allocations: 310
 deallocations: 310
 reallocations: 1
 bytes allocated: 21469
-instructions executed: 37428
-binary size: 39992
-  code: 25488
+instructions executed: 36047
+binary size: 39664
+  code: 25156
   data: 889
-  metadata: 13615
+  metadata: 13619
 functions:
   __arr_drop_Doc:
     calls: 10
@@ -350,7 +350,7 @@ functions:
     bytes: 304
   __builtin_any$Doc$lam$has_hard:
     calls: 5
-    bytes: 344
+    bytes: 312
   __builtin_count_while$char$s0$lam$__m2__dedent$lambda1:
     calls: 0
     bytes: 268
@@ -368,7 +368,7 @@ functions:
     bytes: 84
   __test$cleanup:
     calls: 1
-    bytes: 6164
+    bytes: 6292
   aipl_arr_inc:
     calls: 92
     bytes: (external)
@@ -419,13 +419,13 @@ functions:
     bytes: (external)
   col_after:
     calls: 28
-    bytes: 712
+    bytes: 676
   fits:
     calls: 0
     bytes: 36
   fits$tail:
     calls: 42
-    bytes: 2808
+    bytes: 2764
   fits_atom:
     calls: 0
     bytes: 52
@@ -443,4 +443,4 @@ functions:
     bytes: 108
   print:
     calls: 11
-    bytes: 12536
+    bytes: 12188

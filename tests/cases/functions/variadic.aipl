@@ -40,18 +40,18 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 210
-instructions executed: 1528
-binary size: 9120
-  code: 5144
+instructions executed: 1456
+binary size: 9016
+  code: 5036
   data: 714
-  metadata: 3262
+  metadata: 3266
 functions:
   __test$joined:
     calls: 1
-    bytes: 2164
+    bytes: 2120
   __test$sum:
     calls: 1
-    bytes: 840
+    bytes: 844
   aipl_arr_inc:
     calls: 4
     bytes: (external)
@@ -78,13 +78,13 @@ functions:
     bytes: (external)
   joined$vo1:
     calls: 2
-    bytes: 1136
+    bytes: 1124
   main:
     calls: 1
     bytes: 164
   sum:
     calls: 3
-    bytes: 288
+    bytes: 256
   sum$vo1:
     calls: 2
-    bytes: 552
+    bytes: 528
