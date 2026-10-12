@@ -41,6 +41,7 @@ mod str24;
 #[allow(dead_code)] // staged: wired up when the array value widens
 mod arr24;
 mod array_ops;
+mod buffer;
 mod str24_host;
 
 // STAGED, the same way and for the same reason: the 256-bit `#{char}` value,
@@ -144,7 +145,7 @@ use aipl_syntax::{DebugOptions, Error, Span};
 // `header_of`/inc/dec are common to both. Don't change it without auditing the
 // array runtime.
 const HEADER_SIZE: usize = 8;
-const STATIC_REFCOUNT: i64 = i64::MAX;
+const STATIC_REFCOUNT: i64 = buffer::STATIC_REFCOUNT;
 
 // A heap *string* additionally stores its content length, in a word placed just
 // *before* the refcount (so the refcount stays at `ptr - HEADER_SIZE`, shared
@@ -176,11 +177,6 @@ fn fmt_error_of(v: FfiValue) -> Error {
         }
         other => panic!("dogfooded formatter: FmtError.span: {other:?}"),
     }
-}
-
-/// The refcount cell of any heap block (string or array): the word at `-8`.
-unsafe fn header_of(ptr: *const u8) -> *mut i64 {
-    unsafe { ptr.sub(HEADER_SIZE) as *mut i64 }
 }
 
 // ---------- Small-string optimization (SSO) ----------
@@ -686,36 +682,6 @@ type ArrDropFn = extern "C" fn(*const u8, i64);
 // element size isn't known to the caller. The operations over a block are
 // `array_ops`, shared with the AOT runtime; what is here is the allocator they
 // ask for and the entry points compiled code calls.
-
-/// A new allocation of `size` bytes, 8-aligned, for a block (`array_ops`).
-unsafe fn raw_alloc(size: usize) -> *mut u8 {
-    let layout = std::alloc::Layout::from_size_align(size, std::mem::align_of::<i64>())
-        .expect("array layout");
-    let raw = unsafe { std::alloc::alloc(layout) };
-    if raw.is_null() {
-        std::alloc::handle_alloc_error(layout);
-    }
-    raw
-}
-
-/// `ptr`, an allocation of `old_size` bytes from [`raw_alloc`], resized to
-/// `new_size`.
-unsafe fn raw_realloc(ptr: *mut u8, old_size: usize, new_size: usize) -> *mut u8 {
-    let layout = std::alloc::Layout::from_size_align(old_size, std::mem::align_of::<i64>())
-        .expect("array layout");
-    let raw = unsafe { std::alloc::realloc(ptr, layout, new_size) };
-    if raw.is_null() {
-        std::alloc::handle_alloc_error(layout);
-    }
-    raw
-}
-
-/// Free an allocation of `size` bytes from [`raw_alloc`].
-unsafe fn raw_free(ptr: *mut u8, size: usize) {
-    let layout = std::alloc::Layout::from_size_align(size, std::mem::align_of::<i64>())
-        .expect("array layout");
-    unsafe { std::alloc::dealloc(ptr, layout) };
-}
 
 /// Retain (`inc`) or drop one element via a retain/drop helper-fn pointer, if
 /// non-null. `at` points at the element; the helper handles `count` elements.
@@ -3158,18 +3124,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_concat", str24::aipl_concat as *const u8);
     jit_builder.symbol("aipl_trim", str24::aipl_trim as *const u8);
     jit_builder.symbol("aipl_str_heap", str24::aipl_str_heap as *const u8);
-    // The wide-array ABI. Nothing emits a call to these yet; registering them now
-    // is what makes each later step a change of caller rather than of both ends.
-    jit_builder.symbol("aipl_arrw_len", arr24::aipl_arrw_len as *const u8);
-    jit_builder.symbol(
-        "aipl_arrw_inline_cap",
-        arr24::aipl_arrw_inline_cap as *const u8,
-    );
-    jit_builder.symbol("aipl_arrw_elem_ptr", arr24::aipl_arrw_elem_ptr as *const u8);
-    jit_builder.symbol("aipl_arrw_slice", arr24::aipl_arrw_slice as *const u8);
-    jit_builder.symbol("aipl_arrw_reversed", arr24::aipl_arrw_reversed as *const u8);
-    jit_builder.symbol("aipl_arrw_with_cap", arr24::aipl_arrw_with_cap as *const u8);
-    jit_builder.symbol("aipl_arrw_inc", arr24::aipl_arrw_inc as *const u8);
+    // The wide array's element helpers and entries (`arr24`).
     jit_builder.symbol("aipl_arr_drop_warr", arr24::aipl_arr_drop_warr as *const u8);
     jit_builder.symbol(
         "aipl_arr_retain_warr",
@@ -3183,7 +3138,6 @@ fn new_jit_module() -> Result<JITModule, Error> {
         "aipl_arr_retain_opt_warr",
         arr24::aipl_arr_retain_opt_warr as *const u8,
     );
-    jit_builder.symbol("aipl_arrw_dec", arr24::aipl_arrw_dec as *const u8);
     jit_builder.symbol("aipl_arr_window", arr24::aipl_arr_window as *const u8);
     jit_builder.symbol("aipl_arr_settle", arr24::aipl_arr_settle as *const u8);
     jit_builder.symbol(
@@ -4690,9 +4644,8 @@ fn build_borrowed_str(bytes: &[u8]) -> (i64, Option<(*mut u8, usize)>) {
 enum ArgBuf {
     /// A heap `str` block from [`build_borrowed_str`]: its base and content length.
     Str(*mut u8, usize),
-    /// An array block from [`ArgBufs::array_block`]: its tagged base pointer and
-    /// the byte capacity that sizes the deallocation.
-    Array(*const u8, usize),
+    /// A plain array block from [`ArgBufs::array_block`]: its tagged base pointer.
+    Array(*const u8),
     /// An inline composite (struct/variant/optional/result) the callee receives a
     /// pointer to. Owned by the `Vec`, so it just has to stay alive.
     Composite(Vec<u8>),
@@ -4751,9 +4704,9 @@ impl ArgBufs {
             // element (a `none`'s slack, a nullary variant case's payload) must
             // read back as zeroes, and `alloc_block` leaves it uninitialized.
             std::ptr::write_bytes(arr_untag(block) as *mut u8, 0, cap_bytes);
-            *header_of(arr_untag(block)) = STATIC_REFCOUNT;
+            *buffer::refcount(arr_untag(block)) = STATIC_REFCOUNT;
         }
-        self.0.push(ArgBuf::Array(block, cap_bytes));
+        self.0.push(ArgBuf::Array(block));
         block
     }
 }
@@ -4765,12 +4718,7 @@ impl Drop for ArgBufs {
                 ArgBuf::Str(block, content_len) => unsafe {
                     free_dynamic_string(*block, *content_len)
                 },
-                ArgBuf::Array(block, cap_bytes) => unsafe {
-                    raw_free(
-                        block_start(*block),
-                        block_header_bytes(arr_repr(*block)) + *cap_bytes,
-                    );
-                },
+                ArgBuf::Array(block) => unsafe { buffer::free(arr_untag(*block), 0) },
                 // Freed by the `Vec`'s own drop.
                 ArgBuf::Composite(_) => {}
                 // The host owns this one outright — `str24::host_buffer` gave it a
@@ -6869,23 +6817,14 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         // ---- a scalar back ----
         "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now"
         | "aipl_str_inline_capacity" => (0, Ret::Word),
-        // ---- the wide-array ABI (`arr24`), registered ahead of its callers ----
+        // ---- the wide-array ABI (`arr24`) ----
         //
-        // An array argument is a `*const Arr` — one word, like a `str`'s — and an
-        // array *result* goes through a leading out pointer, which is what
-        // `Ret::Str` lowers. It reads as the wrong name here and is the right
-        // behaviour: both are 24-byte sequence values written into a caller slot.
-        // `arr24_todo.txt` 2f renames it `Ret::Wide` once the 8-byte half is gone.
-        "aipl_arrw_len" | "aipl_arrw_inline_cap" => (1, Ret::Word),
-        "aipl_arrw_inc" | "aipl_arrw_dec" => (1, Ret::None),
+        // An array argument is the address of its 24-byte value, and an array
+        // *result* is written through a leading out pointer.
         "aipl_arr_drop_warr"
         | "aipl_arr_retain_warr"
         | "aipl_arr_drop_opt_warr"
         | "aipl_arr_retain_opt_warr" => (2, Ret::None),
-        "aipl_arrw_elem_ptr" => (3, Ret::Word),
-        "aipl_arrw_reversed" => (1, Ret::Str),
-        "aipl_arrw_with_cap" => (3, Ret::Str),
-        "aipl_arrw_slice" => (4, Ret::Str),
         "aipl_shim_get" | "aipl_str_len" | "aipl_str_hash" | "aipl_str_iter_next"
         | "aipl_str_write_ptr" | "aipl_i64_len" | "aipl_u64_len" => {
             (1, Ret::Word)

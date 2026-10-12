@@ -20,6 +20,7 @@
 // ```text
 // plain (elements need no drop):   [cap][refcount][elem0][elem1]...               16 bytes
 // drop (`str[]`, `T[][]`, ...):    [drop_fn][init][cap][refcount][elem0]...       32 bytes
+//                                  \_ prefix _/\_ the buffer: `buffer.rs` _/
 //                                                              ^ base
 // ```
 //
@@ -83,12 +84,11 @@ pub(crate) const ARR_PLAIN_TAG: usize = 0b01;
 pub(crate) const ARR_DROP_TAG: usize = 0b10;
 pub(crate) const ARR_EMPTY_TAG: usize = 0b11;
 
-/// Bytes before the base of each shape's block: `[cap][refcount]`, and
-/// `[drop_fn][init][cap][refcount]`.
-pub(crate) const ARR_PLAIN_HEADER: usize = 16;
-pub(crate) const ARR_DROP_HEADER: usize = 32;
-/// How far back from the base each header word sits.
-pub(crate) const ARR_CAP_BACK: usize = 16;
+/// A drop block is a `buffer` (`[cap][refcount][content]`, which a plain block is
+/// as it stands) with two words in front of it, `[drop_fn][init]`: its *prefix*.
+pub(crate) const ARR_DROP_PREFIX: usize = 16;
+/// How far back from the base each of the prefix's words sits (the buffer's own
+/// header is `buffer`'s).
 pub(crate) const ARR_INIT_BACK: usize = 24;
 pub(crate) const ARR_DROPFN_BACK: usize = 32;
 
@@ -104,9 +104,7 @@ pub(crate) fn arr_inline_empty() -> *const u8 {
 
 /// `[refcount]` and slack, for an array that is permanently empty.
 ///
-/// `i64::MAX` is `str24::STATIC_REFCOUNT`, spelled out because this file is shared
-/// and cannot reach into its host's modules.
-static ARR_EMPTY_BLOCK: [i64; 4] = [i64::MAX, 0, 0, 0];
+static ARR_EMPTY_BLOCK: [i64; 4] = [super::buffer::STATIC_REFCOUNT, 0, 0, 0];
 
 /// The base of [`ARR_EMPTY_BLOCK`]. The refcount sits one word before it, which
 /// is what `header_of` reads, so the base is the *second* word.
@@ -148,13 +146,12 @@ pub(crate) fn arr_untag(ptr: *const u8) -> *const u8 {
     (ptr as usize & !ARR_TAG_MASK) as *const u8
 }
 
-/// Bytes in front of the base of a block of this shape (zero for the shapes that
-/// are never allocated).
-pub(crate) fn block_header_bytes(repr: ArrRepr) -> usize {
+/// Bytes in front of the buffer of a block of this shape (zero for the shapes
+/// that are never allocated, and for a plain block, which is a bare buffer).
+pub(crate) fn block_prefix_bytes(repr: ArrRepr) -> usize {
     match repr {
-        ArrRepr::Plain => ARR_PLAIN_HEADER,
-        ArrRepr::Drop => ARR_DROP_HEADER,
-        ArrRepr::Static | ArrRepr::Empty => 0,
+        ArrRepr::Drop => ARR_DROP_PREFIX,
+        ArrRepr::Plain | ArrRepr::Static | ArrRepr::Empty => 0,
     }
 }
 
@@ -162,9 +159,7 @@ pub(crate) fn block_header_bytes(repr: ArrRepr) -> usize {
 /// does not own (a static one, the empty array): there is nothing to grow in place.
 pub(crate) unsafe fn block_cap_bytes(ptr: *const u8) -> usize {
     match arr_repr(ptr) {
-        ArrRepr::Plain | ArrRepr::Drop => unsafe {
-            core::ptr::read(arr_untag(ptr).sub(ARR_CAP_BACK) as *const i64) as usize
-        },
+        ArrRepr::Plain | ArrRepr::Drop => unsafe { super::buffer::cap(arr_untag(ptr)) },
         ArrRepr::Static | ArrRepr::Empty => 0,
     }
 }
@@ -202,62 +197,6 @@ pub(crate) unsafe fn set_block_init(ptr: *const u8, n: usize) {
 pub(crate) unsafe fn set_block_drop_fn(ptr: *const u8, drop_fn: i64) {
     if arr_repr(ptr) == ArrRepr::Drop {
         unsafe { core::ptr::write(arr_untag(ptr).sub(ARR_DROPFN_BACK) as *mut i64, drop_fn) };
-    }
-}
-
-/// Record the capacity of the element region of a plain or drop block.
-pub(crate) unsafe fn set_block_cap(ptr: *const u8, cap_bytes: usize) {
-    if matches!(arr_repr(ptr), ArrRepr::Plain | ArrRepr::Drop) {
-        unsafe {
-            core::ptr::write(
-                arr_untag(ptr).sub(ARR_CAP_BACK) as *mut i64,
-                cap_bytes as i64,
-            )
-        };
-    }
-}
-
-/// The start of the allocation behind a plain or drop block.
-pub(crate) fn block_start(ptr: *const u8) -> *mut u8 {
-    unsafe { arr_untag(ptr).sub(block_header_bytes(arr_repr(ptr))) as *mut u8 }
-}
-
-/// Bytes to allocate for a block holding `cap_bytes` of elements, of the shape
-/// `drop_fn` asks for.
-pub(crate) fn block_alloc_size(drop_fn: i64, cap_bytes: usize) -> usize {
-    cap_bytes
-        + if drop_fn != 0 {
-            ARR_DROP_HEADER
-        } else {
-            ARR_PLAIN_HEADER
-        }
-}
-
-/// Write the header of the freshly allocated `raw` (`block_alloc_size` bytes) and
-/// return the tagged base: refcount 1, `cap_bytes` of capacity, and for a drop
-/// block (`drop_fn != 0`) its helper and the `init` elements it owns.
-pub(crate) unsafe fn init_block(
-    raw: *mut u8,
-    drop_fn: i64,
-    init: usize,
-    cap_bytes: usize,
-) -> *const u8 {
-    unsafe {
-        let drop = drop_fn != 0;
-        let base = raw.add(if drop {
-            ARR_DROP_HEADER
-        } else {
-            ARR_PLAIN_HEADER
-        });
-        core::ptr::write(base.sub(8) as *mut i64, 1); // refcount
-        core::ptr::write(base.sub(ARR_CAP_BACK) as *mut i64, cap_bytes as i64);
-        if drop {
-            core::ptr::write(base.sub(ARR_INIT_BACK) as *mut i64, init as i64);
-            core::ptr::write(base.sub(ARR_DROPFN_BACK) as *mut i64, drop_fn);
-            (base as usize | ARR_DROP_TAG) as *const u8
-        } else {
-            (base as usize | ARR_PLAIN_TAG) as *const u8
-        }
     }
 }
 

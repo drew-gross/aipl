@@ -66,15 +66,12 @@ pub(crate) const TAG_BUFFER: u8 = 0b00;
 pub(crate) const TAG_INLINE: u8 = 0b01;
 pub(crate) const TAG_ROPE: u8 = 0b10;
 
-/// `[cap][refcount]` — the prefix before a buffer's content. Same 16 bytes as
-/// today's `[len][refcount]`, with the first word's meaning changed.
-pub(crate) const BUF_HEADER: usize = 16;
-/// How far back from `base` the refcount word sits (`refcount_of`); the
-/// capacity is the word before it, `BUF_HEADER` back. Codegen's inlined append
-/// reads both.
-pub(crate) const BUF_REFCOUNT_BACK: usize = 8;
-/// A static buffer's refcount, which `retain`/`release` never touch.
-pub(crate) const STATIC_REFCOUNT: i64 = i64::MAX;
+// The buffer a `str`'s bytes live in — `[cap][refcount][content]`, its constants and
+// its allocate/free/grow/count operations — is `buffer.rs`, shared with the plain
+// array block, which is the same thing. Codegen's inlined append reads the offsets
+// by these names.
+use super::buffer;
+pub(crate) use super::buffer::{BUF_HEADER, BUF_REFCOUNT_BACK, STATIC_REFCOUNT};
 
 pub(crate) const LEN_MASK: u64 = (1 << 56) - 1;
 pub(crate) const TAG_SHIFT: u32 = 56;
@@ -206,7 +203,7 @@ impl Str {
             return 0;
         }
         let end = self.w1 as usize + self.len();
-        let cap_end = self.w0 as usize + buffer_cap(self.w0 as *const u8);
+        let cap_end = self.w0 as usize + unsafe { buffer::cap(self.w0 as *const u8) };
         cap_end.saturating_sub(end)
     }
 
@@ -215,12 +212,7 @@ impl Str {
         if owner.is_null() {
             return;
         }
-        unsafe {
-            let rc = refcount_of(owner);
-            if *rc != STATIC_REFCOUNT {
-                *rc += 1;
-            }
-        }
+        unsafe { buffer::retain(owner) };
     }
 
     pub(crate) fn release(self) {
@@ -229,14 +221,9 @@ impl Str {
             return;
         }
         unsafe {
-            let rc = refcount_of(owner);
-            if *rc == STATIC_REFCOUNT {
-                return;
-            }
-            *rc -= 1;
-            if *rc == 0 {
+            if buffer::release(owner) {
                 match self.tag() {
-                    TAG_BUFFER => free_buffer(owner),
+                    TAG_BUFFER => buffer::free(owner, 0),
                     TAG_ROPE => free_rope(owner),
                     _ => unreachable!("only owners are freed"),
                 }
@@ -251,7 +238,7 @@ impl Str {
     /// the one caller allowed to act on it.
     pub(crate) fn is_unique(self) -> bool {
         let owner = self.owner();
-        !owner.is_null() && unsafe { *refcount_of(owner) } == 1
+        !owner.is_null() && unsafe { buffer::is_unique(owner) }
     }
 }
 
@@ -318,7 +305,7 @@ pub(crate) fn host_buffer(bytes: &[u8]) -> Str {
         return from_bytes_inline(bytes);
     }
     let s = with_capacity(bytes.len(), bytes);
-    unsafe { *refcount_of(s.w0 as *const u8) = STATIC_REFCOUNT };
+    unsafe { *buffer::refcount(s.w0 as *const u8) = STATIC_REFCOUNT };
     s
 }
 
@@ -330,7 +317,7 @@ pub(crate) fn host_buffer(bytes: &[u8]) -> Str {
 /// twice.
 pub(crate) unsafe fn free_host_buffer(value: Str) {
     if value.tag() == TAG_BUFFER && value.w0 != 0 {
-        unsafe { free_buffer(value.w0 as *const u8) }
+        unsafe { buffer::free(value.w0 as *const u8, 0) }
     }
 }
 
@@ -346,7 +333,7 @@ pub(crate) fn from_bytes(bytes: &[u8]) -> Str {
 /// A fresh buffer with room for `cap` bytes, initialized with `init`.
 pub(crate) fn with_capacity(cap: usize, init: &[u8]) -> Str {
     debug_assert!(init.len() <= cap);
-    let base = alloc_buffer(cap);
+    let base = buffer::alloc(0, cap) as *const u8;
     unsafe {
         core::ptr::copy_nonoverlapping(init.as_ptr(), base as *mut u8, init.len());
     }
@@ -354,42 +341,6 @@ pub(crate) fn with_capacity(cap: usize, init: &[u8]) -> Str {
         w0: base as u64,
         w1: base as u64,
         w2: meta(init.len(), TAG_BUFFER),
-    }
-}
-
-unsafe fn refcount_of(owner: *const u8) -> *mut i64 {
-    unsafe { owner.sub(BUF_REFCOUNT_BACK) as *mut i64 }
-}
-
-fn buffer_cap(base: *const u8) -> usize {
-    unsafe { *(base.sub(BUF_HEADER) as *const i64) as usize }
-}
-
-/// Allocate `[cap][refcount=1][content: cap bytes]`, returning the content
-/// pointer (the `base` a value stores).
-fn alloc_buffer(cap: usize) -> *const u8 {
-    let raw = unsafe { super::rt_alloc(BUF_HEADER + cap) } as *mut u8;
-    assert!(!raw.is_null(), "out of memory");
-    unsafe {
-        core::ptr::write(raw as *mut i64, cap as i64);
-        core::ptr::write(raw.add(8) as *mut i64, 1);
-        raw.add(BUF_HEADER)
-    }
-}
-
-unsafe fn free_buffer(base: *const u8) {
-    unsafe { super::rt_free(base.sub(BUF_HEADER) as *mut _) }
-}
-
-/// Grow a block under its own base, keeping the header — and so the refcount —
-/// intact. Only sound for a block this value exclusively owns; the caller
-/// establishes that (see [`append_owned`]).
-unsafe fn grow_buffer(base: *const u8, cap: usize) -> *const u8 {
-    let raw = unsafe { super::rt_realloc(base.sub(BUF_HEADER) as *mut _, BUF_HEADER + cap) };
-    assert!(!raw.is_null(), "out of memory");
-    unsafe {
-        core::ptr::write(raw as *mut i64, cap as i64);
-        (raw as *mut u8).add(BUF_HEADER)
     }
 }
 
@@ -703,7 +654,7 @@ fn overlaps(s: Str, add: &[u8]) -> bool {
     if base.is_null() {
         return false;
     }
-    let (lo, hi) = (base as usize, base as usize + buffer_cap(base));
+    let (lo, hi) = (base as usize, base as usize + unsafe { buffer::cap(base) });
     let at = add.as_ptr() as usize;
     at < hi && at + add.len() > lo
 }
@@ -755,8 +706,8 @@ pub(crate) fn append_owned(s: Str, add: &[u8]) -> Str {
         // cannot: its `data` offset would have to be re-derived, and the bytes
         // before it are not ours to keep.
         if s.w0 == s.w1 {
-            let cap = grow_cap(need, buffer_cap(s.w0 as *const u8));
-            let base = unsafe { grow_buffer(s.w0 as *const u8, cap) };
+            let cap = grow_cap(need, unsafe { buffer::cap(s.w0 as *const u8) });
+            let base = unsafe { buffer::grow(s.w0 as *const u8, 0, cap) } as *const u8;
             unsafe {
                 core::ptr::copy_nonoverlapping(add.as_ptr(), (base as *mut u8).add(len), add.len());
             }
@@ -767,7 +718,7 @@ pub(crate) fn append_owned(s: Str, add: &[u8]) -> Str {
             };
         }
     }
-    let base = alloc_buffer(grow_cap(need, len));
+    let base = buffer::alloc(0, grow_cap(need, len)) as *const u8;
     let mut at = 0usize;
     for_each_chunk(s, &mut |chunk| {
         unsafe {
@@ -927,7 +878,7 @@ impl Builder {
     /// per byte, which is what makes a `+=` loop over an owned value linear.
     fn grow(&mut self, extra: usize) {
         let need = self.s.len() + extra;
-        let cap = (buffer_cap(self.s.w0 as *const u8) * 2).max(need);
+        let cap = (unsafe { buffer::cap(self.s.w0 as *const u8) } * 2).max(need);
         let grown = with_capacity(cap, self.s.buffer_bytes());
         self.s.release();
         self.s = grown;
@@ -1633,7 +1584,7 @@ pub(crate) extern "C" fn aipl_str_reserve(s: *mut Str, extra: i64) {
             return;
         }
         if v.w0 == v.w1 {
-            let base = unsafe { grow_buffer(v.w0 as *const u8, need) };
+            let base = unsafe { buffer::grow(v.w0 as *const u8, 0, need) } as *const u8;
             unsafe {
                 *s = Str {
                     w0: base as u64,
@@ -1887,7 +1838,7 @@ mod tests {
             TAG_BUFFER,
             "past the capacity, so a real allocation"
         );
-        let rc = || unsafe { *refcount_of(s.w0 as *const u8) };
+        let rc = || unsafe { *buffer::refcount(s.w0 as *const u8) };
         assert_eq!(rc(), STATIC_REFCOUNT);
 
         // What a consuming (`owned`) parameter does: release without a retain. Twice
@@ -1997,7 +1948,7 @@ mod tests {
     fn refcounts_balance_and_a_window_keeps_its_buffer_alive() {
         let src = from_bytes(b"a string long enough to need a buffer");
         let base = src.base();
-        let rc = || unsafe { *refcount_of(base) };
+        let rc = || unsafe { *buffer::refcount(base) };
         assert_eq!(rc(), 1);
         let window = src.slice(2, 8);
         window.retain(); // a window that outlives the source
@@ -2534,7 +2485,7 @@ mod tests {
     fn refcount_entry_points_balance() {
         let s = from_bytes(b"refcounted through the entry points, long enough");
         let base = s.base();
-        let rc = || unsafe { *refcount_of(base) };
+        let rc = || unsafe { *buffer::refcount(base) };
         assert_eq!(rc(), 1);
         aipl_inc(&s);
         assert_eq!(rc(), 2);

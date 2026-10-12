@@ -25,7 +25,7 @@ const HEADER_SIZE: usize = 8;
 // `[len: i64][refcount: i64][content][NUL]`, value → content. See the JIT
 // runtime for the full description.
 const STR_HEADER_SIZE: usize = 16;
-const STATIC_REFCOUNT: i64 = i64::MAX;
+const STATIC_REFCOUNT: i64 = buffer::STATIC_REFCOUNT;
 
 extern "C" {
     fn malloc(size: usize) -> *mut c_void;
@@ -1798,35 +1798,17 @@ unsafe fn elem_rc(fn_ptr: i64, at: *const u8, count: usize) {
 }
 
 // The operations over a block (push, reserve, the set and dict operations, the
-// release at refcount zero) are `array_ops`, shared verbatim with the JIT runtime.
-// What it asks of its host is the allocator below, with this runtime's accounting
-// (`rt_alloc`/`rt_realloc`/`rt_free`, which ignore the size a JIT allocator needs).
+// release at refcount zero) are `array_ops`, shared verbatim with the JIT runtime,
+// over the `buffer` a `str` shares. What they ask of their host is the allocator
+// (`rt_alloc`/`rt_realloc`/`rt_free`, with this runtime's accounting).
+#[allow(dead_code)]
+mod buffer {
+    include!("../../aipl-codegen/src/buffer.rs");
+}
+
 #[allow(dead_code)]
 mod array_ops {
     include!("../../aipl-codegen/src/array_ops.rs");
-}
-
-/// A new allocation of `size` bytes for a block (`array_ops`).
-unsafe fn raw_alloc(size: usize) -> *mut u8 {
-    let raw = unsafe { rt_alloc(size) } as *mut u8;
-    if raw.is_null() {
-        abort();
-    }
-    raw
-}
-
-/// `ptr`, an allocation from [`raw_alloc`], resized to `new_size`.
-unsafe fn raw_realloc(ptr: *mut u8, _old_size: usize, new_size: usize) -> *mut u8 {
-    let raw = unsafe { rt_realloc(ptr as *mut c_void, new_size) } as *mut u8;
-    if raw.is_null() {
-        abort();
-    }
-    raw
-}
-
-/// Free an allocation from [`raw_alloc`].
-unsafe fn raw_free(ptr: *mut u8, _size: usize) {
-    unsafe { rt_free(ptr as *mut c_void) };
 }
 
 /// Allocate an array of `len` uninitialized elements, refcount 1, cap == len. A

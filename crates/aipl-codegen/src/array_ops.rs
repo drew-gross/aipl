@@ -6,12 +6,11 @@
 // function here takes the length of the array it is given, and says in its doc
 // what the result's length is.
 //
-// What differs between the two hosts comes in from the parent module:
+// The reference counting, the capacity and the allocation of a block are
+// `buffer.rs`, which a `str`'s bytes share — a plain block is that buffer as it
+// stands, and a drop block is one with two words of prefix. What differs between
+// the two hosts comes in from the parent module:
 //
-// - `raw_alloc(size)`, `raw_realloc(ptr, old_size, new_size)` and
-//   `raw_free(ptr, size)`: the allocator, with the AOT runtime's accounting. They
-//   take and return the *start of the allocation*, which for a block is
-//   `block_start` (before the header), and abort rather than return null.
 // - `elem_rc(fn_ptr, at, count)`: run an element retain or release helper.
 // - `aipl_array_with_cap`, which the set operations size their result with (the
 //   AOT runtime counts calls to it).
@@ -23,11 +22,12 @@
 // owns. Elements the new block copies are retained through `retain_fn`.
 
 use super::array_layout::*;
+use super::buffer;
 
 type DropFn = extern "C" fn(*const u8, i64);
 
 fn is_static(a: *const u8) -> bool {
-    unsafe { *super::header_of(arr_untag(a)) == super::STATIC_REFCOUNT }
+    unsafe { buffer::is_static(arr_untag(a)) }
 }
 
 /// The empty array standing in for a null block, which a few callers still hand
@@ -69,8 +69,13 @@ pub(crate) unsafe fn write_packed_bit(data: *mut u8, idx: usize, val: bool) {
 pub(crate) fn alloc_block(init: usize, cap: usize, drop_fn: i64, elem_size: i64) -> *const u8 {
     let cap_bytes = cap_bytes_for(elem_size, cap);
     unsafe {
-        let raw = super::raw_alloc(block_alloc_size(drop_fn, cap_bytes));
-        init_block(raw, drop_fn, init, cap_bytes)
+        if drop_fn == 0 {
+            return (buffer::alloc(0, cap_bytes) as usize | ARR_PLAIN_TAG) as *const u8;
+        }
+        let base = buffer::alloc(ARR_DROP_PREFIX, cap_bytes);
+        core::ptr::write(base.sub(ARR_INIT_BACK) as *mut i64, init as i64);
+        core::ptr::write(base.sub(ARR_DROPFN_BACK) as *mut i64, drop_fn);
+        (base as usize | ARR_DROP_TAG) as *const u8
     }
 }
 
@@ -80,12 +85,7 @@ pub(crate) fn retain(a: *const u8) {
     if a.is_null() {
         return;
     }
-    unsafe {
-        let h = super::header_of(arr_untag(a));
-        if *h != super::STATIC_REFCOUNT {
-            *h += 1;
-        }
-    }
+    unsafe { buffer::retain(arr_untag(a)) };
 }
 
 /// Release a reference on the block `a`; at zero, release the elements it owns
@@ -95,12 +95,7 @@ pub(crate) fn release(a: *const u8) {
         return;
     }
     unsafe {
-        let h = super::header_of(arr_untag(a));
-        if *h == super::STATIC_REFCOUNT {
-            return;
-        }
-        *h -= 1;
-        if *h == 0 {
+        if buffer::release(arr_untag(a)) {
             free_block(a);
         }
     }
@@ -119,8 +114,7 @@ unsafe fn free_block(a: *const u8) {
             let f: DropFn = core::mem::transmute(drop_fn);
             f(arr_untag(a), block_init(a) as i64);
         }
-        let size = block_header_bytes(repr) + block_cap_bytes(a);
-        super::raw_free(block_start(a), size);
+        buffer::free(arr_untag(a), block_prefix_bytes(repr));
     }
 }
 
@@ -130,13 +124,8 @@ unsafe fn free_block(a: *const u8) {
 /// owned and not static.
 fn grow(a: *const u8, new_cap_bytes: usize) -> *const u8 {
     unsafe {
-        let repr = arr_repr(a);
-        let header = block_header_bytes(repr);
-        let old_size = header + block_cap_bytes(a);
-        let raw = super::raw_realloc(block_start(a), old_size, header + new_cap_bytes);
-        let grown = ((raw.add(header) as usize) | (a as usize & ARR_TAG_MASK)) as *const u8;
-        set_block_cap(grown, new_cap_bytes);
-        grown
+        let base = buffer::grow(arr_untag(a), block_prefix_bytes(arr_repr(a)), new_cap_bytes);
+        (base as usize | (a as usize & ARR_TAG_MASK)) as *const u8
     }
 }
 
@@ -146,15 +135,14 @@ fn grow(a: *const u8, new_cap_bytes: usize) -> *const u8 {
 /// elements, which own nothing yet.
 fn into_drop_shape(a: *const u8, len: usize, cap_bytes: usize, drop_fn: i64) -> *const u8 {
     unsafe {
-        let raw = super::raw_alloc(block_alloc_size(drop_fn, cap_bytes));
-        let moved = init_block(raw, drop_fn, len, cap_bytes);
-        let old_cap = block_cap_bytes(a);
+        // `cap_bytes` of capacity: byte-sized elements, so the count is the size.
+        let moved = alloc_block(len, cap_bytes, drop_fn, 1);
         core::ptr::copy_nonoverlapping(
             arr_untag(a),
             arr_untag(moved) as *mut u8,
-            old_cap.min(cap_bytes),
+            block_cap_bytes(a).min(cap_bytes),
         );
-        super::raw_free(block_start(a), block_header_bytes(ArrRepr::Plain) + old_cap);
+        buffer::free(arr_untag(a), 0);
         moved
     }
 }
@@ -292,7 +280,7 @@ pub(crate) fn reserve(
     let want = len + extra.max(0) as usize;
     let need_bytes = cap_bytes_for(elem_size, want);
     unsafe {
-        if *super::header_of(arr_untag(a)) == 1 {
+        if buffer::is_unique(arr_untag(a)) {
             let mut a = a;
             let mut cap_bytes = block_cap_bytes(a);
             if drop_fn != 0 && arr_repr(a) == ArrRepr::Plain {

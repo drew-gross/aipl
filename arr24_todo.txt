@@ -315,7 +315,7 @@ Stage 5 — reversed as values                                               [do
   7 cases (`arrays/reverse` 4 → 0) and up in none.
 
 
-Stage 6 — the block header, two shapes, and the `str` buffer       [6e next]
+Stage 6 — the block header, two shapes, and the `str` buffer       [done]
 ---------------------------------------------------------------------------------
 The target. `base` is the first element, and the length lives only in the value:
 
@@ -507,8 +507,22 @@ window, a reversal or inline (lent as a copy).
           Corpus: allocations unchanged, instructions +0.8% (copying the wider
           values), bytes up a little where a set or dict nests in an array or a
           dict.
-  [ ] 6e. share the refcount and capacity code with `str24`'s buffer, now that a
-          plain block is one.
+  [x] 6e. the refcount and capacity code is shared with `str24`'s buffer:
+          `buffer.rs` (new, in both runtimes) is `[cap][refcount][content]` and
+          its alloc / free / grow / retain / release, taking the bytes of prefix
+          in front of it — none for a `str` or a plain array block, 16 for a drop
+          block's `[drop_fn][init]`. `str24` and `array_ops` both call it; the
+          array side's own copy of the same arithmetic (`raw_alloc` and friends,
+          which the JIT did over `std::alloc`) is gone, so both runtimes
+          allocate through `rt_alloc`/`rt_realloc`/`rt_free` and the AOT's
+          accounting sees the same calls. The `Arr` model — a third copy, a
+          standalone proof of the layout that nothing compiled held once
+          `ArrValue` was live — is deleted with its `aipl_arrw_*` entries; the
+          properties its tests pinned are tested on the live code
+          (`a_plain_block_is_a_buffer_and_a_drop_block_is_one_with_a_prefix`,
+          `a_window_releases_every_element_of_its_block`).
+          What is still two copies: the retired 8-byte `str` block and its
+          `header_of` in the AOT runtime, which Stage 7 deletes.
   [ ] `drop_fn` stays in a drop block: `aipl_arr_drop_arr(elems, len)` walks a
       nested array's elements without knowing their element type. (Codegen could
       generate a release helper per element type instead and drop the word

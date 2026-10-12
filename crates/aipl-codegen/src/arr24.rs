@@ -5,15 +5,11 @@
 // sequence representation. Deliberately `str24.rs`'s shape, word for word, so the
 // two can eventually be one type rather than two that resemble each other.
 //
-// **Partly wired up.** The value below (`Arr`) is the target, and compiled code
-// does not hold it yet: switching a type's representation is atomic — the
-// runtime, codegen and the checked-in dogfood artifact have to agree on the
-// layout — so arrays are moving one piece at a time, as `str24` did. What
-// compiled code holds today is the 24-byte value over the *old* block, described
-// under "Windows over the 8-byte block" further down, along with the entry points
-// that read and build it. The `Arr` layout itself, its invariants and the
-// operations on it are proven by ordinary Rust tests with no compiler in the
-// loop (`arr24_todo.txt` tracks the rest).
+// What compiled code holds is [`ArrValue`], below, with the entry points that read
+// and build it; the sections after the value describe each shape. The layout, and
+// the block under it, are documented here and in `array_layout.rs`; the block's
+// reference counting and allocation are `buffer.rs`, which a `str` shares, and its
+// operations are `array_ops.rs`.
 //
 // # The value
 //
@@ -81,406 +77,13 @@ pub(crate) const ATAG_INLINE: u8 = 0b01;
 pub(crate) const ATAG_REVERSED: u8 = 0b10;
 /// A block value whose run is not (known to be) the whole of its block: what a
 /// slice makes. Cleared by nothing — a window stays one, and is copied before it
-/// is written through. (`11` was spare in `Arr`'s layout.)
+/// is written through.
 pub(crate) const ATAG_WINDOW: u8 = 0b11;
-
-/// `[drop_fn][init][cap][refcount]` — the prefix before a block's elements.
-pub(crate) const ARR_BLOCK_HEADER: usize = 32;
-/// How far back from `base` each header word sits.
-pub(crate) const ARR_REFCOUNT_BACK: usize = 8;
-pub(crate) const ARR_CAP_BACK: usize = 16;
-pub(crate) const ARR_INIT_BACK: usize = 24;
-pub(crate) const ARR_DROPFN_BACK: usize = 32;
 
 pub(crate) const ARR_LEN_MASK: u64 = (1 << 56) - 1;
 pub(crate) const ARR_TAG_SHIFT: u32 = 56;
 /// An inline value's element count lives in byte 22, as `str24`'s does.
 pub(crate) const ARR_INLINE_LEN_SHIFT: u32 = 48;
-
-/// An array value: three words, no indirection for a block, a window, or inline.
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub(crate) struct Arr {
-    pub w0: u64,
-    pub w1: u64,
-    pub w2: u64,
-}
-
-fn ameta(len: usize, tag: u8) -> u64 {
-    debug_assert!(len as u64 <= ARR_LEN_MASK);
-    (len as u64) | ((tag as u64) << ARR_TAG_SHIFT)
-}
-
-impl Arr {
-    /// The empty array. Also what zeroed memory reads as — a block with a null
-    /// base and zero length — which matters because sret buffers and fresh array
-    /// slots arrive zero-filled, the same property `str24::Str::empty` relies on.
-    pub(crate) fn empty() -> Arr {
-        Arr {
-            w0: 0,
-            w1: 0,
-            w2: 0,
-        }
-    }
-
-    pub(crate) fn tag(self) -> u8 {
-        (self.w2 >> ARR_TAG_SHIFT) as u8
-    }
-
-    /// Element count.
-    pub(crate) fn len(self) -> usize {
-        if self.tag() == ATAG_INLINE {
-            ((self.w2 >> ARR_INLINE_LEN_SHIFT) & 0xFF) as usize
-        } else {
-            (self.w2 & ARR_LEN_MASK) as usize
-        }
-    }
-
-    pub(crate) fn is_empty(self) -> bool {
-        self.len() == 0
-    }
-
-    /// The refcounted allocation behind this value, or null when there is none
-    /// (an inline value, or the zeroed empty). The only word refcounting touches.
-    pub(crate) fn owner(self) -> *const u8 {
-        match self.tag() {
-            ATAG_BLOCK | ATAG_REVERSED => self.w0 as *const u8,
-            _ => core::ptr::null(),
-        }
-    }
-
-    /// Address of element `i`, for a value that addresses a block. An inline
-    /// value's elements live in the value's own words, so it has no address to
-    /// give and is handled by [`Arr::inline_bytes`] instead.
-    ///
-    /// `reversed` counts from the far end: element 0 is the last one in memory.
-    pub(crate) fn elem_ptr(self, i: usize, elem_size: usize) -> *const u8 {
-        debug_assert!(i < self.len());
-        let from_start = match self.tag() {
-            ATAG_REVERSED => self.len() - 1 - i,
-            _ => i,
-        };
-        unsafe { (self.w1 as *const u8).add(from_start * elem_size) }
-    }
-
-    /// `self[lo..hi]` — **free**: a window into the same allocation, no copy and no
-    /// allocation at any length. This is the whole reason for the wide value; the
-    /// 8-byte representation had to allocate a view block here.
-    /// (`aipl_arr_window` is this over the old block.)
-    ///
-    /// Bounds clamp like `aipl_arr_slice`'s. Borrows `self`; the caller retains the
-    /// result if it outlives the source.
-    pub(crate) fn slice(self, lo: usize, hi: usize, elem_size: usize) -> Arr {
-        let len = self.len();
-        let lo = lo.min(len);
-        let hi = hi.clamp(lo, len);
-        let n = hi - lo;
-        match self.tag() {
-            ATAG_INLINE => {
-                let all = self.inline_bytes();
-                from_elems_inline(&all[lo * elem_size..hi * elem_size], n)
-            }
-            // A reversed window's element `lo` sits `len - hi` from the end, so the
-            // data pointer does not move for a reversed slice — only the length and
-            // the far end do. Taking the sub-window of a reversal is the one case
-            // the two tags read differently.
-            ATAG_REVERSED => Arr {
-                w0: self.w0,
-                w1: (unsafe { (self.w1 as *const u8).add((len - hi) * elem_size) }) as u64,
-                w2: ameta(n, ATAG_REVERSED),
-            },
-            _ => Arr {
-                w0: self.w0,
-                w1: if self.w1 == 0 {
-                    0
-                } else {
-                    (unsafe { (self.w1 as *const u8).add(lo * elem_size) }) as u64
-                },
-                w2: ameta(n, ATAG_BLOCK),
-            },
-        }
-    }
-
-    /// The same elements, read back to front — also free, and also a value rather
-    /// than the block the 8-byte representation needed.
-    pub(crate) fn reversed(self) -> Arr {
-        match self.tag() {
-            ATAG_BLOCK => Arr {
-                w2: ameta(self.len(), ATAG_REVERSED),
-                ..self
-            },
-            ATAG_REVERSED => Arr {
-                w2: ameta(self.len(), ATAG_BLOCK),
-                ..self
-            },
-            // An inline value is reversed by reversing its bytes, which needs the
-            // element size; `reverse_inline` is that, and this arm is why
-            // `reversed()` alone is only defined for the two block tags.
-            _ => self,
-        }
-    }
-
-    /// The inline element bytes, as the value's own 22 bytes.
-    pub(crate) fn inline_bytes(self) -> [u8; ARR_INLINE_CAP] {
-        debug_assert_eq!(self.tag(), ATAG_INLINE);
-        let mut out = [0u8; ARR_INLINE_CAP];
-        out[0..8].copy_from_slice(&self.w0.to_le_bytes());
-        out[8..16].copy_from_slice(&self.w1.to_le_bytes());
-        out[16..22].copy_from_slice(&self.w2.to_le_bytes()[0..6]);
-        out
-    }
-
-    /// How many elements could be appended in place, if this value owns its block
-    /// exclusively — the capacity half of the question only, exactly as
-    /// `str24::Str::spare_capacity` is.
-    pub(crate) fn spare_capacity(self, elem_size: usize) -> usize {
-        if self.tag() != ATAG_BLOCK || self.w0 == 0 {
-            return 0;
-        }
-        let end = self.w1 as usize + self.len() * elem_size;
-        let cap_end = self.w0 as usize + block_cap(self.w0 as *const u8);
-        cap_end.saturating_sub(end) / elem_size.max(1)
-    }
-
-    pub(crate) fn retain(self) {
-        let owner = self.owner();
-        if owner.is_null() {
-            return;
-        }
-        unsafe {
-            let rc = arefcount_of(owner);
-            if *rc != ARR_STATIC_REFCOUNT {
-                *rc += 1;
-            }
-        }
-    }
-
-    /// Drop one reference. At zero, release the block's elements through its
-    /// stored `drop_fn` — over `init` elements, *not* `self.len()`, since this
-    /// value may be a window into a longer block — and free it.
-    pub(crate) fn release(self) {
-        let owner = self.owner();
-        if owner.is_null() {
-            return;
-        }
-        unsafe {
-            let rc = arefcount_of(owner);
-            if *rc == ARR_STATIC_REFCOUNT {
-                return;
-            }
-            *rc -= 1;
-            if *rc == 0 {
-                let drop_fn = *(owner.sub(ARR_DROPFN_BACK) as *const i64);
-                if drop_fn != 0 {
-                    let f: ArrElemDrop = core::mem::transmute(drop_fn);
-                    f(owner, block_init(owner) as i64);
-                }
-                free_block(owner);
-            }
-        }
-    }
-
-    pub(crate) fn is_unique(self) -> bool {
-        let owner = self.owner();
-        !owner.is_null() && unsafe { *arefcount_of(owner) } == 1
-    }
-}
-
-/// `str24::STATIC_REFCOUNT`, spelled out because this file is shared and cannot
-/// reach into its host's modules.
-pub(crate) const ARR_STATIC_REFCOUNT: i64 = i64::MAX;
-
-/// A block's per-element drop helper: `(base, init_count)`.
-type ArrElemDrop = unsafe extern "C" fn(*const u8, i64);
-
-unsafe fn arefcount_of(owner: *const u8) -> *mut i64 {
-    unsafe { owner.sub(ARR_REFCOUNT_BACK) as *mut i64 }
-}
-
-fn block_cap(base: *const u8) -> usize {
-    unsafe { *(base.sub(ARR_CAP_BACK) as *const i64) as usize }
-}
-
-fn block_init(base: *const u8) -> usize {
-    unsafe { *(base.sub(ARR_INIT_BACK) as *const i64) as usize }
-}
-
-/// Record that the block behind `base` now has `init` initialized elements —
-/// what a push does once it has written one.
-pub(crate) unsafe fn set_block_init(base: *const u8, init: usize) {
-    unsafe { *(base.sub(ARR_INIT_BACK) as *mut i64) = init as i64 }
-}
-
-unsafe fn free_block(base: *const u8) {
-    unsafe { super::rt_free(base.sub(ARR_BLOCK_HEADER) as *mut _) }
-}
-
-/// Allocate `[drop_fn][init=0][cap][refcount=1][cap bytes]`, returning the `base`
-/// a value stores.
-fn alloc_block(cap_bytes: usize, drop_fn: i64) -> *const u8 {
-    let raw = unsafe { super::rt_alloc(ARR_BLOCK_HEADER + cap_bytes) } as *mut u8;
-    assert!(!raw.is_null(), "out of memory");
-    unsafe {
-        core::ptr::write(raw as *mut i64, drop_fn);
-        core::ptr::write(raw.add(8) as *mut i64, 0);
-        core::ptr::write(raw.add(16) as *mut i64, cap_bytes as i64);
-        core::ptr::write(raw.add(24) as *mut i64, 1);
-        raw.add(ARR_BLOCK_HEADER)
-    }
-}
-
-/// A block with room for `cap` elements and no elements in it yet.
-pub(crate) fn with_capacity(cap: usize, elem_size: usize, drop_fn: i64) -> Arr {
-    let base = alloc_block(cap * elem_size, drop_fn);
-    Arr {
-        w0: base as u64,
-        w1: base as u64,
-        w2: ameta(0, ATAG_BLOCK),
-    }
-}
-
-/// An inline value holding `count` elements whose bytes are `bytes`.
-pub(crate) fn from_elems_inline(bytes: &[u8], count: usize) -> Arr {
-    debug_assert!(bytes.len() <= ARR_INLINE_CAP);
-    let mut buf = [0u8; 24];
-    buf[0..bytes.len()].copy_from_slice(bytes);
-    let w0 = u64::from_le_bytes(buf[0..8].try_into().unwrap());
-    let w1 = u64::from_le_bytes(buf[8..16].try_into().unwrap());
-    let mut w2 = 0u64;
-    for (i, b) in buf[16..22].iter().enumerate() {
-        w2 |= (*b as u64) << (8 * i);
-    }
-    w2 |= (count as u64) << ARR_INLINE_LEN_SHIFT;
-    w2 |= (ATAG_INLINE as u64) << ARR_TAG_SHIFT;
-    Arr { w0, w1, w2 }
-}
-
-/// Build a value holding `count` elements from `bytes`: inline when the bytes fit,
-/// otherwise a fresh block.
-pub(crate) fn from_elems(bytes: &[u8], count: usize, elem_size: usize, drop_fn: i64) -> Arr {
-    if bytes.len() <= ARR_INLINE_CAP && drop_fn == 0 {
-        return from_elems_inline(bytes, count);
-    }
-    let a = with_capacity(count, elem_size, drop_fn);
-    unsafe {
-        core::ptr::copy_nonoverlapping(bytes.as_ptr(), a.w1 as *mut u8, bytes.len());
-        set_block_init(a.w0 as *const u8, count);
-    }
-    Arr {
-        w2: ameta(count, ATAG_BLOCK),
-        ..a
-    }
-}
-
-/// The element bytes of any value, in *element order* (so a reversed value reads
-/// back to front), copied into `out`. Returns the initialized prefix.
-pub(crate) fn elems_in_order<'a>(a: Arr, elem_size: usize, out: &'a mut [u8]) -> &'a [u8] {
-    let n = a.len() * elem_size;
-    if a.tag() == ATAG_INLINE {
-        let all = a.inline_bytes();
-        out[..n].copy_from_slice(&all[..n]);
-        return &out[..n];
-    }
-    for i in 0..a.len() {
-        let src = a.elem_ptr(i, elem_size);
-        unsafe {
-            core::ptr::copy_nonoverlapping(src, out.as_mut_ptr().add(i * elem_size), elem_size)
-        };
-    }
-    &out[..n]
-}
-
-/// How many elements of stride `elem_size` fit inline. A stride of
-/// [`ELEM_BITPACKED`](super::array_layout::ELEM_BITPACKED) — zero, for `bool[]` —
-/// means one bit each, so 22 bytes holds 176.
-///
-/// NOTE: the rest of this file does not handle the bit-packed stride yet;
-/// `elem_ptr` multiplies by it and `spare_capacity` divides by it. See
-/// `arr24_todo.txt`, stage 3e.
-pub(crate) fn inline_cap(elem_size: usize) -> usize {
-    if elem_size == 0 {
-        ARR_INLINE_CAP * 8
-    } else {
-        ARR_INLINE_CAP / elem_size
-    }
-}
-
-// ---------- The wide-array entry points ----------
-//
-// The ABI codegen will call once the array value widens: an array argument is a
-// `*const Arr`, and an array *result* is written through a leading `*mut Arr`,
-// exactly as `str24`'s entry points take and return a `str`. They carry an
-// `aipl_arrw_` prefix so they can be registered beside the 8-byte `aipl_arr_*` /
-// `aipl_array_*` set and moved onto one at a time — the dual-ABI period
-// `arr24_todo.txt` stage 2f ends by deleting the old half.
-//
-// **Nothing calls these yet.** They are here so that each later step is a change
-// of caller rather than a change of caller *and* callee.
-//
-// Every one of them **borrows** its arguments, the rule `str24`'s entry points
-// follow: an entry point reads what it is given and takes its own reference if the
-// result needs to outlive the call. That is what makes a host-built array safe to
-// hand over whatever ownership protocol the callee was compiled for — the lesson
-// the `str` FFI double-free taught (stage 2d).
-
-#[no_mangle]
-pub(crate) extern "C" fn aipl_arrw_len(a: *const Arr) -> i64 {
-    unsafe { (*a).len() as i64 }
-}
-
-#[no_mangle]
-pub(crate) extern "C" fn aipl_arrw_inline_cap(elem_size: i64) -> i64 {
-    inline_cap(elem_size.max(0) as usize) as i64
-}
-
-/// Address of element `i`. Only meaningful for a value that addresses a block —
-/// an inline value's elements live in the value's own words, so codegen reads
-/// those directly rather than through a pointer.
-#[no_mangle]
-pub(crate) extern "C" fn aipl_arrw_elem_ptr(a: *const Arr, i: i64, elem_size: i64) -> *const u8 {
-    let a = unsafe { *a };
-    a.elem_ptr(i.max(0) as usize, elem_size.max(0) as usize)
-}
-
-/// `a[lo..hi]`, as a window. Allocates nothing — the whole point of the wide
-/// value. Retained, like `aipl_str_slice`, because the result shares `a`'s block
-/// and this entry point only borrows `a`.
-#[no_mangle]
-pub(crate) extern "C" fn aipl_arrw_slice(
-    out: *mut Arr,
-    a: *const Arr,
-    lo: i64,
-    hi: i64,
-    elem_size: i64,
-) {
-    let a = unsafe { *a };
-    let sliced = a.slice(
-        lo.max(0) as usize,
-        hi.max(0) as usize,
-        elem_size.max(0) as usize,
-    );
-    sliced.retain();
-    unsafe { *out = sliced };
-}
-
-/// The same elements back to front. Also allocation-free, and retained for the
-/// same reason as a slice.
-#[no_mangle]
-pub(crate) extern "C" fn aipl_arrw_reversed(out: *mut Arr, a: *const Arr) {
-    let reversed = unsafe { *a }.reversed();
-    reversed.retain();
-    unsafe { *out = reversed };
-}
-
-/// A block with room for `cap` elements and none in it — the accumulator a push
-/// loop fills. Deliberately *not* inline even at `cap == 0`: what it returns is
-/// about to be written into, and an inline value has no block to write to.
-#[no_mangle]
-pub(crate) extern "C" fn aipl_arrw_with_cap(out: *mut Arr, cap: i64, elem_size: i64, drop_fn: i64) {
-    unsafe {
-        *out = with_capacity(cap.max(0) as usize, elem_size.max(0) as usize, drop_fn);
-    }
-}
 
 // ---------- Element helpers for an array *of arrays* ----------
 //
@@ -553,14 +156,11 @@ pub(crate) extern "C" fn aipl_arr_retain_opt_warr(elems: *const u8, len: i64) {
     }
 }
 
-// # Windows over the 8-byte block (stage 4b)
-//
-// Until the block itself changes (stage 6c), an array value in compiled code is
-// one of these shapes over the *old* block (`array_layout`):
+// # The shapes of the value
 //
 // ```text
 //            w0                          w1                 w2
-// block      tagged pointer (any repr)   data: *const u8    len
+// block      tagged pointer (any repr)   data: *const u8    [ len : 56 ][ tag:8 ]
 // reversed   untagged heap block         data: *const u8    [ len : 56 ][ tag:8 ]
 // inline     elems[0..8]                 elems[8..16]       [ elems[16..22] ][ len:8 ][ tag:8 ]
 // ```
@@ -575,22 +175,17 @@ pub(crate) extern "C" fn aipl_arr_retain_opt_warr(elems: *const u8, len: i64) {
 // need not — without reading the block, which keeps no length of its own to
 // compare against.
 //
-// A value whose `data` is null is the older whole shape, `{block, 0, 0}`, still
-// read as the block it names: the checked-in artifact's compiled code builds
-// them, and so does zeroed memory (the empty array). Nothing new writes one.
-// Reading either shape as a window is correct, which is what lets the artifact
-// run beside the code that replaced it.
+// Zeroed memory is the empty array: no block, no run, a length of zero.
 //
 // A *reversed* value (`ATAG_REVERSED`) is a window walked from its far end:
 // `data` and the length name a forward run of the block, exactly as a window's
 // do, and element `i` of the value is element `len - 1 - i` of the run. That is
-// `Arr`'s reversed shape, and why reversing allocates nothing — the view block a
-// reversal used to build is gone. Reversing one again is the forward window (or
-// the whole array) it came from. A bit-packed `bool[]` has no byte run to walk,
+// why reversing allocates nothing — the view block a reversal used to build is
+// gone. Reversing one again is the forward window it came from. A bit-packed `bool[]` has no byte run to walk,
 // so reversing one copies.
 //
 // An *inline* value carries its elements in its own 22 bytes and owns no block
-// at all — `Arr`'s inline layout exactly, and a short `str`'s: the tag
+// at all — a short `str`'s layout exactly: the tag
 // (`ATAG_INLINE`) in the top byte of `w2` says so, and the byte below it is the
 // length. Only an array of integers is ever inline (the element types `arr24_todo`
 // stage 3 settled on), at the packed stride, so 22 bytes is 22 `u8`s or 2 `i64`s.
@@ -1744,230 +1339,69 @@ pub(crate) extern "C" fn aipl_arrv_set_drop(a: *const ArrValue, drop_fn: i64) {
     unsafe { super::array_layout::set_block_drop_fn(v.block, drop_fn) };
 }
 
-#[no_mangle]
-pub(crate) extern "C" fn aipl_arrw_inc(a: *const Arr) {
-    unsafe { *a }.retain();
-}
-
-#[no_mangle]
-pub(crate) extern "C" fn aipl_arrw_dec(a: *const Arr) {
-    unsafe { *a }.release();
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// `elem_size` for these tests: 4-byte elements, so a window's arithmetic is
-    /// visible and 5 fit inline (22 / 4).
-    const E: usize = 4;
-
-    fn bytes_of(vals: &[u32]) -> Vec<u8> {
-        vals.iter().flat_map(|v| v.to_le_bytes()).collect()
+    /// The elements `count_drop` was asked to release, across the unit tests that
+    /// use it (each uses its own counter).
+    fn dropped(counter: &core::sync::atomic::AtomicI64) -> i64 {
+        counter.load(core::sync::atomic::Ordering::SeqCst)
     }
 
-    fn read_back(a: Arr) -> Vec<u32> {
-        let mut buf = vec![0u8; a.len() * E + 8];
-        let got = elems_in_order(a, E, &mut buf);
-        got.chunks(E)
-            .map(|c| u32::from_le_bytes(c.try_into().unwrap()))
-            .collect()
+    static WINDOW_DROPS: core::sync::atomic::AtomicI64 = core::sync::atomic::AtomicI64::new(0);
+
+    extern "C" fn count_window_drops(_elems: *const u8, n: i64) {
+        WINDOW_DROPS.fetch_add(n, core::sync::atomic::Ordering::SeqCst);
     }
 
+    /// A plain array block is a `str` buffer — `[cap][refcount][content]` — and a
+    /// drop block is that with two words of prefix, told apart by the tag.
     #[test]
-    fn value_is_three_words() {
-        assert_eq!(core::mem::size_of::<Arr>(), ARR_SIZE);
-        assert_eq!(core::mem::align_of::<Arr>(), 8);
-        // The shared half of the two layouts is byte-identical, which is the point
-        // of writing this against `str24`'s shape.
-        assert_eq!(ARR_SIZE, super::super::str24::STR_SIZE);
-        assert_eq!(ARR_REFCOUNT_BACK, super::super::str24::BUF_REFCOUNT_BACK);
-    }
-
-    #[test]
-    fn zeroed_memory_is_the_empty_array() {
-        let zeroed: Arr = unsafe { core::mem::zeroed() };
-        assert_eq!(zeroed.tag(), ATAG_BLOCK);
-        assert_eq!(zeroed.len(), 0);
-        assert!(zeroed.is_empty());
-        zeroed.retain(); // must no-op on a null owner
-        zeroed.release();
-    }
-
-    #[test]
-    fn round_trips_across_the_inline_boundary() {
-        for n in [0usize, 1, 5, 6, 20] {
-            let vals: Vec<u32> = (0..n as u32).collect();
-            let a = from_elems(&bytes_of(&vals), n, E, 0);
-            assert_eq!(a.len(), n, "len for {n}");
-            let expect_inline = n * E <= ARR_INLINE_CAP;
-            assert_eq!(
-                a.tag(),
-                if expect_inline {
-                    ATAG_INLINE
-                } else {
-                    ATAG_BLOCK
-                },
-                "representation for {n}"
-            );
-            assert_eq!(read_back(a), vals, "elements for {n}");
-            a.release();
+    fn a_plain_block_is_a_buffer_and_a_drop_block_is_one_with_a_prefix() {
+        use super::super::array_layout::*;
+        let plain = super::super::array_ops::alloc_block(0, 4, 0, 8);
+        assert!(arr_repr(plain) == ArrRepr::Plain);
+        let base = arr_untag(plain);
+        unsafe {
+            assert_eq!(super::super::buffer::cap(base), 32);
+            assert_eq!(*super::super::buffer::refcount(base), 1);
+            assert_eq!(block_drop_fn(plain), 0);
         }
+        super::super::array_ops::release(plain);
+
+        let drop_fn = count_window_drops as extern "C" fn(*const u8, i64) as usize as i64;
+        let dropping = super::super::array_ops::alloc_block(2, 4, drop_fn, 8);
+        assert!(arr_repr(dropping) == ArrRepr::Drop);
+        unsafe {
+            assert_eq!(super::super::buffer::cap(arr_untag(dropping)), 32);
+            assert_eq!(block_init(dropping), 2);
+            assert_eq!(block_drop_fn(dropping), drop_fn);
+        }
+        let before = dropped(&WINDOW_DROPS);
+        super::super::array_ops::release(dropping);
+        assert_eq!(dropped(&WINDOW_DROPS) - before, 2);
     }
 
-    /// The whole reason for the wide value: a window is a value, not an
-    /// allocation. The 8-byte representation had to build a 48-byte view block
-    /// here, holding a reference on the array it windowed.
-    #[test]
-    fn a_window_allocates_nothing_and_shares_the_block() {
-        let vals: Vec<u32> = (0..10).collect();
-        let a = from_elems(&bytes_of(&vals), 10, E, 0);
-        assert_eq!(a.tag(), ATAG_BLOCK);
-
-        let mid = a.slice(3, 7, E);
-        assert_eq!(mid.len(), 4);
-        assert_eq!(read_back(mid), vec![3, 4, 5, 6]);
-        // Same allocation, different data pointer: that *is* the window.
-        assert_eq!(mid.owner(), a.owner());
-        assert_ne!(mid.w1, a.w1);
-
-        // Windows compose, and clamp like a slice bound.
-        assert_eq!(read_back(mid.slice(1, 3, E)), vec![4, 5]);
-        assert_eq!(read_back(a.slice(8, 100, E)), vec![8, 9]);
-        assert!(a.slice(7, 2, E).is_empty());
-
-        a.release();
-    }
-
-    /// A reversal is also a value rather than a block, and sub-windowing one reads
-    /// from the other end — the one case the two block tags differ.
-    #[test]
-    fn a_reversal_is_a_value_and_windows_from_the_far_end() {
-        let vals: Vec<u32> = (0..6).collect();
-        let a = from_elems(&bytes_of(&vals), 6, E, 0);
-        let rev = a.reversed();
-        assert_eq!(rev.tag(), ATAG_REVERSED);
-        assert_eq!(rev.owner(), a.owner());
-        assert_eq!(read_back(rev), vec![5, 4, 3, 2, 1, 0]);
-
-        // Reversing twice is the original, and costs nothing either way.
-        assert_eq!(read_back(rev.reversed()), vals);
-
-        // `rev[1..4]` is the reversal's elements 1..4 — counted from its own front.
-        assert_eq!(read_back(rev.slice(1, 4, E)), vec![4, 3, 2]);
-
-        a.release();
-    }
-
-    /// Refcounting is on the block, and a window holds its own reference — so the
-    /// elements outlive the value they were sliced from.
-    #[test]
-    fn a_window_keeps_the_block_alive() {
-        let vals: Vec<u32> = (0..10).collect();
-        let a = from_elems(&bytes_of(&vals), 10, E, 0);
-        let mid = a.slice(2, 5, E);
-        mid.retain();
-        assert!(!a.is_unique());
-        a.release(); // the source is gone; the window is not
-        assert_eq!(read_back(mid), vec![2, 3, 4]);
-        assert!(mid.is_unique());
-        mid.release();
-    }
-
-    /// `release` walks the block's `init` count, not the value's `len`. A window
-    /// that dropped only its own elements would leak the rest — which is why the
-    /// block keeps a count of its own and the unification stops there.
+    /// Releasing walks the block's own `init` elements, not the `len` of whichever
+    /// value let go last: a window over one element of three must not leak the
+    /// other two when it is the last reference.
     #[test]
     fn a_window_releases_every_element_of_its_block() {
-        use core::sync::atomic::{AtomicI64, Ordering};
-        static DROPPED: AtomicI64 = AtomicI64::new(0);
-        unsafe extern "C" fn count_drops(_base: *const u8, n: i64) {
-            DROPPED.fetch_add(n, Ordering::Relaxed);
-        }
-
-        DROPPED.store(0, Ordering::Relaxed);
-        let vals: Vec<u32> = (0..10).collect();
-        let drop_fn = count_drops as unsafe extern "C" fn(*const u8, i64) as i64;
-        let a = from_elems(&bytes_of(&vals), 10, E, drop_fn);
-        assert_eq!(a.tag(), ATAG_BLOCK, "a drop_fn forces a block");
-
-        let mid = a.slice(2, 5, E);
-        mid.retain();
-        a.release();
-        assert_eq!(DROPPED.load(Ordering::Relaxed), 0, "still one reference");
-        mid.release();
-        assert_eq!(
-            DROPPED.load(Ordering::Relaxed),
-            10,
-            "all ten, not the window's three"
-        );
-    }
-
-    /// The inline capacity is in *elements*, so it falls out of the stride — and a
-    /// bit-packed `bool[]` (stride 0) gets eight to the byte.
-    #[test]
-    fn inline_capacity_follows_the_stride() {
-        assert_eq!(inline_cap(8), 2); // i64
-        assert_eq!(inline_cap(4), 5); // i32
-        assert_eq!(inline_cap(1), 22); // i8
-        assert_eq!(inline_cap(0), 176); // bit-packed bool
-        assert_eq!(aipl_arrw_inline_cap(8), 2);
-        assert_eq!(aipl_arrw_inline_cap(-1), inline_cap(0) as i64);
-    }
-
-    /// The entry points are the ABI codegen will call: an array in through a
-    /// pointer, an array out through a leading out pointer. Each borrows what it
-    /// is given and retains what it hands back, so a caller that releases its own
-    /// reference does not invalidate the result.
-    #[test]
-    fn the_wide_entry_points_borrow_and_retain() {
-        let vals: Vec<u32> = (0..10).collect();
-        let a = from_elems(&bytes_of(&vals), 10, E, 0);
-        assert_eq!(aipl_arrw_len(&a), 10);
-
-        let mut window = Arr::empty();
-        aipl_arrw_slice(&mut window, &a, 4, 8, E as i64);
-        assert_eq!(aipl_arrw_len(&window), 4);
-        assert_eq!(read_back(window), vec![4, 5, 6, 7]);
-
-        let mut rev = Arr::empty();
-        aipl_arrw_reversed(&mut rev, &window);
-        assert_eq!(read_back(rev), vec![7, 6, 5, 4]);
-
-        // Both results took their own reference, so the source can go.
-        aipl_arrw_dec(&a);
-        assert_eq!(read_back(window), vec![4, 5, 6, 7]);
-        assert_eq!(read_back(rev), vec![7, 6, 5, 4]);
-
-        let elem2 = aipl_arrw_elem_ptr(&window, 2, E as i64);
-        let got = unsafe { core::ptr::read(elem2 as *const u32) };
-        assert_eq!(got, 6);
-
-        aipl_arrw_dec(&window);
-        aipl_arrw_dec(&rev);
-    }
-
-    /// An accumulator stays a block even when empty: a push has to have somewhere
-    /// to write, and an inline value has no block.
-    #[test]
-    fn with_cap_is_a_block_even_at_zero() {
-        let mut a = Arr::empty();
-        aipl_arrw_with_cap(&mut a, 0, E as i64, 0);
-        assert_eq!(a.tag(), ATAG_BLOCK);
-        assert!(!a.owner().is_null());
-        assert_eq!(a.len(), 0);
-        aipl_arrw_dec(&a);
-    }
-
-    #[test]
-    fn spare_capacity_is_what_is_left_of_the_block() {
-        let a = with_capacity(8, E, 0);
-        assert_eq!(a.len(), 0);
-        assert_eq!(a.spare_capacity(E), 8);
-        // A value that is not a plain block has no room to append into.
-        assert_eq!(a.reversed().spare_capacity(E), 0);
-        assert_eq!(from_elems(&bytes_of(&[1, 2]), 2, E, 0).spare_capacity(E), 0);
-        a.release();
+        let drop_fn = count_window_drops as extern "C" fn(*const u8, i64) as usize as i64;
+        let block = super::super::aipl_array_new(3, drop_fn, 8);
+        let whole = ArrValue::whole_of(block, 3);
+        let mut out = ArrValue::empty();
+        aipl_arr_window(&mut out, &whole, 1, 2, drop_fn, 0, 8);
+        assert!(out.is_window());
+        assert_eq!(out.run_len(), 1);
+        let before = dropped(&WINDOW_DROPS);
+        // The whole value lets go first: the window keeps the block alive.
+        super::super::aipl_array_dec(whole.block);
+        assert_eq!(dropped(&WINDOW_DROPS) - before, 0);
+        // The window is the last reference, and the block frees all three.
+        super::super::aipl_array_dec(out.block);
+        assert_eq!(dropped(&WINDOW_DROPS) - before, 3);
     }
 
     /// Stage 6b: a whole value carries its run like any window; a window is told
@@ -2007,7 +1441,7 @@ mod tests {
     fn a_window_shares_its_block_and_lends_one_on_demand() {
         let root = super::super::array_layout::ARR_ELEMS_OFFSET;
         let refcount = |b: *const u8| unsafe {
-            *super::super::header_of(super::super::array_layout::arr_untag(b))
+            *super::super::buffer::refcount(super::super::array_layout::arr_untag(b))
         };
         let block = super::super::aipl_array_new(5, 0, 8);
         for i in 0..5 {
@@ -2083,7 +1517,7 @@ mod tests {
     fn a_reversal_shares_its_block_and_reverses_back() {
         let root = super::super::array_layout::ARR_ELEMS_OFFSET;
         let refcount = |b: *const u8| unsafe {
-            *super::super::header_of(super::super::array_layout::arr_untag(b))
+            *super::super::buffer::refcount(super::super::array_layout::arr_untag(b))
         };
         let elem = |b: *const u8, i: usize| unsafe {
             *(super::super::array_layout::arr_untag(b).add(root + i * 8) as *const i64)
