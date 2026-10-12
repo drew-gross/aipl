@@ -758,11 +758,11 @@ allocations: 505
 deallocations: 505
 reallocations: 34
 bytes allocated: 40474
-instructions executed: 116023
-binary size: 125848
-  code: 84560
+instructions executed: 114066
+binary size: 125600
+  code: 84388
   data: 5464
-  metadata: 35824
+  metadata: 35748
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -817,7 +817,7 @@ functions:
     bytes: 500
   __m1__indent:
     calls: 12
-    bytes: 1784
+    bytes: 1780
   __rec_drop_Pat:
     calls: 57
     bytes: 268
@@ -847,10 +847,10 @@ functions:
     bytes: 8216
   __test$tm_json:
     calls: 1
-    bytes: 6196
+    bytes: 6136
   __test$word_pat:
     calls: 1
-    bytes: 2332
+    bytes: 2324
   __to_str_u64:
     calls: 0
     bytes: 204
@@ -904,13 +904,13 @@ functions:
     bytes: (external)
   arr_fld:
     calls: 2
-    bytes: 2056
+    bytes: 2048
   caps_fld:
     calls: 0
     bytes: 988
   char_class_body:
     calls: 16
-    bytes: 2040
+    bytes: 2024
   entry_name:
     calls: 5
     bytes: 504
@@ -919,28 +919,28 @@ functions:
     bytes: 348
   json_str:
     calls: 21
-    bytes: 2264
+    bytes: 2244
   main:
     calls: 1
     bytes: 760
   matcher_pat:
     calls: 24
-    bytes: 8296
+    bytes: 8280
   obj_fld:
     calls: 1
-    bytes: 2056
+    bytes: 2048
   obj_of:
     calls: 2
-    bytes: 1676
+    bytes: 1668
   pat_json:
     calls: 2
     bytes: 3516
   re_escape:
     calls: 32
-    bytes: 1960
+    bytes: 1952
   re_escape_set:
     calls: 4
     bytes: 1232
   rule_pats$Kind:
     calls: 2
-    bytes: 10564
+    bytes: 10548

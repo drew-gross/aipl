@@ -114,18 +114,18 @@ allocations: 24
 deallocations: 24
 reallocations: 2
 bytes allocated: 937
-instructions executed: 5987
-binary size: 21592
-  code: 14812
+instructions executed: 5852
+binary size: 21120
+  code: 14436
   data: 1440
-  metadata: 5340
+  metadata: 5244
 functions:
   __eq_i64$arr:
     calls: 1
     bytes: 496
   __test$map_join:
     calls: 1
-    bytes: 10348
+    bytes: 10008
   __to_str_i64:
     calls: 6
     bytes: 204
@@ -164,7 +164,7 @@ functions:
     bytes: 108
   map_join$i64$char$s2$s3$s4$rs$lam$__builtin_to_str:
     calls: 4
-    bytes: 1848
+    bytes: 1832
   map_join$str$char$s2$s3$s4$rs$lam$__test$map_join$same:
     calls: 2
-    bytes: 1808
+    bytes: 1788

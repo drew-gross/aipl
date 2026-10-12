@@ -1768,11 +1768,11 @@ allocations: 5488
 deallocations: 5488
 reallocations: 975
 bytes allocated: 708588
-instructions executed: 2557776
-binary size: 811000
-  code: 523404
+instructions executed: 2551166
+binary size: 810352
+  code: 523048
   data: 13036
-  metadata: 274560
+  metadata: 274268
 functions:
   __arr_drop_Node:
     calls: 18
@@ -1887,10 +1887,10 @@ functions:
     bytes: 432
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__leaves:
     calls: 23
-    bytes: 1356
+    bytes: 1276
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves:
     calls: 5
-    bytes: 1356
+    bytes: 1276
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 4
     bytes: 428
@@ -1974,13 +1974,13 @@ functions:
     bytes: 2848
   __m1__text:
     calls: 15
-    bytes: 1580
+    bytes: 1560
   __m1__token_leaves:
     calls: 5
     bytes: 1496
   __m1__token_text:
     calls: 0
-    bytes: 1580
+    bytes: 1560
   __m2__can_start$Tok:
     calls: 28
     bytes: 252
@@ -1992,7 +1992,7 @@ functions:
     bytes: 1492
   __m2__merge$Tok:
     calls: 96
-    bytes: 696
+    bytes: 736
   __m2__rule_first$Tok:
     calls: 165
     bytes: 9596
@@ -2220,7 +2220,7 @@ functions:
     bytes: 10084
   match_reps$Tok$Node:
     calls: 57
-    bytes: 5252
+    bytes: 5108
   match_rule$Tok$Node:
     calls: 666
     bytes: 8160
@@ -2229,7 +2229,7 @@ functions:
     bytes: 1300
   match_then$Tok$Node:
     calls: 64
-    bytes: 3628
+    bytes: 3584
   parse$Tok$Node:
     calls: 13
     bytes: 284
@@ -2247,7 +2247,7 @@ functions:
     bytes: 2740
   refusal$Tok$Node:
     calls: 10
-    bytes: 4164
+    bytes: 4156
   rule_labels$Tok$Node:
     calls: 146
     bytes: 5220

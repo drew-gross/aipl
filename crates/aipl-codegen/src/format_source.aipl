@@ -427,11 +427,11 @@ allocations: 15942
 deallocations: 15942
 reallocations: 3021
 bytes allocated: 4098118
-instructions executed: 11755394
-binary size: 7831928
-  code: 5293580
+instructions executed: 11736835
+binary size: 7827424
+  code: 5291252
   data: 14090
-  metadata: 2524258
+  metadata: 2522082
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -744,10 +744,10 @@ functions:
     bytes: 688
   __builtin_map_join$__m12__Cst$__builtin_Span$lam$__m12__token_leaves:
     calls: 0
-    bytes: 1356
+    bytes: 1276
   __builtin_map_join$__m8__Pat$str$lam$__m8__nested_bindings:
     calls: 0
-    bytes: 1404
+    bytes: 1308
   __builtin_reverse_find_map$__m12__Cst$__builtin_Span$lam$__m12__last_leaf:
     calls: 30
     bytes: 428
@@ -840,7 +840,7 @@ functions:
     bytes: 5568
   __m10__show_tys:
     calls: 0
-    bytes: 1532
+    bytes: 1528
   __m11__desugar_opt$__m25__AiplTok:
     calls: 324
     bytes: 580
@@ -888,7 +888,7 @@ functions:
     bytes: 780
   __m12__own_token_text:
     calls: 0
-    bytes: 1608
+    bytes: 1584
   __m12__slot_walk:
     calls: 0
     bytes: 820
@@ -912,7 +912,7 @@ functions:
     bytes: 288
   __m12__token_text:
     calls: 0
-    bytes: 1580
+    bytes: 1560
   __m15__between_len:
     calls: 153
     bytes: 800
@@ -945,10 +945,10 @@ functions:
     bytes: 1520
   __m16__unescape:
     calls: 8
-    bytes: 2012
+    bytes: 2004
   __m16__unescape_braces:
     calls: 0
-    bytes: 988
+    bytes: 984
   __m17__construct_ty_name:
     calls: 0
     bytes: 2924
@@ -981,7 +981,7 @@ functions:
     bytes: 628
   __m21__dedent:
     calls: 2
-    bytes: 2804
+    bytes: 2796
   __m23__find_trailing_whitespace:
     calls: 4
     bytes: 588
@@ -1101,7 +1101,7 @@ functions:
     bytes: 66476
   __m32__match_reps$__m25__AiplTok$__m5__Ast:
     calls: 21
-    bytes: 5252
+    bytes: 5108
   __m32__match_rule$__m25__AiplTok$__m5__Ast:
     calls: 472
     bytes: 15800
@@ -1110,7 +1110,7 @@ functions:
     bytes: 1300
   __m32__match_then$__m25__AiplTok$__m5__Ast:
     calls: 137
-    bytes: 3628
+    bytes: 3584
   __m32__parse$__m25__AiplTok$__m5__Ast:
     calls: 4
     bytes: 548
@@ -1122,7 +1122,7 @@ functions:
     bytes: 8792
   __m32__refusal$__m25__AiplTok$__m5__Ast:
     calls: 0
-    bytes: 5224
+    bytes: 5216
   __m32__tok_text$__m25__AiplTok$__m5__Ast:
     calls: 133
     bytes: 1216
@@ -1143,7 +1143,7 @@ functions:
     bytes: 2440
   __m36__base_ty:
     calls: 0
-    bytes: 5048
+    bytes: 5044
   __m36__binding_ann:
     calls: 0
     bytes: 2440
@@ -1206,7 +1206,7 @@ functions:
     bytes: 1612
   __m36__doc_lines$own1:
     calls: 0
-    bytes: 1500
+    bytes: 1520
   __m36__dot_seg:
     calls: 0
     bytes: 6064
@@ -1239,7 +1239,7 @@ functions:
     bytes: 11328
   __m36__format_program:
     calls: 7
-    bytes: 17572
+    bytes: 17540
   __m36__hash_opener:
     calls: 0
     bytes: 2060
@@ -1254,7 +1254,7 @@ functions:
     bytes: 3568
   __m36__ident_list$own2:
     calls: 0
-    bytes: 2220
+    bytes: 2232
   __m36__if_chain:
     calls: 0
     bytes: 13140
@@ -1287,7 +1287,7 @@ functions:
     bytes: 3980
   __m36__lead:
     calls: 17
-    bytes: 1968
+    bytes: 1976
   __m36__let_stmt:
     calls: 0
     bytes: 13952
@@ -1296,7 +1296,7 @@ functions:
     bytes: 8392
   __m36__match_expr:
     calls: 0
-    bytes: 12572
+    bytes: 12456
   __m36__more_before:
     calls: 5
     bytes: 224
@@ -1323,7 +1323,7 @@ functions:
     bytes: 6152
   __m36__paren_ty:
     calls: 0
-    bytes: 12068
+    bytes: 12076
   __m36__pattern:
     calls: 0
     bytes: 16732
@@ -1338,7 +1338,7 @@ functions:
     bytes: 356
   __m36__postfix:
     calls: 0
-    bytes: 13544
+    bytes: 13448
   __m36__postfix_segs:
     calls: 0
     bytes: 3784
@@ -1410,7 +1410,7 @@ functions:
     bytes: 820
   __m36__template_scan:
     calls: 0
-    bytes: 6552
+    bytes: 6536
   __m36__template_verbatim:
     calls: 0
     bytes: 764
@@ -1440,7 +1440,7 @@ functions:
     bytes: 2672
   __m36__type_params:
     calls: 5
-    bytes: 7120
+    bytes: 7128
   __m36__unary:
     calls: 0
     bytes: 2028
@@ -1464,13 +1464,13 @@ functions:
     bytes: 736
   __m37__encode:
     calls: 0
-    bytes: 2100
+    bytes: 2092
   __m37__escape_cost:
     calls: 0
     bytes: 360
   __m37__join_template:
     calls: 0
-    bytes: 1872
+    bytes: 1868
   __m37__needs_escape:
     calls: 0
     bytes: 64
@@ -1479,7 +1479,7 @@ functions:
     bytes: 400
   __m37__requote:
     calls: 0
-    bytes: 6924
+    bytes: 6908
   __m37__single_cost:
     calls: 0
     bytes: 316
@@ -1572,7 +1572,7 @@ functions:
     bytes: 7536
   __m4__bare_operator_import:
     calls: 0
-    bytes: 8700
+    bytes: 8692
   __m4__bind_fields_mut:
     calls: 0
     bytes: 2296
@@ -1599,7 +1599,7 @@ functions:
     bytes: 708
   __m4__doc_block:
     calls: 2
-    bytes: 1792
+    bytes: 1784
   __m4__else_or_unit:
     calls: 0
     bytes: 15664
@@ -1809,7 +1809,7 @@ functions:
     bytes: 8584
   __m4__match_expr:
     calls: 0
-    bytes: 146604
+    bytes: 144988
   __m4__named_param:
     calls: 0
     bytes: 21832
@@ -1866,7 +1866,7 @@ functions:
     bytes: 10332
   __m8__binder_list:
     calls: 0
-    bytes: 1820
+    bytes: 1816
   __m8__binder_name:
     calls: 0
     bytes: 536
@@ -2034,7 +2034,7 @@ functions:
     bytes: 628
   fmt_prepare:
     calls: 7
-    bytes: 2200
+    bytes: 2192
   format_source:
     calls: 4
     bytes: 2228
@@ -2043,7 +2043,7 @@ functions:
     bytes: 808
   strip_line_indent:
     calls: 8
-    bytes: 1684
+    bytes: 1676
   token_fingerprint$own0:
     calls: 36
     bytes: 9992

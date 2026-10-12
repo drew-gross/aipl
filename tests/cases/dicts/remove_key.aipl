@@ -94,11 +94,11 @@ allocations: 55
 deallocations: 55
 reallocations: 0
 bytes allocated: 4132
-instructions executed: 5613
-binary size: 22984
-  code: 14568
+instructions executed: 5603
+binary size: 23024
+  code: 14572
   data: 643
-  metadata: 7773
+  metadata: 7809
 functions:
   __dict_drop_i64$i64$arr:
     calls: 3
@@ -145,9 +145,6 @@ functions:
   __to_str_u64:
     calls: 3
     bytes: 204
-  aipl_arr_elem_ptr:
-    calls: 4
-    bytes: (external)
   aipl_arr_inc:
     calls: 23
     bytes: (external)
@@ -192,4 +189,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 8728
+    bytes: 8732

@@ -744,11 +744,11 @@ allocations: 2265
 deallocations: 2265
 reallocations: 195
 bytes allocated: 184595
-instructions executed: 346053
-binary size: 278592
-  code: 186868
+instructions executed: 345230
+binary size: 278424
+  code: 186776
   data: 6324
-  metadata: 85400
+  metadata: 85324
 functions:
   __arr_drop_Item:
     calls: 57
@@ -818,7 +818,7 @@ functions:
     bytes: 688
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves:
     calls: 21
-    bytes: 1356
+    bytes: 1276
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 0
     bytes: 428
@@ -863,7 +863,7 @@ functions:
     bytes: 628
   __m2__print:
     calls: 51
-    bytes: 12548
+    bytes: 12536
   __m7__trim_end_while$lam$__builtin_is_space:
     calls: 120
     bytes: 400

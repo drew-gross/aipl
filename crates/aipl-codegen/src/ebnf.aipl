@@ -758,11 +758,11 @@ allocations: 1581
 deallocations: 1581
 reallocations: 337
 bytes allocated: 180765
-instructions executed: 293971
-binary size: 181344
-  code: 123580
+instructions executed: 291640
+binary size: 181016
+  code: 123384
   data: 4068
-  metadata: 53696
+  metadata: 53564
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -982,7 +982,7 @@ functions:
     bytes: 1880
   ebnf$Tok$Node:
     calls: 6
-    bytes: 11496
+    bytes: 11320
   first_precs$Tok:
     calls: 19
     bytes: 276
@@ -1000,10 +1000,10 @@ functions:
     bytes: 452
   merge$Tok:
     calls: 101
-    bytes: 696
+    bytes: 736
   render_rule$Tok:
     calls: 101
-    bytes: 14044
+    bytes: 14000
   rep_suffix:
     calls: 14
     bytes: 1708
@@ -1012,7 +1012,7 @@ functions:
     bytes: 9596
   show_first$Tok:
     calls: 27
-    bytes: 3960
+    bytes: 3944
   show_first$Tok$filter1$own0:
     calls: 27
     bytes: 652

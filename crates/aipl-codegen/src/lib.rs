@@ -4450,6 +4450,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
         "aipl_arrv_extend_from",
         arr24::aipl_arrv_extend_from as *const u8,
     );
+    jit_builder.symbol("aipl_arrv_elem_ptr", arr24::aipl_arrv_elem_ptr as *const u8);
     jit_builder.symbol(
         "aipl_arrv_splice_from",
         arr24::aipl_arrv_splice_from as *const u8,
@@ -8208,6 +8209,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         "aipl_arr_push_small" => (3, Ret::Word),
         "aipl_arr_reversed" => (5, Ret::None),
         "aipl_arrv_extend" => (5, Ret::Word),
+        "aipl_arrv_elem_ptr" => (3, Ret::Word),
         "aipl_arrv_sort" => (6, Ret::None),
         "aipl_arrv_push" => (7, Ret::None),
         "aipl_arrv_push_from"
@@ -9894,20 +9896,19 @@ fn owned_block_made_unique_whole<M: Module>(
     // makes it unique.
     settle_array_slot(builder, module, cx, v, ty);
     let block = seq_ptr(builder, v, ty);
-    let unique = owned_block_made_unique_ptr(builder, module, cx, block, ty);
-    if is_wide_seq(ty) {
-        arr_val(builder, unique)
-    } else {
-        unique
-    }
+    owned_block_made_unique_ptr(builder, module, cx, block, v, ty)
 }
 
-/// [`owned_block_made_unique`] on the block pointer itself.
+/// [`owned_block_made_unique`] given the block pointer as well as the value it
+/// came from. A wide value that is shared is copied by `aipl_arrv_reserve_from`
+/// into a value of its own, whose address this returns; an unshared one is
+/// handed back as it is. Anything else is the block pointer, copied or not.
 fn owned_block_made_unique_ptr<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
     cx: Cx,
     v: Value,
+    value: Value,
     ty: &ConcreteType,
 ) -> Value {
     let structs = cx.structs;
@@ -9934,11 +9935,13 @@ fn owned_block_made_unique_ptr<M: Module>(
     // Null: nothing to share. Otherwise read the refcount behind the untagged
     // pointer; `1` and `STATIC_REFCOUNT` both mean "not shared with anyone
     // who could be hurt by an in-place write" here.
+    let wide = is_wide_seq(ty);
+    let unchanged = if wide { value } else { v };
     let is_null = builder.ins().icmp_imm_s(IntCC::Equal, v, 0);
     let check = builder.create_block();
     builder
         .ins()
-        .brif(is_null, merge, &[BlockArg::Value(v)], check, &[]);
+        .brif(is_null, merge, &[BlockArg::Value(unchanged)], check, &[]);
     builder.switch_to_block(check);
     builder.seal_block(check);
     let untagged = builder.ins().band_imm_u(v, !(ARR_TAG_MASK as i64));
@@ -9953,17 +9956,29 @@ fn owned_block_made_unique_ptr<M: Module>(
     let keep = builder.ins().bor(unique, static_rc);
     builder
         .ins()
-        .brif(keep, merge, &[BlockArg::Value(v)], copy_block, &[]);
+        .brif(keep, merge, &[BlockArg::Value(unchanged)], copy_block, &[]);
     builder.switch_to_block(copy_block);
     builder.seal_block(copy_block);
     let esz = builder.ins().iconst(types::I64, esz);
     let zero = builder.ins().iconst(types::I64, 0);
-    let copied = cx.builtins.call(
-        module,
-        builder,
-        "aipl_arr_reserve",
-        &[v, zero, drop_fn, retain_fn, esz],
-    );
+    let copied = if wide {
+        let out_slot = value_slot(builder, ty, cx.structs);
+        let out = builder.ins().stack_addr(types::I64, out_slot, 0);
+        cx.builtins.call_void(
+            module,
+            builder,
+            "aipl_arrv_reserve_from",
+            &[out, value, zero, drop_fn, retain_fn, esz],
+        );
+        out
+    } else {
+        cx.builtins.call(
+            module,
+            builder,
+            "aipl_arr_reserve",
+            &[v, zero, drop_fn, retain_fn, esz],
+        )
+    };
     builder.ins().jump(merge, &[BlockArg::Value(copied)]);
     builder.switch_to_block(merge);
     builder.seal_block(merge);
@@ -10148,70 +10163,31 @@ fn seq_ptr(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> Value 
     }
 }
 
-/// A block carrying one reference, for a runtime entry that *consumes* its
-/// array argument. `owned` says whether the value's own reference is this
-/// site's to give (a moved temporary) or the value is borrowed, so a reference
-/// has to be taken for the entry.
-///
-/// A whole array hands over its first word, retained when borrowed. A window or
-/// an inline value hands over a copy of its elements, which already carries the
-/// reference the entry consumes; an owned window then releases the one it held
-/// on the source (an inline value held none), so either way exactly one
-/// reference changes hands.
-fn consumed_block<M: Module>(
+/// A set read as the source of an `extend` or a spread. A set shares an array's
+/// block and value, so the array entries read it in place — unless its elements
+/// are a narrow integer, which a set keeps as a word and an array packs: those
+/// are copied across into a fresh array, which the caller releases after the
+/// call. `None` is the in-place case, `Some` the fresh array's value and type.
+fn set_source_as_array<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
     cx: Cx,
-    v: Value,
-    ty: &ConcreteType,
-    owned: bool,
-) -> Value {
-    let (builtins, structs) = (cx.builtins, cx.structs);
-    let ConcreteType::Array(elem) = ty else {
-        if !owned {
-            emit_retain(builder, module, builtins, structs, v, ty);
-        }
-        return seq_ptr(builder, v, ty);
+    src: Value,
+    src_ty: &ConcreteType,
+) -> Option<(Value, ConcreteType)> {
+    let ConcreteType::Set(elem, _) = src_ty else {
+        return None;
     };
-    if !is_wide_array(ty) || is_none_inner(elem) {
-        if !owned {
-            emit_retain(builder, module, builtins, structs, v, ty);
-        }
-        return seq_ptr(builder, v, ty);
+    let width = array_elem_size(elem, cx.structs);
+    if width == runtime_elem_size(elem, cx.structs) {
+        return None;
     }
-    let flags = MemFlagsData::trusted();
-    let lend = emit_needs_block(builder, v, ty);
-    let whole_b = builder.create_block();
-    let window_b = builder.create_block();
-    let merge = builder.create_block();
-    builder.append_block_param(merge, types::I64);
-    builder.ins().brif(lend, window_b, &[], whole_b, &[]);
-
-    builder.switch_to_block(whole_b);
-    builder.seal_block(whole_b);
-    if !owned {
-        emit_retain(builder, module, builtins, structs, v, ty);
-    }
-    let whole = builder.ins().load(types::I64, flags, v, 0);
-    builder.ins().jump(merge, &[BlockArg::Value(whole)]);
-
-    builder.switch_to_block(window_b);
-    builder.seal_block(window_b);
-    let (drop_fn, retain_fn, esz) = array_descriptors(builder, module, cx, elem);
-    let view = builtins.call(
-        module,
-        builder,
-        "aipl_arr_window_block",
-        &[v, drop_fn, retain_fn, esz],
-    );
-    if owned {
-        emit_drop(builder, module, builtins, structs, v, ty);
-    }
-    builder.ins().jump(merge, &[BlockArg::Value(view)]);
-
-    builder.switch_to_block(merge);
-    builder.seal_block(merge);
-    builder.block_params(merge)[0]
+    let w = builder.ins().iconst(types::I64, width);
+    let block = cx
+        .builtins
+        .call(module, builder, "aipl_arr_from_set_words", &[src, w]);
+    let arr_ty = ConcreteType::Array(elem.clone());
+    Some((seq_val(builder, block, &arr_ty), arr_ty))
 }
 
 /// Make the array an *owning* slot holds a whole value before something writes
@@ -10249,26 +10225,6 @@ fn settle_array_slot<M: Module>(
     builder.ins().jump(done, &[]);
     builder.switch_to_block(done);
     builder.seal_block(done);
-}
-
-/// The block a `mut` array binding's slot holds, for an in-place mutation to
-/// write through: a window is settled into a whole value first
-/// ([`settle_array_slot`] — the slot owns its reference, which is what makes
-/// that safe), so the first word is always a block. An untyped empty binding
-/// cannot hold a window and is read as it stands.
-fn mut_array_block<M: Module>(
-    builder: &mut FunctionBuilder,
-    module: &mut M,
-    cx: Cx,
-    slot: StackSlot,
-    elem: &ConcreteType,
-) -> Value {
-    if !is_none_inner(elem) {
-        let addr = builder.ins().stack_addr(types::I64, slot, 0);
-        let ty = ConcreteType::Array(Box::new(elem.clone()));
-        settle_array_slot(builder, module, cx, addr, &ty);
-    }
-    builder.ins().stack_load(types::I64, types::I64, slot, 0)
 }
 
 /// The region track for the new version a mutation just wrote into a
@@ -18803,10 +18759,10 @@ fn compile_call_expr<M: Module>(
             // it only ever asks for an `i` below `len(d)`, so there is no absent
             // case to answer: a pair is simply there.
             //
-            // A dict is an array block of `[key][value]` pairs, so the pair's
-            // address is `aipl_arr_elem_ptr` strided by the pair — the same entry
-            // every element read uses, so every array representation is handled
-            // where hand-rolled arithmetic would assume one. The value sits
+            // A dict is an array of `[key][value]` pairs, so the pair's address
+            // is `aipl_arrv_elem_ptr` strided by the pair, read off the dict's
+            // value — one entry for every array shape, where hand-rolled
+            // arithmetic would assume one. The value sits
             // immediately after the key, which is what `dict_key_size` is.
             //
             // Borrows the dict and retains what it hands back, exactly as `get`
@@ -18825,8 +18781,6 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            // The dict's block, under its value.
-            let dict_ptr = seq_ptr(builder, dict_ptr, &dict_ty);
             let (key_ty, val_ty) = match &dict_ty {
                 ConcreteType::Dict(k, v) => ((**k).clone(), (**v).clone()),
                 other => {
@@ -18843,7 +18797,7 @@ fn compile_call_expr<M: Module>(
             let pair = builtins.call(
                 module,
                 builder,
-                "aipl_arr_elem_ptr",
+                "aipl_arrv_elem_ptr",
                 &[dict_ptr, idx_v, psz],
             );
             let (offset, out_ty) = if want_key {
@@ -19403,48 +19357,23 @@ fn compile_call_expr<M: Module>(
                 let mark = scope_depth(scopes);
                 let (src, src_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
                 let src_owned = owned_temp_since(scopes, mark, src);
-                if is_wide_array(&src_ty) {
-                    // Borrowed and read in place, pinned across the call — the
-                    // same contract `Callee::Extend` states — and an owned
-                    // temporary keeps its own track.
-                    if !src_owned {
-                        emit_retain(builder, module, builtins, structs, src, &src_ty);
-                    }
-                    builtins.call_void(
-                        module,
-                        builder,
-                        "aipl_arrv_splice_from",
-                        &[out, arr_ptr, src, drop_fn, retain_fn, esz],
-                    );
-                    if !src_owned {
-                        emit_drop(builder, module, builtins, structs, src, &src_ty);
-                    }
-                } else {
-                    // A set source is consumed by the block entry; the receiver
-                    // becomes a block of its own first, reserved for it.
-                    if src_owned {
-                        moved.push(src);
-                    }
-                    let src_len = seq_len(builder, src, &src_ty);
-                    builtins.call_void(
-                        module,
-                        builder,
-                        "aipl_arrv_reserve_from",
-                        &[out, arr_ptr, src_len, drop_fn, retain_fn, esz],
-                    );
-                    let src_block = consumed_block(builder, module, cx, src, &src_ty, src_owned);
-                    let grown = builder
-                        .ins()
-                        .load(types::I64, MemFlagsData::trusted(), out, 0);
-                    let extended = builtins.call(
-                        module,
-                        builder,
-                        "aipl_arr_extend",
-                        &[grown, src_block, drop_fn, retain_fn, esz],
-                    );
-                    builder
-                        .ins()
-                        .store(MemFlagsData::trusted(), extended, out, 0);
+                // Borrowed and read in place, pinned across the call — the same
+                // contract `Callee::Extend` states — and an owned temporary keeps
+                // its own track. A set is read as it stands, or copied into an
+                // array of its own first (see `set_source_as_array`).
+                let fresh = set_source_as_array(builder, module, cx, src, &src_ty);
+                let (read, read_ty) = fresh.clone().unwrap_or((src, src_ty.clone()));
+                if fresh.is_none() && !src_owned {
+                    emit_retain(builder, module, builtins, structs, src, &src_ty);
+                }
+                builtins.call_void(
+                    module,
+                    builder,
+                    "aipl_arrv_splice_from",
+                    &[out, arr_ptr, read, drop_fn, retain_fn, esz],
+                );
+                if fresh.is_some() || !src_owned {
+                    emit_drop(builder, module, builtins, structs, read, &read_ty);
                 }
             } else {
                 // One element, into the block the spread's reserve made unique
@@ -19762,7 +19691,6 @@ fn compile_call_expr<M: Module>(
                 ),
                 None => mut_array_receiver(env, receiver, "extend")?,
             };
-            let arr_ptr = mut_array_block(builder, module, cx, slot, &elem_ty);
             let mark = scope_depth(scopes);
             let (src_ptr, src_ty) = compile_expr(module, builder, cx, scopes, source)?;
             let src_owned = owned_temp_since(scopes, mark, src_ptr);
@@ -19866,60 +19794,27 @@ fn compile_call_expr<M: Module>(
             let esz = builder
                 .ins()
                 .iconst(types::I64, array_elem_size(&result_elem, structs));
-            if is_wide_array(&src_ty) {
-                // An array source is *borrowed* and read in place whatever its
-                // shape, and the receiver's slot is consumed and written back
-                // (`arr24::aipl_arrv_extend_from`, which reserves first so the
-                // append is one copy). A borrowed source is pinned across the
-                // call: it may be the receiver's own block (`a.extend(a)`), and
-                // the pin is what makes that block shared, so the reserve copies
-                // it before anything is written. An owned temporary cannot be the
-                // receiver's and keeps its own track.
-                if !src_owned {
-                    emit_retain(builder, module, builtins, structs, src_ptr, &src_ty);
-                }
-                let addr = builder.ins().stack_addr(types::I64, slot, 0);
-                builtins.call_void(
-                    module,
-                    builder,
-                    "aipl_arrv_extend_from",
-                    &[addr, addr, src_ptr, drop_fn, retain_fn, esz],
-                );
-                if !src_owned {
-                    emit_drop(builder, module, builtins, structs, src_ptr, &src_ty);
-                }
-            } else {
-                // A set source still goes through the block entry, which
-                // consumes it: an owned temporary is moved in (its track goes),
-                // a borrowed one retained. `aipl_arr_reserve` has `push`'s
-                // contract — it consumes one reference to the receiver and hands
-                // back one owned, growing in place when the block is uniquely
-                // owned and copying when it isn't.
-                if src_owned {
-                    let scope = scopes.last_mut().expect("scope");
-                    scope.retain(|t| !matches!(t.owned, Owned::Value(x) if x == src_ptr));
-                }
-                let src_len = seq_len(builder, src_ptr, &src_ty);
-                let src_block = consumed_block(builder, module, cx, src_ptr, &src_ty, src_owned);
-                // A bit-packed `bool[]` has no pre-sized form; the extend appends
-                // bit by bit through the copying push.
-                let grown = if is_bit_packed(&result_elem) {
-                    arr_ptr
-                } else {
-                    builtins.call(
-                        module,
-                        builder,
-                        "aipl_arr_reserve",
-                        &[arr_ptr, src_len, drop_fn, retain_fn, esz],
-                    )
-                };
-                let new_ptr = builtins.call(
-                    module,
-                    builder,
-                    "aipl_arr_extend",
-                    &[grown, src_block, drop_fn, retain_fn, esz],
-                );
-                builder.ins().stack_store(types::I64, new_ptr, slot, 0);
+            // The source is an array (the type check above admits nothing
+            // else), *borrowed* and read in place whatever its shape, and the
+            // receiver's slot is consumed and written back
+            // (`arr24::aipl_arrv_extend_from`, which reserves first so the
+            // append is one copy). A borrowed source is pinned across the call:
+            // it may be the receiver's own block (`a.extend(a)`), and the pin is
+            // what makes that block shared, so the reserve copies it before
+            // anything is written. An owned temporary cannot be the receiver's
+            // and keeps its own track.
+            if !src_owned {
+                emit_retain(builder, module, builtins, structs, src_ptr, &src_ty);
+            }
+            let addr = builder.ins().stack_addr(types::I64, slot, 0);
+            builtins.call_void(
+                module,
+                builder,
+                "aipl_arrv_extend_from",
+                &[addr, addr, src_ptr, drop_fn, retain_fn, esz],
+            );
+            if !src_owned {
+                emit_drop(builder, module, builtins, structs, src_ptr, &src_ty);
             }
             if !exclusive {
                 region_track_slot(builder, module, cx, scopes, slot, &new_arr_ty);

@@ -25,9 +25,9 @@ reallocations: 0
 bytes allocated: 108
 instructions executed: 139
 binary size: 11456
-  code: 6736
+  code: 6728
   data: 265
-  metadata: 4455
+  metadata: 4463
 functions:
   __dict_drop_str$str:
     calls: 1
@@ -70,7 +70,7 @@ functions:
     bytes: (external)
   fill_or_add_sections_file:
     calls: 1
-    bytes: 2992
+    bytes: 2984
   main:
     calls: 1
     bytes: 100

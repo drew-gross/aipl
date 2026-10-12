@@ -1324,6 +1324,18 @@ pub(crate) extern "C" fn aipl_arrv_splice_from(
     unsafe { core::ptr::write(out, ArrValue::whole(extended)) };
 }
 
+/// The address of element `idx` of the array value at `a`, whatever its shape
+/// (`elem_size` is the stride in bytes). The caller has bounds-checked `idx`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrv_elem_ptr(
+    a: *const ArrValue,
+    idx: i64,
+    elem_size: i64,
+) -> *const u8 {
+    let (first, step, _) = elements(unsafe { &*a }, elem_size as usize);
+    unsafe { first.offset(step * idx as isize) }
+}
+
 /// The array the in-place `map`/`filter` bodies write (`__arr_writable`), from a
 /// value whose reference it consumes, written to `out`: an inline value as it
 /// stands — its elements are its own bytes — and anything else as a uniquely

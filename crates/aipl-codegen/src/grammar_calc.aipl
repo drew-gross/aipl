@@ -470,11 +470,11 @@ allocations: 10175
 deallocations: 10175
 reallocations: 1507
 bytes allocated: 1176054
-instructions executed: 3571485
-binary size: 427848
-  code: 294768
+instructions executed: 3561331
+binary size: 426976
+  code: 294280
   data: 6380
-  metadata: 126700
+  metadata: 126316
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -622,10 +622,10 @@ functions:
     bytes: 552
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__leaves:
     calls: 15
-    bytes: 1356
+    bytes: 1276
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves:
     calls: 322
-    bytes: 1356
+    bytes: 1276
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 2
     bytes: 428
@@ -727,7 +727,7 @@ functions:
     bytes: 9408
   __m13__match_reps$CalcTok$Calc:
     calls: 0
-    bytes: 5252
+    bytes: 5108
   __m13__match_rule$CalcTok$Calc:
     calls: 1375
     bytes: 7708
@@ -736,7 +736,7 @@ functions:
     bytes: 1300
   __m13__match_then$CalcTok$Calc:
     calls: 206
-    bytes: 3628
+    bytes: 3584
   __m13__parse$CalcTok$Calc:
     calls: 42
     bytes: 284
@@ -748,7 +748,7 @@ functions:
     bytes: 8052
   __m13__refusal$CalcTok$Calc:
     calls: 0
-    bytes: 3040
+    bytes: 3032
   __m13__tok_text$CalcTok$Calc:
     calls: 470
     bytes: 700
@@ -772,7 +772,7 @@ functions:
     bytes: 1532
   __m1__own_token_text:
     calls: 308
-    bytes: 1608
+    bytes: 1584
   __m1__show:
     calls: 12
     bytes: 3708
@@ -784,7 +784,7 @@ functions:
     bytes: 1496
   __m1__token_text:
     calls: 0
-    bytes: 1580
+    bytes: 1560
   __m2__can_start$CalcTok:
     calls: 0
     bytes: 252
@@ -802,10 +802,10 @@ functions:
     bytes: 1492
   __m2__merge$CalcTok:
     calls: 24
-    bytes: 696
+    bytes: 736
   __m2__render_rule$CalcTok:
     calls: 13
-    bytes: 13976
+    bytes: 13952
   __m2__rep_suffix:
     calls: 0
     bytes: 1708
@@ -820,7 +820,7 @@ functions:
     bytes: 444
   __m2__show_first_sets$CalcTok$Calc$zip1$own0:
     calls: 1
-    bytes: 5012
+    bytes: 4996
   __m3__desugar_opt$CalcTok:
     calls: 0
     bytes: 580
@@ -880,7 +880,7 @@ functions:
     bytes: 3620
   __m4__render_cst$CalcTok$Calc$s1$lam$calc_space:
     calls: 9
-    bytes: 12724
+    bytes: 12692
   __m5__col_after:
     calls: 76
     bytes: 712
@@ -922,7 +922,7 @@ functions:
     bytes: 72
   __test$calc_cst:
     calls: 1
-    bytes: 2464
+    bytes: 2456
   __test$calc_cst$depth:
     calls: 10
     bytes: 288
@@ -934,7 +934,7 @@ functions:
     bytes: 396
   __test$calc_grammar:
     calls: 1
-    bytes: 11904
+    bytes: 11856
   __test$eval_calc:
     calls: 1
     bytes: 2116

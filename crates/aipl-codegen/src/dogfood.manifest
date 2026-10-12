@@ -62,14 +62,14 @@
 ; import 1 aipl_arr_drop_warr
 ; import 2 aipl_arr_elem_ptr
 ; import 3 aipl_arr_inc
-; import 4 aipl_arr_reserve
-; import 5 aipl_arr_retain_str
-; import 6 aipl_arr_retain_warr
-; import 7 aipl_arr_settle
-; import 8 aipl_arr_window
-; import 9 aipl_array_dec
-; import 10 aipl_array_new
-; import 11 aipl_array_with_cap
+; import 4 aipl_arr_retain_str
+; import 5 aipl_arr_retain_warr
+; import 6 aipl_arr_settle
+; import 7 aipl_arr_window
+; import 8 aipl_array_dec
+; import 9 aipl_array_new
+; import 10 aipl_array_with_cap
+; import 11 aipl_arrv_elem_ptr
 ; import 12 aipl_arrv_extend_from
 ; import 13 aipl_arrv_push
 ; import 14 aipl_arrv_push_from
@@ -314,4 +314,4 @@
 ; data 187 __tostr_lit_94 0800000000000000ffffffffffffff7f52427261636b657400
 
 ; __m28__ast_case_name
-; source-fingerprint 2645669375674311614
+; source-fingerprint 2006097728162322612

@@ -36,15 +36,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 290
-binary size: 3256
-  code: 1916
+instructions executed: 278
+binary size: 3240
+  code: 1900
   data: 122
   metadata: 1218
 functions:
   __test$build:
     calls: 1
-    bytes: 1100
+    bytes: 1084
   __test$rebuilt:
     calls: 1
     bytes: 644

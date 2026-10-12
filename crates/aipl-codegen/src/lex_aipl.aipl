@@ -877,11 +877,11 @@ allocations: 269
 deallocations: 269
 reallocations: 13
 bytes allocated: 485504
-instructions executed: 2240077
-binary size: 315176
-  code: 229984
+instructions executed: 2239960
+binary size: 315128
+  code: 229932
   data: 7732
-  metadata: 77460
+  metadata: 77464
 functions:
   __arr_drop_AiplTok:
     calls: 69
@@ -1026,13 +1026,13 @@ functions:
     bytes: 1520
   __m2__unescape:
     calls: 26
-    bytes: 2012
+    bytes: 2004
   __m2__unescape_braces:
     calls: 12
-    bytes: 988
+    bytes: 984
   __m3__process_raw_string:
     calls: 13
-    bytes: 3368
+    bytes: 3328
   __m7__trim_prefix:
     calls: 38
     bytes: 252

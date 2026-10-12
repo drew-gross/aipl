@@ -315,7 +315,7 @@ Stage 5 — reversed as values                                               [do
   7 cases (`arrays/reverse` 4 → 0) and up in none.
 
 
-Stage 6 — the block header, two shapes, and the `str` buffer       [6a next]
+Stage 6 — the block header, two shapes, and the `str` buffer       [6b next]
 ---------------------------------------------------------------------------------
 The target. `base` is the first element, and the length lives only in the value:
 
@@ -344,7 +344,7 @@ read its length out of the header. Until they take values, `len` cannot leave th
 block — and a value has to say whether it is the whole block (lent as is) or a
 window, a reversal or inline (lent as a copy).
 
-  [ ] 6a. the array entries take values (`*const ArrValue`) and read `data`/`len`
+  [x] 6a. the array entries take values (`*const ArrValue`) and read `data`/`len`
           off them — one entry at a time, each green. The old block-taking entry
           stays registered beside each new one until the checked-in artifact no
           longer imports it (it is *called* through those symbols while it is
@@ -380,12 +380,19 @@ window, a reversal or inline (lent as a copy).
                 is that codegen passes the value, so 6c reads the length there.
                 Together with the receivers: allocations down in 2 cases, up in
                 none; instructions down in ~150, up in none.
-            [ ] still handed a block: a set source of `extend` or a spread
-                (`consumed_block` into `aipl_arr_extend`), a dict's `nth`
-                (`aipl_arr_elem_ptr`), and the made-unique copy
-                (`owned_block_made_unique_ptr`). Codegen's own header reads
-                (`ArrView`, set and dict `==` / hash / render) are 6b's and
-                6c's.
+            [x] the rest: a set source of a spread is read in place as the array
+                value it already is, or — when the set keeps a word per element
+                and the array packs — copied across first
+                (`set_source_as_array`); a dict's `nth` is `aipl_arrv_elem_ptr`;
+                the made-unique copy of an owned wide value is
+                `aipl_arrv_reserve_from`. `consumed_block` and
+                `mut_array_block` are gone. `extend` never had a set source (its
+                type check admits arrays and `str` only).
+                Allocations unchanged, instructions down in 52 cases.
+            No runtime entry that codegen calls for a wide value takes a bare
+            block any more. What still reads a block is codegen itself — `ArrView`'s
+            length load, set and dict `==` / hash / render, the clone and drop
+            walks — which is 6b's and 6c's.
   [ ] 6b. a whole value carries `data` and `len` too, so every block value has
           the window's shape; `ArrView`'s whole-vs-window select and its block
           length load go (most of the per-view cost stages 3 and 5 added).

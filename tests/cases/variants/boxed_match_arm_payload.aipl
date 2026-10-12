@@ -60,9 +60,9 @@ allocations: 23
 deallocations: 23
 reallocations: 2
 bytes allocated: 1423
-instructions executed: 2239
-binary size: 8472
-  code: 5620
+instructions executed: 2212
+binary size: 8456
+  code: 5604
   data: 33
   metadata: 2819
 functions:
@@ -107,7 +107,7 @@ functions:
     bytes: 1116
   render:
     calls: 3
-    bytes: 1668
+    bytes: 1660
   render_plain:
     calls: 6
-    bytes: 1644
+    bytes: 1636

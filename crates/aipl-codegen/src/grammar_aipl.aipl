@@ -4943,11 +4943,11 @@ allocations: 1604022
 deallocations: 1604022
 reallocations: 311089
 bytes allocated: 334277610
-instructions executed: 581445577
-binary size: 7076272
-  code: 4720300
+instructions executed: 579282625
+binary size: 7072096
+  code: 4718144
   data: 62708
-  metadata: 2293264
+  metadata: 2291244
 functions:
   __arr_drop___m11__ModeFrame:
     calls: 298
@@ -5233,16 +5233,16 @@ functions:
     bytes: 140
   __builtin_map_join$__m4__Pat$str$lam$__m4__nested_bindings:
     calls: 8
-    bytes: 1404
+    bytes: 1308
   __builtin_map_join$__m8__Cst$__builtin_Span$lam$__m8__leaves:
     calls: 162
-    bytes: 1356
+    bytes: 1276
   __builtin_map_join$__m8__Cst$__builtin_Span$lam$__m8__token_leaves:
     calls: 1032
-    bytes: 1356
+    bytes: 1276
   __builtin_map_join$__m9__Item$char$s2$s3$s4$rs$lam$__m9__show_item:
     calls: 35
-    bytes: 18956
+    bytes: 18924
   __builtin_reverse_find_map$__m8__Cst$__builtin_Span$lam$__m8__last_leaf:
     calls: 7653
     bytes: 428
@@ -5386,10 +5386,10 @@ functions:
     bytes: 1520
   __m12__unescape:
     calls: 37
-    bytes: 2012
+    bytes: 2004
   __m12__unescape_braces:
     calls: 2
-    bytes: 988
+    bytes: 984
   __m13__construct_ty_name:
     calls: 5
     bytes: 2924
@@ -5425,7 +5425,7 @@ functions:
     bytes: 9816
   __m17__dedent:
     calls: 0
-    bytes: 2804
+    bytes: 2796
   __m20__trim_end_while$lam$__builtin_is_space:
     calls: 70
     bytes: 400
@@ -5548,7 +5548,7 @@ functions:
     bytes: 66476
   __m30__match_reps$__m23__AiplTok$__m1__Ast:
     calls: 3571
-    bytes: 5252
+    bytes: 5108
   __m30__match_rule$__m23__AiplTok$__m1__Ast:
     calls: 115252
     bytes: 15800
@@ -5557,7 +5557,7 @@ functions:
     bytes: 1300
   __m30__match_then$__m23__AiplTok$__m1__Ast:
     calls: 30774
-    bytes: 3628
+    bytes: 3584
   __m30__parse$__m23__AiplTok$__m1__Ast:
     calls: 246
     bytes: 548
@@ -5572,7 +5572,7 @@ functions:
     bytes: 17596
   __m30__refusal$__m23__AiplTok$__m1__Ast:
     calls: 1
-    bytes: 5224
+    bytes: 5216
   __m30__rule_labels$__m23__AiplTok$__m1__Ast:
     calls: 21168
     bytes: 23372
@@ -5599,7 +5599,7 @@ functions:
     bytes: 8892
   __m31__merge$__m23__AiplTok:
     calls: 22608
-    bytes: 696
+    bytes: 736
   __m31__rule_first$__m23__AiplTok:
     calls: 29880
     bytes: 9596
@@ -5614,13 +5614,13 @@ functions:
     bytes: 476
   __m3__show_expr:
     calls: 534
-    bytes: 25752
+    bytes: 25804
   __m3__show_exprs:
     calls: 73
-    bytes: 1532
+    bytes: 1528
   __m4__binder_list:
     calls: 6
-    bytes: 1820
+    bytes: 1816
   __m4__binder_name:
     calls: 14
     bytes: 536
@@ -5650,13 +5650,13 @@ functions:
     bytes: 2864
   __m4__show_pats:
     calls: 13
-    bytes: 1532
+    bytes: 1528
   __m6__show_ty:
     calls: 197
     bytes: 5568
   __m6__show_tys:
     calls: 16
-    bytes: 1532
+    bytes: 1528
   __m7__desugar_opt$__m23__AiplTok:
     calls: 32724
     bytes: 580
@@ -5707,7 +5707,7 @@ functions:
     bytes: 1532
   __m8__own_token_text:
     calls: 468
-    bytes: 1608
+    bytes: 1584
   __m8__slot_walk:
     calls: 117
     bytes: 820
@@ -5722,7 +5722,7 @@ functions:
     bytes: 2848
   __m8__text:
     calls: 10
-    bytes: 1580
+    bytes: 1560
   __m8__tok_span:
     calls: 635
     bytes: 236
@@ -5734,7 +5734,7 @@ functions:
     bytes: 288
   __m8__token_text:
     calls: 2
-    bytes: 1580
+    bytes: 1560
   __m9__show_default:
     calls: 36
     bytes: 420
@@ -5743,10 +5743,10 @@ functions:
     bytes: 384
   __m9__show_fn:
     calls: 27
-    bytes: 9408
+    bytes: 9384
   __m9__show_type_params:
     calls: 37
-    bytes: 2344
+    bytes: 2336
   __rec_drop___m15__Doc:
     calls: 694
     bytes: 184
@@ -6031,7 +6031,7 @@ functions:
     bytes: 7536
   bare_operator_import:
     calls: 3
-    bytes: 8700
+    bytes: 8692
   bind_fields_mut:
     calls: 5
     bytes: 2296
@@ -6061,7 +6061,7 @@ functions:
     bytes: 708
   doc_block:
     calls: 76
-    bytes: 1792
+    bytes: 1784
   else_or_unit:
     calls: 10
     bytes: 15664
@@ -6298,7 +6298,7 @@ functions:
     bytes: 1220
   match_expr:
     calls: 7
-    bytes: 146604
+    bytes: 144988
   named_param:
     calls: 24
     bytes: 21832

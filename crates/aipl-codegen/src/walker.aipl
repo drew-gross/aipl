@@ -3514,11 +3514,11 @@ allocations: 94322
 deallocations: 94322
 reallocations: 18543
 bytes allocated: 22208740
-instructions executed: 68974168
-binary size: 20764080
-  code: 13736996
+instructions executed: 68855237
+binary size: 20759648
+  code: 13734744
   data: 40764
-  metadata: 6986320
+  metadata: 6984140
 functions:
   __arr_drop_ImportEntry:
     calls: 10
@@ -3831,10 +3831,10 @@ functions:
     bytes: 688
   __builtin_map_join$__m11__Pat$str$lam$__m11__nested_bindings:
     calls: 0
-    bytes: 1404
+    bytes: 1308
   __builtin_map_join$__m15__Cst$__builtin_Span$lam$__m15__token_leaves:
     calls: 70
-    bytes: 1356
+    bytes: 1276
   __builtin_reverse_find_map$__m15__Cst$__builtin_Span$lam$__m15__last_leaf:
     calls: 0
     bytes: 428
@@ -3930,7 +3930,7 @@ functions:
     bytes: 500
   __m11__binder_list:
     calls: 0
-    bytes: 1820
+    bytes: 1816
   __m11__binder_name:
     calls: 0
     bytes: 536
@@ -3960,7 +3960,7 @@ functions:
     bytes: 5568
   __m13__show_tys:
     calls: 0
-    bytes: 1532
+    bytes: 1528
   __m14__desugar_opt$__m24__AiplTok:
     calls: 2025
     bytes: 580
@@ -4008,7 +4008,7 @@ functions:
     bytes: 780
   __m15__own_token_text:
     calls: 0
-    bytes: 1608
+    bytes: 1584
   __m15__slot_walk:
     calls: 0
     bytes: 820
@@ -4059,10 +4059,10 @@ functions:
     bytes: 1520
   __m19__unescape:
     calls: 17
-    bytes: 2012
+    bytes: 2004
   __m19__unescape_braces:
     calls: 2
-    bytes: 988
+    bytes: 984
   __m1__col_after:
     calls: 1354
     bytes: 712
@@ -4200,7 +4200,7 @@ functions:
     bytes: 66476
   __m31__match_reps$__m24__AiplTok$__m8__Ast:
     calls: 13
-    bytes: 5252
+    bytes: 5108
   __m31__match_rule$__m24__AiplTok$__m8__Ast:
     calls: 248
     bytes: 15800
@@ -4209,7 +4209,7 @@ functions:
     bytes: 1300
   __m31__match_then$__m24__AiplTok$__m8__Ast:
     calls: 31
-    bytes: 3628
+    bytes: 3584
   __m31__parse_cst$__m24__AiplTok$__m8__Ast:
     calls: 13
     bytes: 496
@@ -4218,7 +4218,7 @@ functions:
     bytes: 8792
   __m31__refusal$__m24__AiplTok$__m8__Ast:
     calls: 0
-    bytes: 5224
+    bytes: 5216
   __m31__tok_text$__m24__AiplTok$__m8__Ast:
     calls: 109
     bytes: 1216
@@ -4239,13 +4239,13 @@ functions:
     bytes: 736
   __m34__encode:
     calls: 14
-    bytes: 2100
+    bytes: 2092
   __m34__escape_cost:
     calls: 0
     bytes: 360
   __m34__join_template:
     calls: 1
-    bytes: 1872
+    bytes: 1868
   __m34__needs_escape:
     calls: 48
     bytes: 64
@@ -4254,7 +4254,7 @@ functions:
     bytes: 400
   __m34__requote:
     calls: 15
-    bytes: 6924
+    bytes: 6908
   __m34__single_cost:
     calls: 14
     bytes: 316
@@ -4263,7 +4263,7 @@ functions:
     bytes: 436
   __m3__dedent:
     calls: 24
-    bytes: 2804
+    bytes: 2796
   __m6__trim_end_while$lam$__builtin_is_space:
     calls: 568
     bytes: 400
@@ -4341,7 +4341,7 @@ functions:
     bytes: 7536
   __m7__bare_operator_import:
     calls: 0
-    bytes: 8700
+    bytes: 8692
   __m7__bind_fields_mut:
     calls: 0
     bytes: 2296
@@ -4368,7 +4368,7 @@ functions:
     bytes: 708
   __m7__doc_block:
     calls: 0
-    bytes: 1792
+    bytes: 1784
   __m7__else_or_unit:
     calls: 0
     bytes: 15664
@@ -4575,7 +4575,7 @@ functions:
     bytes: 8584
   __m7__match_expr:
     calls: 0
-    bytes: 146604
+    bytes: 144988
   __m7__named_param:
     calls: 0
     bytes: 21832
@@ -4752,7 +4752,7 @@ functions:
     bytes: 3388
   base_ty:
     calls: 92
-    bytes: 5048
+    bytes: 5044
   binding_ann:
     calls: 7
     bytes: 2440
@@ -4815,7 +4815,7 @@ functions:
     bytes: 1612
   doc_lines$own1:
     calls: 39
-    bytes: 1500
+    bytes: 1520
   dot_seg:
     calls: 8
     bytes: 6064
@@ -4869,7 +4869,7 @@ functions:
     bytes: 3568
   ident_list$own2:
     calls: 9
-    bytes: 2220
+    bytes: 2232
   if_chain:
     calls: 3
     bytes: 13140
@@ -4902,7 +4902,7 @@ functions:
     bytes: 3980
   lead:
     calls: 460
-    bytes: 1968
+    bytes: 1976
   let_stmt:
     calls: 3
     bytes: 13952
@@ -4914,7 +4914,7 @@ functions:
     bytes: 8392
   match_expr:
     calls: 4
-    bytes: 12572
+    bytes: 12456
   more_before:
     calls: 338
     bytes: 224
@@ -4941,7 +4941,7 @@ functions:
     bytes: 6152
   paren_ty:
     calls: 8
-    bytes: 12068
+    bytes: 12076
   pattern:
     calls: 15
     bytes: 16732
@@ -4956,7 +4956,7 @@ functions:
     bytes: 356
   postfix:
     calls: 192
-    bytes: 7132
+    bytes: 7044
   postfix_segs:
     calls: 192
     bytes: 3784
@@ -5031,7 +5031,7 @@ functions:
     bytes: 820
   template_scan:
     calls: 2
-    bytes: 6552
+    bytes: 6536
   template_verbatim:
     calls: 2
     bytes: 764
@@ -5061,7 +5061,7 @@ functions:
     bytes: 2672
   type_params:
     calls: 58
-    bytes: 7120
+    bytes: 7128
   unary:
     calls: 194
     bytes: 2028

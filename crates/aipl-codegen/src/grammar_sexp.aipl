@@ -277,11 +277,11 @@ allocations: 5735
 deallocations: 5735
 reallocations: 564
 bytes allocated: 642090
-instructions executed: 2147597
-binary size: 411760
-  code: 285168
+instructions executed: 2138447
+binary size: 410904
+  code: 284692
   data: 5028
-  metadata: 121564
+  metadata: 121184
 functions:
   __arr_drop_SexpKind:
     calls: 0
@@ -426,10 +426,10 @@ functions:
     bytes: 552
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__leaves:
     calls: 7
-    bytes: 1356
+    bytes: 1276
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves:
     calls: 397
-    bytes: 1356
+    bytes: 1276
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 0
     bytes: 428
@@ -540,7 +540,7 @@ functions:
     bytes: 9804
   __m13__match_reps$SexpKind$__m15__Sexp:
     calls: 38
-    bytes: 5252
+    bytes: 5108
   __m13__match_rule$SexpKind$__m15__Sexp:
     calls: 673
     bytes: 7908
@@ -549,7 +549,7 @@ functions:
     bytes: 1300
   __m13__match_then$SexpKind$__m15__Sexp:
     calls: 0
-    bytes: 3628
+    bytes: 3584
   __m13__parse$SexpKind$__m15__Sexp:
     calls: 13
     bytes: 284
@@ -561,7 +561,7 @@ functions:
     bytes: 8272
   __m13__refusal$SexpKind$__m15__Sexp:
     calls: 0
-    bytes: 3692
+    bytes: 3680
   __m13__tok_text$SexpKind$__m15__Sexp:
     calls: 118
     bytes: 856
@@ -573,7 +573,7 @@ functions:
     bytes: 652
   __m15__render_sexp:
     calls: 0
-    bytes: 1788
+    bytes: 1780
   __m1__extent:
     calls: 0
     bytes: 252
@@ -597,7 +597,7 @@ functions:
     bytes: 1496
   __m1__token_text:
     calls: 21
-    bytes: 1580
+    bytes: 1560
   __m2__can_start$SexpKind:
     calls: 0
     bytes: 252
@@ -615,10 +615,10 @@ functions:
     bytes: 1492
   __m2__merge$SexpKind:
     calls: 9
-    bytes: 696
+    bytes: 736
   __m2__render_rule$SexpKind:
     calls: 7
-    bytes: 13976
+    bytes: 13952
   __m2__rep_suffix:
     calls: 1
     bytes: 1708
@@ -633,7 +633,7 @@ functions:
     bytes: 444
   __m2__show_first_sets$SexpKind$__m15__Sexp$zip1$own0:
     calls: 1
-    bytes: 5012
+    bytes: 4996
   __m3__desugar_opt$SexpKind:
     calls: 45
     bytes: 580
@@ -693,7 +693,7 @@ functions:
     bytes: 3620
   __m4__render_cst$SexpKind$__m15__Sexp$s1$lam$sexp_space:
     calls: 12
-    bytes: 12724
+    bytes: 12692
   __m5__col_after:
     calls: 77
     bytes: 712
@@ -741,13 +741,13 @@ functions:
     bytes: 8412
   __test$sexp_cst:
     calls: 1
-    bytes: 3392
+    bytes: 3384
   __test$sexp_cst$shown:
     calls: 5
     bytes: 396
   __test$sexp_grammar:
     calls: 1
-    bytes: 11904
+    bytes: 11856
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84

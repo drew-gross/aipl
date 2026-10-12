@@ -26,11 +26,11 @@ allocations: 2
 deallocations: 2
 reallocations: 1
 bytes allocated: 112
-instructions executed: 1884
+instructions executed: 1827
 binary size: 3072
-  code: 1360
+  code: 1356
   data: 302
-  metadata: 1410
+  metadata: 1414
 functions:
   __test$build:
     calls: 1
@@ -49,7 +49,7 @@ functions:
     bytes: (external)
   build:
     calls: 4
-    bytes: 588
+    bytes: 584
   main:
     calls: 1
     bytes: 104

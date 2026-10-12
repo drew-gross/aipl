@@ -40,11 +40,11 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 210
-instructions executed: 1540
-binary size: 9128
-  code: 5148
+instructions executed: 1528
+binary size: 9120
+  code: 5144
   data: 714
-  metadata: 3266
+  metadata: 3262
 functions:
   __test$joined:
     calls: 1
@@ -78,7 +78,7 @@ functions:
     bytes: (external)
   joined$vo1:
     calls: 2
-    bytes: 1140
+    bytes: 1136
   main:
     calls: 1
     bytes: 164

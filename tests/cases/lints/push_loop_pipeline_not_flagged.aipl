@@ -160,9 +160,9 @@ allocations: 40
 deallocations: 40
 reallocations: 1
 bytes allocated: 957
-instructions executed: 7733
-binary size: 14480
-  code: 10164
+instructions executed: 7625
+binary size: 14464
+  code: 10148
   data: 377
   metadata: 3939
 functions:
@@ -213,7 +213,7 @@ functions:
     bytes: 628
   show:
     calls: 8
-    bytes: 1560
+    bytes: 1552
   show_u:
     calls: 2
-    bytes: 1560
+    bytes: 1552

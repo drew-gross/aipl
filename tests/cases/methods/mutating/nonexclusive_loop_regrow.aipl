@@ -40,9 +40,9 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 248
-instructions executed: 1378
-binary size: 4792
-  code: 2532
+instructions executed: 1373
+binary size: 4816
+  code: 2556
   data: 448
   metadata: 1812
 functions:
@@ -51,7 +51,7 @@ functions:
     bytes: 496
   __test$addtwo:
     calls: 1
-    bytes: 1068
+    bytes: 1092
   __test$grow_aliased_matches:
     calls: 1
     bytes: 776

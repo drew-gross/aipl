@@ -368,6 +368,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_arr_retain_opt_warr" => sig(2, false),
         "aipl_arr_load_bit" => sig(2, true),
         "aipl_arr_elem_ptr" => sig(3, true),
+        "aipl_arrv_elem_ptr" => sig(3, true),
         "aipl_i64_len" | "aipl_u64_len" => sig(1, true),
         "aipl_rec_alloc" | "aipl_write_i64" | "aipl_write_u64" => sig(2, true),
         "aipl_write_bytes" | "aipl_array_new" | "aipl_array_with_cap" => sig(3, true),

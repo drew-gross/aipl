@@ -1094,11 +1094,11 @@ allocations: 735
 deallocations: 735
 reallocations: 83
 bytes allocated: 92737
-instructions executed: 85382
+instructions executed: 84912
 binary size: 171488
-  code: 109220
+  code: 109212
   data: 6884
-  metadata: 55384
+  metadata: 55392
 functions:
   __arr_drop_ListStyle:
     calls: 27
@@ -1138,7 +1138,7 @@ functions:
     bytes: 472
   __builtin_map_join$Rule$Kind$char$s2$s3$s4$rs$lam$show_rule$Kind:
     calls: 7
-    bytes: 1452
+    bytes: 1444
   __builtin_try_map$Rule$Kind$Rule$Kind$ParseError$lam$desugar_rule$Kind:
     calls: 6
     bytes: 712
