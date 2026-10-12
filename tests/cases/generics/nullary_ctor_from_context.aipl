@@ -58,11 +58,11 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 438
-instructions executed: 577
-binary size: 8160
-  code: 4460
+instructions executed: 543
+binary size: 7992
+  code: 4340
   data: 383
-  metadata: 3317
+  metadata: 3269
 functions:
   __arr_drop_Holder$Tok:
     calls: 1
@@ -102,4 +102,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2076
+    bytes: 1956

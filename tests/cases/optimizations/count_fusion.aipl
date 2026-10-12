@@ -84,30 +84,30 @@ allocations: 21
 deallocations: 21
 reallocations: 28
 bytes allocated: 538
-instructions executed: 24964
-binary size: 7552
-  code: 4716
+instructions executed: 24274
+binary size: 6544
+  code: 3844
   data: 159
-  metadata: 2677
+  metadata: 2541
 functions:
   __builtin_count_is_at_least$i64:
     calls: 3
-    bytes: 396
+    bytes: 240
   __builtin_count_is_at_most$i64:
     calls: 2
-    bytes: 360
+    bytes: 220
   __builtin_count_is_equal$i64:
     calls: 2
-    bytes: 372
+    bytes: 232
   __builtin_count_is_greater_than$i64:
     calls: 2
-    bytes: 360
+    bytes: 220
   __builtin_count_is_less_than$i64:
     calls: 5
-    bytes: 396
+    bytes: 240
   __builtin_count_is_not_equal$i64:
     calls: 3
-    bytes: 376
+    bytes: 236
   __to_str_bool:
     calls: 17
     bytes: 232

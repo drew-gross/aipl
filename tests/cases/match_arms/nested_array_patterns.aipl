@@ -112,11 +112,11 @@ allocations: 33
 deallocations: 33
 reallocations: 0
 bytes allocated: 2329
-instructions executed: 3281
-binary size: 25272
-  code: 18576
+instructions executed: 2747
+binary size: 22232
+  code: 16368
   data: 33
-  metadata: 6663
+  metadata: 5831
 functions:
   __arr_drop_Slot:
     calls: 12
@@ -141,10 +141,10 @@ functions:
     bytes: (external)
   kind:
     calls: 4
-    bytes: 2016
+    bytes: 2000
   main:
     calls: 1
-    bytes: 14556
+    bytes: 12384
   named:
     calls: 2
-    bytes: 1528
+    bytes: 1508

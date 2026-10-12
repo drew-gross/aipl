@@ -426,6 +426,35 @@ window, a reversal or inline (lent as a copy).
           through one would leak the elements outside it (`arr24`'s
           `a_window_releases_every_element_of_its_block` pins this). Stage 8's
           question — can `cap` stand in for `init` — is now only about drop blocks.
+          **Two rounds, because the checked-in artifact's compiled code reads
+          block headers inline** (an element store at `ARR_ELEMS_OFFSET`, a length
+          load, the `FilterTruncate` store) and has to keep running while it is
+          regenerated: the layout cannot change under it. So first compiled code
+          stops knowing the layout, and only then does the layout move.
+            [x] 6c-1. compiled code never touches a header. Every array a runtime
+                entry produces comes back as a value (`aipl_arrv_new`,
+                `_with_cap`, `_join`, `_from_set_words`, `aipl_strv_split`,
+                `aipl_arrv_list_files`), and the elements go where the value's
+                `data` says; nothing computes `block + ARR_ELEMS_OFFSET`, loads
+                `len` from a block or stores into one. `FilterTruncate` and the
+                in-place `map`'s drop-fn patch are runtime calls
+                (`aipl_arrv_truncate`, `_set_drop`). Windows are told by a tag
+                (`ATAG_WINDOW`, above the length) rather than by comparing
+                against the block's length, so `emit_needs_block` is one compare
+                and reads no block. `load_elem_at` lost its representation
+                dispatch (a value's `data` always points at elements). Set and
+                dict `==` / hash / render read the value's run. Static literals
+                are still emitted in the old layout; only this module reads them.
+                Corpus: allocations unchanged, instructions -9.3%, binary -0.9%.
+            [ ] 6c-2. move the layout, in the runtimes and in static emission
+                only: base-relative header, plain `[cap][refcount]` and drop
+                `[drop_fn][init][cap][refcount]` blocks told apart by a tag in the
+                pointer's low bits (`0b01` plain, `0b10` drop; `0b00` is the old
+                layout, which only the artifact's own static blocks still use and
+                which nothing may read past its refcount), `len` gone from the
+                block (`ArrValue::whole` takes the length it is given; every block
+                function takes `(block, len)`). The artifact needs no
+                regeneration to survive it, which is what 6c-1 bought.
   [x] 6d. **sets and dicts flip to 24-byte values** (decided: rather than keep
           a header of their own). They share the array block and its runtime but
           are still one-word values, so they could not carry a length once 6c

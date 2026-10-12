@@ -27,15 +27,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 56
-instructions executed: 426
-binary size: 3808
-  code: 1736
+instructions executed: 375
+binary size: 3568
+  code: 1564
   data: 352
-  metadata: 1720
+  metadata: 1652
 functions:
   __test$nonempty_last:
     calls: 1
-    bytes: 604
+    bytes: 576
   aipl_array_dec:
     calls: 1
     bytes: (external)
@@ -65,7 +65,7 @@ functions:
     bytes: 196
   nonempty_last$i64:
     calls: 2
-    bytes: 308
+    bytes: 224
   nonempty_last$str:
     calls: 1
-    bytes: 472
+    bytes: 412

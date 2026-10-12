@@ -77,6 +77,10 @@ pub(crate) const ARR_INLINE_CAP: usize = 22;
 pub(crate) const ATAG_BLOCK: u8 = 0b00;
 pub(crate) const ATAG_INLINE: u8 = 0b01;
 pub(crate) const ATAG_REVERSED: u8 = 0b10;
+/// A block value whose run is not (known to be) the whole of its block: what a
+/// slice makes. Cleared by nothing — a window stays one, and is copied before it
+/// is written through. (`11` was spare in `Arr`'s layout.)
+pub(crate) const ATAG_WINDOW: u8 = 0b11;
 
 /// `[drop_fn][init][cap][refcount]` — the prefix before a block's elements.
 pub(crate) const ARR_BLOCK_HEADER: usize = 32;
@@ -562,9 +566,12 @@ pub(crate) extern "C" fn aipl_arr_retain_opt_warr(elems: *const u8, len: i64) {
 // A *block* value carries its run — `data` and `len` — whether it is the whole
 // block or a window of it (stage 6b), so a reader never has to ask which: the
 // elements are `data` and `len`, always. A whole value is the window that
-// happens to cover the block (`data` at the first element, `len` the block's),
-// which is what [`ArrValue::is_window`] tests when something needs to know — a
-// window must be copied before an in-place write, and a whole value need not.
+// covers the block (`data` at the first element, `len` the block's), and the
+// two differ by a tag (stage 6c): a window has `ATAG_WINDOW` above its length,
+// a whole value has none. Something that is about to write through a value asks
+// [`ArrValue::is_window`] — a window must be copied first, and a whole value
+// need not — without reading the block, which keeps no length of its own to
+// compare against.
 //
 // A value whose `data` is null is the older whole shape, `{block, 0, 0}`, still
 // read as the block it names: the checked-in artifact's compiled code builds
@@ -621,14 +628,37 @@ pub(crate) struct ArrValue {
 }
 
 impl ArrValue {
-    /// A run `data`/`len` of `block`, whole or not.
-    fn whole_run(block: *const u8, data: *const u8, len: usize) -> ArrValue {
-        ArrValue { block, data, len }
+    /// The value for the whole of `block`, which holds `len` elements: for a
+    /// caller that built the block and knows how many, so it does not ask the
+    /// block (a block that keeps no length cannot say).
+    fn whole_of(block: *const u8, len: usize) -> ArrValue {
+        ArrValue {
+            block,
+            data: unsafe {
+                super::array_layout::arr_untag(block).add(super::array_layout::ARR_ELEMS_OFFSET)
+            },
+            len,
+        }
+    }
+
+    /// A fresh array of `len` uninitialized elements, as a value whose `data` is
+    /// where they go.
+    pub(crate) fn new_of(len: usize, drop_fn: i64, elem_size: i64) -> ArrValue {
+        ArrValue::whole_of(super::aipl_array_new(len as i64, drop_fn, elem_size), len)
+    }
+
+    /// A window: the run `data`/`len` of `block`.
+    fn window(block: *const u8, data: *const u8, len: usize) -> ArrValue {
+        ArrValue {
+            block,
+            data,
+            len: len | ((ATAG_WINDOW as usize) << ARR_TAG_SHIFT),
+        }
     }
 
     /// The value for the whole of `block`: its run is the block's elements, at
     /// the length the block holds now. (Null: the zeroed empty value.)
-    fn whole(block: *const u8) -> ArrValue {
+    pub(crate) fn whole(block: *const u8) -> ArrValue {
         if block.is_null() {
             return ArrValue {
                 block,
@@ -662,22 +692,16 @@ impl ArrValue {
         (self.len as u64 >> ARR_TAG_SHIFT) as u8 == ATAG_REVERSED
     }
 
-    /// Whether the value is a *window* of its block — a run that is not the whole
-    /// of it — and so cannot be written through or handed to something that
-    /// takes the block as it is. A whole value, either shape, is not.
-    fn is_window(&self) -> bool {
-        if self.is_inline() || self.is_reversed() || self.data.is_null() {
-            return false;
-        }
-        let first = unsafe {
-            super::array_layout::arr_untag(self.block).add(super::array_layout::ARR_ELEMS_OFFSET)
-        };
-        self.data != first || self.len != tagged_len(self.block)
+    /// Whether the value is a *window* of its block — a run that may not be the
+    /// whole of it — and so cannot be written through or handed to something
+    /// that takes the block as it is. A whole value, either shape, is not.
+    pub(crate) fn is_window(&self) -> bool {
+        (self.len as u64 >> ARR_TAG_SHIFT) as u8 == ATAG_WINDOW
     }
 
-    /// The run of a value that is neither inline nor reversed: `data` and the
-    /// length for a value that carries them, the block's own elements for one in
-    /// the older whole shape.
+    /// The run of a value that is not inline: `data` and the length for a value
+    /// that carries them (a reversed one's is the forward run it walks), the
+    /// block's own elements for one in the older whole shape.
     fn run(&self) -> (*const u8, usize) {
         if self.data.is_null() {
             let first = if self.block.is_null() {
@@ -690,7 +714,7 @@ impl ArrValue {
             };
             return (first, tagged_len(self.block));
         }
-        (self.data, self.len)
+        (self.data, self.run_len())
     }
 
     /// A window or a reversed value's element count.
@@ -824,15 +848,20 @@ pub(crate) extern "C" fn aipl_arr_window(
     let result = if n == 0 {
         ArrValue::whole(super::array_layout::arr_inline_empty())
     } else if lo == 0 && n == len {
+        // All of it: the same value, a window or not.
         super::aipl_arr_inc(a.block);
-        ArrValue::whole_run(a.block, first, len)
+        if a.data.is_null() {
+            ArrValue::whole_of(a.block, len)
+        } else {
+            a
+        }
     } else {
         match super::array_layout::arr_repr(a.block) {
             super::array_layout::ArrRepr::Heap
                 if elem_size != super::array_layout::ELEM_BITPACKED =>
             {
                 super::aipl_arr_inc(a.block);
-                ArrValue::whole_run(a.block, unsafe { first.add(lo * elem_size as usize) }, n)
+                ArrValue::window(a.block, unsafe { first.add(lo * elem_size as usize) }, n)
             }
             _ => ArrValue::whole(super::aipl_arr_slice(
                 a.block, lo as i64, hi as i64, drop_fn, retain_fn, elem_size,
@@ -866,7 +895,7 @@ pub(crate) extern "C" fn aipl_arr_reversed(
     } else if a.is_reversed() {
         // Reversing a reversal is the forward run it walks.
         super::aipl_arr_inc(a.block);
-        ArrValue::whole_run(a.block, a.data, a.run_len())
+        ArrValue::window(a.block, a.data, a.run_len())
     } else {
         let (first, len) = a.run();
         if len == 0 {
@@ -1135,6 +1164,7 @@ pub(crate) extern "C" fn aipl_arrv_sort(
 /// `elem_size` describe `T`.
 #[no_mangle]
 pub(crate) extern "C" fn aipl_arrv_join(
+    out: *mut ArrValue,
     parts: *const ArrValue,
     sep: *const ArrValue,
     final_sep: *const ArrValue,
@@ -1142,7 +1172,7 @@ pub(crate) extern "C" fn aipl_arrv_join(
     drop_fn: i64,
     retain_fn: i64,
     elem_size: i64,
-) -> *const u8 {
+) {
     let bits = elem_size == super::array_layout::ELEM_BITPACKED;
     let w = if bits { 0 } else { elem_size as usize };
     let (parts_first, parts_step, n) = elements(unsafe { &*parts }, ARR_SIZE);
@@ -1168,8 +1198,9 @@ pub(crate) extern "C" fn aipl_arrv_join(
         total += part(i).2;
     }
     let (block, dst) = fresh_block(total, drop_fn, elem_size);
+    unsafe { core::ptr::write(out, ArrValue::whole_of(block, total)) };
     if total == 0 {
-        return block;
+        return;
     }
     let mut pos = 0usize;
     for i in 0..n {
@@ -1186,7 +1217,6 @@ pub(crate) extern "C" fn aipl_arrv_join(
         }
     }
     unsafe { super::elem_rc(retain_fn, dst, total) };
-    block
 }
 
 /// `parts.join(sep=..)` over a `str[]`, written to `out`: `str24::join_run` over
@@ -1588,27 +1618,117 @@ fn reserved_bytes(block: *const u8) -> usize {
     unsafe { core::ptr::read(u.add(super::array_layout::ARR_CAP_OFFSET) as *const i64) as usize }
 }
 
-/// The set `set`'s elements as a fresh array block of `width`-byte elements —
-/// `to_array` on a set of a narrow integer. A set keeps a word per scalar and an
-/// array packs a narrow integer at its own width, so the two stop sharing a
-/// block there; each word's low bytes are the element. (Every other element
-/// type is laid out alike in both, and `to_array` shares the block.) Borrows
-/// the set value; the result carries one reference.
+/// The set `set`'s elements as a fresh array of `width`-byte elements, written to
+/// `out` — `to_array` on a set of a narrow integer. A set keeps a word per scalar
+/// and an array packs a narrow integer at its own width, so the two stop sharing
+/// a block there; each word's low bytes are the element. (Every other element
+/// type is laid out alike in both, and `to_array` shares the block.) Borrows the
+/// set value; the result carries one reference.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arr_from_set_words(set: *const ArrValue, width: i64) -> *const u8 {
-    let set = unsafe { (*set).block };
-    let len = tagged_len(set);
-    let out = super::aipl_array_new(len as i64, 0, width);
+pub(crate) extern "C" fn aipl_arrv_from_set_words(
+    out: *mut ArrValue,
+    set: *const ArrValue,
+    width: i64,
+) {
+    let (first, step, len) = elements(unsafe { &*set }, 8);
+    let (block, dst) = fresh_block(len, 0, width);
     let w = width as usize;
-    let src = super::array_layout::arr_untag(set);
     for i in 0..len {
         unsafe {
-            let from = src.add(super::array_layout::ARR_ELEMS_OFFSET + i * 8);
-            let to = (out as *mut u8).add(super::array_layout::ARR_ELEMS_OFFSET + i * w);
-            core::ptr::copy_nonoverlapping(from, to, w);
+            let from = first.offset(step * i as isize);
+            core::ptr::copy_nonoverlapping(from, dst.add(i * w), w);
         }
     }
-    out
+    unsafe { core::ptr::write(out, ArrValue::whole_of(block, len)) };
+}
+
+// # Allocation that hands back a value (stage 6c)
+//
+// Compiled code that wants a new array asks for a value and writes its elements
+// at the value's `data`, rather than taking a block and adding the layout's
+// element offset itself. Which is why the layout can change underneath it.
+
+/// A fresh array of `len` elements, uninitialized, written to `out` (the value's
+/// `data` is where the elements go).
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrv_new(out: *mut ArrValue, len: i64, drop_fn: i64, elem_size: i64) {
+    let n = len.max(0) as usize;
+    let block = super::aipl_array_new(n as i64, drop_fn, elem_size);
+    unsafe { core::ptr::write(out, ArrValue::whole_of(block, n)) };
+}
+
+/// An empty array with room for `cap` elements, written to `out`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrv_with_cap(
+    out: *mut ArrValue,
+    cap: i64,
+    drop_fn: i64,
+    elem_size: i64,
+) {
+    let block = super::aipl_array_with_cap(cap, drop_fn, elem_size);
+    unsafe { core::ptr::write(out, ArrValue::whole_of(block, 0)) };
+}
+
+/// `s.split(sep)` as a `str[]` written to `out`. Each part is a window into `s`,
+/// retained because the array owns it. Borrows both arguments.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_strv_split(
+    out: *mut ArrValue,
+    s: *const super::str24::Str,
+    sep: *const super::str24::Str,
+) {
+    let (sv, sepv) = unsafe { (*s, *sep) };
+    let mut count = 0usize;
+    super::str24::for_each_split(sv, sepv, &mut |_| count += 1);
+    let drop_fn = super::str24::aipl_arr_drop_str as *const () as usize as i64;
+    let (block, dst) = fresh_block(count, drop_fn, super::str24::STR_SIZE as i64);
+    let elems = dst as *mut super::str24::Str;
+    let mut k = 0usize;
+    super::str24::for_each_split(sv, sepv, &mut |part| {
+        part.retain();
+        unsafe { core::ptr::write(elems.add(k), part) };
+        k += 1;
+    });
+    unsafe { core::ptr::write(out, ArrValue::whole_of(block, count)) };
+}
+
+/// Shorten the whole array value at `a` to its first `len` elements, in place —
+/// what the in-place `filter` ends with. The dropped tail was already released
+/// or moved, so the block is told it holds `len` (the elements `release` walks).
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrv_truncate(a: *mut ArrValue, len: i64) {
+    let v = unsafe { &mut *a };
+    if v.is_inline() {
+        let mut raw = v.bytes();
+        raw[ARR_INLINE_CAP] = len as u8;
+        unsafe { core::ptr::write(a, core::ptr::read(raw.as_ptr() as *const ArrValue)) };
+        return;
+    }
+    v.len = len as usize;
+    unsafe {
+        core::ptr::write(
+            super::array_layout::arr_untag(v.block).add(super::array_layout::ARR_LEN_OFFSET)
+                as *mut i64,
+            len,
+        )
+    };
+}
+
+/// Make the element drop helper of the block under the array value `a` `drop_fn`:
+/// the in-place `map` from `T` to `U`, whose elements the block now holds.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrv_set_drop(a: *const ArrValue, drop_fn: i64) {
+    let v = unsafe { &*a };
+    if v.is_inline() {
+        return;
+    }
+    unsafe {
+        core::ptr::write(
+            super::array_layout::arr_untag(v.block).add(super::array_layout::ARR_DROPFN_OFFSET)
+                as *mut i64,
+            drop_fn,
+        )
+    };
 }
 
 #[no_mangle]
@@ -1860,10 +1980,10 @@ mod tests {
         assert_eq!(older.run(), (whole.data, 4));
         assert_eq!(elements(&older, 8), elements(&whole, 8));
 
-        // A prefix shares `data` with the whole value but not its length; a
-        // suffix shares its end but not `data`. Neither is the block's run.
-        let prefix = ArrValue::whole_run(block, whole.data, 3);
-        let suffix = ArrValue::whole_run(block, unsafe { whole.data.add(8) }, 3);
+        // A slice is tagged a window whatever it covers, so the block need not
+        // say how long it is: a prefix and a suffix both are.
+        let prefix = ArrValue::window(block, whole.data, 3);
+        let suffix = ArrValue::window(block, unsafe { whole.data.add(8) }, 3);
         assert!(prefix.is_window());
         assert!(suffix.is_window());
 
@@ -1894,7 +2014,7 @@ mod tests {
         aipl_arr_window(&mut out, &whole, 1, 4, 0, 0, 8);
         let mid = out;
         assert_eq!(mid.block, block);
-        assert_eq!(mid.len, 3);
+        assert_eq!(mid.run_len(), 3);
         assert_eq!(unsafe { *(mid.data as *const i64) }, 11);
         assert_eq!(refcount(block), 2);
 
@@ -1902,7 +2022,7 @@ mod tests {
         aipl_arr_window(&mut out, &mid, 1, 99, 0, 0, 8);
         let inner = out;
         assert_eq!(inner.block, block);
-        assert_eq!(inner.len, 2);
+        assert_eq!(inner.run_len(), 2);
         assert_eq!(unsafe { *(inner.data as *const i64) }, 12);
         assert_eq!(refcount(block), 3);
 
@@ -1973,10 +2093,12 @@ mod tests {
         assert_eq!((elem(lent, 0), elem(lent, 1)), (12, 11));
         super::super::aipl_array_dec(lent);
 
-        // Reversing the whole reversal is the whole array again.
+        // Reversing the whole reversal is the forward run again — over the same
+        // block, but a window, since nothing here says it covers all of it.
         aipl_arr_reversed(&mut out, &r, 0, 0, 8);
-        assert!(!out.is_reversed() && !out.is_window());
+        assert!(!out.is_reversed() && out.is_window());
         assert_eq!(out.block, block);
+        assert_eq!(out.run_len(), 4);
         assert_eq!(refcount(block), 4);
 
         for v in [out, mid, r] {

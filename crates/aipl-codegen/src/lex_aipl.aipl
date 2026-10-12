@@ -877,11 +877,11 @@ allocations: 269
 deallocations: 269
 reallocations: 13
 bytes allocated: 485504
-instructions executed: 2234276
-binary size: 315200
-  code: 230008
+instructions executed: 2192356
+binary size: 296432
+  code: 211568
   data: 7732
-  metadata: 77460
+  metadata: 77132
 functions:
   __arr_drop_AiplTok:
     calls: 69
@@ -918,10 +918,10 @@ functions:
     bytes: 304
   __builtin_any$str$lam$__m1__up_to_any_len$lambda0:
     calls: 14
-    bytes: 360
+    bytes: 312
   __builtin_count_while$char$lam$__m1__lex_step$AiplTok$lambda1:
     calls: 54
-    bytes: 316
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 3
     bytes: 268
@@ -954,7 +954,7 @@ functions:
     bytes: 416
   __eq_AiplTok$arr:
     calls: 16
-    bytes: 356
+    bytes: 240
   __eq_StrStyle:
     calls: 8
     bytes: 64
@@ -972,7 +972,7 @@ functions:
     bytes: 128
   __eq___m1__ScopeSpan$arr:
     calls: 2
-    bytes: 356
+    bytes: 240
   __eq___m1__SpanStr:
     calls: 18
     bytes: 128
@@ -981,10 +981,10 @@ functions:
     bytes: 120
   __eq___m1__Token$AiplTok$arr:
     calls: 10
-    bytes: 356
+    bytes: 240
   __eq_str$arr:
     calls: 7
-    bytes: 436
+    bytes: 320
   __m10__parse_test_section_header:
     calls: 3
     bytes: 744
@@ -999,7 +999,7 @@ functions:
     bytes: 532
   __m1__lex_all$AiplTok:
     calls: 28
-    bytes: 9712
+    bytes: 9456
   __m1__lex_kinds$AiplTok:
     calls: 16
     bytes: 868
@@ -1008,7 +1008,7 @@ functions:
     bytes: 412
   __m1__lex_step$AiplTok:
     calls: 129
-    bytes: 10552
+    bytes: 10536
   __m1__nested_len:
     calls: 79
     bytes: 1148
@@ -1032,7 +1032,7 @@ functions:
     bytes: 984
   __m3__process_raw_string:
     calls: 13
-    bytes: 3184
+    bytes: 2900
   __m7__trim_prefix:
     calls: 38
     bytes: 252
@@ -1044,22 +1044,22 @@ functions:
     bytes: 788
   __test$aipl_token_scopes:
     calls: 1
-    bytes: 1836
+    bytes: 1716
   __test$char_lit_value:
     calls: 1
-    bytes: 1044
+    bytes: 1008
   __test$doc_line_value:
     calls: 1
-    bytes: 1480
+    bytes: 1440
   __test$lex_aipl:
     calls: 1
-    bytes: 69144
+    bytes: 67064
   __test$str_lit_value:
     calls: 1
-    bytes: 2296
+    bytes: 2216
   __test$template_segments:
     calls: 1
-    bytes: 3848
+    bytes: 3224
   __test_try_fail___m1__LexError:
     calls: 0
     bytes: 84
@@ -1095,7 +1095,7 @@ functions:
     bytes: (external)
   aipl_rules:
     calls: 28
-    bytes: 88984
+    bytes: 74700
   aipl_rules$lambda0:
     calls: 0
     bytes: 144
@@ -1140,7 +1140,7 @@ functions:
     bytes: 576
   template_segments:
     calls: 7
-    bytes: 1292
+    bytes: 1192
   tpl_text:
     calls: 5
     bytes: 148

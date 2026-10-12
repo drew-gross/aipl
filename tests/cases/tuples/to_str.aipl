@@ -24,21 +24,21 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 215
-instructions executed: 1428
-binary size: 9816
-  code: 5020
+instructions executed: 1351
+binary size: 9456
+  code: 4756
   data: 683
-  metadata: 4113
+  metadata: 4017
 functions:
   __to_str___tuple$bool$str$opt:
     calls: 1
     bytes: 736
   __to_str___tuple$i64$__tuple_i64_i64$arr_i64:
     calls: 1
-    bytes: 1312
+    bytes: 1184
   __to_str___tuple$i64$char$arr:
     calls: 1
-    bytes: 972
+    bytes: 876
   __to_str___tuple$i64$str:
     calls: 2
     bytes: 484
@@ -62,4 +62,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1516
+    bytes: 1476

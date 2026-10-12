@@ -29,21 +29,21 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 719
-instructions executed: 986
-binary size: 6848
-  code: 3792
+instructions executed: 807
+binary size: 6544
+  code: 3536
   data: 504
-  metadata: 2552
+  metadata: 2504
 functions:
   __eq_set$str:
     calls: 3
-    bytes: 304
+    bytes: 232
   __test$build:
     calls: 1
-    bytes: 2712
+    bytes: 2556
   __test$distinct:
     calls: 1
-    bytes: 604
+    bytes: 576
   aipl_array_dec:
     calls: 7
     bytes: (external)

@@ -114,11 +114,11 @@ allocations: 39
 deallocations: 39
 reallocations: 0
 bytes allocated: 1403
-instructions executed: 2410
-binary size: 4760
-  code: 2184
+instructions executed: 2346
+binary size: 4560
+  code: 2056
   data: 173
-  metadata: 2403
+  metadata: 2331
 functions:
   __rec_drop_List:
     calls: 14
@@ -152,4 +152,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1432
+    bytes: 1304

@@ -98,21 +98,21 @@ allocations: 55
 deallocations: 55
 reallocations: 1
 bytes allocated: 2320
-instructions executed: 6231
-binary size: 14232
-  code: 9496
+instructions executed: 5556
+binary size: 12976
+  code: 8456
   data: 203
-  metadata: 4533
+  metadata: 4317
 functions:
   __builtin_union_all$i64:
     calls: 3
-    bytes: 680
+    bytes: 616
   __to_str_i64:
     calls: 10
     bytes: 204
   __to_str_setdesc$i64:
     calls: 2
-    bytes: 700
+    bytes: 580
   aipl_arr_inc:
     calls: 69
     bytes: (external)
@@ -151,10 +151,10 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 5232
+    bytes: 4572
   merged:
     calls: 2
-    bytes: 680
+    bytes: 616
   show:
     calls: 6
-    bytes: 2000
+    bytes: 1868

@@ -38,18 +38,18 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 609
-instructions executed: 1401
-binary size: 5440
-  code: 2692
+instructions executed: 1289
+binary size: 5256
+  code: 2568
   data: 347
-  metadata: 2401
+  metadata: 2341
 functions:
   __ctor$Tagged$Nums:
     calls: 3
     bytes: 192
   __to_str_Tagged:
     calls: 3
-    bytes: 1344
+    bytes: 1220
   aipl_arr_inc:
     calls: 6
     bytes: (external)

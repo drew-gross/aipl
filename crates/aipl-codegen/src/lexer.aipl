@@ -1473,11 +1473,11 @@ allocations: 283
 deallocations: 283
 reallocations: 4
 bytes allocated: 74128
-instructions executed: 700889
-binary size: 831160
-  code: 564940
+instructions executed: 685848
+binary size: 813904
+  code: 547984
   data: 9188
-  metadata: 257032
+  metadata: 256732
 functions:
   __arr_drop_Kind:
     calls: 88
@@ -1511,10 +1511,10 @@ functions:
     bytes: 568
   __builtin_any$str$lam$up_to_any_len$lambda0:
     calls: 47
-    bytes: 360
+    bytes: 312
   __builtin_count_while$char$lam$lex_step$Kind$lambda1:
     calls: 88
-    bytes: 316
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 12
     bytes: 268
@@ -1553,7 +1553,7 @@ functions:
     bytes: 324
   __eq_Kind$arr:
     calls: 36
-    bytes: 356
+    bytes: 240
   __eq_LexError:
     calls: 15
     bytes: 128
@@ -1565,7 +1565,7 @@ functions:
     bytes: 128
   __eq_ScopeSpan$arr:
     calls: 1
-    bytes: 356
+    bytes: 240
   __eq_SpanStr:
     calls: 49
     bytes: 128
@@ -1574,7 +1574,7 @@ functions:
     bytes: 120
   __eq_Token$Kind$arr:
     calls: 20
-    bytes: 356
+    bytes: 240
   __eq___builtin_Span:
     calls: 69
     bytes: 104
@@ -1583,10 +1583,10 @@ functions:
     bytes: 2004
   __test$keep_skipped:
     calls: 1
-    bytes: 18080
+    bytes: 16916
   __test$lex_all:
     calls: 1
-    bytes: 488568
+    bytes: 473392
   __test$lex_all$esc_str:
     calls: 2
     bytes: 140
@@ -1598,7 +1598,7 @@ functions:
     bytes: 1052
   __test$span_str:
     calls: 1
-    bytes: 2296
+    bytes: 2192
   __test_try_fail_LexError:
     calls: 0
     bytes: 84
@@ -1649,13 +1649,13 @@ functions:
     bytes: 1952
   keep_skipped$Kind:
     calls: 3
-    bytes: 3788
+    bytes: 3832
   lex$Kind:
     calls: 39
     bytes: 532
   lex_all$Kind:
     calls: 76
-    bytes: 10152
+    bytes: 10016
   lex_kinds$Kind:
     calls: 36
     bytes: 868
@@ -1664,7 +1664,7 @@ functions:
     bytes: 412
   lex_step$Kind:
     calls: 224
-    bytes: 10952
+    bytes: 10936
   main:
     calls: 1
     bytes: 248

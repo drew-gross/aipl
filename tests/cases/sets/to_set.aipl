@@ -33,24 +33,24 @@ allocations: 19
 deallocations: 19
 reallocations: 0
 bytes allocated: 1153
-instructions executed: 2321
-binary size: 11592
-  code: 6984
+instructions executed: 1888
+binary size: 10352
+  code: 5976
   data: 471
-  metadata: 4137
+  metadata: 3905
 functions:
   __to_str_bool:
     calls: 2
     bytes: 232
   __to_str_setasc$i64:
     calls: 1
-    bytes: 700
+    bytes: 580
   __to_str_setasc$str:
     calls: 1
-    bytes: 840
+    bytes: 724
   __to_str_setdesc$i64:
     calls: 1
-    bytes: 700
+    bytes: 580
   __to_str_u64:
     calls: 2
     bytes: 204
@@ -89,4 +89,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 4308
+    bytes: 3656

@@ -46,9 +46,9 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 265
-instructions executed: 625
-binary size: 3952
-  code: 2020
+instructions executed: 592
+binary size: 3848
+  code: 1916
   data: 129
   metadata: 1803
 functions:
@@ -72,4 +72,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1816
+    bytes: 1712

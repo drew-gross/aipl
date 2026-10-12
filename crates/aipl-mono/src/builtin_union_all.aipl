@@ -44,30 +44,30 @@ allocations: 51
 deallocations: 51
 reallocations: 0
 bytes allocated: 2773
-instructions executed: 4089
-binary size: 16136
-  code: 10236
+instructions executed: 3288
+binary size: 14512
+  code: 8768
   data: 876
-  metadata: 5024
+  metadata: 4868
 functions:
   __eq_set$bool:
     calls: 1
-    bytes: 256
+    bytes: 192
   __eq_set$char:
     calls: 1
     bytes: 84
   __eq_set$i64:
     calls: 7
-    bytes: 256
+    bytes: 184
   __eq_set$str:
     calls: 1
-    bytes: 304
+    bytes: 232
   __test$union_all:
     calls: 1
-    bytes: 7984
+    bytes: 6836
   __test$union_all$filter1$own0:
     calls: 1
-    bytes: 564
+    bytes: 516
   aipl_arr_inc:
     calls: 93
     bytes: (external)
@@ -112,4 +112,4 @@ functions:
     bytes: 108
   union_all$i64:
     calls: 7
-    bytes: 680
+    bytes: 616

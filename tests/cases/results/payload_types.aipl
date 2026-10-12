@@ -91,11 +91,11 @@ allocations: 25
 deallocations: 25
 reallocations: 0
 bytes allocated: 1037
-instructions executed: 3789
-binary size: 26328
-  code: 14568
+instructions executed: 3491
+binary size: 25784
+  code: 14136
   data: 1755
-  metadata: 10005
+  metadata: 9893
 functions:
   __dict_drop_str$i64:
     calls: 2
@@ -105,7 +105,7 @@ functions:
     bytes: 132
   __eq_set$i64:
     calls: 2
-    bytes: 256
+    bytes: 184
   __eq_set$i64$err$Error:
     calls: 2
     bytes: 108
@@ -123,7 +123,7 @@ functions:
     bytes: 232
   __to_str_dict$str$i64$err$Error:
     calls: 1
-    bytes: 1216
+    bytes: 1192
   __to_str_i64$err$Error:
     calls: 3
     bytes: 592
@@ -138,10 +138,10 @@ functions:
     bytes: 592
   __to_str_set$i64$err$Error:
     calls: 1
-    bytes: 1064
+    bytes: 940
   __to_str_str$arr$opt$err$Error:
     calls: 1
-    bytes: 1476
+    bytes: 1360
   __to_str_u64$err$Error:
     calls: 1
     bytes: 592
@@ -189,16 +189,16 @@ functions:
     bytes: (external)
   count_evens:
     calls: 2
-    bytes: 212
+    bytes: 208
   evens:
     calls: 7
-    bytes: 620
+    bytes: 596
   first_of_pair:
     calls: 1
     bytes: 208
   main:
     calls: 1
-    bytes: 2896
+    bytes: 2828
   pair:
     calls: 2
     bytes: 464

@@ -85,18 +85,18 @@ allocations: 27
 deallocations: 27
 reallocations: 1
 bytes allocated: 1882
-instructions executed: 8170
-binary size: 18936
-  code: 11228
+instructions executed: 6623
+binary size: 17496
+  code: 9876
   data: 1716
-  metadata: 5992
+  metadata: 5904
 functions:
   __eq_i64$arr:
     calls: 12
-    bytes: 432
+    bytes: 264
   __eq_str$arr:
     calls: 5
-    bytes: 436
+    bytes: 320
   __test$between:
     calls: 1
     bytes: 412
@@ -105,22 +105,22 @@ functions:
     bytes: 1668
   __test$from_call$filter_map2$own0:
     calls: 1
-    bytes: 600
+    bytes: 508
   __test$from_call$filter_map5$own0:
     calls: 1
-    bytes: 600
+    bytes: 508
   __test$from_call$scaled_above:
     calls: 5
-    bytes: 648
+    bytes: 528
   __test$labels:
     calls: 1
-    bytes: 928
+    bytes: 820
   __test$widened:
     calls: 1
-    bytes: 1568
+    bytes: 1340
   __test$xs_of:
     calls: 1
-    bytes: 728
+    bytes: 620
   __to_str_i64:
     calls: 2
     bytes: 204
@@ -162,19 +162,19 @@ functions:
     bytes: (external)
   between:
     calls: 2
-    bytes: 648
+    bytes: 536
   from_call:
     calls: 4
-    bytes: 220
+    bytes: 196
   from_call$filter_map2$own0:
     calls: 4
-    bytes: 616
+    bytes: 516
   labels:
     calls: 3
-    bytes: 400
+    bytes: 356
   labels$filter_map2$own0:
     calls: 3
-    bytes: 748
+    bytes: 708
   main:
     calls: 1
     bytes: 372

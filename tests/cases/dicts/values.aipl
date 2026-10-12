@@ -45,11 +45,11 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 940
-instructions executed: 1921
-binary size: 13640
-  code: 8232
+instructions executed: 1687
+binary size: 13112
+  code: 7776
   data: 850
-  metadata: 4558
+  metadata: 4486
 functions:
   __dict_drop_bool$str:
     calls: 1
@@ -80,34 +80,34 @@ functions:
     bytes: 104
   __eq_dict$i64$i64$arr:
     calls: 1
-    bytes: 248
+    bytes: 228
   __eq_dict$i64$i64$opt:
     calls: 1
-    bytes: 248
+    bytes: 228
   __eq_dict$str$Point:
     calls: 1
-    bytes: 272
+    bytes: 252
   __eq_i64$arr:
     calls: 3
-    bytes: 432
+    bytes: 264
   __eq_i64$opt:
     calls: 2
     bytes: 100
   __test$array_values:
     calls: 1
-    bytes: 1672
+    bytes: 1620
   __test$char_keys:
     calls: 1
-    bytes: 992
+    bytes: 936
   __test$heap_str_values:
     calls: 1
-    bytes: 992
+    bytes: 964
   __test$optional_values:
     calls: 1
-    bytes: 952
+    bytes: 908
   __test$struct_values:
     calls: 1
-    bytes: 740
+    bytes: 692
   aipl_arr_inc:
     calls: 9
     bytes: (external)

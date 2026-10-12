@@ -65,11 +65,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1060
-binary size: 7496
-  code: 3512
+instructions executed: 938
+binary size: 6808
+  code: 2932
   data: 1237
-  metadata: 2747
+  metadata: 2639
 functions:
   __test$map_find_if:
     calls: 1
@@ -94,16 +94,16 @@ functions:
     bytes: 316
   map_find_if$i64$i64$lam$__test$map_find_if$double$__test$map_find_if$is_big:
     calls: 2
-    bytes: 344
+    bytes: 228
   map_find_if$i64$i64$lam$__test$map_find_if$lambda0$__test$map_find_if$lambda1:
     calls: 1
-    bytes: 344
+    bytes: 228
   map_find_if$i64$i64$lam$__test$map_find_if$lambda2$__test$map_find_if$lambda3:
     calls: 1
-    bytes: 344
+    bytes: 228
   map_find_if$i64$i64$lam$__test$map_find_if$lambda4$__test$map_find_if$lambda5:
     calls: 1
-    bytes: 344
+    bytes: 228
   map_find_if$i64$i64?$lam$__test$map_find_if$nonzero$__builtin_is_some:
     calls: 1
-    bytes: 380
+    bytes: 264

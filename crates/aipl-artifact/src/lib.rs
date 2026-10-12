@@ -391,7 +391,9 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         // an integer array that may be inline.
         "aipl_arr_window" => sig(7, false),
         "aipl_arr_window_block" => sig(4, true),
-        "aipl_arr_from_set_words" => sig(2, true),
+        "aipl_arrv_from_set_words" | "aipl_strv_split" => sig(3, false),
+        "aipl_arrv_new" | "aipl_arrv_with_cap" => sig(4, false),
+        "aipl_arrv_truncate" | "aipl_arrv_set_drop" => sig(2, false),
         "aipl_arr_push_small" => sig(3, true),
         "aipl_arr_reversed" => sig(5, false),
         "aipl_arrv_extend" => sig(5, true),
@@ -408,7 +410,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_setv_insert" => sig(7, false),
         "aipl_setv_union" => sig(9, false),
         "aipl_dictv_insert" | "aipl_dictv_remove" => sig(6, false),
-        "aipl_arrv_join" => sig(7, true),
+        "aipl_arrv_join" => sig(8, false),
         "aipl_arr_settle" => sig(4, false),
         // The parts, `join`'s three separators, and the element type's three
         // descriptors; the joined array comes back in a register.
@@ -462,6 +464,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         // The cursor, the source, and the separator.
         "aipl_str_split_iter_init" => sig(3, false),
         "aipl_list_files" => sig(1, true),
+        "aipl_arrv_list_files" => sig(2, true),
         "aipl_char_to_str" => sig(2, false),
         "aipl_execute_program" => sig(3, false),
         "aipl_str_starts_with_at" | "aipl_str_starts_with_char" => sig(3, true),

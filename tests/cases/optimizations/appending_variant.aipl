@@ -83,11 +83,11 @@ allocations: 404
 deallocations: 404
 reallocations: 8
 bytes allocated: 24556
-instructions executed: 57786
-binary size: 13624
-  code: 8444
+instructions executed: 51347
+binary size: 12896
+  code: 7804
   data: 33
-  metadata: 5147
+  metadata: 5059
 functions:
   __arr_drop_Rule:
     calls: 69
@@ -139,13 +139,13 @@ functions:
     bytes: (external)
   deep:
     calls: 178
-    bytes: 696
+    bytes: 668
   gather:
     calls: 10
-    bytes: 1852
+    bytes: 1648
   main:
     calls: 1
-    bytes: 4080
+    bytes: 3804
   styles$into$own0:
     calls: 298
-    bytes: 1256
+    bytes: 1124

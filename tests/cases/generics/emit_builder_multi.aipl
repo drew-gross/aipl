@@ -60,11 +60,11 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 241
-instructions executed: 792
-binary size: 5728
-  code: 3748
+instructions executed: 728
+binary size: 5456
+  code: 3548
   data: 1
-  metadata: 1979
+  metadata: 1907
 functions:
   __arr_drop_Rule$TokA:
     calls: 1
@@ -104,4 +104,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2620
+    bytes: 2420

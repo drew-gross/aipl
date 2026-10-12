@@ -908,18 +908,24 @@ pub extern "C" fn aipl_write_string_to_file(
     }
 }
 
-/// `list_files` under the wide ABI. Borrows `dir`.
+/// `list_files` under the wide ABI. Borrows `dir`. Writes the listing to `out`
+/// and returns 1, or returns 0 and writes nothing.
 #[no_mangle]
-pub extern "C" fn aipl_list_files(dir: *const str24::Str) -> *const u8 {
+pub extern "C" fn aipl_arrv_list_files(out: *mut arr24::ArrValue, dir: *const str24::Str) -> i64 {
     count_builtin!(builtin_calls::AIPL_LIST_FILES);
     #[cfg(unix)]
     unsafe {
-        list_unix::list_files_wide(*dir)
+        let block = list_unix::list_files_wide(*dir);
+        if block.is_null() {
+            return 0;
+        }
+        core::ptr::write(out, arr24::ArrValue::whole(block));
+        1
     }
     #[cfg(not(unix))]
     {
-        let _ = dir;
-        core::ptr::null()
+        let _ = (out, dir);
+        0
     }
 }
 

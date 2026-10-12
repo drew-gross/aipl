@@ -182,15 +182,15 @@ allocations: 32
 deallocations: 32
 reallocations: 2
 bytes allocated: 1286
-instructions executed: 9904
-binary size: 19032
-  code: 11856
+instructions executed: 8891
+binary size: 18576
+  code: 11460
   data: 1263
-  metadata: 5913
+  metadata: 5853
 functions:
   __eq_i64$arr:
     calls: 7
-    bytes: 432
+    bytes: 264
   __test$count_down:
     calls: 1
     bytes: 652
@@ -250,10 +250,10 @@ functions:
     bytes: (external)
   count_down$own0:
     calls: 11
-    bytes: 592
+    bytes: 516
   count_up$own0:
     calls: 5
-    bytes: 592
+    bytes: 516
   main:
     calls: 1
     bytes: 652
@@ -265,7 +265,7 @@ functions:
     bytes: 608
   tree$own0:
     calls: 15
-    bytes: 712
+    bytes: 636
   unchanged:
     calls: 4
     bytes: 272

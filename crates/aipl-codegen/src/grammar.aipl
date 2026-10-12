@@ -1094,11 +1094,11 @@ allocations: 735
 deallocations: 735
 reallocations: 83
 bytes allocated: 92737
-instructions executed: 84633
-binary size: 171352
-  code: 109076
+instructions executed: 80190
+binary size: 167656
+  code: 105808
   data: 6884
-  metadata: 55392
+  metadata: 54964
 functions:
   __arr_drop_ListStyle:
     calls: 27
@@ -1126,22 +1126,22 @@ functions:
     bytes: 116
   __builtin_find_index$str$lam$__test$link$lambda0:
     calls: 1
-    bytes: 464
+    bytes: 404
   __builtin_find_index$str$lam$__test$link$lambda1:
     calls: 1
-    bytes: 464
+    bytes: 404
   __builtin_find_index$str$lam$link$Kind$Node$lambda1:
     calls: 26
-    bytes: 440
+    bytes: 392
   __builtin_find_index$str$lam$link_rule$Kind$lambda0:
     calls: 11
-    bytes: 440
+    bytes: 392
   __builtin_map_join$Rule$Kind$char$s2$s3$s4$rs$lam$show_rule$Kind:
     calls: 7
-    bytes: 1408
+    bytes: 1332
   __builtin_try_map$Rule$Kind$Rule$Kind$ParseError$lam$desugar_rule$Kind:
     calls: 6
-    bytes: 700
+    bytes: 632
   __ctor$Node$List:
     calls: 0
     bytes: 136
@@ -1150,7 +1150,7 @@ functions:
     bytes: 232
   __eq_ListStyle$arr:
     calls: 6
-    bytes: 356
+    bytes: 240
   __eq_ParseError:
     calls: 5
     bytes: 128
@@ -1159,7 +1159,7 @@ functions:
     bytes: 104
   __eq_str$arr:
     calls: 2
-    bytes: 436
+    bytes: 320
   __rec_drop_Node:
     calls: 0
     bytes: 72
@@ -1174,13 +1174,13 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 51480
+    bytes: 49636
   __test$link$shown_rule$Kind$Node:
     calls: 13
-    bytes: 1040
+    bytes: 1036
   __test$show_rule:
     calls: 1
-    bytes: 4336
+    bytes: 4188
   __test$show_style:
     calls: 1
     bytes: 756
@@ -1192,7 +1192,7 @@ functions:
     bytes: 836
   __to_str_Prec$arr:
     calls: 2
-    bytes: 1960
+    bytes: 1764
   __to_str_u64:
     calls: 40
     bytes: 204
@@ -1267,16 +1267,16 @@ functions:
     bytes: 488
   group_styles$into$Kind$own0:
     calls: 82
-    bytes: 3440
+    bytes: 3244
   group_styles$len$Kind:
     calls: 0
     bytes: 32
   group_styles$len$Kind$tail:
     calls: 59
-    bytes: 1964
+    bytes: 1836
   link$Kind$Node:
     calls: 15
-    bytes: 2880
+    bytes: 2864
   link_opt$Kind:
     calls: 17
     bytes: 596
@@ -1285,16 +1285,16 @@ functions:
     bytes: 6816
   link_rules$Kind:
     calls: 6
-    bytes: 776
+    bytes: 720
   main:
     calls: 1
     bytes: 316
   prod_names$Kind$Node:
     calls: 19
-    bytes: 768
+    bytes: 724
   show_rule$Kind:
     calls: 71
-    bytes: 8116
+    bytes: 8076
   show_style$own0:
     calls: 3
-    bytes: 1740
+    bytes: 1736

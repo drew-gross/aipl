@@ -110,11 +110,11 @@ allocations: 17
 deallocations: 17
 reallocations: 49
 bytes allocated: 2987
-instructions executed: 77915
-binary size: 8880
-  code: 6052
+instructions executed: 63700
+binary size: 7848
+  code: 5176
   data: 139
-  metadata: 2689
+  metadata: 2533
 functions:
   __to_str_i64$opt:
     calls: 4
@@ -160,13 +160,13 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3892
+    bytes: 3200
   main$filter_map11$own0:
     calls: 1
-    bytes: 600
+    bytes: 508
   main$filter_map8$own0:
     calls: 1
-    bytes: 600
+    bytes: 508
   many:
     calls: 5
     bytes: 368

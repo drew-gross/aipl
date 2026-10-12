@@ -48,11 +48,11 @@ allocations: 19
 deallocations: 19
 reallocations: 0
 bytes allocated: 645
-instructions executed: 3121
-binary size: 7840
-  code: 5536
+instructions executed: 2612
+binary size: 6792
+  code: 4660
   data: 257
-  metadata: 2047
+  metadata: 1875
 functions:
   __to_str_i64:
     calls: 14
@@ -77,10 +77,10 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3248
+    bytes: 2760
   main$zip8$own0$own1:
     calls: 1
-    bytes: 1788
+    bytes: 1464
   show:
     calls: 5
-    bytes: 296
+    bytes: 232

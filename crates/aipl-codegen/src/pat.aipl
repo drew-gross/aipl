@@ -256,11 +256,11 @@ allocations: 141
 deallocations: 141
 reallocations: 5
 bytes allocated: 10921
-instructions executed: 11499
-binary size: 108984
-  code: 71592
+instructions executed: 10771
+binary size: 106832
+  code: 69736
   data: 2851
-  metadata: 34541
+  metadata: 34245
 functions:
   __arr_drop_Pat:
     calls: 9
@@ -276,13 +276,13 @@ functions:
     bytes: 116
   __builtin_all$Pat$lam$is_plain_binder:
     calls: 4
-    bytes: 300
+    bytes: 244
   __builtin_map_join$Pat$str$lam$nested_bindings:
     calls: 3
-    bytes: 1204
+    bytes: 1120
   __eq_str$arr:
     calls: 7
-    bytes: 436
+    bytes: 320
   __m1__show_ann:
     calls: 0
     bytes: 416
@@ -291,16 +291,16 @@ functions:
     bytes: 476
   __m1__show_expr:
     calls: 2
-    bytes: 25608
+    bytes: 25224
   __m1__show_exprs:
     calls: 1
-    bytes: 1484
+    bytes: 1424
   __m3__show_ty:
     calls: 0
     bytes: 5568
   __m3__show_tys:
     calls: 0
-    bytes: 1484
+    bytes: 1424
   __rec_drop_Pat:
     calls: 42
     bytes: 232
@@ -312,22 +312,22 @@ functions:
     bytes: 1292
   __test$binder_list:
     calls: 1
-    bytes: 884
+    bytes: 792
   __test$is_binder_name:
     calls: 1
     bytes: 432
   __test$nested_or_ctor:
     calls: 1
-    bytes: 1964
+    bytes: 1892
   __test$pat_bindings:
     calls: 1
-    bytes: 4236
+    bytes: 3928
   __test$pat_label:
     calls: 1
-    bytes: 2000
+    bytes: 1932
   __test$show_pat:
     calls: 1
-    bytes: 4196
+    bytes: 3996
   __to_str_i64:
     calls: 4
     bytes: 204
@@ -387,7 +387,7 @@ functions:
     bytes: (external)
   binder_list:
     calls: 3
-    bytes: 1760
+    bytes: 1692
   binder_name:
     calls: 2
     bytes: 536
@@ -402,25 +402,25 @@ functions:
     bytes: 2836
   is_plain_binder:
     calls: 4
-    bytes: 512
+    bytes: 508
   main:
     calls: 1
     bytes: 472
   nested_bindings:
     calls: 5
-    bytes: 912
+    bytes: 852
   nested_or_ctor:
     calls: 4
-    bytes: 864
+    bytes: 784
   pat_bindings:
     calls: 9
-    bytes: 1788
+    bytes: 1708
   pat_label:
     calls: 6
     bytes: 1440
   show_pat:
     calls: 22
-    bytes: 2852
+    bytes: 2848
   show_pats:
     calls: 5
-    bytes: 1484
+    bytes: 1424

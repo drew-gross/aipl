@@ -54,11 +54,11 @@ allocations: 3
 deallocations: 3
 reallocations: 1
 bytes allocated: 150
-instructions executed: 1541
-binary size: 11536
-  code: 7556
+instructions executed: 1420
+binary size: 11040
+  code: 7184
   data: 243
-  metadata: 3737
+  metadata: 3613
 functions:
   __arr_drop_Wrapped:
     calls: 2
@@ -68,16 +68,16 @@ functions:
     bytes: 120
   __builtin_try_map$i64$Wrapped$str$lam$main$lambda4:
     calls: 1
-    bytes: 652
+    bytes: 576
   __builtin_try_map$i64$Wrapped$str$lam$main$lambda7:
     calls: 1
-    bytes: 652
+    bytes: 576
   __builtin_try_map$i64$i64$str$lam$main$lambda9:
     calls: 1
-    bytes: 696
+    bytes: 656
   __to_str_i64$arr:
     calls: 1
-    bytes: 844
+    bytes: 716
   aipl_arr_inc:
     calls: 5
     bytes: (external)
@@ -101,7 +101,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2428
+    bytes: 2376
   main$lambda0:
     calls: 1
     bytes: 416

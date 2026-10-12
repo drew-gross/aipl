@@ -1768,11 +1768,11 @@ allocations: 5488
 deallocations: 5488
 reallocations: 975
 bytes allocated: 708588
-instructions executed: 2502009
-binary size: 809592
-  code: 522288
+instructions executed: 2414752
+binary size: 798352
+  code: 512448
   data: 13036
-  metadata: 274268
+  metadata: 272868
 functions:
   __arr_drop_Node:
     calls: 18
@@ -1848,19 +1848,19 @@ functions:
     bytes: 480
   __builtin_all$__m3__Rule$Tok$lam$rule_nullable$Tok$lambda0:
     calls: 0
-    bytes: 320
+    bytes: 252
   __builtin_any$__m3__Prec$lam$climb$Tok$Node$lambda1:
     calls: 13
-    bytes: 304
+    bytes: 252
   __builtin_any$__m3__Rule$Tok$lam$rule_nullable$Tok$lambda1:
     calls: 0
-    bytes: 316
+    bytes: 260
   __builtin_any$str$lam$__m4__up_to_any_len$lambda0:
     calls: 0
-    bytes: 360
+    bytes: 312
   __builtin_count_while$char$lam$__m4__lex_step$Tok$lambda1:
     calls: 230
-    bytes: 316
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 0
     bytes: 280
@@ -1872,40 +1872,40 @@ functions:
     bytes: 356
   __builtin_find_if$__m3__Prec$lam$climb$Tok$Node$lambda0:
     calls: 11
-    bytes: 812
+    bytes: 740
   __builtin_find_index$str$lam$__m3__link$Tok$Node$lambda1:
     calls: 173
-    bytes: 440
+    bytes: 392
   __builtin_find_index$str$lam$__m3__link_rule$Tok$lambda0:
     calls: 57
-    bytes: 440
+    bytes: 392
   __builtin_find_index$str$lam$parse_prepared$Tok$Node$lambda0:
     calls: 103
-    bytes: 440
+    bytes: 392
   __builtin_find_map$__m1__Cst$__builtin_Span$lam$__m1__first_leaf:
     calls: 4
-    bytes: 400
+    bytes: 344
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__leaves:
     calls: 23
-    bytes: 1172
+    bytes: 1088
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves:
     calls: 5
-    bytes: 1172
+    bytes: 1088
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 4
-    bytes: 396
+    bytes: 332
   __builtin_try_map$__m1__Cst$Node$__m3__ParseError$lam$lower_node$Tok$Node$lambda0:
     calls: 24
-    bytes: 728
+    bytes: 660
   __builtin_try_map$__m3__Production$Tok$Node$__m2__First<Tok>$__m3__ParseError$lam$__m2__linked_first_sets$Tok$Node$lambda2:
     calls: 36
-    bytes: 1000
+    bytes: 992
   __builtin_try_map$__m3__Rule$Tok$__m2__First<Tok>$__m3__ParseError$lam$__m2__rule_first$Tok$lambda0:
     calls: 32
-    bytes: 740
+    bytes: 684
   __builtin_try_map$__m3__Rule$Tok$__m3__Rule$Tok$__m3__ParseError$lam$__m3__desugar_rule$Tok:
     calls: 123
-    bytes: 700
+    bytes: 632
   __ctor$Tok$Num:
     calls: 55
     bytes: 96
@@ -1917,7 +1917,7 @@ functions:
     bytes: 136
   __eq_Node$arr:
     calls: 8
-    bytes: 372
+    bytes: 248
   __eq___builtin_Span:
     calls: 14
     bytes: 104
@@ -1926,34 +1926,34 @@ functions:
     bytes: 360
   __eq___m1__Cst$arr:
     calls: 5
-    bytes: 372
+    bytes: 248
   __eq___m1__Cst$arr$arr:
     calls: 2
-    bytes: 356
+    bytes: 240
   __eq___m2__First$Tok:
     calls: 52
     bytes: 160
   __eq___m2__First$Tok$arr:
     calls: 36
-    bytes: 356
+    bytes: 240
   __eq___m3__ListStyle:
     calls: 1
     bytes: 232
   __eq___m3__ListStyle$arr:
     calls: 1
-    bytes: 356
+    bytes: 240
   __eq___m3__ParseError:
     calls: 8
     bytes: 128
   __eq_set$Tok$case:
     calls: 52
-    bytes: 256
+    bytes: 184
   __eq_set$str:
     calls: 100
-    bytes: 304
+    bytes: 232
   __eq_set$str$arr:
     calls: 34
-    bytes: 356
+    bytes: 240
   __m1__extent:
     calls: 3
     bytes: 252
@@ -1965,22 +1965,22 @@ functions:
     bytes: 812
   __m1__leaves:
     calls: 59
-    bytes: 1560
+    bytes: 1492
   __m1__show:
     calls: 228
-    bytes: 3572
+    bytes: 3356
   __m1__split_kids:
     calls: 33
-    bytes: 2816
+    bytes: 2752
   __m1__text:
     calls: 15
-    bytes: 1540
+    bytes: 1488
   __m1__token_leaves:
     calls: 5
-    bytes: 1516
+    bytes: 1480
   __m1__token_text:
     calls: 0
-    bytes: 1540
+    bytes: 1488
   __m2__can_start$Tok:
     calls: 28
     bytes: 252
@@ -1989,13 +1989,13 @@ functions:
     bytes: 244
   __m2__linked_first_sets$Tok$Node:
     calls: 14
-    bytes: 1476
+    bytes: 1436
   __m2__merge$Tok:
     calls: 96
     bytes: 736
   __m2__rule_first$Tok:
     calls: 165
-    bytes: 9568
+    bytes: 9360
   __m3__desugar_opt$Tok:
     calls: 61
     bytes: 580
@@ -2007,16 +2007,16 @@ functions:
     bytes: 488
   __m3__group_styles$into$Tok$own0:
     calls: 601
-    bytes: 3440
+    bytes: 3244
   __m3__group_styles$len$Tok:
     calls: 0
     bytes: 32
   __m3__group_styles$len$Tok$tail:
     calls: 455
-    bytes: 1964
+    bytes: 1836
   __m3__link$Tok$Node:
     calls: 119
-    bytes: 2880
+    bytes: 2864
   __m3__link_opt$Tok:
     calls: 61
     bytes: 596
@@ -2025,10 +2025,10 @@ functions:
     bytes: 6816
   __m3__link_rules$Tok:
     calls: 123
-    bytes: 776
+    bytes: 720
   __m3__prod_names$Tok$Node:
     calls: 261
-    bytes: 768
+    bytes: 724
   __m4__between_len:
     calls: 0
     bytes: 800
@@ -2040,10 +2040,10 @@ functions:
     bytes: 532
   __m4__lex_all$Tok:
     calls: 103
-    bytes: 8504
+    bytes: 8256
   __m4__lex_step$Tok:
     calls: 371
-    bytes: 9556
+    bytes: 9528
   __m4__nested_len:
     calls: 0
     bytes: 1148
@@ -2076,10 +2076,10 @@ functions:
     bytes: 72
   __test$attach_trivia:
     calls: 1
-    bytes: 3584
+    bytes: 3160
   __test$parse:
     calls: 1
-    bytes: 313316
+    bytes: 309412
   __test$parse$as_word:
     calls: 4
     bytes: 232
@@ -2094,7 +2094,7 @@ functions:
     bytes: 996
   __test$parse$trivia_rules:
     calls: 3
-    bytes: 4188
+    bytes: 3668
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -2172,37 +2172,37 @@ functions:
     bytes: (external)
   attach_trivia$Tok:
     calls: 104
-    bytes: 2356
+    bytes: 2300
   build_node:
     calls: 20
-    bytes: 352
+    bytes: 348
   can_reach$Tok$Node$map1:
     calls: 0
     bytes: 460
   climb$Tok$Node:
     calls: 15
-    bytes: 4168
+    bytes: 4144
   error_at$Tok$Node:
     calls: 42
-    bytes: 3196
+    bytes: 3136
   far_miss:
     calls: 149
-    bytes: 1488
+    bytes: 1376
   leaf_at$Tok$Node:
     calls: 241
-    bytes: 528
+    bytes: 484
   lex_toks:
     calls: 103
     bytes: 892
   lower_node$Tok$Node:
     calls: 24
-    bytes: 6876
+    bytes: 6872
   main:
     calls: 1
     bytes: 180
   match_group$Tok$Node:
     calls: 15
-    bytes: 7460
+    bytes: 7332
   match_leading_sep$Tok$Node:
     calls: 5
     bytes: 1508
@@ -2214,22 +2214,22 @@ functions:
     bytes: 1264
   match_one_of$Tok$Node:
     calls: 84
-    bytes: 1972
+    bytes: 1928
   match_prod$Tok$Node:
     calls: 202
-    bytes: 9984
+    bytes: 9784
   match_reps$Tok$Node:
     calls: 57
     bytes: 5132
   match_rule$Tok$Node:
     calls: 666
-    bytes: 8136
+    bytes: 8116
   match_sep$Tok$Node:
     calls: 90
     bytes: 1308
   match_then$Tok$Node:
     calls: 64
-    bytes: 3568
+    bytes: 3488
   parse$Tok$Node:
     calls: 13
     bytes: 284
@@ -2238,31 +2238,31 @@ functions:
     bytes: 512
   parse_prepared$Tok$Node:
     calls: 103
-    bytes: 5924
+    bytes: 5856
   parsed:
     calls: 13
     bytes: 376
   prepare$Tok$Node:
     calls: 14
-    bytes: 2692
+    bytes: 2672
   refusal$Tok$Node:
     calls: 10
-    bytes: 4020
+    bytes: 3920
   rule_labels$Tok$Node:
     calls: 146
-    bytes: 5156
+    bytes: 4916
   rule_nullable$Tok:
     calls: 17
-    bytes: 1428
+    bytes: 1404
   seq_labels$Tok$Node:
     calls: 17
-    bytes: 932
+    bytes: 876
   tok_rules:
     calls: 100
-    bytes: 3476
+    bytes: 3056
   tok_text$Tok$Node:
     calls: 211
-    bytes: 936
+    bytes: 916
   trivia_span$Tok:
     calls: 17
-    bytes: 788
+    bytes: 764
