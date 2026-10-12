@@ -83,11 +83,11 @@ allocations: 23
 deallocations: 23
 reallocations: 0
 bytes allocated: 1250
-instructions executed: 2081
-binary size: 8392
-  code: 5268
+instructions executed: 1855
+binary size: 7872
+  code: 4872
   data: 137
-  metadata: 2987
+  metadata: 2863
 functions:
   __builtin_count_if$i64$lam$is_big:
     calls: 2
@@ -127,4 +127,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 4548
+    bytes: 4152

@@ -256,11 +256,11 @@ allocations: 141
 deallocations: 141
 reallocations: 5
 bytes allocated: 10921
-instructions executed: 12391
-binary size: 110176
-  code: 72332
+instructions executed: 12156
+binary size: 109392
+  code: 71868
   data: 2851
-  metadata: 34993
+  metadata: 34673
 functions:
   __arr_drop_Pat:
     calls: 9
@@ -279,7 +279,7 @@ functions:
     bytes: 332
   __builtin_map_join$Pat$str$lam$nested_bindings:
     calls: 3
-    bytes: 1636
+    bytes: 1404
   __eq_str$arr:
     calls: 7
     bytes: 500
@@ -411,16 +411,16 @@ functions:
     bytes: 908
   nested_or_ctor:
     calls: 4
-    bytes: 956
+    bytes: 884
   pat_bindings:
     calls: 9
-    bytes: 1820
+    bytes: 1756
   pat_label:
     calls: 6
     bytes: 1440
   show_pat:
     calls: 22
-    bytes: 2960
+    bytes: 2864
   show_pats:
     calls: 5
     bytes: 1532

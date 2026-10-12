@@ -44,11 +44,11 @@ allocations: 10
 deallocations: 10
 reallocations: 2
 bytes allocated: 515
-instructions executed: 3091
-binary size: 10728
-  code: 6540
+instructions executed: 2816
+binary size: 9784
+  code: 5796
   data: 736
-  metadata: 3452
+  metadata: 3252
 functions:
   __eq_i64$arr:
     calls: 4
@@ -58,19 +58,19 @@ functions:
     bytes: 500
   __test$apply:
     calls: 1
-    bytes: 2684
+    bytes: 2404
   __test$apply$map2$own0:
     calls: 1
-    bytes: 736
+    bytes: 564
   __test$each:
     calls: 1
-    bytes: 720
+    bytes: 600
   __test$inc:
     calls: 1
     bytes: 240
   __test$inc$map0$own0:
     calls: 1
-    bytes: 736
+    bytes: 564
   __to_str_i64:
     calls: 3
     bytes: 204

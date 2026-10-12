@@ -31,11 +31,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 1375
-binary size: 7640
-  code: 4136
+instructions executed: 1352
+binary size: 7440
+  code: 3984
   data: 769
-  metadata: 2735
+  metadata: 2687
 functions:
   __builtin_all$char$lam$__test$positive$lambda3:
     calls: 1
@@ -66,7 +66,7 @@ functions:
     bytes: 776
   __test$positive$filter5$own0:
     calls: 1
-    bytes: 788
+    bytes: 636
   aipl_arr_inc:
     calls: 2
     bytes: (external)

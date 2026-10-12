@@ -1014,6 +1014,468 @@ pub(crate) extern "C" fn aipl_arrv_extend(
     dst
 }
 
+/// A `str[]` value's elements as `(first, step, len)` — `step` in `Str`s, so
+/// `first.offset(step * i)` is element `i` whatever the value's shape. For the
+/// runtime entries that walk a `str[]` they are handed (`execute_program`'s
+/// arguments).
+pub(crate) fn str_run(a: *const ArrValue) -> (*const super::str24::Str, isize, usize) {
+    let w = super::str24::STR_SIZE;
+    let (first, step, n) = elements(unsafe { &*a }, w);
+    (first as *const super::str24::Str, step / w as isize, n)
+}
+
+/// Bit `k` of a bit-packed run starting at `bits`.
+fn bit_at(bits: *const u8, k: usize) -> bool {
+    unsafe { (core::ptr::read(bits.add(k >> 3)) >> (k & 7)) & 1 != 0 }
+}
+
+/// Set bit `k` of the bit-packed region at `bits` to `on`.
+fn set_bit(bits: *mut u8, k: usize, on: bool) {
+    unsafe {
+        let byte = bits.add(k >> 3);
+        let mask = 1u8 << (k & 7);
+        let b = core::ptr::read(byte);
+        core::ptr::write(byte, if on { b | mask } else { b & !mask });
+    }
+}
+
+/// The element region of a fresh block of `n` elements (`aipl_array_new`), and
+/// the block.
+fn fresh_block(n: usize, drop_fn: i64, elem_size: i64) -> (*const u8, *mut u8) {
+    let block = super::aipl_array_new(n as i64, drop_fn, elem_size);
+    let elems = unsafe { (block as *mut u8).add(super::array_layout::ARR_ELEMS_OFFSET) };
+    (block, elems)
+}
+
+/// Copy the run `first`/`step`/`n` (see [`elements`]) to the contiguous region
+/// at `dst`, `w` bytes an element.
+unsafe fn copy_run(first: *const u8, step: isize, n: usize, w: usize, dst: *mut u8) {
+    unsafe {
+        if step > 0 {
+            core::ptr::copy_nonoverlapping(first, dst, n * w);
+        } else {
+            for i in 0..n {
+                core::ptr::copy_nonoverlapping(first.offset(step * i as isize), dst.add(i * w), w);
+            }
+        }
+    }
+}
+
+/// `xs.sort()` as a value written to `out`: a fresh block holding `xs`'s
+/// elements ascending, each retained. *Borrows* `xs`, whatever its shape. `kind`
+/// is the runtime's `SORT_KIND_*` — how an element is read and compared.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrv_sort(
+    out: *mut ArrValue,
+    a: *const ArrValue,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+    kind: i64,
+) {
+    let v = unsafe { *a };
+    let w = super::array_layout::elem_stride(elem_size);
+    let (first, step, n) = elements(&v, w);
+    let (block, dst) = fresh_block(n, drop_fn, elem_size);
+    if n == 0 {
+        // The empty array, which has no element region to sort in.
+        unsafe { core::ptr::write(out, ArrValue::whole(block)) };
+        return;
+    }
+    unsafe {
+        copy_run(first, step, n, w, dst);
+        super::elem_rc(retain_fn, dst, n);
+        if kind == super::SORT_KIND_STR && w == super::str24::STR_SIZE {
+            let vals = core::slice::from_raw_parts_mut(dst as *mut super::str24::Str, n);
+            super::str24::sort_values(vals);
+        } else if w < 8 {
+            let unsigned = kind == super::SORT_KIND_UNSIGNED;
+            super::array_layout::sort_narrow(dst, n, w, unsigned);
+        } else {
+            let words = core::slice::from_raw_parts_mut(dst as *mut i64, n);
+            super::sort_words(words, kind);
+        }
+        core::ptr::write(out, ArrValue::whole(block));
+    }
+}
+
+/// `parts.join(sep=s, final_sep=f, only_sep=o)` over a `T[][]`: a fresh block of
+/// every part's elements with the separators between — which one in which gap
+/// is `str24::gap_sep`'s rule — measured first, so it is one exact allocation.
+/// *Borrows* the parts and the separators, every one of them read in place
+/// whatever its shape (a part is a 24-byte value at the parts' stride). A
+/// bit-packed `bool` element is copied bit by bit. `drop_fn`, `retain_fn` and
+/// `elem_size` describe `T`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrv_join(
+    parts: *const ArrValue,
+    sep: *const ArrValue,
+    final_sep: *const ArrValue,
+    only_sep: *const ArrValue,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    let bits = elem_size == super::array_layout::ELEM_BITPACKED;
+    let w = if bits { 0 } else { elem_size as usize };
+    let (parts_first, parts_step, n) = elements(unsafe { &*parts }, ARR_SIZE);
+    let part = |i: usize| unsafe {
+        let pv = core::ptr::read(parts_first.offset(parts_step * i as isize) as *const ArrValue);
+        elements(&pv, w)
+    };
+    let gap = |i: usize| {
+        let s = if n == 2 {
+            only_sep
+        } else if i == n - 1 {
+            final_sep
+        } else {
+            sep
+        };
+        elements(unsafe { &*s }, w)
+    };
+    let mut total = 0usize;
+    for i in 0..n {
+        if i > 0 {
+            total += gap(i).2;
+        }
+        total += part(i).2;
+    }
+    let (block, dst) = fresh_block(total, drop_fn, elem_size);
+    if total == 0 {
+        return block;
+    }
+    let mut pos = 0usize;
+    for i in 0..n {
+        let runs = [if i > 0 { Some(gap(i)) } else { None }, Some(part(i))];
+        for (first, step, len) in runs.into_iter().flatten() {
+            if bits {
+                for k in 0..len {
+                    set_bit(dst, pos + k, bit_at(first, k));
+                }
+            } else {
+                unsafe { copy_run(first, step, len, w, dst.add(pos * w)) };
+            }
+            pos += len;
+        }
+    }
+    unsafe { super::elem_rc(retain_fn, dst, total) };
+    block
+}
+
+/// `parts.join(sep=..)` over a `str[]`, written to `out`: `str24::join_run` over
+/// the parts in place, whatever their shape. *Borrows* everything.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_strv_join(
+    out: *mut super::str24::Str,
+    parts: *const ArrValue,
+    sep: *const super::str24::Str,
+    final_sep: *const super::str24::Str,
+    only_sep: *const super::str24::Str,
+) {
+    let w = super::str24::STR_SIZE;
+    let (first, step, n) = elements(unsafe { &*parts }, w);
+    unsafe {
+        let joined = super::str24::join_run(
+            first as *const super::str24::Str,
+            step / w as isize,
+            n,
+            *sep,
+            *final_sep,
+            *only_sep,
+        );
+        core::ptr::write(out, joined);
+    }
+}
+
+// ## The mutating entries
+//
+// Two forms. A *slot* entry takes the address of a `mut` binding's value, which
+// owns one reference: it consumes that reference and writes the result's into
+// the same slot. A *`_from`* entry takes a value whose reference the call
+// consumes (a moved temporary, or one the caller retained for it) and writes the
+// result to `out` — which may be the same address. Both copy the value before
+// reading it, so a window, a reversal or an inline value is settled into a block
+// of its own on a copy, never in memory the caller only lent.
+
+/// The block of the value at `a`, whose reference the call consumes: a whole
+/// value's own, or a fresh copy of a window's, a reversal's or an inline value's
+/// elements (the window's reference on its source released).
+fn consume_to_block(a: *const ArrValue, drop_fn: i64, retain_fn: i64, elem_size: i64) -> *const u8 {
+    let mut v = unsafe { *a };
+    aipl_arr_settle(&mut v, drop_fn, retain_fn, elem_size);
+    v.block
+}
+
+/// `push` for a value whose reference it consumes: the value at `a`, grown by
+/// the element at `x`, written to `out`. In place when `a`'s block is uniquely
+/// owned and has room (`aipl_array_push_mut`, which copies one that is not); a
+/// bit-packed `bool[]` takes the copying push.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrv_push_from(
+    out: *mut ArrValue,
+    a: *const ArrValue,
+    x: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) {
+    let block = consume_to_block(a, drop_fn, retain_fn, elem_size);
+    let grown = if elem_size == super::array_layout::ELEM_BITPACKED {
+        super::aipl_array_push(block, x, drop_fn, retain_fn, elem_size)
+    } else {
+        super::aipl_array_push_mut(block, x, drop_fn, retain_fn, elem_size)
+    };
+    unsafe { core::ptr::write(out, ArrValue::whole(grown)) };
+}
+
+/// `push` onto a `mut` binding's slot. `exclusive` says the binding is
+/// statically unaliased, so the push may write into its block in place;
+/// otherwise a version of it may be borrowed somewhere, and the push copies.
+/// `inline_ok` says the element is an integer, so the value may be (or become)
+/// inline, which [`aipl_arr_push_small`] handles.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrv_push(
+    slot: *mut ArrValue,
+    x: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+    exclusive: i64,
+    inline_ok: i64,
+) {
+    if inline_ok != 0 && aipl_arr_push_small(slot, x, elem_size) != PUSH_SMALL_NOT_HANDLED {
+        return;
+    }
+    let block = consume_to_block(slot, drop_fn, retain_fn, elem_size);
+    // In place — a bit-packed `bool[]` included, whose in-place push sets the
+    // next bit — unlike [`aipl_arrv_push_from`], whose copying `bool[]` push is
+    // for a spread's accumulator, which `bool[]` never reserves.
+    let grown = if exclusive != 0 {
+        super::aipl_array_push_mut(block, x, drop_fn, retain_fn, elem_size)
+    } else {
+        super::aipl_array_push(block, x, drop_fn, retain_fn, elem_size)
+    };
+    unsafe { core::ptr::write(slot, ArrValue::whole(grown)) };
+}
+
+/// `reserve` for a value whose reference it consumes: room for `extra` more
+/// elements, written to `out` (`aipl_arr_reserve`, which keeps a unique block
+/// and copies any other).
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrv_reserve_from(
+    out: *mut ArrValue,
+    a: *const ArrValue,
+    extra: i64,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) {
+    let block = consume_to_block(a, drop_fn, retain_fn, elem_size);
+    let grown = super::aipl_arr_reserve(block, extra, drop_fn, retain_fn, elem_size);
+    unsafe { core::ptr::write(out, ArrValue::whole(grown)) };
+}
+
+/// `extend` for a value whose reference it consumes: the value at `a` with every
+/// element of the value at `src` (borrowed, read in place) appended, written to
+/// `out`. Reserved first, so the append is one copy; a bit-packed `bool[]` has no
+/// reserved form and appends bit by bit (see [`aipl_arrv_extend`]). The caller
+/// pins `src`'s block across the call when it may be `a`'s own, which is what
+/// makes the reserve copy before anything is written.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrv_extend_from(
+    out: *mut ArrValue,
+    a: *const ArrValue,
+    src: *const ArrValue,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) {
+    let block = consume_to_block(a, drop_fn, retain_fn, elem_size);
+    let grown = if elem_size == super::array_layout::ELEM_BITPACKED {
+        block
+    } else {
+        let add = elements(unsafe { &*src }, elem_size as usize).2;
+        super::aipl_arr_reserve(block, add as i64, drop_fn, retain_fn, elem_size)
+    };
+    let extended = aipl_arrv_extend(grown, src, drop_fn, retain_fn, elem_size);
+    unsafe { core::ptr::write(out, ArrValue::whole(extended)) };
+}
+
+/// An array literal's `..src` splice (`__aipl_arr_concat`): the value at `a`,
+/// whose reference the call consumes, with every element of the value at `src`
+/// (borrowed, read in place) appended, written to `out`. Unlike
+/// [`aipl_arrv_extend_from`] it does not reserve: `a` is the literal's
+/// accumulator, which the literal's own `__aipl_arr_reserve` already made
+/// uniquely owned and sized for every element. Its refcount may still read
+/// above one (the accumulator binding's bookkeeping), and a reserve here would
+/// take that for sharing and copy into a block with no room left for the
+/// elements after the splice.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrv_splice_from(
+    out: *mut ArrValue,
+    a: *const ArrValue,
+    src: *const ArrValue,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) {
+    let block = consume_to_block(a, drop_fn, retain_fn, elem_size);
+    let extended = aipl_arrv_extend(block, src, drop_fn, retain_fn, elem_size);
+    unsafe { core::ptr::write(out, ArrValue::whole(extended)) };
+}
+
+/// The array the in-place `map`/`filter` bodies write (`__arr_writable`), from a
+/// value whose reference it consumes, written to `out`: an inline value as it
+/// stands — its elements are its own bytes — and anything else as a uniquely
+/// owned block (`aipl_arr_reserve` with nothing extra keeps a unique block and
+/// copies a shared or static one).
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arrv_writable(
+    out: *mut ArrValue,
+    a: *const ArrValue,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) {
+    let v = unsafe { *a };
+    if v.is_inline() {
+        unsafe { core::ptr::write(out, v) };
+        return;
+    }
+    aipl_arrv_reserve_from(out, a, 0, drop_fn, retain_fn, elem_size);
+}
+
+// ## Sets and dicts
+//
+// A set or a dict value is always whole — never a window, a reversal or inline —
+// so each of these hands its block to the block entry it replaces. What changes
+// is the interface: codegen passes the value, and stage 6c, where the length
+// leaves the block, reads it from there. The slot forms consume the reference a
+// `mut` binding (or a literal under construction) holds and write the result
+// back; `union` consumes both operands.
+
+/// Whether the set value at `s` contains the element at `x`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_setv_contains(
+    s: *const ArrValue,
+    x: *const u8,
+    elem_size: i64,
+    str_cmp: i64,
+) -> i64 {
+    super::aipl_set_contains(unsafe { (*s).block }, x, elem_size, str_cmp)
+}
+
+/// Insert the element at `x` into the set the slot holds (a uniquely owned
+/// one), writing the possibly relocated set back.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_setv_insert(
+    slot: *mut ArrValue,
+    x: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+    str_cmp: i64,
+    order: i64,
+) {
+    unsafe {
+        let set = super::aipl_set_insert(
+            (*slot).block,
+            x,
+            drop_fn,
+            retain_fn,
+            elem_size,
+            str_cmp,
+            order,
+        );
+        core::ptr::write(slot, ArrValue::whole(set));
+    }
+}
+
+/// `a.union(b)` into `out`, consuming both: a fresh set, or — `in_place` — `a`'s
+/// own block grown, which the caller has made unique.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_setv_union(
+    out: *mut ArrValue,
+    a: *const ArrValue,
+    b: *const ArrValue,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+    str_cmp: i64,
+    order: i64,
+    in_place: i64,
+) {
+    unsafe {
+        let (a, b) = ((*a).block, (*b).block);
+        let set = if in_place != 0 {
+            super::aipl_set_union_mut(a, b, drop_fn, retain_fn, elem_size, str_cmp, order)
+        } else {
+            super::aipl_set_union(a, b, drop_fn, retain_fn, elem_size, str_cmp, order)
+        };
+        core::ptr::write(out, ArrValue::whole(set));
+    }
+}
+
+/// The address of the value bound to the key at `key` in the dict value at `d`,
+/// or null.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_dictv_get(
+    d: *const ArrValue,
+    key: *const u8,
+    pair_size: i64,
+    str_cmp: i64,
+) -> *const u8 {
+    super::aipl_dict_get(unsafe { (*d).block }, key, pair_size, str_cmp)
+}
+
+/// Whether the dict value at `d` binds the key at `key`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_dictv_contains_key(
+    d: *const ArrValue,
+    key: *const u8,
+    pair_size: i64,
+    str_cmp: i64,
+) -> i64 {
+    super::aipl_dict_contains_key(unsafe { (*d).block }, key, pair_size, str_cmp)
+}
+
+/// Bind the pair at `pair` in the dict the slot holds (a uniquely owned one),
+/// writing the possibly relocated dict back.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_dictv_insert(
+    slot: *mut ArrValue,
+    pair: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    pair_size: i64,
+    str_cmp: i64,
+) {
+    unsafe {
+        let dict =
+            super::aipl_dict_insert((*slot).block, pair, drop_fn, retain_fn, pair_size, str_cmp);
+        core::ptr::write(slot, ArrValue::whole(dict));
+    }
+}
+
+/// `remove_key` on a `mut` binding's slot: the dict made uniquely owned
+/// (`aipl_arr_reserve` with nothing extra, which keeps a unique block and copies
+/// a shared one), the key's pair removed, and the dict written back.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_dictv_remove(
+    slot: *mut ArrValue,
+    key: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    pair_size: i64,
+    str_cmp: i64,
+) {
+    unsafe {
+        let dict = super::aipl_arr_reserve((*slot).block, 0, drop_fn, retain_fn, pair_size);
+        let _ = super::aipl_dict_remove(dict, key, drop_fn, pair_size, str_cmp);
+        core::ptr::write(slot, ArrValue::whole(dict));
+    }
+}
+
 /// What [`aipl_arr_push_small`] did — see its doc.
 pub(crate) const PUSH_SMALL_NOT_HANDLED: i64 = 0;
 pub(crate) const PUSH_SMALL_INLINE: i64 = 1;
@@ -1092,9 +1554,10 @@ fn reserved_bytes(block: *const u8) -> usize {
 /// array packs a narrow integer at its own width, so the two stop sharing a
 /// block there; each word's low bytes are the element. (Every other element
 /// type is laid out alike in both, and `to_array` shares the block.) Borrows
-/// `set`; the result carries one reference.
+/// the set value; the result carries one reference.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arr_from_set_words(set: *const u8, width: i64) -> *const u8 {
+pub(crate) extern "C" fn aipl_arr_from_set_words(set: *const ArrValue, width: i64) -> *const u8 {
+    let set = unsafe { (*set).block };
     let len = tagged_len(set);
     let out = super::aipl_array_new(len as i64, 0, width);
     let w = width as usize;

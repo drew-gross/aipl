@@ -53,11 +53,11 @@ allocations: 10
 deallocations: 10
 reallocations: 4
 bytes allocated: 680
-instructions executed: 3361
-binary size: 11504
-  code: 6796
+instructions executed: 3307
+binary size: 11192
+  code: 6608
   data: 925
-  metadata: 3783
+  metadata: 3659
 functions:
   __arr_drop___tuple$str$str:
     calls: 2
@@ -85,7 +85,7 @@ functions:
     bytes: 420
   __test$tuple_windows:
     calls: 1
-    bytes: 3444
+    bytes: 3384
   aipl_arr_inc:
     calls: 15
     bytes: (external)
@@ -118,7 +118,7 @@ functions:
     bytes: 116
   tuple_windows$char$s0:
     calls: 2
-    bytes: 636
+    bytes: 572
   tuple_windows$i64:
     calls: 5
-    bytes: 716
+    bytes: 652

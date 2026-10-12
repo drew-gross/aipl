@@ -39,18 +39,18 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 1622
-binary size: 8296
-  code: 4476
+instructions executed: 1599
+binary size: 8096
+  code: 4324
   data: 943
-  metadata: 2877
+  metadata: 2829
 functions:
   __test$all:
     calls: 1
     bytes: 952
   __test$all$filter6$own0:
     calls: 1
-    bytes: 788
+    bytes: 636
   aipl_arr_inc:
     calls: 2
     bytes: (external)

@@ -394,6 +394,20 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_arr_push_small" => sig(3, true),
         "aipl_arr_reversed" => sig(5, false),
         "aipl_arrv_extend" => sig(5, true),
+        "aipl_arrv_sort" => sig(6, false),
+        "aipl_arrv_push" => sig(7, false),
+        "aipl_arrv_push_from"
+        | "aipl_arrv_reserve_from"
+        | "aipl_arrv_extend_from"
+        | "aipl_arrv_splice_from" => {
+            sig(6, false)
+        }
+        "aipl_arrv_writable" => sig(5, false),
+        "aipl_setv_contains" | "aipl_dictv_get" | "aipl_dictv_contains_key" => sig(4, true),
+        "aipl_setv_insert" => sig(7, false),
+        "aipl_setv_union" => sig(9, false),
+        "aipl_dictv_insert" | "aipl_dictv_remove" => sig(6, false),
+        "aipl_arrv_join" => sig(7, true),
         "aipl_arr_settle" => sig(4, false),
         // The parts, `join`'s three separators, and the element type's three
         // descriptors; the joined array comes back in a register.
@@ -436,7 +450,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_data" => sig(2, true),
         "aipl_concat" | "aipl_str_repeat" | "aipl_str_rope" => sig(3, false),
         // The out pointer, the parts, and `join`'s three separators.
-        "aipl_str_join" => sig(5, false),
+        "aipl_str_join" | "aipl_strv_join" => sig(5, false),
         "aipl_str_split"
         | "aipl_str_split_len"
         | "aipl_read_file_to_string"

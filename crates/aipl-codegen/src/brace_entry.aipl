@@ -81,11 +81,11 @@ allocations: 74
 deallocations: 74
 reallocations: 3
 bytes allocated: 5323
-instructions executed: 6000
-binary size: 78568
-  code: 52044
+instructions executed: 5952
+binary size: 78048
+  code: 51832
   data: 1492
-  metadata: 25032
+  metadata: 24724
 functions:
   __arr_drop_BraceEntry:
     calls: 5
@@ -119,7 +119,7 @@ functions:
     bytes: 1532
   __m2__show_pat:
     calls: 0
-    bytes: 2960
+    bytes: 2864
   __m2__show_pats:
     calls: 0
     bytes: 1532
@@ -200,7 +200,7 @@ functions:
     bytes: (external)
   brace_literal:
     calls: 7
-    bytes: 2612
+    bytes: 2496
   main:
     calls: 1
     bytes: 116

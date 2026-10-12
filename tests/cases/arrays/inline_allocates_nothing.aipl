@@ -63,11 +63,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 2782
-binary size: 5128
-  code: 3732
+instructions executed: 2168
+binary size: 4432
+  code: 3176
   data: 33
-  metadata: 1363
+  metadata: 1223
 functions:
   aipl_arr_inc:
     calls: 9
@@ -77,16 +77,16 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1408
+    bytes: 1296
   main$filter4$own0:
     calls: 1
-    bytes: 788
+    bytes: 636
   main$map2$own0:
     calls: 1
-    bytes: 736
+    bytes: 564
   ones:
     calls: 3
-    bytes: 508
+    bytes: 388
   total:
     calls: 3
     bytes: 292

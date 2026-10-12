@@ -309,11 +309,11 @@ allocations: 133
 deallocations: 133
 reallocations: 0
 bytes allocated: 10771
-instructions executed: 35092
-binary size: 23264
-  code: 11700
+instructions executed: 35047
+binary size: 23280
+  code: 11768
   data: 4155
-  metadata: 7409
+  metadata: 7357
 functions:
   __dict_drop_str$str:
     calls: 29
@@ -323,7 +323,7 @@ functions:
     bytes: 136
   __test$fill_or_add_sections:
     calls: 1
-    bytes: 5856
+    bytes: 5960
   aipl_arr_elem_ptr:
     calls: 16
     bytes: (external)
@@ -374,4 +374,4 @@ functions:
     bytes: 128
   step:
     calls: 36
-    bytes: 2872
+    bytes: 2836

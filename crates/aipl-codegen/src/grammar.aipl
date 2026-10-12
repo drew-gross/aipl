@@ -1094,11 +1094,11 @@ allocations: 735
 deallocations: 735
 reallocations: 83
 bytes allocated: 92737
-instructions executed: 86473
-binary size: 174592
-  code: 110864
+instructions executed: 85382
+binary size: 171488
+  code: 109220
   data: 6884
-  metadata: 56844
+  metadata: 55384
 functions:
   __arr_drop_ListStyle:
     calls: 27
@@ -1141,7 +1141,7 @@ functions:
     bytes: 1452
   __builtin_try_map$Rule$Kind$Rule$Kind$ParseError$lam$desugar_rule$Kind:
     calls: 6
-    bytes: 800
+    bytes: 712
   __ctor$Node$List:
     calls: 0
     bytes: 136
@@ -1267,7 +1267,7 @@ functions:
     bytes: 488
   group_styles$into$Kind$own0:
     calls: 82
-    bytes: 3460
+    bytes: 3408
   group_styles$len$Kind:
     calls: 0
     bytes: 32
@@ -1276,7 +1276,7 @@ functions:
     bytes: 1988
   link$Kind$Node:
     calls: 15
-    bytes: 3012
+    bytes: 2944
   link_opt$Kind:
     calls: 17
     bytes: 596
@@ -1285,16 +1285,16 @@ functions:
     bytes: 6816
   link_rules$Kind:
     calls: 6
-    bytes: 852
+    bytes: 800
   main:
     calls: 1
     bytes: 316
   prod_names$Kind$Node:
     calls: 19
-    bytes: 876
+    bytes: 796
   show_rule$Kind:
     calls: 71
-    bytes: 9080
+    bytes: 8112
   show_style$own0:
     calls: 3
-    bytes: 2084
+    bytes: 1748

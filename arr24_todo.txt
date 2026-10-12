@@ -359,9 +359,33 @@ window, a reversal or inline (lent as a copy).
                 when it may be the receiver's own block). A set source, and the
                 bit-packed path, still use `aipl_arr_extend`. Allocations down in
                 5 cases, instructions down in 33, nothing up.
-            [ ] `join`'s parts and separators, `sort`'s input,
-                `execute_program`'s arguments
-            [ ] the mutating receivers
+            [x] `join`'s parts and separators (`aipl_strv_join`,
+                `aipl_arrv_join`, over `str24::join_run`), `sort`'s input
+                (`aipl_arrv_sort`, into a fresh value), `execute_program`'s
+                arguments (`arr24::str_run`). Allocations down in 7 cases.
+            [x] the mutating receivers, in two forms: a slot entry consumes a
+                `mut` binding's reference and writes back (`aipl_arrv_push`,
+                which tries `push_small` first for an integer array), a `_from`
+                entry consumes a value into `out` (`_push_from`,
+                `_reserve_from`, `_extend_from`, `aipl_arrv_writable`). The
+                spread's `..src` is `aipl_arrv_splice_from`, which does *not*
+                reserve: the accumulator's refcount reads above one from its
+                binding's bookkeeping, so a reserve copied it into a block with
+                no room for the elements after the splice, and the next push
+                reallocated a block an earlier step's track still named.
+            [x] sets and dicts: `aipl_setv_contains` / `_insert` / `_union`,
+                `aipl_dictv_get` / `_contains_key` / `_insert` / `_remove`, and
+                the set and dict literals and `to_set` build into a value. Each
+                still hands its block to the block entry it wraps; what changed
+                is that codegen passes the value, so 6c reads the length there.
+                Together with the receivers: allocations down in 2 cases, up in
+                none; instructions down in ~150, up in none.
+            [ ] still handed a block: a set source of `extend` or a spread
+                (`consumed_block` into `aipl_arr_extend`), a dict's `nth`
+                (`aipl_arr_elem_ptr`), and the made-unique copy
+                (`owned_block_made_unique_ptr`). Codegen's own header reads
+                (`ArrView`, set and dict `==` / hash / render) are 6b's and
+                6c's.
   [ ] 6b. a whole value carries `data` and `len` too, so every block value has
           the window's shape; `ArrView`'s whole-vs-window select and its block
           length load go (most of the per-view cost stages 3 and 5 added).
@@ -444,6 +468,12 @@ And what this switch will add:
       stage 3, which exists only because it can point at a block
   [ ] `SeqRepr::Tagged` itself, and the `Abi` field, if arrays end up being the
       last type to have a choice
+  [ ] the block-taking entries 6a replaced, once the checked-in artifact stops
+      importing them: `aipl_arr_sort`, `aipl_str_join`, `aipl_arr_join`,
+      `aipl_arr_push*`, `aipl_set_contains` / `_insert` / `_union`,
+      `aipl_dict_get` / `_contains_key` / `_insert` / `_remove`, and the old
+      `aipl_arr_reserve` / `aipl_arr_extend` call shapes; then the `v` drops out
+      of the new names
 
   Do this as its own change, after 2f is green. Mixing deletion into the switch
   is how a switch stops being reviewable.

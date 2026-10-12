@@ -70,11 +70,11 @@ allocations: 15
 deallocations: 15
 reallocations: 14
 bytes allocated: 359
-instructions executed: 21233
-binary size: 7968
-  code: 5152
+instructions executed: 12033
+binary size: 7792
+  code: 5032
   data: 367
-  metadata: 2449
+  metadata: 2393
 functions:
   __to_str_bool:
     calls: 13
@@ -99,4 +99,4 @@ functions:
     bytes: 4440
   many:
     calls: 2
-    bytes: 480
+    bytes: 360

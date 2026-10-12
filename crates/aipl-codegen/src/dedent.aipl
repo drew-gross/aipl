@@ -63,11 +63,11 @@ allocations: 22
 deallocations: 22
 reallocations: 2
 bytes allocated: 1149
-instructions executed: 23773
-binary size: 9680
-  code: 5532
+instructions executed: 23398
+binary size: 9488
+  code: 5400
   data: 873
-  metadata: 3275
+  metadata: 3215
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 42
@@ -107,7 +107,7 @@ functions:
     bytes: (external)
   dedent:
     calls: 10
-    bytes: 2936
+    bytes: 2804
   main:
     calls: 1
     bytes: 104

@@ -92,11 +92,11 @@ allocations: 31
 deallocations: 31
 reallocations: 2
 bytes allocated: 1873
-instructions executed: 2357
-binary size: 13384
-  code: 8496
+instructions executed: 2337
+binary size: 13336
+  code: 8528
   data: 147
-  metadata: 4741
+  metadata: 4661
 functions:
   __dict_drop_str$i64:
     calls: 1
@@ -106,7 +106,7 @@ functions:
     bytes: 132
   __eq_set$str:
     calls: 3
-    bytes: 296
+    bytes: 300
   __eq_set$str$arr:
     calls: 1
     bytes: 420
@@ -166,7 +166,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 6396
+    bytes: 6424
   total_size:
     calls: 2
     bytes: 296

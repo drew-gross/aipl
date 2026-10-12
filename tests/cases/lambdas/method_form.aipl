@@ -28,18 +28,18 @@ allocations: 15
 deallocations: 15
 reallocations: 6
 bytes allocated: 639
-instructions executed: 1747
-binary size: 6480
-  code: 3560
+instructions executed: 1693
+binary size: 6136
+  code: 3396
   data: 340
-  metadata: 2580
+  metadata: 2400
 functions:
   __eq_str$arr:
     calls: 3
     bytes: 500
   __test$tag:
     calls: 1
-    bytes: 2756
+    bytes: 2592
   __to_str_i64:
     calls: 9
     bytes: 204

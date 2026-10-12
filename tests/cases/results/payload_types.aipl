@@ -91,9 +91,9 @@ allocations: 25
 deallocations: 25
 reallocations: 0
 bytes allocated: 1037
-instructions executed: 3775
-binary size: 26296
-  code: 14532
+instructions executed: 3774
+binary size: 26360
+  code: 14596
   data: 1755
   metadata: 10009
 functions:
@@ -105,7 +105,7 @@ functions:
     bytes: 132
   __eq_set$i64:
     calls: 2
-    bytes: 248
+    bytes: 252
   __eq_set$i64$err$Error:
     calls: 2
     bytes: 108
@@ -192,13 +192,13 @@ functions:
     bytes: 212
   evens:
     calls: 7
-    bytes: 592
+    bytes: 608
   first_of_pair:
     calls: 1
     bytes: 208
   main:
     calls: 1
-    bytes: 2816
+    bytes: 2860
   pair:
     calls: 2
     bytes: 464

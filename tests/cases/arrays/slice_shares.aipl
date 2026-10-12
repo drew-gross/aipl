@@ -66,11 +66,11 @@ allocations: 30
 deallocations: 30
 reallocations: 8
 bytes allocated: 1700
-instructions executed: 92522
-binary size: 12456
-  code: 8080
+instructions executed: 69516
+binary size: 12144
+  code: 7896
   data: 219
-  metadata: 4157
+  metadata: 4029
 functions:
   __eq_u64$arr:
     calls: 1
@@ -119,4 +119,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 5268
+    bytes: 5084

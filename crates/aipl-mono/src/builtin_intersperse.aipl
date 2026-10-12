@@ -45,11 +45,11 @@ allocations: 14
 deallocations: 14
 reallocations: 10
 bytes allocated: 1024
-instructions executed: 3714
-binary size: 10120
-  code: 5904
+instructions executed: 3222
+binary size: 9600
+  code: 5580
   data: 913
-  metadata: 3303
+  metadata: 3107
 functions:
   __test$intersperse:
     calls: 1
@@ -86,10 +86,10 @@ functions:
     bytes: (external)
   intersperse$i64:
     calls: 4
-    bytes: 892
+    bytes: 660
   intersperse$str:
     calls: 5
-    bytes: 788
+    bytes: 696
   main:
     calls: 1
     bytes: 112

@@ -758,11 +758,11 @@ allocations: 1581
 deallocations: 1581
 reallocations: 337
 bytes allocated: 180765
-instructions executed: 298681
-binary size: 183584
-  code: 124908
+instructions executed: 293971
+binary size: 181344
+  code: 123580
   data: 4068
-  metadata: 54608
+  metadata: 53696
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -808,13 +808,13 @@ functions:
     bytes: 552
   __builtin_try_map$__m1__Production$Tok$Node$First<Tok>$__m1__ParseError$lam$linked_first_sets$Tok$Node$lambda2:
     calls: 17
-    bytes: 1108
+    bytes: 1024
   __builtin_try_map$__m1__Rule$Tok$First<Tok>$__m1__ParseError$lam$rule_first$Tok$lambda0:
     calls: 14
-    bytes: 824
+    bytes: 764
   __builtin_try_map$__m1__Rule$Tok$__m1__Rule$Tok$__m1__ParseError$lam$__m1__desugar_rule$Tok:
     calls: 46
-    bytes: 800
+    bytes: 712
   __ctor$Node$List:
     calls: 0
     bytes: 136
@@ -832,10 +832,10 @@ functions:
     bytes: 128
   __eq_set$Tok$case:
     calls: 36
-    bytes: 248
+    bytes: 252
   __eq_set$str:
     calls: 36
-    bytes: 296
+    bytes: 300
   __m1__desugar_opt$Tok:
     calls: 26
     bytes: 580
@@ -844,7 +844,7 @@ functions:
     bytes: 12108
   __m1__group_styles$into$Tok$own0:
     calls: 138
-    bytes: 3460
+    bytes: 3408
   __m1__group_styles$len$Tok:
     calls: 0
     bytes: 32
@@ -853,7 +853,7 @@ functions:
     bytes: 1988
   __m1__link$Tok$Node:
     calls: 9
-    bytes: 3012
+    bytes: 2944
   __m1__link_opt$Tok:
     calls: 12
     bytes: 596
@@ -862,10 +862,10 @@ functions:
     bytes: 6816
   __m1__link_rules$Tok:
     calls: 27
-    bytes: 852
+    bytes: 800
   __m1__prod_names$Tok$Node:
     calls: 20
-    bytes: 876
+    bytes: 796
   __rec_drop_Node:
     calls: 0
     bytes: 72
@@ -877,7 +877,7 @@ functions:
     bytes: 72
   __test$can_start:
     calls: 1
-    bytes: 1212
+    bytes: 1228
   __test$ebnf:
     calls: 1
     bytes: 14344
@@ -892,7 +892,7 @@ functions:
     bytes: 624
   __test$show_first:
     calls: 1
-    bytes: 1476
+    bytes: 1492
   __test$show_first_sets:
     calls: 1
     bytes: 1892
@@ -976,13 +976,13 @@ functions:
     bytes: (external)
   can_start$Tok:
     calls: 5
-    bytes: 232
+    bytes: 252
   climb_precs$Tok:
     calls: 92
     bytes: 1880
   ebnf$Tok$Node:
     calls: 6
-    bytes: 11920
+    bytes: 11496
   first_precs$Tok:
     calls: 19
     bytes: 276
@@ -994,7 +994,7 @@ functions:
     bytes: 5736
   linked_first_sets$Tok$Node:
     calls: 6
-    bytes: 1560
+    bytes: 1492
   main:
     calls: 1
     bytes: 452
@@ -1003,22 +1003,22 @@ functions:
     bytes: 696
   render_rule$Tok:
     calls: 101
-    bytes: 14076
+    bytes: 14044
   rep_suffix:
     calls: 14
     bytes: 1708
   rule_first$Tok:
     calls: 235
-    bytes: 9580
+    bytes: 9596
   show_first$Tok:
     calls: 27
-    bytes: 4084
+    bytes: 3960
   show_first$Tok$filter1$own0:
     calls: 27
-    bytes: 736
+    bytes: 652
   show_first_sets$Tok$Node:
     calls: 5
-    bytes: 536
+    bytes: 444
   show_first_sets$Tok$Node$zip1$own0:
     calls: 5
-    bytes: 1576
+    bytes: 1480

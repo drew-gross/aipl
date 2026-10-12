@@ -1291,12 +1291,28 @@ pub(crate) unsafe fn join_from(
     final_sep: Str,
     only_sep: Str,
 ) -> Str {
+    unsafe { join_run(elems, 1, len, sep, final_sep, only_sep) }
+}
+
+/// [`join_from`] over a run of `str` values `step` elements apart — negative
+/// for a reversed array, whose run is walked from its far end.
+///
+/// SAFETY: `elems.offset(step * i)` addresses an initialized `Str` for every
+/// `i` below `len`.
+pub(crate) unsafe fn join_run(
+    elems: *const Str,
+    step: isize,
+    len: usize,
+    sep: Str,
+    final_sep: Str,
+    only_sep: Str,
+) -> Str {
     let mut total = 0;
     for i in 0..len {
         if i > 0 {
             total += gap_sep(i, len, sep, final_sep, only_sep).len();
         }
-        total += unsafe { core::ptr::read(elems.add(i)) }.len();
+        total += unsafe { core::ptr::read(elems.offset(step * i as isize)) }.len();
     }
     let mut b = Builder::with_capacity(total);
     for i in 0..len {
@@ -1306,7 +1322,7 @@ pub(crate) unsafe fn join_from(
                 true
             });
         }
-        let ev = unsafe { core::ptr::read(elems.add(i)) };
+        let ev = unsafe { core::ptr::read(elems.offset(step * i as isize)) };
         for_each_chunk(ev, &mut |chunk| {
             b.push(chunk);
             true

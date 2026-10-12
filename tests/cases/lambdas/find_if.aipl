@@ -34,11 +34,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 1443
-binary size: 9328
-  code: 5296
+instructions executed: 1420
+binary size: 9128
+  code: 5144
   data: 1040
-  metadata: 2992
+  metadata: 2944
 functions:
   __builtin_find_if$char$lam$__test$first_big$lambda4:
     calls: 1
@@ -72,7 +72,7 @@ functions:
     bytes: 1144
   __test$first_big$filter6$own0:
     calls: 1
-    bytes: 788
+    bytes: 636
   aipl_arr_inc:
     calls: 2
     bytes: (external)

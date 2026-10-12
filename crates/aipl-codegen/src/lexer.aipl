@@ -1473,11 +1473,11 @@ allocations: 283
 deallocations: 283
 reallocations: 4
 bytes allocated: 74128
-instructions executed: 712105
-binary size: 830952
-  code: 564176
+instructions executed: 711070
+binary size: 830664
+  code: 564448
   data: 9188
-  metadata: 257588
+  metadata: 257028
 functions:
   __arr_drop_Kind:
     calls: 88
@@ -1586,7 +1586,7 @@ functions:
     bytes: 18112
   __test$lex_all:
     calls: 1
-    bytes: 486780
+    bytes: 487596
   __test$lex_all$esc_str:
     calls: 2
     bytes: 140
@@ -1649,13 +1649,13 @@ functions:
     bytes: 1952
   keep_skipped$Kind:
     calls: 3
-    bytes: 3892
+    bytes: 3820
   lex$Kind:
     calls: 39
     bytes: 532
   lex_all$Kind:
     calls: 76
-    bytes: 10748
+    bytes: 10276
   lex_kinds$Kind:
     calls: 36
     bytes: 868

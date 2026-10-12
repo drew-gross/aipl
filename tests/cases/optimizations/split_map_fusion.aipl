@@ -60,18 +60,18 @@ allocations: 35
 deallocations: 35
 reallocations: 1
 bytes allocated: 2533
-instructions executed: 2515
-binary size: 10344
-  code: 6340
+instructions executed: 2309
+binary size: 9640
+  code: 5940
   data: 151
-  metadata: 3853
+  metadata: 3549
 functions:
   __builtin_split_map$str$s0$s1$lam$tagged:
     calls: 3
-    bytes: 684
+    bytes: 576
   __builtin_split_map$u64$s0$s1$lam$__builtin_len:
     calls: 2
-    bytes: 712
+    bytes: 508
   __eq_str$arr:
     calls: 1
     bytes: 500
@@ -110,4 +110,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3100
+    bytes: 3012

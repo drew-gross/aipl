@@ -1273,17 +1273,14 @@ fn write_ok_wide(out: *mut u8, stdout: &[u8], stderr: &[u8], exit_code: i64) {
 pub extern "C" fn aipl_execute_program(
     out: *mut u8,
     program: *const str24::Str,
-    args: *const u8,
+    args: *const arr24::ArrValue,
 ) {
     count_builtin!(builtin_calls::AIPL_EXECUTE_PROGRAM);
     #[cfg(unix)]
     unsafe {
-        if args.is_null() {
-            return write_err_wide(out, b"could not execute program");
-        }
-        with_heap(args, |args| {
-            exec_unix::run(out as *mut i64, program as *const u8, args)
-        });
+        // The argument array is a value, read in place whatever its shape.
+        let (first, step, len) = arr24::str_run(args);
+        exec_unix::run(out as *mut i64, program as *const u8, first, step, len);
     }
     #[cfg(not(unix))]
     {
@@ -1293,17 +1290,6 @@ pub extern "C" fn aipl_execute_program(
 }
 
 
-
-#[cfg(unix)]
-unsafe fn execute_program_impl(out: *mut i64, program: *const u8, args: *const u8) {
-    unsafe {
-        if program.is_null() || args.is_null() {
-            write_err_wide(out as *mut u8, b"could not execute program");
-            return;
-        }
-        exec_unix::run(out, program, args);
-    }
-}
 
 // ---------- POSIX process spawning (`execute_program`) ----------
 //
@@ -1444,12 +1430,16 @@ mod exec_unix {
         }
     }
 
-    /// `program`/`a` (a heap-representation array — codegen lends a window, a
-    /// reversed value or an inline one a block of its own first) are each
-    /// consumed exactly once, on every path.
-    pub unsafe fn run(out: *mut i64, program: *const u8, a: *const u8) {
+    /// `program` and the argument run (`first`, `step` `Str`s apart, `len` of
+    /// them — `arr24::str_run`) are borrowed: nothing is released here.
+    pub unsafe fn run(
+        out: *mut i64,
+        program: *const u8,
+        first: *const str24::Str,
+        step: isize,
+        len: usize,
+    ) {
         unsafe {
-            let len = array_len(a);
 
             // argv: program, each arg, then a NULL terminator.
             let argv =
@@ -1459,9 +1449,8 @@ mod exec_unix {
             }
             // Both arguments are borrowed: nothing is released here.
             *argv = dup_cstr(*(program as *const str24::Str));
-            let elems = a.add(ARR_ELEMS_OFFSET) as *const str24::Str;
             for i in 0..len {
-                *argv.add(1 + i) = dup_cstr(core::ptr::read(elems.add(i)));
+                *argv.add(1 + i) = dup_cstr(core::ptr::read(first.offset(step * i as isize)));
             }
             *argv.add(1 + len) = core::ptr::null_mut();
 

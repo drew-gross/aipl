@@ -46,9 +46,9 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 544
-instructions executed: 1116
-binary size: 10296
-  code: 5652
+instructions executed: 1105
+binary size: 10384
+  code: 5740
   data: 871
   metadata: 3773
 functions:
@@ -66,22 +66,22 @@ functions:
     bytes: 132
   __eq_dict$i64$str:
     calls: 1
-    bytes: 248
+    bytes: 252
   __eq_dict$str$i64:
     calls: 1
-    bytes: 268
+    bytes: 272
   __test$dedup:
     calls: 1
-    bytes: 672
+    bytes: 692
   __test$ints:
     calls: 1
-    bytes: 2096
+    bytes: 2124
   __test$make_empty:
     calls: 1
-    bytes: 548
+    bytes: 560
   __test$strs:
     calls: 1
-    bytes: 1008
+    bytes: 1028
   aipl_array_dec:
     calls: 5
     bytes: (external)

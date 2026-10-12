@@ -35,11 +35,11 @@ allocations: 6
 deallocations: 6
 reallocations: 1
 bytes allocated: 322
-instructions executed: 1461
-binary size: 9056
-  code: 4748
+instructions executed: 1455
+binary size: 8912
+  code: 4696
   data: 595
-  metadata: 3713
+  metadata: 3621
 functions:
   __arr_drop_Named:
     calls: 1
@@ -79,4 +79,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1244
+    bytes: 1192

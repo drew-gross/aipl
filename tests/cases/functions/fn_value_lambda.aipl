@@ -45,11 +45,11 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 144
-instructions executed: 699
-binary size: 4896
-  code: 2368
+instructions executed: 676
+binary size: 4680
+  code: 2196
   data: 439
-  metadata: 2089
+  metadata: 2045
 functions:
   __ctor$Tok$Int:
     calls: 1
@@ -77,7 +77,7 @@ functions:
     bytes: 8
   __test$probe$map7$own0:
     calls: 1
-    bytes: 736
+    bytes: 564
   aipl_arr_inc:
     calls: 2
     bytes: (external)

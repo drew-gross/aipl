@@ -63,11 +63,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 56
-instructions executed: 245
-binary size: 2600
-  code: 1136
+instructions executed: 225
+binary size: 2344
+  code: 1008
   data: 33
-  metadata: 1431
+  metadata: 1303
 functions:
   aipl_arr_inc:
     calls: 10
@@ -83,4 +83,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1136
+    bytes: 1008

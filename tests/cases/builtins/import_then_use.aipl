@@ -15,15 +15,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 56
-instructions executed: 143
-binary size: 1728
-  code: 596
+instructions executed: 120
+binary size: 1552
+  code: 476
   data: 106
-  metadata: 1026
+  metadata: 970
 functions:
   __test$pushed_len:
     calls: 1
-    bytes: 488
+    bytes: 368
   aipl_arr_inc:
     calls: 1
     bytes: (external)

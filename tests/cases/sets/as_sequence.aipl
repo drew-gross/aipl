@@ -52,11 +52,11 @@ allocations: 30
 deallocations: 30
 reallocations: 0
 bytes allocated: 1349
-instructions executed: 3941
-binary size: 12504
-  code: 7792
+instructions executed: 3854
+binary size: 12488
+  code: 7768
   data: 387
-  metadata: 4325
+  metadata: 4333
 functions:
   __builtin_all$i64$k0$lam$main$lambda0:
     calls: 1
@@ -123,4 +123,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 4256
+    bytes: 4232

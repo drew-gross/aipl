@@ -754,15 +754,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 509
-deallocations: 509
+allocations: 505
+deallocations: 505
 reallocations: 34
-bytes allocated: 40794
-instructions executed: 116327
-binary size: 128424
-  code: 85976
+bytes allocated: 40474
+instructions executed: 116023
+binary size: 125848
+  code: 84560
   data: 5464
-  metadata: 36984
+  metadata: 35824
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -847,7 +847,7 @@ functions:
     bytes: 8216
   __test$tm_json:
     calls: 1
-    bytes: 6632
+    bytes: 6196
   __test$word_pat:
     calls: 1
     bytes: 2332
@@ -860,11 +860,8 @@ functions:
   aipl_arr_reserve:
     calls: 1
     bytes: (external)
-  aipl_arr_slice:
-    calls: 4
-    bytes: (external)
   aipl_array_dec:
-    calls: 439
+    calls: 435
     bytes: (external)
   aipl_array_new:
     calls: 48
@@ -910,13 +907,13 @@ functions:
     bytes: 2056
   caps_fld:
     calls: 0
-    bytes: 1040
+    bytes: 988
   char_class_body:
     calls: 16
     bytes: 2040
   entry_name:
     calls: 5
-    bytes: 616
+    bytes: 504
   fld:
     calls: 6
     bytes: 348
@@ -937,13 +934,13 @@ functions:
     bytes: 1676
   pat_json:
     calls: 2
-    bytes: 3940
+    bytes: 3516
   re_escape:
     calls: 32
     bytes: 1960
   re_escape_set:
     calls: 4
-    bytes: 1296
+    bytes: 1232
   rule_pats$Kind:
     calls: 2
-    bytes: 10892
+    bytes: 10564

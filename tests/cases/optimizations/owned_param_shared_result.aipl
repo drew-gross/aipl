@@ -63,11 +63,11 @@ allocations: 12
 deallocations: 12
 reallocations: 2
 bytes allocated: 736
-instructions executed: 3839
-binary size: 6848
-  code: 4340
+instructions executed: 3621
+binary size: 6288
+  code: 3888
   data: 99
-  metadata: 2409
+  metadata: 2301
 functions:
   __to_str_i64$arr:
     calls: 4
@@ -98,10 +98,10 @@ functions:
     bytes: (external)
   build:
     calls: 2
-    bytes: 756
+    bytes: 424
   grow$own0:
     calls: 2
-    bytes: 768
+    bytes: 648
   main:
     calls: 1
     bytes: 992

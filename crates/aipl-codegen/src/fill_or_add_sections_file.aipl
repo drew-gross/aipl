@@ -24,10 +24,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 108
 instructions executed: 139
-binary size: 11528
-  code: 6764
+binary size: 11456
+  code: 6736
   data: 265
-  metadata: 4499
+  metadata: 4455
 functions:
   __dict_drop_str$str:
     calls: 1
@@ -37,10 +37,10 @@ functions:
     bytes: 136
   __m1__step:
     calls: 0
-    bytes: 2872
+    bytes: 2836
   __test$fill_or_add_sections_file:
     calls: 1
-    bytes: 528
+    bytes: 536
   aipl_array_dec:
     calls: 1
     bytes: (external)

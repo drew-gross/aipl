@@ -46,11 +46,11 @@ allocations: 14
 deallocations: 14
 reallocations: 8
 bytes allocated: 652
-instructions executed: 3761
-binary size: 9104
-  code: 5424
+instructions executed: 3553
+binary size: 8864
+  code: 5256
   data: 331
-  metadata: 3349
+  metadata: 3277
 functions:
   __to_str_i64$arr:
     calls: 2
@@ -96,10 +96,10 @@ functions:
     bytes: (external)
   join$own0$own1:
     calls: 2
-    bytes: 732
+    bytes: 744
   main:
     calls: 1
-    bytes: 1720
+    bytes: 1744
   merge$own0$own1:
     calls: 2
-    bytes: 1360
+    bytes: 1156
