@@ -754,15 +754,15 @@ fn fixture() -> Grammar<Tok, Node> {
     }
 }
 --- performance ---
-allocations: 1585
-deallocations: 1585
-reallocations: 342
-bytes allocated: 179621
-instructions executed: 260144
-binary size: 177488
-  code: 119364
+allocations: 1581
+deallocations: 1581
+reallocations: 332
+bytes allocated: 179677
+instructions executed: 262439
+binary size: 178680
+  code: 120232
   data: 4068
-  metadata: 54056
+  metadata: 54380
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -808,13 +808,13 @@ functions:
     bytes: 496
   __builtin_try_map$__m1__Production$Tok$Node$First<Tok>$__m1__ParseError$lam$linked_first_sets$Tok$Node$lambda2:
     calls: 17
-    bytes: 1024
+    bytes: 1040
   __builtin_try_map$__m1__Rule$Tok$First<Tok>$__m1__ParseError$lam$rule_first$Tok$lambda0:
     calls: 14
-    bytes: 752
+    bytes: 760
   __builtin_try_map$__m1__Rule$Tok$__m1__Rule$Tok$__m1__ParseError$lam$__m1__desugar_rule$Tok:
     calls: 46
-    bytes: 720
+    bytes: 740
   __ctor$Node$List:
     calls: 0
     bytes: 136
@@ -844,7 +844,7 @@ functions:
     bytes: 12108
   __m1__group_styles$into$Tok$own0:
     calls: 138
-    bytes: 3376
+    bytes: 3384
   __m1__group_styles$len$Tok:
     calls: 0
     bytes: 32
@@ -853,7 +853,7 @@ functions:
     bytes: 1932
   __m1__link$Tok$Node:
     calls: 9
-    bytes: 2908
+    bytes: 2920
   __m1__link_opt$Tok:
     calls: 12
     bytes: 596
@@ -862,10 +862,10 @@ functions:
     bytes: 6816
   __m1__link_rules$Tok:
     calls: 27
-    bytes: 808
+    bytes: 816
   __m1__prod_names$Tok$Node:
     calls: 20
-    bytes: 704
+    bytes: 824
   __rec_drop_Node:
     calls: 0
     bytes: 72
@@ -921,19 +921,19 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 4919
+    calls: 4940
     bytes: (external)
   aipl_array_new:
     calls: 62
     bytes: (external)
   aipl_array_push:
-    calls: 195
+    calls: 212
     bytes: (external)
   aipl_array_push_mut:
-    calls: 677
+    calls: 670
     bytes: (external)
   aipl_array_with_cap:
-    calls: 149
+    calls: 128
     bytes: (external)
   aipl_assert:
     calls: 25
@@ -988,10 +988,10 @@ functions:
     bytes: 256
   climb_precs$Tok:
     calls: 92
-    bytes: 1768
+    bytes: 1880
   ebnf$Tok$Node:
     calls: 6
-    bytes: 11216
+    bytes: 11652
   first_precs$Tok:
     calls: 19
     bytes: 276
@@ -1003,7 +1003,7 @@ functions:
     bytes: 5736
   linked_first_sets$Tok$Node:
     calls: 6
-    bytes: 1272
+    bytes: 1404
   main:
     calls: 1
     bytes: 452
@@ -1012,7 +1012,7 @@ functions:
     bytes: 604
   render_rule$Tok:
     calls: 101
-    bytes: 13512
+    bytes: 13600
   rep_suffix:
     calls: 14
     bytes: 1708
@@ -1024,10 +1024,10 @@ functions:
     bytes: 4096
   show_first$Tok$filter1$own0:
     calls: 27
-    bytes: 748
+    bytes: 716
   show_first_sets$Tok$Node:
     calls: 5
     bytes: 536
   show_first_sets$Tok$Node$zip1$own0:
     calls: 5
-    bytes: 1472
+    bytes: 1412

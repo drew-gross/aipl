@@ -42,15 +42,15 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 280
-instructions executed: 2479
-binary size: 7472
-  code: 3992
+instructions executed: 2523
+binary size: 7640
+  code: 4156
   data: 983
-  metadata: 2497
+  metadata: 2501
 functions:
   __test$parses_a_digit_run:
     calls: 1
-    bytes: 3356
+    bytes: 3520
   aipl_array_dec:
     calls: 1
     bytes: (external)

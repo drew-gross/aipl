@@ -79,15 +79,15 @@ fn main() !prints {
 2
 2 8 26 80
 --- performance ---
-allocations: 409
-deallocations: 409
-reallocations: 17
-bytes allocated: 24636
-instructions executed: 45110
-binary size: 13024
-  code: 7808
+allocations: 404
+deallocations: 404
+reallocations: 8
+bytes allocated: 24556
+instructions executed: 58043
+binary size: 13624
+  code: 8380
   data: 33
-  metadata: 5183
+  metadata: 5211
 functions:
   __arr_drop_Rule:
     calls: 69
@@ -110,11 +110,11 @@ functions:
   aipl_array_new:
     calls: 69
     bytes: (external)
-  aipl_array_push:
-    calls: 8
-    bytes: (external)
   aipl_array_push_mut:
-    calls: 121
+    calls: 105
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 3
     bytes: (external)
   aipl_rec_alloc:
     calls: 310
@@ -142,10 +142,10 @@ functions:
     bytes: 680
   gather:
     calls: 10
-    bytes: 1556
+    bytes: 1884
   main:
     calls: 1
     bytes: 3936
   styles$into$own0:
     calls: 298
-    bytes: 1076
+    bytes: 1320

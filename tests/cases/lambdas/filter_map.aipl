@@ -81,46 +81,46 @@ fn xs_of(ps: Pt[], lo: i64) -> i64[] { ps.filter_map(|p| lo <= p.x, |p| p.x * p.
     assert(xs_of([Pt { x: 1, y: 2 }, Pt { x: 5, y: 3 }], 2) == [15]);
 })
 --- performance ---
-allocations: 29
-deallocations: 29
+allocations: 27
+deallocations: 27
 reallocations: 1
-bytes allocated: 1962
-instructions executed: 7296
-binary size: 17888
-  code: 10124
+bytes allocated: 1882
+instructions executed: 8512
+binary size: 19944
+  code: 11924
   data: 1716
-  metadata: 6048
+  metadata: 6304
 functions:
   __eq_i64$arr:
     calls: 12
-    bytes: 344
+    bytes: 416
   __eq_str$arr:
     calls: 5
     bytes: 412
   __test$between:
     calls: 1
-    bytes: 340
+    bytes: 380
   __test$from_call:
     calls: 1
-    bytes: 1332
+    bytes: 1552
   __test$from_call$filter_map2$own0:
     calls: 1
-    bytes: 624
+    bytes: 776
   __test$from_call$filter_map5$own0:
     calls: 1
-    bytes: 624
+    bytes: 776
   __test$from_call$scaled_above:
     calls: 5
-    bytes: 468
+    bytes: 724
   __test$labels:
     calls: 1
     bytes: 904
   __test$widened:
     calls: 1
-    bytes: 1272
+    bytes: 1628
   __test$xs_of:
     calls: 1
-    bytes: 628
+    bytes: 804
   __to_str_i64:
     calls: 2
     bytes: 204
@@ -131,16 +131,16 @@ functions:
     calls: 9
     bytes: (external)
   aipl_array_dec:
-    calls: 39
+    calls: 40
     bytes: (external)
   aipl_array_new:
     calls: 11
     bytes: (external)
   aipl_array_push_mut:
-    calls: 15
+    calls: 14
     bytes: (external)
   aipl_array_with_cap:
-    calls: 10
+    calls: 8
     bytes: (external)
   aipl_assert:
     calls: 17
@@ -162,19 +162,19 @@ functions:
     bytes: (external)
   between:
     calls: 2
-    bytes: 476
+    bytes: 748
   from_call:
     calls: 4
     bytes: 208
   from_call$filter_map2$own0:
     calls: 4
-    bytes: 640
+    bytes: 792
   labels:
     calls: 3
     bytes: 388
   labels$filter_map2$own0:
     calls: 3
-    bytes: 888
+    bytes: 840
   main:
     calls: 1
     bytes: 372

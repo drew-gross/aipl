@@ -1469,15 +1469,15 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 342
-deallocations: 342
-reallocations: 9
-bytes allocated: 75400
-instructions executed: 698657
-binary size: 829792
-  code: 563140
+allocations: 283
+deallocations: 283
+reallocations: 4
+bytes allocated: 74128
+instructions executed: 699901
+binary size: 830336
+  code: 563560
   data: 9188
-  metadata: 257464
+  metadata: 257588
 functions:
   __arr_drop_Kind:
     calls: 88
@@ -1621,19 +1621,16 @@ functions:
     calls: 24
     bytes: (external)
   aipl_array_dec:
-    calls: 3186
+    calls: 3191
     bytes: (external)
   aipl_array_new:
     calls: 82
     bytes: (external)
   aipl_array_push:
-    calls: 169
+    calls: 174
     bytes: (external)
   aipl_array_push_mut:
     calls: 31
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 64
     bytes: (external)
   aipl_assert:
     calls: 90
@@ -1655,13 +1652,13 @@ functions:
     bytes: 1952
   keep_skipped$Kind:
     calls: 3
-    bytes: 3724
+    bytes: 3824
   lex$Kind:
     calls: 39
     bytes: 532
   lex_all$Kind:
     calls: 76
-    bytes: 10284
+    bytes: 10604
   lex_kinds$Kind:
     calls: 36
     bytes: 868

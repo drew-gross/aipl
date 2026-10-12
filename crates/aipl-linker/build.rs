@@ -8,8 +8,12 @@ use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-changed=runtime/aipl_runtime.rs");
-    // The runtime includes the shared `str` layout verbatim (see `str24`).
+    // The runtime includes the shared layouts verbatim (see `str24`): every file
+    // it `include!`s is an input, and one left off this list is a runtime that
+    // silently stops rebuilding when that file changes — `arr24.rs` was, and a
+    // new entry point in it then failed to link with no stale build to blame.
     println!("cargo:rerun-if-changed=../aipl-codegen/src/str24.rs");
+    println!("cargo:rerun-if-changed=../aipl-codegen/src/arr24.rs");
     println!("cargo:rerun-if-changed=../aipl-codegen/src/charset.rs");
     println!("cargo:rerun-if-changed=../aipl-codegen/src/array_layout.rs");
     println!("cargo:rerun-if-changed=build.rs");

@@ -49,33 +49,30 @@ fn count(mut self: Counter) {
     assert(c.hits == [1, 2]);
 })
 --- performance ---
-allocations: 4
-deallocations: 4
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 176
-instructions executed: 2446
-binary size: 10488
-  code: 5872
+bytes allocated: 0
+instructions executed: 3595
+binary size: 12824
+  code: 8164
   data: 649
-  metadata: 3967
+  metadata: 4011
 functions:
   __eq_i64$arr:
     calls: 3
-    bytes: 344
+    bytes: 416
   __test$count:
     calls: 1
-    bytes: 572
+    bytes: 804
   __test$tally:
     calls: 1
-    bytes: 1232
+    bytes: 1656
   aipl_arr_inc:
-    calls: 76
+    calls: 72
     bytes: (external)
   aipl_array_dec:
-    calls: 80
-    bytes: (external)
-  aipl_array_push:
-    calls: 4
+    calls: 74
     bytes: (external)
   aipl_assert:
     calls: 8
@@ -91,10 +88,10 @@ functions:
     bytes: (external)
   count:
     calls: 2
-    bytes: 700
+    bytes: 1064
   main:
     calls: 1
     bytes: 168
   tally:
     calls: 2
-    bytes: 2856
+    bytes: 4056

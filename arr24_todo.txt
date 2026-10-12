@@ -158,7 +158,7 @@ point at a time; this needs the same.
   a time. That is what keeps each step reviewable.
 
 
-Stage 3 — inline arrays                                   [3-0 done; 3a next]
+Stage 3 — inline arrays                                [done, integers only]
 ---------------------------------------------------------------------------------
 Elements in the value's own 22 bytes: no allocation, no refcount, exactly as a
 short `str` is inline. 22 bytes is 2 `i64`s, 5 `i32`s, 22 `i8`s, or 176
@@ -190,24 +190,57 @@ bit-packed `bool`s.
           Proof: `arrays/narrow_elements_packed.aipl` (a 1000-element `u8[]`
           allocates ~1KB, not ~8KB).
 
-  [ ] 3a. construct one wherever a small array is built: a literal that fits, a
-          `map`/`filter` result that fits, a `split` with few parts.
-  [ ] 3b. teach element reads and writes the inline case. This is the one that
-          bites: the 8-byte attempt SIGSEGV'd because `load_arr_len` and dozens
-          of header reads dereference unconditionally, and a value with no block
-          has nothing to dereference.
-  [ ] 3c. materialize into a block on push/grow past the inline capacity.
-  [ ] 3d. decide the boundary per element size, and whether a `drop_fn` element
-          type may be inline at all (it needs somewhere to record the count —
-          see Stage 6).
-  [ ] 3f. make the inline capacity vary by type, rather than one fixed 22-byte
-          region for every element type: a type whose elements are wide (or
-          whose arrays are typically a little longer than 22 bytes allow) may
-          want a different trade-off, and the encoding should not rule that out.
-  [ ] 3e. bit-packed `bool[]` (`ELEM_BITPACKED`, a stride of 0). `arr24` does not
-          handle it yet: `elem_ptr` multiplies by the stride and `spare_capacity`
-          divides by it, neither of which is right for bits. `inline_cap` does
-          answer for it (22 bytes is 176 bools), so the gap is the accessors.
+  **Decided: only integer element types are ever inline** (3d-f below). An
+  inline value is `Arr`'s inline layout exactly — elements in bytes 0..22, the
+  length in byte 22, `ATAG_INLINE` in byte 23 — inside the bridge value
+  (`arr24::ArrValue`); a whole value and a window have a zero top byte.
+
+  [x] 3a. constructed where a small integer array is built and would otherwise
+          allocate:
+            - a non-constant literal that fits (`[a, b]`). A *constant* one stays
+              the static block it was: already free, and as an inline value it
+              would be copied into a block whenever it is handed to something
+              that takes one (`extend`'s source, a spread, `reverse`) — which
+              showed up as allocations *rising* in 12 cases when tried.
+            - a `push` onto an empty array that was not reserved for more than an
+              inline value holds (`mut out = []`; `with_capacity` reserves a word
+              per element, so its count is its bytes over eight). `map`/`filter`
+              build through exactly that, so a small result is inline;
+              `with_capacity` of 2 or fewer — what every integer type holds
+              inline — now starts from the static empty block rather than
+              allocating one the first push would free.
+            - an in-place `map`/`filter` over an inline input writes its result
+              into the same bytes (`__arr_writable` passes an inline value
+              through; `writable_place`/`writable_elems`). Mono's gate keeps an
+              integer input's output integers (`slot_fits`), since no inline
+              value may hold a set or a dict word.
+            - a slice of an inline value is inline.
+          Not done: `split` (its parts are `str`s, not integers).
+  [x] 3b. reads and ownership learn the inline shape, gated on the static type
+          (`may_be_inline`: an integer array, or an untyped `__none__[]` that
+          may come to hold one): `ArrView` reads elements out of the value
+          itself, retain/release hand the runtime a null, a block-taking entry
+          is lent a copy (`emit_needs_block`), and an owning slot settles into a
+          block before a block write (`aipl_arr_settle`). An inline value is
+          already unique, so `owned_block_made_unique` passes it through — settling
+          it there made a reference the moved value never had, which leaked.
+          The runtime: nested reads (`drop`/`retain_warr`, `join`'s parts) skip
+          or copy an inline element; the FFI reads one.
+  [x] 3c. `push` onto an integer array goes through `aipl_arr_push_small` for
+          anything inline-shaped — into spare room, a full value moved into a
+          block of twice the room, an empty unreserved block started inline, a
+          window settled — and straight to the block runtime otherwise
+          (`emit_int_push`, which tests the common case inline). `extend` and
+          `reserve` settle an inline receiver into a block first.
+          Proof: `arrays/inline_allocates_nothing.aipl` — literals, pushes up to
+          the 22-byte limit, `map` and `filter`, with `allocations: 0`.
+          Corpus: allocations down in 54 cases and up in none; instructions
+          +0.45% for the inline checks.
+  [x] 3d. the boundary is 22 bytes at the packed stride (22 `u8`s … 2 `i64`s),
+          and no element type with a `drop_fn` is inline — only integers are.
+  [-] 3e. bit-packed `bool[]`: not inline (integers only).
+  [-] 3f. capacity varying by type: not now (integers only). The encoding keeps
+          the length in a byte of its own, so a later layout can move it.
 
   Today's `ARR_INLINE_TAG` (8-byte, the empty array over a shared static block)
   is a stand-in for 3 and goes away with 2f. It is not a step toward this: it

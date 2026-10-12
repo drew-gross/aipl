@@ -46,13 +46,13 @@ shorter
 --- performance ---
 allocations: 19
 deallocations: 19
-reallocations: 8
-bytes allocated: 485
-instructions executed: 2714
-binary size: 7072
-  code: 4700
+reallocations: 0
+bytes allocated: 645
+instructions executed: 3369
+binary size: 8680
+  code: 6200
   data: 257
-  metadata: 2115
+  metadata: 2223
 functions:
   __to_str_i64:
     calls: 14
@@ -66,11 +66,8 @@ functions:
   aipl_array_dec:
     calls: 12
     bytes: (external)
-  aipl_array_push:
+  aipl_array_with_cap:
     calls: 4
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 12
     bytes: (external)
   aipl_i64_len:
     calls: 28
@@ -80,10 +77,10 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2612
+    bytes: 3600
   main$zip8$own0$own1:
     calls: 1
-    bytes: 1628
+    bytes: 2104
   show:
     calls: 5
-    bytes: 256
+    bytes: 292

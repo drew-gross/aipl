@@ -132,11 +132,11 @@ allocations: 139
 deallocations: 139
 reallocations: 0
 bytes allocated: 4689
-instructions executed: 12409
-binary size: 19216
-  code: 9972
+instructions executed: 12677
+binary size: 19632
+  code: 10392
   data: 1309
-  metadata: 7935
+  metadata: 7931
 functions:
   __arr_drop_List:
     calls: 1
@@ -161,7 +161,7 @@ functions:
     bytes: 84
   __to_str_Both:
     calls: 2
-    bytes: 1136
+    bytes: 1216
   __to_str_List:
     calls: 106
     bytes: 708
@@ -215,7 +215,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2856
+    bytes: 3196
   sum:
     calls: 9
     bytes: 104

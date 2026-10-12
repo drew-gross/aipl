@@ -36,11 +36,11 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 99
-instructions executed: 580
-binary size: 4184
-  code: 1984
+instructions executed: 609
+binary size: 4272
+  code: 2076
   data: 187
-  metadata: 2013
+  metadata: 2009
 functions:
   __eq___builtin_Span:
     calls: 1
@@ -50,7 +50,7 @@ functions:
     bytes: 232
   __to_str_i64$arr:
     calls: 1
-    bytes: 764
+    bytes: 836
   __to_str_u64:
     calls: 3
     bytes: 204
@@ -77,4 +77,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 680
+    bytes: 700

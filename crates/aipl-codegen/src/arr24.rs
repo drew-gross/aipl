@@ -494,17 +494,27 @@ pub(crate) extern "C" fn aipl_arrw_with_cap(out: *mut Arr, cap: i64, elem_size: 
 #[no_mangle]
 pub(crate) extern "C" fn aipl_arr_drop_warr(elems: *const u8, len: i64) {
     for i in 0..len.max(0) as usize {
-        let ptr = unsafe { core::ptr::read(elems.add(i * ARR_SIZE) as *const *const u8) };
-        super::aipl_array_dec(ptr);
+        if let Some(ptr) = unsafe { owned_block_at(elems.add(i * ARR_SIZE)) } {
+            super::aipl_array_dec(ptr);
+        }
     }
+}
+
+/// The block the padded array value at `at` holds a reference on — its first
+/// word — or `None` for an inline value, which holds none (its first word is
+/// element bytes).
+unsafe fn owned_block_at(at: *const u8) -> Option<*const u8> {
+    let v = unsafe { core::ptr::read(at as *const ArrValue) };
+    (!v.is_inline()).then_some(v.block)
 }
 
 /// Retain each of `len` padded array elements starting at `elems`.
 #[no_mangle]
 pub(crate) extern "C" fn aipl_arr_retain_warr(elems: *const u8, len: i64) {
     for i in 0..len.max(0) as usize {
-        let ptr = unsafe { core::ptr::read(elems.add(i * ARR_SIZE) as *const *const u8) };
-        super::aipl_arr_inc(ptr);
+        if let Some(ptr) = unsafe { owned_block_at(elems.add(i * ARR_SIZE)) } {
+            super::aipl_arr_inc(ptr);
+        }
     }
 }
 
@@ -517,7 +527,9 @@ pub(crate) extern "C" fn aipl_arr_drop_opt_warr(elems: *const u8, len: i64) {
     for i in 0..len.max(0) as usize {
         let e = unsafe { elems.add(i * OPT_ARR_SIZE) };
         if unsafe { core::ptr::read(e as *const i64) } != 0 {
-            super::aipl_array_dec(unsafe { core::ptr::read(e.add(8) as *const *const u8) });
+            if let Some(ptr) = unsafe { owned_block_at(e.add(8)) } {
+                super::aipl_array_dec(ptr);
+            }
         }
     }
 }
@@ -528,7 +540,9 @@ pub(crate) extern "C" fn aipl_arr_retain_opt_warr(elems: *const u8, len: i64) {
     for i in 0..len.max(0) as usize {
         let e = unsafe { elems.add(i * OPT_ARR_SIZE) };
         if unsafe { core::ptr::read(e as *const i64) } != 0 {
-            super::aipl_arr_inc(unsafe { core::ptr::read(e.add(8) as *const *const u8) });
+            if let Some(ptr) = unsafe { owned_block_at(e.add(8)) } {
+                super::aipl_arr_inc(ptr);
+            }
         }
     }
 }
@@ -542,12 +556,23 @@ pub(crate) extern "C" fn aipl_arr_retain_opt_warr(elems: *const u8, len: i64) {
 //            w0                          w1                 w2
 // whole      tagged pointer (any repr)   0                  0
 // window     untagged heap block         data: *const u8    len
+// inline     elems[0..8]                 elems[8..16]       [ elems[16..22] ][ len:8 ][ tag:8 ]
 // ```
 //
-// A nonzero `w1` is what makes a window, and it is always nonzero when set: it
-// points at an element inside the block. A window holds one reference on its
-// block, exactly as a whole value does, so retaining or releasing either is the
-// first word alone — which is all `aipl_arr_{drop,retain}_warr` read.
+// An *inline* value carries its elements in its own 22 bytes and owns no block
+// at all — `Arr`'s inline layout exactly, and a short `str`'s: the tag
+// (`ATAG_INLINE`) in the top byte of `w2` says so, and the byte below it is the
+// length. Only an array of integers is ever inline (the element types `arr24_todo`
+// stage 3 settled on), at the packed stride, so 22 bytes is 22 `u8`s or 2 `i64`s.
+// A whole value and a window have a top byte of zero, since a window's length
+// is far below 2^56.
+//
+// Otherwise a nonzero `w1` is what makes a window, and it is always nonzero
+// when set: it points at an element inside the block. (An inline value's `w1`
+// is element bytes, so the tag is read first.) A window holds one reference on
+// its block, exactly as a whole value does, so retaining or releasing either is
+// the first word alone — which is all `aipl_arr_{drop,retain}_warr` read, once
+// they have passed over an inline element, which holds none.
 //
 // Windows are only ever made over a `Heap` block of byte-addressable elements.
 // A reversed view has no forward run to point into, and a bit-packed `bool[]`
@@ -581,8 +606,48 @@ impl ArrValue {
         }
     }
 
+    /// The value's elements carried in its own bytes (see the header).
+    fn inline(bytes: &[u8], len: usize) -> ArrValue {
+        let mut raw = [0u8; ARR_SIZE];
+        raw[..bytes.len()].copy_from_slice(bytes);
+        raw[ARR_INLINE_CAP] = len as u8;
+        raw[ARR_SIZE - 1] = ATAG_INLINE;
+        unsafe { core::ptr::read(raw.as_ptr() as *const ArrValue) }
+    }
+
+    pub(crate) fn is_inline(&self) -> bool {
+        (self.len as u64 >> ARR_TAG_SHIFT) as u8 == ATAG_INLINE
+    }
+
     fn is_window(&self) -> bool {
-        !self.data.is_null()
+        !self.is_inline() && !self.data.is_null()
+    }
+
+    /// An inline value's element count.
+    pub(crate) fn inline_len(&self) -> usize {
+        ((self.len as u64 >> ARR_INLINE_LEN_SHIFT) & 0xFF) as usize
+    }
+
+    /// An inline value's 24 bytes, its elements first.
+    fn bytes(&self) -> [u8; ARR_SIZE] {
+        unsafe { core::ptr::read(self as *const ArrValue as *const [u8; ARR_SIZE]) }
+    }
+
+    /// An inline value's elements, copied into a fresh heap block that carries
+    /// one reference — for something that needs a block.
+    fn inline_to_block(&self, elem_size: i64) -> *const u8 {
+        let n = self.inline_len();
+        let block = super::aipl_array_new(n as i64, 0, elem_size);
+        let raw = self.bytes();
+        let at = super::array_layout::ARR_ELEMS_OFFSET;
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                raw.as_ptr(),
+                (block as *mut u8).add(at),
+                n * elem_size as usize,
+            )
+        };
+        block
     }
 
     /// The window's first element, as an index into its block.
@@ -619,6 +684,18 @@ pub(crate) extern "C" fn aipl_arr_window(
     elem_size: i64,
 ) {
     let a = unsafe { *a };
+    if a.is_inline() {
+        // A window of an inline value is inline too: fewer of the same bytes.
+        let len = a.inline_len();
+        let lo = start.clamp(0, len as i64) as usize;
+        let hi = end.clamp(0, len as i64) as usize;
+        let w = elem_size as usize;
+        let raw = a.bytes();
+        let n = hi.saturating_sub(lo);
+        let result = ArrValue::inline(&raw[lo * w..(lo + n) * w], n);
+        unsafe { core::ptr::write(out, result) };
+        return;
+    }
     let len = if a.is_window() {
         a.len
     } else {
@@ -660,9 +737,9 @@ pub(crate) extern "C" fn aipl_arr_window(
     unsafe { core::ptr::write(out, result) };
 }
 
-/// A block holding exactly the elements of the window `a` — a fresh copy, each
-/// element retained — carrying the one reference for the caller to release.
-/// Borrows `a`, which must be a window.
+/// A block holding exactly the elements of `a`, which is a window or inline — a
+/// fresh copy, each element retained — carrying the one reference for the
+/// caller to release. Borrows `a`.
 #[no_mangle]
 pub(crate) extern "C" fn aipl_arr_window_block(
     a: *const ArrValue,
@@ -671,6 +748,9 @@ pub(crate) extern "C" fn aipl_arr_window_block(
     elem_size: i64,
 ) -> *const u8 {
     let a = unsafe { *a };
+    if a.is_inline() {
+        return a.inline_to_block(elem_size);
+    }
     let lo = a.start(elem_size);
     super::aipl_arr_slice(
         a.block,
@@ -684,7 +764,8 @@ pub(crate) extern "C" fn aipl_arr_window_block(
 
 /// A reference to a block holding exactly the elements of the array value at
 /// `a`, for a runtime walk that reads nested arrays (`join`'s parts): a whole
-/// value's own block, retained, or a copy of a window's. The caller releases it.
+/// value's own block, retained, or a copy of a window's or an inline value's
+/// elements. The caller releases it.
 pub(crate) fn owned_block_of(
     a: *const ArrValue,
     drop_fn: i64,
@@ -692,7 +773,7 @@ pub(crate) fn owned_block_of(
     elem_size: i64,
 ) -> *const u8 {
     let v = unsafe { *a };
-    if v.is_window() {
+    if v.is_window() || v.is_inline() {
         return aipl_arr_window_block(a, drop_fn, retain_fn, elem_size);
     }
     if !v.block.is_null() {
@@ -701,11 +782,12 @@ pub(crate) fn owned_block_of(
     v.block
 }
 
-/// Turn the window an *owning* slot holds into a whole value over a copy of its
-/// elements, in place, so that code which mutates through the first word finds
-/// a block of its own there — uniquely owned, so the write that follows goes in
-/// place. The slot's reference moves from the source block to the copy. A whole
-/// value is left alone.
+/// Turn the window — or the inline value — an *owning* slot holds into a whole
+/// value over a copy of its elements, in place, so that code which mutates
+/// through the first word finds a block of its own there: uniquely owned, so
+/// the write that follows goes in place. A window's reference moves from the
+/// source block to the copy; an inline value held none. A whole value is left
+/// alone.
 #[no_mangle]
 pub(crate) extern "C" fn aipl_arr_settle(
     a: *mut ArrValue,
@@ -714,12 +796,89 @@ pub(crate) extern "C" fn aipl_arr_settle(
     elem_size: i64,
 ) {
     let v = unsafe { *a };
+    if v.is_inline() {
+        let own = v.inline_to_block(elem_size);
+        unsafe { core::ptr::write(a, ArrValue::whole(own)) };
+        return;
+    }
     if !v.is_window() {
         return;
     }
     let own = aipl_arr_window_block(a, drop_fn, retain_fn, elem_size);
     super::aipl_array_dec(v.block);
     unsafe { core::ptr::write(a, ArrValue::whole(own)) };
+}
+
+/// What [`aipl_arr_push_small`] did — see its doc.
+pub(crate) const PUSH_SMALL_NOT_HANDLED: i64 = 0;
+pub(crate) const PUSH_SMALL_INLINE: i64 = 1;
+pub(crate) const PUSH_SMALL_GREW: i64 = 2;
+
+/// The part of `push` onto an integer array's *owning* slot that the block
+/// runtime does not do: everything that involves an inline value. `x` addresses
+/// the element (its low `width` bytes are it).
+///
+/// - An inline value with room takes the element in its own bytes:
+///   [`PUSH_SMALL_INLINE`].
+/// - An inline value that is full moves into a fresh block of twice the room,
+///   with the element appended: [`PUSH_SMALL_GREW`]. The slot then holds a whole
+///   value over a block it alone owns.
+/// - An *empty* block becomes an inline value holding the element, when it was
+///   not reserved for more than an inline value holds: [`PUSH_SMALL_INLINE`].
+///   That is `mut out = []` and a `map`/`filter` output over a short input
+///   (`with_capacity` reserves a word per element, not knowing the element
+///   type, so the reservation's count is its bytes over eight). A larger
+///   reservation is honoured as a block, since it was made for the pushes that
+///   follow.
+/// - A window is settled into a block of its own, and anything else is left:
+///   [`PUSH_SMALL_NOT_HANDLED`], and the caller pushes onto the block as before.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arr_push_small(slot: *mut ArrValue, x: *const u8, width: i64) -> i64 {
+    let v = unsafe { *slot };
+    let w = width as usize;
+    let room = ARR_INLINE_CAP / w;
+    let elem = unsafe { core::slice::from_raw_parts(x, w) };
+    if v.is_inline() {
+        let n = v.inline_len();
+        let mut raw = v.bytes();
+        if n < room {
+            raw[n * w..(n + 1) * w].copy_from_slice(elem);
+            unsafe { core::ptr::write(slot, ArrValue::inline(&raw[..(n + 1) * w], n + 1)) };
+            return PUSH_SMALL_INLINE;
+        }
+        let block = super::aipl_array_with_cap(((n + 1) * 2) as i64, 0, width);
+        let at = super::array_layout::ARR_ELEMS_OFFSET;
+        unsafe {
+            let dst = (block as *mut u8).add(at);
+            core::ptr::copy_nonoverlapping(raw.as_ptr(), dst, n * w);
+            core::ptr::copy_nonoverlapping(x, dst.add(n * w), w);
+            core::ptr::write(
+                (block as *mut u8).add(super::array_layout::ARR_LEN_OFFSET) as *mut i64,
+                (n + 1) as i64,
+            );
+            core::ptr::write(slot, ArrValue::whole(block));
+        }
+        return PUSH_SMALL_GREW;
+    }
+    if v.is_window() {
+        aipl_arr_settle(slot, 0, 0, width);
+        return PUSH_SMALL_NOT_HANDLED;
+    }
+    if tagged_len(v.block) == 0 && reserved_bytes(v.block) <= 8 * room {
+        super::aipl_array_dec(v.block);
+        unsafe { core::ptr::write(slot, ArrValue::inline(elem, 1)) };
+        return PUSH_SMALL_INLINE;
+    }
+    PUSH_SMALL_NOT_HANDLED
+}
+
+/// The element capacity, in bytes, a block was reserved with (null: none).
+fn reserved_bytes(block: *const u8) -> usize {
+    if block.is_null() {
+        return 0;
+    }
+    let u = super::array_layout::arr_untag(block);
+    unsafe { core::ptr::read(u.add(super::array_layout::ARR_CAP_OFFSET) as *const i64) as usize }
 }
 
 /// The set `set`'s elements as a fresh array block of `width`-byte elements —

@@ -23,31 +23,28 @@ fn map(xs: i64[], f: (i64) -> i64) -> i64[] {
 --- performance ---
 allocations: 2
 deallocations: 2
-reallocations: 4
-bytes allocated: 80
-instructions executed: 746
-binary size: 3136
-  code: 1348
+reallocations: 0
+bytes allocated: 160
+instructions executed: 960
+binary size: 3664
+  code: 1816
   data: 355
-  metadata: 1433
+  metadata: 1493
 functions:
   __eq_i64$arr:
     calls: 2
-    bytes: 344
+    bytes: 416
   __test$map:
     calls: 1
-    bytes: 904
+    bytes: 1300
   aipl_arr_inc:
     calls: 2
     bytes: (external)
   aipl_array_dec:
     calls: 4
     bytes: (external)
-  aipl_array_push:
+  aipl_array_with_cap:
     calls: 2
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 6
     bytes: (external)
   aipl_assert:
     calls: 2

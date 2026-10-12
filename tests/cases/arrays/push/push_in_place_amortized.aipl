@@ -23,31 +23,31 @@ fn grown() -> i64[] {
 --- performance ---
 allocations: 1
 deallocations: 1
-reallocations: 3
-bytes allocated: 40
-instructions executed: 563
-binary size: 2888
-  code: 1296
+reallocations: 1
+bytes allocated: 80
+instructions executed: 748
+binary size: 3712
+  code: 2092
   data: 212
-  metadata: 1380
+  metadata: 1408
 functions:
   __eq_i64$arr:
     calls: 1
-    bytes: 344
+    bytes: 416
   __test$grown:
     calls: 1
-    bytes: 848
+    bytes: 1572
   aipl_arr_inc:
     calls: 1
     bytes: (external)
   aipl_array_dec:
     calls: 2
     bytes: (external)
-  aipl_array_push:
-    calls: 1
-    bytes: (external)
   aipl_array_push_mut:
-    calls: 8
+    calls: 5
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 1

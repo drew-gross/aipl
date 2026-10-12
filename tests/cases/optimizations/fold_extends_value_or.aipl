@@ -125,15 +125,15 @@ f7
 [7]
 []
 --- performance ---
-allocations: 35
-deallocations: 35
-reallocations: 11
-bytes allocated: 1597
-instructions executed: 6276
-binary size: 13792
-  code: 8520
+allocations: 30
+deallocations: 30
+reallocations: 2
+bytes allocated: 1541
+instructions executed: 7569
+binary size: 15128
+  code: 9820
   data: 139
-  metadata: 5133
+  metadata: 5169
 functions:
   __arr_drop_Rule$Tok:
     calls: 2
@@ -149,24 +149,27 @@ functions:
     bytes: 204
   __to_str_i64$arr:
     calls: 10
-    bytes: 764
+    bytes: 836
   aipl_arr_inc:
     calls: 45
     bytes: (external)
   aipl_arr_reserve:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 76
+    calls: 74
     bytes: (external)
   aipl_array_new:
     calls: 2
     bytes: (external)
   aipl_array_push:
-    calls: 8
+    calls: 1
     bytes: (external)
   aipl_array_push_mut:
-    calls: 20
+    calls: 4
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 4
     bytes: (external)
   aipl_i64_len:
     calls: 46
@@ -194,13 +197,13 @@ functions:
     bytes: (external)
   effects:
     calls: 2
-    bytes: 528
+    bytes: 676
   main:
     calls: 1
-    bytes: 4916
+    bytes: 5360
   plain:
     calls: 2
-    bytes: 404
+    bytes: 640
   styles$into$Tok$own0:
     calls: 18
-    bytes: 1348
+    bytes: 1748

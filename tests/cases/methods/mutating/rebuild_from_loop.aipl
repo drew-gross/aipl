@@ -28,31 +28,31 @@ fn double_each(mut self: i64[]) {
 --- performance ---
 allocations: 2
 deallocations: 2
-reallocations: 7
-bytes allocated: 80
-instructions executed: 1527
-binary size: 4136
-  code: 1828
+reallocations: 1
+bytes allocated: 160
+instructions executed: 2105
+binary size: 4864
+  code: 2544
   data: 505
-  metadata: 1803
+  metadata: 1815
 functions:
   __eq_i64$arr:
     calls: 2
-    bytes: 344
+    bytes: 416
   __test$double_each:
     calls: 1
-    bytes: 724
+    bytes: 964
   aipl_arr_inc:
     calls: 14
     bytes: (external)
   aipl_array_dec:
     calls: 16
     bytes: (external)
-  aipl_array_push:
-    calls: 2
-    bytes: (external)
   aipl_array_push_mut:
-    calls: 16
+    calls: 10
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 2
     bytes: (external)
   aipl_assert:
     calls: 2
@@ -68,7 +68,7 @@ functions:
     bytes: (external)
   double_each:
     calls: 2
-    bytes: 648
+    bytes: 1052
   main:
     calls: 1
     bytes: 112

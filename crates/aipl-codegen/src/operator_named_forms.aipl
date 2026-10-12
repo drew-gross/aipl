@@ -58,9 +58,9 @@ allocations: 16
 deallocations: 16
 reallocations: 0
 bytes allocated: 1040
-instructions executed: 3507
-binary size: 16136
-  code: 9936
+instructions executed: 3528
+binary size: 16152
+  code: 9952
   data: 1186
   metadata: 5014
 functions:
@@ -96,4 +96,4 @@ functions:
     bytes: 128
   operator_named_forms:
     calls: 11
-    bytes: 6384
+    bytes: 6400

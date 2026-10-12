@@ -21,15 +21,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 80
-instructions executed: 343
-binary size: 3712
-  code: 1640
+instructions executed: 383
+binary size: 3856
+  code: 1780
   data: 418
-  metadata: 1654
+  metadata: 1658
 functions:
   __test$first:
     calls: 1
-    bytes: 1536
+    bytes: 1676
   aipl_array_dec:
     calls: 1
     bytes: (external)

@@ -22,33 +22,30 @@ fn pipe(xs: i64[], g: (i64) -> i64) -> i64[] { map(xs, g) }.test({
     assert(pipe([1, 2], |x| x * k) == [10, 20]);
 })
 --- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 3
+allocations: 1
+deallocations: 1
+reallocations: 0
 bytes allocated: 80
-instructions executed: 671
-binary size: 3208
-  code: 1352
+instructions executed: 865
+binary size: 3752
+  code: 1820
   data: 392
-  metadata: 1464
+  metadata: 1540
 functions:
   __eq_i64$arr:
     calls: 2
-    bytes: 344
+    bytes: 416
   __test$pipe:
     calls: 1
-    bytes: 908
+    bytes: 1304
   aipl_arr_inc:
     calls: 2
     bytes: (external)
   aipl_array_dec:
     calls: 4
     bytes: (external)
-  aipl_array_push:
-    calls: 2
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 5
+  aipl_array_with_cap:
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 2

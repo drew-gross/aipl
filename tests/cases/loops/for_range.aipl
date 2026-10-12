@@ -65,13 +65,13 @@ false
 --- performance ---
 allocations: 18
 deallocations: 18
-reallocations: 2
-bytes allocated: 772
-instructions executed: 1325
-binary size: 5440
-  code: 2904
+reallocations: 0
+bytes allocated: 812
+instructions executed: 1456
+binary size: 5712
+  code: 3164
   data: 223
-  metadata: 2313
+  metadata: 2325
 functions:
   __to_str_bool:
     calls: 1
@@ -84,18 +84,15 @@ functions:
     bytes: 204
   __to_str_u64$arr:
     calls: 1
-    bytes: 764
+    bytes: 836
   aipl_arr_inc:
     calls: 1
     bytes: (external)
   aipl_array_dec:
     calls: 2
     bytes: (external)
-  aipl_array_push:
+  aipl_array_with_cap:
     calls: 1
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 3
     bytes: (external)
   aipl_i64_len:
     calls: 2
@@ -114,4 +111,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1500
+    bytes: 1688

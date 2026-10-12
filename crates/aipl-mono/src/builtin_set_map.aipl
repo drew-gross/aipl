@@ -93,15 +93,15 @@ pub fn set_map<T: any, U: any>(self: #{T}, f: (T) -> U) -> #{U} {
     assert(#{1, 2}.set_map(|x| x * scale) == #{10, 20});
 })
 --- performance ---
-allocations: 54
-deallocations: 54
-reallocations: 18
-bytes allocated: 2530
-instructions executed: 5713
-binary size: 20728
-  code: 12972
+allocations: 50
+deallocations: 50
+reallocations: 0
+bytes allocated: 2650
+instructions executed: 6537
+binary size: 22088
+  code: 14304
   data: 1348
-  metadata: 6408
+  metadata: 6436
 functions:
   __eq_set$bool:
     calls: 3
@@ -114,7 +114,7 @@ functions:
     bytes: 256
   __test$set_map:
     calls: 1
-    bytes: 11456
+    bytes: 12628
   aipl_arr_inc:
     calls: 15
     bytes: (external)
@@ -122,13 +122,13 @@ functions:
     calls: 69
     bytes: (external)
   aipl_array_push:
-    calls: 14
+    calls: 3
     bytes: (external)
   aipl_array_push_mut:
-    calls: 122
+    calls: 93
     bytes: (external)
   aipl_array_with_cap:
-    calls: 40
+    calls: 47
     bytes: (external)
   aipl_assert:
     calls: 16
@@ -153,4 +153,4 @@ functions:
     bytes: 108
   set_map$i64$i64$lam$__test$set_map$double:
     calls: 5
-    bytes: 640
+    bytes: 800

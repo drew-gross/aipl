@@ -372,12 +372,15 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert" => {
             sig(6, true)
         }
-        // Array windows (`arr24`, stage 4b): the out value, the source value, the
-        // bounds and the element type's three descriptors; a window's view block;
-        // a slot settled in place.
+        // The bridge array value's entries (`arr24`): a window (the out value,
+        // the source value, the bounds and the element type's three
+        // descriptors); the block lent a window or an inline value; a slot
+        // settled in place; a narrow set copied into an array; and a push onto
+        // an integer array that may be inline.
         "aipl_arr_window" => sig(7, false),
         "aipl_arr_window_block" => sig(4, true),
         "aipl_arr_from_set_words" => sig(2, true),
+        "aipl_arr_push_small" => sig(3, true),
         "aipl_arr_settle" => sig(4, false),
         // The parts, `join`'s three separators, and the element type's three
         // descriptors; the joined array comes back in a register.

@@ -252,15 +252,15 @@ pub fn binder_list(self: str[]) -> str {
     assert(["a", "b"].binder_list() == `"a", "b"`);
 })
 --- performance ---
-allocations: 142
-deallocations: 142
-reallocations: 6
-bytes allocated: 10945
-instructions executed: 11574
-binary size: 109296
-  code: 71504
+allocations: 141
+deallocations: 141
+reallocations: 5
+bytes allocated: 10921
+instructions executed: 11672
+binary size: 109640
+  code: 71716
   data: 2851
-  metadata: 34941
+  metadata: 35073
 functions:
   __arr_drop_Pat:
     calls: 9
@@ -341,16 +341,19 @@ functions:
     calls: 10
     bytes: (external)
   aipl_array_dec:
-    calls: 111
+    calls: 112
     bytes: (external)
   aipl_array_new:
     calls: 23
+    bytes: (external)
+  aipl_array_push:
+    calls: 1
     bytes: (external)
   aipl_array_push_mut:
     calls: 4
     bytes: (external)
   aipl_array_with_cap:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 35
@@ -411,10 +414,10 @@ functions:
     bytes: 896
   nested_or_ctor:
     calls: 4
-    bytes: 804
+    bytes: 912
   pat_bindings:
     calls: 9
-    bytes: 1660
+    bytes: 1764
   pat_label:
     calls: 6
     bytes: 1440

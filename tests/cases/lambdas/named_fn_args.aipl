@@ -42,35 +42,35 @@ fn each(self: i64[], f: (i64) -> i64) -> i64[] {
 --- performance ---
 allocations: 10
 deallocations: 10
-reallocations: 4
-bytes allocated: 475
-instructions executed: 2387
-binary size: 8864
-  code: 4856
+reallocations: 2
+bytes allocated: 515
+instructions executed: 2915
+binary size: 10344
+  code: 6160
   data: 736
-  metadata: 3272
+  metadata: 3448
 functions:
   __eq_i64$arr:
     calls: 4
-    bytes: 344
+    bytes: 416
   __eq_str$arr:
     calls: 1
     bytes: 412
   __test$apply:
     calls: 1
-    bytes: 1848
+    bytes: 2556
   __test$apply$map2$own0:
     calls: 1
-    bytes: 576
+    bytes: 712
   __test$each:
     calls: 1
-    bytes: 472
+    bytes: 684
   __test$inc:
     calls: 1
-    bytes: 200
+    bytes: 240
   __test$inc$map0$own0:
     calls: 1
-    bytes: 576
+    bytes: 712
   __to_str_i64:
     calls: 3
     bytes: 204
@@ -86,14 +86,11 @@ functions:
   aipl_array_new:
     calls: 1
     bytes: (external)
-  aipl_array_push:
-    calls: 1
-    bytes: (external)
   aipl_array_push_mut:
-    calls: 12
+    calls: 9
     bytes: (external)
   aipl_array_with_cap:
-    calls: 3
+    calls: 4
     bytes: (external)
   aipl_assert:
     calls: 7

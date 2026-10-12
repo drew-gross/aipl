@@ -46,11 +46,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 104
-instructions executed: 1726
-binary size: 5656
-  code: 2408
+instructions executed: 1781
+binary size: 5696
+  code: 2444
   data: 906
-  metadata: 2342
+  metadata: 2346
 functions:
   __test$count:
     calls: 1
@@ -78,7 +78,7 @@ functions:
     bytes: 268
   count$i64:
     calls: 5
-    bytes: 252
+    bytes: 288
   main:
     calls: 1
     bytes: 104

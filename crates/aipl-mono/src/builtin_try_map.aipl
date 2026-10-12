@@ -74,28 +74,28 @@ pub fn try_map<T: any, U: any, E: any>(self: T[], f: (T) -> U!E) -> U[]!E {
     );
 })
 --- performance ---
-allocations: 45
-deallocations: 45
-reallocations: 6
-bytes allocated: 2485
-instructions executed: 4888
-binary size: 23344
-  code: 13492
+allocations: 42
+deallocations: 42
+reallocations: 4
+bytes allocated: 2365
+instructions executed: 5192
+binary size: 24496
+  code: 14616
   data: 1707
-  metadata: 8145
+  metadata: 8173
 functions:
   __eq_i64$arr:
     calls: 1
-    bytes: 344
+    bytes: 416
   __eq_str$arr:
     calls: 4
     bytes: 412
   __eq_u64$arr:
     calls: 1
-    bytes: 344
+    bytes: 416
   __test$try_map:
     calls: 1
-    bytes: 5996
+    bytes: 6208
   __test$try_map$label:
     calls: 16
     bytes: 680
@@ -133,10 +133,10 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_push:
-    calls: 9
+    calls: 6
     bytes: (external)
   aipl_array_push_mut:
-    calls: 15
+    calls: 10
     bytes: (external)
   aipl_assert:
     calls: 15
@@ -161,19 +161,19 @@ functions:
     bytes: 108
   try_map$i64$i64$str$lam$__test$try_map$lambda8:
     calls: 1
-    bytes: 680
+    bytes: 888
   try_map$i64$i64$str$lam$__test$try_map$lambda9:
     calls: 1
-    bytes: 680
+    bytes: 888
   try_map$i64$str$str$lam$__test$try_map$label:
     calls: 6
-    bytes: 656
+    bytes: 716
   try_map$i64$str$str$lam$__test$try_map$lambda5:
     calls: 1
-    bytes: 656
+    bytes: 716
   try_map$i64$str$str$lam$__test$try_map$lambda6:
     calls: 1
-    bytes: 656
+    bytes: 716
   try_map$str$u64$char$lam$__test$try_map$width:
     calls: 1
-    bytes: 732
+    bytes: 904

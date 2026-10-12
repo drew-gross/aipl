@@ -59,15 +59,15 @@ pub fn dedent(self: str) -> str {
     );
 })
 --- performance ---
-allocations: 30
-deallocations: 30
+allocations: 22
+deallocations: 22
 reallocations: 2
-bytes allocated: 1525
-instructions executed: 22372
-binary size: 9136
-  code: 5056
+bytes allocated: 1149
+instructions executed: 23151
+binary size: 9424
+  code: 5276
   data: 873
-  metadata: 3207
+  metadata: 3275
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 42
@@ -82,16 +82,16 @@ functions:
     calls: 1
     bytes: 1652
   aipl_array_dec:
-    calls: 30
+    calls: 37
     bytes: (external)
   aipl_array_new:
     calls: 10
     bytes: (external)
   aipl_array_push_mut:
-    calls: 17
+    calls: 4
     bytes: (external)
   aipl_array_with_cap:
-    calls: 10
+    calls: 2
     bytes: (external)
   aipl_assert:
     calls: 10
@@ -107,7 +107,7 @@ functions:
     bytes: (external)
   dedent:
     calls: 10
-    bytes: 2460
+    bytes: 2680
   main:
     calls: 1
     bytes: 104

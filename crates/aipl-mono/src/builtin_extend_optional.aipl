@@ -60,19 +60,19 @@ pub fn extend_optional<T: any>(mut self: T[], other: T?) {
     assert(ys == [9, 8]);
 })
 --- performance ---
-allocations: 7
-deallocations: 7
-reallocations: 1
-bytes allocated: 352
-instructions executed: 1656
-binary size: 9736
-  code: 5616
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 272
+instructions executed: 1969
+binary size: 10720
+  code: 6568
   data: 557
-  metadata: 3563
+  metadata: 3595
 functions:
   __eq_i64$arr:
     calls: 4
-    bytes: 344
+    bytes: 416
   __eq_i64$arr$arr:
     calls: 1
     bytes: 332
@@ -81,24 +81,21 @@ functions:
     bytes: 412
   __test$extend_optional:
     calls: 1
-    bytes: 4408
+    bytes: 5288
   aipl_arr_inc:
     calls: 15
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 30
+    calls: 29
     bytes: (external)
   aipl_array_new:
     calls: 2
     bytes: (external)
   aipl_array_push:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_array_push_mut:
-    calls: 5
+    calls: 3
     bytes: (external)
   aipl_assert:
     calls: 6

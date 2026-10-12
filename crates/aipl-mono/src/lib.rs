@@ -10667,8 +10667,15 @@ fn slot_bytes(t: &Type) -> usize {
 /// elements and wrote three words into each one-word slot — which is what the
 /// old `str`-shape test fixed — and `[1, 2].map(|x| [x])` then did the same with
 /// array elements, once arrays became 24 bytes and that test had no way to know.
+///
+/// And it is a question of *what kind* of thing the slots hold where an integer
+/// is involved: a short integer array is held inline (`aipl-codegen`'s
+/// `may_be_inline`), its elements in its own bytes, and the in-place body then
+/// writes into those bytes. That is sound only while the result is integers too
+/// — a set or a dict is a word wide, but no inline value may hold one.
 fn slot_fits(from: &Type, to: &Type) -> bool {
-    slot_bytes(from) == slot_bytes(to)
+    let int = |t: &Type| matches!(t, Type::Primitive(p) if p.is_int());
+    slot_bytes(from) == slot_bytes(to) && int(from) == int(to)
 }
 
 /// Whether `arg` evaluates to a freshly-allocated, uniquely-owned heap value, so

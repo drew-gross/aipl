@@ -66,18 +66,18 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 128
-instructions executed: 1757
-binary size: 11304
-  code: 6076
+instructions executed: 1888
+binary size: 11752
+  code: 6528
   data: 1498
-  metadata: 3730
+  metadata: 3726
 functions:
   __test$find_index:
     calls: 1
-    bytes: 1648
+    bytes: 1688
   __test$find_index$filter9$own0:
     calls: 1
-    bytes: 604
+    bytes: 764
   aipl_arr_inc:
     calls: 2
     bytes: (external)
@@ -113,25 +113,25 @@ functions:
     bytes: 332
   find_index$i64$lam$__test$find_index$is_nine:
     calls: 1
-    bytes: 324
+    bytes: 360
   find_index$i64$lam$__test$find_index$lambda0:
     calls: 1
-    bytes: 324
+    bytes: 360
   find_index$i64$lam$__test$find_index$lambda1:
     calls: 1
-    bytes: 324
+    bytes: 360
   find_index$i64$lam$__test$find_index$lambda10:
     calls: 1
-    bytes: 324
+    bytes: 360
   find_index$i64$lam$__test$find_index$lambda2:
     calls: 1
-    bytes: 324
+    bytes: 360
   find_index$i64$lam$__test$find_index$lambda3:
     calls: 1
-    bytes: 324
+    bytes: 360
   find_index$i64$lam$__test$find_index$lambda8:
     calls: 1
-    bytes: 324
+    bytes: 360
   find_index$str$lam$__test$find_index$lambda5:
     calls: 1
     bytes: 444

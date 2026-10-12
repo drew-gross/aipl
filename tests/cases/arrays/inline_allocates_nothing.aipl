@@ -1,0 +1,92 @@
+# A short integer array is *inline*: its elements live in the array value's own
+# 22 bytes, the way a short `str`'s do, and there is no block to allocate,
+# refcount or free (see "inline" in `crates/aipl-codegen/src/arr24.rs`). That is
+# 22 `u8`s, 11 `i16`s, 5 `i32`s or 2 `i64`s — narrow integers are packed at their
+# own width.
+#
+# An array becomes inline wherever it is built small: a literal whose elements
+# are not all constants (a constant one is a static block, already free), a
+# `push` onto an empty array, and a `map` or `filter` over an inline input,
+# which writes its result into the same bytes. The allocation count below is
+# the proof — every array in this program is inline, and `main` returns its
+# answer as the exit code because rendering one would allocate a buffer.
+
+import {
+    equal as ==,
+    filter,
+    len,
+    less_than as <,
+    logical_and as &&,
+    map,
+    push,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+} from builtins;
+
+fn ones(n: u64) -> i64[] {
+    mut out: i64[] = []; #[allow]
+    for (let i : 0..n) {
+        set out.push(1);
+    }
+    out
+}
+
+fn bytes(n: u64) -> u8[] {
+    mut out: u8[] = []; #[allow]
+    for (let i : 0..n) {
+        set out.push(1);
+    }
+    out
+}
+
+fn total(xs: i64[]) -> i64 {
+    mut n = 0;
+    for (let x : xs) {
+        set n += x;
+    }
+    n
+}
+
+fn main() -> i64 {
+    let p = ones(2); // the most an i64[] holds inline
+    let bumped = ones(2).map(|x| x + 10); // 11, 11
+    let small = ones(2).filter(|x| x < 5); // 1, 1
+    let b = bytes(22); // the most a u8[] holds inline
+    let lens = [b.len(), p.len()]; // not constants, so built inline
+    let full = if (lens[0] == some(22) && b[21] == some(1)) { 100 } else { 0 };
+    total(p) + total(bumped) + total(small) + full // 2 + 22 + 2 + 100
+}
+--- exit code ---
+126
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 2695
+binary size: 4960
+  code: 3560
+  data: 33
+  metadata: 1367
+functions:
+  aipl_arr_inc:
+    calls: 9
+    bytes: (external)
+  aipl_array_dec:
+    calls: 13
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1328
+  main$filter4$own0:
+    calls: 1
+    bytes: 764
+  main$map2$own0:
+    calls: 1
+    bytes: 712
+  ones:
+    calls: 3
+    bytes: 508
+  total:
+    calls: 3
+    bytes: 248

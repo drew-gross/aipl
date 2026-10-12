@@ -94,15 +94,15 @@ allocations: 55
 deallocations: 55
 reallocations: 0
 bytes allocated: 4132
-instructions executed: 5224
-binary size: 22192
-  code: 13584
+instructions executed: 5268
+binary size: 22328
+  code: 13720
   data: 643
   metadata: 7965
 functions:
   __dict_drop_i64$i64$arr:
     calls: 3
-    bytes: 128
+    bytes: 152
   __dict_drop_i64$str:
     calls: 6
     bytes: 128
@@ -114,7 +114,7 @@ functions:
     bytes: 136
   __dict_retain_i64$i64$arr:
     calls: 4
-    bytes: 128
+    bytes: 152
   __dict_retain_i64$str:
     calls: 8
     bytes: 128
@@ -129,7 +129,7 @@ functions:
     bytes: 232
   __to_str_dict$i64$i64$arr:
     calls: 1
-    bytes: 1268
+    bytes: 1356
   __to_str_dict$i64$str:
     calls: 2
     bytes: 840

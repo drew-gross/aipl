@@ -57,28 +57,28 @@ true
 ["a"]
 []
 --- performance ---
-allocations: 7
-deallocations: 7
-reallocations: 1
-bytes allocated: 257
-instructions executed: 1113
-binary size: 8576
-  code: 5072
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 217
+instructions executed: 1313
+binary size: 9424
+  code: 5928
   data: 292
-  metadata: 3212
+  metadata: 3204
 functions:
   __eq_none$arr:
     calls: 1
-    bytes: 72
+    bytes: 128
   __to_str_bool:
     calls: 1
     bytes: 232
   __to_str_i64$arr:
     calls: 1
-    bytes: 764
+    bytes: 836
   __to_str_none$arr:
     calls: 1
-    bytes: 228
+    bytes: 252
   __to_str_str$arr:
     calls: 1
     bytes: 904
@@ -89,12 +89,6 @@ functions:
     calls: 8
     bytes: (external)
   aipl_array_new:
-    calls: 2
-    bytes: (external)
-  aipl_array_push:
-    calls: 1
-    bytes: (external)
-  aipl_array_push_mut:
     calls: 2
     bytes: (external)
   aipl_i64_len:
@@ -108,4 +102,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2872
+    bytes: 3576

@@ -618,15 +618,15 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(grp.show(gs, names) == "[( (term 1 ~  + ~  2) )]");
 })
 --- performance ---
-allocations: 264
-deallocations: 264
-reallocations: 17
-bytes allocated: 20429
-instructions executed: 57266
-binary size: 77648
-  code: 49460
+allocations: 262
+deallocations: 262
+reallocations: 15
+bytes allocated: 20389
+instructions executed: 58054
+binary size: 78336
+  code: 49960
   data: 3703
-  metadata: 24485
+  metadata: 24673
 functions:
   __arr_drop_Cst:
     calls: 40
@@ -678,7 +678,7 @@ functions:
     bytes: 132
   __test$show:
     calls: 1
-    bytes: 17544
+    bytes: 17640
   __test$through:
     calls: 1
     bytes: 388
@@ -692,19 +692,19 @@ functions:
     calls: 112
     bytes: (external)
   aipl_array_dec:
-    calls: 1416
+    calls: 1418
     bytes: (external)
   aipl_array_new:
     calls: 75
     bytes: (external)
   aipl_array_push:
-    calls: 47
+    calls: 49
     bytes: (external)
   aipl_array_push_mut:
     calls: 19
     bytes: (external)
   aipl_array_with_cap:
-    calls: 8
+    calls: 4
     bytes: (external)
   aipl_assert:
     calls: 55
@@ -759,19 +759,19 @@ functions:
     bytes: 1232
   show:
     calls: 23
-    bytes: 3924
+    bytes: 4240
   slot_walk:
     calls: 3
     bytes: 820
   slot_walk_kids:
     calls: 3
-    bytes: 1812
+    bytes: 1844
   slots$own0:
     calls: 3
     bytes: 312
   split_kids:
     calls: 32
-    bytes: 2868
+    bytes: 2912
   text:
     calls: 5
     bytes: 1532
@@ -780,7 +780,7 @@ functions:
     bytes: 236
   token_leaves:
     calls: 31
-    bytes: 1716
+    bytes: 1728
   token_span:
     calls: 5
     bytes: 288

@@ -40,11 +40,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 104
-instructions executed: 1039
-binary size: 6296
-  code: 3028
+instructions executed: 1094
+binary size: 6472
+  code: 3208
   data: 785
-  metadata: 2483
+  metadata: 2479
 functions:
   __test$count_while:
     calls: 1
@@ -72,19 +72,19 @@ functions:
     bytes: 276
   count_while$i64$lam$__test$count_while$lambda0:
     calls: 1
-    bytes: 256
+    bytes: 292
   count_while$i64$lam$__test$count_while$lambda1:
     calls: 1
-    bytes: 256
+    bytes: 292
   count_while$i64$lam$__test$count_while$lambda2:
     calls: 1
-    bytes: 256
+    bytes: 292
   count_while$i64$lam$__test$count_while$lambda3:
     calls: 1
-    bytes: 256
+    bytes: 292
   count_while$i64$lam$__test$count_while$lambda4:
     calls: 1
-    bytes: 256
+    bytes: 292
   count_while$str$lam$__test$count_while$lambda6:
     calls: 1
     bytes: 380

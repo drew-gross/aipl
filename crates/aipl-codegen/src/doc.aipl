@@ -329,15 +329,15 @@ fn cleanup(out: str) -> str {
     assert(raw.print(100) == `x = """\n    hi\n"""\n`);
 })
 --- performance ---
-allocations: 312
-deallocations: 312
+allocations: 311
+deallocations: 311
 reallocations: 1
-bytes allocated: 21565
-instructions executed: 36136
-binary size: 40712
-  code: 25448
+bytes allocated: 21525
+instructions executed: 36384
+binary size: 41128
+  code: 25792
   data: 889
-  metadata: 14375
+  metadata: 14447
 functions:
   __arr_drop_Doc:
     calls: 10
@@ -379,7 +379,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 188
+    calls: 189
     bytes: (external)
   aipl_array_new:
     calls: 41
@@ -388,10 +388,7 @@ functions:
     calls: 40
     bytes: (external)
   aipl_array_push_mut:
-    calls: 24
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 1
+    calls: 23
     bytes: (external)
   aipl_assert:
     calls: 11
@@ -449,4 +446,4 @@ functions:
     bytes: 108
   print:
     calls: 11
-    bytes: 12624
+    bytes: 12968

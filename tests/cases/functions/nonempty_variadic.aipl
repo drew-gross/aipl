@@ -57,34 +57,28 @@ fn main() !prints {
 **x**
 9..7
 --- performance ---
-allocations: 11
-deallocations: 11
+allocations: 10
+deallocations: 10
 reallocations: 0
-bytes allocated: 636
-instructions executed: 747
-binary size: 5680
-  code: 3204
+bytes allocated: 596
+instructions executed: 831
+binary size: 5848
+  code: 3464
   data: 153
-  metadata: 2323
+  metadata: 2231
 functions:
   __builtin_nonempty_first$i64:
     calls: 1
-    bytes: 228
+    bytes: 268
   __builtin_nonempty_last$i64:
     calls: 1
-    bytes: 256
+    bytes: 324
   __to_str_i64:
     calls: 2
     bytes: 204
   __to_str_u64:
     calls: 2
     bytes: 204
-  aipl_array_dec:
-    calls: 1
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
   aipl_i64_len:
     calls: 4
     bytes: (external)
@@ -99,4 +93,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2312
+    bytes: 2464

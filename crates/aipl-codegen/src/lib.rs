@@ -4522,6 +4522,10 @@ fn new_jit_module() -> Result<JITModule, Error> {
         "aipl_arr_from_set_words",
         arr24::aipl_arr_from_set_words as *const u8,
     );
+    jit_builder.symbol(
+        "aipl_arr_push_small",
+        arr24::aipl_arr_push_small as *const u8,
+    );
     jit_builder.symbol("aipl_str_rope", str24::aipl_str_rope as *const u8);
     jit_builder.symbol(
         "aipl_str_pack_inline",
@@ -6619,8 +6623,8 @@ unsafe fn read_ffi_array_elem(
 
 /// Read the array value stored at `at` (of element type `elem`) — its first
 /// word under the `Tagged` ABI, its 24 bytes under `Wide`, where it may be a
-/// window (`arr24::ArrValue`), whose elements are read off the value rather
-/// than the block. `owned` as for [`read_ffi_array`]: the value's one reference
+/// window or inline (`arr24::ArrValue`), whose elements are read off the value
+/// rather than the block. `owned` as for [`read_ffi_array`]: the value's one reference
 /// is on its first word either way.
 ///
 /// SAFETY: `at` must hold a valid array value of element type `elem` for `abi`.
@@ -6636,6 +6640,14 @@ unsafe fn read_ffi_array_at(
         return unsafe { read_ffi_array(abi, raw, elem, owned, structs) };
     }
     let value = unsafe { *(at as *const arr24::ArrValue) };
+    if value.is_inline() {
+        // The elements are the value's own bytes, and it owns nothing to release.
+        let stride = abi_array_elem_size(abi, elem, structs) as usize;
+        let out = (0..value.inline_len())
+            .map(|i| unsafe { read_ffi_array_elem(abi, at.add(i * stride), elem, stride, structs) })
+            .collect();
+        return FfiValue::Array(out);
+    }
     if value.data.is_null() {
         return unsafe { read_ffi_array(abi, raw, elem, owned, structs) };
     }
@@ -8236,6 +8248,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         "aipl_arr_window" => (7, Ret::None),
         "aipl_arr_window_block" => (4, Ret::Word),
         "aipl_arr_from_set_words" => (2, Ret::Word),
+        "aipl_arr_push_small" => (3, Ret::Word),
         "aipl_arr_settle" => (4, Ret::None),
         "aipl_dict_remove" => (5, Ret::Word),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" => (7, Ret::Word),
@@ -9868,7 +9881,8 @@ fn take_field<M: Module>(
 }
 
 /// A moved-in array block (an array, a set, or a dict — all one block shape)
-/// as one this function holds the sole reference to. A block whose refcount
+/// as one this function holds the sole reference to — or, for an inline array,
+/// the value itself, which owns no block to share. A block whose refcount
 /// is above one is *shared* — the one case a move cannot make its own — and
 /// goes through `aipl_arr_reserve` with nothing extra, which copies it and
 /// releases the shared original. Everything else is handed back untouched:
@@ -9882,6 +9896,37 @@ fn take_field<M: Module>(
 /// pointer and the header word is at `-8`, for a view as for a heap block
 /// (`array_layout`).
 fn owned_block_made_unique<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    cx: Cx,
+    v: Value,
+    ty: &ConcreteType,
+) -> Value {
+    // An inline value is unique already — its elements are its own bytes, and
+    // a copy of the value is a copy of them — so it is handed back as it is.
+    // Settling it into a block here would make a reference the moved value
+    // never carried, which the binding taking it over would then retain beside.
+    if !may_be_inline(ty) {
+        return owned_block_made_unique_whole(builder, module, cx, v, ty);
+    }
+    let inline = emit_is_inline(builder, v);
+    let block_b = builder.create_block();
+    let merge = builder.create_block();
+    builder.append_block_param(merge, types::I64);
+    builder
+        .ins()
+        .brif(inline, merge, &[BlockArg::Value(v)], block_b, &[]);
+    builder.switch_to_block(block_b);
+    builder.seal_block(block_b);
+    let unique = owned_block_made_unique_whole(builder, module, cx, v, ty);
+    builder.ins().jump(merge, &[BlockArg::Value(unique)]);
+    builder.switch_to_block(merge);
+    builder.seal_block(merge);
+    builder.block_params(merge)[0]
+}
+
+/// [`owned_block_made_unique`] on a value that is not inline.
+fn owned_block_made_unique_whole<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
     cx: Cx,
@@ -10154,8 +10199,9 @@ fn seq_ptr(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> Value 
 ///
 /// A whole array is its first word, as [`seq_ptr`] reads it, and a set or a
 /// dict is the pointer itself. A window has no block of exactly its elements,
-/// so one is made — a copy of them, allocated only when something that needs a
-/// block is reached (`arr24::aipl_arr_window_block`) — and tracked
+/// and an inline value has no block at all, so one is made — a copy of the
+/// elements, allocated only when something that needs a block is reached
+/// (`arr24::aipl_arr_window_block`) — and tracked
 /// for release (`Owned::View`). The track goes to the *bottom* of the scope:
 /// the retain-elision recognizers read the top entry as "the value just
 /// produced", and this is not one.
@@ -10180,7 +10226,7 @@ fn arr_block<M: Module>(
     }
     let flags = MemFlagsData::trusted();
     let whole = builder.ins().load(types::I64, flags, v, 0);
-    let data = builder.ins().load(types::I64, flags, v, 8);
+    let lend = emit_needs_block(builder, v, ty);
     let owner = i64_slot(builder);
     let zero = builder.ins().iconst(types::I64, 0);
     builder.ins().stack_store(types::I64, zero, owner, 0);
@@ -10189,7 +10235,7 @@ fn arr_block<M: Module>(
     builder.append_block_param(merge, types::I64);
     builder
         .ins()
-        .brif(data, window, &[], merge, &[BlockArg::Value(whole)]);
+        .brif(lend, window, &[], merge, &[BlockArg::Value(whole)]);
     builder.switch_to_block(window);
     builder.seal_block(window);
     let (drop_fn, retain_fn, esz) = array_descriptors(builder, module, cx, elem);
@@ -10218,10 +10264,11 @@ fn arr_block<M: Module>(
 /// site's to give (a moved temporary) or the value is borrowed, so a reference
 /// has to be taken for the entry.
 ///
-/// A whole array hands over its first word, retained when borrowed. A window
-/// hands over a copy of its elements, which already carries the reference the
-/// entry consumes; an owned window then releases the one it held on the source,
-/// so either way exactly one reference changes hands.
+/// A whole array hands over its first word, retained when borrowed. A window or
+/// an inline value hands over a copy of its elements, which already carries the
+/// reference the entry consumes; an owned window then releases the one it held
+/// on the source (an inline value held none), so either way exactly one
+/// reference changes hands.
 fn consumed_block<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
@@ -10244,12 +10291,12 @@ fn consumed_block<M: Module>(
         return seq_ptr(builder, v, ty);
     }
     let flags = MemFlagsData::trusted();
-    let data = builder.ins().load(types::I64, flags, v, 8);
+    let lend = emit_needs_block(builder, v, ty);
     let whole_b = builder.create_block();
     let window_b = builder.create_block();
     let merge = builder.create_block();
     builder.append_block_param(merge, types::I64);
-    builder.ins().brif(data, window_b, &[], whole_b, &[]);
+    builder.ins().brif(lend, window_b, &[], whole_b, &[]);
 
     builder.switch_to_block(whole_b);
     builder.seal_block(whole_b);
@@ -10279,11 +10326,11 @@ fn consumed_block<M: Module>(
 }
 
 /// Make the array an *owning* slot holds a whole value before something writes
-/// through its first word: a window is replaced, in place, by a whole value over
-/// a copy of its elements (`arr24::aipl_arr_settle`), uniquely owned, so the
-/// in-place entries then write straight into it. The slot's
-/// reference moves with it, so its owner's bookkeeping is unchanged. A whole
-/// value costs a load and a branch.
+/// through its first word: a window or an inline value is replaced, in place, by
+/// a whole value over a copy of its elements (`arr24::aipl_arr_settle`),
+/// uniquely owned, so the in-place entries then write straight into it. The
+/// slot's reference moves with it (an inline value had none to move), so its
+/// owner's bookkeeping is unchanged. A whole value costs a load and a branch.
 fn settle_array_slot<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
@@ -10297,12 +10344,10 @@ fn settle_array_slot<M: Module>(
     if !is_wide_array(ty) || is_none_inner(elem) {
         return;
     }
-    let data = builder
-        .ins()
-        .load(types::I64, MemFlagsData::trusted(), addr, 8);
+    let lend = emit_needs_block(builder, addr, ty);
     let window = builder.create_block();
     let done = builder.create_block();
-    builder.ins().brif(data, window, &[], done, &[]);
+    builder.ins().brif(lend, window, &[], done, &[]);
     builder.switch_to_block(window);
     builder.seal_block(window);
     let (drop_fn, retain_fn, esz) = array_descriptors(builder, module, cx, elem);
@@ -10335,6 +10380,164 @@ fn mut_array_block<M: Module>(
         settle_array_slot(builder, module, cx, addr, &ty);
     }
     builder.ins().stack_load(types::I64, types::I64, slot, 0)
+}
+
+/// The element type of the array type `arr_ty`.
+fn new_arr_ty_elem(arr_ty: &ConcreteType) -> ConcreteType {
+    match arr_ty {
+        ConcreteType::Array(e) => (**e).clone(),
+        other => unreachable!("an array type, not {}", type_name(other)),
+    }
+}
+
+/// `set xs.push(x)` onto an integer array — one that may be inline
+/// ([`may_be_inline`]) — whose binding's slot is `slot`. `x_ptr` addresses the
+/// element, `width` bytes of it.
+///
+/// Anything that involves the inline shape is the runtime's
+/// (`arr24::aipl_arr_push_small`): pushing into one with room, moving a full one
+/// into a block, starting an empty, unreserved one inline, and settling a
+/// window. Only a whole, non-empty block skips the call — tested inline here,
+/// since that is the push a long-running loop makes every time — and it, or
+/// anything the runtime handed back unhandled, is pushed exactly as before.
+///
+/// The one difference from the block path elsewhere is how a non-exclusive
+/// binding's *region track* is held: the new version exists on only some of the
+/// paths through here, so it is kept in a word that is null on the others
+/// (`Owned::View`), not as a value-track that would have to dominate the
+/// scope's exit.
+#[allow(clippy::too_many_arguments)]
+fn emit_int_push<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    scopes: &mut [Vec<Tracked>],
+    slot: StackSlot,
+    exclusive: bool,
+    x_ptr: Value,
+    width: i64,
+) {
+    let builtins = cx.builtins;
+    let flags = MemFlagsData::trusted();
+    let addr = builder.ins().stack_addr(types::I64, slot, 0);
+    let zero = builder.ins().iconst(types::I64, 0);
+    // The non-exclusive region track: null unless a fresh block is made below.
+    let region = (!exclusive).then(|| {
+        let owner = i64_slot(builder);
+        builder.ins().stack_store(types::I64, zero, owner, 0);
+        scopes.last_mut().expect("scope").push(Tracked {
+            owned: Owned::View(owner),
+            ty: ConcreteType::Unit,
+        });
+        owner
+    });
+    let w0 = builder.ins().load(types::I64, flags, addr, 0);
+    let w1 = builder.ins().load(types::I64, flags, addr, 8);
+    let inline = emit_is_inline(builder, addr);
+    let safe = builder.ins().select(inline, addr, w0);
+    let len = load_arr_len(builder, safe);
+    let window = builder.ins().icmp_imm_s(IntCC::NotEqual, w1, 0);
+    let empty = builder.ins().icmp_imm_s(IntCC::Equal, len, 0);
+    let special = builder.ins().bor(inline, window);
+    let special = builder.ins().bor(special, empty);
+    let small_b = builder.create_block();
+    let block_b = builder.create_block();
+    let done_b = builder.create_block();
+    builder.ins().brif(special, small_b, &[], block_b, &[]);
+
+    builder.switch_to_block(small_b);
+    builder.seal_block(small_b);
+    let width_v = builder.ins().iconst(types::I64, width);
+    let status = builtins.call(
+        module,
+        builder,
+        "aipl_arr_push_small",
+        &[addr, x_ptr, width_v],
+    );
+    let handled = builder
+        .ins()
+        .icmp_imm_s(IntCC::NotEqual, status, arr24::PUSH_SMALL_NOT_HANDLED);
+    match region {
+        // A full inline value just moved into a fresh block; a non-exclusive
+        // binding's new version gets its region track like any other.
+        Some(owner) => {
+            let grew_b = builder.create_block();
+            let after_b = builder.create_block();
+            builder.ins().brif(handled, after_b, &[], block_b, &[]);
+            builder.switch_to_block(after_b);
+            builder.seal_block(after_b);
+            let grew = builder
+                .ins()
+                .icmp_imm_s(IntCC::Equal, status, arr24::PUSH_SMALL_GREW);
+            builder.ins().brif(grew, grew_b, &[], done_b, &[]);
+            builder.switch_to_block(grew_b);
+            builder.seal_block(grew_b);
+            let block = builder.ins().load(types::I64, flags, addr, 0);
+            builtins.call_void(module, builder, "aipl_arr_inc", &[block]);
+            builder.ins().stack_store(types::I64, block, owner, 0);
+            builder.ins().jump(done_b, &[]);
+        }
+        None => {
+            builder.ins().brif(handled, done_b, &[], block_b, &[]);
+        }
+    }
+
+    // A whole block — as it was, or as the runtime settled a window into — takes
+    // the push exactly as any array's does (see `Callee::Push`).
+    builder.switch_to_block(block_b);
+    builder.seal_block(block_b);
+    let arr_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
+    let esz = builder.ins().iconst(types::I64, width);
+    let sym = if exclusive {
+        "aipl_array_push_mut"
+    } else {
+        "aipl_array_push"
+    };
+    let new_ptr = builtins.call(module, builder, sym, &[arr_ptr, x_ptr, zero, zero, esz]);
+    builder.ins().stack_store(types::I64, new_ptr, slot, 0);
+    if let Some(owner) = region {
+        builtins.call_void(module, builder, "aipl_arr_inc", &[new_ptr]);
+        builder.ins().stack_store(types::I64, new_ptr, owner, 0);
+    }
+    builder.ins().jump(done_b, &[]);
+
+    builder.switch_to_block(done_b);
+    builder.seal_block(done_b);
+}
+
+/// The array an in-place `map`/`filter` body writes — its `mut $a` binding —
+/// as the address of the binding's own value. Reading the binding by name
+/// yields a snapshot, which for a block is the same storage (the block) but for
+/// an inline value is a copy of the bytes the body means to change.
+fn writable_place<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    scopes: &mut Vec<Vec<Tracked>>,
+    arg: &Expr,
+) -> Result<(Value, ConcreteType), Error> {
+    if let ExprKind::Ident(name) = &arg.kind {
+        if let Some(EnvBinding::Mut(slot, ty, _)) = cx.env.get(name) {
+            let ty = ty.borrow().clone();
+            if is_wide_array(&ty) {
+                return Ok((builder.ins().stack_addr(types::I64, *slot, 0), ty));
+            }
+        }
+    }
+    compile_expr(module, builder, cx, scopes, arg)
+}
+
+/// Where the elements of the writable array value at `a` (of type `ty`) start:
+/// in its own bytes when it is inline, past its block's header otherwise
+/// (`__arr_writable` made it a whole block of its own, or left it inline).
+fn writable_elems(builder: &mut FunctionBuilder, a: Value, ty: &ConcreteType) -> Value {
+    let a_ptr = arr_ptr(builder, a);
+    let block_elems = builder.ins().iadd_imm_s(a_ptr, ARR_ELEMS_OFFSET as i64);
+    if !may_be_inline(ty) {
+        return block_elems;
+    }
+    let inline = emit_is_inline(builder, a);
+    builder.ins().select(inline, a, block_elems)
 }
 
 /// The three things every array runtime entry is told about the element type:
@@ -10546,6 +10749,94 @@ fn lives_in_slot(ty: &ConcreteType) -> bool {
 /// that word is exactly the one to replace.
 fn is_wide_array(ty: &ConcreteType) -> bool {
     matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty) && Abi::active().arr_size() > 8
+}
+
+/// Whether `n` elements of `elem` make an inline array: an integer element type
+/// (see [`may_be_inline`]), at least one element, and no more than its 22 bytes
+/// hold at the packed stride. An empty array stays the shared static block,
+/// which costs nothing either.
+fn inline_fits(elem: &ConcreteType, n: usize, structs: &HashMap<String, TypeDef>) -> bool {
+    let arr_ty = ConcreteType::Array(Box::new(elem.clone()));
+    may_be_inline(&arr_ty)
+        && n > 0
+        && n * array_elem_size(elem, structs) as usize <= arr24::ARR_INLINE_CAP
+}
+
+/// An inline array value holding `vals` — canonical integers, each stored in
+/// `width` bytes — in a fresh slot: the elements from byte 0, the length in byte
+/// 22, the tag in byte 23 (`arr24::ArrValue`). It owns nothing, so nothing
+/// tracks it.
+fn emit_inline_array(builder: &mut FunctionBuilder, vals: &[Value], width: i64) -> Value {
+    let slot = builder.create_sized_stack_slot(StackSlotData::new(
+        StackSlotKind::ExplicitSlot,
+        arr24::ARR_SIZE as u32,
+        3,
+    ));
+    let addr = builder.ins().stack_addr(types::I64, slot, 0);
+    let zero = builder.ins().iconst(types::I64, 0);
+    let flags = MemFlagsData::trusted();
+    for off in (0..arr24::ARR_SIZE as i32).step_by(8) {
+        builder.ins().store(flags, zero, addr, off);
+    }
+    for (i, v) in vals.iter().enumerate() {
+        let at = builder.ins().iadd_imm_s(addr, i as i64 * width);
+        store_scalar_elem(builder, *v, at, width);
+    }
+    let len = builder.ins().iconst(types::I64, vals.len() as i64);
+    builder
+        .ins()
+        .istore8(flags, len, addr, arr24::ARR_INLINE_CAP as i32);
+    let tag = builder
+        .ins()
+        .iconst(types::I64, i64::from(arr24::ATAG_INLINE));
+    builder
+        .ins()
+        .istore8(flags, tag, addr, arr24::ARR_SIZE as i32 - 1);
+    addr
+}
+
+/// Whether a value of `ty` may be *inline* — its elements in its own 22 bytes,
+/// no block (`arr24::ArrValue`, `arr24_todo.txt` stage 3). Only an array of
+/// integers is: everything that reads or owns an array value has to check for
+/// the inline shape first, and an array of any other element type never takes
+/// it, so only these pay for the check.
+///
+/// So may an *untyped* one (`__none__[]`): `mut a = []` is typed by its
+/// placeholder until something refines it, and `set a = [1, 2]` stores an
+/// inline value into it — which the release of the old value and the retain
+/// of the new one then see through the placeholder type.
+fn may_be_inline(ty: &ConcreteType) -> bool {
+    is_wide_array(ty)
+        && matches!(ty, ConcreteType::Array(e) if is_none_inner(e)
+            || matches!(**e, ConcreteType::Primitive(p) if p.is_int()))
+}
+
+/// Whether the array value at `v` is inline: the tag in the top byte of its last
+/// word. A whole value's and a window's top byte is zero.
+fn emit_is_inline(builder: &mut FunctionBuilder, v: Value) -> Value {
+    let w2 = builder
+        .ins()
+        .load(types::I64, MemFlagsData::trusted(), v, 16);
+    let tag = builder.ins().ushr_imm_u(w2, arr24::ARR_TAG_SHIFT as i64);
+    builder
+        .ins()
+        .icmp_imm_s(IntCC::Equal, tag, arr24::ATAG_INLINE as i64)
+}
+
+/// Whether the array value at `v` (of type `ty`) is not a whole block — a
+/// window, or an inline value — and so has to be lent a block of its own
+/// elements before a runtime entry that takes a block sees it.
+fn emit_needs_block(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> Value {
+    let data = builder
+        .ins()
+        .load(types::I64, MemFlagsData::trusted(), v, 8);
+    let window = builder.ins().icmp_imm_s(IntCC::NotEqual, data, 0);
+    if may_be_inline(ty) {
+        let inline = emit_is_inline(builder, v);
+        builder.ins().bor(window, inline)
+    } else {
+        window
+    }
 }
 
 /// An optional of a scalar — `i64?`, `bool?`, `char?`. Sixteen bytes (the tag
@@ -11081,11 +11372,38 @@ fn arr_view(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> ArrVi
     let flags = MemFlagsData::trusted();
     let ptr = builder.ins().load(types::I64, flags, v, 0);
     let data = builder.ins().load(types::I64, flags, v, 8);
-    let window_len = builder.ins().load(types::I64, flags, v, 16);
-    let whole = block_view(builder, ptr);
+    let w2 = builder.ins().load(types::I64, flags, v, 16);
     let is_window = builder.ins().icmp_imm_s(IntCC::NotEqual, data, 0);
+    if !may_be_inline(ty) {
+        let whole = block_view(builder, ptr);
+        let base = builder.ins().select(is_window, data, whole.base);
+        let len = builder.ins().select(is_window, w2, whole.len);
+        return ArrView {
+            ptr,
+            base,
+            len,
+            array: true,
+        };
+    }
+    // An inline value's first word is element bytes, not a pointer, so the
+    // block reads below go through the value's own address instead — memory
+    // that is certainly there, read and then not used. That address is 8-aligned,
+    // so its tag bits read `Heap` and the element reads take the fast path, whose
+    // `base` is the value itself.
+    let tag = builder.ins().ushr_imm_u(w2, arr24::ARR_TAG_SHIFT as i64);
+    let is_inline = builder
+        .ins()
+        .icmp_imm_s(IntCC::Equal, tag, arr24::ATAG_INLINE as i64);
+    let ptr = builder.ins().select(is_inline, v, ptr);
+    let whole = block_view(builder, ptr);
     let base = builder.ins().select(is_window, data, whole.base);
-    let len = builder.ins().select(is_window, window_len, whole.len);
+    let base = builder.ins().select(is_inline, v, base);
+    let len = builder.ins().select(is_window, w2, whole.len);
+    let inline_len = builder
+        .ins()
+        .ushr_imm_u(w2, arr24::ARR_INLINE_LEN_SHIFT as i64);
+    let inline_len = builder.ins().band_imm_u(inline_len, 0xFF);
+    let len = builder.ins().select(is_inline, inline_len, len);
     ArrView {
         ptr,
         base,
@@ -11391,8 +11709,17 @@ fn emit_rc_w<M: Module>(
             // call anyway.
             // An array value is an address now; a set or dict is still the
             // tagged pointer itself. A window holds its one reference on the
-            // block in the same first word, so it needs nothing more.
+            // block in the same first word, so it needs nothing more; an inline
+            // value holds none, and its first word is element bytes, so it
+            // hands the runtime a null, which both entries pass over.
             let ptr = seq_ptr(builder, v, ty);
+            let ptr = if may_be_inline(ty) {
+                let inline = emit_is_inline(builder, v);
+                let null = builder.ins().iconst(types::I64, 0);
+                builder.ins().select(inline, null, ptr)
+            } else {
+                ptr
+            };
             if rc_statically_noop(builder.func, ptr, HEADER_SIZE) {
                 return;
             }
@@ -18750,11 +19077,10 @@ fn compile_call_expr<M: Module>(
             // Internal (in-place `filter`): `__filter_keep(arr, w, e)` stores
             // element `e` at slot `w` with a raw pointer copy — no refcount
             // change, since ownership relocates from `e`'s read slot to slot `w`.
-            let (a_val, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            let a_ptr = arr_ptr(builder, a_val);
+            let (a_val, a_ty) = writable_place(module, builder, cx, scopes, &args[0])?;
             let (w, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
             let (e, ety) = compile_expr(module, builder, cx, scopes, &args[2])?;
-            let base = builder.ins().iadd_imm_s(a_ptr, ARR_ELEMS_OFFSET as i64);
+            let base = writable_elems(builder, a_val, &a_ty);
             // Stride and store both follow the element type. They were a fixed 8
             // and a word store, on the in-place gate's assumption that an element
             // is never composite — true until a wide `str` became one. A
@@ -18779,12 +19105,35 @@ fn compile_call_expr<M: Module>(
             // Internal (in-place `filter`): set the array's length to `w`. The
             // dead tail `[w, old_len)` holds relocated/stale pointers and is
             // never released (the block is later freed by its capacity).
-            let (a_val, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            let a_ptr = arr_ptr(builder, a_val);
+            let (a_val, a_ty) = writable_place(module, builder, cx, scopes, &args[0])?;
             let (w, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
-            builder
-                .ins()
-                .store(MemFlagsData::trusted(), w, a_ptr, ARR_LEN_OFFSET as i32);
+            let flags = MemFlagsData::trusted();
+            let set_block_len = |builder: &mut FunctionBuilder| {
+                let a_ptr = arr_ptr(builder, a_val);
+                builder.ins().store(flags, w, a_ptr, ARR_LEN_OFFSET as i32);
+            };
+            if may_be_inline(&a_ty) {
+                // An inline buffer's length is its byte 22, not a block's word.
+                let inline = emit_is_inline(builder, a_val);
+                let inline_b = builder.create_block();
+                let block_b = builder.create_block();
+                let done = builder.create_block();
+                builder.ins().brif(inline, inline_b, &[], block_b, &[]);
+                builder.switch_to_block(inline_b);
+                builder.seal_block(inline_b);
+                builder
+                    .ins()
+                    .istore8(flags, w, a_val, arr24::ARR_INLINE_CAP as i32);
+                builder.ins().jump(done, &[]);
+                builder.switch_to_block(block_b);
+                builder.seal_block(block_b);
+                set_block_len(builder);
+                builder.ins().jump(done, &[]);
+                builder.switch_to_block(done);
+                builder.seal_block(done);
+            } else {
+                set_block_len(builder);
+            }
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         Callee::MapSet => {
@@ -18799,12 +19148,11 @@ fn compile_call_expr<M: Module>(
             // allocated with. When `T != U` the array's stored element drop-fn
             // (set for `T` when the buffer was built) is now wrong, so patch it to
             // `U`'s here.
-            let (a_val, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            let a_ptr = arr_ptr(builder, a_val);
+            let (a_val, a_ty) = writable_place(module, builder, cx, scopes, &args[0])?;
             let (i_val, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
             let (new_val, new_ty) = compile_expr(module, builder, cx, scopes, &args[2])?;
             let (old_val, old_ty) = compile_expr(module, builder, cx, scopes, &args[3])?;
-            let base = builder.ins().iadd_imm_s(a_ptr, ARR_ELEMS_OFFSET as i64);
+            let base = writable_elems(builder, a_val, &a_ty);
             // The block's stride is the *old* element type's — that is what it
             // was allocated with — while the value written is the new one. Both
             // were a fixed 8 until a wide `str` made an element composite.
@@ -18823,13 +19171,20 @@ fn compile_call_expr<M: Module>(
             emit_retain(builder, module, builtins, structs, new_val, &new_ty);
             emit_drop(builder, module, builtins, structs, old_val, &old_ty);
             store_elem(builder, addr, new_val, &new_ty, stride, structs);
-            let new_drop = array_drop_fn_addr(builder, module, cx, &new_ty);
-            builder.ins().store(
-                MemFlagsData::trusted(),
-                new_drop,
-                a_ptr,
-                ARR_DROPFN_OFFSET as i32,
-            );
+            // An integer buffer, which may be inline, has no header to patch —
+            // and needs none: the gate (`slot_fits`) keeps an integer input's
+            // output integers, whose drop-fn is the null an integer block
+            // already holds.
+            if !may_be_inline(&a_ty) {
+                let a_ptr = arr_ptr(builder, a_val);
+                let new_drop = array_drop_fn_addr(builder, module, cx, &new_ty);
+                builder.ins().store(
+                    MemFlagsData::trusted(),
+                    new_drop,
+                    a_ptr,
+                    ARR_DROPFN_OFFSET as i32,
+                );
+            }
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         Callee::Move => {
@@ -19022,6 +19377,22 @@ fn compile_call_expr<M: Module>(
                 .ins()
                 .iconst(types::I64, array_elem_size(&elem, structs));
             let zero = builder.ins().iconst(types::I64, 0);
+            // An inline input is writable as it stands — its elements are its
+            // own bytes — so it is copied out as a value and nothing else (the
+            // in-place bodies write it through `writable_elems`).
+            let (inline_b, merge) = if may_be_inline(&arr_ty) {
+                let inline = emit_is_inline(builder, arr_ptr);
+                let inline_b = builder.create_block();
+                let block_b = builder.create_block();
+                let merge = builder.create_block();
+                builder.append_block_param(merge, types::I64);
+                builder.ins().brif(inline, inline_b, &[], block_b, &[]);
+                builder.switch_to_block(block_b);
+                builder.seal_block(block_b);
+                (Some(inline_b), Some(merge))
+            } else {
+                (None, None)
+            };
             // The parameter's reference is this site's to consume, so a window
             // may be settled in place into a copy, which the reserve keeps.
             settle_array_slot(builder, module, cx, arr_ptr, &arr_ty);
@@ -19033,6 +19404,19 @@ fn compile_call_expr<M: Module>(
                 &[block, zero, drop_fn, retain_fn, esz],
             );
             let owned = arr_val(builder, owned);
+            let owned = match (inline_b, merge) {
+                (Some(inline_b), Some(merge)) => {
+                    builder.ins().jump(merge, &[BlockArg::Value(owned)]);
+                    builder.switch_to_block(inline_b);
+                    builder.seal_block(inline_b);
+                    let copy = copy_slot_value(builder, arr_ptr, arr24::ARR_SIZE as u32);
+                    builder.ins().jump(merge, &[BlockArg::Value(copy)]);
+                    builder.switch_to_block(merge);
+                    builder.seal_block(merge);
+                    builder.block_params(merge)[0]
+                }
+                _ => owned,
+            };
             scopes
                 .last_mut()
                 .expect("scope")
@@ -19067,7 +19451,32 @@ fn compile_call_expr<M: Module>(
             // 8-byte-element outputs (optional outputs use a plain `[]`).
             let zero = builder.ins().iconst(types::I64, 0); // drop_fn
             let esz = builder.ins().iconst(types::I64, 8); // elem_size
-            let ptr = builtins.call(module, builder, "aipl_array_with_cap", &[cap, zero, esz]);
+                                                           // A reservation every integer element type holds inline (2, at a
+                                                           // word apiece) starts from the shared empty block instead: the first
+                                                           // push of an integer makes the array inline anyway
+                                                           // (`arr24::aipl_arr_push_small`), so a block allocated here would
+                                                           // only be freed again. Any other element type grows from nothing,
+                                                           // which for two elements is the same one allocation.
+            let small = builder.ins().icmp_imm_u(
+                IntCC::UnsignedLessThanOrEqual,
+                cap,
+                (arr24::ARR_INLINE_CAP / 8) as i64,
+            );
+            // The shared empty block's pointer (not an array value).
+            let empty = emit_const_empty(module, builder, cx)?;
+            let alloc_b = builder.create_block();
+            let merge = builder.create_block();
+            builder.append_block_param(merge, types::I64);
+            builder
+                .ins()
+                .brif(small, merge, &[BlockArg::Value(empty)], alloc_b, &[]);
+            builder.switch_to_block(alloc_b);
+            builder.seal_block(alloc_b);
+            let block = builtins.call(module, builder, "aipl_array_with_cap", &[cap, zero, esz]);
+            builder.ins().jump(merge, &[BlockArg::Value(block)]);
+            builder.switch_to_block(merge);
+            builder.seal_block(merge);
+            let ptr = builder.block_params(merge)[0];
             let arr_ty = ConcreteType::Array(Box::new(ConcreteType::NoneInner));
             let value = arr_val(builder, ptr);
             scopes
@@ -19259,7 +19668,11 @@ fn compile_call_expr<M: Module>(
             let receiver = &args[0];
             let value = &args[1];
             let (slot, ty_cell, exclusive, elem_ty) = mut_array_receiver(env, receiver, "push")?;
-            let arr_ptr = mut_array_block(builder, module, cx, slot, &elem_ty);
+            // The element first, then the receiver: an integer array's push may
+            // keep the value inline, which has to be decided before anything
+            // settles the slot into a block (`emit_int_push`). Nothing the
+            // element evaluates can write the slot — an expression cannot assign
+            // a binding declared outside it.
             let (x_v, x_ty) = compile_expr(module, builder, cx, scopes, value)?;
             let elem_was_none = is_none_inner(&elem_ty);
             // An empty array (`__none__` element) takes its element type from
@@ -19302,6 +19715,13 @@ fn compile_call_expr<M: Module>(
                 builder.ins().stack_addr(types::I64, s, 0)
             };
             let new_arr_ty = ConcreteType::Array(Box::new(result_elem));
+            if may_be_inline(&new_arr_ty) {
+                let width = array_elem_size(&new_arr_ty_elem(&new_arr_ty), structs);
+                emit_int_push(module, builder, cx, scopes, slot, exclusive, x_ptr, width);
+                *ty_cell.borrow_mut() = new_arr_ty;
+                return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
+            }
+            let arr_ptr = mut_array_block(builder, module, cx, slot, &new_arr_ty_elem(&new_arr_ty));
             if is_char_array(&new_arr_ty) {
                 // `char[]` is str-shaped (see `is_char_array`) and `str` has no
                 // in-place-growable form yet: every push rebuilds a fresh
@@ -22473,6 +22893,16 @@ fn compile_expr_inner<M: Module>(
                     .last_mut()
                     .expect("scope")
                     .push(Tracked::new(value, &arr_ty));
+                return Ok((value, arr_ty));
+            }
+            // Inline when it fits — and only here, for a literal that would
+            // otherwise allocate. A *constant* one (above) is a static block,
+            // which is already free, and stays one: as an inline value it would
+            // be copied into a block every time something that takes one is
+            // handed it (`extend`'s source, a spread, `reverse`).
+            if inline_fits(&elem, vals.len(), structs) {
+                let words: Vec<Value> = vals.iter().map(|(v, _, _)| *v).collect();
+                let value = emit_inline_array(builder, &words, array_elem_size(&elem, structs));
                 return Ok((value, arr_ty));
             }
             let len = builder.ins().iconst(types::I64, elems.len() as i64);

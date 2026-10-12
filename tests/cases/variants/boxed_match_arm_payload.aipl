@@ -58,13 +58,13 @@ copy once:          [a b]
 --- performance ---
 allocations: 23
 deallocations: 23
-reallocations: 0
-bytes allocated: 1439
-instructions executed: 2124
-binary size: 8264
-  code: 5420
+reallocations: 2
+bytes allocated: 1423
+instructions executed: 2168
+binary size: 8472
+  code: 5536
   data: 33
-  metadata: 2811
+  metadata: 2903
 functions:
   __arr_drop_R:
     calls: 3
@@ -79,16 +79,16 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 13
+    calls: 15
     bytes: (external)
   aipl_array_new:
     calls: 1
     bytes: (external)
+  aipl_array_push:
+    calls: 2
+    bytes: (external)
   aipl_array_push_mut:
     calls: 4
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 2
     bytes: (external)
   aipl_rec_alloc:
     calls: 11
@@ -101,7 +101,7 @@ functions:
     bytes: (external)
   copy_or:
     calls: 8
-    bytes: 792
+    bytes: 908
   main:
     calls: 1
     bytes: 1116

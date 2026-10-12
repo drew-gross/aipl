@@ -156,15 +156,15 @@ fn main() !prints {
 0,2,4
 10,6
 --- performance ---
-allocations: 47
-deallocations: 47
-reallocations: 10
-bytes allocated: 1165
-instructions executed: 6890
-binary size: 13584
-  code: 8988
+allocations: 40
+deallocations: 40
+reallocations: 1
+bytes allocated: 957
+instructions executed: 7897
+binary size: 15960
+  code: 11308
   data: 377
-  metadata: 4219
+  metadata: 4275
 functions:
   __to_str_i64:
     calls: 20
@@ -176,19 +176,25 @@ functions:
     calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 19
+    calls: 16
     bytes: (external)
   aipl_arr_reserve:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 41
+    calls: 37
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
     bytes: (external)
   aipl_array_push:
-    calls: 10
+    calls: 1
     bytes: (external)
   aipl_array_push_mut:
-    calls: 18
+    calls: 2
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 2
     bytes: (external)
   aipl_i64_len:
     calls: 40
@@ -204,13 +210,13 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 5052
+    bytes: 7116
   main$filter_map2$own0:
     calls: 1
-    bytes: 624
+    bytes: 776
   show:
     calls: 8
-    bytes: 1452
+    bytes: 1504
   show_u:
     calls: 2
-    bytes: 1452
+    bytes: 1504

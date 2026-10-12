@@ -1092,13 +1092,13 @@ fn echo(matched: str) -> str { matched }
 --- performance ---
 allocations: 735
 deallocations: 735
-reallocations: 101
-bytes allocated: 92529
-instructions executed: 83297
-binary size: 173088
-  code: 109420
+reallocations: 83
+bytes allocated: 92737
+instructions executed: 84125
+binary size: 173568
+  code: 109836
   data: 6884
-  metadata: 56784
+  metadata: 56848
 functions:
   __arr_drop_ListStyle:
     calls: 27
@@ -1141,7 +1141,7 @@ functions:
     bytes: 1408
   __builtin_try_map$Rule$Kind$Rule$Kind$ParseError$lam$desugar_rule$Kind:
     calls: 6
-    bytes: 720
+    bytes: 740
   __ctor$Node$List:
     calls: 0
     bytes: 136
@@ -1203,19 +1203,19 @@ functions:
     calls: 15
     bytes: (external)
   aipl_array_dec:
-    calls: 549
+    calls: 567
     bytes: (external)
   aipl_array_new:
     calls: 41
     bytes: (external)
   aipl_array_push:
-    calls: 39
+    calls: 57
     bytes: (external)
   aipl_array_push_mut:
     calls: 142
     bytes: (external)
   aipl_array_with_cap:
-    calls: 19
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 41
@@ -1267,7 +1267,7 @@ functions:
     bytes: 488
   group_styles$into$Kind$own0:
     calls: 82
-    bytes: 3376
+    bytes: 3384
   group_styles$len$Kind:
     calls: 0
     bytes: 32
@@ -1276,7 +1276,7 @@ functions:
     bytes: 1932
   link$Kind$Node:
     calls: 15
-    bytes: 2908
+    bytes: 2920
   link_opt$Kind:
     calls: 17
     bytes: 596
@@ -1285,16 +1285,16 @@ functions:
     bytes: 6816
   link_rules$Kind:
     calls: 6
-    bytes: 808
+    bytes: 816
   main:
     calls: 1
     bytes: 316
   prod_names$Kind$Node:
     calls: 19
-    bytes: 704
+    bytes: 824
   show_rule$Kind:
     calls: 71
-    bytes: 8908
+    bytes: 9076
   show_style$own0:
     calls: 3
-    bytes: 2000
+    bytes: 2080

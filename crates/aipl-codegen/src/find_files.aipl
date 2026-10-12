@@ -33,15 +33,15 @@ pub fn with_extension(self: str[], ext: str) -> str[] {
     assert(["a.aipl/b.txt"].with_extension(".aipl") == []);
 })
 --- performance ---
-allocations: 18
-deallocations: 18
+allocations: 16
+deallocations: 16
 reallocations: 3
-bytes allocated: 1064
-instructions executed: 2139
-binary size: 12936
-  code: 7712
+bytes allocated: 992
+instructions executed: 2261
+binary size: 14248
+  code: 8544
   data: 642
-  metadata: 4582
+  metadata: 5062
 functions:
   __eq_str$arr:
     calls: 6
@@ -51,7 +51,7 @@ functions:
     bytes: 388
   __test$with_extension:
     calls: 1
-    bytes: 5692
+    bytes: 6404
   aipl_arr_inc:
     calls: 6
     bytes: (external)
@@ -68,7 +68,7 @@ functions:
     calls: 6
     bytes: (external)
   aipl_array_with_cap:
-    calls: 7
+    calls: 5
     bytes: (external)
   aipl_assert:
     calls: 7
@@ -87,7 +87,7 @@ functions:
     bytes: (external)
   find_files:
     calls: 1
-    bytes: 1036
+    bytes: 1156
   main:
     calls: 1
     bytes: 184
