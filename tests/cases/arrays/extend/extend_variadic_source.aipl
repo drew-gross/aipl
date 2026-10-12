@@ -91,24 +91,24 @@ allocations: 20
 deallocations: 20
 reallocations: 2
 bytes allocated: 926
-instructions executed: 3548
-binary size: 14720
-  code: 9416
-  data: 359
-  metadata: 4945
+instructions executed: 3500
+binary size: 14504
+  code: 9372
+  data: 182
+  metadata: 4950
 functions:
   __to_str_bool:
     calls: 1
-    bytes: 232
+    bytes: 224
   __to_str_char$arr:
     calls: 1
-    bytes: 768
+    bytes: 756
   __to_str_i64$arr:
     calls: 3
-    bytes: 716
+    bytes: 704
   __to_str_str$arr:
     calls: 1
-    bytes: 792
+    bytes: 780
   __to_str_u64:
     calls: 1
     bytes: 204

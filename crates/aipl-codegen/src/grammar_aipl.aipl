@@ -4944,10 +4944,10 @@ deallocations: 1606725
 reallocations: 311087
 bytes allocated: 334773378
 instructions executed: 521952198
-binary size: 7037488
-  code: 4689384
-  data: 62684
-  metadata: 2285420
+binary size: 7037272
+  code: 4689340
+  data: 62523
+  metadata: 2285409
 functions:
   __arr_drop___m11__ModeFrame:
     calls: 298
@@ -5857,7 +5857,7 @@ functions:
     bytes: 84
   __to_str___m7__ParseError:
     calls: 0
-    bytes: 836
+    bytes: 792
   __to_str_i64:
     calls: 106
     bytes: 204

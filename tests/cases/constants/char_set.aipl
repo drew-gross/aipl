@@ -42,15 +42,15 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 152
-instructions executed: 465
-binary size: 3056
-  code: 1652
-  data: 47
-  metadata: 1357
+instructions executed: 445
+binary size: 3016
+  code: 1644
+  data: 14
+  metadata: 1358
 functions:
   __to_str_bool:
     calls: 5
-    bytes: 232
+    bytes: 224
   __to_str_u64:
     calls: 3
     bytes: 204

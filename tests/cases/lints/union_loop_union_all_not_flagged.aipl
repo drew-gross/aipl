@@ -175,18 +175,18 @@ allocations: 100
 deallocations: 100
 reallocations: 0
 bytes allocated: 3139
-instructions executed: 10756
-binary size: 17936
-  code: 12016
-  data: 75
-  metadata: 5845
+instructions executed: 10748
+binary size: 17864
+  code: 12004
+  data: 26
+  metadata: 5834
 functions:
   __to_str_i64:
     calls: 30
     bytes: 204
   __to_str_setdesc$i64:
     calls: 1
-    bytes: 580
+    bytes: 568
   __to_str_u64:
     calls: 3
     bytes: 204

@@ -146,24 +146,24 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 277
-instructions executed: 1796
-binary size: 8480
-  code: 5340
-  data: 263
-  metadata: 2877
+instructions executed: 1760
+binary size: 8376
+  code: 5320
+  data: 182
+  metadata: 2874
 functions:
   __builtin_find_if$i64$lam$main$lambda0:
     calls: 1
     bytes: 224
   __to_str_bool:
     calls: 1
-    bytes: 232
+    bytes: 224
   __to_str_i64:
     calls: 3
     bytes: 204
   __to_str_i64$opt:
     calls: 8
-    bytes: 388
+    bytes: 376
   aipl_array_dec:
     calls: 1
     bytes: (external)

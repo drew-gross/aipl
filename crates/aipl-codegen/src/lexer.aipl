@@ -1474,10 +1474,10 @@ deallocations: 283
 reallocations: 4
 bytes allocated: 74112
 instructions executed: 685848
-binary size: 813880
-  code: 547984
-  data: 9164
-  metadata: 256732
+binary size: 813680
+  code: 547940
+  data: 9003
+  metadata: 256737
 functions:
   __arr_drop_Kind:
     calls: 88
@@ -1607,7 +1607,7 @@ functions:
     bytes: 84
   __to_str_LexError:
     calls: 0
-    bytes: 836
+    bytes: 792
   __to_str_str:
     calls: 0
     bytes: 300

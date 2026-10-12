@@ -67,10 +67,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 112
 instructions executed: 1690
-binary size: 10328
+binary size: 10320
   code: 5448
   data: 1330
-  metadata: 3550
+  metadata: 3542
 functions:
   __test$find_index:
     calls: 1

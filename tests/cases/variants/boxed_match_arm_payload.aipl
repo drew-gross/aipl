@@ -61,10 +61,10 @@ deallocations: 23
 reallocations: 2
 bytes allocated: 1423
 instructions executed: 2009
-binary size: 8032
+binary size: 8024
   code: 5288
   data: 9
-  metadata: 2735
+  metadata: 2727
 functions:
   __arr_drop_R:
     calls: 3

@@ -1,15 +1,10 @@
 // NOTE: plain `//` comments, not `//!` module docs, and no inner attributes:
 // this file is `include!`d by the AOT runtime, which can carry neither.
 //
-// The 256-bit `#{char}` value — one bit per `char`, implemented and tested on
-// its own before anything is switched over to it.
-//
-// **Not wired up yet.** Switching a type's representation is atomic: the
-// runtime, codegen, and every checked-in `.clif` have to agree, so there is no
-// way to land it a piece at a time. What *can* be de-risked first is this — the
-// layout, its invariants, and the operations that read and build it, proven by
-// ordinary Rust tests with no compiler in the loop. `str24.rs` was staged the
-// same way and says more about why.
+// The 256-bit `#{char}` value — one bit per `char`. Codegen builds and combines
+// these inline; what the runtime needs of it is the cursor entries at the end
+// (`aipl_charset_next` / `_prev`), and the `CharSet` methods behind them. The
+// rest of the methods are the model the layout's tests are written against.
 //
 // # One copy, two runtimes
 //
@@ -61,11 +56,13 @@ pub(crate) struct CharSet {
 impl CharSet {
     /// The empty set. Also what zeroed memory reads as, which matters because
     /// fresh array slots and sret buffers arrive zero-filled.
+    #[cfg(test)]
     pub(crate) fn empty() -> CharSet {
         CharSet { words: [0; 4] }
     }
 
     /// Every char — the complement of the empty set.
+    #[cfg(test)]
     pub(crate) fn full() -> CharSet {
         CharSet { words: [!0; 4] }
     }
@@ -73,6 +70,7 @@ impl CharSet {
     /// The set of exactly the bytes in `bytes`. Duplicates are free: setting a
     /// bit twice is setting it once, which is why building a set from a literal
     /// needs no de-duplication pass.
+    #[cfg(test)]
     pub(crate) fn from_bytes(bytes: &[u8]) -> CharSet {
         let mut s = CharSet::empty();
         for &b in bytes {
@@ -82,38 +80,46 @@ impl CharSet {
     }
 
     /// Whether `c` is a member: one shift and one mask.
+    #[cfg(test)]
     pub(crate) fn contains(self, c: u8) -> bool {
         let c = c as usize;
         self.words[c >> 6] >> (c & 63) & 1 != 0
     }
 
+    #[cfg(test)]
     pub(crate) fn insert(&mut self, c: u8) {
         let c = c as usize;
         self.words[c >> 6] |= 1u64 << (c & 63);
     }
 
+    #[cfg(test)]
     pub(crate) fn remove(&mut self, c: u8) {
         let c = c as usize;
         self.words[c >> 6] &= !(1u64 << (c & 63));
     }
 
+    #[cfg(test)]
     pub(crate) fn union(self, other: CharSet) -> CharSet {
         self.zip(other, |a, b| a | b)
     }
 
+    #[cfg(test)]
     pub(crate) fn intersect(self, other: CharSet) -> CharSet {
         self.zip(other, |a, b| a & b)
     }
 
     /// The members of `self` that are not in `other`.
+    #[cfg(test)]
     pub(crate) fn difference(self, other: CharSet) -> CharSet {
         self.zip(other, |a, b| a & !b)
     }
 
+    #[cfg(test)]
     pub(crate) fn is_subset_of(self, other: CharSet) -> bool {
         self.difference(other).is_empty()
     }
 
+    #[cfg(test)]
     fn zip(self, other: CharSet, f: impl Fn(u64, u64) -> u64) -> CharSet {
         let mut out = CharSet::empty();
         for i in 0..4 {
@@ -123,6 +129,7 @@ impl CharSet {
     }
 
     /// How many members — a popcount per word, not a walk.
+    #[cfg(test)]
     pub(crate) fn len(self) -> usize {
         let mut n = 0;
         for i in 0..4 {
@@ -131,6 +138,7 @@ impl CharSet {
         n
     }
 
+    #[cfg(test)]
     pub(crate) fn is_empty(self) -> bool {
         self.words == [0; 4]
     }

@@ -59,10 +59,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 112
 instructions executed: 1554
-binary size: 10176
+binary size: 10168
   code: 5332
   data: 1268
-  metadata: 3576
+  metadata: 3568
 functions:
   __test$find_if:
     calls: 1

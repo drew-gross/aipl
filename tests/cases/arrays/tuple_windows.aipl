@@ -45,11 +45,11 @@ allocations: 19
 deallocations: 19
 reallocations: 1
 bytes allocated: 920
-instructions executed: 2103
-binary size: 9848
-  code: 5752
-  data: 279
-  metadata: 3817
+instructions executed: 2085
+binary size: 9688
+  code: 5720
+  data: 150
+  metadata: 3818
 functions:
   __arr_drop___tuple$str$str:
     calls: 1
@@ -62,10 +62,10 @@ functions:
     bytes: 556
   __to_str___tuple$str$str$opt:
     calls: 1
-    bytes: 796
+    bytes: 772
   __to_str_bool:
     calls: 2
-    bytes: 232
+    bytes: 224
   __to_str_i64:
     calls: 7
     bytes: 204

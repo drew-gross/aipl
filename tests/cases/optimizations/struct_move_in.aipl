@@ -77,11 +77,11 @@ allocations: 48
 deallocations: 48
 reallocations: 3
 bytes allocated: 2930
-instructions executed: 7158
-binary size: 20248
-  code: 12764
-  data: 580
-  metadata: 6904
+instructions executed: 6980
+binary size: 19768
+  code: 12672
+  data: 195
+  metadata: 6901
 functions:
   __arr_drop_First:
     calls: 2
@@ -91,10 +91,10 @@ functions:
     bytes: 152
   __to_str_First:
     calls: 3
-    bytes: 1524
+    bytes: 1464
   __to_str_Named:
     calls: 6
-    bytes: 1132
+    bytes: 1100
   __to_str_u64:
     calls: 2
     bytes: 204

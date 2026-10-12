@@ -69,9 +69,9 @@
 //
 // Every place that uses an array pointer as a memory base strips the tag
 // first (`arr_untag`), and every place that depends on the shape classifies once
-// (`arr_repr`) and matches on the result — the pattern `str_repr`/`StrRepr`
-// set, so that a new representation is a compile error at each site that
-// does not yet handle it rather than a silent fall-through.
+// (`arr_repr`) and matches on the result, so that a new representation is a
+// compile error at each site that does not yet handle it rather than a silent
+// fall-through.
 
 /// Where the first element is, relative to the base. A name rather than a bare
 /// zero so the places that step from a block to its elements say so.

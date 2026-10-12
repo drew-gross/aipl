@@ -1769,10 +1769,10 @@ deallocations: 5529
 reallocations: 975
 bytes allocated: 706844
 instructions executed: 2414752
-binary size: 798328
-  code: 512448
-  data: 13012
-  metadata: 272868
+binary size: 798120
+  code: 512404
+  data: 12851
+  metadata: 272865
 functions:
   __arr_drop_Node:
     calls: 18
@@ -2100,7 +2100,7 @@ functions:
     bytes: 84
   __to_str___m3__ParseError:
     calls: 0
-    bytes: 836
+    bytes: 792
   __to_str_u64:
     calls: 7
     bytes: 204

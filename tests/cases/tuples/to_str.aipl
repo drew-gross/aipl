@@ -24,24 +24,24 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 199
-instructions executed: 1351
-binary size: 9432
-  code: 4756
-  data: 659
-  metadata: 4017
+instructions executed: 1289
+binary size: 8896
+  code: 4648
+  data: 226
+  metadata: 4022
 functions:
   __to_str___tuple$bool$str$opt:
     calls: 1
-    bytes: 736
+    bytes: 704
   __to_str___tuple$i64$__tuple_i64_i64$arr_i64:
     calls: 1
-    bytes: 1184
+    bytes: 1144
   __to_str___tuple$i64$char$arr:
     calls: 1
-    bytes: 876
+    bytes: 852
   __to_str___tuple$i64$str:
     calls: 2
-    bytes: 484
+    bytes: 472
   aipl_arr_inc:
     calls: 1
     bytes: (external)

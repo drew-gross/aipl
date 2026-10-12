@@ -69,11 +69,11 @@ allocations: 12
 deallocations: 12
 reallocations: 0
 bytes allocated: 246
-instructions executed: 1253
-binary size: 5072
-  code: 2780
-  data: 159
-  metadata: 2133
+instructions executed: 1205
+binary size: 5032
+  code: 2772
+  data: 126
+  metadata: 2134
 functions:
   __builtin_all$i64$lam$main$lambda2:
     calls: 1
@@ -95,7 +95,7 @@ functions:
     bytes: 172
   __to_str_bool:
     calls: 12
-    bytes: 232
+    bytes: 224
   aipl_write_bytes:
     calls: 12
     bytes: (external)

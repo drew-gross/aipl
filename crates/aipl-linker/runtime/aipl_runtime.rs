@@ -17,16 +17,6 @@ use core::panic::PanicInfo;
 #[cfg(aipl_instrument)]
 use core::sync::atomic::{AtomicU64, Ordering};
 
-// Refcount prefix shared by every refcounted heap block (strings AND arrays):
-// the i64 refcount is at `ptr - HEADER_SIZE`, so `header_of`/inc/dec are common.
-const HEADER_SIZE: usize = 8;
-// A heap *string* also stores its content length, in a word *before* the
-// refcount (keeping the refcount at `ptr - HEADER_SIZE`, shared with arrays):
-// `[len: i64][refcount: i64][content][NUL]`, value → content. See the JIT
-// runtime for the full description.
-const STR_HEADER_SIZE: usize = 16;
-const STATIC_REFCOUNT: i64 = buffer::STATIC_REFCOUNT;
-
 extern "C" {
     fn malloc(size: usize) -> *mut c_void;
     fn realloc(ptr: *mut c_void, size: usize) -> *mut c_void;
@@ -34,7 +24,6 @@ extern "C" {
     fn abort() -> !;
     fn strlen(s: *const c_char) -> usize;
     fn memcpy(dst: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
-    fn memmove(dst: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
     fn write(fd: c_int, buf: *const c_void, count: usize) -> isize;
 }
 
@@ -116,89 +105,35 @@ mod builtin_calls {
     /// sorted so the reported breakdown has a stable order, with the `AIPL_*`
     /// constants below indexing it.
     ///
-    /// Maintained by hand, and *not* the set that is actually counted: a slot is
-    /// only ever bumped by a `count_builtin!` at the entry point itself, and the
-    /// `str` entry points moved into the shared `str24` module without one — which
-    /// is why `AIPL_CONCAT`, `AIPL_INC` and their neighbours read as unused, and
-    /// why no `aipl_str_*` row appears in a `--- performance ---` breakdown.
+    /// Maintained by hand, and exactly the set that is counted: a slot is only
+    /// ever bumped by a `count_builtin!` at the entry point itself. The shared
+    /// modules (`str24`, `arr24`, `array_ops`) have no host-specific counter to
+    /// reach, so their entry points are not here — nor do they show in a
+    /// `--- performance ---` breakdown.
     pub const NAMES: &[&[u8]] = &[
-        b"aipl_arr_drop_arr\0",
-        b"aipl_arr_drop_opt_arr\0",
-        b"aipl_arr_drop_opt_str\0",
-        b"aipl_arr_drop_str\0",
-        b"aipl_arr_elem_ptr\0",
-        b"aipl_arr_extend\0",
         b"aipl_arr_inc\0",
-        b"aipl_arr_join\0",
-        b"aipl_arr_load_bit\0",
-        b"aipl_arr_reserve\0",
-        b"aipl_arr_retain_opt\0",
-        b"aipl_arr_retain_ptr\0",
-        b"aipl_arr_reverse\0",
-        b"aipl_arr_slice\0",
-        b"aipl_arr_sort\0",
         b"aipl_array_dec\0",
         b"aipl_array_new\0",
-        b"aipl_array_push\0",
-        b"aipl_array_push_mut\0",
         b"aipl_array_with_cap\0",
         b"aipl_assert\0",
-        b"aipl_char_at\0",
-        b"aipl_concat\0",
-        b"aipl_concat_lazy\0",
-        b"aipl_concat_mut\0",
-        b"aipl_dec\0",
-        b"aipl_dict_contains_key\0",
-        b"aipl_dict_get\0",
-        b"aipl_dict_insert\0",
-        b"aipl_dict_remove\0",
         b"aipl_execute_program\0",
         b"aipl_i64_len\0",
-        b"aipl_inc\0",
         b"aipl_list_files\0",
         b"aipl_monotonic_now\0",
         b"aipl_now_nanos\0",
-        b"aipl_print\0",
-        b"aipl_print_error\0",
         b"aipl_read_file_to_string\0",
         b"aipl_rec_alloc\0",
         b"aipl_rec_dec_strong\0",
         b"aipl_rec_dec_weak\0",
         b"aipl_rec_inc_strong\0",
         b"aipl_rec_inc_weak\0",
-        b"aipl_set_contains\0",
-        b"aipl_set_insert\0",
-        b"aipl_set_union\0",
-        b"aipl_set_union_mut\0",
         b"aipl_shim_get\0",
         b"aipl_shim_set\0",
-        b"aipl_str_alloc\0",
-        b"aipl_str_cmp\0",
-        b"aipl_str_contains\0",
-        b"aipl_str_data\0",
-        b"aipl_str_ends_with\0",
-        b"aipl_str_ends_with_char\0",
-        b"aipl_str_eq\0",
-        b"aipl_str_hash\0",
-        b"aipl_str_iter_init\0",
-        b"aipl_str_iter_next\0",
-        b"aipl_str_join\0",
-        b"aipl_str_len\0",
-        b"aipl_str_repeat\0",
-        b"aipl_str_reverse\0",
-        b"aipl_str_slice\0",
-        b"aipl_str_sort\0",
-        b"aipl_str_split\0",
-        b"aipl_str_starts_with\0",
-        b"aipl_str_starts_with_at\0",
-        b"aipl_str_starts_with_char\0",
         b"aipl_test_begin\0",
         b"aipl_test_end\0",
         b"aipl_test_fail\0",
         b"aipl_test_fail_none\0",
         b"aipl_test_summary\0",
-        b"aipl_trim\0",
-        b"aipl_trim_mut\0",
         b"aipl_u64_len\0",
         b"aipl_write_bytes\0",
         b"aipl_write_i64\0",
@@ -208,88 +143,34 @@ mod builtin_calls {
 
     pub static COUNTS: [AtomicU64; NAMES.len()] = [const { AtomicU64::new(0) }; NAMES.len()];
 
-    pub const AIPL_ARR_DROP_ARR: usize = 0;
-    pub const AIPL_ARR_DROP_OPT_ARR: usize = 1;
-    pub const AIPL_ARR_DROP_OPT_STR: usize = 2;
-    pub const AIPL_ARR_DROP_STR: usize = 3;
-    pub const AIPL_ARR_ELEM_PTR: usize = 4;
-    pub const AIPL_ARR_EXTEND: usize = 5;
-    pub const AIPL_ARR_INC: usize = 6;
-    pub const AIPL_ARR_JOIN: usize = 7;
-    pub const AIPL_ARR_LOAD_BIT: usize = 8;
-    pub const AIPL_ARR_RESERVE: usize = 9;
-    pub const AIPL_ARR_RETAIN_OPT: usize = 10;
-    pub const AIPL_ARR_RETAIN_PTR: usize = 11;
-    pub const AIPL_ARR_REVERSE: usize = 12;
-    pub const AIPL_ARR_SLICE: usize = 13;
-    pub const AIPL_ARR_SORT: usize = 14;
-    pub const AIPL_ARRAY_DEC: usize = 15;
-    pub const AIPL_ARRAY_NEW: usize = 16;
-    pub const AIPL_ARRAY_PUSH: usize = 17;
-    pub const AIPL_ARRAY_PUSH_MUT: usize = 18;
-    pub const AIPL_ARRAY_WITH_CAP: usize = 19;
-    pub const AIPL_ASSERT: usize = 20;
-    pub const AIPL_CHAR_AT: usize = 21;
-    pub const AIPL_CONCAT: usize = 22;
-    pub const AIPL_CONCAT_LAZY: usize = 23;
-    pub const AIPL_CONCAT_MUT: usize = 24;
-    pub const AIPL_DEC: usize = 25;
-    pub const AIPL_DICT_CONTAINS_KEY: usize = 26;
-    pub const AIPL_DICT_GET: usize = 27;
-    pub const AIPL_DICT_INSERT: usize = 28;
-    pub const AIPL_DICT_REMOVE: usize = 29;
-    pub const AIPL_EXECUTE_PROGRAM: usize = 30;
-    pub const AIPL_I64_LEN: usize = 31;
-    pub const AIPL_INC: usize = 32;
-    pub const AIPL_LIST_FILES: usize = 33;
-    pub const AIPL_MONOTONIC_NOW: usize = 34;
-    pub const AIPL_NOW_NANOS: usize = 35;
-    pub const AIPL_PRINT: usize = 36;
-    pub const AIPL_PRINT_ERROR: usize = 37;
-    pub const AIPL_READ_FILE_TO_STRING: usize = 38;
-    pub const AIPL_REC_ALLOC: usize = 39;
-    pub const AIPL_REC_DEC_STRONG: usize = 40;
-    pub const AIPL_REC_DEC_WEAK: usize = 41;
-    pub const AIPL_REC_INC_STRONG: usize = 42;
-    pub const AIPL_REC_INC_WEAK: usize = 43;
-    pub const AIPL_SET_CONTAINS: usize = 44;
-    pub const AIPL_SET_INSERT: usize = 45;
-    pub const AIPL_SET_UNION: usize = 46;
-    pub const AIPL_SET_UNION_MUT: usize = 47;
-    pub const AIPL_SHIM_GET: usize = 48;
-    pub const AIPL_SHIM_SET: usize = 49;
-    pub const AIPL_STR_ALLOC: usize = 50;
-    pub const AIPL_STR_CMP: usize = 51;
-    pub const AIPL_STR_CONTAINS: usize = 52;
-    pub const AIPL_STR_DATA: usize = 53;
-    pub const AIPL_STR_ENDS_WITH: usize = 54;
-    pub const AIPL_STR_ENDS_WITH_CHAR: usize = 55;
-    pub const AIPL_STR_EQ: usize = 56;
-    pub const AIPL_STR_HASH: usize = 57;
-    pub const AIPL_STR_ITER_INIT: usize = 58;
-    pub const AIPL_STR_ITER_NEXT: usize = 59;
-    pub const AIPL_STR_JOIN: usize = 60;
-    pub const AIPL_STR_LEN: usize = 61;
-    pub const AIPL_STR_REPEAT: usize = 62;
-    pub const AIPL_STR_REVERSE: usize = 63;
-    pub const AIPL_STR_SLICE: usize = 64;
-    pub const AIPL_STR_SORT: usize = 65;
-    pub const AIPL_STR_SPLIT: usize = 66;
-    pub const AIPL_STR_STARTS_WITH: usize = 67;
-    pub const AIPL_STR_STARTS_WITH_AT: usize = 68;
-    pub const AIPL_STR_STARTS_WITH_CHAR: usize = 69;
-    pub const AIPL_TEST_BEGIN: usize = 70;
-    pub const AIPL_TEST_END: usize = 71;
-    pub const AIPL_TEST_FAIL: usize = 72;
-    pub const AIPL_TEST_FAIL_NONE: usize = 73;
-    pub const AIPL_TEST_SUMMARY: usize = 74;
-    pub const AIPL_TRIM: usize = 75;
-    pub const AIPL_TRIM_MUT: usize = 76;
-    pub const AIPL_U64_LEN: usize = 77;
-    pub const AIPL_WRITE_BYTES: usize = 78;
-    pub const AIPL_WRITE_I64: usize = 79;
-    pub const AIPL_WRITE_STRING_TO_FILE: usize = 80;
-    pub const AIPL_WRITE_U64: usize = 81;
+    pub const AIPL_ARR_INC: usize = 0;
+    pub const AIPL_ARRAY_DEC: usize = 1;
+    pub const AIPL_ARRAY_NEW: usize = 2;
+    pub const AIPL_ARRAY_WITH_CAP: usize = 3;
+    pub const AIPL_ASSERT: usize = 4;
+    pub const AIPL_EXECUTE_PROGRAM: usize = 5;
+    pub const AIPL_I64_LEN: usize = 6;
+    pub const AIPL_LIST_FILES: usize = 7;
+    pub const AIPL_MONOTONIC_NOW: usize = 8;
+    pub const AIPL_NOW_NANOS: usize = 9;
+    pub const AIPL_READ_FILE_TO_STRING: usize = 10;
+    pub const AIPL_REC_ALLOC: usize = 11;
+    pub const AIPL_REC_DEC_STRONG: usize = 12;
+    pub const AIPL_REC_DEC_WEAK: usize = 13;
+    pub const AIPL_REC_INC_STRONG: usize = 14;
+    pub const AIPL_REC_INC_WEAK: usize = 15;
+    pub const AIPL_SHIM_GET: usize = 16;
+    pub const AIPL_SHIM_SET: usize = 17;
+    pub const AIPL_TEST_BEGIN: usize = 18;
+    pub const AIPL_TEST_END: usize = 19;
+    pub const AIPL_TEST_FAIL: usize = 20;
+    pub const AIPL_TEST_FAIL_NONE: usize = 21;
+    pub const AIPL_TEST_SUMMARY: usize = 22;
+    pub const AIPL_U64_LEN: usize = 23;
+    pub const AIPL_WRITE_BYTES: usize = 24;
+    pub const AIPL_WRITE_I64: usize = 25;
+    pub const AIPL_WRITE_STRING_TO_FILE: usize = 26;
+    pub const AIPL_WRITE_U64: usize = 27;
 }
 
 // ---------- Per-AIPL-function call counts (instrumented build only) ----------
@@ -372,18 +253,17 @@ mod str24 {
     include!("../../aipl-codegen/src/str24.rs");
 }
 
-// STAGED the same way, and for the same reason: the 24-byte array value, shared
-// verbatim rather than mirrored by hand. See the file's header.
-#[allow(dead_code)] // staged: wired up when the array value widens
+// The 24-byte array value, shared verbatim rather than mirrored by hand, for the
+// same reason. See the file's header. (`dead_code` is allowed on the same grounds
+// as `str24`'s: a helper only the JIT reaches is unused here.)
+#[allow(dead_code)]
 mod arr24 {
     include!("../../aipl-codegen/src/arr24.rs");
 }
 
-// STAGED the same way: the 256-bit `#{char}` value. Shared from the start
-// rather than mirrored later, so the two runtimes cannot drift apart while it
-// is being wired up — the same reasoning as `str24` above, and cheaper here
-// because a char set has no allocator to ask about.
-#[allow(dead_code)] // staged: wired up when `#{char}` switches representation
+// The 256-bit `#{char}` value, shared the same way — and cheaper here, because a
+// char set has no allocator to ask about.
+#[allow(dead_code)]
 mod charset {
     include!("../../aipl-codegen/src/charset.rs");
 }
@@ -456,310 +336,6 @@ pub extern "C" fn aipl_count_call(name: *const c_char) {
     let _ = name;
 }
 
-#[inline]
-unsafe fn header_of(ptr: *const u8) -> *mut i64 {
-    unsafe { ptr.sub(HEADER_SIZE) as *mut i64 }
-}
-
-/// The stored content length of a heap string (the word at `-16`, before refcount).
-#[inline]
-unsafe fn heap_len(ptr: *const u8) -> usize {
-    unsafe { *(ptr.sub(STR_HEADER_SIZE) as *const i64) as usize }
-}
-
-// ---------- The retired 8-byte `str` value ----------
-//
-// **Not the live representation.** A `str` is the 24-byte value in `str24.rs`
-// (included above); everything from here to the end of the dispatch section below
-// is the 8-byte tagged pointer it replaced. It is still compiled but no longer
-// reached, which is what the dead-code warnings on `HEAP_TAG` / `INLINE_TAG` /
-// `CONCAT_TAG` and the constants around them are telling you. Kept because
-// deleting it is its own change; read it as history.
-//
-// Mirror of the JIT runtime (see crates/aipl-codegen/src/lib.rs). A `str` value
-// was either a heap/static pointer (8-byte aligned, so low two bits 0) or an
-// inline small string tagged `0b01`: byte0 = (len<<2)|1
-// with len in 0..=7, bytes 1..=7 = content. The low two bits are the repr tag:
-// 00 = heap/static, 01 = inline, 10 = view, 11 = concat. inc/dec no-op on inline;
-// consumers materialize, so correctness never depends on the "<=7 is inline"
-// invariant.
-
-// The representation discriminant lives in the low two bits of every `str`
-// value; `str_repr` decodes it into a [`StrRepr`]. Branch on a value's
-// representation by `match`ing `str_repr(..)` (NOT ad-hoc `is_*` checks), so
-// adding a representation forces every dispatch site to handle it.
-const TAG_MASK: usize = 0b11;
-const HEAP_TAG: usize = 0b00;
-const INLINE_TAG: usize = 0b01;
-
-#[inline]
-fn inline_len(v: *const u8) -> usize {
-    ((v as usize) >> 2) & 0x7
-}
-
-// ---------- String views (slices that share a backing buffer) ----------
-//
-// Mirror of the JIT runtime (see crates/aipl-codegen/src/lib.rs). A *view* is the
-// third `str` representation, tagged by low bit 1 (bit 0 = 0): the value is
-// `view_obj_ptr | 0b10`, pointing at a heap struct:
-//   [0] refcount: i64 | [8] data_ptr: *const u8 | [16] len: i64 | [24] owner.
-// `data_ptr` points into the owner's content; `owner` (the parent str value) is
-// inc'd on create and dec'd on free, so the shared buffer outlives the view.
-const VIEW_TAG: usize = 0b10;
-const VIEW_SIZE: usize = 32;
-const VIEW_DATA_OFFSET: usize = 8;
-const VIEW_LEN_OFFSET: usize = 16;
-const VIEW_OWNER_OFFSET: usize = 24;
-
-#[inline]
-fn view_obj(v: *const u8) -> *mut u8 {
-    ((v as usize) & !0b111) as *mut u8
-}
-
-// ---------- Concatenated strings (lazy ropes) ----------
-//
-// Mirror of the JIT runtime (see crates/aipl-codegen/src/lib.rs). The fourth
-// `str` representation, tagged `0b11`: value `node_ptr | 0b11`, node is a heap
-// struct `[0] refcount | [8] left:str | [16] right:str | [24] cache:ptr`. Built
-// by `aipl_concat_lazy` for every `str + str`; materialized (memoized into
-// `cache`) on first byte-access. inc/dec count the node and, at zero, release
-// both children and the cache.
-const CONCAT_TAG: usize = 0b11;
-const CONCAT_SIZE: usize = 40;
-const CONCAT_LEFT_OFFSET: usize = 8;
-const CONCAT_RIGHT_OFFSET: usize = 16;
-const CONCAT_CACHE_OFFSET: usize = 24;
-const CONCAT_LEN_OFFSET: usize = 32; // total content length, summed once at build
-
-#[inline]
-fn concat_obj(v: *const u8) -> *mut u8 {
-    ((v as usize) & !0b111) as *mut u8
-}
-
-// ---------- Representation dispatch ----------
-//
-// The rule outlives the representation it was written for, and the wide value
-// follows it too: classify a `str` once, then `match` — prefer that over
-// scattered `is_*` checks, so adding a representation makes the compiler flag
-// every site that doesn't handle it. Variants that genuinely share handling may
-// share an arm (e.g. `Null | Heap`), but spell them out rather than using a bare
-// `_`. CLAUDE.md states it under "Multiple runtime representations".
-
-/// The active representation of a (non-poisoned) 8-byte `str` value — the
-/// retired scheme. The live value's three are `TAG_BUFFER` / `TAG_INLINE` /
-/// `TAG_ROPE` in `str24.rs`; note that `View` is *not* among them, because a
-/// window into a buffer is an ordinary buffer value there (its `data` points
-/// inside its `base`), which is the simplification the wide layout bought.
-enum StrRepr {
-    /// Null pointer — the empty string, no storage.
-    Null,
-    /// Small-string-optimized: <= 7 content bytes packed in the value itself.
-    Inline,
-    /// Owned or static heap string; the value is its NUL-terminated content ptr.
-    Heap,
-    /// A slice sharing another string's buffer; carries the view object.
-    View(*mut u8),
-    /// A lazy concatenation — a *rope*; carries the concat node.
-    Rope(*mut u8),
-}
-
-/// Classify a `str` value into its active [`StrRepr`] (the discriminant is the
-/// low two bits; see the per-representation sections above).
-#[inline]
-fn str_repr(v: *const u8) -> StrRepr {
-    if v.is_null() {
-        return StrRepr::Null;
-    }
-    match (v as usize) & TAG_MASK {
-        HEAP_TAG => StrRepr::Heap,
-        INLINE_TAG => StrRepr::Inline,
-        VIEW_TAG => StrRepr::View(view_obj(v)),
-        CONCAT_TAG => StrRepr::Rope(concat_obj(v)),
-        _ => unreachable!("two-bit tag is exhaustive"),
-    }
-}
-
-/// Pack <= 7 content bytes into an inline str value.
-fn pack_inline(bytes: &[u8]) -> *const u8 {
-    let mut val: u64 = ((bytes.len() as u64) << 2) | 1;
-    let mut i = 0;
-    while i < bytes.len() {
-        val |= (bytes[i] as u64) << (8 * (i + 1));
-        i += 1;
-    }
-    val as usize as *const u8
-}
-
-/// Content bytes of any str value: inline → copied into `buf` (which must
-/// outlive the slice); heap/static → its NUL-delimited bytes; null → empty.
-unsafe fn str_bytes<'a>(v: *const u8, buf: &'a mut [u8; 8]) -> &'a [u8] {
-    match str_repr(v) {
-        StrRepr::Null => &[],
-        StrRepr::Inline => {
-            let src = (v as usize as u64).to_le_bytes();
-            let len = inline_len(v);
-            let mut i = 0;
-            while i < 8 {
-                buf[i] = src[i];
-                i += 1;
-            }
-            &buf[1..1 + len]
-        }
-        StrRepr::View(obj) => unsafe {
-            let data = *(obj.add(VIEW_DATA_OFFSET) as *const *const u8);
-            let len = *(obj.add(VIEW_LEN_OFFSET) as *const i64) as usize;
-            core::slice::from_raw_parts(data, len)
-        },
-        // Materialize (memoized) and read the flattened cache's bytes.
-        StrRepr::Rope(_) => unsafe { str_bytes(concat_materialize(v), buf) },
-        StrRepr::Heap => unsafe { core::slice::from_raw_parts(v, heap_len(v)) },
-    }
-}
-
-/// Normalize a possibly-view str (a file path) to a form the C file API can use:
-/// a view's bytes aren't NUL-terminated (and its value is tagged), so copy it to
-/// a fresh owned string; any other representation is returned unchanged. The
-/// caller must `aipl_dec` the result iff it differs from the input.
-unsafe fn view_to_owned_path(v: *const u8) -> *const u8 {
-    match str_repr(v) {
-        // A view's bytes aren't NUL-terminated, and a concat's value is a node
-        // pointer, not content — copy either to a fresh owned (NUL-terminated)
-        // string. Inline/heap/null are already usable directly.
-        StrRepr::View(_) | StrRepr::Rope(_) => {
-            let mut b = [0u8; 8];
-            make_str(unsafe { str_bytes(v, &mut b) })
-        }
-        StrRepr::Null | StrRepr::Inline | StrRepr::Heap => v,
-    }
-}
-
-/// A NUL-terminated C pointer for any (non-null) str value, for `fopen`: inline
-/// content is copied + NUL-terminated into `buf` (8 bytes holds <=7 + NUL); a
-/// heap str is already NUL-terminated so its pointer is returned directly. A view
-/// or concat must be normalized via `view_to_owned_path` first (into an owned
-/// heap str), so they reach here only as `Heap`.
-unsafe fn str_cptr<'a>(v: *const u8, buf: &'a mut [u8; 8]) -> *const c_char {
-    match str_repr(v) {
-        StrRepr::Inline => {
-            let src = (v as usize as u64).to_le_bytes();
-            let len = inline_len(v);
-            let mut i = 0;
-            while i < len {
-                buf[i] = src[i + 1];
-                i += 1;
-            }
-            buf[len] = 0;
-            buf.as_ptr() as *const c_char
-        }
-        // Heap (incl. a normalized view/concat) is already NUL-terminated; null
-        // shouldn't reach here, but its pointer is a valid empty C string.
-        StrRepr::Null | StrRepr::Heap | StrRepr::View(_) | StrRepr::Rope(_) => {
-            v as *const c_char
-        }
-    }
-}
-
-/// Canonicalize freshly-built content into a str value: inline when it fits
-/// (<= 7 bytes), else a fresh heap string.
-fn make_str(bytes: &[u8]) -> *const u8 {
-    if bytes.len() <= 7 {
-        pack_inline(bytes)
-    } else {
-        unsafe {
-            let raw = rt_str_buf(bytes.len());
-            memcpy(
-                raw.add(STR_HEADER_SIZE) as *mut c_void,
-                bytes.as_ptr() as *const c_void,
-                bytes.len(),
-            );
-            raw.add(STR_HEADER_SIZE)
-        }
-    }
-}
-
-/// Flatten a concat into a contiguous owned heap str, memoized on the node's
-/// `cache` slot. Recurses through nested concats via `str_bytes`.
-unsafe fn concat_materialize(v: *const u8) -> *const u8 {
-    unsafe {
-        let obj = concat_obj(v);
-        let cache_slot = obj.add(CONCAT_CACHE_OFFSET) as *mut *const u8;
-        let cached = *cache_slot;
-        if !cached.is_null() {
-            return cached;
-        }
-        let left = *(obj.add(CONCAT_LEFT_OFFSET) as *const *const u8);
-        let right = *(obj.add(CONCAT_RIGHT_OFFSET) as *const *const u8);
-        let mut lb = [0u8; 8];
-        let mut rb = [0u8; 8];
-        let sa = str_bytes(left, &mut lb);
-        let sb = str_bytes(right, &mut rb);
-        let (la, lbn) = (sa.len(), sb.len());
-        let result = if la + lbn <= 7 {
-            let mut tmp = [0u8; 7];
-            memcpy(
-                tmp.as_mut_ptr() as *mut c_void,
-                sa.as_ptr() as *const c_void,
-                la,
-            );
-            memcpy(
-                tmp.as_mut_ptr().add(la) as *mut c_void,
-                sb.as_ptr() as *const c_void,
-                lbn,
-            );
-            pack_inline(&tmp[..la + lbn])
-        } else {
-            let raw = rt_str_buf(la + lbn);
-            memcpy(
-                raw.add(STR_HEADER_SIZE) as *mut c_void,
-                sa.as_ptr() as *const c_void,
-                la,
-            );
-            memcpy(
-                raw.add(STR_HEADER_SIZE + la) as *mut c_void,
-                sb.as_ptr() as *const c_void,
-                lbn,
-            );
-            raw.add(STR_HEADER_SIZE)
-        };
-        *cache_slot = result;
-        result
-    }
-}
-
-
-
-
-/// Visit each leaf's contiguous bytes in order **without materializing a rope**:
-/// a rope recurses into its children (reusing its `cache` if already
-/// materialized), every other representation yields its bytes via `str_bytes`.
-/// `f` returns `false` to stop early; the return value is whether the whole
-/// string was visited. The shared primitive behind the streaming string
-/// operations (print, equality, hashing, indexing, prefix/suffix, join). Mirrors
-/// the JIT runtime's copy.
-fn str_for_each_chunk(ptr: *const u8, f: &mut impl FnMut(&[u8]) -> bool) -> bool {
-    match str_repr(ptr) {
-        StrRepr::Null => true,
-        StrRepr::Rope(obj) => unsafe {
-            let cache = *(obj.add(CONCAT_CACHE_OFFSET) as *const *const u8);
-            if cache.is_null() {
-                let left = *(obj.add(CONCAT_LEFT_OFFSET) as *const *const u8);
-                let right = *(obj.add(CONCAT_RIGHT_OFFSET) as *const *const u8);
-                str_for_each_chunk(left, f) && str_for_each_chunk(right, f)
-            } else {
-                str_for_each_chunk(cache, f)
-            }
-        },
-        // A contiguous leaf (inline/view/heap) yields its bytes directly.
-        StrRepr::Inline | StrRepr::View(_) | StrRepr::Heap => {
-            let mut buf = [0u8; 8];
-            let bytes = unsafe { str_bytes(ptr, &mut buf) };
-            f(bytes)
-        }
-    }
-}
-
-
-
 // ---------- The wide `str`'s I/O half (AOT) ----------
 //
 // `str24.rs` is shared verbatim between the two runtimes because the layout must
@@ -798,8 +374,6 @@ pub extern "C" fn aipl_print_error(s: *const str24::Str) {
     });
     unsafe { write(2, b"\n".as_ptr() as *const c_void, 1) };
 }
-
-
 
 
 // ---------- The wide `str`'s file I/O (AOT) ----------
@@ -911,7 +485,7 @@ pub extern "C" fn aipl_write_string_to_file(
 /// `list_files` under the wide ABI. Borrows `dir`. Writes the listing to `out`
 /// and returns 1, or returns 0 and writes nothing.
 #[no_mangle]
-pub extern "C" fn aipl_arrv_list_files(out: *mut arr24::ArrValue, dir: *const str24::Str) -> i64 {
+pub extern "C" fn aipl_list_files(out: *mut arr24::ArrValue, dir: *const str24::Str) -> i64 {
     count_builtin!(builtin_calls::AIPL_LIST_FILES);
     #[cfg(unix)]
     unsafe {
@@ -929,9 +503,6 @@ pub extern "C" fn aipl_arrv_list_files(out: *mut arr24::ArrValue, dir: *const st
         0
     }
 }
-
-
-
 
 
 #[cfg(not(unix))]
@@ -1314,12 +885,8 @@ pub extern "C" fn aipl_execute_program(
 #[cfg(unix)]
 mod exec_unix {
     use super::{
-        fail_msg, fclose, fmt_i64, fopen, fread, fseek,
-        ftell, rt_alloc, rt_free, SEEK_END,
+        fail_msg, fclose, fmt_i64, fopen, fread, fseek, ftell, rt_alloc, rt_free, str24, SEEK_END,
         SEEK_SET,
-        str24,
-        write_ok_wide,
-        write_err_wide,
     };
     use core::ffi::{c_char, c_int, c_void};
     use core::sync::atomic::{AtomicU64, Ordering};
@@ -1623,21 +1190,6 @@ fn fmt_i64(buf: &mut [u8; 20], n: i64) -> usize {
     i
 }
 
-/// Allocate a result str buffer for `content` content bytes, refcount 1, with
-/// the content length stored. Returns the block start (content at `+STR_HEADER_SIZE`).
-unsafe fn rt_str_buf(content: usize) -> *mut u8 {
-    unsafe {
-        let raw = rt_alloc(STR_HEADER_SIZE + content + 1) as *mut u8;
-        if raw.is_null() {
-            abort();
-        }
-        *(raw as *mut i64) = content as i64; // stored length (block word 0)
-        *(raw as *mut i64).add(1) = 1; // refcount (block word 1)
-        *raw.add(STR_HEADER_SIZE + content) = 0;
-        raw
-    }
-}
-
 // One-allocation `to_str` cursor primitives (mirror the JIT runtime). `to_str`
 // measures the total length, allocates once via `aipl_str_alloc`, then fills the
 // buffer through a moving cursor with the write helpers below.
@@ -1722,16 +1274,6 @@ pub extern "C" fn aipl_write_bytes(dst: *const u8, src: *const u8, n: i64) -> *c
 }
 
 
-/// ASCII whitespace: space, tab, newline, carriage return, vertical tab, and
-/// form feed.
-#[inline]
-fn is_ascii_ws(b: u8) -> bool {
-    matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c)
-}
-
-
-
-
 /// How [`aipl_arr_sort`] orders its elements. Every `ord` element type is a
 /// scalar — a word, or a narrow integer packed at its own width — or a `str`, so
 /// the only question is how to read one: as a signed integer, as an unsigned one
@@ -1750,30 +1292,6 @@ fn sort_words(words: &mut [i64], kind: i64) {
         _ => words.sort_unstable(),
     }
 }
-
-
-
-
-
-// ---------- Char-iteration cursor (`for c in s`) ----------
-//
-// Mirror of the JIT runtime. A small fixed cursor codegen stack-allocates so
-// iterating a rope streams its bytes leaf-by-leaf without materializing and
-// without a heap traversal stack. `next` descends from the root to the leaf
-// containing the current position (O(rope depth), via the stored child lengths)
-// and caches the leaf, so sequential reads within it are O(1). Layout
-// (`ITER_SIZE` bytes, 8-aligned): [0] root | [8] pos | [16] total | [24] leaf_ptr
-// | [32] leaf_start | [40] leaf_len | [48] scratch (8 bytes).
-const ITER_ROOT: usize = 0;
-const ITER_POS: usize = 8;
-const ITER_TOTAL: usize = 16;
-const ITER_LEAF_PTR: usize = 24;
-const ITER_LEAF_START: usize = 32;
-const ITER_LEAF_LEN: usize = 40;
-const ITER_SCRATCH: usize = 48;
-
-
-
 
 
 // ---------- Refcounted array runtime ----------
@@ -1987,31 +1505,6 @@ fn rec_release(b: *mut i64) {
 // pointers compared by content, with the array `str` drop/retain helpers stored
 // so the block frees/retains its strings). Mirrors codegen.
 
-
-
-
-
-
-
-
-
-/// The unordered set's `order` argument; see codegen's `SET_ORDER_NONE`, whose
-/// encoding this mirrors: the sign is the direction, the magnitude the word
-/// comparison (`1` signed, `2` unsigned).
-const SET_ORDER_NONE: i64 = 0;
-
-
-
-/// Allocate an AIPL `str` (refcounted, NUL-terminated) holding a copy of the
-/// C string `cstr` (e.g. a CLI argument). Goes through `make_str`, so the result
-/// is inline (<= 7 bytes) or a heap string with its length stored.
-unsafe fn aipl_str_from_cstr(cstr: *const c_char) -> *const u8 {
-    unsafe {
-        let n = strlen(cstr);
-        // SSO: a short arg is inline — no allocation.
-        make_str(core::slice::from_raw_parts(cstr as *const u8, n))
-    }
-}
 
 /// Build the CLI arguments as an AIPL `str[]`, excluding `argv[0]` (the program
 /// name) so a program sees only the arguments a user passed. The array owns its
@@ -2356,8 +1849,6 @@ unsafe fn report_perfmon_stats(path: *const c_char, wall_ns: u64, peak_bytes: u6
 use core::sync::atomic::{AtomicBool, AtomicI64, Ordering as TestOrd};
 static TEST_CUR_FAILED: AtomicBool = AtomicBool::new(false);
 static TEST_FAILED: AtomicI64 = AtomicI64::new(0);
-
-
 
 
 // The wide-ABI counterparts. They ignore their `str` argument for exactly the

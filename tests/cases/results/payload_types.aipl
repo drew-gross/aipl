@@ -91,11 +91,11 @@ allocations: 25
 deallocations: 25
 reallocations: 0
 bytes allocated: 941
-instructions executed: 3491
-binary size: 25784
-  code: 14136
-  data: 1755
-  metadata: 9893
+instructions executed: 3377
+binary size: 24288
+  code: 13820
+  data: 578
+  metadata: 9890
 functions:
   __dict_drop_str$i64:
     calls: 2
@@ -111,40 +111,40 @@ functions:
     bytes: 108
   __to_str_Point$err$Error:
     calls: 1
-    bytes: 904
+    bytes: 864
   __to_str_Shape$err$Error:
     calls: 1
-    bytes: 840
+    bytes: 800
   __to_str___tuple$i64$str$err$Error:
     calls: 1
-    bytes: 900
+    bytes: 880
   __to_str_bool:
     calls: 2
-    bytes: 232
+    bytes: 224
   __to_str_dict$str$i64$err$Error:
     calls: 1
-    bytes: 1192
+    bytes: 1160
   __to_str_i64$err$Error:
     calls: 3
-    bytes: 592
+    bytes: 576
   __to_str_i64$opt:
     calls: 1
-    bytes: 388
+    bytes: 376
   __to_str_i64$opt$err$Error:
     calls: 2
-    bytes: 744
+    bytes: 716
   __to_str_i8$err$Error:
     calls: 1
-    bytes: 592
+    bytes: 576
   __to_str_set$i64$err$Error:
     calls: 1
-    bytes: 940
+    bytes: 912
   __to_str_str$arr$opt$err$Error:
     calls: 1
-    bytes: 1360
+    bytes: 1300
   __to_str_u64$err$Error:
     calls: 1
-    bytes: 592
+    bytes: 576
   aipl_arr_inc:
     calls: 15
     bytes: (external)

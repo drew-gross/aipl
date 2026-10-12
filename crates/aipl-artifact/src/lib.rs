@@ -363,7 +363,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_arr_retain_warr"
         | "aipl_arr_drop_opt_warr"
         | "aipl_arr_retain_opt_warr" => sig(2, false),
-        "aipl_arrv_elem_ptr" => sig(3, true),
+        "aipl_arr_elem_ptr" => sig(3, true),
         "aipl_i64_len" | "aipl_u64_len" => sig(1, true),
         "aipl_rec_alloc" | "aipl_write_i64" | "aipl_write_u64" => sig(2, true),
         "aipl_write_bytes" | "aipl_array_new" | "aipl_array_with_cap" => sig(3, true),
@@ -374,25 +374,25 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         // an integer array that may be inline.
         "aipl_arr_window" => sig(7, false),
         "aipl_arr_window_block" => sig(4, true),
-        "aipl_arrv_from_set_words" | "aipl_strv_split" => sig(3, false),
-        "aipl_arrv_new" | "aipl_arrv_with_cap" => sig(4, false),
-        "aipl_arrv_truncate" | "aipl_arrv_set_drop" => sig(2, false),
+        "aipl_arr_from_set_words" | "aipl_str_split" => sig(3, false),
+        "aipl_arr_new" | "aipl_arr_with_cap" => sig(4, false),
+        "aipl_arr_truncate" | "aipl_arr_set_drop" => sig(2, false),
         "aipl_arr_push_small" => sig(3, true),
         "aipl_arr_reversed" => sig(5, false),
-        "aipl_arrv_sort" => sig(6, false),
-        "aipl_arrv_push" => sig(7, false),
-        "aipl_arrv_push_from"
-        | "aipl_arrv_reserve_from"
-        | "aipl_arrv_extend_from"
-        | "aipl_arrv_splice_from" => {
+        "aipl_arr_sort" => sig(6, false),
+        "aipl_arr_push" => sig(7, false),
+        "aipl_arr_push_from"
+        | "aipl_arr_reserve_from"
+        | "aipl_arr_extend_from"
+        | "aipl_arr_splice_from" => {
             sig(6, false)
         }
-        "aipl_arrv_writable" => sig(5, false),
-        "aipl_setv_contains" | "aipl_dictv_get" | "aipl_dictv_contains_key" => sig(4, true),
-        "aipl_setv_insert" => sig(7, false),
-        "aipl_setv_union" => sig(9, false),
-        "aipl_dictv_insert" | "aipl_dictv_remove" => sig(6, false),
-        "aipl_arrv_join" => sig(8, false),
+        "aipl_arr_writable" => sig(5, false),
+        "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" => sig(4, true),
+        "aipl_set_insert" => sig(7, false),
+        "aipl_set_union" => sig(9, false),
+        "aipl_dict_insert" | "aipl_dict_remove" => sig(6, false),
+        "aipl_arr_join" => sig(8, false),
         "aipl_arr_settle" => sig(4, false),
         // The parts, `join`'s three separators, and the element type's three
         // descriptors; the joined array comes back in a register.
@@ -434,7 +434,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_data" => sig(2, true),
         "aipl_concat" | "aipl_str_repeat" | "aipl_str_rope" => sig(3, false),
         // The out pointer, the parts, and `join`'s three separators.
-        "aipl_strv_join" => sig(5, false),
+        "aipl_str_join" => sig(5, false),
         "aipl_str_split_len"
         | "aipl_read_file_to_string"
         | "aipl_write_string_to_file"
@@ -443,7 +443,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_split_iter_next" => sig(2, true),
         // The cursor, the source, and the separator.
         "aipl_str_split_iter_init" => sig(3, false),
-        "aipl_arrv_list_files" => sig(2, true),
+        "aipl_list_files" => sig(2, true),
         "aipl_char_to_str" => sig(2, false),
         "aipl_execute_program" => sig(3, false),
         "aipl_str_starts_with_at" | "aipl_str_starts_with_char" => sig(3, true),

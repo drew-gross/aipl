@@ -53,18 +53,18 @@ allocations: 21
 deallocations: 21
 reallocations: 0
 bytes allocated: 1232
-instructions executed: 542
-binary size: 6648
-  code: 3376
-  data: 335
-  metadata: 2937
+instructions executed: 522
+binary size: 6376
+  code: 3324
+  data: 110
+  metadata: 2942
 functions:
   __to_str_Shape:
     calls: 2
-    bytes: 1164
+    bytes: 1120
   __to_str_bool:
     calls: 2
-    bytes: 232
+    bytes: 224
   __to_str_i64:
     calls: 5
     bytes: 204

@@ -63,21 +63,21 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 61
-instructions executed: 202
-binary size: 2912
-  code: 1124
-  data: 164
-  metadata: 1624
+instructions executed: 188
+binary size: 2768
+  code: 1096
+  data: 51
+  metadata: 1621
 functions:
   __eq___builtin_Span:
     calls: 1
     bytes: 104
   __to_str___builtin_Span:
     calls: 1
-    bytes: 484
+    bytes: 464
   __to_str_bool:
     calls: 1
-    bytes: 232
+    bytes: 224
   aipl_u64_len:
     calls: 4
     bytes: (external)

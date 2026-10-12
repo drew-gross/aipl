@@ -43,11 +43,11 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 152
-instructions executed: 1094
-binary size: 4672
-  code: 2584
-  data: 151
-  metadata: 1937
+instructions executed: 1070
+binary size: 4576
+  code: 2564
+  data: 70
+  metadata: 1942
 functions:
   __builtin_find_index$i64$lam$main$lambda0:
     calls: 1
@@ -66,10 +66,10 @@ functions:
     bytes: 100
   __to_str_bool:
     calls: 1
-    bytes: 232
+    bytes: 224
   __to_str_u64$opt:
     calls: 6
-    bytes: 388
+    bytes: 376
   aipl_u64_len:
     calls: 8
     bytes: (external)

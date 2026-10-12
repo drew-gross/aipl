@@ -552,55 +552,55 @@ window, a reversal or inline (lent as a copy).
       headers.
 
 
-Stage 7 — delete what the switch leaves behind
+Stage 7 — delete what the switch leaves behind                              [done]
 ---------------------------------------------------------------------------------
 A representation switch leaves its predecessor compiled but unreachable, and the
-`str24` switch is the proof: the 8-byte `str` is still in the tree, behind
-`#[allow(dead_code)]`, and the AOT runtime reports **39 dead-code warnings** for it
+`str24` switch was the proof: the 8-byte `str` sat in the tree behind
+`#[allow(dead_code)]`, and the AOT runtime reported 39 dead-code warnings for it
 when compiled directly (`rustc --crate-type=staticlib runtime/aipl_runtime.rs`).
-Those warnings are the checklist — that is what makes this stage mechanical rather
-than archaeological, and it is worth doing for `str` at the same time as for
-arrays, since the two switches leave the same kind of residue.
+Those warnings were the checklist. Done as one change, for `str` and for arrays
+together, since the two switches left the same kind of residue:
 
-Already identified, from `str`:
-  [ ] the retired 8-byte `str` block in `aipl-codegen/src/lib.rs` and in
-      `aipl-linker/runtime/aipl_runtime.rs` — both are labelled as retired, so
-      the labels are the extent of it
-  [ ] its `StrRepr` enum and `str_repr` classifier, and the tag constants
-      (`TAG_MASK`, `INLINE_TAG`, `HEAP_TAG`, `VIEW_TAG`, `CONCAT_TAG`)
-  [ ] the old FFI `str` path: `build_borrowed_str`, `ArgBufs::str_value`,
+  [x] the retired 8-byte `str` block in `aipl-codegen/src/lib.rs` and in
+      `aipl-linker/runtime/aipl_runtime.rs`, with `StrRepr`, `str_repr`, the tag
+      constants (`TAG_MASK`, `INLINE_TAG`, `HEAP_TAG`, `VIEW_TAG`, `CONCAT_TAG`),
+      the view and concat object layouts, `str_bytes`, `make_str`,
+      `concat_materialize`, `str_for_each_chunk`, `header_of`, `heap_len`,
+      `memmove` and the char-iteration cursor's constants.
+  [x] the old FFI `str` path: `build_borrowed_str`, `ArgBufs::str_value`,
       `ArgBuf::Str`, `alloc_dynamic_string`, `free_dynamic_string`,
-      `STR_HEADER_SIZE`, the 8-byte `pack_inline`
-  [ ] `abi_spike.rs` — a spike for the `str` ABI, kept as a regression test for
-      the Cranelift lowerings it proved. Confirm that is still what it is, or
-      delete it
-  [ ] the `builtin_calls` counter table: its `AIPL_*` index constants for the
-      `str` entry points are never bumped, because those moved into the shared
-      `str24` module without a `count_builtin!`. Either count them or drop the
-      rows — today a `--- performance ---` breakdown silently has no `aipl_str_*`
-      line
-  [ ] `aipl_concat_lazy` / `aipl_concat_mut` / `__aipl_trim_mut`-style aliases
-      that now all resolve to one entry point
-
-And what this switch will add:
-  [ ] `array_layout.rs` in its entirety, once nothing reads the 8-byte layout
-  [ ] `ArrRepr`, down to `Heap` and the empty `Inline` stand-in (`Sliced` went
-      in 4c, `Reversed` in 5)
-  [ ] the `builtin_calls` slots `aipl_arr_reverse` and `aipl_arr_slice`'s
-      siblings that no entry point bumps any more (`aipl_arr_reverse` is gone;
-      the shared `arr24` entries that replaced it are not counted at all)
-  [ ] `ARR_INLINE_TAG` and the shared static empty block — the stand-in for
-      stage 3, which exists only because it can point at a block
-  [x] `SeqRepr::Tagged` itself, and the `Abi` field: gone with 2f.
-  [x] the block-taking entries 6a replaced: deleted in 6c-2.
-  [ ] the `v` in the names that replaced them (`aipl_arrv_*`, `aipl_setv_*`,
-      `aipl_dictv_*`, `aipl_strv_*`) now that nothing shares the plain name — a
-      rename across the runtime, the codegen tables and the artifact manifest, so
-      its own change
-
-  Do this as its own change. Mixing deletion into the switch
-  is how a switch stops being reviewable.
-
+      `STR_HEADER_SIZE`, the 8-byte `pack_inline`, and the `str` and `char[]`
+      arms of the one-word argument path (a `str` is written in place).
+  [x] `rc_statically_noop`: a best-effort elision that recognised an inline-tagged
+      constant or `symbol + header`, and so could never match a 24-byte value
+      read through a slot. Nothing's `instructions executed` rose when it went.
+  [x] `emit_str_literal` is the bytes it says it is: the render pieces a sink
+      copies, with no `[len][refcount]` header in front of them.
+  [x] the `builtin_calls` counter table: exactly the 28 entries that are counted.
+      The `str24` / `arr24` / `array_ops` entry points are shared code with no
+      host counter to reach, so they never had rows to bump.
+  [x] `__aipl_concat_lazy` / `__aipl_concat_mut` / `__aipl_trim_mut`: aliases
+      nothing named.
+  [x] the "staged" markers: `arr24` and `charset` are not staged, and no longer
+      carry `allow(dead_code)` in the JIT crate. The `CharSet` methods only the
+      model's tests call are `#[cfg(test)]`.
+  [x] `abi_spike.rs` is what its header says — regression tests for the Cranelift
+      lowerings the 24-byte ABI rests on — and stays; the dev-dependency comment
+      that called it TEMPORARY now says why it is kept.
+  [x] `array_layout.rs`, `ArrRepr`: the new block layout, not residue.
+  [x] the shared static empty array stays, deliberately: an empty array that
+      allocates nothing and whose `data` is a real, non-null address, so a
+      zero-length copy or walk never hands `copy_nonoverlapping` a null (it
+      asserts on one in debug builds).
+  [x] the `v` in the names the 6a entries took (`aipl_arrv_*` -> `aipl_arr_*`,
+      `aipl_setv_*` -> `aipl_set_*`, `aipl_dictv_*` -> `aipl_dict_*`,
+      `aipl_strv_*` -> `aipl_str_*`, `aipl_arrv_list_files` ->
+      `aipl_list_files`).
+  [x] the old names, for one round trip: the checked-in artifact imported them,
+      and the compiler that regenerates it has to load it first, so they were
+      forwarding symbols (`legacy_names.rs`) and a mapping in `aipl-artifact`'s
+      signature table for the one handoff that regenerated it. Deleted with the
+      next.
 
 Stage 8 — can `init` go away?                                   [decide later]
 ---------------------------------------------------------------------------------

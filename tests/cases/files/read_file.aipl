@@ -19,15 +19,15 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 107
-instructions executed: 284
-binary size: 2712
-  code: 1300
-  data: 91
-  metadata: 1321
+instructions executed: 276
+binary size: 2632
+  code: 1284
+  data: 26
+  metadata: 1322
 functions:
   __to_str_str$err$Error:
     calls: 2
-    bytes: 668
+    bytes: 652
   aipl_read_file_to_string:
     calls: 2
     bytes: (external)

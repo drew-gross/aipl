@@ -745,10 +745,10 @@ deallocations: 2275
 reallocations: 195
 bytes allocated: 184067
 instructions executed: 307548
-binary size: 264896
-  code: 174724
-  data: 6300
-  metadata: 83872
+binary size: 264680
+  code: 174680
+  data: 6139
+  metadata: 83861
 functions:
   __arr_drop_Item:
     calls: 57
@@ -947,7 +947,7 @@ functions:
     bytes: 84
   __to_str___m8__ParseError:
     calls: 0
-    bytes: 836
+    bytes: 792
   __to_str_u64:
     calls: 7
     bytes: 204

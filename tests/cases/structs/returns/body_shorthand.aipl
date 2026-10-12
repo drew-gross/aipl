@@ -74,18 +74,18 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 203
-instructions executed: 714
-binary size: 4592
-  code: 1860
-  data: 364
-  metadata: 2368
+instructions executed: 654
+binary size: 4280
+  code: 1796
+  data: 115
+  metadata: 2369
 functions:
   __to_str_Named:
     calls: 1
-    bytes: 836
+    bytes: 792
   __to_str_Vec2:
     calls: 4
-    bytes: 484
+    bytes: 464
   aipl_i64_len:
     calls: 20
     bytes: (external)

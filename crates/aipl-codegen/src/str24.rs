@@ -7,9 +7,7 @@
 // **This is the live representation.** Codegen emits a literal as three words
 // through it (`emit_str_literal`), arrays stride by `STR_SIZE`, and every
 // `aipl_str_*` runtime symbol both runtimes export is one of the entry points at
-// the bottom of this file. The older 8-byte tagged value it replaced is still
-// compiled in `aipl-codegen/src/lib.rs` and the AOT runtime, behind branches the
-// wide ABI no longer reaches; those two files say so where they define it.
+// the bottom of this file.
 //
 // # One copy, two runtimes
 //
@@ -71,6 +69,8 @@ pub(crate) const TAG_ROPE: u8 = 0b10;
 // array block, which is the same thing. Codegen's inlined append reads the offsets
 // by these names.
 use super::buffer;
+// Used by codegen's inlined append (the JIT host); the AOT runtime has no use for them.
+#[allow(unused_imports)]
 pub(crate) use super::buffer::{BUF_HEADER, BUF_REFCOUNT_BACK, STATIC_REFCOUNT};
 
 pub(crate) const LEN_MASK: u64 = (1 << 56) - 1;

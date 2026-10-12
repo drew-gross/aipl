@@ -25,14 +25,12 @@
 // shift on a register the length already needed, and `base`/`data` are
 // dereferenced without masking.
 //
-// # What this buys over the 8-byte tagged pointer
+// # What this buys
 //
-// **A slice stops being an allocation.** An 8-byte array value is one tagged
-// pointer, so a window into an array had nowhere to put its bounds and needed a
-// *view block* — 48 bytes on the heap, holding a reference on the array it
-// windowed. Here a window is just a value: `data` moved forward and `len` cut
-// short, tag still `block`. (The bridge value below already does this over the
-// old block, which is why that view block and its tag are gone.)
+// **A slice is not an allocation.** A window into an array is just a value:
+// `data` moved forward and `len` cut short. (The one-word tagged pointer this
+// replaced had nowhere to put a window's bounds, and needed a *view block* — 48
+// bytes on the heap, holding a reference on the array it windowed.)
 //
 // `reversed` cannot go the same way — there is no pointer arithmetic that reads a
 // run backwards — so it keeps a tag. But it too loses its block: it is the same
@@ -72,7 +70,6 @@ pub(crate) const ARR_SIZE: usize = 24;
 /// The most element *bytes* that fit inline: `w0`, `w1`, and six bytes of `w2`.
 pub(crate) const ARR_INLINE_CAP: usize = 22;
 
-pub(crate) const ATAG_BLOCK: u8 = 0b00;
 pub(crate) const ATAG_INLINE: u8 = 0b01;
 pub(crate) const ATAG_REVERSED: u8 = 0b10;
 /// A block value whose run is not (known to be) the whole of its block: what a
@@ -690,7 +687,7 @@ unsafe fn copy_run(first: *const u8, step: isize, n: usize, w: usize, dst: *mut 
 /// elements ascending, each retained. *Borrows* `xs`, whatever its shape. `kind`
 /// is the runtime's `SORT_KIND_*` — how an element is read and compared.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arrv_sort(
+pub(crate) extern "C" fn aipl_arr_sort(
     out: *mut ArrValue,
     a: *const ArrValue,
     drop_fn: i64,
@@ -732,7 +729,7 @@ pub(crate) extern "C" fn aipl_arrv_sort(
 /// bit-packed `bool` element is copied bit by bit. `drop_fn`, `retain_fn` and
 /// `elem_size` describe `T`.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arrv_join(
+pub(crate) extern "C" fn aipl_arr_join(
     out: *mut ArrValue,
     parts: *const ArrValue,
     sep: *const ArrValue,
@@ -791,7 +788,7 @@ pub(crate) extern "C" fn aipl_arrv_join(
 /// `parts.join(sep=..)` over a `str[]`, written to `out`: `str24::join_run` over
 /// the parts in place, whatever their shape. *Borrows* everything.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_strv_join(
+pub(crate) extern "C" fn aipl_str_join(
     out: *mut super::str24::Str,
     parts: *const ArrValue,
     sep: *const super::str24::Str,
@@ -837,7 +834,7 @@ fn consume(a: *const ArrValue, drop_fn: i64, retain_fn: i64, elem_size: i64) -> 
 /// owned and has room (`array_ops::push_mut`, which copies one that is not); a
 /// bit-packed `bool[]` takes the copying push.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arrv_push_from(
+pub(crate) extern "C" fn aipl_arr_push_from(
     out: *mut ArrValue,
     a: *const ArrValue,
     x: *const u8,
@@ -860,7 +857,7 @@ pub(crate) extern "C" fn aipl_arrv_push_from(
 /// `inline_ok` says the element is an integer, so the value may be (or become)
 /// inline, which [`aipl_arr_push_small`] handles.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arrv_push(
+pub(crate) extern "C" fn aipl_arr_push(
     slot: *mut ArrValue,
     x: *const u8,
     drop_fn: i64,
@@ -874,7 +871,7 @@ pub(crate) extern "C" fn aipl_arrv_push(
     }
     let (block, len) = consume(slot, drop_fn, retain_fn, elem_size);
     // In place — a bit-packed `bool[]` included, whose in-place push sets the
-    // next bit — unlike [`aipl_arrv_push_from`], whose copying `bool[]` push is
+    // next bit — unlike [`aipl_arr_push_from`], whose copying `bool[]` push is
     // for a spread's accumulator, which `bool[]` never reserves.
     let grown = if exclusive != 0 {
         super::array_ops::push_mut(block, len, x, drop_fn, retain_fn, elem_size)
@@ -888,7 +885,7 @@ pub(crate) extern "C" fn aipl_arrv_push(
 /// elements, written to `out` (`array_ops::reserve`, which keeps a unique block
 /// and copies any other).
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arrv_reserve_from(
+pub(crate) extern "C" fn aipl_arr_reserve_from(
     out: *mut ArrValue,
     a: *const ArrValue,
     extra: i64,
@@ -908,7 +905,7 @@ pub(crate) extern "C" fn aipl_arrv_reserve_from(
 /// `src`'s block across the call when it may be `a`'s own, which is what makes
 /// the reserve copy before anything is written.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arrv_extend_from(
+pub(crate) extern "C" fn aipl_arr_extend_from(
     out: *mut ArrValue,
     a: *const ArrValue,
     src: *const ArrValue,
@@ -932,14 +929,14 @@ pub(crate) extern "C" fn aipl_arrv_extend_from(
 /// An array literal's `..src` splice (`__aipl_arr_concat`): the value at `a`,
 /// whose reference the call consumes, with every element of the value at `src`
 /// (borrowed, read in place) appended, written to `out`. Unlike
-/// [`aipl_arrv_extend_from`] it does not reserve: `a` is the literal's
+/// [`aipl_arr_extend_from`] it does not reserve: `a` is the literal's
 /// accumulator, which the literal's own `__aipl_arr_reserve` already made
 /// uniquely owned and sized for every element. Its refcount may still read
 /// above one (the accumulator binding's bookkeeping), and a reserve here would
 /// take that for sharing and copy into a block with no room left for the
 /// elements after the splice.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arrv_splice_from(
+pub(crate) extern "C" fn aipl_arr_splice_from(
     out: *mut ArrValue,
     a: *const ArrValue,
     src: *const ArrValue,
@@ -965,7 +962,7 @@ pub(crate) extern "C" fn aipl_arrv_splice_from(
 /// The address of element `idx` of the array value at `a`, whatever its shape
 /// (`elem_size` is the stride in bytes). The caller has bounds-checked `idx`.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arrv_elem_ptr(
+pub(crate) extern "C" fn aipl_arr_elem_ptr(
     a: *const ArrValue,
     idx: i64,
     elem_size: i64,
@@ -980,7 +977,7 @@ pub(crate) extern "C" fn aipl_arrv_elem_ptr(
 /// owned block (`array_ops::reserve` with nothing extra keeps a unique block and
 /// copies a shared or static one).
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arrv_writable(
+pub(crate) extern "C" fn aipl_arr_writable(
     out: *mut ArrValue,
     a: *const ArrValue,
     drop_fn: i64,
@@ -992,7 +989,7 @@ pub(crate) extern "C" fn aipl_arrv_writable(
         unsafe { core::ptr::write(out, v) };
         return;
     }
-    aipl_arrv_reserve_from(out, a, 0, drop_fn, retain_fn, elem_size);
+    aipl_arr_reserve_from(out, a, 0, drop_fn, retain_fn, elem_size);
 }
 
 // ## Sets and dicts
@@ -1005,7 +1002,7 @@ pub(crate) extern "C" fn aipl_arrv_writable(
 
 /// Whether the set value at `s` contains the element at `x`.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_setv_contains(
+pub(crate) extern "C" fn aipl_set_contains(
     s: *const ArrValue,
     x: *const u8,
     elem_size: i64,
@@ -1024,7 +1021,7 @@ pub(crate) extern "C" fn aipl_setv_contains(
 /// Insert the element at `x` into the set the slot holds (a uniquely owned
 /// one), writing the possibly relocated set back.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_setv_insert(
+pub(crate) extern "C" fn aipl_set_insert(
     slot: *mut ArrValue,
     x: *const u8,
     drop_fn: i64,
@@ -1052,7 +1049,7 @@ pub(crate) extern "C" fn aipl_setv_insert(
 /// `a.union(b)` into `out`, consuming both: a fresh set, or — `in_place` — `a`'s
 /// own block grown, which the caller has made unique.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_setv_union(
+pub(crate) extern "C" fn aipl_set_union(
     out: *mut ArrValue,
     a: *const ArrValue,
     b: *const ArrValue,
@@ -1102,7 +1099,7 @@ pub(crate) extern "C" fn aipl_setv_union(
 /// The address of the value bound to the key at `key` in the dict value at `d`,
 /// or null.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_dictv_get(
+pub(crate) extern "C" fn aipl_dict_get(
     d: *const ArrValue,
     key: *const u8,
     pair_size: i64,
@@ -1114,7 +1111,7 @@ pub(crate) extern "C" fn aipl_dictv_get(
 
 /// Whether the dict value at `d` binds the key at `key`.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_dictv_contains_key(
+pub(crate) extern "C" fn aipl_dict_contains_key(
     d: *const ArrValue,
     key: *const u8,
     pair_size: i64,
@@ -1133,7 +1130,7 @@ pub(crate) extern "C" fn aipl_dictv_contains_key(
 /// Bind the pair at `pair` in the dict the slot holds (a uniquely owned one),
 /// writing the possibly relocated dict back.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_dictv_insert(
+pub(crate) extern "C" fn aipl_dict_insert(
     slot: *mut ArrValue,
     pair: *const u8,
     drop_fn: i64,
@@ -1160,7 +1157,7 @@ pub(crate) extern "C" fn aipl_dictv_insert(
 /// (`array_ops::reserve` with nothing extra, which keeps a unique block and
 /// copies a shared one), the key's pair removed, and the dict written back.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_dictv_remove(
+pub(crate) extern "C" fn aipl_dict_remove(
     slot: *mut ArrValue,
     key: *const u8,
     drop_fn: i64,
@@ -1243,7 +1240,7 @@ pub(crate) extern "C" fn aipl_arr_push_small(slot: *mut ArrValue, x: *const u8, 
 /// type is laid out alike in both, and `to_array` shares the block.) Borrows the
 /// set value; the result carries one reference.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arrv_from_set_words(
+pub(crate) extern "C" fn aipl_arr_from_set_words(
     out: *mut ArrValue,
     set: *const ArrValue,
     width: i64,
@@ -1269,7 +1266,7 @@ pub(crate) extern "C" fn aipl_arrv_from_set_words(
 /// A fresh array of `len` elements, uninitialized, written to `out` (the value's
 /// `data` is where the elements go).
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arrv_new(out: *mut ArrValue, len: i64, drop_fn: i64, elem_size: i64) {
+pub(crate) extern "C" fn aipl_arr_new(out: *mut ArrValue, len: i64, drop_fn: i64, elem_size: i64) {
     let n = len.max(0) as usize;
     let block = super::aipl_array_new(n as i64, drop_fn, elem_size);
     unsafe { core::ptr::write(out, ArrValue::whole_of(block, n)) };
@@ -1277,7 +1274,7 @@ pub(crate) extern "C" fn aipl_arrv_new(out: *mut ArrValue, len: i64, drop_fn: i6
 
 /// An empty array with room for `cap` elements, written to `out`.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arrv_with_cap(
+pub(crate) extern "C" fn aipl_arr_with_cap(
     out: *mut ArrValue,
     cap: i64,
     drop_fn: i64,
@@ -1290,7 +1287,7 @@ pub(crate) extern "C" fn aipl_arrv_with_cap(
 /// `s.split(sep)` as a `str[]` written to `out`. Each part is a window into `s`,
 /// retained because the array owns it. Borrows both arguments.
 #[no_mangle]
-pub(crate) extern "C" fn aipl_strv_split(
+pub(crate) extern "C" fn aipl_str_split(
     out: *mut ArrValue,
     s: *const super::str24::Str,
     sep: *const super::str24::Str,
@@ -1314,7 +1311,7 @@ pub(crate) extern "C" fn aipl_strv_split(
 /// what the in-place `filter` ends with. The dropped tail was already released
 /// or moved, so the block is told it holds `len` (the elements `release` walks).
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arrv_truncate(a: *mut ArrValue, len: i64) {
+pub(crate) extern "C" fn aipl_arr_truncate(a: *mut ArrValue, len: i64) {
     let v = unsafe { &mut *a };
     if v.is_inline() {
         let mut raw = v.bytes();
@@ -1331,7 +1328,7 @@ pub(crate) extern "C" fn aipl_arrv_truncate(a: *mut ArrValue, len: i64) {
 /// plain block has none to set, and the in-place gate keeps it to element types
 /// that agree on whether they need one.)
 #[no_mangle]
-pub(crate) extern "C" fn aipl_arrv_set_drop(a: *const ArrValue, drop_fn: i64) {
+pub(crate) extern "C" fn aipl_arr_set_drop(a: *const ArrValue, drop_fn: i64) {
     let v = unsafe { &*a };
     if v.is_inline() {
         return;

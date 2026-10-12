@@ -66,11 +66,11 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 427
-instructions executed: 324
-binary size: 3424
-  code: 1784
-  data: 47
-  metadata: 1593
+instructions executed: 316
+binary size: 3384
+  code: 1776
+  data: 14
+  metadata: 1594
 functions:
   __eq_Maybe:
     calls: 1
@@ -83,7 +83,7 @@ functions:
     bytes: 100
   __to_str_bool:
     calls: 2
-    bytes: 232
+    bytes: 224
   __to_str_i64:
     calls: 2
     bytes: 204

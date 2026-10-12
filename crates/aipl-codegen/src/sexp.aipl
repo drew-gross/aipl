@@ -74,10 +74,10 @@ deallocations: 12738
 reallocations: 490
 bytes allocated: 12454602
 instructions executed: 7635967
-binary size: 234000
-  code: 162860
-  data: 1716
-  metadata: 69424
+binary size: 233784
+  code: 162816
+  data: 1555
+  metadata: 69413
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -372,7 +372,7 @@ functions:
     bytes: 84
   __to_str___m4__ParseError:
     calls: 0
-    bytes: 836
+    bytes: 792
   __to_str_u64:
     calls: 0
     bytes: 204

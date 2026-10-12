@@ -79,11 +79,11 @@ allocations: 41
 deallocations: 41
 reallocations: 1
 bytes allocated: 2204
-instructions executed: 2659
-binary size: 11288
-  code: 6000
-  data: 507
-  metadata: 4781
+instructions executed: 2561
+binary size: 10872
+  code: 5916
+  data: 170
+  metadata: 4786
 functions:
   __arr_drop_Rule$Tok:
     calls: 5
@@ -105,10 +105,10 @@ functions:
     bytes: 116
   __to_str_Rule$Tok:
     calls: 12
-    bytes: 2092
+    bytes: 2016
   __to_str_bool:
     calls: 1
-    bytes: 232
+    bytes: 224
   __to_str_u64:
     calls: 1
     bytes: 204

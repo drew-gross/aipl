@@ -50,11 +50,11 @@ allocations: 24
 deallocations: 24
 reallocations: 0
 bytes allocated: 1115
-instructions executed: 2599
-binary size: 5848
-  code: 2956
-  data: 235
-  metadata: 2657
+instructions executed: 2483
+binary size: 5648
+  code: 2916
+  data: 74
+  metadata: 2658
 functions:
   __arr_drop_Cst:
     calls: 2
@@ -67,7 +67,7 @@ functions:
     bytes: 84
   __to_str_Cst:
     calls: 15
-    bytes: 1372
+    bytes: 1332
   __to_str_i64:
     calls: 1
     bytes: 204

@@ -74,11 +74,11 @@ allocations: 14
 deallocations: 14
 reallocations: 0
 bytes allocated: 387
-instructions executed: 1154
-binary size: 6944
-  code: 3948
-  data: 175
-  metadata: 2821
+instructions executed: 1142
+binary size: 6832
+  code: 3928
+  data: 94
+  metadata: 2810
 functions:
   __builtin_nonempty_first$i64:
     calls: 2
@@ -94,13 +94,13 @@ functions:
     bytes: 264
   __to_str_bool:
     calls: 1
-    bytes: 232
+    bytes: 224
   __to_str_i64:
     calls: 7
     bytes: 204
   __to_str_i64$opt:
     calls: 2
-    bytes: 388
+    bytes: 376
   __to_str_u64:
     calls: 2
     bytes: 204

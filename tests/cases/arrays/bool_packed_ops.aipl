@@ -29,10 +29,10 @@ deallocations: 4
 reallocations: 1
 bytes allocated: 107
 instructions executed: 1726
-binary size: 4584
+binary size: 4576
   code: 2052
   data: 599
-  metadata: 1933
+  metadata: 1925
 functions:
   __eq_bool$arr:
     calls: 4

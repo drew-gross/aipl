@@ -75,11 +75,11 @@ allocations: 59
 deallocations: 59
 reallocations: 0
 bytes allocated: 1771
-instructions executed: 4251
-binary size: 6104
-  code: 2972
-  data: 167
-  metadata: 2965
+instructions executed: 4023
+binary size: 5960
+  code: 2944
+  data: 54
+  metadata: 2962
 functions:
   __eq_List:
     calls: 8
@@ -89,10 +89,10 @@ functions:
     bytes: 44
   __to_str_List:
     calls: 45
-    bytes: 708
+    bytes: 688
   __to_str_bool:
     calls: 3
-    bytes: 232
+    bytes: 224
   __to_str_i64:
     calls: 2
     bytes: 204

@@ -78,18 +78,18 @@ allocations: 150007
 deallocations: 150007
 reallocations: 0
 bytes allocated: 10800297
-instructions executed: 29700283
-binary size: 4680
-  code: 2292
-  data: 47
-  metadata: 2341
+instructions executed: 29700267
+binary size: 4640
+  code: 2284
+  data: 14
+  metadata: 2342
 functions:
   __rec_drop_Work:
     calls: 150003
     bytes: 84
   __to_str_bool:
     calls: 4
-    bytes: 232
+    bytes: 224
   aipl_rec_alloc:
     calls: 150003
     bytes: (external)

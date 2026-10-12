@@ -47,11 +47,11 @@ allocations: 22
 deallocations: 22
 reallocations: 1
 bytes allocated: 1359
-instructions executed: 921
-binary size: 7376
-  code: 4500
-  data: 55
-  metadata: 2821
+instructions executed: 893
+binary size: 7336
+  code: 4492
+  data: 22
+  metadata: 2822
 functions:
   __arr_drop_Tok:
     calls: 1
@@ -61,7 +61,7 @@ functions:
     bytes: 136
   __to_str_bool:
     calls: 7
-    bytes: 232
+    bytes: 224
   __to_str_u64:
     calls: 1
     bytes: 204

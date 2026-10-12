@@ -82,11 +82,11 @@ allocations: 44
 deallocations: 44
 reallocations: 4
 bytes allocated: 1937
-instructions executed: 5533
-binary size: 16560
-  code: 10752
-  data: 411
-  metadata: 5397
+instructions executed: 5465
+binary size: 16248
+  code: 10676
+  data: 186
+  metadata: 5386
 functions:
   __builtin_set_map$char$str$lam$__builtin_to_str:
     calls: 2
@@ -96,16 +96,16 @@ functions:
     bytes: 204
   __to_str_set$bool:
     calls: 1
-    bytes: 628
+    bytes: 608
   __to_str_set$i64:
     calls: 6
-    bytes: 580
+    bytes: 568
   __to_str_set$str:
     calls: 2
-    bytes: 724
+    bytes: 692
   __to_str_setasc$i64:
     calls: 1
-    bytes: 580
+    bytes: 568
   __to_str_u64:
     calls: 2
     bytes: 204

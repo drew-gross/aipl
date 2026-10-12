@@ -46,24 +46,24 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 126
-instructions executed: 633
-binary size: 6968
-  code: 3164
-  data: 619
-  metadata: 3185
+instructions executed: 597
+binary size: 6456
+  code: 3068
+  data: 202
+  metadata: 3186
 functions:
   __to_str_bool:
     calls: 1
-    bytes: 232
+    bytes: 224
   __to_str_i64:
     calls: 1
     bytes: 204
   __to_str_i64$opt$opt$opt$opt:
     calls: 1
-    bytes: 876
+    bytes: 828
   __to_str_str$opt$opt$opt$opt:
     calls: 1
-    bytes: 952
+    bytes: 912
   aipl_i64_len:
     calls: 4
     bytes: (external)

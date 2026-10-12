@@ -64,10 +64,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 1932
-binary size: 3752
+binary size: 3744
   code: 2576
   data: 9
-  metadata: 1167
+  metadata: 1159
 functions:
   aipl_arr_inc:
     calls: 9

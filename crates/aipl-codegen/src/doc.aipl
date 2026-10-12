@@ -334,10 +334,10 @@ deallocations: 310
 reallocations: 1
 bytes allocated: 21469
 instructions executed: 34415
-binary size: 38296
+binary size: 38288
   code: 24020
   data: 865
-  metadata: 13411
+  metadata: 13403
 functions:
   __arr_drop_Doc:
     calls: 10

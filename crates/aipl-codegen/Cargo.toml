@@ -46,5 +46,7 @@ workspace = true
 aipl-artifact = { workspace = true }
 
 [dev-dependencies]
-# TEMPORARY (STR_REPR.md ABI spike): cross-target ISA lookup. Delete with abi_spike.rs.
+# Cross-target ISA lookup, for `abi_spike.rs`: the regression tests for the Cranelift
+# lowerings the 24-byte value ABI rests on (a three-word signature, an out pointer,
+# and that x86-64 refuses a three-word return), which a Cranelift upgrade could change.
 cranelift-codegen = { version = "0.134.2", features = ["all-arch"] }

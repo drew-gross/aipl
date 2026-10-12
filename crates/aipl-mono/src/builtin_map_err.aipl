@@ -87,10 +87,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 2700
-binary size: 21824
-  code: 12352
-  data: 1879
-  metadata: 7593
+binary size: 21696
+  code: 12332
+  data: 1766
+  metadata: 7598
 functions:
   __test$map_err:
     calls: 1
@@ -109,10 +109,10 @@ functions:
     bytes: 84
   __to_str_FmtError:
     calls: 0
-    bytes: 564
+    bytes: 552
   __to_str_bool:
     calls: 0
-    bytes: 232
+    bytes: 224
   __to_str_i64:
     calls: 0
     bytes: 204

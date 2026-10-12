@@ -31,10 +31,10 @@ deallocations: 12
 reallocations: 0
 bytes allocated: 1008
 instructions executed: 1143
-binary size: 5344
+binary size: 5336
   code: 2656
   data: 541
-  metadata: 2147
+  metadata: 2139
 functions:
   __eq_str$arr:
     calls: 6

@@ -623,10 +623,10 @@ deallocations: 266
 reallocations: 15
 bytes allocated: 18933
 instructions executed: 51050
-binary size: 72408
+binary size: 72400
   code: 45572
   data: 3679
-  metadata: 23157
+  metadata: 23149
 functions:
   __arr_drop_Cst:
     calls: 40

@@ -34,30 +34,30 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 218
-instructions executed: 1017
-binary size: 8944
-  code: 4260
-  data: 739
-  metadata: 3945
+instructions executed: 965
+binary size: 8360
+  code: 4156
+  data: 258
+  metadata: 3946
 functions:
   __to_str_Person:
     calls: 1
-    bytes: 744
+    bytes: 708
   __to_str_Point:
     calls: 1
-    bytes: 484
+    bytes: 464
   __to_str_char$opt:
     calls: 2
-    bytes: 380
+    bytes: 368
   __to_str_i64$arr$opt:
     calls: 1
-    bytes: 880
+    bytes: 868
   __to_str_i64$opt:
     calls: 1
-    bytes: 388
+    bytes: 376
   __to_str_str$opt:
     calls: 1
-    bytes: 472
+    bytes: 460
   aipl_arr_inc:
     calls: 1
     bytes: (external)

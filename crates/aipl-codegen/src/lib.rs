@@ -33,22 +33,18 @@ pub mod ffi_ast;
 #[allow(dead_code)]
 mod str24;
 
-// STAGED: the 24-byte *array* value — the array half of unifying `str` and array
-// into one sequence representation, and `str24`'s shape on purpose. Shared with the
-// AOT runtime from the start, for the same reason `str24` is: a divergence in a
-// layout constant is silent memory corruption rather than a failing test. Nothing
-// is wired up to it; see the file's header for why that switch is atomic.
-#[allow(dead_code)] // staged: wired up when the array value widens
+// The 24-byte *array* value, `str24`'s shape on purpose, and the operations over
+// the block under it. Shared with the AOT runtime, for the same reason `str24`
+// is: a divergence in a layout constant is silent memory corruption rather than a
+// failing test. `buffer` is the refcounted allocation a `str` and a plain array
+// block both are.
 mod arr24;
 mod array_ops;
 mod buffer;
 mod str24_host;
 
-// STAGED, the same way and for the same reason: the 256-bit `#{char}` value,
-// proven on its own before codegen switches the type over to it. Shared
-// verbatim with the AOT runtime, so `no_std`-safe — which costs nothing, since
-// a char set never allocates.
-#[allow(dead_code)] // staged: wired up when `#{char}` switches representation
+// The 256-bit `#{char}` value. Shared verbatim with the AOT runtime, so
+// `no_std`-safe — which costs nothing, since a char set never allocates.
 mod charset;
 
 // The array layout — block, representation tags, reversed view — shared with
@@ -131,30 +127,11 @@ use aipl_syntax::{
 };
 use aipl_syntax::{DebugOptions, Error, Span};
 
-// ---------- Refcounted string runtime ----------
-//
-// Every str has an 8-byte header preceding the content:
-//   [refcount: i64 LE][bytes..][null]
-// The pointer the language uses points at `bytes`. Static literals carry
-// `STATIC_REFCOUNT` (i64::MAX) so inc/dec become no-ops on them. Dynamic
-// strings (from concat) start at 1 and are freed by `aipl_dec` when the
-// count reaches 0.
-
 // `HEADER_SIZE` is the refcount prefix shared by every refcounted heap block
-// (strings AND arrays): the `i64` refcount sits at `ptr - HEADER_SIZE`, so
-// `header_of`/inc/dec are common to both. Don't change it without auditing the
-// array runtime.
+// (a `str` buffer and an array block alike — `buffer.rs`): the `i64` refcount
+// sits at `base - HEADER_SIZE`.
 const HEADER_SIZE: usize = 8;
 const STATIC_REFCOUNT: i64 = buffer::STATIC_REFCOUNT;
-
-// A heap *string* additionally stores its content length, in a word placed just
-// *before* the refcount (so the refcount stays at `ptr - HEADER_SIZE`, shared
-// with arrays): layout `[len: i64][refcount: i64][content bytes][NUL]`, with the
-// value pointing at the first content byte. So `len` at `ptr - STR_HEADER_SIZE`
-// (`-16`), refcount at `ptr - HEADER_SIZE` (`-8`), block start at `-16`. Storing
-// the length means `len`/`str_bytes`/drop never walk to the NUL to count bytes
-// (the NUL is kept only so a heap path can be handed to the C file API).
-const STR_HEADER_SIZE: usize = 16;
 
 /// The AIPL `FmtError` struct, rebuilt as a spanned [`Error`]. Shared by every
 /// formatter entry that can fail, so they decode the same shape the same way.
@@ -181,94 +158,15 @@ fn fmt_error_of(v: FfiValue) -> Error {
 
 // ---------- Small-string optimization (SSO) ----------
 //
-// ---------- The retired 8-byte `str` value ----------
-//
-// **Not the live representation.** A `str` is the 24-byte value in `str24.rs`;
-// what follows is the 8-byte tagged pointer it replaced, still compiled but no
-// longer reached — the AOT runtime's dead-code warnings name its constants
-// (`HEAP_TAG`, `INLINE_TAG`, `CONCAT_TAG`), 39 of them at the time of writing.
-// Kept because deleting it is its own change; read it as history, and read
-// `str24.rs` for how a `str` actually works.
-//
-// A `str` value was either a heap/static pointer (8-byte aligned, so its low bits
-// are 0) or an *inline* small string tagged `0b01` in the low two bits. Inline
-// layout, as the value's bytes in memory (little-endian, like the rest of the
-// runtime):
-//   byte0 = (len << 2) | 1   with len in 0..=7   (low two bits are always 0b01)
-//   bytes 1..=7 = content    (unused trailing bytes are 0)
-// Strings of length <= 7 were stored inline — no allocation, no refcount; length
-// >= 8 stayed heap. The low two bits form the representation tag: 00 = heap/static,
-// 01 = inline, 10 = view, 11 = concat. Shifting `len` by two (not one) keeps the
-// inline tag exactly `0b01` regardless of the length's parity, which frees the
-// `0b11` slot for the concat representation. `aipl_inc`/`aipl_dec` no-op on inline
-// values, exactly like a static refcount, so refcounting and array element
-// drop/retain need no special-casing. Consumers always *materialize* (read the
-// bytes from any representation), so correctness never depends on the invariant;
-// the "<=7 is always inline" invariant is purely what makes those strings free.
-
-// The discriminant lived in the low two bits. In the wide value it is the top
-// byte of `w2` instead, and `Str::tag` is what reads it.
-const TAG_MASK: usize = 0b11;
-const INLINE_TAG: usize = 0b01;
-
-// ---------- Representation dispatch ----------
-//
-// Still the rule, and it applies to the wide value just as it did here: classify
-// a `str` once (`Str::tag`), then `match`. Prefer that over scattered `is_*`
-// boolean checks — a `match` is exhaustive, so adding a representation makes the
-// compiler flag every site that doesn't yet handle it, instead of silently
-// falling through to a buffer/`else` arm. Variants whose handling genuinely
-// coincides may share an arm, but spell them out rather than using a bare `_` so
-// the next representation still forces a decision. CLAUDE.md states it under
-// "Multiple runtime representations".
-
-/// Pack <= 7 content bytes into a *retired-representation* inline str value
-/// (`bytes.len()` must be <= 7). `str24::inline_words` is the live counterpart,
-/// and its capacity is 22.
-fn pack_inline(bytes: &[u8]) -> *const u8 {
-    debug_assert!(bytes.len() <= 7);
-    let mut val: u64 = ((bytes.len() as u64) << 2) | 1;
-    for (i, &b) in bytes.iter().enumerate() {
-        val |= (b as u64) << (8 * (i + 1));
-    }
-    val as usize as *const u8
-}
-
-fn alloc_dynamic_string(content_len: usize) -> *mut u8 {
-    // Layout: [len: i64][refcount: i64][content: u8 * len][null: u8]
-    let total = STR_HEADER_SIZE + content_len + 1;
-    let layout = std::alloc::Layout::from_size_align(total, std::mem::align_of::<i64>())
-        .expect("string layout");
-    let raw = unsafe { std::alloc::alloc(layout) };
-    if raw.is_null() {
-        std::alloc::handle_alloc_error(layout);
-    }
-    unsafe {
-        std::ptr::write(raw as *mut i64, content_len as i64); // stored length
-        std::ptr::write((raw as *mut i64).add(1), 1); // refcount
-        *raw.add(STR_HEADER_SIZE + content_len) = 0; // null terminator
-    }
-    raw
-}
-
-unsafe fn free_dynamic_string(block: *mut u8, content_len: usize) {
-    let total = STR_HEADER_SIZE + content_len + 1;
-    let layout = std::alloc::Layout::from_size_align(total, std::mem::align_of::<i64>())
-        .expect("string layout");
-    unsafe {
-        std::alloc::dealloc(block, layout);
-    }
-}
-
 /// `list_files(dir) -> str[]`: every file at or below `dir`, walked recursively,
 /// each path `dir`-prefixed and in directory order (callers that need determinism
 /// sort). A directory is descended into rather than listed, and a symlink counts
 /// as a file (`file_type` doesn't follow it), so the walk can't cycle. Writes the
 /// listing to `out` as an array value and returns 1, or returns 0 and writes
-/// nothing on any failure. Borrows `dir`. Mirrors `aipl_arrv_list_files` in the
+/// nothing on any failure. Borrows `dir`. Mirrors `aipl_list_files` in the
 /// linker runtime.
 #[no_mangle]
-extern "C" fn aipl_arrv_list_files(out: *mut arr24::ArrValue, dir: *const str24::Str) -> i64 {
+extern "C" fn aipl_list_files(out: *mut arr24::ArrValue, dir: *const str24::Str) -> i64 {
     let Some(files) = list_files_paths(dir) else {
         return 0;
     };
@@ -600,7 +498,7 @@ extern "C" fn aipl_write_bytes(dst: *const u8, src: *const u8, n: i64) -> *const
     }
 }
 
-/// How [`aipl_arrv_sort`] orders its elements. Every `ord` element type is a
+/// How [`aipl_arr_sort`] orders its elements. Every `ord` element type is a
 /// scalar — a word, or a narrow integer packed at its own width — or a `str`, so
 /// the only question is how to read one: as a signed integer, as an unsigned one
 /// (`u8`..`u64`, and `char` — a byte value), or as a `str` to compare
@@ -639,7 +537,7 @@ fn set_order_code(elem: &ConcreteType, order: aipl_syntax::ast::SetOrder) -> i64
 }
 
 /// Order `words` in place by [`SORT_KIND_SIGNED`]/`_UNSIGNED`/`_STR`. Shared by
-/// both runtimes' `aipl_arrv_sort`; kept byte-for-byte identical, which is why it
+/// both runtimes' `aipl_arr_sort`; kept byte-for-byte identical, which is why it
 /// uses `sort_unstable_by` — the stable sorts need an allocation, and the linker
 /// runtime is `#![no_std]`. Unstable is enough here: `ord` elements are compared
 /// by value, so equal ones are indistinguishable.
@@ -3087,51 +2985,48 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_arr_window", arr24::aipl_arr_window as *const u8);
     jit_builder.symbol("aipl_arr_settle", arr24::aipl_arr_settle as *const u8);
     jit_builder.symbol(
-        "aipl_arrv_from_set_words",
-        arr24::aipl_arrv_from_set_words as *const u8,
+        "aipl_arr_from_set_words",
+        arr24::aipl_arr_from_set_words as *const u8,
     );
     jit_builder.symbol(
         "aipl_arr_push_small",
         arr24::aipl_arr_push_small as *const u8,
     );
     jit_builder.symbol("aipl_arr_reversed", arr24::aipl_arr_reversed as *const u8);
-    jit_builder.symbol("aipl_arrv_sort", arr24::aipl_arrv_sort as *const u8);
-    jit_builder.symbol("aipl_arrv_push", arr24::aipl_arrv_push as *const u8);
+    jit_builder.symbol("aipl_arr_sort", arr24::aipl_arr_sort as *const u8);
+    jit_builder.symbol("aipl_arr_push", arr24::aipl_arr_push as *const u8);
+    jit_builder.symbol("aipl_arr_push_from", arr24::aipl_arr_push_from as *const u8);
     jit_builder.symbol(
-        "aipl_arrv_push_from",
-        arr24::aipl_arrv_push_from as *const u8,
+        "aipl_arr_reserve_from",
+        arr24::aipl_arr_reserve_from as *const u8,
     );
     jit_builder.symbol(
-        "aipl_arrv_reserve_from",
-        arr24::aipl_arrv_reserve_from as *const u8,
+        "aipl_arr_extend_from",
+        arr24::aipl_arr_extend_from as *const u8,
     );
+    jit_builder.symbol("aipl_arr_elem_ptr", arr24::aipl_arr_elem_ptr as *const u8);
     jit_builder.symbol(
-        "aipl_arrv_extend_from",
-        arr24::aipl_arrv_extend_from as *const u8,
+        "aipl_arr_splice_from",
+        arr24::aipl_arr_splice_from as *const u8,
     );
-    jit_builder.symbol("aipl_arrv_elem_ptr", arr24::aipl_arrv_elem_ptr as *const u8);
+    jit_builder.symbol("aipl_arr_writable", arr24::aipl_arr_writable as *const u8);
+    jit_builder.symbol("aipl_set_contains", arr24::aipl_set_contains as *const u8);
+    jit_builder.symbol("aipl_set_insert", arr24::aipl_set_insert as *const u8);
+    jit_builder.symbol("aipl_set_union", arr24::aipl_set_union as *const u8);
+    jit_builder.symbol("aipl_dict_get", arr24::aipl_dict_get as *const u8);
     jit_builder.symbol(
-        "aipl_arrv_splice_from",
-        arr24::aipl_arrv_splice_from as *const u8,
+        "aipl_dict_contains_key",
+        arr24::aipl_dict_contains_key as *const u8,
     );
-    jit_builder.symbol("aipl_arrv_writable", arr24::aipl_arrv_writable as *const u8);
-    jit_builder.symbol("aipl_setv_contains", arr24::aipl_setv_contains as *const u8);
-    jit_builder.symbol("aipl_setv_insert", arr24::aipl_setv_insert as *const u8);
-    jit_builder.symbol("aipl_setv_union", arr24::aipl_setv_union as *const u8);
-    jit_builder.symbol("aipl_dictv_get", arr24::aipl_dictv_get as *const u8);
-    jit_builder.symbol(
-        "aipl_dictv_contains_key",
-        arr24::aipl_dictv_contains_key as *const u8,
-    );
-    jit_builder.symbol("aipl_dictv_insert", arr24::aipl_dictv_insert as *const u8);
-    jit_builder.symbol("aipl_dictv_remove", arr24::aipl_dictv_remove as *const u8);
-    jit_builder.symbol("aipl_arrv_join", arr24::aipl_arrv_join as *const u8);
-    jit_builder.symbol("aipl_arrv_new", arr24::aipl_arrv_new as *const u8);
-    jit_builder.symbol("aipl_arrv_with_cap", arr24::aipl_arrv_with_cap as *const u8);
-    jit_builder.symbol("aipl_strv_split", arr24::aipl_strv_split as *const u8);
-    jit_builder.symbol("aipl_arrv_truncate", arr24::aipl_arrv_truncate as *const u8);
-    jit_builder.symbol("aipl_arrv_set_drop", arr24::aipl_arrv_set_drop as *const u8);
-    jit_builder.symbol("aipl_strv_join", arr24::aipl_strv_join as *const u8);
+    jit_builder.symbol("aipl_dict_insert", arr24::aipl_dict_insert as *const u8);
+    jit_builder.symbol("aipl_dict_remove", arr24::aipl_dict_remove as *const u8);
+    jit_builder.symbol("aipl_arr_join", arr24::aipl_arr_join as *const u8);
+    jit_builder.symbol("aipl_arr_new", arr24::aipl_arr_new as *const u8);
+    jit_builder.symbol("aipl_arr_with_cap", arr24::aipl_arr_with_cap as *const u8);
+    jit_builder.symbol("aipl_str_split", arr24::aipl_str_split as *const u8);
+    jit_builder.symbol("aipl_arr_truncate", arr24::aipl_arr_truncate as *const u8);
+    jit_builder.symbol("aipl_arr_set_drop", arr24::aipl_arr_set_drop as *const u8);
+    jit_builder.symbol("aipl_str_join", arr24::aipl_str_join as *const u8);
     jit_builder.symbol("aipl_str_rope", str24::aipl_str_rope as *const u8);
     jit_builder.symbol(
         "aipl_str_pack_inline",
@@ -3188,7 +3083,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
         "aipl_write_string_to_file",
         str24_host::aipl_write_string_to_file as *const u8,
     );
-    jit_builder.symbol("aipl_arrv_list_files", aipl_arrv_list_files as *const u8);
+    jit_builder.symbol("aipl_list_files", aipl_list_files as *const u8);
     jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
     jit_builder.symbol("aipl_str_split_len", str24::aipl_str_split_len as *const u8);
     jit_builder.symbol(
@@ -4540,26 +4435,6 @@ unsafe fn invoke(ptr: *const u8, args: &[i64]) -> i64 {
     }
 }
 
-/// Build a `str` value for an FFI argument the host owns. A short string (<= 7
-/// bytes) is packed inline (no allocation); a longer one gets a fresh heap buffer
-/// tagged `STATIC_REFCOUNT`, so the callee's refcount inc/dec all no-op on it —
-/// exactly like a string literal — and never frees it. The host keeps ownership
-/// and frees the heap buffer after the call. Returns the value and, for the heap
-/// case, the `(header, content_len)` to hand to [`free_dynamic_string`].
-fn build_borrowed_str(bytes: &[u8]) -> (i64, Option<(*mut u8, usize)>) {
-    if bytes.len() <= 7 {
-        (pack_inline(bytes) as i64, None)
-    } else {
-        let raw = alloc_dynamic_string(bytes.len());
-        unsafe {
-            // alloc wrote `[len][refcount=1]`; make the refcount static (word 1).
-            std::ptr::write((raw as *mut i64).add(1), STATIC_REFCOUNT);
-            std::ptr::copy_nonoverlapping(bytes.as_ptr(), raw.add(STR_HEADER_SIZE), bytes.len());
-            (raw.add(STR_HEADER_SIZE) as i64, Some((raw, bytes.len())))
-        }
-    }
-}
-
 // ---------------------------------------------------------------------------
 // FFI argument writers.
 //
@@ -4580,8 +4455,6 @@ fn build_borrowed_str(bytes: &[u8]) -> (i64, Option<(*mut u8, usize)>) {
 
 /// One host-owned buffer backing a borrowed FFI argument.
 enum ArgBuf {
-    /// A heap `str` block from [`build_borrowed_str`]: its base and content length.
-    Str(*mut u8, usize),
     /// A plain array block from [`ArgBufs::array_block`]: its tagged base pointer.
     Array(*const u8),
     /// An inline composite (struct/variant/optional/result) the callee receives a
@@ -4604,16 +4477,6 @@ impl ArgBufs {
     /// its allocation for the length of the call, so the free is deferred to here.
     fn wide_str(&mut self, value: str24::Str) {
         self.0.push(ArgBuf::WideStr(value));
-    }
-
-    /// A borrowed `str` value (see [`build_borrowed_str`]), keeping the heap case
-    /// alive for the call.
-    fn str_value(&mut self, s: &str) -> i64 {
-        let (val, heap) = build_borrowed_str(s.as_bytes());
-        if let Some((block, content_len)) = heap {
-            self.0.push(ArgBuf::Str(block, content_len));
-        }
-        val
     }
 
     /// Keep `buf` — an inline composite — alive for the call, and return the
@@ -4653,9 +4516,6 @@ impl Drop for ArgBufs {
     fn drop(&mut self) {
         for buf in &self.0 {
             match buf {
-                ArgBuf::Str(block, content_len) => unsafe {
-                    free_dynamic_string(*block, *content_len)
-                },
                 ArgBuf::Array(block) => unsafe { buffer::free(arr_untag(*block), 0) },
                 // Freed by the `Vec`'s own drop.
                 ArgBuf::Composite(_) => {}
@@ -4705,7 +4565,7 @@ fn ffi_arg_abi(
         unsafe { write_ffi_arg(abi, buf.as_mut_ptr(), ty, v, structs, bufs)? };
         return Ok(bufs.composite(buf));
     }
-    ffi_arg_word(abi, ty, v, structs, bufs)
+    ffi_arg_word(abi, ty, v, structs)
 }
 
 /// Marshal `v` into the 8-byte word a value of the *pointer-like* type `ty` — a
@@ -4716,7 +4576,6 @@ fn ffi_arg_word(
     ty: &ConcreteType,
     v: &FfiValue,
     structs: &HashMap<String, TypeDef>,
-    bufs: &mut ArgBufs,
 ) -> Result<i64, String> {
     debug_assert!(
         !abi_is_composite(abi, ty, structs),
@@ -4736,7 +4595,6 @@ fn ffi_arg_word(
     }
     match v {
         FfiValue::Int(n) if is_ffi_scalar(ty) => Ok(*n),
-        FfiValue::Str(s) if is_str_repr(ty) => Ok(bufs.str_value(s)),
         _ => Err(mismatch(ty, v)),
     }
 }
@@ -4804,10 +4662,6 @@ fn build_borrowed_array(
     structs: &HashMap<String, TypeDef>,
     bufs: &mut ArgBufs,
 ) -> Result<(i64, usize), String> {
-    if matches!(elem, ConcreteType::Primitive(Primitive::Char)) {
-        let s = chars_to_utf8(elems)?;
-        return Ok((bufs.str_value(&s), 0));
-    }
     let elem_size = if is_str_repr(elem) {
         // A wide `str` element is the value itself, 24 bytes in the block.
         abi.str_size()
@@ -5046,18 +4900,14 @@ unsafe fn write_ffi_arg(
         };
     }
     // An array value is `{block, data, len}` over the borrowed block: the whole
-    // of it, as `arr24::ArrValue::whole` makes one. (A `char[]` is a `str`, whose
-    // value is the single word `build_borrowed_array` hands back.)
+    // of it, as `arr24::ArrValue::whole_of` makes one. (A `char[]` is a `str`,
+    // written above.)
     if let ConcreteType::Array(elem) = ty {
         let FfiValue::Array(elems) = v else {
             return Err(mismatch(ty, v));
         };
         let (block, len) = build_borrowed_array(abi, elem, elems, structs, bufs)?;
-        if !is_char_array(ty) {
-            unsafe { write_whole_value(dst, block as *const u8, len) };
-        } else {
-            unsafe { std::ptr::write(dst as *mut i64, block) };
-        }
+        unsafe { write_whole_value(dst, block as *const u8, len) };
         return Ok(());
     }
     // A dict value is the same three words.
@@ -5069,7 +4919,7 @@ unsafe fn write_ffi_arg(
         unsafe { write_whole_value(dst, block as *const u8, len) };
         return Ok(());
     }
-    let word = ffi_arg_word(abi, ty, v, structs, bufs)?;
+    let word = ffi_arg_word(abi, ty, v, structs)?;
     unsafe { std::ptr::write(dst as *mut i64, word) };
     Ok(())
 }
@@ -6776,30 +6626,30 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         // the caller already holds the slot it wants filled.
         "aipl_arr_window" => (7, Ret::None),
         "aipl_arr_window_block" => (4, Ret::Word),
-        "aipl_arrv_from_set_words" | "aipl_strv_split" => (3, Ret::None),
-        "aipl_arrv_new" | "aipl_arrv_with_cap" => (4, Ret::None),
-        "aipl_arrv_list_files" => (2, Ret::Word),
-        "aipl_arrv_truncate" | "aipl_arrv_set_drop" => (2, Ret::None),
+        "aipl_arr_from_set_words" | "aipl_str_split" => (3, Ret::None),
+        "aipl_arr_new" | "aipl_arr_with_cap" => (4, Ret::None),
+        "aipl_list_files" => (2, Ret::Word),
+        "aipl_arr_truncate" | "aipl_arr_set_drop" => (2, Ret::None),
         "aipl_arr_push_small" => (3, Ret::Word),
         "aipl_arr_reversed" => (5, Ret::None),
-        "aipl_arrv_elem_ptr" => (3, Ret::Word),
-        "aipl_arrv_sort" => (6, Ret::None),
-        "aipl_arrv_push" => (7, Ret::None),
-        "aipl_arrv_push_from"
-        | "aipl_arrv_reserve_from"
-        | "aipl_arrv_extend_from"
-        | "aipl_arrv_splice_from" => {
+        "aipl_arr_elem_ptr" => (3, Ret::Word),
+        "aipl_arr_sort" => (6, Ret::None),
+        "aipl_arr_push" => (7, Ret::None),
+        "aipl_arr_push_from"
+        | "aipl_arr_reserve_from"
+        | "aipl_arr_extend_from"
+        | "aipl_arr_splice_from" => {
             (6, Ret::None)
         }
-        "aipl_arrv_writable" => (5, Ret::None),
-        "aipl_setv_contains" | "aipl_dictv_get" | "aipl_dictv_contains_key" => (4, Ret::Word),
-        "aipl_setv_insert" => (7, Ret::None),
-        "aipl_setv_union" => (9, Ret::None),
-        "aipl_dictv_insert" | "aipl_dictv_remove" => (6, Ret::None),
-        "aipl_arrv_join" => (8, Ret::None),
+        "aipl_arr_writable" => (5, Ret::None),
+        "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" => (4, Ret::Word),
+        "aipl_set_insert" => (7, Ret::None),
+        "aipl_set_union" => (9, Ret::None),
+        "aipl_dict_insert" | "aipl_dict_remove" => (6, Ret::None),
+        "aipl_arr_join" => (8, Ret::None),
         // The parts and `join`'s three separators; the `str` comes back through
-        // the out pointer, as `aipl_strv_join`'s does.
-        "aipl_strv_join" => (4, Ret::Str),
+        // the out pointer, as `aipl_str_join`'s does.
+        "aipl_str_join" => (4, Ret::Str),
         "aipl_arr_settle" => (4, Ret::None),
         // ---- a `str` back, through the out pointer ----
         "aipl_trim" | "aipl_str_reverse" | "aipl_str_sort" | "aipl_str_alloc"
@@ -6983,11 +6833,11 @@ fn register_builtins(
     // arguments — see `borrowed_param` — so there is nothing else to record.
     const SIG_REGS: &[(Callee, &str)] = &[
         (Callee::Print, "aipl_print"),
-        (Callee::Split, "aipl_strv_split"),
+        (Callee::Split, "aipl_str_split"),
         (Callee::SplitLen, "aipl_str_split_len"),
         (Callee::ReadFileToString, "aipl_read_file_to_string"),
         (Callee::WriteStringToFile, "aipl_write_string_to_file"),
-        (Callee::ListFiles, "aipl_arrv_list_files"),
+        (Callee::ListFiles, "aipl_list_files"),
         (Callee::NowNanos, "aipl_now_nanos"),
         (Callee::MonotonicNow, "aipl_monotonic_now"),
         (Callee::ExecuteProgram, "aipl_execute_program"),
@@ -8101,70 +7951,6 @@ fn declared_import<M: Module>(module: &M, sym: &str) -> Result<FuncId, Error> {
         .ok_or_else(|| Error::msg(format!("instrumented build without `{sym}`")))
 }
 
-/// True when a refcount op on the str-repr value `v` is statically known to be
-/// a runtime no-op, so the `aipl_inc`/`aipl_dec` call would be pure overhead
-/// and is elided. Recognized by the defining instruction:
-///   - a constant that is null (`0`) or inline-tagged (`..01`, a packed <= 7
-///     byte literal) — neither owns heap. A heap/view/rope pointer is never a
-///     codegen-time constant, and a heap-tagged (`..00`) constant is excluded
-///     anyway, so this can't misfire on a baked pointer;
-///   - `symbol_value + header` — a pointer into a static literal's data object,
-///     whose `STATIC_REFCOUNT` header makes the runtime ignore every inc/dec on
-///     it (and which is never freed). `header` is the literal's header size —
-///     `STR_HEADER_SIZE` for a `str`, `HEADER_SIZE` for a constant array — and
-///     the pointer sits exactly that far past the symbol.
-/// Best-effort by design: a literal that arrives through a block param, a
-/// stack slot, or a component load isn't recognized, and its (no-op) rc call
-/// is emitted exactly as before — eliding is only ever an optimization, never
-/// required for balance, because rc ops on these representations don't count.
-fn rc_statically_noop(func: &Function, v: Value, header: usize) -> bool {
-    use cranelift::codegen::ir::{instructions::InstructionData, Opcode, ValueDef};
-    let ValueDef::Result(inst, _) = func.dfg.value_def(v) else {
-        return false;
-    };
-    match func.dfg.insts[inst] {
-        InstructionData::UnaryImm {
-            opcode: Opcode::Iconst,
-            imm,
-        } => {
-            let raw = imm.bits();
-            raw == 0 || raw & TAG_MASK as i64 == INLINE_TAG as i64
-        }
-        // `iadd_imm` no longer lowers to a single `BinaryImm64`/`IaddImm`
-        // instruction: it materializes the immediate as an `iconst` and emits a
-        // plain `iadd`. So `symbol_value + STR_HEADER_SIZE` now appears as
-        // `iadd(symbol_value, iconst STR_HEADER_SIZE)`.
-        InstructionData::Binary {
-            opcode: Opcode::Iadd,
-            args,
-        } => {
-            let is_symbol = |val: Value| {
-                matches!(
-                    func.dfg.value_def(val),
-                    ValueDef::Result(def, _)
-                        if func.dfg.insts[def].opcode() == Opcode::SymbolValue
-                )
-            };
-            let is_header_const = |val: Value| {
-                matches!(
-                    func.dfg.value_def(val),
-                    ValueDef::Result(def, _)
-                        if matches!(
-                            func.dfg.insts[def],
-                            InstructionData::UnaryImm {
-                                opcode: Opcode::Iconst,
-                                imm,
-                            } if imm.bits() == header as i64
-                        )
-                )
-            };
-            let [a, b] = args;
-            (is_symbol(a) && is_header_const(b)) || (is_symbol(b) && is_header_const(a))
-        }
-        _ => false,
-    }
-}
-
 /// Lower `s[i]` to a `char?`: call the runtime `aipl_char_at` (the byte at `i`
 /// as `0..=255`, or `-1` out of bounds) and wrap
 /// it into a flattened `{tag, value}` optional slot (tag = in-bounds, value = the
@@ -8463,7 +8249,7 @@ fn owned_block_made_unique_whole<M: Module>(
 }
 
 /// [`owned_block_made_unique`] given the block pointer as well as the value it
-/// came from. A value that is shared is copied by `aipl_arrv_reserve_from` into
+/// came from. A value that is shared is copied by `aipl_arr_reserve_from` into
 /// a value of its own, whose address this returns; an unshared one is handed
 /// back as it is. (A type with no block — a `#{char}`'s bitfield — has nothing to
 /// copy.)
@@ -8532,7 +8318,7 @@ fn owned_block_made_unique_ptr<M: Module>(
     cx.builtins.call_void(
         module,
         builder,
-        "aipl_arrv_reserve_from",
+        "aipl_arr_reserve_from",
         &[copied, value, zero, drop_fn, retain_fn, esz],
     );
     builder.ins().jump(merge, &[BlockArg::Value(copied)]);
@@ -8741,7 +8527,7 @@ fn set_source_as_array<M: Module>(
     let w = builder.ins().iconst(types::I64, width);
     let out = array_value_slot(builder);
     cx.builtins
-        .call_void(module, builder, "aipl_arrv_from_set_words", &[out, src, w]);
+        .call_void(module, builder, "aipl_arr_from_set_words", &[out, src, w]);
     Some((out, ConcreteType::Array(elem.clone())))
 }
 
@@ -8877,14 +8663,14 @@ fn new_seq_with_cap<M: Module>(
     builtins.call_void(
         module,
         builder,
-        "aipl_arrv_with_cap",
+        "aipl_arr_with_cap",
         &[out, cap, drop_fn, elem_size],
     );
     out
 }
 
 /// The address of a fresh, uninitialized 24-byte stack slot, for a runtime entry
-/// that writes an array value (`aipl_arrv_new`, `aipl_strv_split`, ...).
+/// that writes an array value (`aipl_arr_new`, `aipl_str_split`, ...).
 fn array_value_slot(builder: &mut FunctionBuilder) -> Value {
     let slot = builder.create_sized_stack_slot(StackSlotData::new(
         StackSlotKind::ExplicitSlot,
@@ -8970,8 +8756,7 @@ fn is_bit_packed(elem: &ConcreteType) -> bool {
 /// Whether `ty` is `char[]` — the one array element type that shares `str`'s
 /// runtime representation entirely (tag scheme, heap layout, refcounting)
 /// rather than the generic array block, since a `char` is a single byte and
-/// `str`'s content is just packed bytes (see the "Representation dispatch"
-/// doc above `StrRepr`). `char[]` stays a distinct compile-time `ConcreteType` (it
+/// `str`'s content is just packed bytes. `char[]` stays a distinct compile-time `ConcreteType` (it
 /// still displays and type-checks as `char[]`, not `str`) — only its runtime
 /// construction/access/refcounting is redirected to the `str` runtime, at
 /// every site that would otherwise use the generic array runtime.
@@ -9978,13 +9763,6 @@ fn emit_rc_w<M: Module>(
         // shares `str`'s representation — see `is_char_array`) — inc/dec the
         // pointer.
         _ if is_str_repr(ty) || is_char_array(ty) => {
-            // Skip the call entirely when `v` is a literal the runtime would
-            // ignore anyway (static/inline — see `rc_statically_noop`).
-            if rc_statically_noop(builder.func, v, STR_HEADER_SIZE) {
-                return;
-            }
-            // `active_sym` routes these to their `aipl_*` counterparts when the
-            // switch is on, where `v` is an address rather than a tagged pointer.
             let sym = match op {
                 RcOp::Retain => "aipl_inc",
                 RcOp::Drop => "aipl_dec",
@@ -10019,9 +9797,6 @@ fn emit_rc_w<M: Module>(
             } else {
                 ptr
             };
-            if rc_statically_noop(builder.func, ptr, HEADER_SIZE) {
-                return;
-            }
             let sym = match op {
                 RcOp::Retain => "aipl_arr_inc",
                 RcOp::Drop => "aipl_array_dec",
@@ -10802,7 +10577,7 @@ fn emit_eq_body<M: Module>(
                 let c = builtins.call(
                     module,
                     builder,
-                    "aipl_setv_contains",
+                    "aipl_set_contains",
                     &[rv_value, xptr, esz, str_cmp],
                 );
                 let cont = builder.create_block();
@@ -10959,7 +10734,7 @@ fn emit_eq_body<M: Module>(
                 let rslot = builtins.call(
                     module,
                     builder,
-                    "aipl_dictv_get",
+                    "aipl_dict_get",
                     &[rv_value, kptr, psz, str_cmp],
                 );
                 let found = builder.ins().icmp_imm_s(IntCC::NotEqual, rslot, 0);
@@ -12099,12 +11874,10 @@ fn store_binding(
 /// Allocate a `str` of exactly `len` bytes and return `(value, write_ptr)` —
 /// what to store, and where to put the bytes.
 ///
-/// The two are the *same* under the tagged representation, where a `str` value
-/// is its content pointer, and different under the wide one, where the value is
-/// 24 bytes describing a buffer that has to be asked for its write pointer.
-/// Every "build a fresh buffer and copy into it" site went straight to
-/// `aipl_str_alloc` and used its result as both, which is exactly the conflation
-/// that breaks — so they go through here instead.
+/// The value is 24 bytes describing a buffer, which has to be asked for its write
+/// pointer: the two are different things, and a site that used the value as both
+/// is the conflation that breaks, so every "build a fresh buffer and copy into
+/// it" site goes through here.
 ///
 /// Pair every call with [`emit_str_grew`]: wide allocation gives *capacity*, and
 /// the value's length is only recorded once the bytes are in.
@@ -12121,9 +11894,8 @@ fn emit_str_alloc<M: Module>(
     (built, start)
 }
 
-/// Record that a buffer from [`emit_str_alloc`] now holds `len` bytes. A no-op
-/// under the tagged representation, where `aipl_str_alloc` already set the
-/// length it was asked for.
+/// Record that a buffer from [`emit_str_alloc`] now holds `len` bytes (allocation
+/// gives capacity, not length).
 fn emit_str_grew<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
@@ -12385,10 +12157,10 @@ fn emit_render_boxed<M: Module>(
     Ok(len)
 }
 
-/// Materialize a fresh static string literal (`[STATIC_REFCOUNT][bytes][NUL]`)
-/// and return a pointer past its header. Used for the fixed pieces `to_str`
-/// stitches around rendered values; `STATIC_REFCOUNT` makes inc/dec no-ops, so
-/// these flow through concatenation (which decs its inputs) safely.
+/// Materialize `bytes` as a static data object and return a pointer to them. Used
+/// for the fixed pieces `to_str` stitches around rendered values, which a sink
+/// copies from; it is not a `str` value (see `emit_const_str`), so it carries no
+/// header.
 fn emit_str_literal<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
@@ -12400,22 +12172,17 @@ fn emit_str_literal<M: Module>(
     let data_id = module
         .declare_data(&format!("__tostr_lit_{n}"), Linkage::Local, false, false)
         .map_err(|e| Error::msg(format!("declare lit: {e}")))?;
-    // Static string layout: [len: i64][refcount = STATIC][bytes][NUL]; pointer
-    // points past both header words.
-    let mut content = Vec::with_capacity(STR_HEADER_SIZE + bytes.len() + 1);
-    content.extend_from_slice(&(bytes.len() as i64).to_le_bytes());
-    content.extend_from_slice(&STATIC_REFCOUNT.to_le_bytes());
-    content.extend_from_slice(bytes);
-    content.push(0);
     let mut desc = DataDescription::new();
     desc.set_align(8);
+    // A data object cannot be empty; nothing reads the pad.
+    let mut content = bytes.to_vec();
+    content.resize(content.len().max(1), 0);
     desc.define(content.into_boxed_slice());
     module
         .define_data(data_id, &desc)
         .map_err(|e| Error::msg(format!("define lit: {e}")))?;
     let gv = module.declare_data_in_func(data_id, builder.func);
-    let base = builder.ins().symbol_value(types::I64, gv);
-    Ok(builder.ins().iadd_imm_s(base, STR_HEADER_SIZE as i64))
+    Ok(builder.ins().symbol_value(types::I64, gv))
 }
 
 fn emit_const_str<M: Module>(
@@ -15431,7 +15198,7 @@ fn compile_call_expr<M: Module>(
             )?;
             // Tagged `aipl_str_split` consumes both; `aipl_str_split` borrows.
             let result = array_value_slot(builder);
-            builtins.call_void(module, builder, "aipl_strv_split", &[result, s_v, sep_v]);
+            builtins.call_void(module, builder, "aipl_str_split", &[result, s_v, sep_v]);
             let ty = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::Str)));
             scopes
                 .last_mut()
@@ -15540,7 +15307,7 @@ fn compile_call_expr<M: Module>(
             // The tagged runtime consumes (decs) the directory ref, so inc to
             // keep our scope-tracked ref alive; `aipl_list_files` borrows.
             let listing = array_value_slot(builder);
-            let ok = builtins.call(module, builder, "aipl_arrv_list_files", &[listing, dir_v]);
+            let ok = builtins.call(module, builder, "aipl_list_files", &[listing, dir_v]);
             let result_ty = ConcreteType::Result(
                 Box::new(ConcreteType::Array(Box::new(ConcreteType::Primitive(
                     Primitive::Str,
@@ -16080,7 +15847,7 @@ fn compile_call_expr<M: Module>(
             };
             // The runtime borrows the value and reads it in place, whatever its
             // shape, writing the sorted copy into a fresh value
-            // (`arr24::aipl_arrv_sort`).
+            // (`arr24::aipl_arr_sort`).
             let (drop_fn, retain_fn, esz) = array_descriptors(builder, module, cx, &elem);
             let kind_v = builder.ins().iconst(types::I64, kind);
             let arr_ty = ConcreteType::Array(Box::new(elem));
@@ -16089,7 +15856,7 @@ fn compile_call_expr<M: Module>(
             builtins.call_void(
                 module,
                 builder,
-                "aipl_arrv_sort",
+                "aipl_arr_sort",
                 &[out, ptr, drop_fn, retain_fn, esz, kind_v],
             );
             scopes
@@ -16210,7 +15977,7 @@ fn compile_call_expr<M: Module>(
                 let out = builtins.call(
                     module,
                     builder,
-                    "aipl_strv_join",
+                    "aipl_str_join",
                     &[parts, vals[0], vals[1], vals[2]],
                 );
                 let out_ty = ConcreteType::Primitive(Primitive::Str);
@@ -16233,7 +16000,7 @@ fn compile_call_expr<M: Module>(
                     }
                 };
                 let out_ty = ConcreteType::Array(Box::new(elem.clone()));
-                // `aipl_arrv_join` borrows the parts and each separator, and reads
+                // `aipl_arr_join` borrows the parts and each separator, and reads
                 // every one in place whatever its shape.
                 // The element helpers describe `T`, not the parts: the runtime
                 // copies and retains the innermost elements.
@@ -16268,14 +16035,14 @@ fn compile_call_expr<M: Module>(
                         builtins.call_void(
                             module,
                             builder,
-                            "aipl_arrv_new",
+                            "aipl_arr_new",
                             &[one_v, zero, drop_fn, esz],
                         );
                         let exclusive = builder.ins().iconst(types::I64, 1);
                         builtins.call_void(
                             module,
                             builder,
-                            "aipl_arrv_push",
+                            "aipl_arr_push",
                             &[one_v, slot, drop_fn, retain_fn, esz, exclusive, zero],
                         );
                         scopes
@@ -16289,7 +16056,7 @@ fn compile_call_expr<M: Module>(
                 builtins.call_void(
                     module,
                     builder,
-                    "aipl_arrv_join",
+                    "aipl_arr_join",
                     &[
                         out, parts, vals[0], vals[1], vals[2], drop_fn, retain_fn, esz,
                     ],
@@ -16447,7 +16214,7 @@ fn compile_call_expr<M: Module>(
             builtins.call_void(
                 module,
                 builder,
-                "aipl_setv_insert",
+                "aipl_set_insert",
                 &[set_v, x_ptr, drop_fn, retain_fn, esz_v, str_cmp, ord],
             );
             let i1 = builder.ins().iadd_imm_s(i, 1);
@@ -16509,12 +16276,7 @@ fn compile_call_expr<M: Module>(
             } else {
                 let w = builder.ins().iconst(types::I64, width);
                 let out = array_value_slot(builder);
-                builtins.call_void(
-                    module,
-                    builder,
-                    "aipl_arrv_from_set_words",
-                    &[out, set_v, w],
-                );
+                builtins.call_void(module, builder, "aipl_arr_from_set_words", &[out, set_v, w]);
                 out
             };
             scopes
@@ -16946,7 +16708,7 @@ fn compile_call_expr<M: Module>(
                 let found = builtins.call(
                     module,
                     builder,
-                    "aipl_setv_contains",
+                    "aipl_set_contains",
                     &[set_ptr, x_ptr, esz, str_cmp],
                 );
                 (found, ConcreteType::Primitive(Primitive::Bool))
@@ -17001,7 +16763,7 @@ fn compile_call_expr<M: Module>(
             let ord = builder
                 .ins()
                 .iconst(types::I64, set_order_code(elem, *order));
-            // `aipl_setv_union` consumes both operands, so `b` is retained to
+            // `aipl_set_union` consumes both operands, so `b` is retained to
             // balance its own track either way, and `a` unless it is a fresh
             // temporary whose reference goes to the union.
             emit_retain(builder, module, builtins, structs, b_ptr, &b_ty);
@@ -17039,7 +16801,7 @@ fn compile_call_expr<M: Module>(
             builtins.call_void(
                 module,
                 builder,
-                "aipl_setv_union",
+                "aipl_set_union",
                 &[
                     res, a_v, b_ptr, drop_fn, retain_fn, esz, str_cmp, ord, in_place,
                 ],
@@ -17103,7 +16865,7 @@ fn compile_call_expr<M: Module>(
                 let vslot = builtins.call(
                     module,
                     builder,
-                    "aipl_dictv_get",
+                    "aipl_dict_get",
                     &[dict_v, key_ptr, psz, str_cmp],
                 );
                 let found = builder.ins().icmp_imm_s(IntCC::NotEqual, vslot, 0);
@@ -17179,13 +16941,13 @@ fn compile_call_expr<M: Module>(
             let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&key_ty));
             let (drop_fn, retain_fn) = pair_rc_fn_addrs(builder, module, cx, &key_ty, &val_ty);
             // The slot's reference is consumed and the dict written back
-            // (`arr24::aipl_dictv_remove`); a non-exclusive binding's new version
+            // (`arr24::aipl_dict_remove`); a non-exclusive binding's new version
             // gets its region track, as `extend`'s does.
             let addr = builder.ins().stack_addr(types::I64, slot, 0);
             builtins.call_void(
                 module,
                 builder,
-                "aipl_dictv_remove",
+                "aipl_dict_remove",
                 &[addr, key_ptr, drop_fn, retain_fn, psz, str_cmp],
             );
             if !exclusive {
@@ -17202,7 +16964,7 @@ fn compile_call_expr<M: Module>(
             // case to answer: a pair is simply there.
             //
             // A dict is an array of `[key][value]` pairs, so the pair's address
-            // is `aipl_arrv_elem_ptr` strided by the pair, read off the dict's
+            // is `aipl_arr_elem_ptr` strided by the pair, read off the dict's
             // value — one entry for every array shape, where hand-rolled
             // arithmetic would assume one. The value sits
             // immediately after the key, which is what `dict_key_size` is.
@@ -17239,7 +17001,7 @@ fn compile_call_expr<M: Module>(
             let pair = builtins.call(
                 module,
                 builder,
-                "aipl_arrv_elem_ptr",
+                "aipl_arr_elem_ptr",
                 &[dict_ptr, idx_v, psz],
             );
             let (offset, out_ty) = if want_key {
@@ -17298,7 +17060,7 @@ fn compile_call_expr<M: Module>(
                 let found = builtins.call(
                     module,
                     builder,
-                    "aipl_dictv_contains_key",
+                    "aipl_dict_contains_key",
                     &[dict_v, key_ptr, psz, str_cmp],
                 );
                 (found, ConcreteType::Primitive(Primitive::Bool))
@@ -17341,7 +17103,7 @@ fn compile_call_expr<M: Module>(
             // many elements it now holds, so this does not know where either is.
             let (a_val, _) = writable_place(module, builder, cx, scopes, &args[0])?;
             let (w, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
-            builtins.call_void(module, builder, "aipl_arrv_truncate", &[a_val, w]);
+            builtins.call_void(module, builder, "aipl_arr_truncate", &[a_val, w]);
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         Callee::MapSet => {
@@ -17385,7 +17147,7 @@ fn compile_call_expr<M: Module>(
             // already holds.
             if !may_be_inline(&a_ty) {
                 let new_drop = array_drop_fn_addr(builder, module, cx, &new_ty);
-                builtins.call_void(module, builder, "aipl_arrv_set_drop", &[a_val, new_drop]);
+                builtins.call_void(module, builder, "aipl_arr_set_drop", &[a_val, new_drop]);
             }
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
@@ -17576,14 +17338,14 @@ fn compile_call_expr<M: Module>(
             // The parameter's reference is this site's to consume: an inline
             // input comes back as it stands — its elements are its own bytes,
             // which the in-place bodies write through `writable_elems` — and
-            // anything else as a uniquely owned block (`arr24::aipl_arrv_writable`).
+            // anything else as a uniquely owned block (`arr24::aipl_arr_writable`).
             let (drop_fn, retain_fn, esz) = array_descriptors(builder, module, cx, &elem);
             let out_slot = value_slot(builder, &arr_ty, structs);
             let owned = builder.ins().stack_addr(types::I64, out_slot, 0);
             builtins.call_void(
                 module,
                 builder,
-                "aipl_arrv_writable",
+                "aipl_arr_writable",
                 &[owned, arr_ptr, drop_fn, retain_fn, esz],
             );
             scopes
@@ -17648,7 +17410,7 @@ fn compile_call_expr<M: Module>(
             builtins.call_void(
                 module,
                 builder,
-                "aipl_arrv_with_cap",
+                "aipl_arr_with_cap",
                 &[value, cap, zero, esz],
             );
             builder.ins().jump(merge, &[]);
@@ -17770,7 +17532,7 @@ fn compile_call_expr<M: Module>(
                 builtins.call_void(
                     module,
                     builder,
-                    "aipl_arrv_reserve_from",
+                    "aipl_arr_reserve_from",
                     &[out, arr_ptr, extra, drop_fn, retain_fn, esz],
                 );
             } else if *callee == Callee::ArrConcat {
@@ -17789,7 +17551,7 @@ fn compile_call_expr<M: Module>(
                 builtins.call_void(
                     module,
                     builder,
-                    "aipl_arrv_splice_from",
+                    "aipl_arr_splice_from",
                     &[out, arr_ptr, read, drop_fn, retain_fn, esz],
                 );
                 if fresh.is_some() || !src_owned {
@@ -17816,7 +17578,7 @@ fn compile_call_expr<M: Module>(
                 builtins.call_void(
                     module,
                     builder,
-                    "aipl_arrv_push_from",
+                    "aipl_arr_push_from",
                     &[out, arr_ptr, x_slot, drop_fn, retain_fn, esz],
                 );
             }
@@ -17926,8 +17688,8 @@ fn compile_call_expr<M: Module>(
                     ));
                 }
                 // The receiver's handle has to be re-derived here: the generic
-                // load above reads one word from the slot, which is the whole
-                // value only under the tagged representation.
+                // load above reads one word from the slot, which is not the
+                // whole 24-byte value.
                 let arr_ptr = load_binding_str(builder, slot);
                 if exclusive {
                     // Statically proven unaliased, so the append may write into
@@ -17968,7 +17730,7 @@ fn compile_call_expr<M: Module>(
             } else {
                 // The runtime takes the binding's slot, consumes the reference it
                 // holds and writes the grown value back
-                // (`arr24::aipl_arrv_push`): in place when the binding is
+                // (`arr24::aipl_arr_push`): in place when the binding is
                 // statically unaliased (`exclusive`), copying otherwise, and for
                 // an integer element through the inline value when it fits. A
                 // non-exclusive binding's new version then gets a region track
@@ -17981,7 +17743,7 @@ fn compile_call_expr<M: Module>(
                 builtins.call_void(
                     module,
                     builder,
-                    "aipl_arrv_push",
+                    "aipl_arr_push",
                     &[addr, x_ptr, drop_fn, retain_fn, esz, exclusive_v, inline_ok],
                 );
                 if !exclusive {
@@ -18069,7 +17831,7 @@ fn compile_call_expr<M: Module>(
             builtins.call_void(
                 module,
                 builder,
-                "aipl_arrv_reserve_from",
+                "aipl_arr_reserve_from",
                 &[addr, addr, extra, drop_fn, retain_fn, esz],
             );
             if !exclusive {
@@ -18217,7 +17979,7 @@ fn compile_call_expr<M: Module>(
             // The source is an array (the type check above admits nothing
             // else), *borrowed* and read in place whatever its shape, and the
             // receiver's slot is consumed and written back
-            // (`arr24::aipl_arrv_extend_from`, which reserves first so the
+            // (`arr24::aipl_arr_extend_from`, which reserves first so the
             // append is one copy). A borrowed source is pinned across the call:
             // it may be the receiver's own block (`a.extend(a)`), and the pin is
             // what makes that block shared, so the reserve copies it before
@@ -18230,7 +17992,7 @@ fn compile_call_expr<M: Module>(
             builtins.call_void(
                 module,
                 builder,
-                "aipl_arrv_extend_from",
+                "aipl_arr_extend_from",
                 &[addr, addr, src_ptr, drop_fn, retain_fn, esz],
             );
             if !src_owned {
@@ -20009,7 +19771,7 @@ fn compile_expr_inner<M: Module>(
                         builtins.call_void(
                             module,
                             builder,
-                            "aipl_setv_union",
+                            "aipl_set_union",
                             &[
                                 addr, addr, b_ptr, drop_fn, retain_fn, esz, str_cmp, ord, in_place,
                             ],
@@ -21027,7 +20789,7 @@ fn compile_expr_inner<M: Module>(
             builtins.call_void(
                 module,
                 builder,
-                "aipl_arrv_new",
+                "aipl_arr_new",
                 &[value, len, drop_fn, esz_v],
             );
             let elems_base = builder
@@ -21188,7 +20950,7 @@ fn compile_expr_inner<M: Module>(
                 builtins.call_void(
                     module,
                     builder,
-                    "aipl_setv_insert",
+                    "aipl_set_insert",
                     &[ptr, x_ptr, drop_fn, retain_fn, esz_v, str_cmp, ord],
                 );
             }
@@ -21274,7 +21036,7 @@ fn compile_expr_inner<M: Module>(
                 builtins.call_void(
                     module,
                     builder,
-                    "aipl_dictv_insert",
+                    "aipl_dict_insert",
                     &[ptr, pbase, drop_fn, retain_fn, psz, str_cmp],
                 );
             }

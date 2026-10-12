@@ -91,11 +91,11 @@ allocations: 36
 deallocations: 36
 reallocations: 4
 bytes allocated: 1901
-instructions executed: 4844
-binary size: 15232
-  code: 8916
-  data: 499
-  metadata: 5817
+instructions executed: 4744
+binary size: 14944
+  code: 8860
+  data: 274
+  metadata: 5810
 functions:
   __arr_drop_Tree:
     calls: 2
@@ -108,16 +108,16 @@ functions:
     bytes: 84
   __to_str_bool$arr:
     calls: 1
-    bytes: 636
+    bytes: 616
   __to_str_i64:
     calls: 2
     bytes: 204
   __to_str_i64$arr:
     calls: 5
-    bytes: 716
+    bytes: 704
   __to_str_i64$arr$arr:
     calls: 1
-    bytes: 1144
+    bytes: 1120
   aipl_arr_inc:
     calls: 26
     bytes: (external)

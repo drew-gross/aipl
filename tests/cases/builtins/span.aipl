@@ -21,21 +21,21 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 136
-instructions executed: 440
-binary size: 3920
-  code: 1928
-  data: 167
-  metadata: 1825
+instructions executed: 418
+binary size: 3784
+  code: 1900
+  data: 54
+  metadata: 1830
 functions:
   __eq___builtin_Span:
     calls: 2
     bytes: 104
   __to_str___builtin_Span:
     calls: 1
-    bytes: 484
+    bytes: 464
   __to_str_bool:
     calls: 3
-    bytes: 232
+    bytes: 224
   __to_str_u64:
     calls: 2
     bytes: 204

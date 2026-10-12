@@ -54,11 +54,11 @@ allocations: 3
 deallocations: 3
 reallocations: 1
 bytes allocated: 150
-instructions executed: 1420
-binary size: 10944
-  code: 7184
-  data: 147
-  metadata: 3613
+instructions executed: 1414
+binary size: 10880
+  code: 7172
+  data: 98
+  metadata: 3610
 functions:
   __arr_drop_Wrapped:
     calls: 2
@@ -77,7 +77,7 @@ functions:
     bytes: 656
   __to_str_i64$arr:
     calls: 1
-    bytes: 716
+    bytes: 704
   aipl_arr_inc:
     calls: 5
     bytes: (external)

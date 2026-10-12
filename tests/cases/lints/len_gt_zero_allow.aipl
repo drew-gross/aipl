@@ -32,15 +32,15 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 80
-instructions executed: 237
-binary size: 1832
-  code: 688
-  data: 79
-  metadata: 1065
+instructions executed: 221
+binary size: 1792
+  code: 680
+  data: 46
+  metadata: 1066
 functions:
   __to_str_bool:
     calls: 4
-    bytes: 232
+    bytes: 224
   aipl_write_bytes:
     calls: 4
     bytes: (external)

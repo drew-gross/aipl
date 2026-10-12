@@ -41,18 +41,18 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 164
-instructions executed: 728
-binary size: 5032
-  code: 3008
-  data: 47
-  metadata: 1977
+instructions executed: 696
+binary size: 4992
+  code: 3000
+  data: 14
+  metadata: 1978
 functions:
   __eq_Tok:
     calls: 1
     bytes: 272
   __to_str_bool:
     calls: 8
-    bytes: 232
+    bytes: 224
   aipl_write_bytes:
     calls: 8
     bytes: (external)

@@ -35,15 +35,15 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 84
-instructions executed: 205
-binary size: 2248
-  code: 1020
-  data: 67
-  metadata: 1161
+instructions executed: 199
+binary size: 2184
+  code: 1008
+  data: 18
+  metadata: 1158
 functions:
   __to_str_unit$err$Error:
     calls: 2
-    bytes: 472
+    bytes: 460
   aipl_write_bytes:
     calls: 4
     bytes: (external)

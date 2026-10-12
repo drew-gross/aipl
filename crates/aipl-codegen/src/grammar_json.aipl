@@ -512,10 +512,10 @@ deallocations: 19766
 reallocations: 2650
 bytes allocated: 2805935
 instructions executed: 6971851
-binary size: 453128
-  code: 308460
-  data: 9044
-  metadata: 135624
+binary size: 452904
+  code: 308416
+  data: 8883
+  metadata: 135605
 functions:
   __arr_drop_Json:
     calls: 125
@@ -1002,7 +1002,7 @@ functions:
     bytes: 84
   __to_str___m3__ParseError:
     calls: 0
-    bytes: 836
+    bytes: 792
   __to_str_u64:
     calls: 1
     bytes: 204

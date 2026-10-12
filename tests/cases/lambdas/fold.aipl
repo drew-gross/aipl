@@ -37,10 +37,10 @@ deallocations: 4
 reallocations: 0
 bytes allocated: 312
 instructions executed: 1426
-binary size: 6672
+binary size: 6664
   code: 3492
   data: 731
-  metadata: 2449
+  metadata: 2441
 functions:
   __test$sums_an_array:
     calls: 1

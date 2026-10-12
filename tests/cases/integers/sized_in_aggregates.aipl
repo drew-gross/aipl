@@ -106,24 +106,24 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 291
-instructions executed: 679
-binary size: 6008
-  code: 2656
-  data: 443
-  metadata: 2909
+instructions executed: 641
+binary size: 5648
+  code: 2588
+  data: 154
+  metadata: 2906
 functions:
   __rec_drop_W:
     calls: 2
     bytes: 48
   __to_str_P:
     calls: 1
-    bytes: 624
+    bytes: 600
   __to_str_W:
     calls: 3
-    bytes: 856
+    bytes: 824
   __to_str_u32$arr:
     calls: 1
-    bytes: 716
+    bytes: 704
   aipl_rec_alloc:
     calls: 2
     bytes: (external)
