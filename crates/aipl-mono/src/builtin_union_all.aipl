@@ -43,36 +43,33 @@ pub fn union_all<T: any>(self: #{T}[]) -> #{T} {
 allocations: 51
 deallocations: 51
 reallocations: 0
-bytes allocated: 2469
-instructions executed: 3107
-binary size: 14208
-  code: 8348
+bytes allocated: 2773
+instructions executed: 4029
+binary size: 15752
+  code: 9780
   data: 876
-  metadata: 4984
+  metadata: 5096
 functions:
   __eq_set$bool:
     calls: 1
-    bytes: 256
+    bytes: 248
   __eq_set$char:
     calls: 1
     bytes: 84
   __eq_set$i64:
     calls: 7
-    bytes: 256
+    bytes: 248
   __eq_set$str:
     calls: 1
-    bytes: 304
+    bytes: 296
   __test$union_all:
     calls: 1
-    bytes: 6168
+    bytes: 7392
   __test$union_all$filter1$own0:
     calls: 1
-    bytes: 664
-  aipl_arr_drop_arr:
-    calls: 9
-    bytes: (external)
+    bytes: 696
   aipl_arr_inc:
-    calls: 81
+    calls: 93
     bytes: (external)
   aipl_arr_reserve:
     calls: 1
@@ -115,4 +112,4 @@ functions:
     bytes: 108
   union_all$i64:
     calls: 7
-    bytes: 508
+    bytes: 708

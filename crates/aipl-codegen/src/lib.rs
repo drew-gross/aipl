@@ -4923,6 +4923,11 @@ pub fn generate_dogfood_artifact(
         aipl_artifact::ARRAY_ABI_PREFIX,
         Abi::active().arrays.name()
     ));
+    out.push_str(&format!(
+        "; {}{}\n",
+        aipl_artifact::SET_ABI_PREFIX,
+        Abi::active().sets.name()
+    ));
     // Struct types any entry references (param or return), so the inverse can
     // rebuild their layouts and marshal a struct return — collected here, emitted
     // as `; struct` lines after the entries.
@@ -6388,6 +6393,15 @@ unsafe fn write_ffi_arg(
             return Err(mismatch(ty, v));
         };
         let block = build_borrowed_array(abi, elem, elems, structs, bufs)?;
+        unsafe { std::ptr::write(dst as *mut i64, block) };
+        return Ok(());
+    }
+    // A dict value is `{block, 0, 0}` too, under an ABI where it is wide.
+    if let ConcreteType::Dict(k, val) = ty {
+        let FfiValue::Dict(entries) = v else {
+            return Err(mismatch(ty, v));
+        };
+        let block = build_borrowed_dict(abi, k, val, entries, structs, bufs)?;
         unsafe { std::ptr::write(dst as *mut i64, block) };
         return Ok(());
     }
@@ -9783,7 +9797,7 @@ fn take_field<M: Module>(
         let (empty, _) = emit_const_str(module, builder, cx, b"")?;
         copy_composite(builder, src, empty, fty, structs);
         Ok(v)
-    } else if is_wide_array(fty) {
+    } else if is_wide_seq(fty) {
         let src = builder.ins().iadd_imm_s(obj_ptr, offset as i64);
         Ok(take_array_value(builder, src))
     } else {
@@ -9851,14 +9865,14 @@ fn owned_block_made_unique_whole<M: Module>(
     v: Value,
     ty: &ConcreteType,
 ) -> Value {
-    // The check and the copy work on the block; an array *value* is unwrapped
-    // to it first and re-wrapped after, a set or a dict already is one. The
-    // value is owned — that is what moving it in meant — so a window may be
-    // settled in place first, and then the copy below makes it unique.
+    // The check and the copy work on the block; a value is unwrapped to it first
+    // and re-wrapped after. The value is owned — that is what moving it in
+    // meant — so a window may be settled in place first, and then the copy below
+    // makes it unique.
     settle_array_slot(builder, module, cx, v, ty);
     let block = seq_ptr(builder, v, ty);
     let unique = owned_block_made_unique_ptr(builder, module, cx, block, ty);
-    if is_wide_array(ty) {
+    if is_wide_seq(ty) {
         arr_val(builder, unique)
     } else {
         unique
@@ -10095,17 +10109,15 @@ fn arr_ptr(builder: &mut FunctionBuilder, value: Value) -> Value {
         .load(types::I64, MemFlagsData::trusted(), value, 0)
 }
 
-/// The tagged block pointer behind a value of an array-*backed* type `ty`: an
-/// array's first word ([`arr_ptr`]), or a set or a dict, which is still the
-/// pointer itself.
+/// The tagged block pointer behind a value of an array-*backed* type `ty`: the
+/// first word of a 24-byte array, set or dict value ([`arr_ptr`]). (A
+/// `#{char}` is its bitfield, and never asked.)
 ///
 /// For the sites that share one path across all three — refcounting, and the
-/// few that already know the value is whole — and so would otherwise each have
-/// to spell out which of them is an address. A set or dict reaching one of those
-/// sites with [`arr_ptr`] applied would read its block's first word as a
-/// pointer. Like [`arr_ptr`], it does not see a window.
+/// few that already know the value is whole. Like [`arr_ptr`], it does not see
+/// a window.
 fn seq_ptr(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> Value {
-    if is_wide_array(ty) {
+    if is_wide_seq(ty) {
         arr_ptr(builder, v)
     } else {
         v
@@ -10135,8 +10147,9 @@ fn arr_block<M: Module>(
     v: Value,
     ty: &ConcreteType,
 ) -> Value {
+    // A set or a dict is never anything but whole: its block is its first word.
     let ConcreteType::Array(elem) = ty else {
-        return v;
+        return seq_ptr(builder, v, ty);
     };
     // An untyped empty array was never sliced, so it is never a window.
     if !is_wide_array(ty) || is_none_inner(elem) {
@@ -10200,7 +10213,7 @@ fn consumed_block<M: Module>(
         if !owned {
             emit_retain(builder, module, builtins, structs, v, ty);
         }
-        return v;
+        return seq_ptr(builder, v, ty);
     };
     if !is_wide_array(ty) || is_none_inner(elem) {
         if !owned {
@@ -10475,15 +10488,15 @@ fn array_descriptors<M: Module>(
 }
 
 /// The value for a block pointer `ptr` of an array-backed type `ty`: a fresh
-/// [`arr_val`] for an array, the pointer itself for a set or a dict — the
-/// inverse of [`seq_ptr`].
+/// [`arr_val`] for a 24-byte array, set or dict, the pointer itself where the
+/// value is one word — the inverse of [`seq_ptr`].
 ///
 /// For a site that got a block back from the runtime and has to *track* or
 /// *retain* it as a value of `ty`: both go through `emit_rc`, which reads an
 /// array as the address of its value, so handing it the bare block would release
 /// whatever the block's first word happens to be.
 fn seq_val(builder: &mut FunctionBuilder, ptr: Value, ty: &ConcreteType) -> Value {
-    if is_wide_array(ty) {
+    if is_wide_seq(ty) {
         arr_val(builder, ptr)
     } else {
         ptr
@@ -10652,13 +10665,13 @@ fn is_char_set(ty: &ConcreteType) -> bool {
 /// rather than deciding for itself: a slot written one way and read the other
 /// is a silent miscompile rather than a crash.
 fn lives_in_slot(ty: &ConcreteType) -> bool {
-    is_str_shaped(ty) || is_inline_optional(ty) || is_char_set(ty) || is_wide_array(ty)
+    is_str_shaped(ty) || is_inline_optional(ty) || is_char_set(ty) || is_wide_seq(ty)
 }
 
 /// Whether `ty` is an array held as the 24-byte wide value (`arr24::ArrValue`:
 /// the block, and a window's bounds when it is one — see
 /// [`Abi::arr_is_composite`]). A `char[]` rides `str`'s representation instead,
-/// and is a composite in its own right; a set or a dict is still one word.
+/// and is a composite in its own right. A set or a dict is [`is_wide_set`].
 ///
 /// Such an array lives *in* its binding's slot, as a `str` does, rather than the
 /// slot holding a pointer to it. That is what keeps `push` and `extend` on a
@@ -10667,6 +10680,21 @@ fn lives_in_slot(ty: &ConcreteType) -> bool {
 /// that word is exactly the one to replace.
 fn is_wide_array(ty: &ConcreteType) -> bool {
     matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty) && Abi::active().arr_size() > 8
+}
+
+/// Whether `ty` is a set or a dict held as the 24-byte value `{block, 0, 0}`
+/// ([`Abi::sets_wide`], `arr24_todo.txt` 6d) — never a window, a reversal or
+/// inline, so its block is always its first word. A `#{char}` is its bitfield.
+fn is_wide_set(ty: &ConcreteType) -> bool {
+    matches!(ty, ConcreteType::Set(..) | ConcreteType::Dict(..))
+        && !is_char_set(ty)
+        && Abi::active().sets_wide()
+}
+
+/// Whether `ty`'s value is the 24-byte value over a block: a wide array, set or
+/// dict. Its block is the first word ([`seq_ptr`]).
+fn is_wide_seq(ty: &ConcreteType) -> bool {
+    is_wide_array(ty) || is_wide_set(ty)
 }
 
 /// Whether `n` elements of `elem` make an inline array: an integer element type
@@ -11291,11 +11319,13 @@ fn block_view(builder: &mut FunctionBuilder, ptr: Value) -> ArrView {
     }
 }
 
-/// [`ArrView`] of a value of an array-backed type `ty`: an array value, whole or
-/// a window, or a set or a dict, which is the block pointer itself.
+/// [`ArrView`] of a value of an array-backed type `ty`: an array value — whole,
+/// a window, reversed or inline — or a set or a dict, which is always whole.
 fn arr_view_shape(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> ArrView {
     if !is_wide_array(ty) {
-        return block_view(builder, v);
+        // A set or a dict: whole, so its view is its block's.
+        let block = seq_ptr(builder, v, ty);
+        return block_view(builder, block);
     }
     let flags = MemFlagsData::trusted();
     let ptr = builder.ins().load(types::I64, flags, v, 0);
@@ -11683,8 +11713,8 @@ fn emit_rc_w<M: Module>(
             // A constant array literal (`emit_const_array`) is skipped exactly
             // as a static `str` literal is above: the runtime would ignore the
             // call anyway.
-            // An array value is an address now; a set or dict is still the
-            // tagged pointer itself. A window holds its one reference on the
+            // An array, set or dict value is an address; the block it holds its
+            // reference on is its first word. A window holds its one reference on the
             // block in the same first word, so it needs nothing more; an inline
             // value holds none, and its first word is element bytes, so it
             // hands the runtime a null, which both entries pass over.
@@ -12438,6 +12468,9 @@ fn emit_eq_body<M: Module>(
         ConcreteType::Set(elem, _) => {
             // Order-independent: same length and every element of the left set is
             // a member of the right (distinct elements + equal sizes ⇒ equal sets).
+            // What follows reads the blocks under the two values.
+            let lv = seq_ptr(builder, lv, ty);
+            let rv = seq_ptr(builder, rv, ty);
             let ll = load_arr_len(builder, lv);
             let rl = load_arr_len(builder, rv);
             let len_eq = builder.ins().icmp(IntCC::Equal, ll, rl);
@@ -12588,6 +12621,9 @@ fn emit_eq_body<M: Module>(
         ConcreteType::Dict(k, v) => {
             // Equal iff same length and every left pair's key is bound in the
             // right to an equal value (distinct keys + equal sizes ⇒ equal maps).
+            // What follows reads the blocks under the two values.
+            let lv = seq_ptr(builder, lv, ty);
+            let rv = seq_ptr(builder, rv, ty);
             let ll = load_arr_len(builder, lv);
             let rl = load_arr_len(builder, rv);
             let len_eq = builder.ins().icmp(IntCC::Equal, ll, rl);
@@ -12869,7 +12905,8 @@ fn emit_hash<M: Module>(
             }
         }
         ConcreteType::Set(elem, _) => {
-            let view = block_view(builder, v);
+            let block = seq_ptr(builder, v, ty);
+            let view = block_view(builder, block);
             let seed = emit_scalar_hash(builder, view.len);
             if is_none_inner(elem) {
                 seed
@@ -12957,6 +12994,7 @@ fn emit_hash<M: Module>(
             // Order-independent over pairs (matching dict `==`): fold each pair's
             // (key, value) combine commutatively. Within a pair the combine is
             // order-sensitive so `{1: 2}` and `{2: 1}` differ.
+            let v = seq_ptr(builder, v, ty);
             let len = load_arr_len(builder, v);
             let seed = emit_scalar_hash(builder, len);
             if is_none_inner(key_ty) {
@@ -13219,10 +13257,10 @@ fn array_drop_fn_addr<M: Module>(
         // A set or a dict *is* an array block (see `is_heap`), so the element
         // drop for a nested array serves them unchanged: it decs each element's
         // block pointer, and that is what one of these is.
-        // A nested array is a padded 24-byte value under the wide layout, so it
-        // needs the 24-stride helper; a set or a dict is still a plain word and
-        // keeps the 8-byte one (they switch representation separately).
-        ConcreteType::Array(_) if is_wide_array(elem) => Some(b.id(module, "aipl_arr_drop_warr")),
+        // A nested array, set or dict is a 24-byte value under the wide layout,
+        // so it needs the 24-stride helper; under an artifact's `Tagged` layout
+        // it is a plain word and keeps the 8-byte one.
+        _ if is_wide_seq(elem) => Some(b.id(module, "aipl_arr_drop_warr")),
         ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => {
             Some(b.id(module, "aipl_arr_drop_arr"))
         }
@@ -13264,7 +13302,7 @@ fn array_retain_fn_addr<M: Module>(
         // As in `array_drop_fn_addr`: a char-set element owns nothing, so
         // there is no reference to take on it.
         _ if is_char_set(elem) => None,
-        ConcreteType::Array(_) if is_wide_array(elem) => Some(b.id(module, "aipl_arr_retain_warr")),
+        _ if is_wide_seq(elem) => Some(b.id(module, "aipl_arr_retain_warr")),
         ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => {
             Some(b.id(module, "aipl_arr_retain_ptr"))
         }
@@ -13980,10 +14018,14 @@ fn emit_render<M: Module>(
             emit_render_charset(module, builder, cx, value, descending, sink)?
         }
         ConcreteType::Set(elem, _) => {
-            let view = block_view(builder, value);
+            let block = seq_ptr(builder, value, ty);
+            let view = block_view(builder, block);
             emit_render_seq(module, builder, cx, view, elem, sink, b'{', b'}')?
         }
-        ConcreteType::Dict(k, v) => emit_render_dict(module, builder, cx, value, k, v, sink)?,
+        ConcreteType::Dict(k, v) => {
+            let block = seq_ptr(builder, value, ty);
+            emit_render_dict(module, builder, cx, block, k, v, sink)?
+        }
         ConcreteType::Optional(_) => emit_render_optional(module, builder, cx, value, ty, sink)?,
         ConcreteType::Result(ok, err) => {
             emit_render_result(module, builder, cx, value, ok, err, sink)?
@@ -18192,11 +18234,12 @@ fn compile_call_expr<M: Module>(
                 .ins()
                 .stack_load(types::I64, types::I64, set_slot, 0);
             let set_ty = ConcreteType::Set(Box::new(elem), order);
+            let v = seq_val(builder, ptr, &set_ty);
             scopes
                 .last_mut()
                 .expect("scope")
-                .push(Tracked::new(ptr, &set_ty));
-            (ptr, set_ty)
+                .push(Tracked::new(v, &set_ty));
+            (v, set_ty)
         }
         Callee::ToArray => {
             // `s.to_array() -> T[]` on an ordered set: the elements in the set's
@@ -18229,6 +18272,8 @@ fn compile_call_expr<M: Module>(
                     args[0].span.clone(),
                 ));
             }
+            // The set's block, under its value.
+            let ptr = seq_ptr(builder, ptr, &t);
             // Sets are array blocks — see the note at `reverse`'s array arm.
             // The block is shared, and the array is a value wrapping it — unless
             // the elements are a narrow integer, which a set keeps as a word
@@ -18670,11 +18715,12 @@ fn compile_call_expr<M: Module>(
                     .ins()
                     .iconst(types::I64, runtime_elem_size(&elem, structs));
                 let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
+                let set_block = seq_ptr(builder, set_ptr, &set_ty);
                 let found = builtins.call(
                     module,
                     builder,
                     "aipl_set_contains",
-                    &[set_ptr, x_ptr, esz, str_cmp],
+                    &[set_block, x_ptr, esz, str_cmp],
                 );
                 (found, ConcreteType::Primitive(Primitive::Bool))
             }
@@ -18728,10 +18774,11 @@ fn compile_call_expr<M: Module>(
             let ord = builder
                 .ins()
                 .iconst(types::I64, set_order_code(elem, *order));
-            // Sets are array blocks — see the note at `reverse`'s array arm.
-            // `aipl_set_union_mut` decs `b`, so it is inc'd to balance its own
-            // track either way.
-            builtins.call_void(module, builder, "aipl_arr_inc", &[b_ptr]);
+            // Sets are array blocks — see the note at `reverse`'s array arm —
+            // under their values. `aipl_set_union_mut` decs `b`, so it is inc'd
+            // to balance its own track either way.
+            let b_block = seq_ptr(builder, b_ptr, &b_ty);
+            builtins.call_void(module, builder, "aipl_arr_inc", &[b_block]);
             let res = if a_owned && !is_none_inner(elem) {
                 // A receiver this scope owns outright grows in place: its
                 // reference (its tracking entry, popped here) goes to
@@ -18755,21 +18802,24 @@ fn compile_call_expr<M: Module>(
                         .is_some();
                 debug_assert!(popped, "an owned union receiver is tracked");
                 let a_unique = owned_block_made_unique(builder, module, cx, a_ptr, &result_ty);
+                let a_unique = seq_ptr(builder, a_unique, &result_ty);
                 builtins.call(
                     module,
                     builder,
                     "aipl_set_union_mut",
-                    &[a_unique, b_ptr, drop_fn, retain_fn, esz, str_cmp, ord],
+                    &[a_unique, b_block, drop_fn, retain_fn, esz, str_cmp, ord],
                 )
             } else {
-                builtins.call_void(module, builder, "aipl_arr_inc", &[a_ptr]);
+                let a_block = seq_ptr(builder, a_ptr, &a_ty);
+                builtins.call_void(module, builder, "aipl_arr_inc", &[a_block]);
                 builtins.call(
                     module,
                     builder,
                     "aipl_set_union",
-                    &[a_ptr, b_ptr, drop_fn, retain_fn, esz, str_cmp, ord],
+                    &[a_block, b_block, drop_fn, retain_fn, esz, str_cmp, ord],
                 )
             };
+            let res = seq_val(builder, res, &result_ty);
             scopes
                 .last_mut()
                 .expect("scope")
@@ -18787,6 +18837,8 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            // The dict's block, under its value.
+            let dict_ptr = seq_ptr(builder, dict_ptr, &dict_ty);
             let (key_ty, val_ty) = match &dict_ty {
                 ConcreteType::Dict(k, v) => ((**k).clone(), (**v).clone()),
                 other => {
@@ -18921,7 +18973,8 @@ fn compile_call_expr<M: Module>(
                 // Possibly shared: the slot's own reference was consumed by the
                 // reserve, so the extra retain plus value-track is this version's
                 // region track, keeping it borrowable to the scope's exit —
-                // `extend`, unchanged.
+                // `extend`, unchanged — held as a value of its own.
+                let owned = seq_val(builder, owned, &dict_ty);
                 emit_retain(builder, module, builtins, structs, owned, &dict_ty);
                 scopes
                     .last_mut()
@@ -18960,6 +19013,8 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            // The dict's block, under its value.
+            let dict_ptr = seq_ptr(builder, dict_ptr, &dict_ty);
             let (key_ty, val_ty) = match &dict_ty {
                 ConcreteType::Dict(k, v) => ((**k).clone(), (**v).clone()),
                 other => {
@@ -19003,6 +19058,8 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            // The dict's block, under its value.
+            let dict_ptr = seq_ptr(builder, dict_ptr, &dict_ty);
             let (key_ty, val_ty) = match &dict_ty {
                 ConcreteType::Dict(k, v) => ((**k).clone(), (**v).clone()),
                 other => {
@@ -19266,7 +19323,7 @@ fn compile_call_expr<M: Module>(
                         copy_composite(builder, src, empty, &t, structs);
                         scopes.last_mut().expect("scope").push(Tracked::new(v, &t));
                         (v, t)
-                    } else if is_wide_array(&t) {
+                    } else if is_wide_seq(&t) {
                         // Copied out whole — it may be a window — since the
                         // slot it lived in is emptied.
                         let src = builder.ins().stack_addr(types::I64, *slot, 0);
@@ -21882,7 +21939,9 @@ fn compile_expr_inner<M: Module>(
                         let (b_ptr, b_ty) = compile_expr(module, builder, cx, scopes, other)?;
                         expect_type(&b_ty, &expected_ty, "union operand", other.span.clone())?;
                         // `aipl_set_union_mut` decs `b`; inc first so b's own track
-                        // balances. `a` is reused, not dec'd.
+                        // balances. `a` is reused, not dec'd. Both are the blocks
+                        // under the values (the slot's is its first word).
+                        let b_ptr = seq_ptr(builder, b_ptr, &b_ty);
                         builtins.call_void(module, builder, "aipl_arr_inc", &[b_ptr]);
                         let drop_fn = array_drop_fn_addr(builder, module, cx, elem);
                         let retain_fn = array_retain_fn_addr(builder, module, cx, elem);
@@ -22969,6 +23028,7 @@ fn compile_expr_inner<M: Module>(
             if elems.is_empty() {
                 let value = emit_const_empty(module, builder, cx)?;
                 let set_ty = ConcreteType::Set(Box::new(ConcreteType::NoneInner), *order);
+                let value = seq_val(builder, value, &set_ty);
                 return Ok((value, set_ty));
             }
             // Every element a literal `char`: the four words are known *now*, so
@@ -23078,6 +23138,7 @@ fn compile_expr_inner<M: Module>(
                 );
             }
             let set_ty = ConcreteType::Set(Box::new(elem), *order);
+            let ptr = seq_val(builder, ptr, &set_ty);
             scopes
                 .last_mut()
                 .expect("scope")
@@ -23101,6 +23162,7 @@ fn compile_expr_inner<M: Module>(
                     Box::new(ConcreteType::NoneInner),
                     Box::new(ConcreteType::NoneInner),
                 );
+                let value = seq_val(builder, value, &dict_ty);
                 return Ok((value, dict_ty));
             }
             let mut key_ty: Option<ConcreteType> = None;
@@ -23162,6 +23224,7 @@ fn compile_expr_inner<M: Module>(
                 );
             }
             let dict_ty = ConcreteType::Dict(Box::new(key), Box::new(val));
+            let ptr = seq_val(builder, ptr, &dict_ty);
             scopes
                 .last_mut()
                 .expect("scope")
@@ -23698,16 +23761,18 @@ impl SeqRepr {
 /// guessed at — marshaling with the wrong layout is memory corruption, not a
 /// wrong answer, so there is no safe default to fall back on.
 fn abi_of_manifest(manifest: &aipl_artifact::Manifest) -> Result<Abi, Error> {
-    let arrays = match manifest.array_abi.as_deref() {
-        None => SeqRepr::Tagged,
+    let read = |line: Option<&str>, what: &str| match line {
+        None => Ok(SeqRepr::Tagged),
         Some(name) => SeqRepr::from_name(name).ok_or_else(|| {
             Error::msg(format!(
-                "artifact manifest names array ABI {name:?}, which this compiler does not \
+                "artifact manifest names {what} ABI {name:?}, which this compiler does not \
                  know; regenerate the artifact"
             ))
-        })?,
+        }),
     };
-    Ok(Abi { arrays })
+    let arrays = read(manifest.array_abi.as_deref(), "array")?;
+    let sets = read(manifest.set_abi.as_deref(), "set")?;
+    Ok(Abi { arrays, sets })
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -23720,6 +23785,12 @@ pub struct Abi {
     /// reachable, and it goes with `arr24_todo.txt` stage 7. A `str` has no
     /// counterpart field because it has no choice left.
     arrays: SeqRepr,
+    /// Which representation a **set** or a **dict** value has (a `#{char}` is
+    /// its 32-byte bitfield under either): `Tagged`, the block pointer, or
+    /// `Wide`, the 24-byte value `{block, 0, 0}` passed by address as an array
+    /// is. They flipped on their own, after arrays (`arr24_todo.txt` 6d), and an
+    /// artifact records which with its `; set-abi` line.
+    sets: SeqRepr,
 }
 
 impl Abi {
@@ -23731,6 +23802,7 @@ impl Abi {
         // and the narrow element strides that stage 3 builds on).
         Abi {
             arrays: SeqRepr::Narrow,
+            sets: SeqRepr::Wide,
         }
     }
 
@@ -23769,6 +23841,12 @@ impl Abi {
     fn arr_is_composite(self) -> bool {
         matches!(self.arrays, SeqRepr::Wide | SeqRepr::Narrow)
     }
+
+    /// Whether a set or a dict is the 24-byte value under this ABI — which is
+    /// then both its size and whether it travels by address.
+    fn sets_wide(self) -> bool {
+        !matches!(self.sets, SeqRepr::Tagged)
+    }
 }
 
 #[cfg(test)]
@@ -23782,9 +23860,11 @@ mod abi_tests {
     fn the_array_representation_decides_size_and_composite_ness() {
         let tagged = Abi {
             arrays: SeqRepr::Tagged,
+            sets: SeqRepr::Tagged,
         };
         let wide = Abi {
             arrays: SeqRepr::Wide,
+            sets: SeqRepr::Tagged,
         };
         let structs = HashMap::new();
         let i64s = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::I64)));
@@ -23798,9 +23878,11 @@ mod abi_tests {
         assert!(abi_is_composite(wide, &i64s, &structs));
 
         // The switch is thrown: freshly compiled code uses the wide layout, with
-        // narrow integers packed (`SeqRepr::Narrow`), which is the same value.
+        // narrow integers packed (`SeqRepr::Narrow`), which is the same value —
+        // and sets and dicts are the 24-byte value too.
         let narrow = Abi {
             arrays: SeqRepr::Narrow,
+            sets: SeqRepr::Wide,
         };
         assert_eq!(Abi::active(), narrow);
         assert_eq!(
@@ -23830,9 +23912,11 @@ mod abi_tests {
         };
         let tagged = Abi {
             arrays: SeqRepr::Tagged,
+            sets: SeqRepr::Tagged,
         };
         let wide = Abi {
             arrays: SeqRepr::Wide,
+            sets: SeqRepr::Tagged,
         };
 
         // Every artifact built before the line existed was compiled `Tagged`.
@@ -23852,6 +23936,47 @@ mod abi_tests {
         }
     }
 
+    /// The set knob, both ways: a set or a dict is a word under `Tagged` and the
+    /// 24-byte value under `Wide`, while a `#{char}` is its 32-byte bitfield
+    /// under either. And an artifact names its own, as it does its arrays.
+    #[test]
+    fn the_set_representation_decides_size_and_composite_ness() {
+        let structs = HashMap::new();
+        let ints = ConcreteType::Set(
+            Box::new(ConcreteType::Primitive(Primitive::I64)),
+            aipl_syntax::ast::SetOrder::Unordered,
+        );
+        let chars = ConcreteType::Set(
+            Box::new(ConcreteType::Primitive(Primitive::Char)),
+            aipl_syntax::ast::SetOrder::Unordered,
+        );
+        let dict = ConcreteType::Dict(
+            Box::new(ConcreteType::Primitive(Primitive::Str)),
+            Box::new(ConcreteType::Primitive(Primitive::I64)),
+        );
+        for (sets, size, composite) in [(SeqRepr::Tagged, 8, false), (SeqRepr::Wide, 24, true)] {
+            let abi = Abi {
+                arrays: SeqRepr::Narrow,
+                sets,
+            };
+            for t in [&ints, &dict] {
+                assert_eq!(abi_elem_size(abi, t, &structs), size);
+                assert_eq!(abi_is_composite(abi, t, &structs), composite);
+            }
+            assert_eq!(
+                abi_elem_size(abi, &chars, &structs),
+                charset::CHARSET_SIZE as i64
+            );
+        }
+        let read = |text: &str| {
+            abi_of_manifest(&aipl_artifact::parse_manifest(text).unwrap())
+                .unwrap()
+                .sets
+        };
+        assert_eq!(read("; dogfood-ir v1\n"), SeqRepr::Tagged);
+        assert_eq!(read("; dogfood-ir v1\n; set-abi wide\n"), SeqRepr::Wide);
+    }
+
     /// Only `Narrow` packs an array's narrow integers, and only an array's: the
     /// element size a set or a dict is told is still a word, and a `bool` is
     /// bit-packed under every ABI.
@@ -23859,9 +23984,11 @@ mod abi_tests {
     fn narrow_integers_pack_only_in_arrays_under_narrow() {
         let wide = Abi {
             arrays: SeqRepr::Wide,
+            sets: SeqRepr::Tagged,
         };
         let narrow = Abi {
             arrays: SeqRepr::Narrow,
+            sets: SeqRepr::Tagged,
         };
         let structs = HashMap::new();
         let p = |p| ConcreteType::Primitive(p);
@@ -23887,9 +24014,11 @@ mod abi_tests {
     fn the_array_representation_decides_size_and_composite_ness_for_optionals() {
         let tagged = Abi {
             arrays: SeqRepr::Tagged,
+            sets: SeqRepr::Tagged,
         };
         let wide = Abi {
             arrays: SeqRepr::Wide,
+            sets: SeqRepr::Tagged,
         };
         let structs = HashMap::new();
         let i64s = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::I64)));
@@ -23923,6 +24052,11 @@ fn abi_is_composite(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeD
     // since it rides `str`'s representation rather than an array block's.
     if matches!(ty, ConcreteType::Array(_)) {
         return abi.arr_is_composite();
+    }
+    // A set or a dict too, on its own knob — the bitfield `#{char}` is claimed
+    // above.
+    if matches!(ty, ConcreteType::Set(..) | ConcreteType::Dict(..)) {
+        return abi.sets_wide();
     }
     matches!(ty, ConcreteType::Optional(_) | ConcreteType::Result(_, _))
         || matches!(ty, ConcreteType::Named(n) if structs.get(n).is_some_and(|d| !d.boxed()))
@@ -23995,10 +24129,10 @@ fn abi_elem_size(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeDef>
                 .map_or(8, |t| if t.boxed() { 8 } else { t.size() as i64 })
         }
         // A `char[]` is claimed by `is_str_shaped` above; every other array is
-        // sized by the array representation in force. Sets and dicts are still a
-        // plain word — they are array-backed, so they follow arrays, but not in
-        // this step (see `arr24_todo.txt`).
+        // sized by the array representation in force, and a set (a `#{char}` is
+        // claimed above too) or a dict by the set representation.
         ConcreteType::Array(_) => abi.arr_size(),
+        ConcreteType::Set(..) | ConcreteType::Dict(..) if abi.sets_wide() => arr24::ARR_SIZE as i64,
         _ => 8,
     }
 }

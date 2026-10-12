@@ -468,13 +468,13 @@ fn is_calc_op(self: str) -> bool {
 --- performance ---
 allocations: 10175
 deallocations: 10175
-reallocations: 1504
-bytes allocated: 1175670
-instructions executed: 3611915
-binary size: 437224
-  code: 299480
+reallocations: 1507
+bytes allocated: 1176054
+instructions executed: 3617226
+binary size: 440048
+  code: 302184
   data: 6380
-  metadata: 131364
+  metadata: 131484
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -496,7 +496,7 @@ functions:
     bytes: 116
   __arr_drop___m2__First$CalcTok:
     calls: 13
-    bytes: 140
+    bytes: 152
   __arr_drop___m3__ListStyle:
     calls: 0
     bytes: 120
@@ -538,7 +538,7 @@ functions:
     bytes: 116
   __arr_retain___m2__First$CalcTok:
     calls: 31
-    bytes: 140
+    bytes: 152
   __arr_retain___m3__ListStyle:
     calls: 0
     bytes: 120
@@ -634,10 +634,10 @@ functions:
     bytes: 816
   __builtin_try_map$__m3__Production$CalcTok$Calc$__m2__First<CalcTok>$__m3__ParseError$lam$__m2__linked_first_sets$CalcTok$Calc$lambda2:
     calls: 4
-    bytes: 1088
+    bytes: 1108
   __builtin_try_map$__m3__Rule$CalcTok$__m2__First<CalcTok>$__m3__ParseError$lam$__m2__rule_first$CalcTok$lambda0:
     calls: 8
-    bytes: 820
+    bytes: 824
   __builtin_try_map$__m3__Rule$CalcTok$__m3__Rule$CalcTok$__m3__ParseError$lam$__m3__desugar_rule$CalcTok:
     calls: 256
     bytes: 800
@@ -652,10 +652,10 @@ functions:
     bytes: 420
   __eq_set$CalcTok$case:
     calls: 7
-    bytes: 256
+    bytes: 248
   __eq_set$str:
     calls: 7
-    bytes: 304
+    bytes: 296
   __m10__trim_end_while$lam$__builtin_is_space:
     calls: 18
     bytes: 400
@@ -691,7 +691,7 @@ functions:
     bytes: 1520
   __m13__can_reach$CalcTok$Calc$map1:
     calls: 0
-    bytes: 324
+    bytes: 344
   __m13__climb$CalcTok$Calc:
     calls: 160
     bytes: 4324
@@ -724,7 +724,7 @@ functions:
     bytes: 1996
   __m13__match_prod$CalcTok$Calc:
     calls: 417
-    bytes: 9056
+    bytes: 9408
   __m13__match_reps$CalcTok$Calc:
     calls: 0
     bytes: 5572
@@ -787,7 +787,7 @@ functions:
     bytes: 1580
   __m2__can_start$CalcTok:
     calls: 0
-    bytes: 256
+    bytes: 232
   __m2__climb_precs$CalcTok:
     calls: 12
     bytes: 1880
@@ -799,19 +799,19 @@ functions:
     bytes: 244
   __m2__linked_first_sets$CalcTok$Calc:
     calls: 1
-    bytes: 1456
+    bytes: 1560
   __m2__merge$CalcTok:
     calls: 24
-    bytes: 604
+    bytes: 696
   __m2__render_rule$CalcTok:
     calls: 13
-    bytes: 13868
+    bytes: 14052
   __m2__rep_suffix:
     calls: 0
     bytes: 1708
   __m2__rule_first$CalcTok:
     calls: 40
-    bytes: 7728
+    bytes: 9580
   __m2__show_first$CalcTok$filter1$own0:
     calls: 3
     bytes: 736
@@ -820,7 +820,7 @@ functions:
     bytes: 536
   __m2__show_first_sets$CalcTok$Calc$zip1$own0:
     calls: 1
-    bytes: 5160
+    bytes: 5200
   __m3__desugar_opt$CalcTok:
     calls: 0
     bytes: 580
@@ -934,7 +934,7 @@ functions:
     bytes: 396
   __test$calc_grammar:
     calls: 1
-    bytes: 12316
+    bytes: 12368
   __test$eval_calc:
     calls: 1
     bytes: 2116
@@ -962,17 +962,11 @@ functions:
   __to_str_u64:
     calls: 0
     bytes: 204
-  aipl_arr_drop_arr:
-    calls: 1
-    bytes: (external)
   aipl_arr_inc:
-    calls: 54929
+    calls: 54980
     bytes: (external)
   aipl_arr_reserve:
     calls: 1306
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 3
     bytes: (external)
   aipl_arr_sort:
     calls: 4

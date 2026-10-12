@@ -80,6 +80,10 @@ pub struct Manifest {
     /// codegen's representation enum and should not have to: `aipl-codegen`'s
     /// `abi_of_manifest` maps it, and refuses a value it does not recognise.
     pub array_abi: Option<String>,
+    /// The `; set-abi` line's value — which representation a **set** or **dict**
+    /// has in the artifact's code — or `None` for one that predates the line,
+    /// which means the 8-byte one. Kept as text for the reason `array_abi` is.
+    pub set_abi: Option<String>,
 }
 
 /// The `; array-abi <repr>` header line. Written by the artifact generator for
@@ -89,6 +93,11 @@ pub struct Manifest {
 /// `arr24_todo.txt` 2c: without it, switching the compiler's array
 /// representation would also relabel every artifact compiled before the switch.
 pub const ARRAY_ABI_PREFIX: &str = "array-abi ";
+
+/// The `; set-abi <repr>` header line: [`ARRAY_ABI_PREFIX`]'s counterpart for
+/// sets and dicts, which switched representation on their own (`arr24_todo.txt`
+/// 6d).
+pub const SET_ABI_PREFIX: &str = "set-abi ";
 
 /// Parse the `;`-comment manifest at the head of an artifact.
 ///
@@ -111,6 +120,8 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
         let body = body.trim();
         if let Some(rest) = body.strip_prefix(ARRAY_ABI_PREFIX) {
             m.array_abi = Some(rest.trim().to_string());
+        } else if let Some(rest) = body.strip_prefix(SET_ABI_PREFIX) {
+            m.set_abi = Some(rest.trim().to_string());
         } else if let Some(rest) = body.strip_prefix("struct ") {
             m.types.push(TypeLine::Struct(rest.to_string()));
         } else if let Some(rest) = body.strip_prefix("variant ") {

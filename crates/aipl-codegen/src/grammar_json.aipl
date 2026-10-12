@@ -509,13 +509,13 @@ fn json_space(l: str, r: str) -> bool { l == ":" }
 --- performance ---
 allocations: 19622
 deallocations: 19622
-reallocations: 2649
-bytes allocated: 2825055
-instructions executed: 7610540
-binary size: 476192
-  code: 324628
+reallocations: 2650
+bytes allocated: 2825343
+instructions executed: 7619748
+binary size: 479064
+  code: 327380
   data: 9068
-  metadata: 142496
+  metadata: 142616
 functions:
   __arr_drop_Json:
     calls: 125
@@ -540,7 +540,7 @@ functions:
     bytes: 116
   __arr_drop___m2__First$JsonTok:
     calls: 10
-    bytes: 140
+    bytes: 152
   __arr_drop___m3__ListStyle:
     calls: 380
     bytes: 120
@@ -585,7 +585,7 @@ functions:
     bytes: 116
   __arr_retain___m2__First$JsonTok:
     calls: 56
-    bytes: 140
+    bytes: 152
   __arr_retain___m3__ListStyle:
     calls: 456
     bytes: 120
@@ -675,10 +675,10 @@ functions:
     bytes: 816
   __builtin_try_map$__m3__Production$JsonTok$Json$__m2__First<JsonTok>$__m3__ParseError$lam$__m2__linked_first_sets$JsonTok$Json$lambda2:
     calls: 3
-    bytes: 1088
+    bytes: 1108
   __builtin_try_map$__m3__Rule$JsonTok$__m2__First<JsonTok>$__m3__ParseError$lam$__m2__rule_first$JsonTok$lambda0:
     calls: 6
-    bytes: 820
+    bytes: 824
   __builtin_try_map$__m3__Rule$JsonTok$__m3__Rule$JsonTok$__m3__ParseError$lam$__m3__desugar_rule$JsonTok:
     calls: 308
     bytes: 800
@@ -708,10 +708,10 @@ functions:
     bytes: 420
   __eq_set$JsonTok$case:
     calls: 11
-    bytes: 256
+    bytes: 248
   __eq_set$str:
     calls: 11
-    bytes: 304
+    bytes: 296
   __m10__trim_end_while$lam$__builtin_is_space:
     calls: 61
     bytes: 400
@@ -750,7 +750,7 @@ functions:
     bytes: 2012
   __m13__can_reach$JsonTok$Json$map1:
     calls: 0
-    bytes: 384
+    bytes: 404
   __m13__climb$JsonTok$Json:
     calls: 0
     bytes: 4324
@@ -783,7 +783,7 @@ functions:
     bytes: 1996
   __m13__match_prod$JsonTok$Json:
     calls: 781
-    bytes: 9444
+    bytes: 9804
   __m13__match_reps$JsonTok$Json:
     calls: 62
     bytes: 5572
@@ -843,7 +843,7 @@ functions:
     bytes: 1580
   __m2__can_start$JsonTok:
     calls: 0
-    bytes: 256
+    bytes: 232
   __m2__climb_precs$JsonTok:
     calls: 26
     bytes: 1880
@@ -855,19 +855,19 @@ functions:
     bytes: 244
   __m2__linked_first_sets$JsonTok$Json:
     calls: 1
-    bytes: 1456
+    bytes: 1560
   __m2__merge$JsonTok:
     calls: 39
-    bytes: 604
+    bytes: 696
   __m2__render_rule$JsonTok:
     calls: 30
-    bytes: 13936
+    bytes: 14124
   __m2__rep_suffix:
     calls: 2
     bytes: 1708
   __m2__rule_first$JsonTok:
     calls: 72
-    bytes: 7728
+    bytes: 9580
   __m2__show_first$JsonTok$filter1$own0:
     calls: 8
     bytes: 736
@@ -876,7 +876,7 @@ functions:
     bytes: 536
   __m2__show_first_sets$JsonTok$Json$zip1$own0:
     calls: 1
-    bytes: 5216
+    bytes: 5292
   __m3__desugar_opt$JsonTok:
     calls: 154
     bytes: 580
@@ -990,7 +990,7 @@ functions:
     bytes: 396
   __test$json_grammar:
     calls: 1
-    bytes: 12316
+    bytes: 12368
   __test$parse_json:
     calls: 1
     bytes: 17232
@@ -1007,7 +1007,7 @@ functions:
     calls: 1
     bytes: 204
   aipl_arr_inc:
-    calls: 76597
+    calls: 76676
     bytes: (external)
   aipl_arr_reserve:
     calls: 4633

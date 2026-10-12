@@ -97,30 +97,24 @@ fn main() !prints {
 allocations: 57
 deallocations: 57
 reallocations: 1
-bytes allocated: 2336
-instructions executed: 6210
-binary size: 13952
-  code: 9004
+bytes allocated: 2416
+instructions executed: 6734
+binary size: 14960
+  code: 9940
   data: 203
-  metadata: 4745
+  metadata: 4817
 functions:
   __builtin_union_all$i64:
     calls: 3
-    bytes: 508
+    bytes: 708
   __to_str_i64:
     calls: 10
     bytes: 204
   __to_str_setdesc$i64:
     calls: 2
-    bytes: 708
-  aipl_arr_drop_arr:
-    calls: 3
-    bytes: (external)
+    bytes: 704
   aipl_arr_inc:
-    calls: 60
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 2
+    calls: 67
     bytes: (external)
   aipl_arr_sort:
     calls: 6
@@ -160,10 +154,10 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 4788
+    bytes: 5320
   merged:
     calls: 2
-    bytes: 508
+    bytes: 708
   show:
     calls: 6
-    bytes: 2288
+    bytes: 2296

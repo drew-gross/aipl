@@ -276,12 +276,12 @@ fn sexp_space(l: str, r: str) -> bool { false }
 allocations: 5735
 deallocations: 5735
 reallocations: 564
-bytes allocated: 641866
-instructions executed: 2187042
-binary size: 421232
-  code: 289932
+bytes allocated: 642090
+instructions executed: 2189230
+binary size: 424064
+  code: 292644
   data: 5028
-  metadata: 126272
+  metadata: 126392
 functions:
   __arr_drop_SexpKind:
     calls: 0
@@ -306,7 +306,7 @@ functions:
     bytes: 116
   __arr_drop___m2__First$SexpKind:
     calls: 7
-    bytes: 140
+    bytes: 152
   __arr_drop___m3__ListStyle:
     calls: 88
     bytes: 120
@@ -351,7 +351,7 @@ functions:
     bytes: 116
   __arr_retain___m2__First$SexpKind:
     calls: 14
-    bytes: 140
+    bytes: 152
   __arr_retain___m3__ListStyle:
     calls: 88
     bytes: 120
@@ -438,10 +438,10 @@ functions:
     bytes: 816
   __builtin_try_map$__m3__Production$SexpKind$__m15__Sexp$__m2__First<SexpKind>$__m3__ParseError$lam$__m2__linked_first_sets$SexpKind$__m15__Sexp$lambda2:
     calls: 3
-    bytes: 1088
+    bytes: 1108
   __builtin_try_map$__m3__Rule$SexpKind$__m2__First<SexpKind>$__m3__ParseError$lam$__m2__rule_first$SexpKind$lambda0:
     calls: 3
-    bytes: 820
+    bytes: 824
   __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule$SexpKind$__m3__ParseError$lam$__m3__desugar_rule$SexpKind:
     calls: 45
     bytes: 800
@@ -465,10 +465,10 @@ functions:
     bytes: 420
   __eq_set$SexpKind$case:
     calls: 5
-    bytes: 256
+    bytes: 248
   __eq_set$str:
     calls: 5
-    bytes: 304
+    bytes: 296
   __m10__trim_end_while$lam$__builtin_is_space:
     calls: 61
     bytes: 400
@@ -504,7 +504,7 @@ functions:
     bytes: 1520
   __m13__can_reach$SexpKind$__m15__Sexp$map1:
     calls: 0
-    bytes: 384
+    bytes: 404
   __m13__climb$SexpKind$__m15__Sexp:
     calls: 0
     bytes: 4324
@@ -537,7 +537,7 @@ functions:
     bytes: 1996
   __m13__match_prod$SexpKind$__m15__Sexp:
     calls: 222
-    bytes: 9444
+    bytes: 9804
   __m13__match_reps$SexpKind$__m15__Sexp:
     calls: 38
     bytes: 5572
@@ -600,7 +600,7 @@ functions:
     bytes: 1580
   __m2__can_start$SexpKind:
     calls: 0
-    bytes: 256
+    bytes: 232
   __m2__climb_precs$SexpKind:
     calls: 6
     bytes: 1880
@@ -612,19 +612,19 @@ functions:
     bytes: 244
   __m2__linked_first_sets$SexpKind$__m15__Sexp:
     calls: 1
-    bytes: 1456
+    bytes: 1560
   __m2__merge$SexpKind:
     calls: 9
-    bytes: 604
+    bytes: 696
   __m2__render_rule$SexpKind:
     calls: 7
-    bytes: 13868
+    bytes: 14052
   __m2__rep_suffix:
     calls: 1
     bytes: 1708
   __m2__rule_first$SexpKind:
     calls: 18
-    bytes: 7728
+    bytes: 9580
   __m2__show_first$SexpKind$filter1$own0:
     calls: 2
     bytes: 736
@@ -633,7 +633,7 @@ functions:
     bytes: 536
   __m2__show_first_sets$SexpKind$__m15__Sexp$zip1$own0:
     calls: 1
-    bytes: 5160
+    bytes: 5200
   __m3__desugar_opt$SexpKind:
     calls: 45
     bytes: 580
@@ -747,7 +747,7 @@ functions:
     bytes: 396
   __test$sexp_grammar:
     calls: 1
-    bytes: 12316
+    bytes: 12368
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -758,7 +758,7 @@ functions:
     calls: 1
     bytes: 204
   aipl_arr_inc:
-    calls: 26094
+    calls: 26116
     bytes: (external)
   aipl_arr_reserve:
     calls: 1766

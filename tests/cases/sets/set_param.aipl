@@ -20,24 +20,24 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 296
-instructions executed: 342
-binary size: 4112
-  code: 2036
+instructions executed: 377
+binary size: 4168
+  code: 2096
   data: 251
-  metadata: 1825
+  metadata: 1821
 functions:
   __eq_set$i64:
     calls: 1
-    bytes: 256
+    bytes: 248
   __test$build:
     calls: 1
-    bytes: 560
+    bytes: 588
   __test$count:
     calls: 1
-    bytes: 372
+    bytes: 388
   __test$member:
     calls: 1
-    bytes: 616
+    bytes: 640
   aipl_array_dec:
     calls: 5
     bytes: (external)

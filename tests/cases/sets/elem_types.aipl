@@ -32,21 +32,21 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 66
-instructions executed: 351
-binary size: 3720
-  code: 1640
+instructions executed: 367
+binary size: 3744
+  code: 1660
   data: 360
-  metadata: 1720
+  metadata: 1724
 functions:
   __eq_set$bool:
     calls: 1
-    bytes: 256
+    bytes: 248
   __eq_set$char:
     calls: 1
     bytes: 84
   __test$bools:
     calls: 1
-    bytes: 664
+    bytes: 692
   __test$chars:
     calls: 1
     bytes: 468

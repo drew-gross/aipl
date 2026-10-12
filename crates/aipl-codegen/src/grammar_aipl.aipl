@@ -4941,13 +4941,13 @@ fn why(src: str) -> str {
 --- performance ---
 allocations: 1604022
 deallocations: 1604022
-reallocations: 308362
-bytes allocated: 334185162
-instructions executed: 581002578
-binary size: 7105088
-  code: 4738632
+reallocations: 311089
+bytes allocated: 334277610
+instructions executed: 586353016
+binary size: 7108736
+  code: 4742048
   data: 62708
-  metadata: 2303748
+  metadata: 2303980
 functions:
   __arr_drop___m11__ModeFrame:
     calls: 298
@@ -4984,7 +4984,7 @@ functions:
     bytes: 184
   __arr_drop___m31__First$__m23__AiplTok:
     calls: 2601
-    bytes: 140
+    bytes: 152
   __arr_drop___m3__Expr:
     calls: 93
     bytes: 116
@@ -5083,7 +5083,7 @@ functions:
     bytes: 184
   __arr_retain___m31__First$__m23__AiplTok:
     calls: 17460
-    bytes: 140
+    bytes: 152
   __arr_retain___m3__Expr:
     calls: 71
     bytes: 116
@@ -5314,10 +5314,10 @@ functions:
     bytes: 11272
   __builtin_try_map$__m7__Production$__m23__AiplTok$__m1__Ast$__m31__First<AiplTok>$__m7__ParseError$lam$__m31__linked_first_sets$__m23__AiplTok$__m1__Ast$lambda2:
     calls: 72
-    bytes: 12136
+    bytes: 12152
   __builtin_try_map$__m7__Rule$__m23__AiplTok$__m31__First<AiplTok>$__m7__ParseError$lam$__m31__rule_first$__m23__AiplTok$lambda0:
     calls: 2520
-    bytes: 820
+    bytes: 824
   __builtin_try_map$__m7__Rule$__m23__AiplTok$__m7__Rule$__m23__AiplTok$__m7__ParseError$lam$__m7__desugar_rule$__m23__AiplTok:
     calls: 69892
     bytes: 800
@@ -5344,13 +5344,13 @@ functions:
     bytes: 420
   __eq_set$__m23__AiplTok$case:
     calls: 1494
-    bytes: 256
+    bytes: 248
   __eq_set$str:
     calls: 2844
-    bytes: 304
+    bytes: 296
   __eq_set$str$arr:
     calls: 54
-    bytes: 436
+    bytes: 420
   __eq_str$arr:
     calls: 21
     bytes: 500
@@ -5512,7 +5512,7 @@ functions:
     bytes: 744
   __m30__can_reach$__m23__AiplTok$__m1__Ast$map1:
     calls: 0
-    bytes: 560
+    bytes: 580
   __m30__climb$__m23__AiplTok$__m1__Ast:
     calls: 607
     bytes: 4324
@@ -5545,7 +5545,7 @@ functions:
     bytes: 1996
   __m30__match_prod$__m23__AiplTok$__m1__Ast:
     calls: 15119
-    bytes: 66224
+    bytes: 66476
   __m30__match_reps$__m23__AiplTok$__m1__Ast:
     calls: 3571
     bytes: 5572
@@ -5569,19 +5569,19 @@ functions:
     bytes: 9136
   __m30__prepare$__m23__AiplTok$__m1__Ast:
     calls: 9
-    bytes: 17668
+    bytes: 17672
   __m30__refusal$__m23__AiplTok$__m1__Ast:
     calls: 1
     bytes: 5224
   __m30__rule_labels$__m23__AiplTok$__m1__Ast:
     calls: 21168
-    bytes: 22604
+    bytes: 23412
   __m30__rule_nullable$__m23__AiplTok:
     calls: 7722
-    bytes: 1400
+    bytes: 1464
   __m30__seq_labels$__m23__AiplTok$__m1__Ast:
     calls: 5994
-    bytes: 700
+    bytes: 940
   __m30__tok_text$__m23__AiplTok$__m1__Ast:
     calls: 35424
     bytes: 1216
@@ -5590,19 +5590,19 @@ functions:
     bytes: 1068
   __m31__can_start$__m23__AiplTok:
     calls: 197
-    bytes: 256
+    bytes: 232
   __m31__first_sets$__m23__AiplTok$__m1__Ast:
     calls: 9
     bytes: 244
   __m31__linked_first_sets$__m23__AiplTok$__m1__Ast:
     calls: 9
-    bytes: 8848
+    bytes: 8944
   __m31__merge$__m23__AiplTok:
     calls: 22608
-    bytes: 604
+    bytes: 696
   __m31__rule_first$__m23__AiplTok:
     calls: 29880
-    bytes: 7728
+    bytes: 9580
   __m32__line_at:
     calls: 9
     bytes: 652
@@ -5864,17 +5864,11 @@ functions:
   __to_str_u64:
     calls: 23
     bytes: 204
-  aipl_arr_drop_arr:
-    calls: 1953
-    bytes: (external)
   aipl_arr_inc:
-    calls: 3944882
+    calls: 3989486
     bytes: (external)
   aipl_arr_reserve:
     calls: 82485
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 13230
     bytes: (external)
   aipl_arr_slice:
     calls: 13

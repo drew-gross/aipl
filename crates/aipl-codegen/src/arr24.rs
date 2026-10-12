@@ -481,13 +481,13 @@ pub(crate) extern "C" fn aipl_arrw_with_cap(out: *mut Arr, cap: i64, elem_size: 
 // An outer array's elements are themselves array values, and at refcount zero
 // (or when the outer array's elements are copied) each one has to be released
 // (or retained). The 8-byte helpers (`aipl_arr_drop_arr`, `aipl_arr_retain_ptr`)
-// walk 8-byte slots; a padded array value is 24 bytes, its tagged pointer in the
-// first word. They cannot simply change stride, because sets and dicts share
-// them and are still a plain word — so arrays get their own pair, chosen by
-// codegen's `array_drop_fn_addr` / `array_retain_fn_addr`.
+// walk 8-byte slots; an array, set or dict value is 24 bytes, its block in the
+// first word — so those get their own pair, chosen by codegen's
+// `array_drop_fn_addr` / `array_retain_fn_addr`. (The 8-byte pair stays for an
+// artifact compiled before the switch.)
 //
-// Each reads only the first word, which is all a padded value carries in this
-// stage. They call the host's `aipl_array_dec` / `aipl_arr_inc` through
+// Each reads only the first word — the block a value holds its reference on —
+// and passes over an inline value, which holds none. They call the host's `aipl_array_dec` / `aipl_arr_inc` through
 // `super::`, the way `str24` reaches its host's allocator.
 
 /// Release each of `len` padded array elements starting at `elems`.

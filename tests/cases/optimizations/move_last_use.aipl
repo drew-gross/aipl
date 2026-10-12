@@ -147,9 +147,9 @@ allocations: 49
 deallocations: 49
 reallocations: 4
 bytes allocated: 2715
-instructions executed: 10429
-binary size: 19928
-  code: 13000
+instructions executed: 10482
+binary size: 20088
+  code: 13160
   data: 475
   metadata: 6453
 functions:
@@ -158,7 +158,7 @@ functions:
     bytes: 908
   __to_str_set$i64:
     calls: 1
-    bytes: 708
+    bytes: 704
   __to_str_u64:
     calls: 8
     bytes: 204
@@ -212,7 +212,7 @@ functions:
     bytes: 768
   main:
     calls: 1
-    bytes: 8480
+    bytes: 8644
   merge$own0$own1:
     calls: 2
     bytes: 1164

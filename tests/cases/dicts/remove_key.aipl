@@ -94,9 +94,9 @@ allocations: 55
 deallocations: 55
 reallocations: 0
 bytes allocated: 4132
-instructions executed: 5310
-binary size: 22408
-  code: 13804
+instructions executed: 5637
+binary size: 23480
+  code: 14876
   data: 643
   metadata: 7961
 functions:
@@ -129,16 +129,16 @@ functions:
     bytes: 232
   __to_str_dict$i64$i64$arr:
     calls: 1
-    bytes: 1440
+    bytes: 1436
   __to_str_dict$i64$str:
     calls: 2
-    bytes: 840
+    bytes: 860
   __to_str_dict$str$i64:
     calls: 3
-    bytes: 844
+    bytes: 864
   __to_str_dict$str$str:
     calls: 4
-    bytes: 936
+    bytes: 944
   __to_str_i64:
     calls: 2
     bytes: 204
@@ -192,4 +192,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 8008
+    bytes: 9036

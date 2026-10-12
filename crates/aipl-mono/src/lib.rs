@@ -10638,23 +10638,20 @@ fn str_shaped(t: &Type) -> bool {
 /// How many bytes a `reusable` element of type `t` occupies in an array slot.
 ///
 /// Monomorphization does not know codegen's layout table, but this one fact it
-/// has to: a `str` is a 24-byte value, and so — under the wide array layout — is
-/// an array, whose 24 bytes are its block and, for a window, where its elements
-/// start and how many (`aipl-codegen`'s `is_wide_array`). A narrow integer is
-/// packed at its own width in an array (`aipl-codegen`'s `array_elem_size`), so
-/// an `i64[]` buffer has no room to be reused for a `u8[]` or the other way
-/// round. Every other type `reusable` admits is one word: the 64-bit integers,
-/// and a set or a dict, which are still a plain word until they switch
-/// representation on their own (`arr24_todo.txt`).
+/// has to: a `str` is a 24-byte value, and so — under the wide layouts — is an
+/// array, a set and a dict, each its block plus, for an array window, where its
+/// elements start and how many (`aipl-codegen`'s `is_wide_seq`). A `#{char}` is
+/// its 32-byte bitfield. A narrow integer is packed at its own width in an array
+/// (`aipl-codegen`'s `array_elem_size`), so an `i64[]` buffer has no room to be
+/// reused for a `u8[]` or the other way round, and a 64-bit integer is a word.
 ///
 /// A `char[]` is `str`-shaped, so it is 24 bytes either way.
 fn slot_bytes(t: &Type) -> usize {
-    if str_shaped(t) || matches!(t, Type::Array(_)) {
-        24
-    } else if let Type::Primitive(p) = t {
-        p.int_bits().map_or(8, |bits| (bits / 8) as usize)
-    } else {
-        8
+    match t {
+        Type::Set(e, _) if matches!(**e, Type::Primitive(Primitive::Char)) => 32,
+        _ if str_shaped(t) || matches!(t, Type::Array(_) | Type::Set(..) | Type::Dict(..)) => 24,
+        Type::Primitive(p) => p.int_bits().map_or(8, |bits| (bits / 8) as usize),
+        _ => 8,
     }
 }
 

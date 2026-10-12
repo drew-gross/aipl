@@ -372,11 +372,23 @@ window, a reversal or inline (lent as a copy).
           through one would leak the elements outside it (`arr24`'s
           `a_window_releases_every_element_of_its_block` pins this). Stage 8's
           question — can `cap` stand in for `init` — is now only about drop blocks.
-  [ ] 6d. **sets and dicts.** They share the array block and its runtime today
-          but are still one-word values, so they cannot carry a length — which
-          6c takes out of the block. Either they flip to 24-byte values first
-          (deferred earlier: "flip dicts and sets later") or they keep a header
-          of their own that still holds `len`. To decide before 6c.
+  [x] 6d. **sets and dicts flip to 24-byte values** (decided: rather than keep
+          a header of their own). They share the array block and its runtime but
+          are still one-word values, so they could not carry a length once 6c
+          takes it out of the block. Done as its own change, the way arrays
+          flipped in 4a: content `{block, 0, 0}` first (a `#{char}` stays the
+          32-byte bitfield it is), then the entries that take them learn values
+          with the rest of 6a.
+          Done: `Abi::sets` (`SeqRepr`), recorded by an artifact as
+          `; set-abi wide` (an artifact's dict parameter is marshalled by it —
+          the checked-in one took `#{str:str}` as a word). `is_wide_set` /
+          `is_wide_seq` beside `is_wide_array`; `seq_ptr`/`seq_val` unwrap and
+          wrap at every set and dict runtime entry, as 4a did for arrays; set and
+          dict elements use the 24-stride helpers; the FFI writes a dict value;
+          mono's in-place gate knows their width (and a `#{char}`'s 32 bytes).
+          Corpus: allocations unchanged, instructions +0.8% (copying the wider
+          values), bytes up a little where a set or dict nests in an array or a
+          dict.
   [ ] 6e. share the refcount and capacity code with `str24`'s buffer, now that a
           plain block is one.
   [ ] `drop_fn` stays in a drop block: `aipl_arr_drop_arr(elems, len)` walks a

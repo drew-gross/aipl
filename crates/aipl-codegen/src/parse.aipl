@@ -1766,13 +1766,13 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
 --- performance ---
 allocations: 5488
 deallocations: 5488
-reallocations: 967
-bytes allocated: 704780
-instructions executed: 2556381
-binary size: 813712
-  code: 523988
+reallocations: 975
+bytes allocated: 708588
+instructions executed: 2585258
+binary size: 817464
+  code: 527508
   data: 13036
-  metadata: 276688
+  metadata: 276920
 functions:
   __arr_drop_Node:
     calls: 18
@@ -1785,7 +1785,7 @@ functions:
     bytes: 116
   __arr_drop___m2__First$Tok:
     calls: 82
-    bytes: 140
+    bytes: 152
   __arr_drop___m3__ListStyle:
     calls: 55
     bytes: 120
@@ -1821,7 +1821,7 @@ functions:
     bytes: 116
   __arr_retain___m2__First$Tok:
     calls: 150
-    bytes: 140
+    bytes: 152
   __arr_retain___m3__ListStyle:
     calls: 54
     bytes: 120
@@ -1899,10 +1899,10 @@ functions:
     bytes: 816
   __builtin_try_map$__m3__Production$Tok$Node$__m2__First<Tok>$__m3__ParseError$lam$__m2__linked_first_sets$Tok$Node$lambda2:
     calls: 36
-    bytes: 1088
+    bytes: 1108
   __builtin_try_map$__m3__Rule$Tok$__m2__First<Tok>$__m3__ParseError$lam$__m2__rule_first$Tok$lambda0:
     calls: 32
-    bytes: 820
+    bytes: 824
   __builtin_try_map$__m3__Rule$Tok$__m3__Rule$Tok$__m3__ParseError$lam$__m3__desugar_rule$Tok:
     calls: 123
     bytes: 800
@@ -1947,13 +1947,13 @@ functions:
     bytes: 128
   __eq_set$Tok$case:
     calls: 52
-    bytes: 256
+    bytes: 248
   __eq_set$str:
     calls: 100
-    bytes: 304
+    bytes: 296
   __eq_set$str$arr:
     calls: 34
-    bytes: 436
+    bytes: 420
   __m1__extent:
     calls: 3
     bytes: 252
@@ -1983,19 +1983,19 @@ functions:
     bytes: 1580
   __m2__can_start$Tok:
     calls: 28
-    bytes: 256
+    bytes: 232
   __m2__first_sets$Tok$Node:
     calls: 14
     bytes: 244
   __m2__linked_first_sets$Tok$Node:
     calls: 14
-    bytes: 1456
+    bytes: 1560
   __m2__merge$Tok:
     calls: 96
-    bytes: 604
+    bytes: 696
   __m2__rule_first$Tok:
     calls: 165
-    bytes: 7728
+    bytes: 9580
   __m3__desugar_opt$Tok:
     calls: 61
     bytes: 580
@@ -2104,17 +2104,11 @@ functions:
   __to_str_u64:
     calls: 7
     bytes: 204
-  aipl_arr_drop_arr:
-    calls: 78
-    bytes: (external)
   aipl_arr_inc:
-    calls: 31835
+    calls: 32118
     bytes: (external)
   aipl_arr_reserve:
     calls: 593
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 142
     bytes: (external)
   aipl_arr_sort:
     calls: 42
@@ -2187,7 +2181,7 @@ functions:
     bytes: 368
   can_reach$Tok$Node$map1:
     calls: 0
-    bytes: 440
+    bytes: 460
   climb$Tok$Node:
     calls: 15
     bytes: 4324
@@ -2226,7 +2220,7 @@ functions:
     bytes: 1996
   match_prod$Tok$Node:
     calls: 202
-    bytes: 9752
+    bytes: 10084
   match_reps$Tok$Node:
     calls: 57
     bytes: 5572
@@ -2253,19 +2247,19 @@ functions:
     bytes: 376
   prepare$Tok$Node:
     calls: 14
-    bytes: 2972
+    bytes: 2976
   refusal$Tok$Node:
     calls: 10
     bytes: 4164
   rule_labels$Tok$Node:
     calls: 146
-    bytes: 4448
+    bytes: 5268
   rule_nullable$Tok:
     calls: 17
-    bytes: 1400
+    bytes: 1464
   seq_labels$Tok$Node:
     calls: 17
-    bytes: 700
+    bytes: 940
   tok_rules:
     calls: 100
     bytes: 3464

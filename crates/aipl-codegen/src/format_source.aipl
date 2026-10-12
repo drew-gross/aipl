@@ -428,10 +428,10 @@ deallocations: 15942
 reallocations: 3021
 bytes allocated: 4098118
 instructions executed: 11801960
-binary size: 7887792
-  code: 5327912
+binary size: 7888056
+  code: 5328160
   data: 14090
-  metadata: 2545790
+  metadata: 2545806
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -1065,7 +1065,7 @@ functions:
     bytes: 744
   __m32__can_reach$__m25__AiplTok$__m5__Ast$map1:
     calls: 0
-    bytes: 560
+    bytes: 580
   __m32__climb$__m25__AiplTok$__m5__Ast:
     calls: 2
     bytes: 4324
@@ -1098,7 +1098,7 @@ functions:
     bytes: 1996
   __m32__match_prod$__m25__AiplTok$__m5__Ast:
     calls: 74
-    bytes: 66224
+    bytes: 66476
   __m32__match_reps$__m25__AiplTok$__m5__Ast:
     calls: 21
     bytes: 5572
@@ -1131,7 +1131,7 @@ functions:
     bytes: 1068
   __m33__can_start$__m25__AiplTok:
     calls: 0
-    bytes: 256
+    bytes: 232
   __m34__line_at:
     calls: 0
     bytes: 652
