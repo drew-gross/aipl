@@ -79,9 +79,9 @@ allocations: 41
 deallocations: 41
 reallocations: 1
 bytes allocated: 2204
-instructions executed: 2806
-binary size: 11888
-  code: 6360
+instructions executed: 2890
+binary size: 12184
+  code: 6656
   data: 531
   metadata: 4997
 functions:
@@ -96,7 +96,7 @@ functions:
     bytes: 208
   __eq_Rule$Tok$arr:
     calls: 1
-    bytes: 348
+    bytes: 436
   __eq_Tok:
     calls: 1
     bytes: 104
@@ -105,7 +105,7 @@ functions:
     bytes: 116
   __to_str_Rule$Tok:
     calls: 12
-    bytes: 2180
+    bytes: 2260
   __to_str_bool:
     calls: 1
     bytes: 232
@@ -159,7 +159,7 @@ functions:
     bytes: 580
   shift$Tok:
     calls: 4
-    bytes: 1216
+    bytes: 1296
   size$Tok:
     calls: 4
-    bytes: 492
+    bytes: 540

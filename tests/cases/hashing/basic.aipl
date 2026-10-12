@@ -48,9 +48,9 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 575
-instructions executed: 2777
-binary size: 14704
-  code: 9844
+instructions executed: 2817
+binary size: 14848
+  code: 9988
   data: 1130
   metadata: 3730
 functions:
@@ -62,7 +62,7 @@ functions:
     bytes: 128
   __test$arr:
     calls: 1
-    bytes: 1680
+    bytes: 1824
   __test$dict:
     calls: 1
     bytes: 2136

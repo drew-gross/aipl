@@ -21,18 +21,18 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 492
-instructions executed: 494
-binary size: 4872
-  code: 2372
+instructions executed: 518
+binary size: 4952
+  code: 2448
   data: 267
-  metadata: 2233
+  metadata: 2237
 functions:
   __builtin_find_if$i64?$lam$__builtin_is_some:
     calls: 1
-    bytes: 296
+    bytes: 336
   __builtin_map_find_if$i64$i64$lam$main$lambda0$main$lambda1:
     calls: 1
-    bytes: 340
+    bytes: 376
   __to_str_i64$opt:
     calls: 2
     bytes: 388

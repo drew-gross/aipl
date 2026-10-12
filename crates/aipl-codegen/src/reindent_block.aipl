@@ -108,11 +108,11 @@ allocations: 96
 deallocations: 96
 reallocations: 5
 bytes allocated: 5570
-instructions executed: 15704
-binary size: 16584
-  code: 10392
+instructions executed: 16483
+binary size: 16952
+  code: 10756
   data: 921
-  metadata: 5271
+  metadata: 5275
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 24
@@ -164,4 +164,4 @@ functions:
     bytes: 116
   reindent_block:
     calls: 9
-    bytes: 7676
+    bytes: 8040

@@ -27,11 +27,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 56
-instructions executed: 430
-binary size: 3808
-  code: 1736
+instructions executed: 482
+binary size: 3896
+  code: 1820
   data: 352
-  metadata: 1720
+  metadata: 1724
 functions:
   __test$nonempty_last:
     calls: 1
@@ -65,7 +65,7 @@ functions:
     bytes: 196
   nonempty_last$i64:
     calls: 2
-    bytes: 324
+    bytes: 364
   nonempty_last$str:
     calls: 1
-    bytes: 476
+    bytes: 520

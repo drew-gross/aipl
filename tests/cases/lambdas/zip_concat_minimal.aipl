@@ -19,11 +19,11 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 360
-instructions executed: 704
-binary size: 4968
-  code: 3088
+instructions executed: 784
+binary size: 5192
+  code: 3316
   data: 1
-  metadata: 1879
+  metadata: 1875
 functions:
   aipl_arr_inc:
     calls: 1
@@ -39,7 +39,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 868
+    bytes: 912
   main$zip1$own0$own1:
     calls: 1
-    bytes: 2220
+    bytes: 2404

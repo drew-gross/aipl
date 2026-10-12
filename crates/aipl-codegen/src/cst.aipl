@@ -622,9 +622,9 @@ allocations: 262
 deallocations: 262
 reallocations: 15
 bytes allocated: 20389
-instructions executed: 58054
-binary size: 78336
-  code: 49960
+instructions executed: 61572
+binary size: 79880
+  code: 51504
   data: 3703
   metadata: 24673
 functions:
@@ -636,49 +636,49 @@ functions:
     bytes: 116
   __builtin_find_map$Cst$__builtin_Span$lam$first_leaf:
     calls: 8
-    bytes: 392
+    bytes: 432
   __builtin_find_map$Cst$__builtin_Span$lam$first_token:
     calls: 5
-    bytes: 392
+    bytes: 432
   __builtin_map_join$Cst$__builtin_Span$lam$leaves:
     calls: 13
-    bytes: 1588
+    bytes: 1672
   __builtin_map_join$Cst$__builtin_Span$lam$token_leaves:
     calls: 9
-    bytes: 1588
+    bytes: 1672
   __builtin_reverse_find_map$Cst$__builtin_Span$lam$last_leaf:
     calls: 8
-    bytes: 376
+    bytes: 428
   __builtin_reverse_find_map$Cst$__builtin_Span$lam$last_token:
     calls: 3
-    bytes: 376
+    bytes: 428
   __eq_Cst:
     calls: 23
     bytes: 360
   __eq_Cst$arr:
     calls: 11
-    bytes: 348
+    bytes: 436
   __eq_Slot:
     calls: 8
     bytes: 136
   __eq_Slot$arr:
     calls: 3
-    bytes: 332
+    bytes: 420
   __eq___builtin_Span:
     calls: 46
     bytes: 104
   __eq___builtin_Span$arr:
     calls: 4
-    bytes: 332
+    bytes: 420
   __eq_str$arr:
     calls: 1
-    bytes: 412
+    bytes: 500
   __rec_drop_Cst:
     calls: 66
     bytes: 132
   __test$show:
     calls: 1
-    bytes: 17640
+    bytes: 17900
   __test$through:
     calls: 1
     bytes: 388
@@ -744,46 +744,46 @@ functions:
     bytes: 780
   leaves:
     calls: 32
-    bytes: 1764
+    bytes: 1772
   leaves$len:
     calls: 5
-    bytes: 1236
+    bytes: 1392
   main:
     calls: 1
     bytes: 168
   own_token_text:
     calls: 3
-    bytes: 1552
+    bytes: 1608
   parts:
     calls: 15
     bytes: 1232
   show:
     calls: 23
-    bytes: 4240
+    bytes: 4412
   slot_walk:
     calls: 3
     bytes: 820
   slot_walk_kids:
     calls: 3
-    bytes: 1844
+    bytes: 1892
   slots$own0:
     calls: 3
     bytes: 312
   split_kids:
     calls: 32
-    bytes: 2912
+    bytes: 2948
   text:
     calls: 5
-    bytes: 1532
+    bytes: 1580
   tok_span:
     calls: 2
     bytes: 236
   token_leaves:
     calls: 31
-    bytes: 1728
+    bytes: 1736
   token_span:
     calls: 5
     bytes: 288
   token_text:
     calls: 5
-    bytes: 1532
+    bytes: 1580

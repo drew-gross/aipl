@@ -1,5 +1,7 @@
-# .reverse() returns an O(1) reversed view; iterating or comparing it
-# produces the same result as a fully-copied reversed array.
+# .reverse() is O(1) and allocates nothing: the result is the same run of the
+# same block, walked from its far end (see "reversed" in
+# `crates/aipl-codegen/src/arr24.rs`). Iterating or comparing it produces the
+# same result as a fully-copied reversed array.
 
 import { equal as ==, len, reverse, wrapping_add_assign as += } from builtins;
 
@@ -11,7 +13,7 @@ fn sum_reversed(xs: i64[]) -> i64 {
     total
 }.test({
     // sum is commutative so it doesn't actually test reversal, but it
-    // exercises the iterator path on a reversed view.
+    // exercises the iterator path on a reversed value.
     assert(sum_reversed([1, 2, 3, 4, 5]) == 15);
     assert(sum_reversed([]) == 0);
 })
@@ -28,39 +30,33 @@ fn reversed_len(xs: i64[]) -> u64 { len(xs.reverse()) }.test({
     assert(reversed_len([]) == 0);
 })
 --- performance ---
-allocations: 4
-deallocations: 4
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 192
-instructions executed: 1168
-binary size: 6184
-  code: 2960
+bytes allocated: 0
+instructions executed: 1208
+binary size: 5448
+  code: 2476
   data: 766
-  metadata: 2458
+  metadata: 2206
 functions:
   __eq_i64$arr:
     calls: 4
-    bytes: 416
+    bytes: 496
   __test$reversed_eq:
     calls: 1
-    bytes: 1516
+    bytes: 908
   __test$reversed_len:
     calls: 1
-    bytes: 316
+    bytes: 324
   __test$sum_reversed:
     calls: 1
     bytes: 212
-  aipl_arr_elem_ptr:
-    calls: 5
-    bytes: (external)
   aipl_arr_inc:
-    calls: 4
-    bytes: (external)
-  aipl_arr_reverse:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 8
+    calls: 3
     bytes: (external)
   aipl_assert:
     calls: 8
@@ -79,4 +75,4 @@ functions:
     bytes: 256
   sum_reversed:
     calls: 2
-    bytes: 244
+    bytes: 280

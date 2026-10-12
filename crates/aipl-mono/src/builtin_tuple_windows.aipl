@@ -53,9 +53,9 @@ allocations: 10
 deallocations: 10
 reallocations: 4
 bytes allocated: 680
-instructions executed: 3155
-binary size: 11096
-  code: 6388
+instructions executed: 3361
+binary size: 11504
+  code: 6796
   data: 925
   metadata: 3783
 functions:
@@ -70,22 +70,22 @@ functions:
     bytes: 104
   __eq___tuple$char$char$arr:
     calls: 1
-    bytes: 332
+    bytes: 420
   __eq___tuple$i64$i64:
     calls: 4
     bytes: 104
   __eq___tuple$i64$i64$arr:
     calls: 2
-    bytes: 332
+    bytes: 420
   __eq___tuple$str$str:
     calls: 2
     bytes: 136
   __eq___tuple$str$str$arr:
     calls: 1
-    bytes: 332
+    bytes: 420
   __test$tuple_windows:
     calls: 1
-    bytes: 3344
+    bytes: 3444
   aipl_arr_inc:
     calls: 15
     bytes: (external)
@@ -121,4 +121,4 @@ functions:
     bytes: 636
   tuple_windows$i64:
     calls: 5
-    bytes: 672
+    bytes: 716

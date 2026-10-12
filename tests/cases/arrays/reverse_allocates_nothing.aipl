@@ -1,0 +1,62 @@
+# Reversing an array allocates nothing: the result is a value over the same
+# block's run, walked from its far end (see "reversed" in
+# `crates/aipl-codegen/src/arr24.rs`). So is everything done to one here —
+# reading it, slicing it (a reversed window), and reversing it again, which is
+# the forward array it came from. Only a bit-packed `bool[]`, with no byte run
+# to walk, is copied.
+#
+# The allocation count below is the proof: the source is a constant literal,
+# which lives in the data section, so nothing here allocates unless a reversal
+# does — and `main` returns its answer as the exit code because rendering would
+# allocate a buffer.
+
+import {
+    equal as ==,
+    logical_and as &&,
+    reverse,
+    value_or,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+} from builtins;
+
+fn total(xs: i64[]) -> i64 {
+    mut n = 0;
+    for (let x : xs) {
+        set n += x;
+    }
+    n
+}
+
+fn main() -> i64 {
+    let xs = [1, 2, 3, 4, 5, 6];
+    let r = xs.reverse(); // 6, 5, 4, 3, 2, 1
+    let mid = r[1..4]; // 5, 4, 3 — still reversed, still over `xs`
+    let back = r.reverse(); // `xs` again
+    let same = if (back == xs && mid.reverse() == [3, 4, 5]) { 100 } else { 0 };
+    r[0].value_or(0) + mid[0].value_or(0) + total(mid) + same // 6 + 5 + 12 + 100
+}
+--- exit code ---
+123
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 890
+binary size: 2880
+  code: 1768
+  data: 137
+  metadata: 975
+functions:
+  __eq_i64$arr:
+    calls: 2
+    bytes: 496
+  aipl_arr_inc:
+    calls: 4
+    bytes: (external)
+  aipl_array_dec:
+    calls: 4
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1272

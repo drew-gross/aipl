@@ -66,25 +66,25 @@ fn main() !prints {
 [2]
 true true 9
 --- performance ---
-allocations: 38
-deallocations: 38
+allocations: 36
+deallocations: 36
 reallocations: 0
-bytes allocated: 2178
-instructions executed: 7169
-binary size: 17712
-  code: 11292
+bytes allocated: 2082
+instructions executed: 7419
+binary size: 17584
+  code: 11264
   data: 615
-  metadata: 5805
+  metadata: 5705
 functions:
   __eq_i64$arr:
     calls: 1
-    bytes: 416
+    bytes: 496
   __to_str_bool:
     calls: 2
     bytes: 232
   __to_str_bool$arr:
     calls: 1
-    bytes: 792
+    bytes: 800
   __to_str_char$arr:
     calls: 1
     bytes: 768
@@ -93,7 +93,7 @@ functions:
     bytes: 204
   __to_str_i64$arr:
     calls: 9
-    bytes: 836
+    bytes: 908
   __to_str_none$arr:
     calls: 1
     bytes: 252
@@ -106,11 +106,11 @@ functions:
   aipl_arr_reserve:
     calls: 5
     bytes: (external)
-  aipl_arr_reverse:
-    calls: 2
-    bytes: (external)
   aipl_array_dec:
-    calls: 24
+    calls: 20
+    bytes: (external)
+  aipl_array_new:
+    calls: 2
     bytes: (external)
   aipl_array_push:
     calls: 2
@@ -126,16 +126,16 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 4836
+    bytes: 4552
   main$filter3$own0:
     calls: 1
-    bytes: 764
+    bytes: 788
   main$filter7$own0:
     calls: 1
-    bytes: 764
+    bytes: 788
   main$map1$own0:
     calls: 1
-    bytes: 712
+    bytes: 736
   main$map5$own0:
     calls: 1
-    bytes: 716
+    bytes: 740

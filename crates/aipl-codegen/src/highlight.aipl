@@ -758,9 +758,9 @@ allocations: 509
 deallocations: 509
 reallocations: 34
 bytes allocated: 40794
-instructions executed: 115070
-binary size: 127240
-  code: 84740
+instructions executed: 116303
+binary size: 128568
+  code: 86068
   data: 5464
   metadata: 37036
 functions:
@@ -793,31 +793,31 @@ functions:
     bytes: 304
   __builtin_count_while$Item$lam$rule_pats$Kind$lambda0:
     calls: 0
-    bytes: 556
+    bytes: 596
   __builtin_count_while$Item$lam$rule_pats$Kind$lambda1$lambda0:
     calls: 4
-    bytes: 556
+    bytes: 596
   __eq_Entry:
     calls: 1
     bytes: 128
   __eq_Entry$arr:
     calls: 2
-    bytes: 332
+    bytes: 420
   __eq_Pat:
     calls: 12
     bytes: 480
   __eq_Pat$arr:
     calls: 9
-    bytes: 348
+    bytes: 436
   __eq_set$char:
     calls: 3
     bytes: 84
   __eq_str$arr:
     calls: 1
-    bytes: 412
+    bytes: 500
   __m1__indent:
     calls: 12
-    bytes: 1748
+    bytes: 1784
   __rec_drop_Pat:
     calls: 57
     bytes: 268
@@ -844,13 +844,13 @@ functions:
     bytes: 1104
   __test$rule_pats:
     calls: 1
-    bytes: 8212
+    bytes: 8216
   __test$tm_json:
     calls: 1
-    bytes: 6520
+    bytes: 6724
   __test$word_pat:
     calls: 1
-    bytes: 2280
+    bytes: 2332
   __to_str_u64:
     calls: 0
     bytes: 204
@@ -910,16 +910,16 @@ functions:
     bytes: (external)
   arr_fld:
     calls: 2
-    bytes: 2000
+    bytes: 2056
   caps_fld:
     calls: 0
-    bytes: 1000
+    bytes: 1040
   char_class_body:
     calls: 16
     bytes: 2040
   entry_name:
     calls: 5
-    bytes: 608
+    bytes: 616
   fld:
     calls: 6
     bytes: 348
@@ -931,22 +931,22 @@ functions:
     bytes: 760
   matcher_pat:
     calls: 24
-    bytes: 8276
+    bytes: 8296
   obj_fld:
     calls: 1
-    bytes: 2000
+    bytes: 2056
   obj_of:
     calls: 2
-    bytes: 1628
+    bytes: 1676
   pat_json:
     calls: 2
-    bytes: 3780
+    bytes: 3940
   re_escape:
     calls: 32
     bytes: 1960
   re_escape_set:
     calls: 4
-    bytes: 1232
+    bytes: 1296
   rule_pats$Kind:
     calls: 2
-    bytes: 10656
+    bytes: 10892

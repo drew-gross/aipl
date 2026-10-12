@@ -69,30 +69,30 @@ allocations: 12
 deallocations: 12
 reallocations: 0
 bytes allocated: 246
-instructions executed: 1393
-binary size: 5984
-  code: 3416
+instructions executed: 1533
+binary size: 6344
+  code: 3776
   data: 279
   metadata: 2289
 functions:
   __builtin_all$i64$lam$main$lambda2:
     calls: 1
-    bytes: 268
+    bytes: 316
   __builtin_all$i64$lam$main$lambda3:
     calls: 1
-    bytes: 268
+    bytes: 316
   __builtin_all$i64$lam$main$lambda5:
     calls: 1
-    bytes: 268
+    bytes: 316
   __builtin_any$i64$lam$main$lambda0:
     calls: 1
-    bytes: 256
+    bytes: 304
   __builtin_any$i64$lam$main$lambda1:
     calls: 1
-    bytes: 256
+    bytes: 304
   __builtin_any$i64$lam$main$lambda4:
     calls: 1
-    bytes: 256
+    bytes: 304
   __to_str_bool:
     calls: 12
     bytes: 232
@@ -101,10 +101,10 @@ functions:
     bytes: (external)
   all_big:
     calls: 3
-    bytes: 292
+    bytes: 328
   has_big:
     calls: 3
-    bytes: 280
+    bytes: 316
   main:
     calls: 1
     bytes: 1040

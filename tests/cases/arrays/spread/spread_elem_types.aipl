@@ -24,9 +24,9 @@ allocations: 9
 deallocations: 9
 reallocations: 2
 bytes allocated: 379
-instructions executed: 1652
-binary size: 10784
-  code: 6096
+instructions executed: 1768
+binary size: 10960
+  code: 6272
   data: 689
   metadata: 3999
 functions:
@@ -35,13 +35,13 @@ functions:
     bytes: 72
   __eq_P$arr:
     calls: 1
-    bytes: 332
+    bytes: 420
   __eq_bool$arr:
     calls: 1
-    bytes: 344
+    bytes: 352
   __eq_i64$arr:
     calls: 3
-    bytes: 416
+    bytes: 496
   __test$chars:
     calls: 1
     bytes: 4828

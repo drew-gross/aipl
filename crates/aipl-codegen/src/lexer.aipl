@@ -1473,11 +1473,11 @@ allocations: 283
 deallocations: 283
 reallocations: 4
 bytes allocated: 74128
-instructions executed: 699901
-binary size: 830336
-  code: 563560
+instructions executed: 712099
+binary size: 831080
+  code: 564300
   data: 9188
-  metadata: 257588
+  metadata: 257592
 functions:
   __arr_drop_Kind:
     calls: 88
@@ -1511,7 +1511,7 @@ functions:
     bytes: 568
   __builtin_any$str$lam$up_to_any_len$lambda0:
     calls: 47
-    bytes: 352
+    bytes: 392
   __builtin_count_while$char$lam$lex_step$Kind$lambda1:
     calls: 88
     bytes: 316
@@ -1553,7 +1553,7 @@ functions:
     bytes: 324
   __eq_Kind$arr:
     calls: 36
-    bytes: 332
+    bytes: 420
   __eq_LexError:
     calls: 15
     bytes: 128
@@ -1565,7 +1565,7 @@ functions:
     bytes: 128
   __eq_ScopeSpan$arr:
     calls: 1
-    bytes: 332
+    bytes: 420
   __eq_SpanStr:
     calls: 49
     bytes: 128
@@ -1574,7 +1574,7 @@ functions:
     bytes: 120
   __eq_Token$Kind$arr:
     calls: 20
-    bytes: 332
+    bytes: 420
   __eq___builtin_Span:
     calls: 69
     bytes: 104
@@ -1583,10 +1583,10 @@ functions:
     bytes: 2012
   __test$keep_skipped:
     calls: 1
-    bytes: 18052
+    bytes: 18112
   __test$lex_all:
     calls: 1
-    bytes: 486824
+    bytes: 486904
   __test$lex_all$esc_str:
     calls: 2
     bytes: 140
@@ -1598,7 +1598,7 @@ functions:
     bytes: 1052
   __test$span_str:
     calls: 1
-    bytes: 2276
+    bytes: 2316
   __test_try_fail_LexError:
     calls: 0
     bytes: 84
@@ -1652,13 +1652,13 @@ functions:
     bytes: 1952
   keep_skipped$Kind:
     calls: 3
-    bytes: 3824
+    bytes: 3892
   lex$Kind:
     calls: 39
     bytes: 532
   lex_all$Kind:
     calls: 76
-    bytes: 10604
+    bytes: 10748
   lex_kinds$Kind:
     calls: 36
     bytes: 868
@@ -1667,7 +1667,7 @@ functions:
     bytes: 412
   lex_step$Kind:
     calls: 224
-    bytes: 10948
+    bytes: 10992
   main:
     calls: 1
     bytes: 248

@@ -556,8 +556,17 @@ pub(crate) extern "C" fn aipl_arr_retain_opt_warr(elems: *const u8, len: i64) {
 //            w0                          w1                 w2
 // whole      tagged pointer (any repr)   0                  0
 // window     untagged heap block         data: *const u8    len
+// reversed   untagged heap block         data: *const u8    [ len : 56 ][ tag:8 ]
 // inline     elems[0..8]                 elems[8..16]       [ elems[16..22] ][ len:8 ][ tag:8 ]
 // ```
+//
+// A *reversed* value (`ATAG_REVERSED`) is a window walked from its far end:
+// `data` and the length name a forward run of the block, exactly as a window's
+// do, and element `i` of the value is element `len - 1 - i` of the run. That is
+// `Arr`'s reversed shape, and why reversing allocates nothing — the view block a
+// reversal used to build is gone. Reversing one again is the forward window (or
+// the whole array) it came from. A bit-packed `bool[]` has no byte run to walk,
+// so reversing one copies.
 //
 // An *inline* value carries its elements in its own 22 bytes and owns no block
 // at all — `Arr`'s inline layout exactly, and a short `str`'s: the tag
@@ -575,9 +584,9 @@ pub(crate) extern "C" fn aipl_arr_retain_opt_warr(elems: *const u8, len: i64) {
 // they have passed over an inline element, which holds none.
 //
 // Windows are only ever made over a `Heap` block of byte-addressable elements.
-// A reversed view has no forward run to point into, and a bit-packed `bool[]`
-// no byte to point at, so slicing either *copies* the window into a block of its
-// own (`aipl_arr_slice`) and yields a whole value around it.
+// A bit-packed `bool[]` has no byte to point at, so slicing one *copies* the
+// window into a block of its own (`aipl_arr_slice`) and yields a whole value
+// around it. (A reversed value is sliced into a reversed value — see below.)
 //
 // Code that reads elements learns the window shape (length, indexing,
 // iteration, and the runtime's nested reads); every other runtime entry still
@@ -619,8 +628,52 @@ impl ArrValue {
         (self.len as u64 >> ARR_TAG_SHIFT) as u8 == ATAG_INLINE
     }
 
+    pub(crate) fn is_reversed(&self) -> bool {
+        (self.len as u64 >> ARR_TAG_SHIFT) as u8 == ATAG_REVERSED
+    }
+
     fn is_window(&self) -> bool {
-        !self.is_inline() && !self.data.is_null()
+        !self.is_inline() && !self.is_reversed() && !self.data.is_null()
+    }
+
+    /// A window or a reversed value's element count.
+    pub(crate) fn run_len(&self) -> usize {
+        (self.len as u64 & ARR_LEN_MASK) as usize
+    }
+
+    /// A reversed value over the forward run `data`/`len` of `block`.
+    fn reversed(block: *const u8, data: *const u8, len: usize) -> ArrValue {
+        ArrValue {
+            block,
+            data,
+            len: len | ((ATAG_REVERSED as usize) << ARR_TAG_SHIFT),
+        }
+    }
+
+    /// The elements of a window or a reversed value, in the value's own order,
+    /// copied into a fresh heap block and each retained — the block lent to
+    /// something that needs one.
+    fn run_to_block(&self, drop_fn: i64, retain_fn: i64, elem_size: i64) -> *const u8 {
+        let n = self.run_len();
+        let w = elem_size as usize;
+        let block = super::aipl_array_new(n as i64, drop_fn, elem_size);
+        let at = super::array_layout::ARR_ELEMS_OFFSET;
+        unsafe {
+            let dst = (block as *mut u8).add(at);
+            if self.is_reversed() {
+                for i in 0..n {
+                    core::ptr::copy_nonoverlapping(
+                        self.data.add((n - 1 - i) * w),
+                        dst.add(i * w),
+                        w,
+                    );
+                }
+            } else {
+                core::ptr::copy_nonoverlapping(self.data, dst, n * w);
+            }
+            super::elem_rc(retain_fn, dst, n);
+        }
+        block
     }
 
     /// An inline value's element count.
@@ -696,6 +749,23 @@ pub(crate) extern "C" fn aipl_arr_window(
         unsafe { core::ptr::write(out, result) };
         return;
     }
+    if a.is_reversed() {
+        // `[lo, hi)` of the value is `[len - hi, len - lo)` of its run, still
+        // walked backwards.
+        let len = a.run_len();
+        let lo = start.clamp(0, len as i64) as usize;
+        let hi = end.clamp(0, len as i64) as usize;
+        let n = hi.saturating_sub(lo);
+        let result = if n == 0 {
+            ArrValue::whole(super::array_layout::arr_inline_empty())
+        } else {
+            super::aipl_arr_inc(a.block);
+            let data = unsafe { a.data.add((len - hi) * elem_size as usize) };
+            ArrValue::reversed(a.block, data, n)
+        };
+        unsafe { core::ptr::write(out, result) };
+        return;
+    }
     let len = if a.is_window() {
         a.len
     } else {
@@ -737,9 +807,62 @@ pub(crate) extern "C" fn aipl_arr_window(
     unsafe { core::ptr::write(out, result) };
 }
 
-/// A block holding exactly the elements of `a`, which is a window or inline — a
-/// fresh copy, each element retained — carrying the one reference for the
-/// caller to release. Borrows `a`.
+/// `a.reverse()` as a value written to `out`, carrying one new reference.
+/// Borrows `a`. Nothing is allocated except for a bit-packed `bool[]`, which has
+/// no byte run to walk backwards and is copied (see the header).
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arr_reversed(
+    out: *mut ArrValue,
+    a: *const ArrValue,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) {
+    let a = unsafe { *a };
+    let w = elem_size as usize;
+    let result = if a.is_inline() {
+        let n = a.inline_len();
+        let raw = a.bytes();
+        let mut rev = [0u8; ARR_INLINE_CAP];
+        for i in 0..n {
+            rev[i * w..(i + 1) * w].copy_from_slice(&raw[(n - 1 - i) * w..(n - i) * w]);
+        }
+        ArrValue::inline(&rev[..n * w], n)
+    } else if a.is_reversed() {
+        super::aipl_arr_inc(a.block);
+        let elems = unsafe { a.block.add(super::array_layout::ARR_ELEMS_OFFSET) };
+        if a.data == elems && a.run_len() == tagged_len(a.block) {
+            ArrValue::whole(a.block)
+        } else {
+            ArrValue {
+                block: a.block,
+                data: a.data,
+                len: a.run_len(),
+            }
+        }
+    } else if a.is_window() {
+        super::aipl_arr_inc(a.block);
+        ArrValue::reversed(a.block, a.data, a.len)
+    } else {
+        let len = tagged_len(a.block);
+        if len == 0 {
+            ArrValue::whole(super::array_layout::arr_inline_empty())
+        } else if elem_size == super::array_layout::ELEM_BITPACKED {
+            ArrValue::whole(super::arr_reverse_copy(
+                a.block, drop_fn, retain_fn, elem_size,
+            ))
+        } else {
+            super::aipl_arr_inc(a.block);
+            let elems = unsafe { a.block.add(super::array_layout::ARR_ELEMS_OFFSET) };
+            ArrValue::reversed(a.block, elems, len)
+        }
+    };
+    unsafe { core::ptr::write(out, result) };
+}
+
+/// A block holding exactly the elements of `a`, in its order — `a` being a
+/// window, a reversed value or inline — as a fresh copy, each element retained,
+/// carrying the one reference for the caller to release. Borrows `a`.
 #[no_mangle]
 pub(crate) extern "C" fn aipl_arr_window_block(
     a: *const ArrValue,
@@ -750,6 +873,9 @@ pub(crate) extern "C" fn aipl_arr_window_block(
     let a = unsafe { *a };
     if a.is_inline() {
         return a.inline_to_block(elem_size);
+    }
+    if a.is_reversed() {
+        return a.run_to_block(drop_fn, retain_fn, elem_size);
     }
     let lo = a.start(elem_size);
     super::aipl_arr_slice(
@@ -764,8 +890,8 @@ pub(crate) extern "C" fn aipl_arr_window_block(
 
 /// A reference to a block holding exactly the elements of the array value at
 /// `a`, for a runtime walk that reads nested arrays (`join`'s parts): a whole
-/// value's own block, retained, or a copy of a window's or an inline value's
-/// elements. The caller releases it.
+/// value's own block, retained, or a copy of a window's, a reversed value's or an
+/// inline value's elements. The caller releases it.
 pub(crate) fn owned_block_of(
     a: *const ArrValue,
     drop_fn: i64,
@@ -773,7 +899,7 @@ pub(crate) fn owned_block_of(
     elem_size: i64,
 ) -> *const u8 {
     let v = unsafe { *a };
-    if v.is_window() || v.is_inline() {
+    if v.is_window() || v.is_reversed() || v.is_inline() {
         return aipl_arr_window_block(a, drop_fn, retain_fn, elem_size);
     }
     if !v.block.is_null() {
@@ -782,7 +908,8 @@ pub(crate) fn owned_block_of(
     v.block
 }
 
-/// Turn the window — or the inline value — an *owning* slot holds into a whole
+/// Turn the window — a reversed one, or an inline value — an *owning* slot holds
+/// into a whole
 /// value over a copy of its elements, in place, so that code which mutates
 /// through the first word finds a block of its own there: uniquely owned, so
 /// the write that follows goes in place. A window's reference moves from the
@@ -801,7 +928,7 @@ pub(crate) extern "C" fn aipl_arr_settle(
         unsafe { core::ptr::write(a, ArrValue::whole(own)) };
         return;
     }
-    if !v.is_window() {
+    if !v.is_window() && !v.is_reversed() {
         return;
     }
     let own = aipl_arr_window_block(a, drop_fn, retain_fn, elem_size);
@@ -830,7 +957,8 @@ pub(crate) const PUSH_SMALL_GREW: i64 = 2;
 ///   type, so the reservation's count is its bytes over eight). A larger
 ///   reservation is honoured as a block, since it was made for the pushes that
 ///   follow.
-/// - A window is settled into a block of its own, and anything else is left:
+/// - A window (or a reversed one) is settled into a block of its own, and
+///   anything else is left:
 ///   [`PUSH_SMALL_NOT_HANDLED`], and the caller pushes onto the block as before.
 #[no_mangle]
 pub(crate) extern "C" fn aipl_arr_push_small(slot: *mut ArrValue, x: *const u8, width: i64) -> i64 {
@@ -860,7 +988,7 @@ pub(crate) extern "C" fn aipl_arr_push_small(slot: *mut ArrValue, x: *const u8, 
         }
         return PUSH_SMALL_GREW;
     }
-    if v.is_window() {
+    if v.is_window() || v.is_reversed() {
         aipl_arr_settle(slot, 0, 0, width);
         return PUSH_SMALL_NOT_HANDLED;
     }
@@ -1188,6 +1316,53 @@ mod tests {
 
         super::super::aipl_array_dec(slot.block);
         super::super::aipl_array_dec(inner.block);
+        assert_eq!(refcount(block), 1);
+        super::super::aipl_array_dec(block);
+    }
+
+    /// A reversal is a value over the same block: reading it, slicing it and
+    /// reversing it again move references, never elements, and only a block
+    /// lent to the runtime copies — in the reversed order.
+    #[test]
+    fn a_reversal_shares_its_block_and_reverses_back() {
+        let root = super::super::array_layout::ARR_ELEMS_OFFSET;
+        let refcount = |b: *const u8| unsafe { *super::super::header_of(b) };
+        let elem = |b: *const u8, i: usize| unsafe { *(b.add(root + i * 8) as *const i64) };
+        let block = super::super::aipl_array_new(4, 0, 8);
+        for i in 0..4 {
+            unsafe { core::ptr::write(block.add(root + i * 8) as *mut i64, 10 + i as i64) };
+        }
+        let whole = ArrValue::whole(block);
+        let mut out = ArrValue::whole(core::ptr::null());
+
+        aipl_arr_reversed(&mut out, &whole, 0, 0, 8);
+        let r = out;
+        assert!(r.is_reversed());
+        assert_eq!(r.block, block);
+        assert_eq!(r.run_len(), 4);
+        assert_eq!(refcount(block), 2);
+
+        // `r[1..3]` is 12, 11: a reversed run of the block's elements 1..3.
+        aipl_arr_window(&mut out, &r, 1, 3, 0, 0, 8);
+        let mid = out;
+        assert!(mid.is_reversed());
+        assert_eq!(mid.run_len(), 2);
+        assert_eq!(unsafe { *(mid.data as *const i64) }, 11);
+
+        // Lent as a block, the elements come out in the value's order.
+        let lent = aipl_arr_window_block(&mid, 0, 0, 8);
+        assert_eq!((elem(lent, 0), elem(lent, 1)), (12, 11));
+        super::super::aipl_array_dec(lent);
+
+        // Reversing the whole reversal is the whole array again.
+        aipl_arr_reversed(&mut out, &r, 0, 0, 8);
+        assert!(!out.is_reversed() && !out.is_window());
+        assert_eq!(out.block, block);
+        assert_eq!(refcount(block), 4);
+
+        for v in [out, mid, r] {
+            super::super::aipl_array_dec(v.block);
+        }
         assert_eq!(refcount(block), 1);
         super::super::aipl_array_dec(block);
     }

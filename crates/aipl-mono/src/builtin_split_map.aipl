@@ -75,21 +75,21 @@ allocations: 39
 deallocations: 39
 reallocations: 0
 bytes allocated: 3185
-instructions executed: 3444
-binary size: 13080
-  code: 7068
+instructions executed: 3660
+binary size: 13256
+  code: 7244
   data: 1281
   metadata: 4731
 functions:
   __eq_bool$arr:
     calls: 1
-    bytes: 344
+    bytes: 352
   __eq_str$arr:
     calls: 7
-    bytes: 412
+    bytes: 500
   __eq_u64$arr:
     calls: 1
-    bytes: 416
+    bytes: 496
   __test$split_map:
     calls: 1
     bytes: 5104

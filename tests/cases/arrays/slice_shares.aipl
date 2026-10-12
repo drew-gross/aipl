@@ -3,8 +3,9 @@
 # bounds carried in the value, never a copy of the elements. So its cost does not
 # grow with the window — the `bytes allocated` below would be thousands if any
 # of these copied — and slicing a slice is a window of the same block rather
-# than a view stacked on a view. (A reversed source still lends a view block:
-# there is no forward run of it to point into.)
+# than a view stacked on a view. A reversal is a value of the same kind — the
+# run walked from its far end — so slicing a reversed array, or reversing a
+# slice, shares the block too.
 #
 # A window is read-only in the sense that matters: writing into it would write
 # into the source, so the first mutation (`push`, `extend`, an in-place `map`)
@@ -40,8 +41,8 @@ fn main() !prints {
     set grown.push(99);
     print(`{grown} {big[..4]}`);
 
-    // Views compose with the other view: a slice of a reversed array, and a
-    // reversed slice.
+    // A slice composes with a reversal: a slice of a reversed array, and a
+    // reversed slice — each still a value over `big`'s block.
     print(big.reverse()[..3].to_str());
     print(big[..3].reverse().to_str());
 
@@ -61,45 +62,39 @@ true
 [2, 1, 0]
 ["beta", "gamma"]
 --- performance ---
-allocations: 34
-deallocations: 34
+allocations: 30
+deallocations: 30
 reallocations: 8
-bytes allocated: 1908
-instructions executed: 94373
-binary size: 12480
-  code: 7980
+bytes allocated: 1700
+instructions executed: 92522
+binary size: 12456
+  code: 8080
   data: 219
-  metadata: 4281
+  metadata: 4157
 functions:
   __eq_u64$arr:
     calls: 1
-    bytes: 416
+    bytes: 496
   __to_str_bool:
     calls: 1
     bytes: 232
   __to_str_str$arr:
     calls: 1
-    bytes: 904
+    bytes: 972
   __to_str_u64:
     calls: 8
     bytes: 204
   __to_str_u64$arr:
     calls: 4
-    bytes: 836
-  aipl_arr_elem_ptr:
-    calls: 6
-    bytes: (external)
+    bytes: 908
   aipl_arr_inc:
-    calls: 14
-    bytes: (external)
-  aipl_arr_reverse:
-    calls: 2
+    calls: 15
     bytes: (external)
   aipl_arr_slice:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 22
+    calls: 19
     bytes: (external)
   aipl_array_new:
     calls: 1
@@ -124,4 +119,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 5388
+    bytes: 5268

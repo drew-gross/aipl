@@ -45,39 +45,39 @@ allocations: 15
 deallocations: 15
 reallocations: 2
 bytes allocated: 996
-instructions executed: 3615
-binary size: 13400
-  code: 8316
+instructions executed: 3810
+binary size: 13768
+  code: 8688
   data: 895
-  metadata: 4189
+  metadata: 4185
 functions:
   __eq_bool$arr:
     calls: 1
-    bytes: 344
+    bytes: 352
   __eq_i64$arr:
     calls: 3
-    bytes: 416
+    bytes: 496
   __eq_str$arr:
     calls: 2
-    bytes: 412
+    bytes: 500
   __test$doubled:
     calls: 1
-    bytes: 3220
+    bytes: 3292
   __test$doubled$map1$own0:
     calls: 1
-    bytes: 716
+    bytes: 740
   __test$doubled$map3$own0:
     calls: 1
-    bytes: 712
+    bytes: 736
   __test$doubled$map5$own0:
     calls: 1
-    bytes: 712
+    bytes: 736
   __test$doubled$map7$own0:
     calls: 1
-    bytes: 760
+    bytes: 788
   __test$doubled$map9$own0:
     calls: 1
-    bytes: 712
+    bytes: 736
   __to_str_i64:
     calls: 3
     bytes: 204

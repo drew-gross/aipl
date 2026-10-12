@@ -110,9 +110,9 @@ allocations: 17
 deallocations: 17
 reallocations: 49
 bytes allocated: 2987
-instructions executed: 105871
-binary size: 9792
-  code: 6780
+instructions executed: 104629
+binary size: 10208
+  code: 7196
   data: 139
   metadata: 2873
 functions:
@@ -160,13 +160,13 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 4156
+    bytes: 4524
   main$filter_map11$own0:
     calls: 1
-    bytes: 776
+    bytes: 800
   main$filter_map8$own0:
     calls: 1
-    bytes: 776
+    bytes: 800
   many:
     calls: 5
     bytes: 480

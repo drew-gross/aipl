@@ -17,15 +17,15 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 73
-instructions executed: 1004
-binary size: 2728
-  code: 1116
+instructions executed: 1068
+binary size: 2800
+  code: 1188
   data: 219
   metadata: 1393
 functions:
   __to_str_i64$arr:
     calls: 3
-    bytes: 836
+    bytes: 908
   aipl_i64_len:
     calls: 14
     bytes: (external)

@@ -1,8 +1,8 @@
 // NOTE: plain `//` comments, not `//!` module docs, and no inner attributes:
 // this file is `include!`d by the AOT runtime, which can carry neither.
 //
-// The array value's layout — the block, the representation tags in the
-// pointer, and the view blocks — **shared verbatim** by the JIT runtime
+// The array value's layout — the block and the representation tags in the
+// pointer — **shared verbatim** by the JIT runtime
 // (`aipl-codegen`, which has it as an ordinary module) and the AOT runtime
 // (`aipl-linker/runtime/aipl_runtime.rs`, which `include!`s it inside a
 // `mod array_layout`), exactly as `str24.rs` shares the string layout. A
@@ -12,7 +12,7 @@
 // had already drifted in their comments, if not yet in their values.
 //
 // Everything here is a pure reading of a pointer or a size: no allocation,
-// no `std`. What allocates (the block, a view) and what walks elements stays
+// no `std`. What allocates (the block) and what walks elements stays
 // in each runtime, where the allocator and the accounting are.
 //
 // # The block
@@ -38,43 +38,28 @@
 //
 // ```text
 // 0b00  Heap   — the block above
-// 0b01  Rev    — a reversed view: a thin wrapper reading an inner array backwards
-// 0b10  —        unused: a slice view lived here, before a slice became a window
-//                carried in the 24-byte value (`arr24::ArrValue`)
-// 0b11  Inline — no block at all: the value *is* the array
+// 0b01  —        unused: a reversed view lived here, and
+// 0b10  —        unused: a slice view here, before a reversal and a slice became
+//                shapes of the 24-byte value (`arr24::ArrValue`)
+// 0b11  Inline — the shared empty array (below)
 // ```
 //
 // # Inline
 //
-// The array counterpart of an inline `str`: a value that owns no allocation, so
-// there is nothing to refcount and nothing to free. An 8-byte value leaves 62
-// bits beside the tag, which is room for a length and a few bytes of elements —
-// but the only inline value anything constructs today is the **empty** array, the
-// bare tag `0b11`. That is the case worth having first: it is the one an empty
-// `filter`, a zero-length slice and a `map` over nothing all produce, and each of
-// those allocates a block for a value with no elements in it.
+// The **empty** array, as a tagged pointer that owns no allocation: the bare tag
+// `0b11` over a shared static block. It is what an empty `filter`, a zero-length
+// slice and a `map` over nothing produce, none of which needs a block.
 //
-// The length is therefore not encoded yet. When elements arrive the encoding to
-// reach for is the inline `str`'s — a length field beside the tag and the element
-// bytes above it — and `arr_inline_len` is the one place that would change.
+// It is not where arrays with elements are held inline. Those carry their
+// elements in the 24-byte value's own bytes, `str`'s inline layout
+// (`arr24::ArrValue`), and this tag is a stand-in that stage 7 retires along
+// with the rest of the 8-byte layout.
 //
 // Every place that uses an array pointer as a memory base strips the tag
 // first (`arr_untag`), and every place that reads elements classifies once
 // (`arr_repr`) and matches on the result — the pattern `str_repr`/`StrRepr`
 // set, so that a new representation is a compile error at each site that
 // does not yet handle it rather than a silent fall-through.
-//
-// # The view block
-//
-// ```text
-// [refcount][len][inner: ptr][drop_fn][retain_fn][elem_size]          (Rev)
-//             ^ data pointer, tagged
-// ```
-//
-// `len` sits where a heap block's does, so a length read never dispatches.
-// A view holds one reference on `inner` (any representation — a reversed view
-// can wrap another) and records the drop/retain helpers and element size it
-// needs to materialize itself into a heap block when something wants to write.
 
 /// The heap block, relative to the data pointer.
 pub(crate) const ARR_LEN_OFFSET: usize = 0; // length, in elements
@@ -85,7 +70,6 @@ pub(crate) const ARR_ELEMS_OFFSET: usize = 24; // first element
 /// The representation tag, in the data pointer's two low bits.
 pub(crate) const ARR_TAG_MASK: usize = 0b11;
 pub(crate) const ARR_HEAP_TAG: usize = 0b00;
-pub(crate) const ARR_REV_TAG: usize = 0b01;
 pub(crate) const ARR_INLINE_TAG: usize = 0b11;
 
 /// The empty array, as a value: no allocation, no refcount, nothing to free.
@@ -114,8 +98,7 @@ pub(crate) fn arr_inline_len(_ptr: *const u8) -> usize {
 /// `[refcount][len][cap][drop_fn][-]` for an array that is permanently empty.
 ///
 /// A handful of entry points need a *block* — they hand a pointer to something
-/// that reads the header, or materialize a view before writing — and an inline
-/// value has none. Rather than teach each of them the inline case, they reach for
+/// that reads the header — and the inline empty value has none. Rather than teach each of them the inline case, they reach for
 /// this: a real heap-shaped block that happens to be static and empty, so the
 /// reads find `len = 0` and the refcount makes every inc/dec a no-op. The fifth
 /// word is slack so that an element address computed past the header (never read,
@@ -132,14 +115,6 @@ pub(crate) fn arr_empty_block() -> *const u8 {
     unsafe { (ARR_EMPTY_BLOCK.as_ptr() as *const u8).add(8) }
 }
 
-/// The view block, relative to its data pointer. `len` is at [`ARR_LEN_OFFSET`].
-pub(crate) const REV_INNER_OFFSET: usize = 8; // tagged pointer to the wrapped array
-pub(crate) const REV_DROP_OFFSET: usize = 16; // element drop fn, for materializing
-pub(crate) const REV_RETAIN_OFFSET: usize = 24; // element retain fn, likewise
-pub(crate) const REV_ELEMSIZE_OFFSET: usize = 32; // element stride; `ELEM_BITPACKED` for `bool[]`
-/// Bytes after the refcount header.
-pub(crate) const REV_BLOCK_DATA_SIZE: usize = 40;
-
 /// `bool[]` is bit-packed (8 elements per byte, like `std::vector<bool>` but
 /// with the ordinary array interface). Codegen signals it with an element size
 /// of 0 — the one sentinel that means "bit-packed" rather than a byte stride.
@@ -151,7 +126,6 @@ pub(crate) const ELEM_BITPACKED: i64 = 0;
 #[derive(Clone, Copy)]
 pub(crate) enum ArrRepr {
     Heap,
-    Reversed,
     /// The value is the array; it addresses no block. See the header.
     Inline,
 }
@@ -160,7 +134,6 @@ pub(crate) enum ArrRepr {
 pub(crate) fn arr_repr(ptr: *const u8) -> ArrRepr {
     match ptr as usize & ARR_TAG_MASK {
         ARR_HEAP_TAG => ArrRepr::Heap,
-        ARR_REV_TAG => ArrRepr::Reversed,
         ARR_INLINE_TAG => ArrRepr::Inline,
         tag => unreachable!("unknown array repr tag {tag}"),
     }

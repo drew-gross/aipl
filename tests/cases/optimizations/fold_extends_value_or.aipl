@@ -129,9 +129,9 @@ allocations: 30
 deallocations: 30
 reallocations: 2
 bytes allocated: 1541
-instructions executed: 7569
-binary size: 15128
-  code: 9820
+instructions executed: 7811
+binary size: 15264
+  code: 9956
   data: 139
   metadata: 5169
 functions:
@@ -149,7 +149,7 @@ functions:
     bytes: 204
   __to_str_i64$arr:
     calls: 10
-    bytes: 836
+    bytes: 908
   aipl_arr_inc:
     calls: 45
     bytes: (external)
@@ -200,10 +200,10 @@ functions:
     bytes: 676
   main:
     calls: 1
-    bytes: 5360
+    bytes: 5396
   plain:
     calls: 2
     bytes: 640
   styles$into$Tok$own0:
     calls: 18
-    bytes: 1748
+    bytes: 1776

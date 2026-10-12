@@ -64,6 +64,7 @@ case_tests! {
     cases_arrays_push_push_none_element = "cases/arrays/push/push_none_element",
     cases_arrays_push_aliased_array = "cases/arrays/push_aliased_array",
     cases_arrays_reverse = "cases/arrays/reverse",
+    cases_arrays_reverse_allocates_nothing = "cases/arrays/reverse_allocates_nothing",
     cases_arrays_slice = "cases/arrays/slice",
     cases_arrays_slice_allocates_nothing = "cases/arrays/slice_allocates_nothing",
     cases_arrays_slice_shares = "cases/arrays/slice_shares",

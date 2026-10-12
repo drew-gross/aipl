@@ -1444,9 +1444,9 @@ mod exec_unix {
         }
     }
 
-    /// `program`/`a` (a heap-representation array — the caller already
-    /// materialized any reversed view) are each consumed exactly once, on
-    /// every path.
+    /// `program`/`a` (a heap-representation array — codegen lends a window, a
+    /// reversed value or an inline one a block of its own first) are each
+    /// consumed exactly once, on every path.
     pub unsafe fn run(out: *mut i64, program: *const u8, a: *const u8) {
         unsafe {
             let len = array_len(a);
@@ -1749,9 +1749,9 @@ fn sort_words(words: &mut [i64], kind: i64) {
 }
 
 /// `xs.sort() -> T[]` — a fresh array with the same elements in ascending order.
-/// Consumes `a` (callers pre-inc) and co-owns the elements it copies. Unlike
-/// `aipl_arr_reverse` this cannot be a lazy view: the order is not a function of
-/// the index. Mirrors the JIT runtime's `aipl_arr_sort`.
+/// Consumes `a` (callers pre-inc) and co-owns the elements it copies. Unlike a
+/// reversal (`arr24::aipl_arr_reversed`) this cannot be a value: the order is
+/// not a function of the index. Mirrors the JIT runtime's `aipl_arr_sort`.
 #[no_mangle]
 pub extern "C" fn aipl_arr_sort(
     a: *const u8,
@@ -1791,26 +1791,6 @@ pub extern "C" fn aipl_arr_sort(
         aipl_array_dec(a);
         raw
     }
-}
-
-
-/// `xs.reverse() -> T[]` — new array with elements in reverse order.
-/// O(1): returns a reversed-view repr wrapping `a`.
-/// Transfers ownership of `a` into the view (no drop, no retain on `a`).
-/// Mirrors the JIT runtime's `aipl_arr_reverse`.
-#[no_mangle]
-pub extern "C" fn aipl_arr_reverse(
-    a: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_ARR_REVERSE);
-    if a.is_null() {
-        return a;
-    }
-    let len = unsafe { array_len(a) };
-    unsafe { alloc_reversed_view(a, len, drop_fn, retain_fn, elem_size) }
 }
 
 
@@ -1928,31 +1908,6 @@ const ITER_SCRATCH: usize = 48;
 
 type ArrDropFn = extern "C" fn(*const u8, i64);
 
-/// Allocate a reversed-view block.  Transfers ownership of `inner` into
-/// the view (no drop, no retain on `inner`).  Returns data_ptr | ARR_REV_TAG.
-unsafe fn alloc_reversed_view(
-    inner: *const u8,
-    len: usize,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    unsafe {
-        let raw = rt_alloc(HEADER_SIZE + REV_BLOCK_DATA_SIZE) as *mut u8;
-        if raw.is_null() {
-            abort();
-        }
-        *(raw as *mut i64) = 1; // refcount
-        let data = raw.add(HEADER_SIZE);
-        *(data.add(ARR_LEN_OFFSET) as *mut i64) = len as i64;
-        *(data.add(REV_INNER_OFFSET) as *mut *const u8) = inner;
-        *(data.add(REV_DROP_OFFSET) as *mut i64) = drop_fn;
-        *(data.add(REV_RETAIN_OFFSET) as *mut i64) = retain_fn;
-        *(data.add(REV_ELEMSIZE_OFFSET) as *mut i64) = elem_size;
-        (data as usize | ARR_REV_TAG) as *const u8
-    }
-}
-
 /// A fresh heap array holding copies of `a`'s elements in `[start, start + n)`
 /// (any repr), each retained via `retain_fn`. Does NOT drop `a`. Mirrors the
 /// JIT runtime's `do_arr_slice_copy`.
@@ -1985,13 +1940,14 @@ unsafe fn do_arr_slice_copy(
     }
 }
 
-/// Materialize a reversed view into a fresh heap array, consuming the view
-/// (dec + free the view block).  The inner array is dec'd too.
+/// A new heap array whose elements are those of the block `a` in reverse
+/// order, each retained. Does NOT drop `a`. Mirrors the JIT runtime's
+/// `do_arr_reverse` — reversing a bit-packed `bool[]`, reached through
+/// [`arr_reverse_copy`].
 unsafe fn do_arr_reverse(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: i64) -> *const u8 {
     unsafe {
-        let u = arr_untag(a);
-        let inner = *(u.add(REV_INNER_OFFSET) as *const *const u8);
-        let len = *(u as *const i64) as usize;
+        let inner = a;
+        let len = array_len(a);
         if elem_size == ELEM_BITPACKED {
             let raw = array_alloc(len, len, drop_fn, ELEM_BITPACKED) as *const u8;
             let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
@@ -2015,27 +1971,26 @@ unsafe fn do_arr_reverse(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: 
     }
 }
 
+/// [`do_arr_reverse`] under the name both runtimes give it, for the shared
+/// `arr24::aipl_arr_reversed`.
+fn arr_reverse_copy(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: i64) -> *const u8 {
+    unsafe { do_arr_reverse(a, drop_fn, retain_fn, elem_size) }
+}
+
 /// A *borrowed* array as a heap block for the duration of `f`: a heap array
-/// is handed over as is, a view is materialized into a block `f` reads and
-/// that is released afterwards. Mirrors the JIT runtime's `with_heap`.
+/// is handed over as is, and the shared empty array as the empty block.
+/// Mirrors the JIT runtime's `with_heap`.
 fn with_heap<R>(a: *const u8, f: impl FnOnce(*const u8) -> R) -> R {
     match arr_repr(a) {
         ArrRepr::Heap => f(a),
         // No block of its own, and nothing to materialize: the permanently-empty
         // block reads as the same array.
         ArrRepr::Inline => f(arr_empty_block()),
-        ArrRepr::Reversed => {
-            aipl_arr_inc(a);
-            let heap = aipl_arr_ensure_heap(a);
-            let out = f(heap);
-            aipl_array_dec(heap);
-            out
-        }
     }
 }
 
-/// Ensure `a` is a heap array, materializing it if it's a view.
-/// Consumes `a` (it's dec'd / freed if a view was materialized).
+/// The block an array pointer names, as a heap block: itself, or the shared
+/// empty block for the inline empty array. Consumes `a`'s reference.
 fn aipl_arr_ensure_heap(a: *const u8) -> *const u8 {
     if a.is_null() {
         return a;
@@ -2045,22 +2000,6 @@ fn aipl_arr_ensure_heap(a: *const u8) -> *const u8 {
         // Already as materialized as an empty array gets; the static block carries
         // no reference for the caller to release.
         ArrRepr::Inline => arr_empty_block(),
-        ArrRepr::Reversed => {
-            let u = arr_untag(a);
-            let (inner, drop_fn, retain_fn, elem_size) = unsafe {
-                (
-                    *(u.add(REV_INNER_OFFSET) as *const *const u8),
-                    *(u.add(REV_DROP_OFFSET) as *const i64),
-                    *(u.add(REV_RETAIN_OFFSET) as *const i64),
-                    *(u.add(REV_ELEMSIZE_OFFSET) as *const i64),
-                )
-            };
-            let heap = unsafe { do_arr_reverse(a, drop_fn, retain_fn, elem_size) };
-            aipl_array_dec(a);
-            // dec the inner (do_arr_reverse didn't)
-            aipl_array_dec(inner);
-            heap
-        }
     }
 }
 
@@ -2071,12 +2010,6 @@ unsafe fn heap_elem_ptr_rt(base: *const u8, idx: usize, elem_size: usize) -> *co
 unsafe fn arr_elem_ptr_rt(a: *const u8, idx: usize, elem_size: usize) -> *const u8 {
     match arr_repr(a) {
         ArrRepr::Heap => unsafe { heap_elem_ptr_rt(arr_untag(a), idx, elem_size) },
-        ArrRepr::Reversed => {
-            let u = arr_untag(a);
-            let inner = unsafe { *(u.add(REV_INNER_OFFSET) as *const *const u8) };
-            let len = unsafe { *(u as *const i64) as usize };
-            unsafe { arr_elem_ptr_rt(inner, len - 1 - idx, elem_size) }
-        }
         // An inline array holds no elements, so the bounds check upstream has
         // already answered.
         ArrRepr::Inline => unreachable!("element {idx} of an empty array"),
@@ -2088,12 +2021,6 @@ unsafe fn arr_load_bit_rt(a: *const u8, idx: usize) -> bool {
         ArrRepr::Heap => {
             let base = unsafe { arr_untag(a).add(ARR_ELEMS_OFFSET) };
             unsafe { (*base.add(idx >> 3) >> (idx & 7)) & 1 != 0 }
-        }
-        ArrRepr::Reversed => {
-            let u = arr_untag(a);
-            let inner = unsafe { *(u.add(REV_INNER_OFFSET) as *const *const u8) };
-            let len = unsafe { *(u as *const i64) as usize };
-            unsafe { arr_load_bit_rt(inner, len - 1 - idx) }
         }
         // No elements, so no bits; the bounds check upstream has answered.
         ArrRepr::Inline => unreachable!("bit {idx} of an empty array"),
@@ -2200,13 +2127,6 @@ pub extern "C" fn aipl_array_dec(ptr: *const u8) {
                         let f: ArrDropFn = core::mem::transmute(drop_fn);
                         f(u.add(ARR_ELEMS_OFFSET), len as i64);
                     }
-                    rt_free(h as *mut c_void);
-                }
-                // A view owns one reference on its inner array and nothing
-                // else; the elements are the inner's to release.
-                ArrRepr::Reversed => {
-                    let inner = *(u.add(REV_INNER_OFFSET) as *const *const u8);
-                    aipl_array_dec(inner);
                     rt_free(h as *mut c_void);
                 }
             }

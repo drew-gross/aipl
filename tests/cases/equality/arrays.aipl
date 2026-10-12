@@ -21,24 +21,24 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 640
-instructions executed: 2310
-binary size: 8120
-  code: 4248
+instructions executed: 2620
+binary size: 8384
+  code: 4512
   data: 785
   metadata: 3087
 functions:
   __eq_i64$arr:
     calls: 8
-    bytes: 416
+    bytes: 496
   __eq_i64$arr$arr:
     calls: 2
-    bytes: 332
+    bytes: 420
   __eq_none$arr:
     calls: 1
-    bytes: 128
+    bytes: 136
   __eq_str$arr:
     calls: 2
-    bytes: 412
+    bytes: 500
   __test$eq_arrays:
     calls: 1
     bytes: 2852

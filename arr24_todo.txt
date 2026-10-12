@@ -291,11 +291,28 @@ Stage 4 — slices as values                                                 [do
       `seq_val` lost the `structs` they no longer read.
 
 
-Stage 5 — reversed as values                                   [blocked on 2]
+Stage 5 — reversed as values                                               [done]
 ---------------------------------------------------------------------------------
-  [ ] delete the Rev view block; `Arr::reversed` flips a tag and copies nothing
-  [ ] note that reversal keeps a *tag* where a slice does not, because no
-      pointer arithmetic reads a run backwards
+  [x] the Rev view block is gone, with `ARR_REV_TAG`, the `REV_*` offsets,
+      `alloc_reversed_view`, `view_fields`, `aipl_arr_reverse` and every
+      `ArrRepr::Reversed` arm, in both runtimes and the shared layout (tags
+      `0b01` and `0b10` are now both unused). `xs.reverse()` is a value —
+      `{block, data, len | ATAG_REVERSED}`, a forward run walked from its far
+      end, `Arr`'s reversed shape — built by `arr24::aipl_arr_reversed`:
+      nothing allocated, and reversing it again is the forward window or the
+      whole array it came from. A slice of one is a reversed value; an inline
+      value reverses its own bytes; a bit-packed `bool[]` has no byte run, so
+      reversing one copies (`arr_reverse_copy`, one name in both runtimes).
+  [x] reversal keeps a *tag* where a slice does not, because no pointer
+      arithmetic reads a run backwards — recorded in `arr24.rs`'s header.
+  [x] readers: `ArrView` points `base` at the value's first element and steps
+      by a signed stride (`ArrView::step`), so a reversed value costs a read
+      nothing per element — the first attempt mapped the index per read and
+      cost +4% instructions corpus-wide; this costs +0.9%, all per view. A
+      block lent to the runtime, the FFI and `join`'s parts copy or read in
+      the value's order.
+  Proof: `arrays/reverse_allocates_nothing.aipl`. Corpus: allocations down in
+  7 cases (`arrays/reverse` 4 → 0) and up in none.
 
 
 Stage 6 — the block header, and where unification stops         [blocked on 2]
@@ -352,8 +369,11 @@ Already identified, from `str`:
 
 And what this switch will add:
   [ ] `array_layout.rs` in its entirety, once nothing reads the 8-byte layout
-  [ ] `ArrRepr` and its `Heap`/`Reversed` arms, with the reversed view block
-      (`Sliced` went in 4c)
+  [ ] `ArrRepr`, down to `Heap` and the empty `Inline` stand-in (`Sliced` went
+      in 4c, `Reversed` in 5)
+  [ ] the `builtin_calls` slots `aipl_arr_reverse` and `aipl_arr_slice`'s
+      siblings that no entry point bumps any more (`aipl_arr_reverse` is gone;
+      the shared `arr24` entries that replaced it are not counted at all)
   [ ] `ARR_INLINE_TAG` and the shared static empty block — the stand-in for
       stage 3, which exists only because it can point at a block
   [ ] `SeqRepr::Tagged` itself, and the `Abi` field, if arrays end up being the

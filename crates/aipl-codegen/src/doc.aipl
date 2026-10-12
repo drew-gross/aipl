@@ -333,11 +333,11 @@ allocations: 311
 deallocations: 311
 reallocations: 1
 bytes allocated: 21525
-instructions executed: 36384
-binary size: 41128
-  code: 25792
+instructions executed: 38069
+binary size: 41672
+  code: 26332
   data: 889
-  metadata: 14447
+  metadata: 14451
 functions:
   __arr_drop_Doc:
     calls: 10
@@ -350,7 +350,7 @@ functions:
     bytes: 304
   __builtin_any$Doc$lam$has_hard:
     calls: 5
-    bytes: 304
+    bytes: 344
   __builtin_count_while$char$s0$lam$__m2__dedent$lambda1:
     calls: 0
     bytes: 268
@@ -422,13 +422,13 @@ functions:
     bytes: (external)
   col_after:
     calls: 28
-    bytes: 668
+    bytes: 712
   fits:
     calls: 0
     bytes: 36
   fits$tail:
     calls: 42
-    bytes: 2764
+    bytes: 2808
   fits_atom:
     calls: 0
     bytes: 52
@@ -446,4 +446,4 @@ functions:
     bytes: 108
   print:
     calls: 11
-    bytes: 12968
+    bytes: 13380

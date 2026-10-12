@@ -156,9 +156,9 @@ allocations: 58
 deallocations: 58
 reallocations: 1
 bytes allocated: 2146
-instructions executed: 13898
-binary size: 25760
-  code: 13648
+instructions executed: 14156
+binary size: 25848
+  code: 13736
   data: 2917
   metadata: 9195
 functions:
@@ -173,7 +173,7 @@ functions:
     bytes: 136
   __eq_Companion$arr:
     calls: 9
-    bytes: 332
+    bytes: 420
   __test$companion_files:
     calls: 1
     bytes: 6104

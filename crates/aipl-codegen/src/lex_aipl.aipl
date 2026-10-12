@@ -877,11 +877,11 @@ allocations: 269
 deallocations: 269
 reallocations: 13
 bytes allocated: 485504
-instructions executed: 2237117
-binary size: 315776
-  code: 229920
+instructions executed: 2240984
+binary size: 316680
+  code: 230820
   data: 7732
-  metadata: 78124
+  metadata: 78128
 functions:
   __arr_drop_AiplTok:
     calls: 69
@@ -918,7 +918,7 @@ functions:
     bytes: 304
   __builtin_any$str$lam$__m1__up_to_any_len$lambda0:
     calls: 14
-    bytes: 352
+    bytes: 392
   __builtin_count_while$char$lam$__m1__lex_step$AiplTok$lambda1:
     calls: 54
     bytes: 316
@@ -954,7 +954,7 @@ functions:
     bytes: 416
   __eq_AiplTok$arr:
     calls: 16
-    bytes: 332
+    bytes: 420
   __eq_StrStyle:
     calls: 8
     bytes: 64
@@ -972,7 +972,7 @@ functions:
     bytes: 128
   __eq___m1__ScopeSpan$arr:
     calls: 2
-    bytes: 332
+    bytes: 420
   __eq___m1__SpanStr:
     calls: 18
     bytes: 128
@@ -981,10 +981,10 @@ functions:
     bytes: 120
   __eq___m1__Token$AiplTok$arr:
     calls: 10
-    bytes: 332
+    bytes: 420
   __eq_str$arr:
     calls: 7
-    bytes: 412
+    bytes: 500
   __m10__parse_test_section_header:
     calls: 3
     bytes: 744
@@ -999,7 +999,7 @@ functions:
     bytes: 532
   __m1__lex_all$AiplTok:
     calls: 28
-    bytes: 10020
+    bytes: 10192
   __m1__lex_kinds$AiplTok:
     calls: 16
     bytes: 868
@@ -1008,7 +1008,7 @@ functions:
     bytes: 412
   __m1__lex_step$AiplTok:
     calls: 129
-    bytes: 10540
+    bytes: 10576
   __m1__nested_len:
     calls: 79
     bytes: 1148
@@ -1032,7 +1032,7 @@ functions:
     bytes: 988
   __m3__process_raw_string:
     calls: 13
-    bytes: 3264
+    bytes: 3488
   __m7__trim_prefix:
     calls: 38
     bytes: 252
@@ -1053,7 +1053,7 @@ functions:
     bytes: 1464
   __test$lex_aipl:
     calls: 1
-    bytes: 68860
+    bytes: 68876
   __test$str_lit_value:
     calls: 1
     bytes: 2264
@@ -1140,7 +1140,7 @@ functions:
     bytes: 576
   template_segments:
     calls: 7
-    bytes: 1496
+    bytes: 1556
   tpl_text:
     calls: 5
     bytes: 148

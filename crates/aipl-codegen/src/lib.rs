@@ -618,8 +618,9 @@ const SORT_KIND_STR: i64 = 2;
 /// `xs.sort() -> T[]` — a fresh array with the same elements in ascending order.
 /// Consumes `xs` (callers pre-inc) and co-owns the elements it copies.
 ///
-/// Unlike [`aipl_arr_reverse`] this cannot be a lazy view: the order isn't a
-/// function of the index, so the result has to be materialized. Only `ord`
+/// Unlike a reversal (`arr24::aipl_arr_reversed`) this cannot be a value: the
+/// order isn't a function of the index, so the result has to be materialized.
+/// Only `ord`
 /// element types reach here, so the block is a flat run of scalars (or of `str`
 /// values) and sorting is a permutation of them — which moves no ownership,
 /// hence the single blanket retain before sorting.
@@ -763,31 +764,14 @@ fn sort_words(words: &mut [i64], kind: i64) {
     }
 }
 
-/// `xs.reverse() -> T[]` — O(1): returns a reversed-view repr wrapping `xs`.
-/// Transfers ownership of `xs` into the view (no drop, no retain).
-/// `drop_fn`, `retain_fn`, `elem_size` describe the element type.
-#[no_mangle]
-extern "C" fn aipl_arr_reverse(
-    a: *const u8,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    if a.is_null() {
-        return a;
-    }
-    let len = unsafe { array_len_of(a) };
-    alloc_reversed_view(a, len, drop_fn, retain_fn, elem_size)
-}
-
 /// `xs[start..end]` — array slice. Both bounds are clamped to `[0, len]` (an
 /// out-of-range end yields a shorter array; `start >= end` yields `[]`).
 /// *Borrows* `xs` (does not drop it) and returns an array the caller owns.
 ///
 /// The elements are *copied* into a fresh heap block, each retained: a slice
 /// that shares is a window carried in the value (`arr24::aipl_arr_window`), and
-/// this is what that reaches for when sharing is impossible — a source it cannot
-/// point into (reversed, or bit-packed), or a window lent to a runtime entry
+/// this is what that reaches for when sharing is impossible — a bit-packed
+/// source, which has no byte to point into, or a window lent to a runtime entry
 /// that wants a block of exactly its elements (`arr24::aipl_arr_window_block`).
 /// The two degenerate windows copy nothing: an empty one is the empty array,
 /// and the whole array is the array itself, retained.
@@ -898,52 +882,10 @@ fn array_block_size(cap_bytes: usize) -> usize {
     HEADER_SIZE + ARR_ELEMS_OFFSET + cap_bytes
 }
 
-/// Allocate a reversed-view block wrapping `inner` (tagged).  Steals the
-/// caller's reference to `inner` (does not retain it separately).
-fn alloc_reversed_view(
-    inner: *const u8,
-    len: usize,
-    drop_fn: i64,
-    retain_fn: i64,
-    elem_size: i64,
-) -> *const u8 {
-    let layout = std::alloc::Layout::from_size_align(
-        HEADER_SIZE + REV_BLOCK_DATA_SIZE,
-        std::mem::align_of::<i64>(),
-    )
-    .expect("rev-view layout");
-    let raw = unsafe { std::alloc::alloc(layout) };
-    if raw.is_null() {
-        std::alloc::handle_alloc_error(layout);
-    }
-    unsafe {
-        std::ptr::write(raw as *mut i64, 1); // refcount = 1
-        let data = raw.add(HEADER_SIZE);
-        std::ptr::write(data as *mut i64, len as i64);
-        std::ptr::write(data.add(REV_INNER_OFFSET) as *mut *const u8, inner);
-        std::ptr::write(data.add(REV_DROP_OFFSET) as *mut i64, drop_fn);
-        std::ptr::write(data.add(REV_RETAIN_OFFSET) as *mut i64, retain_fn);
-        std::ptr::write(data.add(REV_ELEMSIZE_OFFSET) as *mut i64, elem_size);
-        (data as usize | ARR_REV_TAG) as *const u8
-    }
-}
-
-/// The five words every view block records, read back off a view pointer.
-unsafe fn view_fields(a: *const u8) -> (*const u8, i64, i64, i64) {
-    let u = arr_untag(a);
-    unsafe {
-        (
-            std::ptr::read(u.add(REV_INNER_OFFSET) as *const *const u8),
-            std::ptr::read(u.add(REV_DROP_OFFSET) as *const i64),
-            std::ptr::read(u.add(REV_RETAIN_OFFSET) as *const i64),
-            std::ptr::read(u.add(REV_ELEMSIZE_OFFSET) as *const i64),
-        )
-    }
-}
-
 /// A *borrowed* array as a heap block for the duration of `f`: a heap array is
-/// handed over as is, a view is materialized into a block `f` reads and that
-/// is released afterwards. For the entry points that read every element of
+/// handed over as is, and the shared empty array as the empty block. (A view
+/// used to be materialized here; a slice and a reversal are values now, lent a
+/// block by codegen before they reach the runtime.) For the entry points that read every element of
 /// an argument they do not own (`join`, `execute_program`'s argument list),
 /// where dispatching per element would gain nothing over one copy.
 fn with_heap<R>(a: *const u8, f: impl FnOnce(*const u8) -> R) -> R {
@@ -952,30 +894,17 @@ fn with_heap<R>(a: *const u8, f: impl FnOnce(*const u8) -> R) -> R {
         // No block of its own, and nothing to materialize: the permanently-empty
         // block reads as the same array.
         ArrRepr::Inline => f(arr_empty_block()),
-        ArrRepr::Reversed => {
-            aipl_arr_inc(a);
-            let heap = aipl_arr_ensure_heap(a);
-            let out = f(heap);
-            aipl_array_dec(heap);
-            out
-        }
     }
 }
 
-/// Materialize a view (or return the input unchanged for a heap array).
-/// Consumes the input pointer's reference.
+/// The block an array pointer names, as a heap block: itself, or the shared
+/// empty block for the inline empty array. Consumes the input's reference.
 fn aipl_arr_ensure_heap(a: *const u8) -> *const u8 {
     match arr_repr(a) {
         ArrRepr::Heap => a,
         // Already as materialized as an empty array gets; the static block carries
         // no reference for the caller to release.
         ArrRepr::Inline => arr_empty_block(),
-        ArrRepr::Reversed => {
-            let (inner, drop_fn, retain_fn, elem_size) = unsafe { view_fields(a) };
-            let heap = do_arr_reverse(inner, drop_fn, retain_fn, elem_size);
-            aipl_array_dec(a);
-            heap
-        }
     }
 }
 
@@ -1013,8 +942,10 @@ fn do_arr_slice_copy(
     raw
 }
 
-/// Core reversal logic: build a new heap array whose elements are those of `a`
-/// (heap or reversed) in reverse order.  Does NOT drop `a`.
+/// A new heap array whose elements are those of the block `a` in reverse order,
+/// each retained. Does NOT drop `a`. What reversing a bit-packed `bool[]` is —
+/// it has no byte run for a reversed value to walk (see `arr24`) — reached
+/// through [`arr_reverse_copy`].
 fn do_arr_reverse(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: i64) -> *const u8 {
     let len = unsafe { array_len_of(arr_untag(a)) };
     if elem_size == ELEM_BITPACKED {
@@ -1043,6 +974,12 @@ fn do_arr_reverse(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: i64) ->
     raw
 }
 
+/// [`do_arr_reverse`] under the name both runtimes give it, for the shared
+/// `arr24::aipl_arr_reversed`.
+fn arr_reverse_copy(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: i64) -> *const u8 {
+    do_arr_reverse(a, drop_fn, retain_fn, elem_size)
+}
+
 /// Return a pointer to element `idx` in a heap array (assumes tag already stripped
 /// by `arr_elem_ptr`).
 unsafe fn heap_elem_ptr(base: *const u8, idx: usize, elem_size: usize) -> *const u8 {
@@ -1068,13 +1005,6 @@ extern "C" fn aipl_arr_load_bit(a: *const u8, idx: i64) -> i64 {
 unsafe fn arr_elem_ptr(a: *const u8, idx: usize, elem_size: usize) -> *const u8 {
     match arr_repr(a) {
         ArrRepr::Heap => unsafe { heap_elem_ptr(arr_untag(a), idx, elem_size) },
-        ArrRepr::Reversed => {
-            let u = arr_untag(a);
-            let inner = unsafe { std::ptr::read(u.add(REV_INNER_OFFSET) as *const *const u8) };
-            let len = unsafe { std::ptr::read(u as *const i64) as usize };
-            let j = len - 1 - idx;
-            unsafe { arr_elem_ptr(inner, j, elem_size) }
-        }
         // An inline array holds no elements, so every index is out of bounds and
         // the bounds check upstream has already answered.
         ArrRepr::Inline => unreachable!("element {idx} of an empty array"),
@@ -1087,12 +1017,6 @@ unsafe fn arr_load_bit(a: *const u8, idx: usize) -> bool {
         ArrRepr::Heap => {
             let base = arr_untag(a).add(ARR_ELEMS_OFFSET);
             unsafe { (*base.add(idx >> 3) >> (idx & 7)) & 1 != 0 }
-        }
-        ArrRepr::Reversed => {
-            let u = arr_untag(a);
-            let inner = unsafe { std::ptr::read(u.add(REV_INNER_OFFSET) as *const *const u8) };
-            let len = unsafe { std::ptr::read(u as *const i64) as usize };
-            unsafe { arr_load_bit(inner, len - 1 - idx) }
         }
         // No elements, so no bits; the bounds check upstream has answered.
         ArrRepr::Inline => unreachable!("bit {idx} of an empty array"),
@@ -1228,18 +1152,6 @@ extern "C" fn aipl_array_dec(ptr: *const u8) {
                         std::mem::align_of::<i64>(),
                     )
                     .expect("array layout");
-                    std::alloc::dealloc(h as *mut u8, layout);
-                }
-                // A view owns one reference on its inner array and nothing
-                // else; the elements are the inner's to release.
-                ArrRepr::Reversed => {
-                    let inner = std::ptr::read(u.add(REV_INNER_OFFSET) as *const *const u8);
-                    aipl_array_dec(inner);
-                    let layout = std::alloc::Layout::from_size_align(
-                        HEADER_SIZE + REV_BLOCK_DATA_SIZE,
-                        std::mem::align_of::<i64>(),
-                    )
-                    .expect("view layout");
                     std::alloc::dealloc(h as *mut u8, layout);
                 }
             }
@@ -4526,6 +4438,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
         "aipl_arr_push_small",
         arr24::aipl_arr_push_small as *const u8,
     );
+    jit_builder.symbol("aipl_arr_reversed", arr24::aipl_arr_reversed as *const u8);
     jit_builder.symbol("aipl_str_rope", str24::aipl_str_rope as *const u8);
     jit_builder.symbol(
         "aipl_str_pack_inline",
@@ -4604,7 +4517,6 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_monotonic_now", aipl_monotonic_now as *const u8);
     jit_builder.symbol("aipl_shim_get", aipl_shim_get as *const u8);
     jit_builder.symbol("aipl_shim_set", aipl_shim_set as *const u8);
-    jit_builder.symbol("aipl_arr_reverse", aipl_arr_reverse as *const u8);
     jit_builder.symbol("aipl_arr_sort", aipl_arr_sort as *const u8);
     jit_builder.symbol("aipl_array_new", aipl_array_new as *const u8);
     jit_builder.symbol("aipl_array_with_cap", aipl_array_with_cap as *const u8);
@@ -6623,8 +6535,8 @@ unsafe fn read_ffi_array_elem(
 
 /// Read the array value stored at `at` (of element type `elem`) — its first
 /// word under the `Tagged` ABI, its 24 bytes under `Wide`, where it may be a
-/// window or inline (`arr24::ArrValue`), whose elements are read off the value
-/// rather than the block. `owned` as for [`read_ffi_array`]: the value's one reference
+/// window, reversed or inline (`arr24::ArrValue`), whose elements are read off
+/// the value rather than the block. `owned` as for [`read_ffi_array`]: the value's one reference
 /// is on its first word either way.
 ///
 /// SAFETY: `at` must hold a valid array value of element type `elem` for `abi`.
@@ -6651,10 +6563,13 @@ unsafe fn read_ffi_array_at(
     if value.data.is_null() {
         return unsafe { read_ffi_array(abi, raw, elem, owned, structs) };
     }
-    // A window is never bit-packed (`arr24`'s header says why), so every
-    // element is byte-addressable at the element stride.
+    // A window — or a reversed one — is never bit-packed (`arr24`'s header says
+    // why), so every element is byte-addressable at the element stride.
     let stride = abi_array_elem_size(abi, elem, structs) as usize;
-    let out = (0..value.len)
+    let n = value.run_len();
+    let reversed = value.is_reversed();
+    let out = (0..n)
+        .map(|i| if reversed { n - 1 - i } else { i })
         .map(|i| unsafe {
             read_ffi_array_elem(abi, value.data.add(i * stride), elem, stride, structs)
         })
@@ -8233,7 +8148,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_write_bytes"
         | "aipl_array_new"
         | "aipl_array_with_cap" => (3, Ret::Word),
-        "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" | "aipl_arr_reverse" => {
+        "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" => {
             (4, Ret::Word)
         }
         "aipl_array_push"
@@ -8249,6 +8164,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         "aipl_arr_window_block" => (4, Ret::Word),
         "aipl_arr_from_set_words" => (2, Ret::Word),
         "aipl_arr_push_small" => (3, Ret::Word),
+        "aipl_arr_reversed" => (5, Ret::None),
         "aipl_arr_settle" => (4, Ret::None),
         "aipl_dict_remove" => (5, Ret::Word),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" => (7, Ret::Word),
@@ -11323,7 +11239,7 @@ fn load_array_elem<M: Module>(
     let base = builder.ins().iadd_imm_s(untagged, ARR_ELEMS_OFFSET as i64);
     let stride = elem_size_of(elem, structs);
     load_elem_at(
-        module, builder, builtins, arr_ptr, base, idx, elem, stride, structs,
+        module, builder, builtins, arr_ptr, base, idx, elem, stride, None, structs,
     )
 }
 
@@ -11348,6 +11264,14 @@ struct ArrView {
     /// [`array_elem_size`] — a narrow integer at its own width — rather than a
     /// set's or a dict's, a word per scalar.
     array: bool,
+    /// For an array value, whether it is reversed (`arr24::ArrValue`): `base`
+    /// and `len` are then a forward run, and element `i` is its `len - 1 - i`.
+    reversed: Option<Value>,
+    /// The signed byte step between consecutive elements, when it is not the
+    /// stride known at compile time: [`arr_view`] points `base` at the value's
+    /// *first* element and steps backwards through a reversed one, so a read is
+    /// the same multiply-and-add for either direction.
+    step: Option<Value>,
 }
 
 /// [`ArrView`] of a tagged block pointer — a whole array, a set or a dict.
@@ -11360,12 +11284,14 @@ fn block_view(builder: &mut FunctionBuilder, ptr: Value) -> ArrView {
         base,
         len,
         array: false,
+        reversed: None,
+        step: None,
     }
 }
 
 /// [`ArrView`] of a value of an array-backed type `ty`: an array value, whole or
 /// a window, or a set or a dict, which is the block pointer itself.
-fn arr_view(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> ArrView {
+fn arr_view_shape(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> ArrView {
     if !is_wide_array(ty) {
         return block_view(builder, v);
     }
@@ -11373,16 +11299,25 @@ fn arr_view(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> ArrVi
     let ptr = builder.ins().load(types::I64, flags, v, 0);
     let data = builder.ins().load(types::I64, flags, v, 8);
     let w2 = builder.ins().load(types::I64, flags, v, 16);
+    // A window and a reversed value both carry a run — `data` and a length —
+    // and differ only in the tag above the length, which a reversed value sets.
     let is_window = builder.ins().icmp_imm_s(IntCC::NotEqual, data, 0);
+    let run_len = builder.ins().band_imm_u(w2, arr24::ARR_LEN_MASK as i64);
+    let tag = builder.ins().ushr_imm_u(w2, arr24::ARR_TAG_SHIFT as i64);
+    let reversed = builder
+        .ins()
+        .icmp_imm_s(IntCC::Equal, tag, arr24::ATAG_REVERSED as i64);
     if !may_be_inline(ty) {
         let whole = block_view(builder, ptr);
         let base = builder.ins().select(is_window, data, whole.base);
-        let len = builder.ins().select(is_window, w2, whole.len);
+        let len = builder.ins().select(is_window, run_len, whole.len);
         return ArrView {
             ptr,
             base,
             len,
             array: true,
+            reversed: Some(reversed),
+            step: None,
         };
     }
     // An inline value's first word is element bytes, not a pointer, so the
@@ -11390,7 +11325,6 @@ fn arr_view(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> ArrVi
     // that is certainly there, read and then not used. That address is 8-aligned,
     // so its tag bits read `Heap` and the element reads take the fast path, whose
     // `base` is the value itself.
-    let tag = builder.ins().ushr_imm_u(w2, arr24::ARR_TAG_SHIFT as i64);
     let is_inline = builder
         .ins()
         .icmp_imm_s(IntCC::Equal, tag, arr24::ATAG_INLINE as i64);
@@ -11398,7 +11332,7 @@ fn arr_view(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> ArrVi
     let whole = block_view(builder, ptr);
     let base = builder.ins().select(is_window, data, whole.base);
     let base = builder.ins().select(is_inline, v, base);
-    let len = builder.ins().select(is_window, w2, whole.len);
+    let len = builder.ins().select(is_window, run_len, whole.len);
     let inline_len = builder
         .ins()
         .ushr_imm_u(w2, arr24::ARR_INLINE_LEN_SHIFT as i64);
@@ -11409,6 +11343,41 @@ fn arr_view(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> ArrVi
         base,
         len,
         array: true,
+        reversed: Some(reversed),
+        step: None,
+    }
+}
+
+/// [`arr_view_shape`], set up for reading elements: for an array value, `base`
+/// is its first element and `step` the signed stride to the next, so a reversed
+/// one is read backwards at no cost per element.
+fn arr_view(
+    builder: &mut FunctionBuilder,
+    v: Value,
+    ty: &ConcreteType,
+    structs: &HashMap<String, TypeDef>,
+) -> ArrView {
+    let view = arr_view_shape(builder, v, ty);
+    let (Some(reversed), ConcreteType::Array(elem)) = (view.reversed, ty) else {
+        return view;
+    };
+    let stride = array_elem_size(elem, structs);
+    if stride == ELEM_BITPACKED {
+        // A `bool[]` is never a reversed value (reversing one copies it), and
+        // its reads address bits, not strides.
+        return view;
+    }
+    let past = builder.ins().imul_imm_s(view.len, stride);
+    let last = builder.ins().iadd(view.base, past);
+    let last = builder.ins().iadd_imm_s(last, -stride);
+    let base = builder.ins().select(reversed, last, view.base);
+    let forward = builder.ins().iconst(types::I64, stride);
+    let backward = builder.ins().iconst(types::I64, -stride);
+    let step = builder.ins().select(reversed, backward, forward);
+    ArrView {
+        base,
+        step: Some(step),
+        ..view
     }
 }
 
@@ -11428,13 +11397,14 @@ fn load_view_elem<M: Module>(
         elem_size_of(elem, structs)
     };
     load_elem_at(
-        module, builder, builtins, view.ptr, view.base, idx, elem, stride, structs,
+        module, builder, builtins, view.ptr, view.base, idx, elem, stride, view.step, structs,
     )
 }
 
 /// Element `idx` of the array whose tagged pointer is `arr_ptr` and whose
 /// elements start at `base` when that pointer is a heap block, `stride` bytes
-/// apart (a bit-packed `bool`'s stride is not read).
+/// apart (a bit-packed `bool`'s stride is not read) — or `step` apart, a signed
+/// stride in a register, when the view has one (`ArrView::step`).
 #[allow(clippy::too_many_arguments)]
 fn load_elem_at<M: Module>(
     module: &mut M,
@@ -11445,6 +11415,7 @@ fn load_elem_at<M: Module>(
     idx: Value,
     elem: &ConcreteType,
     stride: i64,
+    step: Option<Value>,
     structs: &HashMap<String, TypeDef>,
 ) -> Value {
     // Inline tag check: fast heap path, slow extern path for non-heap reprs.
@@ -11476,7 +11447,10 @@ fn load_elem_at<M: Module>(
         let shifted = builder.ins().ushr(byte, bit_idx);
         builder.ins().band_imm_u(shifted, 1)
     } else {
-        let off = builder.ins().imul_imm_s(idx, stride);
+        let off = match step {
+            Some(step) => builder.ins().imul(idx, step),
+            None => builder.ins().imul_imm_s(idx, stride),
+        };
         let addr = builder.ins().iadd(base, off);
         if is_str_shaped(elem) {
             // A **snapshot**, for the reason `lookup_ident` copies a `mut`
@@ -11604,7 +11578,7 @@ fn seq_len(builder: &mut FunctionBuilder, ptr: Value, ty: &ConcreteType) -> Valu
     if is_char_array(ty) {
         emit_str_len(builder, ptr)
     } else {
-        arr_view(builder, ptr, ty).len
+        arr_view_shape(builder, ptr, ty).len
     }
 }
 
@@ -11623,7 +11597,7 @@ fn seq_elem<M: Module>(
     if is_char_array(arr_ty) {
         load_char_array_byte(module, builder, builtins, ptr, idx)
     } else if let ConcreteType::Array(elem) = arr_ty {
-        let view = arr_view(builder, ptr, arr_ty);
+        let view = arr_view(builder, ptr, arr_ty, structs);
         load_view_elem(module, builder, builtins, view, idx, elem, structs)
     } else {
         unreachable!("seq_elem called with a non-array type")
@@ -12401,8 +12375,8 @@ fn emit_eq_body<M: Module>(
         }
         ConcreteType::Array(elem) => {
             // Either side may be a window, so both are read through their view.
-            let lv = arr_view(builder, lv, ty);
-            let rv = arr_view(builder, rv, ty);
+            let lv = arr_view(builder, lv, ty, structs);
+            let rv = arr_view(builder, rv, ty, structs);
             let (ll, rl) = (lv.len, rv.len);
             let len_eq = builder.ins().icmp(IntCC::Equal, ll, rl);
             // Both empty (untyped element) → length equality is the whole answer,
@@ -12884,7 +12858,7 @@ fn emit_hash<M: Module>(
         }
         ConcreteType::Array(elem) => {
             // An array value may be a window, so it is read through its view.
-            let view = arr_view(builder, v, ty);
+            let view = arr_view(builder, v, ty, structs);
             let seed = emit_scalar_hash(builder, view.len);
             if is_none_inner(elem) {
                 seed
@@ -13996,7 +13970,7 @@ fn emit_render<M: Module>(
         // `value` is a real `str` underneath, not a generic array block.
         _ if is_char_array(ty) => emit_render_char_array(module, builder, cx, value, sink)?,
         ConcreteType::Array(elem) => {
-            let view = arr_view(builder, value, ty);
+            let view = arr_view(builder, value, ty, cx.structs);
             emit_render_seq(module, builder, cx, view, elem, sink, b'[', b']')?
         }
         ConcreteType::Set(elem, order) if **elem == ConcreteType::Primitive(Primitive::Char) => {
@@ -17715,7 +17689,7 @@ fn compile_call_expr<M: Module>(
                 // A set/dict shares the array layout, so its element/pair count is
                 // the same `len` field; an array's comes off its value, which may
                 // be a window.
-                arr_view(builder, ptr, &t).len
+                arr_view_shape(builder, ptr, &t).len
             } else {
                 return Err(Error::at(
                     format!(
@@ -18166,7 +18140,7 @@ fn compile_call_expr<M: Module>(
                 .iconst(types::I64, set_order_code(&elem, order));
             // Past the `char[]` case, the source is an array value, which may be
             // a window; the walk below reads it through its view.
-            let src = arr_view(builder, arr_ptr, &t);
+            let src = arr_view(builder, arr_ptr, &t, structs);
             let len = src.len;
             let first = builtins.call(
                 module,
@@ -18308,36 +18282,26 @@ fn compile_call_expr<M: Module>(
                 (result, t)
             } else if let ConcreteType::Array(elem) = &t {
                 let elem = (**elem).clone();
-                // Array receiver: `aipl_arr_inc`, not `emit_inc`. `aipl_inc` dispatches on the
-                // *string* tag scheme (its own doc says so), which reads an array's
-                // representation tag as a str's. The two coincide for an untagged
-                // array — both find the refcount at `ptr - 8` — which is why this was
-                // survivable; under the wide `str` it reads 24 bytes of array header
-                // as a value instead.
-                //
-                // The runtime builds the reversed view over a block, so `ptr`
-                // is the block under the value from here on — a copy of its
-                // elements when the value is a window.
-                let ptr = arr_block(builder, module, cx, scopes, ptr, &t);
-                builtins.call_void(module, builder, "aipl_arr_inc", &[ptr]);
-                let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
-                let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
-                let esz = builder
-                    .ins()
-                    .iconst(types::I64, array_elem_size(&elem, structs));
-                let view = builtins.call(
+                // A reversal is a value: the same run walked from its far end,
+                // written straight into a fresh value and holding one reference
+                // on the receiver's block (`arr24::aipl_arr_reversed`). The
+                // receiver is borrowed, and nothing is allocated except for a
+                // bit-packed `bool[]`, which is copied.
+                let (drop_fn, retain_fn, esz) = array_descriptors(builder, module, cx, &elem);
+                let arr_ty = ConcreteType::Array(Box::new(elem));
+                let slot = value_slot(builder, &arr_ty, structs);
+                let out = builder.ins().stack_addr(types::I64, slot, 0);
+                builtins.call_void(
                     module,
                     builder,
-                    "aipl_arr_reverse",
-                    &[ptr, drop_fn, retain_fn, esz],
+                    "aipl_arr_reversed",
+                    &[out, ptr, drop_fn, retain_fn, esz],
                 );
-                let arr_ty = ConcreteType::Array(Box::new(elem));
-                let view = arr_val(builder, view);
                 scopes
                     .last_mut()
                     .expect("scope")
-                    .push(Tracked::new(view, &arr_ty));
-                (view, arr_ty)
+                    .push(Tracked::new(out, &arr_ty));
+                (out, arr_ty)
             } else {
                 return Err(Error::at(
                     format!("\"reverse\" expects a str or array, got {}", type_name(&t)),
@@ -18461,10 +18425,10 @@ fn compile_call_expr<M: Module>(
                 // The helpers below read arrays through their views — either side
                 // may be a window. An element or an optional element is not an
                 // array and is passed as it is.
-                let recv = arr_view(builder, recv, &recv_ty);
+                let recv = arr_view(builder, recv, &recv_ty, structs);
                 match shape {
                     SeShape::Seq => {
-                        let pat = arr_view(builder, pat_v, &pat_ty);
+                        let pat = arr_view(builder, pat_v, &pat_ty, structs);
                         emit_arr_starts_ends(module, builder, cx, recv, pat, &elem, end, at)?
                     }
                     SeShape::Elem => {
@@ -18594,10 +18558,10 @@ fn compile_call_expr<M: Module>(
                 // The helpers below read arrays through their views — either side
                 // may be a window. An element or an optional element is not an
                 // array and is passed as it is.
-                let recv = arr_view(builder, recv, &recv_ty);
+                let recv = arr_view(builder, recv, &recv_ty, structs);
                 match shape {
                     SeShape::Seq => {
-                        let ndl = arr_view(builder, ndl_v, &ndl_ty);
+                        let ndl = arr_view(builder, ndl_v, &ndl_ty, structs);
                         emit_arr_contains_seq(module, builder, cx, recv, ndl, &elem)?
                     }
                     SeShape::Elem => {
@@ -20475,8 +20439,9 @@ fn emit_slice<M: Module>(
             .iconst(types::I64, array_elem_size(&elem, structs));
         let b_v = b_v.unwrap_or_else(|| builder.ins().iconst(types::I64, i64::MAX));
         // A window carried in the value itself: the runtime writes the result
-        // straight into a fresh value, allocating nothing unless the source is
-        // a reversed or bit-packed array (`arr24::aipl_arr_window`).
+        // straight into a fresh value — a window, a reversed one, or inline —
+        // allocating nothing unless the source is a bit-packed `bool[]`
+        // (`arr24::aipl_arr_window`).
         let slot = value_slot(builder, recv_ty, structs);
         let result = builder.ins().stack_addr(types::I64, slot, 0);
         builtins.call_void(
@@ -22108,7 +22073,7 @@ fn compile_expr_inner<M: Module>(
             // for an array value that may be a window, or off the block for a
             // set. Every other iterable keeps `it_ptr`.
             let it_view = matches!(&it_ty, ConcreteType::Array(_) | ConcreteType::Set(..))
-                .then(|| arr_view(builder, it_ptr, &it_ty));
+                .then(|| arr_view(builder, it_ptr, &it_ty, structs));
 
             // The split cursor, and the buffer its parts land in. The separator
             // is compiled here, after the source — the order `split` evaluated
@@ -23221,7 +23186,7 @@ fn compile_expr_inner<M: Module>(
                 ));
             }
 
-            let view = arr_view(builder, recv_v, &recv_ty);
+            let view = arr_view(builder, recv_v, &recv_ty, structs);
             let elem_ty = match &recv_ty {
                 ConcreteType::Array(inner) => (**inner).clone(),
                 _ => {

@@ -78,15 +78,15 @@ some(200)
 0:8
 1:7
 --- performance ---
-allocations: 21
-deallocations: 21
+allocations: 20
+deallocations: 20
 reallocations: 7
-bytes allocated: 1018
-instructions executed: 19333
-binary size: 6600
-  code: 3708
+bytes allocated: 970
+instructions executed: 19147
+binary size: 6480
+  code: 3672
   data: 155
-  metadata: 2737
+  metadata: 2653
 functions:
   __to_str_i64:
     calls: 5
@@ -97,17 +97,11 @@ functions:
   __to_str_u64:
     calls: 2
     bytes: 204
-  aipl_arr_elem_ptr:
-    calls: 1
-    bytes: (external)
   aipl_arr_inc:
     calls: 2
     bytes: (external)
-  aipl_arr_reverse:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_array_push:
     calls: 1
@@ -132,4 +126,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2912
+    bytes: 2876

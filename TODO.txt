@@ -475,7 +475,7 @@ design:
 
 optimizations:
   make inline capcity vary by type, and even by site (e.g. a const array literal that is mapped or filtered)
-  inline arrays for non-primitive types
+  inline arrays for non-primitive types (that require a drop of each element)
   inline arrays for bool[]
   concat("", v) should fold to v
   apply similar length optimizations to templates as we do to array literals with spreads

@@ -58,15 +58,15 @@ allocations: 16
 deallocations: 16
 reallocations: 0
 bytes allocated: 1040
-instructions executed: 3528
-binary size: 16152
-  code: 9952
+instructions executed: 3836
+binary size: 16240
+  code: 10040
   data: 1186
   metadata: 5014
 functions:
   __eq_str$arr:
     calls: 11
-    bytes: 412
+    bytes: 500
   __test$operator_named_forms:
     calls: 1
     bytes: 3012
