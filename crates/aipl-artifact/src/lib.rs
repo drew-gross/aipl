@@ -90,14 +90,13 @@ pub struct Manifest {
 /// The `; array-abi <repr>` header line. Written by the artifact generator for
 /// the representation it emitted, and read back by an engine loaded from the
 /// artifact, so that it marshals with the ABI the artifact's code actually
-/// speaks rather than the one the running compiler would emit. See
-/// `arr24_todo.txt` 2c: without it, switching the compiler's array
-/// representation would also relabel every artifact compiled before the switch.
+/// speaks rather than the one the running compiler would emit: without it,
+/// changing the compiler's array representation would also relabel every
+/// artifact compiled before the change.
 pub const ARRAY_ABI_PREFIX: &str = "array-abi ";
 
 /// The `; set-abi <repr>` header line: [`ARRAY_ABI_PREFIX`]'s counterpart for
-/// sets and dicts, which switched representation on their own (`arr24_todo.txt`
-/// 6d).
+/// sets and dicts, which switched representation on their own.
 pub const SET_ABI_PREFIX: &str = "set-abi ";
 
 /// Parse the `;`-comment manifest at the head of an artifact.

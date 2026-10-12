@@ -86,11 +86,9 @@ pub(crate) const ARR_INLINE_LEN_SHIFT: u32 = 48;
 //
 // An outer array's elements are themselves array values, and at refcount zero
 // (or when the outer array's elements are copied) each one has to be released
-// (or retained). The 8-byte helpers (`aipl_arr_drop_arr`, `aipl_arr_retain_ptr`)
-// walk 8-byte slots; an array, set or dict value is 24 bytes, its block in the
-// first word — so those get their own pair, chosen by codegen's
-// `array_drop_fn_addr` / `array_retain_fn_addr`. (The 8-byte pair stays for an
-// artifact compiled before the switch.)
+// (or retained). An array, set or dict value is 24 bytes, its block in the first
+// word, so these walk 24-byte slots; codegen chooses them in `array_drop_fn_addr`
+// / `array_retain_fn_addr`.
 //
 // Each reads only the first word — the block a value holds its reference on —
 // and passes over an inline value, which holds none. They call the host's `aipl_array_dec` / `aipl_arr_inc` through
@@ -163,10 +161,10 @@ pub(crate) extern "C" fn aipl_arr_retain_opt_warr(elems: *const u8, len: i64) {
 // ```
 //
 // A *block* value carries its run — `data` and `len` — whether it is the whole
-// block or a window of it (stage 6b), so a reader never has to ask which: the
+// block or a window of it, so a reader never has to ask which: the
 // elements are `data` and `len`, always. A whole value is the window that
 // covers the block (`data` at the first element, `len` the block's), and the
-// two differ by a tag (stage 6c): a window has `ATAG_WINDOW` above its length,
+// two differ by a tag: a window has `ATAG_WINDOW` above its length,
 // a whole value has none. Something that is about to write through a value asks
 // [`ArrValue::is_window`] — a window must be copied first, and a whole value
 // need not — without reading the block, which keeps no length of its own to
@@ -184,8 +182,8 @@ pub(crate) extern "C" fn aipl_arr_retain_opt_warr(elems: *const u8, len: i64) {
 // An *inline* value carries its elements in its own 22 bytes and owns no block
 // at all — a short `str`'s layout exactly: the tag
 // (`ATAG_INLINE`) in the top byte of `w2` says so, and the byte below it is the
-// length. Only an array of integers is ever inline (the element types `arr24_todo`
-// stage 3 settled on), at the packed stride, so 22 bytes is 22 `u8`s or 2 `i64`s.
+// length. Only an array of integers is ever inline, at the packed stride, so 22
+// bytes is 22 `u8`s or 2 `i64`s.
 // A whole value and a window have a top byte of zero, since a window's length
 // is far below 2^56.
 //
@@ -196,23 +194,18 @@ pub(crate) extern "C" fn aipl_arr_retain_opt_warr(elems: *const u8, len: i64) {
 // the first word alone — which is all `aipl_arr_{drop,retain}_warr` read, once
 // they have passed over an inline element, which holds none.
 //
-// Windows are only ever made over a `Heap` block of byte-addressable elements.
-// A bit-packed `bool[]` has no byte to point at (its whole value still carries a
-// `data` and a length, but the run is bits, which only the block's readers walk),
-// so slicing one *copies* the
-// window into a block of its own (`aipl_arr_slice`) and yields a whole value
-// around it. (A reversed value is sliced into a reversed value — see below.)
+// Windows are only ever made over a block of byte-addressable elements. A
+// bit-packed `bool[]` has no byte to point at (its whole value still carries a
+// `data` and a length, but the run is bits, which only the readers that know it is
+// a `bool[]` walk), so slicing one *copies* the window into a block of its own and
+// yields a whole value around it. (A reversed value is sliced into a reversed
+// value — see below.)
 //
-// Code that reads elements learns the window shape (length, indexing,
-// iteration, and the runtime's nested reads); every other runtime entry still
-// takes a block, and gets one from [`aipl_arr_window_block`] — a copy of the
-// window's elements, made only when something that needs a block is reached.
-// The copy is the one thing a slice view saved, and it is paid only where a
-// block is wanted: an in-place write copied a view on its first write anyway,
-// and the entries that take a block (`sort`, `reverse`, `join`'s separators,
-// `execute_program`'s arguments) read every element of it regardless.
+// Every entry takes the value and reads its run, so a slice costs nothing until
+// something has to write through it, and then only the copy an in-place write
+// would have made on its first write anyway (`aipl_arr_settle`).
 
-/// An array value as compiled code holds it in this stage — see above.
+/// An array value as compiled code holds it — see above.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub(crate) struct ArrValue {
@@ -558,14 +551,11 @@ pub(crate) extern "C" fn aipl_arr_settle(
     unsafe { core::ptr::write(a, ArrValue::whole_of(own, v.run_len())) };
 }
 
-// # Entries that take values (stage 6a)
+// # Entries that take values
 //
-// The block-taking entries read an array's length out of its block, which is
-// why a window, a reversal or an inline value has to be lent a block of its own
-// before reaching one. These take the value and read `data` and the length off
-// it, whatever its shape — the step toward taking the length out of the block
-// (`arr24_todo.txt`, stage 6). Each replaces one block-taking entry, which stays
-// registered until the checked-in artifact no longer calls it.
+// A block keeps no length, and a window, a reversal or an inline value has no
+// block of its own to lend, so every entry takes the value and reads `data` and
+// the length off it, whatever its shape.
 
 /// The elements of the array value `v`, in its order, as a run of `width`-byte
 /// elements starting at `first` and `step` bytes apart (negative for a reversed
@@ -1257,7 +1247,7 @@ pub(crate) extern "C" fn aipl_arr_from_set_words(
     unsafe { core::ptr::write(out, ArrValue::whole_of(block, len)) };
 }
 
-// # Allocation that hands back a value (stage 6c)
+// # Allocation that hands back a value
 //
 // Compiled code that wants a new array asks for a value and writes its elements
 // at the value's `data`, rather than taking a block and adding the layout's
@@ -1401,7 +1391,7 @@ mod tests {
         assert_eq!(dropped(&WINDOW_DROPS) - before, 3);
     }
 
-    /// Stage 6b: a whole value carries its run like any window; a window is told
+    /// A whole value carries its run like any window; a window is told
     /// by its tag, not by comparing against a block that keeps no length.
     #[test]
     fn a_whole_value_carries_its_run() {

@@ -562,11 +562,11 @@ fn iter_state_size() -> u32 {
 //
 // The block, the representation tags and the reversed view are `array_layout`
 // (shared verbatim with the AOT runtime); this is the JIT side's allocation,
-// accounting and element traffic over that layout. Elements are 8 bytes each
-// (a scalar, or a heap pointer for `str`/array elements) unless the element
-// type is composite or bit-packed; element i of a heap block lives at
-// `ptr + ARR_ELEMS_OFFSET + i*stride`. The drop helpers a block records are
-// `aipl_arr_drop_str` / `aipl_arr_drop_arr` and friends below.
+// accounting and element traffic over that layout. Elements are packed at their
+// stride (`array_elem_size`): a word for most scalars, a narrow integer at its
+// own width, a bit for a `bool`, 24 bytes for a `str` or a nested array. Element
+// i of a block lives at `base + i*stride`. The drop helpers a block records are
+// `aipl_arr_drop_str` / `aipl_arr_drop_warr` and friends.
 
 use array_layout::*;
 
@@ -8915,7 +8915,7 @@ fn emit_inline_array(builder: &mut FunctionBuilder, vals: &[Value], width: i64) 
 }
 
 /// Whether a value of `ty` may be *inline* — its elements in its own 22 bytes,
-/// no block (`arr24::ArrValue`, `arr24_todo.txt` stage 3). Only an array of
+/// no block (`arr24::ArrValue`). Only an array of
 /// integers is: everything that reads or owns an array value has to check for
 /// the inline shape first, and an array of any other element type never takes
 /// it, so only these pay for the check.
@@ -9493,8 +9493,7 @@ fn arr_view_shape(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) ->
     }
     // An inline value's first word is element bytes, not a pointer, so the
     // element reads go through the value's own address instead — memory that is
-    // certainly there. That address is 8-aligned, so its tag bits read `Heap`
-    // and the element reads take the fast path, whose `base` is the value itself.
+    // certainly there: the element reads' `base` is the value itself.
     let is_inline = builder
         .ins()
         .icmp_imm_s(IntCC::Equal, tag, arr24::ATAG_INLINE as i64);
