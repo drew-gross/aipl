@@ -61,8 +61,16 @@ fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }.performance({
   is effect-free. Using an effect there is a compile error. Allowing effects is a
   separate future project, and it also covers what the benchmark timing pass
   would do with repeated output.
-- Absolute bounds (`instructions <= 1500`) are allowed. Relative and structural
-  claims are the recommended style, because they survive compiler changes.
+- **Prefer exact counts.** The counts are exact and repeatable, so for a small
+  closure the number is the claim: `allocations == 1` says what `0 < allocations`
+  only hints at, and a loose bound lets a regression through. An exact count moves
+  only when the code it counts changes, i.e. in a commit that implements an
+  optimization, where touching those lines is the right outcome. Use a relative
+  claim (`a.instructions == b.instructions`) when the property is about a
+  comparison rather than a size, and a bound only for a large or noisy closure
+  where the exact figure would be arbitrary. (Every measurement carries a fixed
+  overhead of 5 instructions, so a change to `measure` itself shifts them all by a
+  constant.)
 - `measure` is legal only inside `.performance` blocks. Like `.test` blocks,
   `.performance` blocks are excluded from production builds and from the dogfood
   artifact.

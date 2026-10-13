@@ -21,7 +21,6 @@
 import {
     Measurement,
     equal as ==,
-    less_than as <,
     measure_begin,
     measure_consume,
     measure_end,
@@ -36,9 +35,11 @@ import {
 # literal label is refused at compile time, since a report could not tell them
 # apart.
 #
-# The counts are exact and repeatable, so a claim about them can be an equality.
-# They include a small constant for the call and release themselves, which is the
-# same on every measurement and so cancels in any comparison between two.
+# The counts are exact and repeatable, so a claim about them should be an equality:
+# for a small closure the number is the claim, and it moves only in a commit that
+# changes the code it counts. They include a small constant for the call and
+# release themselves (5 instructions), the same on every measurement, so it
+# cancels in a comparison between two and is part of an exact count.
 #
 # The `input` is built outside the window and handed in so that building it is
 # not what is measured, and `f` is called with it exactly once. Callable only in a
@@ -70,7 +71,8 @@ pub fn measure<T: any, R: any>(label: str, input: T, f: (T) -> R) !measure -> Me
     assert(allocations == 0);
     assert(bytes_allocated == 0);
     assert(peak_live_bytes == 0);
-    assert(0 < instructions);
+    // Exactly the cost of measuring: the call and the release, nothing else.
+    assert(instructions == 5);
 })
 --- performance ---
 allocations: 0

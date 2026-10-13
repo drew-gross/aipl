@@ -1,13 +1,20 @@
 # `measure(label, input, f)` runs `f(input)` once and reports what it cost, so a
-# `.performance` block can state a property of the code and have `aipl check`
-# hold it to that. The counts are exact and repeatable, which is why most claims
-# here are equalities; the few bounds are on instructions, the one count a
-# compiler change may move.
+# `.performance` block can state a property of the code and have `aipl check` hold
+# it to that.
+#
+# **Claims here are exact.** The counts are exact and repeatable, so for a small
+# closure the number *is* the claim: `allocations == 1` says what `0 < allocations`
+# only hints at, and a regression to two passes the second and fails the first. An
+# exact count moves only when the code that produced it changes — in a commit that
+# implements an optimization, which is the commit that should be touching these
+# lines — and a relative claim (`a.instructions == b.instructions`) is for a
+# property that is about a *comparison*, not a size.
 #
 # What a measurement contains: the heap allocations made, the bytes they asked
 # for, the most heap live at once *counted from what was live when it began*, and
-# the CLIF instructions executed. It includes a small fixed cost for the
-# measuring itself, which is the same every time and so cancels in a comparison.
+# the CLIF instructions executed. Instructions include the measuring itself, a
+# fixed 5 that every measurement below carries (the identity closure is nothing
+# but that).
 #
 # The input is built outside the window, so building it is not measured; the
 # result is released inside it, so freeing it is.
@@ -17,7 +24,6 @@ import {
     count,
     equal as ==,
     less_than as <,
-    less_than_or_equal as <=,
     measure,
     not_equal as !=,
     push,
@@ -39,7 +45,8 @@ fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }
 fn main() {}
 
 fn work() {}.performance({
-    // Work that touches no heap costs none, and holds none.
+    // Work that touches no heap costs none, and holds none. What it does cost is
+    // the fixed few instructions of measuring.
     let Measurement { allocations, bytes_allocated, peak_live_bytes, instructions } = measure(
         "scalar",
         3,
@@ -48,11 +55,12 @@ fn work() {}.performance({
     assert(allocations == 0);
     assert(bytes_allocated == 0);
     assert(peak_live_bytes == 0);
-    assert(instructions <= 100);
+    assert(instructions == 5);
 })
 
-// A relative claim, the kind that survives compiler changes: counting stops once
-// the answer is settled, so it costs the same on ten elements as on ten thousand.
+// Counting stops once the answer is settled, so it costs the same on ten elements
+// as on ten thousand. That is a comparison, so it is stated as one; the number it
+// compares is pinned too.
 fn early_exit() {}.performance({
     let small = filled(10, 2);
     let large = filled(10000, 2);
@@ -61,6 +69,7 @@ fn early_exit() {}.performance({
     assert(at_ten.allocations == 0);
     assert(at_ten_thousand.allocations == 0);
     assert(at_ten.instructions == at_ten_thousand.instructions);
+    assert(at_ten.instructions == 133);
 })
 
 // A value small enough to live in the value's own words needs no allocation:
@@ -68,36 +77,56 @@ fn early_exit() {}.performance({
 // existence — that building one is free — and states it where a change to the
 // representation would break it.
 fn inline_values() {}.performance({
-    assert(measure("one element", 1, |n| [n]).allocations == 0);
+    let Measurement { allocations, bytes_allocated, peak_live_bytes, instructions } = measure(
+        "one element",
+        1,
+        |n| [n],
+    );
+    assert(allocations == 0);
+    assert(bytes_allocated == 0);
+    assert(peak_live_bytes == 0);
+    assert(instructions == 17);
     assert(measure("short string", "hi", |s| s).allocations == 0);
 })
 
-// Allocation and the peak of live memory. Building a hundred-element array
-// allocates, and what is live at its peak is at least what one allocation held.
+// Building a hundred-element array is one allocation of 64 bytes that then grows in
+// place. `bytes allocated` counts only that first request; the peak is what the
+// growth reached — the array's block at its final capacity — and it is the
+// growth policy, so a change to it shows here. Three times the elements is the same
+// one allocation, a larger peak, and about three times the instructions.
 fn building() {}.performance({
-    let built = measure("build 100", 100, |n| filled(n, 7));
-    assert(0 < built.allocations);
-    assert(0 < built.bytes_allocated);
-    assert(0 < built.peak_live_bytes);
-    // Doing it three times over allocates more, and takes more instructions.
+    let Measurement { allocations, bytes_allocated, peak_live_bytes, instructions } = measure(
+        "build 100",
+        100,
+        |n| filled(n, 7),
+    );
+    assert(allocations == 1);
+    assert(bytes_allocated == 64);
+    assert(peak_live_bytes == 1552);
+    assert(instructions == 2700);
     let three_times = measure("build 300", 300, |n| filled(n, 7));
-    assert(built.instructions < three_times.instructions);
-    assert(built.allocations <= three_times.allocations);
+    assert(three_times.allocations == 1);
+    assert(three_times.bytes_allocated == 64);
+    assert(three_times.peak_live_bytes == 3088);
+    assert(three_times.instructions == 7900);
 })
 
 // The peak is counted from what was live when the window opened. `held` is a
 // large array alive throughout, and a measurement made while it is held neither
-// sees it nor is changed by it.
+// sees it nor is changed by it: the same work measures the same with and without
+// it.
 fn peak_is_relative() {}.performance({
+    let alone = measure("build alone", 100, |n| filled(n, 7));
     let held = filled(1000, 1);
     let alongside = measure("beside a held array", 3, |n| n);
+    let with_it_held = measure("build with it held", 100, |n| filled(n, 7));
     assert(alongside.peak_live_bytes == 0);
     assert(alongside.allocations == 0);
-    // And the same work measures the same with and without it.
-    let build_with_held = measure("build with it held", 100, |n| filled(n, 7));
-    let built_alone = measure("build alone", 100, |n| filled(n, 7));
-    assert(build_with_held.peak_live_bytes == built_alone.peak_live_bytes);
-    assert(build_with_held.allocations == built_alone.allocations);
+    assert(alongside.instructions == 5);
+    assert(with_it_held.peak_live_bytes == 1552);
+    assert(with_it_held.peak_live_bytes == alone.peak_live_bytes);
+    assert(with_it_held.allocations == alone.allocations);
+    assert(with_it_held.instructions == alone.instructions);
     assert(held.count(1) == 1000);
 })
 --- performance ---
