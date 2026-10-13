@@ -27,9 +27,14 @@ fn normalized(bytes: &[u8]) -> String {
 
 /// Run `aipl report <args>` from `dir`, returning `(stdout, stderr, exit code)`.
 fn report_in(dir: &str, args: &[&str]) -> (String, String, i32) {
+    report_with_env(dir, args, &[])
+}
+
+fn report_with_env(dir: &str, args: &[&str], env: &[(&str, &str)]) -> (String, String, i32) {
     let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
         .arg("report")
         .args(args)
+        .envs(env.iter().copied())
         .current_dir(dir)
         .output()
         .expect("run aipl report");
@@ -260,9 +265,49 @@ fn a_missing_file_and_missing_or_extra_arguments_are_refused() {
 }
 
 #[test]
-fn a_leak_is_named_and_fails_but_only_when_the_counts_disagree() {
-    // Nothing in the language can leak today, so the rule is exercised on the
-    // stats directly: it is the same check `report` makes before it exits.
+fn a_leak_is_named_and_fails_but_the_counts_still_print() {
+    // Nothing in the language can leak on purpose, so the instrumented runtime has a
+    // test switch that stops counting frees (see `leak_injected` in the runtime):
+    // the run then reads as one that never freed a block. It is the only way to
+    // show that the gate still fires.
+    let leaked = [("AIPL_INJECT_LEAK", "1")];
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("report");
+    fs::create_dir_all(&dir).expect("create temp dir");
+    fs::write(dir.join("leaky.aipl"), ECHO).expect("write temp source");
+    let (stdout, stderr, code) = report_with_env(&dir.to_string_lossy(), &["leaky.aipl"], &leaked);
+    assert_eq!(
+        stdout,
+        "\
+allocations       2
+deallocations     0
+reallocations     0
+bytes allocated   49
+peak live bytes   49
+instructions      38
+binary size       1240 bytes (code 336, data 1, metadata 903)
+
+function            calls  code bytes
+__to_str_u64            1         204
+aipl_array_dec          1    external
+aipl_array_new          1    external
+aipl_u64_len            2    external
+aipl_write_u64          1    external
+main                    1         132
+"
+    );
+    assert_eq!(
+        stderr,
+        "leak: 2 of 2 allocations were never freed (0 deallocations)\n"
+    );
+    assert_eq!(code, 1);
+
+    // Without the switch the same file is clean.
+    let (_stdout, stderr, code) = report_in(&dir.to_string_lossy(), &["leaky.aipl"]);
+    assert_eq!((stderr.as_str(), code), ("", 0));
+}
+
+#[test]
+fn only_a_disagreement_between_the_counts_is_a_leak() {
     let balanced = recorded("tests/cases/cli/args.aipl");
     assert_eq!(balanced.leaked(), None);
     let mut leaky = balanced.clone();

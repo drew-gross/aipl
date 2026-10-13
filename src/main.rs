@@ -367,8 +367,25 @@ fn check_file(
         match aipl::perf::run_performance_tests(&driver, stem, &batch_label, dbg) {
             Ok(run) => {
                 print!("{}", run.report);
-                aipl::codegen::add_test_totals(run.total, run.failed);
-                if run.failed > 0 {
+                let mut failed = run.failed;
+                let mut total = run.total;
+                // A leak fails the file as a test of its own would, named like one:
+                // every instrumented run is held to freeing what it allocates.
+                if let Some((allocated, freed)) = run.leaked {
+                    let at = if batch_label.is_empty() {
+                        String::new()
+                    } else {
+                        format!("{batch_label}::")
+                    };
+                    println!(
+                        "test {at}performance blocks ... FAIL\n  leak: {} of {allocated} allocations were never freed ({freed} deallocations)",
+                        allocated.abs_diff(freed)
+                    );
+                    total += 1;
+                    failed += 1;
+                }
+                aipl::codegen::add_test_totals(total, failed);
+                if failed > 0 {
                     exit_code = 1;
                 }
             }

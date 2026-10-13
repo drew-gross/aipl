@@ -74,6 +74,11 @@ pub struct TestRun {
     /// Blocks run, and how many of them failed.
     pub total: i64,
     pub failed: i64,
+    /// `(allocations, deallocations)` when the run freed fewer blocks than it
+    /// allocated — a leak — and `None` when every allocation was paired with a free.
+    /// The same gate every other instrumented run has: a block that leaks has
+    /// nothing to say that is true.
+    pub leaked: Option<(u64, u64)>,
     /// The failure report, exactly as the in-process runner prints one (`test
     /// <name> ... FAIL`, then a line per failed assertion). Empty when all passed.
     pub report: String,
@@ -102,9 +107,11 @@ pub fn run_performance_tests(
         let exe = dir.join(binary::default_exe_name(&format!("{stem}_performance")));
         binary::link_instrumented(&object, &exe).map_err(MeasureError::Link)?;
         let tally_path = dir.join("tally.txt");
+        let stats_path = dir.join("alloc_stats.txt");
         let output = Command::new(&exe)
             .env("AIPL_TEST_REPORT", file_label)
             .env("AIPL_TEST_TALLY", &tally_path)
+            .env("AIPL_ALLOC_STATS", &stats_path)
             .output()
             .map_err(|e| MeasureError::Run(format!("`.performance` run failed to start: {e}")))?;
         let tally = fs::read_to_string(&tally_path).map_err(|e| {
@@ -119,9 +126,23 @@ pub fn run_performance_tests(
                 "`.performance` run reported an unreadable tally: {tally:?}"
             )));
         };
+        // The allocation tallies the runtime writes at exit. A run that reported a
+        // tally reached its exit, so they are there; if somehow not, there is no
+        // evidence of a leak and none is claimed.
+        let leaked = fs::read_to_string(&stats_path).ok().and_then(|stats| {
+            let count = |key: &str| {
+                stats
+                    .lines()
+                    .find_map(|l| l.strip_prefix(key))
+                    .and_then(|v| v.trim().parse::<u64>().ok())
+            };
+            let (allocated, freed) = (count("allocations:")?, count("deallocations:")?);
+            (allocated != freed).then_some((allocated, freed))
+        });
         Ok(TestRun {
             total,
             failed,
+            leaked,
             report: String::from_utf8_lossy(&output.stdout).replace("\r\n", "\n"),
         })
     })();

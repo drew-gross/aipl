@@ -218,6 +218,16 @@ Two separate perf tracks:
   harness does: an `assert`'s file label is baked into the binary's data. It needs
   the linker `aipl build` does, and exits 1 for a program that leaks.
 
+  **The leak gate does not depend on any section.** Every instrumented run is held
+  to freeing every block it allocates — the harness measures *every* running case
+  (examples, which pin nothing, included), `aipl report` exits 1, and `aipl check`
+  fails a file whose `.performance` blocks leak. Nothing in the language can leak
+  on purpose, so the instrumented runtime has a test switch, `AIPL_INJECT_LEAK=1`,
+  that stops it counting frees; the tests that show each gate still fires use it
+  (`the_leak_gate_runs_for_a_case_with_no_sections` in `tests/cases.rs`, and the
+  leak tests in `tests/suites/report.rs` and `check.rs`). A gate that quietly stops
+  running looks exactly like a clean codebase, which is why they are tested.
+
   **To pin one, use a `--- report ---` section**: its body is exactly what `aipl
   report` prints for the case (aligned counts, the peak, the function table), and
   `aipl check` validates it by running the same report, so it is both readable

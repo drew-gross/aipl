@@ -237,6 +237,30 @@ macro_rules! count_builtin {
     };
 }
 
+/// Whether `AIPL_INJECT_LEAK` is set: the instrumented runtime then stops counting
+/// frees, so a run reads as one that leaked every block it allocated.
+///
+/// A test hook, and the reason it exists is that nothing in the language can leak
+/// on purpose: every gate that refuses a leak (`aipl report`, the cases harness,
+/// `aipl check` on `.performance` blocks) would otherwise have no way to be shown
+/// still working, and a gate that quietly stops running looks exactly like a
+/// clean codebase. Instrumented build only, so nothing that ships can be affected;
+/// it changes only what is *counted*, never what is freed.
+#[cfg(aipl_instrument)]
+fn leak_injected() -> bool {
+    use core::sync::atomic::AtomicU8;
+    // 0: not looked at yet, 1: off, 2: on. Read once.
+    static STATE: AtomicU8 = AtomicU8::new(0);
+    match STATE.load(Ordering::Relaxed) {
+        0 => {
+            let on = unsafe { !getenv(b"AIPL_INJECT_LEAK\0".as_ptr() as *const c_char).is_null() };
+            STATE.store(if on { 2 } else { 1 }, Ordering::Relaxed);
+            on
+        }
+        state => state == 2,
+    }
+}
+
 /// `size` more bytes are live: raise the live total and the peak with it.
 #[cfg(aipl_instrument)]
 #[inline]
@@ -269,7 +293,9 @@ unsafe fn rt_alloc(size: usize) -> *mut c_void {
 unsafe fn rt_free(ptr: *mut c_void) {
     #[cfg(aipl_instrument)]
     {
-        FREE_COUNT.fetch_add(1, Ordering::Relaxed);
+        if !leak_injected() {
+            FREE_COUNT.fetch_add(1, Ordering::Relaxed);
+        }
         if ptr.is_null() {
             return;
         }

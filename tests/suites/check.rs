@@ -1200,6 +1200,54 @@ error: \"==\" between u64 and bool: both sides must be the same type
 }
 
 #[test]
+fn a_performance_block_that_leaks_fails_the_file_like_a_failing_test() {
+    // The instrumented runtime has a test switch (`AIPL_INJECT_LEAK`) that stops
+    // counting frees — nothing in the language can leak on purpose — so the block
+    // below, which builds an array and drops it, reads as having leaked it. The
+    // leak is named as a test of its own, and the summary counts it as one.
+    let src = "import { measure } from builtins;\n\n\
+               fn work() {}.performance({\n    measure(\"array\", 3, |n| [n, n, n]);\n})\n";
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("check_here");
+    fs::create_dir_all(&dir).expect("create temp dir");
+    fs::write(dir.join("performance_leak.aipl"), src).expect("write temp source");
+    let run = |env: &[(&str, &str)]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
+            .args(["check", "performance_leak.aipl"])
+            .envs(env.iter().copied())
+            .current_dir(&dir)
+            .output()
+            .expect("run aipl check");
+        (
+            String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n"),
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+            out.status.code(),
+        )
+    };
+    assert_eq!(
+        run(&[("AIPL_INJECT_LEAK", "1")]),
+        (
+            "\
+test performance blocks ... FAIL
+  leak: 1 of 1 allocations were never freed (0 deallocations)
+2 tests: 1 passed, 1 failed
+"
+            .to_string(),
+            String::new(),
+            Some(1)
+        )
+    );
+    // Without the switch it is the same block, passing.
+    assert_eq!(
+        run(&[]),
+        (
+            "1 tests: 1 passed, 0 failed\n".to_string(),
+            String::new(),
+            Some(0)
+        )
+    );
+}
+
+#[test]
 fn a_performance_block_is_left_out_of_what_run_and_build_make() {
     // Same program with and without a block that calls `measure`: `run` behaves
     // identically. (The IR and binary being byte-identical is checked by hand

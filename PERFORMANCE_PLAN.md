@@ -221,7 +221,12 @@ again.
       gives the metric, old → new, %, regression/improvement, and the scoped
       refresh command.
 - [ ] A case with no row fails, naming the scoped refresh.
-- [ ] The leak gate stays per case.
+- [x] The leak gate stays per case — and now holds for *every* running case,
+      pinned or not (`run_performance_check` always measures; it used to run only
+      because `performance` was mandatory except for `examples/`, which therefore
+      escaped it). It also gates a file's `.performance` blocks in `check`. The
+      tests that prove the gates fire use a test-only runtime switch,
+      `AIPL_INJECT_LEAK`.
 - [ ] Handoff (`handoff/src/discovery.rs` + unit tests, `main.rs`): recognize
       baseline-move failures by a distinct marker. Keep going through refills, IR
       regen and the final run; exit non-zero with the list. After the final run,

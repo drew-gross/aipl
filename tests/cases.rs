@@ -59,6 +59,10 @@
 //!                          (no `main`), it measures the `.test` run instead —
 //!                          see below.
 //!
+//! Every running case is also *measured*, whatever sections it has, and refused if
+//! it leaks (allocations != deallocations): the leak gate is not a side effect of
+//! comparing `performance` or `report`, and applies to the exempt `examples/` too.
+//!
 //! A case need not define `main`. A *library* case has `.test` blocks but no
 //! `main`: it's exercised only through `aipl check`, and its `--- performance ---`
 //! measures that test run (the harness AOT-builds the synthesized `.test` driver).
@@ -456,6 +460,59 @@ fn case_display((path, root, prefix, _): &CaseFile) -> String {
 /// failure mode this whole arrangement has to rule out. Fails when a case has no
 /// test (or a test names a case that no longer exists), and when two cases
 /// collide on one test name.
+/// The leak gate runs for a case that pins nothing.
+///
+/// `examples/arrays` has neither a `--- performance ---` nor a `--- report ---`
+/// section (examples are exempt from the first), and the gate must hold it to
+/// freeing what it allocates all the same: it used to run only as a side effect of
+/// comparing a section, which stops being true the day a section becomes optional.
+///
+/// Nothing in the language can leak on purpose, so the instrumented runtime has a
+/// test switch that stops counting frees (`AIPL_INJECT_LEAK`). It is set on a
+/// *child* run of this very test binary, filtered to that one case: setting it here
+/// would reach every case running in parallel in this process.
+#[test]
+fn the_leak_gate_runs_for_a_case_with_no_sections() {
+    let spec = parse_spec(
+        &fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/arrays.aipl"))
+            .expect("read the example"),
+    );
+    assert!(
+        spec.performance.is_none() && spec.report.is_none(),
+        "this test needs a case that pins nothing"
+    );
+
+    let run = |leak: bool| {
+        let mut cmd = Command::new(std::env::current_exe().expect("this test binary"));
+        cmd.args(["--exact", "examples_arrays", "--test-threads=1"]);
+        if leak {
+            cmd.env("AIPL_INJECT_LEAK", "1");
+        }
+        let out = cmd.output().expect("re-run the harness on one case");
+        let stdout = String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n");
+        // libtest's own lines vary; the harness's failure message is the point.
+        let message: Vec<String> = stdout
+            .lines()
+            .filter(|l| l.contains("memory leak") || *l == "Fix the leak.")
+            .map(str::to_string)
+            .collect();
+        (out.status.success(), message)
+    };
+
+    assert_eq!(run(false), (true, vec![]));
+    assert_eq!(
+        run(true),
+        (
+            false,
+            vec![
+                "[examples/arrays.aipl]: memory leak — allocations (3) != deallocations (0)"
+                    .to_string(),
+                "Fix the leak.".to_string(),
+            ]
+        )
+    );
+}
+
 #[test]
 fn every_case_has_a_test() {
     let (cases, _) = setup_cases();
@@ -1557,38 +1614,45 @@ fn run_success_case(
         }
     }
 
-    // Allocation accounting, if requested. Correctness (above) is checked
-    // first so a perf mismatch never masks a behavioral regression.
-    // `report` is the same measurement in the form a person reads, so a case
-    // that pins either (or both) is measured once.
+    // Allocation accounting. Correctness (above) is checked first so a perf
+    // mismatch never masks a behavioral regression.
+    //
+    // **Every running case is measured, whether or not it pins anything**: the run
+    // is what the leak gate needs, and the gate is the one check here that has
+    // found real bugs, so it must not depend on a case having a section to compare.
+    // (That used to be true by accident — `performance` was required on every case
+    // but the examples — and would stop being true the moment it became optional.)
+    // What is *compared* is still only what the case asks for. `report` is the same
+    // measurement in the form a person reads, so a case that pins either, or both,
+    // is measured once.
     let performance = (spec.performance.is_some() || (fills.enabled && require_metrics))
         .then(|| spec.performance.as_deref().unwrap_or(""));
-    if performance.is_some() || spec.report.is_some() {
-        check_section!(run_performance_check(
-            ctx,
-            orig_path,
-            &measured,
-            stem,
-            spec,
-            case_dir,
-            performance,
-            spec.report.as_deref(),
-            &obj_bytes,
-            &symbol_names,
-            fills,
-        ));
-    }
+    check_section!(run_performance_check(
+        ctx,
+        orig_path,
+        &measured,
+        stem,
+        spec,
+        case_dir,
+        performance,
+        spec.report.as_deref(),
+        &obj_bytes,
+        &symbol_names,
+        fills,
+    ));
     // Every section matched, or fill mode queued the ones that didn't; a normal
     // run would have short-circuited to `Fail` before here. The caller flushes.
     Outcome::Pass
 }
 
 /// Measure the case (see [`perf::measure`]: an instrumented build, linked against
-/// the instrumented runtime and run once) and verify, or fill in, the expected
-/// counts from a `--- performance ---` section and/or the `--- report ---`
-/// section, each only when asked for (`Some`). The instrumented object is
-/// separate from the behavior-check one so production/JIT runs carry no counter
-/// overhead.
+/// the instrumented runtime and run once), refuse it if it leaks, and verify, or
+/// fill in, the expected counts from a `--- performance ---` section and/or the
+/// `--- report ---` section, each only when asked for (`Some`).
+///
+/// The leak gate is not one of those: it runs for every case, section or no
+/// section. The instrumented object is separate from the behavior-check one so
+/// production/JIT runs carry no counter overhead.
 #[allow(clippy::too_many_arguments)]
 fn run_performance_check(
     ctx: &str,
@@ -1622,14 +1686,20 @@ fn run_performance_check(
     };
 
     // Memory-leak gate: every heap allocation must be paired with a free. Checked
-    // even in fill mode so `fill_expected` cannot bake in a leak.
+    // even in fill mode so `fill_expected` cannot bake in a leak, and with no
+    // section to refresh there is nothing to say about counts afterwards.
     if actual.allocations != actual.deallocations {
+        let then = if performance.is_some() || report.is_some() {
+            format!(
+                "Fix the leak, then re-run `{}` to refresh the expected counts.",
+                scoped_fill_cmd(ctx)
+            )
+        } else {
+            "Fix the leak.".to_string()
+        };
         return Outcome::Fail(format!(
-            "{ctx}: memory leak — allocations ({}) != deallocations ({})\n\
-             Fix the leak, then re-run `{}` to refresh the expected counts.",
-            actual.allocations,
-            actual.deallocations,
-            scoped_fill_cmd(ctx),
+            "{ctx}: memory leak — allocations ({}) != deallocations ({})\n{then}",
+            actual.allocations, actual.deallocations,
         ));
     }
 
