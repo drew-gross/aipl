@@ -485,7 +485,32 @@ fn a_trace_does_not_stop_the_batch_and_is_counted_separately() {
 // ---------------------------------------------------------------------------
 // Recorded sections: `check` validates a file's trailing `--- section ---`
 // blocks, so a fixture is checked by the command a user would run.
+//
+// These are written to be read as examples: each states the whole of what `check`
+// printed, so this is what a mismatch (or a clean run) looks like.
 // ---------------------------------------------------------------------------
+
+/// Write `src` to `<name>.aipl` in a scratch directory and run `aipl check` on it
+/// *from that directory*, by its bare name — so what `check` prints names the file
+/// `name.aipl`, not a path that depends on where the target directory is.
+fn check_here(name: &str, src: &str) -> (String, String, i32) {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("check_here");
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let file = format!("{name}.aipl");
+    fs::write(dir.join(&file), src).expect("write temp source");
+    let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
+        .arg("check")
+        .arg(&file)
+        .current_dir(&dir)
+        .output()
+        .expect("run aipl check");
+    let norm = |b: &[u8]| String::from_utf8_lossy(b).replace("\r\n", "\n");
+    (
+        norm(&out.stdout),
+        norm(&out.stderr),
+        out.status.code().unwrap_or(-1),
+    )
+}
 
 /// The summary a single-file `check` always ends with; a file with no `.test`
 /// blocks has none to count.
@@ -499,7 +524,7 @@ fn a_file_without_sections_does_not_have_its_main_run() {
     // `main` here exits 3 and would print; with no section asking for a run it is
     // not executed, so the file passes. Running it unasked would make `check` a
     // way to start a server.
-    let (stdout, stderr, code) = check(
+    let (stdout, stderr, code) = check_here(
         "sections_none",
         "import { print } from builtins;\n\nfn main() !prints -> i64 {\n    print(\"hi\");\n    3\n}\n",
     );
@@ -509,17 +534,24 @@ fn a_file_without_sections_does_not_have_its_main_run() {
 #[test]
 fn matching_stdout_and_exit_code_sections_pass() {
     let src = format!("{GREETS}--- stdout ---\nhi\n--- exit code ---\n0\n");
-    let (stdout, stderr, code) = check("sections_match", &src);
+    let (stdout, stderr, code) = check_here("sections_match", &src);
     assert_eq!((stdout.as_str(), stderr.as_str(), code), (NO_TESTS, "", 0));
 }
 
 #[test]
 fn a_stdout_mismatch_names_the_file_the_section_and_both_sides() {
     let src = format!("{GREETS}--- stdout ---\nbye\n");
-    let (_stdout, stderr, code) = check("sections_stdout_wrong", &src);
-    assert!(
-        stderr.contains("sections_stdout_wrong.aipl: `stdout` mismatch\n--- expected ---\nbye\n--- actual ---\nhi"),
-        "got:\n{stderr}"
+    let (stdout, stderr, code) = check_here("sections_stdout_wrong", &src);
+    assert_eq!(stdout, NO_TESTS);
+    assert_eq!(
+        stderr,
+        "\
+sections_stdout_wrong.aipl: `stdout` mismatch
+--- expected ---
+bye
+--- actual ---
+hi
+"
     );
     assert_eq!(code, 1);
 }
@@ -529,10 +561,17 @@ fn an_absent_section_records_silence_and_a_clean_exit() {
     // Only `exit code` is written, but a run is now being checked, so the
     // missing `stdout` means "prints nothing" — and `hi` is a finding.
     let src = format!("{GREETS}--- exit code ---\n0\n");
-    let (_stdout, stderr, code) = check("sections_absent_means_empty", &src);
-    assert!(
-        stderr.contains("`stdout` mismatch\n--- expected ---\n\n--- actual ---\nhi"),
-        "got:\n{stderr}"
+    let (stdout, stderr, code) = check_here("sections_absent_means_empty", &src);
+    assert_eq!(stdout, NO_TESTS);
+    assert_eq!(
+        stderr,
+        "\
+sections_absent_means_empty.aipl: `stdout` mismatch
+--- expected ---
+
+--- actual ---
+hi
+"
     );
     assert_eq!(code, 1);
 }
@@ -540,14 +579,21 @@ fn an_absent_section_records_silence_and_a_clean_exit() {
 #[test]
 fn an_exit_code_section_is_compared_with_the_status_main_returns() {
     let src = "fn main() -> i64 { 3 }\n--- exit code ---\n3\n";
-    let (stdout, stderr, code) = check("sections_exit_ok", src);
+    let (stdout, stderr, code) = check_here("sections_exit_ok", src);
     assert_eq!((stdout.as_str(), stderr.as_str(), code), (NO_TESTS, "", 0));
 
     let src = "fn main() -> i64 { 3 }\n--- exit code ---\n4\n";
-    let (_stdout, stderr, code) = check("sections_exit_wrong", src);
-    assert!(
-        stderr.contains("`exit code` mismatch\n--- expected ---\n4\n--- actual ---\n3"),
-        "got:\n{stderr}"
+    let (stdout, stderr, code) = check_here("sections_exit_wrong", src);
+    assert_eq!(stdout, NO_TESTS);
+    assert_eq!(
+        stderr,
+        "\
+sections_exit_wrong.aipl: `exit code` mismatch
+--- expected ---
+4
+--- actual ---
+3
+"
     );
     assert_eq!(code, 1);
 }
@@ -557,7 +603,7 @@ fn a_cli_section_is_what_main_receives() {
     let src = "import { len, print, to_str } from builtins;\n\n\
                fn main(args: str[]) !prints {\n    print(to_str(len(args)));\n}\n\
                --- cli ---\none\ntwo\n--- stdout ---\n2\n";
-    let (stdout, stderr, code) = check("sections_cli", src);
+    let (stdout, stderr, code) = check_here("sections_cli", src);
     assert_eq!((stdout.as_str(), stderr.as_str(), code), (NO_TESTS, "", 0));
 }
 
@@ -566,29 +612,37 @@ fn an_expect_file_section_checks_what_the_run_wrote() {
     let writer = "import { print, to_str, write_string_to_file } from builtins;\n\n\
                   fn main() !prints !write_files {\n    print(to_str(write_string_to_file(\"out.txt\", \"written\")));\n}\n\
                   --- stdout ---\nok()\n";
-    let (stdout, stderr, code) = check(
+    let (stdout, stderr, code) = check_here(
         "sections_expect_ok",
         &format!("{writer}--- expect file: out.txt ---\nwritten\n"),
     );
     assert_eq!((stdout.as_str(), stderr.as_str(), code), (NO_TESTS, "", 0));
 
-    let (_stdout, stderr, code) = check(
+    let (stdout, stderr, code) = check_here(
         "sections_expect_wrong",
         &format!("{writer}--- expect file: out.txt ---\nother\n"),
     );
-    assert!(
-        stderr.contains("`expect file: out.txt` mismatch"),
-        "got:\n{stderr}"
+    assert_eq!(stdout, NO_TESTS);
+    assert_eq!(
+        stderr,
+        "\
+sections_expect_wrong.aipl: `expect file: out.txt` mismatch
+--- expected ---
+other
+--- actual ---
+written
+"
     );
     assert_eq!(code, 1);
 
-    let (_stdout, stderr, code) = check(
+    let (stdout, stderr, code) = check_here(
         "sections_expect_missing",
         &format!("{writer}--- expect file: never.txt ---\nx\n"),
     );
-    assert!(
-        stderr.contains("expected output file \"never.txt\" was not written"),
-        "got:\n{stderr}"
+    assert_eq!(stdout, NO_TESTS);
+    assert_eq!(
+        stderr,
+        "sections_expect_missing.aipl: expected output file \"never.txt\" was not written: No such file or directory (os error 2)\n"
     );
     assert_eq!(code, 1);
 }
@@ -596,54 +650,80 @@ fn an_expect_file_section_checks_what_the_run_wrote() {
 #[test]
 fn a_run_section_on_a_file_with_no_main_is_reported() {
     let src = "fn f() -> i64 { 1 }\n--- stdout ---\nx\n";
-    let (_stdout, stderr, code) = check("sections_no_main", src);
-    assert!(
-        stderr.contains("a file with no `main` runs only its `.test` blocks"),
-        "got:\n{stderr}"
+    let (stdout, stderr, code) = check_here("sections_no_main", src);
+    assert_eq!(stdout, NO_TESTS);
+    assert_eq!(
+        stderr,
+        "sections_no_main.aipl: a file with no `main` runs only its `.test` blocks — it can't have a stdout/stderr/exit/cli/expect-file section\n"
     );
     assert_eq!(code, 1);
 }
 
+/// What compiling `fn bad() -> i64 { true }` reports, as an `errors` section
+/// records it: the file is named `./`-relative to where `check` was started.
+const BAD_ERRORS: &str = "\
+error: fn \"bad\": body returns bool, but the declared return type is i64
+ --> ./bad.aipl:1:19
+  |
+1 | fn bad() -> i64 { true }
+  |                   ^^^^";
+
 #[test]
 fn an_errors_section_makes_a_failing_compile_the_expected_outcome() {
-    // `bad` returns the wrong type. Record the rendered diagnostic by running it
-    // once, then check the recorded form passes — the path inside it is the
-    // `./`-relative spelling, not whatever this test's temp path looks like.
     let program = "fn bad() -> i64 { true }\n";
-    let (_stdout, stderr, code) = check_tree(
+
+    // Written as `?`, the section is wrong, and the mismatch shows what to write.
+    let (stdout, stderr, code) = check_tree(
         "sections_errors_record",
         &[("bad.aipl", &format!("{program}--- errors ---\n?\n"))],
         &[],
     );
+    assert_eq!(
+        stdout,
+        "1 file, 0 tests: 0 passed, 0 failed\n1 file has mismatched sections\n"
+    );
+    assert_eq!(
+        stderr,
+        format!(
+            "./bad.aipl: `errors` mismatch\n--- expected ---\n?\n--- actual ---\n{BAD_ERRORS}\n"
+        )
+    );
     assert_eq!(code, 1);
-    let expected = stderr
-        .split("bad.aipl: `errors` mismatch\n--- expected ---\n?\n--- actual ---\n")
-        .nth(1)
-        .unwrap_or_else(|| panic!("no errors mismatch in:\n{stderr}"))
-        .trim_end()
-        .to_string();
-    assert!(expected.contains("--> ./bad.aipl:1:"), "got:\n{expected}");
 
-    for args in [&[][..], &["bad.aipl"][..], &["./bad.aipl"][..]] {
+    // Written as what it showed, it passes, however the file is named on the
+    // command line (or found by walking the tree). A named file is checked on its
+    // own and has no tests to summarize, since it never compiled; a walk or a
+    // directory is a batch, which always ends in its one-line summary.
+    for (args, summary) in [
+        (&[][..], "1 file, 0 tests: 0 passed, 0 failed\n"),
+        (&["."][..], "1 file, 0 tests: 0 passed, 0 failed\n"),
+        (&["bad.aipl"][..], ""),
+        (&["./bad.aipl"][..], ""),
+    ] {
         let (stdout, stderr, code) = check_tree(
             "sections_errors_ok",
             &[(
                 "bad.aipl",
-                &format!("{program}--- errors ---\n{expected}\n"),
+                &format!("{program}--- errors ---\n{BAD_ERRORS}\n"),
             )],
             args,
         );
-        assert_eq!(code, 0, "args {args:?}:\n{stdout}{stderr}");
+        assert_eq!(
+            (stdout.as_str(), stderr.as_str(), code),
+            (summary, "", 0),
+            "args {args:?}"
+        );
     }
 }
 
 #[test]
 fn an_errors_section_on_a_file_that_compiles_is_reported() {
     let src = "fn ok() -> i64 { 1 }\n--- errors ---\nerror: nope\n";
-    let (_stdout, stderr, code) = check("sections_errors_compiles", src);
-    assert!(
-        stderr.contains("expected an error, but compilation succeeded"),
-        "got:\n{stderr}"
+    let (stdout, stderr, code) = check_here("sections_errors_compiles", src);
+    assert_eq!(stdout, "");
+    assert_eq!(
+        stderr,
+        "sections_errors_compiles.aipl: expected an error, but compilation succeeded\n"
     );
     assert_eq!(code, 1);
 }
@@ -651,10 +731,22 @@ fn an_errors_section_on_a_file_that_compiles_is_reported() {
 #[test]
 fn an_errors_section_cannot_sit_with_a_section_that_observes_a_run() {
     let src = "fn bad() -> i64 { true }\n--- errors ---\nx\n--- stdout ---\ny\n";
-    let (_stdout, stderr, code) = check("sections_errors_conflict", src);
-    assert!(
-        stderr.contains("`errors` section is mutually exclusive with stdout/stderr/exit code"),
-        "got:\n{stderr}"
+    let (stdout, stderr, code) = check_here("sections_errors_conflict", src);
+    assert_eq!(stdout, "");
+    assert_eq!(
+        stderr,
+        "\
+sections_errors_conflict.aipl: `errors` section is mutually exclusive with stdout/stderr/exit code
+sections_errors_conflict.aipl: `errors` mismatch
+--- expected ---
+x
+--- actual ---
+error: fn \"bad\": body returns bool, but the declared return type is i64
+ --> ./sections_errors_conflict.aipl:1:19
+  |
+1 | fn bad() -> i64 { true }
+  |                   ^^^^
+"
     );
     assert_eq!(code, 1);
 }
@@ -668,7 +760,7 @@ fn companions_are_staged_so_the_file_can_import_them() {
                fn main() !prints {\n    print(to_str(answer()));\n}\n\
                --- file: helper.aipl ---\npub fn answer() -> i64 { 42 }\n\
                --- stdout ---\n42\n";
-    let (stdout, stderr, code) = check("sections_companion", src);
+    let (stdout, stderr, code) = check_here("sections_companion", src);
     assert_eq!((stdout.as_str(), stderr.as_str(), code), (NO_TESTS, "", 0));
 }
 
@@ -678,9 +770,11 @@ fn companions_are_staged_for_the_tests_too() {
                import { answer } from \"./helper.aipl\";\n\n\
                fn f() -> i64 { answer() }.test({\n    assert(f() == 42);\n})\n\
                --- file: helper.aipl ---\npub fn answer() -> i64 { 42 }\n";
-    let (stdout, _stderr, code) = check("sections_companion_tests", src);
-    assert_eq!(stdout, "1 tests: 1 passed, 0 failed\n");
-    assert_eq!(code, 0);
+    let (stdout, stderr, code) = check_here("sections_companion_tests", src);
+    assert_eq!(
+        (stdout.as_str(), stderr.as_str(), code),
+        ("1 tests: 1 passed, 0 failed\n", "", 0)
+    );
 }
 
 #[test]
@@ -689,9 +783,25 @@ fn a_mismatched_section_does_not_hide_a_failing_test() {
                fn f() -> i64 { 1 }.test({\n    assert(f() == 2);\n})\n\n\
                fn main() !prints {\n    print(\"hi\");\n}\n\
                --- stdout ---\nbye\n";
-    let (stdout, stderr, code) = check("sections_with_failing_test", src);
-    assert!(stdout.contains("test f ... FAIL"), "got:\n{stdout}");
-    assert!(stderr.contains("`stdout` mismatch"), "got:\n{stderr}");
+    let (stdout, stderr, code) = check_here("sections_with_failing_test", src);
+    assert_eq!(
+        stdout,
+        "\
+test f ... FAIL
+  assert failed at sections_with_failing_test.aipl:4 f() == 2
+1 tests: 0 passed, 1 failed
+"
+    );
+    assert_eq!(
+        stderr,
+        "\
+sections_with_failing_test.aipl: `stdout` mismatch
+--- expected ---
+bye
+--- actual ---
+hi
+"
+    );
     assert_eq!(code, 1);
 }
 
@@ -706,18 +816,24 @@ fn the_batch_counts_files_with_mismatched_sections_and_keeps_going() {
         ],
         &[],
     );
-    assert!(
-        stderr.contains("./a_wrong.aipl: `stdout` mismatch"),
-        "got:\n{stderr}"
+    assert_eq!(
+        stderr,
+        "\
+./a_wrong.aipl: `stdout` mismatch
+--- expected ---
+bye
+--- actual ---
+hi
+./c_wrong.aipl: `stdout` mismatch
+--- expected ---
+bye
+--- actual ---
+hi
+"
     );
-    assert!(
-        stderr.contains("./c_wrong.aipl: `stdout` mismatch"),
-        "got:\n{stderr}"
-    );
-    assert!(!stderr.contains("b_ok.aipl"), "got:\n{stderr}");
-    assert!(
-        stdout.contains("2 files have mismatched sections"),
-        "got:\n{stdout}"
+    assert_eq!(
+        stdout,
+        "3 files, 0 tests: 0 passed, 0 failed\n2 files have mismatched sections\n"
     );
     assert_eq!(code, 1);
 }
@@ -725,29 +841,33 @@ fn the_batch_counts_files_with_mismatched_sections_and_keeps_going() {
 #[test]
 fn ignore_sections_checks_the_tests_alone() {
     let src = format!("{GREETS}--- stdout ---\nbye\n");
-    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("check");
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("check_here");
     fs::create_dir_all(&dir).expect("create temp dir");
-    let path = dir.join("sections_ignored.aipl");
-    fs::write(&path, src).expect("write temp source");
+    fs::write(dir.join("sections_ignored.aipl"), src).expect("write temp source");
     let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
-        .arg("check")
-        .arg("--ignore-sections")
-        .arg(&path)
+        .args(["check", "--ignore-sections", "sections_ignored.aipl"])
+        .current_dir(&dir)
         .output()
         .expect("run aipl check");
     assert_eq!(
-        out.status.code(),
-        Some(0),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
+        (
+            String::from_utf8_lossy(&out.stdout).into_owned(),
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+            out.status.code()
+        ),
+        (NO_TESTS.to_string(), String::new(), Some(0))
     );
 }
 
 #[test]
 fn a_malformed_section_is_the_files_error_not_a_dropped_expectation() {
     let src = format!("{GREETS}--- stdotu ---\nhi\n");
-    let (_stdout, stderr, code) = check("sections_unknown", &src);
-    assert!(stderr.contains("stdotu"), "got:\n{stderr}");
+    let (stdout, stderr, code) = check_here("sections_unknown", &src);
+    assert_eq!(stdout, "");
+    assert_eq!(
+        stderr,
+        "sections_unknown.aipl: unknown section name \"stdotu\"\n"
+    );
     assert_eq!(code, 1);
 }
 
@@ -769,29 +889,31 @@ fn performance_block(claim: &str) -> String {
 
 #[test]
 fn a_performance_block_that_holds_passes_and_is_counted() {
-    let (stdout, stderr, code) = check(
+    let (stdout, stderr, code) = check_here(
         "performance_holds",
         &performance_block("assert(measure(\"scalar\", 3, |n| n).allocations == 0);"),
     );
-    assert_eq!(stdout, "1 tests: 1 passed, 0 failed\n", "{stderr}");
-    assert_eq!(code, 0, "{stderr}");
+    assert_eq!(
+        (stdout.as_str(), stderr.as_str(), code),
+        ("1 tests: 1 passed, 0 failed\n", "", 0)
+    );
 }
 
 #[test]
 fn a_performance_claim_that_does_not_hold_fails_the_check() {
-    let (stdout, _stderr, code) = check(
+    let (stdout, stderr, code) = check_here(
         "performance_fails",
         &performance_block("assert(measure(\"scalar\", 3, |n| n).instructions == 0);"),
     );
-    assert!(
-        stdout.contains("test work.performance ... FAIL"),
-        "got:\n{stdout}"
+    assert_eq!(
+        stdout,
+        "\
+test work.performance ... FAIL
+  assert failed at performance_fails.aipl:4 measure(\"scalar\", 3, |n| n).instructions == 0
+1 tests: 0 passed, 1 failed
+"
     );
-    assert!(
-        stdout.contains("1 tests: 0 passed, 1 failed"),
-        "got:\n{stdout}"
-    );
-    assert_eq!(code, 1);
+    assert_eq!((stderr.as_str(), code), ("", 1));
 }
 
 #[test]
@@ -800,18 +922,23 @@ fn performance_and_ordinary_tests_share_one_summary_and_a_failure_of_either_fail
                fn one() -> i64 { 1 }.test({\n    assert(one() == 1);\n}).performance({\n    \
                assert(measure(\"scalar\", 3, |n| n).allocations == 0);\n})\n\n\
                fn two() -> i64 { 2 }.test({\n    assert(two() == 3);\n})\n";
-    let (stdout, _stderr, code) = check("performance_summary", src);
-    assert!(stdout.contains("test two ... FAIL"), "got:\n{stdout}");
-    assert!(
-        stdout.contains("3 tests: 2 passed, 1 failed"),
-        "got:\n{stdout}"
+    let (stdout, stderr, code) = check_here("performance_summary", src);
+    // Three tests — `one`, `one.performance`, `two` — and the one that fails is
+    // the ordinary one; the performance block passes silently.
+    assert_eq!(
+        stdout,
+        "\
+test two ... FAIL
+  assert failed at performance_summary.aipl:10 two() == 3
+3 tests: 2 passed, 1 failed
+"
     );
-    assert_eq!(code, 1);
+    assert_eq!((stderr.as_str(), code), ("", 1));
 }
 
 #[test]
 fn a_performance_failure_in_a_batch_names_its_file_and_does_not_stop_the_run() {
-    let (stdout, _stderr, code) = check_tree(
+    let (stdout, stderr, code) = check_tree(
         "performance_batch",
         &[
             (
@@ -825,16 +952,16 @@ fn a_performance_failure_in_a_batch_names_its_file_and_does_not_stop_the_run() {
         ],
         &[],
     );
-    assert!(
-        stdout.contains("test ./a_fails.aipl::work.performance ... FAIL"),
-        "got:\n{stdout}"
-    );
     // The second file ran, and both blocks are in the one aggregate.
-    assert!(
-        stdout.contains("2 tests: 1 passed, 1 failed"),
-        "got:\n{stdout}"
+    assert_eq!(
+        stdout,
+        "\
+test ./a_fails.aipl::work.performance ... FAIL
+  assert failed at a_fails.aipl:4 measure(\"scalar\", 3, |n| n).instructions == 0
+2 files, 2 tests: 1 passed, 1 failed
+"
     );
-    assert_eq!(code, 1);
+    assert_eq!((stderr.as_str(), code), ("", 1));
 }
 
 #[test]
@@ -843,45 +970,85 @@ fn measure_outside_a_performance_block_is_refused() {
     // may count anything.
     let in_test = "import { equal as ==, measure } from builtins;\n\n\
                    fn one() -> i64 { 1 }.test({\n    assert(measure(\"x\", 1, |n| n).allocations == 0);\n})\n";
-    let (_stdout, stderr, code) = check("measure_in_test", in_test);
-    assert!(
-        stderr.contains("fn \"measure\" can only be called from a `.performance` block"),
-        "got:\n{stderr}"
+    let (stdout, stderr, code) = check_here("measure_in_test", in_test);
+    assert_eq!(stdout, "");
+    assert_eq!(
+        stderr,
+        "\
+error: fn \"measure\" can only be called from a `.performance` block
+ --> measure_in_test.aipl:4:12
+  |
+4 |     assert(measure(\"x\", 1, |n| n).allocations == 0);
+  |            ^^^^^^^^^^^^^^^^^^^^^^
+"
     );
     assert_eq!(code, 1);
 
     let in_fn = "import { measure } from builtins;\n\n\
                  fn main() {\n    measure(\"x\", 1, |n| n);\n}\n";
-    let (_stdout, stderr, code) = check("measure_in_main", in_fn);
-    assert!(
-        stderr.contains("fn \"measure\" can only be called from a `.performance` block"),
-        "got:\n{stderr}"
+    let (stdout, stderr, code) = check_here("measure_in_main", in_fn);
+    assert_eq!(stdout, "");
+    assert_eq!(
+        stderr,
+        "\
+error: fn \"measure\" can only be called from a `.performance` block
+ --> measure_in_main.aipl:4:5
+  |
+4 |     measure(\"x\", 1, |n| n);
+  |     ^^^^^^^^^^^^^^^^^^^^^^
+"
     );
     assert_eq!(code, 1);
 }
 
 #[test]
 fn a_performance_block_may_not_use_an_effect_directly_or_through_what_it_measures() {
-    let src = "import { measure, print } from builtins;\n\n\
-               fn noisy(n: i64) !prints -> i64 {\n    print(\"hi\");\n    n\n}\n\n\
-               fn work() {}.performance({\n    print(\"direct\");\n    measure(\"named\", 1, noisy);\n    \
-               measure(\"closure\", 1, |n| {\n        print(\"inside\");\n        n\n    });\n})\n";
-    let (_stdout, stderr, code) = check("performance_effects", src);
-    // Each of the three uses is refused, and each says why.
+    let src = "\
+import { measure, print } from builtins;
+
+fn noisy(n: i64) !prints -> i64 {
+    print(\"hi\");
+    n
+}
+
+fn work() {}.performance({
+    print(\"direct\");
+    measure(\"named\", 1, noisy);
+    measure(
+        \"closure\",
+        1,
+        |n| {
+            print(\"inside\");
+            n
+        },
+    );
+})
+";
+    let (stdout, stderr, code) = check_here("performance_effects", src);
+    // Each of the three uses is refused, and each says why: printing in the block
+    // itself, handing it a function that prints, and a closure that prints.
+    assert_eq!(stdout, "");
     assert_eq!(
-        stderr
-            .matches("effects are not supported in a `.performance` block yet")
-            .count(),
-        3,
-        "got:\n{stderr}"
-    );
-    assert!(
-        stderr.contains("fn \"print\" has effect \"!prints\""),
-        "got:\n{stderr}"
-    );
-    assert!(
-        stderr.contains("fn \"noisy\" has effect \"!prints\""),
-        "got:\n{stderr}"
+        stderr,
+        "\
+error: effects are not supported in a `.performance` block yet: fn \"print\" has effect \"!prints\"
+ --> performance_effects.aipl:9:5
+  |
+9 |     print(\"direct\");
+  |     ^^^^^^^^^^^^^^^
+
+error: effects are not supported in a `.performance` block yet: fn \"noisy\" has effect \"!prints\"
+  --> performance_effects.aipl:10:25
+   |
+10 |     measure(\"named\", 1, noisy);
+   |                         ^^^^^
+
+error: effects are not supported in a `.performance` block yet: fn \"print\" has effect \"!prints\"
+  --> performance_effects.aipl:15:13
+   |
+15 |             print(\"inside\");
+   |             ^^^^^^^^^^^^^^^
+"
     );
     assert_eq!(code, 1);
 }
@@ -890,10 +1057,17 @@ fn a_performance_block_may_not_use_an_effect_directly_or_through_what_it_measure
 fn a_literal_measurement_label_used_twice_in_one_block_is_refused() {
     let src = "import { measure } from builtins;\n\n\
                fn work() {}.performance({\n    measure(\"same\", 1, |n| n);\n    measure(\"same\", 2, |n| n);\n})\n";
-    let (_stdout, stderr, code) = check("performance_duplicate_label", src);
-    assert!(
-        stderr.contains("duplicate measurement label \"same\" in this `.performance` block"),
-        "got:\n{stderr}"
+    let (stdout, stderr, code) = check_here("performance_duplicate_label", src);
+    assert_eq!(stdout, "");
+    assert_eq!(
+        stderr,
+        "\
+error: duplicate measurement label \"same\" in this `.performance` block — a report could not tell the two apart
+ --> performance_duplicate_label.aipl:5:13
+  |
+5 |     measure(\"same\", 2, |n| n);
+  |             ^^^^^^
+"
     );
     assert_eq!(code, 1);
 
@@ -901,21 +1075,29 @@ fn a_literal_measurement_label_used_twice_in_one_block_is_refused() {
     let two_blocks = "import { measure } from builtins;\n\n\
                       fn a() {}.performance({\n    measure(\"same\", 1, |n| n);\n})\n\n\
                       fn b() {}.performance({\n    measure(\"same\", 1, |n| n);\n})\n";
-    let (stdout, stderr, code) = check("performance_label_per_block", two_blocks);
-    assert_eq!(stdout, "2 tests: 2 passed, 0 failed\n", "{stderr}");
-    assert_eq!(code, 0);
+    let (stdout, stderr, code) = check_here("performance_label_per_block", two_blocks);
+    assert_eq!(
+        (stdout.as_str(), stderr.as_str(), code),
+        ("2 tests: 2 passed, 0 failed\n", "", 0)
+    );
 }
 
 #[test]
 fn a_type_error_in_a_performance_block_is_reported_with_its_source() {
-    let (_stdout, stderr, code) = check(
+    let (stdout, stderr, code) = check_here(
         "performance_type_error",
         &performance_block("assert(measure(\"x\", 1, |n| n).allocations == true);"),
     );
-    assert!(stderr.contains("error:"), "got:\n{stderr}");
-    assert!(
-        stderr.contains("performance_type_error.aipl"),
-        "got:\n{stderr}"
+    assert_eq!(stdout, "");
+    assert_eq!(
+        stderr,
+        "\
+error: \"==\" between u64 and bool: both sides must be the same type
+ --> performance_type_error.aipl:4:12
+  |
+4 |     assert(measure(\"x\", 1, |n| n).allocations == true);
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"
     );
     assert_eq!(code, 1);
 }
@@ -928,21 +1110,20 @@ fn a_performance_block_is_left_out_of_what_run_and_build_make() {
     let src = "import { measure, print } from builtins;\n\n\
                fn work() {}.performance({\n    measure(\"x\", 1, |n| n);\n})\n\n\
                fn main() !prints {\n    print(\"hi\");\n}\n";
-    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("check");
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("check_here");
     fs::create_dir_all(&dir).expect("create temp dir");
-    let path = dir.join("performance_run.aipl");
-    fs::write(&path, src).expect("write temp source");
+    fs::write(dir.join("performance_run.aipl"), src).expect("write temp source");
     let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
-        .arg("run")
-        .arg(&path)
+        .args(["run", "performance_run.aipl"])
+        .current_dir(&dir)
         .output()
         .expect("run aipl run");
-    let stdout = String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n");
     assert_eq!(
-        stdout,
-        "hi\n0\n",
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
+        (
+            String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n"),
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+            out.status.code()
+        ),
+        ("hi\n0\n".to_string(), String::new(), Some(0))
     );
-    assert_eq!(out.status.code(), Some(0));
 }

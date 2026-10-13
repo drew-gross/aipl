@@ -237,6 +237,12 @@ pub struct PerfStats {
     pub deallocations: u64,
     pub reallocations: u64,
     pub bytes_allocated: u64,
+    /// The most heap live at once over the run, in bytes the program asked for.
+    ///
+    /// Not part of the `--- performance ---` body ([`PerfStats::render`]), which
+    /// predates it and is being retired; it is what `aipl report` prints, and
+    /// `0` when the stats being parsed did not carry it.
+    pub peak_live_bytes: u64,
     pub instructions: u64,
     pub binary_size: BinSizes,
     /// Every function the program ran or emitted code for, sorted by name — the
@@ -277,9 +283,26 @@ pub struct FnStat {
 impl PerfStats {
     /// The `--- performance ---` body these stats represent.
     pub fn render(&self) -> String {
+        self.render_counts(false)
+    }
+
+    /// [`render`](PerfStats::render) plus the `peak live bytes:` line: the same
+    /// `key: value` form, which [`PerfStats::parse`] reads back whole. What a tool
+    /// that wants every count asks for, where `--- performance ---` stays as it
+    /// was.
+    pub fn render_machine(&self) -> String {
+        self.render_counts(true)
+    }
+
+    fn render_counts(&self, with_peak: bool) -> String {
+        let peak = if with_peak {
+            format!("peak live bytes: {}\n", self.peak_live_bytes)
+        } else {
+            String::new()
+        };
         let mut out = format!(
             "allocations: {}\ndeallocations: {}\nreallocations: {}\nbytes allocated: {}\n\
-             instructions executed: {}\n{}",
+             {peak}instructions executed: {}\n{}",
             self.allocations,
             self.deallocations,
             self.reallocations,
@@ -299,6 +322,62 @@ impl PerfStats {
             ));
         }
         out
+    }
+
+    /// The stats for a person: the counts aligned, the binary size split on one
+    /// line, and the functions as a table. `aipl report`'s output.
+    pub fn render_report(&self) -> String {
+        let mut out = String::new();
+        let mut row = |label: &str, value: String| out.push_str(&format!("{label:<17} {value}\n"));
+        row("allocations", self.allocations.to_string());
+        row("deallocations", self.deallocations.to_string());
+        row("reallocations", self.reallocations.to_string());
+        row("bytes allocated", self.bytes_allocated.to_string());
+        row("peak live bytes", self.peak_live_bytes.to_string());
+        row("instructions", self.instructions.to_string());
+        row(
+            "binary size",
+            format!(
+                "{} bytes (code {}, data {}, metadata {})",
+                self.binary_size.total,
+                self.binary_size.code,
+                self.binary_size.data,
+                self.binary_size.metadata
+            ),
+        );
+        if self.functions.is_empty() {
+            return out;
+        }
+        let name_width = self
+            .functions
+            .iter()
+            .map(|f| f.name.len())
+            .max()
+            .unwrap_or(0);
+        let name_width = name_width.max("function".len());
+        out.push_str(&format!(
+            "\n{:<name_width$}  {:>9}  {:>10}\n",
+            "function", "calls", "code bytes"
+        ));
+        for f in &self.functions {
+            let bytes = match f.bytes {
+                Some(n) => n.to_string(),
+                None => "external".to_string(),
+            };
+            out.push_str(&format!(
+                "{:<name_width$}  {:>9}  {:>10}\n",
+                f.name, f.calls, bytes
+            ));
+        }
+        out
+    }
+
+    /// How many allocations were never freed, or `None` when every one was. A
+    /// program that leaks is wrong, and a count that includes it is not one to
+    /// trust, so `aipl report` says so and exits non-zero.
+    pub fn leaked(&self) -> Option<u64> {
+        let n = self.allocations.abs_diff(self.deallocations);
+        (n > 0).then_some(n)
     }
 
     /// Fold the object's per-function byte sizes into the call counts read back
@@ -458,6 +537,7 @@ impl PerfStats {
         let mut deallocations = None;
         let mut reallocations = None;
         let mut bytes_allocated = None;
+        let mut peak_live_bytes = None;
         let mut instructions = None;
         let mut binary_size = None;
         let mut code = None;
@@ -515,6 +595,8 @@ impl PerfStats {
             }
             if let Some(v) = line.strip_prefix("bytes allocated:") {
                 bytes_allocated = v.trim().parse().ok();
+            } else if let Some(v) = line.strip_prefix("peak live bytes:") {
+                peak_live_bytes = v.trim().parse().ok();
             } else if let Some(v) = line.strip_prefix("instructions executed:") {
                 instructions = v.trim().parse().ok();
             } else if let Some(v) = line.strip_prefix("binary size:") {
@@ -538,6 +620,7 @@ impl PerfStats {
             deallocations: deallocations?,
             reallocations: reallocations?,
             bytes_allocated: bytes_allocated?,
+            peak_live_bytes: peak_live_bytes.unwrap_or(0),
             instructions: instructions?,
             binary_size: BinSizes {
                 total: binary_size?,

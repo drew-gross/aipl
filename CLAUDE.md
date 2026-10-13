@@ -207,7 +207,16 @@ Two separate perf tracks:
   giving every function's call count and byte size in one list — builtins
   included, at `bytes: (external)`, since only this object's code is measured).
   These have hard assertions and are filled/refreshed with the `fill_expected`
-  ignored test (see below).
+  ignored test (see below). **To look at one, run `aipl report <file.aipl>`** — it
+  prints the same counts (plus the peak of live heap bytes, which the section does
+  not carry), the binary size split, and the `functions:` table as readable
+  columns; `--machine` prints them as `key: value` lines, and `-- args` passes
+  program arguments (default: the file's `--- cli ---`). It runs through
+  `aipl::perf::measure`, the one implementation the harness uses, so its numbers
+  are the section's byte for byte (`tests/suites/report.rs` checks that on a spread
+  of cases), and it roots the file at its own directory for the same reason the
+  harness does: an `assert`'s file label is baked into the binary's data. It needs
+  the linker `aipl build` does, and exits 1 for a program that leaks.
 - **Non-deterministic, *not* asserted**: `tests/performance_metrics.md` — a
   checked-in table of wall-clock (measured in-process, so process spawn/teardown
   is excluded), build time, and peak RSS per case. These drift run-to-run, so

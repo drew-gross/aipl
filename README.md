@@ -18,6 +18,7 @@ cargo build
 ./target/debug/aipl run   file.aipl          # compile and JIT-execute `main`
 ./target/debug/aipl build file.aipl -o app   # link a native executable
 ./target/debug/aipl check [path...]          # run every fn's `.test` and `.performance` blocks
+./target/debug/aipl report file.aipl         # allocations, instructions, binary size and per-function counts for one run
 ./target/debug/aipl fmt   file.aipl          # rewrite in canonical format (`--check` to report)
 ./target/debug/aipl docs  [path...] -o dir   # write the HTML documentation site
 ./target/debug/aipl lsp                      # serve the Language Server Protocol (editors spawn this)
@@ -38,6 +39,12 @@ fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }.performance({
     assert(small.instructions == large.instructions);
 })
 ```
+
+`aipl report file.aipl` is the whole-program counterpart: it runs the file's `main`
+once in the same instrumented build and prints the counts, the object's size, and
+every function's call count and code size (`--machine` for `key: value` lines,
+`-- args` to pass the program arguments). It is the quickest way to see what a
+change did to a program.
 
 `measure(label, input, f)` runs `f(input)` once and returns a `Measurement` — its
 `allocations`, `bytes_allocated`, `peak_live_bytes` and `instructions`, all exact

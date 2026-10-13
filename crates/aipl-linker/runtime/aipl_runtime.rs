@@ -1660,6 +1660,7 @@ pub extern "C" fn main(argc: c_int, argv: *const *const c_char) -> c_int {
 //   deallocations: <M>
 //   reallocations: <K>
 //   bytes allocated: <B>
+//   peak live bytes: <P>
 //   instructions executed: <I>
 //   functions:
 //     <name>:               (one entry per function that ran, AIPL or builtin)
@@ -1729,6 +1730,8 @@ unsafe fn report_alloc_stats() {
         fput_u64(f, REALLOC_COUNT.load(Ordering::Relaxed));
         fputs(b"\nbytes allocated: \0".as_ptr() as *const c_char, f);
         fput_u64(f, ALLOC_BYTES.load(Ordering::Relaxed));
+        fputs(b"\npeak live bytes: \0".as_ptr() as *const c_char, f);
+        fput_u64(f, PEAK_LIVE_BYTES.load(Ordering::Relaxed));
         fputs(b"\ninstructions executed: \0".as_ptr() as *const c_char, f);
         fput_u64(f, INSN_COUNT.load(Ordering::Relaxed));
         // One `functions:` block covering both halves of the call story: the

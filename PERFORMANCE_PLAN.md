@@ -177,13 +177,33 @@ again.
 - [x] Runtime: track peak live bytes (a high-water mark of allocated minus freed),
       in both the JIT and AOT runtimes. (Done in the instrumented AOT runtime; the
       JIT never instruments. See Phase 3.)
-- [ ] `aipl report <file.aipl> [-- args]`: runs `main`, or the `.test` driver for a
+- [x] `aipl report <file.aipl> [-- args]`: runs `main`, or the `.test` driver for a
       library file, instrumented. It prints the counts (including peak live
       bytes), the binary size split, and per-function calls/bytes, and flags a
-      leak (allocations ≠ deallocations).
-- [ ] Machine-readable output mode for the harness and handoff.
-- [ ] `report` suite in `tests/suites/` (plus its `mod` line) covering the output.
-- [ ] Usage text; README and CLAUDE.md mention.
+      leak (allocations ≠ deallocations). Landed in `report_cmd` over
+      `aipl::perf::measure`. Decisions:
+      - Arguments after `--` go to the program; otherwise the file's `--- cli ---`.
+      - The file is staged as `check` stages one (companions beside it, a scratch
+        directory the program runs in) but rooted at **its own directory**, not the
+        working directory: an `assert`'s file label is baked into the binary's
+        data, so any other root makes `binary size` depend on where `report` ran
+        and disagree with the harness. With it, `report`'s numbers equal a case's
+        recorded section byte for byte.
+      - A leak prints a `leak:` line on stderr and exits 1; the counts still print.
+      - `PerfStats` gained `peak_live_bytes`, read from a new `peak live bytes:`
+        line the instrumented runtime writes. **`render()` (the `--- performance
+        ---` body) does not include it**, so no section churns; `render_machine()`
+        and `render_report()` do.
+- [x] Machine-readable output mode for the harness and handoff: `--machine`, the
+      `--- performance ---` form plus the peak line, which `PerfStats::parse` reads
+      back whole. (The harness calls `aipl::perf` directly; this is for tools that
+      shell out, handoff in Phase 2.)
+- [x] `report` suite in `tests/suites/` (plus its `mod` line) covering the output:
+      parity with the recorded section on four cases (cli section, library,
+      file-writing, companions), independence from the working directory, both
+      output forms, the peak, `--` arguments overriding `--- cli ---`, and the
+      refusals.
+- [x] Usage text; README and CLAUDE.md mention.
 
 ### Phase 2: baseline table, sections become optional (the churn win)
 

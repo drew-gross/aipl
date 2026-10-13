@@ -61,6 +61,8 @@ fn cli() -> ExitCode {
         // `check` owns its exit code (0 = all tests passed, 1 = a failure) and
         // prints its own report, so it returns an `ExitCode` directly.
         Some("check") => return check_cmd(&args[2..]),
+        // `report` owns its exit code too: 1 for a program that leaks.
+        Some("report") => return report_cmd(&args[2..]),
         Some("lsp") => lsp_cmd(&args[2..]),
         Some("--help") | Some("-h") | Some("help") | None => {
             println!("{}", usage(&prog));
@@ -88,6 +90,7 @@ fn usage(prog: &str) -> String {
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
   {prog} fmt   <file.aipl> [--check]        rewrite the file in canonical format
   {prog} check [path...] [--ignore-sections]  run every fn's `.test({{ .. }})` block, and check each file's sections
+  {prog} report <file.aipl> [--machine] [-- args...]  count what a run of the file costs
   {prog} lsp                                serve the Language Server Protocol on stdin/stdout
 
 `docs` is `doc`'s whole-project counterpart: where `doc` prints one file's
@@ -109,6 +112,16 @@ only when one of them is present). `--- file: p ---` sections are staged beside
 the file so its imports and fixtures resolve. `--ignore-sections` checks the
 tests alone. It reports every failure rather than stopping at the first, and
 exits 0 only if all of them were formatted, compiled, passed, and matched.
+
+`report` builds the file's `main` (or, for a file with only `.test` blocks, the run
+of those tests) in the instrumented build and runs it once: heap allocations,
+bytes asked for, the most heap live at once, CLIF instructions executed, the
+object's size split into code/data/metadata, and every function's call count and
+code size, runtime builtins included. The counts are exact and repeatable. It
+needs the linker `build` does. Arguments after `--` go to the program (default:
+the file's `--- cli ---` section); `--machine` prints the same counts as `key:
+value` lines for a tool to read. A program that frees fewer blocks than it
+allocated leaks, which `report` says and exits 1 for.
 
 `lsp` is for an editor to spawn, not for a person to run: it speaks the
 Language Server Protocol over stdin/stdout and answers go-to-definition, hover,
@@ -391,9 +404,12 @@ fn check_file(
 /// A malformed section (an unknown name, a non-integer `exit code`, a companion
 /// path that cannot be staged) is the file's error to report. Skipping it would
 /// drop an expectation, and the file would pass for the wrong reason.
-fn read_spec(file: &Path) -> Result<SpecFields, String> {
+///
+/// `label` is the path as the user gave it (or discovery found it), which is what
+/// the error names.
+fn read_spec(file: &Path, label: &str) -> Result<SpecFields, String> {
     match std::fs::read_to_string(file) {
-        Ok(src) => aipl::parse_spec(&src).map_err(|e| format!("{}: {e}", file.display())),
+        Ok(src) => aipl::parse_spec(&src).map_err(|e| format!("{label}: {e}")),
         Err(_) => Ok(SpecFields::default()),
     }
 }
@@ -476,7 +492,7 @@ fn check_resolved(
     sections: bool,
     dbg: DebugOptions,
 ) -> Result<Checked, String> {
-    let spec = read_spec(path)?;
+    let spec = read_spec(path, label)?;
     let section_label = sections.then(|| section_label(path, project_root));
     in_staged_dir(path, &spec, project_root, |staged| {
         check_file(staged, label, &spec, section_label.as_deref(), dbg)
@@ -714,6 +730,123 @@ fn check_cmd(args: &[String]) -> ExitCode {
     } else {
         ExitCode::SUCCESS
     }
+}
+
+/// `report <file.aipl> [--machine] [-- args...]` — run the file once in the
+/// instrumented build and print what it cost.
+///
+/// What it runs is what the cases harness measures for `--- performance ---`: the
+/// file's `main`, or for a library with only `.test` blocks the synthesized test
+/// driver (so the report is of the same run `aipl check` makes, minus
+/// `.performance` blocks). It is built and run the way `check` stages a file —
+/// `--- file: ---` companions beside it, in a scratch directory the program runs
+/// in — so a program that reads fixtures or writes files neither fails nor
+/// litters.
+///
+/// Exit 0, or 1 when the file does not compile, cannot be run, or leaks.
+fn report_cmd(args: &[String]) -> ExitCode {
+    let (args, dbg) = take_debug_flag(args);
+    let mut machine = false;
+    let mut file: Option<&str> = None;
+    let mut program_args: Option<Vec<String>> = None;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--" => {
+                program_args = Some(args[i + 1..].to_vec());
+                break;
+            }
+            "--machine" => machine = true,
+            other if file.is_none() => file = Some(other),
+            other => {
+                eprintln!("unexpected arg {other:?}");
+                return ExitCode::FAILURE;
+            }
+        }
+        i += 1;
+    }
+    let Some(file) = file else {
+        eprintln!("missing source file");
+        return ExitCode::FAILURE;
+    };
+    let Ok(path) = std::fs::canonicalize(file) else {
+        eprintln!("no such file: {file}");
+        return ExitCode::FAILURE;
+    };
+    let result = report_resolved(&path, file, program_args, dbg);
+    let stats = match result {
+        Ok(stats) => stats,
+        Err(msg) => {
+            eprintln!("{msg}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if machine {
+        println!("{}", stats.render_machine());
+    } else {
+        print!("{}", stats.render_report());
+    }
+    match stats.leaked() {
+        Some(n) => {
+            eprintln!(
+                "leak: {n} of {} allocations were never freed ({} deallocations)",
+                stats.allocations, stats.deallocations
+            );
+            ExitCode::FAILURE
+        }
+        None => ExitCode::SUCCESS,
+    }
+}
+
+/// [`report_cmd`] up to the printing: stage the file, build it, run it.
+fn report_resolved(
+    path: &Path,
+    label: &str,
+    program_args: Option<Vec<String>>,
+    dbg: DebugOptions,
+) -> Result<aipl::perf::PerfStats, String> {
+    let spec = read_spec(path, label)?;
+    // The file is a one-file project rooted at its own directory, not at wherever
+    // `report` was run from. That root is what an `assert` or `trace` names its file
+    // relative to, and the name is baked into the binary's data: rooted anywhere
+    // else, `binary size` would depend on the working directory, and would stop
+    // agreeing with the cases harness, which roots a case the same way.
+    let project_root = path.parent().unwrap_or(path).to_path_buf();
+    // Explicit arguments win; otherwise the file's own `--- cli ---`.
+    let cli = program_args.unwrap_or_else(|| spec.cli.clone());
+    in_staged_dir(path, &spec, &project_root, |staged| {
+        report_file(staged, label, &cli, dbg)
+    })?
+}
+
+fn report_file(
+    staged: &Staged,
+    label: &str,
+    cli: &[String],
+    dbg: DebugOptions,
+) -> Result<aipl::perf::PerfStats, String> {
+    let render = |e| render_err_at(&staged.entry, label, e);
+    let program = loader::load_program_rooted(&staged.entry, &staged.root, dbg).map_err(render)?;
+    let stem = staged
+        .entry
+        .file_stem()
+        .and_then(OsStr::to_str)
+        .unwrap_or("a.out");
+    let measured = aipl::perf::measured_program(&program);
+    let object = ObjectCompilation::new(&measured, stem, dbg, false).map_err(render)?;
+    // Read before `emit` consumes the compilation: what each symbol is called in
+    // AIPL, for the per-function code sizes.
+    let symbol_names = object.code_symbol_names();
+    let production = object.emit().map_err(|e| e.to_string())?;
+    // The staged scratch directory the program runs in (see `in_staged_dir`).
+    let dir = env::current_dir().map_err(|e| format!("current dir: {e}"))?;
+    aipl::perf::measure(&measured, stem, &production, &symbol_names, cli, &dir, dbg).map_err(|e| {
+        match e {
+            aipl::perf::MeasureError::Compile(errors) => render(errors),
+            aipl::perf::MeasureError::Link(e) => e.to_string(),
+            aipl::perf::MeasureError::Run(msg) => msg,
+        }
+    })
 }
 
 /// Serve the Language Server Protocol on stdin/stdout.

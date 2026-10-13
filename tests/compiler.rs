@@ -32,6 +32,8 @@ mod mono;
 mod parser;
 #[path = "suites/projects.rs"]
 mod projects;
+#[path = "suites/report.rs"]
+mod report;
 #[path = "suites/shims.rs"]
 mod shims;
 
