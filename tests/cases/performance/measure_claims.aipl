@@ -1,0 +1,116 @@
+# `measure(label, input, f)` runs `f(input)` once and reports what it cost, so a
+# `.performance` block can state a property of the code and have `aipl check`
+# hold it to that. The counts are exact and repeatable, which is why most claims
+# here are equalities; the few bounds are on instructions, the one count a
+# compiler change may move.
+#
+# What a measurement contains: the heap allocations made, the bytes they asked
+# for, the most heap live at once *counted from what was live when it began*, and
+# the CLIF instructions executed. It includes a small fixed cost for the
+# measuring itself, which is the same every time and so cancels in a comparison.
+#
+# The input is built outside the window, so building it is not measured; the
+# result is released inside it, so freeing it is.
+
+import {
+    Measurement,
+    count,
+    equal as ==,
+    less_than as <,
+    less_than_or_equal as <=,
+    measure,
+    not_equal as !=,
+    push,
+    wrapping_increment as ++,
+} from builtins;
+
+fn filled(n: i64, x: i64) -> i64[] {
+    mut xs: i64[] = [];
+    mut i: i64 = 0;
+    while (i != n) {
+        set xs.push(x);
+        set i++;
+    }
+    xs
+}
+
+fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }
+
+fn main() {}
+
+fn work() {}.performance({
+    // Work that touches no heap costs none, and holds none.
+    let Measurement { allocations, bytes_allocated, peak_live_bytes, instructions } = measure(
+        "scalar",
+        3,
+        |n| n,
+    );
+    assert(allocations == 0);
+    assert(bytes_allocated == 0);
+    assert(peak_live_bytes == 0);
+    assert(instructions <= 100);
+})
+
+// A relative claim, the kind that survives compiler changes: counting stops once
+// the answer is settled, so it costs the same on ten elements as on ten thousand.
+fn early_exit() {}.performance({
+    let small = filled(10, 2);
+    let large = filled(10000, 2);
+    let at_ten = measure("ten elements", small, decided_early);
+    let at_ten_thousand = measure("ten thousand elements", large, decided_early);
+    assert(at_ten.allocations == 0);
+    assert(at_ten_thousand.allocations == 0);
+    assert(at_ten.instructions == at_ten_thousand.instructions);
+})
+
+// A value small enough to live in the value's own words needs no allocation:
+// a one-element array, a short string. The claim is the point of the section's
+// existence — that building one is free — and states it where a change to the
+// representation would break it.
+fn inline_values() {}.performance({
+    assert(measure("one element", 1, |n| [n]).allocations == 0);
+    assert(measure("short string", "hi", |s| s).allocations == 0);
+})
+
+// Allocation and the peak of live memory. Building a hundred-element array
+// allocates, and what is live at its peak is at least what one allocation held.
+fn building() {}.performance({
+    let built = measure("build 100", 100, |n| filled(n, 7));
+    assert(0 < built.allocations);
+    assert(0 < built.bytes_allocated);
+    assert(0 < built.peak_live_bytes);
+    // Doing it three times over allocates more, and takes more instructions.
+    let three_times = measure("build 300", 300, |n| filled(n, 7));
+    assert(built.instructions < three_times.instructions);
+    assert(built.allocations <= three_times.allocations);
+})
+
+// The peak is counted from what was live when the window opened. `held` is a
+// large array alive throughout, and a measurement made while it is held neither
+// sees it nor is changed by it.
+fn peak_is_relative() {}.performance({
+    let held = filled(1000, 1);
+    let alongside = measure("beside a held array", 3, |n| n);
+    assert(alongside.peak_live_bytes == 0);
+    assert(alongside.allocations == 0);
+    // And the same work measures the same with and without it.
+    let build_with_held = measure("build with it held", 100, |n| filled(n, 7));
+    let built_alone = measure("build alone", 100, |n| filled(n, 7));
+    assert(build_with_held.peak_live_bytes == built_alone.peak_live_bytes);
+    assert(build_with_held.allocations == built_alone.allocations);
+    assert(held.count(1) == 1000);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 3
+binary size: 488
+  code: 8
+  data: 1
+  metadata: 479
+functions:
+  main:
+    calls: 1
+    bytes: 8

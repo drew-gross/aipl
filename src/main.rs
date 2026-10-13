@@ -260,6 +260,9 @@ struct Checked {
     exit_code: i64,
     traces: Option<String>,
     sections: Vec<String>,
+    /// Whether the test driver ran at all: an `errors` file never compiles, so it
+    /// has no tests and no summary to print.
+    ran_tests: bool,
 }
 
 /// Where one file is loaded from: the `entry` source, and the `root` its
@@ -317,16 +320,48 @@ fn check_file(
             exit_code: 0,
             traces: None,
             sections: found,
+            ran_tests: false,
         });
     }
     let program = loader::load_program_rooted(&staged.entry, &staged.root, dbg).map_err(render)?;
+    // A `.performance` block can be wrong in a way its types and effects do not
+    // say; that is reported up front, like a type error, and nothing runs.
+    let faults = aipl::performance_diagnostics(&program);
+    if !faults.is_empty() {
+        return Err(render(faults));
+    }
     let traces = aipl::trace_diagnostics(&program, "check");
     let test_program = aipl::codegen::build_test_program(&program);
     // `__test_main` runs each test and returns the exit code (0 ok, 1 failures),
     // printing failures itself. (Runs on `main`'s large-stack worker thread,
     // which gives codegen room for deep `.test` driver/expression trees.)
     let comp = Compilation::new(&test_program, dbg).map_err(render)?;
-    let exit_code = comp.run_0("__test_main").map_err(|e| e.to_string())?;
+    let mut exit_code = comp.run_0("__test_main").map_err(|e| e.to_string())?;
+
+    // The `.performance` blocks, run apart from the tests above: they need an
+    // instrumented build, which the JIT is not. Their failures print as the tests'
+    // do and their tallies join the same aggregate, so a failing block fails the
+    // file exactly as a failing test does — and, like one, stops nothing else.
+    if let Some(driver) = aipl::codegen::build_performance_program(&program) {
+        let stem = staged
+            .entry
+            .file_stem()
+            .and_then(OsStr::to_str)
+            .unwrap_or("a.out");
+        let batch_label = aipl::codegen::test_file().unwrap_or_default();
+        match aipl::perf::run_performance_tests(&driver, stem, &batch_label, dbg) {
+            Ok(run) => {
+                print!("{}", run.report);
+                aipl::codegen::add_test_totals(run.total, run.failed);
+                if run.failed > 0 {
+                    exit_code = 1;
+                }
+            }
+            Err(aipl::perf::MeasureError::Compile(errors)) => return Err(render(errors)),
+            Err(aipl::perf::MeasureError::Link(e)) => return Err(e.to_string()),
+            Err(aipl::perf::MeasureError::Run(msg)) => return Err(msg),
+        }
+    }
 
     let mut found = Vec::new();
     if section_label.is_some() && sections::runs_main(spec) {
@@ -344,6 +379,7 @@ fn check_file(
         exit_code,
         traces: (!traces.is_empty()).then(|| render(traces)),
         sections: found,
+        ran_tests: true,
     })
 }
 
@@ -566,11 +602,18 @@ fn check_cmd(args: &[String]) -> ExitCode {
         // Reported before the tests run, and either way: the point is to end the
         // invocation knowing about every problem, not just the first kind.
         let unformatted = check_formatting(path, label);
+        // The summary is printed here, once both kinds of test have run, rather
+        // than by the JIT runner when its own tests finish.
+        aipl::codegen::set_quiet_summary(true);
         let outcome = check_resolved(path, label, &project_root, validate_sections, dbg);
         let (tests_ok, traced, mismatched) = match outcome {
             // Reported after the run, so a trace the tests hit has already
             // printed its value by the time the diagnostic explains itself.
             Ok(checked) => {
+                if checked.ran_tests {
+                    let (total, passed, failed) = aipl::codegen::test_totals();
+                    println!("{total} tests: {passed} passed, {failed} failed");
+                }
                 if let Some(report) = &checked.traces {
                     eprintln!("{report}");
                 }

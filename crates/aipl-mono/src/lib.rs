@@ -7880,6 +7880,7 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::ValueOr, "builtin_value_or.aipl"),
     (Callee::ValueOrErr, "builtin_value_or_err.aipl"),
     (Callee::InlineStr, "builtin_inline_str.aipl"),
+    (Callee::Measure, "builtin_measure.aipl"),
 ];
 
 /// One [`AIPL_BUILTIN_SOURCES`] entry's `pub fn`, loaded through the real

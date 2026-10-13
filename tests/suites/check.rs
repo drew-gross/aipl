@@ -750,3 +750,199 @@ fn a_malformed_section_is_the_files_error_not_a_dropped_expectation() {
     assert!(stderr.contains("stdotu"), "got:\n{stderr}");
     assert_eq!(code, 1);
 }
+
+// ---------------------------------------------------------------------------
+// `.performance` blocks and `measure`: run by `check`, in an instrumented build.
+// The corpus (`tests/cases/performance/`) holds the claims that pass and the one
+// that is pinned failing; what lives here is what a case cannot reach — the
+// diagnostics a block's compile errors print to stderr, and batch labelling.
+// ---------------------------------------------------------------------------
+
+/// A function whose `.performance` block makes one claim, parameterized on the
+/// claim. Canonical format, so no fixture here fails over whitespace.
+fn performance_block(claim: &str) -> String {
+    format!(
+        "import {{ equal as ==, measure }} from builtins;\n\n\
+         fn work() {{}}.performance({{\n    {claim}\n}})\n"
+    )
+}
+
+#[test]
+fn a_performance_block_that_holds_passes_and_is_counted() {
+    let (stdout, stderr, code) = check(
+        "performance_holds",
+        &performance_block("assert(measure(\"scalar\", 3, |n| n).allocations == 0);"),
+    );
+    assert_eq!(stdout, "1 tests: 1 passed, 0 failed\n", "{stderr}");
+    assert_eq!(code, 0, "{stderr}");
+}
+
+#[test]
+fn a_performance_claim_that_does_not_hold_fails_the_check() {
+    let (stdout, _stderr, code) = check(
+        "performance_fails",
+        &performance_block("assert(measure(\"scalar\", 3, |n| n).instructions == 0);"),
+    );
+    assert!(
+        stdout.contains("test work.performance ... FAIL"),
+        "got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("1 tests: 0 passed, 1 failed"),
+        "got:\n{stdout}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn performance_and_ordinary_tests_share_one_summary_and_a_failure_of_either_fails() {
+    let src = "import { equal as ==, measure } from builtins;\n\n\
+               fn one() -> i64 { 1 }.test({\n    assert(one() == 1);\n}).performance({\n    \
+               assert(measure(\"scalar\", 3, |n| n).allocations == 0);\n})\n\n\
+               fn two() -> i64 { 2 }.test({\n    assert(two() == 3);\n})\n";
+    let (stdout, _stderr, code) = check("performance_summary", src);
+    assert!(stdout.contains("test two ... FAIL"), "got:\n{stdout}");
+    assert!(
+        stdout.contains("3 tests: 2 passed, 1 failed"),
+        "got:\n{stdout}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_performance_failure_in_a_batch_names_its_file_and_does_not_stop_the_run() {
+    let (stdout, _stderr, code) = check_tree(
+        "performance_batch",
+        &[
+            (
+                "a_fails.aipl",
+                &performance_block("assert(measure(\"scalar\", 3, |n| n).instructions == 0);"),
+            ),
+            (
+                "b_holds.aipl",
+                &performance_block("assert(measure(\"scalar\", 3, |n| n).allocations == 0);"),
+            ),
+        ],
+        &[],
+    );
+    assert!(
+        stdout.contains("test ./a_fails.aipl::work.performance ... FAIL"),
+        "got:\n{stdout}"
+    );
+    // The second file ran, and both blocks are in the one aggregate.
+    assert!(
+        stdout.contains("2 tests: 1 passed, 1 failed"),
+        "got:\n{stdout}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn measure_outside_a_performance_block_is_refused() {
+    // Not in a `.test` block either: a performance block is the only place that
+    // may count anything.
+    let in_test = "import { equal as ==, measure } from builtins;\n\n\
+                   fn one() -> i64 { 1 }.test({\n    assert(measure(\"x\", 1, |n| n).allocations == 0);\n})\n";
+    let (_stdout, stderr, code) = check("measure_in_test", in_test);
+    assert!(
+        stderr.contains("fn \"measure\" can only be called from a `.performance` block"),
+        "got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+
+    let in_fn = "import { measure } from builtins;\n\n\
+                 fn main() {\n    measure(\"x\", 1, |n| n);\n}\n";
+    let (_stdout, stderr, code) = check("measure_in_main", in_fn);
+    assert!(
+        stderr.contains("fn \"measure\" can only be called from a `.performance` block"),
+        "got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_performance_block_may_not_use_an_effect_directly_or_through_what_it_measures() {
+    let src = "import { measure, print } from builtins;\n\n\
+               fn noisy(n: i64) !prints -> i64 {\n    print(\"hi\");\n    n\n}\n\n\
+               fn work() {}.performance({\n    print(\"direct\");\n    measure(\"named\", 1, noisy);\n    \
+               measure(\"closure\", 1, |n| {\n        print(\"inside\");\n        n\n    });\n})\n";
+    let (_stdout, stderr, code) = check("performance_effects", src);
+    // Each of the three uses is refused, and each says why.
+    assert_eq!(
+        stderr
+            .matches("effects are not supported in a `.performance` block yet")
+            .count(),
+        3,
+        "got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("fn \"print\" has effect \"!prints\""),
+        "got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("fn \"noisy\" has effect \"!prints\""),
+        "got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_literal_measurement_label_used_twice_in_one_block_is_refused() {
+    let src = "import { measure } from builtins;\n\n\
+               fn work() {}.performance({\n    measure(\"same\", 1, |n| n);\n    measure(\"same\", 2, |n| n);\n})\n";
+    let (_stdout, stderr, code) = check("performance_duplicate_label", src);
+    assert!(
+        stderr.contains("duplicate measurement label \"same\" in this `.performance` block"),
+        "got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+
+    // The same label in two blocks is two different reports, and fine.
+    let two_blocks = "import { measure } from builtins;\n\n\
+                      fn a() {}.performance({\n    measure(\"same\", 1, |n| n);\n})\n\n\
+                      fn b() {}.performance({\n    measure(\"same\", 1, |n| n);\n})\n";
+    let (stdout, stderr, code) = check("performance_label_per_block", two_blocks);
+    assert_eq!(stdout, "2 tests: 2 passed, 0 failed\n", "{stderr}");
+    assert_eq!(code, 0);
+}
+
+#[test]
+fn a_type_error_in_a_performance_block_is_reported_with_its_source() {
+    let (_stdout, stderr, code) = check(
+        "performance_type_error",
+        &performance_block("assert(measure(\"x\", 1, |n| n).allocations == true);"),
+    );
+    assert!(stderr.contains("error:"), "got:\n{stderr}");
+    assert!(
+        stderr.contains("performance_type_error.aipl"),
+        "got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_performance_block_is_left_out_of_what_run_and_build_make() {
+    // Same program with and without a block that calls `measure`: `run` behaves
+    // identically. (The IR and binary being byte-identical is checked by hand
+    // when the mechanism changes; this is the behavioural half.)
+    let src = "import { measure, print } from builtins;\n\n\
+               fn work() {}.performance({\n    measure(\"x\", 1, |n| n);\n})\n\n\
+               fn main() !prints {\n    print(\"hi\");\n}\n";
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("check");
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let path = dir.join("performance_run.aipl");
+    fs::write(&path, src).expect("write temp source");
+    let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
+        .arg("run")
+        .arg(&path)
+        .output()
+        .expect("run aipl run");
+    let stdout = String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n");
+    assert_eq!(
+        stdout,
+        "hi\n0\n",
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(out.status.code(), Some(0));
+}

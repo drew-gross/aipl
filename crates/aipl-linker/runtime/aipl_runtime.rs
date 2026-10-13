@@ -83,6 +83,22 @@ static ALLOC_BYTES: AtomicU64 = AtomicU64::new(0);
 // helpers (`aipl_concat`, `__aipl_str_eq`, …) are native, not counted.
 #[cfg(aipl_instrument)]
 static INSN_COUNT: AtomicU64 = AtomicU64::new(0);
+// Heap bytes live right now (requested sizes of blocks allocated and not yet
+// freed), and the most that has been live since the peak was last reset. Both
+// are only read through `measure`, which resets the peak when its window opens
+// and reports it relative to what was live then.
+//
+// Knowing a block's size at `free` time is what costs: libc cannot be asked for
+// the size that was *requested*, so the instrumented build prefixes every block
+// with a header holding it (`ALLOC_HEADER` bytes, keeping the 16-byte alignment
+// `malloc` promises). Only the instrumented build — never what ships — and
+// `bytes allocated` is unaffected, since it counts the request, not the header.
+#[cfg(aipl_instrument)]
+static LIVE_BYTES: AtomicU64 = AtomicU64::new(0);
+#[cfg(aipl_instrument)]
+static PEAK_LIVE_BYTES: AtomicU64 = AtomicU64::new(0);
+#[cfg(aipl_instrument)]
+const ALLOC_HEADER: usize = 16;
 
 // ---------- Per-builtin call counts (instrumented build only) ----------
 //
@@ -221,21 +237,51 @@ macro_rules! count_builtin {
     };
 }
 
+/// `size` more bytes are live: raise the live total and the peak with it.
+#[cfg(aipl_instrument)]
+#[inline]
+fn note_live_up(size: usize) {
+    let live = LIVE_BYTES.fetch_add(size as u64, Ordering::Relaxed) + size as u64;
+    PEAK_LIVE_BYTES.fetch_max(live, Ordering::Relaxed);
+}
+
 #[inline]
 unsafe fn rt_alloc(size: usize) -> *mut c_void {
     #[cfg(aipl_instrument)]
     {
         ALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
         ALLOC_BYTES.fetch_add(size as u64, Ordering::Relaxed);
+        let base = unsafe { malloc(size + ALLOC_HEADER) } as *mut u8;
+        if base.is_null() {
+            return base as *mut c_void;
+        }
+        unsafe { *(base as *mut usize) = size };
+        note_live_up(size);
+        return unsafe { base.add(ALLOC_HEADER) } as *mut c_void;
     }
-    unsafe { malloc(size) }
+    #[cfg(not(aipl_instrument))]
+    unsafe {
+        malloc(size)
+    }
 }
 
 #[inline]
 unsafe fn rt_free(ptr: *mut c_void) {
     #[cfg(aipl_instrument)]
-    FREE_COUNT.fetch_add(1, Ordering::Relaxed);
-    unsafe { free(ptr) }
+    {
+        FREE_COUNT.fetch_add(1, Ordering::Relaxed);
+        if ptr.is_null() {
+            return;
+        }
+        let base = unsafe { (ptr as *mut u8).sub(ALLOC_HEADER) };
+        let size = unsafe { *(base as *const usize) };
+        LIVE_BYTES.fetch_sub(size as u64, Ordering::Relaxed);
+        unsafe { free(base as *mut c_void) };
+    }
+    #[cfg(not(aipl_instrument))]
+    unsafe {
+        free(ptr)
+    }
 }
 
 // The 24-byte `str` layout — the live representation — **shared verbatim** with
@@ -286,8 +332,37 @@ unsafe fn rt_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
     // block rather than a fresh malloc/free pair, so it's neither an allocation
     // nor a deallocation, but it is worth tracking on its own.
     #[cfg(aipl_instrument)]
-    REALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
-    unsafe { realloc(ptr, size) }
+    {
+        REALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
+        // Resizing keeps the header: it moves with the block, and only the size
+        // it records (and the live total with it) changes.
+        if ptr.is_null() {
+            let base = unsafe { malloc(size + ALLOC_HEADER) } as *mut u8;
+            if base.is_null() {
+                return base as *mut c_void;
+            }
+            unsafe { *(base as *mut usize) = size };
+            note_live_up(size);
+            return unsafe { base.add(ALLOC_HEADER) } as *mut c_void;
+        }
+        let old_base = unsafe { (ptr as *mut u8).sub(ALLOC_HEADER) };
+        let old = unsafe { *(old_base as *const usize) };
+        let base = unsafe { realloc(old_base as *mut c_void, size + ALLOC_HEADER) } as *mut u8;
+        if base.is_null() {
+            return base as *mut c_void;
+        }
+        unsafe { *(base as *mut usize) = size };
+        if size >= old {
+            note_live_up(size - old);
+        } else {
+            LIVE_BYTES.fetch_sub((old - size) as u64, Ordering::Relaxed);
+        }
+        return unsafe { base.add(ALLOC_HEADER) } as *mut c_void;
+    }
+    #[cfg(not(aipl_instrument))]
+    unsafe {
+        realloc(ptr, size)
+    }
 }
 
 /// Add `n` to the executed-instruction tally. Codegen emits one call per basic
@@ -1838,55 +1913,195 @@ unsafe fn report_perfmon_stats(path: *const c_char, wall_ns: u64, peak_bytes: u6
     }
 }
 
-// ---------- Test-runner hooks ----------
+// ---------- `measure`'s counting window ----------
 //
-// The `check` command's JIT runner is the authoritative test reporter (see the
-// JIT runtime in `aipl-codegen`). These AOT stubs exist only so a *library* case
-// (one with `.test` blocks but no `main`) can be built from its synthesized test
-// driver — the cases harness AOT-builds that driver to measure `--- performance
-// ---`. They tally pass/fail and yield an exit code; failures are diagnosed by
-// `aipl check`, so nothing is printed here.
-use core::sync::atomic::{AtomicBool, AtomicI64, Ordering as TestOrd};
-static TEST_CUR_FAILED: AtomicBool = AtomicBool::new(false);
-static TEST_FAILED: AtomicI64 = AtomicI64::new(0);
-
-
-// The wide-ABI counterparts. They ignore their `str` argument for exactly the
-// reason the `aipl_*` versions do — an AOT binary records pass/fail counts and
-// leaves the *reporting* to `aipl check` — so the only thing that changes is the
-// argument's type. Written here rather than left to the JIT because a half-
-// written entry point links in one runtime and not the other (see `aipl_print`).
-#[no_mangle]
-pub extern "C" fn aipl_test_begin(_name: *const str24::Str) {
-    count_builtin!(builtin_calls::AIPL_TEST_BEGIN);
-    TEST_CUR_FAILED.store(false, TestOrd::Relaxed);
-}
+// `measure(..)` opens a window, runs the work, closes it, and reads the counters
+// of the closed window. Open snapshots the allocation, byte and instruction
+// tallies and the live-byte total, and restarts the peak from where live bytes
+// stand — so the peak it reports is what the work added on top of what was
+// already held, not an absolute that depends on what ran before. Close takes the
+// differences.
+//
+// All of it exists only in the instrumented build, the one that counts anything;
+// elsewhere the window opens and closes on nothing and every counter reads zero.
+// Windows do not nest: `measure` is not reentrant, and a second `begin` before an
+// `end` simply restarts the first.
+#[cfg(aipl_instrument)]
+static MEASURE_BASE: [AtomicU64; 4] = [const { AtomicU64::new(0) }; 4];
+#[cfg(aipl_instrument)]
+static MEASURE_RESULT: [AtomicU64; 4] = [const { AtomicU64::new(0) }; 4];
 
 #[no_mangle]
-pub extern "C" fn aipl_assert(cond: i64, _loc: *const str24::Str) {
-    count_builtin!(builtin_calls::AIPL_ASSERT);
-    if cond == 0 {
-        TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
+pub extern "C" fn aipl_measure_begin() {
+    #[cfg(aipl_instrument)]
+    {
+        MEASURE_BASE[0].store(ALLOC_COUNT.load(Ordering::Relaxed), Ordering::Relaxed);
+        MEASURE_BASE[1].store(ALLOC_BYTES.load(Ordering::Relaxed), Ordering::Relaxed);
+        MEASURE_BASE[2].store(INSN_COUNT.load(Ordering::Relaxed), Ordering::Relaxed);
+        let live = LIVE_BYTES.load(Ordering::Relaxed);
+        MEASURE_BASE[3].store(live, Ordering::Relaxed);
+        PEAK_LIVE_BYTES.store(live, Ordering::Relaxed);
     }
 }
 
 #[no_mangle]
-pub extern "C" fn aipl_test_fail(_msg: *const str24::Str) {
+pub extern "C" fn aipl_measure_end() {
+    #[cfg(aipl_instrument)]
+    {
+        let since = |now: &AtomicU64, base: usize| {
+            now.load(Ordering::Relaxed)
+                .saturating_sub(MEASURE_BASE[base].load(Ordering::Relaxed))
+        };
+        // The index `aipl_measure_read` takes: allocations, bytes allocated, peak
+        // live bytes, instructions.
+        MEASURE_RESULT[0].store(since(&ALLOC_COUNT, 0), Ordering::Relaxed);
+        MEASURE_RESULT[1].store(since(&ALLOC_BYTES, 1), Ordering::Relaxed);
+        MEASURE_RESULT[2].store(since(&PEAK_LIVE_BYTES, 3), Ordering::Relaxed);
+        MEASURE_RESULT[3].store(since(&INSN_COUNT, 2), Ordering::Relaxed);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn aipl_measure_read(which: i64) -> i64 {
+    #[cfg(aipl_instrument)]
+    if (0..4).contains(&which) {
+        return MEASURE_RESULT[which as usize].load(Ordering::Relaxed) as i64;
+    }
+    let _ = which;
+    0
+}
+
+// ---------- Test-runner hooks ----------
+//
+// The `check` command's JIT runner is the authoritative test reporter (see the
+// JIT runtime in `aipl-codegen`). These hooks exist for two other uses of an AOT
+// build of a synthesized test driver:
+//
+//   - a *library* case's driver, which the cases harness builds to measure
+//     `--- performance ---`: it only needs the pass/fail tally, and failures were
+//     already diagnosed by `aipl check`, so by default nothing is printed;
+//   - a file's `.performance` blocks, which `aipl check` must run in an
+//     instrumented build (their counts exist nowhere else) and so cannot hand to
+//     the JIT. There the failures are the point, so `check` sets
+//     `AIPL_TEST_REPORT` and they are printed exactly as the JIT prints them.
+//
+// `AIPL_TEST_REPORT` turns reporting on; its value, when not empty, is the file
+// label a batch run qualifies each header with (`test <file>::<name> ... FAIL`).
+// `AIPL_TEST_TALLY` names a file the final `total failed` counts are written to,
+// so the caller can fold them into its own aggregate.
+use core::sync::atomic::{AtomicBool, AtomicI64, AtomicUsize, Ordering as TestOrd};
+static TEST_CUR_FAILED: AtomicBool = AtomicBool::new(false);
+static TEST_HEADER_PRINTED: AtomicBool = AtomicBool::new(false);
+static TEST_TOTAL: AtomicI64 = AtomicI64::new(0);
+static TEST_FAILED: AtomicI64 = AtomicI64::new(0);
+
+/// The running test's name, copied at `test_begin`: the argument points at the
+/// caller's stack slot, which does not outlive the call. A name past the buffer is
+/// cut short, which only affects a failure header's text.
+const TEST_NAME_CAP: usize = 256;
+static mut TEST_NAME: [u8; TEST_NAME_CAP] = [0; TEST_NAME_CAP];
+static TEST_NAME_LEN: AtomicUsize = AtomicUsize::new(0);
+
+/// `AIPL_TEST_REPORT`'s value, or null when failures are not to be reported.
+fn test_report_label() -> *const c_char {
+    unsafe { getenv(b"AIPL_TEST_REPORT\0".as_ptr() as *const c_char) }
+}
+
+fn out_bytes(bytes: &[u8]) {
+    unsafe { write(1, bytes.as_ptr() as *const c_void, bytes.len()) };
+}
+
+fn out_str(s: *const str24::Str) {
+    str24::for_each_chunk(unsafe { *s }, &mut |chunk| {
+        out_bytes(chunk);
+        true
+    });
+}
+
+/// The `test <name> ... FAIL` header, once per failing test, qualified by the file
+/// label when there is one — the same line the JIT runner prints.
+fn print_fail_header(label: *const c_char) {
+    if TEST_HEADER_PRINTED.swap(true, TestOrd::Relaxed) {
+        return;
+    }
+    out_bytes(b"test ");
+    if !label.is_null() && unsafe { *label } != 0 {
+        out_bytes(unsafe { core::slice::from_raw_parts(label as *const u8, strlen(label)) });
+        out_bytes(b"::");
+    }
+    let len = TEST_NAME_LEN.load(TestOrd::Relaxed);
+    out_bytes(unsafe { core::slice::from_raw_parts(core::ptr::addr_of!(TEST_NAME) as *const u8, len) });
+    out_bytes(b" ... FAIL\n");
+}
+
+// The wide-ABI entry points. They borrow their `str` argument for the reason the
+// `aipl_*` versions always have: an `aipl_*` entry point is handed the caller's
+// 24-byte value, which the caller keeps alive.
+#[no_mangle]
+pub extern "C" fn aipl_test_begin(name: *const str24::Str) {
+    count_builtin!(builtin_calls::AIPL_TEST_BEGIN);
+    TEST_CUR_FAILED.store(false, TestOrd::Relaxed);
+    TEST_HEADER_PRINTED.store(false, TestOrd::Relaxed);
+    let mut len = 0usize;
+    str24::for_each_chunk(unsafe { *name }, &mut |chunk| {
+        let take = chunk.len().min(TEST_NAME_CAP - len);
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                chunk.as_ptr(),
+                (core::ptr::addr_of_mut!(TEST_NAME) as *mut u8).add(len),
+                take,
+            )
+        };
+        len += take;
+        true
+    });
+    TEST_NAME_LEN.store(len, TestOrd::Relaxed);
+}
+
+#[no_mangle]
+pub extern "C" fn aipl_assert(cond: i64, loc: *const str24::Str) {
+    count_builtin!(builtin_calls::AIPL_ASSERT);
+    if cond == 0 {
+        TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
+        let label = test_report_label();
+        if !label.is_null() {
+            print_fail_header(label);
+            out_bytes(b"  assert failed at ");
+            out_str(loc);
+            out_bytes(b"\n");
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn aipl_test_fail(msg: *const str24::Str) {
     count_builtin!(builtin_calls::AIPL_TEST_FAIL);
     TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
+    let label = test_report_label();
+    if !label.is_null() {
+        print_fail_header(label);
+        out_bytes(b"  `?` propagated an error: ");
+        out_str(msg);
+        out_bytes(b"\n");
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn aipl_test_fail_none() {
     count_builtin!(builtin_calls::AIPL_TEST_FAIL_NONE);
-    // `?` on a `none` inside a `.test`: mark the current test failed. The
-    // report is only printed by the JIT runtime under `aipl check`.
+    // `?` on a `none` inside a `.test`: mark the current test failed.
     TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
+    let label = test_report_label();
+    if !label.is_null() {
+        print_fail_header(label);
+        out_bytes(b"  `?` propagated a `none`\n");
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn aipl_test_end() {
     count_builtin!(builtin_calls::AIPL_TEST_END);
+    TEST_TOTAL.fetch_add(1, TestOrd::Relaxed);
     if TEST_CUR_FAILED.load(TestOrd::Relaxed) {
         TEST_FAILED.fetch_add(1, TestOrd::Relaxed);
     }
@@ -1895,5 +2110,19 @@ pub extern "C" fn aipl_test_end() {
 #[no_mangle]
 pub extern "C" fn aipl_test_summary() -> i64 {
     count_builtin!(builtin_calls::AIPL_TEST_SUMMARY);
-    i64::from(TEST_FAILED.load(TestOrd::Relaxed) > 0)
+    let failed = TEST_FAILED.load(TestOrd::Relaxed);
+    let tally = unsafe { getenv(b"AIPL_TEST_TALLY\0".as_ptr() as *const c_char) };
+    if !tally.is_null() {
+        unsafe {
+            let f = fopen(tally, b"wb\0".as_ptr() as *const c_char);
+            if !f.is_null() {
+                fput_u64(f, TEST_TOTAL.load(TestOrd::Relaxed) as u64);
+                fputs(b" \0".as_ptr() as *const c_char, f);
+                fput_u64(f, failed as u64);
+                fputs(b"\n\0".as_ptr() as *const c_char, f);
+                fclose(f);
+            }
+        }
+    }
+    i64::from(failed > 0)
 }

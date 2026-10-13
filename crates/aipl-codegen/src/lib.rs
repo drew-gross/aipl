@@ -801,6 +801,19 @@ fn rec_release(b: *mut i64) {
 #[no_mangle]
 extern "C" fn aipl_count_insns(_n: i64) {}
 
+/// The counting window behind `measure`. The JIT does not instrument, so there is
+/// nothing to count: the window opens and closes on nothing and every counter
+/// reads zero. A `.performance` block is never run here — `check` runs it in an
+/// instrumented build — so this only has to resolve.
+#[no_mangle]
+extern "C" fn aipl_measure_begin() {}
+#[no_mangle]
+extern "C" fn aipl_measure_end() {}
+#[no_mangle]
+extern "C" fn aipl_measure_read(_which: i64) -> i64 {
+    0
+}
+
 /// Per-function call counter hook (arg = a pointer to the function's
 /// NUL-terminated symbol name). A no-op here for the same reason as
 /// `aipl_count_insns`: the JIT never instruments, so this only has to resolve.
@@ -868,6 +881,25 @@ pub fn test_totals() -> (i64, i64, i64) {
         TEST_PASSED.load(TestOrd::Relaxed),
         TEST_FAILED.load(TestOrd::Relaxed),
     )
+}
+
+/// The file whose tests are running now — what [`set_test_file`] last set, or
+/// `None` in single-file mode.
+pub fn test_file() -> Option<String> {
+    TEST_CUR_FILE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone()
+}
+
+/// Fold tests run elsewhere into the cumulative counts: `total` of them, `failed`
+/// of which failed. This is how a file's `.performance` blocks, which have to run
+/// in an instrumented build rather than in this process, still land in the one
+/// aggregate the summary reports.
+pub fn add_test_totals(total: i64, failed: i64) {
+    TEST_TOTAL.fetch_add(total, TestOrd::Relaxed);
+    TEST_FAILED.fetch_add(failed, TestOrd::Relaxed);
+    TEST_PASSED.fetch_add(total - failed, TestOrd::Relaxed);
 }
 
 /// Print the `test <name> ... FAIL` header once per failing test, qualified by
@@ -1330,6 +1362,16 @@ fn builtin_struct_decls() -> Vec<StructDecl> {
         .collect()
 }
 
+/// Which of a program's tests a synthesized driver runs. A `.performance` block is
+/// test code, but it is run apart from the `.test` blocks: it needs an
+/// instrumented build (its counts are the point), and it is the only code allowed
+/// the internal `!measure` effect — which the `.test` blocks, in turn, are not.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TestKind {
+    Tests,
+    Performance,
+}
+
 /// Build the program the `check` command JIT-runs. Keeps every original item
 /// (with any `.test` body stripped so `run`/`build` semantics are unchanged),
 /// adds a `__test$<fn>` function per tested function (body = the test block,
@@ -1337,7 +1379,31 @@ fn builtin_struct_decls() -> Vec<StructDecl> {
 /// driver that, for each test, calls `__test_begin(name)` / the test /
 /// `__test_end()`, then yields `__test_summary()` as its i64 exit code.
 /// `Compilation::new(&that).run_0("__test_main")` runs the suite.
+///
+/// A `.performance` block is not among them; see [`build_performance_program`].
 pub fn build_test_program(program: &Program) -> Program {
+    synthesize_driver(program, TestKind::Tests)
+}
+
+/// The counterpart of [`build_test_program`] for the program's `.performance`
+/// blocks, or `None` when it has none. Same shape — `__test$<fn>` per block, a
+/// `__test_main` driver — but every synthesized function declares the `!measure`
+/// effect and no other, so a block can call `measure` and cannot print, read a
+/// file or reach the clock. (That is the whole of "effects are not supported in a
+/// `.performance` block yet": the checker's ordinary effect discipline, applied
+/// to a function that declares almost nothing.)
+///
+/// The caller builds it instrumented — see `aipl check` — because the counts a
+/// block asserts on exist only there.
+pub fn build_performance_program(program: &Program) -> Option<Program> {
+    let has_performance = program.items.iter().any(|item| {
+        matches!(item, Item::Fn(f)
+            if f.test_body.is_some() && aipl_syntax::performance_source_name(&f.name).is_some())
+    });
+    has_performance.then(|| synthesize_driver(program, TestKind::Performance))
+}
+
+fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
     let span: Span = 0..0;
     let call = |callee: Callee, args: Vec<Expr>| {
         Expr::new(ExprKind::Call(callee, args, false), span.clone())
@@ -1347,16 +1413,19 @@ pub fn build_test_program(program: &Program) -> Program {
     };
     // A test body may call anything (incl. `!prints`/`!read_files`/`!write_files`/
     // `!list_files`/`!execute_program`/`!clock` functions), so the synthesized
-    // test fns / driver declare every known effect.
-    let all_effects = || {
-        vec![
+    // test fns / driver declare every known effect — except `measure`, which only
+    // a `.performance` block has. A performance block declares that and nothing
+    // else.
+    let all_effects = || match kind {
+        TestKind::Tests => vec![
             "prints".to_string(),
             "read_files".to_string(),
             "write_files".to_string(),
             "list_files".to_string(),
             "execute_program".to_string(),
             "clock".to_string(),
-        ]
+        ],
+        TestKind::Performance => vec!["measure".to_string()],
     };
 
     let mut items: Vec<Item> = Vec::new();
@@ -1364,10 +1433,16 @@ pub fn build_test_program(program: &Program) -> Program {
     for item in &program.items {
         match item {
             Item::Fn(f) if f.test_body.is_some() => {
-                let test_fn = aipl_syntax::test_fn_name(&f.name);
+                let is_performance = aipl_syntax::performance_source_name(&f.name).is_some();
+                // Every function loses its test body here, run or not, so the
+                // program carries only what `run` and `build` would compile.
                 let mut orig = f.clone();
                 orig.test_body = None;
                 items.push(Item::Fn(orig));
+                if is_performance != (kind == TestKind::Performance) {
+                    continue;
+                }
+                let test_fn = aipl_syntax::test_fn_name(&f.name);
                 items.push(Item::Fn(AstFn {
                     name: f.name.renamed(test_fn.clone()),
                     is_pub: true,
@@ -3127,6 +3202,9 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_test_fail", aipl_test_fail as *const u8);
     jit_builder.symbol("aipl_test_fail_none", aipl_test_fail_none as *const u8);
     jit_builder.symbol("aipl_test_end", aipl_test_end as *const u8);
+    jit_builder.symbol("aipl_measure_begin", aipl_measure_begin as *const u8);
+    jit_builder.symbol("aipl_measure_end", aipl_measure_end as *const u8);
+    jit_builder.symbol("aipl_measure_read", aipl_measure_read as *const u8);
     jit_builder.symbol("aipl_test_summary", aipl_test_summary as *const u8);
     jit_builder.symbol("aipl_i64_len", aipl_i64_len as *const u8);
     jit_builder.symbol("aipl_write_i64", aipl_write_i64 as *const u8);
@@ -6572,7 +6650,9 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_rec_dec_weak"
         | "aipl_count_insns"
         | "aipl_count_call" => (1, Ret::None),
-        "aipl_test_end" | "aipl_test_fail_none" => (0, Ret::None),
+        "aipl_test_end" | "aipl_test_fail_none" | "aipl_measure_begin" | "aipl_measure_end" => {
+            (0, Ret::None)
+        }
         "aipl_assert"
         | "aipl_shim_set"
         | "aipl_str_iter_init"
@@ -6591,6 +6671,8 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         // ---- a scalar back ----
         "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now"
         | "aipl_str_inline_capacity" => (0, Ret::Word),
+        // A counter of the closed measurement window, chosen by index.
+        "aipl_measure_read" => (1, Ret::Word),
         // ---- the wide-array ABI (`arr24`) ----
         //
         // An array argument is the address of its 24-byte value, and an array
@@ -6866,6 +6948,10 @@ fn register_builtins(
         (Callee::TestBegin, "aipl_test_begin"),
         (Callee::TestEnd, "aipl_test_end"),
         (Callee::TestSummary, "aipl_test_summary"),
+        // The counting window behind `measure`.
+        (Callee::MeasureBegin, "aipl_measure_begin"),
+        (Callee::MeasureEnd, "aipl_measure_end"),
+        (Callee::MeasureRead, "aipl_measure_read"),
     ];
     for (callee, sym) in SIG_REGS {
         let name = callee.name();
@@ -17088,6 +17174,66 @@ fn compile_call_expr<M: Module>(
             let off = builder.ins().imul_imm_s(w, stride);
             let addr = builder.ins().iadd(base, off);
             store_elem(builder, addr, e, &ety, stride, structs);
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
+        }
+        Callee::MeasureBegin | Callee::MeasureEnd => {
+            // Internal (`measure`): the two edges of the counting window.
+            //
+            // Instructions are counted per basic block, added when the block is
+            // *entered* — so a window opened and closed inside one block counts
+            // nothing between them, whatever the block holds, and work the
+            // optimizer inlined into it would silently not count. The window
+            // therefore gets blocks of its own: `begin` is the last thing in the
+            // block it sits in, so everything after it is counted from the start
+            // of a new one, and `end` is the first (and only) thing in a block of
+            // its own, so the work before it is counted in full and the code
+            // after it is not charged to it. What a measurement includes is then
+            // the blocks of the work plus a fixed few instructions.
+            if !args.is_empty() {
+                return Err(Error::at(
+                    format!(
+                        "{} expects no args, got {}",
+                        callee.import_name(),
+                        args.len()
+                    ),
+                    span.clone(),
+                ));
+            }
+            let (sym, split_before) = match callee {
+                Callee::MeasureBegin => ("aipl_measure_begin", false),
+                _ => ("aipl_measure_end", true),
+            };
+            if split_before {
+                let edge = builder.create_block();
+                builder.ins().jump(edge, &[]);
+                builder.switch_to_block(edge);
+                builder.seal_block(edge);
+            }
+            builtins.call_void(module, builder, sym, &[]);
+            let next = builder.create_block();
+            builder.ins().jump(next, &[]);
+            builder.switch_to_block(next);
+            builder.seal_block(next);
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
+        }
+        Callee::MeasureConsume => {
+            // Internal (`measure`): release the measured value here, inside the
+            // window, rather than at scope exit after it has closed. Only a fresh
+            // temporary is ours to release; a value held by a binding is released
+            // by that binding, as it always is. A scalar owns nothing, so this is
+            // then no code at all — the call still exists for the optimizer, which
+            // must not drop the computation of a value nobody reads.
+            let [arg] = args else {
+                return Err(Error::at(
+                    format!("measure_consume expects 1 arg, got {}", args.len()),
+                    span.clone(),
+                ));
+            };
+            let before = scope_depth(scopes);
+            let (v, ty) = compile_expr(module, builder, cx, scopes, arg)?;
+            if move_owned_temp(scopes, before, v) {
+                emit_drop(builder, module, builtins, structs, v, &ty);
+            }
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         Callee::FilterDrop => {

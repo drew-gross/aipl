@@ -2711,6 +2711,50 @@ pub fn trace_diagnostics(program: &ast::Program, command: &str) -> Vec<Error> {
     out
 }
 
+/// The ways a `.performance` block is wrong that its types and effects do not
+/// already say: a literal measurement label used twice in one block.
+///
+/// A label names a measurement in a report, so two with the same text could not
+/// be told apart. Only literal labels are compared — a computed one (`` `n={n}` ``
+/// in a sweep) has no text until it runs, and is the caller's to keep distinct.
+/// Labels are per block: two blocks may each have a `"small"`.
+///
+/// Reported by `aipl check` before the block runs, the way a type error is.
+pub fn performance_diagnostics(program: &ast::Program) -> Vec<Error> {
+    let mut out = Vec::new();
+    for item in &program.items {
+        let ast::Item::Fn(f) = item else { continue };
+        if performance_source_name(&f.name).is_none() {
+            continue;
+        }
+        let Some(block) = f.test_body.as_ref() else {
+            continue;
+        };
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+        each_subexpr(block, &mut |e| {
+            let ast::ExprKind::Call(callee, args, _) = &e.kind else {
+                return;
+            };
+            if *callee != ast::Callee::Measure {
+                return;
+            }
+            let Some(ast::ExprKind::Str(label)) = args.first().map(|a| &a.kind) else {
+                return;
+            };
+            if !seen.insert(label.clone()) {
+                let e = Error::at(
+                    format!(
+                        "duplicate measurement label {label:?} in this `.performance` block — a report could not tell the two apart"
+                    ),
+                    args[0].span.clone(),
+                );
+                out.push(attribute_to_file(e, &f.name.text, &program.sources));
+            }
+        });
+    }
+    out
+}
+
 /// Tag `e` with the source of the file the function named `name` came from, so
 /// the caret lands in *that* file rather than in whatever source the caller
 /// holds.
@@ -2887,6 +2931,11 @@ pub const BUILTIN_SIGNATURES: &str = r#"
 struct __builtin_Span { start: u64, end: u64 }
 // A finished child process's captured output and exit status.
 struct __builtin_ExecResult { stdout: str, stderr: str, exit_code: i64 }
+// What one `measure(..)` call cost: heap allocations made, bytes those requested,
+// the most heap that was live at once (counted from what was live when the
+// window opened), and CLIF instructions executed. All deterministic for a given
+// program and compiler.
+struct __builtin_Measurement { allocations: u64, bytes_allocated: u64, peak_live_bytes: u64, instructions: u64 }
 
 fn __builtin_print(self: str) !prints {}
 // Split on each occurrence of `sep`, returning the parts (slices/views of `self`).
@@ -2975,6 +3024,18 @@ fn __builtin_rope_str(self: str, other: str) -> str { self }
 fn __builtin_pack_inline(self: str) -> str { self }
 // Internal: the bound `inline_str` checks against, so nothing hardcodes it.
 fn __builtin_inline_capacity() -> u64 { 0 }
+// Internal: the counting window behind `measure`. `!measure` is an effect only so
+// that nothing outside a `.performance` block can call these (or `measure`), and
+// so that the optimizer, which never reorders or drops an effectful call, keeps
+// the window around exactly the work it was opened for.
+fn __builtin_measure_begin() !measure {}
+// Release `self` now, inside the window. The value being measured has to be
+// *used* by something the optimizer cannot remove, or a pure call whose result
+// nobody reads is dropped altogether; and its drop is part of what the work
+// costs, so it happens before the window closes rather than at scope exit.
+fn __builtin_measure_consume<R: any>(self: R) !measure {}
+fn __builtin_measure_end() !measure {}
+fn __builtin_measure_read(which: u64) !measure -> u64 { 0 }
 // Concatenate `self` with itself `n` times; returns `""` for `n == 0`. The count
 // is unsigned, matching `len`: a repeat count is never negative, and its usual
 // source is length/column arithmetic (`" ".repeat(indent)`).
@@ -3110,7 +3171,7 @@ fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
 // NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
 // `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
-// `extend_optional`, `inline_str`, `range`, `set_map`, `tuple_windows`, `union_all`,
+// `extend_optional`, `inline_str`, `measure`, `range`, `set_map`, `tuple_windows`, `union_all`,
 // `value_or`, and `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
 // which is the single source of both their body and their signature.
@@ -3538,6 +3599,11 @@ pub const INTERNAL_BUILTINS: &[Callee] = &[
     // caller checks against. `inline_str` is the spelling.
     Callee::PackInline,
     Callee::InlineCapacity,
+    // The counting window `measure` is built from. `measure` is the spelling.
+    Callee::MeasureBegin,
+    Callee::MeasureConsume,
+    Callee::MeasureEnd,
+    Callee::MeasureRead,
 ];
 
 /// Whether `callee` is one of [`INTERNAL_BUILTINS`].
@@ -3591,7 +3657,7 @@ pub const SHIM_SLOT_COUNT: usize = 2;
 /// needs no import), these behave like any other importable builtin: gated,
 /// and mapped to a reserved canonical name so a user's own type of the same
 /// name can never silently collide.
-pub const IMPORTABLE_BUILTIN_TYPES: &[&str] = &["Span", "ExecResult"];
+pub const IMPORTABLE_BUILTIN_TYPES: &[&str] = &["Span", "ExecResult", "Measurement"];
 
 /// The canonical name of the builtin `Span` struct — what an imported `Span`
 /// resolves to, and the name every pass that dispatches on "is this a range?"

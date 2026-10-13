@@ -351,12 +351,14 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_count_call" => sig(1, false),
         // Test-runner hooks: `__test_end()` returns nothing; `__test_summary()`
         // returns the exit code.
-        "aipl_test_end" | "aipl_test_fail_none" => sig(0, false),
+        "aipl_test_end" | "aipl_test_fail_none" | "aipl_measure_begin" | "aipl_measure_end" => {
+            sig(0, false)
+        }
         // Takes nothing, returns the reading.
         "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now"
         | "aipl_str_inline_capacity" => sig(0, true),
         // Shim slots: read one, or write one (returns nothing).
-        "aipl_shim_get" => sig(1, true),
+        "aipl_shim_get" | "aipl_measure_read" => sig(1, true),
         "aipl_shim_set" => sig(2, false),
         "aipl_arr_drop_warr"
         | "aipl_arr_retain_warr"

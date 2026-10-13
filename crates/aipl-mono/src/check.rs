@@ -160,11 +160,36 @@ pub(crate) fn generic_instance_name(base: &str, args: &[Type]) -> String {
 /// concrete route produces.
 pub(crate) const TUPLE_TEMPLATE: &str = "__tuple";
 
+/// The diagnostic for a call to `callee`, which declares `effect`, from a function
+/// that declares `caller_effects` and not that one.
+///
+/// Two cases are not the general discipline but a consequence of what `!measure`
+/// is. The effect is internal, declared by `measure` and nothing a program can
+/// reach except from a `.performance` block, whose synthesized function declares
+/// it *and no other effect*. So a missing `!measure` means a call to `measure`
+/// from anywhere else, and a caller that has `!measure` is a `.performance`
+/// block that reached for an effect — which is not supported there yet.
+fn undeclared_effect_message(callee: &str, effect: &str, caller_effects: &[String]) -> String {
+    if effect == "measure" {
+        format!("fn {callee:?} can only be called from a `.performance` block")
+    } else if caller_effects.iter().any(|e| e == "measure") {
+        format!(
+            "effects are not supported in a `.performance` block yet: fn {callee:?} has effect \"!{effect}\""
+        )
+    } else {
+        format!(
+            "fn {callee:?} has effect \"!{effect}\" but the calling function does not declare it"
+        )
+    }
+}
+
 /// Effects the language recognizes. `prints` = writes to stdout; `read_files` =
 /// reads from the filesystem; `write_files` = writes to the filesystem;
 /// `list_files` = enumerates the filesystem (directory listing);
 /// `execute_program` = spawns a child process; `clock` = reads the wall clock
-/// (so a function's result depends on when it ran).
+/// (so a function's result depends on when it ran). `measure` is internal:
+/// it marks `measure(..)` and the counting window it is built from, so only a
+/// `.performance` block (which declares it, and nothing else) can reach them.
 const KNOWN_EFFECTS: &[&str] = &[
     "prints",
     "read_files",
@@ -172,6 +197,7 @@ const KNOWN_EFFECTS: &[&str] = &[
     "list_files",
     "execute_program",
     "clock",
+    "measure",
 ];
 
 /// Whether an expression's value is used by whatever encloses it.
@@ -4452,10 +4478,7 @@ impl Cx<'_> {
         for e in self.callee_effects(name) {
             if !effects.contains(&e) {
                 return Err(Error::at(
-                    format!(
-                        "fn {:?} has effect \"!{e}\" but the calling function does not declare it",
-                        display(name)
-                    ),
+                    undeclared_effect_message(&display(name), &e, effects),
                     span.clone(),
                 ));
             }
@@ -5060,10 +5083,7 @@ impl Cx<'_> {
         for e in &fx {
             if !effects.iter().any(|d| d == e) {
                 return Err(Error::at(
-                    format!(
-                        "fn {:?} has effect \"!{e}\" but the calling function does not declare it",
-                        display(name)
-                    ),
+                    undeclared_effect_message(&display(name), e, effects),
                     span.clone(),
                 ));
             }

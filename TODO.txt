@@ -82,6 +82,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  assert(0 < allocations) is silly in most cases. Should have some preference for exact.
   make the runtime a bit less type erased maybe? E.g. dropping an array should be able to drop primitve vs. non-primitive arrays based on type, not a flag
   unify flat sets and flat dicts repr with arrays
   use set membership in duplicate case name check (with ad-hoc set)

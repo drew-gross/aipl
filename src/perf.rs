@@ -50,6 +50,85 @@ pub fn measured_program(program: &Program) -> Program {
     }
 }
 
+/// A program's `.performance` driver (see
+/// [`crate::codegen::build_performance_program`]) as a program that can be built
+/// and run: its `__test_main` becomes the entry, and any `main` of the user's own
+/// steps aside for it.
+pub fn driver_as_main(driver: &Program) -> Program {
+    let mut program = driver.clone();
+    program
+        .items
+        .retain(|it| !matches!(it, Item::Fn(f) if f.name == "main"));
+    for it in &mut program.items {
+        if let Item::Fn(f) = it {
+            if f.name == "__test_main" {
+                f.name.text = "main".to_string();
+            }
+        }
+    }
+    program
+}
+
+/// What running a file's `.performance` blocks produced.
+pub struct TestRun {
+    /// Blocks run, and how many of them failed.
+    pub total: i64,
+    pub failed: i64,
+    /// The failure report, exactly as the in-process runner prints one (`test
+    /// <name> ... FAIL`, then a line per failed assertion). Empty when all passed.
+    pub report: String,
+}
+
+/// Run a `.performance` driver: build it instrumented, link it against the
+/// instrumented runtime, and run it once in the current directory (the caller has
+/// staged the file's companions there).
+///
+/// The blocks run apart from the file's `.test` blocks because their counts exist
+/// only in the instrumented build, which the in-process JIT is not. The program
+/// reports its own failures — `file_label` is the batch label it qualifies each
+/// header with, empty for a single file — and its tallies come back through a file
+/// it is told to write, so the caller can fold them into its aggregate.
+pub fn run_performance_tests(
+    driver: &Program,
+    stem: &str,
+    file_label: &str,
+    dbg: DebugOptions,
+) -> Result<TestRun, MeasureError> {
+    let object = ObjectCompilation::new(&driver_as_main(driver), stem, dbg, true)
+        .and_then(|c| c.emit().map_err(Vec::from))
+        .map_err(MeasureError::Compile)?;
+    let dir = binary::scratch_dir("check-perf").map_err(MeasureError::Link)?;
+    let result = (|| {
+        let exe = dir.join(binary::default_exe_name(&format!("{stem}_performance")));
+        binary::link_instrumented(&object, &exe).map_err(MeasureError::Link)?;
+        let tally_path = dir.join("tally.txt");
+        let output = Command::new(&exe)
+            .env("AIPL_TEST_REPORT", file_label)
+            .env("AIPL_TEST_TALLY", &tally_path)
+            .output()
+            .map_err(|e| MeasureError::Run(format!("`.performance` run failed to start: {e}")))?;
+        let tally = fs::read_to_string(&tally_path).map_err(|e| {
+            MeasureError::Run(format!(
+                "`.performance` run exited with {:?} before reporting its results: {e}",
+                output.status.code()
+            ))
+        })?;
+        let mut counts = tally.split_whitespace().map(|n| n.parse::<i64>());
+        let (Some(Ok(total)), Some(Ok(failed))) = (counts.next(), counts.next()) else {
+            return Err(MeasureError::Run(format!(
+                "`.performance` run reported an unreadable tally: {tally:?}"
+            )));
+        };
+        Ok(TestRun {
+            total,
+            failed,
+            report: String::from_utf8_lossy(&output.stdout).replace("\r\n", "\n"),
+        })
+    })();
+    let _ = fs::remove_dir_all(&dir);
+    result
+}
+
 /// Why a measurement could not be produced. The variants keep a compile or link
 /// diagnostic as the diagnostic it is, so the caller renders it against the
 /// source it holds; [`MeasureError::render`] does that.

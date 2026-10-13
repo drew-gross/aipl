@@ -104,6 +104,21 @@ pub enum Callee {
     InlineStr,
     PackInline,
     InlineCapacity,
+    /// `measure(label, input, f) -> Measurement` — runs `f(input)` once inside a
+    /// counting window and reports what it cost. Written in AIPL
+    /// (`builtin_measure.aipl`) on top of the three runtime hooks below, which only
+    /// it may reach. Legal only in a `.performance` block: it carries the internal
+    /// `!measure` effect, which nothing else declares.
+    Measure,
+    /// Open the counting window: snapshot the allocation, byte and instruction
+    /// counters and start tracking the peak of live bytes from where they stand.
+    MeasureBegin,
+    /// Release a value inside the window (see `__builtin_measure_consume`).
+    MeasureConsume,
+    /// Close the window, keeping what happened inside it for [`Callee::MeasureRead`].
+    MeasureEnd,
+    /// One counter of the closed window, chosen by index.
+    MeasureRead,
     IsAllWhitespace,
     /// `starts_with(self: T[], prefix: T*)`, with the pattern shape mono chose.
     StartsWith(SeqShape),
@@ -337,6 +352,11 @@ impl Callee {
         Callee::InlineStr,
         Callee::PackInline,
         Callee::InlineCapacity,
+        Callee::Measure,
+        Callee::MeasureBegin,
+        Callee::MeasureConsume,
+        Callee::MeasureEnd,
+        Callee::MeasureRead,
         Callee::IsAllWhitespace,
         Callee::StartsWith(SeqShape::Seq),
         Callee::StartsWithAt(SeqShape::Seq),
@@ -504,6 +524,11 @@ impl Callee {
             Callee::InlineStr => "__builtin_inline_str",
             Callee::PackInline => "__builtin_pack_inline",
             Callee::InlineCapacity => "__builtin_inline_capacity",
+            Callee::Measure => "__builtin_measure",
+            Callee::MeasureBegin => "__builtin_measure_begin",
+            Callee::MeasureConsume => "__builtin_measure_consume",
+            Callee::MeasureEnd => "__builtin_measure_end",
+            Callee::MeasureRead => "__builtin_measure_read",
             Callee::IsAllWhitespace => "__builtin_is_all_whitespace",
             Callee::StartsWith(_) => "__builtin_starts_with",
             Callee::StartsWithAt(_) => "__builtin_starts_with_at",

@@ -165,8 +165,9 @@ again.
       change: `measure` no longer fails on a nonzero exit by itself, only when
       the run never reported (the harness's behavior checks already cover an
       unexpected exit).
-- [ ] Runtime: track peak live bytes (a high-water mark of allocated minus freed),
-      in both the JIT and AOT runtimes.
+- [x] Runtime: track peak live bytes (a high-water mark of allocated minus freed),
+      in both the JIT and AOT runtimes. (Done in the instrumented AOT runtime; the
+      JIT never instruments. See Phase 3.)
 - [ ] `aipl report <file.aipl> [-- args]`: runs `main`, or the `.test` driver for a
       library file, instrumented. It prints the counts (including peak live
       bytes), the binary size split, and per-function calls/bytes, and flags a
@@ -234,21 +235,66 @@ again.
         already drives `?` and `assert`.
       - Parser messages for a block's helpers still say `.test` block (they share
         a production); only the duplicate-helper message names the attribute.
-- [ ] `measure` builtin and `Measurement` struct (allocations, bytes allocated,
-      peak live bytes, instructions). Runtime counter snapshots around the
-      closure; peak live is measured relative to the live bytes at entry; opaque
-      input and result; the result dropped inside the window.
-- [ ] `measure` outside a `.performance` block is a compile error. Duplicate labels
-      in a block are an error.
-- [ ] No effects: a `.performance` block or measured closure that uses an effect is
-      a compile error, with a message saying effects aren't supported there yet.
-- [ ] `.performance` blocks are excluded from production builds and from
-      `dogfood.o`, the same as `.test`.
-- [ ] `aipl check` runs them instrumented. Failures are reported with test
-      failures and are non-fatal to the rest of the run.
-- [ ] Cases under `tests/cases/performance/`: an inline array with no allocation,
-      a relative claim, an absolute bound, a peak-live claim, the effect refusal,
-      and a failing claim pinned by `--- check ---` (or its Phase 7 name).
+- [x] `measure` builtin and `Measurement` struct (allocations, bytes allocated,
+      peak live bytes, instructions). `builtin_measure.aipl` (AIPL, generic), over
+      four internal builtins: `measure_begin`, `measure_consume`, `measure_end`,
+      `measure_read(i)`. Decisions:
+      - **Effect.** `measure` and the four carry the internal `!measure` effect
+        (in `KNOWN_EFFECTS`). It is what makes "only in a `.performance` block"
+        and "no other effect in one" fall out of the existing effect discipline:
+        the performance test functions declare `measure` and nothing else
+        (`build_performance_program`), the ordinary test functions declare
+        everything *except* it. `undeclared_effect_message` turns the two cases
+        into targeted messages.
+      - **Window.** Instructions are counted per basic block on entry, so `begin`
+        and `end` get blocks of their own in codegen (`Callee::MeasureBegin |
+        MeasureEnd`); otherwise work inside one block counts nothing. A
+        measurement includes a fixed overhead (an identity closure costs 5
+        instructions) that cancels in comparisons.
+      - **Result dropped inside the window**: `measure_consume(f(input))` is a
+        generic intrinsic whose codegen arm releases a fresh temporary there, and
+        which the optimizer cannot remove (an unused pure `let` is eliminated
+        outright; verified).
+      - **Opaque input**: no explicit barrier. The lambda-specialized `measure`
+        instance is a call boundary, and constant inputs are not folded (verified:
+        identity 5, `n + 1` 7, a polynomial 12). Add a barrier if a future
+        optimization specializes on constant arguments.
+      - **Peak live bytes** are tracked by the *instrumented* AOT runtime only: each
+        block gets a 16-byte size header there (`bytes allocated` still counts the
+        request), and the peak restarts from the live total when a window opens.
+        The JIT never instruments, so its `measure_*` are no-ops reading 0; the
+        Phase 1 "both runtimes" item is done in that sense.
+      - `label` is not used by the runtime yet (reserved for `aipl benchmark`'s
+        replay). Computed labels are not checked for duplicates.
+- [x] `measure` outside a `.performance` block is a compile error ("fn \"measure\"
+      can only be called from a `.performance` block"); a duplicate *literal* label
+      in one block is an error (`aipl_syntax::performance_diagnostics`, reported by
+      `check` before anything runs). Labels are per block.
+- [x] No effects: the performance test functions declare only `!measure`, so a
+      block or a measured closure that uses an effect gets "effects are not
+      supported in a `.performance` block yet: fn \"print\" has effect
+      \"!prints\"". Covers a named function passed as the closure too.
+- [x] `.performance` blocks are excluded from production builds and from
+      `dogfood.o`, the same as `.test`: a program with a `measure`-using block
+      builds to a byte-identical IR and binary (checked by hand). No dogfooded
+      source uses `.performance` yet; Phase 5 will, and goes through the same
+      path.
+- [x] `aipl check` runs them instrumented. They run apart from the `.test` blocks,
+      in an AOT build of `build_performance_program` linked against the
+      instrumented runtime (`aipl::perf::run_performance_tests`), because the
+      in-process JIT does not instrument. The AOT runtime's test hooks now report
+      failures in the JIT's exact format when `AIPL_TEST_REPORT` is set (its value
+      is the batch file label) and write their tally to `AIPL_TEST_TALLY`; `check`
+      folds it into the one aggregate. Single-file mode now prints the summary
+      itself, after both kinds have run. A failing or uncompilable block fails the
+      file and stops nothing else. **A file with a `.performance` block therefore
+      needs the same linker `aipl build` does.**
+- [x] Cases under `tests/cases/performance/`: `measure_claims` (no allocation for
+      inline values, an early-exit relative claim, allocation and peak, peak
+      relative to what is already live, an absolute bound) and
+      `measure_claim_fails` (a failing claim pinned by `--- check ---`). The
+      compile-time refusals (outside a block, effects, duplicate label) are in the
+      Rust `check` suite, since their messages are on stderr.
 - [ ] Docs: CLAUDE.md, `aipl docs`.
 
 ### Phase 4: migrate property cases, retire `--- performance ---`

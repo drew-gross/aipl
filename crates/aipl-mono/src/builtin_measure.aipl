@@ -1,0 +1,103 @@
+# The AIPL implementation of the `measure` builtin. Monomorphization registers
+# this under the canonical name `__builtin_measure` (see `AIPL_BUILTIN_SOURCES`
+# in `lib.rs`), so a user's `measure("label", input, |x| f(x))` resolves through
+# the ordinary generic / higher-order machinery — the in-file name `measure` is
+# only for this file's own tests, which read exactly like user code.
+#
+# It runs `f(input)` once inside a counting window and hands back what that cost.
+# The window is the three internal builtins it is made of: `measure_begin` opens
+# it, `measure_end` closes it, and `measure_read` reads a counter of the closed
+# window. Between them, `measure_consume` releases the result — inside the window,
+# because freeing it is part of what the work costs, and as a use the optimizer
+# cannot remove, because a pure call whose result nobody reads is dropped
+# altogether, and a measurement of nothing is not a measurement.
+#
+# All of them carry the internal `!measure` effect, and so does this function.
+# That is the whole of why it can only be called from a `.performance` block: the
+# block declares `!measure` and nothing else, and no other function can.
+#
+# **No lint.** Nothing is being reimplemented: there is no longhand to match.
+
+import {
+    Measurement,
+    equal as ==,
+    less_than as <,
+    measure_begin,
+    measure_consume,
+    measure_end,
+    measure_read,
+} from builtins;
+
+# What `f(input)` cost, counted from just before it starts to just after its
+# result is released: the heap allocations it made, the bytes those asked for, the
+# most heap that was live at once (counted from what was live when it began), and
+# the CLIF instructions it executed. `label` names the measurement in reports; it
+# is not a key — two measurements may share one in a block — but a repeated
+# literal label is refused at compile time, since a report could not tell them
+# apart.
+#
+# The counts are exact and repeatable, so a claim about them can be an equality.
+# They include a small constant for the call and release themselves, which is the
+# same on every measurement and so cancels in any comparison between two.
+#
+# The `input` is built outside the window and handed in so that building it is
+# not what is measured, and `f` is called with it exactly once. Callable only in a
+# `.performance` block.
+pub fn measure<T: any, R: any>(label: str, input: T, f: (T) -> R) !measure -> Measurement {
+    measure_begin();
+    measure_consume(f(input));
+    measure_end();
+    Measurement {
+        allocations: measure_read(0),
+        bytes_allocated: measure_read(1),
+        peak_live_bytes: measure_read(2),
+        instructions: measure_read(3),
+    }
+}.test({
+    // The result is a plain struct of four counts.
+    let m = Measurement { allocations: 1, bytes_allocated: 2, peak_live_bytes: 3, instructions: 4 };
+    assert(m.allocations == 1);
+    assert(m.bytes_allocated == 2);
+    assert(m.peak_live_bytes == 3);
+    assert(m.instructions == 4);
+}).performance({
+    // A closure that allocates nothing costs no allocations and no memory.
+    let Measurement { allocations, bytes_allocated, peak_live_bytes, instructions } = measure(
+        "nothing",
+        3,
+        |n| n,
+    );
+    assert(allocations == 0);
+    assert(bytes_allocated == 0);
+    assert(peak_live_bytes == 0);
+    assert(0 < instructions);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 86
+binary size: 1640
+  code: 408
+  data: 252
+  metadata: 980
+functions:
+  __test$measure:
+    calls: 1
+    bytes: 300
+  aipl_assert:
+    calls: 4
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 108
