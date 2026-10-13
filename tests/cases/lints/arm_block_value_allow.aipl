@@ -4,7 +4,7 @@
 # this lint points, and that is deliberate: it is the one line that carries a
 # marker whatever the layout. An arm written on one line ends with it; a broken
 # block has it alone on its own line. A marker after the opening `{`, or after
-# the value's first line when the value itself breaks, is moved by `aipl fmt`
+# the value's first line when the value itself breaks, is moved by the formatter
 # onto its own line — where it squelches nothing.
 
 import { print, to_str, wrapping_add as + } from builtins;

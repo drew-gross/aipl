@@ -60,7 +60,7 @@ fn string_literal(bytes: &[u8]) -> Option<String> {
 /// may not advise a rewrite that changes what the program does.
 ///
 /// **Only a literal written on one line**, which is what keeps every hit
-/// squelchable. `#[allow]` is line-scoped, and `aipl fmt` breaks a set literal
+/// squelchable. `#[allow]` is line-scoped, and the formatter breaks a set literal
 /// too wide for one line into one element per line — then relocates a trailing
 /// marker from inside the braces onto the statement's closing `};`, a line the
 /// span does not start on. A literal it keeps on one line carries the marker at

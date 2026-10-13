@@ -26,7 +26,7 @@ fn main() !prints {
     // Advice that did not lex would be worse than none, so the lint bows out.
     let control: #{char} = #{'', 'a', 'b'};
 
-    // Wide enough that `aipl fmt` breaks it one element per line. `#[allow]` is
+    // Wide enough that the formatter breaks it one element per line. `#[allow]` is
     // line-scoped and the marker cannot then sit on the line the span starts on,
     // so the lint stays quiet rather than becoming unsquelchable.
     let wide: #{char} = #{

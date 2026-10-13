@@ -1,5 +1,5 @@
 # A tuple literal takes a trailing comma, like every other comma list in the
-# language — and has to, because `aipl fmt` writes one when it breaks a list
+# language — and has to, because the formatter writes one when it breaks a list
 # across lines. A printer that writes a separator the parser refuses is a
 # formatter that emits source it cannot read back, and this file is the proof
 # it does not: it is checked in already formatted, so the corpus formatting test

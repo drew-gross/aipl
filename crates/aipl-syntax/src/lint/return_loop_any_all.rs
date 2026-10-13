@@ -156,7 +156,7 @@ pub(super) fn return_loop_any_all(e: &Expr, src: &str, names: &AnyAllNames, hits
     };
     // Point at the `return`, not the loop. `#[allow]` is line-scoped, so a hit
     // spanning the loop could never be squelched: the marker would have to go on
-    // the `for (..) {` header, and `aipl fmt` relocates one written there onto a
+    // the `for (..) {` header, and the formatter relocates one written there onto a
     // line of its own, where it squelches nothing. `return true;` is a short
     // statement that always occupies one line, and it is the line that makes
     // this a fold to a single answer.

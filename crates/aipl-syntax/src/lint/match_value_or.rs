@@ -163,7 +163,7 @@ pub(super) fn match_value_or(e: &Expr, src: &str, hits: &mut Vec<Error>) {
     // `#[allow]` is line-scoped (see `allow_squelch`), so a hit spanning the
     // multi-line `match` could never be squelched. That lone identifier is
     // always one line, so it always takes a trailing marker and keeps it
-    // through `aipl fmt` — and it is the arm that identifies the shape, since
+    // through the formatter — and it is the arm that identifies the shape, since
     // a default alone is something `value_or` has too.
     hits.push(Error::at(
         format!(

@@ -283,7 +283,7 @@ impl Server {
     ///
     /// The formatter is canonical, so there is nothing to negotiate with the
     /// client's own settings: tab size and insert-spaces arrive in `options`
-    /// and are ignored, exactly as `aipl fmt` ignores them.
+    /// and are ignored, exactly as the formatter ignores them.
     fn formatting(&self, params: &Value) -> Value {
         let Some((_, text, _)) = self.locate_document(params) else {
             return Value::Null;

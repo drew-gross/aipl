@@ -8,7 +8,7 @@
 # carry the marker would be the `match (..) {` header, and the formatter moves
 # a marker written there onto its own line, where it squelches nothing. The
 # `err` call always starts on its arm's own line, so it always takes a trailing
-# marker and keeps it through `aipl fmt`.
+# marker and keeps it through the formatter.
 
 import { equal as ==, logical_and as &&, print, value_or_err } from builtins;
 
@@ -24,7 +24,7 @@ fn need(o: i64?) -> i64!str {
 fn need_short(o: i64?) -> i64!str { o.value_or_err("missing") }
 
 // The statement form points at the `return` itself, not the arm's `{`: a marker
-// after the brace would not survive `aipl fmt`, while the `return` line takes
+// after the brace would not survive the formatter, while the `return` line takes
 // one like any other statement.
 fn need_returning(o: i64?) -> i64!str {
     match (o) {

@@ -82,7 +82,6 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
-  remove aipl fmt entirely. Add subset flags to check e.g. aipl check --format
   Large optimization tests that still use performance section: move_last_use, fold_extends_value_or and loop_split_fusion are optimization tests over the line threshold.
   chain.allocations == by_hand.allocations ---> replace this with struct comparison
   in tests/cases/report/test_driver_run.aipl why does fn double() get minted as __test$double?
@@ -153,8 +152,9 @@ integer signedness problems:
   3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.
 
 dev loop:
+  Add subset flags to check e.g. aipl check --format
   have the clir IR include the human readable version of data section strings in comments
-  check should also validate sections (e.g. performance, errors)
+  check should validate remaining sections (performance, check)
   dbg() function
   report type errors from different functions
   combined failure tests that are all testing failures of the same feature

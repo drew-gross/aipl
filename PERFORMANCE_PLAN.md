@@ -253,7 +253,7 @@ again.
       already knows. (`walker.aipl` needed no change: `fn_attrs` already lays out
       any `.name({ .. })` generically.)
 - [x] Hand off; this regenerates the artifact. Confirm the form round-trips
-      through `aipl fmt` before writing it anywhere else.
+      through the formatter before writing it anywhere else.
 - [x] Treat `.performance` as `.test` for now (Drew's call): `check` runs it and
       `assert` works in it. Design, since the Rust AST has no field for it:
       - The parser keeps the attribute on `Function` (`performance:

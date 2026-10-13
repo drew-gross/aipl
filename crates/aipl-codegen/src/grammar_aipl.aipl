@@ -551,7 +551,7 @@ fn items() -> Production<AiplTok, Ast>[] {
     ]);
 
     // `variant V = | A | B(i64)` — a leading `|` is allowed and means nothing,
-    // which is what lets `aipl fmt` align every case under one column.
+    // which is what lets the formatter align every case under one column.
     // The cases are a `|`-separated list that may open with a `|` — the shape
     // the formatter gives it once it breaks one case per line. A case's `# ..`
     // lines sit above its `|`, so they ride with the separator rather than

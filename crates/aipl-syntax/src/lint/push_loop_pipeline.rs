@@ -167,7 +167,7 @@ pub(super) fn push_loop_pipeline(
     };
     // Point at the seed, not the loop. `#[allow]` is line-scoped (see
     // `allow_squelch`), so a hit spanning the loop could never be squelched:
-    // the marker would have to go on the `for (..) {` header, and `aipl fmt`
+    // the marker would have to go on the `for (..) {` header, and the formatter
     // relocates one written there onto a line of its own, where it squelches
     // nothing. `mut {acc} = [];` is a short statement that always occupies
     // one line, and it is where the shape starts.

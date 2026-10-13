@@ -176,7 +176,7 @@ pub(super) fn match_value_or_err(e: &Expr, src: &str, pure_fn: bool, hits: &mut 
     // `match` could never be squelched. This arm is the one that identifies the
     // shape — the `some` arm varies — and its `err` call always starts on the
     // arm's own line, which therefore takes a trailing marker and keeps it
-    // through `aipl fmt`. For the block form that line is the `return`'s: a
+    // through the formatter. For the block form that line is the `return`'s: a
     // marker after the arm's `{` would not survive formatting.
     let at = leaves.unwrap_or(&none_arm.body);
     hits.push(Error::at(

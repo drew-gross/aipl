@@ -15,7 +15,7 @@ use crate::Error;
 /// The hit spans the closing brace, which is the one line that carries an
 /// `#[allow]` whatever the layout: an arm on one line ends there, and a broken
 /// block's `}` sits on its own line. A marker after the opening `{`, or after
-/// the value's first line, is moved by `aipl fmt` to where it squelches
+/// the value's first line, is moved by the formatter to where it squelches
 /// nothing.
 pub(super) fn arm_block_value(e: &Expr, src: &str, hits: &mut Vec<Error>) {
     let ExprKind::Match(_, arms) = &e.kind else {

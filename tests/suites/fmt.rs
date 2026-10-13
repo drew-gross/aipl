@@ -347,9 +347,9 @@ fn fill_expected_fmt() {
 }
 
 /// Formatting through the CLI: `aipl check` reports an unformatted file without
-/// touching it, `aipl check --fix` rewrites it in place, and the old `aipl fmt`
-/// says where it went. (A CLI surface the `.aipl` cases framework, which only
-/// `run`s/`check`s, can't exercise.)
+/// touching it, `aipl check --fix` rewrites it in place. (A CLI
+/// surface the `.aipl` cases framework, which only `run`s/`check`s, can't
+/// exercise.)
 #[test]
 fn cli_check_formats_with_fix() {
     let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("fmt_cli");
@@ -399,15 +399,6 @@ fn cli_check_formats_with_fix() {
             "0 tests: 0 passed, 0 failed\n".to_string(),
             String::new(),
             Some(0)
-        )
-    );
-    // The retired subcommand points at its replacement rather than doing nothing.
-    assert_eq!(
-        run(&["fmt", "wide.aipl"]),
-        (
-            String::new(),
-            "`aipl fmt` is now `aipl check --fix <path>`: it formats the file, and refreshes the sections that no longer match what it does\n".to_string(),
-            Some(1)
         )
     );
     let _ = std::fs::remove_file(&path);

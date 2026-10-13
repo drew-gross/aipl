@@ -188,7 +188,7 @@ failure but not a fatal one — it is named on stderr, its tests still run, and 
 batch summary ends with `N files need formatting`.
 
 **`aipl check --fix` is the other half: it repairs what a rewrite can.** There is
-no `aipl fmt` subcommand any more (it prints where it went). `--fix` formats each
+no separate formatting subcommand. `--fix` formats each
 file in place, *then* rewrites every recorded `stdout`/`stderr`/`exit code`/
 `errors`/`expect file:`/`report` section that no longer says what the file does,
 printing `formatted <file>` and `fixed <file>: <sections>`. Formatting goes first

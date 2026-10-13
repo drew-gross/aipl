@@ -82,7 +82,7 @@ fn one_param(
         return;
     }
     // The body's span starts at the `{` that opens it, which is a single line
-    // that survives `aipl fmt` — and the closest line to the signature that a
+    // that survives the formatter — and the closest line to the signature that a
     // parameter can be blamed on, `ast::Param` carrying no span of its own.
     // `fn_body_type_stutter` blames the same place for the same reason.
     hits.push(Error::at(

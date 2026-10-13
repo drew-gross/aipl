@@ -730,7 +730,7 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseEr
                 let inner = base + 1 + group_count(brackets.0);
                 let after_sub = inner + group_count(sub);
 
-                // Bound rather than written into the tuple: `aipl fmt` breaks a
+                // Bound rather than written into the tuple: the formatter breaks a
                 // long tuple literal across lines with a trailing comma, which
                 // the tuple grammar does not accept.
                 let linked_open = link_rule(brackets.0, names, base + 1)?;

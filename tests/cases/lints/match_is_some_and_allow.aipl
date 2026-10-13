@@ -8,7 +8,7 @@
 # marker would be the `match (..) {` header, and the formatter moves a marker
 # written there onto its own line, where it squelches nothing. A literal arm is
 # always one line, so it always takes a trailing marker and keeps it through
-# `aipl fmt`.
+# the formatter.
 
 import { equal as ==, is_some_and, print, to_str } from builtins;
 

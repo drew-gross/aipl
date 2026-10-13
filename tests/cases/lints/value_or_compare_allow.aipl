@@ -1,7 +1,7 @@
 # `#[allow]` keeps the filled form — the escape hatch every lint carries.
 # The marker goes on the line holding the default argument, which is where
 # this lint points; a literal is always one line, so it always takes a
-# trailing marker and keeps it through `aipl fmt`.
+# trailing marker and keeps it through the formatter.
 
 import { equal as ==, print, to_str, value_or } from builtins;
 

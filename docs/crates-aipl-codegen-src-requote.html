@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/requote.aipl</code></h1>
 
-      <div class="module-doc"><p>The formatter's string re-delimiter. A <code>&quot;...&quot;</code> literal and an interpolation-free <code>`...`</code> literal denote the same value and differ only in which characters they must escape — <code>&quot;</code> under the first, <code>`</code>/<code>{</code>/<code>}</code> under the second — so <code>aipl fmt</code> spells each literal with whichever delimiter needs fewer escapes. A <code>&quot;&quot;&quot;</code>/<code>```</code> block whose value has no newline is a single-line literal spread over three lines, so it is respelled as one too, with the same choice of delimiter. <code>walker.aipl</code> applies it to every string token.</p></div>
+      <div class="module-doc"><p>The formatter's string re-delimiter. A <code>&quot;...&quot;</code> literal and an interpolation-free <code>`...`</code> literal denote the same value and differ only in which characters they must escape — <code>&quot;</code> under the first, <code>`</code>/<code>{</code>/<code>}</code> under the second — so the formatter spells each literal with whichever delimiter needs fewer escapes. A <code>&quot;&quot;&quot;</code>/<code>```</code> block whose value has no newline is a single-line literal spread over three lines, so it is respelled as one too, with the same choice of delimiter. <code>walker.aipl</code> applies it to every string token.</p></div>
 
 
 

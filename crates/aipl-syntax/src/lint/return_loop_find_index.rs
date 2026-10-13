@@ -94,7 +94,7 @@ pub(super) fn return_loop_find_index(
     };
     // Point at the `return`, not the loop: `#[allow]` is line-scoped, and a hit
     // spanning the loop could only be squelched from the `for (..) {` header,
-    // which `aipl fmt` relocates a marker off. `return some(i);` is one line,
+    // which the formatter relocates a marker off. `return some(i);` is one line,
     // and it is the line that makes this a search for the first match.
     hits.push(Error::at(
         format!(

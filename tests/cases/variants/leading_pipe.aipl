@@ -1,6 +1,6 @@
 # A variant's first case may be preceded by a `|`. It means nothing — this
 # declares the same type `Circle(i64) | ..` would — but it lets every case line
-# up under one `|`, which is exactly the layout `aipl fmt` emits once the cases
+# up under one `|`, which is exactly the layout the formatter emits once the cases
 # are too wide to sit on one line.
 
 import { equal as ==, wrapping_add as +, wrapping_mul as * } from builtins;
@@ -35,7 +35,7 @@ fn perimeter(s: Shape) -> i64 {
 
 // A one-case variant may carry the leading `|` too — but only where it earns
 // its keep: this one fits on a line, so canonical format has no `|` at all
-// (`aipl fmt` drops it, the way it drops a list's trailing comma when the list
+// (the formatter drops it, the way it drops a list's trailing comma when the list
 // goes flat). The dropped-on-input direction is covered by the formatter's own
 // fixture, `tests/fmt/variant_leading_pipe.aipl`.
 variant Only = Just(i64)

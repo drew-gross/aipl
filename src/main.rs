@@ -56,16 +56,6 @@ fn cli() -> ExitCode {
         Some("doc") => doc_cmd(&args[2..]),
         Some("docs") => docs_cmd(&args[2..]),
         Some("build") => build_cmd(&args[2..]),
-        // `fmt` was folded into `check --fix`: one command that makes a tree right,
-        // rather than one that formats and another that finds what is wrong. The
-        // name stays long enough to say where it went.
-        Some("fmt") => {
-            eprintln!(
-                "`aipl fmt` is now `aipl check --fix <path>`: it formats the file, and \
-                 refreshes the sections that no longer match what it does"
-            );
-            return ExitCode::FAILURE;
-        }
         // `check` owns its exit code (0 = all tests passed, 1 = a failure) and
         // prints its own report, so it returns an `ExitCode` directly.
         Some("check") => return check_cmd(&args[2..]),

@@ -1,7 +1,7 @@
 # The formatter's string re-delimiter. A `"..."` literal and an
 # interpolation-free `` `...` `` literal denote the same value and differ only in
 # which characters they must escape — `"` under the first, `` ` ``/`{`/`}` under
-# the second — so `aipl fmt` spells each literal with whichever delimiter needs
+# the second — so the formatter spells each literal with whichever delimiter needs
 # fewer escapes. A `"""`/```` ``` ```` block whose value has no newline is a
 # single-line literal spread over three lines, so it is respelled as one too,
 # with the same choice of delimiter. `walker.aipl` applies it to every string
