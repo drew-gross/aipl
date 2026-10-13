@@ -346,36 +346,70 @@ fn fill_expected_fmt() {
     );
 }
 
-/// The `aipl fmt` CLI: rewrites in place; `--check` reports without writing.
-/// (A CLI surface the `.aipl` cases framework, which only `run`s/`check`s,
-/// can't exercise.)
+/// Formatting through the CLI: `aipl check` reports an unformatted file without
+/// touching it, `aipl check --fix` rewrites it in place, and the old `aipl fmt`
+/// says where it went. (A CLI surface the `.aipl` cases framework, which only
+/// `run`s/`check`s, can't exercise.)
 #[test]
-fn cli_fmt_and_check() {
-    let path = std::env::temp_dir().join(format!("aipl_fmt_{}.aipl", std::process::id()));
+fn cli_check_formats_with_fix() {
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("fmt_cli");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("wide.aipl");
     let src = "fn main()   ->   i64 { 42 }\n";
     std::fs::write(&path, src).unwrap();
     let run = |args: &[&str]| {
-        std::process::Command::new(env!("CARGO_BIN_EXE_aipl"))
-            .arg("fmt")
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_aipl"))
             .args(args)
-            .arg(&path)
+            .current_dir(&dir)
             .output()
-            .expect("spawn aipl fmt")
+            .expect("spawn aipl");
+        (
+            String::from_utf8_lossy(&out.stdout).into_owned(),
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+            out.status.code(),
+        )
     };
-    // --check on an unformatted file: exit 1, file untouched.
-    let out = run(&["--check"]);
-    assert!(!out.status.success(), "--check should fail on unformatted");
+    // Plain `check`: reported, exit 1, file untouched.
+    assert_eq!(
+        run(&["check", "wide.aipl"]),
+        (
+            "0 tests: 0 passed, 0 failed\n".to_string(),
+            "wide.aipl: needs formatting (run `aipl check --fix wide.aipl`)\n".to_string(),
+            Some(1)
+        )
+    );
     assert_eq!(std::fs::read_to_string(&path).unwrap(), src);
-    // fmt rewrites in place.
-    let out = run(&[]);
-    assert!(out.status.success());
+    // `--fix` rewrites it in place and says so.
+    assert_eq!(
+        run(&["check", "--fix", "wide.aipl"]),
+        (
+            "formatted wide.aipl\n0 tests: 0 passed, 0 failed\n".to_string(),
+            String::new(),
+            Some(0)
+        )
+    );
     assert_eq!(
         std::fs::read_to_string(&path).unwrap(),
         "fn main() -> i64 { 42 }\n"
     );
-    // --check on the formatted file: exit 0.
-    let out = run(&["--check"]);
-    assert!(out.status.success(), "--check should pass when formatted");
+    // And now `check` passes.
+    assert_eq!(
+        run(&["check", "wide.aipl"]),
+        (
+            "0 tests: 0 passed, 0 failed\n".to_string(),
+            String::new(),
+            Some(0)
+        )
+    );
+    // The retired subcommand points at its replacement rather than doing nothing.
+    assert_eq!(
+        run(&["fmt", "wide.aipl"]),
+        (
+            String::new(),
+            "`aipl fmt` is now `aipl check --fix <path>`: it formats the file, and refreshes the sections that no longer match what it does\n".to_string(),
+            Some(1)
+        )
+    );
     let _ = std::fs::remove_file(&path);
 }
 

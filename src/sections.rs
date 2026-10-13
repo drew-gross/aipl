@@ -31,6 +31,29 @@ use crate::binary;
 use crate::codegen::{normalize_output, ObjectCompilation};
 use crate::{DebugOptions, Error, SpecFields};
 
+/// One way a file disagrees with its recorded sections.
+///
+/// `fix` is the section body that would make the finding go away — `(section
+/// name, new body)`, in the form `aipl check --fix` writes back — when there is
+/// one. A mismatch always has: the section should say what the file now does.
+/// Things no rewrite can repair (an expected file that was never written, a
+/// `main` that does not exist, a leak, two sections that contradict each other)
+/// have none, and stay failures under `--fix`.
+pub struct Finding {
+    pub message: String,
+    pub fix: Option<(String, String)>,
+}
+
+impl Finding {
+    /// A finding with nothing to rewrite.
+    pub fn unfixable(message: impl Into<String>) -> Self {
+        Finding {
+            message: message.into(),
+            fix: None,
+        }
+    }
+}
+
 /// Whether the file asks for its `main` to be run: any section that observes a
 /// run. A file with none of them is a plain program, and checking it must not
 /// execute `main` — that may be a server, or read its input from a terminal.
@@ -43,10 +66,13 @@ pub fn runs_main(spec: &SpecFields) -> bool {
 }
 
 /// A mismatch report for one section, or `None` when `actual` is what the file
-/// recorded.
-fn mismatch(section: &str, actual: &str, expected: &str) -> Option<String> {
-    (actual != expected).then(|| {
-        format!("`{section}` mismatch\n--- expected ---\n{expected}\n--- actual ---\n{actual}")
+/// recorded. Its fix is the section rewritten to say `actual`.
+fn mismatch(section: &str, actual: &str, expected: &str) -> Option<Finding> {
+    (actual != expected).then(|| Finding {
+        message: format!(
+            "`{section}` mismatch\n--- expected ---\n{expected}\n--- actual ---\n{actual}"
+        ),
+        fix: Some((section.to_string(), actual.to_string())),
     })
 }
 
@@ -54,7 +80,7 @@ fn mismatch(section: &str, actual: &str, expected: &str) -> Option<String> {
 /// compile, so a section that observes a run, or one that needs a compiled
 /// program, contradicts it; the file is wrong, not the program, and neither
 /// section could be checked against anything.
-pub fn conflicts(spec: &SpecFields) -> Vec<String> {
+pub fn conflicts(spec: &SpecFields) -> Vec<Finding> {
     if spec.errors.is_none() {
         return Vec::new();
     }
@@ -82,7 +108,7 @@ pub fn conflicts(spec: &SpecFields) -> Vec<String> {
             "`expect file:` section requires a running program, so it cannot coexist with `errors`",
         );
     }
-    found.into_iter().map(str::to_string).collect()
+    found.into_iter().map(Finding::unfixable).collect()
 }
 
 /// Check an `errors` section: the file must fail to compile, with exactly the
@@ -94,14 +120,16 @@ pub fn conflicts(spec: &SpecFields) -> Vec<String> {
 /// trailing newlines dropped — so a diagnostic positioned at end of file lands
 /// where the section's author saw it, not on a line that only exists because the
 /// file went on to hold sections.
-pub fn errors(spec: &SpecFields, compiled: Result<(), Vec<Error>>, label: &str) -> Vec<String> {
+pub fn errors(spec: &SpecFields, compiled: Result<(), Vec<Error>>, label: &str) -> Vec<Finding> {
     let Some(expected) = spec.errors.as_deref() else {
         return Vec::new();
     };
     match compiled {
         // Nothing to compare: the section claims an error the compiler no longer
         // reports, so the section itself is what is wrong.
-        Ok(()) => vec!["expected an error, but compilation succeeded".to_string()],
+        Ok(()) => vec![Finding::unfixable(
+            "expected an error, but compilation succeeded",
+        )],
         Err(errs) => {
             let actual = Error::render_all(&errs, &spec.source, label);
             mismatch("errors", &actual, expected).into_iter().collect()
@@ -130,7 +158,7 @@ pub fn behavior(
     stem: &str,
     label: &str,
     dbg: DebugOptions,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<Finding>, String> {
     let has_main = program
         .items
         .iter()
@@ -155,7 +183,7 @@ pub fn behavior(
 
 /// The body of [`behavior`], with `dir` as its scratch directory so the caller
 /// can remove it however this returns.
-fn run_in(dir: &Path, obj: &[u8], spec: &SpecFields, stem: &str) -> Result<Vec<String>, Error> {
+fn run_in(dir: &Path, obj: &[u8], spec: &SpecFields, stem: &str) -> Result<Vec<Finding>, Error> {
     crate::stage_companions(dir, &spec.extra_files)
         .map_err(|e| Error::msg(format!("stage companions in {}: {e}", dir.display())))?;
     let exe = dir.join(binary::default_exe_name(stem));
@@ -176,7 +204,7 @@ fn run_in(dir: &Path, obj: &[u8], spec: &SpecFields, stem: &str) -> Result<Vec<S
     // An absent section is not "unchecked": it records empty output and a clean
     // exit, which is what makes a stray `print` show up in a file that expects
     // silence.
-    let mut found: Vec<String> = [
+    let mut found: Vec<Finding> = [
         mismatch("stdout", &stdout, spec.stdout.as_deref().unwrap_or("")),
         mismatch("stderr", &stderr, spec.stderr.as_deref().unwrap_or("")),
         mismatch("exit code", &exit.to_string(), &expected_exit.to_string()),
@@ -192,7 +220,9 @@ fn run_in(dir: &Path, obj: &[u8], spec: &SpecFields, stem: &str) -> Result<Vec<S
                 &normalize_output(&written),
                 expected,
             )),
-            Err(e) => found.push(format!("expected output file {rel:?} was not written: {e}")),
+            Err(e) => found.push(Finding::unfixable(format!(
+                "expected output file {rel:?} was not written: {e}"
+            ))),
         }
     }
     Ok(found)
@@ -213,7 +243,7 @@ pub fn report(
     stem: &str,
     label: &str,
     dbg: DebugOptions,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<Finding>, String> {
     let Some(expected) = spec.report.as_deref() else {
         return Ok(Vec::new());
     };
@@ -228,14 +258,19 @@ pub fn report(
     let stats = measured?;
 
     // A section body has its trailing newlines stripped, and a report ends in one.
-    let mut found: Vec<String> = mismatch("report", stats.render_report().trim_end(), expected)
+    let mut found: Vec<Finding> = mismatch("report", stats.render_report().trim_end(), expected)
         .into_iter()
         .collect();
     if let Some(n) = stats.leaked() {
-        found.push(format!(
+        // A report of a leaking run is not one to record: the fix would bake the
+        // leak into the section, which is why the harness refuses the same thing.
+        for f in &mut found {
+            f.fix = None;
+        }
+        found.push(Finding::unfixable(format!(
             "leak: {n} of {} allocations were never freed ({} deallocations)",
             stats.allocations, stats.deallocations
-        ));
+        )));
     }
     Ok(found)
 }

@@ -15,7 +15,7 @@ resolution, formatting or type checking here to drift out of step.
 | go to definition | the server, via `aipl-index` — crosses files through `import` |
 | hover | the declaration's signature and its `# ..` documentation |
 | outline / breadcrumbs / symbol search | the file's declarations, with a `variant`'s cases nested under it |
-| format document | `aipl fmt`, which is canonical — it decides the layout, not your settings |
+| format document | the formatter (`aipl check --fix`), which is canonical — it decides the layout, not your settings |
 | diagnostics | the loader and the type checker, re-run shortly after you stop typing |
 
 Format-on-save is enabled for `.aipl` files by default (the formatter is

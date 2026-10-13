@@ -56,8 +56,16 @@ fn cli() -> ExitCode {
         Some("doc") => doc_cmd(&args[2..]),
         Some("docs") => docs_cmd(&args[2..]),
         Some("build") => build_cmd(&args[2..]),
-        // `fmt` owns its exit code (`--check` reports needs-formatting as 1).
-        Some("fmt") => return fmt_cmd(&args[2..]),
+        // `fmt` was folded into `check --fix`: one command that makes a tree right,
+        // rather than one that formats and another that finds what is wrong. The
+        // name stays long enough to say where it went.
+        Some("fmt") => {
+            eprintln!(
+                "`aipl fmt` is now `aipl check --fix <path>`: it formats the file, and \
+                 refreshes the sections that no longer match what it does"
+            );
+            return ExitCode::FAILURE;
+        }
         // `check` owns its exit code (0 = all tests passed, 1 = a failure) and
         // prints its own report, so it returns an `ExitCode` directly.
         Some("check") => return check_cmd(&args[2..]),
@@ -88,8 +96,7 @@ fn usage(prog: &str) -> String {
   {prog} doc   <file.aipl>                  print the file's and each declaration's `# ..` docs
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
-  {prog} fmt   <file.aipl> [--check]        rewrite the file in canonical format
-  {prog} check [path...] [--ignore-sections]  run every fn's `.test({{ .. }})` block, and check each file's sections
+  {prog} check [path...] [--fix] [--ignore-sections]  run the tests, and check formatting and each file's sections
   {prog} report <file.aipl> [--machine] [-- args...]  count what a run of the file costs
   {prog} lsp                                serve the Language Server Protocol on stdin/stdout
 
@@ -102,16 +109,25 @@ otherwise.
 `check` with no path checks every `.aipl` file under the working directory (one
 process, so the engine links once); pass a file to check just that one, or a
 directory to check the tree under it. It also reports any file that isn't in
-canonical format (`aipl fmt`), runs a function's `.performance({{ .. }})` block too (in
-an instrumented build, which needs the linker `build` does), and validates the
-`--- section ---` blocks a file
-may end with: `errors` (the file must fail to compile with exactly those
-diagnostics, named relative to where `check` was started), and `stdout`,
-`stderr`, `exit code`, `cli` and `expect file: p` (one run of its `main`, made
-only when one of them is present), and `report` (what `aipl report` prints for it). `--- file: p ---` sections are staged beside
-the file so its imports and fixtures resolve. `--ignore-sections` checks the
-tests alone. It reports every failure rather than stopping at the first, and
-exits 0 only if all of them were formatted, compiled, passed, and matched.
+canonical format, runs a function's `.performance({{ .. }})` block too (in an
+instrumented build, which needs the linker `build` does), and validates the
+`--- section ---` blocks a file may end with: `errors` (the file must fail to
+compile with exactly those diagnostics, named relative to where `check` was
+started), `stdout`, `stderr`, `exit code`, `cli` and `expect file: p` (one run of
+its `main`, made only when one of them is present), and `report` (what `aipl
+report` prints for it). `--- file: p ---` sections are staged beside the file so
+its imports and fixtures resolve. `--ignore-sections` checks the tests alone. It
+reports every failure rather than stopping at the first, and exits 0 only if all
+of them were formatted, compiled, passed, and matched.
+
+`--fix` repairs what a rewrite can: it formats each file in place, then rewrites
+each recorded section that no longer says what the file does (printing `formatted
+<file>` and `fixed <file>: <sections>`). Formatting goes first because it moves
+line numbers that `errors` and `report` record. It does not hide a real problem:
+a failing test, a leak, a `trace`, a file that does not compile, a section for a
+file that was never written, or sections that contradict each other are still
+failures. A section a file does not have is added only for output the file's own
+run produced, since an absent `stdout` already means `prints nothing`.
 
 `report` builds the file's `main` (or, for a file with only `.test` blocks, the run
 of those tests) in the instrumented build and runs it once: heap allocations,
@@ -187,57 +203,6 @@ fn run_cmd(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-/// `fmt <file> [--check]` — rewrite the file in canonical format (in place).
-/// With `--check`, write nothing: exit 0 if already formatted, 1 if not (or on
-/// any error). Trailing `--- section ---` blocks are preserved byte-for-byte.
-fn fmt_cmd(args: &[String]) -> ExitCode {
-    let mut file: Option<&str> = None;
-    let mut check = false;
-    for a in args {
-        match a.as_str() {
-            "--check" => check = true,
-            other => {
-                if file.is_some() {
-                    eprintln!("unexpected arg {other:?}");
-                    return ExitCode::FAILURE;
-                }
-                file = Some(other);
-            }
-        }
-    }
-    let Some(file) = file else {
-        eprintln!("missing source file");
-        return ExitCode::FAILURE;
-    };
-    let src = match std::fs::read_to_string(file) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("{file}: {e}");
-            return ExitCode::FAILURE;
-        }
-    };
-    let formatted = match aipl::fmt::format_source(&src, &aipl::fmt::FmtOptions::default()) {
-        Ok(f) => f,
-        Err(e) => {
-            eprintln!("{}", e.render(aipl::strip_test_sections(&src), file));
-            return ExitCode::FAILURE;
-        }
-    };
-    if formatted == src {
-        return ExitCode::SUCCESS;
-    }
-    if check {
-        eprintln!("{file}: needs formatting");
-        return ExitCode::FAILURE;
-    }
-    if let Err(e) = std::fs::write(file, &formatted) {
-        eprintln!("{file}: {e}");
-        return ExitCode::FAILURE;
-    }
-    println!("formatted {file}");
-    ExitCode::SUCCESS
-}
-
 /// Collect every `*.aipl` file under `dir`, recursively, into `out`.
 ///
 /// Skips hidden entries (`.git`, editor state) and `target/` build output —
@@ -274,7 +239,7 @@ fn collect_aipl(dir: &Path, out: &mut Vec<PathBuf>) {
 struct Checked {
     exit_code: i64,
     traces: Option<String>,
-    sections: Vec<String>,
+    sections: Vec<sections::Finding>,
     /// Whether the test driver ran at all: an `errors` file never compiles, so it
     /// has no tests and no summary to print.
     ran_tests: bool,
@@ -404,8 +369,8 @@ fn check_file(
             .unwrap_or("a.out");
         // A run that could not be produced is a finding about the file like a
         // mismatch is, not a reason to forget that its tests already ran.
-        found =
-            sections::behavior(&program, spec, stem, label, dbg).unwrap_or_else(|msg| vec![msg]);
+        found = sections::behavior(&program, spec, stem, label, dbg)
+            .unwrap_or_else(|msg| vec![sections::Finding::unfixable(msg)]);
     }
     // A pinned `aipl report`: built both ways and run once, like the command.
     if section_label.is_some() && spec.report.is_some() {
@@ -415,7 +380,8 @@ fn check_file(
             .and_then(OsStr::to_str)
             .unwrap_or("a.out");
         found.extend(
-            sections::report(&program, spec, stem, label, dbg).unwrap_or_else(|msg| vec![msg]),
+            sections::report(&program, spec, stem, label, dbg)
+                .unwrap_or_else(|msg| vec![sections::Finding::unfixable(msg)]),
         );
     }
     Ok(Checked {
@@ -528,9 +494,70 @@ fn check_resolved(
 }
 
 /// Print each way a file's sections disagree with what it does, naming the file.
-fn report_sections(label: &str, found: &[String]) {
+fn report_sections(label: &str, found: &[sections::Finding]) {
     for f in found {
-        eprintln!("{label}: {f}");
+        eprintln!("{label}: {}", f.message);
+    }
+}
+
+/// `--fix` for the sections: write each finding that has a fix back into `path`,
+/// through the same dogfooded function `fill_expected` refreshes the corpus with,
+/// and return the findings that remain — the ones no rewrite repairs.
+///
+/// A finding's fix is the section saying what the file now does, so applying it
+/// makes the finding true; what is left (a failing test, a leak, an expected file
+/// never written, sections that contradict each other) is a real problem that a
+/// rewritten section would only hide.
+fn apply_fixes(path: &Path, label: &str, found: Vec<sections::Finding>) -> Vec<sections::Finding> {
+    let (fixable, mut rest): (Vec<_>, Vec<_>) = found.into_iter().partition(|f| f.fix.is_some());
+    if fixable.is_empty() {
+        return rest;
+    }
+    let fills: Vec<(String, String)> = fixable.iter().filter_map(|f| f.fix.clone()).collect();
+    match aipl::codegen::fill_or_add_sections_file(&path.to_string_lossy(), &fills) {
+        Ok(()) => {
+            let mut names: Vec<&str> = Vec::new();
+            for (section, _) in &fills {
+                if !names.contains(&section.as_str()) {
+                    names.push(section);
+                }
+            }
+            println!("fixed {label}: {}", names.join(", "));
+        }
+        Err(e) => {
+            eprintln!("{label}: could not write the fixed sections: {e}");
+            rest.extend(fixable);
+        }
+    }
+    rest
+}
+
+/// `--fix` for formatting: rewrite `file` in canonical form. Returns whether it is
+/// still unformatted afterwards (only if the rewrite could not be written).
+///
+/// Done before anything else is checked, because formatting moves line numbers and
+/// an `errors` or `report` section records them: fixing those first would record
+/// positions the next format changes. A source the formatter cannot parse is left
+/// alone — loading it reports the syntax error, which is the diagnostic that helps.
+fn fix_formatting(file: &Path, label: &str) -> bool {
+    let Ok(src) = std::fs::read_to_string(file) else {
+        return false;
+    };
+    let Ok(formatted) = aipl::fmt::format_source(&src, &aipl::fmt::FmtOptions::default()) else {
+        return false;
+    };
+    if formatted == src {
+        return false;
+    }
+    match std::fs::write(file, &formatted) {
+        Ok(()) => {
+            println!("formatted {label}");
+            false
+        }
+        Err(e) => {
+            eprintln!("{label}: could not rewrite: {e}");
+            true
+        }
     }
 }
 
@@ -554,7 +581,7 @@ fn check_formatting(file: &Path, label: &str) -> bool {
     if formatted == src {
         return false;
     }
-    eprintln!("{label}: needs formatting (run `aipl fmt {label}`)");
+    eprintln!("{label}: needs formatting (run `aipl check --fix {label}`)");
     true
 }
 
@@ -571,9 +598,12 @@ fn check_formatting(file: &Path, label: &str) -> bool {
 /// functions' `.test` bodies — but the ~0.2s dogfood-engine link is a lazy
 /// per-thread `thread_local!`, so a batch pays it once instead of once per file.
 ///
-/// Each file is also checked against `aipl fmt`'s canonical format, since a
-/// project running `aipl check` as its handoff gate wants one command to say
-/// whether the tree is ready — not two.
+/// Each file is also checked against the canonical format, since a project running
+/// `aipl check` as its handoff gate wants one command to say whether the tree is
+/// ready — not two. `--fix` is the same question answered by repairing: it formats
+/// the file, then refreshes the sections that no longer match (see [`apply_fixes`]),
+/// and leaves the failures a rewrite cannot repair — so it is also how a tree is
+/// made ready.
 ///
 /// A file's trailing `--- section ---` blocks are expectations about it, and are
 /// validated too (see [`sections`]): `errors` for a file that must not compile,
@@ -588,9 +618,10 @@ fn check_formatting(file: &Path, label: &str) -> bool {
 fn check_cmd(args: &[String]) -> ExitCode {
     let (args, dbg) = take_debug_flag(args);
     let validate_sections = !args.iter().any(|a| a == "--ignore-sections");
+    let fix = args.iter().any(|a| a == "--fix");
     let args: Vec<String> = args
         .into_iter()
-        .filter(|a| a != "--ignore-sections")
+        .filter(|a| a != "--ignore-sections" && a != "--fix")
         .collect();
 
     // One explicit file keeps the single-file report: bare `test <name>` headers
@@ -648,7 +679,11 @@ fn check_cmd(args: &[String]) -> ExitCode {
         let (path, label) = &resolved[0];
         // Reported before the tests run, and either way: the point is to end the
         // invocation knowing about every problem, not just the first kind.
-        let unformatted = check_formatting(path, label);
+        let unformatted = if fix {
+            fix_formatting(path, label)
+        } else {
+            check_formatting(path, label)
+        };
         // The summary is printed here, once both kinds of test have run, rather
         // than by the JIT runner when its own tests finish.
         aipl::codegen::set_quiet_summary(true);
@@ -657,6 +692,13 @@ fn check_cmd(args: &[String]) -> ExitCode {
             // Reported after the run, so a trace the tests hit has already
             // printed its value by the time the diagnostic explains itself.
             Ok(checked) => {
+                // Fixed before the summary is printed, so the summary is the last
+                // thing said about the file.
+                let remaining = if fix {
+                    apply_fixes(path, label, checked.sections)
+                } else {
+                    checked.sections
+                };
                 if checked.ran_tests {
                     let (total, passed, failed) = aipl::codegen::test_totals();
                     println!("{total} tests: {passed} passed, {failed} failed");
@@ -664,11 +706,11 @@ fn check_cmd(args: &[String]) -> ExitCode {
                 if let Some(report) = &checked.traces {
                     eprintln!("{report}");
                 }
-                report_sections(label, &checked.sections);
+                report_sections(label, &remaining);
                 (
                     checked.exit_code == 0,
                     checked.traces.is_some(),
-                    !checked.sections.is_empty(),
+                    !remaining.is_empty(),
                 )
             }
             Err(msg) => {
@@ -689,7 +731,12 @@ fn check_cmd(args: &[String]) -> ExitCode {
     let mut traced = 0usize;
     let mut mismatched = 0usize;
     for (path, label) in &resolved {
-        if check_formatting(path, label) {
+        let still_unformatted = if fix {
+            fix_formatting(path, label)
+        } else {
+            check_formatting(path, label)
+        };
+        if still_unformatted {
             unformatted += 1;
         }
         aipl::codegen::set_test_file(Some(label));
@@ -700,8 +747,13 @@ fn check_cmd(args: &[String]) -> ExitCode {
                     eprintln!("{report}");
                     traced += 1;
                 }
-                if !checked.sections.is_empty() {
-                    report_sections(label, &checked.sections);
+                let remaining = if fix {
+                    apply_fixes(path, label, checked.sections)
+                } else {
+                    checked.sections
+                };
+                if !remaining.is_empty() {
+                    report_sections(label, &remaining);
                     mismatched += 1;
                 }
             }

@@ -406,8 +406,12 @@ Each item below can land separately.
       performs. First check whether the allocation tally is cheap enough in the
       production runtime; otherwise flag leaks only where an instrumented run
       happens.
-- [ ] Fill flag on `check` (name TBD) rewrites mismatched sections and replaces
-      `fill_expected`.
+- [x] Fill flag on `check`: `--fix` formats each file, then rewrites the sections
+      that no longer match (stdout, stderr, exit code, errors, expect file, report),
+      through the same function `fill_expected` uses; the `fmt` subcommand is gone
+      (it points at `check --fix`). It does not replace `fill_expected` yet: `check`
+      does not validate `--- performance ---` or `--- check ---`, and the harness
+      (and so handoff) still refills through `fill_expected`.
 - [ ] Harness: each case becomes `aipl check <case>` plus whatever `check` doesn't
       own yet (`--- performance ---` before Phase 4, the baseline comparison).
       Delete the duplicated section logic from `tests/cases.rs`.

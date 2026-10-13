@@ -281,7 +281,7 @@ fn the_outline_nests_cases_under_their_variant() {
 
 #[test]
 fn formatting_replaces_the_whole_document() {
-    // Imports out of order and a misindented body: `aipl fmt` fixes both.
+    // Imports out of order and a misindented body: the formatter fixes both.
     let source = "import { print } from builtins;\n\
                   import { wrapping_add as + } from builtins;\n\
                   fn main() !prints {\n\

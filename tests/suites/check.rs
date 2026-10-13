@@ -4,10 +4,10 @@
 //! temp `.aipl` file — or a whole temp tree, for the batch mode a bare
 //! `aipl check` runs — and asserting on `check`'s stdout and exit code.
 //!
-//! Every fixture source here is written in `aipl fmt`'s canonical format, since
+//! Every fixture source here is written in the formatter's canonical format, since
 //! `check` reports unformatted files: an offhandedly-spaced import would make a
 //! test about test *counts* fail over whitespace. Reformat one by round-tripping
-//! it through `aipl fmt` rather than by eye.
+//! it through `aipl check --fix` rather than by eye.
 
 use std::fs;
 use std::path::PathBuf;
@@ -132,21 +132,20 @@ fn a_file_that_does_not_compile_is_reported_without_stopping_the_run() {
 }
 
 /// `PASSES` with the import's inner spacing squeezed — parses and passes, but
-/// isn't what `aipl fmt` would write.
+/// isn't what the formatter would write.
 const UNFORMATTED: &str = "import { equal as ==} from builtins;\n\
      fn a() -> i64 { 1 }.test({ assert(a() == 1); })\n";
 
 #[test]
 fn an_unformatted_file_fails_even_when_its_tests_pass() {
-    let (stdout, stderr, code) = check("unformatted", UNFORMATTED);
+    let (stdout, stderr, code) = check_here("unformatted", UNFORMATTED);
     // The tests still ran — formatting is reported alongside them, not instead.
     assert_eq!(stdout, "1 tests: 1 passed, 0 failed\n");
-    assert!(
-        stderr.contains("needs formatting"),
-        "expected a formatting diagnostic, got:\n{stderr}"
+    // And the diagnostic names the command that fixes it.
+    assert_eq!(
+        stderr,
+        "unformatted.aipl: needs formatting (run `aipl check --fix unformatted.aipl`)\n"
     );
-    // And it names the command that fixes it.
-    assert!(stderr.contains("aipl fmt"), "got:\n{stderr}");
     assert_eq!(code, 1);
 }
 
@@ -1271,4 +1270,198 @@ fn a_performance_block_is_left_out_of_what_run_and_build_make() {
         ),
         ("hi\n0\n".to_string(), String::new(), Some(0))
     );
+}
+
+// ---------------------------------------------------------------------------
+// `--fix`: format each file, then rewrite the recorded sections that no longer say
+// what the file does. Written as examples: each states the whole of what it printed
+// and what the file became.
+// ---------------------------------------------------------------------------
+
+/// What a tree file reads as after a run — `check_tree` leaves its files on disk.
+fn tree_file(name: &str, rel: &str) -> String {
+    fs::read_to_string(
+        PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+            .join("check_tree")
+            .join(name)
+            .join(rel),
+    )
+    .expect("read a fixed file")
+}
+
+#[test]
+fn fix_formats_the_file_and_refreshes_the_sections_that_went_stale() {
+    // Unformatted, with a `stdout` and an `exit code` that no longer match.
+    let src = "import { print } from builtins;\nfn main() !prints { print( \"hi\" ); }\n\
+               --- stdout ---\nbye\n--- exit code ---\n7\n";
+    let (stdout, stderr, code) = check_tree("fix_stale", &[("a.aipl", src)], &["--fix", "a.aipl"]);
+    assert_eq!(
+        stdout,
+        format!("formatted a.aipl\nfixed a.aipl: stdout, exit code\n{NO_TESTS}")
+    );
+    assert_eq!((stderr.as_str(), code), ("", 0));
+    assert_eq!(
+        tree_file("fix_stale", "a.aipl"),
+        "\
+import { print } from builtins;
+
+fn main() !prints {
+    print(\"hi\");
+}
+--- stdout ---
+hi
+--- exit code ---
+0
+"
+    );
+    // And a plain `check` of the result has nothing to say.
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join("check_tree")
+        .join("fix_stale");
+    let again = Command::new(env!("CARGO_BIN_EXE_aipl"))
+        .args(["check", "a.aipl"])
+        .current_dir(&dir)
+        .output()
+        .expect("run aipl check");
+    assert_eq!(
+        (
+            String::from_utf8_lossy(&again.stdout).into_owned(),
+            String::from_utf8_lossy(&again.stderr).into_owned(),
+            again.status.code()
+        ),
+        (NO_TESTS.to_string(), String::new(), Some(0))
+    );
+}
+
+#[test]
+fn fix_refreshes_an_errors_section_after_formatting_has_moved_its_line_numbers() {
+    // The diagnostic records a line and column, and formatting moves both — so the
+    // formatter has to have run first, or the section would record a position the
+    // next format changes.
+    let src = "fn   bad()  ->  i64   {   true   }\n--- errors ---\nstale\n";
+    let (stdout, stderr, code) =
+        check_tree("fix_errors", &[("bad.aipl", src)], &["--fix", "bad.aipl"]);
+    assert_eq!(stdout, "formatted bad.aipl\nfixed bad.aipl: errors\n");
+    assert_eq!((stderr.as_str(), code), ("", 0));
+    assert_eq!(
+        tree_file("fix_errors", "bad.aipl"),
+        "\
+fn bad() -> i64 { true }
+--- errors ---
+error: fn \"bad\": body returns bool, but the declared return type is i64
+ --> ./bad.aipl:1:19
+  |
+1 | fn bad() -> i64 { true }
+  |                   ^^^^
+"
+    );
+}
+
+#[test]
+fn fix_refreshes_a_report_section() {
+    let src = "fn main() {}\n--- report ---\nstale\n";
+    let (stdout, stderr, code) = check_tree("fix_report", &[("r.aipl", src)], &["--fix", "r.aipl"]);
+    assert_eq!(stdout, format!("fixed r.aipl: report\n{NO_TESTS}"));
+    assert_eq!((stderr.as_str(), code), ("", 0));
+    assert_eq!(
+        tree_file("fix_report", "r.aipl"),
+        format!("fn main() {{}}\n--- report ---\n{REPORT_OF_EMPTY_MAIN}\n")
+    );
+}
+
+#[test]
+fn fix_does_not_hide_a_failing_test() {
+    // The stale `stdout` is repaired; the failing assertion is a real failure, and
+    // stays one.
+    let src = "import { equal as ==, print } from builtins;\n\n\
+               fn f() -> i64 { 1 }.test({\n    assert(f() == 2);\n})\n\n\
+               fn main() !prints {\n    print(\"hi\");\n}\n--- stdout ---\nbye\n";
+    let (stdout, stderr, code) =
+        check_tree("fix_failing", &[("t.aipl", src)], &["--fix", "t.aipl"]);
+    assert_eq!(
+        stdout,
+        "\
+test f ... FAIL
+  assert failed at t.aipl:4 f() == 2
+fixed t.aipl: stdout
+1 tests: 0 passed, 1 failed
+"
+    );
+    assert_eq!((stderr.as_str(), code), ("", 1));
+    assert!(tree_file("fix_failing", "t.aipl").ends_with("--- stdout ---\nhi\n"));
+}
+
+#[test]
+fn fix_leaves_what_a_rewrite_cannot_repair() {
+    // Each of these is a problem with the file, not a stale section: `main` that
+    // is not there, an expected file the run never wrote, a section the file's
+    // other sections forbid.
+    let no_main = "fn f() -> i64 { 1 }\n--- stdout ---\nx\n";
+    let (stdout, stderr, code) =
+        check_tree("fix_no_main", &[("n.aipl", no_main)], &["--fix", "n.aipl"]);
+    assert_eq!(stdout, NO_TESTS);
+    assert_eq!(
+        stderr,
+        "n.aipl: a file with no `main` runs only its `.test` blocks — it can't have a stdout/stderr/exit/cli/expect-file section\n"
+    );
+    assert_eq!(code, 1);
+    // And the file is as it was.
+    assert_eq!(tree_file("fix_no_main", "n.aipl"), no_main);
+
+    let missing = "fn main() {}\n--- expect file: never.txt ---\nx\n";
+    let (stdout, stderr, code) =
+        check_tree("fix_missing", &[("m.aipl", missing)], &["--fix", "m.aipl"]);
+    assert_eq!(stdout, NO_TESTS);
+    assert_eq!(
+        stderr,
+        "m.aipl: expected output file \"never.txt\" was not written: No such file or directory (os error 2)\n"
+    );
+    assert_eq!(code, 1);
+    assert_eq!(tree_file("fix_missing", "m.aipl"), missing);
+}
+
+#[test]
+fn fix_in_a_batch_repairs_every_file_and_counts_only_the_rest() {
+    let (stdout, stderr, code) = check_tree(
+        "fix_batch",
+        &[
+            ("a_stale.aipl", &format!("{GREETS}--- stdout ---\nbye\n")),
+            ("b_ok.aipl", &format!("{GREETS}--- stdout ---\nhi\n")),
+            ("c_stale.aipl", &format!("{GREETS}--- stdout ---\nbye\n")),
+        ],
+        &["--fix"],
+    );
+    assert_eq!(
+        stdout,
+        "fixed ./a_stale.aipl: stdout\nfixed ./c_stale.aipl: stdout\n3 files, 0 tests: 0 passed, 0 failed\n"
+    );
+    assert_eq!((stderr.as_str(), code), ("", 0));
+    assert!(tree_file("fix_batch", "a_stale.aipl").ends_with("--- stdout ---\nhi\n"));
+}
+
+#[test]
+fn fix_with_ignore_sections_only_formats() {
+    let src = format!("import {{ print }} from builtins;\nfn main() !prints {{ print( \"hi\" ); }}\n--- stdout ---\nbye\n");
+    let (stdout, stderr, code) = check_tree(
+        "fix_ignore",
+        &[("i.aipl", &src)],
+        &["--fix", "--ignore-sections", "i.aipl"],
+    );
+    assert_eq!(stdout, format!("formatted i.aipl\n{NO_TESTS}"));
+    assert_eq!((stderr.as_str(), code), ("", 0));
+    // The section is still wrong; this run was not asked about it.
+    assert!(tree_file("fix_ignore", "i.aipl").ends_with("--- stdout ---\nbye\n"));
+}
+
+#[test]
+fn fix_leaves_a_file_that_does_not_parse_alone() {
+    // The formatter cannot parse it, so there is nothing to rewrite; loading it
+    // reports the syntax error, which is the diagnostic that helps.
+    let src = "fn main( {\n";
+    let (stdout, stderr, code) =
+        check_tree("fix_unparsed", &[("p.aipl", src)], &["--fix", "p.aipl"]);
+    assert_eq!(stdout, "");
+    assert!(stderr.starts_with("error:"), "got:\n{stderr}");
+    assert_eq!(code, 1);
+    assert_eq!(tree_file("fix_unparsed", "p.aipl"), src);
 }

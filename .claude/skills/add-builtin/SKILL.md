@@ -155,14 +155,14 @@ you can't advise precisely is one to leave alone — a mis-advised lint is worse
 than a missing one. Put each near-miss in the `_not_flagged` fixture with a
 comment saying *why*.
 
-**The hit's span must be one line that survives `aipl fmt`.** `#[allow]` is
+**The hit's span must be one line that survives `aipl check --fix`.** `#[allow]` is
 line-scoped, so a span covering a multi-line construct can never be squelched —
 and an unsquelchable lint that fires on an AIPL-implemented builtin **panics the
 compiler for every program that reaches that builtin**. Point at a short
 statement inside the shape (the `mut acc = [];` seed; the `return some(x);`).
 Your own new builtin will usually trip the new lint — it *is* the longhand — so
 squelch it there with a trailing `#[allow]` and a comment saying why, then
-confirm `aipl fmt` keeps the marker on that line.
+confirm `aipl check --fix` keeps the marker on that line.
 
 **Message shape**, matching the others:
 

@@ -17,9 +17,8 @@ output it produces.
 cargo build
 ./target/debug/aipl run   file.aipl          # compile and JIT-execute `main`
 ./target/debug/aipl build file.aipl -o app   # link a native executable
-./target/debug/aipl check [path...]          # run every fn's `.test` and `.performance` blocks
+./target/debug/aipl check [path...] [--fix]  # run every fn's tests; --fix formats and refreshes stale sections
 ./target/debug/aipl report file.aipl         # allocations, instructions, binary size and per-function counts for one run
-./target/debug/aipl fmt   file.aipl          # rewrite in canonical format (`--check` to report)
 ./target/debug/aipl docs  [path...] -o dir   # write the HTML documentation site
 ./target/debug/aipl lsp                      # serve the Language Server Protocol (editors spawn this)
 ```

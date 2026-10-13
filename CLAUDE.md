@@ -9,7 +9,7 @@ see below) and stop there; leave the working tree uncommitted.
 `cargo handoff` **is** the pre-handoff validation — run it once, at the end of a
 task, as the whole finish-a-task gate. It runs the finish sequence in
 dependency order and pays for the expensive regeneration steps only when a test
-run proves they're needed: `cargo fmt` + `aipl fmt` the corpus, a discovery
+run proves they're needed: `cargo fmt` + format the corpus, a discovery
 run, then (only if that surfaced fillable staleness) scoped
 `fill_expected` refills of exactly the mismatched cases and the staged
 dogfood-IR regen/validate/promote flow, then a final run. That final run is
@@ -74,7 +74,7 @@ sequencing.
 
 Not `cargo handoff | tail -20`, not `2>&1 | tail`, not `| grep`, not `| head`.
 The same goes for any whole-suite `cargo nextest run` or `cargo test`. A pipe
-buffers the entire run, so the step-by-step output — `==> aipl fmt`,
+buffers the entire run, so the step-by-step output — `==> format the corpus`,
 `==> nextest (discovery)`, the elapsed times — appears only when the process
 exits, ten to twenty minutes later. Until then the shells view shows nothing and
 the run is indistinguishable from a hang. Watching a slow gate make progress is
@@ -168,17 +168,17 @@ drop into manual inspection when a test actually fails and you need to
 understand *why*, or for the rare thing no test covers.
 
 ## Formatting
-Every task ends formatted (`cargo fmt` for Rust, `aipl fmt` for `.aipl`). You
+Every task ends formatted (`cargo fmt` for Rust, `aipl check --fix` for `.aipl`). You
 don't run these by hand as a separate step — `cargo handoff` (see the Handoff
 section above) formats first, then tests, so a single handoff run leaves the
 tree both green and formatted.
 
-## AIPL source formatting (`aipl fmt`)
+## AIPL source formatting (`aipl check --fix`)
 Every checked-in `.aipl` file (outside the formatter's own `tests/fmt/`
 fixtures) must be in canonical format — the `all_aipl_files_stay_formatted`
 test in `tests/fmt.rs` enforces it over `tests/cases/`, `crates/`, `examples/`,
 and `tests/ffi_fixtures/`. So a **new or edited `.aipl` file must be formatted**:
-run `aipl fmt <file>` (in place; `--check` reports without writing), or reformat
+run `aipl check --fix <file>` (in place; plain `aipl check` reports without writing), or reformat
 the whole corpus at once with the author helper
 `cargo test --test compiler -- --ignored fmt::format_corpus`.
 
@@ -186,6 +186,20 @@ the whole corpus at once with the author helper
 gets one command for "is this tree ready". An unformatted file is a `check`
 failure but not a fatal one — it is named on stderr, its tests still run, and the
 batch summary ends with `N files need formatting`.
+
+**`aipl check --fix` is the other half: it repairs what a rewrite can.** There is
+no `aipl fmt` subcommand any more (it prints where it went). `--fix` formats each
+file in place, *then* rewrites every recorded `stdout`/`stderr`/`exit code`/
+`errors`/`expect file:`/`report` section that no longer says what the file does,
+printing `formatted <file>` and `fixed <file>: <sections>`. Formatting goes first
+because it moves the line numbers an `errors` or `report` body records. It never
+turns a real problem into a passing file: a failing test, a leak, a `trace`, a file
+that does not compile, an expected file the run never wrote, or sections that
+contradict each other are still failures (and a report of a leaking run is not
+recorded). It is the user-facing version of `fill_expected` and writes through the
+same dogfooded function — but not the same set of sections: `check` does not
+validate `--- performance ---` or `--- check ---`, so `--fix` cannot refresh them,
+and the corpus's own refills (and handoff) still go through `fill_expected`.
 
 The formatter (`aipl-fmt` crate, `aipl::fmt::format_source`) is canonical
 (gofmt-style — it decides line breaks; width defaults to 100) and works off the
@@ -423,7 +437,7 @@ written in the gap neither detaches a block nor hides a blank line that does.
   what lets it sit above the imports, where a reader looks first. A block
   *adjacent* to an `import` is still an error, and the message names the blank
   line as the fix.
-- **`aipl fmt` keeps module docs at the very top**, above the hoisted imports,
+- **`aipl check --fix` keeps module docs at the very top**, above the hoisted imports,
   and keeps the blank line under them — the separation is the syntax.
 - `aipl doc` prints the block under the file's name; `aipl docs` renders it above
   the declarations, and its first paragraph is the file's one-line summary on the
@@ -627,7 +641,7 @@ Rules worth knowing before reaching for it:
 - It does **not** work in the fn-body shorthand (`fn f() -> T { ..x }`): that
   production is led by a field name, so `..` can't start one.
 
-## Authoring a lint: the hit's span must be one line that survives `aipl fmt`
+## Authoring a lint: the hit's span must be one line that survives `aipl check --fix`
 **One lint, one file.** Each lint lives in `crates/aipl-syntax/src/lint/<name>.rs`,
 named after the lint function it holds (plus that lint's own private helpers), so
 a fuzzy file search on the name in a diagnostic lands on its implementation.
@@ -639,13 +653,13 @@ is `pub(super)`.
 
 `#[allow]` is line-scoped — it squelches hits whose span *starts* on the marker's
 line. So a lint whose span covers a multi-line construct can never be squelched:
-the only line able to carry the marker is the construct's first, and `aipl fmt`
+the only line able to carry the marker is the construct's first, and `aipl check --fix`
 relocates a marker written there (e.g. inside a `match (..) {` header) onto its
 own line, where it squelches nothing.
 
 Point the hit at a single-line sub-expression that identifies the shape — for
 `match_is_some_and`, the `none => false` arm rather than the whole `match`. Then
-verify by squelching it somewhere real and re-running `aipl fmt`.
+verify by squelching it somewhere real and re-running `aipl check --fix`.
 
 This matters more than it sounds: an unsquelchable lint that fires on an
 AIPL-implemented builtin (`crates/aipl-mono/src/builtin_*.aipl`) **panics the
@@ -854,7 +868,7 @@ compiled into the checked-in `dogfood.clif` — the **parser**
 `format_source.aipl`) — and the compiler that regenerates the artifact is
 running the *checked-in* one. So a source written in a syntax form the
 checked-in parser does not know cannot be parsed to regenerate anything, and a
-source the checked-in formatter does not know is what `aipl fmt` (handoff's
+source the checked-in formatter does not know is what `aipl check --fix` (handoff's
 step 1, before any regeneration) chokes on or, worse, silently rewrites into
 something that means something else — a struct spread `T { ..base, x: 1 }`
 became `T { .., base, x: 1 }` before the walker knew the form. Adding a syntax
@@ -868,12 +882,12 @@ form means teaching both.
    form: they run in-engine, not through the artifact.
 2. Hand off. The staged flow regenerates `dogfood.clif` with the new parser and
    walker in it, and the corpus (which does not use the form yet) validates
-   it. Confirm the new form round-trips through `aipl fmt` before trusting a
+   it. Confirm the new form round-trips through `aipl check --fix` before trusting a
    formatted corpus.
 3. Only now write the form anywhere else — including in those two files.
 
 Skip step 2 and the symptom is a parse error, from the checked-in parser, on
-`grammar_aipl.aipl` itself, or the `aipl fmt` failure or silent rewrite above.
+`grammar_aipl.aipl` itself, or the `aipl check --fix` failure or silent rewrite above.
 If you find the formatter already stranded — the corpus is written in a form
 only the staged artifact knows — the escape is: `fill_staged_ir`; format the
 corpus with the staged formatter
@@ -882,7 +896,7 @@ corpus with the staged formatter
 rewrote the sources the artifact is generated from; validate + promote as
 below; then hand off normally for the refills. The same escape applies when
 the formatter's *FFI surface* changes — a renamed or new entry the checked-in
-artifact doesn't export — since `aipl fmt` then has nothing to call until the
+artifact doesn't export — since `aipl check --fix` then has nothing to call until the
 artifact is regenerated.
 
 **The escape above assumes `fill_staged_ir` can still parse the compiler's own
@@ -905,14 +919,14 @@ round trip:
    artifact must too.
 4. Hand off.
 
-**Do not run `aipl fmt` while the swaps are in place.** `requote` respells a
+**Do not run `aipl check --fix` while the swaps are in place.** `requote` respells a
 literal into whichever delimiter needs fewer escapes, so it turns the cooked form
 straight back into the raw one the old lexer refuses — and the formatter then
 reports unlexable output, which reads like a formatter bug rather than the
 bootstrap it is. Formatting waits until step 3.
 
 This is not a licence to hand-drive generally: it announces itself as a hard
-failure in the parser or in `aipl fmt`, and it's the only ordering the gate
+failure in the parser or in `aipl check --fix`, and it's the only ordering the gate
 can't express.
 
 The steps, for those cases:

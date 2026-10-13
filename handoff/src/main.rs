@@ -15,7 +15,7 @@
 //!
 //!    The build is its own step for attribution: every step here is a `cargo`
 //!    invocation, so whichever runs first silently absorbs any pending rebuild —
-//!    which is how `aipl fmt` came to report ~850s for ~38s of formatting. It
+//!    which is how the formatting step came to report ~850s for ~38s of formatting. It
 //!    goes after `cargo fmt` (which can invalidate what it built) and before
 //!    `format_corpus` (which, since the dogfooded `.aipl` sources became
 //!    run-time reads, no longer can).
@@ -447,7 +447,7 @@ or discard it
     // Build everything up front, as its own step, purely so the timing report
     // attributes the compile to the compile. Every step below is a `cargo`
     // invocation that would otherwise absorb whatever rebuild is pending — and
-    // it was always the *first* one that paid, which made `aipl fmt` read as
+    // it was always the *first* one that paid, which made the formatting step read as
     // ~850s when the formatting itself is ~38s. Right after `cargo fmt`, so a
     // reformat of a `.rs` file can't invalidate what this just built.
     //
@@ -474,12 +474,15 @@ or discard it
     // AIPL-defined builtins), so reformatting one of *those* does still
     // invalidate aipl-mono — which the compile check below absorbs and reports
     // as its own step.
-    r.step("aipl fmt (format_corpus)", helper("fmt::format_corpus"));
-    let fmt_out = helper_output(&mut r, "aipl fmt");
+    r.step(
+        "format the corpus (format_corpus)",
+        helper("fmt::format_corpus"),
+    );
+    let fmt_out = helper_output(&mut r, "format the corpus");
     if fmt_out.contains("format failed:") {
         r.save_out();
         let detail = excerpt(&fmt_out, usize::MAX, |l| l.contains("format failed:"));
-        r.fail("aipl fmt", &detail);
+        r.fail("format the corpus", &detail);
     }
     if let Some(n) = reformatted_count(&fmt_out) {
         if n > 0 {
