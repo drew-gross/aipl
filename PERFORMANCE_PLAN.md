@@ -1,0 +1,299 @@
+# Performance tracking redesign
+
+Claude maintains this file: it is the plan and the progress record for replacing
+the per-case `--- performance ---` sections. (`TODO.txt` is Drew's alone and is
+not touched by this work.) Tick a box when its item has landed in a green
+handoff, and update the design notes when a decision changes.
+
+## Why
+
+The `--- performance ---` sections pin every count exactly, including a
+`functions:` block that gives each function's calls and bytes. That is about
+13,800 per-function entries across 717 sections. Any codegen or dogfood tweak
+moves them, so they now dominate every diff. In the last fifteen commits,
+85–99% of changed `.aipl` lines were section refills (e.g. `3584d6e7`: 2,764 of
+3,211; `9e4aa616`: 6,806 of 6,808).
+
+They also fail at their own job. `fill_expected` rewrites every section, so a
+property one case exists to protect (say, `allocations: 0` in a fusion test) is
+silently re-recorded among hundreds of other refilled sections.
+
+## Goals
+
+1. A major performance change, regression **or improvement**, fails handoff so it
+   gets reviewed. Handoff still finishes every other step, so all problems are
+   found in one run.
+2. Code can assert performance properties, such as "creating an array that fits
+   inline allocates nothing", and a refill cannot paper over them.
+3. A codegen or dogfood tweak does not produce a diff that dwarfs the change.
+4. The same mechanism serves AIPL users: they can check their own code, report on
+   it, and benchmark it, including wall time, which can be reported but never
+   asserted.
+
+## Design (settled)
+
+### `.performance({ .. })` and `measure`
+
+A second function attribute beside `.test`. Its block sets up inputs, measures,
+and asserts:
+
+```
+fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }.performance({
+    let small = twos(10);
+    let large = twos(10000);
+    let a = measure("10 elements", small, |xs| decided_early(xs));
+    let b = measure("10k elements", large, |xs| decided_early(xs));
+    assert(a.allocations == 0);
+    assert(b.instructions == a.instructions); // stops after 3 matches, at any length
+})
+```
+
+- `measure(label, input, f)`:
+  - `input` crosses an opaque boundary, so the optimizer cannot fold or hoist the
+    measured work into the setup.
+  - The result is treated as used and is dropped inside the measured window.
+  - Setup outside the closure is never measured.
+- `Measurement` holds deterministic fields only: allocations, bytes allocated,
+  peak live bytes, instructions. **There are no call counts**; calls are never
+  visible to user code. **Wall time is not a value in the language**, so it
+  cannot be asserted on.
+- **No effects, for now.** A `.performance` block, and every closure it measures,
+  is effect-free. Using an effect there is a compile error. Allowing effects is a
+  separate future project, and it also covers what the benchmark timing pass
+  would do with repeated output.
+- Absolute bounds (`instructions <= 1500`) are allowed. Relative and structural
+  claims are the recommended style, because they survive compiler changes.
+- `measure` is legal only inside `.performance` blocks. Like `.test` blocks,
+  `.performance` blocks are excluded from production builds and from the dogfood
+  artifact.
+- **`aipl check` runs them** (DESIGN_PRINCIPLES §2: bare `check` runs every
+  validation). It builds them instrumented, and their failures sit beside test
+  failures without suppressing anything else.
+
+### `aipl benchmark <path>`
+
+- It has two passes:
+  1. **Counting pass**: the instrumented build, the same as `check`. It records
+     each label's `Measurement`.
+  2. **Timing pass**: the production build. Each `measure` warms up, then repeats
+     its closure until the timings settle, and reports the median and spread.
+     It **replays** the recorded `Measurement` for each label, so the block's
+     code sees identical values in both passes.
+- Labels must be unique per block; a duplicate is an error.
+- Only `.performance` blocks are timed. `main` is timed only if `main` itself
+  has a `.performance` block. Until effects are allowed, that is possible only
+  for an effect-free `main`.
+
+### `aipl report <file.aipl>`
+
+Whole-program counts (including peak live bytes) plus the per-function
+calls/bytes breakdown that used to live in `functions:`. It is a compiler
+command, so users have it, and by default it is on-demand, not checked in. It
+replaces reading `--- performance ---` sections when debugging a regression.
+
+**`--- report ---` section.** A file may pin its `aipl report` output, and
+`check` validates it like any other section. This is for the few properties only
+the function list can show: an instance not minted, a call inlined away. It is
+opt-in per case. Use it only where `measure` cannot express the property;
+otherwise it brings back the old churn.
+
+### The baseline: `tests/performance_metrics.md`
+
+- One row per case, with the deterministic columns (allocations, bytes
+  allocated, peak live bytes, instructions, code bytes) beside the existing wall-clock / build /
+  peak RSS columns. It keeps the same format and the same generator.
+- **`refresh_perfmon` writes exact deterministic counts**, which corrects any
+  drift below the threshold. It is the only thing that writes the table.
+  `AIPL_CASE` scopes it to some rows, which is how one accepts specific moves.
+- Each case's test compares its measured counts with its row. A move past the
+  threshold **in either direction** fails that case and names the scoped refresh
+  command. Smaller moves pass, and the file does not change, so a tweak costs no
+  diff.
+- Handoff treats these failures as not fillable but not fatal. It finishes every
+  other remediation and the final run, then exits non-zero listing every moved
+  case.
+- **Dropped:** whole-corpus totals and geomean lines. Per-case thresholds are the
+  broad net.
+
+### `aipl check` validates every section
+
+`check` reads a file's trailing sections (stdout, stderr, exit code, cli, errors,
+expect file, report, file companions) and validates them. `--- check ---` is
+redefined as the `.test` runner's report and renamed to say so. With that, the cases harness becomes
+"`aipl check` this case, then compare its baseline row". A fill flag on `check`
+replaces `fill_expected`, which gives users the same snapshot workflow.
+
+### Whole-compiler metric
+
+This is a `.performance` block on the dogfood entry points (parse, format) over
+fixed representative inputs, not a separate harness.
+
+## Phases
+
+The phases are units of work, **not a sequence**. Drew picks the order, likely
+parts of 7, then 3, then more of 7, and so on. Each checkbox is meant to land on
+its own where it can. Every landing ends at a green `cargo handoff` and stops so
+Drew can commit; unrelated work never shares a tree.
+
+The dependencies that do hold:
+
+| phase | needs | why |
+|---|---|---|
+| 2 (baseline) | 1 | the `functions:` block should be reachable through `aipl report` before the sections that hold it are deleted |
+| 4 (migrate) | 3; the `--- report ---` items of 1 + 7 | claims are written as `.performance` blocks; calls-only properties as `--- report ---` |
+| 5 (compiler metric) | 3 | it is a `.performance` block |
+| 6 (benchmark) | 3 | it runs `.performance` blocks |
+| 7 `--- report ---` item | 1 | it pins `aipl report` output |
+
+**Phase 7 while `--- performance ---` still exists:** `check` does not learn that
+section. The harness keeps validating it, and the baseline once Phase 2 lands,
+until Phase 4 deletes it. Otherwise `check` gains a section only to lose it
+again.
+
+### Phase 1: measurement in the compiler, `aipl report`
+
+- [ ] Move the instrumented build/link/run and stats parsing (`run_performance_check`,
+      `measure_perf_stats`, `PerfStats`, `BinSizes`, `merge_fn_sizes` in
+      `tests/cases.rs`) into the `aipl` library, so the harness and the CLI share
+      one implementation.
+- [ ] Runtime: track peak live bytes (a high-water mark of allocated minus freed),
+      in both the JIT and AOT runtimes.
+- [ ] `aipl report <file.aipl> [-- args]`: runs `main`, or the `.test` driver for a
+      library file, instrumented. It prints the counts (including peak live
+      bytes), the binary size split, and per-function calls/bytes, and flags a
+      leak (allocations ≠ deallocations).
+- [ ] Machine-readable output mode for the harness and handoff.
+- [ ] `report` suite in `tests/suites/` (plus its `mod` line) covering the output.
+- [ ] Usage text; README and CLAUDE.md mention.
+
+### Phase 2: baseline table, sections become optional (the churn win)
+
+- [ ] Add deterministic columns (allocations, bytes allocated, peak live bytes,
+      instructions, code bytes) to `performance_metrics.md`. The header prose says
+      which columns are checked and which are not.
+- [ ] `refresh_perfmon` builds both variants per case and writes exact counts. Its
+      summary covers the deterministic moves too.
+- [ ] `AIPL_CASE` scoping for `refresh_perfmon`: rewrite only the matched rows,
+      and always prune rows whose case no longer exists. It still fails
+      intentionally to show its summary.
+- [ ] Per-case comparison with the row, both directions. Thresholds: Drew will
+      decide them when this phase starts. The placeholder is |Δ| ≥ 10% **and**
+      |Δ| ≥ a per-metric floor. Keep the constants in one place. The message
+      gives the metric, old → new, %, regression/improvement, and the scoped
+      refresh command.
+- [ ] A case with no row fails, naming the scoped refresh.
+- [ ] The leak gate stays per case.
+- [ ] Handoff (`handoff/src/discovery.rs` + unit tests, `main.rs`): recognize
+      baseline-move failures by a distinct marker. Keep going through refills, IR
+      regen and the final run; exit non-zero with the list. After the final run,
+      run a scoped refresh for added or deleted cases. This is bookkeeping, not
+      a reviewed move.
+- [ ] `--- performance ---` becomes optional (remove the "missing required"
+      failure).
+- [ ] Audit which cases protect a real property and keep their section until
+      Phase 4: `optimizations/`, `perf/`, `performance/`, plus the ~90 whose prose
+      cites allocations or instructions. Record the list below, marking each case
+      as expressible with `measure` or needing `--- report ---`.
+- [ ] Delete the section from every other case, including all 111 under `crates/`.
+- [ ] Docs: CLAUDE.md (Performance monitoring, Test `main` style, the handoff
+      notes about performance refills) and the `tests/cases.rs` module docs.
+
+### Phase 3: `.performance` and `measure` (syntax bootstrap: two handoffs)
+
+- [ ] `grammar_aipl.aipl`: add `.performance({ .. })` as a second `fn_attr`, with
+      its parsed structures (`item.aipl`, `parsed.aipl`). `walker.aipl` lays it out
+      the way it lays out `.test`. Write both in syntax the checked-in parser
+      already knows.
+- [ ] Hand off; this regenerates the artifact. Confirm the form round-trips
+      through `aipl fmt` before writing it anywhere else.
+- [ ] `measure` builtin and `Measurement` struct (allocations, bytes allocated,
+      peak live bytes, instructions). Runtime counter snapshots around the
+      closure; peak live is measured relative to the live bytes at entry; opaque
+      input and result; the result dropped inside the window.
+- [ ] `measure` outside a `.performance` block is a compile error. Duplicate labels
+      in a block are an error.
+- [ ] No effects: a `.performance` block or measured closure that uses an effect is
+      a compile error, with a message saying effects aren't supported there yet.
+- [ ] `.performance` blocks are excluded from production builds and from
+      `dogfood.o`, the same as `.test`.
+- [ ] `aipl check` runs them instrumented. Failures are reported with test
+      failures and are non-fatal to the rest of the run.
+- [ ] Cases under `tests/cases/performance/`: an inline array with no allocation,
+      a relative claim, an absolute bound, a peak-live claim, the effect refusal,
+      and a failing claim pinned by `--- check ---` (or its Phase 7 name).
+- [ ] Docs: CLAUDE.md, `aipl docs`.
+
+### Phase 4: migrate property cases, retire `--- performance ---`
+
+- [ ] Convert each audited case (list below) to `.performance` claims, or to a
+      `--- report ---` section where only the function list shows the property
+      (`*_not_minted`, inlining).
+- [ ] Remove the section kind: `Spec::performance`, `PerfStats` rendering/parsing,
+      the fill path, `EXTERNAL_BYTES`, and the docs.
+
+### Phase 5: whole-compiler metric
+
+- [ ] `.performance` blocks on the dogfood entry points: parse (`aipl_parse_file`)
+      and format (`format_source`) over representative inputs embedded as `"""`
+      literals, which keeps them effect-free. Use absolute bounds with headroom.
+- [ ] Confirm the blocks stay out of `dogfood.o`. The source change still
+      regenerates the IR through handoff.
+
+### Phase 6: `aipl benchmark`
+
+- [ ] Counting pass records label → `Measurement`. The timing pass runs the
+      production build and replays the recorded values by label, with warmup and
+      an adaptive iteration count. It reports the median and spread per label
+      beside the counts.
+- [ ] Only `.performance` blocks; `main` only when it has one.
+- [ ] `--save <file>` / `--compare <file>` for user-side trend tracking (not
+      asserted).
+- [ ] Tests: the deterministic half exactly; the timing half by shape only (labels
+      and columns present).
+
+### Phase 7: `aipl check` validates every section
+
+Each item below can land separately.
+
+- [ ] `check` parses trailing sections and validates stdout, stderr, exit code,
+      cli, errors, expect file. A mismatch is a check failure that does not
+      suppress the others.
+- [ ] `check` stages `--- file: ---` companions into a scratch dir itself.
+- [ ] Rename `--- check ---` / `--- check exit code ---` to a name that says they
+      pin the `.test` runner's report (choose when implementing) and migrate the
+      handful of cases that use them.
+- [ ] `--- report ---`: `check` validates a pinned `aipl report` (needs Phase 1).
+- [ ] Leak gate: `check` flags allocations ≠ deallocations on the runs it already
+      performs. First check whether the allocation tally is cheap enough in the
+      production runtime; otherwise flag leaks only where an instrumented run
+      happens.
+- [ ] Fill flag on `check` (name TBD) rewrites mismatched sections and replaces
+      `fill_expected`.
+- [ ] Harness: each case becomes `aipl check <case>` plus whatever `check` doesn't
+      own yet (`--- performance ---` before Phase 4, the baseline comparison).
+      Delete the duplicated section logic from `tests/cases.rs`.
+- [ ] Handoff: the refill step calls `check`'s fill flag on the stale cases.
+      Update the discovery parsing and its unit tests.
+- [ ] Docs: CLAUDE.md ("Authoring error-case fixtures", every `fill_expected`
+      mention), `tests/cases.rs` module docs.
+
+## Decided
+
+- **Calls-only properties** are pinned with a `--- report ---` section that `check`
+  validates.
+- **Effects** are not allowed in `.performance` blocks for now. Allowing them is a
+  future project.
+- **Peak live bytes** is a `Measurement` field, a baseline column, and part of
+  `aipl report`.
+- **`--- check ---`** becomes the `.test` runner's report under a clearer name.
+- **Thresholds** will be decided by Drew at the start of Phase 2.
+- **Order** is flexible (see Phases).
+
+## Future (out of scope here)
+
+- Effects in `.performance` blocks and measured closures, including what the
+  benchmark timing pass does with repeated output.
+
+## Audit: cases that keep `--- performance ---` until Phase 4
+
+_(filled in during Phase 2)_
