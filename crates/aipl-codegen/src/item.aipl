@@ -48,6 +48,12 @@ struct Signature { type_vars: TypeParam[], params: Param[], effects: str[], retu
 # private to the test, never `pub`. The parser hands them over here and the
 # Rust side hoists them to top-level items under a name only the test can
 # reach (`aipl_parser::post_parse`), so nothing past it sees the nesting.
+#
+# `performance` is the function's `.performance({ .. })` attribute, if it has
+# one. The Rust AST has no such field: the bridge turns the attribute into a
+# function of its own before anything else sees the program (see `ffi_ast.rs`),
+# the way the `.test` helpers are hoisted, so this is the parser's account of
+# what was written and nothing downstream of the bridge reads it.
 struct Function {
     name: SpanStr,
     is_pub: bool,
@@ -55,8 +61,14 @@ struct Function {
     body: Expr,
     test_body: Expr?,
     test_fns: Function[] = [],
+    performance: PerformanceBlock? = none,
     doc: str?,
 }
+
+# One `.performance({ .. })` attribute: its block, the functions declared inside
+# the block (helpers private to it, as in a `.test` block), and the span of the
+# attribute name, which is where a diagnostic about the attribute points.
+struct PerformanceBlock { body: Expr, fns: Function[], span: Span }
 
 struct FieldDecl { name: str, ty: Ty, default: Expr? }
 
@@ -145,7 +157,12 @@ fn show_fn(self: Function) -> str {
     let effects = sig.effects.map(effect_marker).join();
     let helpers = self.test_fns.map(|h| ` {h.show_fn()}`).join();
     let test = self.test_body.map(|b| ` .test({b.show_expr()}{helpers})`).value_or("");
-    `{show_doc(self.doc)}{vis}fn {self.name.text}{show_type_params(sig.type_vars)}({sig.params.map(show_param).join(sep=", ")}){effects}{ret} = {self.body.show_expr()}{test}`
+    let performance = self.performance.map(show_performance).value_or("");
+    `{show_doc(self.doc)}{vis}fn {self.name.text}{show_type_params(sig.type_vars)}({sig.params.map(show_param).join(sep=", ")}){effects}{ret} = {self.body.show_expr()}{test}{performance}`
+}
+
+fn show_performance(self: PerformanceBlock) -> str {
+    ` .performance({self.body.show_expr()}{self.fns.map(|h| ` {h.show_fn()}`).join()})`
 }
 
 fn effect_marker(self: str) -> str { ` !{self}` }
@@ -215,10 +232,10 @@ deallocations: 18
 reallocations: 2
 bytes allocated: 1354
 instructions executed: 1689
-binary size: 100992
-  code: 71248
+binary size: 104352
+  code: 73776
   data: 402
-  metadata: 29342
+  metadata: 30174
 functions:
   __arr_drop_FieldDecl:
     calls: 1
@@ -315,7 +332,7 @@ functions:
     bytes: 384
   show_fn:
     calls: 0
-    bytes: 9124
+    bytes: 11652
   show_item:
     calls: 2
     bytes: 15596

@@ -209,12 +209,31 @@ again.
 
 ### Phase 3: `.performance` and `measure` (syntax bootstrap: two handoffs)
 
-- [ ] `grammar_aipl.aipl`: add `.performance({ .. })` as a second `fn_attr`, with
+- [x] `grammar_aipl.aipl`: add `.performance({ .. })` as a second `fn_attr`, with
       its parsed structures (`item.aipl`, `parsed.aipl`). `walker.aipl` lays it out
       the way it lays out `.test`. Write both in syntax the checked-in parser
-      already knows.
-- [ ] Hand off; this regenerates the artifact. Confirm the form round-trips
+      already knows. (`walker.aipl` needed no change: `fn_attrs` already lays out
+      any `.name({ .. })` generically.)
+- [x] Hand off; this regenerates the artifact. Confirm the form round-trips
       through `aipl fmt` before writing it anywhere else.
+- [x] Treat `.performance` as `.test` for now (Drew's call): `check` runs it and
+      `assert` works in it. Design, since the Rust AST has no field for it:
+      - The parser keeps the attribute on `Function` (`performance:
+        PerformanceBlock?`, parser-side only). The bridge (`ffi_ast.rs::item`)
+        turns it into a second item right after the function: a private
+        `__performance$<f>` with no parameters, a unit body, and the block as its
+        `.test` body and helpers. Everything downstream then handles it as the
+        test code it is: `check` runs it, an imported file's is dropped, `assert`
+        is baked, helpers are hoisted.
+      - Names: `aipl_syntax::performance_fn_name` / `performance_source_name`;
+        `is_test_body` / `is_test_helper` understand the `__test$__performance$<f>`
+        owner. `aipl check` reports it as `f.performance`; `aipl-index` skips the
+        stand-in.
+      - Later phases tell a performance block from a test by that name (`measure`
+        legal only in one; excluded from production), the way `is_test_body`
+        already drives `?` and `assert`.
+      - Parser messages for a block's helpers still say `.test` block (they share
+        a production); only the duplicate-helper message names the attribute.
 - [ ] `measure` builtin and `Measurement` struct (allocations, bytes allocated,
       peak live bytes, instructions). Runtime counter snapshots around the
       closure; peak live is measured relative to the live bytes at entry; opaque

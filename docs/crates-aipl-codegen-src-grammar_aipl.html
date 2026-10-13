@@ -1871,7 +1871,7 @@
           </h3>
           <pre class="signature"><code>fn lower_fn_attr(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>fn_attr</code> — <code>.test({ .. })</code>, the only one. The argument shape is fixed by the production; what is checked here is that the name matches it. Every string-argument attribute is refused, which is the whole reason that alternative parses: so each can be refused <em>by name</em>.</p></div>
+          <div class="doc"><p><code>fn_attr</code> — <code>.test({ .. })</code> or <code>.performance({ .. })</code>, the only two. The argument shape is fixed by the production; what is checked here is that the name matches it. Every string-argument attribute is refused, which is the whole reason that alternative parses: so each can be refused <em>by name</em>.</p></div>
 
 
         </section>
@@ -2023,7 +2023,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$128159: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$128609: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

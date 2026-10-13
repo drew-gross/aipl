@@ -39,10 +39,10 @@ variant ParsedBody = Block(Expr) | Construct(FieldInit[], Span)
 # function's own lowering then binds those fields off.
 struct ParsedParam { param: Param, fields: str[], span: Span }
 
-# One `.test({ .. })` attribute: its block, the functions declared inside the
-# block, and the span of the attribute name, which is where a duplicate is
-# reported.
-struct FnAttr { body: Expr, fns: Function[], span: Span }
+# One function attribute, `.test({ .. })` or `.performance({ .. })`: which one
+# (`name`), its block, the functions declared inside the block, and the span of
+# the attribute name, which is where a duplicate is reported.
+struct FnAttr { name: str, body: Expr, fns: Function[], span: Span }
 
 # A `.test` block's contents as its production hands them up: the functions
 # declared in it, and the statement chain — `none` while nothing has followed

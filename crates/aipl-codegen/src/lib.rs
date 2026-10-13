@@ -1382,7 +1382,13 @@ pub fn build_test_program(program: &Program) -> Program {
                     test_fns: Vec::new(),
                     doc: None,
                 }));
-                tests.push((f.name.text.clone(), test_fn));
+                // A `.performance` block is reported as `f.performance`, after the
+                // attribute that holds it, not as the function standing in for it.
+                let reported = match aipl_syntax::performance_source_name(&f.name) {
+                    Some(owner) => format!("{owner}.performance"),
+                    None => f.name.text.clone(),
+                };
+                tests.push((reported, test_fn));
             }
             other => items.push(other.clone()),
         }

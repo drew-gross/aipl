@@ -1,0 +1,15 @@
+# One `.performance` per function, as one `.test`: with two, which would win?
+
+fn f() -> i64 { 1 }.performance({
+    assert(f() == 1);
+}).performance({
+    assert(f() == 1);
+})
+
+fn main() {}
+--- errors ---
+error: duplicate `.performance` attribute
+ --> ./tests/cases/performance/err_duplicate_attribute.aipl:5:4
+  |
+5 | }).performance({
+  |    ^^^^^^^^^^^

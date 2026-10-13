@@ -2537,14 +2537,58 @@ pub fn set_is_operator_name_hook(f: fn(&str) -> bool) {
 /// `__test$<f>$lambda0`, and its `?` acts on the lambda's own return type. A
 /// source function name carries no `$`, so a `$` past the prefix is the mark of
 /// something synthesized from the body rather than the body itself.
+///
+/// The one `$` the owner itself may carry is [`performance_fn_name`]'s: a
+/// `.performance` block is test code attached to a function the parser invented
+/// (`__performance$<f>`), so its body is `__test$__performance$<f>`.
 pub fn test_fn_name(f: &str) -> String {
     format!("__test${f}")
+}
+
+/// The prefix of a function standing for another function's `.performance`
+/// block. The parser reads that attribute off `f`, and the bridge from it
+/// (`ffi_ast.rs`) turns it into a function of its own, `__performance$<f>`, whose
+/// `.test` body is the block — so a performance block reaches everything
+/// downstream as the test code it currently is. A `$` cannot appear in a source
+/// name, so no program can spell it.
+const PERFORMANCE_PREFIX: &str = "__performance$";
+
+/// The name of the function standing for `f`'s `.performance` block — see
+/// [`PERFORMANCE_PREFIX`].
+pub fn performance_fn_name(f: &str) -> String {
+    format!("{PERFORMANCE_PREFIX}{f}")
+}
+
+/// The function `name` stands for the `.performance` block of, or `None` when
+/// `name` is not one — see [`performance_fn_name`].
+pub fn performance_source_name(name: &str) -> Option<&str> {
+    name.strip_prefix(PERFORMANCE_PREFIX)
+        .filter(|f| !f.is_empty() && !f.contains('$'))
+}
+
+/// Split what follows `__test$` into the function the test belongs to and
+/// whatever was synthesized under it (empty for the body itself, `$<..>` for
+/// anything else). The owner is `<f>`, or `__performance$<f>` for a
+/// `.performance` block.
+fn split_test_owner(rest: &str) -> Option<(&str, &str)> {
+    let from = match rest.strip_prefix(PERFORMANCE_PREFIX) {
+        Some(_) => PERFORMANCE_PREFIX.len(),
+        None => 0,
+    };
+    let end = rest[from..].find('$').map_or(rest.len(), |i| from + i);
+    let (owner, tail) = rest.split_at(end);
+    let well_formed = match owner.strip_prefix(PERFORMANCE_PREFIX) {
+        Some(f) => !f.is_empty(),
+        None => !owner.is_empty(),
+    };
+    well_formed.then_some((owner, tail))
 }
 
 /// Whether `name` is exactly a `.test` body — see [`test_fn_name`].
 pub fn is_test_body(name: &str) -> bool {
     name.strip_prefix("__test$")
-        .is_some_and(|f| !f.contains('$'))
+        .and_then(split_test_owner)
+        .is_some_and(|(_, tail)| tail.is_empty())
 }
 
 /// The top-level name a function declared inside `f`'s `.test` block is hoisted
@@ -2559,8 +2603,9 @@ pub fn test_helper_name(f: &str, helper: &str) -> String {
 /// [`test_helper_name`] — or `None` when `name` is not one.
 pub fn test_helper_source_name(name: &str) -> Option<&str> {
     let rest = name.strip_prefix("__test$")?;
-    let (f, helper) = rest.split_once('$')?;
-    (!f.is_empty() && !helper.is_empty() && !helper.contains('$')).then_some(helper)
+    let (_, tail) = split_test_owner(rest)?;
+    let helper = tail.strip_prefix('$')?;
+    (!helper.is_empty() && !helper.contains('$')).then_some(helper)
 }
 
 /// Whether `name` is a hoisted test helper — see [`test_helper_name`]. Test
@@ -2590,6 +2635,20 @@ mod test_body_tests {
         assert!(!is_test_body("__test$map$map0"));
         // Nor are the runner's own entry points, or ordinary functions.
         assert!(!is_test_body("__test_main"));
+        // A `.performance` block is test code owned by its synthetic function.
+        let perf = performance_fn_name("map");
+        assert_eq!(performance_source_name(&perf), Some("map"));
+        assert_eq!(performance_source_name("map"), None);
+        assert_eq!(performance_source_name("__performance$"), None);
+        assert!(is_test_body(&test_fn_name(&perf)));
+        assert!(!is_test_body("__test$__performance$"));
+        assert!(!is_test_body(&format!("{}$lambda0", test_fn_name(&perf))));
+        assert!(is_test_helper(&test_helper_name(&perf, "fixture")));
+        assert_eq!(
+            test_helper_source_name(&test_helper_name(&perf, "fixture")),
+            Some("fixture")
+        );
+        assert!(!is_test_helper(&test_fn_name(&perf)));
         assert!(!is_test_body("map"));
     }
 }

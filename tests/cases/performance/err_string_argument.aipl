@@ -1,0 +1,12 @@
+# `.performance` takes a block, like `.test`. The string form parses only so it
+# can be refused by name.
+
+fn f() -> i64 { 1 }.performance("fast")
+
+fn main() {}
+--- errors ---
+error: `.performance` takes a `{ .. }` block, not a string argument
+ --> ./tests/cases/performance/err_string_argument.aipl:4:21
+  |
+4 | fn f() -> i64 { 1 }.performance("fast")
+  |                     ^^^^^^^^^^^

@@ -94,8 +94,15 @@ fn parse_error_message(v: &FfiValue) -> String {
 // ---------- the readers ----------
 
 fn program(v: &FfiValue) -> R<ast::Program> {
+    let FfiValue::Array(elems) = field(v, "items")? else {
+        return Err("expected `items` to be an array".to_string());
+    };
+    let mut items = Vec::with_capacity(elems.len());
+    for e in elems {
+        items.extend(item(e)?);
+    }
     Ok(ast::Program {
-        items: each(field(v, "items")?, item)?,
+        items,
         // A single parsed file has no merged-source map; the loader fills one
         // in when it flattens several files together.
         sources: Vec::new(),
@@ -103,16 +110,75 @@ fn program(v: &FfiValue) -> R<ast::Program> {
     })
 }
 
-fn item(v: &FfiValue) -> R<ast::Item> {
+/// One parsed item as the items it becomes: itself, except that a function
+/// carrying a `.performance({ .. })` attribute is followed by a function of its
+/// own holding the block.
+///
+/// The Rust AST has no field for the attribute. Like the helpers declared inside
+/// a `.test` block, it is turned into ordinary items before anything else sees
+/// the program: `__performance$<f>`, private, with no parameters, a unit body,
+/// and the block as its `.test` body (so `aipl check` runs it, `assert` works in
+/// it, and an imported file's is dropped, all by the machinery `.test` already
+/// has). It sits right after `f`, and its helpers, hoisted later by
+/// [`aipl_parser::post_parse`] as a `.test` block's are, follow it.
+fn item(v: &FfiValue) -> R<Vec<ast::Item>> {
     let (case, payload) = variant(v)?;
     Ok(match case {
-        "Fn" => ast::Item::Fn(function(at(payload, 0, case)?)?),
-        "Struct" => ast::Item::Struct(struct_decl(at(payload, 0, case)?)?),
-        "Variant" => ast::Item::Variant(variant_decl(at(payload, 0, case)?)?),
-        "Import" => ast::Item::Import(import_decl(at(payload, 0, case)?)?),
-        "Const" => ast::Item::Const(const_decl(at(payload, 0, case)?)?),
+        "Fn" => {
+            let decl = at(payload, 0, case)?;
+            let f = function(decl)?;
+            let performance = maybe(field(decl, "performance")?, performance_block)?;
+            let stand_in = performance.map(|block| performance_function(&f, block));
+            [Some(f), stand_in]
+                .into_iter()
+                .flatten()
+                .map(ast::Item::Fn)
+                .collect()
+        }
+        "Struct" => vec![ast::Item::Struct(struct_decl(at(payload, 0, case)?)?)],
+        "Variant" => vec![ast::Item::Variant(variant_decl(at(payload, 0, case)?)?)],
+        "Import" => vec![ast::Item::Import(import_decl(at(payload, 0, case)?)?)],
+        "Const" => vec![ast::Item::Const(const_decl(at(payload, 0, case)?)?)],
         other => return Err(unknown("Item", other)),
     })
+}
+
+/// A `.performance({ .. })` attribute as the parser lowered it: the block's
+/// value, the helpers declared in it, and the span of the attribute name.
+struct PerformanceBlock {
+    body: ast::Expr,
+    fns: Vec<ast::Function>,
+    span: Span,
+}
+
+fn performance_block(v: &FfiValue) -> R<PerformanceBlock> {
+    Ok(PerformanceBlock {
+        body: expr(field(v, "body")?)?,
+        fns: each(field(v, "fns")?, function)?,
+        span: span(field(v, "span")?)?,
+    })
+}
+
+/// The function standing for `f`'s `.performance` block — see [`item`]. Named at
+/// the attribute, which is where a diagnostic about the function itself points.
+fn performance_function(f: &ast::Function, block: PerformanceBlock) -> ast::Function {
+    ast::Function {
+        name: ast::SpanStr {
+            text: aipl_syntax::performance_fn_name(&f.name),
+            span: block.span.clone(),
+        },
+        is_pub: false,
+        sig: ast::Signature {
+            type_vars: Vec::new(),
+            params: Vec::new(),
+            effects: Vec::new(),
+            return_ty: None,
+        },
+        body: ast::Expr::new(ast::ExprKind::Unit, block.span),
+        test_body: Some(block.body),
+        test_fns: block.fns,
+        doc: None,
+    }
 }
 
 fn const_decl(v: &FfiValue) -> R<ast::ConstDecl> {
