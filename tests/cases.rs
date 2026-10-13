@@ -125,12 +125,8 @@ use aipl::ast::Program;
 use aipl::binary;
 use aipl::codegen::{Compilation, ObjectCompilation};
 use aipl::loader;
+use aipl::perf::{self, PerfStats};
 use aipl::{DebugOptions, Error};
-
-/// What a `functions:` entry's `bytes:` line reads when the function has no code
-/// in the measured object — see [`FnStat::bytes`]. Not a number, so it can never
-/// be mistaken for a measured zero.
-const EXTERNAL_BYTES: &str = "(external)";
 
 /// The command that runs the ignored section-refresh helper ([`fill_expected`]).
 /// Surfaced in failure messages so a stale `--- performance ---`/`errors`/`check`
@@ -1009,36 +1005,10 @@ fn stage_case_for_build(
     }
 }
 
-/// The program whose binary we build/time: the case's own program when it has a
-/// `main`; otherwise the synthesized `.test` driver, with its `__test_main`
-/// renamed to `main` so it's the AOT entry. So a library case (no `main`, only
-/// `.test` blocks) is built and measured as the same test run `aipl check`
-/// verifies — both its asserted `--- performance ---` and its non-deterministic
-/// perfmon-table row time that test run, not an absent `main`.
-fn measured_program(program: &Program) -> Program {
-    let has_main = program
-        .items
-        .iter()
-        .any(|it| matches!(it, aipl::ast::Item::Fn(f) if f.name == "main"));
-    if has_main {
-        program.clone()
-    } else {
-        let mut tp = aipl::codegen::build_test_program(program);
-        for it in &mut tp.items {
-            if let aipl::ast::Item::Fn(f) = it {
-                if f.name == "__test_main" {
-                    f.name.text = "main".to_string();
-                }
-            }
-        }
-        tp
-    }
-}
-
 /// Build the production (non-instrumented) binary for a case, returning its path.
 fn build_case_binary(src_path: &Path, stem: &str, case_dir: &Path) -> Result<PathBuf, String> {
     let program = load_case(src_path).map_err(|e| Error::display_all(&e))?;
-    let measured = measured_program(&program);
+    let measured = perf::measured_program(&program);
     let comp = ObjectCompilation::new(&measured, stem, debug_opts(), false)
         .map_err(|e| Error::display_all(&e))?;
     let obj = comp.emit().map_err(|e| e.to_string())?;
@@ -1422,7 +1392,7 @@ fn run_success_case(
     // The object whose `binary size` and perf are measured: the case's own program
     // when it has a `main`; otherwise the synthesized `.test` driver. So a
     // library's perf section measures the same test run `aipl check` verifies.
-    let measured = measured_program(&program);
+    let measured = perf::measured_program(&program);
     // The object used for behavior checks (and the basis for `aipl build`) is
     // *not* instrumented — production runs carry no instruction-counter overhead.
     // The `--- performance ---` check builds its own instrumented object below.
@@ -1574,11 +1544,6 @@ fn run_success_case(
     // first so a perf mismatch never masks a behavioral regression.
     if spec.performance.is_some() || (fills.enabled && require_metrics) {
         let perf = spec.performance.as_deref().unwrap_or("");
-        // `obj_bytes` is the non-instrumented (production) object; its length is
-        // the `binary size` metric — split into code/data/metadata for the
-        // report, with `code`'s per-function parts going to the `functions:`
-        // block instead.
-        let (sizes, fn_sizes) = BinSizes::of(&obj_bytes, &symbol_names);
         check_section!(run_performance_check(
             ctx,
             orig_path,
@@ -1587,8 +1552,7 @@ fn run_success_case(
             spec,
             case_dir,
             perf,
-            sizes,
-            fn_sizes,
+            &obj_bytes,
             &symbol_names,
             fills,
         ));
@@ -1598,10 +1562,11 @@ fn run_success_case(
     Outcome::Pass
 }
 
-/// Build the *instrumented* object (executed-instruction counter enabled), link
-/// it against the instrumented runtime, run it, and verify (or fill in) the
-/// expected counts from a `--- performance ---` section. This object is separate
-/// from the behavior-check one so production/JIT runs carry no counter overhead.
+/// Measure the case (see [`perf::measure`]: an instrumented build, linked against
+/// the instrumented runtime and run once) and verify, or fill in, the expected
+/// counts from a `--- performance ---` section. The instrumented object is
+/// separate from the behavior-check one so production/JIT runs carry no counter
+/// overhead.
 #[allow(clippy::too_many_arguments)]
 fn run_performance_check(
     ctx: &str,
@@ -1611,35 +1576,26 @@ fn run_performance_check(
     spec: &Spec,
     case_dir: &Path,
     expected_body: &str,
-    prod_sizes: BinSizes,
-    fn_sizes: Vec<(String, u64)>,
+    production: &[u8],
     symbol_names: &HashMap<String, String>,
     fills: &mut Fills,
 ) -> Outcome {
-    let obj_bytes = match ObjectCompilation::new(program, stem, debug_opts(), true)
-        .and_then(|c| c.emit().map_err(Vec::from))
-    {
-        Ok(b) => b,
-        Err(e) => {
-            return Outcome::Fail(format!(
-                "{ctx}: instrumented compile failed:\n{}",
-                Error::render_all(&e, &spec.source, &render_path(orig_path))
-            ))
-        }
-    };
-    let actual = match measure_perf_stats(
-        ctx,
-        orig_path,
-        &obj_bytes,
+    let actual = match perf::measure(
+        program,
         stem,
-        spec,
-        case_dir,
-        prod_sizes,
-        fn_sizes,
+        production,
         symbol_names,
+        &spec.cli,
+        case_dir,
+        debug_opts(),
     ) {
         Ok(v) => v,
-        Err(msg) => return Outcome::Fail(msg),
+        Err(e) => {
+            return Outcome::Fail(format!(
+                "{ctx}: {}",
+                e.render(&spec.source, &render_path(orig_path))
+            ))
+        }
     };
 
     // Memory-leak gate: every heap allocation must be paired with a free. Checked
@@ -1658,7 +1614,7 @@ fn run_performance_check(
     // rendered actual — it's treated as an ordinary mismatch (a normal run fails;
     // fill mode overwrites it). Comparing on the rendered string keeps
     // `check_or_fill`'s "differs ⇒ refresh/fail" contract uniform across sections.
-    let expected_render = match parse_perf_stats(expected_body) {
+    let expected_render = match PerfStats::parse(expected_body) {
         Some(v) => v.render(),
         None => String::new(),
     };
@@ -1669,395 +1625,6 @@ fn run_performance_check(
         &actual.render(),
         &expected_render,
     )
-}
-
-/// Build the instrumented variant of the case, run it with `AIPL_ALLOC_STATS`
-/// pointed at a temp file, and read back the `PerfStats`. The runtime reports
-/// the five execution counters and each function's call count; the two things it
-/// cannot see — the `binary size` split and the per-function byte sizes, both
-/// measured by the harness from the production object — are folded in here, so
-/// the whole `PerfStats` still parses through one path.
-#[allow(clippy::too_many_arguments)]
-fn measure_perf_stats(
-    ctx: &str,
-    orig_path: &Path,
-    obj_bytes: &[u8],
-    stem: &str,
-    spec: &Spec,
-    case_dir: &Path,
-    prod_sizes: BinSizes,
-    fn_sizes: Vec<(String, u64)>,
-    symbol_names: &HashMap<String, String>,
-) -> Result<PerfStats, String> {
-    let exe = case_dir.join(binary::default_exe_name(&format!("{stem}_instr")));
-    if let Err(e) = binary::link_instrumented(obj_bytes, &exe) {
-        return Err(format!(
-            "{ctx}: instrumented link failed:\n{}",
-            e.render(&spec.source, &render_path(orig_path))
-        ));
-    }
-
-    let stats_path = case_dir.join("alloc_stats.txt");
-    let _ = fs::remove_file(&stats_path);
-    let output = Command::new(&exe)
-        .args(&spec.cli)
-        .current_dir(case_dir)
-        .env("AIPL_ALLOC_STATS", &stats_path)
-        .output()
-        .map_err(|e| format!("{ctx}: instrumented spawn failed: {e}"))?;
-    if !output.status.success() && spec.exit_code.unwrap_or(0) == 0 {
-        // A nonzero exit the case didn't expect means the instrumented run
-        // crashed before reporting — surface it rather than a missing-file error.
-        return Err(format!(
-            "{ctx}: instrumented run exited with {:?} before reporting alloc stats",
-            output.status.code()
-        ));
-    }
-
-    let contents = fs::read_to_string(&stats_path).map_err(|e| {
-        format!(
-            "{ctx}: could not read alloc stats at {}: {e}",
-            stats_path.display()
-        )
-    })?;
-    // The runtime's call table is fixed-size; an overflow would quietly under-
-    // count, so it says so instead and that is a harness failure, not a metric.
-    if contents.contains("uncounted calls:") {
-        return Err(format!(
-            "{ctx}: the runtime's per-function call table overflowed, so the counts are\n\
-             incomplete. Raise `fn_calls::CAP` in crates/aipl-linker/runtime/aipl_runtime.rs.\n\
-             {contents}"
-        ));
-    }
-    // The runtime reports the execution counters and per-function call counts;
-    // append the (harness-measured) binary size split so the combined text
-    // parses into a full `PerfStats`, then fold the per-function byte sizes into
-    // the `functions:` block the counts opened.
-    let contents = format!("{contents}\n{}", prod_sizes.render());
-    let mut stats = parse_perf_stats(&contents)
-        .ok_or_else(|| format!("{ctx}: malformed perf stats from runtime:\n{contents}"))?;
-    stats.merge_fn_sizes(symbol_names, fn_sizes);
-    Ok(stats)
-}
-
-/// Measured performance statistics for a case run. All six fields are required
-/// in a `--- performance ---` body. `instructions` is the CLIF instructions
-/// executed; `binary_size` is the byte length of the compiler-emitted (non-
-/// instrumented) object — the machine code produced for the program, excluding
-/// the separately-linked runtime. All are deterministic for a fixed toolchain
-/// (codegen emits from ordered work-lists, not HashMap iteration), though
-/// `binary_size` is target-specific (machine code + object format), unlike the
-/// others.
-#[derive(Clone, PartialEq, Eq)]
-struct PerfStats {
-    allocations: u64,
-    deallocations: u64,
-    reallocations: u64,
-    bytes_allocated: u64,
-    instructions: u64,
-    binary_size: BinSizes,
-    /// Every function the program ran or emitted code for, sorted by name — the
-    /// `functions:` block. Compiled AIPL functions and runtime builtins share
-    /// one list because the two questions a reader has (how often did this run,
-    /// how big is it) are the same questions either way; which side of the
-    /// runtime boundary a function sits on shows up as a `bytes: (external)`,
-    /// since only this object's code is measured.
-    functions: Vec<FnStat>,
-}
-
-/// One `functions:` entry. `calls` is how many times the function was *entered*
-/// during the run (from the instrumented build's counters), `bytes` how much
-/// code it occupies in the emitted object.
-///
-/// The two are worth reading together, and neither alone tells the story. Call
-/// counts are what the `instructions executed` metric cannot see: a call into
-/// the runtime is one CLIF instruction however much work it does, so a builtin's
-/// count is the only sign of work crossing that boundary. Byte sizes are what
-/// monomorphization did: every emitted function appears, so a change in what
-/// gets specialized shows up here as an added or removed entry.
-#[derive(Clone, PartialEq, Eq)]
-struct FnStat {
-    name: String,
-    /// Times entered. `0` for a function that was emitted but never ran.
-    calls: u64,
-    /// Bytes of code in the object, or `None` — rendered `(external)` — for a
-    /// function with no code *here*: a runtime builtin, resolved at link time
-    /// from the separately-compiled runtime staticlib. Distinguished from a
-    /// number so the two zeros can't be confused: `calls: 0` is a real count (an
-    /// emitted specialization nothing reached), while a builtin's size is not
-    /// zero but unmeasured, and deliberately so — the runtime is identical for
-    /// every program, so folding it in would add the same large constant to
-    /// every case. The numbers that *are* present sum to `code:` exactly.
-    bytes: Option<u64>,
-}
-
-impl PerfStats {
-    /// The `--- performance ---` body these stats represent.
-    fn render(&self) -> String {
-        let mut out = format!(
-            "allocations: {}\ndeallocations: {}\nreallocations: {}\nbytes allocated: {}\n\
-             instructions executed: {}\n{}",
-            self.allocations,
-            self.deallocations,
-            self.reallocations,
-            self.bytes_allocated,
-            self.instructions,
-            self.binary_size.render(),
-        );
-        out.push_str("\nfunctions:");
-        for f in &self.functions {
-            let bytes = match f.bytes {
-                Some(n) => n.to_string(),
-                None => EXTERNAL_BYTES.to_string(),
-            };
-            out.push_str(&format!(
-                "\n  {}:\n    calls: {}\n    bytes: {bytes}",
-                f.name, f.calls
-            ));
-        }
-        out
-    }
-
-    /// Fold the object's per-function byte sizes into the call counts read back
-    /// from the run, producing the single sorted `functions:` list.
-    ///
-    /// The two arrive under different names: the runtime reports the *symbol*
-    /// it was handed, while `fn_sizes` has already been mapped to AIPL-level
-    /// names — so the counts are mapped through the same table first (see
-    /// [`ObjectCompilation::code_symbol_names`]). A builtin is in neither table
-    /// and keeps its own name.
-    ///
-    /// Neither side is a superset, and that is exactly what identifies an
-    /// external: a function that never ran contributes only bytes, while an
-    /// entry `fn_sizes` never matches has no code in this object at all and
-    /// keeps its `None`.
-    fn merge_fn_sizes(&mut self, names: &HashMap<String, String>, fn_sizes: Vec<(String, u64)>) {
-        let mut by_name: HashMap<String, FnStat> = HashMap::new();
-        for f in self.functions.drain(..) {
-            let name = names.get(&f.name).cloned().unwrap_or(f.name);
-            by_name.insert(name.clone(), FnStat { name, ..f });
-        }
-        for (name, bytes) in fn_sizes {
-            by_name
-                .entry(name.clone())
-                .or_insert(FnStat {
-                    name,
-                    calls: 0,
-                    bytes: None,
-                })
-                .bytes = Some(bytes);
-        }
-        self.functions = by_name.into_values().collect();
-        self.functions.sort_by(|a, b| a.name.cmp(&b.name));
-    }
-}
-
-/// The object's `binary size` and where it goes. `code` is the executable
-/// `__text`, `data` the read-only literal sections (string literals, …), and
-/// `metadata` everything else in the object file — headers, the symbol + string
-/// tables, relocations, and padding (i.e. `total - code - data`). The split is
-/// deterministic for a fixed toolchain (like `total` itself) and is often
-/// dominated by `metadata`: AIPL's long mangled symbol names and per-function
-/// relocations cost more than the machine code for small programs.
-#[derive(Clone, PartialEq, Eq)]
-struct BinSizes {
-    total: u64,
-    code: u64,
-    data: u64,
-    metadata: u64,
-}
-
-impl BinSizes {
-    /// Split an object's bytes into code/data/metadata (see the struct docs),
-    /// returning that alongside `code`'s per-function parts — which the caller
-    /// folds into the `functions:` block rather than reporting under `code:`,
-    /// since a function's size only makes sense next to how often it ran.
-    /// `names` maps object symbols back to the AIPL names they were compiled
-    /// from (see [`ObjectCompilation::code_symbol_names`]); a symbol that isn't
-    /// in it — codegen's synthesized helpers — keeps its own name.
-    fn of(obj_bytes: &[u8], names: &HashMap<String, String>) -> (BinSizes, Vec<(String, u64)>) {
-        use object::{Object, ObjectSection, ObjectSymbol, SectionIndex, SectionKind, SymbolKind};
-        let total = obj_bytes.len() as u64;
-        let (mut code, mut data) = (0u64, 0u64);
-        let mut code_fns: Vec<(String, u64)> = Vec::new();
-        if let Ok(obj) = object::File::parse(obj_bytes) {
-            // Mach-O prefixes every symbol with `_`; the name in `names` (and
-            // the one worth reading) is the unprefixed one.
-            let prefix = match obj.format() {
-                object::BinaryFormat::MachO => "_",
-                _ => "",
-            };
-            let mut text: Vec<(SectionIndex, u64, u64)> = Vec::new();
-            for sec in obj.sections() {
-                // On-disk byte span (BSS-style sections have none → 0), so
-                // `code + data` never exceeds the file and `metadata` is the rest.
-                let bytes = sec.file_range().map_or(0, |(_, len)| len);
-                match sec.kind() {
-                    SectionKind::Text => {
-                        code += bytes;
-                        text.push((sec.index(), sec.address(), bytes));
-                    }
-                    SectionKind::Data | SectionKind::ReadOnlyData | SectionKind::ReadOnlyString => {
-                        data += bytes
-                    }
-                    _ => {}
-                }
-            }
-            // Where each function starts. The object records no symbol *sizes*
-            // (Mach-O has nowhere to put them), so a function's size is the
-            // distance to the next one — and the last runs to the end of its
-            // section. Padding between functions therefore lands on the one it
-            // follows, and the parts sum to `code` exactly.
-            let mut starts: HashMap<SectionIndex, Vec<(u64, String)>> = HashMap::new();
-            for sym in obj.symbols() {
-                let Some(ix) = sym.section_index() else {
-                    continue;
-                };
-                // Only function starts: a text section can also carry section
-                // symbols and embedded data, whose bytes belong to the function
-                // they sit in rather than to a line of their own.
-                if sym.kind() != SymbolKind::Text || !text.iter().any(|(t, _, _)| *t == ix) {
-                    continue;
-                }
-                let raw = sym.name().unwrap_or("<unnamed>");
-                let unprefixed = raw.strip_prefix(prefix).unwrap_or(raw);
-                let name = names.get(unprefixed).map_or(unprefixed, String::as_str);
-                starts
-                    .entry(ix)
-                    .or_default()
-                    .push((sym.address(), name.to_string()));
-            }
-            for (ix, addr, size) in text {
-                let mut syms = starts.remove(&ix).unwrap_or_default();
-                syms.sort();
-                for (i, (at, name)) in syms.iter().enumerate() {
-                    // The first symbol absorbs any section-leading padding, so
-                    // no bytes go unattributed.
-                    let start = if i == 0 { addr } else { *at };
-                    let end = syms.get(i + 1).map_or(addr + size, |(next, _)| *next);
-                    code_fns.push((name.clone(), end.saturating_sub(start)));
-                }
-            }
-        }
-        code_fns.sort();
-        (
-            BinSizes {
-                total,
-                code,
-                data,
-                metadata: total.saturating_sub(code + data),
-            },
-            code_fns,
-        )
-    }
-
-    /// The `binary size:` line plus its indented `code`/`data`/`metadata` split.
-    fn render(&self) -> String {
-        format!(
-            "binary size: {}\n  code: {}\n  data: {}\n  metadata: {}",
-            self.total, self.code, self.data, self.metadata
-        )
-    }
-}
-
-/// Parse the `allocations:` / `deallocations:` / `reallocations:` / `bytes
-/// allocated:` / `instructions executed:` / `binary size:` lines (order-
-/// independent, surrounding whitespace ignored) plus the `functions:` block
-/// (which is positional — see below). All six scalars are required; a missing
-/// line yields `None`.
-fn parse_perf_stats(s: &str) -> Option<PerfStats> {
-    let mut allocations = None;
-    let mut deallocations = None;
-    let mut reallocations = None;
-    let mut bytes_allocated = None;
-    let mut instructions = None;
-    let mut binary_size = None;
-    let mut code = None;
-    let mut data = None;
-    let mut metadata = None;
-    // The `functions:` block: a `  <name>:` heading per function, then its
-    // `    calls:`/`    bytes:` lines. Read by *indent*, not by name — a
-    // function may legitimately be called `calls`, `bytes`, or `metadata`, so
-    // matching on the text would mistake a heading for a field (or for the
-    // sibling line the block sits next to). A missing field defaults to 0,
-    // which is what lets the runtime write calls-only entries the harness then
-    // fills sizes into.
-    let mut functions: Vec<FnStat> = Vec::new();
-    let mut in_functions = false;
-    for raw in s.lines() {
-        let line = raw.trim();
-        if line == "functions:" {
-            in_functions = true;
-            continue;
-        }
-        if in_functions {
-            // A field of the entry above it (deeper indent), …
-            if raw.starts_with("    ") {
-                if let (Some(f), Some((key, v))) = (functions.last_mut(), line.split_once(": ")) {
-                    let v = v.trim();
-                    match (key.trim(), v.parse::<u64>()) {
-                        ("calls", Ok(n)) => {
-                            f.calls = n;
-                            continue;
-                        }
-                        ("bytes", Ok(n)) => {
-                            f.bytes = Some(n);
-                            continue;
-                        }
-                        // A builtin's size isn't 0, it's unmeasured — see
-                        // [`FnStat::bytes`].
-                        ("bytes", Err(_)) if v == EXTERNAL_BYTES => {
-                            f.bytes = None;
-                            continue;
-                        }
-                        _ => {}
-                    }
-                }
-            // … or a new entry's heading (`  <name>:`, no value).
-            } else if raw.starts_with("  ") && line.ends_with(':') {
-                functions.push(FnStat {
-                    name: line[..line.len() - 1].to_string(),
-                    calls: 0,
-                    bytes: None,
-                });
-                continue;
-            }
-            in_functions = false;
-        }
-        if let Some(v) = line.strip_prefix("bytes allocated:") {
-            bytes_allocated = v.trim().parse().ok();
-        } else if let Some(v) = line.strip_prefix("instructions executed:") {
-            instructions = v.trim().parse().ok();
-        } else if let Some(v) = line.strip_prefix("binary size:") {
-            binary_size = v.trim().parse().ok();
-        } else if let Some(v) = line.strip_prefix("code:") {
-            code = v.trim().parse().ok();
-        } else if let Some(v) = line.strip_prefix("data:") {
-            data = v.trim().parse().ok();
-        } else if let Some(v) = line.strip_prefix("metadata:") {
-            metadata = v.trim().parse().ok();
-        } else if let Some(v) = line.strip_prefix("allocations:") {
-            allocations = v.trim().parse().ok();
-        } else if let Some(v) = line.strip_prefix("deallocations:") {
-            deallocations = v.trim().parse().ok();
-        } else if let Some(v) = line.strip_prefix("reallocations:") {
-            reallocations = v.trim().parse().ok();
-        }
-    }
-    Some(PerfStats {
-        allocations: allocations?,
-        deallocations: deallocations?,
-        reallocations: reallocations?,
-        bytes_allocated: bytes_allocated?,
-        instructions: instructions?,
-        binary_size: BinSizes {
-            total: binary_size?,
-            code: code?,
-            data: data?,
-            metadata: metadata?,
-        },
-        functions,
-    })
 }
 
 /// Normalizes captured child output before comparing it against the expected

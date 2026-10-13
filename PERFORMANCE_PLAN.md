@@ -152,10 +152,19 @@ again.
 
 ### Phase 1: measurement in the compiler, `aipl report`
 
-- [ ] Move the instrumented build/link/run and stats parsing (`run_performance_check`,
+- [x] Move the instrumented build/link/run and stats parsing (`run_performance_check`,
       `measure_perf_stats`, `PerfStats`, `BinSizes`, `merge_fn_sizes` in
       `tests/cases.rs`) into the `aipl` library, so the harness and the CLI share
-      one implementation.
+      one implementation. Landed as `src/perf.rs` (`aipl::perf`): `measure`,
+      `measured_program`, `PerfStats` (with `render`/`parse`), `FnStat`,
+      `BinSizes`, `MeasureError`. The caller builds the production object
+      (the harness also runs it for behavior) and passes it with its symbol
+      names; `measure` does the instrumented compile, link, run and parse. The
+      harness keeps the `--- performance ---` comparison, the leak gate and fill.
+      `object` is now a regular dependency of the root crate. One behavior
+      change: `measure` no longer fails on a nonzero exit by itself, only when
+      the run never reported (the harness's behavior checks already cover an
+      unexpected exit).
 - [ ] Runtime: track peak live bytes (a high-water mark of allocated minus freed),
       in both the JIT and AOT runtimes.
 - [ ] `aipl report <file.aipl> [-- args]`: runs `main`, or the `.test` driver for a

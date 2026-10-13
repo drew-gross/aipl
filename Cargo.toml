@@ -68,11 +68,11 @@ aipl-fmt = { workspace = true }
 aipl-index = { workspace = true }
 aipl-lsp = { workspace = true }
 aipl-docs = { workspace = true }
+object = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
 regex = { workspace = true }
-object = { workspace = true }
 
 [lib]
 path = "src/lib.rs"
