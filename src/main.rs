@@ -99,7 +99,9 @@ otherwise.
 `check` with no path checks every `.aipl` file under the working directory (one
 process, so the engine links once); pass a file to check just that one, or a
 directory to check the tree under it. It also reports any file that isn't in
-canonical format (`aipl fmt`), and validates the `--- section ---` blocks a file
+canonical format (`aipl fmt`), runs a function's `.performance({{ .. }})` block too (in
+an instrumented build, which needs the linker `build` does), and validates the
+`--- section ---` blocks a file
 may end with: `errors` (the file must fail to compile with exactly those
 diagnostics, named relative to where `check` was started), and `stdout`,
 `stderr`, `exit code`, `cli` and `expect file: p` (one run of its `main`, made
@@ -512,7 +514,8 @@ fn check_formatting(file: &Path, label: &str) -> bool {
     true
 }
 
-/// `check [path...]` — JIT-run every function's `.test({ .. })` block and report.
+/// `check [path...]` — JIT-run every function's `.test({ .. })` block, run its
+/// `.performance({ .. })` block in an instrumented build, and report.
 ///
 /// With no path, checks every `.aipl` file under the working directory: `aipl
 /// check` on its own is meant to be a project's whole handoff step. A path may

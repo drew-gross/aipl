@@ -61,16 +61,17 @@ fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }.performance({
   is effect-free. Using an effect there is a compile error. Allowing effects is a
   separate future project, and it also covers what the benchmark timing pass
   would do with repeated output.
-- **Prefer exact counts.** The counts are exact and repeatable, so for a small
-  closure the number is the claim: `allocations == 1` says what `0 < allocations`
-  only hints at, and a loose bound lets a regression through. An exact count moves
-  only when the code it counts changes, i.e. in a commit that implements an
-  optimization, where touching those lines is the right outcome. Use a relative
-  claim (`a.instructions == b.instructions`) when the property is about a
-  comparison rather than a size, and a bound only for a large or noisy closure
-  where the exact figure would be arbitrary. (Every measurement carries a fixed
-  overhead of 5 instructions, so a change to `measure` itself shifts them all by a
-  constant.)
+- **Prefer exact counts when the code being measured is small.** The counts are
+  exact and repeatable, so for a small closure the number is the claim:
+  `allocations == 1` says what `0 < allocations` only hints at, and a loose bound
+  lets a regression through. Few commits touch small code, so an exact claim about
+  it seldom needs updating, and when it moves it is in the commit that changed the
+  code, where touching those lines is the right outcome. For code many commits
+  touch, an exact count would churn with each of them: state a comparison
+  (`a.instructions == b.instructions`), which survives the churn, or a bound. A
+  comparison is also right when the property is about a comparison rather than a
+  size. (Every measurement carries a fixed overhead of 5 instructions, so a change
+  to `measure` itself shifts every exact instruction count by a constant.)
 - `measure` is legal only inside `.performance` blocks. Like `.test` blocks,
   `.performance` blocks are excluded from production builds and from the dogfood
   artifact.
@@ -303,7 +304,9 @@ again.
       `measure_claim_fails` (a failing claim pinned by `--- check ---`). The
       compile-time refusals (outside a block, effects, duplicate label) are in the
       Rust `check` suite, since their messages are on stderr.
-- [ ] Docs: CLAUDE.md, `aipl docs`.
+- [x] Docs: CLAUDE.md ("`.performance` blocks and `measure`"), README, `check`'s
+      usage text, and the `# ..` documentation on `measure` itself, which `aipl docs`
+      renders.
 
 ### Phase 4: migrate property cases, retire `--- performance ---`
 

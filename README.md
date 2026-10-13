@@ -17,7 +17,7 @@ output it produces.
 cargo build
 ./target/debug/aipl run   file.aipl          # compile and JIT-execute `main`
 ./target/debug/aipl build file.aipl -o app   # link a native executable
-./target/debug/aipl check [path...]          # run every fn's `.test({ .. })` block
+./target/debug/aipl check [path...]          # run every fn's `.test` and `.performance` blocks
 ./target/debug/aipl fmt   file.aipl          # rewrite in canonical format (`--check` to report)
 ./target/debug/aipl docs  [path...] -o dir   # write the HTML documentation site
 ./target/debug/aipl lsp                      # serve the Language Server Protocol (editors spawn this)
@@ -26,6 +26,24 @@ cargo build
 `aipl check` is the test runner: a function carries its tests in a
 `.test({ .. })` block after its body, and `check` runs them all, reports any
 file that is not in canonical format, and exits non-zero on any failure.
+
+A function can also carry a `.performance({ .. })` block, which states what the
+function costs and has `check` hold it to that:
+
+```
+fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }.performance({
+    let small = measure("ten elements", filled(10, 2), decided_early);
+    let large = measure("ten thousand", filled(10000, 2), decided_early);
+    assert(small.allocations == 0);
+    assert(small.instructions == large.instructions);
+})
+```
+
+`measure(label, input, f)` runs `f(input)` once and returns a `Measurement` — its
+`allocations`, `bytes_allocated`, `peak_live_bytes` and `instructions`, all exact
+and repeatable. A performance block runs in an instrumented build (so `check`
+needs the linker `build` does), can use no effects, and is left out of anything
+`run` or `build` produces.
 
 A file imports what it uses, operators included, always aliased:
 

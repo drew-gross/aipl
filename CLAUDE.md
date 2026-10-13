@@ -230,6 +230,61 @@ perf mismatch, a stale perfmon table) print the exact command to run.
 `fill_expected` always overwrites every section with current values — no need
 to set bodies to `?` first.
 
+## `.performance` blocks and `measure`
+A function can carry a `.performance({ .. })` block beside its `.test`, in either
+order. It is *not* the `--- performance ---` section above: that records a case's
+whole-program counts and is refilled; this is code that states a property and is
+held to it. See `PERFORMANCE_PLAN.md` for where it is going; what exists:
+
+- **`measure(label, input, f) -> Measurement`** (`import { measure, Measurement }
+  from builtins;`) runs `f(input)` once inside a counting window and returns
+  `allocations`, `bytes_allocated`, `peak_live_bytes` (counted from what was live
+  when the window opened) and `instructions`. Build the input *outside* the call —
+  it is not measured; the result is released inside it — it is.
+- **It is `check`'s to run, and runs instrumented.** Blocks run apart from the
+  `.test` blocks, in an AOT build linked against the instrumented runtime, so a
+  file with one needs the linker `aipl build` does. Failures print as
+  `test f.performance ... FAIL` and count in the same summary.
+- **Where it can be written.** Only in a `.performance` block: `measure` carries
+  the internal `!measure` effect, which the performance functions declare and
+  nothing else does (not even `.test`). The same functions declare *no other*
+  effect, so a block, or a closure it measures, that prints or reads a file is a
+  compile error ("effects are not supported in a `.performance` block yet").
+  Effects in a block are a future project. A repeated *literal* label in one block
+  is an error.
+- **It is left out of production.** `aipl run` / `build` ignore it, and the IR and
+  binary are byte-identical with and without it. (A `.performance` is parsed into
+  a function plus a private `__performance$<f>` standing in for its block — the
+  Rust AST has no field for it — and everything downstream treats that as test
+  code. Names: `aipl_syntax::performance_fn_name` / `performance_source_name`.)
+
+**Writing claims — exact when the code measured is small.** The counts are exact
+and repeatable. For a small closure the number *is* the claim (`allocations == 1`
+says what `0 < allocations` only hints at, and a loose bound lets a regression
+through); few commits touch small code, so an exact claim about it seldom needs
+updating, and when it moves it is in the commit that changed the code. For code
+many commits touch, an exact count would churn with each of them: state a
+comparison between two measurements (`a.instructions == b.instructions`), which
+survives the churn, or a bound. A comparison is also the right claim when the
+property is about a comparison — "stops early, so it costs the same at ten
+elements as at ten thousand" — whatever the size. Every measurement carries a
+fixed overhead of 5 instructions, so a change to `measure` itself shifts every
+exact instruction count by a constant.
+
+**Finding the numbers.** `trace(m)` declares no effect, so it prints a whole
+measurement from inside a block (`check` then refuses the file, as it does any
+`trace` — remove it before handoff). Instructions are counted per basic block, on
+entry, which is why `begin` and `end` get blocks of their own in codegen; a
+window inside one block would count nothing.
+
+Fixtures: claims that pass, and one that fails and is pinned by `--- check ---`,
+live in `tests/cases/performance/`. The compile-time refusals print to stderr,
+which a case section cannot pin, so they are tests in `tests/suites/check.rs`.
+Two `lint` interactions to know: two measurements compared by field are fine (the
+destructure lint stays quiet when a field is read off more than one value), but a
+single one read only by field wants destructuring — struct patterns have no `..`,
+so for one claim read the field off the call, `measure(..).allocations == 0`.
+
 ## Test targets are merged (`tests/compiler.rs`, `tests/dogfood.rs`)
 
 There are **three** integration-test targets, not one per suite. Every extra

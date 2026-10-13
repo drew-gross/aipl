@@ -35,11 +35,14 @@ import {
 # literal label is refused at compile time, since a report could not tell them
 # apart.
 #
-# The counts are exact and repeatable, so a claim about them should be an equality:
-# for a small closure the number is the claim, and it moves only in a commit that
-# changes the code it counts. They include a small constant for the call and
-# release themselves (5 instructions), the same on every measurement, so it
-# cancels in a comparison between two and is part of an exact count.
+# The counts are exact and repeatable, so a claim about them can be an equality,
+# and when the code being measured is small it should be: the number is the claim,
+# and few commits touch small code, so it seldom needs updating — when it does, that
+# is the commit worth looking at. Code that many commits touch would make an exact
+# count churn with each of them; state a comparison between two measurements
+# instead (`a.instructions == b.instructions`), or a bound. The counts include a
+# small constant for the call and release themselves (5 instructions), the same on
+# every measurement, so it cancels in a comparison and is part of an exact count.
 #
 # The `input` is built outside the window and handed in so that building it is
 # not what is measured, and `f` is called with it exactly once. Callable only in a

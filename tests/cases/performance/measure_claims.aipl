@@ -2,13 +2,16 @@
 # `.performance` block can state a property of the code and have `aipl check` hold
 # it to that.
 #
-# **Claims here are exact.** The counts are exact and repeatable, so for a small
-# closure the number *is* the claim: `allocations == 1` says what `0 < allocations`
-# only hints at, and a regression to two passes the second and fails the first. An
-# exact count moves only when the code that produced it changes — in a commit that
-# implements an optimization, which is the commit that should be touching these
-# lines — and a relative claim (`a.instructions == b.instructions`) is for a
-# property that is about a *comparison*, not a size.
+# **Claims here are exact, because the code they measure is small.** The counts
+# are exact and repeatable, so for a small closure the number *is* the claim:
+# `allocations == 1` says what `0 < allocations` only hints at, and a regression
+# to two passes the second and fails the first. Few commits touch code this small,
+# so an exact claim about it seldom needs updating — and when it does move, it is
+# in the commit that changed the code, which is the one that should be touching
+# these lines. For code many commits touch, an exact count would churn with each;
+# there, state a comparison (`a.instructions == b.instructions`), which survives
+# the churn, or a bound. A comparison is also right when the property *is* about a
+# comparison, whatever the size.
 #
 # What a measurement contains: the heap allocations made, the bytes they asked
 # for, the most heap live at once *counted from what was live when it began*, and
