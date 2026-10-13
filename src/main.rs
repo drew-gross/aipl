@@ -6,7 +6,7 @@ use std::process::ExitCode;
 use aipl::binary;
 use aipl::codegen::{Compilation, ObjectCompilation};
 use aipl::loader;
-use aipl::{DebugOptions, Error};
+use aipl::{sections, DebugOptions, Error, SpecFields};
 
 /// Render the errors a compile reported — every independent finding a pass
 /// collected, not just the first — each with a source caret when possible.
@@ -87,7 +87,7 @@ fn usage(prog: &str) -> String {
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
   {prog} fmt   <file.aipl> [--check]        rewrite the file in canonical format
-  {prog} check [path...]                    run every fn's `.test({{ .. }})` block
+  {prog} check [path...] [--ignore-sections]  run every fn's `.test({{ .. }})` block, and check each file's sections
   {prog} lsp                                serve the Language Server Protocol on stdin/stdout
 
 `docs` is `doc`'s whole-project counterpart: where `doc` prints one file's
@@ -99,8 +99,14 @@ otherwise.
 `check` with no path checks every `.aipl` file under the working directory (one
 process, so the engine links once); pass a file to check just that one, or a
 directory to check the tree under it. It also reports any file that isn't in
-canonical format (`aipl fmt`). It reports every failure rather than stopping at
-the first, and exits 0 only if all of them were formatted, compiled, and passed.
+canonical format (`aipl fmt`), and validates the `--- section ---` blocks a file
+may end with: `errors` (the file must fail to compile with exactly those
+diagnostics, named relative to where `check` was started), and `stdout`,
+`stderr`, `exit code`, `cli` and `expect file: p` (one run of its `main`, made
+only when one of them is present). `--- file: p ---` sections are staged beside
+the file so its imports and fixtures resolve. `--ignore-sections` checks the
+tests alone. It reports every failure rather than stopping at the first, and
+exits 0 only if all of them were formatted, compiled, passed, and matched.
 
 `lsp` is for an editor to spawn, not for a person to run: it speaks the
 Language Server Protocol over stdin/stdout and answers go-to-definition, hover,
@@ -247,22 +253,43 @@ fn collect_aipl(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 /// What checking one file found: the `__test_main` driver's exit code (0 = every
-/// test passed), and the rendered `trace(..)` diagnostics if the program still
-/// holds any.
+/// test passed), the rendered `trace(..)` diagnostics if the program still holds
+/// any, and how its recorded `--- section ---`s disagree with what it does (empty
+/// when they all match, or when sections were not validated).
 struct Checked {
     exit_code: i64,
     traces: Option<String>,
+    sections: Vec<String>,
 }
 
-/// Load, compile, and run one file's `__test_main` driver. `Err` is a rendered
-/// load/compile failure.
+/// Where one file is loaded from: the `entry` source, and the `root` its
+/// `trace(..)` labels and imported-file names are relative to.
 ///
-/// `file` is absolute (so loading and its relative imports resolve no matter
-/// what the working directory is); `label` is the path as the user typed or as
-/// discovery found it, and is what diagnostics show. `project_root` is the
-/// directory those labels are relative to — the working directory this
-/// invocation started in, which is *not* the one the tests run from (see
-/// [`in_staged_dir`]), and which is what a `trace(..)` names its file against.
+/// Normally that is the file itself and the directory `check` was started in. A
+/// file carrying `--- file:` companions is a self-contained case instead: its
+/// imports are the companions, which exist only beside a staged copy of its
+/// source, so it is loaded from there and rooted at the scratch directory.
+struct Staged {
+    entry: PathBuf,
+    root: PathBuf,
+}
+
+/// Load, compile, and run one file's `__test_main` driver, then validate its
+/// recorded sections. `Err` is a rendered load/compile failure.
+///
+/// `staged.entry` is absolute (so loading and its relative imports resolve no
+/// matter what the working directory is); `label` is the path as the user typed
+/// or as discovery found it, and is what diagnostics show. See [`in_staged_dir`]
+/// for why the tests run from a different directory than this was started in.
+///
+/// `section_label` is `Some` when the file's sections are validated, and is the
+/// path an `errors` section names in its diagnostics; `None` checks the tests
+/// alone (`--ignore-sections`).
+///
+/// A file with an `errors` section is *expected* not to compile, so it is
+/// compiled for its diagnostics and nothing else runs. Any other file runs its
+/// tests, and also its `main` when it has a section that observes a run (see
+/// [`sections::runs_main`]).
 ///
 /// The `trace` report is returned rather than printed: a trace is only a failure
 /// once the tests have had their chance to hit it and print, so the caller
@@ -271,13 +298,28 @@ struct Checked {
 /// The pass/fail tallies live in the test runtime and accumulate across calls,
 /// which is what lets a batch run report one aggregate at the end.
 fn check_file(
-    file: &Path,
+    staged: &Staged,
     label: &str,
-    project_root: &Path,
+    spec: &SpecFields,
+    section_label: Option<&str>,
     dbg: DebugOptions,
 ) -> Result<Checked, String> {
-    let render = |e| render_err_at(file, label, e);
-    let program = loader::load_program_rooted(file, project_root, dbg).map_err(render)?;
+    let render = |e| render_err_at(&staged.entry, label, e);
+    if let (Some(section_label), Some(_)) = (section_label, &spec.errors) {
+        // Loaded from the text the section was recorded against (`spec.source`),
+        // not whatever the loader would cut from the file, so an end-of-file
+        // diagnostic sits where it did when the section was written.
+        let compiled = loader::load_program_overlay(&staged.entry, &spec.source, dbg)
+            .and_then(|program| Compilation::new(&program, dbg).map(|_| ()));
+        let mut found = sections::conflicts(spec);
+        found.extend(sections::errors(spec, compiled, section_label));
+        return Ok(Checked {
+            exit_code: 0,
+            traces: None,
+            sections: found,
+        });
+    }
+    let program = loader::load_program_rooted(&staged.entry, &staged.root, dbg).map_err(render)?;
     let traces = aipl::trace_diagnostics(&program, "check");
     let test_program = aipl::codegen::build_test_program(&program);
     // `__test_main` runs each test and returns the exit code (0 ok, 1 failures),
@@ -285,14 +327,55 @@ fn check_file(
     // which gives codegen room for deep `.test` driver/expression trees.)
     let comp = Compilation::new(&test_program, dbg).map_err(render)?;
     let exit_code = comp.run_0("__test_main").map_err(|e| e.to_string())?;
+
+    let mut found = Vec::new();
+    if section_label.is_some() && sections::runs_main(spec) {
+        let stem = staged
+            .entry
+            .file_stem()
+            .and_then(OsStr::to_str)
+            .unwrap_or("a.out");
+        // A run that could not be produced is a finding about the file like a
+        // mismatch is, not a reason to forget that its tests already ran.
+        found =
+            sections::behavior(&program, spec, stem, label, dbg).unwrap_or_else(|msg| vec![msg]);
+    }
     Ok(Checked {
         exit_code,
         traces: (!traces.is_empty()).then(|| render(traces)),
+        sections: found,
     })
 }
 
+/// A file's trailing sections, parsed. An unreadable file has none: loading it
+/// reports that with the diagnostic worth reading.
+///
+/// A malformed section (an unknown name, a non-integer `exit code`, a companion
+/// path that cannot be staged) is the file's error to report. Skipping it would
+/// drop an expectation, and the file would pass for the wrong reason.
+fn read_spec(file: &Path) -> Result<SpecFields, String> {
+    match std::fs::read_to_string(file) {
+        Ok(src) => aipl::parse_spec(&src).map_err(|e| format!("{}: {e}", file.display())),
+        Err(_) => Ok(SpecFields::default()),
+    }
+}
+
+/// The path an `errors` section names `file` by: relative to the directory
+/// `check` was started in, `./`-prefixed — the same spelling however `check` was
+/// pointed at it (`a.aipl`, `./a.aipl`, an absolute path, or found by walking a
+/// directory), which is what lets a recorded diagnostic be compared at all.
+fn section_label(file: &Path, project_root: &Path) -> String {
+    let root = project_root
+        .canonicalize()
+        .unwrap_or_else(|_| project_root.to_path_buf());
+    match file.strip_prefix(&root) {
+        Ok(rel) => format!("./{}", rel.to_string_lossy().replace('\\', "/")),
+        Err(_) => file.display().to_string(),
+    }
+}
+
 /// Run `f` with the process working directory pointed at a fresh scratch
-/// directory holding `file`'s `--- file: ---` companions.
+/// directory holding `file`'s `--- file:` companions.
 ///
 /// A `.test` block is ordinary code: it can write files, and it resolves
 /// relative paths against the working directory. Run in place, `aipl check`
@@ -300,29 +383,73 @@ fn check_file(
 /// so tests get a scratch directory instead, staged with the sibling files a
 /// case expects to find (fixtures its tests read, modules they import).
 ///
-/// Loading still happens from the original absolute path, so imports resolve
-/// against the real tree rather than the scratch copy.
-fn in_staged_dir<T>(file: &Path, f: impl FnOnce() -> T) -> Result<T, String> {
-    let companions = match std::fs::read_to_string(file) {
-        // A `file:` marker naming an unstageable path is the file's error to
-        // report, not something to quietly stage somewhere else.
-        Ok(src) => aipl::companion_files(&src).map_err(|e| format!("{}: {e}", file.display()))?,
-        // Unreadable is not fatal here — loading the file below reports it with
-        // the diagnostic the user actually wants.
-        Err(_) => Vec::new(),
-    };
+/// A file without companions is still loaded from where it is, so its imports
+/// resolve against the real tree rather than an empty scratch copy. One *with*
+/// companions is loaded from a copy of its source staged beside them, since that
+/// is the only place its imports exist (see [`Staged`]).
+fn in_staged_dir<T>(
+    file: &Path,
+    spec: &SpecFields,
+    project_root: &Path,
+    f: impl FnOnce(&Staged) -> T,
+) -> Result<T, String> {
     let dir = binary::scratch_dir("check").map_err(|e| e.to_string())?;
-    aipl::stage_companions(&dir, &companions)
-        .map_err(|e| format!("stage companions in {}: {e}", dir.display()))?;
+    let staged = (|| {
+        aipl::stage_companions(&dir, &spec.extra_files)
+            .map_err(|e| format!("stage companions in {}: {e}", dir.display()))?;
+        if spec.extra_files.is_empty() {
+            return Ok(Staged {
+                entry: file.to_path_buf(),
+                root: project_root.to_path_buf(),
+            });
+        }
+        let entry = dir.join(file.file_name().unwrap_or(OsStr::new("a.aipl")));
+        std::fs::write(&entry, &spec.source)
+            .map_err(|e| format!("stage {}: {e}", entry.display()))?;
+        Ok(Staged {
+            entry,
+            root: dir.clone(),
+        })
+    })();
+    let staged = match staged {
+        Ok(s) => s,
+        Err(e) => {
+            let _ = std::fs::remove_dir_all(&dir);
+            return Err(e);
+        }
+    };
     let prev = env::current_dir().map_err(|e| format!("current dir: {e}"))?;
     env::set_current_dir(&dir).map_err(|e| format!("enter {}: {e}", dir.display()))?;
-    let out = f();
+    let out = f(&staged);
     // Restore first, so a failure to clean up can't leave the process parked in
     // a directory it is about to delete.
     let restored = env::set_current_dir(&prev);
     let _ = std::fs::remove_dir_all(&dir);
     restored.map_err(|e| format!("return to {}: {e}", prev.display()))?;
     Ok(out)
+}
+
+/// Check one resolved file: parse its sections, stage it, and run
+/// [`check_file`]. `sections` says whether its recorded sections are validated.
+fn check_resolved(
+    path: &Path,
+    label: &str,
+    project_root: &Path,
+    sections: bool,
+    dbg: DebugOptions,
+) -> Result<Checked, String> {
+    let spec = read_spec(path)?;
+    let section_label = sections.then(|| section_label(path, project_root));
+    in_staged_dir(path, &spec, project_root, |staged| {
+        check_file(staged, label, &spec, section_label.as_deref(), dbg)
+    })?
+}
+
+/// Print each way a file's sections disagree with what it does, naming the file.
+fn report_sections(label: &str, found: &[String]) {
+    for f in found {
+        eprintln!("{label}: {f}");
+    }
 }
 
 /// Report `file` to stderr if it isn't in canonical format, returning whether it
@@ -365,12 +492,23 @@ fn check_formatting(file: &Path, label: &str) -> bool {
 /// project running `aipl check` as its handoff gate wants one command to say
 /// whether the tree is ready — not two.
 ///
+/// A file's trailing `--- section ---` blocks are expectations about it, and are
+/// validated too (see [`sections`]): `errors` for a file that must not compile,
+/// `stdout`/`stderr`/`exit code`/`cli`/`expect file:` for what its `main` does.
+/// `--ignore-sections` checks the tests alone, for a caller that validates the
+/// sections itself.
+///
 /// A file that fails to compile, or fails formatting, is reported and does *not*
 /// stop the run; you get every problem in the codebase from one invocation
 /// rather than the first one. Exit code 0 only if every file was formatted,
-/// compiled, and had every test pass.
+/// compiled, had every test pass, and matched its sections.
 fn check_cmd(args: &[String]) -> ExitCode {
     let (args, dbg) = take_debug_flag(args);
+    let validate_sections = !args.iter().any(|a| a == "--ignore-sections");
+    let args: Vec<String> = args
+        .into_iter()
+        .filter(|a| a != "--ignore-sections")
+        .collect();
 
     // One explicit file keeps the single-file report: bare `test <name>` headers
     // and the runtime's own summary line. Anything else — no argument, a
@@ -428,25 +566,27 @@ fn check_cmd(args: &[String]) -> ExitCode {
         // Reported before the tests run, and either way: the point is to end the
         // invocation knowing about every problem, not just the first kind.
         let unformatted = check_formatting(path, label);
-        let outcome = match in_staged_dir(path, || check_file(path, label, &project_root, dbg)) {
-            Ok(o) => o,
-            Err(msg) => Err(msg),
-        };
-        let (tests_ok, traced) = match outcome {
+        let outcome = check_resolved(path, label, &project_root, validate_sections, dbg);
+        let (tests_ok, traced, mismatched) = match outcome {
             // Reported after the run, so a trace the tests hit has already
             // printed its value by the time the diagnostic explains itself.
             Ok(checked) => {
                 if let Some(report) = &checked.traces {
                     eprintln!("{report}");
                 }
-                (checked.exit_code == 0, checked.traces.is_some())
+                report_sections(label, &checked.sections);
+                (
+                    checked.exit_code == 0,
+                    checked.traces.is_some(),
+                    !checked.sections.is_empty(),
+                )
             }
             Err(msg) => {
                 eprintln!("{msg}");
-                (false, false)
+                (false, false, false)
             }
         };
-        return if tests_ok && !unformatted && !traced {
+        return if tests_ok && !unformatted && !traced && !mismatched {
             ExitCode::SUCCESS
         } else {
             ExitCode::FAILURE
@@ -457,20 +597,22 @@ fn check_cmd(args: &[String]) -> ExitCode {
     let mut broken = 0usize;
     let mut unformatted = 0usize;
     let mut traced = 0usize;
+    let mut mismatched = 0usize;
     for (path, label) in &resolved {
         if check_formatting(path, label) {
             unformatted += 1;
         }
         aipl::codegen::set_test_file(Some(label));
-        let outcome = match in_staged_dir(path, || check_file(path, label, &project_root, dbg)) {
-            Ok(o) => o,
-            Err(msg) => Err(msg),
-        };
+        let outcome = check_resolved(path, label, &project_root, validate_sections, dbg);
         match outcome {
             Ok(checked) => {
                 if let Some(report) = &checked.traces {
                     eprintln!("{report}");
                     traced += 1;
+                }
+                if !checked.sections.is_empty() {
+                    report_sections(label, &checked.sections);
+                    mismatched += 1;
                 }
             }
             Err(msg) => {
@@ -511,7 +653,17 @@ fn check_cmd(args: &[String]) -> ExitCode {
         };
         println!("{traced} {phrase} trace()");
     }
-    if failed > 0 || broken > 0 || unformatted > 0 || traced > 0 {
+    if mismatched > 0 {
+        // Likewise: a file whose sections disagree with what it does may have
+        // passed every test, so "0 failed" says nothing about it.
+        let (word, verb) = if mismatched == 1 {
+            ("file", "has")
+        } else {
+            ("files", "have")
+        };
+        println!("{mismatched} {word} {verb} mismatched sections");
+    }
+    if failed > 0 || broken > 0 || unformatted > 0 || traced > 0 || mismatched > 0 {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS

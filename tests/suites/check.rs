@@ -481,3 +481,272 @@ fn a_trace_does_not_stop_the_batch_and_is_counted_separately() {
     );
     assert_eq!(code, 1);
 }
+
+// ---------------------------------------------------------------------------
+// Recorded sections: `check` validates a file's trailing `--- section ---`
+// blocks, so a fixture is checked by the command a user would run.
+// ---------------------------------------------------------------------------
+
+/// The summary a single-file `check` always ends with; a file with no `.test`
+/// blocks has none to count.
+const NO_TESTS: &str = "0 tests: 0 passed, 0 failed\n";
+
+const GREETS: &str =
+    "import { print } from builtins;\n\nfn main() !prints {\n    print(\"hi\");\n}\n";
+
+#[test]
+fn a_file_without_sections_does_not_have_its_main_run() {
+    // `main` here exits 3 and would print; with no section asking for a run it is
+    // not executed, so the file passes. Running it unasked would make `check` a
+    // way to start a server.
+    let (stdout, stderr, code) = check(
+        "sections_none",
+        "import { print } from builtins;\n\nfn main() !prints -> i64 {\n    print(\"hi\");\n    3\n}\n",
+    );
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), (NO_TESTS, "", 0));
+}
+
+#[test]
+fn matching_stdout_and_exit_code_sections_pass() {
+    let src = format!("{GREETS}--- stdout ---\nhi\n--- exit code ---\n0\n");
+    let (stdout, stderr, code) = check("sections_match", &src);
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), (NO_TESTS, "", 0));
+}
+
+#[test]
+fn a_stdout_mismatch_names_the_file_the_section_and_both_sides() {
+    let src = format!("{GREETS}--- stdout ---\nbye\n");
+    let (_stdout, stderr, code) = check("sections_stdout_wrong", &src);
+    assert!(
+        stderr.contains("sections_stdout_wrong.aipl: `stdout` mismatch\n--- expected ---\nbye\n--- actual ---\nhi"),
+        "got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn an_absent_section_records_silence_and_a_clean_exit() {
+    // Only `exit code` is written, but a run is now being checked, so the
+    // missing `stdout` means "prints nothing" — and `hi` is a finding.
+    let src = format!("{GREETS}--- exit code ---\n0\n");
+    let (_stdout, stderr, code) = check("sections_absent_means_empty", &src);
+    assert!(
+        stderr.contains("`stdout` mismatch\n--- expected ---\n\n--- actual ---\nhi"),
+        "got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn an_exit_code_section_is_compared_with_the_status_main_returns() {
+    let src = "fn main() -> i64 { 3 }\n--- exit code ---\n3\n";
+    let (stdout, stderr, code) = check("sections_exit_ok", src);
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), (NO_TESTS, "", 0));
+
+    let src = "fn main() -> i64 { 3 }\n--- exit code ---\n4\n";
+    let (_stdout, stderr, code) = check("sections_exit_wrong", src);
+    assert!(
+        stderr.contains("`exit code` mismatch\n--- expected ---\n4\n--- actual ---\n3"),
+        "got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_cli_section_is_what_main_receives() {
+    let src = "import { len, print, to_str } from builtins;\n\n\
+               fn main(args: str[]) !prints {\n    print(to_str(len(args)));\n}\n\
+               --- cli ---\none\ntwo\n--- stdout ---\n2\n";
+    let (stdout, stderr, code) = check("sections_cli", src);
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), (NO_TESTS, "", 0));
+}
+
+#[test]
+fn an_expect_file_section_checks_what_the_run_wrote() {
+    let writer = "import { print, to_str, write_string_to_file } from builtins;\n\n\
+                  fn main() !prints !write_files {\n    print(to_str(write_string_to_file(\"out.txt\", \"written\")));\n}\n\
+                  --- stdout ---\nok()\n";
+    let (stdout, stderr, code) = check(
+        "sections_expect_ok",
+        &format!("{writer}--- expect file: out.txt ---\nwritten\n"),
+    );
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), (NO_TESTS, "", 0));
+
+    let (_stdout, stderr, code) = check(
+        "sections_expect_wrong",
+        &format!("{writer}--- expect file: out.txt ---\nother\n"),
+    );
+    assert!(
+        stderr.contains("`expect file: out.txt` mismatch"),
+        "got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+
+    let (_stdout, stderr, code) = check(
+        "sections_expect_missing",
+        &format!("{writer}--- expect file: never.txt ---\nx\n"),
+    );
+    assert!(
+        stderr.contains("expected output file \"never.txt\" was not written"),
+        "got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_run_section_on_a_file_with_no_main_is_reported() {
+    let src = "fn f() -> i64 { 1 }\n--- stdout ---\nx\n";
+    let (_stdout, stderr, code) = check("sections_no_main", src);
+    assert!(
+        stderr.contains("a file with no `main` runs only its `.test` blocks"),
+        "got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn an_errors_section_makes_a_failing_compile_the_expected_outcome() {
+    // `bad` returns the wrong type. Record the rendered diagnostic by running it
+    // once, then check the recorded form passes — the path inside it is the
+    // `./`-relative spelling, not whatever this test's temp path looks like.
+    let program = "fn bad() -> i64 { true }\n";
+    let (_stdout, stderr, code) = check_tree(
+        "sections_errors_record",
+        &[("bad.aipl", &format!("{program}--- errors ---\n?\n"))],
+        &[],
+    );
+    assert_eq!(code, 1);
+    let expected = stderr
+        .split("bad.aipl: `errors` mismatch\n--- expected ---\n?\n--- actual ---\n")
+        .nth(1)
+        .unwrap_or_else(|| panic!("no errors mismatch in:\n{stderr}"))
+        .trim_end()
+        .to_string();
+    assert!(expected.contains("--> ./bad.aipl:1:"), "got:\n{expected}");
+
+    for args in [&[][..], &["bad.aipl"][..], &["./bad.aipl"][..]] {
+        let (stdout, stderr, code) = check_tree(
+            "sections_errors_ok",
+            &[(
+                "bad.aipl",
+                &format!("{program}--- errors ---\n{expected}\n"),
+            )],
+            args,
+        );
+        assert_eq!(code, 0, "args {args:?}:\n{stdout}{stderr}");
+    }
+}
+
+#[test]
+fn an_errors_section_on_a_file_that_compiles_is_reported() {
+    let src = "fn ok() -> i64 { 1 }\n--- errors ---\nerror: nope\n";
+    let (_stdout, stderr, code) = check("sections_errors_compiles", src);
+    assert!(
+        stderr.contains("expected an error, but compilation succeeded"),
+        "got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn an_errors_section_cannot_sit_with_a_section_that_observes_a_run() {
+    let src = "fn bad() -> i64 { true }\n--- errors ---\nx\n--- stdout ---\ny\n";
+    let (_stdout, stderr, code) = check("sections_errors_conflict", src);
+    assert!(
+        stderr.contains("`errors` section is mutually exclusive with stdout/stderr/exit code"),
+        "got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn companions_are_staged_so_the_file_can_import_them() {
+    // `helper.aipl` exists only as a `--- file: ---` section; the import resolves
+    // because the file is loaded from a staged copy beside it.
+    let src = "import { print, to_str } from builtins;\n\
+               import { answer } from \"./helper.aipl\";\n\n\
+               fn main() !prints {\n    print(to_str(answer()));\n}\n\
+               --- file: helper.aipl ---\npub fn answer() -> i64 { 42 }\n\
+               --- stdout ---\n42\n";
+    let (stdout, stderr, code) = check("sections_companion", src);
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), (NO_TESTS, "", 0));
+}
+
+#[test]
+fn companions_are_staged_for_the_tests_too() {
+    let src = "import { equal as == } from builtins;\n\
+               import { answer } from \"./helper.aipl\";\n\n\
+               fn f() -> i64 { answer() }.test({\n    assert(f() == 42);\n})\n\
+               --- file: helper.aipl ---\npub fn answer() -> i64 { 42 }\n";
+    let (stdout, _stderr, code) = check("sections_companion_tests", src);
+    assert_eq!(stdout, "1 tests: 1 passed, 0 failed\n");
+    assert_eq!(code, 0);
+}
+
+#[test]
+fn a_mismatched_section_does_not_hide_a_failing_test() {
+    let src = "import { equal as ==, print } from builtins;\n\n\
+               fn f() -> i64 { 1 }.test({\n    assert(f() == 2);\n})\n\n\
+               fn main() !prints {\n    print(\"hi\");\n}\n\
+               --- stdout ---\nbye\n";
+    let (stdout, stderr, code) = check("sections_with_failing_test", src);
+    assert!(stdout.contains("test f ... FAIL"), "got:\n{stdout}");
+    assert!(stderr.contains("`stdout` mismatch"), "got:\n{stderr}");
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn the_batch_counts_files_with_mismatched_sections_and_keeps_going() {
+    let (stdout, stderr, code) = check_tree(
+        "sections_batch",
+        &[
+            ("a_wrong.aipl", &format!("{GREETS}--- stdout ---\nbye\n")),
+            ("b_ok.aipl", &format!("{GREETS}--- stdout ---\nhi\n")),
+            ("c_wrong.aipl", &format!("{GREETS}--- stdout ---\nbye\n")),
+        ],
+        &[],
+    );
+    assert!(
+        stderr.contains("./a_wrong.aipl: `stdout` mismatch"),
+        "got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("./c_wrong.aipl: `stdout` mismatch"),
+        "got:\n{stderr}"
+    );
+    assert!(!stderr.contains("b_ok.aipl"), "got:\n{stderr}");
+    assert!(
+        stdout.contains("2 files have mismatched sections"),
+        "got:\n{stdout}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn ignore_sections_checks_the_tests_alone() {
+    let src = format!("{GREETS}--- stdout ---\nbye\n");
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("check");
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let path = dir.join("sections_ignored.aipl");
+    fs::write(&path, src).expect("write temp source");
+    let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
+        .arg("check")
+        .arg("--ignore-sections")
+        .arg(&path)
+        .output()
+        .expect("run aipl check");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
+fn a_malformed_section_is_the_files_error_not_a_dropped_expectation() {
+    let src = format!("{GREETS}--- stdotu ---\nhi\n");
+    let (_stdout, stderr, code) = check("sections_unknown", &src);
+    assert!(stderr.contains("stdotu"), "got:\n{stderr}");
+    assert_eq!(code, 1);
+}

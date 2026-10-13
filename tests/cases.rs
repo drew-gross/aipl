@@ -1529,6 +1529,10 @@ fn run_success_case(
     if let Some(plan) = check_plan(spec) {
         let output = match Command::new(env!("CARGO_BIN_EXE_aipl"))
             .arg("check")
+            // The harness validates the sections itself (and, in fill mode,
+            // against the file as it was before this run rewrites it), so this
+            // run is for the `.test` blocks alone.
+            .arg("--ignore-sections")
             .arg(orig_path)
             .output()
         {

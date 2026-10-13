@@ -255,10 +255,24 @@ again.
 
 Each item below can land separately.
 
-- [ ] `check` parses trailing sections and validates stdout, stderr, exit code,
+- [x] `check` parses trailing sections and validates stdout, stderr, exit code,
       cli, errors, expect file. A mismatch is a check failure that does not
-      suppress the others.
-- [ ] `check` stages `--- file: ---` companions into a scratch dir itself.
+      suppress the others. Staging `--- file: ---` companions into a scratch dir
+      is part of this item, since `import`s and `expect file` can't resolve
+      without it. Landed in `src/sections.rs` and `check_cmd`; decisions:
+      - `main` is run only when the file has a section that observes a run
+        (`stdout`, `stderr`, `exit code`, `cli`, `expect file:`). A file with none
+        is a plain program and is not executed. Once a run happens, an absent
+        `stdout`/`stderr`/`exit code` means empty/empty/0, as in the harness.
+      - A file with companions is loaded from a staged copy of its source rooted
+        at the scratch dir; one without is loaded in place. An `errors` file is
+        compiled from `spec.source`, so end-of-file diagnostics render as the
+        harness renders them.
+      - `errors` diagnostics name the file `./`-relative to where `check` started,
+        however it was pointed at the file.
+      - `--ignore-sections` checks the tests alone. The harness passes it until
+        the harness item below makes `check` own the sections.
+      - `performance`, `check` and `check exit code` are not validated by `check`.
 - [ ] Rename `--- check ---` / `--- check exit code ---` to a name that says they
       pin the `.test` runner's report (choose when implementing) and migrate the
       handful of cases that use them.
