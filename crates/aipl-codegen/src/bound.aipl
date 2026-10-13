@@ -34,32 +34,3 @@ pub fn show_bound(self: Bound) -> str {
         Variant => "variant",
     }
 }
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 182
-binary size: 2640
-  code: 1224
-  data: 273
-  metadata: 1143
-functions:
-  __test$bound_from_name:
-    calls: 1
-    bytes: 1104
-  aipl_assert:
-    calls: 4
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 120

@@ -58,38 +58,3 @@ pub fn prim_from_name(name: str) -> Prim? {
     assert(prim_from_name(I8.prim_name()) == some(I8));
     assert(prim_from_name(Char.prim_name()) == some(Char));
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 941
-binary size: 5128
-  code: 2648
-  data: 644
-  metadata: 1836
-functions:
-  __test$prim_from_name:
-    calls: 1
-    bytes: 856
-  __test$prim_name:
-    calls: 1
-    bytes: 380
-  aipl_assert:
-    calls: 10
-    bytes: (external)
-  aipl_test_begin:
-    calls: 2
-    bytes: (external)
-  aipl_test_end:
-    calls: 2
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 184
-  prim_from_name:
-    calls: 7
-    bytes: 1228

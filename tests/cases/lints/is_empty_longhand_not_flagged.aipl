@@ -45,23 +45,3 @@ true
 true
 false
 true
---- performance ---
-allocations: 6
-deallocations: 6
-reallocations: 0
-bytes allocated: 122
-instructions executed: 427
-binary size: 3272
-  code: 1676
-  data: 38
-  metadata: 1558
-functions:
-  __to_str_bool:
-    calls: 6
-    bytes: 224
-  aipl_write_bytes:
-    calls: 6
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 1452

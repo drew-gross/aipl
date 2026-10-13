@@ -75,32 +75,3 @@ fn is_dotfile(name: str) -> bool { name.starts_with('.') && !name.ends_with('/')
     assert(is_dotfile(".bashrc"));
     assert(!is_dotfile("README"));
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 1015
-binary size: 12072
-  code: 4872
-  data: 2759
-  metadata: 4441
-functions:
-  __test$is_dotfile:
-    calls: 1
-    bytes: 4764
-  aipl_assert:
-    calls: 39
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

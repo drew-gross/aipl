@@ -30,32 +30,3 @@ pub fn is_some_and<T: any>(self: T?, pred: (T) -> bool) -> bool {
     let limit = 3;
     assert(some(2).is_some_and(|x| x <= limit)); // a captured bound
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 144
-binary size: 2584
-  code: 688
-  data: 584
-  metadata: 1312
-functions:
-  __test$is_some_and:
-    calls: 1
-    bytes: 576
-  aipl_assert:
-    calls: 8
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 112

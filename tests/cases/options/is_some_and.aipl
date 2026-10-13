@@ -24,17 +24,3 @@ fn main() -> i64 {
 --- stdout ---
 --- exit code ---
 0
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 51
-binary size: 784
-  code: 260
-  data: 1
-  metadata: 523
-functions:
-  main:
-    calls: 1
-    bytes: 260

@@ -17,38 +17,3 @@ fn add2(a: i64?, b: i64?) -> i64? { some(a? + b?) }.test({
     assert(add2(some(3), none) == none); // second none propagates
     assert(add2(none, some(4)) == none); // first none propagates
 })
---- performance ---
-allocations: 1
-deallocations: 1
-reallocations: 0
-bytes allocated: 88
-instructions executed: 277
-binary size: 3112
-  code: 1332
-  data: 329
-  metadata: 1451
-functions:
-  __test$add2:
-    calls: 1
-    bytes: 816
-  __test$add2$bang:
-    calls: 2
-    bytes: 288
-  add2:
-    calls: 3
-    bytes: 128
-  aipl_assert:
-    calls: 5
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100

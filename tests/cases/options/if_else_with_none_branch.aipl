@@ -9,32 +9,3 @@ fn maybe(want: bool) -> i64 {
     assert(maybe(true) == 42);
     assert(maybe(false) == -1);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 51
-binary size: 1264
-  code: 288
-  data: 140
-  metadata: 836
-functions:
-  __test$maybe:
-    calls: 1
-    bytes: 184
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104

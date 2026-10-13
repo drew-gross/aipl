@@ -66,35 +66,3 @@ unbounded
 bounded at 4
 bounded at 3
 5 lo=0 hi=2
---- performance ---
-allocations: 57
-deallocations: 57
-reallocations: 0
-bytes allocated: 3386
-instructions executed: 1382
-binary size: 5160
-  code: 3028
-  data: 1
-  metadata: 2131
-functions:
-  __to_str_u64:
-    calls: 23
-    bytes: 204
-  aipl_u64_len:
-    calls: 46
-    bytes: (external)
-  aipl_write_u64:
-    calls: 23
-    bytes: (external)
-  clamp:
-    calls: 5
-    bytes: 580
-  describe:
-    calls: 3
-    bytes: 408
-  main:
-    calls: 1
-    bytes: 1180
-  show:
-    calls: 3
-    bytes: 656

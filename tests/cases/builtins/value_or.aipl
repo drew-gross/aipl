@@ -11,32 +11,3 @@ fn first_char(s: str) -> char { s[0].value_or('?') }.test({
     assert(none.value_or(35) == 35);
     assert(value_or(some(5), 9) == 5); #[allow]
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 129
-binary size: 2032
-  code: 612
-  data: 299
-  metadata: 1121
-functions:
-  __test$first_char:
-    calls: 1
-    bytes: 504
-  aipl_assert:
-    calls: 5
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

@@ -22,35 +22,3 @@ fn sum_below(n: i64) -> i64 {
     assert(sum_below(1) == 0);
     assert(sum_below(0) == 0); // condition false up front: body never runs
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 242
-binary size: 1552
-  code: 428
-  data: 165
-  metadata: 959
-functions:
-  __test$sum_below:
-    calls: 1
-    bytes: 220
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108
-  sum_below:
-    calls: 3
-    bytes: 100

@@ -22,17 +22,3 @@ two spaces
 ----
 flush left
     indented under it
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 31
-binary size: 912
-  code: 164
-  data: 89
-  metadata: 659
-functions:
-  main:
-    calls: 1
-    bytes: 164

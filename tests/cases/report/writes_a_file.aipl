@@ -1,0 +1,27 @@
+# A report of a program that writes a file. `aipl report` runs it in a scratch
+# directory, as `check` does, so the file lands there and not in the tree — and the
+# run is counted like any other: the write is a call into the runtime.
+
+import { print, to_str, write_string_to_file } from builtins;
+
+fn main() !prints !write_files {
+    print(to_str(write_string_to_file("out.txt", "reported")));
+}
+--- stdout ---
+ok()
+--- expect file: out.txt ---
+reported
+--- report ---
+allocations       2
+deallocations     2
+reallocations     0
+bytes allocated   28
+peak live bytes   20
+instructions      62
+binary size       1880 bytes (code 756, data 18, metadata 1106)
+
+function                       calls  code bytes
+__to_str_unit$err$Error            1         460
+aipl_write_bytes                   1    external
+aipl_write_string_to_file          1    external
+main                               1         296

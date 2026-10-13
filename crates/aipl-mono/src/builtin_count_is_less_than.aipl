@@ -42,38 +42,3 @@ pub fn count_is_less_than<T: any>(self: T[], x: T, limit: u64) -> bool {
     assert([1, 2, 3].count_is_less_than(9, 0) == ([1, 2, 3].count(9) < 0)); // no matches
     assert([].count_is_less_than(1, 0) == (0 < 0)); // empty
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 961
-binary size: 3952
-  code: 1596
-  data: 770
-  metadata: 1586
-functions:
-  __builtin_count_is_less_than$i64:
-    calls: 5
-    bytes: 240
-  __test$count_is_less_than:
-    calls: 1
-    bytes: 992
-  aipl_assert:
-    calls: 6
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  count_is_less_than$i64:
-    calls: 6
-    bytes: 240
-  main:
-    calls: 1
-    bytes: 124

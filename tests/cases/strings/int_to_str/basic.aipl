@@ -13,26 +13,3 @@ fn main() !prints -> i64 {
 0
 42
 count: 7
---- performance ---
-allocations: 4
-deallocations: 4
-reallocations: 0
-bytes allocated: 140
-instructions executed: 90
-binary size: 1488
-  code: 492
-  data: 1
-  metadata: 995
-functions:
-  __to_str_i64:
-    calls: 3
-    bytes: 204
-  aipl_i64_len:
-    calls: 6
-    bytes: (external)
-  aipl_write_i64:
-    calls: 3
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 288

@@ -17,32 +17,3 @@ fn bump(mut self: Counter, by: i64) {
     assert(snapshot.n == 15);
     assert(c.n == 115);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 158
-binary size: 1432
-  code: 508
-  data: 91
-  metadata: 833
-functions:
-  __test$bump:
-    calls: 1
-    bytes: 408
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100

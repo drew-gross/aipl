@@ -179,9 +179,9 @@ impl Run {
     /// mode, precisely so a refill cannot bake a leak into a `--- performance ---`
     /// section, so a refill fails on it too. Without this alternative the failure
     /// fell through every net — `hard_failures` excludes each `cases_*` test by
-    /// name, and [`Run::plan`]'s case regex wants `` `section` mismatch `` or
-    /// `missing required` — and the gate printed HANDOFF OK over a case that
-    /// failed deterministically on every run.
+    /// name, and [`Run::plan`]'s case regex wants `` `section` mismatch `` — and
+    /// the gate printed HANDOFF OK over a case that failed deterministically on
+    /// every run.
     pub fn unfillable(&self) -> Vec<String> {
         static RE: OnceLock<Regex> = OnceLock::new();
         // Assembled with `concat!` rather than one string with `\` continuations:
@@ -277,11 +277,7 @@ impl Run {
 
         let out = self.failure_output();
         let mut plan = Plan {
-            need_fill: re(
-                &MISMATCH,
-                r"`[a-z ]+` mismatch|error mismatch|missing required `--- [a-z ]+ ---` section",
-            )
-            .is_match(&out),
+            need_fill: re(&MISMATCH, r"`[a-z ]+` mismatch|error mismatch").is_match(&out),
             ..Plan::default()
         };
 
@@ -341,10 +337,7 @@ impl Run {
         // `AIPL_CASE` one enormous non-existent case name. The refill then fails
         // with "matched no test cases", which reads like a corpus problem and is
         // not one.
-        let case_path = re(
-            &CASE_PATH,
-            r"\[([^\]\n]+)\]: ((`[a-z ]+`|error) mismatch|missing required)",
-        );
+        let case_path = re(&CASE_PATH, r"\[([^\]\n]+)\]: (`[a-z ]+`|error) mismatch");
         let mut cases: BTreeSet<String> = case_path
             .captures_iter(&out)
             .map(|c| c[1].to_string())
@@ -663,7 +656,7 @@ mod tests {
             ),
             (
                 "cases_arrays_take",
-                "[cases/arrays/take]: missing required `--- performance ---` section",
+                "[cases/arrays/take]: `report` mismatch",
             ),
         ]);
         let plan = run.plan();
@@ -674,7 +667,7 @@ mod tests {
             plan.fail_cases,
             ["cases/arrays/take", "cases/strings/slice"]
         );
-        assert_eq!(plan.changed_sections, ["performance", "stdout"]);
+        assert_eq!(plan.changed_sections, ["performance", "report", "stdout"]);
         assert!(plan.behavioral_changed);
     }
 

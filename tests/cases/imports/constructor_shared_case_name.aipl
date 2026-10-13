@@ -22,26 +22,3 @@ variant Size = A | C
 pub fn size_rank(self: Size) -> i64 { match (self) { A => 10, C => 20 } }
 --- stdout ---
 11
---- performance ---
-allocations: 1
-deallocations: 1
-reallocations: 0
-bytes allocated: 18
-instructions executed: 31
-binary size: 1152
-  code: 300
-  data: 1
-  metadata: 851
-functions:
-  __to_str_i64:
-    calls: 1
-    bytes: 204
-  aipl_i64_len:
-    calls: 2
-    bytes: (external)
-  aipl_write_i64:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 96

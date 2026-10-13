@@ -232,13 +232,16 @@ again.
       regen and the final run; exit non-zero with the list. After the final run,
       run a scoped refresh for added or deleted cases. This is bookkeeping, not
       a reviewed move.
-- [ ] `--- performance ---` becomes optional (remove the "missing required"
-      failure).
+- [x] `--- performance ---` becomes optional (the "missing required" failure is
+      gone; `fill_expected` refreshes an existing section and never adds one;
+      handoff no longer matches the old message).
 - [ ] Audit which cases protect a real property and keep their section until
       Phase 4: `optimizations/`, `perf/`, `performance/`, plus the ~90 whose prose
       cites allocations or instructions. Record the list below, marking each case
       as expressible with `measure` or needing `--- report ---`.
-- [ ] Delete the section from every other case, including all 111 under `crates/`.
+- [x] Delete the section from every other case: done for every small case, including
+      74 of the 105 under `crates/`; see the audit at the end. The 31 large
+      `crates/` sources keep it.
 - [ ] Docs: CLAUDE.md (Performance monitoring, Test `main` style, the handoff
       notes about performance refills) and the `tests/cases.rs` module docs.
 
@@ -430,6 +433,35 @@ Each item below can land separately.
 - Effects in `.performance` blocks and measured closures, including what the
   benchmark timing pass does with repeated output.
 
-## Audit: cases that keep `--- performance ---` until Phase 4
+## Audit: where every `--- performance ---` section went
 
-_(filled in during Phase 2)_
+719 cases carried the section. Policy (Drew's four rules): a small test of behavior
+pins nothing; a large one keeps the section (it stands in for a whole-compiler metric
+until there is one); a small test that an optimization removes instructions or
+allocations gets a `.performance` block; one that removes calls gets a `--- report ---`;
+both, both. "Large" is a source of **100 lines or more**.
+
+- **Removed — small tests of behavior: 622.** Nothing replaces them: the leak gate
+  runs for every case, which is what most of those sections were quietly checking.
+  (This includes the cases that test `.performance` and `--- report ---` themselves,
+  which carry the feature they test.)
+- **Kept — large: 42.** 31 under `crates/` (the dogfooded compiler, the real
+  stand-in for a whole-compiler metric) and 11 under `tests/cases/`: `integers/narrow_int_elements`, `lints/push_loop_pipeline_not_flagged`, `lints/return_loop_find_if_not_flagged`, `lints/return_loop_find_index_not_flagged`, `lints/union_loop_union_all_not_flagged`, `methods/mutating/recursive_receiver`, `optimizations/fold_extends_value_or`, `optimizations/loop_split_fusion`, `optimizations/move_last_use`, `structs/boxed_field_with_array`, `variants/recursive_mut_accumulator`.
+  Three of those test an optimization and would be rules 3/4 if smaller:
+  `optimizations/move_last_use`, `optimizations/fold_extends_value_or`,
+  `optimizations/loop_split_fusion`. They stay large-and-kept for now.
+- **`--- report ---` only (23):** `arrays/extend/extend_reserves_once`, `arrays/extend/push_loop_reallocates`, `arrays/push/push_in_place_amortized`, `functions/owned_inplace`, `functions/owned_inplace_bool`, `optimizations/appending_variant`, `optimizations/appending_variant_not_minted`, `optimizations/counting_variant`, `optimizations/counting_variant_not_fused`, `optimizations/fold_lengths`, `optimizations/inline_early_exit`, `optimizations/inline_mutating_method`, `optimizations/inspect_only_args`, `optimizations/loop_reverse_fusion`, `optimizations/read_only_builtin_args`, `optimizations/shared_ctor_wrapper`, `optimizations/split_len_fusion`, `optimizations/split_len_fusion_effects`, `optimizations/struct_move_in`, `optimizations/subst_single_use_binding`, `optimizations/to_str_len_fusion`, `optimizations/to_str_len_fusion_effects`, `strings/concat/print_rope`.
+- **`.performance` block only (25):** `arrays/inline_allocates_nothing`, `arrays/inline_empty`, `arrays/narrow_elements_packed`, `arrays/reverse_allocates_nothing`, `arrays/slice_allocates_nothing`, `arrays/slice_shares`, `lambdas/filter_in_place`, `lambdas/map_in_place`, `optimizations/const_array_literal`, `optimizations/const_fold`, `optimizations/const_fold_concat`, `optimizations/count_fusion`, `optimizations/ctor_eq_unwrap`, `optimizations/map_value_or_unwraps`, `optimizations/sink_into_branch`, `optimizations/sink_past_trailing_statements`, `optimizations/sink_total_arithmetic`, `optimizations/value_or_default_sinks`, `perf/instructions_executed`, `performance/refcount_balance`, `strings/concat_in_place`, `strings/concat_in_place_grows`, `strings/named_representations`, `strings/small_string_optimization`, `strings/trim_in_place`.
+- **Both (7):** `optimizations/filter_map_fusion`, `optimizations/index_map_fusion`, `optimizations/loop_map_fusion`, `optimizations/loop_tuple_windows_fusion`, `optimizations/map_find_if_fusion`, `optimizations/slice_starts_with_fusion`, `optimizations/split_map_fusion`.
+- **Considered an optimization test and then dropped to plain behavior (1):** `sets/union`.
+
+Judgement calls worth a second look: `sets/union` (header claims in-place reuse, but
+the set literals' own allocations swamp it, so it is a behavior test); the
+`*_effects` fusion cases are behavior tests (their evidence is the order of printed
+output) except `split_len_fusion_effects` and `to_str_len_fusion_effects`, whose
+header cites the function list; `strings/concat/print_rope` is a report because
+printing is an effect and a block cannot use one; `loop_reverse_fusion` is a report
+only because its saving is in calls (a reversed view allocates nothing either way).
+A few files whose line count put them over the threshold only through their own
+`.test` fixtures (the `lints/*_not_flagged` set) keep a section that tells a
+behavior test nothing; they are the first candidates if the threshold moves.

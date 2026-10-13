@@ -31,32 +31,3 @@ fn probe() -> bool { true }.test({
     assert(u16v(65535) == 65535);
     assert(u32v(4294967295) == 4294967295);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 157
-binary size: 2888
-  code: 760
-  data: 719
-  metadata: 1409
-functions:
-  __test$probe:
-    calls: 1
-    bytes: 656
-  aipl_assert:
-    calls: 10
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104

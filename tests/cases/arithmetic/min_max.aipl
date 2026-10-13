@@ -47,32 +47,3 @@ fn clamp_low(x: i64, lo: i64) -> i64 { x.max(lo) }.test({
     assert(min(a, b) == "xya");
     assert(max(a, b) == "xyz");
 })
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 78
-instructions executed: 490
-binary size: 6184
-  code: 2452
-  data: 1067
-  metadata: 2665
-functions:
-  __test$clamp_low:
-    calls: 1
-    bytes: 2344
-  aipl_assert:
-    calls: 20
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

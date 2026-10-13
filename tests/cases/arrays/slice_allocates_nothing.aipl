@@ -5,12 +5,18 @@
 # length, an element, a walk over it, or a slice of it, which is a window of the
 # same block rather than a view of a view.
 #
-# The allocation count below is the proof. Every array here windows a constant
-# literal, which lives in the data section, so there is nothing in the program
-# to allocate unless a slice does — and `main` returns its answer as the exit
-# code rather than printing it, since rendering would allocate a buffer.
+# The `.performance` block on `main` is the proof. Every array here windows a
+# constant literal, which lives in the data section, so there is nothing in the
+# program to allocate unless a slice does. (`main` returns its answer as the exit
+# code rather than printing it, since rendering would allocate a buffer.)
 
-import { value_or, wrapping_add as +, wrapping_add_assign as += } from builtins;
+import {
+    equal as ==,
+    measure,
+    value_or,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+} from builtins;
 
 fn total(xs: i64[]) -> i64 {
     mut n = 0;
@@ -25,29 +31,13 @@ fn main() -> i64 {
     let mid = xs[2..6]; // 3, 4, 5, 6
     let inner = mid[1..3]; // 4, 5: a window of a window, still over `xs`
     total(mid) + total(inner) + inner[0].value_or(0) // 18 + 9 + 4
-}
+}.performance({
+    let xs = [1, 2, 3, 4, 5, 6, 7, 8];
+    let mid = xs[2..6];
+    assert(measure("slice", xs, |a| a[2..6]).allocations == 0);
+    assert(measure("slice of a slice", mid, |m| m[1..3]).allocations == 0);
+    assert(measure("walk a slice", mid, total).allocations == 0);
+    assert(measure("read from a slice", mid, |m| m[0]).allocations == 0);
+})
 --- exit code ---
 31
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 286
-binary size: 1384
-  code: 612
-  data: 73
-  metadata: 699
-functions:
-  aipl_arr_inc:
-    calls: 2
-    bytes: (external)
-  aipl_array_dec:
-    calls: 2
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 440
-  total:
-    calls: 2
-    bytes: 172

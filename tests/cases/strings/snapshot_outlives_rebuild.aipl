@@ -32,29 +32,3 @@ hello world, long enough to live on the heap!
 hello world, long enough to live on the heap!?
 hello world, long enough to live on the heap! 52
 hello world, long enough to live on the heap!?...
---- performance ---
-allocations: 8
-deallocations: 8
-reallocations: 0
-bytes allocated: 509
-instructions executed: 519
-binary size: 4352
-  code: 2256
-  data: 133
-  metadata: 1963
-functions:
-  __to_str_u64:
-    calls: 1
-    bytes: 204
-  aipl_u64_len:
-    calls: 2
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 10
-    bytes: (external)
-  aipl_write_u64:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 2052

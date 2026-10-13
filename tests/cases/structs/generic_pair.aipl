@@ -18,35 +18,3 @@ fn swapped_kinds() -> i64 {
 }.test({
     assert(swapped_kinds() == 42);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 71
-binary size: 1480
-  code: 408
-  data: 115
-  metadata: 957
-functions:
-  __test$mixed:
-    calls: 1
-    bytes: 140
-  __test$swapped_kinds:
-    calls: 1
-    bytes: 88
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 2
-    bytes: (external)
-  aipl_test_end:
-    calls: 2
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 180

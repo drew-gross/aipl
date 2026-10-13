@@ -24,32 +24,3 @@ aipl_test_begin            1    external
 aipl_test_end              1    external
 aipl_test_summary          1    external
 main                       1         104
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 39
-binary size: 1176
-  code: 228
-  data: 110
-  metadata: 838
-functions:
-  __test$double:
-    calls: 1
-    bytes: 124
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104

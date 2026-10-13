@@ -42,29 +42,3 @@ fn main() !prints {
 error
 hello, world!
 hi, Drew
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 105
-instructions executed: 248
-binary size: 3216
-  code: 1808
-  data: 1
-  metadata: 1407
-functions:
-  __to_str_i64:
-    calls: 1
-    bytes: 204
-  aipl_i64_len:
-    calls: 2
-    bytes: (external)
-  aipl_write_i64:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 1320
-  safe_add:
-    calls: 2
-    bytes: 284

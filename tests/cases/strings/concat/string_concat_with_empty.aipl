@@ -13,35 +13,3 @@ fn lead_empty() -> str { "" +++ heap_str("lone") }.test({
 fn trail_empty() -> str { heap_str("lone") +++ "" }.test({
     assert(trail_empty() == "lone");
 })
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 78
-instructions executed: 108
-binary size: 2056
-  code: 720
-  data: 145
-  metadata: 1191
-functions:
-  __test$lead_empty:
-    calls: 1
-    bytes: 276
-  __test$trail_empty:
-    calls: 1
-    bytes: 264
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 2
-    bytes: (external)
-  aipl_test_end:
-    calls: 2
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 180

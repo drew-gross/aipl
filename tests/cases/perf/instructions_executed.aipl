@@ -2,10 +2,17 @@
 # sum, over every basic-block entry at runtime, of that block's (compile-time
 # fixed) CLIF instruction count — so it reflects *executed* instructions (a
 # loop body counts once per iteration), and it's deterministic for a fixed
-# program. That determinism is what lets the count be asserted in the
-# `--- performance ---` section below.
+# program. That determinism is what lets the count be asserted — here by the
+# `.performance` block on `triangle`.
 
-import { print, to_str, wrapping_add_assign as +=, wrapping_increment as ++ } from builtins;
+import {
+    equal as ==,
+    measure,
+    print,
+    to_str,
+    wrapping_add_assign as +=,
+    wrapping_increment as ++,
+} from builtins;
 
 fn triangle() -> i64 {
     mut sum = 0;
@@ -16,33 +23,35 @@ fn triangle() -> i64 {
         set i++;
     }
     sum
-}
+}.performance({
+    fn sum_over(digits: str) -> i64 {
+        mut sum = 0;
+        mut i = 1;
+        for (let _c : digits) {
+            set sum += i;
+            set i++;
+        }
+        sum
+    }
+
+    // Deterministic: the same call counts the same, every time.
+    let first = measure("first", 0, |_| triangle());
+    let again = measure("again", 0, |_| triangle());
+    assert(first.instructions == again.instructions);
+    assert(first.instructions == 620);
+
+    // *Executed* instructions: a loop body counts once per iteration, so more
+    // iterations cost more, from nothing at all up.
+    let empty = measure("no iterations", "", sum_over);
+    let ten = measure("ten iterations", "0123456789", sum_over);
+    let twenty = measure("twenty iterations", "01234567890123456789", sum_over);
+    assert(empty.instructions == 56);
+    assert(ten.instructions == 611);
+    assert(twenty.instructions == 1171);
+})
 
 fn main() !prints {
     print(to_str(triangle())); // 1+2+...+10 = 55
 }
 --- stdout ---
 55
---- performance ---
-allocations: 1
-deallocations: 1
-reallocations: 0
-bytes allocated: 18
-instructions executed: 641
-binary size: 1504
-  code: 548
-  data: 1
-  metadata: 955
-functions:
-  __to_str_i64:
-    calls: 1
-    bytes: 204
-  aipl_i64_len:
-    calls: 2
-    bytes: (external)
-  aipl_write_i64:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 344

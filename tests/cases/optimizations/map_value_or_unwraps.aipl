@@ -5,12 +5,21 @@
 # behind it, so no optional is ever built and `v` is never bound: the `some`
 # arm is the slice and the `none` arm the literal, exactly as written below.
 #
-# The `instructions executed` count is the assertion: the two spellings are
-# called the same way, and each costs what the other does.
+# The instruction counts are the assertion (the `.performance` block on `edge`):
+# the two spellings are called the same way, and each costs what the other does.
 
-import { Span, map, print, value_or } from builtins;
+import { Span, equal as ==, map, measure, print, value_or } from builtins;
 
-fn edge(src: str, sp: Span?) -> str { sp.map(|s| src[s]).value_or("") }
+fn edge(src: str, sp: Span?) -> str { sp.map(|s| src[s]).value_or("") }.performance({
+    let found: Span? = some(1..3);
+    let missing: Span? = none;
+    let hit = measure("map/value_or hit", found, |sp| edge("hello", sp));
+    let long_hit = measure("match hit", found, |sp| edge_long("hello", sp));
+    let miss = measure("map/value_or miss", missing, |sp| edge("hello", sp));
+    let long_miss = measure("match miss", missing, |sp| edge_long("hello", sp));
+    assert(hit.instructions == long_hit.instructions);
+    assert(miss.instructions == long_miss.instructions);
+})
 
 fn edge_long(src: str, sp: Span?) -> str {
     match (sp) {
@@ -30,17 +39,3 @@ el
 
 el
 
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 77
-binary size: 1104
-  code: 412
-  data: 1
-  metadata: 691
-functions:
-  main:
-    calls: 1
-    bytes: 412

@@ -4,11 +4,16 @@
 # and neither is a composite (optional/struct). For non-composite types that
 # means both are 8-byte (scalars, `str`, arrays), so `T` and `U` may DIFFER;
 # the per-slot element drop-fn is patched from `T`'s to `U`'s as it goes.
+#
+# The `.performance` block on `doubled` is the measurement: a map over a fresh
+# array allocates exactly what the array itself did, nothing for the result.
 
 import {
+    Measurement,
     concat as +++,
     equal as ==,
     map,
+    measure,
     to_str,
     wrapping_add as +,
     wrapping_mul as *,
@@ -23,7 +28,7 @@ fn doubled(xs: i64[]) -> i64[] { xs.map(|x| x * 2) }.test({
 
     // Heap (str) elements, T == U: the old string in each slot is dropped and
     // the new one stored in place. A leak or double-free would unbalance the
-    // allocation/deallocation counts.
+    // allocation/deallocation counts, which the leak gate refuses.
     assert(["a", "b", "c"].map(|s| s +++ "!") == ["a!", "b!", "c!"]);
 
     // A captured variable, in place.
@@ -39,78 +44,33 @@ fn doubled(xs: i64[]) -> i64[] { xs.map(|x| x * 2) }.test({
     // can't reuse the 8-byte-per-element `str` buffer. Built fresh via the
     // copying path; still correct, just not in-place.
     assert(["a", "bb", "a"].map(|s| s == "a") == [true, false, true]);
+}).performance({
+    // The fresh array, built from a run-time value so it is a heap block rather than
+    // a constant, and costing what it costs before anything is mapped over it.
+    let Measurement { allocations, bytes_allocated } = measure(
+        "the array alone",
+        1,
+        |n| [n, n + 1, n + 2, n + 3],
+    );
+    assert(allocations == 1);
+    assert(bytes_allocated == 48);
+
+    // Mapping it — once, or twice in a chain — writes into that block: the same
+    // one allocation of the same 48 bytes.
+    let mapped = measure("map", 1, |n| [n, n + 1, n + 2, n + 3].map(|x| x * 2));
+    let chained = measure(
+        "chained maps",
+        1,
+        |n| [n, n + 1, n + 2, n + 3].map(|x| x + 1).map(|x| x * x),
+    );
+    assert(mapped.allocations == allocations);
+    assert(mapped.bytes_allocated == bytes_allocated);
+    assert(chained.allocations == allocations);
+    assert(chained.bytes_allocated == bytes_allocated);
+
+    // `str` to `bool` cannot reuse the buffer (a `bool[]` is bit-packed), so it
+    // builds its result: exactly one allocation more than the array alone.
+    let strings = measure("nine strings", "a", |s| [s, s, s, s, s, s, s, s, s]);
+    let packed = measure("str to bool", "a", |s| [s, s, s, s, s, s, s, s, s].map(|t| t == "a"));
+    assert(packed.allocations == strings.allocations + 1);
 })
---- performance ---
-allocations: 16
-deallocations: 16
-reallocations: 2
-bytes allocated: 972
-instructions executed: 2794
-binary size: 10848
-  code: 6376
-  data: 727
-  metadata: 3745
-functions:
-  __eq_bool$arr:
-    calls: 1
-    bytes: 160
-  __eq_i64$arr:
-    calls: 3
-    bytes: 264
-  __eq_str$arr:
-    calls: 2
-    bytes: 320
-  __test$doubled:
-    calls: 1
-    bytes: 2876
-  __test$doubled$map1$own0:
-    calls: 1
-    bytes: 460
-  __test$doubled$map3$own0:
-    calls: 1
-    bytes: 456
-  __test$doubled$map5$own0:
-    calls: 1
-    bytes: 456
-  __test$doubled$map7$own0:
-    calls: 1
-    bytes: 616
-  __test$doubled$map9$own0:
-    calls: 1
-    bytes: 456
-  __to_str_i64:
-    calls: 3
-    bytes: 204
-  aipl_arr_inc:
-    calls: 9
-    bytes: (external)
-  aipl_array_dec:
-    calls: 14
-    bytes: (external)
-  aipl_array_new:
-    calls: 4
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 1
-    bytes: (external)
-  aipl_assert:
-    calls: 6
-    bytes: (external)
-  aipl_i64_len:
-    calls: 6
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  aipl_write_i64:
-    calls: 3
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

@@ -22,38 +22,3 @@ fn main() !prints {
 nothing
 true
 true
---- performance ---
-allocations: 5
-deallocations: 5
-reallocations: 0
-bytes allocated: 233
-instructions executed: 372
-binary size: 4520
-  code: 2532
-  data: 14
-  metadata: 1974
-functions:
-  __eq___tuple$i64$str:
-    calls: 1
-    bytes: 104
-  __to_str_bool:
-    calls: 2
-    bytes: 224
-  __to_str_i64:
-    calls: 1
-    bytes: 204
-  aipl_i64_len:
-    calls: 2
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 2
-    bytes: (external)
-  aipl_write_i64:
-    calls: 1
-    bytes: (external)
-  describe:
-    calls: 2
-    bytes: 604
-  main:
-    calls: 1
-    bytes: 1396

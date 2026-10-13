@@ -1,14 +1,19 @@
 # When `filter` receives a freshly-allocated, uniquely-owned array (an array
 # literal, or a call result like `xs.map(..)`), it filters in place: kept
 # elements are compacted toward the front of the same allocation and the
-# filtered-out ones are dropped, so no separate output array is allocated.
+# filtered-out ones are dropped, so no separate output array is allocated. The
+# `.performance` block on `keep_gt3` is the measurement: a filter over a fresh
+# array allocates exactly what the array itself did, whatever it keeps.
 
 import {
+    Measurement,
     equal as ==,
     filter,
     greater_than as >,
     map,
+    measure,
     not_equal as !=,
+    wrapping_add as +,
     wrapping_mul as *,
 } from builtins;
 
@@ -21,71 +26,42 @@ fn keep_gt3(xs: i64[]) -> i64[] { xs.filter(|x| x > 3) }.test({
     assert([1, 2, 3].filter(|x| x > 0) == [1, 2, 3]);
 
     // Heap (str) elements: exercises the move-kept / drop-filtered refcounting.
-    // A leak or double-free would show up as an allocation/deallocation imbalance.
+    // A leak or double-free would show up as an allocation/deallocation imbalance,
+    // which the leak gate refuses.
     assert(["a", "", "b", "", "c"].filter(|w| w != "") == ["a", "b", "c"]);
 
     // Chained: `map` allocates a fresh array, `filter` consumes it in place.
     assert([1, 2, 3, 4].map(|x| x * 10).filter(|x| x > 15) == [20, 30, 40]);
+}).performance({
+    let Measurement { allocations, bytes_allocated } = measure(
+        "the array alone",
+        1,
+        |n| [n, n + 1, n + 2, n + 3, n + 4, n + 5],
+    );
+    assert(allocations == 1);
+    // Keeping some, none or all compacts within that block: nothing more allocated.
+    let some = measure(
+        "keep some",
+        1,
+        |n| [n, n + 1, n + 2, n + 3, n + 4, n + 5].filter(|x| x > 3),
+    );
+    let none_kept = measure(
+        "keep none",
+        1,
+        |n| [n, n + 1, n + 2, n + 3, n + 4, n + 5].filter(|x| x > 100),
+    );
+    let all = measure("keep all", 1, |n| [n, n + 1, n + 2, n + 3, n + 4, n + 5].filter(|x| x > 0));
+    assert(some.allocations == allocations);
+    assert(some.bytes_allocated == bytes_allocated);
+    assert(none_kept.allocations == allocations);
+    assert(all.allocations == allocations);
+
+    // A `map` that builds the array and a `filter` that consumes it in place: still
+    // the one array.
+    let chained = measure(
+        "map then filter",
+        1,
+        |n| [n, n + 1, n + 2, n + 3].map(|x| x * 10).filter(|x| x > 15),
+    );
+    assert(chained.allocations == 1);
 })
---- performance ---
-allocations: 6
-deallocations: 6
-reallocations: 0
-bytes allocated: 448
-instructions executed: 2425
-binary size: 9040
-  code: 5392
-  data: 664
-  metadata: 2984
-functions:
-  __eq_i64$arr:
-    calls: 4
-    bytes: 264
-  __eq_str$arr:
-    calls: 1
-    bytes: 320
-  __test$keep_gt3:
-    calls: 1
-    bytes: 1684
-  __test$keep_gt3$filter1$own0:
-    calls: 1
-    bytes: 496
-  __test$keep_gt3$filter11$own0:
-    calls: 1
-    bytes: 496
-  __test$keep_gt3$filter3$own0:
-    calls: 1
-    bytes: 496
-  __test$keep_gt3$filter5$own0:
-    calls: 1
-    bytes: 496
-  __test$keep_gt3$filter7$own0:
-    calls: 1
-    bytes: 572
-  __test$keep_gt3$map9$own0:
-    calls: 1
-    bytes: 460
-  aipl_arr_inc:
-    calls: 10
-    bytes: (external)
-  aipl_array_dec:
-    calls: 12
-    bytes: (external)
-  aipl_array_new:
-    calls: 2
-    bytes: (external)
-  aipl_assert:
-    calls: 5
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

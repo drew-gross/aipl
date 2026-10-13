@@ -43,32 +43,3 @@ fn step<K: any>(k: K, text: str) -> Step<K> {
     let e: Step<Kind> = Step { tok: none, plain: Tok { kind: Num, text: "p" }, label: "L" };
     assert(e.tok.map(|t| t.text) == none);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 668
-binary size: 6040
-  code: 3156
-  data: 612
-  metadata: 2272
-functions:
-  __test$step:
-    calls: 1
-    bytes: 3056
-  aipl_assert:
-    calls: 7
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100

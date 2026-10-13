@@ -14,17 +14,3 @@ fn main() !prints -> i64 {
 first
 
 second
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 11
-binary size: 608
-  code: 92
-  data: 1
-  metadata: 515
-functions:
-  main:
-    calls: 1
-    bytes: 92

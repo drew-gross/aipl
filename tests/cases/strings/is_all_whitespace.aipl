@@ -12,35 +12,3 @@ fn blank(s: str) -> bool { s.is_all_whitespace() }.test({
     assert(!"\tx".is_all_whitespace());
     assert(blank("\n\n")); // free helper / method chain
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 1273
-binary size: 2896
-  code: 996
-  data: 480
-  metadata: 1420
-functions:
-  __builtin_all$char$s0$lam$__builtin_is_whitespace:
-    calls: 7
-    bytes: 304
-  __test$blank:
-    calls: 1
-    bytes: 588
-  aipl_assert:
-    calls: 7
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104

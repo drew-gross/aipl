@@ -41,38 +41,3 @@ some(some(some(some(42))))
 true
 42
 some(some(some(some("deep"))))
---- performance ---
-allocations: 4
-deallocations: 4
-reallocations: 0
-bytes allocated: 126
-instructions executed: 597
-binary size: 6456
-  code: 3068
-  data: 202
-  metadata: 3186
-functions:
-  __to_str_bool:
-    calls: 1
-    bytes: 224
-  __to_str_i64:
-    calls: 1
-    bytes: 204
-  __to_str_i64$opt$opt$opt$opt:
-    calls: 1
-    bytes: 828
-  __to_str_str$opt$opt$opt$opt:
-    calls: 1
-    bytes: 912
-  aipl_i64_len:
-    calls: 4
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 18
-    bytes: (external)
-  aipl_write_i64:
-    calls: 2
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 900

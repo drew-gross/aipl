@@ -62,26 +62,3 @@ fn msg_len(r: i64!Wrapped) -> i64 {
 1
 -1
 3
---- performance ---
-allocations: 4
-deallocations: 4
-reallocations: 0
-bytes allocated: 69
-instructions executed: 313
-binary size: 3192
-  code: 1780
-  data: 1
-  metadata: 1411
-functions:
-  __to_str_i64:
-    calls: 4
-    bytes: 204
-  aipl_i64_len:
-    calls: 8
-    bytes: (external)
-  aipl_write_i64:
-    calls: 4
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 1576

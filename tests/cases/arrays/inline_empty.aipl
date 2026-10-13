@@ -5,12 +5,24 @@
 # over nothing all produce one, and each used to allocate a block to hold no
 # elements.
 #
-# The allocation count below is the proof, and it is the whole arithmetic: 6, one
-# per `to_str` buffer, and **none for an array**. `xs` is a literal (a static
-# block, so no allocation either), and each of the three zero-length slices is
-# inline — before this, every one of them was a freshly allocated block.
+# The `.performance` block on `main` is the proof: **no array allocates** — `xs` is
+# a literal (a static block), and each zero-length slice, empty `filter` result and
+# `map` over nothing is inline. Before this, every one of them was a freshly
+# allocated block.
 
-import { equal as ==, is_empty, len, logical_not as !, print, to_str } from builtins;
+import {
+    equal as ==,
+    filter,
+    greater_than as >,
+    is_empty,
+    len,
+    logical_not as !,
+    map,
+    measure,
+    print,
+    to_str,
+    wrapping_add as +,
+} from builtins;
 
 fn main() !prints {
     let xs = [1, 2, 3];
@@ -28,7 +40,18 @@ fn main() !prints {
     // A slice past the end clamps to empty, and so does a backwards one.
     print(to_str(len(xs[3..3]))); // 0
     print(to_str(len(xs[2..1]))); // 0
-}
+}.performance({
+    let xs = [1, 2, 3];
+
+    // A zero-length slice, one past the end, and a backwards one: each is an
+    // inline empty array, not a block holding no elements.
+    assert(measure("zero-length slice", xs, |a| a[1..1]).allocations == 0);
+    assert(measure("slice at the end", xs, |a| a[3..3]).allocations == 0);
+    assert(measure("backwards slice", xs, |a| a[2..1]).allocations == 0);
+    // And so are a `filter` over nothing and a `map` over nothing.
+    assert(measure("filter over nothing", xs, |a| a[1..1].filter(|x| x > 9)).allocations == 0);
+    assert(measure("map over nothing", xs, |a| a[1..1].map(|x| x + 1)).allocations == 0);
+})
 --- stdout ---
 0
 true
@@ -36,35 +59,3 @@ true
 true
 0
 0
---- performance ---
-allocations: 6
-deallocations: 6
-reallocations: 0
-bytes allocated: 111
-instructions executed: 444
-binary size: 3152
-  code: 1504
-  data: 54
-  metadata: 1594
-functions:
-  __eq_i64$arr:
-    calls: 2
-    bytes: 264
-  __to_str_bool:
-    calls: 3
-    bytes: 224
-  __to_str_u64:
-    calls: 3
-    bytes: 204
-  aipl_u64_len:
-    calls: 6
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 3
-    bytes: (external)
-  aipl_write_u64:
-    calls: 3
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 812

@@ -33,32 +33,3 @@ fn first_char(s: str) -> char? { s[0] }.test({
     assert(!"asdf".contains(first_char("zebra")));
     assert(!"asdf".contains(first_char(""))); // out of bounds: none
 })
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 127
-instructions executed: 532
-binary size: 6360
-  code: 2660
-  data: 1050
-  metadata: 2650
-functions:
-  __test$first_char:
-    calls: 1
-    bytes: 2552
-  aipl_assert:
-    calls: 18
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

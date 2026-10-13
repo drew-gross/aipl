@@ -16,35 +16,3 @@ fn sum(xs: i64[]) -> i64 {
     let n: i64 = len(xs);
     assert(sum(xs) + n == 63);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 295
-binary size: 1784
-  code: 600
-  data: 190
-  metadata: 994
-functions:
-  __test$sum:
-    calls: 1
-    bytes: 328
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100
-  sum:
-    calls: 2
-    bytes: 172

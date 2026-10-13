@@ -39,32 +39,3 @@ fn probe() -> bool { true }.test({
     // 64-bit: i64::MAX + 1 saturates (a wrapping add would flip to i64::MIN).
     assert(9223372036854775807 + 1 == 9223372036854775807);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 250
-binary size: 3616
-  code: 1156
-  data: 830
-  metadata: 1630
-functions:
-  __test$probe:
-    calls: 1
-    bytes: 1052
-  aipl_assert:
-    calls: 13
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104

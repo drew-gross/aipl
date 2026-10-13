@@ -20,32 +20,3 @@ fn unwrap_a(o: Outer) -> i64 {
     assert(unwrap_a(Wrap(B)) == 0);
     assert(unwrap_a(Empty) == 0 - 1);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 59
-binary size: 1464
-  code: 320
-  data: 236
-  metadata: 908
-functions:
-  __test$unwrap_a:
-    calls: 1
-    bytes: 212
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

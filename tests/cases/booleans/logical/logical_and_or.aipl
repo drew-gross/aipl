@@ -9,35 +9,3 @@ fn or(x: bool, y: bool) -> bool { x || y }.test({
     assert(or(false, true) == true);
     assert(or(false, false) == false);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 76
-binary size: 1712
-  code: 404
-  data: 257
-  metadata: 1051
-functions:
-  __test$and:
-    calls: 1
-    bytes: 124
-  __test$or:
-    calls: 1
-    bytes: 124
-  aipl_assert:
-    calls: 4
-    bytes: (external)
-  aipl_test_begin:
-    calls: 2
-    bytes: (external)
-  aipl_test_end:
-    calls: 2
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 156

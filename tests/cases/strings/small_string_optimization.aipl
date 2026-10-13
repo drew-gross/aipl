@@ -7,10 +7,20 @@
 # never allocates, which this case used to claim ("ZERO heap activity", against
 # counters that have long read 2). Of the four operations here the literal and
 # `trim` stay inline, while the two that *build* a value allocate whatever their
-# own representation needs, short result or not — which is the `allocations: 2`
-# below: an 88-byte rope node for the `+++`, and an 18-byte buffer for `to_str`.
+# own representation needs, short result or not — which is what the
+# `.performance` block on `main` measures: an 88-byte rope node for the `+++`, and
+# an 18-byte buffer for `to_str`.
 
-import { concat as +++, inline_str, print, to_str, trim, value_or } from builtins;
+import {
+    concat as +++,
+    equal as ==,
+    inline_str,
+    measure,
+    print,
+    to_str,
+    trim,
+    value_or,
+} from builtins;
 
 fn main() !prints {
     // `inline_str` rather than a bare `"hi"`: it names the representation the case
@@ -22,32 +32,22 @@ fn main() !prints {
     print(trim("  ok  ")); // repacked inline -> "ok" (2 bytes), no allocation
     print(to_str(42)); // a fresh buffer -> "42" (2 bytes)
     print(""); // the empty string is inline too (a blank line)
-}
+}.performance({
+    let greeting = inline_str("hi").value_or("");
+    // The literal, `trim` and the empty string stay inline: nothing allocated.
+    assert(measure("literal", "hi", |s| s).allocations == 0);
+    assert(measure("trim", "  ok  ", trim).allocations == 0);
+    assert(measure("empty string", "", |s| s).allocations == 0);
+
+    // The two that build a value allocate whatever their own representation needs,
+    // however short the result.
+    assert(measure("concat", greeting, |g| g +++ "!").allocations == 1);
+    assert(measure("concat bytes", greeting, |g| g +++ "!").bytes_allocated == 88);
+    assert(measure("to_str", 42, to_str).allocations == 1);
+    assert(measure("to_str bytes", 42, to_str).bytes_allocated == 18);
+})
 --- stdout ---
 hi!
 ok
 42
 
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 106
-instructions executed: 89
-binary size: 1888
-  code: 692
-  data: 1
-  metadata: 1195
-functions:
-  __to_str_i64:
-    calls: 1
-    bytes: 204
-  aipl_i64_len:
-    calls: 2
-    bytes: (external)
-  aipl_write_i64:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 488

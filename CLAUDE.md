@@ -202,12 +202,30 @@ the enforcement test.
 
 ## Performance monitoring (non-deterministic)
 Two separate perf tracks:
-- **Deterministic, asserted**: the per-case `--- performance ---` sections
-  (allocations, instructions executed, binary size, and a `functions:` block
-  giving every function's call count and byte size in one list — builtins
-  included, at `bytes: (external)`, since only this object's code is measured).
-  These have hard assertions and are filled/refreshed with the `fill_expected`
-  ignored test (see below). **To look at one, run `aipl report <file.aipl>`** — it
+- **Deterministic, asserted.** A case says what it asserts about cost in one of
+  four ways, by what it is *for*:
+
+  | the case is… | it carries |
+  |---|---|
+  | a small test of behavior | nothing — no performance section, no report, no `.performance` block |
+  | a large test of behavior | a `--- performance ---` section (below) |
+  | a small test that an optimization removes **instructions or allocations** | a `.performance` block stating it |
+  | a small test that an optimization removes **calls** (or reallocations) | a `--- report ---` section |
+
+  Both optimization kinds at once get both. "Large" is a source of **100 lines or
+  more** — in practice the dogfooded compiler under `crates/`, which stand in
+  for a whole-compiler metric until there is a real one, and so keep the section
+  until then. Everything about the cost of a small behavior test is already
+  covered without a section: the leak gate runs for every case (below), and a
+  section on a case nothing depends on is only churn, refilled on every codegen
+  change. Don't add `--- performance ---` to a new small case.
+
+  The per-case `--- performance ---` section (allocations, instructions
+  executed, binary size, and a `functions:` block giving every function's call
+  count and byte size in one list — builtins included, at `bytes: (external)`,
+  since only this object's code is measured) is **optional**. It has hard
+  assertions and is refreshed with the `fill_expected` ignored test (see below)
+  where present, never added. **To look at one, run `aipl report <file.aipl>`** — it
   prints the same counts (plus the peak of live heap bytes, which the section does
   not carry), the binary size split, and the `functions:` table as readable
   columns; `--machine` prints them as `key: value` lines, and `-- args` passes
@@ -232,13 +250,13 @@ Two separate perf tracks:
   report` prints for the case (aligned counts, the peak, the function table), and
   `aipl check` validates it by running the same report, so it is both readable
   documentation of what the program costs and refilled by handoff when codegen
-  moves — which a number written into a Rust test is not. It is optional, and for
-  the properties only the function list shows (an instance not minted, a call
-  inlined away); reach for a `.performance` block first when `measure` can state
-  the property, since a pinned report churns with every codegen change that moves
-  a size. `--- performance ---` is still required on every running case and holds
-  the same measurement; a case with both is two renderings of one run. Examples:
-  `tests/cases/report/`.
+  moves — which a number written into a Rust test is not. It is for the
+  properties only the function list shows (an instance not minted, a call inlined
+  away, a reallocation saved); reach for a `.performance` block first when
+  `measure` can state the property, since a pinned report churns with every
+  codegen change that moves a size. A case with both a `--- report ---` and a
+  `--- performance ---` has two renderings of one run. Examples:
+  `tests/cases/report/`, and the fusion cases in `tests/cases/optimizations/`.
 - **Non-deterministic, *not* asserted**: `tests/performance_metrics.md` — a
   checked-in table of wall-clock (measured in-process, so process spawn/teardown
   is excluded), build time, and peak RSS per case. These drift run-to-run, so
@@ -376,7 +394,8 @@ precisely because a case with no `#[test]` would otherwise never run.
 
 Note that every `.aipl` under `crates/` is *also* discovered as a case, so
 adding a dogfooded source adds a case too — it needs the same `#[test]` entry
-and the same `--- performance ---` section any case does. Handoff fills both.
+any case does, which handoff fills. It needs no `--- performance ---`: a small
+source tests behavior and pins nothing (see "Performance monitoring").
 
 ## Documentation attaches by adjacency; a detached block at the top is the file's
 A `# ..` block directly above a declaration documents it. **A blank line under a

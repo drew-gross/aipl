@@ -14,26 +14,3 @@ hello world
 --- stdout ---
 ok("hello world")
 err("could not read file")
---- performance ---
-allocations: 5
-deallocations: 5
-reallocations: 0
-bytes allocated: 107
-instructions executed: 276
-binary size: 2632
-  code: 1284
-  data: 26
-  metadata: 1322
-functions:
-  __to_str_str$err$Error:
-    calls: 2
-    bytes: 652
-  aipl_read_file_to_string:
-    calls: 2
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 6
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 632

@@ -12,32 +12,3 @@ fn greet(Person { age }) -> i64 { age }.test({
     assert(p.name == "claude");
     assert(greet(p) == 30);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 77
-binary size: 1552
-  code: 432
-  data: 125
-  metadata: 995
-functions:
-  __test$greet:
-    calls: 1
-    bytes: 328
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104

@@ -52,29 +52,3 @@ fn main() !prints {
 7 hi=1
 5 hi=3
 5 hi=99
---- performance ---
-allocations: 32
-deallocations: 32
-reallocations: 0
-bytes allocated: 1684
-instructions executed: 807
-binary size: 2552
-  code: 1200
-  data: 1
-  metadata: 1351
-functions:
-  __to_str_u64:
-    calls: 16
-    bytes: 204
-  aipl_u64_len:
-    calls: 32
-    bytes: (external)
-  aipl_write_u64:
-    calls: 16
-    bytes: (external)
-  clamp:
-    calls: 8
-    bytes: 408
-  main:
-    calls: 1
-    bytes: 588

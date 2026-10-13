@@ -5,32 +5,3 @@ import { equal as ==, saturating_remainder as %, wrapping_add as + } from builti
 fn f() -> i64 { 2 + 10 % 3 }.test({
     assert(f() == 3);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 28
-binary size: 984
-  code: 172
-  data: 50
-  metadata: 762
-functions:
-  __test$f:
-    calls: 1
-    bytes: 76
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 96

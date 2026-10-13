@@ -58,35 +58,3 @@ fn main() !prints {
 true
 Span { start: 2, end: 6 }
 cde
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 61
-instructions executed: 188
-binary size: 2768
-  code: 1096
-  data: 51
-  metadata: 1621
-functions:
-  __eq___builtin_Span:
-    calls: 1
-    bytes: 104
-  __to_str___builtin_Span:
-    calls: 1
-    bytes: 464
-  __to_str_bool:
-    calls: 1
-    bytes: 224
-  aipl_u64_len:
-    calls: 4
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 6
-    bytes: (external)
-  aipl_write_u64:
-    calls: 2
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 304

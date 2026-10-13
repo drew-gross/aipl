@@ -28,23 +28,3 @@ fn main() !prints {
 --- stdout ---
 true
 true
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 40
-instructions executed: 126
-binary size: 1824
-  code: 728
-  data: 14
-  metadata: 1082
-functions:
-  __to_str_bool:
-    calls: 2
-    bytes: 224
-  aipl_write_bytes:
-    calls: 2
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 504

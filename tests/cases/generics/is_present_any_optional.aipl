@@ -12,32 +12,3 @@ fn is_present(x: any?) -> bool {
     assert(is_present(some('z')) == true); // char? some
     assert(is_present(""[0]) == false); // char? none (index past end)
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 81
-binary size: 1600
-  code: 404
-  data: 235
-  metadata: 961
-functions:
-  __test$is_present:
-    calls: 1
-    bytes: 296
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

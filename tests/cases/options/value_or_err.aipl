@@ -36,32 +36,3 @@ digit 4
 error: empty input
 error: not a digit
 code 404
---- performance ---
-allocations: 6
-deallocations: 6
-reallocations: 0
-bytes allocated: 388
-instructions executed: 444
-binary size: 3512
-  code: 1964
-  data: 1
-  metadata: 1547
-functions:
-  __to_str_i64:
-    calls: 2
-    bytes: 204
-  aipl_i64_len:
-    calls: 4
-    bytes: (external)
-  aipl_write_i64:
-    calls: 2
-    bytes: (external)
-  describe:
-    calls: 3
-    bytes: 552
-  first_digit:
-    calls: 3
-    bytes: 512
-  main:
-    calls: 1
-    bytes: 696

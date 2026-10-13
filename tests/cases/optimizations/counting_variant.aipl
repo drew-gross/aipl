@@ -63,65 +63,30 @@ fn main() !prints {
 0 1 1
 0 1
 0 2 8 26 80
---- performance ---
-allocations: 389
-deallocations: 389
-reallocations: 0
-bytes allocated: 23820
-instructions executed: 20181
-binary size: 8464
-  code: 4668
-  data: 9
-  metadata: 3787
-functions:
-  __arr_drop_Rule:
-    calls: 59
-    bytes: 116
-  __arr_retain_Rule:
-    calls: 0
-    bytes: 116
-  __rec_drop_Rule:
-    calls: 306
-    bytes: 124
-  __to_str_u64:
-    calls: 10
-    bytes: 204
-  aipl_arr_inc:
-    calls: 61
-    bytes: (external)
-  aipl_array_dec:
-    calls: 120
-    bytes: (external)
-  aipl_array_new:
-    calls: 59
-    bytes: (external)
-  aipl_rec_alloc:
-    calls: 306
-    bytes: (external)
-  aipl_rec_dec_strong:
-    calls: 899
-    bytes: (external)
-  aipl_rec_dec_weak:
-    calls: 178
-    bytes: (external)
-  aipl_rec_inc_strong:
-    calls: 593
-    bytes: (external)
-  aipl_rec_inc_weak:
-    calls: 178
-    bytes: (external)
-  aipl_u64_len:
-    calls: 20
-    bytes: (external)
-  aipl_write_u64:
-    calls: 10
-    bytes: (external)
-  deep:
-    calls: 179
-    bytes: 668
-  main:
-    calls: 1
-    bytes: 2920
-  styles$len:
-    calls: 306
-    bytes: 520
+--- report ---
+allocations       389
+deallocations     389
+reallocations     0
+bytes allocated   23820
+peak live bytes   23820
+instructions      20181
+binary size       8464 bytes (code 4668, data 9, metadata 3787)
+
+function                 calls  code bytes
+__arr_drop_Rule             59         116
+__arr_retain_Rule            0         116
+__rec_drop_Rule            306         124
+__to_str_u64                10         204
+aipl_arr_inc                61    external
+aipl_array_dec             120    external
+aipl_array_new              59    external
+aipl_rec_alloc             306    external
+aipl_rec_dec_strong        899    external
+aipl_rec_dec_weak          178    external
+aipl_rec_inc_strong        593    external
+aipl_rec_inc_weak          178    external
+aipl_u64_len                20    external
+aipl_write_u64              10    external
+deep                       179         668
+main                         1        2920
+styles$len                 306         520

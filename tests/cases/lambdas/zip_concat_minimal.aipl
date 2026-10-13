@@ -14,29 +14,3 @@ fn main() !prints {
 concat
 ax
 by
---- performance ---
-allocations: 4
-deallocations: 4
-reallocations: 0
-bytes allocated: 360
-instructions executed: 603
-binary size: 4400
-  code: 2636
-  data: 1
-  metadata: 1763
-functions:
-  aipl_arr_inc:
-    calls: 1
-    bytes: (external)
-  aipl_array_dec:
-    calls: 3
-    bytes: (external)
-  aipl_array_new:
-    calls: 2
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 732
-  main$zip1$own0$own1:
-    calls: 1
-    bytes: 1904

@@ -41,47 +41,24 @@ fn main() !prints {
 [3, 3, 4, 4, 0, 0, 0]
 {1, 2, 9}
 {3, 4, 9}
---- performance ---
-allocations: 14
-deallocations: 14
-reallocations: 8
-bytes allocated: 492
-instructions executed: 2939
-binary size: 8072
-  code: 4780
-  data: 138
-  metadata: 3154
-functions:
-  __to_str_i64$arr:
-    calls: 2
-    bytes: 704
-  __to_str_set$i64:
-    calls: 2
-    bytes: 568
-  aipl_arr_inc:
-    calls: 14
-    bytes: (external)
-  aipl_array_dec:
-    calls: 20
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 6
-    bytes: (external)
-  aipl_i64_len:
-    calls: 40
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 24
-    bytes: (external)
-  aipl_write_i64:
-    calls: 20
-    bytes: (external)
-  join$own0$own1:
-    calls: 2
-    bytes: 740
-  main:
-    calls: 1
-    bytes: 1728
-  merge$own0$own1:
-    calls: 2
-    bytes: 1040
+--- report ---
+allocations       14
+deallocations     14
+reallocations     8
+bytes allocated   492
+peak live bytes   395
+instructions      2939
+binary size       8072 bytes (code 4780, data 138, metadata 3154)
+
+function                 calls  code bytes
+__to_str_i64$arr             2         704
+__to_str_set$i64             2         568
+aipl_arr_inc                14    external
+aipl_array_dec              20    external
+aipl_array_with_cap          6    external
+aipl_i64_len                40    external
+aipl_write_bytes            24    external
+aipl_write_i64              20    external
+join$own0$own1               2         740
+main                         1        1728
+merge$own0$own1              2        1040

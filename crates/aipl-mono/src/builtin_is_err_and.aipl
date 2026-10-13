@@ -68,38 +68,3 @@ pub fn is_err_and<T: any, E: any>(self: T!E, pred: (E) -> bool) -> bool {
 })
 
 struct LenError { reason: str, at: i64 }
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 1626
-binary size: 10368
-  code: 5152
-  data: 1639
-  metadata: 3577
-functions:
-  __test$is_err_and:
-    calls: 1
-    bytes: 4092
-  __test$is_err_and$check_len:
-    calls: 5
-    bytes: 504
-  __test$is_err_and$digit_of:
-    calls: 9
-    bytes: 448
-  aipl_assert:
-    calls: 18
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

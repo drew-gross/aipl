@@ -58,23 +58,3 @@ fn main() !prints {
 }
 --- stdout ---
 one element
---- performance ---
-allocations: 1
-deallocations: 1
-reallocations: 0
-bytes allocated: 56
-instructions executed: 217
-binary size: 2304
-  code: 992
-  data: 9
-  metadata: 1303
-functions:
-  aipl_arr_inc:
-    calls: 10
-    bytes: (external)
-  aipl_array_dec:
-    calls: 10
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 992

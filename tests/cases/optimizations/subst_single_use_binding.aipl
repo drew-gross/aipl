@@ -80,32 +80,19 @@ fn main() !prints {
 computing
 after
 2
---- performance ---
-allocations: 7
-deallocations: 7
-reallocations: 0
-bytes allocated: 150
-instructions executed: 795
-binary size: 4168
-  code: 2500
-  data: 65
-  metadata: 1603
-functions:
-  __to_str_i64:
-    calls: 5
-    bytes: 204
-  aipl_array_dec:
-    calls: 2
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 1
-    bytes: (external)
-  aipl_i64_len:
-    calls: 10
-    bytes: (external)
-  aipl_write_i64:
-    calls: 5
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 2296
+--- report ---
+allocations       7
+deallocations     7
+reallocations     0
+bytes allocated   150
+peak live bytes   115
+instructions      795
+binary size       4168 bytes (code 2500, data 65, metadata 1603)
+
+function                 calls  code bytes
+__to_str_i64                 5         204
+aipl_array_dec               2    external
+aipl_array_with_cap          1    external
+aipl_i64_len                10    external
+aipl_write_i64               5    external
+main                         1        2296

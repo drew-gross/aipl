@@ -6,32 +6,3 @@ fn pick(c: bool) -> i64 { if (c) { 1 } else { 2 } }.test({
     // pick(true)=1, pick(false)=2 → 1 + 2 = 3
     assert(pick(true) + pick(false) == 3);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 50
-binary size: 1352
-  code: 272
-  data: 181
-  metadata: 899
-functions:
-  __test$pick:
-    calls: 1
-    bytes: 172
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100

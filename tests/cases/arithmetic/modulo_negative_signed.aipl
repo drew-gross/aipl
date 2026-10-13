@@ -6,32 +6,3 @@ fn m(x: i64, y: i64) -> i64 { x % y }.test({
     assert(m(-7, 3) == -1);
     assert(m(-7, 3) + 1 == 0);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 39
-binary size: 1176
-  code: 220
-  data: 128
-  metadata: 828
-functions:
-  __test$m:
-    calls: 1
-    bytes: 124
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 96

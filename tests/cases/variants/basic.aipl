@@ -34,35 +34,3 @@ fn unit_square() -> Shape { Rect(1, 1) }.test({
     assert(o == some(Circle(2)));
     assert(o.is_some());
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 364
-binary size: 3168
-  code: 1152
-  data: 538
-  metadata: 1478
-functions:
-  __eq_Shape:
-    calls: 4
-    bytes: 176
-  __test$unit_square:
-    calls: 1
-    bytes: 864
-  aipl_assert:
-    calls: 10
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 112

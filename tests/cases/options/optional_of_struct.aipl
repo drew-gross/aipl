@@ -22,38 +22,3 @@ fn wrap(p: Point) -> Point? { some(p) }.test({
     let lbl = on.map(|n| n.label).value_or("?");
     assert(lbl == "z");
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 318
-binary size: 3256
-  code: 1392
-  data: 382
-  metadata: 1482
-functions:
-  __eq_Named:
-    calls: 1
-    bytes: 104
-  __eq_Point:
-    calls: 2
-    bytes: 104
-  __test$wrap:
-    calls: 1
-    bytes: 1084
-  aipl_assert:
-    calls: 5
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100

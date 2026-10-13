@@ -69,32 +69,3 @@ Vec2 { x: 1, y: 2 }
 Named { name: "home", at: Vec2 { x: 7, y: 0 } }
 built
 Vec2 { x: 4, y: 4 }
---- performance ---
-allocations: 5
-deallocations: 5
-reallocations: 0
-bytes allocated: 203
-instructions executed: 654
-binary size: 4280
-  code: 1796
-  data: 115
-  metadata: 2369
-functions:
-  __to_str_Named:
-    calls: 1
-    bytes: 792
-  __to_str_Vec2:
-    calls: 4
-    bytes: 464
-  aipl_i64_len:
-    calls: 20
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 31
-    bytes: (external)
-  aipl_write_i64:
-    calls: 10
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 540

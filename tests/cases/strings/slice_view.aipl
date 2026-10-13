@@ -27,32 +27,3 @@ ello, worl
 ello, worl!
 true
 lo
---- performance ---
-allocations: 3
-deallocations: 3
-reallocations: 0
-bytes allocated: 126
-instructions executed: 634
-binary size: 2608
-  code: 1100
-  data: 14
-  metadata: 1494
-functions:
-  __to_str_bool:
-    calls: 1
-    bytes: 224
-  __to_str_i64:
-    calls: 1
-    bytes: 204
-  aipl_i64_len:
-    calls: 2
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 1
-    bytes: (external)
-  aipl_write_i64:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 672

@@ -9,17 +9,3 @@ fn main() !prints {
 }
 --- stdout ---
 llo,
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 24
-binary size: 776
-  code: 164
-  data: 1
-  metadata: 611
-functions:
-  main:
-    calls: 1
-    bytes: 164

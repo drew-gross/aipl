@@ -25,38 +25,3 @@ fn snapshot() -> str {
 }.test({
     assert(snapshot() == "abc");
 })
---- performance ---
-allocations: 6
-deallocations: 6
-reallocations: 0
-bytes allocated: 120
-instructions executed: 456
-binary size: 5016
-  code: 2652
-  data: 159
-  metadata: 2205
-functions:
-  __test$grown:
-    calls: 1
-    bytes: 1252
-  __test$snapshot:
-    calls: 1
-    bytes: 1228
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 2
-    bytes: (external)
-  aipl_test_end:
-    calls: 2
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 12
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 172

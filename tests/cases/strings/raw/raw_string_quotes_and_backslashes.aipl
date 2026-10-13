@@ -19,17 +19,3 @@ fn main() !prints -> i64 {
 path C:\dir\new "quoted" and ""doubled"" end
 line "with" quotes
 and a \backslash
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 22
-binary size: 880
-  code: 120
-  data: 116
-  metadata: 644
-functions:
-  main:
-    calls: 1
-    bytes: 120

@@ -1,4 +1,4 @@
-import { equal as ==, extend, len, trim } from builtins;
+import { equal as ==, extend, len, measure, trim } from builtins;
 
 fn trimmed() -> u64 {
     mut u = "  z  ";
@@ -22,33 +22,30 @@ fn trimmed() -> u64 {
 
     assert(build() == "padded");
     assert(trimmed() == 1);
+}).performance({
+    assert(measure("trim an inline string", 0, |_| trimmed()).allocations == 0);
+
+    // A string long enough to need a buffer pays for that buffer, and trimming it
+    // adds nothing to it: the result is a window into the same bytes.
+    let with_trim = measure(
+        "long string, trimmed",
+        0,
+        |_| {
+            mut s = "";
+            set s.extend("   a string of padding, long enough to leave the inline form   ");
+            set s = trim(s);
+            s.len()
+        },
+    );
+    let untrimmed = measure(
+        "long string, not trimmed",
+        0,
+        |_| {
+            mut s = "";
+            set s.extend("   a string of padding, long enough to leave the inline form   ");
+            s.len()
+        },
+    );
+    assert(with_trim.allocations == untrimmed.allocations);
+    assert(with_trim.bytes_allocated == untrimmed.bytes_allocated);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 159
-binary size: 2144
-  code: 896
-  data: 117
-  metadata: 1131
-functions:
-  __test$trimmed:
-    calls: 1
-    bytes: 788
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

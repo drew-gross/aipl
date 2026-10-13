@@ -1,8 +1,9 @@
 # An array slice is a window onto its source, the way a `str`'s slice is a
 # window onto its bytes: `xs[a..b]` is the source's block with the window's
 # bounds carried in the value, never a copy of the elements. So its cost does not
-# grow with the window — the `bytes allocated` below would be thousands if any
-# of these copied — and slicing a slice is a window of the same block rather
+# grow with the window — the `.performance` block on `numbers` measures no
+# allocation for any of these, where a copy of a thousand elements would be
+# thousands of bytes — and slicing a slice is a window of the same block rather
 # than a view stacked on a view. A reversal is a value of the same kind — the
 # run walked from its far end — so slicing a reversed array, or reversing a
 # slice, shares the block too.
@@ -11,7 +12,17 @@
 # into the source, so the first mutation (`push`, `extend`, an in-place `map`)
 # materializes the window into a block of its own. The source never changes.
 
-import { equal as ==, len, print, push, reverse, to_str, value_or } from builtins;
+import {
+    Measurement,
+    equal as ==,
+    len,
+    measure,
+    print,
+    push,
+    reverse,
+    to_str,
+    value_or,
+} from builtins;
 
 fn numbers(n: u64) -> u64[] {
     mut out: u64[] = [];
@@ -19,7 +30,29 @@ fn numbers(n: u64) -> u64[] {
         set out.push(i);
     }
     out
-}
+}.performance({
+    let big = numbers(1000);
+    assert(measure("head of 1000", big, |b| b[..500]).allocations == 0);
+    assert(measure("tail of 1000", big, |b| b[500..]).allocations == 0);
+    assert(measure("slice of a slice", big, |b| b[100..900][300..500]).allocations == 0);
+    assert(measure("slice of a reversed array", big, |b| b.reverse()[..3]).allocations == 0);
+    assert(measure("reversed slice", big, |b| b[..3].reverse()).allocations == 0);
+    assert(measure("empty window", big, |b| b[7..7]).allocations == 0);
+
+    // Writing into a window materializes it first, into a block of its own: the
+    // only allocations are the copy of three elements and the push that grows it.
+    let Measurement { allocations, bytes_allocated } = measure(
+        "push onto a slice",
+        big,
+        |b| {
+            mut grown = b[..3];
+            set grown.push(99);
+            grown.len()
+        },
+    );
+    assert(allocations == 2);
+    assert(bytes_allocated == 88);
+})
 
 fn main() !prints {
     let big = numbers(1000);
@@ -46,8 +79,8 @@ fn main() !prints {
     print(big.reverse()[..3].to_str());
     print(big[..3].reverse().to_str());
 
-    // Heap elements are shared, not copied, and released exactly once: the
-    // balanced allocation counts below are the proof.
+    // Heap elements are shared, not copied, and released exactly once: the leak
+    // gate (every run must free what it allocates) is the proof.
     let words = ["alpha", "beta", "gamma", "delta"];
     let some_words = words[1..3];
     print(some_words.to_str());
@@ -61,53 +94,3 @@ true
 [999, 998, 997]
 [2, 1, 0]
 ["beta", "gamma"]
---- performance ---
-allocations: 30
-deallocations: 30
-reallocations: 8
-bytes allocated: 1652
-instructions executed: 48838
-binary size: 10600
-  code: 6708
-  data: 66
-  metadata: 3826
-functions:
-  __eq_u64$arr:
-    calls: 1
-    bytes: 264
-  __to_str_bool:
-    calls: 1
-    bytes: 224
-  __to_str_str$arr:
-    calls: 1
-    bytes: 780
-  __to_str_u64:
-    calls: 8
-    bytes: 204
-  __to_str_u64$arr:
-    calls: 4
-    bytes: 704
-  aipl_arr_inc:
-    calls: 15
-    bytes: (external)
-  aipl_array_dec:
-    calls: 18
-    bytes: (external)
-  aipl_array_new:
-    calls: 2
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 1
-    bytes: (external)
-  aipl_u64_len:
-    calls: 44
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 24
-    bytes: (external)
-  aipl_write_u64:
-    calls: 22
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 4532

@@ -15,23 +15,3 @@ import { less_than as <, logical_not as ! } from builtins;
 pub fn my_custom_lt(a: u64, b: u64) -> bool { !(a < b) }
 --- stdout ---
 false
---- performance ---
-allocations: 1
-deallocations: 1
-reallocations: 0
-bytes allocated: 21
-instructions executed: 41
-binary size: 1240
-  code: 332
-  data: 14
-  metadata: 894
-functions:
-  __to_str_bool:
-    calls: 1
-    bytes: 224
-  aipl_write_bytes:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

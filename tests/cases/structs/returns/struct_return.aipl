@@ -10,35 +10,3 @@ fn make(a: i64, b: i64) -> Point { x: a, y: b }.test({
     assert(p == Point { x: 10, y: 32 });
     assert(p.x + p.y == 42);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 82
-binary size: 1384
-  code: 388
-  data: 126
-  metadata: 870
-functions:
-  __eq_Point:
-    calls: 1
-    bytes: 104
-  __test$make:
-    calls: 1
-    bytes: 184
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100

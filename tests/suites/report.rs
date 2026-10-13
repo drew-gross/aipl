@@ -5,12 +5,12 @@
 //! `--- report ---` sections of `tests/cases/report/`.)
 //!
 //! The central claim is that `report` and the cases harness are one
-//! implementation (`aipl::perf`): so for any corpus case, the counts `report`
-//! prints are exactly the ones the case's `--- performance ---` section records.
-//! That is checked here on cases chosen for the ways a run can differ — a
-//! `--- cli ---` section, a library with only `.test` blocks, a program that
-//! writes a file, companions staged beside the source. The rest pins `report`'s
-//! own behaviour: its arguments, its two output forms, and what it refuses.
+//! implementation (`aipl::perf`): so for a case that pins a `--- report ---`, what
+//! `aipl report` prints is that section, exactly. That is checked here on the cases
+//! in `tests/cases/report/`, chosen for the ways a run can differ — a `--- cli ---`
+//! section, a library with only `.test` blocks, a program that writes a file,
+//! companions staged beside the source. The rest pins `report`'s own behaviour: its
+//! arguments, its two output forms, and what it refuses.
 //!
 //! The binary sizes written out below are this platform's, as the corpus's own
 //! `--- performance ---` sections are, and move with codegen the same way.
@@ -63,44 +63,47 @@ fn report_source(name: &str, src: &str, args: &[&str]) -> (String, String, i32) 
     report_in(&dir.to_string_lossy(), &all)
 }
 
-/// The stats a corpus case records in its `--- performance ---` section.
-fn recorded(case: &str) -> PerfStats {
+/// A corpus case's `--- report ---` section body.
+fn pinned_report(case: &str) -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(case);
     let src = fs::read_to_string(&path).expect("read case");
     let spec = aipl::parse_spec(&src).expect("parse case sections");
-    let body = spec.performance.expect("case has a performance section");
-    PerfStats::parse(&body).expect("parse the recorded stats")
+    spec.report.expect("case pins a report")
 }
 
+/// `aipl report` on the case prints exactly what the case pins. (A section body has
+/// its trailing newlines stripped, and a report ends in one.)
 fn assert_report_matches_the_case(case: &str) {
-    let (stdout, stderr, code) = report(&["--machine", case]);
-    assert_eq!(code, 0, "{case}:\n{stdout}{stderr}");
-    let reported =
-        PerfStats::parse(&stdout).unwrap_or_else(|| panic!("{case}: unparsable:\n{stdout}"));
-    // The recorded section is the `--- performance ---` form, which has no peak.
-    assert_eq!(reported.render(), recorded(case).render(), "{case}");
+    let (stdout, stderr, code) = report(&[case]);
+    assert_eq!((stderr.as_str(), code), ("", 0), "{case}");
+    assert_eq!(stdout.trim_end(), pinned_report(case), "{case}");
 }
 
 // ---- parity with the harness --------------------------------------------------
 
 #[test]
-fn report_agrees_with_the_recorded_section_of_a_program_given_cli_arguments() {
-    assert_report_matches_the_case("tests/cases/cli/args.aipl");
+fn report_agrees_with_the_pinned_report_of_the_smallest_program() {
+    assert_report_matches_the_case("tests/cases/report/smallest_program.aipl");
 }
 
 #[test]
-fn report_agrees_with_the_recorded_section_of_a_library_run_by_its_tests() {
-    assert_report_matches_the_case("tests/cases/lambdas/fold.aipl");
+fn report_agrees_with_the_pinned_report_of_a_program_given_cli_arguments() {
+    assert_report_matches_the_case("tests/cases/report/runtime_calls.aipl");
 }
 
 #[test]
-fn report_agrees_with_the_recorded_section_of_a_program_that_writes_a_file() {
-    assert_report_matches_the_case("tests/cases/files/write_file.aipl");
+fn report_agrees_with_the_pinned_report_of_a_library_run_by_its_tests() {
+    assert_report_matches_the_case("tests/cases/report/test_driver_run.aipl");
 }
 
 #[test]
-fn report_agrees_with_the_recorded_section_of_a_case_with_companions() {
-    assert_report_matches_the_case("tests/cases/lambdas/operator_as_value_custom.aipl");
+fn report_agrees_with_the_pinned_report_of_a_program_that_writes_a_file() {
+    assert_report_matches_the_case("tests/cases/report/writes_a_file.aipl");
+}
+
+#[test]
+fn report_agrees_with_the_pinned_report_of_a_case_with_companions() {
+    assert_report_matches_the_case("tests/cases/report/with_companion.aipl");
 }
 
 #[test]
@@ -308,7 +311,12 @@ main                    1         132
 
 #[test]
 fn only_a_disagreement_between_the_counts_is_a_leak() {
-    let balanced = recorded("tests/cases/cli/args.aipl");
+    let balanced = PerfStats::parse(
+        "allocations: 2\ndeallocations: 2\nreallocations: 0\nbytes allocated: 49\n\
+         instructions executed: 38\nbinary size: 1240\n  code: 336\n  data: 1\n  \
+         metadata: 903\nfunctions:\n  main:\n    calls: 1\n    bytes: 132",
+    )
+    .expect("parses");
     assert_eq!(balanced.leaked(), None);
     let mut leaky = balanced.clone();
     leaky.deallocations -= 1;

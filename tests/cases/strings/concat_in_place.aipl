@@ -1,11 +1,11 @@
 # Building a string by repeated `set s.extend(..)` on a never-aliased binding:
 # each append writes into `s`'s own storage. The result is four bytes, so it
-# never leaves the inline form and the whole function allocates *nothing* —
-# see `concat_in_place_grows.aipl` for the same loop past the 22-byte inline
-# capacity, where the buffer is grown under itself instead. Without the
-# optimization each of the four appends builds a fresh string.
+# never leaves the inline form and the whole function allocates *nothing* (the
+# `.performance` block on `build`) — see `concat_in_place_grows.aipl` for the same
+# loop past the 22-byte inline capacity, where the buffer is grown under itself
+# instead. Without the optimization each of the four appends builds a fresh string.
 
-import { concat as +++, equal as ==, extend } from builtins;
+import { concat as +++, equal as ==, extend, measure } from builtins;
 
 fn build() -> str {
     mut s = "";
@@ -16,6 +16,8 @@ fn build() -> str {
     s
 }.test({
     assert(build() == "abcd");
+}).performance({
+    assert(measure("four appends", 0, |_| build()).allocations == 0);
 })
 
 // The rebuild spelling, `set s = s +++ ..`, reaches the same in-place append
@@ -30,36 +32,6 @@ fn rebuilt() -> str {
     s
 }.test({
     assert(rebuilt() == "ab");
+}).performance({
+    assert(measure("rebuild spelling", 0, |_| rebuilt()).allocations == 0);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 278
-binary size: 3240
-  code: 1900
-  data: 122
-  metadata: 1218
-functions:
-  __test$build:
-    calls: 1
-    bytes: 1084
-  __test$rebuilt:
-    calls: 1
-    bytes: 644
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 2
-    bytes: (external)
-  aipl_test_end:
-    calls: 2
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 172

@@ -43,35 +43,3 @@ pub fn common_space_prefix(a: str, b: str) -> i64 {
     // General (non-whitespace) sanity: the prefix ends at the first differing byte.
     assert(common_space_prefix("abc", "abd") == 0);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 1484
-binary size: 4896
-  code: 1952
-  data: 1099
-  metadata: 1845
-functions:
-  __test$common_space_prefix:
-    calls: 1
-    bytes: 1580
-  aipl_assert:
-    calls: 13
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  common_space_prefix:
-    calls: 13
-    bytes: 244
-  main:
-    calls: 1
-    bytes: 128

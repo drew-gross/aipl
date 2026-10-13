@@ -8,15 +8,18 @@
 # `is_big` are.
 #
 # Measured on this case with the fusion switched off: 31,909 instructions
-# become 22,716 and 3,638 bytes allocated become 1,998. The `functions:` list
+# become 22,716 and 3,638 bytes allocated become 1,998. The `--- report ---`
 # is the readable evidence: three chains, but one `aipl_array_with_cap` — the
 # unfused chain's array in `first_big_twice` — and no `__map*` beside the two
-# `__builtin_map_find_if*` specializations.
+# `__builtin_map_find_if*` specializations. The `.performance` block on `first_big`
+# holds the cost.
 
 import {
+    equal as ==,
     find_if,
     less_than as <,
     map,
+    measure,
     print,
     push,
     wrapping_increment as ++,
@@ -38,7 +41,25 @@ fn stepped(x: i64) -> i64 { x * 10 }
 fn is_big(y: i64) -> bool { 5 < y }
 
 // Fused: `stepped` runs on the first two elements only.
-fn first_big(xs: i64[]) -> i64? { xs.map(stepped).find_if(is_big) }
+fn first_big(xs: i64[]) -> i64? { xs.map(stepped).find_if(is_big) }.performance({
+    let xs = many();
+    let short = [0, 1, 2, 3];
+
+    // Mapping stops at the first match: no mapped array, and the same few
+    // instructions whether the array holds four elements or two hundred.
+    let on_four = measure("four elements", short, first_big);
+    let on_two_hundred = measure("two hundred elements", xs, first_big);
+    assert(on_four.allocations == 0);
+    assert(on_two_hundred.allocations == 0);
+    assert(on_four.instructions == on_two_hundred.instructions);
+    assert(on_two_hundred.instructions == 81);
+
+    // The unfused counterpart maps every element into an array it then reads
+    // twice, and costs two orders of magnitude more.
+    let unfused = measure("every element mapped", xs, first_big_twice);
+    assert(unfused.bytes_allocated == 1850);
+    assert(unfused.instructions == 9370);
+})
 
 // Not fused: the array is bound in between, and read twice below, so it has
 // to exist. Every element is mapped.
@@ -57,50 +78,25 @@ fn main() !prints {
 some(10)
 some(10) some(2000)
 none
---- performance ---
-allocations: 8
-deallocations: 8
-reallocations: 7
-bytes allocated: 1926
-instructions executed: 15154
-binary size: 5040
-  code: 2832
-  data: 66
-  metadata: 2142
-functions:
-  __builtin_find_if$i64$lam$is_big:
-    calls: 1
-    bytes: 224
-  __builtin_find_if$i64$lam$main$lambda1:
-    calls: 1
-    bytes: 224
-  __builtin_map_find_if$i64$i64$lam$stepped$is_big:
-    calls: 1
-    bytes: 232
-  __builtin_map_find_if$i64$i64$lam$stepped$main$lambda2:
-    calls: 1
-    bytes: 232
-  __to_str_i64$opt:
-    calls: 4
-    bytes: 376
-  aipl_arr_inc:
-    calls: 1
-    bytes: (external)
-  aipl_array_dec:
-    calls: 2
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 1
-    bytes: (external)
-  aipl_i64_len:
-    calls: 6
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 7
-    bytes: (external)
-  aipl_write_i64:
-    calls: 3
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 1544
+--- report ---
+allocations       8
+deallocations     8
+reallocations     7
+bytes allocated   1926
+peak live bytes   3958
+instructions      15154
+binary size       5040 bytes (code 2832, data 66, metadata 2142)
+
+function                                                    calls  code bytes
+__builtin_find_if$i64$lam$is_big                                1         224
+__builtin_find_if$i64$lam$main$lambda1                          1         224
+__builtin_map_find_if$i64$i64$lam$stepped$is_big                1         232
+__builtin_map_find_if$i64$i64$lam$stepped$main$lambda2          1         232
+__to_str_i64$opt                                                4         376
+aipl_arr_inc                                                    1    external
+aipl_array_dec                                                  2    external
+aipl_array_with_cap                                             1    external
+aipl_i64_len                                                    6    external
+aipl_write_bytes                                                7    external
+aipl_write_i64                                                  3    external
+main                                                            1        1544

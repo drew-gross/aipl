@@ -20,38 +20,3 @@ fn eq_point(a: Point, b: Point) -> bool { a == b }.test({
     assert(p == q);
     assert(!(p == r));
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 290
-binary size: 2360
-  code: 1092
-  data: 90
-  metadata: 1178
-functions:
-  __eq_Named:
-    calls: 2
-    bytes: 104
-  __eq_Point:
-    calls: 3
-    bytes: 104
-  __test$eq_point:
-    calls: 1
-    bytes: 776
-  aipl_assert:
-    calls: 5
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

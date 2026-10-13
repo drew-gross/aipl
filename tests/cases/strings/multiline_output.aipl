@@ -11,29 +11,3 @@ fn second() -> str { "second" }.test({
 fn third() -> str { "third" }.test({
     assert(third() == "third");
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 113
-binary size: 1792
-  code: 604
-  data: 188
-  metadata: 1000
-functions:
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 3
-    bytes: (external)
-  aipl_test_end:
-    calls: 3
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 604

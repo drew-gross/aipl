@@ -98,29 +98,3 @@ about to fail
 -1
 4
 3
---- performance ---
-allocations: 5
-deallocations: 5
-reallocations: 0
-bytes allocated: 87
-instructions executed: 283
-binary size: 2776
-  code: 1444
-  data: 1
-  metadata: 1331
-functions:
-  __to_str_i64:
-    calls: 5
-    bytes: 204
-  aipl_i64_len:
-    calls: 10
-    bytes: (external)
-  aipl_write_i64:
-    calls: 5
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 692
-  need_loud_return:
-    calls: 1
-    bytes: 548

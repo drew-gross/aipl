@@ -1,9 +1,10 @@
-# Allocation accounting doubles as a leak/double-free check: a refcount-correct
-# program frees everything it allocates, so allocations == deallocations. The
-# counts are pinned, so a regression in the refcount protocol (an extra alloc,
-# a missing free, a double-free) shows up here as a mismatch.
+# A refcount-correct program frees everything it allocates, which the leak gate
+# holds every running case to (allocations == deallocations). The `.performance`
+# block pins the other half: how many allocations the program makes at all, so a
+# regression in the refcount protocol that adds one (an extra copy, a retained
+# temporary) shows up as a changed count.
 
-import { print, push, to_str } from builtins;
+import { Measurement, equal as ==, len, measure, print, push, to_str } from builtins;
 
 fn main() !prints {
     mut xs = [];
@@ -11,41 +12,24 @@ fn main() !prints {
     set xs.push(2);
     set xs.push(3);
     print(to_str(xs));
-}
+}.performance({
+    // Three pushes onto an empty array are one allocation that grows in place...
+    let Measurement { allocations, bytes_allocated, peak_live_bytes } = measure(
+        "three pushes",
+        0,
+        |_| {
+            mut xs = [];
+            set xs.push(1);
+            set xs.push(2);
+            set xs.push(3);
+            xs.len()
+        },
+    );
+    assert(allocations == 1);
+    assert(bytes_allocated == 64);
+    assert(peak_live_bytes == 64);
+    // ...and rendering them is one more buffer.
+    assert(measure("rendered", 0, |_| to_str([1, 2, 3])).allocations == 1);
+})
 --- stdout ---
 [1, 2, 3]
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 89
-instructions executed: 405
-binary size: 2456
-  code: 1120
-  data: 26
-  metadata: 1310
-functions:
-  __to_str_i64$arr:
-    calls: 1
-    bytes: 704
-  aipl_arr_inc:
-    calls: 1
-    bytes: (external)
-  aipl_array_dec:
-    calls: 2
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 1
-    bytes: (external)
-  aipl_i64_len:
-    calls: 6
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 4
-    bytes: (external)
-  aipl_write_i64:
-    calls: 3
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 416

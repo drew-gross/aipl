@@ -7,32 +7,3 @@ import { equal as == } from builtins;
 fn g(v: any[]) -> i64 { 0 }.test({
     assert(g([]) == 0);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 43
-binary size: 1096
-  code: 220
-  data: 58
-  metadata: 818
-functions:
-  __test$g:
-    calls: 1
-    bytes: 124
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 96

@@ -47,32 +47,3 @@ fn arithmetic() -> i64 {
     assert(equal(concat("a", "b"), "ab"));
     assert(equal("x".concat("y"), "xy"));
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 155
-binary size: 3016
-  code: 744
-  data: 795
-  metadata: 1477
-functions:
-  __test$arithmetic:
-    calls: 1
-    bytes: 636
-  aipl_assert:
-    calls: 10
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

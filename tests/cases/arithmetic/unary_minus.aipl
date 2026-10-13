@@ -6,32 +6,3 @@ fn neg(x: i64) -> i64 { -x }.test({
     // neg(5) - (-5) + neg(-7) - 7 == 0
     assert(neg(5) + 5 + neg(-7) - 7 == 0);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 50
-binary size: 1336
-  code: 272
-  data: 161
-  metadata: 903
-functions:
-  __test$neg:
-    calls: 1
-    bytes: 172
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100

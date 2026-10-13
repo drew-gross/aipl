@@ -12,16 +12,18 @@
 # abort, and arithmetic pins nothing.
 #
 # `q` is read by one arm only, so the shape is the one the pass looks for. The
-# `instructions executed:` counter below is the assertion: the three remainders
-# sink into the arm that never runs, so they do not execute at all. Before, they
-# ran on the discarded path and showed up in the count.
+# instruction counts (the `.performance` block on `pick`) are the assertion: the
+# three remainders sink into the arm, so a call that does not take it executes
+# none of them. Before, they ran on the discarded path and showed up in the count.
 #
 # The divisor comes from `len` and the flag from `is_nonempty` so constant
 # folding can't collapse either away before the pass sees them.
 
 import {
+    equal as ==,
     is_nonempty,
     len,
+    measure,
     print,
     saturating_remainder as %,
     to_str,
@@ -35,33 +37,15 @@ fn scaled(n: u64, d: u64) -> u64 { ratio(n, d) + ratio(n + 1, d) + ratio(n + 2, 
 fn pick(flag: bool, d: u64) -> u64 {
     let q = scaled(10, d);
     if (flag) { q } else { 0 }
-}
+}.performance({
+    // Not taking the arm costs the branch and nothing else...
+    assert(measure("arm not taken", false, |f| pick(f, 2)).instructions == 11);
+    // ...where taking it pays for the three remainders.
+    assert(measure("arm taken", true, |f| pick(f, 2)).instructions == 35);
+})
 
 fn main() !prints {
     print(pick("".is_nonempty(), "ab".len()).to_str());
 }
 --- stdout ---
 0
---- performance ---
-allocations: 1
-deallocations: 1
-reallocations: 0
-bytes allocated: 17
-instructions executed: 53
-binary size: 1400
-  code: 544
-  data: 1
-  metadata: 855
-functions:
-  __to_str_u64:
-    calls: 1
-    bytes: 204
-  aipl_u64_len:
-    calls: 2
-    bytes: (external)
-  aipl_write_u64:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 340

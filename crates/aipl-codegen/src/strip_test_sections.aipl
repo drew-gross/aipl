@@ -43,38 +43,3 @@ pub fn strip_test_sections(src: str) -> str {
     // An indented marker line doesn't cut — a header must start at column 0.
     assert(strip_test_sections("code\n  --- stdout ---\nfoo") == "code\n  --- stdout ---\nfoo");
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 9135
-binary size: 6968
-  code: 3176
-  data: 1048
-  metadata: 2744
-functions:
-  __m1__parse_test_section_header:
-    calls: 17
-    bytes: 744
-  __test$strip_test_sections:
-    calls: 1
-    bytes: 1516
-  aipl_assert:
-    calls: 9
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 128
-  strip_test_sections:
-    calls: 9
-    bytes: 788

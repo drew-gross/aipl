@@ -3,32 +3,3 @@ import { equal as == } from builtins;
 fn eq_in_if() -> i64 { if (true == true) { 1 } else { 0 } }.test({
     assert(eq_in_if() == 1);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 28
-binary size: 1008
-  code: 184
-  data: 59
-  metadata: 765
-functions:
-  __test$eq_in_if:
-    calls: 1
-    bytes: 76
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

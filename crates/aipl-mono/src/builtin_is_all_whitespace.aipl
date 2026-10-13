@@ -49,35 +49,3 @@ pub fn is_all_whitespace(self: str) -> bool { self.all(is_whitespace) }.test({
     // Vertical tab and form feed are accepted too, but cannot be written here:
     // AIPL has no numeric escape, which is why `is_whitespace` is an intrinsic.
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 2047
-binary size: 4448
-  code: 1500
-  data: 1036
-  metadata: 1912
-functions:
-  __builtin_all$char$s0$lam$__builtin_is_whitespace:
-    calls: 13
-    bytes: 304
-  __test$is_all_whitespace:
-    calls: 1
-    bytes: 1072
-  aipl_assert:
-    calls: 13
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 124

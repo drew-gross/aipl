@@ -17,35 +17,3 @@ fn build(src: str) -> char[] {
     // 27 chars: past the inline capacity, so the block is grown under itself.
     assert(build("bcdefghijklmnopqrstuvwxyz").len() == 26);
 })
---- performance ---
-allocations: 1
-deallocations: 1
-reallocations: 0
-bytes allocated: 60
-instructions executed: 1719
-binary size: 2624
-  code: 964
-  data: 282
-  metadata: 1378
-functions:
-  __test$build:
-    calls: 1
-    bytes: 480
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  build:
-    calls: 3
-    bytes: 380
-  main:
-    calls: 1
-    bytes: 104

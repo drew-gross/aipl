@@ -30,35 +30,3 @@ fn appended(xs: char[], x: char) -> char[] {
     assert(appended(snap, 'z') == ['a', 'b', 'z']);
     assert(snap == ['a', 'b']);
 })
---- performance ---
-allocations: 3
-deallocations: 3
-reallocations: 0
-bytes allocated: 56
-instructions executed: 291
-binary size: 3616
-  code: 1516
-  data: 285
-  metadata: 1815
-functions:
-  __test$appended:
-    calls: 1
-    bytes: 1408
-  aipl_assert:
-    calls: 5
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 3
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

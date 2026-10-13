@@ -17,26 +17,3 @@ pub fn unwrap_or(o: Opt<i64>, d: i64) -> i64 { match (o) { Some(v) => v, Nothing
 --- stdout ---
 7
 9
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 34
-instructions executed: 55
-binary size: 1248
-  code: 352
-  data: 1
-  metadata: 895
-functions:
-  __to_str_i64:
-    calls: 2
-    bytes: 204
-  aipl_i64_len:
-    calls: 4
-    bytes: (external)
-  aipl_write_i64:
-    calls: 2
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 148

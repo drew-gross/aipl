@@ -40,38 +40,3 @@ some(some(none))
 some(some(some(7)))
 some(some(none))
 some(some(9))
---- performance ---
-allocations: 6
-deallocations: 6
-reallocations: 0
-bytes allocated: 192
-instructions executed: 660
-binary size: 4552
-  code: 2200
-  data: 114
-  metadata: 2238
-functions:
-  __to_str_i64$opt$opt:
-    calls: 1
-    bytes: 524
-  __to_str_i64$opt$opt$opt:
-    calls: 4
-    bytes: 672
-  aipl_array_dec:
-    calls: 1
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
-  aipl_i64_len:
-    calls: 4
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 25
-    bytes: (external)
-  aipl_write_i64:
-    calls: 2
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 1004

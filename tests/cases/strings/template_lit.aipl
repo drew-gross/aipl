@@ -15,26 +15,3 @@ value is 42
 world and 42
 no interpolation
 prefix world middle 42 suffix
---- performance ---
-allocations: 11
-deallocations: 11
-reallocations: 0
-bytes allocated: 758
-instructions executed: 205
-binary size: 2784
-  code: 1400
-  data: 1
-  metadata: 1383
-functions:
-  __to_str_i64:
-    calls: 3
-    bytes: 204
-  aipl_i64_len:
-    calls: 6
-    bytes: (external)
-  aipl_write_i64:
-    calls: 3
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 1196

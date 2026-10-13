@@ -5,32 +5,3 @@ fn flag(b: bool?) -> i64 { b.map(|v| if (v) { 1 } else { 0 }).value_or(0) }.test
     assert(flag(some(false)) == 0);
     assert(flag(none) == 0);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 67
-binary size: 1424
-  code: 340
-  data: 181
-  metadata: 903
-functions:
-  __test$flag:
-    calls: 1
-    bytes: 240
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100

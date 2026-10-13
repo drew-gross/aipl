@@ -1,0 +1,29 @@
+# A report of a program that imports a companion file. The `--- file: ---` section
+# is staged beside the source (the file is loaded from there, rooted at its own
+# directory), so the import resolves exactly as it does under `check`; the
+# report is of the importing program, with the companion's function in it.
+
+import { print, to_str } from builtins;
+import { answer } from "./helper.aipl";
+
+fn main() !prints {
+    print(to_str(answer()));
+}
+--- file: helper.aipl ---
+pub fn answer() -> i64 { 42 }
+--- stdout ---
+42
+--- report ---
+allocations       1
+deallocations     1
+reallocations     0
+bytes allocated   18
+peak live bytes   18
+instructions      29
+binary size       1152 bytes (code 296, data 1, metadata 855)
+
+function            calls  code bytes
+__to_str_i64            1         204
+aipl_i64_len            2    external
+aipl_write_i64          1    external
+main                    1          92

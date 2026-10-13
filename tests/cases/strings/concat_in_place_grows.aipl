@@ -2,12 +2,13 @@
 # the 22-byte inline form. The binding is never aliased, so each append writes
 # into the value's own storage — filling spare capacity where there is some and
 # growing the block under itself where there isn't. Capacity doubles, so N
-# appends cost O(log N) reallocations rather than N fresh strings.
+# appends cost O(log N) reallocations rather than N fresh strings — which the
+# `.performance` block on `build` shows as one allocation however far it grows.
 #
 # `binding_is_exclusive` is what licenses it: `s` is read only by the appends
 # themselves and the tail move, so nothing else can be holding those bytes.
 
-import { equal as ==, extend, len } from builtins;
+import { Measurement, equal as ==, extend, len, measure } from builtins;
 
 fn build(parts: str) -> str {
     mut s = "";
@@ -20,36 +21,21 @@ fn build(parts: str) -> str {
     assert(build("12345").len() == 25); // 25: crossed into a buffer
     assert(build("1234567890").len() == 50); // and grown again
     assert(build("") == "");
+}).performance({
+    // Inline up to 22 bytes: nothing allocated.
+    assert(measure("20 bytes", "1234", build).allocations == 0);
+    // The first append past it takes a buffer...
+    let Measurement { allocations, bytes_allocated, peak_live_bytes } = measure(
+        "25 bytes",
+        "12345",
+        build,
+    );
+    assert(allocations == 1);
+    assert(bytes_allocated == 56);
+    assert(peak_live_bytes == 56);
+
+    // ...and twice as many appends grow that same buffer rather than allocating
+    // another.
+    assert(measure("50 bytes", "1234567890", build).allocations == 1);
+    assert(measure("50 bytes peak", "1234567890", build).peak_live_bytes == 96);
 })
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 1
-bytes allocated: 112
-instructions executed: 1827
-binary size: 3072
-  code: 1356
-  data: 302
-  metadata: 1414
-functions:
-  __test$build:
-    calls: 1
-    bytes: 668
-  aipl_assert:
-    calls: 4
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  build:
-    calls: 4
-    bytes: 584
-  main:
-    calls: 1
-    bytes: 104

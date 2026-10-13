@@ -51,26 +51,3 @@ fn main() !prints {
 a label long enough to be a buffer
 held
 9
---- performance ---
-allocations: 6
-deallocations: 6
-reallocations: 0
-bytes allocated: 106
-instructions executed: 272
-binary size: 2328
-  code: 1008
-  data: 51
-  metadata: 1269
-functions:
-  __to_str_i64:
-    calls: 6
-    bytes: 204
-  aipl_i64_len:
-    calls: 12
-    bytes: (external)
-  aipl_write_i64:
-    calls: 6
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 804

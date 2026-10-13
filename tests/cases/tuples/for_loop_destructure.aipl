@@ -14,38 +14,3 @@ one
 two
 3
 three
---- performance ---
-allocations: 4
-deallocations: 4
-reallocations: 0
-bytes allocated: 179
-instructions executed: 280
-binary size: 2360
-  code: 1116
-  data: 1
-  metadata: 1243
-functions:
-  __arr_drop___tuple$i64$str:
-    calls: 1
-    bytes: 120
-  __arr_retain___tuple$i64$str:
-    calls: 0
-    bytes: 120
-  __to_str_i64:
-    calls: 3
-    bytes: 204
-  aipl_array_dec:
-    calls: 1
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
-  aipl_i64_len:
-    calls: 6
-    bytes: (external)
-  aipl_write_i64:
-    calls: 3
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 672

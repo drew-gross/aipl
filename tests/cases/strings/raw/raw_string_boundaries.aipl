@@ -16,17 +16,3 @@ fn main() !prints -> i64 {
 []
 []
 [kept  ]
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 29
-binary size: 712
-  code: 164
-  data: 1
-  metadata: 547
-functions:
-  main:
-    calls: 1
-    bytes: 164

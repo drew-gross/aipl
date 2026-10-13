@@ -21,22 +21,27 @@
 #     place on a 16-byte element, so unfused there are two output arrays; fused
 #     there is one, reserved to the source length up front.
 #
-# The `functions:` list below is the readable evidence: two `__filter_map*`
-# specializations and no `__filter*`/`__map*` pair beside them. Unfused it
+# The `--- report ---` below is the readable evidence of *calls*: two
+# `__filter_map*` specializations and no `__filter*`/`__map*` pair beside them. Unfused it
 # reads `__filter7`, `__map4`, `__map4$tail`, `__map9` — and one
 # `__filter_map13`, which is `spelled_out` below, the call the other two fuse
-# into.
+# into. The `.performance` block on `many` holds the numbers: what the chains cost
+# in allocations and instructions.
 
 import {
+    Measurement,
+    equal as ==,
     filter,
     filter_map,
     len,
     less_than as <,
     less_than_or_equal as <=,
     map,
+    measure,
     print,
     push,
     to_str,
+    wrapping_add as +,
     wrapping_increment as ++,
     wrapping_mul as *,
 } from builtins;
@@ -49,7 +54,34 @@ fn many() -> i64[] {
         set xs.push(n);
     }
     xs
-}
+}.performance({
+    let source = measure("source alone", 0, |_| many());
+
+    // A uniquely-owned source is compacted into its own buffer: the fused chain
+    // allocates nothing of its own, and is the hand-written `filter_map` call down
+    // to the instruction.
+    let owned_chain = measure("owned", 150, owned);
+    let by_hand = measure("by hand", 150, spelled_out);
+    assert(owned_chain.allocations == source.allocations);
+    assert(owned_chain.bytes_allocated == source.bytes_allocated);
+    assert(owned_chain.instructions == by_hand.instructions);
+
+    // A borrowed source gets one output, reserved once.
+    let xs = many();
+    let Measurement { allocations, bytes_allocated } = measure(
+        "borrowed",
+        xs,
+        |v| borrowed(v, 150),
+    );
+    assert(allocations == 1);
+    assert(bytes_allocated == 1624);
+
+    // A composite element cannot be compacted in place, so the fusion is where an
+    // allocation is saved: one output array beside the source, not two.
+    let points_source = measure("points source alone", 0, |_| pts());
+    let kept = measure("points", 1, points);
+    assert(kept.allocations == points_source.allocations + 1);
+})
 
 // A borrowed source: the fused loop reserves one output and fills it. Unfused,
 // `filter` reserves that same output and `map` then walks it a second time.
@@ -105,59 +137,28 @@ some(398)
 some(398)
 100
 some(2)
---- performance ---
-allocations: 17
-deallocations: 17
-reallocations: 49
-bytes allocated: 2843
-instructions executed: 63684
-binary size: 7728
-  code: 5164
-  data: 42
-  metadata: 2522
-functions:
-  __to_str_i64$opt:
-    calls: 4
-    bytes: 376
-  __to_str_u64:
-    calls: 4
-    bytes: 204
-  aipl_arr_inc:
-    calls: 12
-    bytes: (external)
-  aipl_array_dec:
-    calls: 16
-    bytes: (external)
-  aipl_array_new:
-    calls: 2
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 2
-    bytes: (external)
-  aipl_i64_len:
-    calls: 8
-    bytes: (external)
-  aipl_u64_len:
-    calls: 8
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 8
-    bytes: (external)
-  aipl_write_i64:
-    calls: 4
-    bytes: (external)
-  aipl_write_u64:
-    calls: 4
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 3200
-  main$filter_map11$own0:
-    calls: 1
-    bytes: 508
-  main$filter_map8$own0:
-    calls: 1
-    bytes: 508
-  many:
-    calls: 5
-    bytes: 368
+--- report ---
+allocations       17
+deallocations     17
+reallocations     49
+bytes allocated   2843
+peak live bytes   17067
+instructions      63684
+binary size       7728 bytes (code 5164, data 42, metadata 2522)
+
+function                    calls  code bytes
+__to_str_i64$opt                4         376
+__to_str_u64                    4         204
+aipl_arr_inc                   12    external
+aipl_array_dec                 16    external
+aipl_array_new                  2    external
+aipl_array_with_cap             2    external
+aipl_i64_len                    8    external
+aipl_u64_len                    8    external
+aipl_write_bytes                8    external
+aipl_write_i64                  4    external
+aipl_write_u64                  4    external
+main                            1        3200
+main$filter_map11$own0          1         508
+main$filter_map8$own0           1         508
+many                            5         368

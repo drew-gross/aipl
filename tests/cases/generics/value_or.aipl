@@ -14,32 +14,3 @@ fn value_or<T: any>(self: T?, default: T) -> T {
     assert(value_or(none, 35) == 35); // i64 (pinned by default) -> 35
     assert(value_or(some('a'), 'z') == 'a'); // char -> 'a'
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 61
-binary size: 1424
-  code: 316
-  data: 193
-  metadata: 915
-functions:
-  __test$value_or:
-    calls: 1
-    bytes: 208
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

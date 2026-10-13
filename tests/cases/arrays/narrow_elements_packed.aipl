@@ -1,7 +1,7 @@
 # An array of a narrow integer packs each element at its own width: a `u8[]` is
-# a byte per element, an `i16[]` two, an `i32[]` four. The `bytes allocated`
-# below is the proof — `bytes(1000)` grows a `u8[]` to a thousand elements, which
-# would be eight thousand bytes at a word apiece.
+# a byte per element, an `i16[]` two, an `i32[]` four. The `.performance` block on
+# `bytes` is the proof — it grows a `u8[]` to a thousand elements, whose peak is
+# about a thousand bytes, where a word apiece would be eight thousand.
 #
 # Everything that moves elements has to agree on the width: growing and
 # extending, a window and a slice of it, `join`, the in-place `map`/`filter`
@@ -11,12 +11,14 @@
 # an `if`, a `some`, or nested in another literal.
 
 import {
+    Measurement,
     equal as ==,
     extend,
     filter,
     join,
     len,
     map,
+    measure,
     print,
     push,
     reverse,
@@ -33,7 +35,15 @@ fn bytes(n: u64) -> u8[] {
         set out.push(7);
     }
     out
-}
+}.performance({
+    let n: u64 = 1000;
+
+    // One allocation that grows in place to 1,488 bytes: a thousand elements and
+    // the growth slack, not the 8,000+ of a word per element.
+    let Measurement { allocations, peak_live_bytes } = measure("a thousand bytes", n, bytes);
+    assert(allocations == 1);
+    assert(peak_live_bytes == 1488);
+})
 
 fn halves(flag: bool) -> i16[] { if (flag) { [-1, 300] } else { [2] } }
 
@@ -70,71 +80,3 @@ fn main() !prints {
 [[1, 255], [], [9]] [1, 255, 0, 0, 9]
 [2, 3, 4, 251] [2]
 [3, 40, 500]
---- performance ---
-allocations: 41
-deallocations: 41
-reallocations: 5
-bytes allocated: 2288
-instructions executed: 35113
-binary size: 17712
-  code: 10952
-  data: 346
-  metadata: 6414
-functions:
-  __eq_i32$arr:
-    calls: 1
-    bytes: 264
-  __to_str_bool:
-    calls: 1
-    bytes: 224
-  __to_str_i32:
-    calls: 1
-    bytes: 204
-  __to_str_i32$arr:
-    calls: 5
-    bytes: 704
-  __to_str_i64$arr:
-    calls: 2
-    bytes: 704
-  __to_str_u16$arr:
-    calls: 1
-    bytes: 704
-  __to_str_u64:
-    calls: 1
-    bytes: 204
-  __to_str_u8$arr:
-    calls: 4
-    bytes: 704
-  __to_str_u8$arr$arr:
-    calls: 1
-    bytes: 1120
-  aipl_arr_inc:
-    calls: 13
-    bytes: (external)
-  aipl_array_dec:
-    calls: 23
-    bytes: (external)
-  aipl_array_new:
-    calls: 4
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 4
-    bytes: (external)
-  aipl_i64_len:
-    calls: 48
-    bytes: (external)
-  aipl_u64_len:
-    calls: 38
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 62
-    bytes: (external)
-  aipl_write_i64:
-    calls: 24
-    bytes: (external)
-  aipl_write_u64:
-    calls: 19
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 6120

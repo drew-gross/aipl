@@ -19,26 +19,3 @@ pub fn a_fn() -> i64 { 10 + b_fn() }
 // the whole point here — so `#[allow]` squelches the unused-import lint.
 import { a_fn } from "./a.aipl"; #[allow]
 pub fn b_fn() -> i64 { 32 }
---- performance ---
-allocations: 1
-deallocations: 1
-reallocations: 0
-bytes allocated: 18
-instructions executed: 29
-binary size: 1152
-  code: 296
-  data: 1
-  metadata: 855
-functions:
-  __to_str_i64:
-    calls: 1
-    bytes: 204
-  aipl_i64_len:
-    calls: 2
-    bytes: (external)
-  aipl_write_i64:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 92

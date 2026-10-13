@@ -10,17 +10,3 @@ fn main() !prints -> !Error {
 working
 --- exit code ---
 0
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 19
-binary size: 704
-  code: 132
-  data: 1
-  metadata: 571
-functions:
-  main:
-    calls: 1
-    bytes: 132

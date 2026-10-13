@@ -9,17 +9,3 @@ fn main() !prints {
 }
 --- stdout ---
 ab
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 56
-binary size: 1032
-  code: 376
-  data: 1
-  metadata: 655
-functions:
-  main:
-    calls: 1
-    bytes: 376

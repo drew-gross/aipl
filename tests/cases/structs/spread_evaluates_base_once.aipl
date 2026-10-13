@@ -23,26 +23,3 @@ called
 1
 7
 7
---- performance ---
-allocations: 3
-deallocations: 3
-reallocations: 0
-bytes allocated: 51
-instructions executed: 110
-binary size: 1448
-  code: 496
-  data: 1
-  metadata: 951
-functions:
-  __to_str_i64:
-    calls: 3
-    bytes: 204
-  aipl_i64_len:
-    calls: 6
-    bytes: (external)
-  aipl_write_i64:
-    calls: 3
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 292

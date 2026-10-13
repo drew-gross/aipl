@@ -4,15 +4,13 @@
 # `crates/aipl-codegen/src/str24.rs`): the content packed *inline* into the value's
 # own words, a refcounted *buffer*, or a *rope* node joining two values lazily.
 #
-# The allocation count below is the proof, and it is the whole arithmetic: of the
-# three calls in `main`, `heap_str` allocates its buffer and `rope_str` allocates
-# its node, while `inline_str` allocates nothing, because an inline value has
-# nowhere to allocate. Every argument is a short literal, which arrives *inline*
-# already — so neither allocation would happen if either call were a pass-through.
-# (`main` renders nothing, which would allocate a buffer of its own; the optional
-# `inline_str` returns is unwrapped rather than printed for that reason.)
+# The `.performance` block on `round_trips` is the proof: `heap_str` allocates its
+# buffer and `rope_str` allocates its node, while `inline_str` allocates nothing,
+# because an inline value has nowhere to allocate. Every argument is a short
+# literal, which arrives *inline* already — so neither allocation would happen if
+# either call were a pass-through.
 
-import { equal as ==, heap_str, inline_str, print, rope_str, value_or } from builtins;
+import { equal as ==, heap_str, inline_str, measure, print, rope_str, value_or } from builtins;
 
 fn main() !prints {
     print(heap_str("hi")); // a fresh buffer, though "hi" would fit inline
@@ -22,7 +20,19 @@ fn main() !prints {
 
 # Content survives every conversion, in both directions — the representation is
 # the only thing that changes.
-fn round_trips(s: str) -> bool { heap_str(s) == s }.test({
+fn round_trips(s: str) -> bool { heap_str(s) == s }.performance({
+    // A buffer for the content: one allocation, and `heap_str` makes it even
+    // where "hi" would have fit inline.
+    assert(measure("heap_str", "hi", heap_str).allocations == 1);
+    assert(measure("heap_str bytes", "hi", heap_str).bytes_allocated == 39);
+
+    // A node over the two operands: one allocation, dearer than the buffer.
+    assert(measure("rope_str", "ba", |s| rope_str(s, "nana")).allocations == 1);
+    assert(measure("rope_str bytes", "ba", |s| rope_str(s, "nana")).bytes_allocated == 88);
+
+    // An inline value has nowhere to allocate.
+    assert(measure("inline_str", "hi", inline_str).allocations == 0);
+}).test({
     assert(round_trips("banana"));
     assert(heap_str("banana") == "banana");
     assert(rope_str("ba", "nana") == "banana");
@@ -49,17 +59,3 @@ fn round_trips(s: str) -> bool { heap_str(s) == s }.test({
 hi
 banana
 hi
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 127
-instructions executed: 63
-binary size: 1312
-  code: 432
-  data: 1
-  metadata: 879
-functions:
-  main:
-    calls: 1
-    bytes: 432

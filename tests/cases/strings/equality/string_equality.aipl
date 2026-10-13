@@ -5,32 +5,3 @@ fn eq_same() -> i64 { if ("hi" == "hi") { 1 } else { 0 } }.test({
     assert("hi" != "bye");
     assert(eq_same() == 1);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 100
-binary size: 1656
-  code: 508
-  data: 166
-  metadata: 982
-functions:
-  __test$eq_same:
-    calls: 1
-    bytes: 400
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

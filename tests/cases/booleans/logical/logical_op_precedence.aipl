@@ -5,32 +5,3 @@ import { equal as ==, logical_and as &&, logical_or as || } from builtins;
 fn prec() -> bool { false || true && false }.test({
     assert(prec() == false);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 28
-binary size: 992
-  code: 176
-  data: 61
-  metadata: 755
-functions:
-  __test$prec:
-    calls: 1
-    bytes: 76
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100

@@ -82,6 +82,8 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  Large optimization tests that still use performance section: move_last_use, fold_extends_value_or and loop_split_fusion are optimization tests over the line threshold.
+  chain.allocations == by_hand.allocations ---> replace this with struct comparison
   in tests/cases/report/test_driver_run.aipl why does fn double() get minted as __test$double?
   .performance on decided_early should be actually on decided_early
   make the runtime a bit less type erased maybe? E.g. dropping an array should be able to drop primitve vs. non-primitive arrays based on type, not a flag

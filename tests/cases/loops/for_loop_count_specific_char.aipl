@@ -11,32 +11,3 @@ fn count_a(s: str) -> i64 {
 }.test({
     assert(count_a("banana") == 3);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 390
-binary size: 1392
-  code: 444
-  data: 76
-  metadata: 872
-functions:
-  __test$count_a:
-    calls: 1
-    bytes: 336
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

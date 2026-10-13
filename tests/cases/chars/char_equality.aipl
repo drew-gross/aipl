@@ -4,32 +4,3 @@ fn second_is_e() -> i64 { "hello"[1].map(|c| if (c == 'e') { 101 } else { 0 }).v
     assert(second_is_e() == 101);
     assert("hello"[1] == some('e'));
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 91
-binary size: 1488
-  code: 464
-  data: 125
-  metadata: 899
-functions:
-  __test$second_is_e:
-    calls: 1
-    bytes: 352
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 112

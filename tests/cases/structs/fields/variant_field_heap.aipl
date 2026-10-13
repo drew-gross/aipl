@@ -32,29 +32,3 @@ alice
 anon
 bob
 Person { name: Named("bob"), age: 30 }
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 93
-instructions executed: 420
-binary size: 4088
-  code: 2060
-  data: 75
-  metadata: 1953
-functions:
-  __to_str_Person:
-    calls: 1
-    bytes: 800
-  aipl_i64_len:
-    calls: 2
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 9
-    bytes: (external)
-  aipl_write_i64:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 1260

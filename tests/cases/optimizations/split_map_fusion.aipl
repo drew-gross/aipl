@@ -16,9 +16,11 @@
 # spends the split's own block on the result, so what goes is the retain per
 # part and the second block where the mapped type is not `str`-sized. The pass
 # shows up more in the work than the allocation: 2,359 instructions become
-# 1,929, and the binary 10,640 bytes become 8,760.
+# 1,929, and the binary 10,640 bytes become 8,760. The `.performance` block on
+# `widths` states the result as a comparison: the chain costs exactly what the
+# hand-written `split_map` call does.
 
-import { equal as ==, join, len, map, print, split, split_map, to_str } from builtins;
+import { equal as ==, join, len, map, measure, print, split, split_map, to_str } from builtins;
 
 fn lines(self: str) -> str[] { self.split("\n") }
 
@@ -32,7 +34,18 @@ fn tagged_lines(src: str) -> str {
 }
 
 // Fused, spelled directly, mapping to a type other than `str`.
-fn widths(s: str, sep: str) -> u64[] { s.split(sep).map(len) }
+fn widths(s: str, sep: str) -> u64[] { s.split(sep).map(len) }.performance({
+    let chain = measure("split then map", "aa--b--cccc", |s| widths(s, "--"));
+    let by_hand = measure("split_map", "aa--b--cccc", |s| s.split_map("--", len));
+    assert(chain.allocations == by_hand.allocations);
+    assert(chain.bytes_allocated == by_hand.bytes_allocated);
+    assert(chain.peak_live_bytes == by_hand.peak_live_bytes);
+    assert(chain.instructions == by_hand.instructions);
+
+    // And that is one allocation: the result, not a block of parts to map from.
+    assert(chain.allocations == 1);
+    assert(chain.bytes_allocated == 40);
+})
 
 // *Not* this row: `.map(f).join(sep)` is `map_join`'s pair, and that one is the
 // better fusion — one buffer appended to as each piece is produced, rather than
@@ -55,53 +68,26 @@ fn main() !prints {
 [4]
 <one>/<two>
 true
---- performance ---
-allocations: 35
-deallocations: 35
-reallocations: 1
-bytes allocated: 2501
-instructions executed: 2052
-binary size: 8904
-  code: 5420
-  data: 46
-  metadata: 3438
-functions:
-  __builtin_split_map$str$s0$s1$lam$tagged:
-    calls: 3
-    bytes: 584
-  __builtin_split_map$u64$s0$s1$lam$__builtin_len:
-    calls: 2
-    bytes: 516
-  __eq_str$arr:
-    calls: 1
-    bytes: 320
-  __to_str_bool:
-    calls: 1
-    bytes: 224
-  __to_str_u64:
-    calls: 1
-    bytes: 204
-  __to_str_u64$arr:
-    calls: 2
-    bytes: 704
-  aipl_arr_inc:
-    calls: 10
-    bytes: (external)
-  aipl_array_dec:
-    calls: 13
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
-  aipl_u64_len:
-    calls: 10
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 7
-    bytes: (external)
-  aipl_write_u64:
-    calls: 5
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 2868
+--- report ---
+allocations       35
+deallocations     35
+reallocations     1
+bytes allocated   2501
+peak live bytes   2074
+instructions      2052
+binary size       8904 bytes (code 5420, data 46, metadata 3438)
+
+function                                             calls  code bytes
+__builtin_split_map$str$s0$s1$lam$tagged                 3         584
+__builtin_split_map$u64$s0$s1$lam$__builtin_len          2         516
+__eq_str$arr                                             1         320
+__to_str_bool                                            1         224
+__to_str_u64                                             1         204
+__to_str_u64$arr                                         2         704
+aipl_arr_inc                                            10    external
+aipl_array_dec                                          13    external
+aipl_array_new                                           1    external
+aipl_u64_len                                            10    external
+aipl_write_bytes                                         7    external
+aipl_write_u64                                           5    external
+main                                                     1        2868

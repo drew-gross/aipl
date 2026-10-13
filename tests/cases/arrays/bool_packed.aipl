@@ -21,35 +21,3 @@ fn packed() -> bool[] { [true, false, true, true, false, false, true, false, tru
     }
     assert(trues == 5);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 814
-binary size: 2768
-  code: 1148
-  data: 383
-  metadata: 1237
-functions:
-  __eq_bool$arr:
-    calls: 1
-    bytes: 160
-  __test$packed:
-    calls: 1
-    bytes: 884
-  aipl_assert:
-    calls: 6
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104

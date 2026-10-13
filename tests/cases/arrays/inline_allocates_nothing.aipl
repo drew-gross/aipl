@@ -7,9 +7,10 @@
 # An array becomes inline wherever it is built small: a literal whose elements
 # are not all constants (a constant one is a static block, already free), a
 # `push` onto an empty array, and a `map` or `filter` over an inline input,
-# which writes its result into the same bytes. The allocation count below is
-# the proof — every array in this program is inline, and `main` returns its
-# answer as the exit code because rendering one would allocate a buffer.
+# which writes its result into the same bytes. The `.performance` block on `ones`
+# is the proof: each of those allocates nothing, up to the capacity and one past it
+# exactly once. (`main` returns its answer as the exit code because rendering an
+# array would allocate a buffer.)
 
 import {
     equal as ==,
@@ -18,6 +19,7 @@ import {
     less_than as <,
     logical_and as &&,
     map,
+    measure,
     push,
     wrapping_add as +,
     wrapping_add_assign as +=,
@@ -29,7 +31,21 @@ fn ones(n: u64) -> i64[] {
         set out.push(1);
     }
     out
-}
+}.performance({
+    let two: u64 = 2;
+    let three: u64 = 3;
+    // The most an `i64[]` holds inline is two; a third needs a block.
+    assert(measure("two i64s", two, ones).allocations == 0);
+    assert(measure("three i64s", three, ones).allocations == 1);
+    // A `map` or `filter` over an inline input writes into the same bytes.
+    assert(measure("map over inline", two, |n| ones(n).map(|x| x + 10)).allocations == 0);
+    assert(measure("filter over inline", two, |n| ones(n).filter(|x| x < 5)).allocations == 0);
+    // Narrow integers pack at their own width: 22 `u8`s fit, a 23rd does not.
+    let most: u64 = 22;
+    let past: u64 = 23;
+    assert(measure("22 bytes", most, bytes).allocations == 0);
+    assert(measure("23 bytes", past, bytes).allocations == 1);
+})
 
 fn bytes(n: u64) -> u8[] {
     mut out: u8[] = []; #[allow]
@@ -58,35 +74,3 @@ fn main() -> i64 {
 }
 --- exit code ---
 126
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 1932
-binary size: 3744
-  code: 2576
-  data: 9
-  metadata: 1159
-functions:
-  aipl_arr_inc:
-    calls: 9
-    bytes: (external)
-  aipl_array_dec:
-    calls: 13
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 1056
-  main$filter4$own0:
-    calls: 1
-    bytes: 496
-  main$map2$own0:
-    calls: 1
-    bytes: 456
-  ones:
-    calls: 3
-    bytes: 396
-  total:
-    calls: 3
-    bytes: 172

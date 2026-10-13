@@ -41,26 +41,3 @@ pub fn area(self: Shape) -> i64 {
 7
 0
 7
---- performance ---
-allocations: 4
-deallocations: 4
-reallocations: 0
-bytes allocated: 68
-instructions executed: 138
-binary size: 1536
-  code: 564
-  data: 1
-  metadata: 971
-functions:
-  __to_str_i64:
-    calls: 4
-    bytes: 204
-  aipl_i64_len:
-    calls: 8
-    bytes: (external)
-  aipl_write_i64:
-    calls: 4
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 360

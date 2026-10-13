@@ -7,32 +7,3 @@ fn identity<T>(x: T) -> T { x }.test({
     assert(identity(5) == 5);
     assert(identity('a') == 'a');
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 45
-binary size: 1208
-  code: 256
-  data: 116
-  metadata: 836
-functions:
-  __test$identity:
-    calls: 1
-    bytes: 148
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

@@ -29,26 +29,3 @@ fn main() !prints {
 10
 11
 12
---- performance ---
-allocations: 3
-deallocations: 3
-reallocations: 0
-bytes allocated: 54
-instructions executed: 149
-binary size: 1552
-  code: 616
-  data: 1
-  metadata: 935
-functions:
-  __to_str_i64:
-    calls: 3
-    bytes: 204
-  aipl_i64_len:
-    calls: 6
-    bytes: (external)
-  aipl_write_i64:
-    calls: 3
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 412

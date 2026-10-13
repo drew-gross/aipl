@@ -5,32 +5,3 @@ fn a(s: str) -> str { s }
 fn b(s: str) -> str { a(s) }.test({
     assert(b("threaded") == "threaded");
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 42
-binary size: 1152
-  code: 260
-  data: 85
-  metadata: 807
-functions:
-  __test$b:
-    calls: 1
-    bytes: 164
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 96

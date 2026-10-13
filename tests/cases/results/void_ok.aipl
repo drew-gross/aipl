@@ -41,26 +41,3 @@ fn main() !prints {
 valid
 invalid: negative
 ok()
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 108
-instructions executed: 194
-binary size: 3416
-  code: 1852
-  data: 18
-  metadata: 1546
-functions:
-  __to_str_unit$err$str:
-    calls: 1
-    bytes: 460
-  aipl_write_bytes:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 988
-  validate:
-    calls: 2
-    bytes: 404

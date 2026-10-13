@@ -33,38 +33,3 @@ pub fn count_is_greater_than<T: any>(self: T[], x: T, limit: u64) -> bool {
     assert([1, 2, 3].count_is_greater_than(9, 0) == ([1, 2, 3].count(9) > 0)); // no matches
     assert([].count_is_greater_than(1, 0) == (0 > 0)); // empty
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 1404
-binary size: 3960
-  code: 1564
-  data: 808
-  metadata: 1588
-functions:
-  __builtin_count_is_greater_than$i64:
-    calls: 5
-    bytes: 220
-  __test$count_is_greater_than:
-    calls: 1
-    bytes: 992
-  aipl_assert:
-    calls: 6
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  count_is_greater_than$i64:
-    calls: 6
-    bytes: 220
-  main:
-    calls: 1
-    bytes: 132

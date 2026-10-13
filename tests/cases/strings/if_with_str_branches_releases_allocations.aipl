@@ -12,32 +12,3 @@ fn pick(c: bool) -> str { if (c) { heap_str("left") } else { heap_str("right") }
     assert(pick(true) == "left");
     assert(pick(false) == "right");
 })
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 78
-instructions executed: 73
-binary size: 1656
-  code: 464
-  data: 177
-  metadata: 1015
-functions:
-  __test$pick:
-    calls: 1
-    bytes: 364
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100

@@ -30,26 +30,3 @@ ok()
 err("could not write file")
 --- expect file: out.txt ---
 round trip
---- performance ---
-allocations: 4
-deallocations: 4
-reallocations: 0
-bytes allocated: 84
-instructions executed: 199
-binary size: 2184
-  code: 1008
-  data: 18
-  metadata: 1158
-functions:
-  __to_str_unit$err$Error:
-    calls: 2
-    bytes: 460
-  aipl_write_bytes:
-    calls: 4
-    bytes: (external)
-  aipl_write_string_to_file:
-    calls: 2
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 548

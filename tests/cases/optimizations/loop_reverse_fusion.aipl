@@ -14,9 +14,11 @@
 # 1 (the `materialized(xs)[0]` index), the fused loop reading straight from
 # the block. The instruction count counts only this object's code, so the
 # calls' own work is invisible in it (14,392 becomes 15,396: the backward
-# index is one add per element more than the forward one). The `functions:`
-# list is the evidence — one `aipl_arr_reverse`, `materialized`'s, where the
-# unfused case has three.
+# index is one add per element more than the forward one). The `--- report ---`
+# is the evidence — one `aipl_arr_reverse`, `materialized`'s, where the unfused
+# case has three. (There is no `.performance` block: a reversed view allocates
+# nothing either way, and the instruction count moves the wrong way, so the saving
+# is in calls, which only the report shows.)
 
 import {
     extend,
@@ -77,47 +79,24 @@ cba
 some(200)
 0:8
 1:7
---- performance ---
-allocations: 20
-deallocations: 20
-reallocations: 7
-bytes allocated: 954
-instructions executed: 12454
-binary size: 5856
-  code: 3284
-  data: 58
-  metadata: 2514
-functions:
-  __to_str_i64:
-    calls: 5
-    bytes: 204
-  __to_str_i64$opt:
-    calls: 1
-    bytes: 376
-  __to_str_u64:
-    calls: 2
-    bytes: 204
-  aipl_arr_inc:
-    calls: 2
-    bytes: (external)
-  aipl_array_dec:
-    calls: 2
-    bytes: (external)
-  aipl_i64_len:
-    calls: 12
-    bytes: (external)
-  aipl_u64_len:
-    calls: 4
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 2
-    bytes: (external)
-  aipl_write_i64:
-    calls: 6
-    bytes: (external)
-  aipl_write_u64:
-    calls: 2
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 2500
+--- report ---
+allocations       20
+deallocations     20
+reallocations     7
+bytes allocated   954
+peak live bytes   2338
+instructions      12454
+binary size       5856 bytes (code 3284, data 58, metadata 2514)
+
+function              calls  code bytes
+__to_str_i64              5         204
+__to_str_i64$opt          1         376
+__to_str_u64              2         204
+aipl_arr_inc              2    external
+aipl_array_dec            2    external
+aipl_i64_len             12    external
+aipl_u64_len              4    external
+aipl_write_bytes          2    external
+aipl_write_i64            6    external
+aipl_write_u64            2    external
+main                      1        2500

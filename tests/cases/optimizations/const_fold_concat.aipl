@@ -1,16 +1,30 @@
-# Concatenating two string literals folds to a single literal. The allocation
-# count below is the proof: a `+++` builds a lazy concat node on the heap at run
-# time, so `main` concatenating and allocating nothing means the join happened at
-# compile time. The asserts pin the folded values; `main` is what is measured.
+# Concatenating two string literals folds to a single literal. The `.performance`
+# block on `chain` is the proof: a `+++` builds a lazy concat node on the heap at
+# run time, so a join that allocates nothing and costs exactly what a plain
+# literal costs happened at compile time. The asserts pin the folded values.
 #
 # Only literals *in place* fold. A case that wants a run-time concat says so with
 # `rope_str` (see `tests/cases/strings/named_representations.aipl`) rather than
 # arranging for a `+++` to survive this pass.
 
-import { concat, concat as +++, equal as ==, print } from builtins;
+import { concat, concat as +++, equal as ==, measure, print } from builtins;
 
 fn chain() -> str { "a" +++ "b" +++ "c" }.test({
     assert(chain() == "abc");
+}).performance({
+    let literal = measure("literal", 0, |_| "abc");
+    let operator = measure("chain", 0, |_| chain());
+    let builtin = measure("named", 0, |_| named());
+    let with_empty = measure("empty", 0, |_| empty());
+    assert(operator.allocations == 0);
+    assert(builtin.allocations == 0);
+    assert(with_empty.allocations == 0);
+    assert(operator.instructions == literal.instructions);
+    assert(builtin.instructions == literal.instructions);
+    assert(with_empty.instructions == literal.instructions);
+
+    // What a join the compiler cannot see through costs, for contrast: a node.
+    assert(measure("joined at run time", "a", |s| s +++ "b").allocations == 1);
 })
 
 // The operator and the named builtin are the same call — the alias is the only
@@ -30,17 +44,3 @@ fn main() !prints {
 }
 --- stdout ---
 folded!
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 12
-binary size: 600
-  code: 84
-  data: 1
-  metadata: 515
-functions:
-  main:
-    calls: 1
-    bytes: 84

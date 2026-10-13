@@ -20,44 +20,23 @@ fn grown() -> i64[] {
 }.test({
     assert(grown() == [1, 2, 3, 4, 5, 6, 7, 8]);
 })
---- performance ---
-allocations: 1
-deallocations: 1
-reallocations: 1
-bytes allocated: 64
-instructions executed: 402
-binary size: 2384
-  code: 1052
-  data: 164
-  metadata: 1168
-functions:
-  __eq_i64$arr:
-    calls: 1
-    bytes: 264
-  __test$grown:
-    calls: 1
-    bytes: 684
-  aipl_arr_inc:
-    calls: 1
-    bytes: (external)
-  aipl_array_dec:
-    calls: 2
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 1
-    bytes: (external)
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104
+--- report ---
+allocations       1
+deallocations     1
+reallocations     1
+bytes allocated   64
+peak live bytes   112
+instructions      402
+binary size       2384 bytes (code 1052, data 164, metadata 1168)
+
+function                 calls  code bytes
+__eq_i64$arr                 1         264
+__test$grown                 1         684
+aipl_arr_inc                 1    external
+aipl_array_dec               2    external
+aipl_array_with_cap          1    external
+aipl_assert                  1    external
+aipl_test_begin              1    external
+aipl_test_end                1    external
+aipl_test_summary            1    external
+main                         1         104

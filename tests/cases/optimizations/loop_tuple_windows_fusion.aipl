@@ -21,16 +21,19 @@
 #
 # Measured on this case with the fusion switched off: 21 allocations (40
 # reallocations) become 14 (17), and 63,608 instructions become 42,353. The
-# `functions:` list is the readable evidence — no `__builtin_tuple_windows$..`
+# `--- report ---` is the readable evidence — no `__builtin_tuple_windows$..`
 # specialization is emitted at all. Unfused, every loop below shares one
 # `__builtin_tuple_windows$i64`; fused, only `materialized` still calls it, and
-# that single use is inlined into `main`.
+# that single use is inlined into `main`. The `.performance` block on
+# `materialized` holds the cost: the fused loops allocate nothing.
 
 import {
+    Measurement,
     equal as ==,
     extend,
     len,
     less_than as <,
+    measure,
     print,
     push,
     to_str,
@@ -81,7 +84,24 @@ fn doubled_at(s: str) -> str {
 }
 
 // The array itself: not a loop, so not fused.
-fn materialized(xs: i64[]) -> u64 { xs.tuple_windows().len() }
+fn materialized(xs: i64[]) -> u64 { xs.tuple_windows().len() }.performance({
+    let xs = many();
+
+    // A loop over the pairs builds no array of them: nothing is allocated, whether
+    // it runs to the end or returns early.
+    assert(measure("rises", xs, rises).allocations == 0);
+    assert(measure("first_drop", xs, first_drop).allocations == 0);
+
+    // Asked for the array itself, the pairs exist: a block holding every adjacent
+    // pair, twice the source's size, which grows to 4,112 bytes.
+    let Measurement { allocations, peak_live_bytes } = measure(
+        "pairs kept as an array",
+        xs,
+        materialized,
+    );
+    assert(allocations == 1);
+    assert(peak_live_bytes == 4112);
+})
 
 fn main() !prints {
     let xs = many();
@@ -103,53 +123,26 @@ none
 c2
 
 200
---- performance ---
-allocations: 11
-deallocations: 11
-reallocations: 15
-bytes allocated: 329
-instructions executed: 31696
-binary size: 8144
-  code: 4972
-  data: 90
-  metadata: 3082
-functions:
-  __to_str_i64:
-    calls: 1
-    bytes: 204
-  __to_str_i64$opt:
-    calls: 4
-    bytes: 376
-  __to_str_u64:
-    calls: 2
-    bytes: 204
-  aipl_arr_inc:
-    calls: 2
-    bytes: (external)
-  aipl_array_dec:
-    calls: 2
-    bytes: (external)
-  aipl_i64_len:
-    calls: 4
-    bytes: (external)
-  aipl_u64_len:
-    calls: 4
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 5
-    bytes: (external)
-  aipl_write_i64:
-    calls: 2
-    bytes: (external)
-  aipl_write_u64:
-    calls: 2
-    bytes: (external)
-  doubled_at:
-    calls: 2
-    bytes: 1080
-  first_drop:
-    calls: 4
-    bytes: 460
-  main:
-    calls: 1
-    bytes: 2648
+--- report ---
+allocations       11
+deallocations     11
+reallocations     15
+bytes allocated   329
+peak live bytes   6297
+instructions      31696
+binary size       8144 bytes (code 4972, data 90, metadata 3082)
+
+function              calls  code bytes
+__to_str_i64              1         204
+__to_str_i64$opt          4         376
+__to_str_u64              2         204
+aipl_arr_inc              2    external
+aipl_array_dec            2    external
+aipl_i64_len              4    external
+aipl_u64_len              4    external
+aipl_write_bytes          5    external
+aipl_write_i64            2    external
+aipl_write_u64            2    external
+doubled_at                2        1080
+first_drop                4         460
+main                      1        2648

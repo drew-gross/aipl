@@ -21,32 +21,3 @@ fn describe(Cell { v }) -> i64 {
     assert(describe(empty) == 0 - 1);
     assert(describe(full) + describe(empty) == 98);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 106
-binary size: 1624
-  code: 468
-  data: 243
-  metadata: 913
-functions:
-  __test$describe:
-    calls: 1
-    bytes: 360
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

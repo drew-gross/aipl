@@ -4,32 +4,3 @@ fn first_not_z() -> i64 { "abc"[0].map(|c| if (c != 'z') { 1 } else { 0 }).value
     assert(first_not_z() == 1);
     assert("abc"[0] != some('z'));
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 95
-binary size: 1496
-  code: 472
-  data: 125
-  metadata: 899
-functions:
-  __test$first_not_z:
-    calls: 1
-    bytes: 360
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 112

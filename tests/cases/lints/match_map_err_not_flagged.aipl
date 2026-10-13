@@ -64,26 +64,3 @@ fn code_of(r: i64!Wrapped) -> i64 {
 0
 1
 -1
---- performance ---
-allocations: 5
-deallocations: 5
-reallocations: 0
-bytes allocated: 86
-instructions executed: 397
-binary size: 3736
-  code: 2136
-  data: 1
-  metadata: 1599
-functions:
-  __to_str_i64:
-    calls: 5
-    bytes: 204
-  aipl_i64_len:
-    calls: 10
-    bytes: (external)
-  aipl_write_i64:
-    calls: 5
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 1932

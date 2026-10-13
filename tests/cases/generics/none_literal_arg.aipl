@@ -20,29 +20,3 @@ fn is_present(x: any?) -> bool {
 }.test({
     assert(is_present(none) == false);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 28
-binary size: 952
-  code: 164
-  data: 67
-  metadata: 721
-functions:
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 164

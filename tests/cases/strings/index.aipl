@@ -10,32 +10,3 @@ fn at(s: str, i: i64) -> char? { s[i] }.test({
     assert(at("abc", 3) == none); // out of bounds
     assert(at("", 0) == none); // empty string
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 181
-binary size: 2272
-  code: 844
-  data: 272
-  metadata: 1156
-functions:
-  __test$at:
-    calls: 1
-    bytes: 748
-  aipl_assert:
-    calls: 5
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 96

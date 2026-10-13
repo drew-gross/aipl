@@ -9,32 +9,3 @@ fn pick(b: bool) -> str? { if (b) { some("present") } else { none } }.test({
     assert(pick(true) == some("present"));
     assert(pick(false) == none);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 98
-binary size: 2000
-  code: 712
-  data: 201
-  metadata: 1087
-functions:
-  __test$pick:
-    calls: 1
-    bytes: 612
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100

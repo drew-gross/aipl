@@ -23,35 +23,3 @@ fn to_i(t: Tok) -> i64 {
     assert(to_i(apply(OfInt(Num), 9)) == 9);
     assert(to_i(apply(Plain(Bare), 9)) == 0 - 1);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 66
-binary size: 1392
-  code: 348
-  data: 162
-  metadata: 882
-functions:
-  __ctor$Tok$Num:
-    calls: 1
-    bytes: 60
-  __test$to_i:
-    calls: 1
-    bytes: 188
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100

@@ -42,29 +42,3 @@ fn count_eq(s: str, sep: str, target: str) -> i64 {
 ["xyz"]
 ["a", "b", "cee"]
 ["name", "longvaluehere"]
---- performance ---
-allocations: 16
-deallocations: 16
-reallocations: 0
-bytes allocated: 898
-instructions executed: 2982
-binary size: 3704
-  code: 2044
-  data: 18
-  metadata: 1642
-functions:
-  __to_str_str$arr:
-    calls: 8
-    bytes: 780
-  aipl_array_dec:
-    calls: 8
-    bytes: (external)
-  aipl_array_new:
-    calls: 8
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 42
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 1264

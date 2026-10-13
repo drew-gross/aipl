@@ -3,10 +3,12 @@
 # rest — so it collapses into `xs[i].map(f)`, the optional's `map`, which
 # allocates nothing and calls `f` once.
 #
-# The `functions:` list is what says it fired: a fused shape generates no
+# The `--- report ---` below is what says it fired: a fused shape generates no
 # `aipl_array_with_cap`/`aipl_array_push_mut` pair for the mapped array and
 # calls `dbl` once per index rather than once per element. `walk` below is the
-# unfused counterpart over the same data, so the two sit in one list.
+# unfused counterpart over the same data, so the two sit in one list. The
+# `.performance` block on `dbl` holds the cost: no allocation, and the same
+# instructions however long the array is.
 #
 # Both readings of `recv[i]` fuse, and the pass never finds out which it has:
 # an integer index reads one element (`map` preserves position as well as
@@ -25,8 +27,10 @@
 
 import {
     Span,
+    equal as ==,
     len,
     map,
+    measure,
     print,
     value_or,
     wrapping_add_assign as +=,
@@ -36,7 +40,59 @@ import {
 
 struct Node { tokens: Span[] }
 
-fn dbl(n: i64) -> i64 { n * 2 }
+fn dbl(n: i64) -> i64 { n * 2 }.performance({
+    let short = [1, 2, 3, 4, 5];
+    let long = [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+    ];
+    let src = "let x = 1;";
+    let n = Node { tokens: [Span { start: 0, end: 3 }, Span { start: 4, end: 5 }] };
+
+    // Reading one element of a mapped array builds no array, and applies `dbl` once:
+    // so it costs the same however long the array is.
+    let at_five = measure("index of a map", short, |a| a.map(dbl)[1]);
+    let at_thirty = measure("index of a map, longer array", long, |a| a.map(dbl)[1]);
+    assert(at_five.allocations == 0);
+    assert(at_thirty.allocations == 0);
+    assert(at_five.instructions == at_thirty.instructions);
+    assert(at_five.instructions == 63);
+
+    // Out of bounds there is nothing to map: `dbl` is not called at all.
+    assert(measure("out of bounds", short, |a| a.map(dbl)[99]).instructions == 53);
+
+    // The motivating site: one token's text, without slicing every token out of
+    // the source.
+    assert(measure("first token's text", n, |nd| nd.token_texts(src)[0]).allocations == 0);
+})
 
 fn bracket(c: char) -> str { `[{c}]` }
 
@@ -96,47 +152,24 @@ let x
 some("[b]")
 none
 30
---- performance ---
-allocations: 19
-deallocations: 19
-reallocations: 0
-bytes allocated: 991
-instructions executed: 1880
-binary size: 11648
-  code: 7592
-  data: 122
-  metadata: 3934
-functions:
-  __to_str_i64:
-    calls: 1
-    bytes: 204
-  __to_str_i64$arr:
-    calls: 1
-    bytes: 704
-  __to_str_i64$opt:
-    calls: 6
-    bytes: 376
-  __to_str_str$opt:
-    calls: 1
-    bytes: 460
-  aipl_arr_inc:
-    calls: 4
-    bytes: (external)
-  aipl_array_dec:
-    calls: 7
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
-  aipl_i64_len:
-    calls: 14
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 16
-    bytes: (external)
-  aipl_write_i64:
-    calls: 7
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 5848
+--- report ---
+allocations       19
+deallocations     19
+reallocations     0
+bytes allocated   991
+peak live bytes   991
+instructions      1880
+binary size       11648 bytes (code 7592, data 122, metadata 3934)
+
+function              calls  code bytes
+__to_str_i64              1         204
+__to_str_i64$arr          1         704
+__to_str_i64$opt          6         376
+__to_str_str$opt          1         460
+aipl_arr_inc              4    external
+aipl_array_dec            7    external
+aipl_array_new            1    external
+aipl_i64_len             14    external
+aipl_write_bytes         16    external
+aipl_write_i64            7    external
+main                      1        5848

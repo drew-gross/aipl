@@ -33,26 +33,3 @@ fn main() !prints {
 a fairly long string, long enough that the pair cannot fit on one line
 2
 3
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 34
-instructions executed: 65
-binary size: 1448
-  code: 396
-  data: 87
-  metadata: 965
-functions:
-  __to_str_i64:
-    calls: 2
-    bytes: 204
-  aipl_i64_len:
-    calls: 4
-    bytes: (external)
-  aipl_write_i64:
-    calls: 2
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 192

@@ -1,15 +1,1 @@
 fn main() { for (let c : "") {} }
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 49
-binary size: 808
-  code: 228
-  data: 1
-  metadata: 579
-functions:
-  main:
-    calls: 1
-    bytes: 228

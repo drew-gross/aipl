@@ -11,26 +11,3 @@ fn main() !prints !execute_program {
 }
 --- stdout ---
 err:[could not execute program]
---- performance ---
-allocations: 8
-deallocations: 8
-reallocations: 0
-bytes allocated: 356
-instructions executed: 95
-binary size: 1808
-  code: 756
-  data: 1
-  metadata: 1051
-functions:
-  aipl_array_dec:
-    calls: 1
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
-  aipl_execute_program:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 756

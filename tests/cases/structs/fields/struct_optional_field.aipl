@@ -20,35 +20,3 @@ fn make(present: bool) -> Box {
     assert(e.item == none);
     assert(b.count.value_or(0) + e.count.value_or(35) == 42);
 })
---- performance ---
-allocations: 1
-deallocations: 1
-reallocations: 0
-bytes allocated: 39
-instructions executed: 280
-binary size: 2784
-  code: 1228
-  data: 231
-  metadata: 1325
-functions:
-  __test$make:
-    calls: 1
-    bytes: 588
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100
-  make:
-    calls: 2
-    bytes: 540

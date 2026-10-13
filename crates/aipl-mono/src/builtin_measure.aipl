@@ -77,32 +77,3 @@ pub fn measure<T: any, R: any>(label: str, input: T, f: (T) -> R) !measure -> Me
     // Exactly the cost of measuring: the call and the release, nothing else.
     assert(instructions == 5);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 86
-binary size: 1640
-  code: 408
-  data: 252
-  metadata: 980
-functions:
-  __test$measure:
-    calls: 1
-    bytes: 300
-  aipl_assert:
-    calls: 4
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

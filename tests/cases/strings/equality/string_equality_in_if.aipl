@@ -4,32 +4,3 @@ fn classify(s: str) -> i64 { if (s == "hello") { 1 } else { 0 } }.test({
     assert(classify("hello") == 1);
     assert(classify("world") == 0);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 79
-binary size: 1488
-  code: 448
-  data: 140
-  metadata: 900
-functions:
-  __test$classify:
-    calls: 1
-    bytes: 340
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

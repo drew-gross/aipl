@@ -22,38 +22,3 @@ fn doubled(n: str) -> char[] {
     set long.extend("0123456789012345678901234567890");
     assert(long.len() == 32);
 })
---- performance ---
-allocations: 5
-deallocations: 5
-reallocations: 0
-bytes allocated: 160
-instructions executed: 788
-binary size: 3888
-  code: 1724
-  data: 358
-  metadata: 1806
-functions:
-  __test$doubled:
-    calls: 1
-    bytes: 896
-  aipl_assert:
-    calls: 4
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 8
-    bytes: (external)
-  doubled:
-    calls: 3
-    bytes: 720
-  main:
-    calls: 1
-    bytes: 108

@@ -12,35 +12,3 @@ pub fn trim_prefix(self: str, c: char) -> str {
     assert("".trim_prefix('\n') == ""); // empty source
     assert("xxy".trim_prefix('x') == "xy"); // only the first is dropped
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 263
-binary size: 2664
-  code: 1024
-  data: 275
-  metadata: 1365
-functions:
-  __test$trim_prefix:
-    calls: 1
-    bytes: 660
-  aipl_assert:
-    calls: 4
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 112
-  trim_prefix:
-    calls: 4
-    bytes: 252

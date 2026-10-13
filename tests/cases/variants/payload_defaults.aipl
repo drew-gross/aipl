@@ -42,38 +42,3 @@ fn tag_of(o: Opt<i64>) -> str {
     assert(tag_of(Item(3, tag="z")) == "z");
     assert(tag_of(Nil) == "");
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 212
-binary size: 2976
-  code: 1040
-  data: 491
-  metadata: 1445
-functions:
-  __test$color_of:
-    calls: 1
-    bytes: 268
-  __test$coords:
-    calls: 1
-    bytes: 172
-  __test$tag_of:
-    calls: 1
-    bytes: 364
-  aipl_assert:
-    calls: 7
-    bytes: (external)
-  aipl_test_begin:
-    calls: 3
-    bytes: (external)
-  aipl_test_end:
-    calls: 3
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 236

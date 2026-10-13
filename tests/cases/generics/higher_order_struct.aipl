@@ -17,32 +17,3 @@ fn round_trip<T>(x: T) -> T { unbox(wrap(x)) }.test({
     assert(unbox(wrap("hi")) == "hi");
     assert(wrap(3).value + 1 == 4);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 138
-binary size: 2032
-  code: 632
-  data: 275
-  metadata: 1125
-functions:
-  __test$round_trip:
-    calls: 1
-    bytes: 524
-  aipl_assert:
-    calls: 4
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

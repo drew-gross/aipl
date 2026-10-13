@@ -78,71 +78,32 @@ fn main() !prints {
 0 1
 2
 2 8 26 80
---- performance ---
-allocations: 404
-deallocations: 404
-reallocations: 8
-bytes allocated: 24508
-instructions executed: 51347
-binary size: 12872
-  code: 7804
-  data: 9
-  metadata: 5059
-functions:
-  __arr_drop_Rule:
-    calls: 69
-    bytes: 116
-  __arr_retain_Rule:
-    calls: 0
-    bytes: 116
-  __rec_drop_Rule:
-    calls: 310
-    bytes: 124
-  __to_str_u64:
-    calls: 10
-    bytes: 204
-  aipl_arr_inc:
-    calls: 381
-    bytes: (external)
-  aipl_array_dec:
-    calls: 768
-    bytes: (external)
-  aipl_array_new:
-    calls: 69
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 3
-    bytes: (external)
-  aipl_rec_alloc:
-    calls: 310
-    bytes: (external)
-  aipl_rec_dec_strong:
-    calls: 916
-    bytes: (external)
-  aipl_rec_dec_weak:
-    calls: 180
-    bytes: (external)
-  aipl_rec_inc_strong:
-    calls: 606
-    bytes: (external)
-  aipl_rec_inc_weak:
-    calls: 180
-    bytes: (external)
-  aipl_u64_len:
-    calls: 20
-    bytes: (external)
-  aipl_write_u64:
-    calls: 10
-    bytes: (external)
-  deep:
-    calls: 178
-    bytes: 668
-  gather:
-    calls: 10
-    bytes: 1648
-  main:
-    calls: 1
-    bytes: 3804
-  styles$into$own0:
-    calls: 298
-    bytes: 1124
+--- report ---
+allocations       404
+deallocations     404
+reallocations     8
+bytes allocated   24508
+peak live bytes   24730
+instructions      51347
+binary size       12872 bytes (code 7804, data 9, metadata 5059)
+
+function                 calls  code bytes
+__arr_drop_Rule             69         116
+__arr_retain_Rule            0         116
+__rec_drop_Rule            310         124
+__to_str_u64                10         204
+aipl_arr_inc               381    external
+aipl_array_dec             768    external
+aipl_array_new              69    external
+aipl_array_with_cap          3    external
+aipl_rec_alloc             310    external
+aipl_rec_dec_strong        916    external
+aipl_rec_dec_weak          180    external
+aipl_rec_inc_strong        606    external
+aipl_rec_inc_weak          180    external
+aipl_u64_len                20    external
+aipl_write_u64              10    external
+deep                       178         668
+gather                      10        1648
+main                         1        3804
+styles$into$own0           298        1124

@@ -39,35 +39,3 @@ ok:[out
 ][err
 ] exit=7
 ok:[][] exit=0
---- performance ---
-allocations: 30
-deallocations: 30
-reallocations: 0
-bytes allocated: 1426
-instructions executed: 438
-binary size: 6168
-  code: 3324
-  data: 57
-  metadata: 2787
-functions:
-  __to_str_i64:
-    calls: 3
-    bytes: 204
-  aipl_array_dec:
-    calls: 2
-    bytes: (external)
-  aipl_array_new:
-    calls: 2
-    bytes: (external)
-  aipl_execute_program:
-    calls: 3
-    bytes: (external)
-  aipl_i64_len:
-    calls: 6
-    bytes: (external)
-  aipl_write_i64:
-    calls: 3
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 3120

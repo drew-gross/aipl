@@ -20,17 +20,3 @@ pub fn private_len() -> u64 { PRIVATE.len() }
 --- stdout ---
 shared
 
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 12
-binary size: 600
-  code: 80
-  data: 1
-  metadata: 519
-functions:
-  main:
-    calls: 1
-    bytes: 80

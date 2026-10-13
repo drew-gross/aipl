@@ -6,32 +6,3 @@ fn not_lt(x: i64, y: i64) -> bool { !(x < y) }.test({
     assert(not_lt(3, 5) == false);
     assert(not_lt(5, 3) == true);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 39
-binary size: 1208
-  code: 228
-  data: 140
-  metadata: 840
-functions:
-  __test$not_lt:
-    calls: 1
-    bytes: 124
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104

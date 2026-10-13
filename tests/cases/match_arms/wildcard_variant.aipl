@@ -48,35 +48,3 @@ fn main() !prints {
 true false
 Circle(2) Square(2)
 
---- performance ---
-allocations: 21
-deallocations: 21
-reallocations: 0
-bytes allocated: 1232
-instructions executed: 522
-binary size: 6376
-  code: 3324
-  data: 110
-  metadata: 2942
-functions:
-  __to_str_Shape:
-    calls: 2
-    bytes: 1120
-  __to_str_bool:
-    calls: 2
-    bytes: 224
-  __to_str_i64:
-    calls: 5
-    bytes: 204
-  aipl_i64_len:
-    calls: 14
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 8
-    bytes: (external)
-  aipl_write_i64:
-    calls: 7
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 1776

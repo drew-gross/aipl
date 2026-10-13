@@ -5,14 +5,16 @@
 # the forward array it came from. Only a bit-packed `bool[]`, with no byte run
 # to walk, is copied.
 #
-# The allocation count below is the proof: the source is a constant literal,
-# which lives in the data section, so nothing here allocates unless a reversal
-# does — and `main` returns its answer as the exit code because rendering would
-# allocate a buffer.
+# The `.performance` block on `main` is the proof: the source is a constant
+# literal, which lives in the data section, so nothing here allocates unless a
+# reversal does. (`main` returns its answer as the exit code because rendering
+# would allocate a buffer.)
 
 import {
+    Measurement,
     equal as ==,
     logical_and as &&,
+    measure,
     reverse,
     value_or,
     wrapping_add as +,
@@ -34,29 +36,19 @@ fn main() -> i64 {
     let back = r.reverse(); // `xs` again
     let same = if (back == xs && mid.reverse() == [3, 4, 5]) { 100 } else { 0 };
     r[0].value_or(0) + mid[0].value_or(0) + total(mid) + same // 6 + 5 + 12 + 100
-}
+}.performance({
+    let xs = [1, 2, 3, 4, 5, 6];
+    let r = xs.reverse();
+    assert(measure("reverse", xs, reverse).allocations == 0);
+    assert(measure("reverse twice", xs, |a| a.reverse().reverse()).allocations == 0);
+    assert(measure("slice of a reversed array", r, |v| v[1..4]).allocations == 0);
+    assert(measure("walk a reversed array", r, total).allocations == 0);
+
+    // A bit-packed `bool[]` has no byte run to walk backwards, so it is copied.
+    let flags = [true, false, true];
+    let Measurement { allocations, bytes_allocated } = measure("reverse bools", flags, reverse);
+    assert(allocations == 1);
+    assert(bytes_allocated == 17);
+})
 --- exit code ---
 123
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 577
-binary size: 2208
-  code: 1256
-  data: 89
-  metadata: 863
-functions:
-  __eq_i64$arr:
-    calls: 2
-    bytes: 264
-  aipl_arr_inc:
-    calls: 4
-    bytes: (external)
-  aipl_array_dec:
-    calls: 4
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 992

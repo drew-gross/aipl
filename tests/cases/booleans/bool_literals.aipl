@@ -7,29 +7,3 @@ fn t() -> bool { true }.test({
 fn f() -> bool { false }.test({
     assert(f() == false);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 48
-binary size: 1168
-  code: 240
-  data: 98
-  metadata: 830
-functions:
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 2
-    bytes: (external)
-  aipl_test_end:
-    calls: 2
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 240

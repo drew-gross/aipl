@@ -14,32 +14,3 @@ fn count(s: str) -> i64 {
 }.test({
     assert(count("hello") == 5);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 665
-binary size: 1600
-  code: 628
-  data: 71
-  metadata: 901
-functions:
-  __test$count:
-    calls: 1
-    bytes: 524
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104

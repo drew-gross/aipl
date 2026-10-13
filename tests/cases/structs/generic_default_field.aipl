@@ -16,38 +16,3 @@ fn custom_tag() -> str { Tagged { value: 7, tag: "seven" }.tag }.test({
 fn value_through() -> i64 { Tagged { value: 99 }.value }.test({
     assert(value_through() == 99);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 111
-binary size: 1984
-  code: 648
-  data: 212
-  metadata: 1124
-functions:
-  __test$custom_tag:
-    calls: 1
-    bytes: 156
-  __test$default_tag:
-    calls: 1
-    bytes: 148
-  __test$value_through:
-    calls: 1
-    bytes: 88
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 3
-    bytes: (external)
-  aipl_test_end:
-    calls: 3
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 256

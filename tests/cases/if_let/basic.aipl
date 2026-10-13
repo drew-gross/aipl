@@ -17,26 +17,3 @@ fn main() !prints {
 --- stdout ---
 got 5
 nothing
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 105
-instructions executed: 58
-binary size: 1472
-  code: 508
-  data: 1
-  metadata: 963
-functions:
-  __to_str_i64:
-    calls: 1
-    bytes: 204
-  aipl_i64_len:
-    calls: 2
-    bytes: (external)
-  aipl_write_i64:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 304

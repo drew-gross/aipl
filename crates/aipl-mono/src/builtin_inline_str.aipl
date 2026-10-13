@@ -48,38 +48,3 @@ pub fn inline_str(self: str) -> str? {
     // A string too long to be inline is still too long once it is a rope.
     assert(inline_str(rope_str("12345678901234567890", "123")) == none);
 })
---- performance ---
-allocations: 4
-deallocations: 4
-reallocations: 0
-bytes allocated: 254
-instructions executed: 685
-binary size: 5392
-  code: 2476
-  data: 687
-  metadata: 2229
-functions:
-  __test$inline_str:
-    calls: 1
-    bytes: 1744
-  aipl_assert:
-    calls: 7
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  inline_str:
-    calls: 5
-    bytes: 312
-  inline_str$c0:
-    calls: 2
-    bytes: 312
-  main:
-    calls: 1
-    bytes: 108

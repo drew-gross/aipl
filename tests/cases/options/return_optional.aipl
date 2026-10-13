@@ -8,32 +8,3 @@ fn divide(x: i64, y: i64) -> i64? { if (y == 0) { none } else { some(x / y) } }.
     assert(divide(100, 0) == none);
     assert(divide(100, 4).value_or(-1) + divide(100, 0).value_or(-1) == 24);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 77
-binary size: 1568
-  code: 420
-  data: 239
-  metadata: 909
-functions:
-  __test$divide:
-    calls: 1
-    bytes: 316
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104

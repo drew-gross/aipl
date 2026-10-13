@@ -19,32 +19,3 @@ pub fn trim_end_while(self: str, pred: (char) -> bool) -> str {
     assert("".trim_end_while(|c| c == ' ') == ""); // empty source
     assert("axxbxx".trim_end_while(|c| c == 'x') == "axxb"); // only the trailing run
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 1489
-binary size: 4344
-  code: 2300
-  data: 423
-  metadata: 1621
-functions:
-  __test$trim_end_while:
-    calls: 1
-    bytes: 2184
-  aipl_assert:
-    calls: 5
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 116

@@ -11,17 +11,3 @@ abcabcabc
 x
 
 hihi
---- performance ---
-allocations: 4
-deallocations: 4
-reallocations: 0
-bytes allocated: 156
-instructions executed: 55
-binary size: 1160
-  code: 400
-  data: 1
-  metadata: 759
-functions:
-  main:
-    calls: 1
-    bytes: 400

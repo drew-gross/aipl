@@ -67,26 +67,3 @@ Named("n")
 Term(Space)
 Term(Dot)
 
---- performance ---
-allocations: 8
-deallocations: 8
-reallocations: 0
-bytes allocated: 214
-instructions executed: 1140
-binary size: 8272
-  code: 4456
-  data: 202
-  metadata: 3614
-functions:
-  __to_str_Rule$Tok:
-    calls: 4
-    bytes: 1352
-  __to_str_Rule$Tok2:
-    calls: 4
-    bytes: 1256
-  aipl_write_bytes:
-    calls: 32
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 1848

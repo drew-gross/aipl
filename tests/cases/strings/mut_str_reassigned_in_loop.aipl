@@ -27,32 +27,3 @@ fn shrink(s: str) -> str {
     // way, so it never collapses to an inline (non-heap) string.
     assert(shrink("0123456789,abcdefghij,ABCDEFGHIJ") == "01234567");
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 162
-binary size: 1952
-  code: 608
-  data: 156
-  metadata: 1188
-functions:
-  __test$shrink:
-    calls: 1
-    bytes: 504
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104

@@ -12,35 +12,3 @@ fn len(s: str) -> i64 {
     // 12 + 0 + 1 = 13
     assert(len("hello, world") + len("") + len("a") == 13);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 824
-binary size: 1560
-  code: 548
-  data: 102
-  metadata: 910
-functions:
-  __test$len:
-    calls: 1
-    bytes: 220
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  len:
-    calls: 3
-    bytes: 228
-  main:
-    calls: 1
-    bytes: 100

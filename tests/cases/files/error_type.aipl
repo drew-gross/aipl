@@ -50,23 +50,3 @@ hi
 read: hi
 error: could not read file
 error: empty input
---- performance ---
-allocations: 8
-deallocations: 8
-reallocations: 0
-bytes allocated: 298
-instructions executed: 313
-binary size: 3624
-  code: 2124
-  data: 1
-  metadata: 1499
-functions:
-  aipl_read_file_to_string:
-    calls: 3
-    bytes: (external)
-  first:
-    calls: 3
-    bytes: 636
-  main:
-    calls: 1
-    bytes: 1488

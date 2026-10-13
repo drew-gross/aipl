@@ -29,38 +29,3 @@ fn line_of(s: Span) -> u64 {
 }.test({
     assert(line_of(At(7, 2)) == 2);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 163
-binary size: 2224
-  code: 756
-  data: 309
-  metadata: 1159
-functions:
-  __eq_Shape:
-    calls: 1
-    bytes: 176
-  __test$area:
-    calls: 1
-    bytes: 324
-  __test$line_of:
-    calls: 1
-    bytes: 88
-  aipl_assert:
-    calls: 5
-    bytes: (external)
-  aipl_test_begin:
-    calls: 2
-    bytes: (external)
-  aipl_test_end:
-    calls: 2
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 168

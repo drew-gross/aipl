@@ -42,32 +42,3 @@ fn probe() -> bool { true }.test({
     let u64a: u64 = 3;
     assert(u64a - 9 == 0);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 256
-binary size: 3608
-  code: 1156
-  data: 821
-  metadata: 1631
-functions:
-  __test$probe:
-    calls: 1
-    bytes: 1052
-  aipl_assert:
-    calls: 13
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104

@@ -6,32 +6,3 @@ fn plus(self: i64, n: i64) -> i64 { self + n }.test({
     // (10.plus(5)).double() = 15 * 2 = 30
     assert(10.plus(5).double() == 30);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 28
-binary size: 1000
-  code: 176
-  data: 68
-  metadata: 756
-functions:
-  __test$plus:
-    calls: 1
-    bytes: 76
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100

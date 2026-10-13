@@ -88,35 +88,3 @@ fn message(r: i64!str) -> str {
         err(e) => e,
     }
 }
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 966
-binary size: 8984
-  code: 4680
-  data: 1333
-  metadata: 2971
-functions:
-  __test$value_or_err:
-    calls: 1
-    bytes: 4064
-  __test$value_or_err$digit_of:
-    calls: 5
-    bytes: 504
-  aipl_assert:
-    calls: 14
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 112

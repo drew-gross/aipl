@@ -12,32 +12,3 @@ fn is_len_greater_than_5(v: any[]) -> bool { len(v) > 5 }.test({
     assert(is_len_greater_than_5(chars) == true);
     assert(is_len_greater_than_5(bools) == false);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 132
-binary size: 1888
-  code: 544
-  data: 308
-  metadata: 1036
-functions:
-  __test$is_len_greater_than_5:
-    calls: 1
-    bytes: 412
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 132

@@ -34,38 +34,3 @@ some(5)
 some(5)
 none
 none
---- performance ---
-allocations: 4
-deallocations: 4
-reallocations: 0
-bytes allocated: 86
-instructions executed: 535
-binary size: 3104
-  code: 1512
-  data: 74
-  metadata: 1518
-functions:
-  __builtin_find_if$i64$lam$main$lambda0:
-    calls: 1
-    bytes: 224
-  __builtin_find_if$i64$lam$main$lambda1:
-    calls: 1
-    bytes: 224
-  __to_str_i64$opt:
-    calls: 4
-    bytes: 376
-  aipl_i64_len:
-    calls: 4
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 6
-    bytes: (external)
-  aipl_write_i64:
-    calls: 2
-    bytes: (external)
-  first_big:
-    calls: 2
-    bytes: 220
-  main:
-    calls: 1
-    bytes: 468

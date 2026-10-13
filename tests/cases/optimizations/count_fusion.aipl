@@ -5,16 +5,19 @@
 # All six comparisons fuse, in both operand orders — `n > xs.count(x)` is the
 # same claim as `xs.count(x) < n`, so one rule covers the mirrored form.
 #
-# The saving is in this case's `instructions executed`: `many()` holds 201
-# matches, and every answer below is decided within the first few elements.
+# The saving is in the instructions, which the `.performance` block on `many`
+# measures: it holds 201 matches, and every answer below is decided within the
+# first few elements — a fraction of what counting them all costs.
 
 import {
+    Measurement,
     count,
     equal as ==,
     greater_than as >,
     greater_than_or_equal as >=,
     less_than as <,
     less_than_or_equal as <=,
+    measure,
     not_equal as !=,
     print,
     push,
@@ -30,7 +33,23 @@ fn many() -> i64[] {
         set i++;
     }
     xs
-}
+}.performance({
+    let xs = many();
+
+    // Each comparison is decided at the second or third match, and stops there:
+    // about a hundred instructions.
+    assert(measure("count < 3", xs, |v| v.count(2) < 3).instructions == 133);
+    assert(measure("count > 2", xs, |v| v.count(2) > 2).instructions == 127);
+    assert(measure("count >= 2", xs, |v| v.count(2) >= 2).instructions == 102);
+    assert(measure("count != 2", xs, |v| v.count(2) != 2).instructions == 127);
+    // The bound on the left is the same claim, and costs the same.
+    assert(measure("3 > count", xs, |v| 3 > v.count(2)).instructions == 133);
+
+    // Counting them all is what they avoid: a bound the count never reaches cannot
+    // stop early, and walking all 201 elements costs sixty times as much.
+    let Measurement { instructions } = measure("count < 500", xs, |v| v.count(2) < 500);
+    assert(instructions == 6286);
+})
 
 fn small() -> i64[] { [1, 2, 2, 3, 2] }
 
@@ -79,50 +98,3 @@ true
 true
 false
 
---- performance ---
-allocations: 21
-deallocations: 21
-reallocations: 28
-bytes allocated: 474
-instructions executed: 24206
-binary size: 6456
-  code: 3836
-  data: 78
-  metadata: 2542
-functions:
-  __builtin_count_is_at_least$i64:
-    calls: 3
-    bytes: 240
-  __builtin_count_is_at_most$i64:
-    calls: 2
-    bytes: 220
-  __builtin_count_is_equal$i64:
-    calls: 2
-    bytes: 232
-  __builtin_count_is_greater_than$i64:
-    calls: 2
-    bytes: 220
-  __builtin_count_is_less_than$i64:
-    calls: 5
-    bytes: 240
-  __builtin_count_is_not_equal$i64:
-    calls: 3
-    bytes: 236
-  __to_str_bool:
-    calls: 17
-    bytes: 224
-  aipl_arr_inc:
-    calls: 8
-    bytes: (external)
-  aipl_array_dec:
-    calls: 8
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 17
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 1856
-  many:
-    calls: 4
-    bytes: 368

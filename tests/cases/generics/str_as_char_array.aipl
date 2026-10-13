@@ -20,35 +20,3 @@ fn count_eq<T: any>(self: T[], target: T) -> i64 {
     assert(count_eq("  x ", ' ') == 3); // byte values preserved
     assert(count_eq("", 'z') == 0); // empty string
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 1100
-binary size: 2960
-  code: 1256
-  data: 401
-  metadata: 1303
-functions:
-  __test$count_eq:
-    calls: 1
-    bytes: 880
-  aipl_assert:
-    calls: 5
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  count_eq$char$s0:
-    calls: 3
-    bytes: 268
-  main:
-    calls: 1
-    bytes: 108

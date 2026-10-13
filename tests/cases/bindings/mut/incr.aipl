@@ -17,35 +17,3 @@ fn count_to(limit: i64) -> i64 {
     assert(count_to(0) == 0);
     assert(count_to(1) == 1);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 185
-binary size: 1496
-  code: 400
-  data: 142
-  metadata: 954
-functions:
-  __test$count_to:
-    calls: 1
-    bytes: 220
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  count_to:
-    calls: 3
-    bytes: 72
-  main:
-    calls: 1
-    bytes: 108

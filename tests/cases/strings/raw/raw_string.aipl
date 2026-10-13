@@ -13,29 +13,3 @@ fn raw() -> str {
 }.test({
     assert(raw() == "This is\na raw\nstring");
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 39
-binary size: 1104
-  code: 272
-  data: 69
-  metadata: 763
-functions:
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 272

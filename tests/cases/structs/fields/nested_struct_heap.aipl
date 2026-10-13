@@ -19,32 +19,3 @@ fn full_first(Contact { name }) -> str { name.first }.test({
     assert(c.name.last == "Lovelace");
     assert(c.nick == some("Countess")); // optional field on outer
 })
---- performance ---
-allocations: 3
-deallocations: 3
-reallocations: 0
-bytes allocated: 117
-instructions executed: 247
-binary size: 2912
-  code: 1244
-  data: 214
-  metadata: 1454
-functions:
-  __test$full_first:
-    calls: 1
-    bytes: 1136
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

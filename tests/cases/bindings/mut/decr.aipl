@@ -24,35 +24,3 @@ fn triangle(n: i64) -> i64 {
     assert(triangle(1) == 1);
     assert(triangle(0) == 0);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 227
-binary size: 1520
-  code: 424
-  data: 142
-  metadata: 954
-functions:
-  __test$triangle:
-    calls: 1
-    bytes: 220
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108
-  triangle:
-    calls: 3
-    bytes: 96

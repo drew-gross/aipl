@@ -1,24 +1,26 @@
 # A constant array literal — every element a scalar literal, or no elements at
 # all — is laid out in the binary's data section, exactly as a string literal
-# is. Reading one costs no allocation: the `--- performance ---` section below
-# counts none for `digits()`, `flags()` or `letters()`, however often they are
-# called (a `char[]` literal *is* a static `str`, the same object `"abc"` is).
+# is. Reading one costs no allocation: the `.performance` blocks below measure
+# none for `digits()`, `flags()` or `letters()` (a `char[]` literal *is* a static
+# `str`, the same object `"abc"` is).
 #
 # A static block is shared by every evaluation of the literal, so nothing may
 # write into it. Every path that would — `push`/`extend` on an exclusive
 # `mut`, the in-place buffer reuse behind `map`/`filter` on a fresh value —
 # copies the block first, which is why `digits()` still reads `[0, 3, 5]` after
-# each of them has had a turn: the allocations counted here are exactly those
-# copies. The same guard is what makes `xs.reverse().map(f)` correct — a
+# each of them has had a turn: the one allocation each of them is measured to
+# make is exactly that copy. The same guard is what makes `xs.reverse().map(f)` correct — a
 # reversed *view* isn't a writable block either, and the in-place `map` used to
 # store straight through it.
 
 import {
+    Measurement,
     equal as ==,
     extend,
     filter,
     len,
     map,
+    measure,
     print,
     push,
     reverse,
@@ -26,11 +28,40 @@ import {
     wrapping_mul as *,
 } from builtins;
 
-fn digits() -> i64[] { [0, 3, 5] }
+fn digits() -> i64[] { [0, 3, 5] }.performance({
+    // Reading the literal costs nothing but the call.
+    assert(measure("read", 0, |_| digits()).allocations == 0);
 
-fn flags() -> bool[] { [true, false, true, true, true, true, true, true, false] }
+    // Every way of writing into it copies the block first, once.
+    assert(measure("map", 0, |_| digits().map(|x| x + 1)).allocations == 1);
+    assert(measure("filter", 0, |_| digits().filter(|x| x == 3)).allocations == 1);
+    assert(measure("reverse then map", 0, |_| [1, 2, 3].reverse().map(|x| x * 2)).allocations == 1);
 
-fn letters() -> char[] { ['a', 'b', 'c'] }
+    // A `mut` seeded from the constant: the first append copies, and the later
+    // ones grow the copy in place — still one allocation for all three.
+    let Measurement { allocations, bytes_allocated, peak_live_bytes } = measure(
+        "seeded mut",
+        0,
+        |_| {
+            mut xs = [0, 3, 5];
+            set xs.push(7);
+            set xs.push(8);
+            set xs.extend([1, 2]);
+            xs.len()
+        },
+    );
+    assert(allocations == 1);
+    assert(bytes_allocated == 48);
+    assert(peak_live_bytes == 80);
+})
+
+fn flags() -> bool[] { [true, false, true, true, true, true, true, true, false] }.performance({
+    assert(measure("read", 0, |_| flags()).allocations == 0);
+})
+
+fn letters() -> char[] { ['a', 'b', 'c'] }.performance({
+    assert(measure("read", 0, |_| letters()).allocations == 0);
+})
 
 fn main() !prints {
     print(`{digits()} {flags()} {letters()} {[-1, -2]} {[]}`);
@@ -65,68 +96,3 @@ fn main() !prints {
 [6, 4, 2]
 [2]
 true true 9
---- performance ---
-allocations: 36
-deallocations: 36
-reallocations: 0
-bytes allocated: 1970
-instructions executed: 5897
-binary size: 14696
-  code: 9168
-  data: 246
-  metadata: 5282
-functions:
-  __eq_i64$arr:
-    calls: 1
-    bytes: 264
-  __to_str_bool:
-    calls: 2
-    bytes: 224
-  __to_str_bool$arr:
-    calls: 1
-    bytes: 616
-  __to_str_char$arr:
-    calls: 1
-    bytes: 756
-  __to_str_i64:
-    calls: 1
-    bytes: 204
-  __to_str_i64$arr:
-    calls: 9
-    bytes: 704
-  __to_str_none$arr:
-    calls: 1
-    bytes: 200
-  aipl_arr_inc:
-    calls: 13
-    bytes: (external)
-  aipl_array_dec:
-    calls: 15
-    bytes: (external)
-  aipl_array_new:
-    calls: 2
-    bytes: (external)
-  aipl_i64_len:
-    calls: 54
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 61
-    bytes: (external)
-  aipl_write_i64:
-    calls: 27
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 4292
-  main$filter3$own0:
-    calls: 1
-    bytes: 496
-  main$filter7$own0:
-    calls: 1
-    bytes: 496
-  main$map1$own0:
-    calls: 1
-    bytes: 456
-  main$map5$own0:
-    calls: 1
-    bytes: 460

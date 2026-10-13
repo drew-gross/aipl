@@ -5,14 +5,20 @@
 # default then sits directly ahead of a `match` that only the `none` arm reads
 # — which is exactly the shape the sinking pass moves into that arm.
 #
-# So the two calls below build one string between them, not two. The
-# `allocations:` counter is the assertion.
+# So the two calls below build one string between them, not two. The allocations
+# (the `.performance` block on `text`) are the assertion: the call whose optional
+# is present builds no default at all.
 
-import { len, print, to_str, value_or } from builtins;
+import { equal as ==, len, measure, print, to_str, value_or } from builtins;
 
 fn fallback(n: u64) -> str { `fallback {n} padded out well past the inline limit` }
 
-fn text(o: str?, n: u64) -> u64 { o.value_or(fallback(n)).len() }
+fn text(o: str?, n: u64) -> u64 { o.value_or(fallback(n)).len() }.performance({
+    assert(measure("present", some("found"), |o| text(o, 1)).allocations == 0);
+    // The default is built when it is needed: three allocations to render it.
+    let nothing: str? = none;
+    assert(measure("absent", nothing, |o| text(o, 2)).allocations == 3);
+})
 
 fn main() !prints {
     print(text(some("found"), 1).to_str());
@@ -21,29 +27,3 @@ fn main() !prints {
 --- stdout ---
 5
 48
---- performance ---
-allocations: 5
-deallocations: 5
-reallocations: 0
-bytes allocated: 228
-instructions executed: 191
-binary size: 2168
-  code: 900
-  data: 55
-  metadata: 1213
-functions:
-  __to_str_u64:
-    calls: 3
-    bytes: 204
-  aipl_u64_len:
-    calls: 6
-    bytes: (external)
-  aipl_write_u64:
-    calls: 3
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 304
-  text:
-    calls: 2
-    bytes: 392

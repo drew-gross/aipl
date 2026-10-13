@@ -7,10 +7,10 @@
 # that order either way. It is only the second step, moving into the arm, that
 # defers anything.
 #
-# As in `sink_into_branch`, `allocations:` is the assertion: two calls, one
-# string built.
+# As in `sink_into_branch`, the allocations are the assertion (the `.performance`
+# block on `size`): the call that does not take the arm builds no string.
 
-import { is_nonempty, len, print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, is_nonempty, len, measure, print, to_str, wrapping_add as + } from builtins;
 
 fn label(n: u64) -> str { `value {n} padded out well past the inline-string limit` }
 
@@ -23,7 +23,10 @@ fn size(flag: bool, n: u64) -> u64 {
         set out = 1;
     };
     out + 1
-}
+}.performance({
+    assert(measure("arm not taken", false, |f| size(f, 1)).allocations == 0);
+    assert(measure("arm taken", true, |f| size(f, 2)).allocations == 3);
+})
 
 fn main() !prints {
     print(size("".is_nonempty(), 1).to_str());
@@ -32,29 +35,3 @@ fn main() !prints {
 --- stdout ---
 2
 53
---- performance ---
-allocations: 5
-deallocations: 5
-reallocations: 0
-bytes allocated: 228
-instructions executed: 188
-binary size: 1968
-  code: 796
-  data: 62
-  metadata: 1110
-functions:
-  __to_str_u64:
-    calls: 3
-    bytes: 204
-  aipl_u64_len:
-    calls: 6
-    bytes: (external)
-  aipl_write_u64:
-    calls: 3
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 292
-  size:
-    calls: 2
-    bytes: 300

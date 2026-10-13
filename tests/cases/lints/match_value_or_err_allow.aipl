@@ -62,20 +62,3 @@ fn main() !prints {
 agree on some
 agree on none
 returning form kept
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 217
-binary size: 1848
-  code: 1116
-  data: 1
-  metadata: 731
-functions:
-  main:
-    calls: 1
-    bytes: 704
-  need_returning:
-    calls: 2
-    bytes: 412

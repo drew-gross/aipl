@@ -24,20 +24,3 @@ abc
 bc
 xy
 x
---- performance ---
-allocations: 1
-deallocations: 1
-reallocations: 0
-bytes allocated: 18
-instructions executed: 151
-binary size: 1960
-  code: 908
-  data: 1
-  metadata: 1051
-functions:
-  aipl_write_bytes:
-    calls: 2
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 908

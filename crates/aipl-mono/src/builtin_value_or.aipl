@@ -66,35 +66,3 @@ pub fn value_or<T: any>(self: T?, default: T) -> T {
 struct Point { x: i64, y: i64 }
 
 variant Color = Red | Blue
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 591
-binary size: 6280
-  code: 2352
-  data: 1540
-  metadata: 2388
-functions:
-  __eq_Point:
-    calls: 1
-    bytes: 104
-  __test$value_or:
-    calls: 1
-    bytes: 2140
-  aipl_assert:
-    calls: 18
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

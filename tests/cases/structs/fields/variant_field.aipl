@@ -27,38 +27,3 @@ fn describe(Token { kind }) -> str {
     assert(t.kind == Punct);
     assert(t.start == 9);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 289
-binary size: 3808
-  code: 1800
-  data: 491
-  metadata: 1517
-functions:
-  __eq_Kind:
-    calls: 1
-    bytes: 64
-  __eq_Token:
-    calls: 1
-    bytes: 128
-  __test$describe:
-    calls: 1
-    bytes: 1500
-  aipl_assert:
-    calls: 6
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108

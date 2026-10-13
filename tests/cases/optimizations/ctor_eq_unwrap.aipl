@@ -9,11 +9,11 @@
 # on `x` that compares payloads directly, which is what the comparison did
 # anyway, minus the value it had to be handed.
 #
-# The `allocations:` counter is the assertion for the heap case below: without
-# the rewrite, building `some("a string long past the inline limit")` to throw
-# it away is an allocation this program never makes.
+# The `.performance` block on `is_long` is the assertion for the heap case below:
+# without the rewrite, building `some("a string long past the inline limit")` to
+# throw it away would be an allocation, and the comparison makes none.
 
-import { equal as ==, is_nonempty, not_equal as !=, print, to_str } from builtins;
+import { equal as ==, is_nonempty, measure, not_equal as !=, print, to_str } from builtins;
 
 fn matches(x: i64?, y: i64) -> bool { x == some(y) }
 
@@ -28,7 +28,13 @@ fn failed_with(r: i64!str, m: str) -> bool { r == err(m) }
 // A heap payload, where the construction also cost a retain.
 fn long() -> str { "a string long past the inline limit, so it lives on the heap" }
 
-fn is_long(x: str?) -> bool { x == some(long()) }
+fn is_long(x: str?) -> bool { x == some(long()) }.performance({
+    // `long()` is still called — it is the comparison's operand — but nothing is
+    // built to hold its result, whether the comparison hits or misses.
+    let nothing: str? = none;
+    assert(measure("miss", nothing, is_long).allocations == 0);
+    assert(measure("hit", some(long()), is_long).allocations == 0);
+})
 
 // The payload-less constructors ask the tag and nothing else.
 fn is_absent(x: i64?) -> bool { x == none }
@@ -97,41 +103,3 @@ true
 false
 true
 false
---- performance ---
-allocations: 21
-deallocations: 21
-reallocations: 0
-bytes allocated: 573
-instructions executed: 864
-binary size: 5392
-  code: 2900
-  data: 94
-  metadata: 2398
-functions:
-  __rec_drop_List:
-    calls: 4
-    bytes: 44
-  __to_str_bool:
-    calls: 17
-    bytes: 224
-  aipl_rec_alloc:
-    calls: 4
-    bytes: (external)
-  aipl_rec_dec_strong:
-    calls: 6
-    bytes: (external)
-  aipl_rec_dec_weak:
-    calls: 2
-    bytes: (external)
-  aipl_rec_inc_strong:
-    calls: 2
-    bytes: (external)
-  aipl_rec_inc_weak:
-    calls: 2
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 17
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 2632

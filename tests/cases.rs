@@ -29,7 +29,7 @@
 //!                          where it is present, never added. Mutually exclusive
 //!                          with `errors`.
 //!   `--- performance ---`— expected accounting for a successful run, six
-//!                          required lines: `allocations: N`,
+//!                          lines: `allocations: N`,
 //!                          `deallocations: M`, `reallocations: K`,
 //!                          `bytes allocated: B`, `instructions executed: I`
 //!                          (CLIF instructions executed), and `binary size: S`
@@ -52,12 +52,16 @@
 //!                          the list of
 //!                          instances monomorphization emitted, so a change in
 //!                          what gets specialized shows up as a diff here.
-//!                          Mutually exclusive with `errors`. REQUIRED on every
-//!                          running case under `tests/cases/` and `crates/`
-//!                          (only the user-facing `examples/` are exempt); a
-//!                          success case without one fails. For a *library* case
-//!                          (no `main`), it measures the `.test` run instead —
-//!                          see below.
+//!                          Mutually exclusive with `errors`. OPTIONAL: a case that
+//!                          tests behavior pins nothing here. It is kept for the
+//!                          large programs, where it stands in for a whole-compiler
+//!                          metric; the properties an optimization is *for* are
+//!                          stated by a `.performance` block (allocations,
+//!                          instructions) or a `--- report ---` section (which
+//!                          functions were called), where they read as claims.
+//!                          Refreshed by `fill_expected` where present, never
+//!                          added. For a *library* case (no `main`), it measures
+//!                          the `.test` run instead — see below.
 //!
 //! Every running case is also *measured*, whatever sections it has, and refused if
 //! it leaks (allocations != deallocations): the leak gate is not a side effect of
@@ -690,8 +694,8 @@ fn run_perfmon() {
 ///     `import`s resolve.
 ///   - `crates/**/*.aipl` — the compiler-dogfooded helpers (`add`, `count_while`,
 ///     `dedent`, `process_raw_string`, …), loaded in place. Run as library cases:
-///     their `.test` blocks are verified and their (required) `--- performance ---`
-///     section is asserted.
+///     their `.test` blocks are verified and their `--- performance ---` section, if
+///     they have one, is asserted.
 fn collect_all_cases(cases_root: &Path, examples_root: &Path, crates_root: &Path) -> Vec<CaseFile> {
     let mut cases = Vec::new();
     collect_cases(cases_root, &mut cases);
@@ -959,27 +963,7 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
         }
         run_error_case(&ctx, path, &src_path, &spec, &mut fills)
     } else {
-        // A `--- performance ---` section is mandatory for every running test
-        // case — `tests/cases/` and the compiler-dogfooded `crates/` helpers
-        // alike; only the user-facing `examples/` are exempt. Author a new case
-        // with a `?` body and run the fill helper to capture the measured
-        // allocation counts.
-        // `fill` mode falls through both gates: a missing required section is
-        // *created* by the flush below (`fill_or_add_sections_file` appends a
-        // section that isn't there), so a brand-new case is finished in a single
-        // pass rather than erroring here and needing a second run.
-        let exempt = rel.starts_with("examples");
-        if !exempt && !fill && spec.performance.is_none() {
-            return Outcome::Fail(format!(
-                "{ctx}: missing required `--- performance ---` section. Add one with a \
-                 `?` body and run `{}` to fill in the measured \
-                 allocation/deallocation counts.",
-                scoped_fill_cmd(&ctx)
-            ));
-        }
-        run_success_case(
-            &ctx, path, &src_path, stem, &spec, &case_dir, &mut fills, !exempt,
-        )
+        run_success_case(&ctx, path, &src_path, stem, &spec, &case_dir, &mut fills)
     };
     // Write back whatever fill mode collected, whether or not a later section
     // failed: the sections checked before the failure were measured on this run
@@ -1429,10 +1413,6 @@ fn run_success_case(
     // Where a fill run collects the sections that moved; `fills.enabled` is what
     // distinguishes fill mode from a normal validating run.
     fills: &mut Fills,
-    // Whether `--- performance ---` is mandatory for this case (false only for
-    // the exempt `examples/`). In fill mode this is what authorizes *creating*
-    // an absent one, so a fill never adds that section to an example.
-    require_metrics: bool,
 ) -> Outcome {
     let program = match load_case(src_path) {
         Ok(p) => p,
@@ -1621,12 +1601,12 @@ fn run_success_case(
     // is what the leak gate needs, and the gate is the one check here that has
     // found real bugs, so it must not depend on a case having a section to compare.
     // (That used to be true by accident — `performance` was required on every case
-    // but the examples — and would stop being true the moment it became optional.)
+    // but the examples — and would have stopped being true the moment it became
+    // optional, which it now is.)
     // What is *compared* is still only what the case asks for. `report` is the same
     // measurement in the form a person reads, so a case that pins either, or both,
     // is measured once.
-    let performance = (spec.performance.is_some() || (fills.enabled && require_metrics))
-        .then(|| spec.performance.as_deref().unwrap_or(""));
+    let performance = spec.performance.as_deref();
     check_section!(run_performance_check(
         ctx,
         orig_path,

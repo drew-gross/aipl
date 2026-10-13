@@ -37,38 +37,3 @@ pub fn count_is_not_equal<T: any>(self: T[], x: T, limit: u64) -> bool {
     assert([1, 2, 3].count_is_not_equal(9, 0) == ([1, 2, 3].count(9) != 0)); // no matches
     assert([].count_is_not_equal(1, 0) == (0 != 0)); // empty
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 1439
-binary size: 3944
-  code: 1588
-  data: 771
-  metadata: 1585
-functions:
-  __builtin_count_is_not_equal$i64:
-    calls: 5
-    bytes: 236
-  __test$count_is_not_equal:
-    calls: 1
-    bytes: 992
-  aipl_assert:
-    calls: 6
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  count_is_not_equal$i64:
-    calls: 6
-    bytes: 236
-  main:
-    calls: 1
-    bytes: 124

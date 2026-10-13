@@ -33,41 +33,22 @@ a:Nums([1, 2])
 b:Nums([3])
 c:Nums([4, 5])
 
---- performance ---
-allocations: 9
-deallocations: 9
-reallocations: 0
-bytes allocated: 609
-instructions executed: 1255
-binary size: 5000
-  code: 2532
-  data: 130
-  metadata: 2338
-functions:
-  __ctor$Tagged$Nums:
-    calls: 3
-    bytes: 192
-  __to_str_Tagged:
-    calls: 3
-    bytes: 1184
-  aipl_arr_inc:
-    calls: 6
-    bytes: (external)
-  aipl_array_dec:
-    calls: 6
-    bytes: (external)
-  aipl_i64_len:
-    calls: 10
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 17
-    bytes: (external)
-  aipl_write_i64:
-    calls: 5
-    bytes: (external)
-  applied:
-    calls: 3
-    bytes: 536
-  main:
-    calls: 1
-    bytes: 620
+--- report ---
+allocations       9
+deallocations     9
+reallocations     0
+bytes allocated   609
+peak live bytes   609
+instructions      1255
+binary size       5000 bytes (code 2532, data 130, metadata 2338)
+
+function                calls  code bytes
+__ctor$Tagged$Nums          3         192
+__to_str_Tagged             3        1184
+aipl_arr_inc                6    external
+aipl_array_dec              6    external
+aipl_i64_len               10    external
+aipl_write_bytes           17    external
+aipl_write_i64              5    external
+applied                     3         536
+main                        1         620

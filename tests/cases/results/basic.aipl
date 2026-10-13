@@ -30,29 +30,3 @@ fn main() !prints {
 --- stdout ---
 = 5
 error: divide by zero
---- performance ---
-allocations: 3
-deallocations: 3
-reallocations: 0
-bytes allocated: 193
-instructions executed: 104
-binary size: 1832
-  code: 760
-  data: 1
-  metadata: 1071
-functions:
-  __to_str_i64:
-    calls: 1
-    bytes: 204
-  aipl_i64_len:
-    calls: 2
-    bytes: (external)
-  aipl_write_i64:
-    calls: 1
-    bytes: (external)
-  describe:
-    calls: 2
-    bytes: 400
-  main:
-    calls: 1
-    bytes: 156

@@ -12,32 +12,3 @@ fn same_length(v1: any[], v2: any[]) -> bool { len(v1) == len(v2) }.test({
     // char[] vs char[], both length 1
     assert(same_length(['x'], ['y']) == true);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 195
-binary size: 2128
-  code: 688
-  data: 365
-  metadata: 1075
-functions:
-  __test$same_length:
-    calls: 1
-    bytes: 576
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 112

@@ -7,29 +7,3 @@ fn add(x: i64, y: i64) -> i64 { x + y }.test({
 fn use_add() -> i64 { add(2, 3) }.test({
     assert(use_add() == 5);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 58
-binary size: 1224
-  code: 288
-  data: 106
-  metadata: 830
-functions:
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 2
-    bytes: (external)
-  aipl_test_end:
-    calls: 2
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 288

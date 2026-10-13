@@ -72,35 +72,3 @@ pub fn int_fits(v: i64, name: str) -> bool {
     assert(!int_fits(0, "bool"));
     assert(!int_fits(5, "str"));
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 2177
-binary size: 8688
-  code: 3520
-  data: 1813
-  metadata: 3355
-functions:
-  __test$int_fits:
-    calls: 1
-    bytes: 2684
-  aipl_assert:
-    calls: 31
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  int_fits:
-    calls: 31
-    bytes: 728
-  main:
-    calls: 1
-    bytes: 108

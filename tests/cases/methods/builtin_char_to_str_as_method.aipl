@@ -6,17 +6,3 @@ fn main() !prints -> i64 {
 }
 --- stdout ---
 X
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 7
-binary size: 656
-  code: 80
-  data: 1
-  metadata: 575
-functions:
-  main:
-    calls: 1
-    bytes: 80

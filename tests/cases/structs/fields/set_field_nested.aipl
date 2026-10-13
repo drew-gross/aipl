@@ -51,35 +51,3 @@ fn retag(s: Seg, tag: str, y: i64) -> Seg {
     assert(t.id == 5); // top-level sibling unchanged
     assert(s.line.start.y == 2); // source struct unaffected
 })
---- performance ---
-allocations: 3
-deallocations: 3
-reallocations: 0
-bytes allocated: 117
-instructions executed: 714
-binary size: 5792
-  code: 2856
-  data: 605
-  metadata: 2331
-functions:
-  __test$retag:
-    calls: 1
-    bytes: 1816
-  __test$shift_start_x:
-    calls: 1
-    bytes: 860
-  aipl_assert:
-    calls: 10
-    bytes: (external)
-  aipl_test_begin:
-    calls: 2
-    bytes: (external)
-  aipl_test_end:
-    calls: 2
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 180

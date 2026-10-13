@@ -8,35 +8,3 @@ fn beq(x: bool, y: bool) -> bool { x == y }.test({
 fn bne(x: bool, y: bool) -> bool { x != y }.test({
     assert(bne(false, true) == true);
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 65
-binary size: 1520
-  code: 360
-  data: 190
-  metadata: 970
-functions:
-  __test$beq:
-    calls: 1
-    bytes: 124
-  __test$bne:
-    calls: 1
-    bytes: 76
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 2
-    bytes: (external)
-  aipl_test_end:
-    calls: 2
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 160

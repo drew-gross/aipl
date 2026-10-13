@@ -1,6 +1,7 @@
-# All-constant expressions are folded at compile time — main compiles to a
-# bare constant return (see the instruction count below). The asserts pin the
-# folded values to the run-time semantics they must match.
+# All-constant expressions are folded at compile time: each costs exactly what
+# returning the literal it folds to costs (the `.performance` block on `arith`),
+# where the same expression over a variable costs more. The asserts pin the folded
+# values to the run-time semantics they must match.
 
 import {
     equal as ==,
@@ -11,6 +12,7 @@ import {
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
+    measure,
     not_equal as !=,
     saturating_divide as /,
     saturating_remainder as %,
@@ -21,6 +23,18 @@ import {
 
 fn arith() -> i64 { ((2 + 3) * 10) - ((7 / 2) + (7 % 2)) }.test({
     assert(arith() == 46);
+}).performance({
+    let literal = measure("literal", 0, |_| 46);
+    let arithmetic = measure("arith", 0, |_| arith());
+    let wrapping = measure("wraps", 0, |_| wraps());
+    let logic = measure("bools", 0, |_| bools());
+    assert(arithmetic.instructions == literal.instructions);
+    assert(wrapping.instructions == literal.instructions);
+    assert(logic.instructions == literal.instructions);
+
+    // With a variable in it, nothing folds.
+    let unfolded = measure("unfolded", 5, |n| ((n + 3) * 10) - ((7 / 2) + (7 % 2)));
+    assert(literal.instructions < unfolded.instructions);
 })
 
 // i64 wrapping at the boundaries: `+`/`-` here are the wrapping flavors, and
@@ -41,17 +55,3 @@ fn bools() -> bool { (1 < 2) && (2 <= 2) && (3 > 2) && (2 >= 2) && (1 == 1) && (
 fn main() -> i64 { (6 * 7) % 100 }
 --- exit code ---
 42
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 2
-binary size: 488
-  code: 8
-  data: 1
-  metadata: 479
-functions:
-  main:
-    calls: 1
-    bytes: 8

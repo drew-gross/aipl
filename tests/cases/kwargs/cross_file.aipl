@@ -17,17 +17,3 @@ wrapping_mul as *hiwrapping_mul as *
 import { concat as +++} from builtins;
 fn default_edge() -> str { "|" }
 pub fn framed(s: str, edge: str = default_edge()) -> str { edge +++ s +++ edge }
---- performance ---
-allocations: 4
-deallocations: 4
-reallocations: 0
-bytes allocated: 352
-instructions executed: 47
-binary size: 1120
-  code: 400
-  data: 1
-  metadata: 719
-functions:
-  main:
-    calls: 1
-    bytes: 400

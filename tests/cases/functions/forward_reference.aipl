@@ -5,32 +5,3 @@ fn caller() -> i64 { callee(7) }.test({
 })
 
 fn callee(x: i64) -> i64 { x * 2 }
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 28
-binary size: 1000
-  code: 180
-  data: 56
-  metadata: 764
-functions:
-  __test$caller:
-    calls: 1
-    bytes: 76
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104

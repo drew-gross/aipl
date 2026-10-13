@@ -21,35 +21,3 @@ fn snapshot() -> str {
 }.test({
     assert(snapshot() == "  hi  ");
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 168
-binary size: 2336
-  code: 940
-  data: 160
-  metadata: 1236
-functions:
-  __test$snapshot:
-    calls: 1
-    bytes: 380
-  __test$trimmed:
-    calls: 1
-    bytes: 384
-  aipl_assert:
-    calls: 2
-    bytes: (external)
-  aipl_test_begin:
-    calls: 2
-    bytes: (external)
-  aipl_test_end:
-    calls: 2
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 176

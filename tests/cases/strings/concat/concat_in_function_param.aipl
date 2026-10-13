@@ -6,29 +6,3 @@ import { equal as ==, rope_str } from builtins;
 fn joined() -> str { rope_str("hello, ", "world") }.test({
     assert(joined() == "hello, world");
 })
---- performance ---
-allocations: 1
-deallocations: 1
-reallocations: 0
-bytes allocated: 88
-instructions executed: 49
-binary size: 1264
-  code: 332
-  data: 75
-  metadata: 857
-functions:
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 332

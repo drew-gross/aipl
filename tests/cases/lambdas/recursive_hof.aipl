@@ -14,38 +14,3 @@ fn rec(n: i64, f: (i64) -> i64) -> i64 { if (n <= 0) { f(0) } else { rec(n - 1, 
     let bump = 7;
     assert(rec(3, |x| x + bump) == 7); // f(0) = 0 + 7 = 7
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 62
-binary size: 1192
-  code: 252
-  data: 64
-  metadata: 876
-functions:
-  __test$rec:
-    calls: 1
-    bytes: 92
-  aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 100
-  rec$lam$__test$rec$lambda0:
-    calls: 0
-    bytes: 32
-  rec$lam$__test$rec$lambda0$tail:
-    calls: 4
-    bytes: 28

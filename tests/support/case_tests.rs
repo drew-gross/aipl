@@ -618,6 +618,8 @@ case_tests! {
     cases_report_runtime_calls = "cases/report/runtime_calls",
     cases_report_smallest_program = "cases/report/smallest_program",
     cases_report_test_driver_run = "cases/report/test_driver_run",
+    cases_report_with_companion = "cases/report/with_companion",
+    cases_report_writes_a_file = "cases/report/writes_a_file",
     cases_results_array_payload = "cases/results/array_payload",
     cases_results_basic = "cases/results/basic",
     cases_results_err_results = "cases/results/err_results",

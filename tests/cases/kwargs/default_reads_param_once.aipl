@@ -24,26 +24,3 @@ noisy
 a
 b
 6
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 35
-instructions executed: 90
-binary size: 1448
-  code: 504
-  data: 1
-  metadata: 943
-functions:
-  __to_str_i64:
-    calls: 2
-    bytes: 204
-  aipl_i64_len:
-    calls: 4
-    bytes: (external)
-  aipl_write_i64:
-    calls: 2
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 300

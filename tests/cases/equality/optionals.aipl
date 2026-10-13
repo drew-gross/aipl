@@ -17,35 +17,3 @@ fn eq_opt(a: i64?, b: i64?) -> bool { a == b }.test({
     assert(d == e);
     assert(!(d == g));
 })
---- performance ---
-allocations: 0
-deallocations: 0
-reallocations: 0
-bytes allocated: 0
-instructions executed: 205
-binary size: 2248
-  code: 820
-  data: 260
-  metadata: 1168
-functions:
-  __eq_i64$opt:
-    calls: 2
-    bytes: 100
-  __test$eq_opt:
-    calls: 1
-    bytes: 616
-  aipl_assert:
-    calls: 6
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 104

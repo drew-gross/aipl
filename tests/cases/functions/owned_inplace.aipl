@@ -19,41 +19,22 @@ fn extended(xs: i64[]) -> i64[] {
     assert(extended(base) == [10, 20, 99]);
     assert(base == [10, 20]);
 })
---- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 88
-instructions executed: 639
-binary size: 3280
-  code: 1420
-  data: 335
-  metadata: 1525
-functions:
-  __eq_i64$arr:
-    calls: 3
-    bytes: 264
-  __test$extended:
-    calls: 1
-    bytes: 1048
-  aipl_arr_inc:
-    calls: 3
-    bytes: (external)
-  aipl_array_dec:
-    calls: 3
-    bytes: (external)
-  aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  main:
-    calls: 1
-    bytes: 108
+--- report ---
+allocations       2
+deallocations     2
+reallocations     0
+bytes allocated   88
+peak live bytes   88
+instructions      639
+binary size       3280 bytes (code 1420, data 335, metadata 1525)
+
+function               calls  code bytes
+__eq_i64$arr               3         264
+__test$extended            1        1048
+aipl_arr_inc               3    external
+aipl_array_dec             3    external
+aipl_assert                3    external
+aipl_test_begin            1    external
+aipl_test_end              1    external
+aipl_test_summary          1    external
+main                       1         108
