@@ -1,7 +1,8 @@
 //! Integration tests for `aipl report` — what a run of a file costs.
 //!
 //! These are meant to be read as examples: where a test is about what `report`
-//! prints, it states the whole output, so this file shows what a report looks like.
+//! prints, it states the whole output. (The human form lives in the corpus, as the
+//! `--- report ---` sections of `tests/cases/report/`.)
 //!
 //! The central claim is that `report` and the cases harness are one
 //! implementation (`aipl::perf`): so for any corpus case, the counts `report`
@@ -111,58 +112,12 @@ fn report_does_not_depend_on_where_it_is_run_from() {
 }
 
 // ---- what a report looks like -------------------------------------------------
-
-#[test]
-fn the_human_form_of_the_smallest_program() {
-    let (stdout, stderr, code) = report_source("empty", "fn main() {}\n", &[]);
-    assert_eq!(stderr, "");
-    assert_eq!(code, 0);
-    assert_eq!(
-        stdout,
-        "\
-allocations       0
-deallocations     0
-reallocations     0
-bytes allocated   0
-peak live bytes   0
-instructions      3
-binary size       488 bytes (code 8, data 1, metadata 479)
-
-function      calls  code bytes
-main              1           8
-"
-    );
-}
-
-#[test]
-fn the_human_form_of_a_program_that_calls_into_the_runtime() {
-    // `tests/cases/cli/args.aipl`, which prints each argument and their count. A
-    // function the runtime supplies has no code in this object, so its size reads
-    // `external` rather than a misleading 0.
-    let (stdout, stderr, code) = report(&["tests/cases/cli/args.aipl"]);
-    assert_eq!(stderr, "");
-    assert_eq!(code, 0);
-    assert_eq!(
-        stdout,
-        "\
-allocations       2
-deallocations     2
-reallocations     0
-bytes allocated   121
-peak live bytes   121
-instructions      133
-binary size       1504 bytes (code 524, data 1, metadata 979)
-
-function            calls  code bytes
-__to_str_u64            1         204
-aipl_array_dec          1    external
-aipl_array_new          1    external
-aipl_u64_len            2    external
-aipl_write_u64          1    external
-main                    1         320
-"
-    );
-}
+//
+// The human form is not pinned here. It is written out as the `--- report ---`
+// section of `tests/cases/report/` — the smallest program, a program that calls
+// into the runtime, and a library's test run — where `check` holds each to its
+// program and handoff refreshes it when codegen moves, which a Rust test could not
+// be. What stays in this file is what has no section: the machine form.
 
 #[test]
 fn the_machine_form_is_the_performance_section_plus_the_peak() {

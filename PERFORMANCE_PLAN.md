@@ -381,7 +381,19 @@ Each item below can land separately.
 - [ ] Rename `--- check ---` / `--- check exit code ---` to a name that says they
       pin the `.test` runner's report (choose when implementing) and migrate the
       handful of cases that use them.
-- [ ] `--- report ---`: `check` validates a pinned `aipl report` (needs Phase 1).
+- [x] `--- report ---`: `check` validates a pinned `aipl report`. The body is the
+      human form `aipl report` prints, trailing newlines stripped, compared as
+      written. Landed across: `parse_spec.aipl` (`report` field; a regeneration of
+      the artifact before the Rust bridge reads it), `SpecFields`, `sections::report`
+      (built through `perf::measure_program`, the function `aipl report` now also
+      uses), the harness (`Spec.report`; measured once with `performance`;
+      refilled where present, never added; exclusive with `errors`). A leak is a
+      finding of its own. Ported from Rust tests into cases under
+      `tests/cases/report/`: the smallest program, a program that calls into the
+      runtime (with a `--- cli ---`), and a library's test run. They still carry the
+      mandatory `--- performance ---`, so for now each pins one run twice; Phase 2
+      and 4 make that section optional. The `*_not_minted` and inlining cases are
+      the intended users and move over in Phase 4.
 - [ ] Leak gate: `check` flags allocations ≠ deallocations on the runs it already
       performs. First check whether the allocation tally is cheap enough in the
       production runtime; otherwise flag leaks only where an instrumented run

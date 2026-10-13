@@ -24,7 +24,7 @@
 ; struct __m19__ScopeSpan 40 span@0:__builtin_Span scope@16:str
 ; struct __m19__LexError 40 message@0:str span@24:__builtin_Span
 ; struct __m25__Companion 48 path@0:str contents@24:str
-; struct __m26__Spec 288 source@0:str extra_files@24:__m26__Entry[] expect_files@48:__m26__Entry[] stdout@72:str? stderr@104:str? exit_code@136:i64? errors@152:str? performance@184:str? cli@216:str[] check@240:str? check_exit_code@272:i64?
+; struct __m26__Spec 320 source@0:str extra_files@24:__m26__Entry[] expect_files@48:__m26__Entry[] stdout@72:str? stderr@104:str? exit_code@136:i64? errors@152:str? performance@184:str? report@216:str? cli@248:str[] check@272:str? check_exit_code@304:i64?
 ; struct __m26__Entry 48 path@0:str contents@24:str
 ; struct __m27__ParsedFile 80 program@0:__m36__Program allows@56:__builtin_Span[]
 ; struct __m36__Program 56 items@0:__m36__Item[] doc@24:str?
@@ -316,4 +316,4 @@
 ; data 188 __tostr_lit_94 52427261636b6574
 
 ; __m28__ast_case_name
-; source-fingerprint 6011783895817026829
+; source-fingerprint 13854425216375845965

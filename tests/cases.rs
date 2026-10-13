@@ -20,6 +20,14 @@
 //!                          this section means the program is expected
 //!                          to fail to compile; mutually exclusive with
 //!                          stdout/stderr/exit code.
+//!   `--- report ---`     — expected `aipl report` for the case, as that command prints
+//!                          it: the same measurement as `performance` in the form a
+//!                          person reads (aligned counts, the peak of live heap, a
+//!                          table of functions). Optional, and for the properties
+//!                          the function list shows — an instance that was not
+//!                          minted, a call inlined away. Refreshed by `fill_expected`
+//!                          where it is present, never added. Mutually exclusive
+//!                          with `errors`.
 //!   `--- performance ---`— expected accounting for a successful run, six
 //!                          required lines: `allocations: N`,
 //!                          `deallocations: M`, `reallocations: K`,
@@ -188,6 +196,9 @@ struct Spec {
     /// Expected allocation accounting, as the raw `--- performance ---` body
     /// (e.g. `allocations: 3\ndeallocations: 3`). `None` means the case is not perf-checked.
     performance: Option<String>,
+    /// Expected `aipl report` for the case — the readable form of the same run,
+    /// compared as written and refilled only when the section is already there.
+    report: Option<String>,
     /// CLI arguments passed to the built binary, one per line of the
     /// `--- cli ---` section. Reaches the program as `main`'s `str[]`.
     cli: Vec<String>,
@@ -227,6 +238,7 @@ fn parse_spec(contents: &str) -> Spec {
         exit_code: f.exit_code,
         errors: f.errors,
         performance: f.performance,
+        report: f.report,
         cli: f.cli,
         check: f.check,
         check_exit_code: f.check_exit_code,
@@ -871,6 +883,11 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
         if spec.performance.is_some() {
             return Outcome::Fail(format!(
                 "{ctx}: `performance` section requires a running program, so it cannot coexist with `errors`"
+            ));
+        }
+        if spec.report.is_some() {
+            return Outcome::Fail(format!(
+                "{ctx}: `report` section requires a running program, so it cannot coexist with `errors`"
             ));
         }
         if spec.check.is_some() {
@@ -1542,8 +1559,11 @@ fn run_success_case(
 
     // Allocation accounting, if requested. Correctness (above) is checked
     // first so a perf mismatch never masks a behavioral regression.
-    if spec.performance.is_some() || (fills.enabled && require_metrics) {
-        let perf = spec.performance.as_deref().unwrap_or("");
+    // `report` is the same measurement in the form a person reads, so a case
+    // that pins either (or both) is measured once.
+    let performance = (spec.performance.is_some() || (fills.enabled && require_metrics))
+        .then(|| spec.performance.as_deref().unwrap_or(""));
+    if performance.is_some() || spec.report.is_some() {
         check_section!(run_performance_check(
             ctx,
             orig_path,
@@ -1551,7 +1571,8 @@ fn run_success_case(
             stem,
             spec,
             case_dir,
-            perf,
+            performance,
+            spec.report.as_deref(),
             &obj_bytes,
             &symbol_names,
             fills,
@@ -1564,7 +1585,8 @@ fn run_success_case(
 
 /// Measure the case (see [`perf::measure`]: an instrumented build, linked against
 /// the instrumented runtime and run once) and verify, or fill in, the expected
-/// counts from a `--- performance ---` section. The instrumented object is
+/// counts from a `--- performance ---` section and/or the `--- report ---`
+/// section, each only when asked for (`Some`). The instrumented object is
 /// separate from the behavior-check one so production/JIT runs carry no counter
 /// overhead.
 #[allow(clippy::too_many_arguments)]
@@ -1575,7 +1597,8 @@ fn run_performance_check(
     stem: &str,
     spec: &Spec,
     case_dir: &Path,
-    expected_body: &str,
+    performance: Option<&str>,
+    report: Option<&str>,
     production: &[u8],
     symbol_names: &HashMap<String, String>,
     fills: &mut Fills,
@@ -1610,21 +1633,36 @@ fn run_performance_check(
         ));
     }
 
-    // A malformed (or `?`) expected body never parses, so it can't equal the
-    // rendered actual — it's treated as an ordinary mismatch (a normal run fails;
-    // fill mode overwrites it). Comparing on the rendered string keeps
-    // `check_or_fill`'s "differs ⇒ refresh/fail" contract uniform across sections.
-    let expected_render = match PerfStats::parse(expected_body) {
-        Some(v) => v.render(),
-        None => String::new(),
-    };
-    check_or_fill(
-        fills,
-        ctx,
-        "performance",
-        &actual.render(),
-        &expected_render,
-    )
+    if let Some(expected_body) = performance {
+        // A malformed (or `?`) expected body never parses, so it can't equal the
+        // rendered actual — it's treated as an ordinary mismatch (a normal run
+        // fails; fill mode overwrites it). Comparing on the rendered string keeps
+        // `check_or_fill`'s "differs ⇒ refresh/fail" contract uniform across
+        // sections.
+        let expected_render = match PerfStats::parse(expected_body) {
+            Some(v) => v.render(),
+            None => String::new(),
+        };
+        check_section!(check_or_fill(
+            fills,
+            ctx,
+            "performance",
+            &actual.render(),
+            &expected_render,
+        ));
+    }
+    match report {
+        // A section body has its trailing newlines stripped, and a report ends in
+        // one. Compared as written: it is text a reader is meant to read.
+        Some(expected) => check_or_fill(
+            fills,
+            ctx,
+            "report",
+            actual.render_report().trim_end(),
+            expected,
+        ),
+        None => Outcome::Pass,
+    }
 }
 
 /// Normalizes captured child output before comparing it against the expected

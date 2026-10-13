@@ -108,7 +108,7 @@ an instrumented build, which needs the linker `build` does), and validates the
 may end with: `errors` (the file must fail to compile with exactly those
 diagnostics, named relative to where `check` was started), and `stdout`,
 `stderr`, `exit code`, `cli` and `expect file: p` (one run of its `main`, made
-only when one of them is present). `--- file: p ---` sections are staged beside
+only when one of them is present), and `report` (what `aipl report` prints for it). `--- file: p ---` sections are staged beside
 the file so its imports and fixtures resolve. `--ignore-sections` checks the
 tests alone. It reports every failure rather than stopping at the first, and
 exits 0 only if all of them were formatted, compiled, passed, and matched.
@@ -389,6 +389,17 @@ fn check_file(
         // mismatch is, not a reason to forget that its tests already ran.
         found =
             sections::behavior(&program, spec, stem, label, dbg).unwrap_or_else(|msg| vec![msg]);
+    }
+    // A pinned `aipl report`: built both ways and run once, like the command.
+    if section_label.is_some() && spec.report.is_some() {
+        let stem = staged
+            .entry
+            .file_stem()
+            .and_then(OsStr::to_str)
+            .unwrap_or("a.out");
+        found.extend(
+            sections::report(&program, spec, stem, label, dbg).unwrap_or_else(|msg| vec![msg]),
+        );
     }
     Ok(Checked {
         exit_code,
@@ -832,20 +843,12 @@ fn report_file(
         .file_stem()
         .and_then(OsStr::to_str)
         .unwrap_or("a.out");
-    let measured = aipl::perf::measured_program(&program);
-    let object = ObjectCompilation::new(&measured, stem, dbg, false).map_err(render)?;
-    // Read before `emit` consumes the compilation: what each symbol is called in
-    // AIPL, for the per-function code sizes.
-    let symbol_names = object.code_symbol_names();
-    let production = object.emit().map_err(|e| e.to_string())?;
     // The staged scratch directory the program runs in (see `in_staged_dir`).
     let dir = env::current_dir().map_err(|e| format!("current dir: {e}"))?;
-    aipl::perf::measure(&measured, stem, &production, &symbol_names, cli, &dir, dbg).map_err(|e| {
-        match e {
-            aipl::perf::MeasureError::Compile(errors) => render(errors),
-            aipl::perf::MeasureError::Link(e) => e.to_string(),
-            aipl::perf::MeasureError::Run(msg) => msg,
-        }
+    aipl::perf::measure_program(&program, stem, cli, &dir, dbg).map_err(|e| match e {
+        aipl::perf::MeasureError::Compile(errors) => render(errors),
+        aipl::perf::MeasureError::Link(e) => e.to_string(),
+        aipl::perf::MeasureError::Run(msg) => msg,
     })
 }
 

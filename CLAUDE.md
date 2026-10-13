@@ -217,6 +217,18 @@ Two separate perf tracks:
   of cases), and it roots the file at its own directory for the same reason the
   harness does: an `assert`'s file label is baked into the binary's data. It needs
   the linker `aipl build` does, and exits 1 for a program that leaks.
+
+  **To pin one, use a `--- report ---` section**: its body is exactly what `aipl
+  report` prints for the case (aligned counts, the peak, the function table), and
+  `aipl check` validates it by running the same report, so it is both readable
+  documentation of what the program costs and refilled by handoff when codegen
+  moves — which a number written into a Rust test is not. It is optional, and for
+  the properties only the function list shows (an instance not minted, a call
+  inlined away); reach for a `.performance` block first when `measure` can state
+  the property, since a pinned report churns with every codegen change that moves
+  a size. `--- performance ---` is still required on every running case and holds
+  the same measurement; a case with both is two renderings of one run. Examples:
+  `tests/cases/report/`.
 - **Non-deterministic, *not* asserted**: `tests/performance_metrics.md` — a
   checked-in table of wall-clock (measured in-process, so process spawn/teardown
   is excluded), build time, and peak RSS per case. These drift run-to-run, so

@@ -871,6 +871,103 @@ fn a_malformed_section_is_the_files_error_not_a_dropped_expectation() {
     assert_eq!(code, 1);
 }
 
+/// What `aipl report` prints for `fn main() {}` — the figures are this platform's,
+/// as the corpus's own sections are.
+const REPORT_OF_EMPTY_MAIN: &str = "\
+allocations       0
+deallocations     0
+reallocations     0
+bytes allocated   0
+peak live bytes   0
+instructions      3
+binary size       488 bytes (code 8, data 1, metadata 479)
+
+function      calls  code bytes
+main              1           8";
+
+#[test]
+fn a_report_section_that_matches_what_report_prints_passes() {
+    let src = format!("fn main() {{}}\n--- report ---\n{REPORT_OF_EMPTY_MAIN}\n");
+    let (stdout, stderr, code) = check_here("sections_report_ok", &src);
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), (NO_TESTS, "", 0));
+}
+
+#[test]
+fn a_report_section_that_does_not_match_shows_what_report_printed() {
+    // The mismatch carries the whole actual report, so the section can be written
+    // by copying it — or by running `aipl report`, which prints the same text.
+    let src = "fn main() {}\n--- report ---\n?\n";
+    let (stdout, stderr, code) = check_here("sections_report_wrong", src);
+    assert_eq!(stdout, NO_TESTS);
+    assert_eq!(
+        stderr,
+        format!(
+            "sections_report_wrong.aipl: `report` mismatch\n--- expected ---\n?\n--- actual ---\n{REPORT_OF_EMPTY_MAIN}\n"
+        )
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_report_is_of_the_run_the_cli_section_asks_for() {
+    // The arguments come from `--- cli ---`, so this is a report of a run with two:
+    // the array of them is what the program allocates, and the whole of what `check`
+    // says about the mismatched section is the report that would have matched.
+    let src = "import { len, print, to_str } from builtins;\n\n\
+               fn main(args: str[]) !prints {\n    print(to_str(len(args)));\n}\n\
+               --- cli ---\none\ntwo\n--- stdout ---\n2\n--- report ---\n?\n";
+    let (stdout, stderr, code) = check_here("sections_report_cli", src);
+    assert_eq!(stdout, NO_TESTS);
+    assert_eq!(
+        stderr,
+        "\
+sections_report_cli.aipl: `report` mismatch
+--- expected ---
+?
+--- actual ---
+allocations       2
+deallocations     2
+reallocations     0
+bytes allocated   97
+peak live bytes   97
+instructions      38
+binary size       1240 bytes (code 336, data 1, metadata 903)
+
+function            calls  code bytes
+__to_str_u64            1         204
+aipl_array_dec          1    external
+aipl_array_new          1    external
+aipl_u64_len            2    external
+aipl_write_u64          1    external
+main                    1         132
+"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_report_section_cannot_sit_with_an_errors_section() {
+    let src = "fn bad() -> i64 { true }\n--- errors ---\nx\n--- report ---\ny\n";
+    let (stdout, stderr, code) = check_here("sections_report_errors", src);
+    assert_eq!(stdout, "");
+    assert_eq!(
+        stderr,
+        "\
+sections_report_errors.aipl: `report` section requires a running program, so it cannot coexist with `errors`
+sections_report_errors.aipl: `errors` mismatch
+--- expected ---
+x
+--- actual ---
+error: fn \"bad\": body returns bool, but the declared return type is i64
+ --> ./sections_report_errors.aipl:1:19
+  |
+1 | fn bad() -> i64 { true }
+  |                   ^^^^
+"
+    );
+    assert_eq!(code, 1);
+}
+
 // ---------------------------------------------------------------------------
 // `.performance` blocks and `measure`: run by `check`, in an instrumented build.
 // The corpus (`tests/cases/performance/`) holds the claims that pass and the one

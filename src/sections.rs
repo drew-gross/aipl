@@ -14,6 +14,7 @@
 //! | `errors` | the diagnostics compiling the file produces; the file must not compile |
 //! | `stdout`, `stderr`, `exit code` | one run of the built `main` |
 //! | `cli` | not compared: the arguments that run is given |
+//! | `report` | what `aipl report` prints for the file |
 //! | `expect file: p` | the file `p` the run left in its working directory |
 //!
 //! `--- file: p ---` companions are not expectations; they are staged beside the
@@ -64,6 +65,11 @@ pub fn conflicts(spec: &SpecFields) -> Vec<String> {
     if spec.performance.is_some() {
         found.push(
             "`performance` section requires a running program, so it cannot coexist with `errors`",
+        );
+    }
+    if spec.report.is_some() {
+        found.push(
+            "`report` section requires a running program, so it cannot coexist with `errors`",
         );
     }
     if spec.check.is_some() {
@@ -188,6 +194,48 @@ fn run_in(dir: &Path, obj: &[u8], spec: &SpecFields, stem: &str) -> Result<Vec<S
             )),
             Err(e) => found.push(format!("expected output file {rel:?} was not written: {e}")),
         }
+    }
+    Ok(found)
+}
+
+/// Check a `report` section: the file's `aipl report`, as that command prints it.
+///
+/// The file is built both ways and run once, in a scratch directory holding its
+/// companions and with `cli` as its arguments — exactly what `aipl report` does,
+/// through the same function, so the section can be written by running that
+/// command. A program that leaks is a finding of its own, as it is to `report`.
+///
+/// `Err` is a failure to produce a report at all (it does not compile for the
+/// instrumented build, or cannot be linked), rendered for the caller to print.
+pub fn report(
+    program: &Program,
+    spec: &SpecFields,
+    stem: &str,
+    label: &str,
+    dbg: DebugOptions,
+) -> Result<Vec<String>, String> {
+    let Some(expected) = spec.report.as_deref() else {
+        return Ok(Vec::new());
+    };
+    let dir = binary::scratch_dir("check-report").map_err(|e| e.to_string())?;
+    let measured = crate::stage_companions(&dir, &spec.extra_files)
+        .map_err(|e| format!("stage companions in {}: {e}", dir.display()))
+        .and_then(|()| {
+            crate::perf::measure_program(program, stem, &spec.cli, &dir, dbg)
+                .map_err(|e| e.render(&spec.source, label))
+        });
+    let _ = fs::remove_dir_all(&dir);
+    let stats = measured?;
+
+    // A section body has its trailing newlines stripped, and a report ends in one.
+    let mut found: Vec<String> = mismatch("report", stats.render_report().trim_end(), expected)
+        .into_iter()
+        .collect();
+    if let Some(n) = stats.leaked() {
+        found.push(format!(
+            "leak: {n} of {} allocations were never freed ({} deallocations)",
+            stats.allocations, stats.deallocations
+        ));
     }
     Ok(found)
 }

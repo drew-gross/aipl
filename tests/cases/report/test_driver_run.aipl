@@ -1,0 +1,55 @@
+# A library with `.test` blocks and no `main`: `aipl report` measures the run of
+# its tests, the same run `aipl check` makes. The functions of that run are the
+# synthesized `__test$<fn>` bodies, and each `assert` is a call into the runtime.
+
+import { equal as ==, wrapping_add as + } from builtins;
+
+fn double(x: i64) -> i64 { x + x }.test({
+    assert(double(2) == 4);
+    assert(double(0) == 0);
+})
+--- report ---
+allocations       0
+deallocations     0
+reallocations     0
+bytes allocated   0
+peak live bytes   0
+instructions      39
+binary size       1176 bytes (code 228, data 110, metadata 838)
+
+function               calls  code bytes
+__test$double              1         124
+aipl_assert                2    external
+aipl_test_begin            1    external
+aipl_test_end              1    external
+aipl_test_summary          1    external
+main                       1         104
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 39
+binary size: 1176
+  code: 228
+  data: 110
+  metadata: 838
+functions:
+  __test$double:
+    calls: 1
+    bytes: 124
+  aipl_assert:
+    calls: 2
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 104

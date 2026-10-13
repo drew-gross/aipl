@@ -159,6 +159,32 @@ impl MeasureError {
     }
 }
 
+/// Measure a loaded `program` from scratch: the run [`measured_program`] picks,
+/// built both ways (the production object for its size, the instrumented one for
+/// its counts) and run once in `dir` with `cli` as its arguments.
+///
+/// This is what `aipl report` prints and what a `--- report ---` section pins, so
+/// they cannot disagree about what was built. The cases harness builds the
+/// production object itself — it runs it for behavior too — and calls [`measure`].
+pub fn measure_program(
+    program: &Program,
+    stem: &str,
+    cli: &[String],
+    dir: &Path,
+    dbg: DebugOptions,
+) -> Result<PerfStats, MeasureError> {
+    let measured = measured_program(program);
+    let object =
+        ObjectCompilation::new(&measured, stem, dbg, false).map_err(MeasureError::Compile)?;
+    // Read before `emit` consumes the compilation: what each symbol is called in
+    // AIPL, for the per-function code sizes.
+    let symbol_names = object.code_symbol_names();
+    let production = object
+        .emit()
+        .map_err(|e| MeasureError::Compile(Vec::from(e)))?;
+    measure(&measured, stem, &production, &symbol_names, cli, dir, dbg)
+}
+
 /// Measure `program` (already passed through [`measured_program`]).
 ///
 /// `production` is its non-instrumented object and `symbol_names` that object's

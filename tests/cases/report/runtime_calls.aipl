@@ -1,0 +1,71 @@
+# A report of a program that calls into the runtime. `aipl report` lists every
+# function the run entered or the object emitted — compiled AIPL functions and the
+# runtime builtins they call, in one table — and a builtin has no code in this
+# object, so its size reads `external` rather than a misleading 0.
+#
+# The program is `cli/args.aipl`: it prints each command-line argument and then how
+# many there were. The arguments come from the `--- cli ---` section, as they do for
+# `aipl report` on the file.
+
+import { len, print, to_str } from builtins;
+
+fn main(args: str[]) !prints {
+    for (let a : args) {
+        print(a);
+    }
+    print(to_str(len(args)));
+}
+--- cli ---
+alpha
+two words
+gamma
+--- stdout ---
+alpha
+two words
+gamma
+3
+--- report ---
+allocations       2
+deallocations     2
+reallocations     0
+bytes allocated   121
+peak live bytes   121
+instructions      133
+binary size       1504 bytes (code 524, data 1, metadata 979)
+
+function            calls  code bytes
+__to_str_u64            1         204
+aipl_array_dec          1    external
+aipl_array_new          1    external
+aipl_u64_len            2    external
+aipl_write_u64          1    external
+main                    1         320
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 121
+instructions executed: 133
+binary size: 1504
+  code: 524
+  data: 1
+  metadata: 979
+functions:
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_array_dec:
+    calls: 1
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 320

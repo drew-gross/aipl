@@ -82,6 +82,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  in tests/cases/report/test_driver_run.aipl why does fn double() get minted as __test$double?
   .performance on decided_early should be actually on decided_early
   make the runtime a bit less type erased maybe? E.g. dropping an array should be able to drop primitve vs. non-primitive arrays based on type, not a flag
   unify flat sets and flat dicts repr with arrays
