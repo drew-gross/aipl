@@ -317,7 +317,7 @@ to set bodies to `?` first.
 ## `.performance` blocks and `measure`
 A function can carry a `.performance({ .. })` block beside its `.test`, in either
 order. It is not the baseline table above: that records a case's whole-program counts
-and is refreshed; this is code that states a property and is held to it. See `PERFORMANCE_PLAN.md` for where it is going; what exists:
+and is refreshed; this is code that states a property and is held to it. What exists:
 
 - **`measure(label, input, f) -> Measurement`** (`import { measure, Measurement }
   from builtins;`) runs `f(input)` once inside a counting window and returns
