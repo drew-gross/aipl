@@ -87,13 +87,13 @@ pub fn dedent(self: str) -> str {
         dedent,
     );
     assert(few == allocations);
-    assert(allocations == 3);
+    assert(allocations == 2);
 
     // What does grow with the input is the bytes allocated and the bytes live at
     // once. These are exact because the stages that build them are what the
     // fusions replace. The instruction count is not pinned here:
     // `tests/performance_metrics.md` holds it for this file, exactly, and
     // refreshes it with the code.
-    assert(bytes_allocated == 3598);
-    assert(peak_live_bytes == 4604);
+    assert(bytes_allocated == 2774);
+    assert(peak_live_bytes == 3780);
 })

@@ -1,0 +1,90 @@
+# The AIPL implementation of the `filter_map_reduce` builtin. Monomorphization
+# registers this function under the canonical name `__builtin_filter_map_reduce`
+# (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's
+# `xs.filter_map_reduce(keep, f, step)` resolves through the ordinary generic /
+# higher-order machinery — the in-file name is only for this file's own tests,
+# which read exactly like user code.
+#
+# It is what `xs.filter(keep).map(f).<reduction>()` means, in one pass and with
+# no array built at all: `filter` would allocate the survivors and `map` their
+# mapped values, for the reduction to walk once and drop. It is `map_reduce` (see
+# `builtin_map_reduce.aipl`) over only the elements `keep` accepts. Written by the
+# compiler's operation-fusion pass for those chains (see `chain_fusions` in
+# aipl-mono, where the table of reductions lives); also callable directly.
+
+import {
+    equal as ==,
+    filter,
+    greater_than as >,
+    is_nonempty,
+    len,
+    logical_not as !,
+    map,
+    max,
+    maximum,
+    min,
+    minimum,
+    wrapping_add as +,
+    wrapping_mul as *,
+    wrapping_sub as -,
+} from builtins;
+
+# The elements `keep` accepts, each mapped by `f`, combined left to right with
+# `step`: for the survivors `[a, b, c]`, `some(step(step(f(a), f(b)), f(c)))`. The
+# first mapped survivor seeds the result, so `step` is never called on fewer than
+# two; when nothing survives — an empty receiver, or a `keep` that accepts none —
+# it is `none`.
+#
+# `keep` then `f` run per element, in order, interleaved with `step` and with the
+# next element's `keep` — which no one can tell apart unless one of them does
+# something, and the fusion that writes this call refuses when any does.
+pub fn filter_map_reduce<T: any, U: any>(
+    self: T[],
+    keep: (T) -> bool,
+    f: (T) -> U,
+    step: (U, U) -> U,
+) -> U? {
+    mut reduced: U? = none;
+    for (let x : self) {
+        if (keep(x)) {
+            let next = f(x);
+            set reduced = match (reduced) {
+                some(so_far) => some(step(so_far, next)),
+                none => some(next),
+            };
+        };
+    }
+    reduced
+}.test({
+    fn is_big(self: i64) -> bool { self > 2 }
+    assert(is_big(3));
+    assert(!is_big(1));
+
+    // Only the survivors are mapped and reduced.
+    assert([1, 2, 3, 4].filter_map_reduce(is_big, |x| x * 10, min) == some(30));
+    assert([1, 2, 3, 4].filter_map_reduce(is_big, |x| x * 10, max) == some(40));
+    // It is `filter`, then `map`, then the reduction.
+    assert(
+        [5, 1, 4, 2].filter_map_reduce(is_big, |x| 9 - x, min) == [5, 1, 4, 2]
+            .filter(is_big)
+            .map(|x| 9 - x)
+            .minimum(),
+    );
+    assert(
+        [5, 1, 4, 2].filter_map_reduce(is_big, |x| 9 - x, max) == [5, 1, 4, 2]
+            .filter(is_big)
+            .map(|x| 9 - x)
+            .maximum(),
+    );
+    // One survivor is itself; no step is taken.
+    assert([1, 7, 2].filter_map_reduce(is_big, |x| x + 1, min) == some(8));
+    // Nothing survives, or nothing is there: `none`.
+    assert([1, 2].filter_map_reduce(is_big, |x| x, min) == none);
+    assert([1, 2].filter(is_big).filter_map_reduce(is_big, |x| x, min) == none);
+    // The result type need not be the element type.
+    assert(["a", "", "bcd", ""].filter_map_reduce(is_nonempty, len, max) == some(3));
+    assert(["pear", "", "apple"].filter_map_reduce(is_nonempty, |s| s, min) == some("apple"));
+    assert(filter_map_reduce([2, 3], is_big, |x| x, max) == some(3)); // free-call form
+    let by = 100;
+    assert([1, 5].filter_map_reduce(is_big, |x| x + by, max) == some(105)); // a captured value
+})

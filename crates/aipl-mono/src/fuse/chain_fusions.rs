@@ -14,10 +14,14 @@
 //! which call is the reduction and which builtin is its step, so adding the next
 //! reduction is a row, not a builtin.
 //!
-//! The mapping stage is the part that is still one case: `map` is the only call
-//! that feeds a reduction here. Each further stage that should feed one
-//! (`filter_map`, say) is a fused builtin of its own that takes the same `step`;
-//! the table of reductions does not change.
+//! What feeds a reduction is the other table, [`STAGES`]: the call whose result
+//! the reduction consumes, and the fused builtin that does that call's work and
+//! the reduction's together. `map` becomes `map_reduce`; `filter_map` — which is
+//! what `filter(p).map(f)` has already become by the time the reduction is
+//! reached — becomes `filter_map_reduce`. Each further stage that should feed a
+//! reduction is a row there and a builtin that takes the same `step`; the table
+//! of reductions does not change, and neither does a stage's row when a
+//! reduction is added.
 //!
 //! The receiver may reach here under the `let`s inlining leaves in front of an
 //! inlined body; the chain is found beneath them and the fused call put back
@@ -163,8 +167,9 @@ pub(super) fn build(whole: &Expr, outer: Option<&Callee>) -> Option<Expr> {
     let (into, step) = match row(inner_name, name) {
         Some(f) => (f.into.clone(), None),
         None => {
-            let reduction = reduction_row(name).filter(|_| *inner_name == Callee::Map)?;
-            (Callee::MapReduce, Some(&reduction.step))
+            let reduction = reduction_row(name)?;
+            let stage = stage_row(inner_name)?;
+            (stage.into.clone(), Some(&reduction.step))
         }
     };
     if bindings
@@ -204,6 +209,32 @@ struct Reduction {
     step: Callee,
 }
 
+/// A call whose result a reduction can consume, and the fused builtin that does
+/// its work and the reduction's in one pass: the stage's own arguments followed
+/// by the reduction's `step`.
+struct Stage {
+    stage: Callee,
+    into: Callee,
+}
+
+/// Every stage that can feed a reduction. See the module docs.
+const STAGES: &[Stage] = &[
+    Stage {
+        stage: Callee::Map,
+        into: Callee::MapReduce,
+    },
+    // `xs.filter(p).map(f).<reduction>()`, once `filter(p).map(f)` has fused.
+    Stage {
+        stage: Callee::FilterMap,
+        into: Callee::FilterMapReduce,
+    },
+];
+
+/// The [`STAGES`] row for `stage`, if it can feed a reduction.
+fn stage_row(stage: &Callee) -> Option<&'static Stage> {
+    STAGES.iter().find(|s| s.stage == *stage)
+}
+
 /// Every reduction the pass knows. See the module docs for how to add one.
 const REDUCTIONS: &[Reduction] = &[
     // `xs.map(f).minimum()`: smaller of two. Agrees with `minimum` on every
@@ -230,16 +261,18 @@ fn reduction_row(reduction: &Callee) -> Option<&'static Reduction> {
 ///
 /// A `map` feeding a *reduction* is the one exception to "the parent wins". A
 /// `map` whose own receiver is a `filter` has a better partner in that `filter`:
-/// `filter_map` selects and maps in one pass, and what is left for the reduction
-/// is the one array it builds. Taking the reduction instead, `map_reduce` over
-/// the `filter`'s result, would leave the `filter` a separate pass over every
-/// element and an array of the survivors besides. Until a fused call exists that
-/// takes the filter, the map, and the step together, the filter keeps the map.
+/// they fuse into `filter_map`, and that — a [`STAGES`] row of its own — is what
+/// feeds the reduction, as `filter_map_reduce`: one pass, nothing built. Taking the
+/// reduction first instead, `map_reduce` over the `filter`'s result, would leave
+/// the `filter` a separate pass over every element and an array of the survivors
+/// besides.
 fn stands_aside_for(whole: &Expr, name: &Callee, outer: &Callee) -> bool {
     if row(name, outer).is_some() {
         return true;
     }
-    *name == Callee::Map && reduction_row(outer).is_some() && !has_filter_receiver(whole)
+    stage_row(name).is_some()
+        && reduction_row(outer).is_some()
+        && !(*name == Callee::Map && has_filter_receiver(whole))
 }
 
 /// Whether the first argument of `call` — its receiver — is a `filter`, possibly

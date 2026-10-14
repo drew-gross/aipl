@@ -8,7 +8,8 @@
 # passed to it, so the next reduction is a row (`reduction`, `step`) in
 # `chain_fusions`, not a new builtin. The `.performance` block holds the saving —
 # nothing allocated for fifty numbers rendered and measured, where the unfused
-# form allocates the mapped array — and the program checks every element type the
+# form allocates the mapped array, and nothing for a `filter` in front of the
+# `map` either — and the program checks every element type the
 # reductions accept still gives the same answers.
 
 import {
@@ -66,14 +67,14 @@ fn main() !prints {
     assert(measure("longest", fifty, longest).allocations == 0);
     assert(measure("smallest square", fifty, smallest_square).allocations == 0);
 
-    // A `filter` in front of the `map` keeps it: `filter_map` selects and maps in
-    // one pass, which leaves the reduction an array of the five lengths (72
-    // bytes) to walk. Taking the reduction instead would leave `filter` a pass of
-    // its own over the lines, and an array of the five surviving line views
-    // (more than twice that). Until one fused call takes filter, map and step
-    // together, the `filter` wins the `map`.
+    // A `filter` in front of the `map` fuses too: `filter(p).map(f)` is already
+    // one `filter_map` by the time the reduction is reached, and `filter_map`
+    // feeding a reduction is `filter_map_reduce` — selecting, mapping and
+    // combining in one pass with no array at all. (Taking the reduction before
+    // the `filter` has fused would leave the `filter` a pass of its own, and an
+    // array of the surviving lines, which is what the order of the rules guards.)
     let lines = "alpha,,be,gamma,,d,epsilon".split(",");
-    assert(measure("filtered", lines, shortest_nonblank).bytes_allocated == 72);
+    assert(measure("filtered", lines, shortest_nonblank).allocations == 0);
 })
 --- stdout ---
 some(1) some(2) some(9) some("7")

@@ -26,9 +26,10 @@
 //!   the same question the other way, and every row here for one has a row for the
 //!   other.
 //!   A chain may also end in a *reduction*: `xs.map(f).minimum()` collapses into
-//!   `map_reduce(xs, f, min)`, one pass and no mapped array, and the reduction is a
-//!   row in a table of its own, so `maximum` — and the next one — is a line, not
-//!   a builtin.
+//!   `map_reduce(xs, f, min)`, one pass and no mapped array, and with a `filter`
+//!   in front into `filter_map_reduce`, one pass and no array at all. The
+//!   reduction is a row in a table of its own, so `maximum` — and the next one —
+//!   is a line, not a builtin; the call that feeds it is a row in another.
 //! - [`compose_fusions`] — a `map` of a `map`. `xs.map(f).map(g)` builds an
 //!   array of every `f(x)` for the second pass to walk once and drop, so it
 //!   collapses into `xs.map(|x| g(f(x)))`. It is not a row in the chain table
