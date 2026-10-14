@@ -665,21 +665,11 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
 fn sep_spelling<K: variant>(sep: Rule<K>?) -> str!ParseError {
     match (sep) {
         none => ok(""),
-        some(r) => match (r) {
-            Literal(s) => ok(s),
-            Term(..)
-            | Then(..)
-            | OneOf(..)
-            | Many(..)
-            | Maybe(..)
-            | Named(..)
-            | NamedIdx(..)
-            | Climb(..)
-            | Refuse(..) => err(ParseError {
-                message: "a bracketed list's separator must be a literal, so the printer can write it back",
-                span: 0..0,
-            }),
-        },
+        some(Literal(s)) => ok(s),
+        _ => err(ParseError {
+            message: "a bracketed list's separator must be a literal, so the printer can write it back",
+            span: 0..0,
+        }),
     }
 }
 
