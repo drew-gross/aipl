@@ -1,0 +1,19 @@
+# The same for a `match` run for effect: its closing `}` needs a `;` when more
+# statements follow.
+
+import { print } from builtins;
+
+fn main() !io {
+    let x = 1;
+    match (x) {
+        1 => print("one"),
+        _ => print("other"),
+    }
+    print("done");
+}
+--- errors ---
+error: missing `;` before `print`: every statement ends with one, even an `if` or `match` whose value is unused
+  --> ./tests/cases/conditionals/err_match_missing_semicolon.aipl:12:5
+   |
+12 |     print("done");
+   |     ^^^^^

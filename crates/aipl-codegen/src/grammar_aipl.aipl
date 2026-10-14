@@ -730,14 +730,47 @@ fn statements() -> Production<AiplTok, Ast>[] {
         Then([Named("kw_stmt"), Named("block_body")]),
         Then([Named("expr"), Named("block_tail")]),
     ]));
-    let block_tail: Rule<AiplTok> = Maybe(Then([Lit(";"), Named("block_body")]));
+
+    //
+    // The second alternative of `semicolon` is the one failure this position has
+    // a better word for than "expected `;`, `}`, or an operator": a token that
+    // opens a new statement, straight after an expression. The expression is
+    // nearly always an `if` or `match` used for its effect, whose closing `}`
+    // reads as the end of a statement in every language with a block form.
+    let semicolon: Rule<AiplTok> = OneOf([
+        Lit(";"),
+        Then([Named("statement_start"), Refuse(Fn(missing_semicolon))]),
+    ]);
+    let block_tail: Rule<AiplTok> = Maybe(Then([semicolon, Named("block_body")]));
+
+    // Only a token that can *only* begin a statement. `(`, `[`, `-`, `!` and `|`
+    // also continue the expression before them (a call, an index, a binary
+    // minus), so they stay the expression's and are not diagnosed here.
+    let statement_start: Rule<AiplTok> = OneOf([
+        Term(Name),
+        Term(IntLit),
+        Term(StrLit),
+        Term(CharTok),
+        Lit("let"),
+        Lit("mut"),
+        Lit("set"),
+        Lit("for"),
+        Lit("while"),
+        Lit("return"),
+        Lit("if"),
+        Lit("match"),
+        Lit("shim"),
+        Lit("true"),
+        Lit("false"),
+        Lit("none"),
+    ]);
 
     // A loop body admits no trailing expression: its value could never be
     // observed, so every expression in it must be an `expr;` statement.
     let loop_body: Rule<AiplTok> = one(Named("loop_inner"), nested_in=braces());
     let loop_inner: Rule<AiplTok> = Maybe(OneOf([
         Then([Named("kw_stmt"), Named("loop_inner")]),
-        Then([Named("expr"), Lit(";"), Named("loop_inner")]),
+        Then([Named("expr"), semicolon, Named("loop_inner")]),
     ]));
 
     // Keyword-led statements, so their first tokens stay disjoint from `expr`'s
@@ -857,6 +890,11 @@ fn statements() -> Production<AiplTok, Ast>[] {
         p("block", block, TryMk(lower_block)),
         p("block_body", block_body, TryMk(lower_block_body)),
         p("block_tail", block_tail, TryMk(lower_block_tail)),
+        // Labelled "`;`" so a token that is no statement's start leaves the
+        // "expected" list as it was: `semicolon` already expects exactly that, and
+        // the label dedups against it. The node is never built; its only use is
+        // to be followed by the refusal.
+        pl("statement_start", statement_start, "`;`", Kid),
         // `loop_body` passes its `loop_inner` through, and is deliberately
         // *not* repaired the way `block` is. A loop body's value is discarded,
         // so no diagnostic ever points at the synthetic `0` an empty one
@@ -2783,6 +2821,18 @@ fn bare_operator_import(op: str) -> str {
         bare_operator_import(
             "==",
         ) == """the "==" operator has no bare form; import it aliased: `equal as ==` from builtins""",
+    );
+})
+
+# What a statement-opening token straight after an expression means: the `;`
+# between them is missing. `next` is that token, which the error underlines.
+fn missing_semicolon(next: str) -> str {
+    `missing \`;\` before \`{next}\`: every statement ends with one, even an \`if\` or \`match\` whose value is unused`
+}.test({
+    assert(
+        missing_semicolon(
+            "print",
+        ) == "missing `;` before `print`: every statement ends with one, even an `if` or `match` whose value is unused",
     );
 })
 

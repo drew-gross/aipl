@@ -1,0 +1,19 @@
+# A loop body is all statements, so the `;` is missing wherever the `if` sits —
+# here followed by a `let` rather than a call.
+
+import { print } from builtins;
+
+fn main() !io {
+    for (let i : [1, 2, 3]) {
+        if (i == 2) {
+            print("two");
+        }
+        let doubled = i * 2;
+    }
+}
+--- errors ---
+error: missing `;` before `let`: every statement ends with one, even an `if` or `match` whose value is unused
+  --> ./tests/cases/conditionals/err_if_missing_semicolon_in_loop.aipl:11:9
+   |
+11 |         let doubled = i * 2;
+   |         ^^^

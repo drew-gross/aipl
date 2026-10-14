@@ -237,7 +237,6 @@ errors:
   assert should print the mixed values when there is an
   "assert failed at" should show the actual file name, not input:xxx
   type errors should point to source locations
-  better error when you forget a ; after an if.
 
 HOF:
   lower_item returns a T!E but the body doesn't seem to have any error paths. I think this is because it's passed to a function that accepts lambdas that return errors. There should be a better way to do this (Liskov substitution principle?)

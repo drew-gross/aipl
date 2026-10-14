@@ -1,0 +1,19 @@
+# An `if` used for its effect is a statement, so it ends with `;` like any
+# other. Leaving it off makes the `if` the block's value and the next line an
+# error, which the message names rather than listing what could have followed.
+
+import { print } from builtins;
+
+fn main() !io {
+    let x = 1;
+    if (x == 1) {
+        print("one");
+    }
+    print("done");
+}
+--- errors ---
+error: missing `;` before `print`: every statement ends with one, even an `if` or `match` whose value is unused
+  --> ./tests/cases/conditionals/err_if_missing_semicolon.aipl:12:5
+   |
+12 |     print("done");
+   |     ^^^^^

@@ -1724,6 +1724,20 @@
 
 
 
+        <section class="item" id="item-missing_semicolon">
+          <h3>
+            <a class="anchor" href="#item-missing_semicolon">missing_semicolon</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn missing_semicolon(next: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>What a statement-opening token straight after an expression means: the <code>;</code> between them is missing. <code>next</code> is that token, which the error underlines.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower_import_name">
           <h3>
             <a class="anchor" href="#item-lower_import_name">lower_import_name</a>
@@ -2023,7 +2037,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$128934: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$130968: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
