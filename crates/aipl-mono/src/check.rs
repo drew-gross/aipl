@@ -3713,6 +3713,24 @@ impl Cx<'_> {
             }
             ExprKind::Field(obj, fname) => {
                 let ot = self.check_expr(obj, env, effects)?;
+                // The loader reads a tuple pattern's slots off a temporary it
+                // names, so a value that is not a tuple fails here — on a field
+                // access the user never wrote, of a binding they never named.
+                let pattern = match &obj.kind {
+                    ExprKind::Ident(n) if n.starts_with(aipl_syntax::LET_TUPLE_BASE_PREFIX) => {
+                        Some(TuplePattern::Let)
+                    }
+                    ExprKind::Ident(n) if n.starts_with(aipl_syntax::FOR_TUPLE_BASE_PREFIX) => {
+                        Some(TuplePattern::For)
+                    }
+                    _ => None,
+                };
+                if let Some(pattern) = pattern.filter(|_| !is_tuple_ty(&ot)) {
+                    return Err(Error::at(
+                        pattern.not_a_tuple(&tyname(&ot)),
+                        obj.span.clone(),
+                    ));
+                }
                 let fields = self.fields_of(&ot).ok_or_else(|| {
                     Error::at(
                         format!("field access on non-struct value of type {}", tyname(&ot)),
@@ -5380,6 +5398,41 @@ fn span_map_signature(array_form: &Signature) -> Signature {
 /// than spelled out at each site.
 fn is_span(ty: &Type) -> bool {
     matches!(ty, Type::Named(n) if n == SPAN_TYPE)
+}
+
+/// Whether `ty` is a tuple, as the checker meets one: still `Type::Tuple`, or
+/// already lowered to its synthetic struct.
+fn is_tuple_ty(ty: &Type) -> bool {
+    match ty {
+        Type::Tuple(_) => true,
+        Type::Named(n) => n.starts_with(TUPLE_TEMPLATE),
+        _ => false,
+    }
+}
+
+/// Which tuple pattern the loader read a temporary's slots for — what a value
+/// that is not a tuple was being taken apart by.
+#[derive(Clone, Copy)]
+enum TuplePattern {
+    /// `let (a, b) = v;`
+    Let,
+    /// `for (let (a, b) : xs)`, where the value is each element.
+    For,
+}
+
+impl TuplePattern {
+    fn not_a_tuple(self, ty: &str) -> String {
+        match self {
+            TuplePattern::Let => format!(
+                "cannot destructure {ty} as a tuple — a pattern like \"(a, b)\" takes apart a tuple value"
+            ),
+            TuplePattern::For => format!(
+                "cannot destructure the elements of this loop as tuples — they are {ty}. \
+                 To bind a dict's key and value write \"for (let k, v : d)\"; for an \
+                 array's position and element, \"for (let i, x : xs)\""
+            ),
+        }
+    }
 }
 
 /// Strip the internal name-mangling prefix for diagnostics: the reserved

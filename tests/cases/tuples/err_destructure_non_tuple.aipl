@@ -1,0 +1,12 @@
+# A tuple pattern takes apart a tuple. Given any other value, the error is about
+# the pattern, not about a field read on a binding that was never written.
+
+fn main() {
+    let (a, b) = 5;
+}
+--- errors ---
+error: cannot destructure i64 as a tuple — a pattern like "(a, b)" takes apart a tuple value
+ --> ./tests/cases/tuples/err_destructure_non_tuple.aipl:5:18
+  |
+5 |     let (a, b) = 5;
+  |                  ^

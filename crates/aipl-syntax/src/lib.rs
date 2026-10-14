@@ -4340,6 +4340,17 @@ pub const CASE_SLOT_PREFIX: &str = "__slot$";
 /// a generic is a different template that happens to share field names.
 pub const DESTRUCTURE_BASE_PREFIX: &str = "__spat$";
 
+/// Name prefix of the temporary a tuple pattern in `let (a, b) = v;` reads its
+/// slots from (`__tpat$<offset>._0`, `._1`, ..). The checker uses it to report a
+/// value that is no tuple as the pattern the user wrote, not as a field access
+/// on a binding they never named. The grammar spells it too
+/// (`grammar_aipl.aipl`, `lower_let_tuple`).
+pub const LET_TUPLE_BASE_PREFIX: &str = "__tpat$";
+
+/// [`LET_TUPLE_BASE_PREFIX`] for the loop form, `for (let (a, b) : xs)`, where
+/// the temporary is the loop variable and the value in question is each element.
+pub const FOR_TUPLE_BASE_PREFIX: &str = "__fpat$";
+
 /// Parameter-name prefix of the lambda `aipl_mono::lower_ctor_refs` wraps a
 /// payload-carrying constructor reference in (`Circle` → `|__ctor0| Circle(__ctor0)`).
 /// Shared so [`ctor_ref_case`] can recognize that lambda and read the case back

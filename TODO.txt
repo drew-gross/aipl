@@ -231,7 +231,6 @@ bugs:
     It needs the binding held while both a scalar field and the boxed-optional field are read — reading only .next allocates 1 and balances, reading only .val elides the allocation entirely. That's presumably why recursive_struct.aipl and recursive_list.aipl never tripped it. My boxed case is reshaped to cover the boxed store path without hitting it
 
 errors:
-  for (let (k, v) : dict) gives a bad error currently
   report multiple errors when one call site has multiple type errors
   report multiple errors when there is a badly typed let
   assert should print the mixed values when there is an
@@ -247,6 +246,7 @@ jit:
   do we really need a jit? What about compiling the tests to a binary?
 
 grammer ideas:
+  Better way of expression specific errors for missing items, e.g. missing semicolon after if should be simpler to express
   3. Indexed accessors — own_texts_at(i) — for the call sites that read only the head and never want the list. Descends, stops, allocates nothing
 
   4. Put the token kind on the leaf. This is the real answer to "should be token comparisons". Leaf(Span) → Leaf(Span, K), making Cst<K> generic — which is consistent with the rest of the pipeline: Rule<K>, Production<K, A>, Grammar<K, A> are all parameterized, and Cst is the one type that isn't, which is exactly why the kind gets thrown away. Then lower_atom becomes match (node.own_kind(0)) { If => .., Match => .., LParen => .. } — exhaustive, so a new token forces a decision at each site, and a typo'd "mathc" becomes a compile error instead of a silently-dead branch. AiplTok already carries Name(str), IntLit(i64), StrLit(str, StrStyle), so sites like lower_shim_binding destructure instead of slicing src at all. Be clear-eyed though: measured, this is ~12%, not 4×. Do it for the "classify once, then match" discipline your own CLAUDE.md argues for; don't do it expecting a speedup.

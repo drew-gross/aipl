@@ -1,0 +1,16 @@
+# A dict's two-binder loop is `for (let k, v : d)`. Writing the pair as a tuple
+# pattern asks each *value* to be a tuple, which it is not here, and the error
+# says so and names the form that was meant.
+
+fn main() {
+    let d = #{1: 2, 3: 4};
+    for (let (k, v) : d) {
+        let pair = [k, v];
+    }
+}
+--- errors ---
+error: cannot destructure the elements of this loop as tuples — they are i64. To bind a dict's key and value write "for (let k, v : d)"; for an array's position and element, "for (let i, x : xs)"
+ --> ./tests/cases/dicts/err_for_tuple_pattern_over_dict.aipl:7:23
+  |
+7 |     for (let (k, v) : d) {
+  |                       ^
