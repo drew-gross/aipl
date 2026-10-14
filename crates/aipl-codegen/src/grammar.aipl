@@ -228,7 +228,7 @@ variant Rule<K: variant> =
     # "expected X, found Y" a plain non-match would produce.
     #
     # The one rule that can hold a function value, which costs `Rule` its `==`
-    # — a rule is compared through `show_rule` instead.
+    # — a rule is compared through `show` instead.
     | Refuse(Refusal)
 
 # What a `Refuse` says: a fixed message, or one computed from what was matched
@@ -417,14 +417,14 @@ pub fn prod_names<K: variant, A: any>(g: Grammar<K, A>) -> str[] { g.prods.map(|
 # this is the one way to look at one. Defaulted arguments of a `Many` are
 # written only where they differ from the default, so what is shown is what a
 # grammar author would have written.
-pub fn show_rule<K: variant>(self: Rule<K>) -> str {
+pub fn show<K: variant>(self: Rule<K>) -> str {
     match (self) {
         Term(k) => `Term({k.case_name()})`,
         Literal(s) => `Literal("{s}")`,
-        Then(rs) => `Then([{rs.map(show_rule).join(sep=", ")}])`,
-        OneOf(rs) => `OneOf([{rs.map(show_rule).join(sep=", ")}])`,
+        Then(rs) => `Then([{rs.map(show).join(sep=", ")}])`,
+        OneOf(rs) => `OneOf([{rs.map(show).join(sep=", ")}])`,
         Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, spaced, sorted, style, group) => {
-            mut args = [show_rule(sub)];
+            mut args = [show(sub)];
             if (min != 0) {
                 set args.push(`min={min}`);
             };
@@ -432,7 +432,7 @@ pub fn show_rule<K: variant>(self: Rule<K>) -> str {
                 set args.push(`max={m}`);
             };
             if (let some(sr) = sep) {
-                set args.push(`sep={show_rule(sr)}`);
+                set args.push(`sep={show(sr)}`);
             };
             if (!trailing_sep) {
                 set args.push("trailing_sep=false");
@@ -441,7 +441,7 @@ pub fn show_rule<K: variant>(self: Rule<K>) -> str {
                 set args.push("leading_sep=true");
             };
             if (let some(brackets) = nested_in) {
-                set args.push(`nested_in=({show_rule(brackets.0)}, {show_rule(brackets.1)})`);
+                set args.push(`nested_in=({show(brackets.0)}, {show(brackets.1)})`);
             };
             if (spaced) {
                 set args.push("spaced=true");
@@ -457,26 +457,28 @@ pub fn show_rule<K: variant>(self: Rule<K>) -> str {
             };
             `Many({args.join(sep=", ")})`
         },
-        Maybe(sub) => `Maybe({show_rule(sub)})`,
+        Maybe(sub) => `Maybe({show(sub)})`,
         Named(n) => `Named("{n}")`,
         NamedIdx(i) => `NamedIdx({i})`,
-        Climb(atom, precs) => `Climb({show_rule(atom)}, {precs})`,
+        Climb(atom, precs) => `Climb({show(atom)}, {precs})`,
         Refuse(what) => match (what) {
             Msg(m) => `Refuse(Msg("{m}"))`,
             Fn(..) => "Refuse(Fn(..))",
         },
     }
 }.test({
-    let t: Rule<Kind> = Term(Atom);
-    assert(show_rule(t) == "Term(Atom)");
-    let seq: Rule<Kind> = Then([Literal("("), Maybe(Named("x")), NamedIdx(2)]);
-    assert(show_rule(seq) == `Then([Literal("("), Maybe(Named("x")), NamedIdx(2)])`);
-    let alt: Rule<Kind> = OneOf([Term(Atom), Term(Open)]);
-    assert(show_rule(alt) == "OneOf([Term(Atom), Term(Open)])");
+    assert(Term(Atom).show() == "Term(Atom)");
+    assert(
+        Then([
+            Literal("("),
+            Maybe(Named("x")),
+            NamedIdx(2),
+        ]).show() == `Then([Literal("("), Maybe(Named("x")), NamedIdx(2)])`,
+    );
+    assert(OneOf([Term(Atom), Term(Open)]).show() == "OneOf([Term(Atom), Term(Open)])");
 
     // A `Many` shows only what was written: the defaults stay silent.
-    let star: Rule<Kind> = Many(Term(Atom));
-    assert(show_rule(star) == "Many(Term(Atom))");
+    assert(Many(Term(Atom)).show() == "Many(Term(Atom))");
     let full: Rule<Kind> = Many(
         Term(Atom),
         min=1,
@@ -491,20 +493,18 @@ pub fn show_rule<K: variant>(self: Rule<K>) -> str {
         group=4,
     );
     assert(
-        show_rule(
-            full,
-        ) == """Many(Term(Atom), min=1, max=3, sep=Literal(","), trailing_sep=false, leading_sep=true, nested_in=(Literal("["), Literal("]")), spaced=true, sorted=true, style=ListStyle { sep: ";" }, group=4)""",
+        full.show() == """Many(Term(Atom), min=1, max=3, sep=Literal(","), trailing_sep=false, leading_sep=true, nested_in=(Literal("["), Literal("]")), spaced=true, sorted=true, style=ListStyle { sep: ";" }, group=4)""",
     );
 
-    let climb: Rule<Kind> = Climb(Term(Atom), [Prec { power: 1, right: false, ops: ["+"] }]);
     assert(
-        show_rule(climb) == """Climb(Term(Atom), [Prec { power: 1, right: false, ops: ["+"] }])""",
+        Climb(
+            Term(Atom),
+            [Prec { power: 1, right: false, ops: ["+"] }],
+        ).show() == """Climb(Term(Atom), [Prec { power: 1, right: false, ops: ["+"] }])""",
     );
 
-    let fixed: Rule<Kind> = Refuse(Msg("no"));
-    assert(show_rule(fixed) == `Refuse(Msg("no"))`);
-    let computed: Rule<Kind> = Refuse(Fn(echo));
-    assert(show_rule(computed) == "Refuse(Fn(..))");
+    assert(Refuse(Msg("no")).show() == `Refuse(Msg("no"))`);
+    assert(Refuse(Fn(echo)).show() == "Refuse(Fn(..))");
 })
 
 # A `ListStyle` as the literal that builds it, defaults left out — `ListStyle
@@ -810,9 +810,9 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
 }.test({
     // The rule of production `i` of `g`, shown, for the assertions above — neither a
     // grammar value nor a rule can be compared with `==` (both may hold function
-    // values), so a rule is asserted on through its `show_rule` text.
+    // values), so a rule is asserted on through its `show` text.
     fn shown_rule<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
-        g.prods[i].map(|p| show_rule(p.rule)).value_or("")
+        g.prods[i].map(|p| show(p.rule)).value_or("")
     }
 
     fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {

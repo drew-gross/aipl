@@ -656,7 +656,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/find_trailing_whitespace | 0 | 0 | 0 | 6230 | 2488 | 3.00 | 89.50 | 1456 |
 | crates/aipl-codegen/src/format | 2275 | 184067 | 19208 | 307548 | 174676 | 206.00 | 954.51 | 1968 |
 | crates/aipl-codegen/src/format_source | 16345 | 4178470 | 485883 | 11139891 | 5302456 | 2433.00 | 18401.96 | 5072 |
-| crates/aipl-codegen/src/grammar | 736 | 92801 | 47064 | 80141 | 105700 | 76.00 | 541.25 | 1712 |
+| crates/aipl-codegen/src/grammar | 736 | 92801 | 47064 | 80141 | 105692 | 88.00 | 1106.54 | 1728 |
 | crates/aipl-codegen/src/grammar_aipl | 1695299 | 351625350 | 901250 | 551666168 | 4736416 | 143619.00 | 13156.84 | 8992 |
 | crates/aipl-codegen/src/grammar_calc | 10300 | 1168990 | 42260 | 3277642 | 283632 | 883.00 | 2935.17 | 2384 |
 | crates/aipl-codegen/src/grammar_json | 19766 | 2805935 | 35129 | 6972313 | 308412 | 1754.00 | 3000.19 | 2528 |

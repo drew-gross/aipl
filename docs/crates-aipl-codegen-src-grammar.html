@@ -211,7 +211,7 @@
 
             <li id="item-Refuse"><code>Refuse(Refusal)</code>
 
-              <div class="doc"><p>A rule that never matches: reached, it fails the whole parse with the message its <code>Refusal</code> gives. Refusal is not a miss — no enclosing choice, option or repetition backtracks out of it — so it is only ever reached on purpose, after a sequence has matched the thing worth refusing: <code>Then([Named(&quot;operator&quot;), Refuse(..)])</code> accepts an operator and then rejects it, and the error underlines what the sequence matched.</p><p>This is how a grammar names a shape the language <em>used to</em> have, or that a reader would plausibly write, and says something more useful than the &quot;expected X, found Y&quot; a plain non-match would produce.</p><p>The one rule that can hold a function value, which costs <code>Rule</code> its <code>==</code> — a rule is compared through <code>show_rule</code> instead.</p></div>
+              <div class="doc"><p>A rule that never matches: reached, it fails the whole parse with the message its <code>Refusal</code> gives. Refusal is not a miss — no enclosing choice, option or repetition backtracks out of it — so it is only ever reached on purpose, after a sequence has matched the thing worth refusing: <code>Then([Named(&quot;operator&quot;), Refuse(..)])</code> accepts an operator and then rejects it, and the error underlines what the sequence matched.</p><p>This is how a grammar names a shape the language <em>used to</em> have, or that a reader would plausibly write, and says something more useful than the &quot;expected X, found Y&quot; a plain non-match would produce.</p><p>The one rule that can hold a function value, which costs <code>Rule</code> its <code>==</code> — a rule is compared through <code>show</code> instead.</p></div>
 
 
             </li>
@@ -408,12 +408,12 @@
 
 
 
-        <section class="item" id="item-show_rule">
+        <section class="item" id="item-show">
           <h3>
-            <a class="anchor" href="#item-show_rule">show_rule</a>
+            <a class="anchor" href="#item-show">show</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn show_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn show&#60;K: variant&#62;(self: Rule&#60;K&#62;) -&#62; str</code></pre>
 
           <div class="doc"><p><code>r</code> written back out as the constructor calls that build it — the debug view of a rule, and how a test asserts on one. A <code>Rule</code> cannot be compared with <code>==</code> (a <code>Refuse</code> may hold a function value) or rendered with <code>to_str</code>, so this is the one way to look at one. Defaulted arguments of a <code>Many</code> are written only where they differ from the default, so what is shown is what a grammar author would have written.</p></div>
 
@@ -427,7 +427,7 @@
             <a class="anchor" href="#item-show_style">show_style</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn show_style(__spat$26739: ListStyle) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn show_style(__spat$26504: ListStyle) -&#62; str</code></pre>
 
           <div class="doc"><p>A <code>ListStyle</code> as the literal that builds it, defaults left out — <code>ListStyle {}</code> for the default style.</p></div>
 
