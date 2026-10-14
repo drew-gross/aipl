@@ -549,6 +549,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    add some dict building fusions ie.g. foo()['key'] should fuse and throw out most of the dict inside foo()
     xs.map(f)[a..b] should fuse (like  xs.map(f)[a]) does
     Suggestions, best first
         2. Not measured: build into one buffer instead of spreading temporaries. Even with fusion 1, group_styles is still entered 487k times and aipl_arr_extend/reserve run about 615k/653k times. That's [style, ..group_styles(a), ..group_styles(b)] creating fresh arrays only to copy them into the parent. Rewriting the recursive producer to append into a buffer it's handed (a f$into(out, x) variant) applies the idea behind MapJoin to user recursion.
@@ -660,12 +661,8 @@ allocator:
   make own allocator
 
 perfmon:
-  Add a whole-corpus check to performance_metrics.md that is always exact, and sums up everything.
-  move the performance sections out of the .aipl files, it's getting hard to review
   show call-sites of each function in the final binary
   show regression and improvements
-  improve it in some way that it allows you to prove that an optimzation did or did not happen
-  add tests that specifically exercise perf
   functions in external libs don't get size instrumented
   split out binary size changes due to tests
 
