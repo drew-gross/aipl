@@ -1,0 +1,82 @@
+# `xs.map(f).minimum()` maps every element into an array only for the reduction
+# to walk it once and drop it. The fusion pass collapses the pair into
+# `map_reduce(xs, f, min)`, which maps and combines in one pass and builds no
+# array. `maximum` is the same with `max`.
+#
+# It is one fusion with a table of reductions behind it, not a builtin per pair:
+# what makes `map_reduce` a minimum rather than anything else is only the step
+# passed to it, so the next reduction is a row (`reduction`, `step`) in
+# `chain_fusions`, not a new builtin. The `.performance` block holds the saving —
+# nothing allocated for fifty numbers rendered and measured, where the unfused
+# form allocates the mapped array — and the program checks every element type the
+# reductions accept still gives the same answers.
+
+import {
+    equal as ==,
+    filter,
+    is_nonempty,
+    len,
+    less_than as <,
+    map,
+    maximum,
+    measure,
+    minimum,
+    print,
+    push,
+    split,
+    to_str,
+    wrapping_increment as ++,
+    wrapping_mul as *,
+} from builtins;
+
+fn filled(n: i64) -> i64[] {
+    mut xs: i64[] = [];
+    mut i: i64 = 0;
+    while (i < n) {
+        set xs.push(i * 7);
+        set i++;
+    }
+    xs
+}
+
+fn shortest(xs: i64[]) -> u64? { xs.map(to_str).map(len).minimum() }
+
+fn longest(xs: i64[]) -> u64? { xs.map(to_str).map(len).maximum() }
+
+fn smallest_square(xs: i64[]) -> i64? { xs.map(|x| x * x).minimum() }
+
+fn largest_text(xs: i64[]) -> str? { xs.map(to_str).maximum() }
+
+fn shortest_nonblank(lines: str[]) -> u64? { lines.filter(is_nonempty).map(len).minimum() }
+
+fn main() !prints {
+    let xs = [3, -4, 12, 7];
+    print(`{shortest(xs)} {longest(xs)} {smallest_square(xs)} {largest_text(xs)}`);
+
+    // Nothing to reduce: `none`, whichever reduction it is.
+    let nothing: i64[] = [];
+    print(`{shortest(nothing)} {smallest_square(nothing)}`);
+
+    // One element is itself.
+    print(`{smallest_square([5])} {longest([123])}`);
+    print(`{shortest_nonblank(["alpha", "", "be", "gamma"])}`);
+}.performance({
+    let fifty = filled(50);
+    assert(measure("shortest", fifty, shortest).allocations == 0);
+    assert(measure("longest", fifty, longest).allocations == 0);
+    assert(measure("smallest square", fifty, smallest_square).allocations == 0);
+
+    // A `filter` in front of the `map` keeps it: `filter_map` selects and maps in
+    // one pass, which leaves the reduction an array of the five lengths (72
+    // bytes) to walk. Taking the reduction instead would leave `filter` a pass of
+    // its own over the lines, and an array of the five surviving line views
+    // (more than twice that). Until one fused call takes filter, map and step
+    // together, the `filter` wins the `map`.
+    let lines = "alpha,,be,gamma,,d,epsilon".split(",");
+    assert(measure("filtered", lines, shortest_nonblank).bytes_allocated == 72);
+})
+--- stdout ---
+some(1) some(2) some(9) some("7")
+none none
+some(25) some(3)
+some(2)

@@ -1,13 +1,18 @@
 import {
+    Measurement,
     count_while,
     equal as ==,
+    extend,
     filter,
     is_all_whitespace,
     join,
+    less_than as <,
     logical_not as !,
     map,
+    measure,
     minimum,
     value_or,
+    wrapping_increment as ++,
 } from builtins;
 import { lines } from "./lines.aipl";
 
@@ -57,4 +62,38 @@ pub fn dedent(self: str) -> str {
             "        first long line\n        second long line",
         ) == "first long line\nsecond long line",
     );
+}).performance({
+    // `dedent` is the parser's raw-string de-denter, run on every `"""` block it
+    // reads, and a pipeline: `lines`, a `filter`, a `map` and a `minimum` to find
+    // the indent, then a `map` and a `join` to strip it. Each stage is a pass
+    // over every line, and a stage's result is an array the next one walks once.
+    // These pin what that costs today, for the fusions that are meant to cut it.
+    //
+    // Input built here, outside the call, so what is counted is `dedent`.
+    mut hundred = "";
+    mut i: u64 = 0;
+    while (i < 100) {
+        set hundred.extend("        line of text\n");
+        set i++;
+    }
+
+    // The number of allocations does not grow with the number of lines, so this
+    // is a comparison, which survives whatever the stages are built from. The
+    // exact count is the part a fusion changes.
+    let few = measure("three lines", "    a\n    b\n    c", dedent).allocations;
+    let Measurement { allocations, bytes_allocated, peak_live_bytes } = measure(
+        "a hundred lines",
+        hundred,
+        dedent,
+    );
+    assert(few == allocations);
+    assert(allocations == 3);
+
+    // What does grow with the input is the bytes allocated and the bytes live at
+    // once. These are exact because the stages that build them are what the
+    // fusions replace. The instruction count is not pinned here:
+    // `tests/performance_metrics.md` holds it for this file, exactly, and
+    // refreshes it with the code.
+    assert(bytes_allocated == 3598);
+    assert(peak_live_bytes == 4604);
 })

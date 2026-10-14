@@ -418,6 +418,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/optimizations/loop_tuple_windows_fusion | 11 | 329 | 6297 | 31696 | 4972 | 20.00 | 95.73 | 1520 |
 | cases/optimizations/map_find_if_fusion | 8 | 1926 | 3958 | 15154 | 2832 | 12.00 | 93.89 | 1504 |
 | cases/optimizations/map_map_fusion | 25 | 1043 | 754 | 3193 | 7456 | 16.00 | 137.95 | 1488 |
+| cases/optimizations/map_reduce_fusion | 25 | 1330 | 1277 | 2710 | 7112 | 12.00 | 263.83 | 1488 |
 | cases/optimizations/map_value_or_unwraps | 0 | 0 | 0 | 77 | 412 | 3.00 | 85.46 | 1440 |
 | cases/optimizations/move_last_use | 49 | 2475 | 2450 | 8366 | 11708 | 30.00 | 115.42 | 1488 |
 | cases/optimizations/owned_param_shared_result | 12 | 672 | 720 | 2891 | 3364 | 9.00 | 84.57 | 1488 |
@@ -688,7 +689,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/process_raw_string | 15 | 666 | 228 | 17705 | 5664 | 9.00 | 97.70 | 1504 |
 | crates/aipl-codegen/src/reindent_block | 90 | 5146 | 1683 | 14578 | 9684 | 18.00 | 104.68 | 1536 |
 | crates/aipl-codegen/src/requote | 613 | 39882 | 4111 | 166424 | 47516 | 73.00 | 924.47 | 1600 |
-| crates/aipl-codegen/src/sexp | 12738 | 12454602 | 243962 | 7635967 | 162812 | 2293.00 | 2558.81 | 7504 |
+| crates/aipl-codegen/src/sexp | 12738 | 12454602 | 243962 | 7617396 | 162452 | 2142.00 | 4054.90 | 7440 |
 | crates/aipl-codegen/src/source_loc | 16 | 982 | 982 | 725 | 2008 | 6.00 | 83.18 | 1488 |
 | crates/aipl-codegen/src/split_test_sections | 0 | 0 | 0 | 10117 | 5320 | 4.00 | 88.25 | 1472 |
 | crates/aipl-codegen/src/strip_test_sections | 0 | 0 | 0 | 9135 | 3176 | 4.00 | 85.64 | 1456 |
@@ -734,6 +735,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_map_find_if | 0 | 0 | 0 | 938 | 2932 | 2.00 | 88.06 | 1472 |
 | crates/aipl-mono/src/builtin_map_join | 24 | 921 | 624 | 5309 | 13508 | 9.00 | 109.14 | 1504 |
 | crates/aipl-mono/src/builtin_map_ok | 8 | 704 | 704 | 2651 | 14588 | 5.00 | 97.05 | 1472 |
+| crates/aipl-mono/src/builtin_map_reduce | 3 | 216 | 216 | 2872 | 7040 | 4.00 | 91.52 | 1520 |
 | crates/aipl-mono/src/builtin_measure | 0 | 0 | 0 | 86 | 408 | 1.00 | 82.26 | 1456 |
 | crates/aipl-mono/src/builtin_nonempty_first | 1 | 56 | 56 | 319 | 1488 | 3.00 | 82.04 | 1488 |
 | crates/aipl-mono/src/builtin_nonempty_last | 1 | 56 | 56 | 375 | 1564 | 3.00 | 79.93 | 1488 |

@@ -481,6 +481,7 @@ design:
   apis should express intent
 
 optimizations:
+  detect if a user function amounts to a reduction (not sure if lint to .reduce() or make eligible for fusion)
   body_size should probably count match arms to prevent function that are huge match tables from getting inlined every time
   make inline capcity vary by type, and even by site (e.g. a const array literal that is mapped or filtered)
   inline arrays for non-primitive types (that require a drop of each element).

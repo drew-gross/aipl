@@ -7871,6 +7871,7 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::MapJoin, "builtin_map_join.aipl"),
     (Callee::JoinIsNonempty, "builtin_join_is_nonempty.aipl"),
     (Callee::JoinIsEmpty, "builtin_join_is_empty.aipl"),
+    (Callee::MapReduce, "builtin_map_reduce.aipl"),
     (Callee::SplitMap, "builtin_split_map.aipl"),
     (Callee::FindMap, "builtin_find_map.aipl"),
     (Callee::ReverseFindMap, "builtin_reverse_find_map.aipl"),

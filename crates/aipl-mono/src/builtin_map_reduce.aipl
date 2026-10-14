@@ -1,0 +1,68 @@
+# The AIPL implementation of the `map_reduce` builtin. Monomorphization registers
+# this function under the canonical name `__builtin_map_reduce` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.map_reduce(f, step)`
+# resolves through the ordinary generic / higher-order machinery — the in-file
+# name is only for this file's own tests, which read exactly like user code.
+#
+# It is what `xs.map(f).<reduction>()` means, in one pass and with no mapped array
+# built: `map` would allocate every `f(x)` for the reduction to walk once and
+# drop. The reduction is the `step`, which combines what has been reduced so far
+# with the next mapped element — `min` for `minimum`, `max` for `maximum`. Written
+# by the compiler's operation-fusion pass for those chains (see `chain_fusions`
+# in aipl-mono, where the table of reductions lives); also callable directly.
+
+import {
+    equal as ==,
+    filter,
+    len,
+    logical_not as !,
+    map,
+    max,
+    maximum,
+    min,
+    minimum,
+    wrapping_add as +,
+    wrapping_mul as *,
+    wrapping_sub as -,
+} from builtins;
+
+# `f` applied to each element, left to right, combined with `step` as it goes:
+# for `[a, b, c]`, `some(step(step(f(a), f(b)), f(c)))`. The first mapped element
+# seeds the result, so `step` is never called on fewer than two; an empty receiver
+# is `none`, and one element is `some(f(that element))`.
+#
+# `f` runs once per element, in order, interleaved with `step` rather than before
+# all of them — which no one can tell apart unless `step` does something, and a
+# reduction's step does not.
+pub fn map_reduce<T: any, U: any>(self: T[], f: (T) -> U, step: (U, U) -> U) -> U? {
+    mut reduced: U? = none;
+    for (let x : self) {
+        let next = f(x);
+        set reduced = match (reduced) {
+            some(so_far) => some(step(so_far, next)),
+            none => some(next),
+        };
+    }
+    reduced
+}.test({
+    fn is_nine(self: i64) -> bool { self == 9 }
+    assert(!is_nine(8));
+
+    // The two reductions it was written for, over a mapped array.
+    assert([3, 1, 2].map_reduce(|x| x * 10, min) == some(10));
+    assert([3, 1, 2].map_reduce(|x| x * 10, max) == some(30));
+    // It is `map` then the reduction.
+    assert([3, 1, 2].map_reduce(|x| 5 - x, min) == [3, 1, 2].map(|x| 5 - x).minimum());
+    assert([3, 1, 2].map_reduce(|x| 5 - x, max) == [3, 1, 2].map(|x| 5 - x).maximum());
+    // One element is itself; no step is taken.
+    assert([7].map_reduce(|x| x + 1, min) == some(8));
+    // Empty is `none` (a typed empty from `filter`).
+    assert([1, 2].filter(is_nine).map_reduce(|x| x, min) == none);
+    // The result type need not be the element type, and `step` is any combiner.
+    assert(["a", "bcd", "ef"].map_reduce(len, max) == some(3));
+    assert(['b', 'a', 'c'].map_reduce(|c| c, min) == some('a'));
+    assert(["pear", "apple"].map_reduce(|s| s, min) == some("apple"));
+    assert(map_reduce([2, 3], |x| x, max) == some(3)); // free-call form
+    let by = 100;
+    assert([1, 2].map_reduce(|x| x + by, max) == some(102)); // a captured value
+})

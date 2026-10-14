@@ -4,6 +4,21 @@
 //! source is uniquely owned and the element sizing allows, into the source's own
 //! buffer.
 //!
+//! # Reductions
+//!
+//! A second table, [`REDUCTIONS`], is for a chain whose outer call *reduces* its
+//! receiver to one value — `xs.map(f).minimum()` — rather than producing another
+//! sequence. They are one fusion, not one per reduction: `map_reduce(xs, f, step)`
+//! maps and combines in a single pass with no mapped array, and what makes it
+//! `minimum` rather than anything else is only the `step` (`min`). A row says
+//! which call is the reduction and which builtin is its step, so adding the next
+//! reduction is a row, not a builtin.
+//!
+//! The mapping stage is the part that is still one case: `map` is the only call
+//! that feeds a reduction here. Each further stage that should feed one
+//! (`filter_map`, say) is a fused builtin of its own that takes the same `step`;
+//! the table of reductions does not change.
+//!
 //! The receiver may reach here under the `let`s inlining leaves in front of an
 //! inlined body; the chain is found beneath them and the fused call put back
 //! there (see [`build`]).
@@ -135,7 +150,7 @@ pub(super) fn build(whole: &Expr, outer: Option<&Callee>) -> Option<Expr> {
     let ExprKind::Call(name, args, method_style) = &whole.kind else {
         return None;
     };
-    if outer.is_some_and(|o| row(name, o).is_some()) {
+    if outer.is_some_and(|o| stands_aside_for(whole, name, o)) {
         return None;
     }
     let (recv, rest) = args.split_first()?;
@@ -143,7 +158,15 @@ pub(super) fn build(whole: &Expr, outer: Option<&Callee>) -> Option<Expr> {
     let ExprKind::Call(inner_name, inner_args, _) = &inner.kind else {
         return None;
     };
-    let f = row(inner_name, name)?;
+    // Either a row of the chain table, or a `map` feeding a reduction — which is
+    // a call to `map_reduce` with the reduction's step as one more argument.
+    let (into, step) = match row(inner_name, name) {
+        Some(f) => (f.into.clone(), None),
+        None => {
+            let reduction = reduction_row(name).filter(|_| *inner_name == Callee::Map)?;
+            (Callee::MapReduce, Some(&reduction.step))
+        }
+    };
     if bindings
         .iter()
         .any(|b| rest.iter().any(|a| mentions_free(a, b.name)))
@@ -152,12 +175,84 @@ pub(super) fn build(whole: &Expr, outer: Option<&Callee>) -> Option<Expr> {
     }
     let mut fused = inner_args.clone();
     fused.extend(rest.iter().cloned());
+    // The step is the builtin itself, passed as a function value: spelled as the
+    // name a call to it resolves from, which is how a program names one.
+    if let Some(step) = step {
+        fused.push(Expr::new(
+            ExprKind::Ident(step.name().to_string()),
+            whole.span.clone(),
+        ));
+    }
     // Spanned as the whole chain: that is the source the user wrote, and what
     // any later diagnostic should point at. The bindings the call moves under
     // are rebuilt the same way, since the value they now produce is the fused
     // call's.
-    let call = Expr::rebuilt(ExprKind::Call(f.into.clone(), fused, *method_style), whole);
+    let call = Expr::rebuilt(ExprKind::Call(into, fused, *method_style), whole);
     Some(under_bindings(bindings, whole, call))
+}
+
+/// One reduction a mapped array can be fed to: `reduction` is the call, and
+/// `step` is the builtin that combines two values of the mapped type into the
+/// one it keeps — the whole of what distinguishes `minimum` from `maximum`.
+///
+/// Both are the *same shape* as the unfused call by construction: `reduction`
+/// takes the first element as its seed and folds the rest in order, and
+/// `map_reduce` does the same with `step`, so the only requirement on a row is
+/// that `step` agrees with `reduction` on any two elements.
+struct Reduction {
+    reduction: Callee,
+    step: Callee,
+}
+
+/// Every reduction the pass knows. See the module docs for how to add one.
+const REDUCTIONS: &[Reduction] = &[
+    // `xs.map(f).minimum()`: smaller of two. Agrees with `minimum` on every
+    // element type it accepts; on equal elements it keeps the later one, which
+    // cannot be told from the earlier.
+    Reduction {
+        reduction: Callee::Minimum,
+        step: Callee::Min,
+    },
+    Reduction {
+        reduction: Callee::Maximum,
+        step: Callee::Max,
+    },
+];
+
+/// The [`REDUCTIONS`] row for `reduction`, if it is one.
+fn reduction_row(reduction: &Callee) -> Option<&'static Reduction> {
+    REDUCTIONS.iter().find(|r| r.reduction == *reduction)
+}
+
+/// Whether `whole` — a call to `name`, the receiver of a call to `outer` — leaves
+/// itself for that parent to fuse (see "Standing aside for the parent" on
+/// [`build`]).
+///
+/// A `map` feeding a *reduction* is the one exception to "the parent wins". A
+/// `map` whose own receiver is a `filter` has a better partner in that `filter`:
+/// `filter_map` selects and maps in one pass, and what is left for the reduction
+/// is the one array it builds. Taking the reduction instead, `map_reduce` over
+/// the `filter`'s result, would leave the `filter` a separate pass over every
+/// element and an array of the survivors besides. Until a fused call exists that
+/// takes the filter, the map, and the step together, the filter keeps the map.
+fn stands_aside_for(whole: &Expr, name: &Callee, outer: &Callee) -> bool {
+    if row(name, outer).is_some() {
+        return true;
+    }
+    *name == Callee::Map && reduction_row(outer).is_some() && !has_filter_receiver(whole)
+}
+
+/// Whether the first argument of `call` — its receiver — is a `filter`, possibly
+/// under the `let`s an inlined call leaves in front of its body.
+fn has_filter_receiver(call: &Expr) -> bool {
+    let ExprKind::Call(_, args, _) = &call.kind else {
+        return false;
+    };
+    let Some(receiver) = args.first() else {
+        return false;
+    };
+    let (_, inner) = through_bindings(receiver);
+    matches!(&inner.kind, ExprKind::Call(Callee::Filter, ..))
 }
 
 /// The row pairing an `inner` call with an `outer` one, if there is one.
