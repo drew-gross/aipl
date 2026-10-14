@@ -551,7 +551,6 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
-    .join().is_nonempty() should fuse
     equality operator fusion for many operations, match fusion, etc.
     add some dict building fusions ie.g. foo()['key'] should fuse and throw out most of the dict inside foo()
     xs.map(f)[a..b] should fuse (like  xs.map(f)[a]) does
@@ -567,7 +566,7 @@ optimizations:
 
         The two hand-written changes are in .claude/worktrees/fusion-probe (branch worktree-fusion-probe), in crates/aipl-codegen/src/grammar.aipl. They're uncommitted, since your CLAUDE.md says you handle commits. They're there to reproduce the numbers, not to merge, and you can delete the worktree whenever you like.
 
-    apparently, to_str_len still uses to_str() on boxed types to compute the let. We should stop that and use to_str_len.
+    apparently, to_str_len still uses to_str() on boxed types to compute the len. We should stop that and use to_str_len.
     foo.reverse()[x] and foo.reverse()[x..y] should fuse
     .map().to_set() should fuse
     map().join().len() should fuse

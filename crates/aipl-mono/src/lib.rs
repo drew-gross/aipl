@@ -7869,6 +7869,8 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::FindIf, "builtin_find_if.aipl"),
     (Callee::MapFindIf, "builtin_map_find_if.aipl"),
     (Callee::MapJoin, "builtin_map_join.aipl"),
+    (Callee::JoinIsNonempty, "builtin_join_is_nonempty.aipl"),
+    (Callee::JoinIsEmpty, "builtin_join_is_empty.aipl"),
     (Callee::SplitMap, "builtin_split_map.aipl"),
     (Callee::FindMap, "builtin_find_map.aipl"),
     (Callee::ReverseFindMap, "builtin_reverse_find_map.aipl"),
@@ -11320,6 +11322,7 @@ fn aliases_or_unsafe(
                         // that very binding.
                         f if builtin_is_mutating(f.name()) => iterating,
                         Callee::Len
+                        | Callee::IsEmpty
                         | Callee::IsNonempty
                         | Callee::ToStr
                         | Callee::ToStrLen
@@ -11341,6 +11344,7 @@ fn aliases_or_unsafe(
                 let consuming = matches!(
                     fname,
                     Callee::Len
+                        | Callee::IsEmpty
                         | Callee::IsNonempty
                         | Callee::ToStr
                         | Callee::ToStrLen

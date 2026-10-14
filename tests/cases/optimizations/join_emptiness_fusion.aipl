@@ -1,0 +1,49 @@
+# `xs.join(sep=s).is_nonempty()` asks whether a join has anything in it, and
+# answers by building it: `join` measures every piece, allocates the whole result
+# and copies each piece in, only for the answer to be a single bit. The fusion
+# pass collapses the pair into `join_is_nonempty`, which stops at the first piece
+# with something in it and allocates nothing. `is_empty` is the same question
+# the other way round and fuses the same way, into `join_is_empty`: a fusion that
+# works on one works on the other.
+#
+# The separators matter, because an all-empty join is not always empty. Two empty
+# pieces with a `sep` of `-` join to `-`, and that is what `only_sep` (the gap of
+# a two-piece join), `final_sep` and `sep` decide between; the builtin applies
+# `join`'s own rule, and its `.test` block checks it against `join` itself. This
+# case checks the fusion fires and the answers survive it.
+#
+# The arrays are built outside the measured call, so what is counted is the join.
+
+import { equal as ==, is_empty, is_nonempty, join, measure, print, split } from builtins;
+
+fn has_text(xs: str[]) -> bool { xs.join().is_nonempty() }
+
+fn has_text_dashed(xs: str[]) -> bool { xs.join(sep="-").is_nonempty() }
+
+fn no_text(xs: str[]) -> bool { xs.join().is_empty() }
+
+fn no_text_dashed(xs: str[]) -> bool { xs.join(sep="-").is_empty() }
+
+fn main() !prints {
+    let words = ["", "a", ""];
+    let blanks = ["", "", ""];
+    let pair = ["", ""];
+    print(`{has_text(words)} {has_text(blanks)} {has_text(pair)}`);
+    print(`{has_text_dashed(words)} {has_text_dashed(blanks)} {has_text_dashed(pair)}`);
+    print(`{no_text(words)} {no_text(blanks)} {no_text(pair)}`);
+    print(`{no_text_dashed(words)} {no_text_dashed(blanks)} {no_text_dashed(pair)}`);
+}.performance({
+    let words = "a,b,c".split(",");
+    let blanks = ",,".split(",");
+    assert(measure("a piece has text", words, has_text).allocations == 0);
+    assert(measure("every piece blank", blanks, has_text).allocations == 0);
+    assert(measure("a separator decides", blanks, has_text_dashed).allocations == 0);
+    assert(measure("a piece has text, asked empty", words, no_text).allocations == 0);
+    assert(measure("every piece blank, asked empty", blanks, no_text).allocations == 0);
+    assert(measure("a separator decides, asked empty", blanks, no_text_dashed).allocations == 0);
+})
+--- stdout ---
+true false false
+true true true
+false true true
+false false false

@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">112 files, 1334 items.</p>
+      <p class="summary">114 files, 1336 items.</p>
 
       <ul class="files">
 
@@ -2678,6 +2678,42 @@
 
             <li>
               <a href="crates-aipl-mono-src-builtin_is_some_and.html#item-is_some_and"><code>is_some_and</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_join_is_empty.html">crates/aipl-mono/src/builtin_join_is_empty.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>join_is_empty</code> builtin — the other half of <code>join_is_nonempty</code> (see <code>builtin_join_is_nonempty.aipl</code>, which says what the fusion is for and what rule decides it). Monomorphization registers this function under the canonical name <code>__builtin_join_is_empty</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.join_is_empty(sep=s)</code> resolves through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_join_is_empty.html#item-join_is_empty"><code>join_is_empty</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_join_is_nonempty.html">crates/aipl-mono/src/builtin_join_is_nonempty.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>join_is_nonempty</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_join_is_nonempty</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.join_is_nonempty(sep=s)</code> resolves through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_join_is_nonempty.html#item-join_is_nonempty"><code>join_is_nonempty</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

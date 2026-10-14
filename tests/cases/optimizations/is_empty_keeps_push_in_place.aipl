@@ -1,0 +1,36 @@
+# `is_empty` and `is_nonempty` ask one question, and a program must not pay a
+# different price for the way it phrases it.
+#
+# Reading a `mut` array with `is_nonempty` leaves it exclusively owned, so the
+# `push` after it still writes into the same block. The analysis that decides that
+# lists the builtins that only *read* their receiver, and `is_empty` was missing
+# from the list: reading the array with it looked like the array escaping into a
+# call, and the next `push` copied the block first — a second allocation for no
+# reason a reader could see. Both phrasings are held to the same cost here.
+
+import { equal as ==, is_empty, is_nonempty, measure, push } from builtins;
+
+fn after_nonempty(n: i64) -> bool {
+    mut xs: i64[] = [];
+    set xs.push(n);
+    set xs.push(n);
+    let seen = xs.is_nonempty();
+    set xs.push(n);
+    set xs.push(n);
+    seen
+}
+
+fn after_empty(n: i64) -> bool {
+    mut xs: i64[] = [];
+    set xs.push(n);
+    set xs.push(n);
+    let seen = xs.is_empty();
+    set xs.push(n);
+    set xs.push(n);
+    seen
+}
+
+fn main() {}.performance({
+    assert(measure("is_nonempty", 1, after_nonempty).allocations == 1);
+    assert(measure("is_empty", 1, after_empty).allocations == 1);
+})

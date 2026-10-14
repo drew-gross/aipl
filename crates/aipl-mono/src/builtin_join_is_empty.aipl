@@ -1,0 +1,43 @@
+# The AIPL implementation of the `join_is_empty` builtin — the other half of
+# `join_is_nonempty` (see `builtin_join_is_nonempty.aipl`, which says what the
+# fusion is for and what rule decides it). Monomorphization registers this
+# function under the canonical name `__builtin_join_is_empty` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.join_is_empty(sep=s)`
+# resolves through the ordinary generic machinery — the in-file name is only for
+# this file's own tests, which read exactly like user code.
+#
+# It is what `xs.join(sep=s).is_empty()` means, without building the join. The
+# compiler's operation-fusion pass writes it for that chain (see
+# `chain_fusions` in aipl-mono); also callable directly.
+
+import { join_is_nonempty, logical_not as ! } from builtins;
+
+# True when `self.join(sep=sep, final_sep=final_sep, only_sep=only_sep)` has no
+# elements: every piece is empty and so is every separator `join` would write
+# between them. Exactly the negation of `join_is_nonempty`, which owns the rule.
+pub fn join_is_empty<T: any>(
+    self: T[][],
+    sep: T* = [],
+    final_sep: T* = sep,
+    only_sep: T* = sep,
+) -> bool { !self.join_is_nonempty(sep=sep, final_sep=final_sep, only_sep=only_sep) }.test({
+    // No piece has anything in it.
+    assert(["", "", ""].join_is_empty());
+    assert(["", ""].join_is_empty());
+    let none_at_all: str[] = [];
+    assert(none_at_all.join_is_empty());
+    assert(none_at_all.join_is_empty(sep="-"));
+    // Some piece does.
+    assert(!["", "a", ""].join_is_empty());
+    assert(!["a"].join_is_empty());
+
+    // A separator can make an all-empty join not empty: `only_sep` in the sole
+    // gap of two pieces, `final_sep` in the last gap, `sep` in the rest.
+    assert(!["", ""].join_is_empty(sep="-"));
+    assert(["", ""].join_is_empty(sep="-", only_sep=""));
+    assert(!["", "", ""].join_is_empty(final_sep="&"));
+    assert(["", "", ""].join_is_empty(only_sep="+"));
+    // Free-call form, and a non-`char` element type.
+    assert(!join_is_empty([[1, 2], [3]]));
+    assert(join_is_empty(["", ""]));
+})

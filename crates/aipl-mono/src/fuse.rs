@@ -19,7 +19,12 @@
 //!   is the shape at its sharpest: `to_str` measures the rendering, allocates
 //!   exactly that, writes it, and hands back a `str` whose only use is to be
 //!   measured again — so the pair collapses into `to_str_len`, the measure pass
-//!   with nothing built behind it.
+//!   with nothing built behind it. `xs.join(sep=s).is_nonempty()` is the same
+//!   shape for one bit: `join` builds the whole result to be asked whether
+//!   anything is in it, so the pair collapses into `join_is_nonempty`, which
+//!   stops at the first non-empty piece and builds nothing. `is_empty` is
+//!   the same question the other way, and every row here for one has a row for the
+//!   other.
 //! - [`slice_fusions`] — a call on a sliced receiver. `xs[i..].starts_with(p)`
 //!   builds the whole tail of `xs` — for an array, a fresh block with every
 //!   element copied — only to look at its first few elements, so it collapses

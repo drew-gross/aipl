@@ -1,0 +1,85 @@
+# The AIPL implementation of the `join_is_nonempty` builtin. Monomorphization
+# registers this function under the canonical name `__builtin_join_is_nonempty`
+# (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's
+# `xs.join_is_nonempty(sep=s)` resolves through the ordinary generic machinery —
+# the in-file name is only for this file's own tests, which read exactly like
+# user code.
+#
+# It is what `xs.join(sep=s).is_nonempty()` means, without building the join:
+# `join` measures every piece, allocates the whole result and copies each piece
+# in, and this asks only whether anything would be there. Written by the
+# compiler's operation-fusion pass for that chain (see `chain_fusions` in
+# aipl-mono); also callable directly.
+
+import {
+    any,
+    equal as ==,
+    is_nonempty,
+    join,
+    len,
+    less_than as <,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    split,
+} from builtins;
+
+# True when `self.join(sep=sep, final_sep=final_sep, only_sep=only_sep)` has any
+# element: some piece is non-empty, or — when every piece is empty — a separator
+# that would be written between them is. The three separators are `join`'s,
+# all defaulting to empty, and which one applies is `join`'s rule: `only_sep`
+# in the sole gap of a two-piece join, `final_sep` in the last gap and `sep` in
+# every other. Stops at the first non-empty piece; an empty `self` is false.
+pub fn join_is_nonempty<T: any>(
+    self: T[][],
+    sep: T* = [],
+    final_sep: T* = sep,
+    only_sep: T* = sep,
+) -> bool {
+    let n = self.len();
+    self.any(is_nonempty) || if (n == 2) {
+        only_sep.is_nonempty()
+    } else {
+        2 < n && (sep.is_nonempty() || final_sep.is_nonempty())
+    }
+}.test({
+    // Some piece has something in it.
+    assert(["", "a", ""].join_is_nonempty());
+    assert(["a"].join_is_nonempty());
+    // Every piece is empty, and no separator says otherwise.
+    assert(!["", "", ""].join_is_nonempty());
+    assert(!["", ""].join_is_nonempty());
+    assert(!"".split(",").join_is_nonempty());
+    // No pieces at all: nothing to put a separator between, whatever it is.
+    let none_at_all: str[] = [];
+    assert(!none_at_all.join_is_nonempty());
+    assert(!none_at_all.join_is_nonempty(sep="-"));
+    // One piece has no gap, so no separator is written.
+    assert(!"".split(",").join_is_nonempty(sep="-", final_sep="&", only_sep="+"));
+    // Two empty pieces have one gap, and it is `only_sep`'s.
+    assert(["", ""].join_is_nonempty(sep="-"));
+    assert(!["", ""].join_is_nonempty(sep="-", only_sep=""));
+    assert(["", ""].join_is_nonempty(only_sep="+"));
+    // `only_sep` defaults to `sep`, so naming `final_sep` does not change it.
+    assert(["", ""].join_is_nonempty(sep="-", final_sep="&"));
+    // Three or more: `sep` between, `final_sep` in the last gap.
+    assert(["", "", ""].join_is_nonempty(sep="-"));
+    assert(["", "", ""].join_is_nonempty(final_sep="&"));
+    assert(!["", "", ""].join_is_nonempty(only_sep="+"));
+    assert(!["", "", ""].join_is_nonempty(sep="", final_sep=""));
+    // It agrees with building the join, for every separator that decides it.
+    let pieces = ["", "", "", ""];
+    assert(
+        pieces.join_is_nonempty(sep="", final_sep="&") == pieces
+            .join(sep="", final_sep="&")
+            .is_nonempty(),
+    );
+    assert(pieces.join_is_nonempty(sep="-") == pieces.join(sep="-").is_nonempty());
+    let two = ["", ""];
+    assert(two.join_is_nonempty(sep="-") == two.join(sep="-").is_nonempty());
+    assert(two.join_is_nonempty(only_sep="+") == two.join(only_sep="+").is_nonempty());
+    assert(two.join_is_nonempty() == two.join().is_nonempty());
+    // Free-call form, and a non-`char` element type.
+    assert(join_is_nonempty([[1, 2], [3]]));
+    assert(join_is_nonempty(["", "x"]));
+})

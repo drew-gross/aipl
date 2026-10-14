@@ -4290,16 +4290,6 @@ impl Cx<'_> {
                 ));
             }
         }
-        if matches!(callee, Callee::Len | Callee::IsNonempty) && args.len() == 1 {
-            let t = self.check_expr(&args[0], env, effects)?;
-            if matches!(t, Type::Set(..) | Type::Dict(_, _)) || is_str_repr(&t) {
-                return Ok(if *callee == Callee::Len {
-                    Type::Primitive(Primitive::U64)
-                } else {
-                    Type::Primitive(Primitive::Bool)
-                });
-            }
-        }
         // An operator resolved (in the loader) to its canonical `__builtin_*`
         // impl. Typed exactly as the operator is, because it *is* the operator:
         // after import resolution `a == b` and a bare `equal(a, b)` are one call,

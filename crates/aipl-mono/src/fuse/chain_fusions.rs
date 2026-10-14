@@ -50,6 +50,26 @@ const CHAIN_FUSIONS: &[ChainFusion] = &[
         outer: Callee::Join,
         into: Callee::MapJoin,
     },
+    // `xs.join(sep=s).is_nonempty()`: `join` measures every piece, allocates the
+    // whole result and copies each piece in, for a caller that asks only
+    // whether anything is there. `join_is_nonempty` stops at the first piece
+    // with something in it, and allocates nothing. The outer has no arguments of
+    // its own, so the fused call takes `join`'s: the receiver and the three
+    // separators.
+    ChainFusion {
+        inner: Callee::Join,
+        outer: Callee::IsNonempty,
+        into: Callee::JoinIsNonempty,
+    },
+    // `xs.join(sep=s).is_empty()`: the same fusion for the other half of the
+    // question. Every fusion on `is_nonempty` has a row here for `is_empty`, and
+    // the reverse — they are one question asked two ways, and a program should
+    // not get a different cost for choosing between them.
+    ChainFusion {
+        inner: Callee::Join,
+        outer: Callee::IsEmpty,
+        into: Callee::JoinIsEmpty,
+    },
     // `s.split(sep).map(f)`: `split` builds a block holding every part — a
     // retained view each — for `map` to walk once and drop; `split_map` maps
     // each part as the cut is made, over a cursor that materializes nothing.
