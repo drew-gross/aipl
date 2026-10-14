@@ -417,8 +417,8 @@ pub fn prod_names<K: variant, A: any>(g: Grammar<K, A>) -> str[] { g.prods.map(|
 # this is the one way to look at one. Defaulted arguments of a `Many` are
 # written only where they differ from the default, so what is shown is what a
 # grammar author would have written.
-pub fn show_rule<K: variant>(r: Rule<K>) -> str {
-    match (r) {
+pub fn show_rule<K: variant>(self: Rule<K>) -> str {
+    match (self) {
         Term(k) => `Term({k.case_name()})`,
         Literal(s) => `Literal("{s}")`,
         Then(rs) => `Then([{rs.map(show_rule).join(sep=", ")}])`,

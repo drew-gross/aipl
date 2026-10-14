@@ -43,7 +43,19 @@ fn filled(n: i64, x: i64) -> i64[] {
     xs
 }
 
-fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }
+// Counting stops once the answer is settled, so it costs the same on ten elements
+// as on ten thousand. That is a comparison, so it is stated as one; the number it
+// compares is pinned too.
+fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }.performance({
+    let small = filled(10, 2);
+    let large = filled(10000, 2);
+    let at_ten = measure("ten elements", small, decided_early);
+    let at_ten_thousand = measure("ten thousand elements", large, decided_early);
+    assert(at_ten.allocations == 0);
+    assert(at_ten_thousand.allocations == 0);
+    assert(at_ten.instructions == at_ten_thousand.instructions);
+    assert(at_ten.instructions == 133);
+})
 
 fn main() {}
 
@@ -59,20 +71,6 @@ fn work() {}.performance({
     assert(bytes_allocated == 0);
     assert(peak_live_bytes == 0);
     assert(instructions == 5);
-})
-
-// Counting stops once the answer is settled, so it costs the same on ten elements
-// as on ten thousand. That is a comparison, so it is stated as one; the number it
-// compares is pinned too.
-fn early_exit() {}.performance({
-    let small = filled(10, 2);
-    let large = filled(10000, 2);
-    let at_ten = measure("ten elements", small, decided_early);
-    let at_ten_thousand = measure("ten thousand elements", large, decided_early);
-    assert(at_ten.allocations == 0);
-    assert(at_ten_thousand.allocations == 0);
-    assert(at_ten.instructions == at_ten_thousand.instructions);
-    assert(at_ten.instructions == 133);
 })
 
 // A value small enough to live in the value's own words needs no allocation:

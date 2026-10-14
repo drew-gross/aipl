@@ -86,11 +86,10 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  impl Abi can go away now that str24 and arr24 are fully integrated (tho maybe should wait for sets and dicts to be unified too?)
   the approach of matching on mangled names is bad, we should propagate more information
-  Large optimization tests that still use performance section: move_last_use, fold_extends_value_or and loop_split_fusion are optimization tests over the line threshold.
   chain.allocations == by_hand.allocations ---> replace this with struct comparison
   in tests/cases/report/test_driver_run.aipl why does fn double() get minted as __test$double?
-  .performance on decided_early should be actually on decided_early
   make the runtime a bit less type erased maybe? E.g. dropping an array should be able to drop primitve vs. non-primitive arrays based on type, not a flag
   unify flat sets and flat dicts repr with arrays
   use set membership in duplicate case name check (with ad-hoc set)
@@ -303,6 +302,7 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
+  Unicode support
   Variant without Case should work
   i64 without 0 should work
   none.value_or_err doesn't type check. Maybe it should? Unclear.
@@ -374,9 +374,12 @@ parser:
   after the aipl parser is written in aipl make sure the repair() jank isn't necessary
 
 grammar:
+  TokenRule's unterminated should move into only the places where it's actually used
   make an ebnf loader as well as dumper
 
 utilities:
+  zip
+  repeat an int N times
   int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html
   map on a set is a bit of a weird operation, I feel like I should come up with a name for it (what if the pred isn't injective?)
   (T, U)[] -> (T[], U[]) function
@@ -550,6 +553,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    equality operator fusion for many operations, match fusion, etc.
     add some dict building fusions ie.g. foo()['key'] should fuse and throw out most of the dict inside foo()
     xs.map(f)[a..b] should fuse (like  xs.map(f)[a]) does
     Suggestions, best first
@@ -667,6 +671,9 @@ perfmon:
   functions in external libs don't get size instrumented
   split out binary size changes due to tests
 
+report:
+  make a flamegraph option
+
 check:
   check should error on lint failures, but still run tests and report results
   can recover from parse errors too and run tests
@@ -685,8 +692,6 @@ integers:
   unpinned int lits should be passable as struct fields
 
 Cache monomorphizations of the same lambda
-
-Unicode support
 
 error improvements:
   tests/cases/kwargs/err_generic_default_conflicts.aipl is showing a mangled name in it's error. This should type check against the bound and see that T (any) isn't compatible with 0 (num)
@@ -744,16 +749,6 @@ lexer:
   threaded across the FFI (marshal_lex, LexedError) and rendered by Error.
 
 check if flat vec is more performant for cons list in doc.aipl (use runtime perf numbers) NOTE: probably should make a perf test to format entire codebase for this
-
-match:
-  Nested matching e.g.
-    match (opt_of_array) {
-        some([]) => ...,
-        some([var]) => ...,
-        some(multi) => ...,
-        none => ...,
-    }
-  rest/spread in match
 
 make a function composition operator
 
