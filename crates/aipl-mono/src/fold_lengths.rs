@@ -1,6 +1,20 @@
 //! Push a `len(..)` inward until it reaches something that already knows the
 //! answer, so the sequence it was measuring never has to be built.
 //!
+//! `is_empty(..)` and `is_nonempty(..)` are the same question asked for one
+//! bit, and take the same road: a `len` that stops at an array literal answers
+//! with its element count, and these answer with `true` or `false`. Only the rows
+//! that are about a *count* — the spread accumulator, `filter`, `map_join`, the
+//! optional `map` — are `len`'s alone; the control-flow rows and the
+//! length-preserving calls are shared. See [`Ask`]. So a function that builds a
+//! table of arrays, asked `is_nonempty` of its result, becomes a `match` that
+//! answers `true` or `false` per arm and never builds one.
+//!
+//! An *index* — `f(..)[i]`, a `T?` out of a `T[]` — is the third question, and
+//! the one that needs the most care ([`fold_index`]): it goes through `if`/`match`
+//! only while the index is a literal or a name, and out of a literal only when
+//! picking the element cannot change a type.
+//!
 //! `len` is the one builtin that reads nothing but a count, and a surprising
 //! amount of code hands it a sequence assembled for no other purpose:
 //! `group_styles(r).len()` in `grammar.aipl` builds a `ListStyle[]` of every
@@ -119,11 +133,16 @@ pub(crate) fn fold_expr(e: &Expr, blocked: &HashSet<String>) -> Expr {
 /// [`fold_expr`] carrying the hoisted keyword arguments that hold an empty
 /// sequence — see [`is_empty_sequence`] for why that one fact has to travel.
 fn fold_in(e: &Expr, empty: &mut Vec<String>, blocked: &HashSet<String>) -> Expr {
-    if let ExprKind::Call(Callee::Len, args, _) = &e.kind {
-        if let [arg] = args.as_slice() {
-            if let Some(folded) = fold_length(e, arg, empty, blocked) {
+    if let ExprKind::Call(callee, args, _) = &e.kind {
+        if let (Some(ask), [arg]) = (Ask::of(callee), args.as_slice()) {
+            if let Some(folded) = fold_length(e, arg, empty, blocked, ask) {
                 return fold_in(&folded, empty, blocked);
             }
+        }
+    }
+    if let ExprKind::Index(operand, index) = &e.kind {
+        if let Some(folded) = fold_index(e, operand, index, blocked) {
+            return fold_in(&folded, empty, blocked);
         }
     }
     // A `let` is in scope for its body and nothing else, so it is recorded for
@@ -205,6 +224,7 @@ fn fold_length(
     arg: &Expr,
     outer: &[String],
     blocked: &HashSet<String>,
+    ask: Ask,
 ) -> Option<Expr> {
     let (bindings, inner) = through_bindings(arg);
     let counted = {
@@ -214,16 +234,70 @@ fn fold_length(
         for b in &bindings {
             note_empty(b.name, b.value, &mut empty);
         }
-        count_of(whole, inner, &empty, blocked)?
+        count_of(whole, inner, &empty, blocked, ask)?
     };
     Some(under_bindings(bindings, whole, counted))
 }
 
-/// The length of `e`, computed from its shape rather than by building it.
-fn count_of(whole: &Expr, e: &Expr, empty: &[String], blocked: &HashSet<String>) -> Option<Expr> {
+/// What is being asked of a sequence by a call this pass folds.
+///
+/// The question decides two things: the call a branch is asked with (`measure`
+/// below) and what a literal answers with. Everything about *getting to* the
+/// literal — through `let`s, `if`s, `match`es, the length-preserving calls — is
+/// the same for all three, which is why they share a table instead of each
+/// having one.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Ask {
+    /// `len(..)`: how many.
+    Len,
+    /// `is_empty(..)`: whether none.
+    IsEmpty,
+    /// `is_nonempty(..)`: whether any.
+    IsNonempty,
+}
+
+impl Ask {
+    /// The question `callee` asks, if it is one this pass folds.
+    fn of(callee: &Callee) -> Option<Ask> {
+        match callee {
+            Callee::Len => Some(Ask::Len),
+            Callee::IsEmpty => Some(Ask::IsEmpty),
+            Callee::IsNonempty => Some(Ask::IsNonempty),
+            _ => None,
+        }
+    }
+
+    /// The call that asks it.
+    fn callee(self) -> Callee {
+        match self {
+            Ask::Len => Callee::Len,
+            Ask::IsEmpty => Callee::IsEmpty,
+            Ask::IsNonempty => Callee::IsNonempty,
+        }
+    }
+
+    /// The answer for a sequence of `n` elements, as a literal.
+    fn answer(self, n: usize, span: aipl_syntax::Span) -> Expr {
+        let kind = match self {
+            Ask::Len => ExprKind::Num(n as i64),
+            Ask::IsEmpty => ExprKind::Bool(n == 0),
+            Ask::IsNonempty => ExprKind::Bool(n != 0),
+        };
+        Expr::new(kind, span)
+    }
+}
+
+/// The answer to `ask` about `e`, computed from its shape rather than by
+/// building it.
+fn count_of(
+    whole: &Expr,
+    e: &Expr,
+    empty: &[String],
+    blocked: &HashSet<String>,
+    ask: Ask,
+) -> Option<Expr> {
     let span = || whole.span.clone();
-    let num = |n: usize| Expr::new(ExprKind::Num(n as i64), span());
-    let measure = |x: &Expr| Expr::new(ExprKind::Call(Callee::Len, vec![x.clone()], true), span());
+    let measure = |x: &Expr| Expr::new(ExprKind::Call(ask.callee(), vec![x.clone()], true), span());
     // A rewritten node keeps the whole `len(..)` call's span: that is the source
     // the user wrote, and what a later diagnostic should point at.
     let like = |kind| Expr::rebuilt(kind, whole);
@@ -238,11 +312,13 @@ fn count_of(whole: &Expr, e: &Expr, empty: &[String], blocked: &HashSet<String>)
             {
                 return None;
             }
-            Some(num(elems.len()))
+            Some(ask.answer(elems.len(), span()))
         }
+        // `""` — nothing to build, and the text says how many.
+        ExprKind::Str(text) if ask != Ask::Len => Some(ask.answer(text.len(), span())),
         // `[a, ..xs]` as the loader left it: the appends go, and the size it
         // reserved past the seed stays, being the length they would have added.
-        ExprKind::LetMut(..) => {
+        ExprKind::LetMut(..) if ask == Ask::Len => {
             let acc = spread_accumulator(e)?;
             if !acc.appended.iter().all(|p| can_drop(p.value, blocked)) {
                 return None;
@@ -278,6 +354,12 @@ fn count_of(whole: &Expr, e: &Expr, empty: &[String], blocked: &HashSet<String>)
         ))),
         ExprKind::Call(callee, args, method_style) => {
             match callee {
+                // The rows below are about a count, which a yes/no cannot use.
+                Callee::Filter | Callee::FilterMap | Callee::MapJoin | Callee::ValueOr
+                    if ask != Ask::Len =>
+                {
+                    None
+                }
                 // `xs.filter(p)` counts rather than collects. `p` runs once per
                 // element either way; only the kept elements are not copied,
                 // and copying is not observable — so unlike the mapping rows
@@ -332,6 +414,151 @@ fn count_of(whole: &Expr, e: &Expr, empty: &[String], blocked: &HashSet<String>)
         }
         _ => None,
     }
+}
+
+/// `operand[index]` answered from the shape of `operand` instead of by building
+/// it, or `None` when nothing here recognizes the shape.
+///
+/// ```text
+/// [a, b][1]                          →  some(b)
+/// [][i]                              →  none
+/// match (s) { "x" => [a], _ => [] }[0]
+///     →  match (s) { "x" => some(a), _ => none }
+/// ```
+///
+/// Two things make an index touchier than a count, and each has a guard:
+///
+/// - **The index is read after the operand, in a different place.** Pushing
+///   `[i]` into the arms of a `match` evaluates it once the arm has run, so it
+///   must be something whose evaluation cannot be told apart from there: a
+///   literal, or a name ([`stable_index`]). A name an enclosing `let` binds, that
+///   this walk would carry the index under, is a different name there and is
+///   refused.
+/// - **The element comes out of its array.** A bare number in `[1, 2]` takes its
+///   width from the array it sits in (`u8[]`), and `some(1)` on its own is
+///   `i64`. The checker has already run, so nothing would catch the change; an
+///   element that mentions a number is therefore left where it is
+///   ([`mentions_number`]), and the fold is missed rather than wrong. The
+///   elements this is for — strings, names, calls — carry their own types.
+///
+/// An index past the end of a *non-empty* literal is `none` too, but is not
+/// folded: nothing records the type of that `none`, and the element type can
+/// only be read off an empty literal's recorded type.
+///
+/// `none` is typed from the empty literal it replaces: an empty `[]` is
+/// context-typed, so the checker recorded its type on it ([`Expr::ty`]), and the
+/// `none` that stands in for an index into it is that type made optional. An
+/// empty literal with no recorded type is not folded.
+fn fold_index(
+    whole: &Expr,
+    operand: &Expr,
+    index: &Expr,
+    blocked: &HashSet<String>,
+) -> Option<Expr> {
+    if !stable_index(index) {
+        return None;
+    }
+    let (bindings, inner) = through_bindings(operand);
+    if let ExprKind::Ident(name) = &index.kind {
+        if bindings.iter().any(|b| b.name == name) {
+            return None;
+        }
+    }
+    let picked = index_of(whole, inner, index, blocked)?;
+    Some(under_bindings(bindings, whole, picked))
+}
+
+/// Whether `index` can be evaluated anywhere in the operand's arms and mean the
+/// same: a literal, or a name.
+fn stable_index(index: &Expr) -> bool {
+    matches!(index.kind, ExprKind::Num(_) | ExprKind::Ident(_))
+}
+
+/// Whether `e` mentions a number literal anywhere — see [`fold_index`].
+fn mentions_number(e: &Expr) -> bool {
+    matches!(e.kind, ExprKind::Num(_)) || crate::children(e).iter().any(|c| mentions_number(c))
+}
+
+/// `e[index]`, computed from `e`'s shape. `whole` is the index expression, whose
+/// span a rewritten node keeps.
+fn index_of(whole: &Expr, e: &Expr, index: &Expr, blocked: &HashSet<String>) -> Option<Expr> {
+    let like = |kind| Expr::rebuilt(kind, whole);
+    let at = |x: &Expr| {
+        Expr::rebuilt(
+            ExprKind::Index(Box::new(x.clone()), Box::new(index.clone())),
+            whole,
+        )
+    };
+    match &e.kind {
+        ExprKind::ArrayLit(elems) => {
+            let droppable = |skip: Option<usize>| {
+                elems.iter().enumerate().all(|(i, x)| {
+                    Some(i) == skip
+                        || (!matches!(x.kind, ExprKind::Spread(_)) && can_drop(x, blocked))
+                })
+            };
+            match &index.kind {
+                ExprKind::Num(k) => {
+                    let k = usize::try_from(*k).ok()?;
+                    match elems.get(k) {
+                        Some(picked) => {
+                            if mentions_number(picked) || !droppable(Some(k)) {
+                                return None;
+                            }
+                            Some(like(ExprKind::Call(
+                                Callee::Some,
+                                vec![picked.clone()],
+                                false,
+                            )))
+                        }
+                        None => none_for_empty(whole, e, elems),
+                    }
+                }
+                // Nothing is there at any position.
+                _ => none_for_empty(whole, e, elems),
+            }
+        }
+        ExprKind::If(c, a, b) => Some(like(ExprKind::If(
+            c.clone(),
+            Box::new(at(a)),
+            Box::new(at(b)),
+        ))),
+        ExprKind::Match(scrutinee, arms) => Some(like(ExprKind::Match(
+            scrutinee.clone(),
+            arms.iter()
+                .map(|a| MatchArm {
+                    pattern: a.pattern.clone(),
+                    body: at(&a.body),
+                    span: a.span.clone(),
+                })
+                .collect(),
+        ))),
+        ExprKind::IfLet(arm, scrutinee, els) => Some(like(ExprKind::IfLet(
+            Box::new(MatchArm {
+                pattern: arm.pattern.clone(),
+                body: at(&arm.body),
+                span: arm.span.clone(),
+            }),
+            scrutinee.clone(),
+            Box::new(at(els)),
+        ))),
+        _ => None,
+    }
+}
+
+/// `none`, of the element type of the empty literal `e` — or `None` for a
+/// literal that has elements, or has no recorded type to take it from.
+fn none_for_empty(whole: &Expr, e: &Expr, elems: &[Expr]) -> Option<Expr> {
+    if !elems.is_empty() {
+        return None;
+    }
+    let Some(Type::Array(element)) = e.ty.as_deref() else {
+        return None;
+    };
+    if crate::mentions_abstract_type(element) {
+        return None;
+    }
+    Some(Expr::new(ExprKind::None, whole.span.clone()).with_ty(Type::Optional(element.clone())))
 }
 
 /// `arm` with its body measured rather than produced.

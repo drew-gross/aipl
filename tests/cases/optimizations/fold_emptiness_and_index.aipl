@@ -1,0 +1,71 @@
+# `is_empty`, `is_nonempty` and an index are questions about a sequence's shape,
+# and a function that builds a sequence only to be asked one is building it for
+# nothing. The fold pushes the question inward — through `let`s, `if`s and
+# `match`es, which is where a function builds its result — until it meets an array
+# literal, which already knows the answer:
+#
+#     is_nonempty(match (s) { "a" => [x, y], _ => [] })
+#         →  match (s) { "a" => true, _ => false }
+#
+# The `.performance` blocks hold the property that matters: no array is built, so
+# nothing is allocated, for a hit and for a miss. The program body checks the
+# answers are still the right ones.
+#
+# An index is touchier than a count, so it has two guards. Its position must be a
+# literal or a name, so that evaluating it inside each arm cannot differ from
+# evaluating it once after. And an element is only taken out of its array if it
+# mentions no bare number: `[200, 3]` is `u8[]` because of where it sits, and a
+# `200` on its own would be an `i64`. That fold is missed rather than wrong, and
+# `small` below is the program that would notice.
+#
+# One fold is missed for want of a type: an index past the end of a *non-empty*
+# literal (`["beta"][1]`) is `none`, but nothing records what it is a `none` of —
+# only an empty `[]` carries the type it was checked against. `second_form` asks
+# for exactly that, to check it still answers correctly; it is not claimed free.
+
+import { equal as ==, is_empty, is_nonempty, measure, print, value_or } from builtins;
+
+fn forms(self: str) -> str[] {
+    match (self) {
+        "a" => ["alpha", "alef"],
+        "b" => ["beta"],
+        "c" => ["gamma"],
+        _ => [],
+    }
+}
+
+fn known(self: str) -> bool { self.forms().is_nonempty() }
+
+fn unknown(self: str) -> bool { self.forms().is_empty() }
+
+fn first_form(self: str) -> str { self.forms()[0].value_or("none") }
+
+fn second_form(self: str) -> str { self.forms()[1].value_or("none") }
+
+fn second_of(a: str, b: str) -> str { [a, b][1].value_or("") }
+
+fn blank(s: str) -> bool { [s].is_empty() }
+
+fn small() -> u8 {
+    let xs: u8[] = [200, 3];
+    xs[0].value_or(0)
+}
+
+fn main() !prints {
+    print(`{known("a")} {known("z")} {unknown("a")} {unknown("z")}`);
+    print(`{first_form("a")} {first_form("c")} {first_form("z")}`);
+    print(`{second_form("a")} {second_form("b")}`);
+    print(`{second_of("x", "y")} {blank("q")} {small()}`);
+}.performance({
+    assert(measure("hit", "a", known).allocations == 0);
+    assert(measure("miss", "z", known).allocations == 0);
+    assert(measure("hit, asked empty", "a", unknown).allocations == 0);
+    assert(measure("first of a hit", "a", first_form).allocations == 0);
+    assert(measure("first of a miss", "z", first_form).allocations == 0);
+    assert(measure("from a literal", "x", blank).allocations == 0);
+})
+--- stdout ---
+true false false true
+alpha gamma none
+alef none
+y false 200

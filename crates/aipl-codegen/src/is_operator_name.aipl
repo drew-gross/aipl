@@ -46,15 +46,13 @@ pub fn is_operator_name(self: str) -> bool { self.operator_named_forms().is_none
     assert(!"---".is_operator_name()); // three, not `--`
     assert(!"and".is_operator_name());
 }).performance({
-    // Asked of every identifier the loader sees, so ideally it allocates
-    // nothing. `operator_named_forms` builds the array of named builtins an
-    // operator is imported under, and this only asks whether that array is
-    // empty: the call should inline and `is_nonempty` fuse into it, so no array
-    // is ever built. Neither happens yet, and these pin what is true today: an
-    // operator builds its one array (an array of two names, or of one), and a
-    // name that is no operator builds none. The target is 0 for every row; when
-    // an optimization gets there, these are the lines that change.
-    assert(measure("two flavors", "+", is_operator_name).allocations == 1);
-    assert(measure("one flavor", "==", is_operator_name).allocations == 1);
+    // Asked of every identifier the loader sees, so it allocates nothing.
+    // `operator_named_forms` builds the array of named builtins an operator is
+    // imported under, and this only asks whether that array is empty: the call
+    // is inlined into this one (it is inspected, so size is no bar), the
+    // `is_nonempty` is pushed into the arms of its `match`, and each arm
+    // answers `true` or `false` without building its array.
+    assert(measure("two flavors", "+", is_operator_name).allocations == 0);
+    assert(measure("one flavor", "==", is_operator_name).allocations == 0);
     assert(measure("not an operator", "map", is_operator_name).allocations == 0);
 })

@@ -47,19 +47,19 @@ a
 --- stdout ---
 true alpha alpha+alef alpha/alef
 --- report ---
-allocations       14
-deallocations     14
+allocations       12
+deallocations     12
 reallocations     0
-bytes allocated   1002
-peak live bytes   924
-instructions      565
-binary size       9400 bytes (code 6020, data 22, metadata 3358)
+bytes allocated   842
+peak live bytes   764
+instructions      452
+binary size       7512 bytes (code 4820, data 22, metadata 2670)
 
 function              calls  code bytes
 __to_str_bool             1         224
-aipl_arr_inc              4    external
-aipl_array_dec            9    external
-aipl_array_new            5    external
+aipl_arr_inc              2    external
+aipl_array_dec            5    external
+aipl_array_new            3    external
 aipl_write_bytes          1    external
 forms                     2        1372
-main                      1        4424
+main                      1        3224

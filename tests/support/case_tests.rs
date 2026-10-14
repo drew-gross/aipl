@@ -561,6 +561,7 @@ case_tests! {
     cases_optimizations_counting_variant_not_fused = "cases/optimizations/counting_variant_not_fused",
     cases_optimizations_ctor_eq_unwrap = "cases/optimizations/ctor_eq_unwrap",
     cases_optimizations_filter_map_fusion = "cases/optimizations/filter_map_fusion",
+    cases_optimizations_fold_emptiness_and_index = "cases/optimizations/fold_emptiness_and_index",
     cases_optimizations_fold_extends = "cases/optimizations/fold_extends",
     cases_optimizations_fold_extends_value_or = "cases/optimizations/fold_extends_value_or",
     cases_optimizations_fold_lengths = "cases/optimizations/fold_lengths",
