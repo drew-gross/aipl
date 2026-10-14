@@ -96,7 +96,6 @@ misc cleanup:
   use template literals more than concat
   heap_str, rope_str, inline_str should probably be test-only or internal-only
   dict.key_values(|k, v| `{k}: {v}`) should exist, use it in append_missing
-  step_result n should be u64 without 0, move 0 check to call site
   keyword_len and exact_len should accept str without "" for spelling
   does set_map().join() make sense? Should there be a set_join?
   prevent untyped expressions from even getting to mono by using a separate type that can't contain them
@@ -129,11 +128,8 @@ misc cleanup:
   unescape + unescape_braces can probably be DRYed up
   union_all can be context ordered, like to_set
   make it so builtin .aipl files can contain helper functions
-  only should be named one and use a nested_in kwarg (i.e. thinner wrapper over Many)
-  parser rules for destructuring in for loops should be DRYer with destructuring in let bindings
   lex doc comments as one big token, not one per line
   a function value may be *called* through a parameter but not stored into a field or a constructor from one, so `Mk` has to be written at the call site where the name is still a name
-  In group_styles, rs.map(group_styles) is refused
   p.name == "self" and p.name.starts_with("__") should be stored vars, not derived from string matching
   DRY up operator name lists (is_binop, is_operator_name), maybe make a struct to describe each op?
   what is `walker.aipl`'s space-splitting test tokenizer? Can it be removed?
@@ -554,6 +550,10 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    is_nonempty in is_operator_name should fuse somehow, unsure exactly how yet. Probably needs these:
+      1) inline functions if the result is passed to is_nonempty()
+      2) match (v) { arm => val }.foo() should move the foo call into the arm, at least if val is const, maybe more
+      3) is_nonempty should constant fold for array literals
     equality operator fusion for many operations, match fusion, etc.
     add some dict building fusions ie.g. foo()['key'] should fuse and throw out most of the dict inside foo()
     xs.map(f)[a..b] should fuse (like  xs.map(f)[a]) does
