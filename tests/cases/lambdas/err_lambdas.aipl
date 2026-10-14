@@ -136,3 +136,7 @@ error: map expects an array, an optional or a Span, got i64
    |                      ^
 
 error: fn "return_function": cannot return a function value ((i64) -> i64)
+  --> ./tests/cases/lambdas/err_lambdas.aipl:74:4
+   |
+74 | fn return_function() -> (i64) -> i64 { inc }
+   |    ^^^^^^^^^^^^^^^

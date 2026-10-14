@@ -52,6 +52,10 @@ error: non-exhaustive match: missing err
    |     ^^^^^^^^^^^
 
 error: fn "payload_invalid_type": a set element must be an integer (i8..i64, u8..u64), bool, char, or str, got i64[]
+  --> ./tests/cases/results/err_results.aipl:29:4
+   |
+29 | fn payload_invalid_type() -> #{i64[]}!Error { err("x") }
+   |    ^^^^^^^^^^^^^^^^^^^^
 
 error: "err" expects 1 argument, got 0
   --> ./tests/cases/results/err_results.aipl:32:25

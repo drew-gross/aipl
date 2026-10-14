@@ -7,3 +7,7 @@ struct Point { x: i64, y: i64 }
 fn f(c: Case<Point>) -> i64 { 0 }
 --- errors ---
 error: fn "f": Case<Point> — a case belongs to a variant, and Point is not one
+ --> ./tests/cases/variants/err_case_of_non_variant.aipl:7:4
+  |
+7 | fn f(c: Case<Point>) -> i64 { 0 }
+  |    ^

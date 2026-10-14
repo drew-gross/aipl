@@ -1438,90 +1438,112 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
     let mut items: Vec<Item> = Vec::with_capacity(program.items.len());
     for item in &program.items {
         lc.abstract_vars.clear();
-        let lowered = match item {
-            Item::Fn(f) => {
-                // The function's own type parameters are abstract while lowering
-                // its signature/body: a `Box<T>` over one of them stays generic.
-                lc.abstract_vars = f.sig.type_var_names();
-                let params = f
-                    .sig
-                    .params
-                    .iter()
-                    .map(|p| {
-                        Ok(Param {
-                            ty: lc.lower_ty(&p.ty)?,
-                            default: p.default.as_ref().map(|d| lc.lower_expr(d)).transpose()?,
-                            ..p.clone()
-                        })
-                    })
-                    .collect::<Result<Vec<_>, Error>>()?;
-                let return_ty = f
-                    .sig
-                    .return_ty
-                    .as_ref()
-                    .map(|t| lc.lower_ty(t))
-                    .transpose()?;
-                let body = lc.lower_expr(&f.body)?;
-                let test_body = f.test_body.as_ref().map(|t| lc.lower_expr(t)).transpose()?;
-                Item::Fn(Function {
-                    sig: Signature {
-                        params,
-                        return_ty,
-                        ..f.sig.clone()
-                    },
-                    body,
-                    test_body,
-                    ..f.clone()
-                })
-            }
-            // A generic template is left untouched — its fields still reference
-            // its own type variables; each concrete use is instantiated on demand.
-            Item::Struct(s) if s.is_generic() => item.clone(),
-            Item::Variant(v) if v.is_generic() => item.clone(),
-            Item::Struct(s) => Item::Struct(StructDecl {
-                doc: s.doc.clone(),
-                name: s.name.clone(),
-                type_vars: Vec::new(),
-                fields: s
-                    .fields
-                    .iter()
-                    .map(|fd| {
-                        Ok(FieldDecl {
-                            ty: lc.lower_ty(&fd.ty)?,
-                            default: fd.default.as_ref().map(|d| lc.lower_expr(d)).transpose()?,
-                            name: fd.name.clone(),
-                        })
-                    })
-                    .collect::<Result<_, Error>>()?,
-            }),
-            Item::Variant(v) => Item::Variant(VariantDecl {
-                doc: v.doc.clone(),
-                name: v.name.clone(),
-                type_vars: Vec::new(),
-                cases: v
-                    .cases
-                    .iter()
-                    .map(|c| {
-                        Ok(VariantCase {
-                            doc: c.doc.clone(),
-                            name: c.name.clone(),
-                            payload: c
-                                .payload
-                                .iter()
-                                .map(|p| {
-                                    Ok(CaseParam {
-                                        ty: lc.lower_ty(&p.ty)?,
-                                        ..p.clone()
-                                    })
-                                })
-                                .collect::<Result<_, Error>>()?,
-                        })
-                    })
-                    .collect::<Result<_, Error>>()?,
-            }),
-            Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
-            Item::Import(_) => item.clone(),
+        // A type in a signature or a field carries no span, so an error from
+        // lowering one is located at the declaration that wrote it.
+        let (declared_name, declared_at) = match item {
+            Item::Fn(f) => (Some(&f.name), Some(f.name.span.clone())),
+            Item::Struct(s) => (Some(&s.name), Some(s.name.span.clone())),
+            Item::Variant(v) => (Some(&v.name), Some(v.name.span.clone())),
+            Item::Const(_) | Item::Import(_) => (None, None),
         };
+        let lowered = (|| -> Result<Item, Error> {
+            Ok(match item {
+                Item::Fn(f) => {
+                    // The function's own type parameters are abstract while lowering
+                    // its signature/body: a `Box<T>` over one of them stays generic.
+                    lc.abstract_vars = f.sig.type_var_names();
+                    let params = f
+                        .sig
+                        .params
+                        .iter()
+                        .map(|p| {
+                            Ok(Param {
+                                ty: lc.lower_ty(&p.ty)?,
+                                default: p
+                                    .default
+                                    .as_ref()
+                                    .map(|d| lc.lower_expr(d))
+                                    .transpose()?,
+                                ..p.clone()
+                            })
+                        })
+                        .collect::<Result<Vec<_>, Error>>()?;
+                    let return_ty = f
+                        .sig
+                        .return_ty
+                        .as_ref()
+                        .map(|t| lc.lower_ty(t))
+                        .transpose()?;
+                    let body = lc.lower_expr(&f.body)?;
+                    let test_body = f.test_body.as_ref().map(|t| lc.lower_expr(t)).transpose()?;
+                    Item::Fn(Function {
+                        sig: Signature {
+                            params,
+                            return_ty,
+                            ..f.sig.clone()
+                        },
+                        body,
+                        test_body,
+                        ..f.clone()
+                    })
+                }
+                // A generic template is left untouched — its fields still reference
+                // its own type variables; each concrete use is instantiated on demand.
+                Item::Struct(s) if s.is_generic() => item.clone(),
+                Item::Variant(v) if v.is_generic() => item.clone(),
+                Item::Struct(s) => Item::Struct(StructDecl {
+                    doc: s.doc.clone(),
+                    name: s.name.clone(),
+                    type_vars: Vec::new(),
+                    fields: s
+                        .fields
+                        .iter()
+                        .map(|fd| {
+                            Ok(FieldDecl {
+                                ty: lc.lower_ty(&fd.ty)?,
+                                default: fd
+                                    .default
+                                    .as_ref()
+                                    .map(|d| lc.lower_expr(d))
+                                    .transpose()?,
+                                name: fd.name.clone(),
+                            })
+                        })
+                        .collect::<Result<_, Error>>()?,
+                }),
+                Item::Variant(v) => Item::Variant(VariantDecl {
+                    doc: v.doc.clone(),
+                    name: v.name.clone(),
+                    type_vars: Vec::new(),
+                    cases: v
+                        .cases
+                        .iter()
+                        .map(|c| {
+                            Ok(VariantCase {
+                                doc: c.doc.clone(),
+                                name: c.name.clone(),
+                                payload: c
+                                    .payload
+                                    .iter()
+                                    .map(|p| {
+                                        Ok(CaseParam {
+                                            ty: lc.lower_ty(&p.ty)?,
+                                            ..p.clone()
+                                        })
+                                    })
+                                    .collect::<Result<_, Error>>()?,
+                            })
+                        })
+                        .collect::<Result<_, Error>>()?,
+                }),
+                Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
+                Item::Import(_) => item.clone(),
+            })
+        })()
+        .map_err(|e| match (declared_name, declared_at) {
+            (Some(name), Some(span)) => check::attribute(e.or_at(span), name, &program.sources),
+            _ => e,
+        })?;
         items.push(lowered);
     }
     // Prepend synthesized instances (like `lower_tuples`) so their declarations
@@ -1597,8 +1619,13 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                 if f.sig.is_mutating() {
                     mutating.insert(f.name.text.clone());
                 }
+                // Both rejections below are about the signature as written, which
+                // carries no span of its own: they point at the name.
+                let at_name = |e: Error| {
+                    check::attribute(e.or_at(f.name.span.clone()), &f.name, &program.sources)
+                };
                 if is_generic(f) {
-                    generics.insert(f.name.text.clone(), normalize(f)?);
+                    generics.insert(f.name.text.clone(), normalize(f).map_err(at_name)?);
                 } else {
                     // A non-generic fn must not mention `any` in its return.
                     if f.sig
@@ -1606,11 +1633,11 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                         .as_ref()
                         .is_some_and(|t| ty_mentions(t, "any"))
                     {
-                        return Err(Error::msg(format!(
+                        return Err(at_name(Error::msg(format!(
                             "fn \"{}\": \"any\" is only allowed in a parameter (\"any[]\", \"any?\") \
                              or via a declared type parameter \"<T: any>\"",
                             f.name
-                        )));
+                        ))));
                     }
                     fn_returns.insert(
                         f.name.text.clone(),

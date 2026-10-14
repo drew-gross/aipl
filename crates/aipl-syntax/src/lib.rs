@@ -205,6 +205,17 @@ impl Error {
         }
     }
 
+    /// This error, located at `span` if it has no location of its own. For a
+    /// check that knows only which declaration it was running on — a type in a
+    /// signature carries no span of its own — so that a diagnostic points at
+    /// the declaration rather than at nothing.
+    pub fn or_at(mut self, span: Span) -> Self {
+        if self.span.is_none() {
+            self.span = Some(span);
+        }
+        self
+    }
+
     /// Record that this error's spans index `source`, the file named `label`.
     /// The *innermost* attribution wins: an error bubbling out through a chain
     /// of imports is already tagged with the file it was raised against, and

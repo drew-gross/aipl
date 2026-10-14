@@ -18,7 +18,19 @@ fn lo(s: Span) -> u64 { s.start } #[allow]
 fn main() -> i64 { 0 }
 --- errors ---
 error: struct "Tok" field "span": unknown type "Span" — "Span" is a builtin type; import it with `import { Span } from builtins;`
+  --> ./tests/cases/imports/err_builtin_type_not_imported.aipl:12:8
+   |
+12 | struct Tok { span: Span }
+   |        ^^^
 
 error: variant "Node" case "At" payload: unknown type "Span" — "Span" is a builtin type; import it with `import { Span } from builtins;`
+  --> ./tests/cases/imports/err_builtin_type_not_imported.aipl:14:16
+   |
+14 | variant Node = At(Span) | Nowhere
+   |                ^^
 
 error: fn "lo": unknown type "Span" — "Span" is a builtin type; import it with `import { Span } from builtins;`
+  --> ./tests/cases/imports/err_builtin_type_not_imported.aipl:16:4
+   |
+16 | fn lo(s: Span) -> u64 { s.start } #[allow]
+   |    ^^

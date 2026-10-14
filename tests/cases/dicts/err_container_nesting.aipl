@@ -22,5 +22,13 @@ fn dict_value() -> i64 {
 fn main() -> i64 { opt_core() + dict_value() }
 --- errors ---
 error: fn "opt_core": a set or dict can be an array element but not an optional or dict element
+  --> ./tests/cases/dicts/err_container_nesting.aipl:13:27
+   |
+13 |     let d: #{i64: i64}? = none;
+   |                           ^^^^
 
 error: fn "dict_value": a set or dict can be an array element but not an optional or dict element
+  --> ./tests/cases/dicts/err_container_nesting.aipl:18:29
+   |
+18 |     let d: #{str: #{i64}} = #{};
+   |                             ^^^

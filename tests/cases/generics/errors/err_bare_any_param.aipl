@@ -6,3 +6,7 @@ fn g(x: any) -> i64 { 0 }
 fn main() -> i64 { 0 }
 --- errors ---
 error: fn "g": bare "any" is not allowed; use "any[]", "any?", or a named type parameter "<T: any>"
+ --> ./tests/cases/generics/errors/err_bare_any_param.aipl:4:4
+  |
+4 | fn g(x: any) -> i64 { 0 }
+  |    ^

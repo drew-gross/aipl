@@ -78,6 +78,10 @@ fn range_chained() {
 fn main() {}
 --- errors ---
 error: fn "unknown_type": unknown type "Widget"
+  --> ./tests/cases/structs/err_structs.aipl:25:4
+   |
+25 | fn unknown_type(x: Widget) -> i64 { 0 }
+   |    ^^^^^^^^^^^^
 
 error: unknown struct "Bogus"
   --> ./tests/cases/structs/err_structs.aipl:28:30

@@ -1,0 +1,11 @@
+# The same for a struct's field: the report points at the struct's name.
+
+struct Point { x: i64, y: Coordinate }
+
+fn main() {}
+--- errors ---
+error: struct "Point" field "y": unknown type "Coordinate"
+ --> ./tests/cases/structs/err_unknown_type_in_field.aipl:3:8
+  |
+3 | struct Point { x: i64, y: Coordinate }
+  |        ^^^^^

@@ -1,0 +1,12 @@
+# A type written in a signature carries no position of its own, so an unknown
+# one is reported at the function that wrote it rather than with no location.
+
+fn area(shape: Shape) -> i64 { 0 }
+
+fn main() {}
+--- errors ---
+error: fn "area": unknown type "Shape"
+ --> ./tests/cases/functions/err_unknown_type_in_signature.aipl:4:4
+  |
+4 | fn area(shape: Shape) -> i64 { 0 }
+  |    ^^^^

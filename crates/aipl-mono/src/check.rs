@@ -1486,7 +1486,11 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
                     &[],
                     &format!("struct {:?} field {:?}", s.name, f.name),
                 ) {
-                    errors.push(e);
+                    errors.push(attribute(
+                        e.or_at(s.name.span.clone()),
+                        &s.name,
+                        &program.sources,
+                    ));
                 }
                 if let Some(default) = &f.default {
                     let checked = cx.check_expr(default, &HashMap::new(), &[]).and_then(|dt| {
@@ -1525,7 +1529,11 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
                         &[],
                         &format!("variant {:?} case {:?} payload", v.name, case.name),
                     ) {
-                        errors.push(e);
+                        errors.push(attribute(
+                            e.or_at(case.name.span.clone()),
+                            &v.name,
+                            &program.sources,
+                        ));
                     }
                     if let Some(default) = &slot.default {
                         let checked = cx.check_expr(default, &earlier, &[]).and_then(|dt| {
@@ -1568,7 +1576,11 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
             // this is what keeps the report in source order.
             drain_recovered(&cx, &program.sources, &mut errors);
             if let Err(e) = checked {
-                errors.push(attribute(e, &f.name, &program.sources));
+                errors.push(attribute(
+                    e.or_at(f.name.span.clone()),
+                    &f.name,
+                    &program.sources,
+                ));
             }
         }
     }
@@ -1613,7 +1625,7 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
 /// which the caller already renders correctly, or a builtin declaration) or the
 /// program has no source map (a single parsed file). `Error::in_file` keeps the
 /// innermost attribution, so an error already tagged by the loader is untouched.
-fn attribute(e: Error, name: &str, sources: &[aipl_syntax::ast::FileSource]) -> Error {
+pub(crate) fn attribute(e: Error, name: &str, sources: &[aipl_syntax::ast::FileSource]) -> Error {
     let Some(idx) = aipl_syntax::mangled_file_index(name) else {
         return e;
     };
@@ -2038,7 +2050,8 @@ impl Cx<'_> {
             declared,
             &self.current_type_params.borrow(),
             &format!("fn {:?}", display(&self.current_fn.borrow())),
-        )?;
+        )
+        .map_err(|e| e.or_at(val.span.clone()))?;
         let declared = subst_typevars(declared, &self.current_type_params.borrow());
         // A written `Rule<Tok>` is a generic *application*; the value's type is
         // the instance it resolves to (`Rule$Tok`). Resolve the annotation the

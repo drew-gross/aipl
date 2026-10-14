@@ -1,0 +1,11 @@
+# An unknown type in a `let` annotation is reported at the value being bound.
+
+fn main() {
+    let n: Count = 1;
+}
+--- errors ---
+error: fn "main": unknown type "Count"
+ --> ./tests/cases/bindings/err_unknown_type_in_annotation.aipl:4:20
+  |
+4 |     let n: Count = 1;
+  |                    ^

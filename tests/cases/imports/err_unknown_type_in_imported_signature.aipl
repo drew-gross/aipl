@@ -1,0 +1,16 @@
+# A signature error inside an imported file points into that file, under its
+# own path, not at a position in this one.
+
+import { area } from "./shapes.aipl";
+
+fn main() {
+    let a = area(1);
+}
+--- file: shapes.aipl ---
+pub fn area(side: i64) -> Measure { 0 }
+--- errors ---
+error: fn "area": unknown type "Measure"
+ --> ./shapes.aipl:1:8
+  |
+1 | pub fn area(side: i64) -> Measure { 0 }
+  |        ^^^^

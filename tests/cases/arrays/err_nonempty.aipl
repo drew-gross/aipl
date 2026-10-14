@@ -42,3 +42,7 @@ error: binding "xs" is declared i64[] without [], but its value is i64[]
    |                                ^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: fn "not_an_array": `without []` excludes the empty array, and i64 is not an array type
+  --> ./tests/cases/arrays/err_nonempty.aipl:20:29
+   |
+20 |     let n: i64 without [] = 5;
+   |                             ^

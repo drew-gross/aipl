@@ -79,7 +79,19 @@ error: set: cannot assign to immutable binding "n" (use "let mut")
    |         ^^^^^^^
 
 error: fn "mut_not_self": a "mut" receiver must be named "self"
+  --> ./tests/cases/methods/err_methods.aipl:39:4
+   |
+39 | fn mut_not_self(mut other: i64) {
+   |    ^^^^^^^^^^^^
 
 error: fn "non_first_mut": only the first parameter may be "mut"
+  --> ./tests/cases/methods/err_methods.aipl:43:4
+   |
+43 | fn non_first_mut(self: i64, mut x: i64) {
+   |    ^^^^^^^^^^^^^
 
 error: fn "mutating_returns_value": a mutating method cannot return a value
+  --> ./tests/cases/methods/err_methods.aipl:47:4
+   |
+47 | fn mutating_returns_value(mut self: i64) -> i64 { self }
+   |    ^^^^^^^^^^^^^^^^^^^^^^

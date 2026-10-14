@@ -22,6 +22,10 @@ fn outer() -> i64 { inner() }
 fn main() {}
 --- errors ---
 error: fn "declares_unknown_effect" declares unknown effect "!mystery"
+ --> ./tests/cases/effects/err_effects.aipl:7:4
+  |
+7 | fn declares_unknown_effect() !mystery -> i64 { 0 }
+  |    ^^^^^^^^^^^^^^^^^^^^^^^
 
 error: fn "print" has effect "!prints" but the calling function does not declare it
   --> ./tests/cases/effects/err_effects.aipl:11:13

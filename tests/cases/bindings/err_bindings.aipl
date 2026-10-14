@@ -79,3 +79,7 @@ error: integer literal 300 does not fit in u8
    |                 ^^^
 
 error: fn "annotation_unknown_type": unknown type "Nope"
+  --> ./tests/cases/bindings/err_bindings.aipl:40:19
+   |
+40 |     let n: Nope = 1;
+   |                   ^
