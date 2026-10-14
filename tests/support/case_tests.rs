@@ -581,6 +581,7 @@ case_tests! {
     cases_optimizations_loop_split_fusion = "cases/optimizations/loop_split_fusion",
     cases_optimizations_loop_tuple_windows_fusion = "cases/optimizations/loop_tuple_windows_fusion",
     cases_optimizations_map_find_if_fusion = "cases/optimizations/map_find_if_fusion",
+    cases_optimizations_map_map_fusion = "cases/optimizations/map_map_fusion",
     cases_optimizations_map_value_or_unwraps = "cases/optimizations/map_value_or_unwraps",
     cases_optimizations_move_last_use = "cases/optimizations/move_last_use",
     cases_optimizations_owned_param_shared_result = "cases/optimizations/owned_param_shared_result",

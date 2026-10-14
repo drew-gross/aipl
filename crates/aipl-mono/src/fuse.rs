@@ -1,7 +1,7 @@
 //! Operation fusion: rewriting a composite expression into one builtin that
 //! computes the same answer with less work.
 //!
-//! There are five families, each in its own file with its own table:
+//! There are six families, each in its own file with its own table:
 //!
 //! - [`comparison_fusions`] — a call against a comparison. `xs.count(x)` always
 //!   walks the whole collection, but `xs.count(x) < 4` is settled the moment a
@@ -25,6 +25,12 @@
 //!   stops at the first non-empty piece and builds nothing. `is_empty` is
 //!   the same question the other way, and every row here for one has a row for the
 //!   other.
+//! - [`compose_fusions`] — a `map` of a `map`. `xs.map(f).map(g)` builds an
+//!   array of every `f(x)` for the second pass to walk once and drop, so it
+//!   collapses into `xs.map(|x| g(f(x)))`. It is not a row in the chain table
+//!   because the call it becomes is a `map` of a function built from the two,
+//!   and because a row makes the inner call stand aside for a parent that, here,
+//!   may refuse.
 //! - [`slice_fusions`] — a call on a sliced receiver. `xs[i..].starts_with(p)`
 //!   builds the whole tail of `xs` — for an array, a fresh block with every
 //!   element copied — only to look at its first few elements, so it collapses
@@ -82,6 +88,7 @@
 
 mod chain_fusions;
 mod comparison_fusions;
+mod compose_fusions;
 mod index_fusions;
 // Crate-visible: `apply` and `is_pure` — how a function-valued argument is
 // applied to one element and whether its per-element calls may be moved — are
@@ -184,7 +191,11 @@ fn try_fuse(e: &Expr, outer: Option<&Callee>, guards: &Guards) -> Option<Expr> {
         ExprKind::Call(name, args, _) => {
             match (aipl_syntax::binop_for_builtin(name), args.as_slice()) {
                 (Some(op), [l, r]) => comparison_fusions::build(l, op, r, e),
-                _ => slice_fusions::build(e).or_else(|| chain_fusions::build(e, outer)),
+                // Composition first, and on its own terms rather than as a row in
+                // the chain table: see [`compose_fusions`].
+                _ => compose_fusions::build(e, guards.blocked)
+                    .or_else(|| slice_fusions::build(e))
+                    .or_else(|| chain_fusions::build(e, outer)),
             }
         }
         // A loop guards itself: only its mapping function has to be pure, not

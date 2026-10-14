@@ -1,0 +1,87 @@
+# `xs.map(f).map(g)` is `xs.map(|x| g(f(x)))`: the first `map` builds an array of
+# every `f(x)` for the second to walk once and drop, and the composed `map`
+# builds the final array alone. The `.performance` block holds the saving — for
+# fifty numbers rendered and measured, one array instead of fifty-three
+# allocations — and the program checks that every shape the composition has to
+# step around still answers correctly.
+#
+# What it must not do is reorder anything observable. `f` then `g` per element
+# interleaves the two where the unfused program ran every `f` first, which is
+# only invisible for functions that do nothing observable: `traced` prints, and
+# its output below is the unfused order. And a first function that takes its type
+# from context (`|x| none`) cannot be bound to a plain `let`, so it keeps the
+# two-pass form too.
+
+import {
+    equal as ==,
+    greater_than as >,
+    len,
+    map,
+    measure,
+    not_equal as !=,
+    print,
+    push,
+    to_str,
+    value_or,
+    wrapping_add as +,
+    wrapping_increment as ++,
+    wrapping_mul as *,
+} from builtins;
+
+fn filled(n: i64) -> i64[] {
+    mut xs: i64[] = [];
+    mut i: i64 = 0;
+    while (i != n) {
+        set xs.push(i * 7);
+        set i++;
+    }
+    xs
+}
+
+fn digits(xs: i64[]) -> u64[] { xs.map(to_str).map(len) }
+
+fn plus_one_digits(xs: i64[]) -> u64[] { xs.map(|x| x + 1).map(to_str).map(len) }
+
+fn double(x: i64) -> i64 { x * 2 }
+
+fn traced(x: i64) !prints -> i64 {
+    print(`f{x}`);
+    x
+}
+
+fn untraced(x: i64) !prints -> i64 {
+    print(`g{x}`);
+    x
+}
+
+fn main() !prints {
+    let xs = [1, 22, 333];
+    print(`{digits(xs)} {plus_one_digits(xs)}`);
+
+    // A named function on each side, and a lambda in the middle.
+    print(`{xs.map(double).map(|x| x + 1).map(to_str)}`);
+
+    // An optional is mapped the same way, and may be mapped through twice.
+    print(`{some(4).map(double).map(|x| x + 1)}`);
+
+    // Not composed: the first function takes its type from where it sits.
+    print(`{[1, 2].map(|x| if (x > 1) { some(x) } else { none }).map(|o| o.value_or(0) + 10)}`);
+
+    // Not composed: both print, so the order they run in is the program's.
+    let seen = [1, 2].map(traced).map(untraced);
+    print(`{seen}`);
+}.performance({
+    let numbers = filled(50);
+    assert(measure("two stages", numbers, digits).allocations == 1);
+    assert(measure("three stages", numbers, plus_one_digits).allocations == 1);
+})
+--- stdout ---
+[1, 2, 3] [1, 2, 3]
+["3", "45", "667"]
+some(9)
+[10, 12]
+f1
+f2
+g1
+g2
+[1, 2]

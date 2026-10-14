@@ -256,7 +256,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/lambdas/all | 1 | 32 | 32 | 1092 | 2988 | 3.00 | 127.59 | 1472 |
 | cases/lambdas/any | 1 | 32 | 32 | 942 | 2892 | 2.00 | 128.65 | 1488 |
 | cases/lambdas/builtin_filter | 9 | 640 | 640 | 3110 | 5672 | 5.00 | 85.52 | 1488 |
-| cases/lambdas/builtin_map | 11 | 451 | 483 | 1939 | 4164 | 6.00 | 84.26 | 1520 |
+| cases/lambdas/builtin_map | 10 | 411 | 443 | 1717 | 3612 | 5.00 | 164.44 | 1504 |
 | cases/lambdas/capture_heap_and_fold | 6 | 346 | 370 | 535 | 1804 | 4.00 | 80.28 | 1504 |
 | cases/lambdas/filter_in_place | 6 | 448 | 448 | 2425 | 5392 | 5.00 | 88.42 | 1504 |
 | cases/lambdas/filter_map | 28 | 1714 | 936 | 6623 | 9876 | 8.00 | 97.33 | 1504 |
@@ -268,10 +268,10 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/lambdas/map_capture | 2 | 128 | 128 | 660 | 1364 | 3.00 | 81.45 | 1472 |
 | cases/lambdas/map_empty | 1 | 24 | 24 | 774 | 3184 | 3.00 | 80.70 | 1472 |
 | cases/lambdas/map_fresh_variant | 4 | 144 | 160 | 628 | 1656 | 3.00 | 80.49 | 1472 |
-| cases/lambdas/map_in_place | 16 | 972 | 1004 | 2794 | 6376 | 7.00 | 87.48 | 1520 |
+| cases/lambdas/map_in_place | 16 | 972 | 1004 | 2590 | 5908 | 6.00 | 133.74 | 1520 |
 | cases/lambdas/map_span | 20 | 810 | 842 | 2640 | 4096 | 11.00 | 82.72 | 1488 |
 | cases/lambdas/method_form | 15 | 639 | 855 | 1313 | 2824 | 6.00 | 80.49 | 1504 |
-| cases/lambdas/named_fn_args | 11 | 475 | 403 | 2085 | 4700 | 6.00 | 86.70 | 1520 |
+| cases/lambdas/named_fn_args | 10 | 435 | 363 | 1863 | 4152 | 6.00 | 84.25 | 1504 |
 | cases/lambdas/operator_as_value | 2 | 34 | 34 | 59 | 364 | 4.00 | 79.44 | 1456 |
 | cases/lambdas/operator_as_value_custom | 1 | 20 | 20 | 33 | 304 | 3.00 | 78.65 | 1440 |
 | cases/lambdas/opt_fold | 3 | 280 | 280 | 2394 | 3848 | 4.00 | 136.66 | 1472 |
@@ -417,6 +417,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/optimizations/loop_split_fusion | 78 | 4692 | 858 | 2338 | 6136 | 29.00 | 95.16 | 1504 |
 | cases/optimizations/loop_tuple_windows_fusion | 11 | 329 | 6297 | 31696 | 4972 | 20.00 | 95.73 | 1520 |
 | cases/optimizations/map_find_if_fusion | 8 | 1926 | 3958 | 15154 | 2832 | 12.00 | 93.89 | 1504 |
+| cases/optimizations/map_map_fusion | 25 | 1043 | 754 | 3193 | 7456 | 16.00 | 137.95 | 1488 |
 | cases/optimizations/map_value_or_unwraps | 0 | 0 | 0 | 77 | 412 | 3.00 | 85.46 | 1440 |
 | cases/optimizations/move_last_use | 49 | 2475 | 2450 | 8366 | 11708 | 30.00 | 115.42 | 1488 |
 | cases/optimizations/owned_param_shared_result | 12 | 672 | 720 | 2891 | 3364 | 9.00 | 84.57 | 1488 |
@@ -438,7 +439,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/optimizations/value_or_default_sinks | 5 | 228 | 210 | 191 | 900 | 6.00 | 83.03 | 1488 |
 | cases/options/if_else_with_none_branch | 0 | 0 | 0 | 51 | 288 | 2.00 | 82.38 | 1472 |
 | cases/options/is_some_and | 0 | 0 | 0 | 51 | 260 | 0.00 | 82.06 | 1440 |
-| cases/options/map | 13 | 723 | 723 | 480 | 2436 | 12.00 | 85.60 | 1456 |
+| cases/options/map | 13 | 723 | 723 | 465 | 2356 | 12.00 | 83.97 | 1472 |
 | cases/options/match_trailing_comma | 0 | 0 | 0 | 45 | 252 | 2.00 | 80.77 | 1456 |
 | cases/options/none_is_not_some | 0 | 0 | 0 | 68 | 312 | 2.00 | 81.15 | 1456 |
 | cases/options/optional_of_struct | 0 | 0 | 0 | 318 | 1392 | 2.00 | 83.39 | 1456 |

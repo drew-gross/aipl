@@ -574,7 +574,6 @@ optimizations:
     .reverse().find_map() should fuse
     .map(f).find(p) should fuse to map_find and not keep mapping after found
     fuse sequential extends
-    map(f).map(g) should fuse to map(f(g))
     map(f).to_set() should fuse
     filter/find.
     depth in grammar_sexp can be xs.map(depth).maximum() + 1 and fuse to map_max
