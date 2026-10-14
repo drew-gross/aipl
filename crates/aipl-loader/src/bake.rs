@@ -129,6 +129,11 @@ pub(crate) fn location_label(path: &Path, project_root: Option<&Path>) -> String
             None => return file_label(path),
         }
     };
+    slash_joined(rel)
+}
+
+/// `rel`'s components joined with forward slashes.
+pub(crate) fn slash_joined(rel: &Path) -> String {
     rel.components()
         .map(|c| c.as_os_str().to_string_lossy().into_owned())
         .collect::<Vec<_>>()

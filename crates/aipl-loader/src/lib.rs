@@ -283,8 +283,9 @@ impl Loader {
     /// path imports. `load` reads `src` from disk; the FFI supplies it directly.
     fn load_source(&mut self, path: &Path, src: &str) -> Result<(), Vec<Error>> {
         let is_entry = self.entry.as_deref() == Some(path);
+        let root = self.project_root.clone();
         self.load_source_inner(path, src)
-            .map_err(|errs| tag_origin(is_entry, path, src, errs))
+            .map_err(|errs| tag_origin(is_entry, path, root.as_deref(), src, errs))
     }
 
     fn load_source_inner(&mut self, path: &Path, src: &str) -> Result<(), Vec<Error>> {
@@ -360,8 +361,9 @@ impl Loader {
     fn register_virtual(&mut self, key: PathBuf, src: &str) -> Result<(), Vec<Error>> {
         let is_entry = self.entry.as_deref() == Some(key.as_path());
         let path = key.clone();
+        let root = self.project_root.clone();
         self.register_virtual_inner(key, src)
-            .map_err(|errs| tag_origin(is_entry, &path, src, errs))
+            .map_err(|errs| tag_origin(is_entry, &path, root.as_deref(), src, errs))
     }
 
     fn register_virtual_inner(&mut self, key: PathBuf, src: &str) -> Result<(), Vec<Error>> {
@@ -716,7 +718,7 @@ impl Loader {
         for (path, file) in &self.files {
             if let Some(slot) = sources.get_mut(file.index as usize) {
                 *slot = aipl_syntax::ast::FileSource {
-                    label: file_label(path),
+                    label: diagnostic_label(path, self.project_root.as_deref()),
                     source: file.source.clone(),
                 };
             }
@@ -1673,16 +1675,37 @@ fn rewrite_expr(
 /// and tagging would replace that with a bare basename. Errors arriving from
 /// deeper imports are already tagged, and `Error::in_file` keeps the innermost
 /// attribution.
-fn tag_origin(is_entry: bool, path: &Path, src: &str, errs: Vec<Error>) -> Vec<Error> {
+fn tag_origin(
+    is_entry: bool,
+    path: &Path,
+    project_root: Option<&Path>,
+    src: &str,
+    errs: Vec<Error>,
+) -> Vec<Error> {
     if is_entry {
         return errs;
     }
-    let label = file_label(path);
+    let label = diagnostic_label(path, project_root);
     errs.into_iter().map(|e| e.in_file(&label, src)).collect()
 }
 
-// Used to make errors better by eliminating asbolute paths. TODO: Instead, always
-// use paths relative to the project root i.e. ./file_name.aipl
+/// What a diagnostic that points into `path` calls the file: the path relative
+/// to the project root as `./sub/file.aipl`, the way the entry file is named
+/// under a root-relative invocation, so an error in an imported file says which
+/// file of that name. A virtual source's key is already such a name; a file
+/// outside the root keeps its full path, since nothing shorter identifies it.
+fn diagnostic_label(path: &Path, project_root: Option<&Path>) -> String {
+    if path.is_relative() {
+        return path.display().to_string();
+    }
+    match project_root.and_then(|root| path.strip_prefix(root).ok()) {
+        Some(rel) => format!("./{}", bake::slash_joined(rel)),
+        None => path.display().to_string(),
+    }
+}
+
+/// Just the file's name, for the places a message mentions a file in passing
+/// (`"x" is not exported by lib.aipl`) rather than pointing a caret into it.
 pub(crate) fn file_label(path: &Path) -> String {
     path.file_name()
         .expect("File should have file name")

@@ -1686,7 +1686,7 @@ impl Cx<'_> {
             if !KNOWN_EFFECTS.contains(&e.as_str()) {
                 return Err(Error::msg(format!(
                     "fn {:?} declares unknown effect \"!{e}\"",
-                    f.name
+                    display(&f.name)
                 )));
             }
         }
@@ -1694,7 +1694,7 @@ impl Cx<'_> {
             if p.mutable && i != 0 {
                 return Err(Error::msg(format!(
                     "fn {:?}: only the first parameter may be \"mut\"",
-                    f.name
+                    display(&f.name)
                 )));
             }
         }
@@ -1703,13 +1703,13 @@ impl Cx<'_> {
             if self_p.name != "self" {
                 return Err(Error::msg(format!(
                     "fn {:?}: a \"mut\" receiver must be named \"self\"",
-                    f.name
+                    display(&f.name)
                 )));
             }
             if f.sig.return_ty.is_some() {
                 return Err(Error::msg(format!(
                     "fn {:?}: a mutating method cannot return a value",
-                    f.name
+                    display(&f.name)
                 )));
             }
         }
@@ -1719,17 +1719,21 @@ impl Cx<'_> {
         // return type — there's no first-class function value to hand back.
         let type_var_names = f.sig.type_var_names();
         for p in &f.sig.params {
-            self.check_ty(&p.ty, &type_var_names, &format!("fn {:?}", f.name))?;
+            self.check_ty(
+                &p.ty,
+                &type_var_names,
+                &format!("fn {:?}", display(&f.name)),
+            )?;
         }
         if let Some(rt) = &f.sig.return_ty {
             if matches!(rt, Type::Fn(_, _)) {
                 return Err(Error::msg(format!(
                     "fn {:?}: cannot return a function value ({})",
-                    f.name,
+                    display(&f.name),
                     tyname(rt)
                 )));
             }
-            self.check_ty(rt, &type_var_names, &format!("fn {:?}", f.name))?;
+            self.check_ty(rt, &type_var_names, &format!("fn {:?}", display(&f.name)))?;
         }
 
         // Keyword-parameter defaults are checked in an environment holding the
@@ -1826,7 +1830,7 @@ impl Cx<'_> {
             Error::at(
                 format!(
                     "fn {:?}: body returns {}, but the declared return type is {}",
-                    f.name,
+                    display(&f.name),
                     tyname(&body_ty),
                     tyname(&declared)
                 ),
@@ -2033,7 +2037,7 @@ impl Cx<'_> {
         self.check_ty(
             declared,
             &self.current_type_params.borrow(),
-            &format!("fn {:?}", self.current_fn.borrow()),
+            &format!("fn {:?}", display(&self.current_fn.borrow())),
         )?;
         let declared = subst_typevars(declared, &self.current_type_params.borrow());
         // A written `Rule<Tok>` is a generic *application*; the value's type is
@@ -5378,15 +5382,14 @@ fn is_span(ty: &Type) -> bool {
     matches!(ty, Type::Named(n) if n == SPAN_TYPE)
 }
 
-/// Strip the internal `__builtin_` prefix for diagnostics.
-fn display(name: &str) -> &str {
-    name.strip_prefix("__builtin_").unwrap_or(name)
-}
-
-/// Strip a single internal name-mangling prefix for display: the reserved
+/// Strip the internal name-mangling prefix for diagnostics: the reserved
 /// `__builtin_`, or the loader's per-file module prefix `__m<index>__` (added to
 /// every non-root file's top-level names). Neither can appear in a user-written
 /// identifier, so this only ever strips compiler-internal decoration.
+fn display(name: &str) -> &str {
+    aipl_syntax::strip_mangle_prefix(name)
+}
+
 /// Whether `aty` has the *shape* `pty` demands — its outermost type
 /// constructor, and nothing below it.
 ///

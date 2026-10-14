@@ -21,7 +21,7 @@ import { wrapping_add as + } from builtins;
 pub fn helper(n: i64) -> i64 { nosuchfn(n) + 1 }
 --- errors ---
 error: call to undefined fn "nosuchfn"
- --> util.aipl:5:32
+ --> ./util.aipl:5:32
   |
 5 | pub fn helper(n: i64) -> i64 { nosuchfn(n) + 1 }
   |                                ^^^^^^^^^^^

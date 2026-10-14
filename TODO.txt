@@ -232,12 +232,10 @@ bugs:
 
 errors:
   for (let (k, v) : dict) gives a bad error currently
-  attempting to do a top level mut should give a specific error
   report multiple errors when one call site has multiple type errors
   report multiple errors when there is a badly typed let
   assert should print the mixed values when there is an
   "assert failed at" should show the actual file name, not input:xxx
-  .one_char_len(wrong_type_value) is showing mangled names in it's type errors, and also isn't giving the full file path
   type errors should point to source locations
   better error when you forget a ; after an if.
 

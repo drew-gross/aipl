@@ -300,6 +300,7 @@ case_tests! {
     cases_imports_err_operator_builtin_bare_arity = "cases/imports/err_operator_builtin_bare_arity",
     cases_imports_err_operator_imported_twice = "cases/imports/err_operator_imported_twice",
     cases_imports_err_operator_not_imported = "cases/imports/err_operator_not_imported",
+    cases_imports_err_type_error_in_imported_file = "cases/imports/err_type_error_in_imported_file",
     cases_imports_import_alias = "cases/imports/import_alias",
     cases_imports_imports_pull_named_items_into_scope = "cases/imports/imports_pull_named_items_into_scope",
     cases_imports_operator_alias = "cases/imports/operator_alias",

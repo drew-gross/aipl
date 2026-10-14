@@ -1,0 +1,18 @@
+# A type error inside an imported file is reported under that file's path, and
+# names the function as its author wrote it: not as the `__m1__` form the
+# loader gives every function outside the root file.
+
+import { check_len } from "./util.aipl";
+
+fn main() {
+    let n = check_len();
+}
+--- file: util.aipl ---
+fn one_char_len(self: str, chars: #{char}) -> u64 { 1 }
+pub fn check_len() -> u64 { "abc".one_char_len(5) }
+--- errors ---
+error: fn "one_char_len" arg 1: expected #{char}, got i64
+ --> ./util.aipl:2:48
+  |
+2 | pub fn check_len() -> u64 { "abc".one_char_len(5) }
+  |                                                ^

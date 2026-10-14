@@ -3372,7 +3372,7 @@ pub fn is_str_repr(t: &Type) -> bool {
 
 /// Strip the prefixes a name picks up on its way through the compiler: the
 /// `__builtin_` of a builtin type and the `__m<N>__` of a per-file one.
-fn strip_mangle_prefix(s: &str) -> &str {
+pub fn strip_mangle_prefix(s: &str) -> &str {
     let s = s.strip_prefix("__builtin_").unwrap_or(s);
     if let Some(rest) = s.strip_prefix("__m") {
         let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();

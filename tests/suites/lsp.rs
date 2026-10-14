@@ -427,9 +427,14 @@ fn diagnostics_name_the_imported_file_an_error_came_from() {
         .expect("a list");
     assert!(!found.is_empty(), "the import does not compile");
     let message = found[0]["message"].as_str().expect("message");
-    assert!(
-        message.starts_with("util.aipl: "),
-        "names the file it came from: {message:?}"
+    let util = workspace
+        .path("util.aipl")
+        .canonicalize()
+        .expect("canonical path");
+    assert_eq!(
+        message,
+        format!("{}: unknown identifier \"nope\"", util.display()),
+        "names the file it came from, by its full path"
     );
     assert_eq!(
         found[0]["range"],
