@@ -738,6 +738,41 @@ impl Callee {
         matches!(self, Callee::Map | Callee::Sort | Callee::Reverse)
     }
 
+    /// The builtin that combines two values into the one this builtin keeps, if
+    /// this builtin is a *reduction*; `None` for every other arm.
+    ///
+    /// A reduction takes a sequence and returns one value built from all of it,
+    /// or `none` when there is nothing to build from: it seeds with the first
+    /// element and folds each following one in, in order, with a binary step —
+    /// `minimum` is the fold of `min`, `maximum` of `max`. That step is what
+    /// distinguishes one reduction from another and nothing else does, so a
+    /// reduction is stated by naming it, and everything that treats reductions
+    /// alike reads it from here.
+    ///
+    /// The contract a row owes is the one in that definition: the step must agree
+    /// with the reduction on any two elements, so that
+    /// `xs.reduction()` and "fold `xs` with `step`, seeded by the first element"
+    /// are the same value. It is the only thing a pass that rewrites a reduction
+    /// as a fold relies on. [`crate::fuse`] is the first such pass: a reduction fed
+    /// by a derived sequence becomes one call that derives and folds in a single
+    /// pass, taking the step as an argument.
+    ///
+    /// It says nothing about how the reduction is *evaluated*, only what it
+    /// means; a builtin that is a reduction in this sense may still be lowered by
+    /// its own intrinsic.
+    pub fn reduction_step(&self) -> Option<Callee> {
+        match self {
+            Callee::Minimum => Some(Callee::Min),
+            Callee::Maximum => Some(Callee::Max),
+            _ => None,
+        }
+    }
+
+    /// Whether this builtin is a reduction — see [`Callee::reduction_step`].
+    pub fn is_reduction(&self) -> bool {
+        self.reduction_step().is_some()
+    }
+
     /// The pattern shape of a shape-variadic sequence builtin, or `None` for
     /// any other arm.
     pub fn seq_shape(&self) -> Option<SeqShape> {
@@ -823,6 +858,26 @@ mod tests {
             Callee::resolve("__m3__foo".into()),
             Callee::User("__m3__foo".into())
         );
+    }
+
+    /// A reduction's step has to be a builtin a program can name — the fused
+    /// call that carries it as an argument is spelled with its canonical name.
+    /// Nothing but a reduction has one.
+    #[test]
+    fn a_reductions_step_is_a_known_builtin() {
+        assert_eq!(Callee::Minimum.reduction_step(), Some(Callee::Min));
+        assert_eq!(Callee::Maximum.reduction_step(), Some(Callee::Max));
+        assert!(!Callee::Map.is_reduction());
+        assert!(!Callee::Len.is_reduction());
+        assert!(!Callee::User("minimum".into()).is_reduction());
+        for c in Callee::IMPORTABLE.iter().chain(Callee::INTERNAL) {
+            if let Some(step) = c.reduction_step() {
+                assert!(
+                    Callee::IMPORTABLE.contains(&step),
+                    "{c}'s step {step} is not an importable builtin"
+                );
+            }
+        }
     }
 
     #[test]

@@ -5,8 +5,8 @@
 #
 # It is one fusion with a table of reductions behind it, not a builtin per pair:
 # what makes `map_reduce` a minimum rather than anything else is only the step
-# passed to it, so the next reduction is a row (`reduction`, `step`) in
-# `chain_fusions`, not a new builtin. The `.performance` block holds the saving —
+# passed to it, so the next reduction is a line in `Callee::reduction_step`, not a
+# new builtin. The `.performance` block holds the saving —
 # nothing allocated for fifty numbers rendered and measured, where the unfused
 # form allocates the mapped array, and nothing for a `filter` in front of the
 # `map` either — and the program checks every element type the

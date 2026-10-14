@@ -9,7 +9,8 @@
 # drop. The reduction is the `step`, which combines what has been reduced so far
 # with the next mapped element — `min` for `minimum`, `max` for `maximum`. Written
 # by the compiler's operation-fusion pass for those chains (see `chain_fusions`
-# in aipl-mono, where the table of reductions lives); also callable directly.
+# in aipl-mono, and `Callee::reduction_step`, where the reductions are named);
+# also callable directly.
 
 import {
     equal as ==,

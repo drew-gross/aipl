@@ -6,22 +6,23 @@
 //!
 //! # Reductions
 //!
-//! A second table, [`REDUCTIONS`], is for a chain whose outer call *reduces* its
-//! receiver to one value — `xs.map(f).minimum()` — rather than producing another
-//! sequence. They are one fusion, not one per reduction: `map_reduce(xs, f, step)`
-//! maps and combines in a single pass with no mapped array, and what makes it
-//! `minimum` rather than anything else is only the `step` (`min`). A row says
-//! which call is the reduction and which builtin is its step, so adding the next
-//! reduction is a row, not a builtin.
+//! A chain may instead end in a *reduction* — a builtin that reduces its receiver
+//! to one value, `xs.map(f).minimum()`, rather than producing another sequence.
+//! Which builtins are reductions, and how each combines two values, is not a table
+//! here but a property of the callee ([`Callee::reduction_step`]), because it is a
+//! fact about what the builtin means that other passes may use too. They are one
+//! fusion, not one per reduction: `map_reduce(xs, f, step)` maps and combines in a
+//! single pass with no mapped array, and what makes it `minimum` rather than
+//! anything else is only the `step` (`min`). So adding the next reduction is a line
+//! in `reduction_step`, not a row here and not a builtin.
 //!
-//! What feeds a reduction is the other table, [`STAGES`]: the call whose result
+//! What feeds a reduction is a table here, [`STAGES`]: the call whose result
 //! the reduction consumes, and the fused builtin that does that call's work and
 //! the reduction's together. `map` becomes `map_reduce`; `filter_map` — which is
 //! what `filter(p).map(f)` has already become by the time the reduction is
 //! reached — becomes `filter_map_reduce`. Each further stage that should feed a
-//! reduction is a row there and a builtin that takes the same `step`; the table
-//! of reductions does not change, and neither does a stage's row when a
-//! reduction is added.
+//! reduction is a row there and a builtin that takes the same `step`; the reductions
+//! do not change, and neither does a stage's row when a reduction is added.
 //!
 //! The receiver may reach here under the `let`s inlining leaves in front of an
 //! inlined body; the chain is found beneath them and the fused call put back
@@ -167,9 +168,9 @@ pub(super) fn build(whole: &Expr, outer: Option<&Callee>) -> Option<Expr> {
     let (into, step) = match row(inner_name, name) {
         Some(f) => (f.into.clone(), None),
         None => {
-            let reduction = reduction_row(name)?;
+            let step = name.reduction_step()?;
             let stage = stage_row(inner_name)?;
-            (stage.into.clone(), Some(&reduction.step))
+            (stage.into.clone(), Some(step))
         }
     };
     if bindings
@@ -194,19 +195,6 @@ pub(super) fn build(whole: &Expr, outer: Option<&Callee>) -> Option<Expr> {
     // call's.
     let call = Expr::rebuilt(ExprKind::Call(into, fused, *method_style), whole);
     Some(under_bindings(bindings, whole, call))
-}
-
-/// One reduction a mapped array can be fed to: `reduction` is the call, and
-/// `step` is the builtin that combines two values of the mapped type into the
-/// one it keeps — the whole of what distinguishes `minimum` from `maximum`.
-///
-/// Both are the *same shape* as the unfused call by construction: `reduction`
-/// takes the first element as its seed and folds the rest in order, and
-/// `map_reduce` does the same with `step`, so the only requirement on a row is
-/// that `step` agrees with `reduction` on any two elements.
-struct Reduction {
-    reduction: Callee,
-    step: Callee,
 }
 
 /// A call whose result a reduction can consume, and the fused builtin that does
@@ -235,26 +223,6 @@ fn stage_row(stage: &Callee) -> Option<&'static Stage> {
     STAGES.iter().find(|s| s.stage == *stage)
 }
 
-/// Every reduction the pass knows. See the module docs for how to add one.
-const REDUCTIONS: &[Reduction] = &[
-    // `xs.map(f).minimum()`: smaller of two. Agrees with `minimum` on every
-    // element type it accepts; on equal elements it keeps the later one, which
-    // cannot be told from the earlier.
-    Reduction {
-        reduction: Callee::Minimum,
-        step: Callee::Min,
-    },
-    Reduction {
-        reduction: Callee::Maximum,
-        step: Callee::Max,
-    },
-];
-
-/// The [`REDUCTIONS`] row for `reduction`, if it is one.
-fn reduction_row(reduction: &Callee) -> Option<&'static Reduction> {
-    REDUCTIONS.iter().find(|r| r.reduction == *reduction)
-}
-
 /// Whether `whole` — a call to `name`, the receiver of a call to `outer` — leaves
 /// itself for that parent to fuse (see "Standing aside for the parent" on
 /// [`build`]).
@@ -271,7 +239,7 @@ fn stands_aside_for(whole: &Expr, name: &Callee, outer: &Callee) -> bool {
         return true;
     }
     stage_row(name).is_some()
-        && reduction_row(outer).is_some()
+        && outer.is_reduction()
         && !(*name == Callee::Map && has_filter_receiver(whole))
 }
 
