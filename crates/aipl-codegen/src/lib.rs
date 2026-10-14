@@ -2692,6 +2692,14 @@ fn compile_program<M: Module>(
             move |program| aipl_mono::inline_small_post_mono(program, max_exprs, &externally_called)
         })
         .once(),
+        // Pick the arm of each `match` on a literal, over what the inlining
+        // above just put in the callers: a literal argument now sits next to the
+        // body it feeds. The pre-mono folder never sees these bodies — a
+        // function that only became small after the earlier folds is inlined
+        // here, not there. Matches only, not constants generally: see
+        // `fold_matches_post_mono`. Before the passes below, which look for
+        // constructors and bindings the fold may remove.
+        Pass::scoped("fold_matches_post_mono", aipl_mono::fold_matches_post_mono),
         // Push each `?`, each `match` on an optional/result/variant, and each
         // field access on a struct into the constructor-ending branches under
         // it, so an inlined `value_or_err`/`value_or`/`map_ok`/… — or a small

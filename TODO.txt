@@ -481,7 +481,6 @@ design:
   apis should express intent
 
 optimizations:
-  constant fold match statements
   body_size should probably count match arms to prevent function that are huge match tables from getting inlined every time
   make inline capcity vary by type, and even by site (e.g. a const array literal that is mapped or filtered)
   inline arrays for non-primitive types (that require a drop of each element).
@@ -552,8 +551,6 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
-    is_nonempty in is_operator_name should fuse somehow, unsure exactly how yet. Probably needs these:
-      2) match (v) { arm => val }.foo() should move the foo call into the arm, at least if val is const, maybe more
     .join().is_nonempty() should fuse
     equality operator fusion for many operations, match fusion, etc.
     add some dict building fusions ie.g. foo()['key'] should fuse and throw out most of the dict inside foo()
@@ -668,6 +665,7 @@ allocator:
   make own allocator
 
 perfmon:
+  measure() needs to block optimizations
   show call-sites of each function in the final binary
   show regression and improvements
   functions in external libs don't get size instrumented
@@ -675,6 +673,7 @@ perfmon:
 
 report:
   make a flamegraph option
+  options to dump the clif, the binary, the asm, etc.
 
 check:
   check should print it's runtime

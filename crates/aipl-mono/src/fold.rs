@@ -21,6 +21,10 @@
 //!   ordinary call
 //! - concatenation of two `Str` literals, written either way: `"a" +++ "b"` and
 //!   `concat("a", "b")` are one call after import resolution
+//! - a `match` whose scrutinee is a `str`, `char` or integer literal: the first
+//!   arm whose pattern accepts it, and nothing else ([`fold_match`]). The
+//!   scrutinee may be a `let`-bound `str` literal used for nothing but the
+//!   `match` — the shape an inlined call leaves
 //!
 //! Only a concat whose operands are literals *in place* folds: this pass does
 //! not propagate a `str` literal through a binding (see [`propagatable`]).
@@ -47,6 +51,7 @@
 //! piece folding first, it never has two literals to join.
 
 use crate::passes::Scope;
+use crate::{ConcreteFn, MonoProgram};
 use std::collections::HashMap;
 
 use aipl_syntax::ast::{
@@ -95,6 +100,67 @@ pub fn fold_constants(program: &Program, scope: &Scope) -> Program {
     }
 }
 
+/// [`fold_match`] over the monomorphized program — and only that.
+///
+/// Inlining after monomorphization (`inline_small_post_mono`) is what puts a
+/// literal argument next to the body it feeds for any function that only became
+/// small once the earlier folds had run — a `match` that answers `true` or
+/// `false` per arm, say — and the pre-mono folder never sees those bodies. This
+/// is the half of folding that has to run on them.
+///
+/// Only matches, not [`fold_constants`] as a whole. The rest would be sound here
+/// too, but it would also propagate a literal through the inlined `measure` of a
+/// `.performance` block into the closure it measures, and `measure("..", 1, |n|
+/// [n, n + 1])` is written with a literal precisely so that the array is built at
+/// run time. Folding it to a constant array would make every such claim measure
+/// nothing. Choosing an arm moves no literal into anything it was not already
+/// in.
+pub fn fold_matches_post_mono(program: &MonoProgram, scope: &Scope) -> MonoProgram {
+    MonoProgram {
+        fns: program
+            .fns
+            .iter()
+            .map(|f| match scope.covers(&f.name) {
+                true => ConcreteFn {
+                    body: fold_matches(&f.body),
+                    ..f.clone()
+                },
+                false => f.clone(),
+            })
+            .collect(),
+        ..program.clone()
+    }
+}
+
+/// `e` with every `match` on a literal replaced by the arm that takes it,
+/// innermost first.
+fn fold_matches(e: &Expr) -> Expr {
+    let mut out = e.clone();
+    for child in crate::children_mut(&mut out) {
+        *child = fold_matches(child);
+    }
+    // A `let` of a `str` literal used only as the scrutinee of its body's `match`
+    // is that `match` on the literal (see `is_match_only_use`).
+    if let ExprKind::Let(name, ty, value, body) = &out.kind {
+        if is_match_only_use(value, ty.as_ref(), body, name) {
+            if let ExprKind::Match(_, arms) = &body.kind {
+                let moved = Expr::rebuilt(ExprKind::Match(value.clone(), arms.clone()), body);
+                out = match fold_match(value, arms) {
+                    Some(taken) => Expr::rebuilt(taken, e),
+                    None => Expr::rebuilt(moved.kind, e),
+                };
+                return out;
+            }
+        }
+    }
+    if let ExprKind::Match(scrutinee, arms) = &out.kind {
+        if let Some(taken) = fold_match(scrutinee, arms) {
+            return Expr::rebuilt(taken, e);
+        }
+    }
+    out
+}
+
 /// Structurally rebuild `e` with children folded first, then fold this node
 /// itself if it is a constant op over literals.
 fn fold_expr(e: &Expr, env: &HashMap<String, ExprKind>) -> Expr {
@@ -141,7 +207,9 @@ fn fold_expr(e: &Expr, env: &HashMap<String, ExprKind>) -> Expr {
             // once the binding is out of the way. Folding the body under the
             // extended environment does both in one pass — the substituted
             // literals *are* what makes the enclosing ops foldable.
-            if propagatable(&v, ty.as_ref()) && !binds_name(b, n) {
+            if (propagatable(&v, ty.as_ref()) || is_match_only_use(&v, ty.as_ref(), b, n))
+                && !binds_name(b, n)
+            {
                 let mut inner = env.clone();
                 inner.insert(n.clone(), v.kind.clone());
                 return fold_expr(b, &inner);
@@ -222,6 +290,29 @@ fn propagatable(v: &Expr, ty: Option<&Type>) -> bool {
     ty.is_none_or(|t| *t == natural)
 }
 
+/// Whether `v` is a `str` literal bound to `name`, and `body` uses `name` once,
+/// as the scrutinee of its outermost `match` — the shape an inlined
+/// `fn f(self: str) { match (self) { .. } }` leaves for a literal argument.
+///
+/// [`propagatable`] refuses a `str` literal because substituting it at several
+/// sites makes several of one value. Here there is exactly one site, so
+/// substituting it moves the literal without copying it, and it is the move that
+/// lets [`fold_match`] see it.
+fn is_match_only_use(v: &Expr, ty: Option<&Type>, body: &Expr, name: &str) -> bool {
+    if !matches!(v.kind, ExprKind::Str(_))
+        || ty.is_some_and(|t| *t != Type::Primitive(Primitive::Str))
+    {
+        return false;
+    }
+    let ExprKind::Match(scrutinee, arms) = &body.kind else {
+        return false;
+    };
+    matches!(&scrutinee.kind, ExprKind::Ident(n) if n == name)
+        && !arms
+            .iter()
+            .any(|a| crate::sink::mentions_free(&a.body, name))
+}
+
 /// Whether `e` rebinds `name` anywhere within it — a `let`/`mut`, a `for`
 /// variable, a lambda parameter, or a `match` arm's payload binding.
 ///
@@ -290,6 +381,7 @@ fn try_fold(kind: &ExprKind) -> Option<ExprKind> {
                 crate::contains_context_literal(t) || crate::contains_context_literal(f);
             (!unifies_types).then(|| taken.kind.clone())
         }
+        ExprKind::Match(scrutinee, arms) => fold_match(scrutinee, arms),
         // The reserved impls the loader resolves an operator to. Only these
         // names: an operator aliased to a user function is an ordinary call.
         ExprKind::Call(name, args, _) => {
@@ -329,6 +421,46 @@ fn try_fold(kind: &ExprKind) -> Option<ExprKind> {
         }
         _ => None,
     }
+}
+
+/// `match (<literal>) { .. }` as the body of the arm that takes it.
+///
+/// Only a `str`, `char` or integer literal, and only against the patterns that
+/// can be decided by looking: another literal, or `_`. Arms before the taken one
+/// are skipped only when they are literals that cannot match; any other pattern
+/// (a binder, a constructor, an array) before a decided arm stops the fold, since
+/// whether it takes the value is not something this pass works out. An arm that
+/// no pattern takes is left to the exhaustiveness the checker already proved.
+///
+/// Dropping the other arms is the same move as dropping the branch of an
+/// `if (true)`, and carries the same guard: arms are unified on type, so a
+/// context-typed literal in a dropped arm (`none`, an empty `[]`) may be what
+/// gave the taken one its type, and keeping only that arm would strand it.
+fn fold_match(scrutinee: &Expr, arms: &[MatchArm]) -> Option<ExprKind> {
+    let accepts = |pattern: &Pattern| -> Option<bool> {
+        match (&scrutinee.kind, pattern) {
+            (_, Pattern::Wildcard) => Some(true),
+            (ExprKind::Str(s), Pattern::Str(p)) => Some(s == p),
+            (ExprKind::Char(c), Pattern::Char(p)) => Some(c == p),
+            (ExprKind::Num(n), Pattern::Int(p)) => Some(n == p),
+            _ => None,
+        }
+    };
+    let mut taken = None;
+    for arm in arms {
+        if accepts(&arm.pattern)? {
+            taken = Some(arm);
+            break;
+        }
+    }
+    let taken = taken?;
+    if arms
+        .iter()
+        .any(|a| crate::contains_context_literal(&a.body))
+    {
+        return None;
+    }
+    Some(taken.body.kind.clone())
 }
 
 /// Fold a binary op over two literals. Integer ops use `i64` semantics — the

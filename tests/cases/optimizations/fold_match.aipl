@@ -1,0 +1,64 @@
+# A `match` on a literal is the arm that takes it, and nothing else.
+#
+# The scrutinee is a literal when someone wrote it that way, and — far more often
+# — when an inlined call put it there: `classify("b")` inlines to `let $inl0_self:
+# str = "b"; match ($inl0_self) { .. }`, and the literal is only visible to the
+# fold once the `let` is out of the way. A `str` literal is not substituted for a
+# binding in general (that would make a copy per use of a heap value), but here the
+# binding is used once, as the scrutinee, so the literal moves rather than copies.
+#
+# `known` is the longer road: a table asked `is_nonempty`, which the earlier folds
+# turn into a `match` of `true` and `false`. That body is small only afterwards, so
+# it is inlined after monomorphization — and the fold runs there too, or the
+# `match` on `"a"` would survive into the program. The report holds the result: no
+# call to `classify` or `known`, and no string comparison left to run.
+
+import { is_nonempty, print } from builtins;
+
+fn forms(self: str) -> str[] {
+    match (self) {
+        "a" => ["alpha", "alef"],
+        "b" => ["beta"],
+        "c" => ["gamma"],
+        _ => [],
+    }
+}
+
+fn known(self: str) -> bool { self.forms().is_nonempty() }
+
+fn classify(self: str) -> i64 {
+    match (self) {
+        "a" => 1,
+        "b" => 2,
+        _ => 3,
+    }
+}
+
+fn main() !prints {
+    print(`{classify("a")} {classify("b")} {classify("zzz")}`);
+    print(`{known("a")} {known("z")}`);
+    print(match ('x') {
+        'x' => "ex",
+        _ => "other",
+    });
+}
+--- stdout ---
+1 2 3
+true false
+ex
+--- report ---
+allocations       11
+deallocations     11
+reallocations     0
+bytes allocated   620
+peak live bytes   620
+instructions      282
+binary size       3472 bytes (code 1772, data 14, metadata 1686)
+
+function              calls  code bytes
+__to_str_bool             2         224
+__to_str_i64              3         204
+aipl_i64_len              6    external
+aipl_write_bytes          2    external
+aipl_write_i64            3    external
+main                      1        1344
