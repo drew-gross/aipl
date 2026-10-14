@@ -376,6 +376,7 @@ parser:
 grammar:
   TokenRule's unterminated should move into only the places where it's actually used
   make an ebnf loader as well as dumper
+  can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
   zip
@@ -675,6 +676,7 @@ report:
   make a flamegraph option
 
 check:
+  check should print it's runtime
   check should error on lint failures, but still run tests and report results
   can recover from parse errors too and run tests
   can recover from type errors even?

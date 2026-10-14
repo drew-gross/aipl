@@ -783,24 +783,14 @@ fn statements() -> Production<AiplTok, Ast>[] {
         Named("while_stmt"),
         Named("return_stmt"),
     ]);
+    let bind_target: Rule<AiplTok> = OneOf([
+        Many(Term(Name), min=1, sep=Lit(","), trailing_sep=false, nested_in=parens()),
+        Then([Term(Name), Many(Term(Name), min=1, sep=Lit(","), nested_in=braces(), spaced=true)]),
+        Term(Name),
+    ]);
     let let_stmt: Rule<AiplTok> = OneOf([
-        Then([
-            Lit("let"),
-            Many(Term(Name), min=1, sep=Lit(","), trailing_sep=false, nested_in=parens()),
-            Lit("="),
-            Named("expr"),
-            Lit(";"),
-        ]),
-        Then([
-            Lit("let"),
-            Term(Name),
-            Many(Term(Name), min=1, sep=Lit(","), nested_in=braces(), spaced=true),
-            Lit("="),
-            Named("expr"),
-            Lit(";"),
-        ]),
+        Then([Lit("let"), bind_target, Lit("="), Named("expr"), Lit(";")]),
         Then([Lit("let"), Term(Name), Lit(":"), Named("ty"), Lit("="), Named("expr"), Lit(";")]),
-        Then([Lit("let"), Term(Name), Lit("="), Named("expr"), Lit(";")]),
     ]);
     let mut_stmt: Rule<AiplTok> = OneOf([
         Then([
@@ -839,43 +829,15 @@ fn statements() -> Production<AiplTok, Ast>[] {
     let for_stmt: Rule<AiplTok> = OneOf([
         Then([
             Lit("for"),
-            one(
-                Then([
-                    Lit("let"),
-                    Many(Term(Name), min=1, sep=Lit(","), trailing_sep=false, nested_in=parens()),
-                    Lit(":"),
-                    Named("expr"),
-                ]),
-                nested_in=parens(),
-            ),
+            one(Then([Lit("let"), bind_target, Lit(":"), Named("expr")]), nested_in=parens()),
             Named("loop_body"),
         ]),
         Then([
             Lit("for"),
             one(
-                Then([
-                    Lit("let"),
-                    Term(Name),
-                    Lit(","),
-                    Many(Term(Name), min=1, sep=Lit(","), trailing_sep=false, nested_in=parens()),
-                    Lit(":"),
-                    Named("expr"),
-                ]),
+                Then([Lit("let"), Term(Name), Lit(","), bind_target, Lit(":"), Named("expr")]),
                 nested_in=parens(),
             ),
-            Named("loop_body"),
-        ]),
-        Then([
-            Lit("for"),
-            one(
-                Then([Lit("let"), Term(Name), Lit(","), Term(Name), Lit(":"), Named("expr")]),
-                nested_in=parens(),
-            ),
-            Named("loop_body"),
-        ]),
-        Then([
-            Lit("for"),
-            one(Then([Lit("let"), Term(Name), Lit(":"), Named("expr")]), nested_in=parens()),
             Named("loop_body"),
         ]),
     ]);
