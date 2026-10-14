@@ -1,0 +1,65 @@
+# A call whose result is only asked `is_empty`, `is_nonempty`, or indexed is
+# inlined however big the callee is.
+#
+# `inline_small` copies a body only when it is cheap to copy, and a table is not:
+# `forms` is a `match` with an array per arm, far past its threshold. But a
+# caller that asks only whether the answer is empty (or for one element of it) is
+# using almost nothing of what the table builds, and the table's body is where
+# that can be seen. Placed in the caller, the question and the construction are
+# one expression, which is the shape the passes that look through a constructor
+# act on. The inlining is the first step of that and removes no work by itself;
+# the report pins that it happens.
+#
+# `forms` is called from four places, so `inline_single_use` leaves it alone. Two
+# of them inspect the result — `known` asks `is_nonempty`, `first_form` indexes —
+# and are inlined away. The other two, `joined` and `slashed`, use the whole
+# array, so they keep their calls: only the inspected sites are copied, and the
+# `calls` column of `forms` below is those two. The arguments come from the
+# command line so no call is folded away before the pass sees it.
+
+import { is_nonempty, join, print, value_or } from builtins;
+
+fn forms(self: str) -> str[] {
+    match (self) {
+        "a" => ["alpha", "alef"],
+        "b" => ["beta"],
+        "c" => ["gamma"],
+        "d" => ["delta"],
+        "e" => ["epsilon"],
+        _ => [],
+    }
+}
+
+fn known(self: str) -> bool { self.forms().is_nonempty() }
+
+fn first_form(self: str) -> str { self.forms()[0].value_or("none") }
+
+fn joined(self: str) -> str { self.forms().join(sep="+") }
+
+fn slashed(self: str) -> str { self.forms().join(sep="/") }
+
+fn main(args: str[]) !prints {
+    let word = args[0].value_or("");
+    print(`{known(word)} {first_form(word)} {joined(word)} {slashed(word)}`);
+}
+--- cli ---
+a
+--- stdout ---
+true alpha alpha+alef alpha/alef
+--- report ---
+allocations       14
+deallocations     14
+reallocations     0
+bytes allocated   1002
+peak live bytes   924
+instructions      565
+binary size       9400 bytes (code 6020, data 22, metadata 3358)
+
+function              calls  code bytes
+__to_str_bool             1         224
+aipl_arr_inc              4    external
+aipl_array_dec            9    external
+aipl_array_new            5    external
+aipl_write_bytes          1    external
+forms                     2        1372
+main                      1        4424

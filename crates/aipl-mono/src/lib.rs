@@ -9577,6 +9577,10 @@ enum InlineSites {
     First,
     /// Every site, which is what inlining a *small* function means.
     All,
+    /// Only a call whose result is immediately inspected: the one operand of
+    /// `is_empty`/`is_nonempty`, or the indexed side of `f(..)[i]`. See
+    /// [`inline_inspected`].
+    Inspected,
 }
 
 /// The default body-size threshold for [`inline_small`], in non-leaf
@@ -9685,31 +9689,7 @@ pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
     // stays eligible, and inlining only ever *grows* callers, so re-selecting
     // after each step could never add to this set — while re-walking it would
     // risk an unbounded ping-pong between two small mutually-calling functions.
-    let candidates: Vec<Function> = program
-        .items
-        .iter()
-        .filter_map(|it| match it {
-            Item::Fn(f)
-                if body_size(&f.body) <= max_exprs
-                    && f.name != "main"
-                    && f.sig.type_vars.is_empty()
-                    && !f.sig.params.iter().any(|p| mentions_abstract_type(&p.ty))
-                    && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
-                    && !binders.contains(f.name.as_str())
-                    && is_inline_shape(
-                        f.sig
-                            .params
-                            .iter()
-                            .any(|p| matches!(p.ty, Type::Fn(_, _)) || p.arity.is_variadic()),
-                        &f.body,
-                        &f.name,
-                    ) =>
-            {
-                Some(f.clone())
-            }
-            _ => None,
-        })
-        .collect();
+    let candidates = inline_candidates(&program, &binders, max_exprs, None);
 
     for f in candidates {
         let fparams: Vec<InlineParam> = f
@@ -9760,6 +9740,153 @@ pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
         let _ = replaced;
     }
     program
+}
+
+/// The functions of `program` whose body is at most `max_exprs` [`body_size`] and
+/// is safe to inline (see [`is_inline_shape`]), optionally only those named in
+/// `wanted`. The one filter [`inline_small`] and [`inline_inspected`] share;
+/// they differ in how big a body they accept and where they put it.
+fn inline_candidates(
+    program: &Program,
+    binders: &HashSet<String>,
+    max_exprs: usize,
+    wanted: Option<&HashSet<String>>,
+) -> Vec<Function> {
+    program
+        .items
+        .iter()
+        .filter_map(|it| match it {
+            Item::Fn(f)
+                if body_size(&f.body) <= max_exprs
+                    && wanted.is_none_or(|w| w.contains(f.name.as_str()))
+                    && f.name != "main"
+                    && f.sig.type_vars.is_empty()
+                    && !f.sig.params.iter().any(|p| mentions_abstract_type(&p.ty))
+                    && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
+                    && !binders.contains(f.name.as_str())
+                    && is_inline_shape(
+                        f.sig
+                            .params
+                            .iter()
+                            .any(|p| matches!(p.ty, Type::Fn(_, _)) || p.arity.is_variadic()),
+                        &f.body,
+                        &f.name,
+                    ) =>
+            {
+                Some(f.clone())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// The body-size bound for [`inline_inspected`], in non-leaf expressions.
+///
+/// Sixteen times [`DEFAULT_INLINE_MAX_EXPRS`], because the bodies it exists for
+/// are tables: a `match` with one array per arm is as many expressions as it has
+/// arms, and the question asked of it afterwards (`is_nonempty`) is the case
+/// where none of them is needed. Duplicating one costs its size once per
+/// *inspecting* call site, not per call site, so the bound can be this much looser.
+pub const DEFAULT_INLINE_INSPECTED_MAX_EXPRS: usize = 64;
+
+/// Inline a call into the place that immediately inspects its result —
+/// `is_empty(f(..))`, `is_nonempty(f(..))` or `f(..)[i]` — however big `f`'s body
+/// is, up to `max_exprs` (see [`DEFAULT_INLINE_INSPECTED_MAX_EXPRS`]).
+///
+/// [`inline_small`] inlines what is cheap to copy. This inlines what is
+/// *profitable* to copy: a caller that asks only whether a result is empty, or
+/// for one element of it, is using almost nothing of what the callee built, and
+/// the callee's body is where it can be seen how little. With the body in the
+/// caller the question and the construction are one expression, which is the
+/// shape the passes that look through a constructor can act on. The inlining
+/// itself removes no work, and is not the whole of the optimization: it is the
+/// part that has to come first.
+///
+/// Runs *before* [`inline_small`]. A small wrapper around an inspected call is
+/// itself a candidate for that pass, which copies it into every caller; run
+/// second, this would then put a copy of the big body into each of those copies.
+/// Run first, the body lands in the wrapper once, and the wrapper is too big to
+/// copy.
+///
+/// Selected like [`inline_small`] — once, from the program as it arrives, with
+/// the same safety rules — except that a function is a candidate only if some
+/// body in the program inspects a call to it, so a big function nothing
+/// inspects is never copied.
+pub fn inline_inspected(program: &Program, max_exprs: usize) -> Program {
+    let mut program = program.clone();
+    let binders = collect_binders(&program);
+    let mut inspected = HashSet::new();
+    for it in &program.items {
+        if let Item::Fn(f) = it {
+            collect_inspected_callees(&f.body, &mut inspected);
+            if let Some(t) = &f.test_body {
+                collect_inspected_callees(t, &mut inspected);
+            }
+        }
+    }
+    let candidates = inline_candidates(&program, &binders, max_exprs, Some(&inspected));
+
+    for f in candidates {
+        let fparams: Vec<InlineParam> = f
+            .sig
+            .params
+            .iter()
+            .map(|p| InlineParam {
+                name: p.name.clone(),
+                ty: p.ty.clone(),
+                mutable: p.mutable,
+            })
+            .collect();
+        let mut replaced = false;
+        for it in &mut program.items {
+            if let Item::Fn(g) = it {
+                if g.name == f.name {
+                    continue;
+                }
+                g.body = replace_call(
+                    &g.body,
+                    &f.name,
+                    &fparams,
+                    &f.body,
+                    &mut replaced,
+                    InlineSites::Inspected,
+                );
+                g.test_body = g.test_body.as_ref().map(|t| {
+                    replace_call(
+                        t,
+                        &f.name,
+                        &fparams,
+                        &f.body,
+                        &mut replaced,
+                        InlineSites::Inspected,
+                    )
+                });
+            }
+        }
+    }
+    program
+}
+
+/// The names of the functions `e` calls only to inspect the result — what
+/// [`inspected_call`] would match.
+fn collect_inspected_callees(e: &Expr, out: &mut HashSet<String>) {
+    let operand = match &e.kind {
+        ExprKind::Call(name, args, _) if is_emptiness_check(name) && args.len() == 1 => {
+            Some(&args[0])
+        }
+        ExprKind::Index(operand, _) => Some(&**operand),
+        _ => None,
+    };
+    if let Some(Expr {
+        kind: ExprKind::Call(callee, ..),
+        ..
+    }) = operand
+    {
+        out.insert(callee.name().to_string());
+    }
+    for c in children(e) {
+        collect_inspected_callees(c, out);
+    }
 }
 
 /// [`inline_small`] over the *monomorphized* program: fold a small body into
@@ -10194,10 +10321,64 @@ fn references_name(e: &Expr, name: &str) -> bool {
     }
 }
 
+/// Whether `name` is a call that only asks about the *shape* of its operand:
+/// `is_empty` or `is_nonempty`. Both want to know whether anything is there, not
+/// what — so a caller that builds the operand to answer is doing work its
+/// callee's body can often skip, once the two are in one function.
+fn is_emptiness_check(callee: &Callee) -> bool {
+    matches!(callee, Callee::IsEmpty | Callee::IsNonempty)
+}
+
+/// The call to `fname` — with arity `arity` — that `e` immediately inspects, if
+/// `e` is `is_empty(f(..))`, `is_nonempty(f(..))` or `f(..)[i]`.
+fn inspected_call<'a>(e: &'a Expr, fname: &str, arity: usize) -> Option<&'a Expr> {
+    let operand = match &e.kind {
+        ExprKind::Call(name, args, _) if is_emptiness_check(name) && args.len() == 1 => &args[0],
+        ExprKind::Index(operand, _) => &**operand,
+        _ => return None,
+    };
+    match &operand.kind {
+        ExprKind::Call(callee, args, _) if callee == fname && args.len() == arity => Some(operand),
+        _ => None,
+    }
+}
+
+/// [`replace_call`]'s rule for [`InlineSites::Inspected`]: if `e` inspects a
+/// call to `fname`, `e` rebuilt with that call replaced by the callee's body.
+/// `None` for any other node, which the walk then descends into as usual.
+fn replace_inspected_call(
+    e: &Expr,
+    fname: &str,
+    fparams: &[InlineParam],
+    fbody: &Expr,
+    replaced: &mut bool,
+) -> Option<Expr> {
+    let call = inspected_call(e, fname, fparams.len())?;
+    let ExprKind::Call(_, call_args, _) = &call.kind else {
+        return None;
+    };
+    // The arguments may inspect calls of their own.
+    let rc = |x: &Expr, replaced: &mut bool| {
+        replace_call(x, fname, fparams, fbody, replaced, InlineSites::Inspected)
+    };
+    let call_args: Vec<Expr> = call_args.iter().map(|a| rc(a, replaced)).collect();
+    *replaced = true;
+    let inlined = build_inlined(fparams, fbody, &call_args, call.span.clone());
+    let kind = match &e.kind {
+        ExprKind::Call(name, _, m) => ExprKind::Call(name.clone(), vec![inlined], *m),
+        ExprKind::Index(_, index) => {
+            ExprKind::Index(Box::new(inlined), Box::new(rc(index, replaced)))
+        }
+        _ => return None,
+    };
+    Some(Expr::rebuilt(kind, e))
+}
+
 /// Rebuild `e`, replacing direct calls to `fname` — with matching arity — by the
 /// inlined body of the function it names (`fparam_names`/`fbody`). `sites` says
 /// how many: [`InlineSites::First`] stops at one (and `replaced` short-circuits
-/// the rest of the walk), [`InlineSites::All`] rewrites every site. `replaced`
+/// the rest of the walk), [`InlineSites::All`] rewrites every site, [`InlineSites::Inspected`] only the sites
+/// [`inspected_call`] finds. `replaced`
 /// reports whether anything was rewritten either way. Takes just the
 /// callee's parameter names (rather than a whole function/param list) so it
 /// works for both the pre-mono [`Function`]/[`Param`] and the post-mono
@@ -10211,7 +10392,12 @@ fn replace_call(
     replaced: &mut bool,
     sites: InlineSites,
 ) -> Expr {
-    if !*replaced || sites == InlineSites::All {
+    if sites == InlineSites::Inspected {
+        if let Some(inlined) = replace_inspected_call(e, fname, fparams, fbody, replaced) {
+            return inlined;
+        }
+    }
+    if sites != InlineSites::Inspected && (!*replaced || sites == InlineSites::All) {
         if let ExprKind::Call(name, args, _) = &e.kind {
             // Context-typed arguments (`none`, empty `[]`/`#{}`, an
             // `ok(..)`/`some(..)` wrapping one) used to be skipped here: their

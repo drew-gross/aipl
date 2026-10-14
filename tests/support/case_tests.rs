@@ -567,6 +567,7 @@ case_tests! {
     cases_optimizations_index_map_fusion = "cases/optimizations/index_map_fusion",
     cases_optimizations_index_map_fusion_effects = "cases/optimizations/index_map_fusion_effects",
     cases_optimizations_inline_early_exit = "cases/optimizations/inline_early_exit",
+    cases_optimizations_inline_inspected = "cases/optimizations/inline_inspected",
     cases_optimizations_inline_mutating_method = "cases/optimizations/inline_mutating_method",
     cases_optimizations_inline_small_stale_body = "cases/optimizations/inline_small_stale_body",
     cases_optimizations_inspect_only_args = "cases/optimizations/inspect_only_args",

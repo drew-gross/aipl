@@ -554,6 +554,7 @@ optimizations:
       1) inline functions if the result is passed to is_nonempty()
       2) match (v) { arm => val }.foo() should move the foo call into the arm, at least if val is const, maybe more
       3) is_nonempty should constant fold for array literals
+    .join().is_nonempty() should fuse
     equality operator fusion for many operations, match fusion, etc.
     add some dict building fusions ie.g. foo()['key'] should fuse and throw out most of the dict inside foo()
     xs.map(f)[a..b] should fuse (like  xs.map(f)[a]) does

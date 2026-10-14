@@ -2554,6 +2554,20 @@ fn compile_program<M: Module>(
         // use count across the program and deletes the definition it inlined,
         // neither of which a scope naming callers can answer.
         Pass::whole_program("inline_single_use", aipl_mono::inline_single_use),
+        // Inline a call into the `is_empty`/`is_nonempty`/index that
+        // immediately inspects its result, however big the callee is — the
+        // caller wants almost none of what the callee builds, and the passes
+        // below can only act on that once the two are one expression. Before
+        // `inline_small`, not after: a small wrapper around an inspected call
+        // (`fn known(s) { s.table().is_nonempty() }`) is copied by that pass
+        // into every caller, and if this ran second each copy would receive its
+        // own copy of the table. Run first, the table lands in the wrapper once
+        // and the wrapper is then too big to copy. First round only, for the same
+        // reason as `inline_small`.
+        Pass::whole_program("inline_inspected", |program| {
+            aipl_mono::inline_inspected(program, aipl_mono::DEFAULT_INLINE_INSPECTED_MAX_EXPRS)
+        })
+        .once(),
         // Inline every function small enough to be worth duplicating, at all
         // of its call sites. After `inline_single_use` (which is strictly
         // cheaper — it moves a body rather than copying it) so a single-use
