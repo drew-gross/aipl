@@ -2,7 +2,7 @@
 # shape a nested array element already has — so they can be array elements, and
 # the element retain/drop helpers a `T[][]` already uses carry them unchanged.
 #
-# The `--- performance ---` section below is the real assertion: balanced
+# The leak gate, which every case runs, is the real assertion: balanced
 # allocations are what says the element blocks are retained and released exactly
 # once each.
 

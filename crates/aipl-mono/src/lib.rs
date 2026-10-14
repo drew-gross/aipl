@@ -2500,7 +2500,7 @@ struct Mono<'a> {
     /// per-instance ordinal is all the uniqueness it needs.) A single program-wide counter was
     /// what it replaced, and under that scheme every edit that added or removed
     /// a lambda renumbered all the ones discovered after it — hundreds of
-    /// `--- performance ---` lines and a `.clif` diff for a one-line change.
+    /// baseline-row moves and a `.clif` diff for a one-line change.
     synth: usize,
     /// Declared effects of the function currently being processed. A lambda's
     /// synthesized function and the lambda-specialized callee inherit these:

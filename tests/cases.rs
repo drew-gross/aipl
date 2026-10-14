@@ -21,55 +21,24 @@
 //!                          to fail to compile; mutually exclusive with
 //!                          stdout/stderr/exit code.
 //!   `--- report ---`     — expected `aipl report` for the case, as that command prints
-//!                          it: the same measurement as `performance` in the form a
-//!                          person reads (aligned counts, the peak of live heap, a
-//!                          table of functions). Optional, and for the properties
-//!                          the function list shows — an instance that was not
-//!                          minted, a call inlined away. Refreshed by `fill_expected`
-//!                          where it is present, never added. Mutually exclusive
-//!                          with `errors`.
-//!   `--- performance ---`— expected accounting for a successful run, six
-//!                          lines: `allocations: N`,
-//!                          `deallocations: M`, `reallocations: K`,
-//!                          `bytes allocated: B`, `instructions executed: I`
-//!                          (CLIF instructions executed), and `binary size: S`
-//!                          (bytes of the compiler-emitted object code), which
-//!                          breaks down into `code`/`data`/`metadata`. The
-//!                          harness builds a separate instrumented object, links
-//!                          it against the instrumented runtime, runs it, and
-//!                          checks the tallies (binary size is measured from the
-//!                          non-instrumented object).
-//!                          A `functions:` block then lists every function the
-//!                          program ran or emitted code for — compiled AIPL
-//!                          functions and runtime builtins in one list — each
-//!                          with the two numbers that only make sense together:
-//!                          `calls:` (times entered) and `bytes:` (code size in
-//!                          this object). A builtin is linked in from the runtime
-//!                          and has no code here, so it reports
-//!                          `bytes: (external)` rather than a misleading 0; a
-//!                          function emitted but never called reports 0 calls,
-//!                          which *is* a real count. The byte side doubles as
-//!                          the list of
-//!                          instances monomorphization emitted, so a change in
-//!                          what gets specialized shows up as a diff here.
-//!                          Mutually exclusive with `errors`. OPTIONAL: a case that
-//!                          tests behavior pins nothing here. It is kept for the
-//!                          large programs, where it stands in for a whole-compiler
-//!                          metric; the properties an optimization is *for* are
-//!                          stated by a `.performance` block (allocations,
-//!                          instructions) or a `--- report ---` section (which
-//!                          functions were called), where they read as claims.
-//!                          Refreshed by `fill_expected` where present, never
-//!                          added. For a *library* case (no `main`), it measures
-//!                          the `.test` run instead — see below.
+//!                          it: aligned counts, the peak of live heap, a table of
+//!                          functions. Optional, and for the properties the function
+//!                          list shows — an instance that was not minted, a call
+//!                          inlined away. Refreshed by `fill_expected` where it is
+//!                          present, never added. Mutually exclusive with `errors`.
+//!                          (There is no `--- performance ---` any more: a case's
+//!                          counts are its row in `tests/performance_metrics.md`,
+//!                          and the properties an optimization is *for* are stated
+//!                          by a `.performance` block or a `--- report ---`.)
 //!
 //! Every running case is also *measured*, whatever sections it has, and refused if
 //! it leaks (allocations != deallocations): the leak gate is not a side effect of
-//! comparing `performance` or `report`, and applies to the exempt `examples/` too.
+//! comparing `report`, and applies to the exempt `examples/` too.
 //!
 //! A case need not define `main`. A *library* case has `.test` blocks but no
-//! `main`: it's exercised only through `aipl check`, and its `--- performance ---`
-//! measures that test run (the harness AOT-builds the synthesized `.test` driver).
+//! `main`: it's exercised only through `aipl check`, and its baseline row and
+//! `report` measure that test run (the harness AOT-builds the synthesized `.test`
+//! driver).
 //! Such a case can't have a `stdout`/`stderr`/`exit code`/`cli`/`expect file`
 //! section, since those observe a `main`-driven run.
 //!   `--- check ---`      — expected stdout of `aipl check` (the in-language
@@ -114,7 +83,7 @@
 //! test` skips them; opt in by name):
 //!   - `cargo test --test cases -- --ignored fill_expected` — in a single pass,
 //!     overwrite every section that differs (`stdout`/`stderr`/`exit code`/
-//!     `performance`/`check`/`errors`/`expect file`) with the
+//!     `report`/`check`/`errors`/`expect file`) with the
 //!     actual output. Set `AIPL_CASE` to a path substring — or a comma-separated
 //!     list of them — to target a subset; this is the one mode that still reads
 //!     it, since it is a single test and libtest's filter can't reach inside it.
@@ -135,7 +104,7 @@
 //! `cargo handoff` runs everything else to the end and then fails with the list.
 //!
 //! Each diverges (fails) when done so its summary is visible. The relevant
-//! failure messages (e.g. a `performance` mismatch) name the command to run.
+//! failure messages (e.g. a `report` mismatch) name the command to run.
 //!
 //! Trailing newlines on each section are stripped — a section that
 //! contains a single line of text is just that text, not text+`\n`.
@@ -154,7 +123,7 @@ use aipl::perf::{self, PerfStats};
 use aipl::{DebugOptions, Error};
 
 /// The command that runs the ignored section-refresh helper ([`fill_expected`]).
-/// Surfaced in failure messages so a stale `--- performance ---`/`errors`/`check`
+/// Surfaced in failure messages so a stale `--- report ---`/`errors`/`check`
 /// section tells you exactly how to re-record it.
 const FILL_CMD: &str = "cargo test --test cases -- --ignored fill_expected";
 
@@ -210,9 +179,6 @@ struct Spec {
     stderr: Option<String>,
     exit_code: Option<i32>,
     errors: Option<String>,
-    /// Expected allocation accounting, as the raw `--- performance ---` body
-    /// (e.g. `allocations: 3\ndeallocations: 3`). `None` means the case is not perf-checked.
-    performance: Option<String>,
     /// Expected `aipl report` for the case — the readable form of the same run,
     /// compared as written and refilled only when the section is already there.
     report: Option<String>,
@@ -254,7 +220,6 @@ fn parse_spec(contents: &str) -> Spec {
         stderr: f.stderr,
         exit_code: f.exit_code,
         errors: f.errors,
-        performance: f.performance,
         report: f.report,
         cli: f.cli,
         check: f.check,
@@ -335,7 +300,7 @@ macro_rules! check_section {
 /// is a failure, with it on it is recorded here instead. Batching is the point
 /// — [`flush`](Fills::flush) costs one read, one walk of the file and one write
 /// for the whole case, where rewriting per section paid for all three once per
-/// stale section (and a case whose `stdout`, `exit code` and `performance` all
+/// stale section (and a case whose `stdout`, `exit code` and `report` all
 /// moved is the common shape after a codegen change).
 struct Fills {
     enabled: bool,
@@ -475,10 +440,9 @@ fn case_display((path, root, prefix, _): &CaseFile) -> String {
 /// collide on one test name.
 /// The leak gate runs for a case that pins nothing.
 ///
-/// `examples/arrays` has neither a `--- performance ---` nor a `--- report ---`
-/// section (examples are exempt from the first), and the gate must hold it to
+/// `examples/arrays` has no `--- report ---` section, and the gate must hold it to
 /// freeing what it allocates all the same: it used to run only as a side effect of
-/// comparing a section, which stops being true the day a section becomes optional.
+/// comparing a section, which is no longer a thing a case needs to have.
 ///
 /// Nothing in the language can leak on purpose, so the instrumented runtime has a
 /// test switch that stops counting frees (`AIPL_INJECT_LEAK`). It is set on a
@@ -491,7 +455,7 @@ fn the_leak_gate_runs_for_a_case_with_no_sections() {
             .expect("read the example"),
     );
     assert!(
-        spec.performance.is_none() && spec.report.is_none(),
+        spec.report.is_none(),
         "this test needs a case that pins nothing"
     );
 
@@ -596,7 +560,7 @@ fn every_case_has_a_test() {
 // -- --list`/`--ignored` output.
 
 /// Author helper: in one pass, rewrite every section whose body differs from the
-/// actual output — `stdout` / `stderr` / `exit code` / `performance` /
+/// actual output — `stdout` / `stderr` / `exit code` / `report` /
 /// `check` / `errors` / `expect file`. No `?` placeholder
 /// or repeated runs are needed; a single pass refreshes all sections of every
 /// case. Set `AIPL_CASE` to target a subset. Run with:
@@ -703,8 +667,7 @@ fn run_perfmon() {
 ///     `import`s resolve.
 ///   - `crates/**/*.aipl` — the compiler-dogfooded helpers (`add`, `count_while`,
 ///     `dedent`, `process_raw_string`, …), loaded in place. Run as library cases:
-///     their `.test` blocks are verified and their `--- performance ---` section, if
-///     they have one, is asserted.
+///     their `.test` blocks are verified and their baseline row is asserted.
 fn collect_all_cases(cases_root: &Path, examples_root: &Path, crates_root: &Path) -> Vec<CaseFile> {
     let mut cases = Vec::new();
     collect_cases(cases_root, &mut cases);
@@ -971,11 +934,6 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
         if spec.stdout.is_some() || spec.stderr.is_some() || spec.exit_code.is_some() {
             return Outcome::Fail(format!(
                 "{ctx}: `errors` section is mutually exclusive with stdout/stderr/exit code"
-            ));
-        }
-        if spec.performance.is_some() {
-            return Outcome::Fail(format!(
-                "{ctx}: `performance` section requires a running program, so it cannot coexist with `errors`"
             ));
         }
         if spec.report.is_some() {
@@ -1662,7 +1620,7 @@ fn run_success_case(
         }
     };
     // A *library* case has `.test` blocks but no `main`: it's exercised only
-    // through `aipl check` (below), and its `--- performance ---` measures that
+    // through `aipl check` (below), and its baseline row and `report` measure that
     // test run. Behavior sections (which observe a run's stdout/exit/files) need a
     // `main` to drive them.
     let has_main = program
@@ -1687,7 +1645,7 @@ fn run_success_case(
     let measured = perf::measured_program(&program);
     // The object used for behavior checks (and the basis for `aipl build`) is
     // *not* instrumented — production runs carry no instruction-counter overhead.
-    // The `--- performance ---` check builds its own instrumented object below.
+    // The measurement builds its own instrumented object below.
     let obj_comp = match ObjectCompilation::new(&measured, stem, debug_opts(), false) {
         Ok(c) => c,
         Err(e) => {
@@ -1698,7 +1656,7 @@ fn run_success_case(
         }
     };
     // What the object's symbols are called in AIPL, for the per-function `code`
-    // breakdown in `--- performance ---`. Read before `emit` consumes `obj_comp`.
+    // breakdown in the `report`. Read before `emit` consumes `obj_comp`.
     let symbol_names = obj_comp.code_symbol_names();
     let obj_bytes = match obj_comp.emit() {
         Ok(b) => b,
@@ -1838,13 +1796,10 @@ fn run_success_case(
     // **Every running case is measured, whether or not it pins anything**: the run
     // is what the leak gate needs, and the gate is the one check here that has
     // found real bugs, so it must not depend on a case having a section to compare.
-    // (That used to be true by accident — `performance` was required on every case
-    // but the examples — and would have stopped being true the moment it became
-    // optional, which it now is.)
-    // What is *compared* is still only what the case asks for. `report` is the same
-    // measurement in the form a person reads, so a case that pins either, or both,
-    // is measured once.
-    let performance = spec.performance.as_deref();
+    // (That used to be true by accident — a `performance` section was required on
+    // every case but the examples.)
+    // What is *compared* is the case's row in the metrics table, and its `report`
+    // where it pins one: one measurement serves both.
     check_section!(run_performance_check(
         ctx,
         orig_path,
@@ -1852,7 +1807,6 @@ fn run_success_case(
         stem,
         spec,
         case_dir,
-        performance,
         spec.report.as_deref(),
         &obj_bytes,
         &symbol_names,
@@ -1865,10 +1819,10 @@ fn run_success_case(
 
 /// Measure the case (see [`perf::measure`]: an instrumented build, linked against
 /// the instrumented runtime and run once), refuse it if it leaks, and verify, or
-/// fill in, the expected counts from a `--- performance ---` section and/or the
-/// `--- report ---` section, each only when asked for (`Some`).
+/// fill in, the `--- report ---` section when the case has one (`Some`), and hold
+/// the counts to the case's row in the metrics table.
 ///
-/// The leak gate is not one of those: it runs for every case, section or no
+/// The leak gate does not depend on either: it runs for every case, section or no
 /// section. The instrumented object is separate from the behavior-check one so
 /// production/JIT runs carry no counter overhead.
 #[allow(clippy::too_many_arguments)]
@@ -1879,7 +1833,6 @@ fn run_performance_check(
     stem: &str,
     spec: &Spec,
     case_dir: &Path,
-    performance: Option<&str>,
     report: Option<&str>,
     production: &[u8],
     symbol_names: &HashMap<String, String>,
@@ -1907,9 +1860,9 @@ fn run_performance_check(
     // even in fill mode so `fill_expected` cannot bake in a leak, and with no
     // section to refresh there is nothing to say about counts afterwards.
     if actual.allocations != actual.deallocations {
-        let then = if performance.is_some() || report.is_some() {
+        let then = if report.is_some() {
             format!(
-                "Fix the leak, then re-run `{}` to refresh the expected counts.",
+                "Fix the leak, then re-run `{}` to refresh the report.",
                 scoped_fill_cmd(ctx)
             )
         } else {
@@ -1921,24 +1874,6 @@ fn run_performance_check(
         ));
     }
 
-    if let Some(expected_body) = performance {
-        // A malformed (or `?`) expected body never parses, so it can't equal the
-        // rendered actual — it's treated as an ordinary mismatch (a normal run
-        // fails; fill mode overwrites it). Comparing on the rendered string keeps
-        // `check_or_fill`'s "differs ⇒ refresh/fail" contract uniform across
-        // sections.
-        let expected_render = match PerfStats::parse(expected_body) {
-            Some(v) => v.render(),
-            None => String::new(),
-        };
-        check_section!(check_or_fill(
-            fills,
-            ctx,
-            "performance",
-            &actual.render(),
-            &expected_render,
-        ));
-    }
     let report = match report {
         // A section body has its trailing newlines stripped, and a report ends in
         // one. Compared as written: it is text a reader is meant to read.

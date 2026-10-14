@@ -475,7 +475,7 @@ not a hypothetical: constant folding did exactly that, correctly, and voided the
 subject of twenty-eight cases at once. Every one still passed, because what they
 asserted was the content, and only the representation had changed — so the suite
 reported nothing, and the only clue was a shifted allocation count in a
-`--- performance ---` section that a refill would have absorbed.
+`--- performance ---` section (since retired) that a refill would have absorbed.
 
 **That is the failure mode the principle is about.** A trick is a claim the
 compiler does not check and the name does not state, so nothing defends it.

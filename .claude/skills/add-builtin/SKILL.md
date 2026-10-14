@@ -87,8 +87,8 @@ whose body lives in Rust; the `.aipl` file is the source of the signature for
 these, fed to the checker by `aipl_mono::aipl_builtin_sig_decls()`.
 
 Nothing else needs touching. The per-case `#[test]` list
-(`tests/support/case_tests.rs`), the `--- performance ---` section every `.aipl`
-under `crates/` needs as a discovered case, and any IR regeneration are all
+(`tests/support/case_tests.rs`), the row in `tests/performance_metrics.md` every new
+case needs (handoff adds it), and any IR regeneration are all
 `cargo handoff`'s job — don't hand-drive them.
 
 **If AIPL can't express it** (raw memory, a new runtime call), the path is
@@ -105,10 +105,10 @@ the shape that motivated `find_if`, and converting it proved the lambda captured
 two outer bindings fine). Add a `tests/cases/` case for the builtin as user code
 too — `tests/cases/lambdas/<name>.aipl` for a higher-order one.
 
-Expect the conversion to show up in perf sections as a new
-`__builtin_<name>$…$lam<N>` entry and a small instruction-count shift in every
-case that transitively compiles the converted file. That's the refill handoff
-does, not a regression.
+Expect the conversion to show up as a small instruction-count shift in every
+case that transitively compiles the converted file. Handoff lists those as moved
+baseline rows and exits 1: review them, then accept with the command it prints.
+That is the expected cost of the conversion, not a regression.
 
 ## 4. Lint against ad-hoc reimplementations
 
@@ -198,6 +198,7 @@ turns out to be unsquelchable.
 ## 5. Finish
 
 `cargo handoff`, once, at the end. Expect it to regenerate the case `#[test]`
-list and refill `--- performance ---` widely. Then review the diff and confirm
-every changed line is a metric or a rendered line number — no `--- stdout ---` or
-error *message* body should move.
+list and add a baseline row for each new case. If it exits 1 listing moved
+baseline rows, review them (a builtin that was meant to be free should not move
+them), then accept with the command it prints. Confirm no `--- stdout ---` or
+error *message* body moved.

@@ -10,7 +10,7 @@
 # literal would be inline and have nothing to release). Released outermost
 # first, `self` went before `op`, and `op`'s release then read its pointer out
 # of freed memory and never reached the buffer: one allocation leaked per `^`.
-# The `--- performance ---` section is the assertion — allocations and
+# The leak gate is the assertion — allocations and
 # deallocations agree.
 
 import {

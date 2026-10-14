@@ -805,7 +805,7 @@ fn check_cmd(args: &[String]) -> ExitCode {
 /// `report <file.aipl> [--machine] [-- args...]` — run the file once in the
 /// instrumented build and print what it cost.
 ///
-/// What it runs is what the cases harness measures for `--- performance ---`: the
+/// What it runs is what the cases harness measures for the baseline table: the
 /// file's `main`, or for a library with only `.test` blocks the synthesized test
 /// driver (so the report is of the same run `aipl check` makes, minus
 /// `.performance` blocks). It is built and run the way `check` stages a file —
@@ -958,7 +958,7 @@ fn doc_cmd(args: &[String]) -> Result<(), String> {
     let file = args.first().ok_or("missing source file")?;
     let src = std::fs::read_to_string(file).map_err(|e| format!("{file}: {e}"))?;
     // Strip any trailing `--- .. ---` harness sections (some `.aipl` files carry
-    // a `--- performance ---` block) so the source parses on its own.
+    // a `--- stdout ---` block) so the source parses on its own.
     let stripped = aipl::strip_test_sections(&src);
     let program = aipl::parse(stripped).map_err(|e| e.render(stripped, file))?;
     // The file's own documentation leads, under the file's name — it is about

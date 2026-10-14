@@ -176,7 +176,7 @@ impl Run {
     /// `memory leak` is here despite its message *naming* `fill_expected` ("re-run
     /// `…` to refresh the expected counts"), which is what makes it read as
     /// fillable staleness. It isn't: the harness runs the leak gate even in fill
-    /// mode, precisely so a refill cannot bake a leak into a `--- performance ---`
+    /// mode, precisely so a refill cannot bake a leak into a `--- report ---`
     /// section, so a refill fails on it too. Without this alternative the failure
     /// fell through every net — `hard_failures` excludes each `cases_*` test by
     /// name, and [`Run::plan`]'s case regex wants `` `section` mismatch `` — and
@@ -727,12 +727,12 @@ mod tests {
         let run = run(&[
             (
                 "cases_strings_slice",
-                "[cases/strings/slice]: `performance` mismatch\n\
+                "[cases/strings/slice]: `report` mismatch\n\
                  [cases/strings/slice]: `stdout` mismatch",
             ),
             (
                 "cases_arrays_take",
-                "[cases/arrays/take]: `report` mismatch",
+                "[cases/arrays/take]: `errors` mismatch",
             ),
         ]);
         let plan = run.plan();
@@ -743,7 +743,7 @@ mod tests {
             plan.fail_cases,
             ["cases/arrays/take", "cases/strings/slice"]
         );
-        assert_eq!(plan.changed_sections, ["performance", "report", "stdout"]);
+        assert_eq!(plan.changed_sections, ["errors", "report", "stdout"]);
         assert!(plan.behavioral_changed);
     }
 
@@ -751,7 +751,7 @@ mod tests {
     fn a_metrics_only_refill_is_not_behavioral() {
         let plan = run(&[(
             "cases_strings_slice",
-            "[cases/strings/slice]: `performance` mismatch",
+            "[cases/strings/slice]: `report` mismatch",
         )])
         .plan();
         assert!(plan.need_fill);

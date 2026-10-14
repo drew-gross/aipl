@@ -13,7 +13,7 @@
 //! arguments, its two output forms, and what it refuses.
 //!
 //! The binary sizes written out below are this platform's, as the corpus's own
-//! `--- performance ---` sections are, and move with codegen the same way.
+//! baseline table is, and move with codegen the same way.
 
 use std::fs;
 use std::path::PathBuf;

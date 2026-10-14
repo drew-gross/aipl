@@ -650,7 +650,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/doc | 310 | 21469 | 4705 | 34415 | 24020 | 37.00 | 168.72 | 1552 |
 | crates/aipl-codegen/src/ebnf | 1601 | 179997 | 25112 | 269368 | 118340 | 179.00 | 750.74 | 1856 |
 | crates/aipl-codegen/src/expr | 217 | 16480 | 15171 | 11618 | 57476 | 29.00 | 245.00 | 1616 |
-| crates/aipl-codegen/src/fill_or_add_sections | 133 | 10771 | 6479 | 34785 | 11612 | 24.00 | 101.74 | 1504 |
+| crates/aipl-codegen/src/fill_or_add_sections | 133 | 10761 | 6469 | 34617 | 11592 | 22.00 | 280.22 | 1520 |
 | crates/aipl-codegen/src/fill_or_add_sections_file | 2 | 108 | 108 | 135 | 6712 | 8.00 | 100.38 | 1520 |
 | crates/aipl-codegen/src/find_files | 19 | 1096 | 1040 | 1841 | 6544 | 11.00 | 84.96 | 1520 |
 | crates/aipl-codegen/src/find_trailing_whitespace | 0 | 0 | 0 | 6230 | 2488 | 2.00 | 86.09 | 1440 |
@@ -674,8 +674,8 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/normalize_output | 16 | 880 | 143 | 2750 | 1968 | 5.00 | 80.95 | 1456 |
 | crates/aipl-codegen/src/operator_named_forms | 16 | 1040 | 1040 | 3288 | 8980 | 5.00 | 83.51 | 1472 |
 | crates/aipl-codegen/src/parse | 5529 | 706844 | 87647 | 2414752 | 512404 | 649.00 | 2885.79 | 2592 |
-| crates/aipl-codegen/src/parse_spec | 147 | 4232 | 2204 | 79085 | 128448 | 36.00 | 176.64 | 1616 |
-| crates/aipl-codegen/src/parse_test_section_header | 0 | 0 | 0 | 1472 | 3364 | 4.00 | 84.12 | 1456 |
+| crates/aipl-codegen/src/parse_spec | 147 | 4236 | 2155 | 74079 | 111236 | 35.00 | 577.15 | 1584 |
+| crates/aipl-codegen/src/parse_test_section_header | 0 | 0 | 0 | 1472 | 3344 | 3.00 | 81.32 | 1456 |
 | crates/aipl-codegen/src/parsed | 40 | 2981 | 2521 | 2327 | 49984 | 11.00 | 1272.26 | 1552 |
 | crates/aipl-codegen/src/pat | 142 | 10961 | 3782 | 10771 | 69736 | 26.00 | 243.62 | 1632 |
 | crates/aipl-codegen/src/prim | 0 | 0 | 0 | 941 | 2648 | 2.00 | 81.79 | 1456 |

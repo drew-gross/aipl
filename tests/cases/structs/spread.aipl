@@ -18,7 +18,7 @@ struct Box<T> { value: T, tag: i64 }
 
 // A struct whose fields own heap: the spread reads each one, so `base` and the
 // derived value are both alive afterwards and each owns its reference. The
-// `--- performance ---` section is the real assertion — every allocation is
+// leak gate is the real assertion — every allocation is
 // freed exactly once.
 struct Rec { name: str, tags: str[], n: i64 }
 

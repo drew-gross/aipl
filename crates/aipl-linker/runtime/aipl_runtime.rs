@@ -60,7 +60,7 @@ pub unsafe extern "C" fn rust_eh_personality() -> ! {
 // Every heap allocation/free the runtime makes goes through `rt_alloc`/
 // `rt_free` rather than `malloc`/`free` directly. In the default build these
 // are zero-cost forwarders. In the instrumented variant (`--cfg aipl_instrument`,
-// linked by the test harness's `--- performance ---` checks) they tally call
+// linked for `aipl report`, `measure` and the cases harness) they tally call
 // counts, which `main` reports at exit. Only the runtime's own allocations are
 // counted — libc-internal allocations (e.g. inside `fopen`) bypass these.
 
@@ -125,7 +125,7 @@ mod builtin_calls {
     /// ever bumped by a `count_builtin!` at the entry point itself. The shared
     /// modules (`str24`, `arr24`, `array_ops`) have no host-specific counter to
     /// reach, so their entry points are not here — nor do they show in a
-    /// `--- performance ---` breakdown.
+    /// `aipl report` breakdown.
     pub const NAMES: &[&[u8]] = &[
         b"aipl_arr_inc\0",
         b"aipl_array_dec\0",
@@ -1691,10 +1691,10 @@ pub extern "C" fn main(argc: c_int, argv: *const *const c_char) -> c_int {
 //   functions:
 //     <name>:               (one entry per function that ran, AIPL or builtin)
 //       calls: <n>
-// The test harness reads this back to verify a case's `--- performance ---`
-// section. What it writes is that section minus the two things only the harness
-// can measure: the `binary size` block, and each function's `bytes:` line (read
-// from the object's symbols, which is also where functions that were *emitted
+// `aipl report`, `measure` and the cases harness read this back. What it writes
+// is the report minus the two things only the compiler side can measure: the
+// `binary size` block, and each function's `bytes:` line (read from the
+// object's symbols, which is also where functions that were *emitted
 // but never called* come from). The entries are written in no particular order —
 // builtins first, then the pointer-hashed AIPL table — because the harness sorts
 // the merged list by name anyway.
@@ -2007,7 +2007,7 @@ pub extern "C" fn aipl_measure_read(which: i64) -> i64 {
 // build of a synthesized test driver:
 //
 //   - a *library* case's driver, which the cases harness builds to measure
-//     `--- performance ---`: it only needs the pass/fail tally, and failures were
+//     its run for the baseline table: it only needs the pass/fail tally, and failures were
 //     already diagnosed by `aipl check`, so by default nothing is printed;
 //   - a file's `.performance` blocks, which `aipl check` must run in an
 //     instrumented build (their counts exist nowhere else) and so cannot hand to

@@ -69,7 +69,7 @@ fn append_missing(out: str, pending: #{str: str}) -> str {
 # as a fresh block. Everything else is preserved verbatim.
 #
 # The whole batch costs one walk, which is the point: a case whose `stdout`,
-# `exit code` and `performance` all went stale is read, rewritten and written
+# `exit code` and `report` all went stale is read, rewritten and written
 # back once rather than three times.
 pub fn fill_or_add_sections(contents: str, fills: #{str: str}) -> str {
     // Walk `contents` line by line (matching Rust's `str::lines()`: no line
@@ -259,19 +259,19 @@ pub fn fill_or_add_sections(contents: str, fills: #{str: str}) -> str {
             old out
             --- exit code ---
             0
-            --- performance ---
-            old perf
+            --- report ---
+            old report
 
         """,
-        #{"performance": "new perf", "stdout": "new out"},
+        #{"report": "new report", "stdout": "new out"},
     ) == """
         code
         --- stdout ---
         new out
         --- exit code ---
         0
-        --- performance ---
-        new perf
+        --- report ---
+        new report
 
     """);
 
@@ -284,12 +284,12 @@ pub fn fill_or_add_sections(contents: str, fills: #{str: str}) -> str {
             old
 
         """,
-        #{"stdout": "new", "performance": "allocations: 0"},
+        #{"stdout": "new", "report": "allocations: 0"},
     ) == """
         code
         --- stdout ---
         new
-        --- performance ---
+        --- report ---
         allocations: 0
 
     """);
@@ -304,56 +304,3 @@ pub fn fill_or_add_sections(contents: str, fills: #{str: str}) -> str {
 
     """);
 })
---- performance ---
-allocations: 133
-deallocations: 133
-reallocations: 0
-bytes allocated: 10771
-instructions executed: 34785
-binary size: 23096
-  code: 11612
-  data: 4131
-  metadata: 7353
-functions:
-  __dict_drop_str$str:
-    calls: 29
-    bytes: 136
-  __dict_retain_str$str:
-    calls: 24
-    bytes: 136
-  __test$fill_or_add_sections:
-    calls: 1
-    bytes: 5820
-  aipl_arr_inc:
-    calls: 220
-    bytes: (external)
-  aipl_array_dec:
-    calls: 233
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 13
-    bytes: (external)
-  aipl_assert:
-    calls: 14
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 16
-    bytes: (external)
-  fill_or_add_sections:
-    calls: 14
-    bytes: 2556
-  main:
-    calls: 1
-    bytes: 128
-  step:
-    calls: 36
-    bytes: 2836

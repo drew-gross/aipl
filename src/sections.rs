@@ -18,9 +18,9 @@
 //! | `expect file: p` | the file `p` the run left in its working directory |
 //!
 //! `--- file: p ---` companions are not expectations; they are staged beside the
-//! file by the caller so imports and fixtures resolve. `performance`, `check` and
-//! `check exit code` are not read at all: the first belongs to the cases harness,
-//! and the other two pin a run of `check` itself.
+//! file by the caller so imports and fixtures resolve. `check` and `check exit code`
+//! are not read at all: they pin a run of `check` itself, which the cases harness
+//! compares.
 
 use std::fs;
 use std::path::Path;
@@ -87,11 +87,6 @@ pub fn conflicts(spec: &SpecFields) -> Vec<Finding> {
     let mut found = Vec::new();
     if spec.stdout.is_some() || spec.stderr.is_some() || spec.exit_code.is_some() {
         found.push("`errors` section is mutually exclusive with stdout/stderr/exit code");
-    }
-    if spec.performance.is_some() {
-        found.push(
-            "`performance` section requires a running program, so it cannot coexist with `errors`",
-        );
     }
     if spec.report.is_some() {
         found.push(

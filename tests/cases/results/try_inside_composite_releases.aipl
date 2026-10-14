@@ -11,7 +11,7 @@
 # which is exactly why `[a, f()?]` never leaked while `S { a, n: f()? }` did —
 # and is where the two-phase shape was borrowed from.
 #
-# What proves it is the `--- performance ---` section below: allocations must
+# What proves it is the leak gate, which every case runs: allocations must
 # equal deallocations. Each function is called on the *failing* path, with a
 # heap-allocated value already in place ahead of the `?`.
 

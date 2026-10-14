@@ -53,7 +53,7 @@ mod array_layout;
 
 /// Allocation for the shared `str` layout. Each runtime supplies its own, so
 /// each keeps its own accounting: this side forwards to libc, and the AOT copy
-/// tallies counts and bytes for `--- performance ---` under
+/// tallies counts and bytes for `aipl report` and `measure` under
 /// `--cfg aipl_instrument`. Same names and signatures on both sides — that is
 /// what lets `str24.rs` call them without knowing which runtime it is in.
 unsafe fn rt_alloc(size: usize) -> *mut core::ffi::c_void {
@@ -2011,7 +2011,6 @@ pub fn parse_spec(src: &str) -> Result<SpecFields, String> {
                     stderr: opt_str(&f, "stderr"),
                     exit_code: opt_int(&f, "exit_code"),
                     errors: opt_str(&f, "errors"),
-                    performance: opt_str(&f, "performance"),
                     report: opt_str(&f, "report"),
                     cli: str_array(&f, "cli"),
                     check: opt_str(&f, "check"),
@@ -2038,7 +2037,6 @@ pub struct SpecFields {
     pub stderr: Option<String>,
     pub exit_code: Option<i32>,
     pub errors: Option<String>,
-    pub performance: Option<String>,
     pub report: Option<String>,
     pub cli: Vec<String>,
     pub check: Option<String>,
@@ -2164,7 +2162,7 @@ fn caret_block(source: &str, span: Span, filename: &str) -> String {
 /// (itself doing the file I/O; nothing here touches `std::fs`). Not a parser
 /// hook — only the cases test harness calls this.
 ///
-/// The batch is the point: a case whose `stdout`, `exit code` and `performance`
+/// The batch is the point: a case whose `stdout`, `exit code` and `report`
 /// all went stale is read, walked and written back **once**, not once per
 /// section. Returns `Ok(())` on success or the builtin `Error`'s message on a
 /// read/write failure — the AIPL function returns `!Error` directly, marshaled
@@ -5845,8 +5843,8 @@ impl ObjectCompilation {
     }
 
     /// Maps each defined function's *object symbol* to the AIPL-level name it
-    /// was compiled from, for the per-function `code:` breakdown in the test
-    /// harness's `--- performance ---` section (the object knows only symbols;
+    /// was compiled from, for the per-function breakdown `aipl report` prints
+    /// (the object knows only symbols;
     /// this is what turns them back into names a reader recognizes).
     ///
     /// The two differ wherever codegen renames on the way out — notably `main`,
@@ -13832,7 +13830,7 @@ struct ElemRc {
     ctr: u32,
     // Every generated helper symbol handed out so far. The names carry the type
     // they serve (`__to_str_Point`), which reads far better in a disassembly or
-    // a `--- performance ---` section than a bare counter — but two distinct
+    // an `aipl report` than a bare counter — but two distinct
     // types can mangle to one fragment (`arr[]` and the generic instance
     // `arr<arr>` both give `arr$arr`), and `Module::declare_function` hands back
     // the *same* `FuncId` for a repeated name+signature, which would silently

@@ -30,7 +30,7 @@ pub fn parse_test_section_header(line: str) -> str? {
     }
 }.test({
     // Markers: some(trimmed inner name).
-    assert(parse_test_section_header("--- performance ---") == some("performance"));
+    assert(parse_test_section_header("--- report ---") == some("report"));
     assert(parse_test_section_header("---errors---") == some("errors"));
     assert(parse_test_section_header("--- stdout ---   ") == some("stdout"));
     assert(parse_test_section_header("--- multi word ---") == some("multi word"));

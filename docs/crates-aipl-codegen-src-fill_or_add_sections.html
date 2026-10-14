@@ -41,7 +41,7 @@
           </h3>
           <pre class="signature"><code>pub fn fill_or_add_sections(contents: str, fills: #{str: str}) -&#62; str</code></pre>
 
-          <div class="doc"><p>Rewrites <code>contents</code> so that every section named in <code>fills</code> holds that fill's <code>body</code>: an existing <code>--- section ---</code> block has its old body (up to the next header line or EOF) replaced, and a section the file doesn't carry is appended as a fresh block. Everything else is preserved verbatim.</p><p>The whole batch costs one walk, which is the point: a case whose <code>stdout</code>, <code>exit code</code> and <code>performance</code> all went stale is read, rewritten and written back once rather than three times.</p></div>
+          <div class="doc"><p>Rewrites <code>contents</code> so that every section named in <code>fills</code> holds that fill's <code>body</code>: an existing <code>--- section ---</code> block has its old body (up to the next header line or EOF) replaced, and a section the file doesn't carry is appended as a fresh block. Everything else is preserved verbatim.</p><p>The whole batch costs one walk, which is the point: a case whose <code>stdout</code>, <code>exit code</code> and <code>report</code> all went stale is read, rewritten and written back once rather than three times.</p></div>
 
 
         </section>

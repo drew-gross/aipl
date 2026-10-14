@@ -23,7 +23,7 @@
 //
 // The allocator is the host's: `super::rt_alloc`, `rt_realloc` and `rt_free`,
 // which each runtime keeps so its allocation accounting (the AOT runtime's
-// instrumented build tallies them for `--- performance ---`) stays its own.
+// instrumented build tallies them for `aipl report`) stays its own.
 
 /// `[cap][refcount]` — the prefix before a buffer's content.
 pub(crate) const BUF_HEADER: usize = 16;

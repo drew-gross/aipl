@@ -8,8 +8,8 @@
 # because every argument that owns heap holds a reference of its own by then:
 # `rest` is retained for the call (a participant's boxed parameters join the
 # caller-retains/callee-releases protocol precisely so this works), and no
-# release of some *other* reference can take it. The `--- performance ---`
-# section is the second half of the assertion — every allocation is still freed
+# release of some *other* reference can take it. The leak gate
+# is the second half of the assertion — every allocation is still freed
 # exactly once, so the extra retain/release pairs balance.
 
 import { equal as ==, len, print, saturating_sub as -, to_str, wrapping_add as + } from builtins;

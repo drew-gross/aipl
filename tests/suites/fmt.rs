@@ -93,7 +93,7 @@ fn all_aipl_files_stay_formatted() {
 
 /// Authoring helper: rewrite every enforced `.aipl` file in place with its
 /// canonical formatting, then fail so the run is visibly a bulk rewrite.
-/// Review the diff (and refill any `--- performance ---`/`--- errors ---`
+/// Review the diff (and refill any `--- report ---`/`--- errors ---`
 /// sections whose spans shifted) before committing.
 #[test]
 #[ignore]
@@ -119,7 +119,7 @@ fn format_corpus() {
     .count();
     panic!(
         "reformatted {changed} file(s); review the diff, refill any shifted \
-         --- performance ---/--- errors ---/--- check --- sections \
+         --- report ---/--- errors ---/--- check --- sections \
          (`fill_expected`) and regenerate dogfood IR (`fill_dogfood_ir`), \
          then re-run the suite (this run fails intentionally)"
     );

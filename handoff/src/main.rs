@@ -259,7 +259,7 @@ fn final_run_scope(repo: &Path, plan: &discovery::Plan) -> Option<Vec<String>> {
 /// What is *not* a hazard, and is the reason this is worth doing at all: a
 /// refill rewrites only a case's own trailing `--- section ---` blocks, and
 /// `aipl_parser::parse_with_allows` strips those from every file it parses —
-/// imports included. So refilling `ty.aipl`'s `--- performance ---` cannot
+/// imports included. So refilling `ty.aipl`'s `--- stdout ---` cannot
 /// change what `grammar_aipl.aipl` compiles to, even though it imports it.
 /// `fill_docs` is likewise harmless: nothing under `docs/` is a case input, and
 /// the test that reads it is not a per-case test, so it runs regardless. So is
@@ -581,7 +581,7 @@ or discard it
 
     // `--no-fail-fast` so this executes *every* test and reports all remediable
     // staleness in one pass. Stopping at the first failure would be actively
-    // wrong here: a change that makes both the per-case `--- performance ---`
+    // wrong here: a change that makes both the per-case `--- report ---`
     // sections and the dogfood artifact stale would cancel inside `cases`, `need_ir`
     // would stay false, the staged-IR regen (step 5) would be skipped, and the
     // final run would then fail on `checked_in_ir_is_current` with the IR never

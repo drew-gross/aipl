@@ -23,7 +23,7 @@
 // Two things the host provides, and the reason the file needs no `cfg` of its
 // own: `super::rt_alloc` / `super::rt_free` (so each runtime keeps its own
 // allocation accounting — the AOT's instrumented build tallies them for
-// `--- performance ---`), and the I/O wrappers, which differ genuinely (`std::io`
+// `aipl report`), and the I/O wrappers, which differ genuinely (`std::io`
 // against `libc`) and live in each host.
 //
 // # The value

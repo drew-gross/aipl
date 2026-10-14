@@ -24,11 +24,28 @@
 # receivers at once. Drop any one of the three and the fold compiled correctly
 # while never reaching the path.
 #
+# What the fold saves is the array between `f` and the receiver. The `.performance`
+# block on `appended` measures it: the same row costs what the `match` it is
+# rewritten to costs, one allocation (the receiver growing), where a version that
+# has to keep the optional's result builds a second.
+#
 # Each case prints the receiver's whole *contents* rather than its length: a
 # mis-accounted reference reads back as a plausible-looking array, and a count
 # was exactly what made the first failure look like an arithmetic bug.
 
-import { extend, join, map, print, value_or, wrapping_add as + } from builtins;
+import {
+    equal as ==,
+    extend,
+    join,
+    map,
+    measure,
+    not_equal as !=,
+    print,
+    push,
+    value_or,
+    wrapping_add as +,
+    wrapping_increment as ++,
+} from builtins;
 
 variant Rule<K: variant> = Then(Rule<K>[]) | Many(Rule<K>, Rule<K>?) | Leaf(Case<K>)
 
@@ -79,6 +96,67 @@ fn loud(n: i64) !prints -> i64[] {
     [n]
 }
 
+// The mapping the measured functions use. `pair` is `plain`'s alone, and stays
+// so: a second caller would stop it being inlined there, and move the case's own
+// code for no reason that has to do with the fold.
+fn twin(n: i64) -> i64[] { [n, n + 1] }
+
+// A receiver with room to spare, built outside the measured window.
+fn roomy() -> i64[] {
+    mut v: i64[] = [];
+    mut i: i64 = 0;
+    while (i != 5) {
+        set v.push(9);
+        set i++;
+    }
+    v
+}
+
+// The row, on a receiver handed in.
+fn appended(v: i64[], o: i64?) -> i64[] {
+    mut out = v;
+    set out.extend(o.map(twin).value_or([]));
+    out
+}.performance({
+    // What the fold rewrites it to, written out.
+    let folded = measure("folded", roomy(), |v| appended(v, some(3)));
+    let by_hand = measure("by hand", roomy(), |v| matched(v, some(3)));
+    assert(folded.allocations == 1);
+    assert(folded.allocations == by_hand.allocations);
+    assert(folded.bytes_allocated == by_hand.bytes_allocated);
+
+    // The optional's result is read twice, so it cannot be appended where it is
+    // produced: it exists, and so does an array for it.
+    let kept = measure("kept", roomy(), |v| keeping(v, some(3)));
+    assert(kept.allocations == 2);
+
+    // `none` builds nothing and calls nothing.
+    let nothing = measure("none", roomy(), |v| appended(v, none));
+    assert(nothing.allocations == 0);
+    assert(
+        nothing.instructions == measure("none by hand", roomy(), |v| matched(v, none)).instructions,
+    );
+})
+
+fn matched(v: i64[], o: i64?) -> i64[] {
+    mut out = v;
+    match (o) {
+        some(x) => {
+            set out.extend(twin(x));
+        },
+        none => {},
+    };
+    out
+}
+
+fn keeping(v: i64[], o: i64?) -> i64[] {
+    mut out = v;
+    let extra = o.map(twin).value_or([]);
+    set out.extend(extra);
+    set out.extend(extra);
+    out
+}
+
 fn effects(o: i64?) !prints -> i64[] {
     mut v: i64[] = [];
     set v.extend(o.map(loud).value_or([]));
@@ -124,77 +202,3 @@ fn main() !prints {
 f7
 [7]
 []
---- performance ---
-allocations: 30
-deallocations: 30
-reallocations: 2
-bytes allocated: 1445
-instructions executed: 6507
-binary size: 13976
-  code: 8988
-  data: 42
-  metadata: 4946
-functions:
-  __arr_drop_Rule$Tok:
-    calls: 2
-    bytes: 116
-  __arr_retain_Rule$Tok:
-    calls: 0
-    bytes: 116
-  __rec_drop_Rule$Tok:
-    calls: 8
-    bytes: 124
-  __to_str_i64:
-    calls: 1
-    bytes: 204
-  __to_str_i64$arr:
-    calls: 10
-    bytes: 704
-  aipl_arr_inc:
-    calls: 45
-    bytes: (external)
-  aipl_array_dec:
-    calls: 72
-    bytes: (external)
-  aipl_array_new:
-    calls: 2
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 4
-    bytes: (external)
-  aipl_i64_len:
-    calls: 46
-    bytes: (external)
-  aipl_rec_alloc:
-    calls: 8
-    bytes: (external)
-  aipl_rec_dec_strong:
-    calls: 29
-    bytes: (external)
-  aipl_rec_dec_weak:
-    calls: 9
-    bytes: (external)
-  aipl_rec_inc_strong:
-    calls: 21
-    bytes: (external)
-  aipl_rec_inc_weak:
-    calls: 9
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 33
-    bytes: (external)
-  aipl_write_i64:
-    calls: 23
-    bytes: (external)
-  effects:
-    calls: 2
-    bytes: 564
-  main:
-    calls: 1
-    bytes: 5316
-  plain:
-    calls: 2
-    bytes: 408
-  styles$into$Tok$own0:
-    calls: 18
-    bytes: 1436

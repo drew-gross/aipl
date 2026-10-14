@@ -12,7 +12,7 @@ fn clamp_low(x: i64) -> i64 {
 }
 
 // Early return out of a loop with a heap local (`log`) live at the return point —
-// the `--- performance ---` allocation/deallocation balance below confirms it's
+// the leak gate (allocations must equal deallocations) confirms it's
 // released on the early-return path (no leak, no double free).
 fn first_index_reaching(xs: i64[], limit: i64) -> str {
     mut log = "";

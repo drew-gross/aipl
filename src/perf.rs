@@ -1,5 +1,5 @@
 //! Measuring a program: the deterministic counts behind `aipl report` and the
-//! cases harness's `--- performance ---` section.
+//! cases harness's baseline table.
 //!
 //! One implementation serves both, so what the command prints and what the
 //! corpus records cannot drift apart. A measurement is two builds of the same
@@ -270,8 +270,7 @@ pub fn measure(
     Ok(stats)
 }
 
-/// Measured performance statistics for a case run. All six fields are required
-/// in a `--- performance ---` body. `instructions` is the CLIF instructions
+/// Measured performance statistics for a case run. `instructions` is the CLIF instructions
 /// executed; `binary_size` is the byte length of the compiler-emitted (non-
 /// instrumented) object — the machine code produced for the program, excluding
 /// the separately-linked runtime. All are deterministic for a fixed toolchain
@@ -286,8 +285,6 @@ pub struct PerfStats {
     pub bytes_allocated: u64,
     /// The most heap live at once over the run, in bytes the program asked for.
     ///
-    /// Not part of the `--- performance ---` body ([`PerfStats::render`]), which
-    /// predates it and is being retired; it is what `aipl report` prints, and
     /// `0` when the stats being parsed did not carry it.
     pub peak_live_bytes: u64,
     pub instructions: u64,
@@ -328,32 +325,18 @@ pub struct FnStat {
 }
 
 impl PerfStats {
-    /// The `--- performance ---` body these stats represent.
-    pub fn render(&self) -> String {
-        self.render_counts(false)
-    }
-
-    /// [`render`](PerfStats::render) plus the `peak live bytes:` line: the same
-    /// `key: value` form, which [`PerfStats::parse`] reads back whole. What a tool
-    /// that wants every count asks for, where `--- performance ---` stays as it
-    /// was.
+    /// Every count as `key: value` lines, which [`PerfStats::parse`] reads back
+    /// whole. What a tool that wants the numbers asks for (`aipl report
+    /// --machine`); [`render_report`](PerfStats::render_report) is for a person.
     pub fn render_machine(&self) -> String {
-        self.render_counts(true)
-    }
-
-    fn render_counts(&self, with_peak: bool) -> String {
-        let peak = if with_peak {
-            format!("peak live bytes: {}\n", self.peak_live_bytes)
-        } else {
-            String::new()
-        };
         let mut out = format!(
             "allocations: {}\ndeallocations: {}\nreallocations: {}\nbytes allocated: {}\n\
-             {peak}instructions executed: {}\n{}",
+             peak live bytes: {}\ninstructions executed: {}\n{}",
             self.allocations,
             self.deallocations,
             self.reallocations,
             self.bytes_allocated,
+            self.peak_live_bytes,
             self.instructions,
             self.binary_size.render(),
         );

@@ -15,7 +15,7 @@ fn answer() -> i64 { 41 }.test({
     assert(answer() == 42);
 })
 
-// A `main`, so `--- performance ---` measures it rather than the deliberately
+// A `main`, so the harness measures it rather than the deliberately
 // failing test driver (which exits non-zero before reporting its counters).
 fn main() {}
 --- check exit code ---

@@ -25,9 +25,9 @@ fn main() {
     let rustc = env::var("RUSTC").unwrap_or_else(|_| "rustc".into());
 
     // The default runtime, plus an instrumented variant that counts heap
-    // allocations/frees (built with `--cfg aipl_instrument`). The harness links
-    // the instrumented one for `--- performance ---` checks; everything else
-    // uses the default. They differ only in the crate name (so the output
+    // allocations/frees (built with `--cfg aipl_instrument`). `aipl report`, `measure` and
+    // the cases harness link the instrumented one; everything else uses the
+    // default. They differ only in the crate name (so the output
     // filenames don't collide) and the cfg flag.
     let (lib_path, lib_name) = build_runtime(&rustc, &target, &out_dir, "aipl_runtime", false);
     let (instr_path, instr_name) =

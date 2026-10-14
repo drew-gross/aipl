@@ -1,6 +1,6 @@
 # Both sides of a result can be `str` (heap). Constructing, matching, and `?`-
-# propagating them must keep refcounts balanced — the `--- performance ---`
-# alloc/dealloc counts below would diverge on a leak or double-free.
+# propagating them must keep refcounts balanced — the leak gate
+# (alloc/dealloc counts must agree) would catch a leak or double-free.
 
 import { concat as +++, equal as ==, print } from builtins;
 

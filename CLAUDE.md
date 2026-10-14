@@ -126,7 +126,7 @@ a dev-loop signal, not the handoff gate. When the change is ready, run
 **Refills scale — you don't need to hand-drive them.** `AIPL_CASE` takes a
 comma-separated list, and handoff passes every stale case in a *single*
 `fill_expected` run, so a change that invalidates hundreds of
-`--- performance ---` sections at once (a codegen change, a new baseline runtime
+`--- report ---` sections at once (a codegen change, a new baseline runtime
 call) costs one invocation rather than hundreds. This used to be the one
 sanctioned deviation from the gate: the refill loop spawned one `nextest` per
 mismatched case, and since each invocation pays a fresh-binary startup that
@@ -198,8 +198,9 @@ that does not compile, an expected file the run never wrote, or sections that
 contradict each other are still failures (and a report of a leaking run is not
 recorded). It is the user-facing version of `fill_expected` and writes through the
 same dogfooded function — but not the same set of sections: `check` does not
-validate `--- performance ---` or `--- check ---`, so `--fix` cannot refresh them,
-and the corpus's own refills (and handoff) still go through `fill_expected`.
+validate `--- check ---` (it pins a run of `check` itself), so `--fix` cannot
+refresh it, and the corpus's own refills (and handoff) still go through
+`fill_expected`.
 
 The formatter (`aipl-fmt` crate, `aipl::fmt::format_source`) is canonical
 (gofmt-style — it decides line breaks; width defaults to 100) and works off the
@@ -207,84 +208,86 @@ lexer token stream, so it preserves comments/literals verbatim and leaves
 trailing `--- section ---` blocks byte-for-byte. Reformatting moves line numbers,
 which invalidates any section holding a rendered diagnostic: refill
 `--- errors ---`/`--- check ---` sections with `fill_expected` afterward. It does
-not move `--- performance ---` on its own (see the handoff note above on
+not move a case's baseline row on its own (see the handoff note above on
 content-hashed literal symbols), and the checked-in `dogfood.clif` is renumbered
 and stays stable, so neither normally needs regenerating — the
 `checked_in_ir_is_current` test will tell you if the IR does. Fixture files under
 `tests/fmt/*.aipl` are *intentionally* misformatted inputs and are exempt from
 the enforcement test.
 
-## Performance monitoring (non-deterministic)
-Performance is tracked in two places:
-- **Deterministic, asserted.** A case says what it asserts about cost in one of
-  four ways, by what it is *for*:
+## Performance monitoring
+Performance is tracked in two places: what a case *states* about cost, and the
+baseline table, which pins what every case costs.
+
+- **What a case states.** A case says what it asserts about cost in one of three
+  ways, by what it is *for*:
 
   | the case is… | it carries |
   |---|---|
-  | a small test of behavior | nothing — no performance section, no report, no `.performance` block |
-  | a large test of behavior | a `--- performance ---` section (below) |
+  | a test of behavior | nothing — no report, no `.performance` block |
   | a small test that an optimization removes **instructions or allocations** | a `.performance` block stating it |
   | a small test that an optimization removes **calls** (or reallocations) | a `--- report ---` section |
 
-  Both optimization kinds at once get both. "Large" is a source of **100 lines or
-  more** — in practice the dogfooded compiler under `crates/`, which stand in
-  for a whole-compiler metric until there is a real one, and so keep the section
-  until then. Everything about the cost of a small behavior test is already
-  covered without a section: the leak gate runs for every case (below), and a
-  section on a case nothing depends on is only churn, refilled on every codegen
-  change. Don't add `--- performance ---` to a new small case.
+  Both optimization kinds at once get both. Everything about the *size* of a
+  behavior test's cost is already covered without a section: the leak gate runs
+  for every case (below) and the baseline table has a row for it, so a section on
+  a case nothing depends on is only churn, refilled on every codegen change. There
+  is no per-case `--- performance ---` section any more — a file that still has
+  one is refused ("the `performance` section is gone"), pointing here.
 
-  The per-case `--- performance ---` section (allocations, instructions
-  executed, binary size, and a `functions:` block giving every function's call
-  count and byte size in one list — builtins included, at `bytes: (external)`,
-  since only this object's code is measured) is **optional**. It has hard
-  assertions and is refreshed with the `fill_expected` ignored test (see below)
-  where present, never added. **To look at one, run `aipl report <file.aipl>`** — it
-  prints the same counts (plus the peak of live heap bytes, which the section does
-  not carry), the binary size split, and the `functions:` table as readable
+  **To look at what a program costs, run `aipl report <file.aipl>`** — it prints
+  the counts (allocations, bytes, the peak of live heap bytes, instructions), the
+  binary size split, and a per-function table of calls and code bytes as readable
   columns; `--machine` prints them as `key: value` lines, and `-- args` passes
   program arguments (default: the file's `--- cli ---`). It runs through
   `aipl::perf::measure`, the one implementation the harness uses, so its numbers
-  are the section's byte for byte (`tests/suites/report.rs` checks that on a spread
-  of cases), and it roots the file at its own directory for the same reason the
-  harness does: an `assert`'s file label is baked into the binary's data. It needs
-  the linker `aipl build` does, and exits 1 for a program that leaks.
+  are the baseline row's and a `--- report ---` section's byte for byte
+  (`tests/suites/report.rs` checks that on a spread of cases), and it roots the
+  file at its own directory for the same reason the harness does: an `assert`'s
+  file label is baked into the binary's data. It needs the linker `aipl build`
+  does, and exits 1 for a program that leaks.
 
   **The leak gate does not depend on any section.** Every instrumented run is held
   to freeing every block it allocates — the harness measures *every* running case
   (examples, which pin nothing, included), `aipl report` exits 1, and `aipl check`
-  fails a file whose `.performance` blocks leak. Nothing in the language can leak
-  on purpose, so the instrumented runtime has a test switch, `AIPL_INJECT_LEAK=1`,
-  that stops it counting frees; the tests that show each gate still fires use it
+  fails a file whose `.performance` blocks or `--- report ---` leak (it makes no
+  instrumented run of a file with neither, so a plain file's leak is the harness's
+  to find). Nothing in the language can leak on purpose, so the instrumented
+  runtime has a test switch, `AIPL_INJECT_LEAK=1`, that stops it counting frees;
+  the tests that show each gate still fires use it
   (`the_leak_gate_runs_for_a_case_with_no_sections` in `tests/cases.rs`, and the
   leak tests in `tests/suites/report.rs` and `check.rs`). A gate that quietly stops
   running looks exactly like a clean codebase, which is why they are tested.
 
-  **To pin one, use a `--- report ---` section**: its body is exactly what `aipl
-  report` prints for the case (aligned counts, the peak, the function table), and
-  `aipl check` validates it by running the same report, so it is both readable
-  documentation of what the program costs and refilled by handoff when codegen
-  moves — which a number written into a Rust test is not. It is for the
+  **To pin a function list, use a `--- report ---` section**: its body is exactly
+  what `aipl report` prints for the case (aligned counts, the peak, the function
+  table), and `aipl check` validates it by running the same report, so it is both
+  readable documentation of what the program costs and refilled by handoff when
+  codegen moves — which a number written into a Rust test is not. It is for the
   properties only the function list shows (an instance not minted, a call inlined
   away, a reallocation saved); reach for a `.performance` block first when
   `measure` can state the property, since a pinned report churns with every
-  codegen change that moves a size. A case with both a `--- report ---` and a
-  `--- performance ---` has two renderings of one run. Examples:
-  `tests/cases/report/`, and the fusion cases in `tests/cases/optimizations/`.
+  codegen change that moves a size. Examples: `tests/cases/report/`, and the
+  fusion cases in `tests/cases/optimizations/`.
 - **The baseline table, `tests/performance_metrics.md`** — one row for **every
-  case that runs**, whatever else it carries. Its columns come in two groups:
+  case that runs**, whatever else it carries. It is also the whole-compiler
+  metric: the dogfooded compiler's sources under `crates/` are cases like any
+  other, so a codegen change that makes the compiler slower or larger moves their
+  rows, and there is no separate harness. Its columns come in two groups:
   - *Asserted*: allocations, bytes allocated, peak live bytes, instructions and
     code bytes. Deterministic, and every case's run must reproduce its row
-    **exactly** (thresholds are undecided, so for now there are none). A case whose
-    numbers moved fails with `performance baseline moved`, naming each metric
-    (old → new, %) and the scoped command that accepts the change; a case with no
-    row fails with `performance baseline missing`. Unlike a section, this is not
-    stale text a refill can rewrite — a moved number is a thing to look at — so
-    `fill_expected` leaves it alone, and `cargo handoff` treats it differently:
-    it runs the rest of the gate to the end, then **exits 1 listing the moved
-    cases**. Review them (a change that was meant to be free is the regression
-    this exists to catch), then accept with the command it prints. A case with *no
-    row* is bookkeeping rather than a move, so handoff adds the row itself.
+    **exactly** (there are no thresholds, and none are planned: a codegen change
+    costs one changed file). A case whose numbers moved fails with `performance
+    baseline moved`, naming each metric (old → new, %) and the scoped command that
+    accepts the change; a case with no row fails with `performance baseline
+    missing`. Unlike a section, this is not stale text a refill can rewrite — a
+    moved number is a thing to look at — so `fill_expected` leaves it alone, and
+    `cargo handoff` treats it differently: it runs the rest of the gate to the
+    end, then **exits 1 listing the moved cases** (past 40 it points at the
+    whole-table refresh instead of a scoped one). Review them (a change that was
+    meant to be free is the regression this exists to catch), then accept with the
+    command it prints. A case with *no row* is bookkeeping rather than a move, so
+    handoff adds the row itself.
   - *Not asserted*: wall-clock (measured in-process, so process spawn/teardown is
     excluded), build time, and peak RSS. These drift run-to-run, so they're checked
     in only to track trends.
@@ -305,17 +308,16 @@ binaries are unaffected.
 
 The two author-helper "refresh" modes are `#[ignore]`d tests, not env vars: a
 normal `cargo test` skips them; opt in by name with `-- --ignored <name>`. The
-relevant failure messages (a missing/stale `--- performance ---` section, a
-perf mismatch, a stale perfmon table) print the exact command to run.
+relevant failure messages (a stale section, a moved or missing baseline row)
+print the exact command to run.
 
 `fill_expected` always overwrites every section with current values — no need
 to set bodies to `?` first.
 
 ## `.performance` blocks and `measure`
 A function can carry a `.performance({ .. })` block beside its `.test`, in either
-order. It is *not* the `--- performance ---` section above: that records a case's
-whole-program counts and is refilled; this is code that states a property and is
-held to it. See `PERFORMANCE_PLAN.md` for where it is going; what exists:
+order. It is not the baseline table above: that records a case's whole-program counts
+and is refreshed; this is code that states a property and is held to it. See `PERFORMANCE_PLAN.md` for where it is going; what exists:
 
 - **`measure(label, input, f) -> Measurement`** (`import { measure, Measurement }
   from builtins;`) runs `f(input)` once inside a counting window and returns
@@ -426,8 +428,8 @@ precisely because a case with no `#[test]` would otherwise never run.
 
 Note that every `.aipl` under `crates/` is *also* discovered as a case, so
 adding a dogfooded source adds a case too — it needs the same `#[test]` entry
-any case does, which handoff fills. It needs no `--- performance ---`: a small
-source tests behavior and pins nothing (see "Performance monitoring").
+any case does, which handoff fills, and a row in the baseline table, which
+handoff adds (see "Performance monitoring").
 
 ## Documentation attaches by adjacency; a detached block at the top is the file's
 A `# ..` block directly above a declaration documents it. **A blank line under a
@@ -546,9 +548,9 @@ The loader gates operator *usage* per file against its imports (unimported →
 compile error). So every new `.aipl` (test case, example, embedded compiler
 source, and each `--- file:` companion) that uses operators needs the matching
 import — and since the import shifts line numbers, refill any
-`--- errors ---`/`--- check ---` sections. `--- performance ---` does *not* need
+`--- errors ---`/`--- check ---` sections. A case's baseline row does *not* need
 one: string-literal symbols are content-hashed, so a line shift on its own leaves
-`binary size` alone.
+`code bytes` alone.
 
 When rewriting imports across the corpus, anchor the match to line start
 (`^import {`): `walker.aipl`'s formatter tests hold `"import { == } from
@@ -836,7 +838,8 @@ isn't the thing under test), write a **void** `main` — `fn main() { ... }` —
 *is* the return value (e.g. an `--- exit code ---` test, or a `main` that returns
 a computed expression being checked). This applies to new cases and to edits;
 note that switching a `main` between `-> i64 { ...; 0 }` and `{ ... }` shifts the
-`instructions executed` / `binary size` counters, so refill `--- performance ---`.
+case's baseline row (`instructions`, `code bytes`), which handoff reports as a moved
+row to accept.
 
 ## Fanout updates from test failures
 When a language change forces fixture/example edits across many files, don't

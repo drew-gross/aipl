@@ -16,8 +16,8 @@ const RUNTIME_LIB_BYTES: &[u8] = include_bytes!(env!("AIPL_RUNTIME_LIB_PATH"));
 const RUNTIME_LIB_NAME: &str = env!("AIPL_RUNTIME_LIB_NAME");
 
 /// The instrumented runtime variant, which counts heap allocations/frees and
-/// reports them at exit. Linked via [`link_instrumented`] for the test
-/// harness's `--- performance ---` checks; behaves identically otherwise.
+/// reports them at exit. Linked via [`link_instrumented`] for `aipl report`,
+/// `measure` and the cases harness; behaves identically otherwise.
 const RUNTIME_INSTR_LIB_BYTES: &[u8] = include_bytes!(env!("AIPL_RUNTIME_INSTR_LIB_PATH"));
 const RUNTIME_INSTR_LIB_NAME: &str = env!("AIPL_RUNTIME_INSTR_LIB_NAME");
 

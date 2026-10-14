@@ -4,7 +4,7 @@
 # caller's own reference. Neither function below ever keeps its argument: they
 # read it and return a number. So the pair cancels and both halves are elided
 # (`aipl_mono::inspect_only_params`), leaving the call site with no refcount
-# traffic at all. The `--- performance ---` section is the real assertion here:
+# traffic at all. The `--- report ---` section is the real assertion here:
 # `aipl_inc` never appears, and every allocation is still freed exactly once.
 #
 # The boundary: a function that *re-owns* its argument through a `mut` binding

@@ -11,16 +11,17 @@
 # the body (`let self: str = src; split(self, "\n")`), so the fusion looks
 # under that binding — which is what `numbered` below proves.
 #
-# Measured on this case with the fusion switched off: the walked splits are one
-# array allocation each (86 become 78, 5,428 bytes become 4,692) and 3,085
-# instructions become 2,411. The `functions:` list is the evidence — two
-# `aipl_array_new`, the ones `materialized` and `rewriting` build because they
-# have to, where the unfused case has ten.
+# The saving is in allocations, which the `.performance` block on `count_parts`
+# measures: a walked split costs none, where the same split built as an array is
+# one block holding a view of the source per part. With the fusion switched off
+# the walked loops below each allocated that block, and ran 3,085 instructions
+# where they now run 2,411.
 
 import {
     equal as ==,
     extend,
     len,
+    measure,
     print,
     rope_str,
     split,
@@ -80,6 +81,50 @@ fn rewriting(src: str) -> str {
     out
 }
 
+// The walk on its own, with nothing else to allocate: the cases above build a
+// string as they go, which would hide whether the split itself cost anything.
+fn count_parts(s: str, sep: str) -> u64 {
+    mut n: u64 = 0;
+    for (let part : s.split(sep)) {
+        set n++;
+    }
+    n
+}.performance({
+    let src = "the first long piece\nthe second long piece\nthe third long piece";
+
+    // Walked, the three parts cost no allocation: the cursor hands each one to
+    // the body as it cuts it.
+    let walked = measure("walked", src, |s| count_parts(s, "\n"));
+    assert(walked.allocations == 0);
+    assert(walked.bytes_allocated == 0);
+
+    // Built, the same split is one block holding the three parts.
+    let built = measure("built", src, |s| s.split("\n"));
+    assert(built.allocations == 1);
+    assert(built.bytes_allocated == 104);
+
+    // `lines` reaches the pass inlined, with its parameter bound ahead of the
+    // body, and walks all the same.
+    assert(measure("lines", src, count_lines).allocations == 0);
+
+    // A loop that leaves early abandons a cursor that owns nothing.
+    assert(
+        measure(
+            "abandoned",
+            "x\ny\n\nz\nand a good deal more after that",
+            first_blank,
+        ).allocations == 0,
+    );
+})
+
+fn count_lines(s: str) -> u64 {
+    mut n: u64 = 0;
+    for (let line : s.lines()) {
+        set n++;
+    }
+    n
+}
+
 fn main() !prints {
     print(numbered("alpha\nbeta\n\ngamma"));
     print(widths("aa--b--cccc", "--"));
@@ -114,53 +159,3 @@ some("beta") of 3
 [alpha][beta][gamma]
 0:x
 1:y
---- performance ---
-allocations: 78
-deallocations: 78
-reallocations: 0
-bytes allocated: 4692
-instructions executed: 2338
-binary size: 9904
-  code: 6136
-  data: 74
-  metadata: 3694
-functions:
-  __to_str_i64:
-    calls: 9
-    bytes: 204
-  __to_str_str$opt:
-    calls: 1
-    bytes: 460
-  __to_str_u64:
-    calls: 9
-    bytes: 204
-  aipl_array_dec:
-    calls: 2
-    bytes: (external)
-  aipl_array_new:
-    calls: 2
-    bytes: (external)
-  aipl_i64_len:
-    calls: 18
-    bytes: (external)
-  aipl_u64_len:
-    calls: 18
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 3
-    bytes: (external)
-  aipl_write_i64:
-    calls: 9
-    bytes: (external)
-  aipl_write_u64:
-    calls: 9
-    bytes: (external)
-  first_blank:
-    calls: 2
-    bytes: 272
-  main:
-    calls: 1
-    bytes: 4300
-  widths:
-    calls: 3
-    bytes: 696

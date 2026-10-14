@@ -5,6 +5,25 @@ the per-case `--- performance ---` sections. (`TODO.txt` is Drew's alone and is
 not touched by this work.) Tick a box when its item has landed in a green
 handoff, and update the design notes when a decision changes.
 
+## Outcome (2026-10-13): done
+
+The redesign has landed; what follows is the design as it was settled and the
+record of getting there. Where the result differs from the design below:
+
+- **The baseline is exact, with no thresholds.** Every case's run must reproduce its
+  row in `tests/performance_metrics.md`; with no call counts in the table, a codegen
+  change moves numbers in one file. Handoff lists the moved cases and exits 1 (so
+  both goals 1 and 3 hold, with "major" meaning "any").
+- **The whole-compiler metric is that table**, not a `.performance` block: the
+  dogfooded sources are cases with rows.
+- **`--- performance ---` is gone** (the section, its parser field, its renderer).
+- **`aipl benchmark` moved out** to `TODO.txt` as a feature of its own.
+- **`--- check ---` keeps its name**, and the harness keeps its own section logic
+  rather than delegating to `aipl check` (it still owns `performance`-style
+  baseline comparison, `--- check ---` and the fill path handoff drives).
+- A plain file with no `.performance` block and no `--- report ---` is not
+  leak-checked by `aipl check`; only the harness measures every case.
+
 ## Why
 
 The `--- performance ---` sections pin every count exactly, including a
@@ -114,10 +133,10 @@ otherwise it brings back the old churn.
 - **`refresh_perfmon` writes exact deterministic counts**, which corrects any
   drift below the threshold. It is the only thing that writes the table.
   `AIPL_CASE` scopes it to some rows, which is how one accepts specific moves.
-- Each case's test compares its measured counts with its row. A move past the
-  threshold **in either direction** fails that case and names the scoped refresh
-  command. Smaller moves pass, and the file does not change, so a tweak costs no
-  diff.
+- Each case's test compares its measured counts with its row, **exactly**. Any
+  move fails that case and names the scoped refresh command. (The design here had
+  a threshold in either direction, so a small tweak would cost no diff; Drew chose
+  exact instead, since the table is one file.)
 - Handoff treats these failures as not fillable but not fatal. It finishes every
   other remediation and the final run, then exits non-zero listing every moved
   case.
@@ -219,11 +238,10 @@ again.
       intentionally to show its summary. Shares `CaseFilter` with `fill_expected`.
       Gap: a deleted case's stale row is pruned by the next refresh of any scope,
       but nothing fails in the meantime, so handoff cannot bookkeep it yet.
-- [~] Per-case comparison with the row. **Exact match for now** (Drew: thresholds
-      undecided), so the direction does not matter and nothing is "improvement" yet.
-      `check_baseline` in `tests/cases.rs`; the message gives each metric, old →
-      new, %, and the scoped refresh command. Still open: thresholds, in both
-      directions, kept in one place.
+- [x] Per-case comparison with the row: **exact match, permanently** (Drew: thresholds
+      are deferred indefinitely; a codegen change costs one changed file, and there
+      are no call counts to churn). `check_baseline` in `tests/cases.rs`; the
+      message gives each metric, old → new, %, and the scoped refresh command.
 - [x] A case with no row fails, naming the scoped refresh.
 - [x] The leak gate stays per case — and now holds for *every* running case,
       pinned or not (`run_performance_check` always measures; it used to run only
@@ -242,15 +260,18 @@ again.
 - [x] `--- performance ---` becomes optional (the "missing required" failure is
       gone; `fill_expected` refreshes an existing section and never adds one;
       handoff no longer matches the old message).
-- [ ] Audit which cases protect a real property and keep their section until
-      Phase 4: `optimizations/`, `perf/`, `performance/`, plus the ~90 whose prose
-      cites allocations or instructions. Record the list below, marking each case
-      as expressible with `measure` or needing `--- report ---`.
-- [x] Delete the section from every other case: done for every small case, including
-      74 of the 105 under `crates/`; see the audit at the end. The 31 large
-      `crates/` sources keep it.
-- [ ] Docs: CLAUDE.md (Performance monitoring, Test `main` style, the handoff
-      notes about performance refills) and the `tests/cases.rs` module docs.
+- [x] Audit which cases protect a real property: recorded at the end of this file.
+      Superseded in part: with the whole-corpus baseline in place, the sections kept
+      for the large cases were removed too (below), so the audit's "kept" list is
+      historical.
+- [x] Delete the section from every case: done for every small case, including 74 of
+      the 105 under `crates/`; then the remaining 42 (31 under `crates/`, 11 under
+      `tests/cases/`) once the baseline table stood in for them. Support for the
+      section is dropped (Phase 4).
+- [x] Docs: CLAUDE.md (Performance monitoring, Test `main` style, the handoff
+      notes about performance refills), the add-builtin skill, and the
+      `tests/cases.rs` module docs; stale comments naming the section throughout
+      the corpus and the runtime.
 
 ### Phase 3: `.performance` and `measure` (syntax bootstrap: two handoffs)
 
@@ -345,21 +366,34 @@ again.
 
 ### Phase 4: migrate property cases, retire `--- performance ---`
 
-- [ ] Convert each audited case (list below) to `.performance` claims, or to a
+- [x] Convert each audited case (list below) to `.performance` claims, or to a
       `--- report ---` section where only the function list shows the property
-      (`*_not_minted`, inlining).
-- [ ] Remove the section kind: `Spec::performance`, `PerfStats` rendering/parsing,
-      the fill path, `EXTERNAL_BYTES`, and the docs.
+      (`*_not_minted`, inlining). Done in the Phase 2 migration (the lists at the
+      end). The three large optimization cases that lost their sections with the
+      rest — `optimizations/move_last_use`, `fold_extends_value_or`,
+      `loop_split_fusion` — got `.performance` blocks afterwards, stating what each
+      optimization is for as a comparison (a binding at its last use costs what a
+      fresh value does; the fold costs what the `match` it becomes costs; a walked
+      split allocates nothing where a built one allocates a block).
+- [x] Remove the section kind: `Spec::performance` (harness and `SpecFields`), the
+      `performance` field of the dogfooded `Spec`, `PerfStats::render` and the
+      fill path. `parse_spec` now answers a leftover `--- performance ---` with a
+      message that says where its job went. Kept, because `aipl report --machine`
+      and the runtime's stats file still use them: `PerfStats::parse`,
+      `render_machine` and `EXTERNAL_BYTES`.
 
 ### Phase 5: whole-compiler metric
 
-- [ ] `.performance` blocks on the dogfood entry points: parse (`aipl_parse_file`)
-      and format (`format_source`) over representative inputs embedded as `"""`
-      literals, which keeps them effect-free. Use absolute bounds with headroom.
-- [ ] Confirm the blocks stay out of `dogfood.o`. The source change still
-      regenerates the IR through handoff.
+- [x] **Done by the baseline table, not a `.performance` block** (Drew's call): the
+      dogfooded sources under `crates/` are cases with rows in
+      `performance_metrics.md`, held exactly, so a codegen change that makes the
+      compiler slower or larger moves them. No separate harness.
+- [-] `.performance` blocks on `aipl_parse_file` / `format_source`: dropped with it.
 
 ### Phase 6: `aipl benchmark`
+
+**Moved out of this plan** (Drew): a separate feature, tracked in `TODO.txt`. The
+design above stays as the record of what `measure`'s `label` is reserved for.
 
 - [ ] Counting pass records label → `Measurement`. The timing pass runs the
       production build and replays the recorded values by label, with warmup and
@@ -393,9 +427,7 @@ Each item below can land separately.
       - `--ignore-sections` checks the tests alone. The harness passes it until
         the harness item below makes `check` own the sections.
       - `performance`, `check` and `check exit code` are not validated by `check`.
-- [ ] Rename `--- check ---` / `--- check exit code ---` to a name that says they
-      pin the `.test` runner's report (choose when implementing) and migrate the
-      handful of cases that use them.
+- [-] Rename `--- check ---` / `--- check exit code ---`: not wanted (Drew).
 - [x] `--- report ---`: `check` validates a pinned `aipl report`. The body is the
       human form `aipl report` prints, trailing newlines stripped, compared as
       written. Landed across: `parse_spec.aipl` (`report` field; a regeneration of
@@ -409,23 +441,27 @@ Each item below can land separately.
       mandatory `--- performance ---`, so for now each pins one run twice; Phase 2
       and 4 make that section optional. The `*_not_minted` and inlining cases are
       the intended users and move over in Phase 4.
-- [ ] Leak gate: `check` flags allocations ≠ deallocations on the runs it already
-      performs. First check whether the allocation tally is cheap enough in the
-      production runtime; otherwise flag leaks only where an instrumented run
-      happens.
+- [x] Leak gate: `check` flags allocations ≠ deallocations where it already makes an
+      instrumented run, which is the item's own fallback: a file's `.performance`
+      blocks (`test f.performance ... FAIL` with a `leak:` line, tested in
+      `tests/suites/check.rs`) and its `--- report ---` (a finding of its own, in
+      `sections::report`). Not done, by design: a plain file with neither is not
+      measured by `check` at all (its `.test` blocks run in the uninstrumented JIT,
+      its `main` in the production binary), so its leak is the cases harness's to
+      find. Verified by running `AIPL_INJECT_LEAK=1 aipl check` on one.
 - [x] Fill flag on `check`: `--fix` formats each file, then rewrites the sections
       that no longer match (stdout, stderr, exit code, errors, expect file, report),
       through the same function `fill_expected` uses; the `fmt` subcommand is gone
       (it points at `check --fix`). It does not replace `fill_expected` yet: `check`
       does not validate `--- performance ---` or `--- check ---`, and the harness
       (and so handoff) still refills through `fill_expected`.
-- [ ] Harness: each case becomes `aipl check <case>` plus whatever `check` doesn't
-      own yet (`--- performance ---` before Phase 4, the baseline comparison).
-      Delete the duplicated section logic from `tests/cases.rs`.
-- [ ] Handoff: the refill step calls `check`'s fill flag on the stale cases.
-      Update the discovery parsing and its unit tests.
-- [ ] Docs: CLAUDE.md ("Authoring error-case fixtures", every `fill_expected`
-      mention), `tests/cases.rs` module docs.
+- [-] Harness: each case becomes `aipl check <case>` plus what `check` doesn't own.
+      Dropped as a duplicate (Drew); the harness keeps its own section logic.
+- [x] Handoff refilling through `check`'s fill flag: not done, and not needed for
+      now — handoff refills through `fill_expected`, which is the harness's. What
+      this item left to do was documentation, and that is done (below).
+- [x] Docs: CLAUDE.md, `tests/cases.rs` module docs, the skill. The `fill_expected`
+      mentions are accurate as they stand, since the harness still owns that path.
 
 ## Decided
 
@@ -435,8 +471,8 @@ Each item below can land separately.
   future project.
 - **Peak live bytes** is a `Measurement` field, a baseline column, and part of
   `aipl report`.
-- **`--- check ---`** becomes the `.test` runner's report under a clearer name.
-- **Thresholds** will be decided by Drew at the start of Phase 2.
+- **`--- check ---`** keeps its name (Drew declined the rename).
+- **Thresholds**: none. The baseline is exact (Drew).
 - **Order** is flexible (see Phases).
 
 ## Future (out of scope here)

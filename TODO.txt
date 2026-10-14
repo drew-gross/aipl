@@ -81,6 +81,10 @@ highlighter:
   range collapsing in charachter classes
   fold regions and bracket pair coloring
 
+benchmark:
+  summarize wall time metrics of performance sections
+  --save/--compare option so users can monitor over time
+
 misc cleanup:
   Large optimization tests that still use performance section: move_last_use, fold_extends_value_or and loop_split_fusion are optimization tests over the line threshold.
   chain.allocations == by_hand.allocations ---> replace this with struct comparison
@@ -241,6 +245,9 @@ HOF:
   lower_item returns a T!E but the body doesn't seem to have any error paths. I think this is because it's passed to a function that accepts lambdas that return errors. There should be a better way to do this (Liskov substitution principle?)
 
 math:
+
+jit:
+  do we really need a jit? What about compiling the tests to a binary?
 
 grammer ideas:
   3. Indexed accessors — own_texts_at(i) — for the call sites that read only the head and never want the list. Descends, stops, allocates nothing

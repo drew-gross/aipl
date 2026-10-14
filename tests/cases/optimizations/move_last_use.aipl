@@ -2,15 +2,19 @@
 # caller hands over the reference it holds instead of retaining a second one
 # for the callee and releasing its own at scope exit. Mono marks such
 # arguments (`move_last_use`), and what this case pins is that every one of
-# the shapes below still computes the right answer: the moves are invisible
-# except in the `--- performance ---` counts, and the borrows that must
-# survive — an alias, a later read, a use inside a loop — do.
+# the shapes below still computes the right answer, and that the borrows that
+# must survive — an alias, a later read, a use inside a loop — do. The moves
+# themselves are invisible except in the counts, which the `.performance` block
+# on `merge` states: a binding at its last use costs exactly what a fresh
+# temporary does, and one read again afterwards costs the callee a copy.
 
 import {
     concat as +++,
     equal as ==,
     extend,
+    greater_than as >,
     len,
+    measure,
     print,
     push,
     union,
@@ -49,6 +53,73 @@ fn merge(a: i64[], b: i64[]) -> i64[] {
     set ys.push(0);
     set xs.extend(ys);
     xs
+}.performance({
+    // Handed over at its last use, a binding costs exactly what a fresh value
+    // does: the same allocations and the same instructions, no retain and no
+    // release. Read again afterwards it stays a borrow, and the callee has to copy
+    // what it cannot take.
+    let fresh = measure("merge, fresh", 1, merged_fresh);
+    let binding = measure("merge, last use", 1, merged_binding);
+    let borrowed = measure("merge, read again", 1, merged_then_read);
+    assert(binding.allocations == fresh.allocations);
+    assert(binding.instructions == fresh.instructions);
+    assert(borrowed.allocations > binding.allocations);
+
+    let fresh = measure("grow, fresh", 1, grown_fresh);
+    let binding = measure("grow, last use", 1, grown_binding);
+    let borrowed = measure("grow, read again", 1, grown_then_read);
+    assert(binding.allocations == fresh.allocations);
+    assert(binding.instructions == fresh.instructions);
+    assert(borrowed.allocations > binding.allocations);
+
+    // A `self` receiver is a parameter like any other.
+    let fresh = measure("extended, fresh", 1, extended_fresh);
+    let binding = measure("extended, last use", 1, extended_binding);
+    let borrowed = measure("extended, read again", 1, extended_then_read);
+    assert(binding.allocations == fresh.allocations);
+    assert(binding.instructions == fresh.instructions);
+    assert(borrowed.allocations > binding.allocations);
+})
+
+// The three shapes `merge` takes, each as a fresh argument, a binding at its last
+// use, and a binding read again afterwards. The array is built inside, so the
+// measurement sees whether the callee could use it in place.
+fn merged_fresh(n: i64) -> u64 { merge(build(n), build(n)).len() }
+
+fn merged_binding(n: i64) -> u64 {
+    let q = build(n);
+    merge(build(n), q).len()
+}
+
+fn merged_then_read(n: i64) -> u64 {
+    let q = build(n);
+    merge(build(n), q).len() + q.len()
+}
+
+// The same for `grow`, and for a receiver.
+fn grown_fresh(n: i64) -> u64 { grow(build(n)).len() }
+
+fn grown_binding(n: i64) -> u64 {
+    let a = build(n);
+    grow(a).len()
+}
+
+fn grown_then_read(n: i64) -> u64 {
+    let a = build(n);
+    let g = grow(a);
+    g.len() + a.len()
+}
+
+fn extended_fresh(n: i64) -> u64 { build(n).extended().len() }
+
+fn extended_binding(n: i64) -> u64 {
+    let m = build(n);
+    m.extended().len()
+}
+
+fn extended_then_read(n: i64) -> u64 {
+    let p = build(n);
+    p.extended().len() + p.len()
 }
 
 fn stretch(s: str) -> str { s +++ "!" }
@@ -142,59 +213,3 @@ ab!!
 [1, 2, 3, 8, 8]
 [2, 3, 4, 8, 8]
 [3, 4, 5, 8, 8] [3, 4, 5]
---- performance ---
-allocations: 49
-deallocations: 49
-reallocations: 4
-bytes allocated: 2475
-instructions executed: 8366
-binary size: 18048
-  code: 11708
-  data: 234
-  metadata: 6106
-functions:
-  __to_str_i64$arr:
-    calls: 11
-    bytes: 704
-  __to_str_set$i64:
-    calls: 1
-    bytes: 568
-  __to_str_u64:
-    calls: 8
-    bytes: 204
-  aipl_arr_inc:
-    calls: 28
-    bytes: (external)
-  aipl_array_dec:
-    calls: 34
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 3
-    bytes: (external)
-  aipl_i64_len:
-    calls: 114
-    bytes: (external)
-  aipl_u64_len:
-    calls: 16
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 69
-    bytes: (external)
-  aipl_write_i64:
-    calls: 57
-    bytes: (external)
-  aipl_write_u64:
-    calls: 8
-    bytes: (external)
-  extended$own0:
-    calls: 2
-    bytes: 628
-  grow$own0:
-    calls: 2
-    bytes: 628
-  main:
-    calls: 1
-    bytes: 8132
-  merge$own0$own1:
-    calls: 2
-    bytes: 844

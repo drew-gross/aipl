@@ -13,7 +13,7 @@
 //! That keeps 40 MB of generated text out of every revision (the object is
 //! ~7 MB) and means no build has to lower it.
 //!
-//! This mirrors the `--- performance ---` model in `tests/cases.rs`:
+//! This mirrors the section-refresh model in `tests/cases.rs`:
 //!   - [`checked_in_ir_is_current`] (normal test) regenerates the IR from source
 //!     via the live frontend and checks its fingerprint against the one the
 //!     manifest records. It only passes when the frontend is healthy — a
@@ -357,12 +357,12 @@ fn sanity_check_entries(_a: &Artifact, comp: &Compilation) {
     let marker = comp
         .call_values(
             "parse_test_section_header",
-            &[FfiValue::Str("--- performance ---".to_string())],
+            &[FfiValue::Str("--- report ---".to_string())],
         )
         .unwrap();
     assert_eq!(
         marker,
-        FfiValue::Opt(Some(Box::new(FfiValue::Str("performance".to_string()))))
+        FfiValue::Opt(Some(Box::new(FfiValue::Str("report".to_string()))))
     );
     let plain = comp
         .call_values(

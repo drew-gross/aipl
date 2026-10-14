@@ -36,7 +36,6 @@ struct Spec {
     stderr: str?,
     exit_code: i64?,
     errors: str?,
-    performance: str?,
     report: str?,
     cli: str[],
     check: str?,
@@ -58,7 +57,6 @@ pub fn parse_spec(src: str) -> Spec!str {
         stderr: none,
         exit_code: none,
         errors: none,
-        performance: none,
         report: none,
         cli: [],
         check: none,
@@ -99,10 +97,15 @@ pub fn parse_spec(src: str) -> Spec!str {
     assert(bare.stdout == none);
 
     // `report` is a section like any other text one: the body, trailing newlines
-    // stripped, and independent of `performance`.
+    // stripped.
     assert(parse_spec("x\n--- report ---\nallocations 0\n")?.report == some("allocations 0"));
-    assert(parse_spec("x\n--- report ---\nallocations 0\n")?.performance == none);
-    assert(parse_spec("x\n--- performance ---\nallocations: 0\n")?.report == none);
+    assert(parse_spec("x\n--- stdout ---\nallocations: 0\n")?.report == none);
+
+    // `performance` was a section once; a file that still has one is told where
+    // its job went, rather than that the name is unknown.
+    assert(parse_spec("x\n--- performance ---\nallocations: 0\n").is_err_and(|m| m.contains(
+        "`.performance` block",
+    )));
 
     // `exit code` is parsed, and must be an integer.
     assert(parse_spec("x\n--- exit code ---\n3\n")?.exit_code == some(3));
@@ -168,7 +171,9 @@ fn finalize(spec: Spec, name: str, buf: str) -> Spec!str {
         "stdout" => ok(Spec { ..spec, stdout: some(body) }),
         "stderr" => ok(Spec { ..spec, stderr: some(body) }),
         "errors" => ok(Spec { ..spec, errors: some(body) }),
-        "performance" => ok(Spec { ..spec, performance: some(body) }),
+        "performance" => err(
+            "the `performance` section is gone: a case's counts are its row in tests/performance_metrics.md, and a property is stated by a `.performance` block or a `--- report ---` section",
+        ),
         "report" => ok(Spec { ..spec, report: some(body) }),
         "check" => ok(Spec { ..spec, check: some(body) }),
         // One argument per line. An empty section is *no* arguments: `lines("")`
@@ -202,80 +207,3 @@ fn companion_path(name: str, prefix: str) -> str!str {
     };
     ok(path)
 }
---- performance ---
-allocations: 147
-deallocations: 147
-reallocations: 0
-bytes allocated: 4232
-instructions executed: 79085
-binary size: 183400
-  code: 128448
-  data: 3175
-  metadata: 51777
-functions:
-  __arr_drop_Entry:
-    calls: 2
-    bytes: 140
-  __arr_retain_Entry:
-    calls: 2
-    bytes: 140
-  __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
-    calls: 9
-    bytes: 268
-  __builtin_int_parse:
-    calls: 9
-    bytes: 1096
-  __builtin_int_parse$lambda1:
-    calls: 9
-    bytes: 140
-  __eq_str$arr:
-    calls: 1
-    bytes: 320
-  __test$parse_spec:
-    calls: 1
-    bytes: 83312
-  __test_try_fail_str:
-    calls: 0
-    bytes: 84
-  __to_str_str:
-    calls: 0
-    bytes: 300
-  aipl_arr_inc:
-    calls: 592
-    bytes: (external)
-  aipl_array_dec:
-    calls: 596
-    bytes: (external)
-  aipl_array_new:
-    calls: 2
-    bytes: (external)
-  aipl_assert:
-    calls: 27
-    bytes: (external)
-  aipl_test_begin:
-    calls: 1
-    bytes: (external)
-  aipl_test_end:
-    calls: 1
-    bytes: (external)
-  aipl_test_summary:
-    calls: 1
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 252
-    bytes: (external)
-  companion_path:
-    calls: 4
-    bytes: 1300
-  finalize:
-    calls: 42
-    bytes: 32788
-  main:
-    calls: 1
-    bytes: 108
-  parse_spec:
-    calls: 21
-    bytes: 7968
-  whole_number:
-    calls: 9
-    bytes: 484
