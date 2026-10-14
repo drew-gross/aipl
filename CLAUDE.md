@@ -19,8 +19,8 @@ skips passed during discovery and has read-for-read identical inputs since
 (measured: 173s against 388s). Regenerating the IR or the `#[test]` list
 changes an input to cases that did not re-run, so either falls back to the
 full suite. It exits 0 on green (printing what it refilled/regenerated and flagging behavioral-output
-changes to review in the git diff), or stops with a pointed message naming the
-step and why on any failure a refill can't fix.
+and performance-baseline changes to review in the git diff), or stops with a
+pointed message naming the step and why on any failure a refill can't fix.
 
 **Every step is bounded by a wall-clock ceiling** — `HANDOFF_STEP_TIMEOUT`
 seconds, default 1800, `0` disables. A wedged `nextest` produces no output and
@@ -280,14 +280,15 @@ baseline table, which pins what every case costs.
     costs one changed file). A case whose numbers moved fails with `performance
     baseline moved`, naming each metric (old → new, %) and the scoped command that
     accepts the change; a case with no row fails with `performance baseline
-    missing`. Unlike a section, this is not stale text a refill can rewrite — a
-    moved number is a thing to look at — so `fill_expected` leaves it alone, and
-    `cargo handoff` treats it differently: it runs the rest of the gate to the
-    end, then **exits 1 listing the moved cases** (past 40 it points at the
-    whole-table refresh instead of a scoped one). Review them (a change that was
-    meant to be free is the regression this exists to catch), then accept with the
-    command it prints. A case with *no row* is bookkeeping rather than a move, so
-    handoff adds the row itself.
+    missing`. Unlike a section, this is not stale text, so `fill_expected` leaves
+    it alone — but `cargo handoff` settles both kinds itself, with one
+    `refresh_perfmon` scoped to exactly those cases, run last (the numbers depend
+    on everything before it settling). **There is no manual step.** A move is not
+    made unremarkable by that: handoff lists every moved case and metric in its
+    closing report and the rewritten rows are in the diff of
+    `tests/performance_metrics.md`, which is where to review it — a change that
+    was meant to be free is the regression this table exists to catch. The
+    `refresh_perfmon` command below is for refreshing outside a handoff.
   - *Not asserted*: wall-clock (measured in-process, so process spawn/teardown is
     excluded), build time, and peak RSS. These drift run-to-run, so they're checked
     in only to track trends.
@@ -838,8 +839,8 @@ isn't the thing under test), write a **void** `main` — `fn main() { ... }` —
 *is* the return value (e.g. an `--- exit code ---` test, or a `main` that returns
 a computed expression being checked). This applies to new cases and to edits;
 note that switching a `main` between `-> i64 { ...; 0 }` and `{ ... }` shifts the
-case's baseline row (`instructions`, `code bytes`), which handoff reports as a moved
-row to accept.
+case's baseline row (`instructions`, `code bytes`), which handoff refreshes and reports as
+a moved row to review.
 
 ## Fanout updates from test failures
 When a language change forces fixture/example edits across many files, don't

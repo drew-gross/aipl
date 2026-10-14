@@ -707,7 +707,6 @@ handoff:
   auto-fix unused imports
   do a better job of showing failures when a non-auto-fixable failure is found
   add what JS verification we can to handoff
-  make handoff compile and install the vscode extension
   fix cargo doc --workspace
   instead of having unfillable(), we should have fillable() since we have better control over the test output and can thus influence fillable() better
   should be able to regenerate syntax highlighter

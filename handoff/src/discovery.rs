@@ -306,7 +306,7 @@ impl Run {
     /// test, none abnormal, and every one of them a baseline failure.
     ///
     /// A run like that is complete — every other test passed — so the gate can
-    /// carry on and report the moves at the end instead of stopping on them.
+    /// refresh the rows and report the moves at the end instead of stopping.
     pub fn only_baseline(&self) -> bool {
         !self.failures.is_empty()
             && self.abnormal.is_empty()
@@ -414,11 +414,12 @@ impl Run {
 
 /// Cases whose row in `tests/performance_metrics.md` disagreed with their run.
 ///
-/// Neither kind is stale *text* a refill can rewrite, and neither is a broken
-/// program: a `moved` row is a number somebody has to look at (the change may be
-/// the regression the table exists to catch), and a `missing` row is
-/// bookkeeping for a case that has none yet. So they get their own handling —
-/// see [`Run::baseline`].
+/// Neither kind is stale *text* a section refill can rewrite, and neither is a
+/// broken program: a `moved` row is a number somebody should look at (the change
+/// may be the regression the table exists to catch), and a `missing` row is
+/// bookkeeping for a case that has none yet. Both are rewritten by one scoped
+/// `refresh_perfmon` at the end of the gate, and a move is reported for review
+/// in the diff — see [`Run::baseline`].
 #[derive(Default, Debug, PartialEq, Eq)]
 pub struct Baseline {
     /// Display path (`cases/x/y.aipl`, the text `AIPL_CASE` matches) to the
