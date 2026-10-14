@@ -1,12 +1,12 @@
 # There is no mutable top-level constant: a `mut` one would need storage, and
 # storage is what substituting a literal avoids. The parser has no such form,
-# so it is refused where a declaration would start.
+# but names the mistake rather than reporting an unexpected token.
 
 mut COUNT = 1;
 
 fn main() { let x = COUNT; }
 --- errors ---
-error: expected DocComment, `fn`, `import`, `let`, `pub`, `struct`, or `variant`, found `mut`
+error: aipl does not allow mutable global variables
  --> ./tests/cases/constants/err_mut.aipl:5:1
   |
 5 | mut COUNT = 1;

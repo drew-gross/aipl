@@ -207,6 +207,7 @@ import {
     Many,
     Maybe,
     Mk,
+    Msg,
     Named,
     OneOf,
     ParseError,
@@ -373,6 +374,10 @@ fn items() -> Production<AiplTok, Ast>[] {
             Named("variant_decl"),
             Named("import_decl"),
             Named("const_decl"),
+            // `mut NAME = ..;` at the top level: not a form, but one a reader
+            // plausibly writes, so it is refused by name rather than as an
+            // unexpected token. The error underlines the `mut`.
+            Then([Lit("mut"), Refuse(Msg("aipl does not allow mutable global variables"))]),
         ]),
     ]);
 
