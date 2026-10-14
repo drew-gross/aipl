@@ -660,6 +660,7 @@ allocator:
   make own allocator
 
 perfmon:
+  Add a whole-corpus check to performance_metrics.md that is always exact, and sums up everything.
   move the performance sections out of the .aipl files, it's getting hard to review
   show call-sites of each function in the final binary
   show regression and improvements

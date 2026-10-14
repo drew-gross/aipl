@@ -107,7 +107,7 @@ mod runner;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use runner::{Cmd, Output, Runner, BOLD, DIM, GREEN, OFF};
+use runner::{Cmd, Output, Runner, BOLD, DIM, GREEN, OFF, RED};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -637,9 +637,19 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
     }
 
     let plan = run.plan();
+    // Baseline moves are neither fillable nor a reason to stop: they are
+    // collected here and reported at the end, so the rest of the run still
+    // happens and a second problem is not hidden behind the first.
+    let mut baseline = run.baseline();
     if plan.is_empty() {
-        let detail = tail(&run.failure_output(), 40);
-        r.fail("nextest (unrecognized failure)", &detail);
+        // Nothing but baseline moves failed: there is nothing to remediate and
+        // nothing a final run would find out, so this is the end of the road.
+        if !run.only_baseline() {
+            let detail = tail(&run.failure_output(), 40);
+            r.fail("nextest (unrecognized failure)", &detail);
+        }
+        add_missing_rows(&mut r, &baseline);
+        conclude(&mut r, &baseline, &plan, regenerated_ir, None);
     }
 
     // --- 3. Regenerate the per-case `#[test]` list -------------------------
@@ -770,7 +780,10 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
                 .args(["-E", STAGED_IR_SKIP])
                 .env("AIPL_DOGFOOD_IR", &staged.to_string_lossy()),
         );
-        if !ok {
+        // A baseline that moved is not evidence against the candidate: moving
+        // is what a codegen change *does*, and the table is judged by the final
+        // run, against the IR that was actually promoted.
+        if !ok && !discovery::Run::parse(&r.out).only_baseline() {
             r.save_out();
             let detail = failure_excerpt(&r.out);
             r.fail(
@@ -870,13 +883,77 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
     };
     if !r.step(&label, cmd) {
         r.save_out();
-        let detail = failure_excerpt(&r.out);
-        r.fail("nextest (final — regeneration didn't settle)", &detail);
+        let last = discovery::Run::parse(&r.out);
+        if !last.only_baseline() {
+            let detail = failure_excerpt(&r.out);
+            r.fail("nextest (final — regeneration didn't settle)", &detail);
+        }
+        // A full run is authoritative: the artifact or the case list changed
+        // under the discovery run's numbers. A scoped one only re-ran some
+        // cases, so the others stand as discovery reported them.
+        if scope.is_none() {
+            baseline = last.baseline();
+        } else {
+            baseline.merge(last.baseline());
+        }
+    } else if scope.is_none() {
+        baseline = discovery::Baseline::default();
     }
+    add_missing_rows(&mut r, &baseline);
 
     // --- Report ------------------------------------------------------------
 
-    eprintln!("\n{GREEN}{BOLD}HANDOFF OK{OFF}");
+    conclude(&mut r, &baseline, &plan, regenerated_ir, scope.as_deref());
+}
+
+/// Add a row for every case that has none. Bookkeeping rather than a reviewed
+/// move: a new case has no previous number to have regressed from, so there is
+/// nothing to look at but the number itself, and it is in the diff.
+///
+/// The run that measured the case is not repeated, so this trusts the refresh
+/// to measure what the harness will — which is what it is for.
+fn add_missing_rows(r: &mut Runner, baseline: &discovery::Baseline) {
+    if baseline.missing.is_empty() {
+        return;
+    }
+    let joined = baseline
+        .missing
+        .iter()
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(",");
+    let label = format!(
+        "refresh_perfmon (baseline rows for {} new case(s))",
+        baseline.missing.len()
+    );
+    r.step(&label, helper("refresh_perfmon").env("AIPL_CASE", &joined));
+    let out = helper_output(r, &label);
+    if !out.contains("perfmon refresh complete") {
+        r.save_out();
+        let detail = tail(&out, 40);
+        r.fail(&label, &detail);
+    }
+}
+
+/// The closing report, and the exit. Green only when no baseline moved; a move
+/// is a failure the author has to look at, listed with what moved and the command
+/// that accepts it.
+fn conclude(
+    r: &mut Runner,
+    baseline: &discovery::Baseline,
+    plan: &discovery::Plan,
+    regenerated_ir: bool,
+    scope: Option<&[String]>,
+) -> ! {
+    let moved = &baseline.moved;
+    if moved.is_empty() {
+        eprintln!("\n{GREEN}{BOLD}HANDOFF OK{OFF}");
+    } else {
+        eprintln!(
+            "\n{RED}{BOLD}HANDOFF FAILED: {} performance baseline(s) moved{OFF}",
+            moved.len()
+        );
+    }
     if plan.need_fill {
         if plan.changed_sections.is_empty() {
             // Only *missing* sections (a brand-new case) — nothing mismatched.
@@ -897,7 +974,13 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
     if plan.need_compilers || regenerated_ir || plan.need_ir {
         eprintln!("  re-copied each project's checked-in compiler");
     }
-    if let Some(keep) = &scope {
+    if !baseline.missing.is_empty() {
+        eprintln!(
+            "  added baseline row(s) for {} new case(s)",
+            baseline.missing.len()
+        );
+    }
+    if let Some(keep) = scope {
         eprintln!(
             "{DIM}  (final run scoped to {} refilled case(s) + every non-case test){OFF}",
             keep.len()
@@ -911,8 +994,39 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
             "{DIM}    (git reset --hard HEAD undoes the refill if it recorded a regression){OFF}"
         );
     }
+    if !moved.is_empty() {
+        print_moved(moved);
+    }
     r.timing_report();
-    std::process::exit(0);
+    std::process::exit(if moved.is_empty() { 0 } else { 1 });
+}
+
+/// The most cases whose moves are spelled out; the rest are counted.
+const MOVED_SHOWN: usize = 40;
+
+/// List the cases whose baseline moved, what moved in each, and how to accept
+/// them. Past [`MOVED_SHOWN`] the scoped command would not fit on a line, and a
+/// change that moves that many is a whole-codegen change whose answer is the
+/// whole-corpus refresh anyway.
+fn print_moved(moved: &std::collections::BTreeMap<String, Vec<String>>) {
+    eprintln!("\nThese cases no longer match tests/performance_metrics.md:");
+    for (case, detail) in moved.iter().take(MOVED_SHOWN) {
+        eprintln!("  {case}");
+        for line in detail {
+            eprintln!("    {line}");
+        }
+    }
+    if moved.len() > MOVED_SHOWN {
+        eprintln!("  … and {} more", moved.len() - MOVED_SHOWN);
+    }
+    let cmd = "cargo test --test cases -- --ignored refresh_perfmon";
+    if moved.len() > MOVED_SHOWN {
+        eprintln!("\nReview the change, then accept all of it with\n    {cmd}");
+    } else {
+        let cases = moved.keys().cloned().collect::<Vec<_>>().join(",");
+        eprintln!("\nReview the change, then accept it with\n    AIPL_CASE='{cases}' {cmd}");
+    }
+    eprintln!("(the rest of the run was green)");
 }
 
 /// The failing tests of a corpus run, each with the first line it printed.

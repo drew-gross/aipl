@@ -30,7 +30,7 @@
 //! ever stops diverging, [`Run::helper_output`] says so in as many words instead
 //! of reporting a mysteriously absent message.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
 use regex::Regex;
@@ -264,6 +264,58 @@ impl Run {
             .collect()
     }
 
+    /// The baseline failures in this run (see [`Baseline`]).
+    ///
+    /// The harness prints ``[<display-path>]: performance baseline moved`` or
+    /// `` … missing`` and, for a move, the lines that follow it — one indented
+    /// `metric: old -> new` per column, up to the "If this change is intended"
+    /// line. That text is a contract with `check_baseline` in `tests/cases.rs`.
+    pub fn baseline(&self) -> Baseline {
+        static HEAD: OnceLock<Regex> = OnceLock::new();
+        let head = re(
+            &HEAD,
+            r"^\[([^\]\n]+)\]: performance baseline (moved|missing)",
+        );
+        let mut found = Baseline::default();
+        for f in &self.failures {
+            let mut lines = f.output.lines().peekable();
+            while let Some(line) = lines.next() {
+                let Some(c) = head.captures(line) else {
+                    continue;
+                };
+                let case = c[1].to_string();
+                if &c[2] == "missing" {
+                    found.missing.insert(case);
+                    continue;
+                }
+                let mut detail = Vec::new();
+                while let Some(next) = lines.peek() {
+                    if !next.starts_with("  ") {
+                        break;
+                    }
+                    detail.push(next.trim().to_string());
+                    lines.next();
+                }
+                found.moved.insert(case, detail);
+            }
+        }
+        found
+    }
+
+    /// Whether the run failed for nothing but baseline moves: at least one failed
+    /// test, none abnormal, and every one of them a baseline failure.
+    ///
+    /// A run like that is complete — every other test passed — so the gate can
+    /// carry on and report the moves at the end instead of stopping on them.
+    pub fn only_baseline(&self) -> bool {
+        !self.failures.is_empty()
+            && self.abnormal.is_empty()
+            && self
+                .failures
+                .iter()
+                .all(|f| f.output.contains("]: performance baseline "))
+    }
+
     /// Classify the run into the remediation work it implies.
     pub fn plan(&self) -> Plan {
         static MISMATCH: OnceLock<Regex> = OnceLock::new();
@@ -357,6 +409,30 @@ impl Run {
         }
         plan.fail_cases = cases.into_iter().collect();
         plan
+    }
+}
+
+/// Cases whose row in `tests/performance_metrics.md` disagreed with their run.
+///
+/// Neither kind is stale *text* a refill can rewrite, and neither is a broken
+/// program: a `moved` row is a number somebody has to look at (the change may be
+/// the regression the table exists to catch), and a `missing` row is
+/// bookkeeping for a case that has none yet. So they get their own handling —
+/// see [`Run::baseline`].
+#[derive(Default, Debug, PartialEq, Eq)]
+pub struct Baseline {
+    /// Display path (`cases/x/y.aipl`, the text `AIPL_CASE` matches) to the
+    /// lines saying what moved, as the harness printed them.
+    pub moved: BTreeMap<String, Vec<String>>,
+    /// Display paths with no row at all.
+    pub missing: BTreeSet<String>,
+}
+
+impl Baseline {
+    /// Fold `other` in: a case reported by either run is reported.
+    pub fn merge(&mut self, other: Baseline) {
+        self.moved.extend(other.moved);
+        self.missing.extend(other.missing);
     }
 }
 
@@ -767,5 +843,52 @@ mod tests {
             .unwrap_err();
         assert!(err.contains("no JSON events"), "{err}");
         assert!(!err.contains("exited 0"), "{err}");
+    }
+
+    /// The messages `check_baseline` prints, as the JSON carries them.
+    const MOVED: &str = "[cases/x/y.aipl]: performance baseline moved (tests/performance_metrics.md):\n  allocations: 3 -> 4 (+33.3%)\n  instructions: 120 -> 130 (+8.3%)\nIf this change is intended, accept it with `AIPL_CASE='cases/x/y.aipl' cargo test --test cases -- --ignored refresh_perfmon`.";
+    const MISSING: &str = "[cases/new/one.aipl]: performance baseline missing: tests/performance_metrics.md has no row for this case.\nAdd it with `AIPL_CASE='cases/new/one.aipl' cargo test --test cases -- --ignored refresh_perfmon`.";
+
+    #[test]
+    fn reads_moved_and_missing_baselines() {
+        let r = run(&[("cases_x_y", MOVED), ("cases_new_one", MISSING)]);
+        let b = r.baseline();
+        assert_eq!(
+            b.moved.into_iter().collect::<Vec<_>>(),
+            [(
+                "cases/x/y.aipl".to_string(),
+                vec![
+                    "allocations: 3 -> 4 (+33.3%)".to_string(),
+                    "instructions: 120 -> 130 (+8.3%)".to_string()
+                ]
+            )]
+        );
+        assert_eq!(
+            b.missing.into_iter().collect::<Vec<_>>(),
+            ["cases/new/one.aipl"]
+        );
+    }
+
+    #[test]
+    fn a_run_of_only_baseline_failures_is_complete() {
+        assert!(run(&[("cases_x_y", MOVED), ("cases_new_one", MISSING)]).only_baseline());
+        // One failure of any other kind makes it an ordinary failing run.
+        assert!(!run(&[
+            ("cases_x_y", MOVED),
+            ("cases_a_b", "[cases/a/b.aipl]: `stdout` mismatch")
+        ])
+        .only_baseline());
+        // A green run is not "only baseline failures" either.
+        assert!(!run(&[]).only_baseline());
+    }
+
+    #[test]
+    fn a_baseline_failure_is_not_a_stale_section_or_a_broken_case() {
+        let r = run(&[("cases_x_y", MOVED), ("cases_new_one", MISSING)]);
+        // Nothing a refill rewrites, nothing that stops the gate, and no case to
+        // refill — the other classifiers must leave it alone.
+        assert!(r.unfillable().is_empty());
+        assert!(r.hard_failures().is_empty());
+        assert_eq!(r.plan(), Plan::default());
     }
 }

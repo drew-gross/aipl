@@ -121,9 +121,18 @@
 //!     Every entry must match at least one case, so a mistyped path in a batch
 //!     fails rather than silently refreshing nothing.
 //!   - `cargo test --test cases -- --ignored refresh_perfmon` — rewrite the
-//!     non-deterministic `tests/performance_metrics.md` table.
+//!     `tests/performance_metrics.md` table: the deterministic columns every
+//!     case's run is held to (below), and the non-deterministic ones that only
+//!     track trends. `AIPL_CASE` scopes it the same way, to the matching rows.
 //!   - `cargo test --test cases -- --ignored fill_case_tests` — regenerate the
 //!     per-case `#[test]` list after adding or removing a case file.
+//!
+//! **Every running case has a row in `tests/performance_metrics.md`**, and its run
+//! must reproduce the row's deterministic columns (allocations, bytes allocated,
+//! peak live bytes, instructions, code bytes) exactly: see [`check_baseline`].
+//! That is the one comparison here a refill cannot make — `fill_expected` leaves
+//! it alone — because a moved number is something to look at, not stale text.
+//! `cargo handoff` runs everything else to the end and then fails with the list.
 //!
 //! Each diverges (fails) when done so its summary is visible. The relevant
 //! failure messages (e.g. a `performance` mismatch) name the command to run.
@@ -765,6 +774,77 @@ fn check_or_fill(
     ))
 }
 
+/// The `AIPL_CASE` selection shared by the two author helpers that read it,
+/// [`fill_expected`] and [`refresh_perfmon`]: a path substring, or a
+/// comma-separated list of them (a case path never contains a comma), matched
+/// against a case's display path *with* its `.aipl` extension — the exact text a
+/// per-case failure brackets, so the `AIPL_CASE='<path>'` it suggests can be
+/// pasted back verbatim. That is also how `cargo handoff` names every stale case
+/// in a single run: each `nextest` invocation pays a fresh-binary startup that
+/// dwarfs the work itself, so one invocation for N cases beats N for one.
+///
+/// Unset (or empty) selects every case.
+struct CaseFilter {
+    /// `AIPL_CASE` as given, for summaries.
+    raw: Option<String>,
+    entries: Vec<String>,
+    /// Which entries have selected something, so a typo in a batch is named
+    /// rather than hidden behind its neighbours matching.
+    hit: Vec<bool>,
+}
+
+impl CaseFilter {
+    fn from_env() -> Self {
+        let raw = std::env::var("AIPL_CASE").ok().filter(|s| !s.is_empty());
+        let entries: Vec<String> = raw
+            .iter()
+            .flat_map(|s| s.split(','))
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        CaseFilter {
+            hit: vec![false; entries.len()],
+            raw,
+            entries,
+        }
+    }
+
+    /// Whether the case at `display` (with `/` separators and its extension) is
+    /// selected, recording which entries selected it.
+    fn matches(&mut self, display: &str) -> bool {
+        if self.entries.is_empty() {
+            return true;
+        }
+        let mut any = false;
+        for (i, entry) in self.entries.iter().enumerate() {
+            if display.contains(entry.as_str()) {
+                self.hit[i] = true;
+                any = true;
+            }
+        }
+        any
+    }
+
+    /// A filter that matches nothing is almost always a typo — fail loudly rather
+    /// than silently doing nothing. Reported per entry: in a batch the others will
+    /// have matched, so "something matched" alone would let a mistyped path
+    /// through as a silent no-op.
+    fn assert_all_matched(&self, total: usize) {
+        let missed: Vec<&str> = self
+            .entries
+            .iter()
+            .zip(&self.hit)
+            .filter(|(_, hit)| !**hit)
+            .map(|(entry, _)| entry.as_str())
+            .collect();
+        assert!(
+            missed.is_empty(),
+            "AIPL_CASE matched no test cases (of {total} total) for: {}",
+            missed.join(", ")
+        );
+    }
+}
+
 /// Entry point for the ignored [`fill_expected`] helper: one serial pass over
 /// every case, refreshing each section whose body differs from the actual output.
 /// Unlike a normal run this is a single test, so it collects results rather than
@@ -773,25 +853,7 @@ fn check_or_fill(
 fn run_fill() {
     let (cases, out_root) = setup_cases();
 
-    // Optional substring filter for fast iteration on one (or a few) cases:
-    //   AIPL_CASE=some_value cargo test --test cases -- --ignored fill_expected
-    // matches against the case's display path (e.g. `cases/options/some_value`),
-    // with `/` separators regardless of platform.
-    //
-    // Comma-separated for more than one — a case path never contains a comma.
-    // That is how `cargo handoff` refills every stale case in a single run: each
-    // `nextest` invocation pays a fresh-binary startup that dwarfs the refill
-    // itself, so one invocation for N cases beats N invocations for one.
-    let raw = std::env::var("AIPL_CASE").ok().filter(|s| !s.is_empty());
-    let filters: Vec<&str> = raw
-        .iter()
-        .flat_map(|s| s.split(','))
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .collect();
-    // Which filters actually selected something, so a typo in a batch is named
-    // rather than hidden behind its neighbours matching.
-    let mut hit = vec![false; filters.len()];
+    let mut filter = CaseFilter::from_env();
 
     let mut passed = 0usize;
     let mut matched = 0usize;
@@ -799,22 +861,8 @@ fn run_fill() {
     let mut refreshed: Vec<String> = Vec::new();
     for (path, root, prefix, stage) in cases {
         let rel_with_prefix = Path::new(prefix).join(path.strip_prefix(root).unwrap_or(path));
-        // Matched against the display path *with* its `.aipl` extension — the
-        // exact text a per-case mismatch message brackets, so a failure's
-        // `AIPL_CASE='<path>'` suggestion can be pasted back verbatim (which is
-        // what `cargo handoff` does to refill just the stale cases).
-        if !filters.is_empty() {
-            let name = rel_with_prefix.to_string_lossy().replace('\\', "/");
-            let mut any = false;
-            for (i, f) in filters.iter().enumerate() {
-                if name.contains(f) {
-                    hit[i] = true;
-                    any = true;
-                }
-            }
-            if !any {
-                continue;
-            }
+        if !filter.matches(&rel_with_prefix.to_string_lossy().replace('\\', "/")) {
+            continue;
         }
         matched += 1;
         match run_case(path, &rel_with_prefix, out_root, *stage, true) {
@@ -823,27 +871,11 @@ fn run_fill() {
             Outcome::Fail(msg) => failures.push(msg),
         }
     }
-
-    // A filter that matches nothing is almost always a typo — fail loudly
-    // rather than silently "refreshing" zero cases. Reported per filter: in a
-    // batch the others will have matched, so `matched > 0` alone would let a
-    // mistyped path through as a silent no-op.
-    let missed: Vec<&str> = filters
-        .iter()
-        .enumerate()
-        .filter(|(i, _)| !hit[*i])
-        .map(|(_, f)| *f)
-        .collect();
-    assert!(
-        missed.is_empty(),
-        "AIPL_CASE matched no test cases (of {} total) for: {}",
-        cases.len(),
-        missed.join(", ")
-    );
+    filter.assert_all_matched(cases.len());
 
     // Summary. The filtered wording is a parsed contract — `cargo handoff`
     // parses it to confirm a scoped refill ran clean — so keep it as it reads.
-    match &raw {
+    match &filter.raw {
         Some(f) => eprintln!(
             "\n=== test cases [filter {f:?}]: {passed} passed, {} failed, {} refreshed ({matched} of {} matched) ===",
             failures.len(),
@@ -1027,12 +1059,33 @@ fn run_error_case(
 // ---------- Perf-monitor refresh (non-deterministic metrics) ----------
 
 /// One row of the metrics table.
+///
+/// The first five fields are **deterministic** and asserted: every case's run
+/// must reproduce them exactly (see [`check_baseline`]). The last three are the
+/// non-deterministic ones, kept only to track trends.
+#[derive(Clone, PartialEq)]
 struct PerfRow {
     test: String,
+    allocations: u64,
+    bytes_allocated: u64,
+    peak_live_bytes: u64,
+    instructions: u64,
+    code_bytes: u64,
     wall_us: f64,
     build_ms: f64,
     peak_kb: u64,
 }
+
+/// A deterministic metric of the table: its column heading, and how to read it off
+/// a row. One list, so the table, the comparison and the failure message cannot
+/// disagree about which columns are asserted or what they are called.
+const BASELINE_METRICS: [(&str, fn(&PerfRow) -> u64); 5] = [
+    ("allocations", |r| r.allocations),
+    ("bytes allocated", |r| r.bytes_allocated),
+    ("peak live bytes", |r| r.peak_live_bytes),
+    ("instructions", |r| r.instructions),
+    ("code bytes", |r| r.code_bytes),
+];
 
 /// Number of times each binary is run; we keep the minimum wall-clock/peak (the
 /// least noise-perturbed sample).
@@ -1063,16 +1116,42 @@ fn stage_case_for_build(
     }
 }
 
-/// Build the production (non-instrumented) binary for a case, returning its path.
-fn build_case_binary(src_path: &Path, stem: &str, case_dir: &Path) -> Result<PathBuf, String> {
+/// Build a case both ways: the production (non-instrumented) binary, whose build
+/// is timed and which the wall-clock and memory columns run, and the instrumented
+/// one, which `perf::measure` runs once for the deterministic columns.
+///
+/// Returns the production binary's path, how long it took to build (load +
+/// compile + link, the instrumented build excluded), and the measurement — the
+/// same one the case's own run takes, since `cwd` is the directory the harness
+/// would have staged it in.
+fn build_case_binary(
+    src_path: &Path,
+    stem: &str,
+    case_dir: &Path,
+    cli: &[String],
+) -> Result<(PathBuf, f64, PerfStats), String> {
+    let start = Instant::now();
     let program = load_case(src_path).map_err(|e| Error::display_all(&e))?;
     let measured = perf::measured_program(&program);
     let comp = ObjectCompilation::new(&measured, stem, debug_opts(), false)
         .map_err(|e| Error::display_all(&e))?;
+    let symbol_names = comp.code_symbol_names();
     let obj = comp.emit().map_err(|e| e.to_string())?;
     let exe = case_dir.join(binary::default_exe_name(stem));
     binary::link(&obj, &exe).map_err(|e| e.to_string())?;
-    Ok(exe)
+    let build_ms = start.elapsed().as_secs_f64() * 1000.0;
+
+    let stats = perf::measure(
+        &measured,
+        stem,
+        &obj,
+        &symbol_names,
+        cli,
+        case_dir,
+        debug_opts(),
+    )
+    .map_err(|e| e.render("", ""))?;
+    Ok((exe, build_ms, stats))
 }
 
 /// Run `exe` once with `AIPL_PERFMON_STATS` set and read back the
@@ -1104,36 +1183,64 @@ fn run_once_perfmon(
     Some((wall?, peak?))
 }
 
+/// Where the metrics table lives, relative to the repo root.
+const METRICS_FILE: &str = "tests/performance_metrics.md";
+
+fn metrics_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(METRICS_FILE)
+}
+
+/// The display path a case's table row is keyed by: `cases/arrays/slice` — the
+/// text a case's `[..]` context brackets, minus the `.aipl`.
+fn row_key(display_with_extension: &str) -> String {
+    display_with_extension
+        .trim_end_matches(".aipl")
+        .replace('\\', "/")
+}
+
 fn run_perfmon_refresh(cases: &[CaseFile], out_root: &Path) {
-    let mut rows: Vec<PerfRow> = Vec::new();
+    // Scoped like `fill_expected`: `AIPL_CASE` names the cases whose rows are
+    // rewritten and every other row is carried over as it is.
+    let mut filter = CaseFilter::from_env();
+    let path = metrics_path();
+    let old = read_metrics(&path);
+    let mut kept = old.clone();
+    let mut existing: HashSet<String> = HashSet::new();
+    let mut measured: Vec<PerfRow> = Vec::new();
     let mut skipped = 0usize;
-    for (path, root, prefix, stage) in cases {
-        let rel = path.strip_prefix(root).unwrap_or(path);
+    for (case_path, root, prefix, stage) in cases {
+        let rel = case_path.strip_prefix(root).unwrap_or(case_path);
         let rel_with_prefix = Path::new(prefix).join(rel);
-        let display = rel_with_prefix
-            .with_extension("")
-            .to_string_lossy()
-            .replace('\\', "/");
-        let contents = fs::read_to_string(path).expect("read case");
+        let with_extension = rel_with_prefix.to_string_lossy().replace('\\', "/");
+        let display = row_key(&with_extension);
+        // Every case counts as existing, measured or not, so that a row is
+        // pruned only when its case is really gone.
+        existing.insert(display.clone());
+        if !filter.matches(&with_extension) {
+            continue;
+        }
+        // Replaced by whatever this run measures, or dropped if the case no
+        // longer runs (it became an error case, or stopped building).
+        kept.remove(&display);
+        let contents = fs::read_to_string(case_path).expect("read case");
         let spec = parse_spec(&contents);
         // Error cases never build a binary, so there's nothing to time.
         if spec.errors.is_some() {
             skipped += 1;
             continue;
         }
-        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap();
+        let stem = case_path.file_stem().and_then(|s| s.to_str()).unwrap();
         let (src_path, case_dir) =
-            stage_case_for_build(path, &rel_with_prefix, out_root, stem, &spec, *stage);
+            stage_case_for_build(case_path, &rel_with_prefix, out_root, stem, &spec, *stage);
 
-        let start = Instant::now();
-        let exe = match build_case_binary(&src_path, stem, &case_dir) {
-            Ok(e) => e,
+        let (exe, build_ms, stats) = match build_case_binary(&src_path, stem, &case_dir, &spec.cli)
+        {
+            Ok(built) => built,
             Err(_) => {
                 skipped += 1;
                 continue;
             }
         };
-        let build_ms = start.elapsed().as_secs_f64() * 1000.0;
 
         let stats_path = case_dir.join("perfmon_stats.txt");
         let (mut wall_ns, mut peak_bytes) = (u64::MAX, u64::MAX);
@@ -1154,65 +1261,91 @@ fn run_perfmon_refresh(cases: &[CaseFile], out_root: &Path) {
             skipped += 1;
             continue;
         }
-        rows.push(PerfRow {
+        measured.push(PerfRow {
             test: display,
+            allocations: stats.allocations,
+            bytes_allocated: stats.bytes_allocated,
+            peak_live_bytes: stats.peak_live_bytes,
+            instructions: stats.instructions,
+            code_bytes: stats.binary_size.code,
             wall_us: wall_ns as f64 / 1000.0,
             build_ms,
             peak_kb: peak_bytes.div_ceil(1024),
         });
-        if rows.len().is_multiple_of(25) {
-            eprintln!("measured {} case(s)...", rows.len());
+        if measured.len().is_multiple_of(25) {
+            eprintln!("measured {} case(s)...", measured.len());
         }
     }
+    filter.assert_all_matched(cases.len());
+
+    // A row whose case no longer exists goes, whatever the scope: nothing else
+    // would ever remove it.
+    kept.retain(|test, _| existing.contains(test));
+    let mut rows: Vec<PerfRow> = kept.into_values().chain(measured.iter().cloned()).collect();
     rows.sort_by(|a, b| a.test.cmp(&b.test));
 
-    let metrics_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("performance_metrics.md");
-    let old = read_metrics(&metrics_path);
-    fs::write(&metrics_path, render_metrics(&rows)).expect("write metrics file");
+    fs::write(&path, render_metrics(&rows)).expect("write metrics file");
     eprintln!("{}", compare_metrics(&old, &rows));
 
     // Diverge so the summary is visible (cargo hides passing tests' output) and a
     // refresh is never mistaken for a normal green run.
     panic!(
-        "perfmon refresh complete: wrote {} ({} measured, {} skipped). Failing \
+        "perfmon refresh complete: wrote {} ({} measured, {} skipped, {} rows). Failing \
          intentionally so the summary above is visible — this is not a normal test \
          run (`{PERFMON_CMD}`).",
-        metrics_path.display(),
-        rows.len(),
+        path.display(),
+        measured.len(),
         skipped,
+        rows.len(),
     );
 }
 
 /// Render the metrics table (Markdown, rows already sorted by test path).
 fn render_metrics(rows: &[PerfRow]) -> String {
     let mut s = String::new();
-    s.push_str("# Performance metrics (non-deterministic)\n\n");
+    s.push_str("# Performance metrics\n\n");
     s.push_str(
-        "Per-test wall-clock (measured in-process, so process spawn/teardown is\n\
-         excluded), build time (load + compile + link), and peak resident memory.\n\
-         These drift run-to-run and are **not asserted** anywhere — they're checked in\n\
-         only to track trends. Regenerate and review the printed regression/improvement\n\
-         summary with:\n\n\
+        "One row per case that runs. The columns come in two groups.\n\n\
+         **Asserted** — allocations, bytes allocated, peak live bytes, instructions and\n\
+         code bytes. These are deterministic, measured by the instrumented build, and\n\
+         every case's run must reproduce its row exactly: a case whose numbers moved\n\
+         fails with `performance baseline moved`, and a case with no row fails too. The\n\
+         failure names the scoped refresh that accepts the change.\n\n\
+         **Not asserted** — wall-clock (measured in-process, so process spawn/teardown is\n\
+         excluded), build time (load + compile + link) and peak resident memory. These\n\
+         drift run-to-run, so they're checked in only to track trends.\n\n\
+         Regenerate and review the printed summary with the command below. `AIPL_CASE`\n\
+         (a path substring, or a comma-separated list) rewrites only the matching rows;\n\
+         rows whose case no longer exists are always dropped.\n\n\
          ```\n\
          cargo test --test cases -- --ignored refresh_perfmon\n\
          ```\n\n",
     );
-    s.push_str("| Test | wall-clock (µs) | build (ms) | peak RSS (KB) |\n");
-    s.push_str("| --- | ---: | ---: | ---: |\n");
+    s.push_str(
+        "| Test | allocations | bytes allocated | peak live bytes | instructions | code bytes \
+         | wall-clock (µs) | build (ms) | peak RSS (KB) |\n",
+    );
+    s.push_str("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
     for r in rows {
         s.push_str(&format!(
-            "| {} | {:.2} | {:.2} | {} |\n",
-            r.test, r.wall_us, r.build_ms, r.peak_kb
+            "| {} | {} | {} | {} | {} | {} | {:.2} | {:.2} | {} |\n",
+            r.test,
+            r.allocations,
+            r.bytes_allocated,
+            r.peak_live_bytes,
+            r.instructions,
+            r.code_bytes,
+            r.wall_us,
+            r.build_ms,
+            r.peak_kb
         ));
     }
     s
 }
 
-/// Parse a previously-written metrics file into `test -> (wall_us, build_ms,
-/// peak_kb)`. Returns empty on a missing/unreadable file (first run).
-fn read_metrics(path: &Path) -> HashMap<String, (f64, f64, f64)> {
+/// Parse a previously-written metrics file into `test -> row`. Returns empty on a
+/// missing/unreadable file (first run).
+fn read_metrics(path: &Path) -> HashMap<String, PerfRow> {
     let mut map = HashMap::new();
     let Ok(contents) = fs::read_to_string(path) else {
         return map;
@@ -1223,18 +1356,91 @@ fn read_metrics(path: &Path) -> HashMap<String, (f64, f64, f64)> {
             continue;
         }
         let cols: Vec<&str> = line.trim_matches('|').split('|').map(str::trim).collect();
-        if cols.len() != 4 || cols[0] == "Test" || cols[0].starts_with("---") {
+        if cols.len() != 9 || cols[0] == "Test" || cols[0].starts_with("---") {
             continue;
         }
-        if let (Ok(w), Ok(b), Ok(p)) = (
-            cols[1].parse::<f64>(),
-            cols[2].parse::<f64>(),
-            cols[3].parse::<f64>(),
+        let int = |i: usize| cols[i].parse::<u64>().ok();
+        let float = |i: usize| cols[i].parse::<f64>().ok();
+        if let (Some(a), Some(b), Some(p), Some(i), Some(c), Some(w), Some(bm), Some(kb)) = (
+            int(1),
+            int(2),
+            int(3),
+            int(4),
+            int(5),
+            float(6),
+            float(7),
+            int(8),
         ) {
-            map.insert(cols[0].to_string(), (w, b, p));
+            map.insert(
+                cols[0].to_string(),
+                PerfRow {
+                    test: cols[0].to_string(),
+                    allocations: a,
+                    bytes_allocated: b,
+                    peak_live_bytes: p,
+                    instructions: i,
+                    code_bytes: c,
+                    wall_us: w,
+                    build_ms: bm,
+                    peak_kb: kb,
+                },
+            );
         }
     }
     map
+}
+
+/// The checked-in table, read once.
+fn baselines() -> &'static HashMap<String, PerfRow> {
+    static BASELINES: std::sync::OnceLock<HashMap<String, PerfRow>> = std::sync::OnceLock::new();
+    BASELINES.get_or_init(|| read_metrics(&metrics_path()))
+}
+
+/// Hold a case's measurement to its row in the metrics table: every deterministic
+/// column must match exactly. (Exact for now; thresholds are undecided.)
+///
+/// The two failures are told apart by what follows `performance baseline`, a
+/// contract with `cargo handoff`: it runs everything else to the end and then
+/// fails with the list, rather than stopping at the first.
+fn check_baseline(ctx: &str, stats: &PerfStats) -> Outcome {
+    let key = row_key(ctx.trim_start_matches('[').trim_end_matches(']'));
+    let accept = format!("AIPL_CASE='{key}.aipl' {PERFMON_CMD}");
+    let Some(row) = baselines().get(&key) else {
+        return Outcome::Fail(format!(
+            "{ctx}: performance baseline missing: {METRICS_FILE} has no row for this case.\n\
+             Add it with `{accept}`."
+        ));
+    };
+    let actual = [
+        stats.allocations,
+        stats.bytes_allocated,
+        stats.peak_live_bytes,
+        stats.instructions,
+        stats.binary_size.code,
+    ];
+    let moved: Vec<String> = BASELINE_METRICS
+        .iter()
+        .zip(actual)
+        .filter_map(|((name, read), now)| {
+            let was = read(row);
+            (was != now).then(|| {
+                let pct = if was > 0 {
+                    format!(" ({:+.1}%)", (now as f64 - was as f64) / was as f64 * 100.0)
+                } else {
+                    String::new()
+                };
+                format!("  {name}: {was} -> {now}{pct}")
+            })
+        })
+        .collect();
+    if moved.is_empty() {
+        return Outcome::Pass;
+    }
+    Outcome::Fail(format!(
+        "{ctx}: performance baseline moved ({METRICS_FILE}):\n{}\n\
+         If this change is intended, accept it with `{accept}`.",
+        moved.join("\n")
+    ))
 }
 
 /// One metric's per-test outlier rules: only flag a change that is both
@@ -1243,6 +1449,8 @@ fn read_metrics(path: &Path) -> HashMap<String, (f64, f64, f64)> {
 /// These programs run in (sub-)microseconds and link in tens of milliseconds,
 /// where tiny absolute jitter is a huge *percentage*; the floors filter that out.
 /// The overall aggregate (below) still reflects every shared test regardless.
+///
+/// A deterministic metric has neither: any change at all is a move.
 struct Metric {
     name: &'static str,
     unit: &'static str,
@@ -1250,15 +1458,37 @@ struct Metric {
     decimals: usize,
     threshold: f64,
     floor: f64,
+    read: fn(&PerfRow) -> f64,
 }
 
-const METRICS: [Metric; 3] = [
+impl Metric {
+    /// A metric that is asserted exactly, so every change is reported.
+    const fn exact(name: &'static str, unit: &'static str, read: fn(&PerfRow) -> f64) -> Self {
+        Metric {
+            name,
+            unit,
+            decimals: 0,
+            threshold: 0.0,
+            floor: 0.0,
+            read,
+        }
+    }
+}
+
+/// Every column of the table, in its order.
+const METRICS: [Metric; 8] = [
+    Metric::exact("allocations", "", |r| r.allocations as f64),
+    Metric::exact("bytes allocated", "B", |r| r.bytes_allocated as f64),
+    Metric::exact("peak live bytes", "B", |r| r.peak_live_bytes as f64),
+    Metric::exact("instructions", "", |r| r.instructions as f64),
+    Metric::exact("code bytes", "B", |r| r.code_bytes as f64),
     Metric {
         name: "wall-clock",
         unit: "µs",
         decimals: 2,
         threshold: 10.0,
         floor: 2.0,
+        read: |r| r.wall_us,
     },
     Metric {
         name: "build",
@@ -1266,6 +1496,7 @@ const METRICS: [Metric; 3] = [
         decimals: 2,
         threshold: 10.0,
         floor: 20.0,
+        read: |r| r.build_ms,
     },
     Metric {
         name: "peak RSS",
@@ -1273,6 +1504,7 @@ const METRICS: [Metric; 3] = [
         decimals: 0,
         threshold: 10.0,
         floor: 128.0,
+        read: |r| r.peak_kb as f64,
     },
 ];
 
@@ -1287,24 +1519,32 @@ fn metric_outliers(m: &Metric, deltas: &[(String, f64, f64)]) -> String {
             continue;
         }
         let d = pct(*o, *n);
-        if d > m.threshold {
+        // A rise from zero has no percentage; it is still a regression.
+        if n > o && d >= m.threshold {
             regs.push((t, *o, *n, d));
-        } else if d < -m.threshold {
+        } else if n < o && d <= -m.threshold {
             imps.push((t, *o, *n, d));
         }
     }
     regs.sort_by(|a, b| b.3.total_cmp(&a.3)); // biggest regression first
     imps.sort_by(|a, b| a.3.total_cmp(&b.3)); // biggest improvement first
-    let (name, unit, prec, thr, floor) = (m.name, m.unit, m.decimals, m.threshold, m.floor);
+    let (name, prec) = (m.name, m.decimals);
+    let unit = if m.unit.is_empty() {
+        String::new()
+    } else {
+        format!(" {}", m.unit)
+    };
+    let bound = if m.threshold == 0.0 && m.floor == 0.0 {
+        "any change".to_string()
+    } else {
+        format!(">{:.0}% and >{:.0}{unit}", m.threshold, m.floor)
+    };
     let mut out = String::new();
     let mut list = |label: &str, items: &[(&str, f64, f64, f64)]| {
-        out.push_str(&format!(
-            "{name} {label} (>{thr:.0}% and >{floor:.0} {unit}): {}\n",
-            items.len()
-        ));
+        out.push_str(&format!("{name} {label} ({bound}): {}\n", items.len()));
         for (t, o, n, d) in items.iter().take(20) {
             out.push_str(&format!(
-                "  {t}: {o:.prec$} -> {n:.prec$} {unit} ({d:+.1}%)\n"
+                "  {t}: {o:.prec$} -> {n:.prec$}{unit} ({d:+.1}%)\n"
             ));
         }
     };
@@ -1315,33 +1555,30 @@ fn metric_outliers(m: &Metric, deltas: &[(String, f64, f64)]) -> String {
 
 /// Build the improvement/regression summary comparing the previous metrics to the
 /// freshly measured `rows`: an aggregate "overall change" per metric (summed over
-/// shared tests), per-test outliers for **every** metric (wall-clock, build, peak
-/// RSS — see [`METRICS`]), and added/removed tests.
-fn compare_metrics(old: &HashMap<String, (f64, f64, f64)>, rows: &[PerfRow]) -> String {
+/// shared tests), per-test outliers for **every** metric (see [`METRICS`]), and
+/// added/removed tests.
+fn compare_metrics(old: &HashMap<String, PerfRow>, rows: &[PerfRow]) -> String {
     let pct = |o: f64, n: f64| if o > 0.0 { (n - o) / o * 100.0 } else { 0.0 };
 
-    let (mut ow, mut nw, mut ob, mut nb, mut op, mut np) = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    let mut totals = [(0.0f64, 0.0f64); METRICS.len()];
     let mut shared = 0usize;
     // Per-metric `(test, old, new)` deltas over the shared tests, indexed like
-    // `METRICS` (wall-clock, build, peak RSS).
-    let mut deltas: [Vec<(String, f64, f64)>; 3] = Default::default();
+    // `METRICS`.
+    let mut deltas: Vec<Vec<(String, f64, f64)>> = vec![Vec::new(); METRICS.len()];
     let mut added: Vec<&str> = Vec::new();
     let mut present: HashSet<&str> = HashSet::new();
 
     for r in rows {
         present.insert(r.test.as_str());
         match old.get(&r.test) {
-            Some(&(w, b, p)) => {
+            Some(was) => {
                 shared += 1;
-                ow += w;
-                nw += r.wall_us;
-                ob += b;
-                nb += r.build_ms;
-                op += p;
-                np += r.peak_kb as f64;
-                deltas[0].push((r.test.clone(), w, r.wall_us));
-                deltas[1].push((r.test.clone(), b, r.build_ms));
-                deltas[2].push((r.test.clone(), p, r.peak_kb as f64));
+                for (i, m) in METRICS.iter().enumerate() {
+                    let (o, n) = ((m.read)(was), (m.read)(r));
+                    totals[i].0 += o;
+                    totals[i].1 += n;
+                    deltas[i].push((r.test.clone(), o, n));
+                }
             }
             None => added.push(&r.test),
         }
@@ -1356,18 +1593,19 @@ fn compare_metrics(old: &HashMap<String, (f64, f64, f64)>, rows: &[PerfRow]) -> 
         out.push_str("no previous metrics to compare against (first run).\n");
     } else {
         out.push_str(&format!("overall change across {shared} shared test(s):\n"));
-        out.push_str(&format!(
-            "  wall-clock: {ow:.1} -> {nw:.1} µs ({:+.1}%)\n",
-            pct(ow, nw)
-        ));
-        out.push_str(&format!(
-            "  build:      {ob:.1} -> {nb:.1} ms ({:+.1}%)\n",
-            pct(ob, nb)
-        ));
-        out.push_str(&format!(
-            "  peak RSS:   {op:.0} -> {np:.0} KB ({:+.1}%)\n",
-            pct(op, np)
-        ));
+        for (m, (o, n)) in METRICS.iter().zip(totals) {
+            let prec = m.decimals;
+            let unit = if m.unit.is_empty() {
+                String::new()
+            } else {
+                format!(" {}", m.unit)
+            };
+            out.push_str(&format!(
+                "  {:<16}{o:.prec$} -> {n:.prec$}{unit} ({:+.1}%)\n",
+                format!("{}:", m.name),
+                pct(o, n)
+            ));
+        }
 
         // Per-test outliers for every metric.
         for (m, d) in METRICS.iter().zip(&deltas) {
@@ -1701,7 +1939,7 @@ fn run_performance_check(
             &expected_render,
         ));
     }
-    match report {
+    let report = match report {
         // A section body has its trailing newlines stripped, and a report ends in
         // one. Compared as written: it is text a reader is meant to read.
         Some(expected) => check_or_fill(
@@ -1712,7 +1950,14 @@ fn run_performance_check(
             expected,
         ),
         None => Outcome::Pass,
+    };
+    // The case's row in the metrics table comes last, so a stale section — which
+    // a refill fixes — is what a run says first. A fill run leaves it alone: the
+    // table is refreshed by `refresh_perfmon`, not by `fill_expected`.
+    if fills.enabled || !matches!(report, Outcome::Pass) {
+        return report;
     }
+    check_baseline(ctx, &actual)
 }
 
 /// Normalizes captured child output before comparing it against the expected

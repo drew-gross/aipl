@@ -207,31 +207,38 @@ again.
 
 ### Phase 2: baseline table, sections become optional (the churn win)
 
-- [ ] Add deterministic columns (allocations, bytes allocated, peak live bytes,
+- [x] Add deterministic columns (allocations, bytes allocated, peak live bytes,
       instructions, code bytes) to `performance_metrics.md`. The header prose says
-      which columns are checked and which are not.
-- [ ] `refresh_perfmon` builds both variants per case and writes exact counts. Its
-      summary covers the deterministic moves too.
-- [ ] `AIPL_CASE` scoping for `refresh_perfmon`: rewrite only the matched rows,
+      which columns are checked and which are not. Deterministic columns come
+      first, so the stable prefix of a row is what is asserted.
+- [x] `refresh_perfmon` builds both variants per case and writes exact counts. Its
+      summary covers the deterministic moves too (every change, no threshold:
+      `Metric::exact`).
+- [x] `AIPL_CASE` scoping for `refresh_perfmon`: rewrite only the matched rows,
       and always prune rows whose case no longer exists. It still fails
-      intentionally to show its summary.
-- [ ] Per-case comparison with the row, both directions. Thresholds: Drew will
-      decide them when this phase starts. The placeholder is |Δ| ≥ 10% **and**
-      |Δ| ≥ a per-metric floor. Keep the constants in one place. The message
-      gives the metric, old → new, %, regression/improvement, and the scoped
-      refresh command.
-- [ ] A case with no row fails, naming the scoped refresh.
+      intentionally to show its summary. Shares `CaseFilter` with `fill_expected`.
+      Gap: a deleted case's stale row is pruned by the next refresh of any scope,
+      but nothing fails in the meantime, so handoff cannot bookkeep it yet.
+- [~] Per-case comparison with the row. **Exact match for now** (Drew: thresholds
+      undecided), so the direction does not matter and nothing is "improvement" yet.
+      `check_baseline` in `tests/cases.rs`; the message gives each metric, old →
+      new, %, and the scoped refresh command. Still open: thresholds, in both
+      directions, kept in one place.
+- [x] A case with no row fails, naming the scoped refresh.
 - [x] The leak gate stays per case — and now holds for *every* running case,
       pinned or not (`run_performance_check` always measures; it used to run only
       because `performance` was mandatory except for `examples/`, which therefore
       escaped it). It also gates a file's `.performance` blocks in `check`. The
       tests that prove the gates fire use a test-only runtime switch,
       `AIPL_INJECT_LEAK`.
-- [ ] Handoff (`handoff/src/discovery.rs` + unit tests, `main.rs`): recognize
-      baseline-move failures by a distinct marker. Keep going through refills, IR
-      regen and the final run; exit non-zero with the list. After the final run,
-      run a scoped refresh for added or deleted cases. This is bookkeeping, not
-      a reviewed move.
+- [x] Handoff (`handoff/src/discovery.rs` + unit tests, `main.rs`): recognize
+      baseline-move failures by a distinct marker (`]: performance baseline
+      moved|missing`, a contract with `check_baseline`). It goes through refills,
+      IR regen and the final run, then exits 1 with each moved case, what moved,
+      and the accept command. The staged-IR corpus run tolerates them (a move is
+      not evidence against the candidate). A case with no row is bookkeeping:
+      after the final run handoff adds the rows with a scoped `refresh_perfmon`.
+      Verified end to end by perturbing one row and deleting another.
 - [x] `--- performance ---` becomes optional (the "missing required" failure is
       gone; `fill_expected` refreshes an existing section and never adds one;
       handoff no longer matches the old message).

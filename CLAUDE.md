@@ -215,7 +215,7 @@ and stays stable, so neither normally needs regenerating — the
 the enforcement test.
 
 ## Performance monitoring (non-deterministic)
-Two separate perf tracks:
+Performance is tracked in two places:
 - **Deterministic, asserted.** A case says what it asserts about cost in one of
   four ways, by what it is *for*:
 
@@ -271,17 +271,35 @@ Two separate perf tracks:
   codegen change that moves a size. A case with both a `--- report ---` and a
   `--- performance ---` has two renderings of one run. Examples:
   `tests/cases/report/`, and the fusion cases in `tests/cases/optimizations/`.
-- **Non-deterministic, *not* asserted**: `tests/performance_metrics.md` — a
-  checked-in table of wall-clock (measured in-process, so process spawn/teardown
-  is excluded), build time, and peak RSS per case. These drift run-to-run, so
-  nothing asserts on them; they exist only to track trends.
+- **The baseline table, `tests/performance_metrics.md`** — one row for **every
+  case that runs**, whatever else it carries. Its columns come in two groups:
+  - *Asserted*: allocations, bytes allocated, peak live bytes, instructions and
+    code bytes. Deterministic, and every case's run must reproduce its row
+    **exactly** (thresholds are undecided, so for now there are none). A case whose
+    numbers moved fails with `performance baseline moved`, naming each metric
+    (old → new, %) and the scoped command that accepts the change; a case with no
+    row fails with `performance baseline missing`. Unlike a section, this is not
+    stale text a refill can rewrite — a moved number is a thing to look at — so
+    `fill_expected` leaves it alone, and `cargo handoff` treats it differently:
+    it runs the rest of the gate to the end, then **exits 1 listing the moved
+    cases**. Review them (a change that was meant to be free is the regression
+    this exists to catch), then accept with the command it prints. A case with *no
+    row* is bookkeeping rather than a move, so handoff adds the row itself.
+  - *Not asserted*: wall-clock (measured in-process, so process spawn/teardown is
+    excluded), build time, and peak RSS. These drift run-to-run, so they're checked
+    in only to track trends.
 
-Refresh the non-deterministic table with:
+Refresh the table with:
 `cargo test --test cases -- --ignored refresh_perfmon`
-It runs serially, rewrites `tests/performance_metrics.md`, and prints an
-overall (summed-across-tests) change plus per-test wall-clock outliers and
-added/removed tests, then fails intentionally so the summary is visible. Review
-the printed summary, then commit the regenerated file. The runtime self-times
+It runs serially, builds each case both ways (the production binary for the
+non-deterministic columns, the instrumented one for the counts), rewrites
+`tests/performance_metrics.md`, and prints an overall (summed-across-tests)
+change plus every case whose counts moved, the per-test timing outliers, and
+added/removed tests, then fails intentionally so the summary is visible.
+**`AIPL_CASE` scopes it** the way it scopes `fill_expected` (a path substring, or a
+comma-separated list): only the matching rows are rewritten and the rest carried
+over; a run of any scope drops rows whose case no longer exists. Review the
+printed summary, then commit the regenerated file. The runtime self-times
 only when `AIPL_PERFMON_STATS` points at a file, so normal runs and `aipl build`
 binaries are unaffected.
 
