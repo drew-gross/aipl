@@ -14891,6 +14891,32 @@ fn compile_call<M: Module>(
     Ok((ret_v, info.return_ty.clone()))
 }
 
+/// The error for a call that reached codegen with the wrong number of arguments.
+///
+/// Never a user's mistake, so it is not worded as one. A call to anything with a
+/// signature — every builtin and every user function — has its arity checked
+/// before codegen runs: `check_call` in `aipl-mono` reports `fn "f" expects N
+/// arg(s), got M` against the declared parameters, after the loader has filled in
+/// every keyword and defaulted argument, so what arrives here is the full list. A
+/// call the compiler built itself (an intrinsic a pass introduced, a lowering) has
+/// no signature to be checked against and is held to its intrinsic's arity by the
+/// pass that wrote it. Either way, a miscounted call that gets this far means a
+/// pass broke an invariant: a compiler bug to report, not a program to fix.
+///
+/// The arms below destructure `args` with `let [..] = args else { .. }` rather than
+/// test its length and index it, so the arity is enforced by the pattern and every
+/// argument has a name; this is what the `else` returns.
+fn arity_bug(name: &str, expected: usize, got: usize, span: &Span) -> Error {
+    Error::at(
+        format!(
+            "internal error: {name:?} reached codegen with {got} argument(s), expected \
+             {expected} — arity is checked before codegen (see `arity_bug`), so a pass \
+             built a miscounted call"
+        ),
+        span.clone(),
+    )
+}
+
 /// Compile a call expression, dispatched on the `callee` — the
 /// `ExprKind::Call` handling extracted from [`compile_expr`] so expression
 /// dispatch stays readable. `args`/`style` are the call's arguments and method-
@@ -14953,10 +14979,7 @@ fn compile_call_expr<M: Module>(
     // the name and so cannot be recovered from an opcode alone.
     if *callee == Callee::LogicalNot {
         let [x] = args else {
-            return Err(Error::at(
-                format!("{name:?} expects 1 argument, got {}", args.len()),
-                span.clone(),
-            ));
+            return Err(arity_bug(name, 1, args.len(), &span));
         };
         let (v, t) = compile_expr(module, builder, cx, scopes, x)?;
         expect_type(
@@ -14971,13 +14994,10 @@ fn compile_call_expr<M: Module>(
         ));
     }
     if let Some(op) = aipl_syntax::binop_for_builtin(callee) {
-        if args.len() != 2 {
-            return Err(Error::at(
-                format!("{name:?} expects 2 arguments, got {}", args.len()),
-                span.clone(),
-            ));
-        }
-        return compile_binop(module, builder, cx, scopes, &args[0], op, &args[1], &span);
+        let [lhs, rhs] = args else {
+            return Err(arity_bug(name, 2, args.len(), &span));
+        };
+        return compile_binop(module, builder, cx, scopes, lhs, op, rhs, &span);
     }
 
     Ok(match callee {
@@ -14992,16 +15012,13 @@ fn compile_call_expr<M: Module>(
             // flavor (wrapping/saturating) and operation (add/sub/mul) are the only
             // differences — see `emit_int_addsub` (multiply is wrapping-only).
             // Scalar ints carry no refcount, so there's nothing to track.
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("{name:?} expects 2 arguments, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (lv, lt) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            let (rv, rt) = compile_expr(module, builder, cx, scopes, &args[1])?;
-            let lt = flex_int_ty(&args[0], &lt, &rt);
-            let rt = flex_int_ty(&args[1], &rt, &lt);
+            let [lhs, rhs] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (lv, lt) = compile_expr(module, builder, cx, scopes, lhs)?;
+            let (rv, rt) = compile_expr(module, builder, cx, scopes, rhs)?;
+            let lt = flex_int_ty(lhs, &lt, &rt);
+            let rt = flex_int_ty(rhs, &rt, &lt);
             let p = match (&lt, &rt) {
                 (ConcreteType::Primitive(a), ConcreteType::Primitive(b))
                     if a.is_int() && a == b =>
@@ -15013,13 +15030,13 @@ fn compile_call_expr<M: Module>(
                         &lt,
                         &ConcreteType::Primitive(Primitive::I64),
                         "arithmetic operand",
-                        args[0].span.clone(),
+                        lhs.span.clone(),
                     )?;
                     expect_type(
                         &rt,
                         &ConcreteType::Primitive(Primitive::I64),
                         "arithmetic operand",
-                        args[1].span.clone(),
+                        rhs.span.clone(),
                     )?;
                     Primitive::I64
                 }
@@ -15045,13 +15062,10 @@ fn compile_call_expr<M: Module>(
             // rendered container or constructor still is (`["a", "b"]`,
             // `some('c')`), where the quotes are what tells a string apart
             // from the structure around it.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("\"to_str\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [value] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
             let s = if is_str_repr(&t) {
                 v
             } else if t == ConcreteType::Primitive(Primitive::Char) {
@@ -15069,13 +15083,10 @@ fn compile_call_expr<M: Module>(
             // (see `aipl_mono::fuse`). Nothing is allocated, so there is no
             // fresh `str` to track and no reference to release; the result is a
             // plain integer.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("\"to_str_len\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [value] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
             let len = emit_to_str_len(module, builder, cx, v, &t)?;
             (len, ConcreteType::Primitive(Primitive::U64))
         }
@@ -15083,13 +15094,10 @@ fn compile_call_expr<M: Module>(
             // Generic `hash(x) -> i64`: structural hash by the argument's static
             // type. Borrows the argument (no consume), so its scope-track is
             // untouched.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("\"hash\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [value] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
             let h = emit_hash(module, builder, cx.builtins, cx.structs, v, &t)?;
             (h, ConcreteType::Primitive(Primitive::I64))
         }
@@ -15098,24 +15106,17 @@ fn compile_call_expr<M: Module>(
             // `T?` (`none` if empty). Elements are comparable scalars (the checker
             // restricts to integers/char), so the optional owns no heap. Walks
             // the array with a running accumulator, like the `for`-loop arm.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!(
-                        "{:?} expects 1 argument, got {}",
-                        display_name(name),
-                        args.len()
-                    ),
-                    span.clone(),
-                ));
-            }
+            let [array] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
             let is_min = *callee == Callee::Minimum;
-            let (arr_ptr, arr_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let (arr_ptr, arr_ty) = compile_expr(module, builder, cx, scopes, array)?;
             let elem = match &arr_ty {
                 ConcreteType::Array(e) => (**e).clone(),
                 _ => {
                     return Err(Error::at(
                         format!("{:?} of one argument expects an array", display_name(name)),
-                        args[0].span.clone(),
+                        array.span.clone(),
                     ))
                 }
             };
@@ -15208,19 +15209,15 @@ fn compile_call_expr<M: Module>(
             // larger. Scalars compare with `icmp` under the operand type's own
             // signedness; strings order lexicographically through the runtime
             // `aipl_str_cmp`, exactly as `<`/`>` do.
-            let disp = display_name(name);
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("{disp:?} expects 2 arguments, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (a, at) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            let (b, bt) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let [lhs, rhs] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (a, at) = compile_expr(module, builder, cx, scopes, lhs)?;
+            let (b, bt) = compile_expr(module, builder, cx, scopes, rhs)?;
             // A bare integer literal flexes to the other side's width, so
             // `n.max(1)` needs no conversion on the `1` whatever `n` is.
-            let at = flex_int_ty(&args[0], &at, &bt);
-            let bt = flex_int_ty(&args[1], &bt, &at);
+            let at = flex_int_ty(lhs, &at, &bt);
+            let bt = flex_int_ty(rhs, &bt, &at);
             let want = if *callee == Callee::Min { "min" } else { "max" };
             let is_str = is_str_repr(&at) && is_str_repr(&bt);
             if !is_str {
@@ -15289,25 +15286,22 @@ fn compile_call_expr<M: Module>(
             // (views of `s` for long parts, copies for short). It consumes both
             // str refs, so inc each first (our scope-tracked refs must survive),
             // then track the fresh array for drop.
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("split expects 2 args, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (s_v, s_t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [text, separator] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (s_v, s_t) = compile_expr(module, builder, cx, scopes, text)?;
             expect_type(
                 &s_t,
                 &ConcreteType::Primitive(Primitive::Str),
                 "split receiver",
-                args[0].span.clone(),
+                text.span.clone(),
             )?;
-            let (sep_v, sep_t) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let (sep_v, sep_t) = compile_expr(module, builder, cx, scopes, separator)?;
             expect_type(
                 &sep_t,
                 &ConcreteType::Primitive(Primitive::Str),
                 "split separator",
-                args[1].span.clone(),
+                separator.span.clone(),
             )?;
             // Tagged `aipl_str_split` consumes both; `aipl_str_split` borrows.
             let result = array_value_slot(builder);
@@ -15324,18 +15318,15 @@ fn compile_call_expr<M: Module>(
             // failure. The runtime returns the contents pointer or null; codegen
             // wraps it into the Result with a static error message. The
             // `!read_files` effect is already enforced by the checker.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("read_file_to_string expects 1 arg, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (name_v, name_t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [filename] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (name_v, name_t) = compile_expr(module, builder, cx, scopes, filename)?;
             expect_type(
                 &name_t,
                 &ConcreteType::Primitive(Primitive::Str),
                 "read_file_to_string filename",
-                args[0].span.clone(),
+                filename.span.clone(),
             )?;
             // The runtime consumes (decs) the filename ref, so inc to keep our
             // scope-tracked ref alive.
@@ -15404,18 +15395,15 @@ fn compile_call_expr<M: Module>(
             // empty listing is still a real, non-null array block, so it reads
             // back as `ok([])`); codegen wraps it into the Result with a static
             // error message. The `!list_files` effect is checker-enforced.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("list_files expects 1 arg, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (dir_v, dir_t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [directory] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (dir_v, dir_t) = compile_expr(module, builder, cx, scopes, directory)?;
             expect_type(
                 &dir_t,
                 &ConcreteType::Primitive(Primitive::Str),
                 "list_files directory",
-                args[0].span.clone(),
+                directory.span.clone(),
             )?;
             // The tagged runtime consumes (decs) the directory ref, so inc to
             // keep our scope-tracked ref alive; `aipl_list_files` borrows.
@@ -15454,25 +15442,22 @@ fn compile_call_expr<M: Module>(
             // `(str, str) -> !str`: ok() on success, err(message) on failure. The
             // runtime returns 1/0; codegen wraps it into the void-Ok Result with a
             // static error message. The `!write_files` effect is checker-enforced.
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("write_string_to_file expects 2 args, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (path_v, path_t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [path, contents] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (path_v, path_t) = compile_expr(module, builder, cx, scopes, path)?;
             expect_type(
                 &path_t,
                 &ConcreteType::Primitive(Primitive::Str),
                 "write_string_to_file path",
-                args[0].span.clone(),
+                path.span.clone(),
             )?;
-            let (data_v, data_t) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let (data_v, data_t) = compile_expr(module, builder, cx, scopes, contents)?;
             expect_type(
                 &data_t,
                 &ConcreteType::Primitive(Primitive::Str),
                 "write_string_to_file contents",
-                args[1].span.clone(),
+                contents.span.clone(),
             )?;
             // The runtime consumes (decs) both str args, so inc to keep ours alive.
             // Tagged consumes both refs; `aipl_write_string_to_file` borrows.
@@ -15491,20 +15476,17 @@ fn compile_call_expr<M: Module>(
         }
         Callee::IsSome => {
             // `is_some(opt: T?) -> bool` — true when the optional is present.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("\"is_some\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (ptr, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [optional] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (ptr, recv_ty) = compile_expr(module, builder, cx, scopes, optional)?;
             if !matches!(&recv_ty, ConcreteType::Optional(_)) {
                 return Err(Error::at(
                     format!(
                         "\"is_some\" is only callable on an optional, got {}",
                         type_name(&recv_ty)
                     ),
-                    args[0].span.clone(),
+                    optional.span.clone(),
                 ));
             }
             // `is_some` is the *outermost* layer: any nonzero tag is `some`
@@ -15522,13 +15504,10 @@ fn compile_call_expr<M: Module>(
             // load and no payload is touched — the same read `same_case` and
             // `case_name` do, handed back as a value instead of consumed on the
             // spot. The receiver is borrowed; nothing is consumed.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("\"case_of\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (v, v_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [value] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (v, v_ty) = compile_expr(module, builder, cx, scopes, value)?;
             // The checker's `variant` bound is what guarantees this; the check
             // catches a caller that reached codegen another way rather than
             // reading a tag off something that has none.
@@ -15538,7 +15517,7 @@ fn compile_call_expr<M: Module>(
                         "\"case_of\" is only callable on a variant, got {}",
                         type_name(&v_ty)
                     ),
-                    args[0].span.clone(),
+                    value.span.clone(),
                 ));
             };
             if cx
@@ -15549,7 +15528,7 @@ fn compile_call_expr<M: Module>(
             {
                 return Err(Error::at(
                     format!("\"case_of\" is only callable on a variant, got {vname}"),
-                    args[0].span.clone(),
+                    value.span.clone(),
                 ));
             }
             let tag = builder
@@ -15568,18 +15547,15 @@ fn compile_call_expr<M: Module>(
             //
             // Both operands are borrowed, like `hash` — nothing is consumed, so
             // their scope-tracking is untouched.
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("\"same_case\" expects 2 arguments, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (a, a_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            let (b, b_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let [lhs, rhs] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (a, a_ty) = compile_expr(module, builder, cx, scopes, lhs)?;
+            let (b, b_ty) = compile_expr(module, builder, cx, scopes, rhs)?;
             // The bound is enforced by the checker; this catches a caller that
             // reached codegen another way (a synthesized call, say) rather than
             // silently reading a tag off something that has none.
-            for (t, e) in [(&a_ty, &args[0]), (&b_ty, &args[1])] {
+            for (t, e) in [(&a_ty, lhs), (&b_ty, rhs)] {
                 let is_variant = matches!(t, ConcreteType::Named(n)
                     if cx.structs.get(n).and_then(TypeDef::as_variant).is_some());
                 if !is_variant {
@@ -15616,13 +15592,10 @@ fn compile_call_expr<M: Module>(
             //
             // The receiver is borrowed, like `same_case` — nothing is consumed,
             // so its scope tracking is untouched.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("\"case_name\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (v, v_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [value] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (v, v_ty) = compile_expr(module, builder, cx, scopes, value)?;
             // A variant value leads with its tag; a `Case<V>` *is* the tag. Both
             // name a case, which is what the `variant` bound now admits, so the
             // only difference here is whether the tag needs loading.
@@ -15638,7 +15611,7 @@ fn compile_call_expr<M: Module>(
                             "\"case_name\" is only callable on a variant or a case, got {}",
                             type_name(&v_ty)
                         ),
-                        args[0].span.clone(),
+                        value.span.clone(),
                     ));
                 }
             };
@@ -15653,7 +15626,7 @@ fn compile_call_expr<M: Module>(
                         "\"case_name\" is only callable on a variant, got {}",
                         type_name(&v_ty)
                     ),
-                    args[0].span.clone(),
+                    value.span.clone(),
                 ));
             };
             let tag = if tag_is_value {
@@ -15697,20 +15670,17 @@ fn compile_call_expr<M: Module>(
         }
         Callee::IsSpace => {
             // `c.is_space() -> bool` — true when c is ASCII whitespace.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("\"is_space\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (c, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [ch] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (c, recv_ty) = compile_expr(module, builder, cx, scopes, ch)?;
             if !matches!(&recv_ty, ConcreteType::Primitive(Primitive::Char)) {
                 return Err(Error::at(
                     format!(
                         "\"is_space\" is only callable on a char, got {}",
                         type_name(&recv_ty)
                     ),
-                    args[0].span.clone(),
+                    ch.span.clone(),
                 ));
             }
             // Check if c is ' ', '\t', '\n', or '\r' (32, 9, 10, 13).
@@ -15733,20 +15703,17 @@ fn compile_call_expr<M: Module>(
             // predicate covering them has to come from the compiler. That is
             // what lets `is_all_whitespace` be written in AIPL without narrowing
             // what it accepts (see `builtin_is_all_whitespace.aipl`).
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("\"is_whitespace\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (c, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [ch] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (c, recv_ty) = compile_expr(module, builder, cx, scopes, ch)?;
             if recv_ty != ConcreteType::Primitive(Primitive::Char) {
                 return Err(Error::at(
                     format!(
                         "\"is_whitespace\" is only callable on a char, got {}",
                         type_name(&recv_ty)
                     ),
-                    args[0].span.clone(),
+                    ch.span.clone(),
                 ));
             }
             let mut acc = builder.ins().icmp_imm_s(IntCC::Equal, c, 32);
@@ -15759,20 +15726,17 @@ fn compile_call_expr<M: Module>(
         }
         Callee::IsDigit => {
             // `c.is_digit() -> bool` — true when c is '0'..'9'.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("\"is_digit\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (c, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [ch] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (c, recv_ty) = compile_expr(module, builder, cx, scopes, ch)?;
             if !matches!(&recv_ty, ConcreteType::Primitive(Primitive::Char)) {
                 return Err(Error::at(
                     format!(
                         "\"is_digit\" is only callable on a char, got {}",
                         type_name(&recv_ty)
                     ),
-                    args[0].span.clone(),
+                    ch.span.clone(),
                 ));
             }
             // Check if '0' (48) <= c <= '9' (57).
@@ -15789,20 +15753,17 @@ fn compile_call_expr<M: Module>(
         Callee::ToDigit => {
             // `c.to_digit() -> i64?` — an ASCII digit '0'..'9' to its 0..9
             // value (`c - '0'`), `none` for any other char.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("\"to_digit\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (c, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [ch] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (c, recv_ty) = compile_expr(module, builder, cx, scopes, ch)?;
             if !matches!(&recv_ty, ConcreteType::Primitive(Primitive::Char)) {
                 return Err(Error::at(
                     format!(
                         "\"to_digit\" is only callable on a char, got {}",
                         type_name(&recv_ty)
                     ),
-                    args[0].span.clone(),
+                    ch.span.clone(),
                 ));
             }
             // Branchless: the `i64?` core is a plain scalar (no heap, no
@@ -15841,13 +15802,10 @@ fn compile_call_expr<M: Module>(
                 Callee::IsNonempty => "is_nonempty",
                 _ => "is_empty",
             };
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("fn \"{what}\" expects 1 arg, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [receiver] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (ptr, t) = compile_expr(module, builder, cx, scopes, receiver)?;
             let len = if is_char_set(&t) {
                 emit_charset_len(builder, ptr)
             } else if is_str_shaped(&t) {
@@ -15869,7 +15827,7 @@ fn compile_call_expr<M: Module>(
                         "\"{what}\" expects a str, array, set, or dict, got {}",
                         type_name(&t)
                     ),
-                    args[0].span.clone(),
+                    receiver.span.clone(),
                 ));
             };
             if *callee == Callee::Len {
@@ -15894,13 +15852,10 @@ fn compile_call_expr<M: Module>(
             // element type to an integer, `char`, or `str`; which of those decides
             // how the runtime reads each element (`SORT_KIND_*`), and the stride
             // says how wide it is.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("\"sort\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [receiver] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (ptr, t) = compile_expr(module, builder, cx, scopes, receiver)?;
             // A `str` (or a str-shaped `char[]`) is not an array block — it has no
             // length field and its elements are bytes — so it sorts through the
             // str path, exactly as `reverse` splits these cases. A `str` receiver
@@ -15924,7 +15879,7 @@ fn compile_call_expr<M: Module>(
             let ConcreteType::Array(elem) = &t else {
                 return Err(Error::at(
                     format!("\"sort\" expects an array, got {}", type_name(&t)),
-                    args[0].span.clone(),
+                    receiver.span.clone(),
                 ));
             };
             let elem = (**elem).clone();
@@ -15954,7 +15909,7 @@ fn compile_call_expr<M: Module>(
                             "\"sort\" needs comparable elements (an integer, char, or str), got {}",
                             type_name(other)
                         ),
-                        args[0].span.clone(),
+                        receiver.span.clone(),
                     ));
                 }
             };
@@ -15991,15 +15946,12 @@ fn compile_call_expr<M: Module>(
             // already filled every omitted one — `final_sep` and `only_sep`
             // default to `sep`, which is how an ordinary join stays an ordinary
             // join.
-            if args.len() != 4 {
-                return Err(Error::at(
-                    format!("\"join\" expects 1 argument, got {}", args.len() - 3),
-                    span.clone(),
-                ));
-            }
-            let (parts, pt) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [receiver, sep, final_sep, only_sep] = args else {
+                return Err(arity_bug(name, 4, args.len(), &span));
+            };
+            let (parts, pt) = compile_expr(module, builder, cx, scopes, receiver)?;
             let mut seps: Vec<(Value, ConcreteType)> = Vec::with_capacity(3);
-            for a in &args[1..] {
+            for a in [sep, final_sep, only_sep] {
                 seps.push(compile_expr(module, builder, cx, scopes, a)?);
             }
             // The separator that gets to name `T` for an empty receiver, below.
@@ -16027,7 +15979,7 @@ fn compile_call_expr<M: Module>(
                             "\"join\" expects an array of arrays, got {}",
                             type_name(other)
                         ),
-                        args[0].span.clone(),
+                        receiver.span.clone(),
                     ));
                 }
             };
@@ -16050,7 +16002,7 @@ fn compile_call_expr<M: Module>(
                             "\"join\" cannot tell what it is joining: the parts and the \
                              separator are both empty, so neither names an element type"
                                 .to_string(),
-                            args[0].span.clone(),
+                            receiver.span.clone(),
                         ));
                     }
                     // A `T[]` separator is already the parts' element type; a
@@ -16108,7 +16060,7 @@ fn compile_call_expr<M: Module>(
                                 "\"join\" expects an array of arrays, got an array of {}",
                                 type_name(other)
                             ),
-                            args[0].span.clone(),
+                            receiver.span.clone(),
                         ));
                     }
                 };
@@ -16187,12 +16139,9 @@ fn compile_call_expr<M: Module>(
             // call (`SetOrder::Context`, see `needs_lock`); with none, the plain
             // unordered set. Built like a literal: a block pre-sized to the
             // array's length, each element inserted deduplicated in that order.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("\"to_set\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
+            let [receiver] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
             let order = match &locked {
                 Some(ConcreteType::Set(_, o)) if *o != aipl_syntax::ast::SetOrder::Context => *o,
                 _ => aipl_syntax::ast::SetOrder::Unordered,
@@ -16215,7 +16164,7 @@ fn compile_call_expr<M: Module>(
             //
             // A string literal is str-shaped by construction, so its element
             // type is `char` without asking.
-            if let ExprKind::Str(lit) = &args[0].kind {
+            if let ExprKind::Str(lit) = &receiver.kind {
                 let elem = ConcreteType::Primitive(Primitive::Char);
                 let mut words = [0u64; CHARSET_WORDS];
                 for c in lit.as_bytes() {
@@ -16235,7 +16184,7 @@ fn compile_call_expr<M: Module>(
                 let base = builder.ins().stack_addr(types::I64, slot, 0);
                 return Ok((base, ConcreteType::Set(Box::new(elem), order)));
             }
-            let (arr_ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let (arr_ptr, t) = compile_expr(module, builder, cx, scopes, receiver)?;
             // A `str` receiver gives a `#{char}` — a string is a sequence of
             // chars, and the bitfield is filled by streaming it, so nothing
             // reads its bytes as array elements.
@@ -16248,7 +16197,7 @@ fn compile_call_expr<M: Module>(
                             "\"to_set\" requires an array or a str, got {}",
                             type_name(other)
                         ),
-                        args[0].span.clone(),
+                        receiver.span.clone(),
                     ));
                 }
             };
@@ -16348,20 +16297,17 @@ fn compile_call_expr<M: Module>(
             // same block, retained, seen as an array — no copy, except for a
             // narrow integer element (below). The checker has already refused
             // an unordered receiver.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("\"to_array\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [receiver] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (ptr, t) = compile_expr(module, builder, cx, scopes, receiver)?;
             let ConcreteType::Set(elem, order) = &t else {
                 return Err(Error::at(
                     format!(
                         "\"to_array\" requires an ordered set, got {}",
                         type_name(&t)
                     ),
-                    args[0].span.clone(),
+                    receiver.span.clone(),
                 ));
             };
             if !order.is_ordered() {
@@ -16370,7 +16316,7 @@ fn compile_call_expr<M: Module>(
                         "\"to_array\" requires an ordered set, got {}",
                         type_name(&t)
                     ),
-                    args[0].span.clone(),
+                    receiver.span.clone(),
                 ));
             }
             // The set's block, under its value.
@@ -16401,13 +16347,10 @@ fn compile_call_expr<M: Module>(
         Callee::Reverse => {
             // `xs.reverse() -> T[]` / `s.reverse() -> str` — new sequence with
             // elements (or bytes) in reverse order. Consumes `self` (callers pre-inc).
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("\"reverse\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [receiver] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (ptr, t) = compile_expr(module, builder, cx, scopes, receiver)?;
             if is_str_repr(&t) {
                 // The tagged entry point consumes its receiver, so the caller incs to
                 // balance its own track. The wide one borrows (`active_sym`), so the
@@ -16455,7 +16398,7 @@ fn compile_call_expr<M: Module>(
             } else {
                 return Err(Error::at(
                     format!("\"reverse\" expects a str or array, got {}", type_name(&t)),
-                    args[0].span.clone(),
+                    receiver.span.clone(),
                 ));
             }
         }
@@ -16626,14 +16569,11 @@ fn compile_call_expr<M: Module>(
             // (unlike `starts_with`/`ends_with`, whose `none` is the
             // always-matching empty pattern).
             let shape = *shape;
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("\"contains\" expects 2 args, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (recv, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            let (ndl_v, ndl_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let [receiver, needle] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (recv, recv_ty) = compile_expr(module, builder, cx, scopes, receiver)?;
+            let (ndl_v, ndl_ty) = compile_expr(module, builder, cx, scopes, needle)?;
             let result = if is_str_shaped(&recv_ty) {
                 // `char*` needle. The str runtime consumes (decs) both refs, so
                 // each str handed to it is pre-inc'd; a built 1-char string is
@@ -16690,7 +16630,7 @@ fn compile_call_expr<M: Module>(
                                 "\"contains\" expects a str or array, got {}",
                                 type_name(other)
                             ),
-                            args[0].span.clone(),
+                            receiver.span.clone(),
                         ));
                     }
                 };
@@ -16751,13 +16691,10 @@ fn compile_call_expr<M: Module>(
         Callee::CharToStr => {
             // Internal: a single `char` to a one-char inline `str`. Emitted by
             // variadic `char*` specialization (see mono's `specialize_variadic`).
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("__char_to_str expects 1 arg, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (c, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [ch] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (c, _) = compile_expr(module, builder, cx, scopes, ch)?;
             (
                 emit_char_to_str(module, builder, cx, c),
                 ConcreteType::Primitive(Primitive::Str),
@@ -16766,23 +16703,20 @@ fn compile_call_expr<M: Module>(
         Callee::Has => {
             // `has(s: T{}, x: T) -> bool` — set membership. Borrows the set
             // (it stays live in the caller's scope), so no inc/dec.
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("\"has\" expects 2 args, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (set_ptr, set_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [set, needle] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (set_ptr, set_ty) = compile_expr(module, builder, cx, scopes, set)?;
             let elem = match &set_ty {
                 ConcreteType::Set(inner, _) => (**inner).clone(),
                 other => {
                     return Err(Error::at(
                         format!("\"has\" expects a set, got {}", type_name(other)),
-                        args[0].span.clone(),
+                        set.span.clone(),
                     ));
                 }
             };
-            let (x_v, x_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let (x_v, x_ty) = compile_expr(module, builder, cx, scopes, needle)?;
             // An empty set (`__none__` element) holds nothing — always false —
             // and has no element type to check the argument against.
             if is_none_inner(&elem) {
@@ -16793,8 +16727,8 @@ fn compile_call_expr<M: Module>(
             } else {
                 // A bare literal queried against a narrow-element set flexes,
                 // so `#{u8(1)}.has(1)` needs no conversion on the `1`.
-                let x_ty = flex_int_ty(&args[1], &x_ty, &elem);
-                expect_type(&x_ty, &elem, "has element", args[1].span.clone())?;
+                let x_ty = flex_int_ty(needle, &x_ty, &elem);
+                expect_type(&x_ty, &elem, "has element", needle.span.clone())?;
                 // A char set answers from its bitfield: one shift and one mask,
                 // with no spill, no call and no bounds test — 256 bits cover
                 // `char` totally, so every value indexes a real bit.
@@ -16832,19 +16766,16 @@ fn compile_call_expr<M: Module>(
             // elements of both. (The in-place `set a = a.union(b)` reuse for an
             // exclusive `a` is handled in the Assign arm.) `aipl_set_union`
             // consumes both inputs, so inc both to balance our scope tracks.
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("\"union\" expects 2 args, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
+            let [lhs, rhs] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
             let before_a = scope_depth(scopes);
-            let (a_ptr, a_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let (a_ptr, a_ty) = compile_expr(module, builder, cx, scopes, lhs)?;
             // Whether the receiver is a fresh temporary this scope owns outright
             // — a field moved out of an owned struct parameter, a call result —
             // captured before the second operand can grow the scope past it.
             let a_owned = owned_temp_since(scopes, before_a, a_ptr);
-            let (b_ptr, b_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let (b_ptr, b_ty) = compile_expr(module, builder, cx, scopes, rhs)?;
             // Both sides must be the same set type (up to an empty-`#{}` operand,
             // whose element merges to the concrete side).
             let merged = merge_types(&a_ty, &b_ty);
@@ -16929,13 +16860,10 @@ fn compile_call_expr<M: Module>(
             // `get(d: #{K: V}, key: K) -> V?` — the bound value, else `none`.
             // Borrows the dict (no inc/dec); the matched value is retained into
             // the `some` result, so it outlives the dict.
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("\"get\" expects 2 args, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [dict, key] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, dict)?;
             // The dict's value, which the runtime is handed, and its block.
             let dict_v = dict_ptr;
             let (key_ty, val_ty) = match &dict_ty {
@@ -16943,11 +16871,11 @@ fn compile_call_expr<M: Module>(
                 other => {
                     return Err(Error::at(
                         format!("\"get\" expects a dict, got {}", type_name(other)),
-                        args[0].span.clone(),
+                        dict.span.clone(),
                     ));
                 }
             };
-            let (key_v, key_t) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let (key_v, key_t) = compile_expr(module, builder, cx, scopes, key)?;
             let result_ty = ConcreteType::Optional(Box::new(val_ty.clone()));
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
@@ -16961,8 +16889,8 @@ fn compile_call_expr<M: Module>(
                 builder.ins().stack_store(types::I64, zero, slot, 0);
                 (sbase, result_ty)
             } else {
-                let key_t = flex_int_ty(&args[1], &key_t, &key_ty);
-                expect_type(&key_t, &key_ty, "get key", args[1].span.clone())?;
+                let key_t = flex_int_ty(key, &key_t, &key_ty);
+                expect_type(&key_t, &key_ty, "get key", key.span.clone())?;
                 // Spill the key and pass its address (a `bool` reads back as i64,
                 // a `str` as its pointer).
                 // Spilled by key type, not as a bare word — see `has` for why
@@ -17026,24 +16954,20 @@ fn compile_call_expr<M: Module>(
             // and hands back one owned block, copying when the block is shared and
             // keeping it when it is not. That is exactly `extend`'s discipline, so
             // the bookkeeping below is `extend`'s.
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("\"remove_key\" expects 1 argument, got {}", args.len() - 1),
-                    span.clone(),
-                ));
-            }
-            let receiver = &args[0];
+            let [receiver, key] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
             let (slot, ty_cell, exclusive, key_ty, val_ty) =
                 mut_dict_receiver(env, receiver, "remove_key")?;
-            let (key_v, key_t) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let (key_v, key_t) = compile_expr(module, builder, cx, scopes, key)?;
             let dict_ty = ConcreteType::Dict(Box::new(key_ty.clone()), Box::new(val_ty.clone()));
             // An empty dict (`__none__` key) holds nothing, so there is nothing
             // to find and no key type to compare against.
             if is_none_inner(&key_ty) {
                 return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
             }
-            let key_t = flex_int_ty(&args[1], &key_t, &key_ty);
-            expect_type(&key_t, &key_ty, "remove_key key", args[1].span.clone())?;
+            let key_t = flex_int_ty(key, &key_t, &key_ty);
+            expect_type(&key_t, &key_ty, "remove_key key", key.span.clone())?;
             // Spilled by key type, not as a bare word — see `get` for why storing
             // a composite key's *address* into an 8-byte slot reads back wrong.
             let ks = value_slot(builder, &key_ty, structs);
@@ -17091,24 +17015,21 @@ fn compile_call_expr<M: Module>(
             } else {
                 "__dict_value_at"
             };
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("{what:?} expects 2 args, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [dict, index] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, dict)?;
             let (key_ty, val_ty) = match &dict_ty {
                 ConcreteType::Dict(k, v) => ((**k).clone(), (**v).clone()),
                 other => {
                     return Err(Error::at(
                         format!("{what:?} expects a dict, got {}", type_name(other)),
-                        args[0].span.clone(),
+                        dict.span.clone(),
                     ));
                 }
             };
-            let (idx_v, idx_t) = compile_expr(module, builder, cx, scopes, &args[1])?;
-            expect_len_operand(&idx_t, what, args[1].span.clone())?;
+            let (idx_v, idx_t) = compile_expr(module, builder, cx, scopes, index)?;
+            expect_len_operand(&idx_t, what, index.span.clone())?;
             let pair_size = dict_pair_size(&key_ty, &val_ty, structs);
             let psz = builder.ins().iconst(types::I64, pair_size);
             let pair = builtins.call(
@@ -17134,13 +17055,10 @@ fn compile_call_expr<M: Module>(
         }
         Callee::ContainsKey => {
             // `contains_key(d: #{K: V}, key: K) -> bool`. Borrows the dict.
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("\"contains_key\" expects 2 args, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [dict, key] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, dict)?;
             // The dict's value, which the runtime is handed, and its block.
             let dict_v = dict_ptr;
             let (key_ty, val_ty) = match &dict_ty {
@@ -17148,19 +17066,19 @@ fn compile_call_expr<M: Module>(
                 other => {
                     return Err(Error::at(
                         format!("\"contains_key\" expects a dict, got {}", type_name(other)),
-                        args[0].span.clone(),
+                        dict.span.clone(),
                     ));
                 }
             };
-            let (key_v, key_t) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let (key_v, key_t) = compile_expr(module, builder, cx, scopes, key)?;
             if is_none_inner(&key_ty) {
                 (
                     builder.ins().iconst(types::I64, 0),
                     ConcreteType::Primitive(Primitive::Bool),
                 )
             } else {
-                let key_t = flex_int_ty(&args[1], &key_t, &key_ty);
-                expect_type(&key_t, &key_ty, "contains_key key", args[1].span.clone())?;
+                let key_t = flex_int_ty(key, &key_t, &key_ty);
+                expect_type(&key_t, &key_ty, "contains_key key", key.span.clone())?;
                 // Spilled by key type, not as a bare word — see `has` for why
                 // storing a composite key's *address* into an 8-byte slot is the
                 // bug that reads back as a value.
@@ -17246,10 +17164,7 @@ fn compile_call_expr<M: Module>(
             // then no code at all — the call still exists for the optimizer, which
             // must not drop the computation of a value nobody reads.
             let [arg] = args else {
-                return Err(Error::at(
-                    format!("measure_consume expects 1 arg, got {}", args.len()),
-                    span.clone(),
-                ));
+                return Err(arity_bug(name, 1, args.len(), &span));
             };
             let before = scope_depth(scopes);
             let (v, ty) = compile_expr(module, builder, cx, scopes, arg)?;
@@ -17354,10 +17269,7 @@ fn compile_call_expr<M: Module>(
             // Mono only marks heap-typed bindings, so a binding of any other
             // type reaching here is a plain read.
             let [arg] = args else {
-                return Err(Error::at(
-                    format!("__move expects 1 arg, got {}", args.len()),
-                    span.clone(),
-                ));
+                return Err(arity_bug(name, 1, args.len(), &span));
             };
             // `__move(x.f)`: a heap field taken out of a struct binding that
             // owns its value (`move_field_reads`). The struct keeps its own
@@ -17540,16 +17452,13 @@ fn compile_call_expr<M: Module>(
             // Internal (emitted by `map`): allocate an empty array reserved to
             // the given capacity. Element type is unknown (`__none__`) like an
             // empty `[]`; it's refined and its drop-fn set by the first `push`.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("with_capacity expects 1 arg, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (cap, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [capacity] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (cap, t) = compile_expr(module, builder, cx, scopes, capacity)?;
             // A capacity is a count: `map`'s desugar feeds it `len()` (`u64`),
             // while hand-written calls pass an `i64` literal.
-            expect_len_operand(&t, "with_capacity capacity", args[0].span.clone())?;
+            expect_len_operand(&t, "with_capacity capacity", capacity.span.clone())?;
             // Element type unknown here (`__none__`); the drop-fn and element
             // size are settled by the first `push`. `map`/`filter` only pre-size
             // 8-byte-element outputs (optional outputs use a plain `[]`).
@@ -17772,14 +17681,9 @@ fn compile_call_expr<M: Module>(
             // and any expression-position `xs.push(x)` — was already rewritten
             // by mono into `{ mut t = xs; set t.push(x); t }`, i.e. back into
             // this form on a fresh local.
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("\"push\" expects 1 argument, got {}", args.len() - 1),
-                    span.clone(),
-                ));
-            }
-            let receiver = &args[0];
-            let value = &args[1];
+            let [receiver, value] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
             let (slot, ty_cell, exclusive, elem_ty) = mut_array_receiver(env, receiver, "push")?;
             // The element first, then the receiver: an integer array's push may
             // keep the value inline, which has to be decided before anything
@@ -17938,17 +17842,13 @@ fn compile_call_expr<M: Module>(
             // the appends that follow then fit without growing (see
             // `array_ops::reserve`, which sizes exactly; the `str` runtime's
             // `aipl_str_reserve` does the same for bytes).
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("\"reserve\" expects 1 argument, got {}", args.len() - 1),
-                    span.clone(),
-                ));
-            }
-            let receiver = &args[0];
-            let (extra, extra_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let [receiver, additional] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (extra, extra_ty) = compile_expr(module, builder, cx, scopes, additional)?;
             // A count is a length: either width reads as the same scalar, and
             // a bare literal arrives as an `i64`.
-            expect_len_operand(&extra_ty, "reserve count", args[1].span.clone())?;
+            expect_len_operand(&extra_ty, "reserve count", additional.span.clone())?;
             let (slot, ty_cell, exclusive, elem_ty) = match mut_str_receiver(env, receiver) {
                 Some((slot, cell, exclusive)) => (
                     slot,
@@ -18023,14 +17923,9 @@ fn compile_call_expr<M: Module>(
             // its final length, so appending N elements costs at most one
             // reallocation instead of the log N a repeated `push` pays — and the
             // elements then move as a single `memcpy` plus one retain pass.
-            if args.len() != 2 {
-                return Err(Error::at(
-                    format!("\"extend\" expects 1 argument, got {}", args.len() - 1),
-                    span.clone(),
-                ));
-            }
-            let receiver = &args[0];
-            let source = &args[1];
+            let [receiver, source] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
             // A `str` receiver is the `char` sequence too (see `is_char_array`),
             // so `set s.extend(t)` takes the char path below — the same in-place
             // `aipl_str_append` that `set s = s +++ t;` reaches, and the reason
@@ -18218,13 +18113,10 @@ fn compile_call_expr<M: Module>(
                 // No payload to retain or drop (unit / __none__ never need it).
                 return Ok((ptr, res_ty));
             }
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("fn {name:?} expects 1 arg, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [payload] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (v, t) = compile_expr(module, builder, cx, scopes, payload)?;
             // Any *value* can be a payload. The machinery a payload rides on is
             // already generic over the type: `elem_size_of` sizes it (an inline
             // composite — struct, variant, optional, nested result — by its
@@ -18239,7 +18131,7 @@ fn compile_call_expr<M: Module>(
                 ConcreteType::Unit => {
                     return Err(Error::at(
                         format!("{name:?} payload cannot be () — write `ok()` for a void success"),
-                        args[0].span.clone(),
+                        payload.span.clone(),
                     ));
                 }
                 // Function types are erased by monomorphization: a function is
@@ -18247,7 +18139,7 @@ fn compile_call_expr<M: Module>(
                 ConcreteType::Fn(_, _) => {
                     return Err(Error::at(
                         format!("{name:?} payload cannot be a function ({})", type_name(&t)),
-                        args[0].span.clone(),
+                        payload.span.clone(),
                     ));
                 }
                 _ => {}
@@ -18278,13 +18170,10 @@ fn compile_call_expr<M: Module>(
             (ptr, res_ty)
         }
         Callee::Some => {
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("fn \"some\" expects 1 arg, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let [payload] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (v, t) = compile_expr(module, builder, cx, scopes, payload)?;
             match &t {
                 // Every scalar: any integer width, `bool`, `char`, `str`.
                 _ if is_set_elem(&t) => {}
@@ -18298,7 +18187,7 @@ fn compile_call_expr<M: Module>(
                             "\"some\" argument: optional of {} is not supported",
                             type_name(&t)
                         ),
-                        args[0].span.clone(),
+                        payload.span.clone(),
                     ));
                 }
             }
