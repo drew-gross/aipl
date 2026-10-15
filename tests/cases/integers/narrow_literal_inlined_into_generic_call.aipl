@@ -1,0 +1,36 @@
+# A function whose whole body is an array of integer literals, called once or
+# inlined into its caller, hands that literal to whatever generic builtin the
+# caller applies. The literal is an `i8[]` only because of the return type it was
+# written under; on its own, a bare numeral is an `i64`. Once the call is inlined,
+# the argument is the literal with nothing around it, and the checker's record of
+# the type it was given is all that says so.
+#
+# Monomorphization used to ignore that record for a literal of integers and infer
+# `i64[]`, instantiating the generic builtin for the wrong element type while the
+# storage stayed one byte per element: `first` read three bytes as one wide value.
+# Now a literal built of bare integers takes the recorded type. The builtins below
+# are all ones written in AIPL, so they are generic functions instantiated by the
+# type of their argument — `minimum` and `maximum` among them, since a reduction
+# is the one generic `reduce`.
+
+import { count_if, find_if, first, greater_than as >, last, maximum, minimum, print } from builtins;
+
+fn i8s() -> i8[] { [3, -128, 127] }
+
+fn u8s() -> u8[] { [3, 255, 0] }
+
+fn i16s() -> i16[] { [-32768, 5, 32767] }
+
+fn main() !prints {
+    print(
+        `{i8s().first()} {i8s().last()} {i8s().find_if(|x| x > 100)} {i8s().count_if(|x| x > 0)}`,
+    );
+    print(`{i8s().minimum()} {i8s().maximum()}`);
+    print(`{u8s().minimum()} {u8s().maximum()}`);
+    print(`{i16s().minimum()} {i16s().maximum()} {i16s().first()}`);
+}
+--- stdout ---
+some(3) some(127) some(127) 2
+some(-128) some(127)
+some(0) some(255)
+some(-32768) some(32767) some(-32768)

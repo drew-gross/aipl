@@ -1,0 +1,58 @@
+# `minimum` and `maximum` have no implementation of their own. A reduction is a
+# fold with a binary step, so the compiler lowers `xs.minimum()` to
+# `xs.reduce(min)` and `reduce` is the single implementation of every reduction;
+# the step is the only code that differs. This case holds what that means for a
+# program.
+#
+# `reduce` is a builtin in its own right, with any step. And because the step is
+# the typed `min` and `max`, the reductions order every type those accept: `str`
+# lexicographically, `char`, and unsigned integers by their own width — a `u64`
+# above `i64::MAX` is large, not negative, which the former intrinsic's signed
+# compare got wrong.
+
+import {
+    equal as ==,
+    max,
+    maximum,
+    measure,
+    min,
+    minimum,
+    print,
+    reduce,
+    wrapping_add as +,
+    wrapping_sub as -,
+} from builtins;
+
+fn main() !prints {
+    let xs = [3, 1, 2];
+    print(`{xs.minimum()} {xs.maximum()} {xs.reduce(min)} {xs.reduce(max)}`);
+
+    // Any step. This one sums, seeded by the first element.
+    print(`{xs.reduce(|acc, x| acc + x)}`);
+
+    // Nothing to reduce, and one element.
+    let nothing: i64[] = [];
+    print(`{nothing.minimum()} {[7].maximum()}`);
+
+    // Strings and chars order as `<` does.
+    print(`{["pear", "apple", "fig"].minimum()} {["pear", "apple", "fig"].maximum()}`);
+    print(`{['b', 'a', 'c'].minimum()}`);
+
+    // An unsigned value above `i64::MAX` is the largest, not the smallest.
+    let zero: u64 = 0;
+    let huge = zero - 1;
+    let wide: u64[] = [huge, 1, 5];
+    print(`{wide.minimum()} {wide.maximum() == some(huge)}`);
+}.performance({
+    // The generic fold costs no allocation: the accumulator is a scalar optional.
+    let xs = [3, 1, 2];
+    assert(measure("minimum", xs, minimum).allocations == 0);
+    assert(measure("reduce", xs, |a| a.reduce(min)).allocations == 0);
+})
+--- stdout ---
+some(1) some(3) some(1) some(3)
+some(6)
+none some(7)
+some("apple") some("pear")
+some('a')
+some(1) true

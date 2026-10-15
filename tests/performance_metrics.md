@@ -54,7 +54,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/arrays/list_utils | 13 | 265 | 265 | 1431 | 4292 | 15.00 | 354.18 | 1488 |
 | cases/arrays/match | 8 | 301 | 301 | 1136 | 7016 | 9.00 | 84.73 | 1504 |
 | cases/arrays/match_binders | 8 | 421 | 421 | 771 | 3528 | 13.00 | 84.27 | 1456 |
-| cases/arrays/min_max | 1 | 32 | 32 | 1227 | 3680 | 3.00 | 84.64 | 1488 |
+| cases/arrays/min_max | 1 | 32 | 32 | 1791 | 2952 | 3.00 | 260.90 | 1488 |
 | cases/arrays/narrow_elements_packed | 41 | 2288 | 3618 | 35113 | 10952 | 32.00 | 93.37 | 1488 |
 | cases/arrays/nested_array_annotation | 11 | 760 | 760 | 878 | 3492 | 5.00 | 84.48 | 1504 |
 | cases/arrays/nested_array_to_str | 14 | 876 | 876 | 4415 | 6956 | 10.00 | 85.10 | 1488 |
@@ -75,6 +75,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/arrays/push/push_in_place_amortized | 1 | 64 | 112 | 402 | 1052 | 3.00 | 80.95 | 1504 |
 | cases/arrays/push/push_none_element | 6 | 217 | 217 | 1183 | 5040 | 7.00 | 89.03 | 1488 |
 | cases/arrays/push_aliased_array | 4 | 312 | 384 | 1672 | 2388 | 4.00 | 84.87 | 1520 |
+| cases/arrays/reduce | 27 | 1587 | 1587 | 3529 | 8264 | 20.00 | 133.17 | 1488 |
 | cases/arrays/reverse | 0 | 0 | 0 | 950 | 2176 | 2.00 | 87.40 | 1456 |
 | cases/arrays/reverse_allocates_nothing | 0 | 0 | 0 | 577 | 1256 | 1.00 | 84.72 | 1424 |
 | cases/arrays/slice | 12 | 433 | 433 | 3433 | 3760 | 12.00 | 85.60 | 1488 |
@@ -191,7 +192,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/functions/void/main_returns_nothing | 0 | 0 | 0 | 12 | 76 | 2.00 | 77.20 | 1424 |
 | cases/functions/void/void_function | 4 | 352 | 176 | 86 | 356 | 5.00 | 78.06 | 1440 |
 | cases/generics/bare_type_param | 0 | 0 | 0 | 45 | 256 | 2.00 | 77.18 | 1456 |
-| cases/generics/bound_propagation | 6 | 129 | 129 | 663 | 2588 | 7.00 | 82.39 | 1456 |
+| cases/generics/bound_propagation | 6 | 129 | 129 | 825 | 2764 | 8.00 | 82.83 | 1456 |
 | cases/generics/count_elements | 1 | 17 | 17 | 465 | 1008 | 3.00 | 79.14 | 1472 |
 | cases/generics/emit_builder | 2 | 170 | 170 | 539 | 2140 | 5.00 | 81.52 | 1472 |
 | cases/generics/emit_builder_multi | 3 | 241 | 224 | 728 | 3548 | 6.00 | 84.19 | 1488 |
@@ -234,6 +235,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/integers/literal_flex_boundaries | 0 | 0 | 0 | 157 | 760 | 1.00 | 82.75 | 1472 |
 | cases/integers/literal_flexing | 11 | 198 | 198 | 309 | 1256 | 10.00 | 85.03 | 1488 |
 | cases/integers/narrow_int_elements | 10 | 332 | 332 | 1983 | 5468 | 9.00 | 96.47 | 1488 |
+| cases/integers/narrow_literal_inlined_into_generic_call | 25 | 1504 | 1504 | 2246 | 6252 | 11.00 | 263.16 | 1456 |
 | cases/integers/negative_literals | 0 | 0 | 0 | 153 | 684 | 1.00 | 80.32 | 1440 |
 | cases/integers/saturating_add | 0 | 0 | 0 | 250 | 1156 | 2.00 | 82.29 | 1472 |
 | cases/integers/saturating_sub | 0 | 0 | 0 | 256 | 1156 | 2.00 | 81.42 | 1472 |
@@ -743,6 +745,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_opt_left_fold | 4 | 312 | 312 | 2448 | 5600 | 5.00 | 95.46 | 1520 |
 | crates/aipl-mono/src/builtin_opt_right_fold | 4 | 312 | 312 | 2608 | 5620 | 5.00 | 95.10 | 1504 |
 | crates/aipl-mono/src/builtin_range | 2 | 120 | 120 | 788 | 2136 | 3.00 | 81.89 | 1472 |
+| crates/aipl-mono/src/builtin_reduce | 3 | 240 | 240 | 3171 | 6236 | 5.00 | 90.15 | 1520 |
 | crates/aipl-mono/src/builtin_reverse_find_map | 1 | 39 | 39 | 684 | 2024 | 3.00 | 84.85 | 1472 |
 | crates/aipl-mono/src/builtin_right_fold | 7 | 592 | 592 | 2189 | 4728 | 5.00 | 90.83 | 1488 |
 | crates/aipl-mono/src/builtin_set_map | 50 | 1866 | 1738 | 4686 | 12204 | 9.00 | 95.24 | 1488 |

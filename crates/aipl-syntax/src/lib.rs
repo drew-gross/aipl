@@ -3081,9 +3081,11 @@ fn __builtin_contains<T: any>(self: T[], needle: T[]) -> bool { false }
 // `str` — so these work at any integer width rather than `i64` alone.
 fn __builtin_min<T: ord>(self: T, other: T) -> T { self }
 fn __builtin_max<T: ord>(self: T, other: T) -> T { self }
-// Smallest / largest element of an array, or `none` if empty (codegen folds
-// over the elements). `ord` restricts `T` to comparable elements (integer or
-// char), enforced generically by the checker's bound-checking, not a special
+// Smallest / largest element of an array, or `none` if empty. Reductions with
+// no implementation of their own: the compiler lowers `xs.minimum()` to
+// `xs.reduce(min)` (see `Callee::reduction_step` and `lower_reductions`), so these
+// declarations are for the checker alone. `ord` restricts `T` to comparable
+// elements, enforced generically by the checker's bound-checking, not a special
 // case for these two names.
 fn __builtin_minimum<T: ord>(self: T[]) -> T? { none }
 fn __builtin_maximum<T: ord>(self: T[]) -> T? { none }
@@ -3180,7 +3182,7 @@ fn __builtin_drop_last<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_n<T: any>(self: T[], n: u64) -> T[] { self }
 fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
 // NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
-// `join_is_nonempty`, `join_is_empty`, `map_reduce`, `filter_map_reduce`, `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
+// `join_is_nonempty`, `join_is_empty`, `reduce`, `map_reduce`, `filter_map_reduce`, `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
 // `extend_optional`, `inline_str`, `measure`, `range`, `set_map`, `tuple_windows`, `union_all`,
 // `value_or`, and `value_or_err` are

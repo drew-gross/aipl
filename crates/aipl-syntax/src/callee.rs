@@ -164,6 +164,7 @@ pub enum Callee {
     MapJoin,
     JoinIsNonempty,
     JoinIsEmpty,
+    Reduce,
     MapReduce,
     FilterMapReduce,
     SplitMap,
@@ -392,6 +393,7 @@ impl Callee {
         Callee::MapJoin,
         Callee::JoinIsNonempty,
         Callee::JoinIsEmpty,
+        Callee::Reduce,
         Callee::MapReduce,
         Callee::FilterMapReduce,
         Callee::SplitMap,
@@ -569,6 +571,7 @@ impl Callee {
             Callee::MapJoin => "__builtin_map_join",
             Callee::JoinIsNonempty => "__builtin_join_is_nonempty",
             Callee::JoinIsEmpty => "__builtin_join_is_empty",
+            Callee::Reduce => "__builtin_reduce",
             Callee::MapReduce => "__builtin_map_reduce",
             Callee::FilterMapReduce => "__builtin_filter_map_reduce",
             Callee::SplitMap => "__builtin_split_map",
@@ -757,9 +760,11 @@ impl Callee {
     /// by a derived sequence becomes one call that derives and folds in a single
     /// pass, taking the step as an argument.
     ///
-    /// It says nothing about how the reduction is *evaluated*, only what it
-    /// means; a builtin that is a reduction in this sense may still be lowered by
-    /// its own intrinsic.
+    /// That is also all a reduction needs to be *evaluated*: it has no
+    /// implementation of its own. The compiler lowers `xs.minimum()` to
+    /// `xs.reduce(min)` (`lower_reductions` in `aipl-mono`), so `reduce` is the one
+    /// implementation of every reduction and the step is the only code that
+    /// differs. Adding a reduction is a line here and nothing else.
     pub fn reduction_step(&self) -> Option<Callee> {
         match self {
             Callee::Minimum => Some(Callee::Min),

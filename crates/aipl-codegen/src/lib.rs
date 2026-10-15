@@ -2651,6 +2651,11 @@ fn compile_program<M: Module>(
 
     // Resolve generic `any[]` functions into concrete instances first, so the
     // rest of codegen only ever sees concrete types.
+    // Every reduction becomes a call to the one generic `reduce`, with its step as
+    // an argument — after the optimizer, which wants to see a reduction as a
+    // reduction, and before monomorphization, which is the last place that can
+    // still turn it into a call to an AIPL builtin. See `lower_reductions`.
+    let folded = aipl_mono::lower_reductions(&folded);
     let monomorphized = aipl_mono::monomorphize(&folded, dbg)?;
     // A second inlining pass now that monomorphization has lifted each lambda to
     // its own function and split higher-order callees into per-lambda
@@ -15100,108 +15105,6 @@ fn compile_call_expr<M: Module>(
             let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
             let h = emit_hash(module, builder, cx.builtins, cx.structs, v, &t)?;
             (h, ConcreteType::Primitive(Primitive::I64))
-        }
-        Callee::Minimum | Callee::Maximum => {
-            // `arr.minimum()` / `arr.maximum()`: smallest / largest element as
-            // `T?` (`none` if empty). Elements are comparable scalars (the checker
-            // restricts to integers/char), so the optional owns no heap. Walks
-            // the array with a running accumulator, like the `for`-loop arm.
-            let [array] = args else {
-                return Err(arity_bug(name, 1, args.len(), &span));
-            };
-            let is_min = *callee == Callee::Minimum;
-            let (arr_ptr, arr_ty) = compile_expr(module, builder, cx, scopes, array)?;
-            let elem = match &arr_ty {
-                ConcreteType::Array(e) => (**e).clone(),
-                _ => {
-                    return Err(Error::at(
-                        format!("{:?} of one argument expects an array", display_name(name)),
-                        array.span.clone(),
-                    ))
-                }
-            };
-            let opt_ty = ConcreteType::Optional(Box::new(elem.clone()));
-            // Result slot: a scalar optional `{tag, value}` (no heap, no drop).
-            let rslot = builder.create_sized_stack_slot(StackSlotData::new(
-                StackSlotKind::ExplicitSlot,
-                elem_size_of(&opt_ty, structs) as u32,
-                3,
-            ));
-            let result_ptr = builder.ins().stack_addr(types::I64, rslot, 0);
-            let len = seq_len(builder, arr_ptr, &arr_ty);
-            let zero = builder.ins().iconst(types::I64, 0);
-            let is_empty = builder.ins().icmp(IntCC::Equal, len, zero);
-            let empty_b = builder.create_block();
-            let nonempty_b = builder.create_block();
-            let done = builder.create_block();
-            builder.ins().brif(is_empty, empty_b, &[], nonempty_b, &[]);
-
-            // Empty: `none` — tag 0 (the value field is unused).
-            builder.switch_to_block(empty_b);
-            builder.seal_block(empty_b);
-            builder
-                .ins()
-                .store(MemFlagsData::trusted(), zero, result_ptr, 0);
-            builder.ins().jump(done, &[]);
-
-            // Non-empty: acc = elem[0]; then fold elem[1..] keeping the
-            // smaller (`min`) / larger (`max`); finally `some(acc)`.
-            builder.switch_to_block(nonempty_b);
-            builder.seal_block(nonempty_b);
-            let acc_slot = builder.create_sized_stack_slot(StackSlotData::new(
-                StackSlotKind::ExplicitSlot,
-                8,
-                3,
-            ));
-            let i_slot = builder.create_sized_stack_slot(StackSlotData::new(
-                StackSlotKind::ExplicitSlot,
-                8,
-                3,
-            ));
-            let acc0 = seq_elem(module, builder, builtins, structs, arr_ptr, zero, &arr_ty);
-            builder.ins().stack_store(types::I64, acc0, acc_slot, 0);
-            let one = builder.ins().iconst(types::I64, 1);
-            builder.ins().stack_store(types::I64, one, i_slot, 0);
-            let header = builder.create_block();
-            let body = builder.create_block();
-            let after = builder.create_block();
-            builder.ins().jump(header, &[]);
-
-            builder.switch_to_block(header);
-            let i = builder.ins().stack_load(types::I64, types::I64, i_slot, 0);
-            let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
-            builder.ins().brif(more, body, &[], after, &[]);
-
-            builder.switch_to_block(body);
-            builder.seal_block(body);
-            let e = seq_elem(module, builder, builtins, structs, arr_ptr, i, &arr_ty);
-            let acc = builder
-                .ins()
-                .stack_load(types::I64, types::I64, acc_slot, 0);
-            let cc = if is_min {
-                IntCC::SignedLessThan
-            } else {
-                IntCC::SignedGreaterThan
-            };
-            let take = builder.ins().icmp(cc, e, acc);
-            let new_acc = builder.ins().select(take, e, acc);
-            builder.ins().stack_store(types::I64, new_acc, acc_slot, 0);
-            let inext = builder.ins().iadd_imm_s(i, 1);
-            builder.ins().stack_store(types::I64, inext, i_slot, 0);
-            builder.ins().jump(header, &[]);
-            builder.seal_block(header);
-
-            builder.switch_to_block(after);
-            builder.seal_block(after);
-            let acc = builder
-                .ins()
-                .stack_load(types::I64, types::I64, acc_slot, 0);
-            emit_build_some(builder, result_ptr, acc, &elem, structs);
-            builder.ins().jump(done, &[]);
-
-            builder.switch_to_block(done);
-            builder.seal_block(done);
-            (result_ptr, opt_ty)
         }
         Callee::Min | Callee::Max => {
             // `min(a, b)` / `max(a, b)` over any `ord` type — every integer

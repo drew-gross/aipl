@@ -1,0 +1,59 @@
+# The AIPL implementation of the `reduce` builtin. Monomorphization registers this
+# function under the canonical name `__builtin_reduce` (see `AIPL_BUILTIN_SOURCES`
+# in `lib.rs`), so a user's `xs.reduce(step)` resolves through the ordinary
+# generic / higher-order machinery — the in-file name is only for this file's own
+# tests, which read exactly like user code.
+#
+# It is the one implementation of every reduction. A builtin that reduces a
+# sequence to one value — `minimum`, `maximum` — has no body of its own: the
+# compiler lowers `xs.minimum()` to `xs.reduce(min)` (see `Callee::reduction_step`
+# and `lower_reductions` in aipl-mono), so each reduction is just a name for a
+# step, and the step's own implementation is the only code that distinguishes it.
+# `map_reduce` and `filter_map_reduce` are this with a mapping (and a filter) in
+# front, and the fusion pass writes them for exactly those chains.
+
+import {
+    equal as ==,
+    filter,
+    logical_not as !,
+    max,
+    maximum,
+    min,
+    minimum,
+    wrapping_add as +,
+} from builtins;
+
+# The elements combined left to right with `step`, seeded by the first: for
+# `[a, b, c]`, `some(step(step(a, b), c))`. `step` is never called on fewer than
+# two elements; one element is itself, and an empty receiver is `none`.
+pub fn reduce<T: any>(self: T[], step: (T, T) -> T) -> T? {
+    mut reduced: T? = none;
+    for (let x : self) {
+        set reduced = match (reduced) {
+            some(so_far) => some(step(so_far, x)),
+            none => some(x),
+        };
+    }
+    reduced
+}.test({
+    fn is_nine(self: i64) -> bool { self == 9 }
+    assert(!is_nine(8));
+
+    // The two reductions it stands behind.
+    assert([3, 1, 2].reduce(min) == some(1));
+    assert([3, 1, 2].reduce(max) == some(3));
+    assert([3, 1, 2].reduce(min) == [3, 1, 2].minimum());
+    assert([3, 1, 2].reduce(max) == [3, 1, 2].maximum());
+    // One element is itself; no step is taken.
+    assert([7].reduce(min) == some(7));
+    // Empty is `none` (a typed empty from `filter`).
+    assert([1, 2].filter(is_nine).reduce(min) == none);
+    // Any step, and any element type it accepts.
+    assert(['b', 'a', 'c'].reduce(min) == some('a'));
+    assert(["pear", "apple", "fig"].reduce(max) == some("pear"));
+    assert(reduce([2, 3], max) == some(3)); // free-call form
+    // The order of combination is left to right.
+    assert(["a", "b", "c"].reduce(|acc, s| s) == some("c"));
+    let bonus = 100;
+    assert([1, 2].reduce(|acc, x| acc + x + bonus) == some(103)); // a captured value
+})

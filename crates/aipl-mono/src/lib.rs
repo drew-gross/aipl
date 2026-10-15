@@ -39,6 +39,9 @@ pub use fuse::{effectful_fns, fuse_operations};
 mod fold_lengths;
 pub use fold_lengths::fold_lengths;
 
+mod lower_reductions;
+pub use lower_reductions::lower_reductions;
+
 mod counting_variants;
 pub use counting_variants::counting_variants;
 
@@ -7656,6 +7659,11 @@ impl Mono<'_> {
         // concrete instance and is better than the recorded application.
         let ty = match &expr.ty {
             Some(t) if has_placeholder(&inferred) && !has_placeholder(t) => (**t).clone(),
+            // An array of bare integer literals can only say `i64` for itself, and
+            // its elements are stored at the width its context gave it — which the
+            // checker recorded. Left as `i64[]`, a generic callee is instantiated
+            // for the wrong element type and reads the narrow storage as wide.
+            Some(t) if narrows_literal_array(&expr.kind, &inferred, t) => (**t).clone(),
             _ => inferred,
         };
         Ok((rewritten, ty))
@@ -7871,6 +7879,7 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::MapJoin, "builtin_map_join.aipl"),
     (Callee::JoinIsNonempty, "builtin_join_is_nonempty.aipl"),
     (Callee::JoinIsEmpty, "builtin_join_is_empty.aipl"),
+    (Callee::Reduce, "builtin_reduce.aipl"),
     (Callee::MapReduce, "builtin_map_reduce.aipl"),
     (Callee::FilterMapReduce, "builtin_filter_map_reduce.aipl"),
     (Callee::SplitMap, "builtin_split_map.aipl"),
@@ -10202,6 +10211,37 @@ pub fn children(e: &Expr) -> Vec<&Expr> {
         ExprKind::IfLet(arm, s, else_b) => vec![s.as_ref(), &arm.body, else_b.as_ref()],
         ExprKind::Lambda(_, b) => vec![b],
     }
+}
+
+/// Whether `recorded` is the narrower type of an array of integer literals that
+/// monomorphization inferred as `inferred`.
+///
+/// A bare numeral has one type of its own, `i64`, so `[3, -128, 127]` infers as
+/// `i64[]` wherever it sits; what makes it an `i8[]` is the context the checker
+/// saw and recorded on the literal ([`Expr::ty`]). Inlining can move the literal
+/// out from under that context, into the argument of a generic call, and then the
+/// recorded type is the only record of it. This says when to trust it: the literal
+/// is built of nothing but integer literals (nested arrays of them included), and
+/// `recorded` is the same shape as `inferred` with an integer type where
+/// `inferred` has `i64`. Anything else keeps what inference found.
+fn narrows_literal_array(kind: &ExprKind, inferred: &Type, recorded: &Type) -> bool {
+    fn all_int_literals(e: &Expr) -> bool {
+        match &e.kind {
+            ExprKind::Num(_) => true,
+            ExprKind::Neg(inner) => all_int_literals(inner),
+            ExprKind::ArrayLit(elems) => elems.iter().all(all_int_literals),
+            _ => false,
+        }
+    }
+    fn narrower(inferred: &Type, recorded: &Type) -> bool {
+        match (inferred, recorded) {
+            (Type::Array(i), Type::Array(r)) => narrower(i, r),
+            (Type::Primitive(Primitive::I64), Type::Primitive(r)) => r.is_int(),
+            _ => false,
+        }
+    }
+    matches!(kind, ExprKind::ArrayLit(elems) if elems.iter().all(all_int_literals))
+        && narrower(inferred, recorded)
 }
 
 /// Whether `t` still contains a "decided by context" placeholder — the types a
