@@ -36,9 +36,10 @@ pub enum SeqShape {
 
 /// The callee of a call expression. See the [module docs](self).
 ///
-/// The importable builtins come first, in [`Callee::IMPORTABLE`] order, then
-/// the operator impls (reached through `OPERATOR_BUILTINS`), then the names the
-/// language reserves without an import, then the intrinsics passes synthesize.
+/// The importable builtins come first, in [`Callee::IMPORTABLE`] order — the
+/// operator impls among them, since an operator is a function and its impl is
+/// imported like any other — then the names the language reserves without an
+/// import, then the intrinsics passes synthesize.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Callee {
     // ---- importable builtins: `import { name } from builtins;` ----
@@ -202,8 +203,9 @@ pub enum Callee {
     Repeat,
 
     // ---- operator impls: `import { wrapping_add as + } from builtins;` ----
-    // Intrinsified by codegen; an operator use and a bare `concat(a, b)` are
-    // the same call to the same arm.
+    // Importable like the rest, by name (`import { concat }` then `concat(a, b)`)
+    // or aliased to the operator spelling. Intrinsified by codegen; an operator
+    // use and a bare `concat(a, b)` are the same call to the same arm.
     WrappingAdd,
     SaturatingAdd,
     WrappingSub,
@@ -309,9 +311,12 @@ pub enum Callee {
 impl Callee {
     /// Every importable builtin, in registry order: the arms a program brings
     /// into scope with `import { .. } from builtins;` — the by-name callable
-    /// builtins. `some`/`ok`/`err`, the conversions and the operators are
-    /// language syntax, not importable idents. The shape-variadic arms are
-    /// listed in their undecided (`Seq`) form.
+    /// builtins. The operator impls are among them: an operator is a function
+    /// spelled as syntax, and which spelling it answers to is the importer's
+    /// choice (`wrapping_add as +`), recorded in `OPERATOR_BUILTINS` for the
+    /// places that care — diagnostics and lint suggestions. `some`/`ok`/`err` and
+    /// the conversions are language syntax, not importable idents. The
+    /// shape-variadic arms are listed in their undecided (`Seq`) form.
     pub const IMPORTABLE: &'static [Callee] = &[
         Callee::Print,
         Callee::Split,
@@ -427,10 +432,7 @@ impl Callee {
         Callee::Sort,
         Callee::SortBy,
         Callee::Repeat,
-    ];
-
-    /// The operator impls: every arm an operator spelling can resolve to.
-    pub const OPERATORS: &'static [Callee] = &[
+        // The operator impls: every arm an operator spelling can resolve to.
         Callee::WrappingAdd,
         Callee::SaturatingAdd,
         Callee::WrappingSub,
@@ -451,7 +453,7 @@ impl Callee {
     ];
 
     /// The reserved and synthesized arms — everything
-    /// [`Callee::from_canonical`] can yield beyond the two lists above.
+    /// [`Callee::from_canonical`] can yield beyond the importable list above.
     const INTERNAL: &'static [Callee] = &[
         Callee::Some,
         Callee::Ok,
@@ -669,7 +671,6 @@ impl Callee {
     pub fn from_canonical(name: &str) -> Option<Callee> {
         Callee::IMPORTABLE
             .iter()
-            .chain(Callee::OPERATORS)
             .chain(Callee::INTERNAL)
             .find(|c| c.name() == name)
             .cloned()
@@ -701,7 +702,7 @@ impl Callee {
     }
 
     /// Whether this callee has a canonical `__builtin_*` name — an importable
-    /// builtin or an operator impl (or the reserved-prefix `with_capacity`
+    /// builtin, operator impls included (or the reserved-prefix `with_capacity`
     /// intrinsic): the set the loader's function tables register under that
     /// prefix and that no source identifier can name.
     pub fn is_builtin(&self) -> bool {
@@ -851,11 +852,7 @@ mod tests {
 
     #[test]
     fn every_known_arm_round_trips_through_its_canonical_name() {
-        for c in Callee::IMPORTABLE
-            .iter()
-            .chain(Callee::OPERATORS)
-            .chain(Callee::INTERNAL)
-        {
+        for c in Callee::IMPORTABLE.iter().chain(Callee::INTERNAL) {
             assert_eq!(Callee::from_canonical(c.name()).as_ref(), Some(c), "{c}");
         }
         assert_eq!(Callee::from_canonical("i64"), None);
@@ -888,11 +885,7 @@ mod tests {
     #[test]
     fn canonical_names_are_unique() {
         let mut seen = std::collections::HashSet::new();
-        for c in Callee::IMPORTABLE
-            .iter()
-            .chain(Callee::OPERATORS)
-            .chain(Callee::INTERNAL)
-        {
+        for c in Callee::IMPORTABLE.iter().chain(Callee::INTERNAL) {
             assert!(
                 seen.insert(c.name()),
                 "duplicate canonical name {}",
@@ -909,7 +902,11 @@ mod tests {
             Some(Callee::StartsWith(SeqShape::Seq))
         );
         assert_eq!(Callee::importable("__builtin_len"), None);
-        assert_eq!(Callee::importable("wrapping_add"), None);
+        // An operator impl is importable by name like any other builtin.
+        assert_eq!(
+            Callee::importable("wrapping_add"),
+            Some(Callee::WrappingAdd)
+        );
         assert_eq!(Callee::Len.display_name(), "len");
     }
 

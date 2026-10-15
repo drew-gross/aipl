@@ -86,7 +86,6 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
-  delete Callee::OPERATORS, it's only ever chained with IMPORTABLE anyway, and operators are more of a syntax thing in aipl
   enshrine reductions a bit more, it's probably generically useful. Go as far as deleting the actual implementation of .minimum(), the user call can get translated via reductions. Also add a lot more reductions.
   impl Abi can go away now that str24 and arr24 are fully integrated (tho maybe should wait for sets and dicts to be unified too?)
   the approach of matching on mangled names is bad, we should propagate more information
@@ -483,7 +482,7 @@ design:
   apis should express intent
 
 optimizations:
-  special case seed handling in reduce to avoid optional checks in the generated code
+  special case seed handling in reduce to avoid optional checks in the generated code. Maybe also fuse reduce().value_or()?. Though .value_or isn't always a valid seed e.g. .minimum().value_or(0) in dedent
   detect if a user function amounts to a reduction (not sure if lint to .reduce() or make eligible for fusion)
   body_size should probably count match arms to prevent function that are huge match tables from getting inlined every time
   make inline capcity vary by type, and even by site (e.g. a const array literal that is mapped or filtered)
