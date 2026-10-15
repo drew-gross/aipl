@@ -1335,8 +1335,9 @@ fn native_builtin_decls() -> &'static [Item] {
     DECLS.get_or_init(|| {
         let program = aipl_parser::parse(aipl_syntax::BUILTIN_SIGNATURES)
             .expect("builtin signatures are valid AIPL");
-        program
-            .items
+        // The declarations of the reductions are not in that text: each follows
+        // from its step's signature, and is added here.
+        aipl_syntax::with_reduction_signatures(program.items)
             .into_iter()
             .map(|item| match item {
                 Item::Fn(mut f) => {

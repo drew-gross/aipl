@@ -8194,8 +8194,7 @@ fn builtin_sigs() -> &'static HashMap<String, Signature> {
     SIGS.get_or_init(|| {
         let program =
             aipl_parser::parse(BUILTIN_SIGNATURES).expect("builtin signatures are valid AIPL");
-        program
-            .items
+        aipl_syntax::with_reduction_signatures(program.items)
             .into_iter()
             .filter_map(|item| match item {
                 Item::Fn(f) => {

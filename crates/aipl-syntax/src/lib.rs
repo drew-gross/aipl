@@ -3081,14 +3081,10 @@ fn __builtin_contains<T: any>(self: T[], needle: T[]) -> bool { false }
 // `str` — so these work at any integer width rather than `i64` alone.
 fn __builtin_min<T: ord>(self: T, other: T) -> T { self }
 fn __builtin_max<T: ord>(self: T, other: T) -> T { self }
-// Smallest / largest element of an array, or `none` if empty. Reductions with
-// no implementation of their own: the compiler lowers `xs.minimum()` to
-// `xs.reduce(min)` (see `Callee::reduction_step` and `lower_reductions`), so these
-// declarations are for the checker alone. `ord` restricts `T` to comparable
-// elements, enforced generically by the checker's bound-checking, not a special
-// case for these two names.
-fn __builtin_minimum<T: ord>(self: T[]) -> T? { none }
-fn __builtin_maximum<T: ord>(self: T[]) -> T? { none }
+// `minimum` and `maximum` are not declared here: they are reductions, and a
+// reduction's signature follows from its step's (`min`, `max`, just above) —
+// `<T: ord>(self: T[]) -> T?` from `<T: ord>(self: T, other: T) -> T`. See
+// `Callee::reduction_step` and `with_reduction_signatures`, which adds them.
 // Element/byte count. Unsigned: a length is never negative, so `u64` keeps
 // `len`-derived arithmetic (`a.len() - b.len()`, capacity math) in the
 // saturating-at-zero unsigned world rather than silently going negative.
@@ -3253,6 +3249,72 @@ fn __aipl_concat(a: str, b: str) -> str { "" }
 // holding it, and converts any other type via `to_str`.
 fn __template_interp<T: any>(self: T) -> str { "" }
 "#;
+
+/// `items` — the parsed [`BUILTIN_SIGNATURES`] — with a declaration added for every
+/// reduction, synthesized from the signature of its step.
+///
+/// A reduction ([`Callee::reduction_step`]) takes a sequence and combines its
+/// elements with a binary step, so its signature is the step's with the types
+/// lifted: a step `<T: ord>(self: T, other: T) -> T` makes the reduction
+/// `<T: ord>(self: T[]) -> T?`. Nothing in the reduction's own declaration says
+/// anything the step's does not, so it is not written down — which is also what
+/// stops the two from disagreeing about a bound or an effect.
+///
+/// The step has to be declared (here or by the caller, in `items`) with the shape
+/// `(A, A) -> A`; a reduction naming one that is not is a bug in the table, and
+/// says so rather than inventing a signature.
+pub fn with_reduction_signatures(mut items: Vec<ast::Item>) -> Vec<ast::Item> {
+    let mut synthesized = Vec::new();
+    for reduction in Callee::IMPORTABLE {
+        let Some(step) = reduction.reduction_step() else {
+            continue;
+        };
+        let decl = items
+            .iter()
+            .find_map(|item| match item {
+                ast::Item::Fn(f) if f.name.text == step.name() => Some(f),
+                _ => None,
+            })
+            .unwrap_or_else(|| {
+                panic!(
+                    "{reduction} is a reduction by {step}, which has no declaration to take its signature from"
+                )
+            });
+        let element = match decl.sig.params.as_slice() {
+            [first, second]
+                if first.ty == second.ty && decl.sig.return_ty.as_ref() == Some(&first.ty) =>
+            {
+                first.ty.clone()
+            }
+            _ => panic!("{reduction}'s step {step} must have the shape (A, A) -> A"),
+        };
+        synthesized.push(ast::Item::Fn(ast::Function {
+            name: SpanStr::synthetic(reduction.name()),
+            is_pub: true,
+            sig: ast::Signature {
+                type_vars: decl.sig.type_vars.clone(),
+                params: vec![ast::Param {
+                    name: "self".to_string(),
+                    ty: ast::Type::Array(Box::new(element.clone())),
+                    mutable: false,
+                    arity: ast::Arity::One,
+                    default: None,
+                    implicit_some: false,
+                }],
+                effects: decl.sig.effects.clone(),
+                return_ty: Some(ast::Type::Optional(Box::new(element))),
+            },
+            // A declaration only: the checker reads the signature, and the body is
+            // never run. `none` is a well-typed body for an optional result.
+            body: ast::Expr::new(ast::ExprKind::None, 0..0),
+            test_body: None,
+            test_fns: Vec::new(),
+            doc: None,
+        }));
+    }
+    items.extend(synthesized);
+    items
+}
 
 /// The *concatenated-string* representation of `str`: an internal, mono-only
 /// pseudo-type that flows out of `a + b` (string concat) to mark a value built as

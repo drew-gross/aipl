@@ -1085,3 +1085,36 @@ fn or_token_serves_both_roles() {
     // The body is the `a || b` logical-or.
     assert!(matches!(&body.kind, ExprKind::Call(op, args, _) if op == "||" && args.len() == 2));
 }
+
+/// A reduction's declaration is not written in `BUILTIN_SIGNATURES`: it follows from
+/// its step's signature. These are the declarations `minimum` and `maximum` used to
+/// have by hand, so the synthesized ones are held to exactly what they said —
+/// including the `ord` bound, which is what makes `[some_struct].minimum()` an
+/// error — and to the step they came from.
+#[test]
+fn a_reductions_signature_is_synthesized_from_its_steps() {
+    let by_hand = parse(
+        "fn __builtin_minimum<T: ord>(self: T[]) -> T? { none }\n\
+         fn __builtin_maximum<T: ord>(self: T[]) -> T? { none }\n",
+    )
+    .expect("the former declarations parse");
+    let declared = parse(aipl_syntax::BUILTIN_SIGNATURES).expect("builtin signatures parse");
+    assert!(
+        !declared.items.iter().any(
+            |i| matches!(i, Item::Fn(f) if f.name.text == "__builtin_minimum" || f.name.text == "__builtin_maximum")
+        ),
+        "the reductions are not declared in the signature text"
+    );
+    let all = aipl_syntax::with_reduction_signatures(declared.items);
+    for item in &by_hand.items {
+        let Item::Fn(want) = item else { unreachable!() };
+        let got = all
+            .iter()
+            .find_map(|i| match i {
+                Item::Fn(f) if f.name.text == want.name.text => Some(f),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("{} was not synthesized", want.name.text));
+        assert_eq!(got.sig, want.sig, "{}", want.name.text);
+    }
+}

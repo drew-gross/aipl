@@ -86,6 +86,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  delete Callee::OPERATORS, it's only ever chained with IMPORTABLE anyway, and operators are more of a syntax thing in aipl
   enshrine reductions a bit more, it's probably generically useful. Go as far as deleting the actual implementation of .minimum(), the user call can get translated via reductions. Also add a lot more reductions.
   impl Abi can go away now that str24 and arr24 are fully integrated (tho maybe should wait for sets and dicts to be unified too?)
   the approach of matching on mangled names is bad, we should propagate more information
@@ -782,6 +783,7 @@ the arg contract being different for builtins caused problems for retain elision
 - should retain elision elide only the top of a structure? Is is already doing that?
 
 docs:
+  delete BUILTIN_SIGS, turn it into properties of Callee, integrate into doc
   docs on struct fields
   docs for top-level lets
   hide privates by default so you have to expand a thing to show them
