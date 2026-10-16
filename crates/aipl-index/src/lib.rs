@@ -343,6 +343,25 @@ fn symbols(program: &Program, src: &str) -> Vec<Symbol> {
                     });
                 }
             }
+            // A refinement is listed as the variant it is declared as, with the
+            // type it stands for in place of a list of cases.
+            Item::Refinement(r) => {
+                out.push(Symbol {
+                    name: r.name.text.clone(),
+                    kind: SymbolKind::Variant,
+                    detail: format!(
+                        "variant {}{} = {}",
+                        r.name,
+                        type_vars(&r.type_vars),
+                        aipl_syntax::type_name(&r.target)
+                    ),
+                    doc: r.doc.clone(),
+                    is_pub: true,
+                    name_span: r.name.span.clone(),
+                    parent: None,
+                    slots: Vec::new(),
+                });
+            }
             Item::Const(c) => {
                 out.push(Symbol {
                     name: c.name.text.clone(),

@@ -485,6 +485,7 @@ impl Loader {
                     Item::Fn(f) => (f.name.text.clone(), f.name.span.clone(), f.is_pub),
                     Item::Struct(s) => (s.name.text.clone(), s.name.span.clone(), true),
                     Item::Variant(v) => (v.name.text.clone(), v.name.span.clone(), true),
+                    Item::Refinement(r) => (r.name.text.clone(), r.name.span.clone(), true),
                     Item::Const(c) => (c.name.text.clone(), c.name.span.clone(), c.is_pub),
                     Item::Import(_) => unreachable!("imports stripped during load"),
                 };
@@ -753,6 +754,41 @@ impl Loader {
         // been mangled. Substituting here rather than in any later pass is what
         // keeps constants out of the checker, mono and codegen entirely.
         let merged = substitute_constants(merged);
+        // A named refinement is its target wherever it is written, so it is
+        // expanded away here, for the same reason: nothing past the loader
+        // should have to know a type can have a second name. Its diagnostics
+        // name the declaration, which is attributed to the file that holds it.
+        let mut expanded = Program {
+            items: merged,
+            sources: Vec::new(),
+            doc: None,
+        };
+        let declared = aipl_syntax::expand_refinements(&mut expanded).and_then(|declared| {
+            declared
+                .iter()
+                .try_for_each(|d| {
+                    check_refinement_target(d, &ctor_cases).map_err(|e| (d.name.text.clone(), e))
+                })
+                .map(|()| declared)
+        });
+        if let Err((name, err)) = declared {
+            let path = self
+                .files
+                .iter()
+                .find(|(path, file)| {
+                    let is_root = *path == root;
+                    file.items.iter().any(|item| {
+                        matches!(item, Item::Refinement(r)
+                            if mangle(is_root, file.index, &r.name.text) == name)
+                    })
+                })
+                .map(|(path, _)| path.clone());
+            return Err(match path {
+                Some(path) => self.attribute(&path, root, err),
+                None => err,
+            });
+        }
+        let merged = expanded.items;
         // Resolve keyword arguments (and fill omitted keyword parameters from
         // their defaults) now that every reference is a final global name —
         // after this, calls are fully positional and no `ExprKind::KwArg`
@@ -779,6 +815,63 @@ impl Loader {
             doc: None,
         })
     }
+}
+
+/// The rules a `variant W = V without C` declaration is held to, on its target
+/// once expanded: what it refines must be a variant, and each case it leaves out
+/// one that variant has. The checker holds a *written* `V without C` to the same
+/// rules, but it only sees the types that are used, and a declaration nothing
+/// mentions would otherwise go unchecked.
+fn check_refinement_target(
+    decl: &aipl_syntax::ExpandedRefinement,
+    ctor_cases: &HashMap<String, Vec<String>>,
+) -> Result<(), Error> {
+    let mut base = &decl.target;
+    let mut excluded = Vec::new();
+    while let Type::Without(inner, x) = base {
+        excluded.push(x);
+        base = inner;
+    }
+    let cases = match base {
+        Type::Named(v) | Type::Generic(v, _) => ctor_cases.get(v),
+        _ => None,
+    };
+    let Some(cases) = cases else {
+        return Err(Error::at(
+            format!(
+                "{:?} refines {}, which is not a variant",
+                decl.name.text,
+                aipl_syntax::type_name(base)
+            ),
+            decl.name.span.clone(),
+        ));
+    };
+    for x in excluded {
+        match x {
+            aipl_syntax::ast::Exclusion::NamedCase(case) if !cases.contains(case) => {
+                return Err(Error::at(
+                    format!(
+                        "{:?} leaves out {case:?}, but {} has no such case",
+                        decl.name.text,
+                        aipl_syntax::type_name(base)
+                    ),
+                    decl.name.span.clone(),
+                ));
+            }
+            aipl_syntax::ast::Exclusion::NamedCase(_) => {}
+            aipl_syntax::ast::Exclusion::EmptyArray => {
+                return Err(Error::at(
+                    format!(
+                        "{:?} refines {}, a variant, and `without []` excludes the empty array",
+                        decl.name.text,
+                        aipl_syntax::type_name(base)
+                    ),
+                    decl.name.span.clone(),
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// A top-level constant must be ALL_CAPS and stand for a literal.
@@ -921,8 +1014,9 @@ fn item_exprs_mut(item: &mut Item) -> Vec<&mut Expr> {
                 .flat_map(|c| c.payload.iter_mut())
                 .filter_map(|slot| slot.default.as_mut()),
         ),
-        // Dropped just above; an import declares no expression.
-        Item::Const(_) | Item::Import(_) => {}
+        // Dropped just above, or expanded away; an import declares no
+        // expression.
+        Item::Const(_) | Item::Refinement(_) | Item::Import(_) => {}
     }
     out
 }
@@ -1298,6 +1392,19 @@ fn rewrite_item(
                 })
                 .collect(),
         }),
+        // A refinement's own name becomes the global it stands for and its
+        // target may name imported types, exactly as a variant's payloads do.
+        // The case it excludes is a bare case name, which is never mangled.
+        Item::Refinement(r) => Item::Refinement(aipl_syntax::ast::RefinementDecl {
+            name: r.name.renamed(
+                view.get(&*r.name)
+                    .cloned()
+                    .unwrap_or_else(|| r.name.text.clone()),
+            ),
+            doc: r.doc.clone(),
+            type_vars: r.type_vars.clone(),
+            target: rewrite_type(&r.target, view, &r.type_vars),
+        }),
         // A constant's own name becomes the global it stands for, and its
         // annotation may name an imported type. Its *value* is rewritten too:
         // `"…".to_set()` is admitted as a constant, so a value can name a
@@ -1349,7 +1456,9 @@ fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[TypeParam
         }
         Type::Optional(inner) => Type::Optional(Box::new(rewrite_type(inner, view, type_vars))),
         Type::Array(inner) => Type::Array(Box::new(rewrite_type(inner, view, type_vars))),
-        Type::Without(base, x) => Type::Without(Box::new(rewrite_type(base, view, type_vars)), *x),
+        Type::Without(base, x) => {
+            Type::Without(Box::new(rewrite_type(base, view, type_vars)), x.clone())
+        }
         Type::Set(inner, o) => Type::Set(Box::new(rewrite_type(inner, view, type_vars)), *o),
         Type::Dict(k, v) => Type::Dict(
             Box::new(rewrite_type(k, view, type_vars)),

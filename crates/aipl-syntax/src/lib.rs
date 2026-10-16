@@ -397,8 +397,32 @@ pub mod ast {
         Fn(Function),
         Struct(StructDecl),
         Variant(VariantDecl),
+        Refinement(RefinementDecl),
         Import(ImportDecl),
         Const(ConstDecl),
+    }
+
+    /// `variant Name = V without C` — a named refinement of a variant: the type
+    /// `V without C`, spelled once and given a name.
+    ///
+    /// Like a constant, it is resolved by the loader and gone before anything
+    /// else sees the program: every mention of `Name` is replaced by `target`
+    /// (with the arguments of a generic one substituted), so the checker meets
+    /// only the [`Type::Without`] it stands for. It is declared with `variant`
+    /// because that is what it names — a variant with fewer cases — but it has
+    /// no cases of its own and no representation of its own: a `Name` is a `V`
+    /// at runtime.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct RefinementDecl {
+        pub name: SpanStr,
+        /// The `# ..` doc comment above the declaration, lines joined with
+        /// newlines. `None` when it carries none.
+        pub doc: Option<String>,
+        /// Declared generic type parameters, as on [`VariantDecl`]; `variant
+        /// Rest<T> = Tree<T> without Leaf` names one refinement per `T`.
+        pub type_vars: Vec<TypeParam>,
+        /// The refined type — always a [`Type::Without`].
+        pub target: Type,
     }
 
     /// A top-level constant: `pub let NAME: T = <literal>;`.
@@ -1159,19 +1183,25 @@ pub mod ast {
         Without(Box<Type>, Exclusion),
     }
 
-    /// What a `T without X` type leaves out — the `X`. One case per value the
-    /// checker knows how to exclude; today that is the empty array literal.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    /// What a `T without X` type leaves out — the `X`. One case per kind of
+    /// value the checker knows how to exclude: the empty array, or a case of a
+    /// variant.
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub enum Exclusion {
         /// `[]` — the empty array.
         EmptyArray,
+        /// A case of the variant the base names: `V without C`. The bare case
+        /// name, as it is declared — cases are never mangled, so the name means
+        /// the same wherever the type is read.
+        NamedCase(String),
     }
 
     impl Exclusion {
         /// The excluded value as the user writes it after `without`.
-        pub fn spelling(self) -> &'static str {
+        pub fn spelling(&self) -> String {
             match self {
-                Exclusion::EmptyArray => "[]",
+                Exclusion::EmptyArray => "[]".to_string(),
+                Exclusion::NamedCase(name) => name.clone(),
             }
         }
     }
@@ -2016,6 +2046,7 @@ pub mod ast {
 }
 
 use ast::{BinOp, Callee, Primitive, Type};
+use std::collections::HashMap;
 
 // ---------- Shared AST-level `Type` helpers ----------
 //
@@ -2269,7 +2300,17 @@ pub fn flex_fit(
             ast::Exclusion::EmptyArray => match &e.kind {
                 K::ArrayLit(elems) if !elems.is_empty() => {
                     let base_ty = flex_fit(e, ety, base)?.unwrap_or_else(|| ety.clone());
-                    Ok(Some(Type::Without(Box::new(base_ty), *exclusion)))
+                    Ok(Some(Type::Without(Box::new(base_ty), exclusion.clone())))
+                }
+                _ => Ok(None),
+            },
+            // `V without C`: a construction of some other case is visibly not
+            // a `C`. The value keeps the type it has — a `V` — and is granted
+            // the refinement on top of it.
+            ast::Exclusion::NamedCase(excluded) => match constructed_case(e) {
+                Some((case, _)) if case != excluded => {
+                    let base_ty = flex_fit(e, ety, base)?.unwrap_or_else(|| ety.clone());
+                    Ok(Some(Type::Without(Box::new(base_ty), exclusion.clone())))
                 }
                 _ => Ok(None),
             },
@@ -3781,7 +3822,7 @@ pub fn each_expr(program: &ast::Program, f: &mut impl FnMut(&ast::Expr)) {
                 }
             }
             ast::Item::Const(c) => each_subexpr(&c.value, f),
-            ast::Item::Import(_) => {}
+            ast::Item::Refinement(_) | ast::Item::Import(_) => {}
         }
     }
 }
@@ -3841,6 +3882,10 @@ pub fn promote_type_vars(program: &mut ast::Program) {
                 if let Some(t) = &mut c.ty {
                     promote_ty(t, &[]);
                 }
+            }
+            ast::Item::Refinement(r) => {
+                let vars: Vec<String> = r.type_vars.iter().map(|t| t.name.clone()).collect();
+                promote_ty(&mut r.target, &vars);
             }
             ast::Item::Import(_) => {}
         }
@@ -4004,6 +4049,184 @@ fn erase_assumptions(e: &mut ast::Expr) {
     }
 }
 
+/// Substitute template type variables in `t` with concrete types from `map`,
+/// recursing through every compound type — including nested generic
+/// applications, so a generic field like `inner: Box<T>` becomes `Box<i64>`
+/// once `T` is bound. A `Named` not in `map` (a concrete type or an unrelated
+/// name) is left unchanged.
+pub fn subst_type_params(t: &Type, map: &HashMap<String, Type>) -> Type {
+    match t {
+        Type::Case(v) => Type::Case(Box::new(subst_type_params(v, map))),
+        // Only a *variable* substitutes. Keying this on `Named` meant a struct
+        // that happened to share a template parameter's name was rewritten too.
+        Type::TypeVar(n) => map.get(n).cloned().unwrap_or_else(|| t.clone()),
+        Type::Named(_) | Type::Unknown => t.clone(),
+        Type::Optional(i) => Type::Optional(Box::new(subst_type_params(i, map))),
+        Type::Array(i) => Type::Array(Box::new(subst_type_params(i, map))),
+        Type::Without(b, x) => Type::Without(Box::new(subst_type_params(b, map)), x.clone()),
+        Type::Set(i, o) => Type::Set(Box::new(subst_type_params(i, map)), *o),
+        Type::Dict(k, v) => Type::Dict(
+            Box::new(subst_type_params(k, map)),
+            Box::new(subst_type_params(v, map)),
+        ),
+        Type::Result(ok, err) => Type::Result(
+            Box::new(subst_type_params(ok, map)),
+            Box::new(subst_type_params(err, map)),
+        ),
+        Type::Fn(ps, r) => Type::Fn(
+            ps.iter().map(|p| subst_type_params(p, map)).collect(),
+            Box::new(subst_type_params(r, map)),
+        ),
+        Type::Tuple(es) => Type::Tuple(es.iter().map(|e| subst_type_params(e, map)).collect()),
+        Type::Generic(name, args) => Type::Generic(
+            name.clone(),
+            args.iter().map(|a| subst_type_params(a, map)).collect(),
+        ),
+        Type::Unit
+        | Type::Primitive(_)
+        | Type::Any
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => t.clone(),
+    }
+}
+
+/// Every mention of a named refinement (`variant W = V without C`) replaced by
+/// the type it stands for, and the declarations themselves dropped — so what
+/// leaves the loader holds only the [`ast::Type::Without`] they spell, and
+/// nothing past it knows a refinement can be named.
+///
+/// A refinement may refine another (`variant X = W without D`), so each target
+/// is expanded against the rest, and one that reaches itself is refused. On an
+/// error the name of the declaration is returned beside it, so the caller can
+/// attribute the diagnostic to the file that declared it.
+///
+/// Each declaration's own target comes back fully expanded, used or not: a
+/// declaration nothing mentions leaves no type behind for the checker to
+/// validate, so the caller holds it to the same rules from this.
+pub fn expand_refinements(
+    program: &mut ast::Program,
+) -> Result<Vec<ExpandedRefinement>, (String, Error)> {
+    let mut decls: HashMap<String, ast::RefinementDecl> = HashMap::new();
+    program.items.retain(|item| match item {
+        ast::Item::Refinement(r) => {
+            decls.insert(r.name.text.clone(), r.clone());
+            false
+        }
+        _ => true,
+    });
+    if decls.is_empty() {
+        return Ok(Vec::new());
+    }
+    // In source order, so which of several faults is reported first does not
+    // depend on the map.
+    let mut in_order: Vec<&ast::RefinementDecl> = decls.values().collect();
+    in_order.sort_by_key(|d| d.name.span.start);
+    let mut declared = Vec::new();
+    for decl in in_order {
+        // Seeded with the declaration itself, so one that reaches itself
+        // through its own target is found from here as well as from a use.
+        let mut stack = vec![decl.name.text.clone()];
+        let target = expand_refinement_ty(&decl.target, &decls, &mut stack)?;
+        declared.push(ExpandedRefinement {
+            name: decl.name.clone(),
+            target,
+        });
+    }
+    let mut first_error = None;
+    each_type_mut(program, &mut |t| {
+        if first_error.is_none() {
+            match expand_refinement_ty(t, &decls, &mut Vec::new()) {
+                Ok(expanded) => *t = expanded,
+                Err(e) => first_error = Some(e),
+            }
+        }
+    });
+    first_error.map_or(Ok(declared), Err)
+}
+
+/// A refinement declaration with its target expanded — see
+/// [`expand_refinements`].
+#[derive(Debug, Clone)]
+pub struct ExpandedRefinement {
+    pub name: ast::SpanStr,
+    pub target: Type,
+}
+
+/// [`expand_refinements`] for one type: `t` with every named refinement in it
+/// replaced, recursively. `stack` holds the refinements being expanded, which is
+/// how a cycle is told from a chain.
+fn expand_refinement_ty(
+    t: &Type,
+    decls: &HashMap<String, ast::RefinementDecl>,
+    stack: &mut Vec<String>,
+) -> Result<Type, (String, Error)> {
+    use ast::Type as T;
+    let mut sub = |t: &Type| expand_refinement_ty(t, decls, stack);
+    Ok(match t {
+        T::Named(n) | T::Generic(n, _) if decls.contains_key(n) => {
+            let decl = &decls[n];
+            let args: Vec<Type> = match t {
+                T::Generic(_, args) => args.iter().map(&mut sub).collect::<Result<_, _>>()?,
+                _ => Vec::new(),
+            };
+            let fail = |message: String| (n.clone(), Error::at(message, decl.name.span.clone()));
+            if args.len() != decl.type_vars.len() {
+                return Err(fail(format!(
+                    "{:?} takes {} type argument(s), but {} given",
+                    decl.name.text,
+                    decl.type_vars.len(),
+                    args.len()
+                )));
+            }
+            if stack.contains(n) {
+                return Err(fail(format!(
+                    "{:?} refines itself: {} -> {n}",
+                    decl.name.text,
+                    stack.join(" -> ")
+                )));
+            }
+            let map: HashMap<String, Type> = decl
+                .type_vars
+                .iter()
+                .map(|v| v.name.clone())
+                .zip(args)
+                .collect();
+            stack.push(n.clone());
+            let target = expand_refinement_ty(&subst_type_params(&decl.target, &map), decls, stack);
+            stack.pop();
+            target?
+        }
+        T::Case(v) => T::Case(Box::new(sub(v)?)),
+        T::Optional(i) => T::Optional(Box::new(sub(i)?)),
+        T::Array(i) => T::Array(Box::new(sub(i)?)),
+        T::Without(b, x) => T::Without(Box::new(sub(b)?), x.clone()),
+        T::Set(i, o) => T::Set(Box::new(sub(i)?), *o),
+        T::Dict(k, v) => T::Dict(Box::new(sub(k)?), Box::new(sub(v)?)),
+        T::Result(a, b) => T::Result(Box::new(sub(a)?), Box::new(sub(b)?)),
+        T::Fn(ps, r) => T::Fn(
+            ps.iter().map(&mut sub).collect::<Result<_, _>>()?,
+            Box::new(sub(r)?),
+        ),
+        T::Tuple(es) => T::Tuple(es.iter().map(&mut sub).collect::<Result<_, _>>()?),
+        T::Generic(n, args) => T::Generic(
+            n.clone(),
+            args.iter().map(&mut sub).collect::<Result<_, _>>()?,
+        ),
+        T::Unit
+        | T::Primitive(_)
+        | T::Named(_)
+        | T::TypeVar(_)
+        | T::Any
+        | T::NoneInner
+        | T::EmptyArrayArg
+        | T::NoneLiteralArg
+        | T::Unknown
+        | T::ConcatStr => t.clone(),
+    })
+}
+
 /// Every type written or recorded in `program`, mutably: the places
 /// [`promote_type_vars`] visits, plus each expression's stamped [`Expr::ty`].
 fn each_type_mut(program: &mut ast::Program, f: &mut impl FnMut(&mut Type)) {
@@ -4034,6 +4257,7 @@ fn each_type_mut(program: &mut ast::Program, f: &mut impl FnMut(&mut Type)) {
                     f(t);
                 }
             }
+            ast::Item::Refinement(r) => f(&mut r.target),
             ast::Item::Import(_) => {}
         }
     }
@@ -4068,7 +4292,7 @@ fn each_body_mut(program: &mut ast::Program, f: &mut impl FnMut(&mut ast::Expr))
                 }
             }
             ast::Item::Const(c) => f(&mut c.value),
-            ast::Item::Import(_) => {}
+            ast::Item::Refinement(_) | ast::Item::Import(_) => {}
         }
     }
 }
@@ -4440,6 +4664,24 @@ pub const CTOR_WRAPPER_PREFIX: &str = "__ctor$";
 /// halves split back apart unambiguously.
 pub fn ctor_wrapper_name(variant: &str, case: &str) -> String {
     format!("{CTOR_WRAPPER_PREFIX}{variant}${case}")
+}
+
+/// The case a construction expression builds, and the variant it belongs to —
+/// `("A", "V")` for `A@V` written bare or applied (`A@V(1)`). `None` for
+/// anything that is not a construction, which includes a constructor used as a
+/// *value* (`xs.map(Circle)`): that is a function, not a case of anything.
+pub fn constructed_case(e: &ast::Expr) -> Option<(&str, &str)> {
+    let name = match &e.kind {
+        ast::ExprKind::Ident(n) => n.as_str(),
+        ast::ExprKind::Call(callee, _, _) => callee.name(),
+        _ => return None,
+    };
+    // A constructor *reference* used as a value (`xs.map(Circle)`) is not a
+    // construction, and neither is a function whose name happens to be bare.
+    if name.starts_with(CTOR_WRAPPER_PREFIX) {
+        return None;
+    }
+    name.split_once('@')
 }
 
 /// The `(case, variant)` a constructor *reference* names, if `e` is one.

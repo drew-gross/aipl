@@ -702,6 +702,14 @@ impl<'a> Cx<'a> {
     /// type variables substituted). Lets a `match` on such a value resolve.
     fn cases_of(&self, ty: &Type) -> Option<Vec<(String, Vec<Type>)>> {
         match ty {
+            // `V without C` has the cases of `V` less `C`. This is what makes a
+            // `match` on it need no arm for `C` and refuse one.
+            Type::Without(base, Exclusion::NamedCase(excluded)) => {
+                let mut cases = self.cases_of(base)?;
+                cases.retain(|(c, _)| c != excluded);
+                Some(cases)
+            }
+            Type::Without(base, Exclusion::EmptyArray) => self.cases_of(base),
             Type::Named(n) => self.variant_cases(n),
             Type::Generic(base, args) => {
                 let tmpl = self.generic_variants.get(base)?;
@@ -754,6 +762,7 @@ impl<'a> Cx<'a> {
             }
             Type::Optional(i) => Type::Optional(Box::new(self.resolve_generic_ty(i)?)),
             Type::Array(i) => Type::Array(Box::new(self.resolve_generic_ty(i)?)),
+            Type::Without(b, x) => Type::Without(Box::new(self.resolve_generic_ty(b)?), x.clone()),
             Type::Set(i, o) => Type::Set(Box::new(self.resolve_generic_ty(i)?), *o),
             Type::Dict(k, v) => Type::Dict(
                 Box::new(self.resolve_generic_ty(k)?),
@@ -1406,6 +1415,9 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
                 sigs.insert(f.name.text.clone(), f.sig.clone());
             }
             Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
+            Item::Refinement(_) => {
+                unreachable!("refinements are expanded and dropped during load")
+            }
             Item::Import(_) => {}
         }
     }
@@ -1923,6 +1935,22 @@ impl Cx<'_> {
                         "{ctx}: `without []` excludes the empty array, and {} is not an array type",
                         tyname(other)
                     ))),
+                    // `V without C`: `C` has to be a case `V` still has. A
+                    // type parameter is let through for the same reason as
+                    // above, and an exclusion already made leaves nothing to
+                    // exclude twice.
+                    (Exclusion::NamedCase(_), Type::TypeVar(_)) => Ok(()),
+                    (Exclusion::NamedCase(case), other) => match self.cases_of(base) {
+                        Some(cases) if cases.iter().any(|(c, _)| c == case) => Ok(()),
+                        Some(_) => Err(Error::msg(format!(
+                            "{ctx}: `without {case}` excludes a case of {}, which has no case {case:?}",
+                            tyname(base)
+                        ))),
+                        None => Err(Error::msg(format!(
+                            "{ctx}: `without {case}` excludes a case of a variant, and {} is not one",
+                            tyname(other)
+                        ))),
+                    },
                 }
             }
             // Optional core types: a scalar, `str`, a nested array, or an
@@ -2519,9 +2547,11 @@ impl Cx<'_> {
             }
         }
         // A refined scrutinee is matched as its base: the patterns an array
-        // takes are the patterns a non-empty array takes.
+        // takes are the patterns a non-empty array takes. A variant that has
+        // lost a case is the exception, since the case it lost is exactly what
+        // the match is spared from naming.
         let st = self.check_expr(scrut, env, effects)?;
-        Ok(unrefined(&st).clone())
+        Ok(match_scrutinee_ty(st))
     }
 
     /// Type a nested pattern against `ty`: the binders it introduces, each with
@@ -5531,6 +5561,30 @@ fn shape_name(pty: &Type) -> &'static str {
     }
 }
 
+/// `t` less its outer refinements, and what they exclude.
+fn peel_refinements(t: &Type) -> (&Type, Vec<&Exclusion>) {
+    let mut excluded = Vec::new();
+    let mut base = t;
+    while let Type::Without(inner, x) = base {
+        excluded.push(x);
+        base = inner;
+    }
+    (base, excluded)
+}
+
+/// The type a `match` reads its patterns against: `t` with its refinements
+/// peeled, except those that leave a variant without cases — the patterns that
+/// type takes are not the base's.
+fn match_scrutinee_ty(t: Type) -> Type {
+    match t {
+        Type::Without(base, x @ Exclusion::NamedCase(_)) => {
+            Type::Without(Box::new(match_scrutinee_ty(*base)), x)
+        }
+        Type::Without(base, Exclusion::EmptyArray) => match_scrutinee_ty(*base),
+        other => other,
+    }
+}
+
 fn is_unknown(t: &Type) -> bool {
     matches!(t, Type::Unknown)
 }
@@ -5746,7 +5800,9 @@ fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
         | Type::Unknown
         | Type::ConcatStr => t.clone(),
         Type::Array(inner) => Type::Array(Box::new(subst_typevars(inner, type_params))),
-        Type::Without(base, x) => Type::Without(Box::new(subst_typevars(base, type_params)), *x),
+        Type::Without(base, x) => {
+            Type::Without(Box::new(subst_typevars(base, type_params)), x.clone())
+        }
         Type::Set(inner, o) => Type::Set(Box::new(subst_typevars(inner, type_params)), *o),
         Type::Dict(k, v) => Type::Dict(
             Box::new(subst_typevars(k, type_params)),
@@ -5942,11 +5998,20 @@ pub(crate) fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
     // shown not to be the excluded one, which only a literal (`flex_fit`) or a
     // runtime test (`ensure_nonempty`) does. Two refinements agree when they
     // exclude the same thing from bases that coerce.
-    match (actual, expected) {
-        (Type::Without(a, xa), Type::Without(e, xe)) if xa == xe => return coerce(a, e),
-        (Type::Without(a, _), _) => return coerce(a, expected),
-        (_, Type::Without(..)) => return Err(()),
-        _ => {}
+    // Refinements are a set: a value fits a type that excludes no more than it
+    // does, whichever order they were stacked in (`(V without A) without B` is
+    // `(V without B) without A`).
+    if matches!(actual, Type::Without(..)) || matches!(expected, Type::Without(..)) {
+        let (actual_base, actual_excluded) = peel_refinements(actual);
+        let (expected_base, expected_excluded) = peel_refinements(expected);
+        return if expected_excluded
+            .iter()
+            .all(|x| actual_excluded.contains(x))
+        {
+            coerce(actual_base, expected_base)
+        } else {
+            Err(())
+        };
     }
     // `Error` is `str` under the hood (for now), so the two coerce freely either
     // way: a string error message makes an `Error`, and an `Error` is usable
@@ -6097,7 +6162,7 @@ fn merge(a: Type, b: Type) -> Type {
         // Two arms that both exclude the same value still do; one that does
         // not leaves the branch at the base type.
         (Type::Without(x, xa), Type::Without(y, xb)) if xa == xb => {
-            Type::Without(Box::new(merge((**x).clone(), (**y).clone())), *xa)
+            Type::Without(Box::new(merge((**x).clone(), (**y).clone())), xa.clone())
         }
         (Type::Without(x, _), _) => merge((**x).clone(), b),
         (_, Type::Without(y, _)) => merge(a, (**y).clone()),
@@ -6273,7 +6338,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>, vars: &HashSet<&str>) -> Ty
         | Type::Unknown
         | Type::ConcatStr => t.clone(),
         Type::Array(inner) => Type::Array(Box::new(subst_vars(inner, map, vars))),
-        Type::Without(base, x) => Type::Without(Box::new(subst_vars(base, map, vars)), *x),
+        Type::Without(base, x) => Type::Without(Box::new(subst_vars(base, map, vars)), x.clone()),
         Type::Set(inner, o) => Type::Set(Box::new(subst_vars(inner, map, vars)), *o),
         Type::Dict(k, v) => Type::Dict(
             Box::new(subst_vars(k, map, vars)),

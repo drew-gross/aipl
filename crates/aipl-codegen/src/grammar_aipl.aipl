@@ -125,6 +125,7 @@ import {
     Pat as APat,
     Payload as APayload,
     Program as AProgram,
+    Refinement as ARefinement,
     ShimBind as AShimBind,
     Stmt as AStmt,
     Struct as AStruct,
@@ -239,6 +240,8 @@ import {
     Path,
     PerformanceBlock,
     Program,
+    Refinement as ItemRefinement,
+    RefinementDecl,
     Signature,
     Struct as ItemStruct,
     StructDecl,
@@ -329,6 +332,7 @@ import {
     Fn as TyFn,
     Generic as TyGeneric,
     Named as TyNamed,
+    NamedCase,
     Optional as TyOptional,
     Primitive as TyPrimitive,
     Result as TyResult,
@@ -371,6 +375,10 @@ fn items() -> Production<AiplTok, Ast>[] {
         OneOf([
             Named("function"),
             Named("struct_decl"),
+            // Before `variant_decl`: `variant W = V without C` opens the way a
+            // one-case variant does, and only the `without` after the first
+            // name tells them apart. Ordered choice backtracks to the cases.
+            Named("refinement_decl"),
             Named("variant_decl"),
             Named("import_decl"),
             Named("const_decl"),
@@ -578,6 +586,22 @@ fn items() -> Production<AiplTok, Ast>[] {
             leading_sep=true,
         ),
     ]);
+
+    // `variant W = V without C` — a variant with cases left out, named. The
+    // type is a `ty_core` (a name, with its type arguments) and the `without`
+    // is spelled here rather than through `ty`: `ty` would also take a lone
+    // `A`, and a one-case variant must stay one. The core rather than a whole
+    // `ty_head` keeps `variant V = A B` from also expecting every suffix a type
+    // can take.
+    let refinement_decl: Rule<AiplTok> = Then([
+        Lit("variant"),
+        Term(Name),
+        Named("type_params"),
+        Lit("="),
+        Named("ty_core"),
+        Lit("without"),
+        Named("exclusion"),
+    ]);
     let variant_case: Rule<AiplTok> = OneOf([
         Then([
             Term(Name),
@@ -624,6 +648,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         p("test_tail", test_tail, TryMk(lower_test_tail)),
         p("struct_decl", struct_decl, TryMk(lower_struct_decl)),
         p("field_decl", field_decl, TryMk(lower_field_decl)),
+        p("refinement_decl", refinement_decl, TryMk(lower_refinement_decl)),
         p("variant_decl", variant_decl, TryMk(lower_variant_decl)),
         p("variant_case", variant_case, TryMk(lower_variant_case)),
         p("case_param", case_param, TryMk(lower_case_param)),
@@ -656,10 +681,10 @@ fn types() -> Production<AiplTok, Ast>[] {
         Maybe(Then([Lit("without"), Named("exclusion")])),
     ]);
 
-    // What a `without` clause excludes. One alternative today, the empty array;
-    // a future exclusion is another alternative here and another `Exclusion`
-    // case, not a change to `ty`.
-    let exclusion: Rule<AiplTok> = Then([Lit("["), Lit("]")]);
+    // What a `without` clause excludes: the empty array, or the name of a case.
+    // A further kind of exclusion is another alternative here and another
+    // `Exclusion` case, not a change to `ty`.
+    let exclusion: Rule<AiplTok> = OneOf([Then([Lit("["), Lit("]")]), Term(Name)]);
 
     // The `(`-led forms are ordered longest-first, since every one of them
     // opens the same way: `(A, B) -> R` over `(A, B)[]` over `(A, B)!E` over
@@ -2647,6 +2672,9 @@ fn lower_decl(src: str, decl: Ast, lines: Span[], sp: Span) -> Item!ParseError {
     if (let AVariant(v) = decl) {
         return ok(ItemVariant(VariantDecl { ..v, doc: docs }));
     };
+    if (let ARefinement(r) = decl) {
+        return ok(ItemRefinement(RefinementDecl { ..r, doc: docs }));
+    };
     if (let AConst(c) = decl) {
         return ok(ItemConst(ConstDecl { ..c, doc: docs }));
     };
@@ -3220,6 +3248,22 @@ fn lower_variant_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     }))
 }
 
+# `refinement_decl` — the name, the type parameters, the refined head and what
+# it leaves out. The name is the second token, as in `variant_decl`; the type
+# is rebuilt as the `Without` the clause spells, which is the whole of what the
+# declaration stands for.
+fn lower_refinement_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let head = as_ty(kid(kids, 1, sp)?, sp)?;
+    let x = as_exclusion(kid(kids, 2, sp)?, sp)?;
+    ok(ARefinement(RefinementDecl {
+        name: span_str(src, node.tokens[1].value_or(sp)),
+        doc: none,
+        type_vars: as_type_params(kid(kids, 0, sp)?, sp)?,
+        target: TyWithout(head, x),
+    }))
+}
+
 # The `# ..` lines among `node`'s own tokens that start in `lo..hi` — the run
 # written above the case starting at `hi`, since between two cases there is
 # nothing but those lines and the `|`.
@@ -3624,6 +3668,12 @@ pub fn lower_aipl_ty(src: str) -> Ty!ParseError {
     assert(ty_dump("Box<T[] without []>") == "Generic(Box, Without(Array(T), []))");
     assert(ty_dump("(i64[] without []) -> bool") == "Fn([Without(Array(i64), [])], bool)");
     assert(ty_dump("i64[]!Error without []") == "Without(Result(Array(i64), Error), [])");
+
+    // What is excluded may be a case, by name; the base is then a variant.
+    assert(ty_dump("V without C") == "Without(V, C)");
+    assert(ty_dump("Tree<T> without Leaf") == "Without(Generic(Tree, T), Leaf)");
+    assert(ty_dump("(V without C)?") == "Optional(Without(V, C))");
+    assert(ty_dump("(V without C) without D") == "Without(Without(V, C), D)");
 })
 
 # One AIPL **pattern**, lowered to the AST.
@@ -4187,11 +4237,24 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     );
     // The first case's `|` is optional; every later one is required.
     assert(program_dump("variant V = A\n| B") == "variant V(A | B)");
+
+    // A variant refined by leaving a case out. It opens as a one-case variant
+    // does, and the `without` is what makes it the other thing.
+    assert(program_dump("variant W = V without C") == "variant W = Without(V, C)");
+    assert(
+        program_dump(
+            "variant W<T> = Tree<T> without Leaf",
+        ) == "variant W<T: any> = Without(Generic(Tree, T), Leaf)",
+    );
+    assert(
+        program_dump("# Docs.\nvariant W = V without C") == "doc(Docs.) variant W = Without(V, C)",
+    );
+    assert(program_dump("variant V = A") == "variant V(A)");
     assert(program_dump("variant V = | A | B") == "variant V(A | B)");
     assert(
         program_dump(
             "variant V = A B",
-        ) == "error: expected DocComment, `(`, `|`, an item, or end of input, found `B`",
+        ) == "error: expected DocComment, `(`, `<`, `without`, `|`, an item, or end of input, found `B`",
     );
     // A documented first case has the `|` its docs sit above.
     assert(
@@ -4910,10 +4973,15 @@ fn lower_ty(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     }
 }
 
-# `exclusion` — what a `without` clause leaves out. The one form today is `[]`,
-# so the tokens are not consulted: matching the production is knowing which.
+# `exclusion` — what a `without` clause leaves out: `[]`, or a case by name. The
+# first token tells them apart, since the name is the only form that starts with
+# one.
 fn lower_exclusion(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
-    ok(AExclusion(EmptyArray))
+    let toks = node.own_texts(src);
+    if (toks[0] == some("[")) {
+        return ok(AExclusion(EmptyArray));
+    };
+    ok(AExclusion(NamedCase(toks[0].value_or(""))))
 }
 
 # `ty_head` — the eight alternatives, told apart by their left child's `Ast` case

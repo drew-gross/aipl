@@ -122,12 +122,17 @@
           </h3>
           <pre class="signature"><code>variant Exclusion</code></pre>
 
-          <div class="doc"><p>What a <code>T without X</code> type leaves out — the <code>X</code>. One case per value the checker knows how to exclude; today that is the empty array literal, <code>[]</code>.</p></div>
+          <div class="doc"><p>What a <code>T without X</code> type leaves out — the <code>X</code>. One case per kind of value the checker knows how to exclude: the empty array literal, <code>[]</code>, or a case of a variant, by its declared name.</p></div>
 
 
           <ul class="cases">
 
             <li id="item-EmptyArray"><code>EmptyArray</code>
+
+
+            </li>
+
+            <li id="item-NamedCase"><code>NamedCase(str)</code>
 
 
             </li>

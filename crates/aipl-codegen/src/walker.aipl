@@ -685,9 +685,13 @@ fn ty_head(self: W) -> WDoc!FmtError {
     ok(base)
 }
 
-# What a `without` clause excludes. The one value the grammar knows today is
-# the empty array, `[]`, written against itself.
+# What a `without` clause excludes: the empty array, `[]`, written against
+# itself, or the name of a case of the variant the type refines.
 fn exclusion(self: W) -> WDoc!FmtError {
+    if (self.peek_is(Ident)) {
+        let WStr { w, text } = self.bump();
+        return ok(WDoc { w, doc: Text(text) });
+    };
     let closed = self.expect("[")?.w.expect("]")?.w;
     ok(WDoc { w: closed, doc: Text("[]") })
 }
@@ -867,6 +871,9 @@ fn variant_item(self: W) -> WDoc!FmtError {
     let n = self.expect("variant")?.w.bump();
     let tps = n.w.type_params()?;
     let eq = tps.w.expect("=")?.w;
+    if (eq.refinement_follows()) {
+        return eq.refinement_item(n.text, tps.doc);
+    };
     let cs = eq.variant_cases([])?;
     ok(WDoc {
         w: cs.w,
@@ -876,6 +883,25 @@ fn variant_item(self: W) -> WDoc!FmtError {
             Text(" ="),
             Indent(Concat([Line, Concat(variant_body(cs.cases))])),
         ])),
+    })
+}
+
+# Whether what follows a variant's `=` is a refinement, `V without C`, rather
+# than a list of cases. A case is a name followed by `(`, `|` or the end of the
+# declaration, so a name followed by `without` or by the `<` of a generic base
+# can only be the type being refined.
+fn refinement_follows(self: W) -> bool {
+    self.peek_text_n(1) == "without" || self.peek_text_n(1) == "<"
+}
+
+# `variant V = Base without C`: one line, since there is no list to break. The
+# refined type is laid out as any type is.
+fn refinement_item(self: W, name: str, params: Doc) -> WDoc!FmtError {
+    let t = self.ty()?;
+    let tc = t.w.trailing_comment();
+    ok(WDoc {
+        w: tc.w,
+        doc: group(Concat([Text(`variant {name}`), params, Text(" = "), t.doc, tc.doc])),
     })
 }
 
@@ -2848,6 +2874,10 @@ fn walker_of(src: str) -> W!FmtError {
     assert(walker_of("i64 [ ] without [ ]")?.ty().rendered(100)? == "i64[] without []");
     assert(walker_of("( i64 [ ] without [ ] ) ?")?.ty().rendered(100)? == "(i64[] without [])?");
     assert(walker_of("Box < T [ ] without [ ] >")?.ty().rendered(100)? == "Box<T[] without []>");
+    // A variant refines by excluding one of its cases, named.
+    assert(walker_of("V   without   C")?.ty().rendered(100)? == "V without C");
+    assert(walker_of("( V without C ) ?")?.ty().rendered(100)? == "(V without C)?");
+    assert(walker_of("Tree < T > without Leaf")?.ty().rendered(100)? == "Tree<T> without Leaf");
 
     // --- comma lists --------------------------------------------------------
     // Empty renders as just the brackets; no indent machinery.
@@ -3414,6 +3444,17 @@ fn walker_of(src: str) -> W!FmtError {
 
     // --- variant ------------------------------------------------------------
     assert(walker_of("variant V = A")?.variant_item().rendered(100)? == "variant V = A");
+    // A refinement is one line, whatever it is spelled with.
+    assert(
+        walker_of("variant W   =   V   without   C")?
+            .variant_item()
+            .rendered(100)? == "variant W = V without C",
+    );
+    assert(
+        walker_of("variant W < T > = Tree < T > without Leaf")?
+            .variant_item()
+            .rendered(100)? == "variant W<T> = Tree<T> without Leaf",
+    );
     assert(walker_of("variant V = A | B")?.variant_item().rendered(100)? == "variant V = A | B");
     assert(
         walker_of("variant V = A | B ( i64 )")?

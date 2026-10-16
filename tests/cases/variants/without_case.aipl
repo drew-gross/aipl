@@ -1,0 +1,90 @@
+# `variant Solid = Shape without Dot` names the type `Shape without Dot`: a
+# `Shape` known not to be a `Dot`. It is a `Shape` at runtime, so a `Solid` goes
+# wherever a `Shape` does, and a `match` on one needs no `Dot` arm — and may not
+# have one. Getting *into* a `Solid` takes a construction that is visibly not
+# `Dot`; the refinement is the checker's alone and costs nothing to carry.
+#
+# The type can also be written inline (`Shape without Dot`), refinements stack
+# (`Round` leaves out a second case), and a generic variant is refined per
+# argument (`Grown<T>`).
+
+import { map, print, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
+
+variant Shape = Circle(i64) | Square(i64) | Dot
+
+variant Solid = Shape without Dot
+
+variant Round = Solid without Square
+
+variant Tree<T> = Leaf | Node(T) | Pair(Tree<T>, Tree<T>)
+
+variant Grown<T> = Tree<T> without Leaf
+
+struct Holder { s: Solid, rs: Solid[] }
+
+fn area(s: Solid) -> i64 {
+    match (s) {
+        Circle(r) => 3 * r * r,
+        Square(w) => w * w,
+    }
+}
+
+fn radius(r: Round) -> i64 {
+    match (r) {
+        Circle(r) => r,
+    }
+}
+
+// Written inline, with the same meaning.
+fn inline_area(s: Shape without Dot) -> i64 { area(s) }
+
+fn pick(flag: bool) -> Solid { if (flag) { Circle(2) } else { Square(3) } }
+
+// A `Solid` is accepted where a `Shape` is wanted.
+fn widen(s: Solid) -> Shape { s }
+
+fn grown(g: Grown<i64>) -> i64 {
+    match (g) {
+        Node(n) => n,
+        Pair(..) => 0,
+    }
+}
+
+// Nested patterns over two refined columns.
+fn combined(a: Solid, b: Round) -> i64 {
+    match ((a, b)) {
+        (Circle(r), Circle(s)) => r + s,
+        (Square(w), Circle(s)) => w + s + 100,
+    }
+}
+
+// A wildcard stands for what is left once the excluded case is gone.
+fn is_circle(s: Solid) -> bool {
+    match (s) {
+        Circle(..) => true,
+        Square(..) => false,
+    }
+}
+
+fn main() !prints {
+    print(area(pick(true)).to_str());
+    print(area(pick(false)).to_str());
+    print(inline_area(Square(4)).to_str());
+    print(radius(Circle(7)).to_str());
+    print(grown(Node(5)).to_str());
+    print(combined(Square(1), Circle(2)).to_str());
+    print(is_circle(Square(1)).to_str());
+    let h = Holder { s: Circle(1), rs: [Circle(1), Square(2)] };
+    print(h.rs.map(area).to_str());
+    print(widen(h.s).to_str());
+}
+--- stdout ---
+12
+9
+16
+7
+5
+103
+false
+[3, 4]
+Circle(1)

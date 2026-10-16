@@ -265,6 +265,20 @@
 
 
 
+        <section class="item" id="item-RefinementDecl">
+          <h3>
+            <a class="anchor" href="#item-RefinementDecl">RefinementDecl</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct RefinementDecl</code></pre>
+
+          <div class="doc"><p><code>variant Name = V without C</code>: a variant refined by leaving cases out, named. <code>target</code> is always the <code>Without</code> it spells. The loader substitutes it for every mention of the name and drops the declaration, so nothing past it sees one.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-ConstDecl">
           <h3>
             <a class="anchor" href="#item-ConstDecl">ConstDecl</a>
@@ -302,6 +316,11 @@
             </li>
 
             <li id="item-Variant"><code>Variant(VariantDecl)</code>
+
+
+            </li>
+
+            <li id="item-Refinement"><code>Refinement(RefinementDecl)</code>
 
 
             </li>

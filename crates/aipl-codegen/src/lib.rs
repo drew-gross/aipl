@@ -14075,19 +14075,12 @@ fn plan_match(
                         .collect(),
                 );
             }
-            if !catch_all && seen.len() != vl.cases.len() {
-                let missing: Vec<&str> = vl
-                    .cases
-                    .iter()
-                    .enumerate()
-                    .filter(|(t, _)| !seen.contains(t))
-                    .map(|(_, c)| c.name.as_str())
-                    .collect();
-                return Err(Error::at(
-                    format!("non-exhaustive match: missing {}", missing.join(", ")),
-                    scrut_span.clone(),
-                ));
-            }
+            // No exhaustiveness check here: the checker has made it, and a
+            // `match` can legitimately arrive with arms missing. A
+            // `V without C` is matched without a `C` arm — no value of it
+            // carries that tag — and the refinement is erased to `V` before
+            // this point, so the cases it left out look unmatched. The dispatch
+            // falls through to the last arm for whatever tag is left.
             Ok(MatchPlan::Variant { arm_tags, payloads })
         }
         _ => Err(Error::at(

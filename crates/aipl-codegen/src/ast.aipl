@@ -45,6 +45,7 @@ import {
     ImportName as ImportNameNode,
     Item as ItemNode,
     Program as ProgramNode,
+    RefinementDecl,
     StructDecl,
     TypeParam as TypeParamNode,
     VariantCase as VariantCaseNode,
@@ -111,6 +112,7 @@ variant Ast =
     | Struct(StructDecl)
     | FieldDecl(FieldDeclNode)
     | Variant(VariantDecl)
+    | Refinement(RefinementDecl)
     | VariantCase(VariantCaseNode)
     | CaseParam(CaseParamNode)
     | Const(ConstDecl)
@@ -151,6 +153,7 @@ pub fn ast_case_name(self: Ast) -> str {
         Struct(..) => "a struct declaration",
         FieldDecl(..) => "a field declaration",
         Variant(..) => "a variant declaration",
+        Refinement(..) => "a variant refinement",
         VariantCase(..) => "a variant case",
         CaseParam(..) => "a case parameter",
         Const(..) => "a constant",

@@ -137,6 +137,9 @@ fn item(v: &FfiValue) -> R<Vec<ast::Item>> {
         }
         "Struct" => vec![ast::Item::Struct(struct_decl(at(payload, 0, case)?)?)],
         "Variant" => vec![ast::Item::Variant(variant_decl(at(payload, 0, case)?)?)],
+        "Refinement" => vec![ast::Item::Refinement(refinement_decl(at(
+            payload, 0, case,
+        )?)?)],
         "Import" => vec![ast::Item::Import(import_decl(at(payload, 0, case)?)?)],
         "Const" => vec![ast::Item::Const(const_decl(at(payload, 0, case)?)?)],
         other => return Err(unknown("Item", other)),
@@ -283,6 +286,15 @@ fn variant_decl(v: &FfiValue) -> R<ast::VariantDecl> {
     })
 }
 
+fn refinement_decl(v: &FfiValue) -> R<ast::RefinementDecl> {
+    Ok(ast::RefinementDecl {
+        name: span_str(field(v, "name")?)?,
+        doc: maybe(field(v, "doc")?, text)?,
+        type_vars: each(field(v, "type_vars")?, type_param)?,
+        target: ty(field(v, "target")?)?,
+    })
+}
+
 fn variant_case(v: &FfiValue) -> R<ast::VariantCase> {
     Ok(ast::VariantCase {
         name: span_str(field(v, "name")?)?,
@@ -358,9 +370,10 @@ fn ty(v: &FfiValue) -> R<ast::Type> {
 }
 
 fn exclusion(v: &FfiValue) -> R<ast::Exclusion> {
-    let (case, _) = variant(v)?;
+    let (case, payload) = variant(v)?;
     Ok(match case {
         "EmptyArray" => ast::Exclusion::EmptyArray,
+        "NamedCase" => ast::Exclusion::NamedCase(text(at(payload, 0, case)?)?),
         other => return Err(unknown("Exclusion", other)),
     })
 }

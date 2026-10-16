@@ -71,6 +71,7 @@ mod early_exit;
 /// worklist and what a pass may assume about being run twice.
 pub mod passes;
 
+use aipl_syntax::subst_type_params;
 use aipl_syntax::{
     ast,
     ast::{
@@ -244,6 +245,9 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
                 ..v.clone()
             }),
             Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
+            Item::Refinement(_) => {
+                unreachable!("refinements are expanded and dropped during load")
+            }
             Item::Import(_) => item.clone(),
         })
         .collect();
@@ -608,6 +612,9 @@ pub fn lower_tuples(program: &Program) -> Program {
                     .collect(),
             }),
             Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
+            Item::Refinement(_) => {
+                unreachable!("refinements are expanded and dropped during load")
+            }
             Item::Import(_) => item.clone(),
         })
         .collect();
@@ -763,7 +770,9 @@ fn lt_ty(
         Type::TypeVar(v) => Type::TypeVar(v.clone()),
         Type::Unknown => Type::Unknown,
         Type::Array(inner) => Type::Array(Box::new(lt_ty(inner, fields_map, order))),
-        Type::Without(base, x) => Type::Without(Box::new(lt_ty(base, fields_map, order)), *x),
+        Type::Without(base, x) => {
+            Type::Without(Box::new(lt_ty(base, fields_map, order)), x.clone())
+        }
         Type::Set(inner, o) => Type::Set(Box::new(lt_ty(inner, fields_map, order)), *o),
         Type::Optional(inner) => Type::Optional(Box::new(lt_ty(inner, fields_map, order))),
         Type::Dict(k, v) => Type::Dict(
@@ -1093,49 +1102,6 @@ fn template_member_types(name: &str, args: &[Type], tmpls: &Templates<'_>) -> Ve
     Vec::new()
 }
 
-/// Substitute template type variables in `t` with concrete types from `map`,
-/// recursing through every compound type — including nested generic
-/// applications, so a generic field like `inner: Box<T>` becomes `Box<i64>`
-/// once `T` is bound. A `Named` not in `map` (a concrete type or an unrelated
-/// name) is left unchanged.
-fn subst_type_params(t: &Type, map: &HashMap<String, Type>) -> Type {
-    match t {
-        Type::Case(v) => Type::Case(Box::new(subst_type_params(v, map))),
-        // Only a *variable* substitutes. Keying this on `Named` meant a struct
-        // that happened to share a template parameter's name was rewritten too.
-        Type::TypeVar(n) => map.get(n).cloned().unwrap_or_else(|| t.clone()),
-        Type::Named(_) | Type::Unknown => t.clone(),
-        Type::Optional(i) => Type::Optional(Box::new(subst_type_params(i, map))),
-        Type::Array(i) => Type::Array(Box::new(subst_type_params(i, map))),
-        Type::Without(b, x) => Type::Without(Box::new(subst_type_params(b, map)), *x),
-        Type::Set(i, o) => Type::Set(Box::new(subst_type_params(i, map)), *o),
-        Type::Dict(k, v) => Type::Dict(
-            Box::new(subst_type_params(k, map)),
-            Box::new(subst_type_params(v, map)),
-        ),
-        Type::Result(ok, err) => Type::Result(
-            Box::new(subst_type_params(ok, map)),
-            Box::new(subst_type_params(err, map)),
-        ),
-        Type::Fn(ps, r) => Type::Fn(
-            ps.iter().map(|p| subst_type_params(p, map)).collect(),
-            Box::new(subst_type_params(r, map)),
-        ),
-        Type::Tuple(es) => Type::Tuple(es.iter().map(|e| subst_type_params(e, map)).collect()),
-        Type::Generic(name, args) => Type::Generic(
-            name.clone(),
-            args.iter().map(|a| subst_type_params(a, map)).collect(),
-        ),
-        Type::Unit
-        | Type::Primitive(_)
-        | Type::Any
-        | Type::NoneInner
-        | Type::EmptyArrayArg
-        | Type::NoneLiteralArg
-        | Type::ConcatStr => t.clone(),
-    }
-}
-
 /// Resolves generic struct/variant *type annotations* (`Type::Generic`) into
 /// synthetic monomorphic named types, one per distinct instantiation — the
 /// generic analogue of `lower_tuples`. Constructions (`Box { value: 5 }`) carry
@@ -1208,6 +1174,7 @@ impl GenericLowerer {
             }
             Type::Optional(i) => Type::Optional(Box::new(self.lower_ty(i)?)),
             Type::Array(i) => Type::Array(Box::new(self.lower_ty(i)?)),
+            Type::Without(b, x) => Type::Without(Box::new(self.lower_ty(b)?), x.clone()),
             Type::Set(i, o) => Type::Set(Box::new(self.lower_ty(i)?), *o),
             Type::Dict(k, v) => {
                 Type::Dict(Box::new(self.lower_ty(k)?), Box::new(self.lower_ty(v)?))
@@ -1447,7 +1414,7 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
             Item::Fn(f) => (Some(&f.name), Some(f.name.span.clone())),
             Item::Struct(s) => (Some(&s.name), Some(s.name.span.clone())),
             Item::Variant(v) => (Some(&v.name), Some(v.name.span.clone())),
-            Item::Const(_) | Item::Import(_) => (None, None),
+            Item::Const(_) | Item::Refinement(_) | Item::Import(_) => (None, None),
         };
         let lowered = (|| -> Result<Item, Error> {
             Ok(match item {
@@ -1540,6 +1507,9 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
                         .collect::<Result<_, Error>>()?,
                 }),
                 Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
+                Item::Refinement(_) => {
+                    unreachable!("refinements are expanded and dropped during load")
+                }
                 Item::Import(_) => item.clone(),
             })
         })()
@@ -1617,6 +1587,9 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                 passthrough.push(item.clone());
             }
             Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
+            Item::Refinement(_) => {
+                unreachable!("refinements are expanded and dropped during load")
+            }
             Item::Import(_) => passthrough.push(item.clone()),
             Item::Fn(f) => {
                 if f.sig.is_mutating() {
@@ -1992,6 +1965,9 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
             Item::Variant(v) => variants_out.push(v),
             // Imports are resolved by the loader — codegen never sees them.
             Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
+            Item::Refinement(_) => {
+                unreachable!("refinements are expanded and dropped during load")
+            }
             Item::Import(_) => {}
             Item::Fn(_) => unreachable!("passthrough never carries a fn item"),
         }
@@ -8719,7 +8695,7 @@ fn normalize_param_ty(
         )))),
         Type::Without(base, x) => Ok(Type::Without(
             Box::new(normalize_param_ty(base, type_vars, counter, fname)?),
-            *x,
+            x.clone(),
         )),
         Type::Set(inner, o) => Ok(Type::Set(
             Box::new(normalize_inner(inner, type_vars, counter)),
@@ -8785,9 +8761,10 @@ fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -
             Type::Optional(Box::new(normalize_inner(inner, type_vars, counter)))
         }
         Type::Array(inner) => Type::Array(Box::new(normalize_inner(inner, type_vars, counter))),
-        Type::Without(base, x) => {
-            Type::Without(Box::new(normalize_inner(base, type_vars, counter)), *x)
-        }
+        Type::Without(base, x) => Type::Without(
+            Box::new(normalize_inner(base, type_vars, counter)),
+            x.clone(),
+        ),
         Type::Set(inner, o) => Type::Set(Box::new(normalize_inner(inner, type_vars, counter)), *o),
         Type::Dict(k, v) => Type::Dict(
             Box::new(normalize_inner(k, type_vars, counter)),
@@ -8983,7 +8960,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
                 Type::Array(Box::new(i))
             }
         }
-        Type::Without(base, x) => Type::Without(Box::new(subst_vars(base, map)), *x),
+        Type::Without(base, x) => Type::Without(Box::new(subst_vars(base, map)), x.clone()),
         Type::Set(inner, o) => Type::Set(Box::new(subst_vars(inner, map)), *o),
         Type::Dict(k, v) => Type::Dict(Box::new(subst_vars(k, map)), Box::new(subst_vars(v, map))),
         Type::Result(ok, err) => {
@@ -11802,19 +11779,13 @@ impl MatchTree<'_, '_> {
                         })
                         .collect();
                     if spec.is_empty() {
-                        // No row reaches this case: the checker proved that
-                        // cannot happen for a value, so this arm is dead — but
-                        // a `Match` has to name every case. Reuse the first
-                        // row's leaf; it can never run.
-                        arms.push(MatchArm {
-                            pattern: Pattern::Ctor {
-                                name: case.clone(),
-                                bindings: sub_cols.iter().map(|(v, _)| v.clone()).collect(),
-                                ignore_payload: false,
-                            },
-                            body: self.leaf(&rows[0]),
-                            span: self.span.clone(),
-                        });
+                        // No row reaches this case. The checker proved that
+                        // cannot happen for a value — only a refinement can
+                        // leave a case unmatched (`V without C` is matched with
+                        // no `C` row), and erasure has made it a `V` again — so
+                        // it gets no arm. Naming it would need a body, and the
+                        // only bodies there are belong to rows that bind names
+                        // this arm never introduces.
                         continue;
                     }
                     let new_cols = splice_cols(cols, col, &sub_cols);

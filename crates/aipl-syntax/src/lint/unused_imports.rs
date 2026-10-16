@@ -82,6 +82,7 @@ fn referenced_names(program: &Program) -> HashSet<String> {
                     collect_ty_names(t, &mut out);
                 }
             }
+            Item::Refinement(r) => collect_ty_names(&r.target, &mut out),
             Item::Import(_) => {}
         }
     }

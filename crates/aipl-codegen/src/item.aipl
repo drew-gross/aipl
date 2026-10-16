@@ -8,7 +8,7 @@ import { Bound, show_bound } from "./bound.aipl";
 import { Expr, FieldInit, show_expr } from "./expr.aipl";
 import { SpanStr, span_str } from "./lexer.aipl";
 import { I64 } from "./prim.aipl";
-import { Primitive, Ty, show_ty } from "./ty.aipl";
+import { Named, NamedCase, Primitive, Ty, Without, show_ty } from "./ty.aipl";
 
 struct TypeParam { name: str, bound: Bound }
 
@@ -83,6 +83,11 @@ struct VariantCase { name: SpanStr, doc: str?, payload: CaseParam[] }
 
 struct VariantDecl { name: SpanStr, doc: str?, type_vars: TypeParam[], cases: VariantCase[] }
 
+# `variant Name = V without C`: a variant refined by leaving cases out, named.
+# `target` is always the `Without` it spells. The loader substitutes it for every
+# mention of the name and drops the declaration, so nothing past it sees one.
+struct RefinementDecl { name: SpanStr, doc: str?, type_vars: TypeParam[], target: Ty }
+
 # A top-level `pub let NAME: T = <literal>;`. The loader substitutes each use
 # with the literal and drops the declaration, so nothing past it sees a
 # constant. `name` carries its own span, which is what the diagnostics checking
@@ -93,6 +98,7 @@ variant Item =
     | Fn(Function)
     | Struct(StructDecl)
     | Variant(VariantDecl)
+    | Refinement(RefinementDecl)
     | Import(ImportDecl)
     | Const(ConstDecl)
 
@@ -131,6 +137,7 @@ pub fn show_item(self: Item) -> str {
         Fn(f) => show_fn(f),
         Struct(s) => `{show_doc(s.doc)}struct {s.name.text}{show_type_params(s.type_vars)}({s.fields.map(show_field_decl).join(sep=", ")})`,
         Variant(v) => `{show_doc(v.doc)}variant {v.name.text}{show_type_params(v.type_vars)}({v.cases.map(show_case).join(sep=" | ")})`,
+        Refinement(r) => `{show_doc(r.doc)}variant {r.name.text}{show_type_params(r.type_vars)} = {r.target.show_ty()}`,
         Import(d) => `import [{d.names.map(show_import_name).join(sep=", ")}] from {show_import_source(d.source)}`,
         Const(c) => `{show_doc(c.doc)}let {c.name.text}{show_const_ty(c.ty)} = {show_expr(c.value)}`,
     }
@@ -148,6 +155,13 @@ pub fn show_item(self: Item) -> str {
         fields: [FieldDecl { name: "x", ty: Primitive(I64), default: none }],
     };
     assert(Struct(s).show_item() == "struct P(x: i64)");
+    let r = RefinementDecl {
+        name: span_str("variant W = V without C", 8..9),
+        doc: none,
+        type_vars: no_params,
+        target: Without(Named("V"), NamedCase("C")),
+    };
+    assert(Refinement(r).show_item() == "variant W = Without(V, C)");
 })
 
 fn show_fn(self: Function) -> str {

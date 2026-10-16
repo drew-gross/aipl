@@ -3,7 +3,6 @@ instead. Looks like a small fix: both the checker (check.rs:2051) and codegen (l
 while the ord-bound machinery already compares chars — and ord_bound.aipl's doc comment claims chars work with </>.
 
 variant:
-  add a "variant without" option for concrete/generic type that lets you still pass a conrete type to functions that accept generic
   add an is keyword that matches cases and maybe replaces same_case (or maybe just a .is(CaseName) method?)
   Decide if I want bare variant assignment. Similar: Can a function that returns T be passed as an argument to a function that returns T!str?
   Allow variants to be passed to HOFs, you can e.g. v.map(VariantConstructor).
@@ -305,7 +304,6 @@ shim:
 
 types:
   Unicode support
-  Variant without Case should work
   i64 without 0 should work
   none.value_or_err doesn't type check. Maybe it should? Unclear.
   self.syms.map(|s| show_sym(s)) -> self.syms.map(show_sym) should work

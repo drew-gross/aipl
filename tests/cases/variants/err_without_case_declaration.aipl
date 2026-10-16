@@ -1,0 +1,14 @@
+# A declaration is checked whether or not anything uses it: a case the variant
+# does not have.
+
+variant V = A | B
+
+variant Bad = V without Nope
+
+fn main() {}
+--- errors ---
+error: "Bad" leaves out "Nope", but V has no such case
+ --> ./tests/cases/variants/err_without_case_declaration.aipl:6:9
+  |
+6 | variant Bad = V without Nope
+  |         ^^^

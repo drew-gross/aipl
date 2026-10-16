@@ -27,16 +27,21 @@ variant Ty =
     | Any
     | Without(Ty, Exclusion)
 
-# What a `T without X` type leaves out — the `X`. One case per value the checker
-# knows how to exclude; today that is the empty array literal, `[]`.
-variant Exclusion = EmptyArray
+# What a `T without X` type leaves out — the `X`. One case per kind of value the
+# checker knows how to exclude: the empty array literal, `[]`, or a case of a
+# variant, by its declared name.
+variant Exclusion = EmptyArray | NamedCase(str)
 
 # The excluded value as the user writes it after `without`.
 pub fn show_exclusion(self: Exclusion) -> str {
     match (self) {
         EmptyArray => "[]",
+        NamedCase(name) => name,
     }
-}.test({ assert(EmptyArray.show_exclusion() == "[]") })
+}.test({
+    assert(EmptyArray.show_exclusion() == "[]");
+    assert(NamedCase("Leaf").show_exclusion() == "Leaf");
+})
 
 # How a set orders its elements: `#{T}` promises no order, `#>{T}` walks
 # largest first, `#<{T}` smallest first. The two ordered forms require an `ord`
@@ -94,6 +99,7 @@ pub fn show_ty(self: Ty) -> str {
     assert(Set(Primitive(Str), Asc).show_ty() == "Set(str, Asc)");
     assert(TypeVar("T").show_ty() == "TypeVar(T)");
     assert(Without(Array(i64_ty), EmptyArray).show_ty() == "Without(Array(i64), [])");
+    assert(Without(Named("V"), NamedCase("C")).show_ty() == "Without(V, C)");
 })
 
 # The elements of a type list, comma-separated. An empty list renders empty,

@@ -2032,12 +2032,26 @@
 
 
 
+        <section class="item" id="item-lower_refinement_decl">
+          <h3>
+            <a class="anchor" href="#item-lower_refinement_decl">lower_refinement_decl</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_refinement_decl(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>refinement_decl</code> — the name, the type parameters, the refined head and what it leaves out. The name is the second token, as in <code>variant_decl</code>; the type is rebuilt as the <code>Without</code> the clause spells, which is the whole of what the declaration stands for.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-doc_lines_between">
           <h3>
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$129966: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$131886: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -2543,7 +2557,7 @@
           </h3>
           <pre class="signature"><code>fn lower_exclusion(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>exclusion</code> — what a <code>without</code> clause leaves out. The one form today is <code>[]</code>, so the tokens are not consulted: matching the production is knowing which.</p></div>
+          <div class="doc"><p><code>exclusion</code> — what a <code>without</code> clause leaves out: <code>[]</code>, or a case by name. The first token tells them apart, since the name is the only form that starts with one.</p></div>
 
 
         </section>

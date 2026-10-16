@@ -1,0 +1,32 @@
+# A refinement declared in another file is imported by name like any type, and
+# means what it meant where it was written. The cases it keeps are the variant's
+# own, so they come in through the variant's import as usual.
+
+import { print, to_str } from builtins;
+import { Circle, Shape, Solid, measure } from "./solids.aipl";
+
+fn lift(s: Solid) -> Shape { s }
+
+fn main() !prints {
+    print(measure(Circle(4)).to_str());
+    let s: Solid = Circle(1);
+    print(measure(s).to_str());
+    print(lift(s).to_str());
+}
+--- file: solids.aipl ---
+# Shapes with an escape hatch.
+variant Shape = Circle(i64) | Square(i64) | Dot
+
+# The shapes with something to measure.
+variant Solid = Shape without Dot
+
+pub fn measure(s: Solid) -> i64 {
+    match (s) {
+        Circle(r) => r,
+        Square(w) => w,
+    }
+}
+--- stdout ---
+4
+1
+Circle(1)

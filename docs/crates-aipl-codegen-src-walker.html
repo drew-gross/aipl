@@ -953,7 +953,7 @@
           </h3>
           <pre class="signature"><code>fn exclusion(self: W) -&#62; WDoc!FmtError</code></pre>
 
-          <div class="doc"><p>What a <code>without</code> clause excludes. The one value the grammar knows today is the empty array, <code>[]</code>, written against itself.</p></div>
+          <div class="doc"><p>What a <code>without</code> clause excludes: the empty array, <code>[]</code>, written against itself, or the name of a case of the variant the type refines.</p></div>
 
 
         </section>
@@ -1136,6 +1136,34 @@
           <pre class="signature"><code>fn variant_item(self: W) -&#62; WDoc!FmtError</code></pre>
 
           <div class="doc"><p><code>variant V = A | B(i64)</code>. Flat when it fits; broken to one case per line with a leading <code>| </code> — including the first case, so every case aligns under one <code>|</code>. A case's leading comment or <code># ..</code> doc lines sit above it and, being hard lines, force the broken layout.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-refinement_follows">
+          <h3>
+            <a class="anchor" href="#item-refinement_follows">refinement_follows</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn refinement_follows(self: W) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether what follows a variant's <code>=</code> is a refinement, <code>V without C</code>, rather than a list of cases. A case is a name followed by <code>(</code>, <code>|</code> or the end of the declaration, so a name followed by <code>without</code> or by the <code>&lt;</code> of a generic base can only be the type being refined.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-refinement_item">
+          <h3>
+            <a class="anchor" href="#item-refinement_item">refinement_item</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn refinement_item(self: W, name: str, params: Doc) -&#62; WDoc!FmtError</code></pre>
+
+          <div class="doc"><p><code>variant V = Base without C</code>: one line, since there is no list to break. The refined type is laid out as any type is.</p></div>
 
 
         </section>
@@ -1567,7 +1595,7 @@
             <a class="anchor" href="#item-range_has_stmt">range_has_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$58139: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$59148: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code> or a <code>fn</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 

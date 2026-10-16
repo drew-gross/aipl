@@ -1,0 +1,15 @@
+# Two refinements that name each other have no type to stand for.
+
+variant V = A | B | C
+
+variant First = Second without A
+
+variant Second = First without B
+
+fn main() {}
+--- errors ---
+error: "First" refines itself: First -> Second -> First
+ --> ./tests/cases/variants/err_without_case_cycle.aipl:5:9
+  |
+5 | variant First = Second without A
+  |         ^^^^^

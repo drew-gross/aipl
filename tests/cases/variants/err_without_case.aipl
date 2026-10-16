@@ -1,0 +1,86 @@
+# The ways `V without C` is refused: an arm for the excluded case, a plain `V`
+# (or the excluded case itself) where the refinement is wanted, a case that does
+# not exist, a base that is not a variant, and a refinement that refines itself.
+
+variant V = A | B(i64) | C
+
+variant VMinus = V without C
+
+fn arm_for_excluded(v: VMinus) -> str {
+    match (v) {
+        A => "a",
+        B(..) => "b",
+        C => "c",
+    }
+}
+
+fn takes(v: VMinus) -> i64 { 1 }
+
+fn plain(v: V) -> i64 { takes(v) }
+
+fn excluded_literal() -> i64 {
+    let w: VMinus = C;
+    1
+}
+
+fn missing(v: VMinus) -> str {
+    match (v) {
+        A => "a",
+    }
+}
+
+fn dead_wildcard(v: VMinus) -> str {
+    match (v) {
+        A => "a",
+        B(..) => "b",
+        _ => "never",
+    }
+}
+
+fn no_such_case(v: V without Nope) -> i64 { 1 }
+
+fn not_a_variant(n: i64 without C) -> i64 { 1 }
+
+fn main() {}
+--- errors ---
+error: V without C has no constructor "C"
+  --> ./tests/cases/variants/err_without_case.aipl:13:9
+   |
+13 |         C => "c",
+   |         ^
+
+error: fn "takes" arg 0: expected V without C, got V
+  --> ./tests/cases/variants/err_without_case.aipl:19:31
+   |
+19 | fn plain(v: V) -> i64 { takes(v) }
+   |                               ^
+
+error: binding "w" is declared V without C, but its value is V
+  --> ./tests/cases/variants/err_without_case.aipl:22:21
+   |
+22 |     let w: VMinus = C;
+   |                     ^
+
+error: non-exhaustive match: missing B
+  --> ./tests/cases/variants/err_without_case.aipl:27:5
+   |
+27 |     match (v) {
+   |     ^^^^^^^^^^^
+
+error: unreachable `_` arm: every case is already matched above it
+  --> ./tests/cases/variants/err_without_case.aipl:36:9
+   |
+36 |         _ => "never",
+   |         ^
+
+error: fn "no_such_case": `without Nope` excludes a case of V, which has no case "Nope"
+  --> ./tests/cases/variants/err_without_case.aipl:40:4
+   |
+40 | fn no_such_case(v: V without Nope) -> i64 { 1 }
+   |    ^^^^^^^^^^^^
+
+error: fn "not_a_variant": `without C` excludes a case of a variant, and i64 is not one
+  --> ./tests/cases/variants/err_without_case.aipl:42:4
+   |
+42 | fn not_a_variant(n: i64 without C) -> i64 { 1 }
+   |    ^^^^^^^^^^^^^
