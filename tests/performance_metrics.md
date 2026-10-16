@@ -668,9 +668,9 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/find_files | 19 | 1096 | 1040 | 1841 | 6544 | 12.00 | 89.11 | 1520 |
 | crates/aipl-codegen/src/find_trailing_whitespace | 0 | 0 | 0 | 6230 | 2488 | 3.00 | 91.19 | 1440 |
 | crates/aipl-codegen/src/format | 2275 | 183697 | 19208 | 310930 | 174812 | 198.00 | 1335.16 | 1904 |
-| crates/aipl-codegen/src/format_source | 16189 | 4158470 | 478427 | 11156617 | 5806808 | 2558.00 | 19721.00 | 5072 |
+| crates/aipl-codegen/src/format_source | 16093 | 4141702 | 474787 | 11132965 | 5806296 | 2476.00 | 21157.56 | 5120 |
 | crates/aipl-codegen/src/grammar | 733 | 92489 | 47064 | 80021 | 105136 | 76.00 | 540.41 | 1760 |
-| crates/aipl-codegen/src/grammar_aipl | 1709464 | 356375172 | 893799 | 561751694 | 5207312 | 142730.00 | 13803.59 | 9504 |
+| crates/aipl-codegen/src/grammar_aipl | 1696098 | 354414292 | 890159 | 557587887 | 5206944 | 141027.00 | 13541.41 | 9744 |
 | crates/aipl-codegen/src/grammar_calc | 10181 | 1167854 | 42260 | 3280513 | 284636 | 867.00 | 3012.33 | 2400 |
 | crates/aipl-codegen/src/grammar_json | 19766 | 2805844 | 35129 | 6977714 | 308400 | 1751.00 | 2956.44 | 2640 |
 | crates/aipl-codegen/src/grammar_sexp | 5748 | 629967 | 13968 | 1997065 | 274528 | 568.00 | 2882.84 | 2288 |
@@ -705,7 +705,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/trim_suffix | 0 | 0 | 0 | 351 | 1128 | 2.00 | 78.87 | 1456 |
 | crates/aipl-codegen/src/ty | 84 | 6766 | 6362 | 5280 | 14168 | 14.00 | 105.03 | 1552 |
 | crates/aipl-codegen/src/unescape | 6 | 528 | 352 | 10330 | 8116 | 6.00 | 93.14 | 1472 |
-| crates/aipl-codegen/src/walker | 96375 | 22697153 | 836368 | 65985309 | 15160144 | 13475.00 | 32781.94 | 10288 |
+| crates/aipl-codegen/src/walker | 95871 | 22609633 | 832728 | 65839260 | 15159568 | 13413.00 | 32842.99 | 10752 |
 | crates/aipl-mono/src/builtin_all | 1 | 32 | 32 | 1378 | 3444 | 3.00 | 85.84 | 1488 |
 | crates/aipl-mono/src/builtin_any | 1 | 32 | 32 | 1160 | 3336 | 3.00 | 85.82 | 1488 |
 | crates/aipl-mono/src/builtin_count | 1 | 104 | 104 | 1628 | 2292 | 3.00 | 83.47 | 1456 |

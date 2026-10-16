@@ -558,9 +558,11 @@ fn items() -> Production<AiplTok, Ast>[] {
         Named("type_params"),
         Many(Named("field_decl"), sep=Lit(","), nested_in=braces(), spaced=true),
     ]);
-    let field_decl: Rule<AiplTok> = OneOf([
-        Then([Term(Name), Lit(":"), Named("ty"), Lit("="), Named("expr")]),
-        Then([Term(Name), Lit(":"), Named("ty")]),
+    let field_decl: Rule<AiplTok> = Then([
+        Term(Name),
+        Lit(":"),
+        Named("ty"),
+        Maybe(Then([Lit("="), Named("expr")])),
     ]);
 
     // `variant V = | A | B(i64)` — a leading `|` is allowed and means nothing,
@@ -1091,10 +1093,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Then([Lit("||"), Named("block")]),
         Then([Lit("||"), Named("expr")]),
     ]);
-    let lambda_param: Rule<AiplTok> = OneOf([
-        Then([Term(Name), Lit(":"), Named("ty")]),
-        Term(Name),
-    ]);
+    let lambda_param: Rule<AiplTok> = Then([Term(Name), Maybe(Then([Lit(":"), Named("ty")]))]);
 
     let field_init: Rule<AiplTok> = OneOf([
         Then([Lit(".."), Named("expr")]),
@@ -1107,10 +1106,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     // rule for all three, so `expr` is reachable from a single place under the
     // brace.
     let brace_body: Rule<AiplTok> = Maybe(Many(Named("entry"), min=1, sep=Lit(",")));
-    let entry: Rule<AiplTok> = OneOf([
-        Then([Named("expr"), Lit(":"), Named("expr")]),
-        Named("expr"),
-    ]);
+    let entry: Rule<AiplTok> = Then([Named("expr"), Maybe(Then([Lit(":"), Named("expr")]))]);
 
     [
         pl("expr", expr, "an expression", TryMk(lower_expr)),
@@ -1156,8 +1152,12 @@ fn patterns() -> Production<AiplTok, Ast>[] {
     // A pattern nests: a constructor's slots and a tuple's elements are
     // patterns themselves, so `(1, some(x))` reads as it is written.
     let pattern: Rule<AiplTok> = OneOf([
-        Then([Term(Name), Lit("."), Term(Name), nest("(", Named("ctor_payload"), ")", strict())]),
-        Then([Term(Name), Lit("."), Term(Name)]),
+        Then([
+            Term(Name),
+            Lit("."),
+            Term(Name),
+            Maybe(nest("(", Named("ctor_payload"), ")", strict())),
+        ]),
         Then([Term(Name), nest("(", Named("ctor_payload"), ")", strict())]),
         Term(Name),
         Lit("none"),

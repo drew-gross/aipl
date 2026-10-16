@@ -363,7 +363,6 @@ parser:
   have an "Expect" concept e.g. Then([Lit("let"), Term(Ident), Expect(Lit(";"))]) that a) blocks backtracking b) enables fix-it suggestions to give to the user/tools c) enabled parser recovery so we can find more parse errors at once
   support putting a different name in error messages e.g. "expected a doc comment..." instead of "expected a DocComment..."
   cleanup/remove nest/nest2/nest3
-  OneOf([Then([T, U]), T]) should instead be Then([T, Maybe(U)]) (e.g. in variant)
   a bracketed list's separator must be a literal, so the printer can write it back <--- lift this restriction
   trailing separater = Allowed | Disallowed | Required
   do we need NamedIdx when we have Named?
