@@ -303,6 +303,7 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
+  let/match refines scrutinee in remaining arms
   Unicode support
   i64 without 0 should work
   none.value_or_err doesn't type check. Maybe it should? Unclear.
@@ -363,7 +364,6 @@ parser:
   support putting a different name in error messages e.g. "expected a doc comment..." instead of "expected a DocComment..."
   cleanup/remove nest/nest2/nest3
   OneOf([Then([T, U]), T]) should instead be Then([T, Maybe(U)]) (e.g. in variant)
-  remove expr_unary, it's silly
   a bracketed list's separator must be a literal, so the printer can write it back <--- lift this restriction
   trailing separater = Allowed | Disallowed | Required
   do we need NamedIdx when we have Named?

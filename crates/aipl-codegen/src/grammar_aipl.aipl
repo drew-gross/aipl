@@ -1114,7 +1114,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
 
     [
         pl("expr", expr, "an expression", TryMk(lower_expr)),
-        p("unary", expr_unary(unary), TryMk(lower_unary)),
+        p("unary", unary, TryMk(lower_unary)),
         p("postfix", postfix, TryMk(lower_postfix)),
         p("suffix", suffix, TryMk(lower_suffix)),
         p("atom", atom, TryMk(lower_atom)),
@@ -1131,10 +1131,6 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         p("entry", entry, TryMk(lower_entry)),
     ]
 }
-
-# `unary` needs no transformation; the wrapper exists only so the `expressions`
-# list above reads as one column of `p(name, rule)` calls.
-fn expr_unary(x: Rule<AiplTok>) -> Rule<AiplTok> { x }
 
 // ---------- patterns ----------
 
