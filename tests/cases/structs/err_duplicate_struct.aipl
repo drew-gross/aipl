@@ -4,4 +4,13 @@ struct A { y: i64 }
 
 fn main() -> i64 { 0 }
 --- errors ---
-error: err_duplicate_struct.aipl: duplicate top-level item "A"
+error: ./err_duplicate_struct.aipl: duplicate top-level item "A"
+ --> ./tests/cases/structs/err_duplicate_struct.aipl:3:8
+  |
+3 | struct A { y: i64 }
+  |        ^
+note: "A" first defined here
+ --> ./tests/cases/structs/err_duplicate_struct.aipl:1:8
+  |
+1 | struct A { x: i64 }
+  |        ^

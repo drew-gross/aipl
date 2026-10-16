@@ -1,0 +1,26 @@
+# The collision is inside an imported file, so the diagnostic has to name that
+# file and point into its source — not the entry file's — and show both the
+# import and the local item it clashes with.
+
+import { run } from "./mid.aipl";
+
+fn main() -> i64 { run() }
+--- file: mid.aipl ---
+import { dup } from "./util.aipl";
+
+fn dup() -> i64 { 2 }
+
+pub fn run() -> i64 { dup() }
+--- file: util.aipl ---
+pub fn dup() -> i64 { 1 }
+--- errors ---
+error: ./mid.aipl: import "dup" conflicts with a local item
+ --> ./mid.aipl:1:10
+  |
+1 | import { dup } from "./util.aipl";
+  |          ^^^
+note: "dup" defined here
+ --> ./mid.aipl:3:4
+  |
+3 | fn dup() -> i64 { 2 }
+  |    ^^^

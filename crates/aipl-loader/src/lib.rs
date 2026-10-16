@@ -447,6 +447,22 @@ impl Loader {
         Ok(())
     }
 
+    /// What a diagnostic about `path` calls it: the root-relative path, as the
+    /// caret block's ` --> ` line does.
+    fn label(&self, path: &Path) -> String {
+        diagnostic_label(path, self.project_root.as_deref())
+    }
+
+    /// Tag `err` with the source of `path` so its caret lands in that file. The
+    /// root file is left untagged — its caller renders against it already —
+    /// as in `tag_origin`.
+    fn attribute(&self, path: &Path, root: &Path, err: Error) -> Error {
+        match self.files.get(path) {
+            Some(file) if path != root => err.in_file(self.label(path), &file.source),
+            _ => err,
+        }
+    }
+
     fn flatten(&self, root: &Path) -> Result<Program, Error> {
         // Pass 1: local view — names defined in the file map to their
         // (mangled or, for root, original) global names. Also record which
@@ -454,18 +470,22 @@ impl Loader {
         // (structs/variants). A non-`pub` function is file-private.
         let mut local_views: HashMap<&PathBuf, HashMap<String, String>> = HashMap::new();
         let mut importables: HashMap<&PathBuf, HashSet<String>> = HashMap::new();
+        // Where each file's local items are named, so a later import that
+        // collides with one can point back at the definition.
+        let mut local_spans: HashMap<&PathBuf, HashMap<String, Span>> = HashMap::new();
         // A variant's global name → its case names, for resolving `V.A` paths.
         let mut ctor_cases: HashMap<String, Vec<String>> = HashMap::new();
         for (path, file) in &self.files {
             let is_root = path == root;
             let mut view = HashMap::new();
             let mut exports = HashSet::new();
+            let mut spans: HashMap<String, Span> = HashMap::new();
             for item in &file.items {
-                let (name, importable) = match item {
-                    Item::Fn(f) => (f.name.text.clone(), f.is_pub),
-                    Item::Struct(s) => (s.name.text.clone(), true),
-                    Item::Variant(v) => (v.name.text.clone(), true),
-                    Item::Const(c) => (c.name.text.clone(), c.is_pub),
+                let (name, name_span, importable) = match item {
+                    Item::Fn(f) => (f.name.text.clone(), f.name.span.clone(), f.is_pub),
+                    Item::Struct(s) => (s.name.text.clone(), s.name.span.clone(), true),
+                    Item::Variant(v) => (v.name.text.clone(), v.name.span.clone(), true),
+                    Item::Const(c) => (c.name.text.clone(), c.name.span.clone(), c.is_pub),
                     Item::Import(_) => unreachable!("imports stripped during load"),
                 };
                 // Loaded as the builtin it implements (`load_builtin_impl_str`),
@@ -483,11 +503,17 @@ impl Loader {
                 };
                 let mangled = canonical.unwrap_or_else(|| mangle(is_root, file.index, &name));
                 if view.insert(name.clone(), mangled).is_some() {
-                    return Err(Error::msg(format!(
-                        "{}: duplicate top-level item \"{name}\"",
-                        file_label(path),
-                    )));
+                    let first = spans.get(&name).cloned();
+                    let mut err = Error::at(
+                        format!("{}: duplicate top-level item \"{name}\"", self.label(path)),
+                        name_span,
+                    );
+                    if let Some(first) = first {
+                        err = err.with_note(format!("\"{name}\" first defined here"), first);
+                    }
+                    return Err(self.attribute(path, root, err));
                 }
+                spans.insert(name.clone(), name_span);
                 if importable {
                     exports.insert(name);
                 }
@@ -515,6 +541,11 @@ impl Loader {
                             case_target.insert(c.clone(), format!("{c}@{vglobal}"));
                         }
                     }
+                    for c in &v.cases {
+                        spans
+                            .entry(c.name.text.clone())
+                            .or_insert_with(|| c.name.span.clone());
+                    }
                     ctor_cases.insert(vglobal, cases);
                 }
             }
@@ -527,6 +558,7 @@ impl Loader {
             }
             local_views.insert(path, view);
             importables.insert(path, exports);
+            local_spans.insert(path, spans);
         }
 
         // Pass 2: full view — extend each file's view with names it
@@ -572,22 +604,27 @@ impl Loader {
                         Ok((n.local().to_string(), n.span.clone(), mangled))
                     })
                 })
-                .collect::<Result<_, _>>()?;
+                .collect::<Result<_, _>>()
+                .map_err(|e| self.attribute(path, root, e))?;
 
             let view = full_views.get_mut(path).expect("local view present");
             // Spans of names already brought in by an import (path or builtin),
             // so a later conflicting import can point back at the first one.
-            // Local items aren't tracked here (they carry no name span), so a
-            // collision with one falls back to the single-span form.
+            // A collision with a local item points at `local_spans` instead.
             let mut import_spans: HashMap<String, Span> = HashMap::new();
             for (local, span, mangled) in resolved {
                 if view.insert(local.clone(), mangled).is_some() {
-                    return Err(import_conflict(
-                        file_label(path),
-                        "import",
-                        &local,
-                        span,
-                        import_spans.get(&local).cloned(),
+                    return Err(self.attribute(
+                        path,
+                        root,
+                        import_conflict(
+                            self.label(path),
+                            "import",
+                            &local,
+                            span,
+                            import_spans.get(&local).cloned(),
+                            local_spans[path].get(&local).cloned(),
+                        ),
                     ));
                 }
                 import_spans.insert(local, span);
@@ -633,31 +670,41 @@ impl Loader {
                         if aipl_syntax::is_internal_builtin(&builtin)
                             && !(self.builtin_impl || is_builtin_impl_path(path))
                         {
-                            return Err(Error::at(
-                                format!(
-                                    "\"{}\" is internal to the builtins' implementation and not \
-                                     available to programs",
-                                    n.name
+                            return Err(self.attribute(
+                                path,
+                                root,
+                                Error::at(
+                                    format!(
+                                        "\"{}\" is internal to the builtins' implementation \
+                                         and not available to programs",
+                                        n.name
+                                    ),
+                                    n.span.clone(),
                                 ),
-                                n.span.clone(),
                             ));
                         }
                         builtin.name().to_string()
                     } else if let Some(canonical) = aipl_syntax::builtin_type_canonical(&n.name) {
                         canonical
                     } else {
-                        return Err(Error::at(
-                            format!("\"{}\" is not a builtin", n.name),
-                            n.span.clone(),
+                        return Err(self.attribute(
+                            path,
+                            root,
+                            Error::at(format!("\"{}\" is not a builtin", n.name), n.span.clone()),
                         ));
                     };
                 if view.insert(local.to_string(), canonical).is_some() {
-                    return Err(import_conflict(
-                        file_label(path),
-                        "builtin import",
-                        local,
-                        n.span.clone(),
-                        import_spans.get(local).cloned(),
+                    return Err(self.attribute(
+                        path,
+                        root,
+                        import_conflict(
+                            self.label(path),
+                            "builtin import",
+                            local,
+                            n.span.clone(),
+                            import_spans.get(local).cloned(),
+                            local_spans[path].get(local).cloned(),
+                        ),
                     ));
                 }
                 import_spans.insert(local.to_string(), n.span.clone());
@@ -673,28 +720,29 @@ impl Loader {
             let view = &full_views[path];
             for item in &file.items {
                 if let Item::Fn(f) = item {
-                    check_operators(&f.body, view)?;
+                    check_operators(&f.body, view).map_err(|e| self.attribute(path, root, e))?;
                     if let Some(tb) = &f.test_body {
-                        check_operators(tb, view)?;
+                        check_operators(tb, view).map_err(|e| self.attribute(path, root, e))?;
                     }
                     // Keyword-parameter defaults are expressions too — an
                     // operator used in one needs this file's import.
                     for p in &f.sig.params {
                         if let Some(d) = &p.default {
-                            check_operators(d, view)?;
+                            check_operators(d, view).map_err(|e| self.attribute(path, root, e))?;
                         }
                     }
                 }
                 let const_written = match item {
                     Item::Const(c) => {
-                        check_const_name(c)?;
+                        check_const_name(c).map_err(|e| self.attribute(path, root, e))?;
                         Some(c.name.clone())
                     }
                     _ => None,
                 };
-                let rewritten = rewrite_item(item, view, &ctor_cases, is_root)?;
+                let rewritten = rewrite_item(item, view, &ctor_cases, is_root)
+                    .map_err(|e| self.attribute(path, root, e))?;
                 if let (Some(written), Item::Const(c)) = (&const_written, &rewritten) {
-                    check_const_value(written, c)?;
+                    check_const_value(written, c).map_err(|e| self.attribute(path, root, e))?;
                 }
                 merged.push(rewritten);
             }
@@ -1717,14 +1765,16 @@ pub(crate) fn file_label(path: &Path) -> String {
 /// Build the "import conflicts" error. When the colliding name was a previous
 /// *import* (`prior` carries its span), point at both — the new import as the
 /// primary caret and the earlier one as a `note:`. A collision with a local
-/// item (which has no recorded span) gets the single-span form. `kind` is the
-/// import flavor for the message (`"import"` or `"builtin import"`).
+/// item points the primary caret at the import and a `note:` at the item's
+/// name (`local_item`). `kind` is the import flavor for the message (`"import"`
+/// or `"builtin import"`); `label` names the file both spans index.
 fn import_conflict(
     label: String,
     kind: &str,
     local: &str,
     span: Span,
     prior: Option<Span>,
+    local_item: Option<Span>,
 ) -> Error {
     match prior {
         // Point the primary caret at the *later* (duplicate) import and the
@@ -1742,10 +1792,16 @@ fn import_conflict(
             )
             .with_note(format!("\"{local}\" first imported here"), first)
         }
-        None => Error::at(
-            format!("{label}: {kind} \"{local}\" conflicts with a local item"),
-            span,
-        ),
+        None => {
+            let error = Error::at(
+                format!("{label}: {kind} \"{local}\" conflicts with a local item"),
+                span,
+            );
+            match local_item {
+                Some(item) => error.with_note(format!("\"{local}\" defined here"), item),
+                None => error,
+            }
+        }
     }
 }
 
