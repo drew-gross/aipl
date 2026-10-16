@@ -9,6 +9,10 @@ variant:
   Allow variants to be passed to HOFs, you can e.g. v.map(VariantConstructor).
 
 projects:
+  word_count:
+    make it more compatible with wc
+    make exit code stuff make more sense
+    $ ./aipl run ./word_count.aipl word_count ./README.md -> bad arg "./README.md": invalid digit found in string
   get rid of aipl.build, maybe by checking in the compiler in the main project also?
   Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
 
@@ -192,6 +196,15 @@ lsp:
   IT'S SOOOO SLOW!!!!
 
 bugs:
+  on AiplTok -> Token rename:
+    thread '<unnamed>' (48132909) panicked at tests/cases.rs:421:31: [crates/aipl-codegen/src/highlight_aipl.aipl]: load failed:
+    error: lex_aipl.aipl: import "Token" conflicts with a local item
+
+    --> ./crates/aipl-codegen/src/highlight_aipl.aipl:11:77
+    |11
+    | #     its spelling. The names they accept come from the identifier rule's own
+    |^
+    multiple problems with this error: 1) lex_aipl.aipl should give the basename 2) the error pointer is the totally wrong place 3) the error should point to both the import and the conflicting definition
   An inlined fn wrapped() -> u8[]? { some([200, 1]) } makes wrapped().value_or([]) fail in monomorphization with "conflicting types for T: i64[] vs u8[]". The build without my changes fails the same way.
   An array literal used as an extend source isn't fitted to the receiver's type: set xs.extend([100000, -1]) on an i32[] is rejected by the checker
   Where the unification stops, and why — this is the one real finding. An array block needs two header words a str buffer doesn't: drop_fn, and init, the block's own initialized element count. The second is the interesting one. A str's content is bytes, so freeing a buffer is freeing memory; an array's elements may own heap, so refcount zero has to release each of them — and the value's len cannot say how many, because a window's len is the window's, and dropping only the windowed elements would leak the rest. There's a test for exactly that: a 10-element block, sliced to 3, the source released — releasing the window drops all ten, not three.
