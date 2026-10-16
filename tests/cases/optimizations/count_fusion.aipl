@@ -20,20 +20,11 @@ import {
     measure,
     not_equal as !=,
     print,
-    push,
+    repeat,
     to_str,
-    wrapping_increment as ++,
 } from builtins;
 
-fn many() -> i64[] {
-    mut xs = [2];
-    mut i: u64 = 0;
-    while (i < 200) {
-        set xs.push(2);
-        set i++;
-    }
-    xs
-}.performance({
+fn many() -> i64[] { [2].repeat(201) }.performance({
     let xs = many();
 
     // Each comparison is decided at the second or third match, and stops there:

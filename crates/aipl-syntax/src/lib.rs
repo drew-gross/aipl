@@ -3047,10 +3047,6 @@ fn __builtin_measure_begin() !measure {}
 fn __builtin_measure_consume<R: any>(self: R) !measure {}
 fn __builtin_measure_end() !measure {}
 fn __builtin_measure_read(which: u64) !measure -> u64 { 0 }
-// Concatenate `self` with itself `n` times; returns `""` for `n == 0`. The count
-// is unsigned, matching `len`: a repeat count is never negative, and its usual
-// source is length/column arithmetic (`" ".repeat(indent)`).
-fn __builtin_repeat(self: str, n: u64) -> str { "" }
 // True if every byte is ASCII whitespace (or the string is empty).
 fn __builtin_is_whitespace(self: char) -> bool { false }
 // True if `self` begins / ends with the pattern — `str` bytes or `T[]`
@@ -3178,7 +3174,7 @@ fn __builtin_drop_last<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_n<T: any>(self: T[], n: u64) -> T[] { self }
 fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
 // NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
-// `join_is_nonempty`, `join_is_empty`, `reduce`, `map_reduce`, `filter_map_reduce`, `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
+// `join_is_nonempty`, `join_is_empty`, `reduce`, `repeat`, `map_reduce`, `filter_map_reduce`, `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
 // `extend_optional`, `inline_str`, `measure`, `range`, `set_map`, `tuple_windows`, `union_all`,
 // `value_or`, and `value_or_err` are

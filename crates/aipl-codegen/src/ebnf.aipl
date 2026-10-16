@@ -58,6 +58,7 @@ import {
     logical_not as !,
     logical_or as ||,
     map,
+    repeat,
     saturating_sub as -,
     to_array,
     to_set,
@@ -478,7 +479,7 @@ pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError
 # binding that only ever has its fields read is a lint.
 fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError {
     // One empty set per production.
-    mut sets = g.prods.map(|p| First {});
+    mut sets = [First {}].repeat(g.prods.len());
     mut going = true;
     while (going) {
         // The round is computed against the previous round's sets, not against

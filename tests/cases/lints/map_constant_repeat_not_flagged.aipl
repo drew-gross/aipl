@@ -1,0 +1,24 @@
+# Near-misses for `map_constant_repeat`, each left alone for a reason.
+
+import { map, print, wrapping_add as + } from builtins;
+
+fn next_id() -> i64 { 1 }
+
+fn main() !prints {
+    let xs = [1, 2, 3];
+
+    // The function uses its argument: not a constant, and not ignoring anything.
+    print(`{xs.map(|x| x + 1)}`);
+
+    // The body is a call. `repeat` would evaluate it once where `map` evaluates it
+    // per element, and a call may differ between evaluations (or have an effect).
+    print(`{xs.map(|x| next_id())}`);
+
+    // A range receiver: `(0..3).map(..)` builds an array from nothing, and has no
+    // `len` to count the copies by.
+    print(`{(0..3).map(|i| 7)}`);
+}
+--- stdout ---
+[2, 3, 4]
+[1, 1, 1]
+[7, 7, 7]

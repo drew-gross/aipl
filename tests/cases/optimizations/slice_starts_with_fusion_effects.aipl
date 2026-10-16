@@ -12,17 +12,9 @@
 # three-element pattern that doesn't fit in the two-element slice, but does fit
 # in the array behind it.
 
-import { less_than as <, print, push, starts_with, to_str, wrapping_increment as ++ } from builtins;
+import { print, repeat, starts_with, to_str } from builtins;
 
-fn many() -> i64[] {
-    mut xs = [7];
-    mut i: u64 = 0;
-    while (i < 200) {
-        set xs.push(7);
-        set i++;
-    }
-    xs
-}
+fn many() -> i64[] { [7].repeat(201) }
 
 // The offset is computed by something that prints, so the call it appears in
 // cannot be fused.

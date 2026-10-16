@@ -23,6 +23,7 @@ mod interp_literal;
 mod interp_to_str;
 mod is_empty_longhand;
 mod len_gt_zero;
+mod map_constant_repeat;
 mod map_find_if_some;
 mod match_is_some_and;
 mod match_map_err;
@@ -62,6 +63,7 @@ use self::interp_literal::interp_literal;
 use self::interp_to_str::{interp_to_str, to_str_name};
 use self::is_empty_longhand::{empty_names, is_empty_longhand};
 use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
+use self::map_constant_repeat::{map_constant_repeat, repeat_names};
 use self::map_find_if_some::{find_map_names, map_find_if_some};
 use self::match_is_some_and::match_is_some_and;
 use self::match_map_err::match_map_err;
@@ -118,6 +120,11 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     // three names the shape is made of.
     let find_map = find_map_names(program);
     each_expr(program, &mut |e| map_find_if_some(e, &find_map, &mut hits));
+    // `xs.map(|x| c)` with a constant `c` is `[c].repeat(xs.len())`.
+    let repeat = repeat_names(program);
+    each_expr(program, &mut |e| {
+        map_constant_repeat(e, src, &repeat, &mut hits)
+    });
     each_expr(program, &mut |e| match_is_some_and(e, &mut hits));
     // A match arm whose block is only its value — braces around nothing.
     each_expr(program, &mut |e| arm_block_value(e, src, &mut hits));

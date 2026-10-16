@@ -2,17 +2,15 @@ import {
     Measurement,
     count_while,
     equal as ==,
-    extend,
     filter,
     is_all_whitespace,
     join,
-    less_than as <,
     logical_not as !,
     map,
     measure,
     minimum,
+    repeat,
     value_or,
-    wrapping_increment as ++,
 } from builtins;
 import { lines } from "./lines.aipl";
 
@@ -70,12 +68,7 @@ pub fn dedent(self: str) -> str {
     // These pin what that costs today, for the fusions that are meant to cut it.
     //
     // Input built here, outside the call, so what is counted is `dedent`.
-    mut hundred = "";
-    mut i: u64 = 0;
-    while (i < 100) {
-        set hundred.extend("        line of text\n");
-        set i++;
-    }
+    let hundred = "        line of text\n".repeat(100);
 
     // The number of allocations does not grow with the number of lines, so this
     // is a comparison, which survives whatever the stages are built from. The

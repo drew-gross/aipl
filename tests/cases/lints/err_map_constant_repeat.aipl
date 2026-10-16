@@ -1,0 +1,45 @@
+# `xs.map(|x| c)` with a constant `c` builds the same value once per element and
+# spells the count as a walk over `xs`. `[c].repeat(xs.len())` says "this many
+# copies" directly, and builds `c` once. Every kind of constant body is flagged:
+# a literal, a name read as it is, and a construction of constants. The file
+# imports neither `repeat` nor `len`, so the advice names both.
+
+import { map, print } from builtins;
+
+struct Cell { filled: bool, label: str }
+
+fn zeros(xs: i64[]) -> i64[] { xs.map(|x| 0) }
+
+fn blanks(names: str[]) -> str[] { names.map(|_| "") }
+
+fn defaults(xs: i64[], fallback: i64) -> i64[] { xs.map(|x| fallback) }
+
+fn cells(xs: i64[]) -> Cell[] { xs.map(|x| Cell { filled: false, label: "empty" }) }
+
+fn main() !prints {
+    print(`{zeros([1, 2])} {blanks(["a"])} {defaults([1], 9)} {cells([1]).len()}`);
+}
+--- errors ---
+error: "map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[0].repeat(xs.len())", importing `repeat` and `len` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_constant_repeat.aipl:11:39
+   |
+11 | fn zeros(xs: i64[]) -> i64[] { xs.map(|x| 0) }
+   |                                       ^^^^^
+
+error: "map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[""].repeat(names.len())", importing `repeat` and `len` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_constant_repeat.aipl:13:46
+   |
+13 | fn blanks(names: str[]) -> str[] { names.map(|_| "") }
+   |                                              ^^^^^^
+
+error: "map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[fallback].repeat(xs.len())", importing `repeat` and `len` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_constant_repeat.aipl:15:57
+   |
+15 | fn defaults(xs: i64[], fallback: i64) -> i64[] { xs.map(|x| fallback) }
+   |                                                         ^^^^^^^^^^^^
+
+error: "map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[<element>].repeat(xs.len())", importing `repeat` and `len` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_constant_repeat.aipl:17:40
+   |
+17 | fn cells(xs: i64[]) -> Cell[] { xs.map(|x| Cell { filled: false, label: "empty" }) }
+   |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

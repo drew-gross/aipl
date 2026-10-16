@@ -15,27 +15,9 @@
 # on `many` holds the cost: nothing allocated, and the same instructions however
 # much of the array is left after the offset.
 
-import {
-    Measurement,
-    equal as ==,
-    less_than as <,
-    measure,
-    print,
-    push,
-    starts_with,
-    to_str,
-    wrapping_increment as ++,
-} from builtins;
+import { Measurement, equal as ==, measure, print, repeat, starts_with, to_str } from builtins;
 
-fn many() -> i64[] {
-    mut xs = [7];
-    mut i: u64 = 0;
-    while (i < 200) {
-        set xs.push(7);
-        set i++;
-    }
-    xs
-}.performance({
+fn many() -> i64[] { [7].repeat(201) }.performance({
     let long = many();
     let short = [7, 7, 7];
 
@@ -102,16 +84,16 @@ true
 --- report ---
 allocations       15
 deallocations     15
-reallocations     14
-bytes allocated   327
-peak live bytes   4391
-instructions      11724
-binary size       6064 bytes (code 3740, data 166, metadata 2158)
+reallocations     0
+bytes allocated   3511
+peak live bytes   3511
+instructions      16268
+binary size       6456 bytes (code 3996, data 166, metadata 2294)
 
-function              calls  code bytes
-__to_str_bool            13         224
-aipl_arr_inc              4    external
-aipl_array_dec            4    external
-aipl_write_bytes         13    external
-main                      1        3148
-many                      2         368
+function                  calls  code bytes
+__builtin_repeat$i64          2         532
+__to_str_bool                13         224
+aipl_arr_inc                406    external
+aipl_array_dec              406    external
+aipl_write_bytes             13    external
+main                          1        3240

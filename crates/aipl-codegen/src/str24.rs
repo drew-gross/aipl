@@ -797,19 +797,6 @@ pub(crate) fn trim(s: Str) -> Str {
     s.slice(start, end)
 }
 
-/// `s` repeated `n` times.
-pub(crate) fn repeat(s: Str, n: usize) -> Str {
-    let total = s.len() * n;
-    let mut out = Builder::with_capacity(total);
-    for _ in 0..n {
-        for_each_chunk(s, &mut |chunk| {
-            out.push(chunk);
-            true
-        });
-    }
-    out.finish()
-}
-
 /// A fresh buffer holding `s`'s bytes, writable in place — the working copy
 /// `reverse` and `sort` need without a `Vec`.
 fn owned_copy(s: Str) -> Str {
@@ -1444,11 +1431,6 @@ pub(crate) extern "C" fn aipl_str_reverse(out: *mut Str, s: *const Str) {
 #[no_mangle]
 pub(crate) extern "C" fn aipl_str_sort(out: *mut Str, s: *const Str) {
     unsafe { *out = sort(read(s)) };
-}
-
-#[no_mangle]
-pub(crate) extern "C" fn aipl_str_repeat(out: *mut Str, s: *const Str, n: i64) {
-    unsafe { *out = repeat(read(s), n.max(0) as usize) };
 }
 
 // ---------- Naming a representation ----------
@@ -2189,9 +2171,7 @@ mod tests {
     }
 
     #[test]
-    fn repeat_join_reverse_and_sort() {
-        assert_eq!(text(repeat(from_bytes(b"ab"), 3)), "ababab");
-        assert_eq!(text(repeat(from_bytes(b"ab"), 0)), "");
+    fn join_reverse_and_sort() {
         let parts = [from_bytes(b"a"), from_bytes(b"b"), from_bytes(b"c")];
         assert_eq!(text(join(&parts, from_bytes(b", "))), "a, b, c");
         assert_eq!(text(join(&parts, Str::empty())), "abc");
@@ -2379,12 +2359,9 @@ mod tests {
         assert_eq!(text(trimmed), "padded value here");
         let rev = out(|o| aipl_str_reverse(o, &from_bytes(b"abcd")));
         assert_eq!(text(rev), "dcba");
-        let rep = out(|o| aipl_str_repeat(o, &from_bytes(b"xy"), 3));
-        assert_eq!(text(rep), "xyxyxy");
 
         joined.release();
         rev.release();
-        rep.release();
         // The two window-producing entry points retain, so their results are
         // owned references like any other and are released here.
         sliced.release();

@@ -12,17 +12,9 @@
 # (Symbol lists are not evidence either way here: post-mono inlining folds a
 # single-use `count` into its caller, so the name disappears regardless.)
 
-import { count, less_than as <, print, push, to_str, wrapping_increment as ++ } from builtins;
+import { count, less_than as <, print, repeat, to_str } from builtins;
 
-fn many() -> i64[] {
-    mut xs = [2];
-    mut i: u64 = 0;
-    while (i < 200) {
-        set xs.push(2);
-        set i++;
-    }
-    xs
-}
+fn many() -> i64[] { [2].repeat(201) }
 
 // The bound is computed by something that prints, so the comparison it appears
 // in cannot be fused.

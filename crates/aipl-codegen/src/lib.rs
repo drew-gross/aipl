@@ -3166,7 +3166,6 @@ fn new_jit_module() -> Result<JITModule, Error> {
     );
     jit_builder.symbol("aipl_str_reverse", str24::aipl_str_reverse as *const u8);
     jit_builder.symbol("aipl_str_sort", str24::aipl_str_sort as *const u8);
-    jit_builder.symbol("aipl_str_repeat", str24::aipl_str_repeat as *const u8);
     jit_builder.symbol("aipl_char_to_str", str24::aipl_char_to_str as *const u8);
     jit_builder.symbol("aipl_str_alloc", str24::aipl_str_alloc as *const u8);
     jit_builder.symbol("aipl_str_write_ptr", str24::aipl_str_write_ptr as *const u8);
@@ -6770,7 +6769,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         // ---- a `str` back, through the out pointer ----
         "aipl_trim" | "aipl_str_reverse" | "aipl_str_sort" | "aipl_str_alloc"
         | "aipl_char_to_str" | "aipl_str_heap" | "aipl_str_pack_inline" => (1, Ret::Str),
-        "aipl_concat" | "aipl_str_repeat" | "aipl_str_rope" => (2, Ret::Str),
+        "aipl_concat" | "aipl_str_rope" => (2, Ret::Str),
         "aipl_str_slice" => (3, Ret::Str),
         other => panic!("unknown builtin import symbol {other:?}"),
     }
@@ -6958,7 +6957,6 @@ fn register_builtins(
         (Callee::MonotonicNow, "aipl_monotonic_now"),
         (Callee::ExecuteProgram, "aipl_execute_program"),
         (Callee::Trim, "aipl_trim"),
-        (Callee::Repeat, "aipl_str_repeat"),
         // The `*_str` family — each one entry point, so there is no custom
         // codegen arm: the ordinary-call path reads the signature registered
         // here and the ABI above, exactly as it does for `trim`.

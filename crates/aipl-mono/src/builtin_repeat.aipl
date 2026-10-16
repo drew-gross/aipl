@@ -1,0 +1,65 @@
+# The AIPL implementation of the `repeat` builtin. Monomorphization registers this
+# function under the canonical name `__builtin_repeat` (see `AIPL_BUILTIN_SOURCES`
+# in `lib.rs`), so a user's `xs.repeat(n)` resolves through the ordinary generic
+# machinery — the in-file name is only for this file's own tests, which read
+# exactly like user code.
+#
+# One implementation for every sequence. A `str` is its `char` sequence, so
+# `" ".repeat(indent)` is this with `T = char`, and `[First {}].repeat(n)` is
+# this with `T = First`; there is no second, string-only version.
+
+import {
+    equal as ==,
+    extend,
+    is_empty,
+    len,
+    less_than as <,
+    logical_and as &&,
+    reserve,
+    wrapping_increment as ++,
+    wrapping_mul as *,
+} from builtins;
+
+# `self` concatenated with itself `n` times: `[1, 2].repeat(3)` is
+# `[1, 2, 1, 2, 1, 2]`, and `"ab".repeat(2)` is `"abab"`. Empty for `n == 0` or an
+# empty receiver. The count is unsigned, matching `len`: a repeat count is never
+# negative, and its usual source is length or column arithmetic
+# (`" ".repeat(indent)`, `[x].repeat(xs.len())`).
+#
+# The result is sized once, up front, to exactly `self.len() * n`, so the copies
+# land in one allocation with no growth in between. It is the way to build a
+# sequence of `n` identical elements, in place of a loop that pushes one.
+pub fn repeat<T: any>(self: T[], n: u64) -> T[] {
+    mut out: T[] = [];
+    set out.reserve(self.len() * n);
+    mut copies: u64 = 0;
+    while (copies < n) {
+        set out.extend(self);
+        set copies++;
+    }
+    out
+}.test({
+    // An array, repeated.
+    assert([1, 2].repeat(3) == [1, 2, 1, 2, 1, 2]);
+    assert([7].repeat(4) == [7, 7, 7, 7]);
+    // A string is its char sequence, and comes back as text.
+    assert("ab".repeat(3) == "ababab");
+    assert(" ".repeat(4) == "    ");
+    assert("x".repeat(1) == "x");
+    // Nothing: no copies, or nothing to copy (a typed empty from a slice).
+    assert("ab".repeat(0) == "");
+    assert([1, 2].repeat(0).is_empty());
+    assert("".repeat(5) == "");
+    // Any element type, structs and nested sequences included.
+    assert(["a", "b"].repeat(2) == ["a", "b", "a", "b"]);
+    assert([[1], [2, 3]].repeat(2) == [[1], [2, 3], [1], [2, 3]]);
+    assert([true, false].repeat(2) == [true, false, true, false]);
+    assert(['x', 'y'].repeat(2) == ['x', 'y', 'x', 'y']);
+    // Free-call form, and a count computed from a length.
+    assert(repeat([5], 3) == [5, 5, 5]);
+    let xs = [10, 20, 30];
+    assert([0].repeat(xs.len()) == [0, 0, 0]);
+    // The receiver is unchanged.
+    let base = [1, 2];
+    assert(base.repeat(2).len() == 4 && base == [1, 2]);
+})

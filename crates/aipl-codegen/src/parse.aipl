@@ -59,6 +59,7 @@ import {
     map_err,
     not_equal as !=,
     push,
+    repeat,
     sort,
     to_set,
     try_map,
@@ -829,7 +830,7 @@ fn pruned<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, expect_as: str,
 # reaches the same labels by a different route ends the loop instead of spinning
 # — where deduped arrays would have compared unequal on order alone.
 fn label_sets<K: variant, A: any>(prods: Production<K, A>[], firsts: First<K>[]) -> #{str}[] {
-    mut labels = prods.map(|pr| #{});
+    mut labels: #{str}[] = [#{}].repeat(prods.len());
     mut going = true;
     while (going) {
         let prev = labels;

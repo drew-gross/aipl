@@ -1855,7 +1855,18 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                         }
                     })
                     .collect();
-                let return_ty = sig.return_ty.as_ref().map(|t| subst_vars(t, &map));
+                // See [`returns_its_receiver`]: an instance that took a `str` as its
+                // sequence parameter hands one back.
+                let declared: Vec<Type> = sig.params.iter().map(|p| p.ty.clone()).collect();
+                let return_ty = match params.first() {
+                    Some(first)
+                        if first.ty == Type::Primitive(Primitive::Str)
+                            && returns_its_receiver(&declared, sig.return_ty.as_ref()) =>
+                    {
+                        Some(Type::Primitive(Primitive::Str))
+                    }
+                    _ => sig.return_ty.as_ref().map(|t| subst_vars(t, &map)),
+                };
                 // The body's own annotations (`let x: T`, `|a: T|`) need the
                 // same substitution the signature just got — they reach codegen
                 // verbatim otherwise.
@@ -4953,6 +4964,13 @@ impl Mono<'_> {
             targs.push(t.clone());
         }
         let ret = match &return_ty {
+            // See [`returns_its_receiver`]: a `str` receiver is returned as one.
+            Some(_)
+                if returns_its_receiver(&param_tys, return_ty.as_ref())
+                    && arg_tys.first().is_some_and(is_str_repr) =>
+            {
+                Type::Primitive(Primitive::Str)
+            }
             Some(t) => subst_vars(t, &map),
             None => Type::Primitive(Primitive::I64),
         };
@@ -7880,6 +7898,7 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::JoinIsNonempty, "builtin_join_is_nonempty.aipl"),
     (Callee::JoinIsEmpty, "builtin_join_is_empty.aipl"),
     (Callee::Reduce, "builtin_reduce.aipl"),
+    (Callee::Repeat, "builtin_repeat.aipl"),
     (Callee::MapReduce, "builtin_map_reduce.aipl"),
     (Callee::FilterMapReduce, "builtin_filter_map_reduce.aipl"),
     (Callee::SplitMap, "builtin_split_map.aipl"),
@@ -8301,6 +8320,23 @@ fn bind_builtin_var(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
     }
 }
 
+/// Whether a function declared `(self: T[], ..) -> T[]` hands back the sequence
+/// it was given — its return type is exactly its first parameter's.
+///
+/// For such a function a `str` receiver gets a `str` back. Unification alone binds
+/// `T` to `char` and returns a `char[]`, which holds the same bytes but is not the
+/// same type to the things that care: a template renders it as an array of chars,
+/// and `+++` and a `str` parameter refuse it. So the rule is stated once, on the
+/// shape of the signature, rather than per builtin — `reverse`, `sort`, `repeat`,
+/// `filter`, `drop_n` and the rest all keep a string a string. It is applied
+/// wherever a result type is computed from such a signature: inference over the
+/// declared builtins ([`declared_builtin_return`]), a generic call's return type
+/// ([`Mono::instantiate_types`]), and the instance a `str`-receiving call
+/// specializes ([`ParamSpec::str_kept`]).
+fn returns_its_receiver(param_tys: &[Type], return_ty: Option<&Type>) -> bool {
+    matches!((param_tys.first(), return_ty), (Some(p @ Type::Array(_)), Some(r)) if p == r)
+}
+
 /// Return type of a builtin declared in [`aipl_syntax::BUILTIN_SIGNATURES`],
 /// substituting its type variables from `arg_tys`. `None` if `name` isn't
 /// declared there (an internal/synthetic name, or one of `builtin_return`'s
@@ -8344,6 +8380,12 @@ fn declared_builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
             .or_insert_with(|| none_ish.unwrap_or(Type::Primitive(Primitive::I64)));
     }
     let ptys: Vec<Type> = sig.params.iter().map(|p| p.ty.clone()).collect();
+    // See [`returns_its_receiver`].
+    if returns_its_receiver(&ptys, sig.return_ty.as_ref())
+        && arg_tys.first().is_some_and(is_str_repr)
+    {
+        return Some(Type::Primitive(Primitive::Str));
+    }
     Some(match &sig.return_ty {
         Some(t) => aipl_syntax::inherit_set_order(subst_vars(t, &map), &ptys, arg_tys),
         None => Type::Unit,
@@ -8380,17 +8422,6 @@ fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
                 // Not a dict: the error is codegen's to report against the call.
                 _ => Some(Type::Primitive(Primitive::I64)),
             };
-        }
-        // `xs.reverse() -> T[]` / `s.reverse() -> str` — same type as the input.
-        // The declared signature is `T[] -> T[]`; a `str` receiver (which
-        // `collect_bindings`-style unification would bind as `char[]`) instead
-        // dispatches to a `str` result, so this stays hand-written.
-        Callee::Reverse => {
-            return Some(match arg_tys.first() {
-                Some(t) if is_str_repr(t) => Type::Primitive(Primitive::Str),
-                Some(Type::Array(inner)) => Type::Array(inner.clone()),
-                _ => Type::Array(Box::new(Type::NoneInner)),
-            })
         }
         // some(x) wraps the value's type. Not expressible via plain signature
         // substitution: a concat-str argument must decay to plain `str` before
