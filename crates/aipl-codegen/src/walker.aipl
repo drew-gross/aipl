@@ -494,7 +494,7 @@ fn fmt_kind(k: AiplTok) -> FmtKind {
     match (k) {
         DocComment(..) => DocTok,
         TemplateOpen(..) => TemplateOpenTok,
-        TplText(..) => TplTextTok,
+        TemplateText(..) => TplTextTok,
         TplClose => TplCloseTok,
         Fn | If | Else | Struct | Variant | Import | From | As => Keyword,
         Pub | Let | For | While | Mut | Set | Match | Return | Shim | Builtins | Without => Keyword,

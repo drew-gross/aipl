@@ -258,8 +258,8 @@ import {
     Name,
     StrLit,
     TemplateOpen,
+    TemplateText,
     TplClose,
-    TplText,
     aipl_rules,
     char_lit_value,
     doc_line_value,
@@ -1020,8 +1020,8 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     // mode stack already guaranteed the close matches the open.
     let template: Rule<AiplTok> = Then([
         Term(TemplateOpen),
-        Maybe(Term(TplText)),
-        Many(Then([Lit("{"), Named("expr"), Lit("}"), Maybe(Term(TplText))])),
+        Maybe(Term(TemplateText)),
+        Many(Then([Lit("{"), Named("expr"), Lit("}"), Maybe(Term(TemplateText))])),
         Term(TplClose),
     ]);
 
@@ -1145,7 +1145,7 @@ fn patterns() -> Production<AiplTok, Ast>[] {
         // rather than naming a kind. With no braces in it there is nothing to
         // interpolate — which is the only form a pattern can hold, since a
         // pattern matches a value and an interpolation computes one.
-        Then([Term(TemplateOpen), Maybe(Term(TplText)), Term(TplClose)]),
+        Then([Term(TemplateOpen), Maybe(Term(TemplateText)), Term(TplClose)]),
         Term(CharTok),
         Term(IntLit),
         nest("(", Many(Named("pattern"), min=2, sep=Lit(","), trailing_sep=false), ")", strict()),

@@ -53,7 +53,7 @@ import {
     Semi,
     StrLit,
     TemplateOpen,
-    TplText,
+    TemplateText,
     TripleBacktick,
     TripleQuoted,
     lex_aipl,
@@ -229,7 +229,7 @@ fn token_value(kind: AiplTok) -> str {
 
     // A template's opener likewise: which delimiter it was written with is not
     // part of the token, since `retemplate` moves a literal between the two.
-    // Its text segments need no such arm — both forms lex to one `TplText`.
+    // Its text segments need no such arm — both forms lex to one `TemplateText`.
     if (let TemplateOpen(_) = kind) {
         return TPL_OPEN;
     };
@@ -246,7 +246,7 @@ fn token_value(kind: AiplTok) -> str {
     // (`template_segments`). Re-indenting the literal is therefore a change the
     // formatter is allowed to make to these tokens, exactly as it may re-indent
     // a `"""` block, and this is where that latitude is spelled out.
-    if (let TplText(v) = kind) {
+    if (let TemplateText(v) = kind) {
         return `str {v.strip_line_indent()}`;
     };
     to_str(kind)
@@ -255,7 +255,7 @@ fn token_value(kind: AiplTok) -> str {
     assert(token_value(StrLit("a", Quoted)) == token_value(StrLit("a", TripleQuoted)));
     assert(token_value(StrLit("a", Quoted)) != token_value(StrLit("b", Quoted)));
     assert(token_value(TemplateOpen(Backtick)) == token_value(TemplateOpen(TripleBacktick)));
-    assert(token_value(TplText("a")) != token_value(TplText("b")));
+    assert(token_value(TemplateText("a")) != token_value(TemplateText("b")));
 })
 
 # Every line of `self` with its leading spaces and tabs removed — the shape of a

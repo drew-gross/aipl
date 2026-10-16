@@ -81,7 +81,7 @@ variant AiplTok =
     | StrLit(str, StrStyle)
     | CharTok(char)
     | TemplateOpen(StrStyle)
-    | TplText(str)
+    | TemplateText(str)
     | TplClose
     | True
     | False
@@ -208,7 +208,7 @@ fn op(spelling: str, kind: AiplTok, scope: str) -> TokenRule<AiplTok> {
 # hands the segment's *raw* text, and this decodes its escapes (`` \` ``/`\n`/…
 # as in the `escapes` set below, plus the template's own `\{`/`\}`) with
 # `unescape`, exactly as the `"..."` emit does.
-fn tpl_text(text: str) -> AiplTok { TplText(text.unescape()) }
+fn tpl_text(text: str) -> AiplTok { TemplateText(text.unescape()) }
 
 # The same for a ```` ```...``` ```` template's segments, whose delimiter scans
 # verbatim: a lone `` ` `` or any other backslash inside is content, so only the
@@ -219,7 +219,7 @@ fn tpl_text(text: str) -> AiplTok { TplText(text.unescape()) }
 # lexer reading one token at a time never holds them all. The parser's lowering
 # does it, over the segments it has just collected, which is also where the CST
 # path already did it (`template_segments`): one implementation instead of two.
-fn raw_tpl_text(text: str) -> AiplTok { TplText(text.unescape_braces()) }
+fn raw_tpl_text(text: str) -> AiplTok { TemplateText(text.unescape_braces()) }
 
 # Build an `IntLit` from a matched integer run (an optional leading `-` then
 # digits). The `Int` matcher only claims the run; parsing is the caller's job, so
@@ -813,11 +813,11 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     let interp = "`a{x}b`";
     assert(lex_aipl_kinds(interp)? == [
         TemplateOpen(Backtick),
-        TplText("a"),
+        TemplateText("a"),
         LBrace,
         Name("x"),
         RBrace,
-        TplText("b"),
+        TemplateText("b"),
         TplClose,
     ]);
 
@@ -826,12 +826,12 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // a matcher that declines on a `{` it has not reached yet; the parser folds
     // it instead, where the whole literal is in hand.
     let bare = "`hi`";
-    assert(lex_aipl_kinds(bare)? == [TemplateOpen(Backtick), TplText("hi"), TplClose]);
+    assert(lex_aipl_kinds(bare)? == [TemplateOpen(Backtick), TemplateText("hi"), TplClose]);
 
     // A triple-backtick raw template scans verbatim, and wins over the
     // single-backtick rule (longest delimiter first).
     let raw = "```hi```";
-    assert(lex_aipl_kinds(raw)? == [TemplateOpen(TripleBacktick), TplText("hi"), TplClose]);
+    assert(lex_aipl_kinds(raw)? == [TemplateOpen(TripleBacktick), TemplateText("hi"), TplClose]);
 
     // A brace inside an interpolation closes itself, not the interpolation: its
     // `{` pushed the base mode and its `}` pops that, leaving the template mode
