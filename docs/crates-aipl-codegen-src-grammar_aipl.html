@@ -36,6 +36,20 @@
 
 
 
+        <section class="item" id="item-FieldBinders">
+          <h3>
+            <a class="anchor" href="#item-FieldBinders">FieldBinders</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct FieldBinders</code></pre>
+
+          <div class="doc"><p>The fields a struct pattern reads and the names it binds them as, in order — read off the tokens of its braces, which start at <code>first</code>. <code>x</code> binds <code>x</code> and <code>x as px</code> binds <code>px</code>; either way the field is the one written first.</p><p>Told apart by the <code>as</code> after a field rather than by counting: a field may itself be called <code>as</code> (<code>{ as }</code> and <code>{ as as a }</code> both read as written), because what decides is the token that <em>follows</em> it.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-DocSplit">
           <h3>
             <a class="anchor" href="#item-DocSplit">DocSplit</a>
@@ -1051,6 +1065,20 @@
 
 
 
+        <section class="item" id="item-field_binders_of">
+          <h3>
+            <a class="anchor" href="#item-field_binders_of">field_binders_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn field_binders_of(toks: str[], first: u64) -&#62; FieldBinders</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
         <section class="item" id="item-binder_punct">
           <h3>
             <a class="anchor" href="#item-binder_punct">binder_punct</a>
@@ -1253,7 +1281,7 @@
             <a class="anchor" href="#item-destructure_struct">destructure_struct</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn destructure_struct(struct_name: str, fields: str[], value: Expr, span: Span, acc: Expr, mutable: bool) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn destructure_struct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span, acc: Expr, mutable: bool) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>let T { a, b } = value; rest</code> and its <code>mut</code> twin, as nested bindings. The scrutinee stays an immutable <code>let</code> either way — it is read once per field and never written through — and carries the pattern's type as its annotation, which is what makes the type name mean something rather than decorate the line. The <code>__spat$</code> prefix is <code>aipl_syntax::DESTRUCTURE_BASE_PREFIX</code>, which is how the checker knows to report a mismatch as the destructuring it was.</p></div>
 
@@ -2051,7 +2079,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$132045: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$133761: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -2376,6 +2404,20 @@
           <pre class="signature"><code>fn nest3(open1: str, open2: str, open3: str, body: Rule&#60;AiplTok&#62;, close: str, style: ListStyle) -&#62; Rule&#60;AiplTok&#62;</code></pre>
 
           <div class="doc"><p>And for one written as three (<code>#&gt;{</code>, <code>#&lt;{</code> — the ordered-set brackets).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-field_binders">
+          <h3>
+            <a class="anchor" href="#item-field_binders">field_binders</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn field_binders() -&#62; Rule&#60;AiplTok&#62;</code></pre>
+
+          <div class="doc"><p>The braces of a struct pattern: the fields it reads, each optionally bound under another name — <code>Point { x, y as py }</code>. The field leads and the name it is bound as follows <code>as</code>, so the pattern reads like the import that renames (<code>wrapping_add as +</code>) and a reader can tell which side is the struct's.</p></div>
 
 
         </section>

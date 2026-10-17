@@ -119,8 +119,10 @@ variant ParsedBody = Block(Expr) | Construct(FieldInit[], Span)
 # A parameter as written, before the destructuring form is taken apart.
 # `fields` is empty for every ordinary parameter and holds the pattern's field
 # names for `Point { x, y }`, whose `Param` is the synthetic scrutinee the
-# function's own lowering then binds those fields off.
-struct ParsedParam { param: Param, fields: str[], span: Span }
+# function's own lowering then binds those fields off. `names` is what each field
+# is bound *as*, one per field: the field's own name, or the one written after
+# `as` in `Point { x as px, y }`.
+struct ParsedParam { param: Param, fields: str[], names: str[], span: Span }
 
 # One `.test({ .. })` attribute: its block, and the span of the attribute name,
 # which is where a duplicate is reported.

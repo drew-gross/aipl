@@ -49,12 +49,12 @@
 
             </li>
 
-            <li id="item-LetStruct"><code>LetStruct(struct_name: str, fields: str[], value: Expr, span: Span)</code>
+            <li id="item-LetStruct"><code>LetStruct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span)</code>
 
 
             </li>
 
-            <li id="item-MutStruct"><code>MutStruct(struct_name: str, fields: str[], value: Expr, span: Span)</code>
+            <li id="item-MutStruct"><code>MutStruct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span)</code>
 
 
             </li>
@@ -120,7 +120,7 @@
           </h3>
           <pre class="signature"><code>struct ParsedParam</code></pre>
 
-          <div class="doc"><p>A parameter as written, before the destructuring form is taken apart. <code>fields</code> is empty for every ordinary parameter and holds the pattern's field names for <code>Point { x, y }</code>, whose <code>Param</code> is the synthetic scrutinee the function's own lowering then binds those fields off.</p></div>
+          <div class="doc"><p>A parameter as written, before the destructuring form is taken apart. <code>fields</code> is empty for every ordinary parameter and holds the pattern's field names for <code>Point { x, y }</code>, whose <code>Param</code> is the synthetic scrutinee the function's own lowering then binds those fields off. <code>names</code> is what each field is bound <em>as</em>, one per field: the field's own name, or the one written after <code>as</code> in <code>Point { x as px, y }</code>.</p></div>
 
 
         </section>

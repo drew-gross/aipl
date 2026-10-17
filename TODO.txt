@@ -211,7 +211,6 @@ bugs:
   1 + rs.fold(0, |n, r| n + r.size()) should work, currently doens't due to wrong type getting pinned
   mut out: char[] = [] followed by push aborts at runtime (exit 134, no diagnostic)
   ['a','b'][..0] requests a 272 TB allocation, while [..2] on the same array works.
-  nextest is reporting some tests as leaky
   a fn-typed parameter can't be forwarded to a builtin HOF
       fn scale(xs: i64[], f: (i64) -> i64) -> i64[] { xs.map(f) }
       -> error: fn "map" arg 1: expected (i64) -> _, got (i64) -> i64
@@ -282,7 +281,6 @@ syntax:
   l.map(|v| v.field) stutters, should come up with a syntax that doesn't stutter
   allow default args to refer to each other (requires 1 to be set to break the cycle)
   add match (v) val if expr => r syntax
-  destructuring with renames (let Foo { field as f, .. } = ...)
   allow match arm grouping to bind vars with the same type and name, or ignore bindings
   allow types to be defined in scopes (e.g. in tests to avoid leaking the test utilities)
   some(t) => if (cond) {val1} else {val2},none => val2 <--- to make this work better, allow the if to be on the left of the =>

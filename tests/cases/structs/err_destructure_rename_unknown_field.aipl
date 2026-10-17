@@ -1,0 +1,17 @@
+# The field named before `as` has to exist on the struct: the rename changes what
+# the field is bound as, not which field is read.
+
+struct P { x: i64, y: i64 }
+
+fn make() -> P { x: 1, y: 2 }
+
+fn f() -> i64 {
+    let P { z as a } = make();
+    a
+}
+--- errors ---
+error: struct P has no field "z"
+ --> ./tests/cases/structs/err_destructure_rename_unknown_field.aipl:9:24
+  |
+9 |     let P { z as a } = make();
+  |                        ^^^^^^

@@ -90,6 +90,7 @@ import {
     range,
     right_fold,
     same_case,
+    split,
     starts_with,
     try_map,
     value_or,
@@ -97,6 +98,7 @@ import {
     wrapping_add as +,
     wrapping_add_assign as +=,
     wrapping_decrement as --,
+    wrapping_increment as ++,
     wrapping_sub as -,
     zip_with,
 } from builtins;
@@ -519,7 +521,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         // `Point { x, y }` — the argument destructured in place of being named,
         // the same pattern `let Point { x, y } = v;` writes. It names no
         // parameter, so there is no `: T` to follow.
-        Then([Term(Name), Many(Term(Name), min=1, sep=Lit(","), nested_in=braces(), spaced=true)]),
+        Then([Term(Name), field_binders()]),
     ]);
 
     // A body is a block, or the struct-literal shorthand. The shorthand is tried
@@ -822,7 +824,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
     ]);
     let bind_target: Rule<AiplTok> = OneOf([
         Many(Term(Name), min=1, sep=Lit(","), trailing_sep=false, nested_in=parens()),
-        Then([Term(Name), Many(Term(Name), min=1, sep=Lit(","), nested_in=braces(), spaced=true)]),
+        Then([Term(Name), field_binders()]),
         Term(Name),
     ]);
     let let_stmt: Rule<AiplTok> = OneOf([
@@ -838,14 +840,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
         ]),
     ]);
     let mut_stmt: Rule<AiplTok> = OneOf([
-        Then([
-            Lit("mut"),
-            Term(Name),
-            Many(Term(Name), min=1, sep=Lit(","), nested_in=braces(), spaced=true),
-            Lit("="),
-            Named("expr"),
-            Expect(Lit(";")),
-        ]),
+        Then([Lit("mut"), Term(Name), field_binders(), Lit("="), Named("expr"), Expect(Lit(";"))]),
         Then([
             Lit("mut"),
             Term(Name),
@@ -1976,6 +1971,50 @@ fn lower_block_tail(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # by its fields for `let T { x, y }`.
 fn binder_names(toks: str[]) -> str[] { toks.filter(|w| !binder_punct().contains(w)) }
 
+# The fields a struct pattern reads and the names it binds them as, in order —
+# read off the tokens of its braces, which start at `first`. `x` binds `x` and
+# `x as px` binds `px`; either way the field is the one written first.
+#
+# Told apart by the `as` after a field rather than by counting: a field may
+# itself be called `as` (`{ as }` and `{ as as a }` both read as written), because
+# what decides is the token that *follows* it.
+struct FieldBinders { fields: str[], names: str[] }
+
+fn field_binders_of(toks: str[], first: u64) -> FieldBinders {
+    mut fields: str[] = [];
+    mut names: str[] = [];
+    mut i = first;
+    while (i < toks.len() && toks[i] != some("}")) {
+        let field = toks[i].value_or("");
+        set fields.push(field);
+        if (toks[i + 1] == some("as")) {
+            set names.push(toks[i + 2].value_or(field));
+            set i += 3;
+        } else {
+            set names.push(field);
+            set i++;
+        };
+        if (toks[i] == some(",")) {
+            set i++;
+        };
+    }
+    FieldBinders { fields, names }
+}.test({
+    fn binders(src: str) -> (str[], str[]) {
+        let FieldBinders { fields, names } = field_binders_of(src.split(" "), 0);
+        (fields, names)
+    }
+    assert(binders("x , y }") == (["x", "y"], ["x", "y"]));
+    assert(binders("x as a , y }") == (["x", "y"], ["a", "y"]));
+    assert(binders("x , y as b }") == (["x", "y"], ["x", "b"]));
+    // A field called `as` is told from the keyword by what follows it.
+    assert(binders("as , y }") == (["as", "y"], ["as", "y"]));
+    assert(binders("as as a }") == (["as"], ["a"]));
+    assert(binders("x as as }") == (["x"], ["as"]));
+    // Nothing past the closing brace is read.
+    assert(binders("x } = v ;") == (["x"], ["x"]));
+})
+
 fn binder_punct() -> str[] { ["let", "mut", "for", "(", ")", "{", "}", ",", "=", ";", ":"] }
 
 fn as_stmt(v: Ast, span: Span) -> Stmt!ParseError {
@@ -2017,16 +2056,16 @@ fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!Parse
         let span = value.span;
         return ok(AStmt(SLetTuple(names, value, span)));
     };
-    // `let T { x, y } = e;` — the struct name leads the name list.
+    // `let T { x, y as py } = e;` — the struct name, then the braces.
     if (toks[2] == some("{")) {
         let value = kid_expr(kids, 0, sp)?;
         let span = value.span;
-        let struct_name = names.first().value_or("");
-        let fields = names[1..];
+        let struct_name = toks[1].value_or("");
+        let FieldBinders { fields, names } = field_binders_of(toks, 3);
         if (mutable) {
-            return ok(AStmt(SMutStruct(struct_name, fields, value, span)));
+            return ok(AStmt(SMutStruct(struct_name, fields, names, value, span)));
         };
-        return ok(AStmt(SLetStruct(struct_name, fields, value, span)));
+        return ok(AStmt(SLetStruct(struct_name, fields, names, value, span)));
     };
     let name_span = spans[1].value_or(node.tok_span());
     let name = toks[1].value_or("");
@@ -2216,17 +2255,19 @@ fn wrap_stmt(stmt: Stmt, acc: Expr) -> Expr {
             let span = join_spans(tup_span, inner.span);
             at(Let(tmp, none, value, inner), span)
         },
-        SLetStruct(struct_name, fields, value, span) => destructure_struct(
+        SLetStruct(struct_name, fields, names, value, span) => destructure_struct(
             struct_name,
             fields,
+            names,
             value,
             span,
             acc,
             false,
         ),
-        SMutStruct(struct_name, fields, value, span) => destructure_struct(
+        SMutStruct(struct_name, fields, names, value, span) => destructure_struct(
             struct_name,
             fields,
+            names,
             value,
             span,
             acc,
@@ -2281,13 +2322,14 @@ fn bind_fields_mut(
 fn destructure_struct(
     struct_name: str,
     fields: str[],
+    names: str[],
     value: Expr,
     span: Span,
     acc: Expr,
     mutable: bool,
 ) -> Expr {
     let tmp = `__spat${span.start}`;
-    let inner = bind_fields_mut(fields, tmp, span, acc, fields, mutable);
+    let inner = bind_fields_mut(names, tmp, span, acc, fields, mutable);
     let outer_span = join_spans(span, inner.span);
     at(Let(tmp, some(TyNamed(struct_name)), value, inner), outer_span)
 }
@@ -2921,8 +2963,8 @@ fn lower_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             default: none,
             implicit_some: false,
         };
-        let fields = toks[1..].filter(|w| !binder_punct().contains(w));
-        return ok(AParam(ParsedParam { param: scrutinee, fields, span: name_span }));
+        let FieldBinders { fields, names } = field_binders_of(toks, 2);
+        return ok(AParam(ParsedParam { param: scrutinee, fields, names, span: name_span }));
     };
 
     // The six named shapes. Every sub-rule is one position, and *which*
@@ -2996,6 +3038,7 @@ fn named_param(
     ok(AParam(ParsedParam {
         param: Param { name: name.slot_text(src), ty, mutable, arity, default, implicit_some },
         fields: no_fields,
+        names: no_fields,
         span: name.slot_span().value_or(sp),
     }))
 }
@@ -3410,11 +3453,13 @@ fn bind_param_fields(params: ParsedParam[], body: Expr) -> Expr {
 }
 
 fn bind_one_param(p: ParsedParam, body: Expr) -> Expr {
-    p.fields.right_fold(
+    let reads = zip_with(p.fields, p.names, |field: str, name: str| (field, name));
+    reads.right_fold(
         body,
-        |field: str, result: Expr| {
-            let read = at(Field(at(Ident(p.param.name), p.span), field), p.span);
-            at(Let(field, none, read, result), join_spans(p.span, result.span))
+        |read: (str, str), result: Expr| {
+            let (field, name) = read;
+            let value = at(Field(at(Ident(p.param.name), p.span), field), p.span);
+            at(Let(name, none, value, result), join_spans(p.span, result.span))
         },
     )
 }
@@ -4022,6 +4067,23 @@ pub fn lower_aipl_block(src: str) -> Expr!ParseError {
     );
     assert(block_dump("{ mut P { x } = p; x }") == "Let(__spat$16: P, p, Mut(x, __spat$16.x, x))");
 
+    // A field is bound under another name with `as`: the field is the one read
+    // off the scrutinee, the name the one bound. Renamed and plain mix freely, in
+    // either form, and the order the fields are written is the order they bind.
+    assert(
+        block_dump(
+            "{ let P { x as a, y } = p; a }",
+        ) == "Let(__spat$24: P, p, Let(a, __spat$24.x, Let(y, __spat$24.y, a)))",
+    );
+    assert(
+        block_dump("{ mut P { x as a } = p; a }") == "Let(__spat$21: P, p, Mut(a, __spat$21.x, a))",
+    );
+    assert(
+        block_dump(
+            "{ let P { x, y as b, z } = p; b }",
+        ) == "Let(__spat$27: P, p, Let(x, __spat$27.x, Let(b, __spat$27.y, Let(z, __spat$27.z, b))))",
+    );
+
     // `for (let (a, b) : ps)` is a plain loop over a temporary with the field
     // reads prepended to the body.
     assert(
@@ -4526,6 +4588,10 @@ pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
     // The seventh shape, the destructuring one, which holds a repetition and so
     // is the one alternative whose positions do not line up.
     let destructured = aipl_parse_file("fn g(Point { x, y }) { }")?;
+    let renamed = aipl_parse_file("fn g(Point { x as px, y }) { }")?;
+    assert(
+        renamed.program.show_program() == "fn g(__spat$5: Point) = Let(px, __spat$5.x, Let(y, __spat$5.y, ()))",
+    );
     assert(
         destructured.program.show_program() == "fn g(__spat$5: Point) = Let(x, __spat$5.x, Let(y, __spat$5.y, ()))",
     );
@@ -4824,6 +4890,11 @@ pub fn aipl_parses(src: str) -> bool {
     assert(parses("fn f(Point { x, y }) -> i64 { x }"));
     assert(parses("fn f(Point { x, }, n: i64) -> i64 { x }"));
     assert(!parses("fn f(Point { }) -> i64 { 0 }"));
+    assert(parses("fn f(Point { x as px, y }) -> i64 { px }"));
+    assert(parses("fn f(Point { x as px, }, n: i64) -> i64 { px }"));
+    assert(!parses("fn f(Point { x as }) -> i64 { 0 }"));
+    assert(!parses("fn f(Point { as x }) -> i64 { 0 }"));
+    assert(!parses("fn f() { let P { x as } = p; }"));
 
     // Attributes and the struct-literal body shorthand.
     // The string-argument attribute parses; refusing `.doc` by name is the
@@ -4942,6 +5013,15 @@ fn nest3(
     let open_rule: Rule<AiplTok> = Then([Lit(open1), Lit(open2), Lit(open3)]);
     let close_rule: Rule<AiplTok> = Lit(close);
     Many(body, min=1, max=1, nested_in=(open_rule, close_rule), style=style)
+}
+
+# The braces of a struct pattern: the fields it reads, each optionally bound
+# under another name — `Point { x, y as py }`. The field leads and the name it is
+# bound as follows `as`, so the pattern reads like the import that renames
+# (`wrapping_add as +`) and a reader can tell which side is the struct's.
+fn field_binders() -> Rule<AiplTok> {
+    let binder: Rule<AiplTok> = Then([Term(Name), Maybe(Then([Lit("as"), Term(Name)]))]);
+    Many(binder, min=1, sep=Lit(","), nested_in=braces(), spaced=true)
 }
 
 # The order a `#`-led bracket names, from the token after the `#`: `>` is

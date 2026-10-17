@@ -1,0 +1,14 @@
+# `as` in a struct pattern has to be followed by the name to bind.
+
+struct P { x: i64 }
+
+fn f(p: P) -> i64 {
+    let P { x as } = p;
+    x
+}
+--- errors ---
+error: expected Name, found `}`
+ --> ./tests/cases/syntax/err_destructure_rename_missing_name.aipl:6:18
+  |
+6 |     let P { x as } = p;
+  |                  ^

@@ -1369,7 +1369,7 @@ fn one_param(self: W) -> WDoc!FmtError {
     };
     let n = m.w.bump();
     if (n.w.peek_text() == "{") {
-        let ids = n.w.bump().w.ident_list("}", []);
+        let ids = n.w.bump().w.field_binder_list();
         let closed = ids.w.expect("}")?.w;
         return ok(WDoc {
             w: closed,
@@ -1625,7 +1625,7 @@ fn mut_stmt(self: W) -> WDoc!FmtError {
 # differ only in that keyword, so they share this rather than spelling the same
 # walk twice.
 fn struct_pattern(self: W, kw: str, name: str) -> WDoc!FmtError {
-    let ids = self.bump().w.ident_list("}", []);
+    let ids = self.bump().w.field_binder_list();
     let WDoc { w, doc } = ids.w.expect("}")?.w.expect("=")?.w.expr()?;
     let done = w.expect(";")?.w;
     ok(WDoc {
@@ -1642,6 +1642,13 @@ fn struct_pattern(self: W, kw: str, name: str) -> WDoc!FmtError {
         walker_of("{ x } = q ;")?
             .struct_pattern("mut", "Point")
             .rendered(100)? == "mut Point { x } = q;",
+    );
+
+    // A field bound under another name keeps its `as`, spaced like the import's.
+    assert(
+        walker_of("{ a  as  b , c } = p ;")?
+            .struct_pattern("let", "S")
+            .rendered(100)? == "let S { a as b, c } = p;",
     );
 })
 
@@ -1775,6 +1782,34 @@ fn while_stmt(self: W) -> WDoc!FmtError {
 # A bare comma-separated identifier list up to (not consuming) `end` — binder
 # names and constructor-pattern bindings, which are names rather than types.
 struct WNames { w: W, names: str[] }
+
+# The fields of a struct pattern, up to (not consuming) the closing `}`: each is a
+# name, or a name `as` another — `x as px` — which is kept as one entry so the
+# list joins as it was written. A field may itself be called `as`; what tells the
+# keyword from the name is the token after it, exactly as it does in the grammar.
+fn field_binder_list(self: W) -> WNames {
+    mut w = self;
+    mut acc: str[] = [];
+    while (!(w.peek_text() == "}" || w.at_end())) {
+        let field = w.bump();
+        if (field.w.peek_text() == "as") {
+            let renamed = field.w.bump().w.bump();
+            set acc.push(`{field.text} as {renamed.text}`);
+            set w = renamed.w;
+        } else {
+            set acc.push(field.text);
+            set w = field.w;
+        };
+        set w = if (w.peek_text() == ",") { w.bump().w } else { w };
+    }
+    WNames { w, names: acc }
+}.test({
+    assert(walker_of("x , y }")?.field_binder_list().names == ["x", "y"]);
+    assert(walker_of("x as a , y }")?.field_binder_list().names == ["x as a", "y"]);
+    assert(walker_of("as , y }")?.field_binder_list().names == ["as", "y"]);
+    assert(walker_of("as as a }")?.field_binder_list().names == ["as as a"]);
+    assert(walker_of("x as as }")?.field_binder_list().names == ["x as as"]);
+})
 
 fn ident_list(self: W, end: str, acc0: str[]) -> WNames {
     mut w = self;
@@ -3242,6 +3277,11 @@ fn walker_of(src: str) -> W!FmtError {
         walker_of("fn f ( Point { x } , n : i64 ) -> i64 { x }")?
             .fn_item()
             .rendered(100)? == "fn f(Point { x }, n: i64) -> i64 { x }",
+    );
+    assert(
+        walker_of("fn f ( Point { x  as  px , y } ) -> i64 { px }")?
+            .fn_item()
+            .rendered(100)? == "fn f(Point { x as px, y }) -> i64 { px }",
     );
     assert(walker_of("pub fn f ( ) { }")?.fn_item().rendered(100)? == "pub fn f() {}");
     assert(walker_of("fn f ( ) -> i64 { 1 }")?.fn_item().rendered(100)? == "fn f() -> i64 { 1 }");

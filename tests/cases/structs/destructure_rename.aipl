@@ -1,0 +1,55 @@
+# `T { field as name }` binds a field under another name. The field leads and the
+# name follows `as`, the way an import renames (`wrapping_add as +`). It is what
+# makes two destructurings of the same struct possible in one scope: without it
+# both would bind `x`, and the second would shadow the first.
+#
+# Renamed and plain fields mix freely, the fields not named are not read, and the
+# same pattern works in all three places a struct is taken apart: `let`, `mut`,
+# and a parameter.
+
+import {
+    less_than as <,
+    print,
+    to_str,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+    wrapping_sub as -,
+} from builtins;
+
+struct Point { x: i64, y: i64 }
+
+struct Named { id: i64, label: str }
+
+fn origin() -> Point { x: 1, y: 2 }
+
+// Two points taken apart in the same scope, which a plain pattern cannot do.
+fn manhattan(Point { x as ax, y as ay }, Point { x as bx, y as by }) -> i64 {
+    let dx = if (ax < bx) { bx - ax } else { ax - bx };
+    let dy = if (ay < by) { by - ay } else { ay - by };
+    dx + dy
+}
+
+fn main() !prints {
+    let p = Point { x: 10, y: 20 };
+    let q = origin();
+    let Point { x as px, y as py } = p;
+    let Point { x as qx, y } = q;
+    print(`{px} {py} {qx} {y}`);
+
+    // A mutable rename: the copy is rebound, the source untouched.
+    mut Point { x as moved } = p;
+    set moved += 5;
+    print(`{moved} {p.x}`);
+
+    // A `str` field renames like any other.
+    let n = Named { id: 1, label: "a label long enough to be a buffer" };
+    let Named { label as title } = n;
+    print(title);
+
+    print(to_str(manhattan(p, q)));
+}
+--- stdout ---
+10 20 1 2
+15 10
+a label long enough to be a buffer
+27

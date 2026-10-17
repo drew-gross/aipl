@@ -1772,6 +1772,20 @@
 
 
 
+        <section class="item" id="item-field_binder_list">
+          <h3>
+            <a class="anchor" href="#item-field_binder_list">field_binder_list</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn field_binder_list(self: W) -&#62; WNames</code></pre>
+
+          <div class="doc"><p>The fields of a struct pattern, up to (not consuming) the closing <code>}</code>: each is a name, or a name <code>as</code> another — <code>x as px</code> — which is kept as one entry so the list joins as it was written. A field may itself be called <code>as</code>; what tells the keyword from the name is the token after it, exactly as it does in the grammar.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-ident_list">
           <h3>
             <a class="anchor" href="#item-ident_list">ident_list</a>
