@@ -190,6 +190,20 @@
 
 
 
+        <section class="item" id="item-aipl_parse_errors">
+          <h3>
+            <a class="anchor" href="#item-aipl_parse_errors">aipl_parse_errors</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn aipl_parse_errors(src: str) -&#62; ParseError[]</code></pre>
+
+          <div class="doc"><p>Every syntax error in <code>src</code>, in source order: the ones the grammar recovers from (a missing <code>;</code> after a statement, say — see <code>Expect</code>), and then the one it could not. A file with several slips reports all of them, where <code>aipl_parse_cst</code> stops at the first.</p><p>Only a syntax error is here. A <code>Refuse</code> still aborts the parse outright, and what it says is the one error returned; and a file the grammar accepts is not thereby a valid program — lowering and the loader have their own say.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-aipl_program">
           <h3>
             <a class="anchor" href="#item-aipl_program">aipl_program</a>
@@ -2037,7 +2051,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$131613: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$131981: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

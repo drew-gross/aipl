@@ -89,6 +89,8 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  assign_stmt could be DRYed up probably
+  let_stmt could use a Maybe(Then([])) for when it is typed let?
   g.prods.map(|p| First {}) should maybe be (First{}).repeat_item(...) instead of [First{}].repeat()
   enshrine reductions a bit more, it's probably generically useful. Also add a lot more reductions. Need seed for UnionAll though I think
   impl Abi can go away now that str24 and arr24 are fully integrated (tho maybe should wait for sets and dicts to be unified too?)
@@ -374,6 +376,8 @@ parser:
   after the aipl parser is written in aipl make sure the repair() jank isn't necessary
 
 grammar:
+  maybe can do some sort of recovery even when not using Expect
+  fixit suggestions from expect
   TokenRule's unterminated should move into only the places where it's actually used
   make an ebnf loader as well as dumper
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?

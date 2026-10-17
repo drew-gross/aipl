@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">118 files, 1346 items.</p>
+      <p class="summary">118 files, 1354 items.</p>
 
       <ul class="files">
 
@@ -800,6 +800,11 @@
             </li>
 
             <li>
+              <a href="crates-aipl-codegen-src-grammar_aipl.html#item-aipl_parse_errors"><code>aipl_parse_errors</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
               <a href="crates-aipl-codegen-src-grammar_aipl.html#item-aipl_program"><code>aipl_program</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
@@ -1555,7 +1560,7 @@
           <p class="file-summary">The parser driver: one function that interprets a <code>Grammar</code> (see <code>grammar.aipl</code>) over a token stream (see <code>lexer.aipl</code>) and yields a lossless <code>Cst</code> (see <code>cst.aipl</code>), plus a second pass that lowers that tree to the caller's own AST through each production's <code>build</code>. Together they are the upper half of a front end whose lower half is already data-driven: a language is a <code>TokenRule[]</code> and a <code>Grammar</code>, and nothing else.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-parse.html#private">44 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-parse.html#private">47 private</a></span>
 
 
           <ul class="items">
@@ -1581,6 +1586,16 @@
             </li>
 
             <li>
+              <a href="crates-aipl-codegen-src-parse.html#item-Recovered"><code>Recovered</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-parse.html#item-parse_cst_recovering"><code>parse_cst_recovering</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
               <a href="crates-aipl-codegen-src-parse.html#item-Prepared"><code>Prepared</code></a>
               <span class="kind kind-struct">struct</span>
             </li>
@@ -1592,6 +1607,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-parse.html#item-parse_prepared"><code>parse_prepared</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-parse.html#item-parse_prepared_recovering"><code>parse_prepared_recovering</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

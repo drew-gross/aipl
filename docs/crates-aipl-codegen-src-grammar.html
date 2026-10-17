@@ -216,6 +216,13 @@
 
             </li>
 
+            <li id="item-Expect"><code>Expect(Rule&#60;K&#62;)</code>
+
+              <div class="doc"><p>The rule, which the grammar has already committed to: where it does not match, that is an <em>error in the input</em>, and the parse says so and carries on instead of backtracking. <code>Then([expr, Expect(Lit(&quot;;&quot;))])</code> is an expression whose <code>;</code> is not optional.</p><p>A miss is recorded — what was expected, found where — and the rule is then taken to have matched nothing: it succeeds without consuming a token, exactly as though the missing one had been written. So the sequence around it goes on, and a later mistake is found by the same parse rather than hidden behind the first. <code>parse_cst_recovering</code> returns every error recorded that way; <code>parse_cst</code> and <code>parse</code> fail with the first.</p><p><strong>It is a commitment, and the grammar has to mean it.</strong> Because a miss is not a miss, no enclosing <code>OneOf</code> goes on to its next alternative: an <code>Expect</code> is only right at a point where nothing else could have matched either — after a keyword that opens one form only, say. Placed where a later alternative would have taken the input, it turns a valid program into an error. That is the whole difference from <code>Maybe</code>, and from a plain rule that fails.</p><p>What it costs and saves is paid on <em>invalid</em> input only. A valid program matches every <code>Expect</code> and takes the path it would have taken without one; the saving is that a broken one is not re-parsed down every alternative that cannot succeed either.</p><p>Errors recorded under a sequence that then fails are discarded with it — that path was not taken — so an <code>Expect</code> that fired inside an abandoned alternative reports nothing. And a <code>Refuse</code> still aborts the parse outright, recovered errors included.</p><p>It can match nothing, so a repetition of a bare <code>Expect</code> is refused for looping forever; it belongs after something that consumes.</p></div>
+
+
+            </li>
+
           </ul>
 
         </section>
@@ -427,7 +434,7 @@
             <a class="anchor" href="#item-show_style">show_style</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn show_style(__spat$26504: ListStyle) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn show_style(__spat$28592: ListStyle) -&#62; str</code></pre>
 
           <div class="doc"><p>A <code>ListStyle</code> as the literal that builds it, defaults left out — <code>ListStyle {}</code> for the default style.</p></div>
 

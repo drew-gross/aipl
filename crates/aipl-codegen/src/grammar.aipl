@@ -230,6 +230,39 @@ variant Rule<K: variant> =
     # The one rule that can hold a function value, which costs `Rule` its `==`
     # — a rule is compared through `show` instead.
     | Refuse(Refusal)
+    # The rule, which the grammar has already committed to: where it does not
+    # match, that is an *error in the input*, and the parse says so and carries
+    # on instead of backtracking. `Then([expr, Expect(Lit(";"))])` is an
+    # expression whose `;` is not optional.
+    #
+    # A miss is recorded — what was expected, found where — and the rule is then
+    # taken to have matched nothing: it succeeds without consuming a token,
+    # exactly as though the missing one had been written. So the sequence around
+    # it goes on, and a later mistake is found by the same parse rather than
+    # hidden behind the first. `parse_cst_recovering` returns every error recorded
+    # that way; `parse_cst` and `parse` fail with the first.
+    #
+    # **It is a commitment, and the grammar has to mean it.** Because a miss is
+    # not a miss, no enclosing `OneOf` goes on to its next alternative: an
+    # `Expect` is only right at a point where nothing else could have matched
+    # either — after a keyword that opens one form only, say. Placed where a later
+    # alternative would have taken the input, it turns a valid program into an
+    # error. That is the whole difference from `Maybe`, and from a plain rule
+    # that fails.
+    #
+    # What it costs and saves is paid on *invalid* input only. A valid program
+    # matches every `Expect` and takes the path it would have taken without one;
+    # the saving is that a broken one is not re-parsed down every alternative that
+    # cannot succeed either.
+    #
+    # Errors recorded under a sequence that then fails are discarded with it —
+    # that path was not taken — so an `Expect` that fired inside an abandoned
+    # alternative reports nothing. And a `Refuse` still aborts the parse outright,
+    # recovered errors included.
+    #
+    # It can match nothing, so a repetition of a bare `Expect` is refused for
+    # looping forever; it belongs after something that consumes.
+    | Expect(Rule<K>)
 
 # What a `Refuse` says: a fixed message, or one computed from what was matched
 # in front of it — the tokens the enclosing sequence accepted before reaching
@@ -458,6 +491,7 @@ pub fn show<K: variant>(self: Rule<K>) -> str {
             `Many({args.join(sep=", ")})`
         },
         Maybe(sub) => `Maybe({show(sub)})`,
+        Expect(sub) => `Expect({show(sub)})`,
         Named(n) => `Named("{n}")`,
         NamedIdx(i) => `NamedIdx({i})`,
         Climb(atom, precs) => `Climb({show(atom)}, {precs})`,
@@ -505,6 +539,7 @@ pub fn show<K: variant>(self: Rule<K>) -> str {
 
     assert(Refuse(Msg("no")).show() == `Refuse(Msg("no"))`);
     assert(Refuse(Fn(echo)).show() == "Refuse(Fn(..))");
+    assert(Expect(Literal(";")).show() == `Expect(Literal(";"))`);
 })
 
 # A `ListStyle` as the literal that builds it, defaults left out — `ListStyle
@@ -563,7 +598,7 @@ fn group_styles<K: variant>(r: Rule<K>) -> ListStyle[] {
             ],
             none => [..group_styles(sub), ..opt_group_styles(sep)],
         },
-        Maybe(sub) => group_styles(sub),
+        Maybe(sub) | Expect(sub) => group_styles(sub),
         Climb(atom, _) => group_styles(atom),
         Term(..) | Literal(..) | Named(..) | NamedIdx(..) | Refuse(..) => [],
     }
@@ -647,6 +682,7 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
         Then(rs) => ok(Then(desugar_rules(rs)?)),
         OneOf(rs) => ok(OneOf(desugar_rules(rs)?)),
         Maybe(sub) => ok(Maybe(desugar_rule(sub)?)),
+        Expect(sub) => ok(Expect(desugar_rule(sub)?)),
         Climb(atom, precs) => ok(Climb(desugar_rule(atom)?, precs)),
         Term(k) => ok(Term(k)),
         Literal(s) => ok(Literal(s)),
@@ -741,6 +777,7 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseEr
             },
         },
         Maybe(sub) => ok(Maybe(link_rule(sub, names, base)?)),
+        Expect(sub) => ok(Expect(link_rule(sub, names, base)?)),
         Climb(atom, precs) => ok(Climb(link_rule(atom, names, base)?, precs)),
         Term(k) => ok(Term(k)),
         Literal(s) => ok(Literal(s)),
@@ -889,6 +926,12 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
                 build: Kids(List),
                 layout: Inline,
             },
+            Production {
+                name: "g",
+                rule: Then([Named("a"), Expect(Named("b"))]),
+                build: Kids(List),
+                layout: Inline,
+            },
         ],
     };
     let ls = link(shapes)?;
@@ -904,6 +947,8 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // A refusal carries no reference and passes through, whichever kind.
     assert(shown_rule(ls, 4) == `Then([NamedIdx(0), Refuse(Msg("no"))])`);
     assert(shown_rule(ls, 5) == "Then([NamedIdx(0), Refuse(Fn(..))])");
+    // An `Expect` holds a rule, so its reference is resolved like any other's.
+    assert(shown_rule(ls, 6) == "Then([NamedIdx(0), Expect(NamedIdx(1))])");
 
     // An unresolved reference is a grammar error, named in the message.
     let bad: Grammar<Kind, Node> = Grammar {

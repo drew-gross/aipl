@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/parse.aipl</code></h1>
 
-      <div class="module-doc"><p>The parser driver: one function that interprets a <code>Grammar</code> (see <code>grammar.aipl</code>) over a token stream (see <code>lexer.aipl</code>) and yields a lossless <code>Cst</code> (see <code>cst.aipl</code>), plus a second pass that lowers that tree to the caller's own AST through each production's <code>build</code>. Together they are the upper half of a front end whose lower half is already data-driven: a language is a <code>TokenRule[]</code> and a <code>Grammar</code>, and nothing else.</p><p><strong>PEG, not LR.</strong> <code>OneOf</code> commits to its first matching alternative, so a grammar is unambiguous by construction and a failed alternative simply backtracks. Two consequences the driver has to handle, and does:</p><ul><li><em>Left recursion does not work.</em> <code>expr -&gt; expr &quot;+&quot; term</code> would call itself at the same position forever. Binary operators are spelled with <code>Climb</code> instead, which is why that rule exists.</li><li><em>Errors need furthest-failure tracking.</em> Backtracking throws away the position where a parse got the furthest, which is nearly always where the mistake is. Every rule threads a <code>Far</code> — the deepest position anything was expected at, and the set of things expected there — through both success and failure, so the reported error is the deepest one, not the last.</li></ul><p><strong>Two passes, not one.</strong> <code>parse_cst</code> builds the tree; <code>lower</code> walks it calling <code>build</code>. Lowering during the parse would run a production's <code>build</code> inside speculative alternatives that then backtrack — wasted allocation at best, and at worst a <code>build</code> that legitimately fails aborting a parse that should simply have tried the next alternative. <code>parse</code> is the two in sequence.</p><p>Costs worth knowing before this drives something large: trivia is attached by scanning the trivia list for each consumed token, so a parse is O(tokens × trivia); and with no memoization a heavily-backtracking grammar can be exponential. Both are answered later in the plan — FIRST sets remove most backtracking — and neither matters at the sizes here.</p></div>
+      <div class="module-doc"><p>The parser driver: one function that interprets a <code>Grammar</code> (see <code>grammar.aipl</code>) over a token stream (see <code>lexer.aipl</code>) and yields a lossless <code>Cst</code> (see <code>cst.aipl</code>), plus a second pass that lowers that tree to the caller's own AST through each production's <code>build</code>. Together they are the upper half of a front end whose lower half is already data-driven: a language is a <code>TokenRule[]</code> and a <code>Grammar</code>, and nothing else.</p><p><strong>PEG, not LR.</strong> <code>OneOf</code> commits to its first matching alternative, so a grammar is unambiguous by construction and a failed alternative simply backtracks. Two consequences the driver has to handle, and does:</p><ul><li><em>Left recursion does not work.</em> <code>expr -&gt; expr &quot;+&quot; term</code> would call itself at the same position forever. Binary operators are spelled with <code>Climb</code> instead, which is why that rule exists.</li><li><em>Errors need furthest-failure tracking.</em> Backtracking throws away the position where a parse got the furthest, which is nearly always where the mistake is. Every rule threads a <code>Far</code> — the deepest position anything was expected at, and the set of things expected there — through both success and failure, so the reported error is the deepest one, not the last.</li></ul><p><strong>Recovery is opt-in, per rule, with <code>Expect</code>.</strong> A grammar that has already committed — after a keyword that opens one form only — wraps what must come next in <code>Expect</code>. A miss there is recorded as an error and the parse carries on as though the token had been written, so <code>parse_cst_recovering</code> can return every such error in a file, and no enclosing choice goes looking for another way through. Errors on an abandoned path are discarded with it; a total miss keeps none (the furthest failure is all there is). See <code>Expect</code> in <code>grammar.aipl</code> for the contract, and <code>match_expect</code> for the mechanics.</p><p><strong>Two passes, not one.</strong> <code>parse_cst</code> builds the tree; <code>lower</code> walks it calling <code>build</code>. Lowering during the parse would run a production's <code>build</code> inside speculative alternatives that then backtrack — wasted allocation at best, and at worst a <code>build</code> that legitimately fails aborting a parse that should simply have tried the next alternative. <code>parse</code> is the two in sequence.</p><p>Costs worth knowing before this drives something large: trivia is attached by scanning the trivia list for each consumed token, so a parse is O(tokens × trivia); and with no memoization a heavily-backtracking grammar can be exponential. Both are answered later in the plan — FIRST sets remove most backtracking — and neither matters at the sizes here.</p></div>
 
 
 
@@ -43,7 +43,7 @@
           </h3>
           <pre class="signature"><code>struct Step</code></pre>
 
-          <div class="doc"><p>One rule's result at one position: whether it matched, where it left off, the CST children it contributed to its parent, and the furthest failure so far.</p><p><code>hit: false</code> is an ordinary non-match — the caller backtracks and tries something else — and is <em>not</em> an error. A <code>ParseError</code> is reserved for what no alternative could fix: a malformed grammar, or a <code>build</code> that refused.</p></div>
+          <div class="doc"><p>One rule's result at one position: whether it matched, where it left off, the CST children it contributed to its parent, and the furthest failure so far.</p><p><code>hit: false</code> is an ordinary non-match — the caller backtracks and tries something else — and is <em>not</em> an error. A <code>ParseError</code> is reserved for what no alternative could fix: a malformed grammar, or a <code>build</code> that refused.</p><p><code>recovered</code> is the errors an <code>Expect</code> found and carried on past inside this match, as the failures they were, in source order. They ride on the hit like <code>kids</code> do, so every combinator that joins children joins these, and a match that is abandoned takes them with it: an error recorded down a path the parse then did not take is not an error in the input. Rendered only at the end (<code>recovered_errors</code>), where the source is at hand.</p></div>
 
 
         </section>
@@ -72,6 +72,34 @@
           <pre class="signature"><code>pub fn parse_cst&#60;K: variant, A: any&#62;(src: str, lexed: LexResult&#60;K&#62;, g: Grammar&#60;K, A&#62;, start: str) -&#62; Cst!ParseError</code></pre>
 
           <div class="doc"><p>Parses <code>src</code> — already lexed into <code>lexed</code> — against grammar <code>g</code>, beginning at the production named <code>start</code>, and returns the lossless concrete syntax tree.</p><p><code>g</code> is linked here, so it may be handed over unlinked; linking is idempotent, so a caller parsing repeatedly can <code>link</code> once and pay nothing again. Every token must be consumed: input left over after the start rule succeeds is an error, not a partial parse.</p><p>Fails with a <code>ParseError</code> carrying the span of the offending token — the <em>furthest</em> position anything was expected at, not the last one tried — or the empty span at the end of the source when the input simply ran out.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Recovered">
+          <h3>
+            <a class="anchor" href="#item-Recovered">Recovered</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Recovered</code></pre>
+
+          <div class="doc"><p>What a parse that recovers from <code>Expect</code>s found: every error, in source order, and the tree when the parse reached the end of the input.</p><p><code>cst</code> is <code>none</code> exactly when the parse could not finish — the input ran out of grammar before it ran out of tokens, or no rule matched at all. The last error is then that failure, the one a plain <code>parse_cst</code> would have reported, and any before it are <code>Expect</code>s recovered from on the way there. A tree that is present may still be a tree of <em>broken</em> input (<code>errors</code> is not empty): it stands in the place of the missing text without holding it, so it is for finding more errors and for tools that want a best-effort shape — never for lowering.</p><p>A failure that is not the input's — a <code>Refuse</code>, a malformed grammar — is the <code>!ParseError</code> of the call, and takes the recovered errors with it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-parse_cst_recovering">
+          <h3>
+            <a class="anchor" href="#item-parse_cst_recovering">parse_cst_recovering</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn parse_cst_recovering&#60;K: variant, A: any&#62;(src: str, lexed: LexResult&#60;K&#62;, g: Grammar&#60;K, A&#62;, start: str) -&#62; Recovered!ParseError</code></pre>
+
+          <div class="doc"><p><code>parse_cst</code> that goes on past a missing <code>Expect</code>: the tree it recovered to, and every error found on the way — see <code>Recovered</code>. Links <code>g</code> as <code>parse_cst</code> does.</p></div>
 
 
         </section>
@@ -114,6 +142,20 @@
           <pre class="signature"><code>pub fn parse_prepared&#60;K: variant, A: any&#62;(src: str, lexed: LexResult&#60;K&#62;, prep: Prepared&#60;K, A&#62;, start: str) -&#62; Cst!ParseError</code></pre>
 
           <div class="doc"><p><code>parse_cst</code> against an already-prepared grammar — the same parse, without re-linking and re-analysing the grammar for every source.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-parse_prepared_recovering">
+          <h3>
+            <a class="anchor" href="#item-parse_prepared_recovering">parse_prepared_recovering</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn parse_prepared_recovering&#60;K: variant, A: any&#62;(src: str, lexed: LexResult&#60;K&#62;, prep: Prepared&#60;K, A&#62;, start: str) -&#62; Recovered!ParseError</code></pre>
+
+          <div class="doc"><p><code>parse_prepared</code> that goes on past a missing <code>Expect</code>; see <code>Recovered</code>. The one parse the others are written over.</p></div>
 
 
         </section>
@@ -224,6 +266,20 @@
           <pre class="signature"><code>fn far_miss(far: Far, pos: u64, label: str) -&#62; Far</code></pre>
 
           <div class="doc"><p><code>far</code> updated with &quot;<code>label</code> was expected at <code>pos</code>&quot;. Deeper wins outright; equally deep joins the expected set (deduped); shallower is discarded. An empty label is a <em>transparent</em> production and records nothing.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-far_join">
+          <h3>
+            <a class="anchor" href="#item-far_join">far_join</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn far_join(a: Far, b: Far) -&#62; Far</code></pre>
+
+          <div class="doc"><p>Both failures in one: the deeper of the two, or — at equal depth — what either expected there. The merge <code>far_miss</code> makes one label at a time, for a whole record. <code>a</code>'s blamed bracket wins a tie, as the first to be blamed does.</p></div>
 
 
         </section>
@@ -566,6 +622,20 @@
 
 
 
+        <section class="item" id="item-match_expect">
+          <h3>
+            <a class="anchor" href="#item-match_expect">match_expect</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_expect&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+          <div class="doc"><p><code>sub</code>, which the grammar is committed to: when it does not match, the miss is recorded as an error in the input and the rule matches nothing instead, as though the missing text had been written. The sequence around it carries on, and no enclosing choice goes on to its next alternative — see <code>Expect</code>.</p><p><code>sub</code> is matched against a failure record of its own, so the error says what <em>this</em> rule wanted where it stood. Passing <code>far</code> through would let a deeper failure left by an abandoned alternative speak for it, and the message would blame a place the reader has no reason to look. The two are joined afterwards, so what <code>far</code> goes on to report is what it would have been without the <code>Expect</code>. And the error does take on what <code>far</code> already expected at the very same token — the operators that could have continued the expression before it, say — because that is the full answer to &quot;what could have been here&quot;, and it is the message the parse would have given had it failed there instead.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-match_prod">
           <h3>
             <a class="anchor" href="#item-match_prod">match_prod</a>
@@ -734,6 +804,20 @@
 
 
 
+        <section class="item" id="item-recovered_errors">
+          <h3>
+            <a class="anchor" href="#item-recovered_errors">recovered_errors</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn recovered_errors&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, src: str, recovered: Far[], stuck: ParseError?) -&#62; ParseError[]</code></pre>
+
+          <div class="doc"><p>The errors <code>Expect</code>s recovered from, rendered, then <code>stuck</code> — the failure that ended the parse, when one did — in the order they were found.</p><p>One error to a token. A second <code>Expect</code> failing at the token the first just failed at is the same mistake seen again (<code>Then([Expect(a), Expect(b)])</code> on a token that is neither), and so is the failure that ended the parse when it is at the same token as the last recovery. Reporting each would make one slip read as several.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower_node">
           <h3>
             <a class="anchor" href="#item-lower_node">lower_node</a>
@@ -795,7 +879,7 @@
             <a class="anchor" href="#item-build_node">build_node</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn build_node(src: str, __spat$76690: Parts, kids: Node[]) -&#62; Node</code></pre>
+          <pre class="signature"><code>fn build_node(src: str, __spat$94481: Parts, kids: Node[]) -&#62; Node</code></pre>
 
           <div class="doc"><p>The lowering every fixture production uses: a node with no interior children is a leaf carrying its text, anything else a branch carrying its children.</p></div>
 

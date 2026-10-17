@@ -199,6 +199,7 @@ import { format_cst, render_cst } from "./format.aipl";
 import {
     Build,
     Climb,
+    Expect,
     Fn,
     Grammar,
     Inline,
@@ -271,7 +272,7 @@ import {
 } from "./lex_aipl.aipl";
 import { LexResult, keep_skipped, lex, span_str } from "./lexer.aipl";
 import { operator_named_forms } from "./operator_named_forms.aipl";
-import { parse, parse_cst, parse_prepared, prepare } from "./parse.aipl";
+import { parse, parse_cst, parse_cst_recovering, parse_prepared, prepare } from "./parse.aipl";
 import {
     Assign as SAssign,
     Block as PBlock,
@@ -400,9 +401,9 @@ fn items() -> Production<AiplTok, Ast>[] {
     let import_decl: Rule<AiplTok> = Then([
         Lit("import"),
         Many(Named("import_name"), sep=Lit(","), nested_in=braces(), spaced=true, sorted=true),
-        Lit("from"),
+        Expect(Lit("from")),
         OneOf([Term(StrLit), Lit("builtins")]),
-        Lit(";"),
+        Expect(Lit(";")),
     ]);
 
     // A name, or an aliased name. The aliased form is first: it starts with
@@ -474,7 +475,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         Maybe(Then([Lit(":"), Named("ty")])),
         Lit("="),
         Named("expr"),
-        Lit(";"),
+        Expect(Lit(";")),
     ]);
 
     // `<T, U: ord>`. At least one parameter — `<>` is a syntax error, which is
@@ -797,7 +798,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
     let loop_body: Rule<AiplTok> = one(Named("loop_inner"), nested_in=braces());
     let loop_inner: Rule<AiplTok> = Maybe(OneOf([
         Then([Named("kw_stmt"), Named("loop_inner")]),
-        Then([Named("expr"), semicolon, Named("loop_inner")]),
+        Then([Named("expr"), Expect(semicolon), Named("loop_inner")]),
     ]));
 
     // Keyword-led statements, so their first tokens stay disjoint from `expr`'s
@@ -816,8 +817,16 @@ fn statements() -> Production<AiplTok, Ast>[] {
         Term(Name),
     ]);
     let let_stmt: Rule<AiplTok> = OneOf([
-        Then([Lit("let"), bind_target, Lit("="), Named("expr"), Lit(";")]),
-        Then([Lit("let"), Term(Name), Lit(":"), Named("ty"), Lit("="), Named("expr"), Lit(";")]),
+        Then([Lit("let"), bind_target, Lit("="), Named("expr"), Expect(Lit(";"))]),
+        Then([
+            Lit("let"),
+            Term(Name),
+            Lit(":"),
+            Named("ty"),
+            Lit("="),
+            Named("expr"),
+            Expect(Lit(";")),
+        ]),
     ]);
     let mut_stmt: Rule<AiplTok> = OneOf([
         Then([
@@ -826,10 +835,18 @@ fn statements() -> Production<AiplTok, Ast>[] {
             Many(Term(Name), min=1, sep=Lit(","), nested_in=braces(), spaced=true),
             Lit("="),
             Named("expr"),
-            Lit(";"),
+            Expect(Lit(";")),
         ]),
-        Then([Lit("mut"), Term(Name), Lit(":"), Named("ty"), Lit("="), Named("expr"), Lit(";")]),
-        Then([Lit("mut"), Term(Name), Lit("="), Named("expr"), Lit(";")]),
+        Then([
+            Lit("mut"),
+            Term(Name),
+            Lit(":"),
+            Named("ty"),
+            Lit("="),
+            Named("expr"),
+            Expect(Lit(";")),
+        ]),
+        Then([Lit("mut"), Term(Name), Lit("="), Named("expr"), Expect(Lit(";"))]),
     ]);
 
     // `set t = e;`, the increment/decrement sugar, the four compound
@@ -840,14 +857,14 @@ fn statements() -> Production<AiplTok, Ast>[] {
     // `lower_assign_stmt` splits it back off.
     let assign_target: Rule<AiplTok> = Many(Term(Name), min=1, sep=Lit("."), trailing_sep=false);
     let assign_stmt: Rule<AiplTok> = OneOf([
-        Then([Lit("set"), assign_target, Lit("++"), Lit(";")]),
-        Then([Lit("set"), assign_target, Lit("--"), Lit(";")]),
-        Then([Lit("set"), assign_target, Lit("+="), Named("expr"), Lit(";")]),
-        Then([Lit("set"), assign_target, Lit("-="), Named("expr"), Lit(";")]),
-        Then([Lit("set"), assign_target, Lit("*="), Named("expr"), Lit(";")]),
-        Then([Lit("set"), assign_target, Lit("/="), Named("expr"), Lit(";")]),
-        Then([Lit("set"), assign_target, nest("(", Named("args"), ")", loose()), Lit(";")]),
-        Then([Lit("set"), assign_target, Lit("="), Named("expr"), Lit(";")]),
+        Then([Lit("set"), assign_target, Lit("++"), Expect(Lit(";"))]),
+        Then([Lit("set"), assign_target, Lit("--"), Expect(Lit(";"))]),
+        Then([Lit("set"), assign_target, Lit("+="), Named("expr"), Expect(Lit(";"))]),
+        Then([Lit("set"), assign_target, Lit("-="), Named("expr"), Expect(Lit(";"))]),
+        Then([Lit("set"), assign_target, Lit("*="), Named("expr"), Expect(Lit(";"))]),
+        Then([Lit("set"), assign_target, Lit("/="), Named("expr"), Expect(Lit(";"))]),
+        Then([Lit("set"), assign_target, nest("(", Named("args"), ")", loose()), Expect(Lit(";"))]),
+        Then([Lit("set"), assign_target, Lit("="), Named("expr"), Expect(Lit(";"))]),
     ]);
 
     // The four `for` shapes, told apart after `for ( let` by one token: `(` is
@@ -873,7 +890,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
         one(Named("expr"), nested_in=parens()),
         Named("loop_body"),
     ]);
-    let return_stmt: Rule<AiplTok> = Then([Lit("return"), Named("expr"), Lit(";")]);
+    let return_stmt: Rule<AiplTok> = Then([Lit("return"), Named("expr"), Expect(Lit(";"))]);
 
     [
         p("block", block, TryMk(lower_block)),
@@ -4414,6 +4431,59 @@ pub fn lex_lossless(text: str) -> LexResult<AiplTok>!ParseError {
         .lex(aipl_rules().keep_skipped())
         .map_err(|e| ParseError { message: e.message, span: e.span })
 }
+
+# Every syntax error in `src`, in source order: the ones the grammar recovers
+# from (a missing `;` after a statement, say — see `Expect`), and then the one it
+# could not. A file with several slips reports all of them, where `aipl_parse_cst`
+# stops at the first.
+#
+# Only a syntax error is here. A `Refuse` still aborts the parse outright, and
+# what it says is the one error returned; and a file the grammar accepts is not
+# thereby a valid program — lowering and the loader have their own say.
+pub fn aipl_parse_errors(src: str) -> ParseError[] {
+    let text = aipl_source(src);
+    match (lex_lossless(text)) {
+        ok(lexed) => match (parse_cst_recovering(text, lexed, aipl_grammar(), "program")) {
+            ok(recovered) => recovered.errors,
+            err(e) => [e],
+        },
+        err(e) => [e],
+    }
+}.test({
+    fn messages(src: str) -> str[] { aipl_parse_errors(src).map(|e| e.message) }
+
+    // A program that parses has no errors.
+    assert(messages("fn f() { let x = 1; x }") == []);
+
+    // Each statement's `;` is committed to, so a missing one is reported where it
+    // is and the parse reads on — which is why the second slip is found at all.
+    let ops = "expected `.`, `;`, `?`, `[`, or an operator";
+    assert(messages("fn f() { let x = 1 let y = 2 y }") == [
+        `{ops}, found \`let\``,
+        `{ops}, found \`y\``,
+    ]);
+
+    // Across items, and across statement kinds: a missing `from`, then the `;`
+    // of an import, a constant, a `set` and a `return` — five errors, one parse.
+    let src = "import { a } builtins\nlet X: i64 = 1\nfn f() { set x++ return 1 }";
+    assert(messages(src) == [
+        "expected `from`, found `builtins`",
+        "expected `;`, found `let`",
+        `{ops}, found \`fn\``,
+        "expected `;`, found `return`",
+        `{ops}, found \`}\``,
+    ]);
+
+    // Where they are is part of the answer: each error points at the token found.
+    let spans = aipl_parse_errors("fn f() { let x = 1 let y = 2; }").map(|e| e.span);
+    assert(spans == [19..22]);
+
+    // A `Refuse` is not recovered from. The statement-start check has a better word
+    // for a missing `;` inside a loop than "expected", and aborts with it.
+    assert(messages("fn f() { while (c) { g() h(); } }") == [
+        "missing `;` before `h`: every statement ends with one, even an `if` or `match` whose value is unused",
+    ]);
+})
 
 # `src` lowered to the AST, as the AST — the FFI entry the Rust side rebuilds an
 # `aipl_syntax::ast::Program` from. This is the bridge stage 5a chose: lower in

@@ -71,6 +71,7 @@ import {
 } from builtins;
 import {
     Climb,
+    Expect,
     Fn,
     Grammar,
     Inline,
@@ -154,6 +155,7 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     let r_upto: Rule<Tok> = Many(Term(Num), max=1);
     let r_exactly: Rule<Tok> = Many(Term(Num), min=1, max=1);
     let r_range: Rule<Tok> = Many(Term(Num), min=two, max=4);
+    let r_expect: Rule<Tok> = Then([Term(Num), Expect(Literal(";"))]);
     let g = g_of([
         one("alt", r_alt),
         one("seq", r_seq),
@@ -168,6 +170,7 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
         one("upto", r_upto),
         one("exactly", r_exactly),
         one("range", r_range),
+        one("expect", r_expect),
     ]);
     assert(ebnf(g) == """
         alt = Num | Name ;
@@ -183,6 +186,7 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
         upto = Num? ;
         exactly = Num ;
         range = Num{2,4} ;
+        expect = Num ";"! ;
     """);
 
     // A right-associative level is marked, because the flat rendering is the
@@ -271,6 +275,9 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
                 .value_or(reps)
         },
         Maybe(sub) => `{render_rule(sub, names, Item)}?`,
+        // EBNF has no way to say "and where it is missing, say so and carry on"
+        // either; the `!` marks the rule as one the grammar has committed to.
+        Expect(sub) => `{render_rule(sub, names, Item)}!`,
         Climb(atom, precs) => render_climb(atom, precs, names, ctx),
         // EBNF has no way to say "and then fail"; a comment carrying the
         // message is what a reader of the dump can use — and a computed
@@ -374,7 +381,7 @@ fn climb_precs<K: variant>(r: Rule<K>) -> Prec[] {
             some(brackets) => first_precs([brackets.0, sub]),
             none => climb_precs(sub),
         },
-        Maybe(sub) => climb_precs(sub),
+        Maybe(sub) | Expect(sub) => climb_precs(sub),
         Term(..) | Literal(..) | Named(..) | NamedIdx(..) | Refuse(..) => [],
     }
 }
@@ -551,6 +558,10 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
             },
         },
         Maybe(sub) => ok(First { ..rule_first(sub, sets)?, nullable: true }),
+        // It begins with what its rule does, and is nullable for a different
+        // reason than `Maybe`: where the rule is missing it still matches, with
+        // nothing consumed. So whatever follows it can begin the sequence too.
+        Expect(sub) => ok(First { ..rule_first(sub, sets)?, nullable: true }),
         // A climb begins with its atom: an operator only ever appears after one.
         Climb(atom, precs) => rule_first(atom, sets),
         NamedIdx(i) => sets[i].value_or_err(ParseError {
@@ -588,6 +599,14 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     // A whole-sequence nullability: every element optional, so the rule is too.
     let r_all_opt: Rule<Tok> = Then([Maybe(Literal("!")), Maybe(Term(Num))]);
     assert(rule_first(r_all_opt, sets)?.show_first() == `Num "!" <empty>`);
+
+    // An `Expect` begins with what its rule does and can match nothing, so what
+    // follows it can begin the sequence too — a missing `!` is recovered from,
+    // and the `Num` after it is then the first token.
+    let r_expect: Rule<Tok> = Then([Expect(Literal("!")), Term(Num)]);
+    assert(rule_first(r_expect, sets)?.show_first() == `Num "!"`);
+    let r_expect_only: Rule<Tok> = Expect(Literal("!"));
+    assert(rule_first(r_expect_only, sets)?.show_first() == `"!" <empty>`);
 
     // A separated list begins with its item — or, allowing a leading separator,
     // with that too.
