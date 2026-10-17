@@ -4559,10 +4559,10 @@ pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
 
     // Each statement's `;` is committed to, so a missing one is reported where it
     // is and the parse reads on — which is why the second slip is found at all.
-    let ops = "expected `.`, `;`, `?`, `[`, or an operator";
+    let semi = "expected `;`";
     assert(messages("fn f() { let x = 1 let y = 2 y }") == [
-        `{ops}, found \`let\``,
-        `{ops}, found \`y\``,
+        `{semi}, found \`let\``,
+        `{semi}, found \`y\``,
     ]);
 
     // Across items, and across statement kinds: a missing `from`, then the `;`
@@ -4571,9 +4571,9 @@ pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
     assert(messages(src) == [
         "expected `from`, found `builtins`",
         "expected `;`, found `let`",
-        `{ops}, found \`fn\``,
+        `{semi}, found \`fn\``,
         "expected `;`, found `return`",
-        `{ops}, found \`}\``,
+        `{semi}, found \`}\``,
     ]);
 
     // Where they are is part of the answer: each error points at the token found.
@@ -4591,7 +4591,7 @@ pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
     // But it comes last, and what was met before it is not lost: the slip in the
     // first statement is reported, then the refusal that stopped the parse.
     assert(messages("fn f() { let x = 1 let y = 2; while (c) { g() h(); } }") == [
-        `{ops}, found \`let\``,
+        `{semi}, found \`let\``,
         loop_slip,
     ]);
 
@@ -4599,7 +4599,7 @@ pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
     // the function is given up on whole — and the slip inside it is still reported,
     // ahead of the failure.
     assert(messages("fn f() { let x = 1 let y = 2;") == [
-        `{ops}, found \`let\``,
+        `{semi}, found \`let\``,
         "expected `}`, a statement, or an expression, found end of input (`{` at line 1 is never closed)",
     ]);
 })

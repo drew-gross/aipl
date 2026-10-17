@@ -685,7 +685,7 @@
           </h3>
           <pre class="signature"><code>fn match_expect&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
-          <div class="doc"><p><code>sub</code>, which the grammar is committed to: when it does not match, the miss is recorded as an error in the input and the rule matches nothing instead, as though the missing text had been written. The sequence around it carries on, and no enclosing choice goes on to its next alternative — see <code>Expect</code>.</p><p>The miss is recorded twice, for two readers. A <code>Missing</code> marker goes in the tree, which is how the errors of a parse that <em>succeeds</em> are found: a marker belongs to the path that was taken and goes with it if that path is abandoned. And the slip goes on <code>far</code>, which is how a parse that does not succeed finds them: a miss or a refusal has no tree to look in, only the failure record every rule hands on.</p><p><code>sub</code> is matched against a failure record of its own, so the error says what <em>this</em> rule wanted where it stood. Passing <code>far</code> through would let a deeper failure left by an abandoned alternative speak for it, and the message would blame a place the reader has no reason to look. The two are joined afterwards, so what <code>far</code> goes on to report is what it would have been without the <code>Expect</code>. And the error does take on what <code>far</code> already expected at the very same token — the operators that could have continued the expression before it, say — because that is the full answer to &quot;what could have been here&quot;, and it is the message the parse would have given had it failed there instead.</p></div>
+          <div class="doc"><p><code>sub</code>, which the grammar is committed to: when it does not match, the miss is recorded as an error in the input and the rule matches nothing instead, as though the missing text had been written. The sequence around it carries on, and no enclosing choice goes on to its next alternative — see <code>Expect</code>.</p><p>The miss is recorded twice, for two readers. A <code>Missing</code> marker goes in the tree, which is how the errors of a parse that <em>succeeds</em> are found: a marker belongs to the path that was taken and goes with it if that path is abandoned. And the slip goes on <code>far</code>, which is how a parse that does not succeed finds them: a miss or a refusal has no tree to look in, only the failure record every rule hands on.</p><p><code>sub</code> is matched against a failure record of its own, so the error says what <em>this</em> rule wanted where it stood. Passing <code>far</code> through would let a deeper failure left by an abandoned alternative speak for it, and the message would blame a place the reader has no reason to look. The two are joined afterwards, so what <code>far</code> goes on to report is what it would have been without the <code>Expect</code>.</p><p>The error is the rule's alone, and does <em>not</em> take on what <code>far</code> had already expected at the same token. The operators that could have continued the expression before a missing <code>;</code> are true of the token, but the grammar has said what it needs here: &quot;expected <code>;</code>&quot; is the answer, and a list that buries it among the things that were merely possible is the generic message <code>Expect</code> exists to improve on.</p></div>
 
 
         </section>
@@ -879,7 +879,7 @@
             <a class="anchor" href="#item-stopped">stopped</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn stopped&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, src: str, __spat$57482: Abort) -&#62; Recovered!ParseError</code></pre>
+          <pre class="signature"><code>fn stopped&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, src: str, __spat$57549: Abort) -&#62; Recovered!ParseError</code></pre>
 
           <div class="doc"><p>A parse that a <code>Refuse</code> ended: the input's error, after the <code>Expect</code>s met before it. Anything else that aborts is the grammar's fault, and the call's.</p></div>
 
@@ -977,7 +977,7 @@
             <a class="anchor" href="#item-build_node">build_node</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn build_node(src: str, __spat$101817: Parts, kids: Node[]) -&#62; Node</code></pre>
+          <pre class="signature"><code>fn build_node(src: str, __spat$101854: Parts, kids: Node[]) -&#62; Node</code></pre>
 
           <div class="doc"><p>The lowering every fixture production uses: a node with no interior children is a leaf carrying its text, anything else a branch carrying its children.</p></div>
 

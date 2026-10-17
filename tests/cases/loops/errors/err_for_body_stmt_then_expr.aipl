@@ -9,7 +9,7 @@ fn f(s: str) -> i64 {
     n
 }
 --- errors ---
-error: expected `.`, `;`, `?`, `[`, or an operator, found `}`
+error: expected `;`, found `}`
  --> ./tests/cases/loops/errors/err_for_body_stmt_then_expr.aipl:8:5
   |
 8 |     }

@@ -829,10 +829,13 @@ fn match_maybe<K: variant, A: any>(
 # failure left by an abandoned alternative speak for it, and the message would
 # blame a place the reader has no reason to look. The two are joined afterwards,
 # so what `far` goes on to report is what it would have been without the `Expect`.
-# And the error does take on what `far` already expected at the very same token —
-# the operators that could have continued the expression before it, say — because
-# that is the full answer to "what could have been here", and it is the message
-# the parse would have given had it failed there instead.
+#
+# The error is the rule's alone, and does *not* take on what `far` had already
+# expected at the same token. The operators that could have continued the
+# expression before a missing `;` are true of the token, but the grammar has said
+# what it needs here: "expected `;`" is the answer, and a list that buries it among
+# the things that were merely possible is the generic message `Expect` exists to
+# improve on.
 fn match_expect<K: variant, A: any>(
     p: Parser<K, A>,
     sub: Rule<K>,
@@ -845,8 +848,8 @@ fn match_expect<K: variant, A: any>(
     if (st.hit) {
         return ok(Step { ..st, far: joined });
     };
-    let found = if (far.pos <= st.far.pos) { joined } else { st.far };
-    let slip = Slip { pos: found.pos, expected: found.expected, unclosed: found.unclosed };
+    let wanted = st.far;
+    let slip = Slip { pos: wanted.pos, expected: wanted.expected, unclosed: wanted.unclosed };
     let missing = Missing(slip.pos, slip.expected, slip.unclosed);
 
     // Once to a token: the same slip met again down another path — the parse
@@ -2136,9 +2139,7 @@ pub fn parse<K: variant, A: any>(
         Then([Literal("("), Named("expr"), Expect(Literal(")"))]),
     ]);
     let g_climb = g_of([one("expr", e_expr), one("atom", e_atom)]);
-    assert(errors_of("1 + (2 + 3", g_climb, "expr") == [
-        "expected `)` or an operator, found end of input",
-    ]);
+    assert(errors_of("1 + (2 + 3", g_climb, "expr") == ["expected `)`, found end of input"]);
     assert(errors_of("1 + (2 + 3)", g_climb, "expr") == []);
 
     // Through a separated, repeated list.

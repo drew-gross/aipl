@@ -7,7 +7,7 @@ fn f(s: str) -> i64 {
     0
 }
 --- errors ---
-error: expected `.`, `;`, `?`, `[`, or an operator, found `}`
+error: expected `;`, found `}`
  --> ./tests/cases/loops/errors/err_for_body_trailing_expr.aipl:6:25
   |
 6 |     for (let c : s) { 0 }

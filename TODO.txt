@@ -13,6 +13,7 @@ projects:
     make exit code stuff make more sense
     $ ./aipl run ./word_count.aipl word_count ./README.md -> bad arg "./README.md": invalid digit found in string
   get rid of aipl.build, maybe by checking in the compiler in the main project also?
+  web server
   Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
 
 vscode extension:
@@ -259,6 +260,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  make a function composition operator
   ! is used for both effects and errors, we should switch the syntax for effects
   allow return v; as the last statement of a function
   add units to the language
@@ -274,16 +276,13 @@ syntax:
   limitation: a struct default must be a literal
   a lambda bound to a let is not a value (this would let test helpers move into the test, big cleanup)
     is_nine is a silly test helper
-  only allow doc comments at the start of lines
-  allow default args to be implicitly optional so that you pass T explicitly, but if you pass nothing the callee gets none.
+  only allow doc comments at the start of lines (after the whitespace)
   expr! should return the err held in expr, or exit the test if expr is not an error (only valid in tests for now)
-  converge arrays and string (for inlining, ropes, etc.)
   locally mutable args
   l.map(|v| v.field) stutters, should come up with a syntax that doesn't stutter
   allow default args to refer to each other (requires 1 to be set to break the cycle)
   add match (v) val if expr => r syntax
   destructuring with renames (let Foo { field as f, .. } = ...)
-  module level constants
   allow match arm grouping to bind vars with the same type and name, or ignore bindings
   allow types to be defined in scopes (e.g. in tests to avoid leaking the test utilities)
   some(t) => if (cond) {val1} else {val2},none => val2 <--- to make this work better, allow the if to be on the left of the =>
@@ -749,7 +748,6 @@ lexer:
   "No push" is now a negative sentinel <--- don't do this, sentinels are bad. use optionals
   if Keyword boundary defaults to empty set I think we don't need a separate Exact
   maybe instead of keep_skipped that modifies a ruleset we should have lex_lossless that lexes with trivia. Maybe then we don't even need a trivia/skip split?
-- remove the dump/load stuff when the FFI supports the full lex result
 - Should be able to detect infinite loop - if a lext step succeeded and consumed no charachters, error. Then get rid of 0 < len checks.
 - give LexError an optional secondary span+message (a "note") so the nested
   unclosed-interpolation error can again point back at the real culprit `{`
@@ -759,10 +757,9 @@ lexer:
 
 check if flat vec is more performant for cons list in doc.aipl (use runtime perf numbers) NOTE: probably should make a perf test to format entire codebase for this
 
-make a function composition operator
-
-errors should contain stack traces
-first we need some actual infra for stack traces
+stack traces:
+  errors should contain stack traces
+  first we need some actual infra for stack traces
 
 indent.aipl:
   pre-reserve target*lines + self.len() space

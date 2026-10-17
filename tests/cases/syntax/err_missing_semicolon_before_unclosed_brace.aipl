@@ -5,7 +5,7 @@ fn main() {
     let a = 1
     let b = 2;
 --- errors ---
-error: expected `.`, `;`, `?`, `[`, or an operator, found `let`
+error: expected `;`, found `let`
  --> ./tests/cases/syntax/err_missing_semicolon_before_unclosed_brace.aipl:6:5
   |
 6 |     let b = 2;

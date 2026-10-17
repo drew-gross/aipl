@@ -12,7 +12,7 @@ fn f() {}
 
 fn g() {}
 --- errors ---
-error: expected `.`, `;`, `?`, `[`, or an operator, found `while`
+error: expected `;`, found `while`
  --> ./tests/cases/syntax/err_missing_semicolon_before_refusal.aipl:6:5
   |
 6 |     while (true) {

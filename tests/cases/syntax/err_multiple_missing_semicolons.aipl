@@ -12,25 +12,25 @@ fn other() {
     let d = 4
 }
 --- errors ---
-error: expected `.`, `;`, `?`, `[`, or an operator, found `let`
+error: expected `;`, found `let`
  --> ./tests/cases/syntax/err_multiple_missing_semicolons.aipl:7:5
   |
 7 |     let b = 2
   |     ^^^
 
-error: expected `.`, `;`, `?`, `[`, or an operator, found `let`
+error: expected `;`, found `let`
  --> ./tests/cases/syntax/err_multiple_missing_semicolons.aipl:8:5
   |
 8 |     let c = a
   |     ^^^
 
-error: expected `(`, `.`, `;`, `?`, `[`, `{`, or an operator, found `}`
+error: expected `;`, found `}`
  --> ./tests/cases/syntax/err_multiple_missing_semicolons.aipl:9:1
   |
 9 | }
   | ^
 
-error: expected `.`, `;`, `?`, `[`, or an operator, found `}`
+error: expected `;`, found `}`
   --> ./tests/cases/syntax/err_multiple_missing_semicolons.aipl:13:1
    |
 13 | }
