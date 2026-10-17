@@ -376,7 +376,6 @@ parser:
   after the aipl parser is written in aipl make sure the repair() jank isn't necessary
 
 grammar:
-  wire in the expect and error recovery into prod compiler
   maybe can do some sort of recovery even when not using Expectr
   fixit suggestions from expect
   TokenRule's unterminated should move into only the places where it's actually used

@@ -2062,7 +2062,7 @@ pub struct SpecFields {
 const PARSE_RED_ZONE: usize = 8 * 1024 * 1024;
 const PARSE_SEGMENT: usize = 64 * 1024 * 1024;
 
-fn parse_file(src: &str) -> Result<(Program, Vec<Span>), aipl_syntax::Error> {
+fn parse_file(src: &str) -> Result<(Program, Vec<Span>), Vec<aipl_syntax::Error>> {
     // A recursive-descent parse recurses once per production per level of
     // source nesting, and the lowering once per node — several megabytes of
     // native stack on the largest compiler sources. The CLI runs on a 256 MB

@@ -1,0 +1,25 @@
+# A `Refuse` still ends the parse — the loop body's missing-`;` message is better
+# than "expected" — but it comes last, after the slips met before it.
+
+fn main() {
+    let a = 1
+    while (true) {
+        f() g();
+    }
+}
+
+fn f() {}
+
+fn g() {}
+--- errors ---
+error: expected `.`, `;`, `?`, `[`, or an operator, found `while`
+ --> ./tests/cases/syntax/err_missing_semicolon_before_refusal.aipl:6:5
+  |
+6 |     while (true) {
+  |     ^^^^^
+
+error: missing `;` before `g`: every statement ends with one, even an `if` or `match` whose value is unused
+ --> ./tests/cases/syntax/err_missing_semicolon_before_refusal.aipl:7:13
+  |
+7 |         f() g();
+  |             ^

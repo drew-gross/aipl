@@ -190,20 +190,6 @@
 
 
 
-        <section class="item" id="item-aipl_parse_errors">
-          <h3>
-            <a class="anchor" href="#item-aipl_parse_errors">aipl_parse_errors</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn aipl_parse_errors(src: str) -&#62; ParseError[]</code></pre>
-
-          <div class="doc"><p>Every syntax error in <code>src</code>, in source order: the ones the grammar recovers from (a missing <code>;</code> after a statement, say — see <code>Expect</code>), and then the one it could not. A file with several slips reports all of them, where <code>aipl_parse_cst</code> stops at the first.</p><p>Only a syntax error is here. A <code>Refuse</code> still aborts the parse outright, and what it says is the one error returned; and a file the grammar accepts is not thereby a valid program — lowering and the loader have their own say.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-aipl_program">
           <h3>
             <a class="anchor" href="#item-aipl_program">aipl_program</a>
@@ -232,14 +218,28 @@
 
 
 
+        <section class="item" id="item-ParseFailure">
+          <h3>
+            <a class="anchor" href="#item-ParseFailure">ParseFailure</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct ParseFailure</code></pre>
+
+          <div class="doc"><p>Why a source file has no program: every syntax error in it, in source order — the ones the grammar recovered from (a missing <code>;</code> after a statement, say; see <code>Expect</code>) and the one it could not. Never empty. A file with several slips reports all of them, where <code>aipl_parse_cst</code> stops at the first.</p><p>Only syntax errors recover. A lexing failure, trailing whitespace, a build that refuses (a duplicate <code>.test</code>) and a <code>Refuse</code> each end the parse where they are, and are the last error, after those met before them.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-aipl_parse_file">
           <h3>
             <a class="anchor" href="#item-aipl_parse_file">aipl_parse_file</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn aipl_parse_file(src: str) -&#62; ParsedFile!ParseError</code></pre>
+          <pre class="signature"><code>pub fn aipl_parse_file(src: str) -&#62; ParsedFile!ParseFailure</code></pre>
 
-          <div class="doc"><p>The whole of <code>aipl_parser::parse_with_allows</code>, on this side: strip the expected-output sections, refuse trailing whitespace, lex losslessly, keep the <code>#[allow]</code> spans, parse and lower.</p><p>What it deliberately does <em>not</em> do is <code>post_parse</code> — <code>bake_asserts</code> and <code>promote_type_vars</code> follow a parse but are no part of one, and they stay on the Rust side where they already live.</p></div>
+          <div class="doc"><p>The whole of <code>aipl_parser::parse_with_allows</code>, on this side: strip the expected-output sections, refuse trailing whitespace, lex losslessly, keep the <code>#[allow]</code> spans, parse and lower.</p><p>What it deliberately does <em>not</em> do is <code>post_parse</code> — <code>bake_asserts</code> and <code>promote_type_vars</code> follow a parse but are no part of one, and they stay on the Rust side where they already live.</p><p>A tree that recovered from a missing token is a tree of broken input, and is never lowered: the errors come back instead.</p></div>
 
 
         </section>
@@ -2051,7 +2051,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$131981: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$132045: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -2180,6 +2180,20 @@
           <pre class="signature"><code>fn aipl_space(l: str, r: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>The spacing rule for the productions the generated formatter lays out so far — types and imports: spaces around <code>-&gt;</code>, a space after the <code>:</code> of a dict type, and in an import a space after <code>import</code> and <code>from</code> and either side of <code>as</code>. Nothing anywhere else.</p><p>Everything else a reader would call spacing is a list separating its items, which the group layouts do, or a suffix written against its core, which <code>Tight</code> does. That is the shape the rule takes in a real language: a handful of tokens that want air, and silence for the rest. It is asked about the spellings on either side of a gap, so <code>import</code> then <code>{</code> is one question (yes) and <code>#</code> then <code>{</code> in a set type is another (no).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-failure">
+          <h3>
+            <a class="anchor" href="#item-failure">failure</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn failure(e: ParseError) -&#62; ParseFailure</code></pre>
+
+          <div class="doc"><p><code>e</code> as the failure it is by itself.</p></div>
 
 
         </section>

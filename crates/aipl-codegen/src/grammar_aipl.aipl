@@ -69,6 +69,7 @@ import {
     greater_than_or_equal as >=,
     int_parse,
     is_empty,
+    is_nonempty,
     is_some,
     is_space,
     join,
@@ -272,7 +273,15 @@ import {
 } from "./lex_aipl.aipl";
 import { LexResult, keep_skipped, lex, span_str } from "./lexer.aipl";
 import { operator_named_forms } from "./operator_named_forms.aipl";
-import { parse, parse_cst, parse_cst_recovering, parse_prepared, prepare } from "./parse.aipl";
+import {
+    Recovered,
+    lower,
+    parse,
+    parse_cst,
+    parse_cst_recovering,
+    parse_prepared,
+    prepare,
+} from "./parse.aipl";
 import {
     Assign as SAssign,
     Block as PBlock,
@@ -4432,73 +4441,6 @@ pub fn lex_lossless(text: str) -> LexResult<AiplTok>!ParseError {
         .map_err(|e| ParseError { message: e.message, span: e.span })
 }
 
-# Every syntax error in `src`, in source order: the ones the grammar recovers
-# from (a missing `;` after a statement, say — see `Expect`), and then the one it
-# could not. A file with several slips reports all of them, where `aipl_parse_cst`
-# stops at the first.
-#
-# Only a syntax error is here. A `Refuse` still aborts the parse outright, and
-# what it says is the one error returned; and a file the grammar accepts is not
-# thereby a valid program — lowering and the loader have their own say.
-pub fn aipl_parse_errors(src: str) -> ParseError[] {
-    let text = aipl_source(src);
-    match (lex_lossless(text)) {
-        ok(lexed) => match (parse_cst_recovering(text, lexed, aipl_grammar(), "program")) {
-            ok(recovered) => recovered.errors,
-            err(e) => [e],
-        },
-        err(e) => [e],
-    }
-}.test({
-    fn messages(src: str) -> str[] { aipl_parse_errors(src).map(|e| e.message) }
-
-    // A program that parses has no errors.
-    assert(messages("fn f() { let x = 1; x }") == []);
-
-    // Each statement's `;` is committed to, so a missing one is reported where it
-    // is and the parse reads on — which is why the second slip is found at all.
-    let ops = "expected `.`, `;`, `?`, `[`, or an operator";
-    assert(messages("fn f() { let x = 1 let y = 2 y }") == [
-        `{ops}, found \`let\``,
-        `{ops}, found \`y\``,
-    ]);
-
-    // Across items, and across statement kinds: a missing `from`, then the `;`
-    // of an import, a constant, a `set` and a `return` — five errors, one parse.
-    let src = "import { a } builtins\nlet X: i64 = 1\nfn f() { set x++ return 1 }";
-    assert(messages(src) == [
-        "expected `from`, found `builtins`",
-        "expected `;`, found `let`",
-        `{ops}, found \`fn\``,
-        "expected `;`, found `return`",
-        `{ops}, found \`}\``,
-    ]);
-
-    // Where they are is part of the answer: each error points at the token found.
-    let spans = aipl_parse_errors("fn f() { let x = 1 let y = 2; }").map(|e| e.span);
-    assert(spans == [19..22]);
-
-    // A `Refuse` is not recovered from: the statement-start check has a better word
-    // for a missing `;` inside a loop than "expected", and ends the parse with it.
-    let loop_slip = "missing `;` before `h`: every statement ends with one, even an `if` or `match` whose value is unused";
-    assert(messages("fn f() { while (c) { g() h(); } }") == [loop_slip]);
-
-    // But it comes last, and what was met before it is not lost: the slip in the
-    // first statement is reported, then the refusal that stopped the parse.
-    assert(messages("fn f() { let x = 1 let y = 2; while (c) { g() h(); } }") == [
-        `{ops}, found \`let\``,
-        loop_slip,
-    ]);
-
-    // The same for a parse that simply cannot go on. The brace never closes, so
-    // the function is given up on whole — and the slip inside it is still reported,
-    // ahead of the failure.
-    assert(messages("fn f() { let x = 1 let y = 2;") == [
-        `{ops}, found \`let\``,
-        "expected `}`, a statement, or an expression, found end of input (`{` at line 1 is never closed)",
-    ]);
-})
-
 # `src` lowered to the AST, as the AST — the FFI entry the Rust side rebuilds an
 # `aipl_syntax::ast::Program` from. This is the bridge stage 5a chose: lower in
 # AIPL, marshal the result, reconstruct on the other side.
@@ -4519,6 +4461,19 @@ pub fn aipl_program(src: str) -> Program!ParseError { lower_aipl_program(src) }.
 # than through a sink the caller has to arm first.
 struct ParsedFile { program: Program, allows: Span[] }
 
+# Why a source file has no program: every syntax error in it, in source order — the
+# ones the grammar recovered from (a missing `;` after a statement, say; see
+# `Expect`) and the one it could not. Never empty. A file with several slips
+# reports all of them, where `aipl_parse_cst` stops at the first.
+#
+# Only syntax errors recover. A lexing failure, trailing whitespace, a build that
+# refuses (a duplicate `.test`) and a `Refuse` each end the parse where they are,
+# and are the last error, after those met before them.
+struct ParseFailure { errors: ParseError[] }
+
+# `e` as the failure it is by itself.
+fn failure(e: ParseError) -> ParseFailure { errors: [e] }
+
 # The whole of `aipl_parser::parse_with_allows`, on this side: strip the
 # expected-output sections, refuse trailing whitespace, lex losslessly, keep the
 # `#[allow]` spans, parse and lower.
@@ -4526,11 +4481,26 @@ struct ParsedFile { program: Program, allows: Span[] }
 # What it deliberately does *not* do is `post_parse` — `bake_asserts` and
 # `promote_type_vars` follow a parse but are no part of one, and they stay on
 # the Rust side where they already live.
-pub fn aipl_parse_file(src: str) -> ParsedFile!ParseError {
-    let text = reject_trailing_whitespace(aipl_source(src))?;
-    let lexed = lex_lossless(text)?;
+#
+# A tree that recovered from a missing token is a tree of broken input, and is
+# never lowered: the errors come back instead.
+pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
+    let text = reject_trailing_whitespace(aipl_source(src)).map_err(failure)?;
+    let lexed = lex_lossless(text).map_err(failure)?;
     let allows = allow_spans(lexed);
-    let program = as_program(parse(text, lexed, aipl_grammar(), "program")?, 0..text.len())?;
+    let g = aipl_grammar();
+    let Recovered { cst, errors } = parse_cst_recovering(text, lexed, g, "program").map_err(
+        failure,
+    )?;
+    if (errors.is_nonempty()) {
+        return err(ParseFailure { errors });
+    };
+    let tree = cst.value_or_err(failure(ParseError {
+        message: "the start rule built no node",
+        span: 0..0,
+    }))?;
+    let ast = lower(text, tree, g).map_err(failure)?;
+    let program = as_program(ast, 0..text.len()).map_err(failure)?;
     ok(ParsedFile { program, allows })
 }.test({
     let ParsedFile { program, allows } = aipl_parse_file("fn f() { g(); } #[allow]\n")?;
@@ -4571,9 +4541,67 @@ pub fn aipl_parse_file(src: str) -> ParsedFile!ParseError {
     assert(
         match (aipl_parse_file("fn f() { } \n")) {
             ok(..) => "parsed",
-            err(e) => e.message,
+            err(f) => f.errors.map(|e| e.message).join(sep="; "),
         } == "trailing whitespace is not allowed",
     );
+
+    // Every syntax error in the file, not the first: a statement missing its `;` is
+    // committed to and recovered from, so the parse reads on and finds the next.
+    fn messages(src: str) -> str[] {
+        match (aipl_parse_file(src)) {
+            ok(..) => [],
+            err(f) => f.errors.map(|e| e.message),
+        }
+    }
+
+    // A program that parses has no errors.
+    assert(messages("fn f() { let x = 1; x }") == []);
+
+    // Each statement's `;` is committed to, so a missing one is reported where it
+    // is and the parse reads on — which is why the second slip is found at all.
+    let ops = "expected `.`, `;`, `?`, `[`, or an operator";
+    assert(messages("fn f() { let x = 1 let y = 2 y }") == [
+        `{ops}, found \`let\``,
+        `{ops}, found \`y\``,
+    ]);
+
+    // Across items, and across statement kinds: a missing `from`, then the `;`
+    // of an import, a constant, a `set` and a `return` — five errors, one parse.
+    let src = "import { a } builtins\nlet X: i64 = 1\nfn f() { set x++ return 1 }";
+    assert(messages(src) == [
+        "expected `from`, found `builtins`",
+        "expected `;`, found `let`",
+        `{ops}, found \`fn\``,
+        "expected `;`, found `return`",
+        `{ops}, found \`}\``,
+    ]);
+
+    // Where they are is part of the answer: each error points at the token found.
+    let spans = match (aipl_parse_file("fn f() { let x = 1 let y = 2; }")) {
+        ok(..) => [],
+        err(f) => f.errors.map(|e| e.span),
+    };
+    assert(spans == [19..22]);
+
+    // A `Refuse` is not recovered from: the statement-start check has a better word
+    // for a missing `;` inside a loop than "expected", and ends the parse with it.
+    let loop_slip = "missing `;` before `h`: every statement ends with one, even an `if` or `match` whose value is unused";
+    assert(messages("fn f() { while (c) { g() h(); } }") == [loop_slip]);
+
+    // But it comes last, and what was met before it is not lost: the slip in the
+    // first statement is reported, then the refusal that stopped the parse.
+    assert(messages("fn f() { let x = 1 let y = 2; while (c) { g() h(); } }") == [
+        `{ops}, found \`let\``,
+        loop_slip,
+    ]);
+
+    // The same for a parse that simply cannot go on. The brace never closes, so
+    // the function is given up on whole — and the slip inside it is still reported,
+    // ahead of the failure.
+    assert(messages("fn f() { let x = 1 let y = 2;") == [
+        `{ops}, found \`let\``,
+        "expected `}`, a statement, or an expression, found end of input (`{` at line 1 is never closed)",
+    ]);
 })
 
 # `src` unchanged, or a refusal locating its first run of trailing whitespace.

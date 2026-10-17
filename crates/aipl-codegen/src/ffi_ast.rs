@@ -47,18 +47,30 @@ pub fn program_from_ffi(v: &FfiValue) -> R<ast::Program> {
 /// production sees one, and the loader's lint pass still needs them. They ride
 /// the return value rather than a thread-local sink.
 ///
-/// A parse failure comes back as the `ParseError` it was, message and span, as
-/// an [`aipl_syntax::Error`] the caller renders like any other; a value that
-/// does not have the declared shape is a spanless error naming the mismatch,
-/// since that is a bug in the two declarations rather than in the source.
-pub fn parse_file_from_ffi(v: &FfiValue) -> Result<(ast::Program, Vec<Span>), aipl_syntax::Error> {
+/// A parse failure comes back as every `ParseError` it found, each its message at
+/// its span, as [`aipl_syntax::Error`]s the caller renders like any others — in
+/// source order, and never empty: a file with several syntax errors reports
+/// them all. A value that does not have the declared shape is one spanless
+/// error naming the mismatch, since that is a bug in the two declarations
+/// rather than in the source.
+pub fn parse_file_from_ffi(
+    v: &FfiValue,
+) -> Result<(ast::Program, Vec<Span>), Vec<aipl_syntax::Error>> {
+    let mismatch = |m: String| vec![aipl_syntax::Error::msg(m)];
     match v {
-        FfiValue::Res(Ok(inner)) => parsed_file(inner).map_err(aipl_syntax::Error::msg),
-        FfiValue::Res(Err(e)) => Err(parse_error(e)),
-        other => Err(aipl_syntax::Error::msg(format!(
-            "expected a result, got {}",
-            shape(other)
-        ))),
+        FfiValue::Res(Ok(inner)) => parsed_file(inner).map_err(mismatch),
+        FfiValue::Res(Err(failure)) => Err(parse_failure(failure)),
+        other => Err(mismatch(format!("expected a result, got {}", shape(other)))),
+    }
+}
+
+/// A `ParseFailure` struct — the `errors` array of `ParseError`s — as the errors
+/// the compiler reports. One that cannot be read is the one error saying so.
+fn parse_failure(v: &FfiValue) -> Vec<aipl_syntax::Error> {
+    match field(v, "errors").and_then(|errs| each(errs, |e| Ok(parse_error(e)))) {
+        Ok(errors) if !errors.is_empty() => errors,
+        Ok(_) => vec![aipl_syntax::Error::msg("a parse failed without saying why")],
+        Err(e) => vec![aipl_syntax::Error::msg(e)],
     }
 }
 

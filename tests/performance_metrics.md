@@ -668,9 +668,9 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/find_files | 19 | 1096 | 1040 | 1841 | 6544 | 12.00 | 89.11 | 1520 |
 | crates/aipl-codegen/src/find_trailing_whitespace | 0 | 0 | 0 | 6230 | 2488 | 3.00 | 91.19 | 1440 |
 | crates/aipl-codegen/src/format | 2287 | 185153 | 19208 | 313161 | 180428 | 215.00 | 1925.27 | 1968 |
-| crates/aipl-codegen/src/format_source | 16310 | 4188430 | 482563 | 11240283 | 5840092 | 2578.00 | 20829.59 | 5168 |
+| crates/aipl-codegen/src/format_source | 16311 | 4188542 | 482563 | 11241924 | 5871984 | 3031.00 | 29680.24 | 5312 |
 | crates/aipl-codegen/src/grammar | 767 | 96951 | 49216 | 84139 | 108356 | 88.00 | 566.95 | 1728 |
-| crates/aipl-codegen/src/grammar_aipl | 1747117 | 365420506 | 898351 | 586434933 | 5248848 | 149505.00 | 14633.24 | 9616 |
+| crates/aipl-codegen/src/grammar_aipl | 1747191 | 365428364 | 898351 | 586524652 | 5279956 | 172062.00 | 18655.74 | 9520 |
 | crates/aipl-codegen/src/grammar_calc | 10185 | 1168142 | 42260 | 3434067 | 318420 | 919.00 | 3794.53 | 2544 |
 | crates/aipl-codegen/src/grammar_json | 19773 | 2806348 | 35129 | 7239360 | 342212 | 1901.00 | 3717.30 | 2768 |
 | crates/aipl-codegen/src/grammar_sexp | 5752 | 630255 | 13968 | 2083842 | 308328 | 595.00 | 3608.43 | 2336 |

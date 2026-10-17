@@ -219,14 +219,14 @@ pub fn set_split_test_sections_hook(f: fn(&str) -> (String, String)) {
 
 /// The dogfooded AIPL parser, installed by the compiler (via [`set_parse_hook`]):
 /// a whole file to its `Program` and the spans of its `#[allow]` markers.
-static PARSE_HOOK: std::sync::OnceLock<fn(&str) -> Result<(Program, Vec<Span>), Error>> =
+static PARSE_HOOK: std::sync::OnceLock<fn(&str) -> Result<(Program, Vec<Span>), Vec<Error>>> =
     std::sync::OnceLock::new();
 
 /// Install the parser. The compiler points this at the dogfooded
 /// `aipl_parse_file` (`grammar_aipl.aipl`), run through the embedding FFI and
 /// rebuilt into a `Program` on this side. First install wins (the hook is
 /// process-global).
-pub fn set_parse_hook(f: fn(&str) -> Result<(Program, Vec<Span>), Error>) {
+pub fn set_parse_hook(f: fn(&str) -> Result<(Program, Vec<Span>), Vec<Error>>) {
     let _ = PARSE_HOOK.set(f);
 }
 
@@ -237,8 +237,18 @@ pub fn set_parse_hook(f: fn(&str) -> Result<(Program, Vec<Span>), Error>) {
 /// sections are stripped, trailing whitespace is refused, the source is lexed
 /// losslessly and parsed, and the tree is lowered. What comes back is that
 /// `Program`, which [`post_parse`] then finishes.
+///
+/// A file with several syntax errors fails here with the first; a caller that
+/// reports them all wants [`parse_with_allows`].
 pub fn parse(input: &str) -> Result<Program, Error> {
-    parse_with_allows(input).map(|(program, _)| program)
+    parse_with_allows(input)
+        .map(|(program, _)| program)
+        .map_err(|errors| {
+            errors
+                .into_iter()
+                .next()
+                .expect("a failed parse has an error")
+        })
 }
 
 /// [`parse`], additionally returning the spans of every `#[allow]`
@@ -246,7 +256,12 @@ pub fn parse(input: &str) -> Result<Program, Error> {
 /// [`aipl_syntax::lint`]'s pass, which drops lint errors squelched by a
 /// same-line marker. The markers are trivia, so no production ever sees one;
 /// they ride the parser's return value as its one side-channel.
-pub fn parse_with_allows(input: &str) -> Result<(Program, Vec<Span>), Error> {
+///
+/// A file that does not parse fails with *every* syntax error the parser found,
+/// in source order and never empty: where the grammar has committed to what
+/// must come next, a miss is reported and the parse reads on, so several slips
+/// in one file are all reported by one run.
+pub fn parse_with_allows(input: &str) -> Result<(Program, Vec<Span>), Vec<Error>> {
     let hook = PARSE_HOOK
         .get()
         .expect("parse hook not installed before parsing (call install_parser_hooks)");

@@ -401,7 +401,7 @@ fn sanity_check_entries(_a: &Artifact, comp: &Compilation) {
         )
         .unwrap();
     let (program, allows) = aipl::ffi_ast::parse_file_from_ffi(&parsed)
-        .unwrap_or_else(|e| panic!("dogfooded aipl_parse_file did not rebuild: {e}"));
+        .unwrap_or_else(|e| panic!("dogfooded aipl_parse_file did not rebuild: {e:?}"));
     assert_eq!(program.items.len(), 1);
     assert_eq!(allows, vec![26..34]);
     let refused = comp

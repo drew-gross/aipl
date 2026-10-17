@@ -20,6 +20,7 @@ import {
     concat as +++,
     equal as ==,
     filter,
+    first,
     is_nonempty,
     is_space,
     join,
@@ -42,7 +43,8 @@ import {
     wrapping_increment as ++,
 } from builtins;
 import { clean_trailing_whitespace } from "./clean_trailing_whitespace.aipl";
-import { aipl_parse_file } from "./grammar_aipl.aipl";
+import { ParseError } from "./grammar.aipl";
+import { ParseFailure, aipl_parse_file } from "./grammar_aipl.aipl";
 import {
     AiplTok,
     Backtick,
@@ -71,7 +73,7 @@ import { FmtError, format_program } from "./walker.aipl";
 # an accepted program's meaning).
 pub fn format_source(src: str, width: u64) -> str!FmtError {
     let FmtInput { cleaned, sections } = fmt_prepare(src);
-    aipl_parse_file(cleaned).map_err(|e| FmtError { message: e.message, span: e.span })?;
+    aipl_parse_file(cleaned).map_err(first_error)?;
     let laid_out = fmt_layout(cleaned, width)?;
     verify_same_tokens(cleaned, laid_out)?;
     ok(laid_out +++ sections)
@@ -91,6 +93,23 @@ pub fn format_source(src: str, width: u64) -> str!FmtError {
             err(e) => e.message,
         } == "expected `)` or a parameter, found `{`",
     );
+})
+
+# The first error of a failed parse as the formatter's own. A formatter reports
+# one: it has nothing to say about a file it could not read, and the rest of a
+# parse's errors are `aipl check`'s to show.
+fn first_error(ParseFailure { errors }) -> FmtError {
+    errors
+        .first()
+        .map(|e| FmtError { message: e.message, span: e.span })
+        .value_or(FmtError { message: "the file does not parse", span: 0..0 })
+}.test({
+    assert(first_error(ParseFailure {
+        errors: [
+            ParseError { message: "one", span: 1..2 },
+            ParseError { message: "two", span: 3..4 },
+        ],
+    }) == FmtError { message: "one", span: 1..2 });
 })
 
 # The formatter's input, split into the part it lays out and the part it copies.
