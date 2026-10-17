@@ -52,7 +52,7 @@ import {
     wrapping_add as +,
     wrapping_increment as ++,
 } from builtins;
-import { Cst, Group, Leaf, Tree, Trivia, extent, token_leaves } from "./cst.aipl";
+import { Cst, Group, Leaf, Missing, Tree, Trivia, extent, token_leaves } from "./cst.aipl";
 import {
     Concat,
     Doc,
@@ -150,7 +150,17 @@ fn fmt_node<K: variant, A: any>(
         // A group reached directly, rather than as a child of the production
         // holding it — the same layout either way.
         Group(gi, open, body, close) => group_doc(g, src, gi, open, body, close, space),
+        // Text that is not there cannot be laid out; the formatter's input is a
+        // parse that succeeded, and a tree with a marker in it is not one.
+        Missing(..) => err(missing_token(node)),
     }
+}
+
+# The refusal for a tree holding a `Missing` marker: formatting it would print the
+# source without the token the grammar wanted, which is a different program.
+fn missing_token(node: Cst) -> ParseError {
+    message: "a tree with a missing token cannot be formatted",
+    span: node.extent(),
 }.test({
     fn rendered(g: Grammar<FKind, str>, src: str, node: Cst, width: u64) -> str!ParseError {
         render_cst(g, src, node, spaced_unless_punct, width)
@@ -241,6 +251,14 @@ pub fn render_cst<K: variant, A: any>(
     let tree = Tree(0, [Leaf(0..1), Trivia(1..2), Leaf(2..3)]);
     assert(render_cst(g, src, tree, always_space, 80)? == "a b");
     assert(render_cst(g, src, tree, never_space, 80)? == "ab");
+
+    // A tree with a `Missing` marker is a parse that recovered, not one that
+    // succeeded, and printing it would drop the token the grammar wanted.
+    let mended = Tree(0, [Leaf(0..1), Missing(1, ["`b`"], []), Trivia(1..2), Leaf(2..3)]);
+    assert(render_cst(g, src, mended, always_space, 80) == err(ParseError {
+        message: "a tree with a missing token cannot be formatted",
+        span: 0..0,
+    }));
 })
 
 // ---------- pieces ----------
@@ -265,6 +283,9 @@ fn pieces<K: variant, A: any>(
                 if (!src[sp].is_all_whitespace()) {
                     set out.push(Note(src[sp], breaks_after(src, sp.end)));
                 };
+            },
+            Missing(..) => {
+                return err(missing_token(k));
             },
             Tree(..) | Group(..) => {
                 let d = fmt_node(g, src, k, space)?;

@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">118 files, 1354 items.</p>
+      <p class="summary">118 files, 1363 items.</p>
 
       <ul class="files">
 
@@ -564,7 +564,7 @@
           <p class="file-summary">The formatter driver: one pass from a lossless <code>Cst</code> to a <code>Doc</code>, decided by the <code>Layout</code> each production carries. It is the third interpreter of a <code>Grammar</code> — after <code>parse.aipl</code>'s parser and <code>ebnf.aipl</code>'s dump — and is written the same way: the language is data, this file is the loop over it.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-format.html#private">22 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-format.html#private">23 private</a></span>
 
 
           <ul class="items">
@@ -1560,13 +1560,23 @@
           <p class="file-summary">The parser driver: one function that interprets a <code>Grammar</code> (see <code>grammar.aipl</code>) over a token stream (see <code>lexer.aipl</code>) and yields a lossless <code>Cst</code> (see <code>cst.aipl</code>), plus a second pass that lowers that tree to the caller's own AST through each production's <code>build</code>. Together they are the upper half of a front end whose lower half is already data-driven: a language is a <code>TokenRule[]</code> and a <code>Grammar</code>, and nothing else.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-parse.html#private">47 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-parse.html#private">52 private</a></span>
 
 
           <ul class="items">
 
             <li>
               <a href="crates-aipl-codegen-src-parse.html#item-Far"><code>Far</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-parse.html#item-Slip"><code>Slip</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-parse.html#item-Abort"><code>Abort</code></a>
               <span class="kind kind-struct">struct</span>
             </li>
 

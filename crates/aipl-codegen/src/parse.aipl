@@ -23,9 +23,10 @@
 # next in `Expect`. A miss there is recorded as an error and the parse carries on
 # as though the token had been written, so `parse_cst_recovering` can return every
 # such error in a file, and no enclosing choice goes looking for another way
-# through. Errors on an abandoned path are discarded with it; a total miss keeps
-# none (the furthest failure is all there is). See `Expect` in `grammar.aipl` for
-# the contract, and `match_expect` for the mechanics.
+# through. A parse that succeeds reports the misses on the path it took; one that
+# does not — it misses, or a `Refuse` ends it — reports every miss it met, then
+# the failure. See `Expect` in `grammar.aipl` for the contract, and `match_expect`
+# for the mechanics.
 #
 # **Two passes, not one.** `parse_cst` builds the tree; `lower` walks it calling
 # `build`. Lowering during the parse would run a production's `build` inside
@@ -48,6 +49,7 @@ import {
     contains,
     equal as ==,
     extend,
+    filter,
     find_if,
     find_index,
     first,
@@ -70,6 +72,7 @@ import {
     push,
     repeat,
     sort,
+    sort_by,
     to_set,
     try_map,
     union,
@@ -83,6 +86,7 @@ import {
     Cst,
     Group,
     Leaf,
+    Missing,
     Parts,
     Tree,
     Trivia,
@@ -151,22 +155,55 @@ import { line_at } from "./line_at.aipl";
 # ordered choice a more specific alternative can fail deeper than the one that
 # was really meant, so a label collapsing a family of rules to one word ("an
 # expression") is what keeps the message readable.
-struct Far { pos: u64, expected: str[], unclosed: Span[] = [] }
+struct Far {
+    //
+    // `recorded` is every `Expect` that found its rule missing so far, in the order the
+    // parse met them — kept here, with the furthest failure, because this is the one
+    // thing that travels with a parse through a miss as well as a hit. Which of them
+    // *belong* to the parse that finally succeeds is not this list's to say (a path
+    // abandoned after recording one is still in it); the tree knows that, through its
+    // `Missing` markers. This is what there is when there is no tree: a parse that
+    // missed, or was stopped. See `recovered_errors`.
+    pos: u64,
+    expected: str[],
+    unclosed: Span[] = [],
+    recorded: Slip[] = [],
+}
+
+# One `Expect` that found its rule absent: where it was wanted (a token index), what
+# could have stood there, and the bracket left open at that point, if one was —
+# the three things `error_at` words an error from, held until the source is at
+# hand to word it with. The same three a `Missing` marker in the tree carries.
+struct Slip { pos: u64, expected: str[], unclosed: Span[] }
+
+# Why the driver stopped rather than missed: the error, and every `Expect` that had
+# been recorded before it. `?` carries it out of whatever was in the middle of
+# matching, which is how a `Refuse` ends a parse — and why the recorded ones ride
+# on it, since the frames it unwinds are the only other place they were held.
+#
+# `input` says whose fault it is. A `Refuse` is the input's: the error is an error
+# in the source and is reported with the recorded ones. Anything else (an
+# unresolved reference, a rule that would loop) is the grammar's, and is the call's
+# own failure.
+struct Abort { error: ParseError, recorded: Slip[], input: bool }
+
+# The `Abort` for a fault in the grammar, which no recorded error is about.
+fn grammar_fault(message: str) -> Abort {
+    error: ParseError { message, span: 0..0 },
+    recorded: [],
+    input: false,
+}
+
+# The `Abort` for a refusal: an error in the input, with what `far` had recorded.
+fn refused(error: ParseError, Far { recorded }) -> Abort { error, recorded, input: true }
 
 # One rule's result at one position: whether it matched, where it left off, the
 # CST children it contributed to its parent, and the furthest failure so far.
 #
 # `hit: false` is an ordinary non-match — the caller backtracks and tries
-# something else — and is *not* an error. A `ParseError` is reserved for what no
-# alternative could fix: a malformed grammar, or a `build` that refused.
-#
-# `recovered` is the errors an `Expect` found and carried on past inside this
-# match, as the failures they were, in source order. They ride on the hit like
-# `kids` do, so every combinator that joins children joins these, and a match
-# that is abandoned takes them with it: an error recorded down a path the parse
-# then did not take is not an error in the input. Rendered only at the end
-# (`recovered_errors`), where the source is at hand.
-struct Step { hit: bool, pos: u64, kids: Cst[], far: Far, recovered: Far[] = [] }
+# something else — and is *not* an error. An `Abort` is reserved for what no
+# alternative could fix: a malformed grammar, or a `Refuse`.
+struct Step { hit: bool, pos: u64, kids: Cst[], far: Far }
 
 # What the driver parses against: the tokens, the trivia the lexer set aside,
 # the linked productions, and `end` — one byte past the source's last byte.
@@ -203,7 +240,7 @@ fn far_miss(far: Far, pos: u64, label: str) -> Far {
         return far;
     };
     if (far.pos < pos) {
-        return Far { pos, expected: [label] };
+        return Far { pos, expected: [label], recorded: far.recorded };
     };
     if (far.expected.contains(label)) {
         return far;
@@ -215,14 +252,22 @@ fn far_miss(far: Far, pos: u64, label: str) -> Far {
 }
 
 # Both failures in one: the deeper of the two, or — at equal depth — what either
-# expected there. The merge `far_miss` makes one label at a time, for a whole
-# record. `a`'s blamed bracket wins a tie, as the first to be blamed does.
+# expected there, and everything either recorded. The merge `far_miss` makes one
+# label at a time, for a whole record. `a`'s blamed bracket wins a tie, as the first
+# to be blamed does.
+#
+# `b` is a failure record that began empty at this point (`match_expect` starts one
+# so its error says what *it* wanted), but carrying `a`'s `recorded` — a refusal
+# inside the rule it matched aborts with what `b` holds, and that has to be
+# everything met so far. So `b`'s `recorded` is the whole of it, and `a`'s is a
+# prefix of it.
 fn far_join(a: Far, b: Far) -> Far {
+    let recorded = b.recorded;
     if (a.pos < b.pos) {
-        return b;
+        return Far { ..b, recorded };
     };
     if (b.pos < a.pos) {
-        return a;
+        return Far { ..a, recorded };
     };
     mut expected = a.expected;
     for (let label : b.expected) {
@@ -230,7 +275,7 @@ fn far_join(a: Far, b: Far) -> Far {
             set expected.push(label);
         };
     }
-    far_unclosed(Far { ..a, expected }, b.unclosed)
+    far_unclosed(Far { ..a, expected, recorded }, b.unclosed)
 }
 
 # `far` with the opening bracket that went unclosed at its position. Set by a
@@ -352,6 +397,7 @@ fn with_trailing<K: variant, A: any>(p: Parser<K, A>, root: Cst) -> Cst {
         Tree(i, kids) => Tree(i, [..kids, ..p.trailing]),
         Leaf(sp) => Leaf(sp),
         Trivia(sp) => Trivia(sp),
+        Missing(pos, expected, unclosed) => Missing(pos, expected, unclosed),
         // The root is a production's node, never a group — `match_prod` is what
         // `parse_cst` starts with — so there is nothing to append to here.
         Group(gi, open, body, close) => Group(gi, open, body, close),
@@ -368,7 +414,7 @@ fn match_rule<K: variant, A: any>(
     pos: u64,
     cur: u64,
     far: Far,
-) -> Step!ParseError {
+) -> Step!Abort {
     match (r) {
         Term(k) => ok(match_term(p, k, pos, far)),
         Literal(s) => ok(match_spelling(p, s, pos, far)),
@@ -396,10 +442,10 @@ fn match_rule<K: variant, A: any>(
         // `match_then` handles so the error can span what came before it —
         // there is nothing matched to point at, so it points at the token
         // that was next.
-        Refuse(what) => err(refusal(p, what, pos, pos)),
+        Refuse(what) => err(refused(refusal(p, what, pos, pos), far)),
         // `link` rewrites every one of these; reaching one means the grammar was
         // handed to the driver unlinked, which `parse_cst` makes impossible.
-        Named(n) => err(ParseError { message: `unlinked rule reference "{n}"`, span: 0..0 }),
+        Named(n) => err(grammar_fault(`unlinked rule reference "{n}"`)),
     }
 }
 
@@ -470,16 +516,15 @@ fn match_then<K: variant, A: any>(
     pos: u64,
     cur: u64,
     far: Far,
-) -> Step!ParseError {
+) -> Step!Abort {
     mut cp = pos;
     mut acc: Cst[] = [];
-    mut errors: Far[] = [];
     mut f = far;
     for (let sub : rs) {
         // A refusal here is about what the sequence matched so far, and the
         // error says so by spanning it — and by handing it to the message.
         if (let Refuse(what) = sub) {
-            return err(refusal(p, what, pos, cp));
+            return err(refused(refusal(p, what, pos, cp), f));
         };
         let st = match_rule(p, sub, cp, cur, f)?;
         set f = st.far;
@@ -488,11 +533,8 @@ fn match_then<K: variant, A: any>(
         };
         set cp = st.pos;
         set acc.extend(st.kids);
-        if (st.recovered.is_nonempty()) {
-            set errors.extend(st.recovered);
-        };
     }
-    ok(Step { hit: true, pos: cp, kids: acc, far: f, recovered: errors })
+    ok(Step { hit: true, pos: cp, kids: acc, far: f })
 }
 
 # The first alternative that matches. Every alternative's expectations are kept
@@ -504,7 +546,7 @@ fn match_one_of<K: variant, A: any>(
     pos: u64,
     cur: u64,
     far: Far,
-) -> Step!ParseError {
+) -> Step!Abort {
     mut f = far;
     for (let sub : rs) {
         let st = match_rule(p, sub, pos, cur, f)?;
@@ -543,14 +585,14 @@ fn match_many<K: variant, A: any>(
     pos: u64,
     cur: u64,
     far: Far,
-) -> Step!ParseError {
+) -> Step!Abort {
     match (nested_in) {
         none => match_reps(p, sub, min, max, sep, trailing_sep, leading_sep, pos, cur, far),
         some(brackets) => {
             // `link` stamps every bracketed repetition with its style's index;
             // reaching one without means the grammar was handed to the driver
             // unlinked, which `parse_cst` makes impossible.
-            let gi = group.value_or_err(ParseError { message: "unlinked group", span: 0..0 })?;
+            let gi = group.value_or_err(grammar_fault("unlinked group"))?;
             match_group(
                 p,
                 gi,
@@ -591,7 +633,7 @@ fn match_group<K: variant, A: any>(
     pos: u64,
     cur: u64,
     far: Far,
-) -> Step!ParseError {
+) -> Step!Abort {
     let so = match_rule(p, brackets.0, pos, cur, far)?;
     if (!so.hit) {
         return ok(no(so.far, pos));
@@ -614,13 +656,7 @@ fn match_group<K: variant, A: any>(
         };
         return ok(no(sc.far, pos));
     };
-    ok(Step {
-        hit: true,
-        pos: sc.pos,
-        kids: [Group(gi, so.kids, sb.kids, sc.kids)],
-        far: sc.far,
-        recovered: [..so.recovered, ..sb.recovered, ..sc.recovered],
-    })
+    ok(Step { hit: true, pos: sc.pos, kids: [Group(gi, so.kids, sb.kids, sc.kids)], far: sc.far })
 }
 
 # The repetition itself, without brackets.
@@ -635,7 +671,7 @@ fn match_reps<K: variant, A: any>(
     pos: u64,
     cur: u64,
     far: Far,
-) -> Step!ParseError {
+) -> Step!Abort {
     // Exactly one item, unseparated — what a bracket pair holding one thing
     // desugars to, and by far the commonest repetition in a real grammar. The
     // loop below would run one trip and one more to discover the bound, so this
@@ -645,7 +681,6 @@ fn match_reps<K: variant, A: any>(
     };
     mut cp = pos;
     mut acc: Cst[] = [];
-    mut errors: Far[] = [];
     mut f = far;
     mut n: u64 = 0;
     mut going = true;
@@ -696,17 +731,12 @@ fn match_reps<K: variant, A: any>(
                     // lets `Many(x, min=1, max=1)` hold a body that can be
                     // empty: an empty block, a group around an optional thing.
                     if (st.pos == after && !max.is_some()) {
-                        return err(ParseError {
-                            message: "a repetition matched empty input, which would repeat forever",
-                            span: 0..0,
-                        });
+                        return err(grammar_fault(
+                            "a repetition matched empty input, which would repeat forever",
+                        ));
                     };
                     set acc.extend(led.kids);
                     set acc.extend(st.kids);
-                    if (led.recovered.is_nonempty() || st.recovered.is_nonempty()) {
-                        set errors.extend(led.recovered);
-                        set errors.extend(st.recovered);
-                    };
                     set cp = st.pos;
                     set n++;
                 } else {
@@ -718,7 +748,6 @@ fn match_reps<K: variant, A: any>(
                     // nothing for it to trail.
                     if (!st.hit && trailing_sep && before != after && 0 < n) {
                         set acc.extend(led.kids);
-                        set errors.extend(led.recovered);
                         set cp = after;
                     } else {
                         set cp = before;
@@ -733,7 +762,7 @@ fn match_reps<K: variant, A: any>(
     if (n < min) {
         return ok(no(f, pos));
     };
-    ok(Step { hit: true, pos: cp, kids: acc, far: f, recovered: errors })
+    ok(Step { hit: true, pos: cp, kids: acc, far: f })
 }
 
 # The separator step: what `sep` matched, or an empty match when there is none.
@@ -743,7 +772,7 @@ fn match_sep<K: variant, A: any>(
     pos: u64,
     cur: u64,
     far: Far,
-) -> Step!ParseError {
+) -> Step!Abort {
     match (sep) {
         some(s) => match_rule(p, s, pos, cur, far),
         none => ok(hit_nothing(pos, far)),
@@ -760,7 +789,7 @@ fn match_leading_sep<K: variant, A: any>(
     pos: u64,
     cur: u64,
     far: Far,
-) -> Step!ParseError {
+) -> Step!Abort {
     let st = match_sep(p, sep, pos, cur, far)?;
     if (st.hit) { ok(st) } else { ok(hit_nothing(pos, st.far)) }
 }
@@ -776,7 +805,7 @@ fn match_maybe<K: variant, A: any>(
     pos: u64,
     cur: u64,
     far: Far,
-) -> Step!ParseError {
+) -> Step!Abort {
     let st = match_rule(p, sub, pos, cur, far)?;
     if (st.hit) {
         return ok(st);
@@ -788,6 +817,12 @@ fn match_maybe<K: variant, A: any>(
 # recorded as an error in the input and the rule matches nothing instead, as
 # though the missing text had been written. The sequence around it carries on, and
 # no enclosing choice goes on to its next alternative — see `Expect`.
+#
+# The miss is recorded twice, for two readers. A `Missing` marker goes in the tree,
+# which is how the errors of a parse that *succeeds* are found: a marker belongs
+# to the path that was taken and goes with it if that path is abandoned. And the
+# slip goes on `far`, which is how a parse that does not succeed finds them: a miss
+# or a refusal has no tree to look in, only the failure record every rule hands on.
 #
 # `sub` is matched against a failure record of its own, so the error says what
 # *this* rule wanted where it stood. Passing `far` through would let a deeper
@@ -804,14 +839,21 @@ fn match_expect<K: variant, A: any>(
     pos: u64,
     cur: u64,
     far: Far,
-) -> Step!ParseError {
-    let st = match_rule(p, sub, pos, cur, Far { pos, expected: [] })?;
+) -> Step!Abort {
+    let st = match_rule(p, sub, pos, cur, Far { pos, expected: [], recorded: far.recorded })?;
     let joined = far_join(far, st.far);
     if (st.hit) {
         return ok(Step { ..st, far: joined });
     };
     let found = if (far.pos <= st.far.pos) { joined } else { st.far };
-    ok(Step { hit: true, pos, kids: [], far: joined, recovered: [found] })
+    let slip = Slip { pos: found.pos, expected: found.expected, unclosed: found.unclosed };
+    let missing = Missing(slip.pos, slip.expected, slip.unclosed);
+
+    // Once to a token: the same slip met again down another path — the parse
+    // backtracks over a region more than once — is not a second error.
+    let seen = joined.recorded.any(|prior| prior.pos == slip.pos);
+    let recorded = if (seen) { joined.recorded } else { [..joined.recorded, slip] };
+    ok(Step { hit: true, pos, kids: [missing], far: Far { ..joined, recorded } })
 }
 
 # A reference to production `i` — and the only rule that builds a node. The
@@ -831,11 +873,10 @@ fn match_expect<K: variant, A: any>(
 # since the incoming `far` (a sibling alternative's expectations at the same
 # position) is what the label is merged into. A transparent production (empty
 # `expect_as`) never collapses anything: its insides are the message.
-fn match_prod<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, far: Far) -> Step!ParseError {
-    let Production { rule, expect_as } = p.prods[i].value_or_err(ParseError {
-        message: `no production at index {i}`,
-        span: 0..0,
-    })?;
+fn match_prod<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, far: Far) -> Step!Abort {
+    let Production { rule, expect_as } = p.prods[i].value_or_err(grammar_fault(
+        `no production at index {i}`,
+    ))?;
 
     // Ask the FIRST set before descending. A production that cannot begin with
     // the token sitting here cannot match here, and under ordered choice that is
@@ -856,7 +897,10 @@ fn match_prod<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, far: Far) -
     if (pos < st.far.pos || expect_as.is_empty()) {
         return ok(no(st.far, pos));
     };
-    ok(no(far_miss(far, pos, expect_as), pos))
+
+    // The label replaces what the production expected, not what was recorded:
+    // those are not expectations, and they are not the production's to drop.
+    ok(no(far_miss(Far { ..far, recorded: st.far.recorded }, pos, expect_as), pos))
 }
 
 # Whether production `i` could begin with the token at `pos` — its FIRST set
@@ -1035,7 +1079,7 @@ fn match_climb<K: variant, A: any>(
     pos: u64,
     cur: u64,
     far: Far,
-) -> Step!ParseError {
+) -> Step!Abort {
     let any_power: u64 = 0;
     climb(p, atom, precs, pos, any_power, cur, far)
 }
@@ -1057,13 +1101,12 @@ fn climb<K: variant, A: any>(
     min_power: u64,
     cur: u64,
     far: Far,
-) -> Step!ParseError {
+) -> Step!Abort {
     let head = match_rule(p, atom, pos, cur, far)?;
     if (!head.hit) {
         return ok(head);
     };
     mut kids = head.kids;
-    mut errors = head.recovered;
     mut cp = head.pos;
     mut f = head.far;
     mut going = true;
@@ -1076,7 +1119,6 @@ fn climb<K: variant, A: any>(
                 set f = rhs.far;
                 if (rhs.hit) {
                     set kids = [Tree(cur, kids), ..op_kids, Tree(cur, rhs.kids)];
-                    set errors.extend(rhs.recovered);
                     set cp = rhs.pos;
                 } else {
                     // An operator with nothing after it: leave it unconsumed for
@@ -1102,7 +1144,7 @@ fn climb<K: variant, A: any>(
             },
         };
     }
-    ok(Step { hit: true, pos: cp, kids, far: f, recovered: errors })
+    ok(Step { hit: true, pos: cp, kids, far: f })
 }
 
 // ---------- errors ----------
@@ -1195,15 +1237,23 @@ pub fn parse_cst<K: variant, A: any>(
 # and the tree when the parse reached the end of the input.
 #
 # `cst` is `none` exactly when the parse could not finish — the input ran out of
-# grammar before it ran out of tokens, or no rule matched at all. The last error
-# is then that failure, the one a plain `parse_cst` would have reported, and any
-# before it are `Expect`s recovered from on the way there. A tree that is present
-# may still be a tree of *broken* input (`errors` is not empty): it stands in the
-# place of the missing text without holding it, so it is for finding more errors
-# and for tools that want a best-effort shape — never for lowering.
+# grammar before it ran out of tokens, no rule matched at all, or a `Refuse` ended
+# it. The last error is then that failure, the one a plain `parse_cst` would have
+# reported, and any before it are `Expect`s met on the way there. A tree that is
+# present may still be a tree of *broken* input (`errors` is not empty): it stands
+# in the place of the missing text without holding it, so it is for finding more
+# errors and for tools that want a best-effort shape — never for lowering.
 #
-# A failure that is not the input's — a `Refuse`, a malformed grammar — is the
-# `!ParseError` of the call, and takes the recovered errors with it.
+# What is in `errors` depends on whether there is a tree. With one, exactly the
+# `Expect`s on the path the parse took: a miss recorded down an alternative that
+# was then abandoned is not an error in the input, and the tree (which the
+# alternative took its markers with it out of) is how that is known. Without one,
+# every miss the parse met, abandoned paths included — there is no path to say
+# which were the right ones, and for a parse that has already failed an error
+# that is not quite the reader's is better than the one it hid.
+#
+# A fault in the grammar itself — an unresolved reference, a rule that would loop
+# — is not the input's, and is the `!ParseError` of the call.
 struct Recovered { cst: Cst?, errors: ParseError[] }
 
 # `parse_cst` that goes on past a missing `Expect`: the tree it recovered to, and
@@ -1280,58 +1330,108 @@ pub fn parse_prepared_recovering<K: variant, A: any>(
         firsts,
         labels,
     };
-    let Step { hit, far, pos, kids, recovered } = match_prod(
-        p,
-        i,
-        0,
-        Far { pos: 0, expected: [] },
-    )?;
+    match (match_prod(p, i, 0, Far { pos: 0, expected: [] })) {
+        ok(step) => finished(p, src, step),
+        err(abort) => stopped(p, src, abort),
+    }
+}
+
+# What a parse that ran to a result made of it: the tree and its errors, or the
+# failure that ended it with the `Expect`s met on the way.
+fn finished<K: variant, A: any>(p: Parser<K, A>, src: str, step: Step) -> Recovered!ParseError {
+    let Step { hit, far, pos, kids } = step;
     if (!hit) {
-        // Nothing survives a total miss, the recovered errors with it: they were
-        // recorded on paths this failure abandoned, so the furthest failure is all
-        // there is to report.
-        return ok(Recovered { cst: none, errors: [error_at(p, src, far)] });
+        let missed = error_at(p, src, far);
+        return ok(Recovered {
+            cst: none,
+            errors: recovered_errors(p, src, far.recorded, some(missed), false),
+        });
     };
     if (pos < p.toks.len()) {
         let stuck = error_at(p, src, far_miss(far, pos, "end of input"));
         return ok(Recovered {
             cst: none,
-            errors: recovered_errors(p, src, recovered, some(stuck)),
+            errors: recovered_errors(p, src, far.recorded, some(stuck), false),
         });
     };
     let root = kids
         .first()
         .value_or_err(ParseError { message: "the start rule built no node", span: 0..0 })?;
+    let tree = with_trailing(p, root);
+
+    // Nothing was recorded, so there is nothing to look for: the common case, and
+    // the reason a parse that meets no `Expect` pays nothing for the walk.
+    if (far.recorded.is_empty()) {
+        return ok(Recovered { cst: some(tree), errors: [] });
+    };
     ok(Recovered {
-        cst: some(with_trailing(p, root)),
-        errors: recovered_errors(p, src, recovered, none),
+        cst: some(tree),
+        errors: recovered_errors(p, src, missing_slips(tree), none, false),
     })
 }
 
-# The errors `Expect`s recovered from, rendered, then `stuck` — the failure that
-# ended the parse, when one did — in the order they were found.
+# A parse that a `Refuse` ended: the input's error, after the `Expect`s met before
+# it. Anything else that aborts is the grammar's fault, and the call's.
+fn stopped<K: variant, A: any>(
+    p: Parser<K, A>,
+    src: str,
+    Abort { error, recorded, input },
+) -> Recovered!ParseError {
+    if (!input) {
+        return err(error);
+    };
+    ok(Recovered { cst: none, errors: recovered_errors(p, src, recorded, some(error), true) })
+}
+
+# Every `Missing` marker under `node`, as the slip it stands for, in source order.
+fn missing_slips(node: Cst) -> Slip[] {
+    match (node) {
+        Missing(pos, expected, unclosed) => [Slip { pos, expected, unclosed }],
+        Tree(_, kids) => kids.map(missing_slips).join(),
+        Group(_, open, body, close) => [
+            ..open.map(missing_slips).join(),
+            ..body.map(missing_slips).join(),
+            ..close.map(missing_slips).join(),
+        ],
+        Leaf(..) | Trivia(..) => [],
+    }
+}
+
+# `slips` worded, in the order of the source, then `last` — the failure that ended
+# the parse, when one did.
 #
-# One error to a token. A second `Expect` failing at the token the first just
-# failed at is the same mistake seen again (`Then([Expect(a), Expect(b)])` on a
-# token that is neither), and so is the failure that ended the parse when it is
-# at the same token as the last recovery. Reporting each would make one slip read
-# as several.
+# One error to a token. Two slips at the same token are the same mistake seen
+# twice (`Then([Expect(a), Expect(b)])` on a token that is neither), and so is the
+# failure that ended the parse when it is at a token a slip is already reported
+# at. Reporting each would make one slip read as several. Which of the two stays
+# is `last_wins`: a refusal's message was written for the case, and replaces the
+# generic "expected" a slip at the same token would have said; an ordinary miss
+# says nothing more than the slip did, and the slip, being first, stays.
 fn recovered_errors<K: variant, A: any>(
     p: Parser<K, A>,
     src: str,
-    recovered: Far[],
-    stuck: ParseError?,
+    slips: Slip[],
+    last: ParseError?,
+    last_wins: bool,
 ) -> ParseError[] {
     mut out: ParseError[] = [];
     mut seen: u64[] = [];
-    for (let far : recovered) {
-        if (!seen.contains(far.pos)) {
-            set seen.push(far.pos);
-            set out.push(error_at(p, src, far));
+    for (let slip : slips.sort_by(|a, b| a.pos < b.pos)) {
+        if (!seen.contains(slip.pos)) {
+            set seen.push(slip.pos);
+            set out.push(error_at(
+                p,
+                src,
+                Far { pos: slip.pos, expected: slip.expected, unclosed: slip.unclosed },
+            ));
         };
     }
-    if (let some(e) = stuck) {
-        if (!out.any(|prior| prior.span == e.span)) {
+    if (let some(e) = last) {
+        let clash = out.any(|prior| prior.span == e.span);
+        if (clash && last_wins) {
+            set out = out.filter(|prior| prior.span != e.span);
+        };
+        if (!clash || last_wins) {
             set out.push(e);
         };
     };
@@ -1375,6 +1475,12 @@ fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]
         },
         Leaf(span) => err(ParseError { message: "a token leaf has no lowered value", span }),
         Trivia(span) => err(ParseError { message: "trivia has no lowered value", span }),
+        // A marker is where text was missing: a tree holding one is broken input,
+        // and `parse_cst` fails before anything lowers it.
+        Missing(..) => err(ParseError {
+            message: "a missing token has no lowered value",
+            span: node.extent(),
+        }),
         // Unreachable from a tree `parse_cst` built: `nodes` splices every group
         // away before this recurses, so lowering never lands on one.
         Group(..) => err(ParseError {
@@ -1940,9 +2046,9 @@ pub fn parse<K: variant, A: any>(
     assert(errors_of("a; b;", g_e, "stmts") == []);
 
     // Missing, it is reported and the parse goes on: the tree has the statement
-    // without its `;`, as though the `;` had been written and had no text.
+    // with a marker where its `;` should be, which holds no text.
     assert(errors_of("a b;", g_e, "stmts") == ["expected `;`, found `b`"]);
-    assert(tree_of("a b;", g_e, "stmts") == "(stmts (stmt a) (stmt b ;))");
+    assert(tree_of("a b;", g_e, "stmts") == "(stmts (stmt a <missing `;`>) (stmt b ;))");
 
     // So a second mistake is found by the same parse, which is the point.
     assert(errors_of("a b c;", g_e, "stmts") == [
@@ -1981,9 +2087,7 @@ pub fn parse<K: variant, A: any>(
     let e_second: Rule<Tok> = Then([Term(Word), Refuse(Msg("the second alternative was tried"))]);
     let e_plain: Rule<Tok> = OneOf([Then([Term(Word), Literal(";")]), e_second]);
     let e_commit: Rule<Tok> = OneOf([Then([Term(Word), Expect(Literal(";"))]), e_second]);
-    assert(errors_of("a", g_of([one("s", e_plain)]), "s") == [
-        "aborted: the second alternative was tried",
-    ]);
+    assert(errors_of("a", g_of([one("s", e_plain)]), "s") == ["the second alternative was tried"]);
     assert(errors_of("a", g_of([one("s", e_commit)]), "s") == ["expected `;`, found end of input"]);
 
     // That is the contract, and it cuts both ways: put where a later alternative
@@ -2006,13 +2110,22 @@ pub fn parse<K: variant, A: any>(
     assert(errors_of("a 1", g_abandoned, "s") == []);
     assert(tree_of("a 1", g_abandoned, "s") == "(s a 1)");
 
+    // Once the parse has failed there is no path to say which were the right ones,
+    // so the miss the abandoned alternative met is reported with the rest.
+    assert(errors_of("a 1 ]", g_abandoned, "s") == [
+        "expected `;`, found `1`",
+        "expected end of input, found `]`",
+    ]);
+
     // ---- Expect: where the errors are collected from ----
     //
     // Through a bracketed group, which joins the runs of its open, body and close.
     let e_block: Rule<Tok> = Many(Named("stmt"), nested_in=(Literal("("), Literal(")")));
     let g_block = g_of([one("block", e_block), one("stmt", e_stmt)]);
     assert(errors_of("(a b;)", g_block, "block") == ["expected `;`, found `b`"]);
-    assert(tree_of("(a b;)", g_block, "block") == "(block [( (stmt a) (stmt b ;) )])");
+    assert(
+        tree_of("(a b;)", g_block, "block") == "(block [( (stmt a <missing `;`>) (stmt b ;) )])",
+    );
 
     // Through a precedence climb, whose operands are rebuilt around the errors
     // the atom recorded.
@@ -2033,10 +2146,11 @@ pub fn parse<K: variant, A: any>(
     let g_list_e = g_of([one("list", e_list), one("stmt", e_stmt)]);
     assert(errors_of("a, b;, c", g_list_e, "list").len() == 2);
 
-    // A total miss keeps nothing: the errors were recorded on paths it gave up
-    // on, so the furthest failure is the only thing to report. The group here
-    // never closes, and the `;` missing inside it goes unreported until it does.
+    // A total miss still reports what was met on the way to it. The group here
+    // never closes, so the whole of it is given up on — the statement inside
+    // included — and the `;` it was missing is reported ahead of the bracket.
     assert(errors_of("(a b;", g_block, "block") == [
+        "expected `;`, found `b`",
         "expected Word or `)`, found end of input (`(` at line 1 is never closed)",
     ]);
     assert(tree_of("(a b;", g_block, "block") == "no tree");
@@ -2063,9 +2177,45 @@ pub fn parse<K: variant, A: any>(
     ]);
     assert(errors_of("a ( b", g_of([one("c", e_call)]), "c") == ["expected Num, found `b`"]);
 
-    // A `Refuse` after one is still an abort, and takes the recovered errors with it.
+    // A `Refuse` still ends the parse, and the error it ends it with is last: the
+    // `Expect`s met before it are errors too, and are reported ahead of it.
     let e_refused: Rule<Tok> = Then([Term(Word), Expect(Literal(";")), Refuse(Msg("stop"))]);
-    assert(errors_of("a", g_of([one("r", e_refused)]), "r") == ["aborted: stop"]);
+    assert(errors_of("a", g_of([one("r", e_refused)]), "r") == [
+        "expected `;`, found end of input",
+        "stop",
+    ]);
+    assert(tree_of("a", g_of([one("r", e_refused)]), "r") == "no tree");
+
+    // ... however many, and in source order. This refusal spans everything the
+    // sequence matched before it, so it is the last error and the slips come first.
+    let e_gated: Rule<Tok> = Then([Many(Named("stmt")), Refuse(Msg("stop"))]);
+    let g_gate = g_of([one("gated", e_gated), one("stmt", e_stmt)]);
+    assert(errors_of("a b c;", g_gate, "gated") == [
+        "expected `;`, found `b`",
+        "expected `;`, found `c`",
+        "stop",
+    ]);
+
+    // ... also when the refusal is itself inside an `Expect`, whose rule is matched
+    // against a failure record of its own: what was met before still reaches it.
+    let e_inside: Rule<Tok> = Then([
+        Term(Word),
+        Expect(Literal("+")),
+        Expect(Then([Term(Num), Term(Num), Refuse(Msg("stop"))])),
+    ]);
+    assert(errors_of("a 1 2", g_of([one("i", e_inside)]), "i") == [
+        "expected `+`, found `1`",
+        "stop",
+    ]);
+
+    // A refusal at the very token a slip was reported at says it better, and
+    // replaces it: its message was written for the case.
+    let e_here: Rule<Tok> = Then([Term(Word), Expect(Literal(";")), Maybe(Refuse(Msg("stop")))]);
+    assert(errors_of("a b", g_of([one("h", e_here)]), "h") == ["stop"]);
+
+    // What a grammar fault does not do is blame the input: it is the call's.
+    let e_unlinked: Rule<Tok> = Then([Term(Word), Expect(Literal(";")), Named("nope")]);
+    assert(errors_of("a", g_of([one("u", e_unlinked)]), "u") == [`aborted: no rule named "nope"`]);
 
     // It can match nothing, so a repetition of one is refused rather than spun on.
     let e_forever: Rule<Tok> = Many(Expect(Literal(";")));

@@ -255,10 +255,13 @@ variant Rule<K: variant> =
     # the saving is that a broken one is not re-parsed down every alternative that
     # cannot succeed either.
     #
-    # Errors recorded under a sequence that then fails are discarded with it —
-    # that path was not taken — so an `Expect` that fired inside an abandoned
-    # alternative reports nothing. And a `Refuse` still aborts the parse outright,
-    # recovered errors included.
+    # A miss belongs to the path it was met on. When the parse succeeds, the errors
+    # it returns are the ones on the path it took: one met down an alternative that
+    # was then abandoned is not an error in the input, and is not reported. When it
+    # does not — it misses, or a `Refuse` ends it — there is no path to say which
+    # were the right ones, and every miss met on the way is reported ahead of the
+    # failure that ended it, so a file with several slips shows them all even when
+    # the last is one the grammar cannot recover from.
     #
     # It can match nothing, so a repetition of a bare `Expect` is refused for
     # looping forever; it belongs after something that consumes.

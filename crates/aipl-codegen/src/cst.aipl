@@ -27,6 +27,7 @@ import {
     map,
     push,
     reverse_find_map,
+    sort,
     value_or,
     wrapping_increment as ++,
 } from builtins;
@@ -40,7 +41,21 @@ import {
 # `Then([Lit("("), x, Lit(")")])` into a `nested_in` leaves every `build` function
 # reading exactly the children it read before. The only pass that sees a group is
 # the formatter, which is the pass that needs to know where the brackets are.
-variant Cst = Leaf(Span) | Trivia(Span) | Tree(u64, Cst[]) | Group(u64, Cst[], Cst[], Cst[])
+#
+# `Missing(pos, expected, unclosed)` is where an `Expect` found its rule absent and
+# carried on: a marker that takes no space in the source and holds no text. `pos`
+# is the index of the token that stood where the rule was wanted (one past the last
+# token, at the end of the input), `expected` what could have been there, and
+# `unclosed` the bracket left hanging there, if any — everything `parse.aipl` needs
+# to word the error once it has the source. It is not a token and not a child, so
+# every walk below passes over it exactly as it does trivia, and a tree holding one
+# is a tree of broken input: to find more errors in, and never to lower.
+variant Cst =
+    | Leaf(Span)
+    | Trivia(Span)
+    | Tree(u64, Cst[])
+    | Group(u64, Cst[], Cst[], Cst[])
+    | Missing(u64, str[], Span[])
 
 # Every leaf span under `self`, in source order — token leaves and trivia
 # alike. The whole losslessness property is stated in terms of this list: the
@@ -49,6 +64,7 @@ variant Cst = Leaf(Span) | Trivia(Span) | Tree(u64, Cst[]) | Group(u64, Cst[], C
 pub fn leaves(self: Cst) -> Span[] {
     match (self) {
         Leaf(sp) | Trivia(sp) => [sp],
+        Missing(..) => [],
         Tree(_, kids) => kids.map(leaves).join(),
         Group(_, open, body, close) => [
             ..open.map(leaves).join(),
@@ -72,7 +88,7 @@ pub fn text(self: Cst, src: str) -> str { self.leaves().map(|sp| src[sp]).join()
 pub fn token_leaves(self: Cst) -> Span[] {
     match (self) {
         Leaf(sp) => [sp],
-        Trivia(..) => [],
+        Trivia(..) | Missing(..) => [],
         Tree(_, kids) => kids.map(token_leaves).join(),
         Group(_, open, body, close) => [
             ..open.map(token_leaves).join(),
@@ -119,7 +135,7 @@ fn through(self: Span, Span { end }) -> Span { self.start..end }.test({
 fn first_token(self: Cst) -> Span? {
     match (self) {
         Leaf(sp) => some(sp),
-        Trivia(..) => none,
+        Trivia(..) | Missing(..) => none,
         Tree(_, kids) => kids.find_map(first_token),
         Group(_, open, body, close) => {
             let in_open = open.find_map(first_token);
@@ -138,7 +154,7 @@ fn first_token(self: Cst) -> Span? {
 fn last_token(self: Cst) -> Span? {
     match (self) {
         Leaf(sp) => some(sp),
-        Trivia(..) => none,
+        Trivia(..) | Missing(..) => none,
         Tree(_, kids) => kids.reverse_find_map(last_token),
         Group(_, open, body, close) => {
             let in_open = open.reverse_find_map(last_token);
@@ -186,6 +202,7 @@ pub fn extent(self: Cst) -> Span {
 fn first_leaf(self: Cst) -> Span? {
     match (self) {
         Leaf(sp) | Trivia(sp) => some(sp),
+        Missing(..) => none,
         Tree(_, kids) => kids.find_map(first_leaf),
         Group(_, open, body, close) => {
             let in_open = open.find_map(first_leaf);
@@ -205,6 +222,7 @@ fn first_leaf(self: Cst) -> Span? {
 fn last_leaf(self: Cst) -> Span? {
     match (self) {
         Leaf(sp) | Trivia(sp) => some(sp),
+        Missing(..) => none,
         Tree(_, kids) => kids.reverse_find_map(last_leaf),
         Group(_, open, body, close) => {
             let in_open = open.reverse_find_map(last_leaf);
@@ -260,7 +278,7 @@ struct Parts { cst: Cst, children: Cst[], tokens: Span[] }
 pub fn parts(self: Cst) -> Parts {
     let empty = Parts { cst: self, children: [], tokens: [] };
     match (self) {
-        Leaf(..) | Trivia(..) => empty,
+        Leaf(..) | Trivia(..) | Missing(..) => empty,
         Tree(_, kids) => split_kids(kids, empty),
         Group(_, open, body, close) => split_kids(close, split_kids(body, split_kids(open, empty))),
     }
@@ -283,7 +301,7 @@ fn split_kids(kids: Cst[], acc: Parts) -> Parts {
 fn split_kid(acc: Parts, kid: Cst) -> Parts {
     mut a = acc;
     match (kid) {
-        Trivia(..) => {},
+        Trivia(..) | Missing(..) => {},
         Leaf(sp) => {
             set a.tokens.push(sp);
         },
@@ -344,7 +362,7 @@ struct SlotWalk { out: Slot[], next: u64 }
 fn slot_walk(node: Cst, acc: SlotWalk) -> SlotWalk {
     mut a = acc;
     match (node) {
-        Leaf(..) | Trivia(..) => {},
+        Leaf(..) | Trivia(..) | Missing(..) => {},
         Tree(_, kids) => {
             set a = slot_walk_kids(kids, a);
         },
@@ -372,7 +390,7 @@ fn slot_walk_kids(kids: Cst[], acc: SlotWalk) -> SlotWalk {
 fn slot_walk_kid(acc: SlotWalk, kid: Cst) -> SlotWalk {
     mut a = acc;
     match (kid) {
-        Trivia(..) => {},
+        Trivia(..) | Missing(..) => {},
         Leaf(sp) => {
             set a.out.push(Tok(sp));
         },
@@ -451,6 +469,7 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     match (self) {
         Leaf(sp) => src[sp],
         Trivia(sp) => `~{src[sp]}`,
+        Missing(_, expected, _) => `<missing {expected.sort().join(sep=" | ")}>`,
         Tree(i, kids) => {
             let parts = kids.map(|k| k.show(src, names));
             let name = names[i].value_or("?");
@@ -505,6 +524,23 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(t.token_text(src) == "1+2");
     assert(Trivia(1..2).token_text(src) == "");
     assert(Tree(1, [Trivia(1..2), Leaf(2..3)]).token_text(src) == "+");
+
+    // A `Missing` marker is where text should have been and is not: it covers
+    // nothing, is no token and no child, and so changes nothing but how the tree
+    // reads. The tree around it still tiles the source.
+    let mended = Tree(1, [Leaf(0..1), Missing(1, ["`;`"], []), Trivia(1..2), Leaf(2..3)]);
+    assert(mended.text(src) == "1 +");
+    assert(mended.token_leaves() == [0..1, 2..3]);
+    assert(mended.extent() == 0..3);
+    assert(mended.token_span() == some(0..3));
+    assert(mended.parts().children == []);
+    assert(mended.parts().tokens == [0..1, 2..3]);
+    assert(mended.parts().slots() == [Tok(0..1), Tok(2..3)]);
+    assert(Missing(1, [], []).leaves() == []);
+    assert(Tree(1, [Missing(1, [], [])]).token_span() == none);
+    assert(Tree(1, [Missing(1, [], [])]).extent() == 0..0);
+    assert(mended.show(src, ["", "t"]) == "(t 1 <missing `;`> ~  +)");
+    assert(Missing(0, ["`b`", "`a`"], []).show(src, []) == "<missing `a` | `b`>");
 
     // Nesting: an interior child contributes its own leaves to the parent, in
     // place, so the parent still reconstructs the whole source.

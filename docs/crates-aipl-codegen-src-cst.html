@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>variant Cst</code></pre>
 
-          <div class="doc"><p>An interior node is <code>Tree(prod, kids)</code>; a <code>Group</code> is the bracket pair a bracketed repetition matched, holding its opening kids, the kids between the and its closing kids as three runs.</p><p>A group is <em>transparent</em>: it is not a production, it lowers to nothing of its own, and <code>nodes</code> and <code>own_tokens</code> splice straight through it — so converting a <code>Then([Lit(&quot;(&quot;), x, Lit(&quot;)&quot;)])</code> into a <code>nested_in</code> leaves every <code>build</code> function reading exactly the children it read before. The only pass that sees a group is the formatter, which is the pass that needs to know where the brackets are.</p></div>
+          <div class="doc"><p>An interior node is <code>Tree(prod, kids)</code>; a <code>Group</code> is the bracket pair a bracketed repetition matched, holding its opening kids, the kids between the and its closing kids as three runs.</p><p>A group is <em>transparent</em>: it is not a production, it lowers to nothing of its own, and <code>nodes</code> and <code>own_tokens</code> splice straight through it — so converting a <code>Then([Lit(&quot;(&quot;), x, Lit(&quot;)&quot;)])</code> into a <code>nested_in</code> leaves every <code>build</code> function reading exactly the children it read before. The only pass that sees a group is the formatter, which is the pass that needs to know where the brackets are.</p><p><code>Missing(pos, expected, unclosed)</code> is where an <code>Expect</code> found its rule absent and carried on: a marker that takes no space in the source and holds no text. <code>pos</code> is the index of the token that stood where the rule was wanted (one past the last token, at the end of the input), <code>expected</code> what could have been there, and <code>unclosed</code> the bracket left hanging there, if any — everything <code>parse.aipl</code> needs to word the error once it has the source. It is not a token and not a child, so every walk below passes over it exactly as it does trivia, and a tree holding one is a tree of broken input: to find more errors in, and never to lower.</p></div>
 
 
           <ul class="cases">
@@ -50,6 +50,11 @@
             </li>
 
             <li id="item-Group"><code>Group(u64, Cst[], Cst[], Cst[])</code>
+
+
+            </li>
+
+            <li id="item-Missing"><code>Missing(u64, str[], Span[])</code>
 
 
             </li>
@@ -352,7 +357,7 @@
             <a class="anchor" href="#item-through">through</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn through(self: Span, __spat$4998: Span) -&#62; Span</code></pre>
+          <pre class="signature"><code>fn through(self: Span, __spat$5756: Span) -&#62; Span</code></pre>
 
           <div class="doc"><p>The span from <code>self</code>'s start through the other span's end — what two ends of a node, a first leaf and a last, cover between them. Nothing is checked about the order: a second span that ends before <code>self</code> starts gives a span that ends before it starts, exactly as <code>a.start..b.end</code> spelled out would.</p></div>
 

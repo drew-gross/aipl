@@ -4478,10 +4478,24 @@ pub fn aipl_parse_errors(src: str) -> ParseError[] {
     let spans = aipl_parse_errors("fn f() { let x = 1 let y = 2; }").map(|e| e.span);
     assert(spans == [19..22]);
 
-    // A `Refuse` is not recovered from. The statement-start check has a better word
-    // for a missing `;` inside a loop than "expected", and aborts with it.
-    assert(messages("fn f() { while (c) { g() h(); } }") == [
-        "missing `;` before `h`: every statement ends with one, even an `if` or `match` whose value is unused",
+    // A `Refuse` is not recovered from: the statement-start check has a better word
+    // for a missing `;` inside a loop than "expected", and ends the parse with it.
+    let loop_slip = "missing `;` before `h`: every statement ends with one, even an `if` or `match` whose value is unused";
+    assert(messages("fn f() { while (c) { g() h(); } }") == [loop_slip]);
+
+    // But it comes last, and what was met before it is not lost: the slip in the
+    // first statement is reported, then the refusal that stopped the parse.
+    assert(messages("fn f() { let x = 1 let y = 2; while (c) { g() h(); } }") == [
+        `{ops}, found \`let\``,
+        loop_slip,
+    ]);
+
+    // The same for a parse that simply cannot go on. The brace never closes, so
+    // the function is given up on whole — and the slip inside it is still reported,
+    // ahead of the failure.
+    assert(messages("fn f() { let x = 1 let y = 2;") == [
+        `{ops}, found \`let\``,
+        "expected `}`, a statement, or an expression, found end of input (`{` at line 1 is never closed)",
     ]);
 })
 
