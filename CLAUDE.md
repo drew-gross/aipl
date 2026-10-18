@@ -1,5 +1,14 @@
 # Working in this repo
 
+## TODO.txt
+- NEVER touch TODO.txt. It is for the user only.
+- If you ever accidentally touch it and the user reprimands you, do not touch it again to fix it, not even to revert it.
+
+## Git
+- Do not perform any git operations except when explicitly asked. Write code; the user will review and commit it.
+- You may investigate git history for learning and debugging, but perform no writes.
+- If the user grants explicit permission for a git operation, interpret it in the narrowest possible terms and for the shortest period that allows the task to complete. Interpret what counts as "one task" as narrowly as possible too.
+
 ## Committing
 Don't ask whether to commit, and don't offer to — I always handle commits
 myself. Finish a task at the green-and-formatted state (run `cargo handoff`,

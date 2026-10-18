@@ -8,11 +8,11 @@ variant:
   Allow variants to be passed to HOFs, you can e.g. v.map(VariantConstructor).
 
 projects:
+  change readmes to main.aipl top level docs.
   get rid of aipl.build, maybe by checking in the compiler in the main project also? Or use hard links?
   let `aipl run` call non-main functions and take other files (e.g. word_count on a file)
   word_count:
     benchmark against wc
-    -m (count characters; needs a way to see UTF-8 continuation bytes), reading stdin, wc's column padding
   web server:
   ray tracer:
     https://raytracing.github.io/books/RayTracingInOneWeekend.html
