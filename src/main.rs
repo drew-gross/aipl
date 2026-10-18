@@ -51,7 +51,9 @@ fn cli() -> ExitCode {
     let prog = args.first().cloned().unwrap_or_else(|| "aipl".into());
 
     let result = match args.get(1).map(String::as_str) {
-        Some("run") => run_cmd(&args[2..]),
+        // `run` behaves like running the binary: it owns its exit code, which is
+        // `main`'s return value.
+        Some("run") => return exit_code_of(run_cmd(&args[2..])),
         Some("ir") => ir_cmd(&args[2..]),
         Some("doc") => doc_cmd(&args[2..]),
         Some("docs") => docs_cmd(&args[2..]),
@@ -81,7 +83,7 @@ fn cli() -> ExitCode {
 fn usage(prog: &str) -> String {
     format!(
         "usage:
-  {prog} run   [-- args...]                 compile and JIT-execute `main` from ./main.aipl
+  {prog} run   [-- args...]                 compile and JIT-execute `main` from ./main.aipl, exiting with its result
   {prog} ir    <file.aipl>                  print cranelift IR for a source file
   {prog} doc   <file.aipl>                  print the file's and each declaration's `# ..` docs
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
@@ -167,7 +169,7 @@ fn take_debug_flag(args: &[String]) -> (Vec<String>, DebugOptions) {
 /// The program `aipl run` runs, looked up in the working directory.
 const RUN_FILE: &str = "main.aipl";
 
-fn run_cmd(args: &[String]) -> Result<(), String> {
+fn run_cmd(args: &[String]) -> Result<ExitCode, String> {
     let (args, dbg) = take_debug_flag(args);
     // `run` takes no options of its own yet: everything after `--` is for `main`.
     let trailing = match args.split_first() {
@@ -206,8 +208,18 @@ fn run_cmd(args: &[String]) -> Result<(), String> {
             }
         }
     };
-    println!("{result}");
-    Ok(())
+    // Like a native binary, the process exits with `main`'s return value, which
+    // the OS truncates to its low 8 bits.
+    Ok(ExitCode::from((result & 0xff) as u8))
+}
+
+/// Report a failed command on stderr and exit 1, or pass on the exit code a
+/// successful one chose.
+fn exit_code_of(result: Result<ExitCode, String>) -> ExitCode {
+    result.unwrap_or_else(|rendered| {
+        eprintln!("{rendered}");
+        ExitCode::FAILURE
+    })
 }
 
 /// Collect every `*.aipl` file under `dir`, recursively, into `out`.

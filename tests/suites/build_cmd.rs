@@ -150,7 +150,7 @@ fn run_passes_what_follows_the_separator_to_main() {
             out.status.success(),
         )
     };
-    assert_eq!(run(&["--", "hello"]), ("hello\n0\n".to_string(), true));
+    assert_eq!(run(&["--", "hello"]), ("hello\n".to_string(), true));
     // Without `--`, an argument is `run`'s own, and `run` has none yet.
     assert!(!run(&["hello"]).1);
 }

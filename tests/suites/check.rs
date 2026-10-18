@@ -1268,7 +1268,7 @@ fn a_performance_block_is_left_out_of_what_run_and_build_make() {
             String::from_utf8_lossy(&out.stderr).into_owned(),
             out.status.code()
         ),
-        ("hi\n0\n".to_string(), String::new(), Some(0))
+        ("hi\n".to_string(), String::new(), Some(0))
     );
 }
 
