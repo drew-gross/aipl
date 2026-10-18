@@ -1,0 +1,63 @@
+# `for (let T { a, b } : xs)` takes each element apart the way `let T { a, b } = e;`
+# does (`destructure.aipl`), and everything that form takes this one takes: only
+# the fields that are read need naming, a field can be bound under another name
+# with `as` (`destructure_rename.aipl`), and a generic struct destructures too.
+# `for (let i, T { a } : xs)` adds the iteration counter in front.
+
+import { print, to_str, wrapping_add as + } from builtins;
+
+struct Point { x: i64, y: i64 }
+
+struct Named { id: i64, label: str }
+
+struct Box<T> { v: T, tag: i64 }
+
+fn main() !prints {
+    let points = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];
+    for (let Point { x, y } : points) {
+        print(`{x} {y}`);
+    }
+
+    // A subset of the fields: name only what you read.
+    for (let Point { y } : points) {
+        print(to_str(y));
+    }
+
+    // The renaming is what lets a loop over a struct nest inside another loop over
+    // the same struct, which a plain pattern cannot: both would bind `x`.
+    for (let Point { x as ax } : points) {
+        for (let Point { x as bx } : points) {
+            print(`{ax} {bx} {ax + bx}`);
+        }
+    }
+
+    // The index leads the pattern, as it does a tuple's.
+    for (let i, Point { x, y as py } : points) {
+        print(`{i}: {x} {py}`);
+    }
+
+    // A `str` field is bound like any other; the leak gate holds the counts.
+    let named = [Named { id: 1, label: "a label long enough to be a buffer" }];
+    for (let Named { label as title } : named) {
+        print(title);
+    }
+
+    // A generic struct.
+    let boxes = [Box { v: "held", tag: 9 }];
+    for (let Box { v, tag } : boxes) {
+        print(`{v} {tag}`);
+    }
+}
+--- stdout ---
+1 2
+3 4
+2
+4
+1 1 2
+1 3 4
+3 1 4
+3 3 6
+0: 1 2
+1: 3 4
+a label long enough to be a buffer
+held 9

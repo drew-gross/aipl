@@ -2151,10 +2151,12 @@ fn lower_assign_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 
 fn compound_ops() -> str[] { ["+=", "-=", "*=", "/="] }
 
-# `for_stmt` — the plain loop, the indexed one, the tuple-destructuring one,
-# and the indexed tuple-destructuring one. A `(` after the `let` opens the tuple
-# form, a `(` after the first name's comma the indexed tuple form; otherwise the
-# number of names says whether an index was written.
+# `for_stmt` — the plain loop and the two patterns a `let` takes apart a value
+# with, tuple and struct, each with or without an index in front: `for (let x`,
+# `for (let (a, b)`, `for (let T { a, b }`, and `for (let i, ` before any of the
+# three. A comma after the first name says an index was written; the pattern
+# then starts after it, and what follows the pattern's first token — a `(`, or a
+# name and then `{` — says which it is.
 fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
@@ -2162,14 +2164,19 @@ fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let names = binder_names(toks);
     let iterable = kid_expr(kids, 0, sp)?;
     let body = kid_expr(kids, 1, sp)?;
-    if (toks[3] == some("(")) {
-        return ok(AStmt(for_tuple(names, none, iterable, body, sp)?));
+    let indexed = toks[4] == some(",");
+    let index = if (indexed) { toks[3] } else { none };
+    let pattern: u64 = if (indexed) { 5 } else { 3 };
+    if (toks[pattern] == some("(")) {
+        let pattern_names = if (indexed) { names[1..] } else { names };
+        return ok(AStmt(for_tuple(pattern_names, index, iterable, body, sp)?));
     };
 
-    // `for (let i, (a, b) : xs)` — the first name is the index, the rest the
-    // pattern.
-    if (toks[5] == some("(")) {
-        return ok(AStmt(for_tuple(names[1..], names.first(), iterable, body, sp)?));
+    // `for (let T { x, y as b } : xs)` — the struct name and then its braces.
+    if (toks[pattern + 1] == some("{")) {
+        let struct_name = toks[pattern].value_or("");
+        let FieldBinders { fields, names as bound } = field_binders_of(toks, pattern + 2);
+        return ok(AStmt(for_struct(struct_name, fields, bound, index, iterable, body)));
     };
 
     // `for (let i, x : xs)` — two names, the first of which is the index. Its
@@ -2211,6 +2218,31 @@ fn for_tuple(names: str[], index: str?, iterable: Expr, body: Expr, sp: Span) ->
     let inner = bind_fields(names, tmp, tmp_span, body, tuple_slot_names(names));
     let span = join_spans(tmp_span, inner.span);
     ok(SFor(tmp, tmp_span, index, iterable, inner, span))
+}
+
+# `for (let T { a, b as c } : xs) { body }` is a plain loop over a temporary whose
+# fields are read in front of the body, as `let T { a, b as c } = value;` reads
+# them — and through the same desugaring, so the pattern's type is checked the
+# same way: the temporary is rebound under the struct's name before its fields
+# are taken, which is what rejects a pattern naming a different struct.
+#
+#     for (let __fpat$N : xs) { let __spat$N: T = __fpat$N; let a = __spat$N.a; body }
+#
+# With an `index` it is the indexed loop over that temporary, as `for_tuple`'s is.
+fn for_struct(
+    struct_name: str,
+    fields: str[],
+    names: str[],
+    index: str?,
+    iterable: Expr,
+    body: Expr,
+) -> Stmt {
+    let tmp_span = iterable.span;
+    let tmp = `__fpat${tmp_span.start}`;
+    let element = at(Ident(tmp), tmp_span);
+    let inner = destructure_struct(struct_name, fields, names, element, tmp_span, body, false);
+    let span = join_spans(tmp_span, inner.span);
+    SFor(tmp, tmp_span, index, iterable, inner, span)
 }
 
 # `wrap_stmt` — one statement and the rest of the block, folded into the chain
@@ -4095,6 +4127,22 @@ pub fn lower_aipl_block(src: str) -> Expr!ParseError {
         block_dump(
             "{ for (let (a) : ps) { f(a); } }",
         ) == "error: a tuple pattern needs at least 2 names, e.g. for (let (a, b) : expr) { ... }",
+    );
+
+    // `for (let T { a, b } : ps)` is the same loop over a temporary, with the
+    // struct pattern's own desugaring in front of the body — including the
+    // temporary rebound under the struct's name, which is what checks it.
+    assert(
+        block_dump(
+            "{ for (let P { x, y as b } : ps) { f(x); } }",
+        ) == "Seq(For(__fpat$29, ps, Let(__spat$29: P, __fpat$29, Let(x, __spat$29.x, Let(b, __spat$29.y, Seq(f(x), 0))))), ())",
+    );
+
+    // With an index, which stays on the loop and leads the pattern.
+    assert(
+        block_dump(
+            "{ for (let i, P { x } : ps) { f(x); } }",
+        ) == "Seq(For([i], __fpat$24, ps, Let(__spat$24: P, __fpat$24, Let(x, __spat$24.x, Seq(f(x), 0)))), ())",
     );
 
     // `for (let i, x : xs)` keeps both binders on the node — the index is

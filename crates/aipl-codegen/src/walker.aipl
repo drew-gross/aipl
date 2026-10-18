@@ -1738,21 +1738,16 @@ fn member_path(self: W, acc0: str) -> WStr {
 
 fn for_stmt(self: W) -> WDoc!FmtError {
     let opened = self.bump().w.expect("(")?.w.expect("let")?.w;
-    let binder = if (opened.peek_text() == "(") {
-        opened.tuple_binder()
+    let first = opened.binder_item();
+    let binder = if (first.w.peek_text() == ",") {
+        // `for (let i, x : xs)` — the index-and-item form: the comma is part of the
+        // binder rather than a separator the header walker would otherwise stop
+        // on. The item may itself be a tuple or a struct pattern:
+        // `for (let i, (a, b) : xs)`, `for (let i, P { x } : xs)`.
+        let item = first.w.bump().w.binder_item();
+        WStr { w: item.w, text: `{first.text}, {item.text}` }
     } else {
-        let b = opened.bump();
-        if (b.w.peek_text() == ",") {
-            // `for (let i, x : xs)` — the index-and-item form: two names, and the
-            // comma is part of the binder rather than a separator the header
-            // walker would otherwise stop on. The item may itself be a tuple
-            // pattern: `for (let i, (a, b) : xs)`.
-            let after = b.w.bump().w;
-            let item = if (after.peek_text() == "(") { after.tuple_binder() } else { after.bump() };
-            WStr { w: item.w, text: `{b.text}, {item.text}` }
-        } else {
-            WStr { w: b.w, text: b.text }
-        }
+        first
     };
     let it = binder.w.expect(":")?.w.expr()?;
     let body = it.w.expect(")")?.w.block()?;
@@ -1760,6 +1755,27 @@ fn for_stmt(self: W) -> WDoc!FmtError {
         w: body.w,
         doc: Concat([Text(`for (let {binder.text} : `), it.doc, Text(") "), body.doc]),
     })
+}
+
+# One binder of a `for` header: a name, a tuple pattern `(a, b)`, or a struct
+# pattern `T { a, b as c }` — the name followed by its braces.
+fn binder_item(self: W) -> WStr {
+    if (self.peek_text() == "(") {
+        return self.tuple_binder();
+    };
+    let n = self.bump();
+    if (n.w.peek_text() != "{") {
+        return WStr { w: n.w, text: n.text };
+    };
+    let ids = n.w.bump().w.field_binder_list();
+    let text = `{n.text} \{ {ids.names.join(sep=", ")} }`;
+
+    // The `}` closes the pattern; as in `tuple_binder`, a missing one is left for
+    // the header's own `expect` to report.
+    match (ids.w.expect("}")) {
+        ok(s) => WStr { w: s.w, text },
+        err(_) => WStr { w: ids.w, text },
+    }
 }
 
 fn tuple_binder(self: W) -> WStr {
@@ -3227,6 +3243,16 @@ fn walker_of(src: str) -> W!FmtError {
         walker_of("{ for ( let i , ( a , b ) : xs ) { f ( ) ; } }")?
             .block()
             .rendered(100)? == "{\n    for (let i, (a, b) : xs) {\n        f();\n    }\n}\n",
+    );
+    assert(
+        walker_of("{ for ( let P { x  as  a , y } : xs ) { f ( ) ; } }")?
+            .block()
+            .rendered(100)? == "{\n    for (let P { x as a, y } : xs) {\n        f();\n    }\n}\n",
+    );
+    assert(
+        walker_of("{ for ( let i , P { x } : xs ) { f ( ) ; } }")?
+            .block()
+            .rendered(100)? == "{\n    for (let i, P { x } : xs) {\n        f();\n    }\n}\n",
     );
 
     // --- items ------------------------------------------------------------------

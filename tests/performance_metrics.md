@@ -585,6 +585,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/structs/fields/variant_field | 0 | 0 | 0 | 289 | 1800 | 2.00 | 85.24 | 1456 |
 | cases/structs/fields/variant_field_heap | 2 | 93 | 93 | 420 | 2060 | 7.00 | 83.21 | 1456 |
 | cases/structs/fields/variant_field_struct_payload | 0 | 0 | 0 | 243 | 948 | 1.00 | 83.96 | 1456 |
+| cases/structs/for_loop_destructure | 58 | 3241 | 451 | 1530 | 3956 | 27.00 | 169.35 | 1504 |
 | cases/structs/generic_box | 0 | 0 | 0 | 100 | 560 | 1.00 | 84.06 | 1456 |
 | cases/structs/generic_container_field | 0 | 0 | 0 | 58 | 260 | 2.00 | 81.86 | 1456 |
 | cases/structs/generic_default_field | 0 | 0 | 0 | 111 | 648 | 2.00 | 82.43 | 1440 |
@@ -669,9 +670,9 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/find_files | 19 | 1096 | 1040 | 1841 | 6544 | 12.00 | 89.11 | 1520 |
 | crates/aipl-codegen/src/find_trailing_whitespace | 0 | 0 | 0 | 6230 | 2488 | 3.00 | 91.19 | 1440 |
 | crates/aipl-codegen/src/format | 2287 | 185153 | 19208 | 313161 | 180428 | 215.00 | 1925.27 | 1968 |
-| crates/aipl-codegen/src/format_source | 16675 | 4249054 | 491971 | 11316128 | 5940388 | 2592.00 | 22396.62 | 5360 |
+| crates/aipl-codegen/src/format_source | 16675 | 4249054 | 491971 | 11316128 | 5944492 | 2481.00 | 22370.24 | 5328 |
 | crates/aipl-codegen/src/grammar | 767 | 96951 | 49216 | 84139 | 108356 | 88.00 | 566.95 | 1728 |
-| crates/aipl-codegen/src/grammar_aipl | 1822005 | 379691236 | 924143 | 607542040 | 5351060 | 155038.00 | 15191.96 | 9920 |
+| crates/aipl-codegen/src/grammar_aipl | 1831029 | 381571242 | 924143 | 611408125 | 5352428 | 152761.00 | 14860.04 | 9728 |
 | crates/aipl-codegen/src/grammar_calc | 10185 | 1168142 | 42260 | 3434067 | 318128 | 975.00 | 3783.36 | 2576 |
 | crates/aipl-codegen/src/grammar_json | 19773 | 2806348 | 35129 | 7239360 | 341920 | 1940.00 | 3634.71 | 2720 |
 | crates/aipl-codegen/src/grammar_sexp | 5752 | 630255 | 13968 | 2083842 | 308036 | 645.00 | 3613.26 | 2352 |
@@ -706,7 +707,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/trim_suffix | 0 | 0 | 0 | 351 | 1128 | 2.00 | 78.87 | 1456 |
 | crates/aipl-codegen/src/ty | 84 | 6766 | 6362 | 5280 | 14168 | 14.00 | 105.03 | 1552 |
 | crates/aipl-codegen/src/unescape | 6 | 528 | 352 | 10330 | 8116 | 6.00 | 93.14 | 1472 |
-| crates/aipl-codegen/src/walker | 99316 | 23345069 | 853319 | 67941497 | 15429976 | 14748.00 | 34195.69 | 10640 |
+| crates/aipl-codegen/src/walker | 99634 | 23438381 | 861400 | 69145311 | 15735424 | 13748.00 | 34053.73 | 10800 |
 | crates/aipl-mono/src/builtin_all | 1 | 32 | 32 | 1378 | 3444 | 3.00 | 85.84 | 1488 |
 | crates/aipl-mono/src/builtin_any | 1 | 32 | 32 | 1160 | 3336 | 3.00 | 85.82 | 1488 |
 | crates/aipl-mono/src/builtin_count | 1 | 104 | 104 | 1628 | 2292 | 3.00 | 83.47 | 1456 |

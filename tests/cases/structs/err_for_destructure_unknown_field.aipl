@@ -1,0 +1,16 @@
+# The fields a `for` pattern reads have to exist on the struct.
+
+struct P { x: i64 }
+
+fn f(ps: P[]) -> i64 {
+    for (let P { z } : ps) {
+        return z;
+    }
+    0
+}
+--- errors ---
+error: struct P has no field "z"
+ --> ./tests/cases/structs/err_for_destructure_unknown_field.aipl:6:24
+  |
+6 |     for (let P { z } : ps) {
+  |                        ^^

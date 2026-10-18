@@ -1184,7 +1184,7 @@
           </h3>
           <pre class="signature"><code>fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>for_stmt</code> — the plain loop, the indexed one, the tuple-destructuring one, and the indexed tuple-destructuring one. A <code>(</code> after the <code>let</code> opens the tuple form, a <code>(</code> after the first name's comma the indexed tuple form; otherwise the number of names says whether an index was written.</p></div>
+          <div class="doc"><p><code>for_stmt</code> — the plain loop and the two patterns a <code>let</code> takes apart a value with, tuple and struct, each with or without an index in front: <code>for (let x</code>, <code>for (let (a, b)</code>, <code>for (let T { a, b }</code>, and <code>for (let i, </code> before any of the three. A comma after the first name says an index was written; the pattern then starts after it, and what follows the pattern's first token — a <code>(</code>, or a name and then <code>{</code> — says which it is.</p></div>
 
 
         </section>
@@ -1200,6 +1200,21 @@
 
           <div class="doc"><p><code>for (let (a, b) : xs) { body }</code> is a plain loop over a temporary with the field reads prepended to the body:</p><pre><code>for (let __fpat$N : xs) { let a = __fpat$N._0; let b = __fpat$N._1; body }
 </code></pre><p>With an <code>index</code> — <code>for (let i, (a, b) : xs)</code> — it is the indexed loop over that same temporary, so the counter and the pattern compose exactly as each does alone: <code>for_chain</code> binds <code>i</code> outside the field reads.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-for_struct">
+          <h3>
+            <a class="anchor" href="#item-for_struct">for_struct</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn for_struct(struct_name: str, fields: str[], names: str[], index: str?, iterable: Expr, body: Expr) -&#62; Stmt</code></pre>
+
+          <div class="doc"><p><code>for (let T { a, b as c } : xs) { body }</code> is a plain loop over a temporary whose fields are read in front of the body, as <code>let T { a, b as c } = value;</code> reads them — and through the same desugaring, so the pattern's type is checked the same way: the temporary is rebound under the struct's name before its fields are taken, which is what rejects a pattern naming a different struct.</p><pre><code>for (let __fpat$N : xs) { let __spat$N: T = __fpat$N; let a = __spat$N.a; body }
+</code></pre><p>With an <code>index</code> it is the indexed loop over that temporary, as <code>for_tuple</code>'s is.</p></div>
 
 
         </section>
@@ -2079,7 +2094,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$133761: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$135321: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
