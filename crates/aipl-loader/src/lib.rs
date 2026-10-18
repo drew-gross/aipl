@@ -29,6 +29,22 @@ use aipl_syntax::ast::{
 };
 use aipl_syntax::{DebugOptions, Error, Span};
 
+/// The extension an AIPL source file carries, without the dot.
+pub const SOURCE_EXTENSION: &str = "aipl";
+
+/// Whether `path` names an AIPL source file, which is to say ends in `.aipl`.
+/// Fails with the error to report when it does not, naming the path. Case matters:
+/// `.AIPL` is not `.aipl`. Suitable for refusing a file before it is read.
+pub fn require_source_extension(path: &Path) -> Result<(), Error> {
+    if path.extension().is_some_and(|ext| ext == SOURCE_EXTENSION) {
+        return Ok(());
+    }
+    Err(Error::msg(format!(
+        "{}: not an AIPL source file, whose name must end in `.{SOURCE_EXTENSION}`",
+        path.display()
+    )))
+}
+
 /// Parse `root`, recursively resolve every `import`, and return a single
 /// merged [`Program`] ready for codegen.
 ///
@@ -55,6 +71,7 @@ pub fn load_program_rooted(
     project_root: &Path,
     dbg: DebugOptions,
 ) -> Result<Program, Vec<Error>> {
+    require_source_extension(root)?;
     let root_canon = canonicalize(root)?;
     let mut loader = Loader {
         dbg,
@@ -93,6 +110,7 @@ pub fn load_program_overlay(
     source: &str,
     dbg: DebugOptions,
 ) -> Result<Program, Vec<Error>> {
+    require_source_extension(root)?;
     let root_canon = canonicalize(root)?;
     let mut loader = Loader {
         dbg,
@@ -318,6 +336,16 @@ impl Loader {
                     ImportSource::Path { path: from, span } => {
                         let parent = path.parent().unwrap_or_else(|| Path::new("."));
                         let candidate = parent.join(&from);
+                        // Before the file is looked for, so a wrong extension is
+                        // reported as that and not as a file that does not exist.
+                        require_source_extension(&candidate).map_err(|_| {
+                            Error::at(
+                                format!(
+                                    "import {from:?}: an imported file's name must end in `.{SOURCE_EXTENSION}`"
+                                ),
+                                span.clone(),
+                            )
+                        })?;
                         let canon = canonicalize(&candidate).map_err(|e| {
                             Error::at(format!("import {from:?}: {}", e.message), span)
                         })?;

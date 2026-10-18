@@ -166,6 +166,15 @@ dev loop:
 
 self-hosting:
   make formatter command that is fully self-hosted
+  rough order of what's left:
+    lints
+      #[allow] sidechannel disappears
+    loader
+      `bake`, import resolution, flatten
+    checker
+    type and builtin tables
+    mono and optimizer
+    codegen and runtime
 
 highlighter:
   #[allow] should highlight severely
@@ -230,6 +239,7 @@ bugs:
     It needs the binding held while both a scalar field and the boxed-optional field are read — reading only .next allocates 1 and balances, reading only .val elides the allocation entirely. That's presumably why recursive_struct.aipl and recursive_list.aipl never tripped it. My boxed case is reshaped to cover the boxed store path without hitting it
 
 errors:
+  make it possible to report multiple errors when one of them is an invalid char literal (lexer upgrade)
   report multiple errors when one call site has multiple type errors
   report multiple errors when there is a badly typed let
 

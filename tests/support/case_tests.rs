@@ -301,6 +301,7 @@ case_tests! {
     cases_imports_err_import_collides_with_local = "cases/imports/err_import_collides_with_local",
     cases_imports_err_import_collides_with_local_in_imported_file = "cases/imports/err_import_collides_with_local_in_imported_file",
     cases_imports_err_import_imported_twice = "cases/imports/err_import_imported_twice",
+    cases_imports_err_import_non_aipl_file = "cases/imports/err_import_non_aipl_file",
     cases_imports_err_import_private = "cases/imports/err_import_private",
     cases_imports_err_importing_nonexistent_name = "cases/imports/err_importing_nonexistent_name",
     cases_imports_err_internal_builtin = "cases/imports/err_internal_builtin",

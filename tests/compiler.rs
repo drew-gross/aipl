@@ -36,6 +36,8 @@ mod projects;
 mod report;
 #[path = "suites/shims.rs"]
 mod shims;
+#[path = "suites/source_extension.rs"]
+mod source_extension;
 
 use std::collections::BTreeMap;
 use std::path::Path;

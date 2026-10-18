@@ -1,0 +1,17 @@
+# An imported file has to be named `*.aipl`, and the import is refused on its
+# name before anything looks for the file — so this fails the same way for a
+# file that exists, as here, and for one that does not.
+
+import { greeting } from "./greeting.txt";
+
+fn main() {
+    greeting();
+}
+--- file: greeting.txt ---
+pub fn greeting() {}
+--- errors ---
+error: import "./greeting.txt": an imported file's name must end in `.aipl`
+ --> ./tests/cases/imports/err_import_non_aipl_file.aipl:5:26
+  |
+5 | import { greeting } from "./greeting.txt";
+  |                          ^^^^^^^^^^^^^^^^

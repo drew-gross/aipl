@@ -135,6 +135,9 @@ the document outline, formatting, and diagnostics. An editor should spawn the
 `aipl` sitting in the project (see DESIGN_PRINCIPLES.md §4) so that what it
 reports is what `aipl check` reports.
 
+A source file's name must end in `.aipl`, and so must any file it imports; a
+command refuses any other before reading it.
+
 args to `run` are parsed as i64. Functions of arity 0, 1, or 2 are supported.
 `build` requires `clang` on PATH (used as linker driver).
 
@@ -216,7 +219,7 @@ fn collect_aipl(dir: &Path, out: &mut Vec<PathBuf>) {
         let path = entry.path();
         if path.is_dir() {
             collect_aipl(&path, out);
-        } else if path.extension() == Some(OsStr::new("aipl")) {
+        } else if path.extension() == Some(OsStr::new(loader::SOURCE_EXTENSION)) {
             out.push(path);
         }
     }
@@ -629,6 +632,10 @@ fn check_cmd(args: &[String]) -> ExitCode {
         if path.is_dir() {
             collect_aipl(path, &mut files);
         } else if path.exists() {
+            if let Err(e) = loader::require_source_extension(path) {
+                eprintln!("{e}");
+                return ExitCode::FAILURE;
+            }
             files.push(path.to_path_buf());
         } else {
             eprintln!("no such file or directory: {arg}");
@@ -839,6 +846,11 @@ fn report_cmd(args: &[String]) -> ExitCode {
         eprintln!("missing source file");
         return ExitCode::FAILURE;
     };
+    // Named as the user wrote it, before the path is made absolute below.
+    if let Err(e) = loader::require_source_extension(Path::new(file)) {
+        eprintln!("error: {e}");
+        return ExitCode::FAILURE;
+    }
     let Ok(path) = std::fs::canonicalize(file) else {
         eprintln!("no such file: {file}");
         return ExitCode::FAILURE;
@@ -956,6 +968,7 @@ fn ir_cmd(args: &[String]) -> Result<(), String> {
 fn doc_cmd(args: &[String]) -> Result<(), String> {
     let (args, _dbg) = take_debug_flag(args);
     let file = args.first().ok_or("missing source file")?;
+    loader::require_source_extension(Path::new(file)).map_err(|e| e.to_string())?;
     let src = std::fs::read_to_string(file).map_err(|e| format!("{file}: {e}"))?;
     // Strip any trailing `--- .. ---` harness sections (some `.aipl` files carry
     // a `--- stdout ---` block) so the source parses on its own.
@@ -1056,6 +1069,7 @@ fn docs_cmd(args: &[String]) -> Result<(), String> {
     for path in &paths {
         let path = Path::new(path);
         if path.is_file() {
+            loader::require_source_extension(path).map_err(|e| e.to_string())?;
             files.push(path.to_path_buf());
         } else {
             collect_aipl(path, &mut files);
