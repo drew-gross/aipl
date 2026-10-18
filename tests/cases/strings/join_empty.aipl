@@ -1,0 +1,44 @@
+# Joining nothing gives nothing, whatever the call knows about what it is
+# joining. With a typed receiver or a separator the result has that type: the
+# empty string, or the empty array. With neither — `join([])`, `[].join()` —
+# nothing names an element type, so the result is the untyped empty array `[]`
+# is (`__none__[]`): it renders as `[]` and coerces to any `T[]`, the way the
+# literal does. It used to be an error, "cannot tell what it is joining".
+
+import { join, len, print } from builtins;
+
+fn main() !prints {
+    // The parts have a type, so the separator is not needed to name it.
+    let words: str[] = [];
+    print(`[{words.join()}]`);
+    print(`[{words.join(sep=", ")}]`);
+
+    // An array of arrays joins to an array: the empty one.
+    let rows: i64[][] = [];
+    print(`{rows.join()}`);
+
+    // The separator names the type when the parts are an empty literal.
+    print(`[{[].join(sep=",")}]`);
+
+    // Nothing names it at all: the untyped empty array.
+    print(`{join([])}`);
+    print(`{[].join()}`);
+    let nothing = join([]);
+    print(`{nothing.len()}`);
+
+    // ... which coerces to whatever the binding asks for.
+    let numbers: i64[] = join([]);
+    print(`{numbers}`);
+    let lines: str[] = [].join();
+    print(`{lines}`);
+}
+--- stdout ---
+[]
+[]
+[]
+[]
+[]
+[]
+0
+[]
+[]

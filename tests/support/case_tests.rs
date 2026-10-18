@@ -707,6 +707,7 @@ case_tests! {
     cases_strings_int_to_str_negatives = "cases/strings/int_to_str/negatives",
     cases_strings_is_all_whitespace = "cases/strings/is_all_whitespace",
     cases_strings_join = "cases/strings/join",
+    cases_strings_join_empty = "cases/strings/join_empty",
     cases_strings_join_gap_separators = "cases/strings/join_gap_separators",
     cases_strings_len = "cases/strings/len",
     cases_strings_literals_err_incomplete_escape = "cases/strings/literals/err_incomplete_escape",

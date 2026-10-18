@@ -12170,6 +12170,11 @@ fn emit_render<M: Module>(
         // read via the same byte cursor `for`-loop iteration uses, since
         // `value` is a real `str` underneath, not a generic array block.
         _ if is_char_array(ty) => emit_render_char_array(module, builder, cx, value, sink)?,
+        // An untyped empty array (`[]`, or a `join` of nothing) has no elements to
+        // render and no element type to render them with: it is `[]`.
+        ConcreteType::Array(elem) if is_none_inner(elem) => {
+            emit_lit(module, builder, cx, sink, b"[]")?
+        }
         ConcreteType::Array(elem) => {
             let view = arr_view(builder, value, ty, cx.structs);
             emit_render_seq(module, builder, cx, view, elem, sink, b'[', b']')?
@@ -15891,13 +15896,17 @@ fn compile_call_expr<M: Module>(
                     ConcreteType::Primitive(Primitive::Char) => {
                         ConcreteType::Primitive(Primitive::Str)
                     }
-                    // Both sides empty: nothing anywhere names `T`.
+                    // Both sides empty: nothing anywhere names `T`, so there is no
+                    // representation to choose between — and none is needed, since
+                    // the result is empty too. It is the same untyped empty array
+                    // `[]` is, which coerces to whatever the caller wants.
                     ConcreteType::Array(e) if is_none_inner(e) => {
-                        return Err(Error::at(
-                            "\"join\" cannot tell what it is joining: the parts and the \
-                             separator are both empty, so neither names an element type"
-                                .to_string(),
-                            receiver.span.clone(),
+                        let block = emit_const_empty(module, builder, cx)?;
+                        let zero = builder.ins().iconst(types::I64, 0);
+                        let empty = arr_val_of_len(builder, block, zero);
+                        return Ok((
+                            empty,
+                            ConcreteType::Array(Box::new(ConcreteType::NoneInner)),
                         ));
                     }
                     // A `T[]` separator is already the parts' element type; a

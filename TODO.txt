@@ -151,9 +151,6 @@ misc cleanup:
   min/max shouldn't allow mixed integer types
   split pub mod lint and pub mod ast into separate files
 
-join:
-  join([]) errors now, should just propagate empty array probably?
-
 integer signedness problems:
   2. Literals don't flex through a constructor — ok(0) in a -> u64!E function types its payload i64, so three "declined" sites need let declined: u64 = 0; first. Literals flex fine into an annotated let, a parameter, or a struct field — just not through ok/err/some. Should do this after bounds so "flex" types can propagate as un-chosed bounds until restricted as which point they propagate back through.
   3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.

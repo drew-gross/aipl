@@ -523,6 +523,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/strings/int_to_str/negatives | 3 | 89 | 89 | 80 | 400 | 5.00 | 80.06 | 1456 |
 | cases/strings/is_all_whitespace | 0 | 0 | 0 | 1273 | 996 | 1.00 | 128.63 | 1456 |
 | cases/strings/join | 13 | 825 | 591 | 552 | 2936 | 4.00 | 83.70 | 1472 |
+| cases/strings/join_empty | 8 | 415 | 298 | 344 | 2004 | 8.00 | 184.19 | 1456 |
 | cases/strings/join_gap_separators | 10 | 720 | 681 | 946 | 2080 | 6.00 | 87.19 | 1456 |
 | cases/strings/len | 0 | 0 | 0 | 156 | 664 | 1.00 | 81.55 | 1440 |
 | cases/strings/literals/print_empty_string | 0 | 0 | 0 | 39 | 212 | 2.00 | 81.39 | 1472 |
