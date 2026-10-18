@@ -1,11 +1,30 @@
 import {
+    count_if,
     equal as ==,
+    greater_than as >,
+    is_empty,
     is_whitespace,
+    join,
+    len,
+    logical_and as &&,
     logical_not as !,
+    logical_or as ||,
     print,
+    push,
     read_file_to_string,
+    starts_with,
+    wrapping_add as +,
     wrapping_increment as ++,
 } from builtins;
+
+# What `wc` counts in one input.
+struct Counts { lines: u64, words: u64, bytes: u64 }
+
+# Which of the counts a row shows, in `wc`'s fixed order.
+struct Columns { lines: bool, words: bool, bytes: bool }
+
+# A parsed command line: the columns to show, and the files to count.
+struct Invocation { columns: Columns, paths: str[] }
 
 # The number of words in `self`, a word being any run of non-whitespace
 # characters.
@@ -58,24 +77,161 @@ pub fn word_count(self: str) -> u64 {
     assert(word_count("a,b c") == 2);
 })
 
-# Count the words in the file named by the single command-line argument, print
-# the count, and exit 0. Exits 1 — after saying why — when no path was given or
-# the file could not be read.
-fn main(args: str[]) !prints !read_files -> i64 {
-    match (args[0]) {
-        none => {
-            print("usage: word_count <file>");
-            1
+# The number of lines in `self`: `wc -l` counts newline characters, so a final
+# line with no newline after it is not counted.
+pub fn line_count(self: str) -> u64 { self.count_if(|c| c == '\n') }.test({
+    assert(line_count("") == 0);
+    assert(line_count("no newline") == 0);
+    assert(line_count("one\n") == 1);
+    assert(line_count("one\ntwo") == 1);
+    assert(line_count("\n\n\n") == 3);
+})
+
+# Every count `wc` reports for `self`. The byte count is the length of the
+# string, which is in bytes.
+pub fn counts(self: str) -> Counts {
+    lines: self.line_count(),
+    words: self.word_count(),
+    bytes: self.len(),
+}.test({
+    assert(counts("") == Counts { lines: 0, words: 0, bytes: 0 });
+    assert(counts("one two\nthree\n") == Counts { lines: 2, words: 3, bytes: 14 });
+    // Bytes, not characters: `é` is two.
+    assert(counts("é") == Counts { lines: 0, words: 1, bytes: 2 });
+})
+
+# `a` and `b` counted together, as for the `total` row.
+fn add(a: Counts, b: Counts) -> Counts {
+    lines: a.lines + b.lines,
+    words: a.words + b.words,
+    bytes: a.bytes + b.bytes,
+}.test({
+    assert(add(
+        Counts { lines: 1, words: 2, bytes: 3 },
+        Counts { lines: 10, words: 20, bytes: 30 },
+    ) == Counts { lines: 11, words: 22, bytes: 33 });
+})
+
+# One output line: the counts `columns` selects, then `label`, separated by single
+# spaces.
+fn row(c: Counts, columns: Columns, label: str) -> str {
+    mut cells: str[] = [];
+    if (columns.lines) {
+        set cells.push(`{c.lines}`);
+    };
+    if (columns.words) {
+        set cells.push(`{c.words}`);
+    };
+    if (columns.bytes) {
+        set cells.push(`{c.bytes}`);
+    };
+    set cells.push(label);
+    cells.join(sep=" ")
+}.test({
+    let c = Counts { lines: 2, words: 3, bytes: 14 };
+    assert(row(c, Columns { lines: true, words: true, bytes: true }, "a.txt") == "2 3 14 a.txt");
+    assert(row(c, Columns { lines: false, words: true, bytes: false }, "a.txt") == "3 a.txt");
+    assert(row(c, Columns { lines: true, words: false, bytes: true }, "total") == "2 14 total");
+})
+
+# The columns and files named by `args`. An argument starting with `-` is a set
+# of options, one letter each (`-l`, `-w`, `-c`, and so `-lw`); anything else is
+# a file. With no option the columns are lines, words and bytes, as in `wc`.
+fn parse_args(args: str[]) -> Invocation!str {
+    mut lines = false;
+    mut words = false;
+    mut bytes = false;
+    mut paths: str[] = [];
+    for (let arg : args) {
+        if (arg.starts_with('-') && arg.len() > 1) {
+            for (let c : arg[1..]) {
+                if (c == 'l') {
+                    set lines = true;
+                } else if (c == 'w') {
+                    set words = true;
+                } else if (c == 'c') {
+                    set bytes = true;
+                } else if (c == 'm') {
+                    return err(
+                        "-m is not supported: nothing counts characters yet, use -c for bytes",
+                    );
+                } else {
+                    return err(`unknown option -{c}`);
+                };
+            }
+        } else {
+            set paths.push(arg);
+        };
+    }
+    let none_chosen = !lines && !words && !bytes;
+    ok(Invocation {
+        columns: Columns {
+            lines: lines || none_chosen,
+            words: words || none_chosen,
+            bytes: bytes || none_chosen,
         },
-        some(path) => match (read_file_to_string(path)) {
+        paths,
+    })
+}.test({
+    let all = Columns { lines: true, words: true, bytes: true };
+    assert(parse_args([])? == Invocation { columns: all, paths: [] });
+    assert(parse_args(["a", "b"])? == Invocation { columns: all, paths: ["a", "b"] });
+    assert(parse_args(["-w", "a"])? == Invocation {
+        columns: Columns { lines: false, words: true, bytes: false },
+        paths: ["a"],
+    });
+    // Options combine, in either spelling and wherever they appear.
+    let lines_and_bytes = Columns { lines: true, words: false, bytes: true };
+    assert(parse_args(["-lc", "a"])? == Invocation { columns: lines_and_bytes, paths: ["a"] });
+    assert(parse_args(["a", "-l", "-c"])? == Invocation { columns: lines_and_bytes, paths: ["a"] });
+    // A lone `-` is not an option.
+    assert(parse_args(["-"])? == Invocation { columns: all, paths: ["-"] });
+    assert(parse_args(["-x"]) == err("unknown option -x"));
+    assert(parse_args(["-lx"]) == err("unknown option -x"));
+    assert(parse_args(["-m"]) == err(
+        "-m is not supported: nothing counts characters yet, use -c for bytes",
+    ));
+})
+
+# Print the row for each of `paths`, and a `total` row after them when there is
+# more than one. A file that cannot be read is reported and skipped; the others
+# are still counted. Returns the exit code: 0 if every file was read, 1 if not.
+fn count_files(paths: str[], columns: Columns) !prints !read_files -> i64 {
+    mut total = Counts { lines: 0, words: 0, bytes: 0 };
+    mut status = 0;
+    for (let path : paths) {
+        match (read_file_to_string(path)) {
             ok(contents) => {
-                print(`{word_count(contents)}`);
-                0
+                let c = counts(contents);
+                print(row(c, columns, path));
+                set total = add(total, c);
             },
             err(e) => {
                 print(`word_count: {path}: {e}`);
-                1
+                set status = 1;
             },
+        };
+    }
+    if (paths.len() > 1) {
+        print(row(total, columns, "total"));
+    };
+    status
+}
+
+# Count lines, words and bytes in each file named on the command line, like `wc`.
+# Exits 0 if every file was counted; exits 1 — after saying why — for a bad
+# option, for no file at all, or if a file could not be read.
+fn main(args: str[]) !prints !read_files -> i64 {
+    match (parse_args(args)) {
+        err(e) => {
+            print(`word_count: {e}`);
+            1
+        },
+        ok(invocation) => if (invocation.paths.is_empty()) {
+            print("usage: word_count [-lwc] <file>...");
+            1
+        } else {
+            count_files(invocation.paths, invocation.columns)
         },
     }
 }

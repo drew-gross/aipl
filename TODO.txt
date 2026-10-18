@@ -8,13 +8,17 @@ variant:
   Allow variants to be passed to HOFs, you can e.g. v.map(VariantConstructor).
 
 projects:
+  get rid of aipl.build, maybe by checking in the compiler in the main project also? Or use hard links?
   let `aipl run` call non-main functions and take other files (e.g. word_count on a file)
   word_count:
-    make it more compatible with wc
-    make exit code stuff make more sense
-  get rid of aipl.build, maybe by checking in the compiler in the main project also?
-  web server
-  Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
+    benchmark against wc
+    -m (count characters; needs a way to see UTF-8 continuation bytes), reading stdin, wc's column padding
+  web server:
+  ray tracer:
+    https://raytracing.github.io/books/RayTracingInOneWeekend.html
+
+argparser:
+  make it
 
 vscode extension:
   one language server per workspace folder, so a multi-root workspace uses each
@@ -407,6 +411,7 @@ utilities:
   string_with_span -> strings already are represented as pointer+slice half the time, exposing that representation should make a lot of parser/grammer stuff cleaner
 
 skills:
+  make "develop aipl project" skill that describes how currently projects are for dogfooding the compiler, working on a project should work like how it works for users, and should generate ideas for how to improve the language or dev loop, but not implement them (I'll record the suggestions for later implementation)
   make an "add lint" skill that describes how to lint against a reimplementation
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
@@ -791,6 +796,7 @@ the arg contract being different for builtins caused problems for retain elision
 - should retain elision elide only the top of a structure? Is is already doing that?
 
 docs:
+  aipl doc command should have nicer formatting, and top-level formatting.
   delete BUILTIN_SIGS, turn it into properties of Callee, integrate into doc
   docs on struct fields
   docs for top-level lets
