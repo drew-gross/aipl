@@ -2285,6 +2285,14 @@ impl ConcreteFn {
         self.params.first().is_some_and(|p| p.mutable)
     }
 
+    /// Whether the body names the function itself, as a call or as a value.
+    /// Direct only: two functions that name each other are not recursive by this
+    /// test. Matches by name, so a local that rebinds the name would count too.
+    /// Suitable as a guard before copying the body somewhere else.
+    pub fn is_directly_recursive(&self) -> bool {
+        references_name(&self.body, &self.name)
+    }
+
     /// `main` declared with no return type: it returns nothing, and its exit
     /// code is implicitly 0. As the program entry it still needs an `i64`
     /// result, which codegen gives it (emitting 0) — but its body is
@@ -9725,8 +9733,8 @@ pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
         let mut replaced = false;
         for it in &mut program.items {
             if let Item::Fn(g) = it {
-                // Not into itself: `is_inline_shape` already rejected a
-                // self-referencing body, but a candidate is still its own item.
+                // Not into itself: a self-referencing body was already rejected
+                // (`references_name`), but a candidate is still its own item.
                 if g.name == f.name {
                     continue;
                 }
@@ -9790,8 +9798,10 @@ fn inline_candidates(
                             .iter()
                             .any(|p| matches!(p.ty, Type::Fn(_, _)) || p.arity.is_variadic()),
                         &f.body,
-                        &f.name,
-                    ) =>
+                    )
+                    // Not recursive: every copy would carry the call back to `f`, so
+                    // inlining would never get rid of it.
+                    && !references_name(&f.body, &f.name) =>
             {
                 Some(f.clone())
             }
@@ -9954,8 +9964,10 @@ pub fn inline_small_post_mono(
                         .iter()
                         .any(|p| matches!(p.ty, ConcreteType::Fn(_, _))),
                     &f.body,
-                    &f.name,
                 )
+                // Not recursive: every copy would carry the call back to `f`, so
+                // inlining would never get rid of it.
+                && !f.is_directly_recursive()
         })
         .cloned()
         .collect();
@@ -9980,7 +9992,7 @@ pub fn inline_small_post_mono(
             .collect();
         let mut replaced = false;
         for g in &mut program.fns {
-            // Not into itself: `is_inline_shape` rejected a self-referencing
+            // Not into itself: `is_directly_recursive` rejected a self-referencing
             // body, but a candidate is still its own function.
             if g.name == f.name {
                 continue;
@@ -10034,14 +10046,18 @@ fn is_inline_candidate(
         && is_inline_shape(
             f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _)) || p.arity.is_variadic()),
             &f.body,
-            &f.name,
         )
+        // Not recursive: the definition is dropped once its one call is inlined,
+        // so a body that calls itself would be left calling a function that is
+        // gone. (A candidate's name is never rebound — `binders` above — so a
+        // match by name is exact.)
+        && !references_name(&f.body, &f.name)
 }
 
 /// The shape checks shared by [`is_inline_candidate`] and
 /// [`is_inline_candidate_mono`]: not a higher-order template (those resolve via
-/// mono), and the body has no early exit, no in-place HOF intrinsic, and no
-/// self-reference. The pre-mono caller additionally folds "or variadic" into
+/// mono), and the body has no early exit and no in-place HOF intrinsic. The
+/// pre-mono caller additionally folds "or variadic" into
 /// `higher_order_or_variadic` — variadic resolution is also a mono job — but the
 /// post-mono [`ConcreteParam`] has no `variadic` field to check
 /// (`specialize_variadic` has already resolved every parameter by the time a
@@ -10052,7 +10068,7 @@ fn is_inline_candidate(
 /// would have produced nonsense; [`build_inlined`] now binds that receiver
 /// `mut` and yields it, which is what a call to such a method means in either
 /// position it can appear.
-fn is_inline_shape(higher_order_or_variadic: bool, body: &Expr, name: &str) -> bool {
+fn is_inline_shape(higher_order_or_variadic: bool, body: &Expr) -> bool {
     !higher_order_or_variadic
         // An early exit does not disqualify a body any more, as long as it can
         // be rewritten into an expression that produces the same value — a
@@ -10062,7 +10078,6 @@ fn is_inline_shape(higher_order_or_variadic: bool, body: &Expr, name: &str) -> b
         // disagree about what is inlinable.
         && early_exit::without_early_exits(body).is_some()
         && !contains_inplace_hof_intrinsic(body)
-        && !references_name(body, name)
 }
 
 /// Every name bound by a parameter / `let` / `for` / `match` arm / lambda
@@ -10114,8 +10129,12 @@ fn is_inline_candidate_mono(
                 .iter()
                 .any(|p| matches!(p.ty, ConcreteType::Fn(_, _))),
             &f.body,
-            &f.name,
         )
+        // Not recursive: the definition is dropped once its one call is inlined,
+        // so a body that calls itself would be left calling a function that is
+        // gone. (A candidate's name is never rebound — `binders` above — so a
+        // match by name is exact.)
+        && !f.is_directly_recursive()
 }
 
 /// [`use_counts`] for a [`MonoProgram`].

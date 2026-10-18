@@ -476,6 +476,25 @@ has: paragraphs, `` `code spans` `` (a run of backticks, so a span can hold one)
 `- ` lists, and `**bold**`/`*emphasis*`. Headings, links and tables render as the
 characters they are written with.
 
+## Say why at the use, what at the definition
+A comment about **what a function is being used for** goes at the site that uses
+it; a comment about **what a function does** goes at its definition. They age
+differently: a use is one caller's reason, and it changes (or goes) with that
+caller, while the definition has to be true for every caller there will be.
+
+So the reason a guard exists belongs beside the guard — `// Not recursive: the
+definition is dropped once its call is inlined, so …` next to
+`!f.is_directly_recursive()` — and the definition of `is_directly_recursive`
+says what it tests, what it does not (direct recursion only), and how it
+decides (by name). At most the definition adds a brief "suitable as a guard
+before copying the body somewhere else"; it does not argue the case for any one
+caller, and it does not list its callers. A reader at the definition learns what
+they may rely on; a reader at the call learns why it is there.
+
+If you find a definition explaining one particular caller's reasoning, move that
+to the caller (every caller that has the reason, each in its own words), and
+leave the definition describing the function.
+
 ## Operators must be imported — always as `name as op`
 Operators are not ambient, and **none of them has a bare form**. Every operator is
 imported by aliasing its named builtin:
