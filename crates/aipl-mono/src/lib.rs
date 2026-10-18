@@ -9450,9 +9450,9 @@ pub(crate) fn count_uses(
 /// Inline every single-use private function in `program` and drop it. Returns the
 /// rewritten program (a clone, unchanged when the gate below fails). Conservative
 /// (see `is_inline_candidate`): only direct, exactly-once, exact-arity calls to
-/// non-`pub`, non-generic, non-higher-order, `return`/`?`-free, non-recursive
-/// functions are inlined. Repeats to a fixpoint, since inlining
-/// `f` into `g` can make `g` itself single-use.
+/// non-`pub`, non-generic, non-higher-order, non-recursive functions whose early
+/// exits can be rewritten into expressions are inlined. Repeats to a fixpoint,
+/// since inlining `f` into `g` can make `g` itself single-use.
 pub fn inline_single_use(program: &Program) -> Program {
     let has_fn = |n: &str| {
         program
@@ -9761,10 +9761,10 @@ pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
                 });
             }
         }
-        // Drop the definition only if nothing names it any more — an `Ident` use
-        // (the function as a value) keeps it alive, as does a `pub` name that
-        // another file may still call, as does any reference from a `.test`
-        // block.
+        // The definition stays. Something else may still name it — an `Ident` use
+        // (the function as a value), a `pub` name another file may call, a
+        // reference from a `.test` block — and the monomorphizer prunes whatever
+        // nothing reaches.
         let _ = replaced;
     }
     program
@@ -9788,10 +9788,20 @@ fn inline_candidates(
                 if body_size(&f.body) <= max_exprs
                     && wanted.is_none_or(|w| w.contains(f.name.as_str()))
                     && f.name != "main"
+                    // A generic function is instantiated per call site by
+                    // monomorphization.
                     && f.sig.type_vars.is_empty()
+                    // An `any`-bearing parameter (or return) is specialized by
+                    // monomorphization at the call site. Inlining removes the call,
+                    // so the specialization never happens and the pseudo-type
+                    // reaches codegen.
                     && !f.sig.params.iter().any(|p| mentions_abstract_type(&p.ty))
                     && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
+                    // Never rebound by a local, so a call site means the function
+                    // it appears to.
                     && !binders.contains(f.name.as_str())
+                    // A function-typed or variadic parameter is resolved per call
+                    // site by monomorphization, which inlining here would skip.
                     && is_inline_shape(
                         f.sig
                             .params
@@ -9958,7 +9968,12 @@ pub fn inline_small_post_mono(
                 // A `.test` body's name changes what `?` means inside it — see
                 // `is_inline_candidate_mono`.
                 && !aipl_syntax::is_test_body(&f.name)
+                // Never rebound by a local, so a call site means the function it
+                // appears to.
                 && !binders.contains(f.name.as_str())
+                // A higher-order function (one with a function-typed parameter)
+                // is not inlined. Variadic parameters need no check:
+                // `specialize_variadic` has already resolved them.
                 && is_inline_shape(
                     f.params
                         .iter()
@@ -10019,6 +10034,10 @@ pub fn inline_small_post_mono(
     program
 }
 
+/// Whether the source function `f` is private, called exactly once, and can be
+/// expanded at that call: `counts` holds each name's number of uses, `binders`
+/// every name any local binds, and `skip` the functions already found to be used
+/// only as a value.
 fn is_inline_candidate(
     f: &Function,
     counts: &HashMap<String, usize>,
@@ -10034,15 +10053,15 @@ fn is_inline_candidate(
         // Never shadowed by a local anywhere, so the single counted use is the
         // only `Call`/`Ident` of this name in the whole program.
         && !binders.contains(f.name.as_str())
+        // A generic function is instantiated per call site by monomorphization.
         && f.sig.type_vars.is_empty()
-        // An `any`-bearing parameter (or return) is *specialized* by
-        // monomorphization, at the call site. Inlining removes the call, so the
+        // An `any`-bearing parameter (or return) is specialized by
+        // monomorphization at the call site. Inlining removes the call, so the
         // specialization never happens and the pseudo-type reaches codegen.
-        // `inline_small` has always had this guard; here it was masked by the
-        // context-literal check, which refused these calls for a different
-        // reason and has since been lifted.
         && !f.sig.params.iter().any(|p| mentions_abstract_type(&p.ty))
         && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
+        // A function-typed or variadic parameter is resolved per call site by
+        // monomorphization, which inlining here would skip.
         && is_inline_shape(
             f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _)) || p.arity.is_variadic()),
             &f.body,
@@ -10054,29 +10073,28 @@ fn is_inline_candidate(
         && !references_name(&f.body, &f.name)
 }
 
-/// The shape checks shared by [`is_inline_candidate`] and
-/// [`is_inline_candidate_mono`]: not a higher-order template (those resolve via
-/// mono), and the body has no early exit and no in-place HOF intrinsic. The
-/// pre-mono caller additionally folds "or variadic" into
-/// `higher_order_or_variadic` — variadic resolution is also a mono job — but the
-/// post-mono [`ConcreteParam`] has no `variadic` field to check
-/// (`specialize_variadic` has already resolved every parameter by the time a
-/// [`ConcreteFn`] exists), so its caller passes just the higher-order check.
+/// Whether a function's body can be moved into a caller as it stands: the
+/// function is not a higher-order or variadic template (`higher_order_or_variadic`),
+/// every early exit in the body can be rewritten into an expression, and the body
+/// holds no in-place higher-order intrinsic. It says nothing about the function's
+/// name, signature or call sites; those are for the caller to check. Suitable as
+/// the shared part of an inlining candidate test.
 ///
-/// A mutating method is *not* excluded. It used to be, because binding its
-/// `mut self` receiver with a plain `let` and taking the body's (void) value
-/// would have produced nonsense; [`build_inlined`] now binds that receiver
+/// A mutating method passes: [`build_inlined`] binds its `mut self` receiver
 /// `mut` and yields it, which is what a call to such a method means in either
 /// position it can appear.
 fn is_inline_shape(higher_order_or_variadic: bool, body: &Expr) -> bool {
     !higher_order_or_variadic
-        // An early exit does not disqualify a body any more, as long as it can
-        // be rewritten into an expression that produces the same value — a
-        // guard clause becoming the `if` it already is. See
-        // `early_exit::without_early_exits`, which `build_inlined` then asks
-        // again to do the rewrite, so the gate and the expansion cannot
-        // disagree about what is inlinable.
+        // A guard clause becomes the `if` it already is, and a `return` in tail
+        // position becomes its value; an exit with no such rewrite (one inside a
+        // loop, a `?`) leaves the body where it is. `build_inlined` asks
+        // `without_early_exits` again to do the rewrite, so the gate and the
+        // expansion cannot disagree about what is inlinable.
         && early_exit::without_early_exits(body).is_some()
+        // `__map_result` rebuilds the reused buffer from the *enclosing*
+        // function's return type, so moving one out of its own frame would leave
+        // the buffer typed as the input element — `i64` instead of `i64[]`. A body
+        // before monomorphization has none, so nothing is rejected there.
         && !contains_inplace_hof_intrinsic(body)
 }
 
@@ -10096,10 +10114,9 @@ fn collect_binders(program: &Program) -> HashSet<String> {
     set
 }
 
-/// [`is_inline_candidate`] for the post-mono [`ConcreteFn`] representation:
-/// every instance is already concrete (no `is_pub`/`type_params` to check —
-/// nothing but `main` is externally reachable, and monomorphization leaves no
-/// type parameters), so only the shared shape checks apply.
+/// [`is_inline_candidate`] for a monomorphized [`ConcreteFn`]. It has no `is_pub`
+/// or type parameters to rule out: nothing but `main` is reachable from outside,
+/// and monomorphization leaves no type parameters.
 fn is_inline_candidate_mono(
     f: &ConcreteFn,
     counts: &HashMap<String, usize>,
@@ -10120,10 +10137,13 @@ fn is_inline_candidate_mono(
         // is compiled against a transfer only a real call boundary performs —
         // the caller hands the slot's reference over (`__move`), the entry makes
         // the block unique, and the return hands it back. Splicing the body into
-        // the caller reproduces none of that, and the receiver then came back
-        // short of what the writeback expected. An ordinary (lent) mutating
-        // method inlines as before (`optimizations/inline_mutating_method`).
+        // the caller reproduces none of that, and the receiver would come back
+        // short of what the writeback expects. An ordinary (lent) mutating method
+        // is inlined (`optimizations/inline_mutating_method`).
         && !(f.is_mutating() && f.params.first().is_some_and(|p| p.owned))
+        // A higher-order function (one with a function-typed parameter) is not
+        // inlined. Variadic parameters need no check: `specialize_variadic` has
+        // already resolved them.
         && is_inline_shape(
             f.params
                 .iter()
@@ -10332,13 +10352,9 @@ pub fn children_mut(e: &mut Expr) -> Vec<&mut Expr> {
     }
 }
 
-/// Whether `e` (or any sub-expression) calls an in-place higher-order intrinsic.
-/// These mark the synthesized `map`/`filter`/`zip_with` loop bodies the
-/// monomorphizer emits; `__map_result` reinterprets the reused buffer using the
-/// *enclosing* function's return type, so such a function can't be inlined out of
-/// its own frame without losing that type (the buffer would stay the input
-/// element type — e.g. `i64` instead of `i64[]`). Never appears pre-mono (these
-/// intrinsics are synthesized during monomorphization), so this is a no-op there.
+/// Whether `e` (or any sub-expression) calls an in-place higher-order intrinsic:
+/// one of the calls the monomorphizer synthesizes for the loop bodies of `map`,
+/// `filter` and `zip_with`. None exists before monomorphization.
 fn contains_inplace_hof_intrinsic(e: &Expr) -> bool {
     if let ExprKind::Call(name, _, _) = &e.kind {
         if matches!(

@@ -495,6 +495,26 @@ If you find a definition explaining one particular caller's reasoning, move that
 to the caller (every caller that has the reason, each in its own words), and
 leave the definition describing the function.
 
+## Comments say what the code is, not what it was
+A comment describes the code as it stands. It does not narrate the code it
+replaced: "this used to refuse X", "no longer needed since …", "any more", "as
+before", "has always had this guard", "has since been lifted". A reader of the
+file sees only the present; a sentence about the past gives them something to
+reconcile with code that no longer has it, and it goes stale the moment the
+history it describes stops being the interesting part. Git has the history.
+
+State the present fact instead — "a body with an early exit qualifies when it can
+be rewritten into an expression", not "an early exit does not disqualify a body
+any more". If nothing is left once the history is gone, the comment had nothing
+to say and goes too.
+
+The one thing history may do is explain a present constraint that would
+otherwise look arbitrary, and then it is the constraint that is stated, with the
+past as its reason ("`mut` is refused here because …"), not the change.
+
+Apply it to the comments you touch, not as a sweep: when an edit puts you in a
+comment that narrates the past, rewrite it then.
+
 ## Operators must be imported — always as `name as op`
 Operators are not ambient, and **none of them has a bare form**. Every operator is
 imported by aliasing its named builtin:
