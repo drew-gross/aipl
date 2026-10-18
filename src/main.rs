@@ -81,7 +81,7 @@ fn cli() -> ExitCode {
 fn usage(prog: &str) -> String {
     format!(
         "usage:
-  {prog} run   <file.aipl> [fn] [args...]   compile and JIT-execute a function (default: main)
+  {prog} run   [-- args...]                 compile and JIT-execute `main` from ./main.aipl
   {prog} ir    <file.aipl>                  print cranelift IR for a source file
   {prog} doc   <file.aipl>                  print the file's and each declaration's `# ..` docs
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
@@ -138,7 +138,9 @@ reports is what `aipl check` reports.
 A source file's name must end in `.aipl`, and so must any file it imports; a
 command refuses any other before reading it.
 
-args to `run` are parsed as i64. Functions of arity 0, 1, or 2 are supported.
+`run` always runs `main` from `main.aipl` in the working directory; arguments
+after `--` go to it. A `main` that doesn't take `str[]` gets them parsed as i64
+(arity 0, 1, or 2 is supported).
 `build` requires `clang` on PATH (used as linker driver).
 
 pass `--debug` to any command to trace each compiler pass (loader,
@@ -162,11 +164,23 @@ fn take_debug_flag(args: &[String]) -> (Vec<String>, DebugOptions) {
     (rest, DebugOptions::new(enabled))
 }
 
+/// The program `aipl run` runs, looked up in the working directory.
+const RUN_FILE: &str = "main.aipl";
+
 fn run_cmd(args: &[String]) -> Result<(), String> {
     let (args, dbg) = take_debug_flag(args);
-    let (file, rest) = args.split_first().ok_or("missing source file")?;
-    let fn_name = rest.first().map(String::as_str).unwrap_or("main");
-    let trailing = &rest[rest.len().min(1)..];
+    // `run` takes no options of its own yet: everything after `--` is for `main`.
+    let trailing = match args.split_first() {
+        None => &[][..],
+        Some((sep, rest)) if sep == "--" => rest,
+        Some((other, _)) => {
+            return Err(format!(
+                "unexpected argument {other:?}; `run` always runs `main` in {RUN_FILE}, \
+                 so pass its arguments after `--`"
+            ));
+        }
+    };
+    let (file, fn_name) = (RUN_FILE, "main");
 
     let program = loader::load_program(Path::new(file), dbg).map_err(|e| render_err(file, e))?;
     let comp = Compilation::new(&program, dbg).map_err(|e| render_err(file, e))?;

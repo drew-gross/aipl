@@ -6,7 +6,7 @@
 //! program whose output is the thing under test, so the refusal lives in the
 //! command rather than in the compile.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 /// `trace`'s value is that it needs no import and declares no effect, so a
@@ -108,22 +108,49 @@ fn run_does_not_refuse_a_trace() {
     // `trace` exists for, so `run` prints the trace and exits 0.
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("build_cmd");
     std::fs::create_dir_all(&dir).expect("create temp dir");
-    let path = dir.join("run_traced.aipl");
-    std::fs::write(&path, TRACED).expect("write temp source");
+    let run_dir = dir.join("run_traced");
+    std::fs::create_dir_all(&run_dir).expect("create temp dir");
+    std::fs::write(run_dir.join("main.aipl"), TRACED).expect("write temp source");
     let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
         .arg("run")
-        .arg(&path)
-        .arg("main")
+        .current_dir(&run_dir)
         .output()
         .expect("spawn aipl run");
     let stdout = String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n");
     assert!(
-        stdout.contains("run_traced.aipl:3 v + 2 = 7"),
+        stdout.contains("main.aipl:3 v + 2 = 7"),
         "expected the trace's output, got:\n{stdout}"
     );
     assert_eq!(out.status.code().unwrap_or(-1), 0);
     assert!(
-        !Path::new(&dir.join("run_traced")).exists(),
+        !run_dir.join("main").exists(),
         "`run` should not produce an executable"
     );
+}
+
+#[test]
+fn run_passes_what_follows_the_separator_to_main() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("build_cmd_run_args");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    std::fs::write(
+        dir.join("main.aipl"),
+        "import { print } from builtins;\n\n\
+         fn main(args: str[]) !prints -> i64 {\n    match (args[0]) {\n        none => {\n            print(\"usage\");\n            1\n        },\n        some(a) => {\n            print(a);\n            0\n        },\n    }\n}\n",
+    )
+    .expect("write temp source");
+    let run = |args: &[&str]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
+            .arg("run")
+            .args(args)
+            .current_dir(&dir)
+            .output()
+            .expect("spawn aipl run");
+        (
+            String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n"),
+            out.status.success(),
+        )
+    };
+    assert_eq!(run(&["--", "hello"]), ("hello\n0\n".to_string(), true));
+    // Without `--`, an argument is `run`'s own, and `run` has none yet.
+    assert!(!run(&["hello"]).1);
 }

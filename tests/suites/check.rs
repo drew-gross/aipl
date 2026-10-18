@@ -1256,9 +1256,9 @@ fn a_performance_block_is_left_out_of_what_run_and_build_make() {
                fn main() !prints {\n    print(\"hi\");\n}\n";
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("check_here");
     fs::create_dir_all(&dir).expect("create temp dir");
-    fs::write(dir.join("performance_run.aipl"), src).expect("write temp source");
+    fs::write(dir.join("main.aipl"), src).expect("write temp source");
     let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
-        .args(["run", "performance_run.aipl"])
+        .arg("run")
         .current_dir(&dir)
         .output()
         .expect("run aipl run");

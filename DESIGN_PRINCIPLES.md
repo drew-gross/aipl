@@ -263,7 +263,7 @@ that needed it.
 **A project directory contains the compiler that builds it.** Not a version
 number, not a constraint, not a lockfile naming one — the executable itself,
 checked in beside the source it compiles. `projects/word_count/` holds
-`word_count.aipl` and `aipl`, and building the project is running the `aipl`
+`main.aipl` and `aipl`, and building the project is running the `aipl`
 that is sitting there.
 
 The failure this avoids is the one every version-constrained toolchain has.
@@ -286,7 +286,7 @@ the revision that was known to build it.
 | Decision | Shape |
 |---|---|
 | where the compiler lives | `<project>/aipl`, beside the source — not in a `bin/`, `tools/` or `.aipl/` subdirectory, because the whole point is that it is not somewhere a person has to be told about |
-| how a project is built | with that copy: `./aipl check`, `./aipl build word_count.aipl` |
+| how a project is built | with that copy: `./aipl check`, `./aipl build main.aipl` |
 | what pins the compiler | the executable itself — there is no version to resolve, and nothing that could claim one thing while the binary is another |
 | upgrading a project | replacing that file; a project on an old compiler stays working, because nothing outside it changed |
 | this repository's projects | held to the *current* compiler, by `projects::checked_in_compilers_are_current` — see below |

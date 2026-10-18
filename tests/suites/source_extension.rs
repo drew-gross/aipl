@@ -34,13 +34,12 @@ fn message(path: &std::path::Path) -> String {
 }
 
 #[test]
-fn run_ir_build_and_report_refuse_a_file_without_the_extension() {
+fn ir_build_and_report_refuse_a_file_without_the_extension() {
     let path = source_named("compile", "program.txt");
     let file = path.to_str().expect("utf8 path");
     let out = path.with_file_name("out");
     let out = out.to_str().expect("utf8 path");
     for args in [
-        vec!["run", file],
         vec!["ir", file],
         vec!["build", file, "-o", out],
         vec!["report", file],
@@ -76,7 +75,7 @@ fn only_the_exact_extension_counts() {
         let path = source_named("exact", name);
         let file = path.to_str().expect("utf8 path");
         assert_eq!(
-            refused(&["run", file]),
+            refused(&["ir", file]),
             format!("error: {}\n", message(&path)),
             "{name}"
         );
@@ -87,9 +86,10 @@ fn only_the_exact_extension_counts() {
 /// name and nothing else.
 #[test]
 fn the_same_program_runs_with_the_extension() {
-    let path = source_named("accepted", "program.aipl");
+    let path = source_named("accepted", "main.aipl");
     let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
-        .args(["run", path.to_str().expect("utf8 path")])
+        .arg("run")
+        .current_dir(path.parent().expect("temp dir"))
         .output()
         .expect("spawn aipl");
     assert!(

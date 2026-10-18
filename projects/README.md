@@ -10,7 +10,7 @@ its own repository is that it does not have one.
 word_count/
   aipl              the compiler that builds this project
   aipl.build        which compiler that is (this repository's policy — see below)
-  word_count.aipl   the program
+  main.aipl         the program
   README.md         how to build and run it
 ```
 
@@ -28,8 +28,8 @@ directory:
 ```sh
 cd word_count
 ./aipl check                     # run the project's tests
-./aipl build word_count.aipl     # link a native binary
-./aipl run word_count.aipl main <args>
+./aipl build main.aipl           # link a native binary
+./aipl run -- <args>
 ```
 
 Nothing in here refers to the repository around it. A project can be copied out

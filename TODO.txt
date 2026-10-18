@@ -8,10 +8,10 @@ variant:
   Allow variants to be passed to HOFs, you can e.g. v.map(VariantConstructor).
 
 projects:
+  let `aipl run` call non-main functions and take other files (e.g. word_count on a file)
   word_count:
     make it more compatible with wc
     make exit code stuff make more sense
-    $ ./aipl run ./word_count.aipl word_count ./README.md -> bad arg "./README.md": invalid digit found in string
   get rid of aipl.build, maybe by checking in the compiler in the main project also?
   web server
   Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
