@@ -184,7 +184,8 @@ fn undeclared_effect_message(callee: &str, effect: &str, caller_effects: &[Strin
 }
 
 /// Effects the language recognizes. `prints` = writes to stdout; `read_files` =
-/// reads from the filesystem; `write_files` = writes to the filesystem;
+/// reads from the filesystem; `read_stdin` = reads standard input;
+/// `write_files` = writes to the filesystem;
 /// `list_files` = enumerates the filesystem (directory listing);
 /// `execute_program` = spawns a child process; `clock` = reads the wall clock
 /// (so a function's result depends on when it ran). `measure` is internal:
@@ -193,6 +194,7 @@ fn undeclared_effect_message(callee: &str, effect: &str, caller_effects: &[Strin
 const KNOWN_EFFECTS: &[&str] = &[
     "prints",
     "read_files",
+    "read_stdin",
     "write_files",
     "list_files",
     "execute_program",

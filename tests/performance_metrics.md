@@ -119,6 +119,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/builtins/monotonic_now | 4 | 88 | 88 | 276 | 1528 | 1008525.00 | 79.07 | 1488 |
 | cases/builtins/now_nanos | 0 | 0 | 0 | 69 | 356 | 2.00 | 117.59 | 1440 |
 | cases/builtins/range | 18 | 889 | 921 | 1411 | 3608 | 11.00 | 125.83 | 1472 |
+| cases/builtins/read_line | 4 | 168 | 84 | 99 | 808 | 6.00 | 158.40 | 1456 |
 | cases/builtins/reverse | 7 | 403 | 208 | 806 | 2940 | 3.00 | 82.82 | 1456 |
 | cases/builtins/span | 6 | 136 | 136 | 418 | 1900 | 7.00 | 80.54 | 1456 |
 | cases/builtins/user_fn_shadows_builtin | 0 | 0 | 0 | 28 | 176 | 2.00 | 77.51 | 1440 |

@@ -1412,7 +1412,7 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
     let seq = |first: Expr, rest: Expr| {
         Expr::new(ExprKind::Seq(Box::new(first), Box::new(rest)), span.clone())
     };
-    // A test body may call anything (incl. `!prints`/`!read_files`/`!write_files`/
+    // A test body may call anything (incl. `!prints`/`!read_files`/`!read_stdin`/`!write_files`/
     // `!list_files`/`!execute_program`/`!clock` functions), so the synthesized
     // test fns / driver declare every known effect — except `measure`, which only
     // a `.performance` block has. A performance block declares that and nothing
@@ -1421,6 +1421,7 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
         TestKind::Tests => vec![
             "prints".to_string(),
             "read_files".to_string(),
+            "read_stdin".to_string(),
             "write_files".to_string(),
             "list_files".to_string(),
             "execute_program".to_string(),
@@ -3192,6 +3193,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
         str24_host::aipl_write_string_to_file as *const u8,
     );
     jit_builder.symbol("aipl_list_files", aipl_list_files as *const u8);
+    jit_builder.symbol("aipl_read_line", str24_host::aipl_read_line as *const u8);
     jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
     jit_builder.symbol("aipl_str_split_len", str24::aipl_str_split_len as *const u8);
     jit_builder.symbol(
@@ -6708,7 +6710,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_arr_retain_warr"
         | "aipl_arr_drop_opt_warr"
         | "aipl_arr_retain_opt_warr" => (2, Ret::None),
-        "aipl_shim_get" | "aipl_str_len" | "aipl_str_hash" | "aipl_str_iter_next"
+        "aipl_shim_get" | "aipl_read_line" | "aipl_str_len" | "aipl_str_hash" | "aipl_str_iter_next"
         | "aipl_str_write_ptr" | "aipl_i64_len" | "aipl_u64_len" => {
             (1, Ret::Word)
         }
@@ -6953,6 +6955,7 @@ fn register_builtins(
         (Callee::ReadFileToString, "aipl_read_file_to_string"),
         (Callee::WriteStringToFile, "aipl_write_string_to_file"),
         (Callee::ListFiles, "aipl_list_files"),
+        (Callee::ReadLine, "aipl_read_line"),
         (Callee::NowNanos, "aipl_now_nanos"),
         (Callee::MonotonicNow, "aipl_monotonic_now"),
         (Callee::ExecuteProgram, "aipl_execute_program"),
@@ -12597,6 +12600,44 @@ fn emit_file_result_split<M: Module>(
     Ok(ptr)
 }
 
+/// An optional from an explicit presence flag and the payload to store when
+/// present: tag 1 and the payload at [`OPT_VALUE_OFFSET`], or tag 0 and nothing
+/// else written. The slot is sized for the payload's representation.
+fn emit_optional_split(
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    is_some: Value,
+    payload: Value,
+    payload_ty: &ConcreteType,
+) -> Value {
+    let size = OPT_VALUE_OFFSET + elem_size_of(payload_ty, cx.structs) as u32;
+    let slot =
+        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, size, 3));
+    let ptr = builder.ins().stack_addr(types::I64, slot, 0);
+    let val_at = builder.ins().iadd_imm_s(ptr, OPT_VALUE_OFFSET as i64);
+    let some_b = builder.create_block();
+    let none_b = builder.create_block();
+    let merge = builder.create_block();
+    builder.ins().brif(is_some, some_b, &[], none_b, &[]);
+
+    builder.switch_to_block(some_b);
+    builder.seal_block(some_b);
+    let one = builder.ins().iconst(types::I64, 1);
+    builder.ins().store(MemFlagsData::trusted(), one, ptr, 0);
+    store_array_elem(builder, val_at, payload, payload_ty, cx.structs);
+    builder.ins().jump(merge, &[]);
+
+    builder.switch_to_block(none_b);
+    builder.seal_block(none_b);
+    let zero = builder.ins().iconst(types::I64, 0);
+    builder.ins().store(MemFlagsData::trusted(), zero, ptr, 0);
+    builder.ins().jump(merge, &[]);
+
+    builder.switch_to_block(merge);
+    builder.seal_block(merge);
+    ptr
+}
+
 /// Compute the `i64` exit code for an `fn main() -> !Error` from its result slot:
 /// `ok()` (tag 1) → 0; `err(msg)` (tag 0) → print `error: <msg>` to stderr and
 /// yield 1. Reads (borrows) the err message — the caller's scope drop frees the
@@ -15332,6 +15373,34 @@ fn compile_call_expr<M: Module>(
             // The ok payload is a fresh, owned array (the err is a static
             // literal): track so it's released at scope exit (drop decs the
             // array — and cascades to its strs — only on tag 1).
+            scopes
+                .last_mut()
+                .expect("scope")
+                .push(Tracked::new(ptr, &result_ty));
+            (ptr, result_ty)
+        }
+        Callee::ReadLine => {
+            // `() -> str?`: `some(line)` for the next line of standard input,
+            // `none` at end of input. The runtime writes the line through an out
+            // pointer this call site allocates and returns 1/0 for "there was a
+            // line". The `!read_stdin` effect is checker-enforced.
+            if !args.is_empty() {
+                return Err(arity_bug(name, 0, args.len(), &span));
+            }
+            let str_ty = ConcreteType::Primitive(Primitive::Str);
+            let result_ty = ConcreteType::Optional(Box::new(str_ty.clone()));
+            let line = builder.create_sized_stack_slot(StackSlotData::new(
+                StackSlotKind::ExplicitSlot,
+                str24::STR_SIZE as u32,
+                3,
+            ));
+            let line_addr = builder.ins().stack_addr(types::I64, line, 0);
+            let found = builtins.call(module, builder, "aipl_read_line", &[line_addr]);
+            let is_some = builder.ins().icmp_imm_s(IntCC::NotEqual, found, 0);
+            let ptr = emit_optional_split(builder, cx, is_some, line_addr, &str_ty);
+            // The `some` payload is a fresh, owned str; the `none` carries
+            // nothing, and dropping an optional frees the payload only when
+            // present.
             scopes
                 .last_mut()
                 .expect("scope")

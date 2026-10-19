@@ -154,3 +154,70 @@ fn run_passes_what_follows_the_separator_to_main() {
     // Without `--`, an argument is `run`'s own, and `run` has none yet.
     assert!(!run(&["hello"]).1);
 }
+
+/// Echoes each line of standard input in brackets, then the count.
+const ECHO_LINES: &str = "import { print, read_line, wrapping_add as + } from builtins;\n\n\
+     fn echo(count: i64) !prints !read_stdin -> i64 {\n\
+     \x20   match (read_line()) {\n\
+     \x20       none => count, #[allow]\n\
+     \x20       some(line) => {\n\
+     \x20           print(`[{line}]`);\n\
+     \x20           echo(count + 1)\n\
+     \x20       },\n\
+     \x20   }\n\
+     }\n\n\
+     fn main() !prints !read_stdin {\n\
+     \x20   print(`{echo(0)} lines`);\n\
+     }\n";
+
+/// What `ECHO_LINES` prints for `input` as piped to `command`'s standard input.
+fn echo_lines(mut command: Command, input: &str) -> String {
+    use std::io::Write;
+    let mut child = command
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect("spawn the program");
+    child
+        .stdin
+        .take()
+        .expect("piped stdin")
+        .write_all(input.as_bytes())
+        .expect("write stdin");
+    let out = child.wait_with_output().expect("wait for the program");
+    assert!(out.status.success());
+    String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n")
+}
+
+/// Line endings come off, an empty line is a line, and a last line with no
+/// newline is still one.
+const LINES_IN: &str = "one\r\ntwo\n\nthree";
+const LINES_OUT: &str = "[one]\n[two]\n[]\n[three]\n4 lines\n";
+
+#[test]
+fn read_line_reads_piped_lines_under_run() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("build_cmd_read_line_run");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    std::fs::write(dir.join("main.aipl"), ECHO_LINES).expect("write temp source");
+    let mut command = Command::new(env!("CARGO_BIN_EXE_aipl"));
+    command.arg("run").current_dir(&dir);
+    assert_eq!(echo_lines(command, LINES_IN), LINES_OUT);
+}
+
+#[test]
+fn read_line_reads_piped_lines_in_a_built_binary() {
+    let (stderr, code, exe) = build("read_line", ECHO_LINES);
+    assert_eq!(code, 0, "stderr:\n{stderr}");
+    assert_eq!(echo_lines(Command::new(exe), LINES_IN), LINES_OUT);
+}
+
+#[test]
+fn read_line_returns_long_lines_whole() {
+    let (stderr, code, exe) = build("read_line_long", ECHO_LINES);
+    assert_eq!(code, 0, "stderr:\n{stderr}");
+    let long = "x".repeat(10_000);
+    assert_eq!(
+        echo_lines(Command::new(exe), &format!("{long}\n")),
+        format!("[{long}]\n1 lines\n")
+    );
+}

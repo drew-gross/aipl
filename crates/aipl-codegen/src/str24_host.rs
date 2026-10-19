@@ -79,6 +79,28 @@ pub(super) fn write_string_to_file(path: Str, contents: Str) -> bool {
     std::io::Write::flush(&mut file).is_ok()
 }
 
+/// `read_line()` under the wide ABI: the next line of standard input, without its
+/// `\n` or `\r\n`, through `out`, and **1/0 as the return value** (0 at end of
+/// input or on a read error, with `out` left empty).
+#[no_mangle]
+pub(crate) extern "C" fn aipl_read_line(out: *mut Str) -> i64 {
+    use std::io::BufRead;
+    let mut line = Vec::new();
+    let read = std::io::stdin().lock().read_until(b'\n', &mut line);
+    if !matches!(read, Ok(n) if n > 0) {
+        unsafe { *out = Str::empty() };
+        return 0;
+    }
+    if line.last() == Some(&b'\n') {
+        line.pop();
+        if line.last() == Some(&b'\r') {
+            line.pop();
+        }
+    }
+    unsafe { *out = from_bytes(&line) };
+    1
+}
+
 /// `print(s)` under the new ABI — the `aipl_*` counterpart of `aipl_print`.
 #[no_mangle]
 pub(crate) extern "C" fn aipl_print(s: *const Str) {

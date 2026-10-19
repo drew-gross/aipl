@@ -3025,6 +3025,12 @@ fn __builtin_write_string_to_file(self: str, contents: str) !write_files -> !Err
 // unreadable directory, a non-UTF-8 name, or an entry whose kind the filesystem
 // won't report.
 fn __builtin_list_files(self: str) !list_files -> str[]!Error { ok([]) }
+// The next line of standard input, without its line ending (`\n`, or `\r\n`):
+// `some(line)` for each line, `none` once input is exhausted. A final line with
+// no newline after it is still a line, and an empty line is `some("")`, so
+// `none` always means end of input. Standard input is read in order across
+// calls, and is not echoed or prompted for: print the prompt first.
+fn __builtin_read_line() !read_stdin -> str? { none }
 
 // Wall-clock nanoseconds since the Unix epoch (1970-01-01 UTC). Unsigned and
 // 64-bit, so it counts up to the year 2554; a clock set before the epoch reads

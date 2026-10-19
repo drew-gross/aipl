@@ -445,6 +445,8 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         // The cursor, the source, and the separator.
         "aipl_str_split_iter_init" => sig(3, false),
         "aipl_list_files" => sig(2, true),
+        // The out pointer for the line; the flag comes back in a register.
+        "aipl_read_line" => sig(1, true),
         "aipl_char_to_str" => sig(2, false),
         "aipl_execute_program" => sig(3, false),
         "aipl_str_starts_with_at" | "aipl_str_starts_with_char" => sig(3, true),

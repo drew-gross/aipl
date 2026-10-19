@@ -1,0 +1,15 @@
+# `read_line` takes the next line of standard input as a `str?`: `some(line)`
+# without its line ending, or `none` once input is exhausted. It carries the
+# `!read_stdin` effect, so `main` must declare it. The harness runs a case with
+# no standard input, so this pins the end-of-input answer; the lines themselves
+# are covered by `build_cmd::read_line_*`, which pipe input to a program.
+
+import { print, read_line, to_str } from builtins;
+
+fn main() !prints !read_stdin {
+    print(to_str(read_line()));
+    print(to_str(read_line()));
+}
+--- stdout ---
+none
+none

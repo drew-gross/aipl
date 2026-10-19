@@ -25,6 +25,7 @@ extern "C" {
     fn strlen(s: *const c_char) -> usize;
     fn memcpy(dst: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
     fn write(fd: c_int, buf: *const c_void, count: usize) -> isize;
+    fn read(fd: c_int, buf: *mut c_void, count: usize) -> isize;
 }
 
 // libc stdio for `read_file_to_string`. Declared unconditionally (the
@@ -549,6 +550,71 @@ pub extern "C" fn aipl_read_file_to_string(out: *mut str24::Str, path: *const st
         *out = str24::from_bytes(core::slice::from_raw_parts(buf, size));
         rt_free(buf as *mut c_void);
         1
+    }
+}
+
+/// Standard input read ahead of the line being asked for: `STDIN_BUFFER[pos..len]`
+/// is bytes already read from fd 0 and not yet handed out. The program is single
+/// threaded, so plain statics do.
+static mut STDIN_BUFFER: [u8; 4096] = [0; 4096];
+static mut STDIN_POS: usize = 0;
+static mut STDIN_LEN: usize = 0;
+
+/// The next byte of standard input, or `None` at end of input or on a read error.
+unsafe fn stdin_byte() -> Option<u8> {
+    unsafe {
+        if STDIN_POS == STDIN_LEN {
+            let n = read(
+                0,
+                core::ptr::addr_of_mut!(STDIN_BUFFER) as *mut c_void,
+                STDIN_BUFFER.len(),
+            );
+            if n <= 0 {
+                return None;
+            }
+            STDIN_POS = 0;
+            STDIN_LEN = n as usize;
+        }
+        let byte = STDIN_BUFFER[STDIN_POS];
+        STDIN_POS += 1;
+        Some(byte)
+    }
+}
+
+/// `read_line()` under the wide ABI: the next line of standard input, without its
+/// `\n` or `\r\n`, through `out`, and 1/0 as the return value (0 at end of input,
+/// with `out` left empty). See `str24_host::aipl_read_line`.
+#[no_mangle]
+pub extern "C" fn aipl_read_line(out: *mut str24::Str) -> i64 {
+    unsafe {
+        *out = str24::Str::empty();
+        let mut line = rt_alloc(64) as *mut u8;
+        let mut capacity = 64;
+        let mut len = 0;
+        let mut any = false;
+        while let Some(byte) = stdin_byte() {
+            any = true;
+            if byte == b'\n' {
+                break;
+            }
+            if len == capacity {
+                let grown = rt_alloc(capacity * 2) as *mut u8;
+                memcpy(grown as *mut c_void, line as *const c_void, len);
+                rt_free(line as *mut c_void);
+                line = grown;
+                capacity *= 2;
+            }
+            *line.add(len) = byte;
+            len += 1;
+        }
+        if any {
+            if len > 0 && *line.add(len - 1) == b'\r' {
+                len -= 1;
+            }
+            *out = str24::from_bytes(core::slice::from_raw_parts(line, len));
+        }
+        rt_free(line as *mut c_void);
+        i64::from(any)
     }
 }
 

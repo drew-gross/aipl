@@ -16,6 +16,9 @@ projects:
   web server:
   ray tracer:
     https://raytracing.github.io/books/RayTracingInOneWeekend.html
+  minesweeper:
+    Finish todo items in readme
+    use an arrow-keys commands model
 
 argparser:
   make it
@@ -94,6 +97,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  rename prints effect to print
   assign_stmt could be DRYed up probably
   let_stmt could use a Maybe(Then([])) for when it is typed let?
   g.prods.map(|p| First {}) should maybe be (First{}).repeat_item(...) instead of [First{}].repeat()

@@ -1,0 +1,16 @@
+# `read_line` has the `!read_stdin` effect; a caller that doesn't declare it is
+# rejected.
+
+import { read_line } from builtins;
+
+fn next() -> str? { read_line() }
+
+fn main() {
+    next();
+}
+--- errors ---
+error: fn "read_line" has effect "!read_stdin" but the calling function does not declare it
+ --> ./tests/cases/builtins/err_read_line_missing_effect.aipl:6:21
+  |
+6 | fn next() -> str? { read_line() }
+  |                     ^^^^^^^^^^^
