@@ -38,9 +38,11 @@
 //!      (`git reset --hard HEAD`), so even behavioral sections (stdout / exit
 //!      code / errors / check) are refilled and the git diff is the review
 //!      surface, flagged at the end.
-//!    - a failure a refill can't fix (a compile/link error, a crash, a failed
-//!      in-language `.test`, or any non-`cases` test) → STOP. No section to
-//!      record from, so a refill would just burn a full corpus run without
+//!    - any failure that did not ask for a regeneration (a compile/link error, a
+//!      crash, a leak, a failed in-language `.test`, a Rust assertion — anything
+//!      that printed no `handoff-fill:` marker) → STOP. Nothing is fillable
+//!      unless the failing test says so: see [`discovery`] and
+//!      `handoff::protocol`. A refill would just burn a full corpus run without
 //!      fixing it.
 //! 3. `fill_case_tests` regenerates the checked-in per-case `#[test]` list when a
 //!    case file was added or removed. First, so a new case can reach step 4.
@@ -629,17 +631,12 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
         );
     }
 
-    let unfillable = run.unfillable();
-    if !unfillable.is_empty() {
-        r.fail(
-            "nextest (failure a refill can't fix)",
-            &unfillable.join("\n"),
-        );
-    }
-
-    let hard = run.hard_failures();
-    if !hard.is_empty() {
-        r.fail("nextest (failing test)", &hard.join("\n"));
+    // Nothing is fillable unless the failing test said so (see `discovery`): a
+    // failure that asked for no regeneration stops the gate here, before any
+    // regeneration it could not have helped.
+    let stuck = run.fillable().stuck;
+    if !stuck.is_empty() {
+        r.fail("nextest (failure no refill can fix)", &stuck.join("\n"));
     }
 
     let plan = run.plan();

@@ -37,6 +37,7 @@ use aipl::codegen::{
     DOGFOOD_IR_ENV, DOGFOOD_SOURCE_FILES,
 };
 use aipl::FfiValue;
+use handoff::protocol::Fill;
 use std::path::PathBuf;
 
 const FILL_CMD: &str = "cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir";
@@ -636,8 +637,9 @@ fn checked_in_ir_is_current() {
             // IR is too large to print on error, so don't use assert_eq!
             assert!(
                 lf(&generated) == lf(&text),
-                "staged IR {} is stale. Regenerate with: {FILL_STAGED_CMD}",
-                staged.display()
+                "staged IR {} is stale. Regenerate with: {FILL_STAGED_CMD}\n{}",
+                staged.display(),
+                Fill::Ir.marker()
             );
             continue;
         }
@@ -658,8 +660,9 @@ fn checked_in_ir_is_current() {
             aipl::codegen::artifact_fingerprint(&generated),
             recorded,
             "the checked-in artifact is stale — the AIPL sources no longer compile \
-             to the IR {} was built from. Regenerate with: {FILL_CMD}",
-            a.files.object
+             to the IR {} was built from. Regenerate with: {FILL_CMD}\n{}",
+            a.files.object,
+            Fill::Ir.marker()
         );
     }
 }
@@ -840,8 +843,9 @@ fn no_staged_ir_pending() {
                 "staged IR pending for: {}\n\
                  Validate with:  {VALIDATE_STAGED_CMD}\n\
                  Then promote:   {PROMOTE_STAGED_CMD}\n\
-                 To abort:       delete the .staged file.",
-                staged.display()
+                 To abort:       delete the .staged file.\n{}",
+                staged.display(),
+                Fill::Ir.marker()
             );
         }
     }

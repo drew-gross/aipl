@@ -121,6 +121,7 @@ use aipl::codegen::{Compilation, ObjectCompilation};
 use aipl::loader;
 use aipl::perf::{self, PerfStats};
 use aipl::{DebugOptions, Error};
+use handoff::protocol::Fill;
 
 /// The command that runs the ignored section-refresh helper ([`fill_expected`]).
 /// Surfaced in failure messages so a stale `--- report ---`/`errors`/`check`
@@ -546,9 +547,15 @@ fn every_case_has_a_test() {
     };
     panic!(
         "{CASE_TESTS_FILE} is out of date — it declares a `#[test]` per case, and \
-         a case with no test never runs.{}{}\n\nRegenerate with `{CASE_TESTS_CMD}`.",
+         a case with no test never runs.{}{}\n\nRegenerate with `{CASE_TESTS_CMD}`.\n{}",
         list("case(s) with no `#[test]`", &missing),
         list("declared `#[test]`(s) with no case file", &stale),
+        // The cases with no test have never run, so none of their sections has
+        // been compared: they need filling as well as listing.
+        Fill::CaseTests {
+            added: missing.iter().map(|d| (**d).to_string()).collect(),
+        }
+        .marker(),
     );
 }
 
@@ -732,9 +739,22 @@ fn check_or_fill(
     }
     Outcome::Fail(format!(
         "{ctx}: `{section}` mismatch\n--- expected ---\n{expected}\n--- actual ---\n{actual}\n\
-         If this change is intended, run `{}`.",
-        scoped_fill_cmd(ctx)
+         If this change is intended, run `{}`.\n{}",
+        scoped_fill_cmd(ctx),
+        Fill::Section {
+            case: case_of(ctx),
+            section: section.to_string(),
+        }
+        .marker()
     ))
+}
+
+/// The display path a failure's `[bracketed]` context names — what `AIPL_CASE`
+/// matches and a [`Fill`] marker carries.
+fn case_of(ctx: &str) -> String {
+    ctx.trim_start_matches('[')
+        .trim_end_matches(']')
+        .to_string()
 }
 
 /// The `AIPL_CASE` selection shared by the two author helpers that read it,
@@ -1357,16 +1377,17 @@ fn baselines() -> &'static HashMap<String, PerfRow> {
 /// Hold a case's measurement to its row in the metrics table: every deterministic
 /// column must match exactly. (Exact for now; thresholds are undecided.)
 ///
-/// The two failures are told apart by what follows `performance baseline`, a
-/// contract with `cargo handoff`: it runs everything else to the end and then
-/// fails with the list, rather than stopping at the first.
+/// The two failures are told apart by the [`Fill`] each prints, a contract with
+/// `cargo handoff`: it runs everything else to the end and then settles them with
+/// one `refresh_perfmon`, rather than stopping at the first.
 fn check_baseline(ctx: &str, stats: &PerfStats) -> Outcome {
     let key = row_key(ctx.trim_start_matches('[').trim_end_matches(']'));
     let accept = format!("AIPL_CASE='{key}.aipl' {PERFMON_CMD}");
     let Some(row) = baselines().get(&key) else {
         return Outcome::Fail(format!(
             "{ctx}: performance baseline missing: {METRICS_FILE} has no row for this case.\n\
-             Add it with `{accept}`."
+             Add it with `{accept}`.\n{}",
+            Fill::BaselineMissing { case: case_of(ctx) }.marker()
         ));
     };
     let actual = [
@@ -1396,8 +1417,13 @@ fn check_baseline(ctx: &str, stats: &PerfStats) -> Outcome {
     }
     Outcome::Fail(format!(
         "{ctx}: performance baseline moved ({METRICS_FILE}):\n{}\n\
-         If this change is intended, accept it with `{accept}`.",
-        moved.join("\n")
+         If this change is intended, accept it with `{accept}`.\n{}",
+        moved.join("\n"),
+        Fill::BaselineMoved {
+            case: case_of(ctx),
+            moves: moved.iter().map(|m| m.trim().to_string()).collect(),
+        }
+        .marker()
     ))
 }
 
@@ -1963,5 +1989,60 @@ fn check_runs_at_most_once_whichever_sections_are_used() {
     assert_eq!(
         plan(&format!("{TESTS}{REPORT}{EXIT}")),
         Some((pinned_report, Some(1), false))
+    );
+}
+
+// ---- The `cargo handoff` contract -------------------------------------------
+//
+// `cargo handoff` regenerates only what a failing test asks it to (see
+// `handoff::protocol`), so a stale section that stopped asking would stop the
+// gate rather than get refilled — a failure mode that reads as handoff being
+// broken, not as a missing line here.
+
+#[test]
+fn a_stale_section_asks_for_a_refill_of_its_case() {
+    let mut fills = Fills::new(false);
+    let Outcome::Fail(message) =
+        check_or_fill(&mut fills, "[cases/x/y.aipl]", "stdout", "new\n", "old\n")
+    else {
+        panic!("a differing section must fail");
+    };
+    let (asked, unreadable) = Fill::scan(&message);
+    assert!(unreadable.is_empty(), "{unreadable:?}");
+    assert_eq!(
+        asked,
+        vec![Fill::Section {
+            case: "cases/x/y.aipl".to_string(),
+            section: "stdout".to_string(),
+        }]
+    );
+}
+
+#[test]
+fn a_moved_or_missing_baseline_row_asks_for_a_refresh() {
+    let stats = PerfStats {
+        allocations: 0,
+        deallocations: 0,
+        reallocations: 0,
+        bytes_allocated: 0,
+        peak_live_bytes: 0,
+        instructions: 0,
+        binary_size: aipl::perf::BinSizes {
+            total: 0,
+            code: 0,
+            data: 0,
+            metadata: 0,
+        },
+        functions: Vec::new(),
+    };
+    // A case with no row at all is `missing`; the table has none named like this.
+    let Outcome::Fail(message) = check_baseline("[cases/no/such/case.aipl]", &stats) else {
+        panic!("a case with no row must fail");
+    };
+    assert_eq!(
+        Fill::scan(&message).0,
+        vec![Fill::BaselineMissing {
+            case: "cases/no/such/case.aipl".to_string()
+        }]
     );
 }

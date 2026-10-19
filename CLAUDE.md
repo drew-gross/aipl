@@ -70,6 +70,19 @@ harness's message format, so change one and its test tells you what else has to
 move), and the step runner, watchdog and machine diagnostics are in
 `handoff/src/runner.rs` and `handoff/src/machine.rs`.
 
+**Nothing is fillable unless the failing test says so.** Handoff regenerates only
+what a failure asks for, and a failure asks by printing a `handoff-fill:` line
+(`handoff::protocol::Fill` — the one definition both the gate and the tests use).
+The tests that can go stale print one: a case's section mismatch, a moved or
+missing baseline row, the per-case `#[test]` list, the dogfood artifact, the docs
+site, a project's compiler, and the report-parity tests against a pinned
+`--- report ---`. Every other failure — a compile error, a leak, a crash, a Rust
+assertion — prints none, so the gate stops on it and names it. **A new test whose
+failure a regeneration fixes must print the `Fill` that fixes it**; without one
+the gate stops on it rather than guessing, which is the right failure when it was
+forgotten. (The gate used to recognise what it *could not* fix by message pattern
+and treat the rest as staleness, so a new kind of failure was fixable by default.)
+
 **Don't hand-drive the sequence, and don't validate before it.** The gate is
 the validation *and* the order. Running its steps yourself — `cargo fmt`,
 `fill_case_tests`, `fill_expected`, the staged dogfood-IR flow — doesn't just

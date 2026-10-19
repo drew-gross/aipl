@@ -1,5 +1,15 @@
 //! Reading a nextest run: which tests failed, which failures a refill can fix,
-//! which it can't, and exactly which cases to refill.
+//! and exactly what to regenerate.
+//!
+//! # Nothing is fillable unless the test says so
+//!
+//! [`Run::fillable`] is the one classifier, and it is a whitelist the failing
+//! tests write themselves: a failure is fixable only if its output carries a
+//! [`Fill`] marker (see [`handoff::protocol`]). Every other failure — a case that
+//! will not compile, a crash, a leak, an in-language `.test`, a Rust assertion, a
+//! test nobody taught the protocol — is stuck, and the gate stops and names it.
+//! The inverse design recognised the failures it could *not* fix by pattern, and
+//! so had to be complete to be safe; this one only has to be honest.
 //!
 //! # Where the facts come from
 //!
@@ -33,6 +43,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
+use handoff::protocol::Fill;
 use regex::Regex;
 
 use crate::runner::Output;
@@ -41,7 +52,7 @@ fn re(cell: &'static OnceLock<Regex>, pattern: &str) -> &'static Regex {
     cell.get_or_init(|| Regex::new(pattern).expect("static pattern compiles"))
 }
 
-/// One failed test: its name and everything it printed.
+/// One failed test: its name, everything it printed, and what it asked for.
 pub struct Failure {
     /// The bare test name, as a filter would spell it — `cases_arrays_slice`,
     /// or `dogfood_ir::checked_in_ir_is_current` for a suite that is a `mod` of
@@ -50,6 +61,30 @@ pub struct Failure {
     /// The test's captured output. libtest-json folds a test's stdout and stderr
     /// together into one field, so a panic message (stderr) is here too.
     pub output: String,
+    /// The remedies the test asked for, from the marker lines in `output`.
+    fills: Vec<Fill>,
+    /// Marker lines that did not parse. A test that tried to ask for something
+    /// and got it wrong is stuck, not silent.
+    malformed: Vec<String>,
+}
+
+impl Failure {
+    pub fn new(name: impl Into<String>, output: impl Into<String>) -> Failure {
+        let output = output.into();
+        let (fills, malformed) = Fill::scan(&output);
+        Failure {
+            name: name.into(),
+            output,
+            fills,
+            malformed,
+        }
+    }
+
+    /// Whether a regeneration can fix this: it asked for one, and asked
+    /// correctly.
+    fn is_fillable(&self) -> bool {
+        !self.fills.is_empty() && self.malformed.is_empty()
+    }
 }
 
 /// A parsed nextest run.
@@ -84,10 +119,10 @@ impl Run {
             let Some(name) = v["name"].as_str() else {
                 continue;
             };
-            failures.push(Failure {
-                name: bare_name(name),
-                output: v["stdout"].as_str().unwrap_or_default().to_string(),
-            });
+            failures.push(Failure::new(
+                bare_name(name),
+                v["stdout"].as_str().unwrap_or_default(),
+            ));
         }
 
         // nextest's status column, which carries what libtest's schema can't.
@@ -119,11 +154,6 @@ impl Run {
     /// Every failed test, in the order nextest reported them.
     pub fn failures(&self) -> &[Failure] {
         &self.failures
-    }
-
-    /// Names of every failed test, deduped.
-    pub fn failed_names(&self) -> BTreeSet<String> {
-        self.failures.iter().map(|f| f.name.clone()).collect()
     }
 
     /// Everything the failed tests printed, concatenated — the haystack for the
@@ -165,251 +195,143 @@ impl Run {
         Ok(self.failure_output())
     }
 
-    /// Failures a refill can't fix — there is no section to record actual output
-    /// into. A case that won't build/link/spawn, a crash, a failed in-language
-    /// `.test`, or a leaked allocation. Returns the offending lines, or empty when
-    /// there are none.
+    /// What this run's failures ask a regeneration to fix, and which failures
+    /// ask for nothing.
     ///
-    /// Checked before anything else: burning a full-corpus refill on one of these
-    /// costs a corpus run and fixes nothing.
+    /// The gate proceeds only if [`Fillable::stuck`] is empty. The check comes
+    /// before any regeneration: burning a corpus run on a refill that cannot
+    /// help costs minutes and fixes nothing.
     ///
-    /// `memory leak` is here despite its message *naming* `fill_expected` ("re-run
-    /// `…` to refresh the expected counts"), which is what makes it read as
-    /// fillable staleness. It isn't: the harness runs the leak gate even in fill
-    /// mode, precisely so a refill cannot bake a leak into a `--- report ---`
-    /// section, so a refill fails on it too. Without this alternative the failure
-    /// fell through every net — `hard_failures` excludes each `cases_*` test by
-    /// name, and [`Run::plan`]'s case regex wants `` `section` mismatch `` — and
-    /// the gate printed HANDOFF OK over a case that failed deterministically on
-    /// every run.
-    pub fn unfillable(&self) -> Vec<String> {
-        static RE: OnceLock<Regex> = OnceLock::new();
-        // Assembled with `concat!` rather than one string with `\` continuations:
-        // these are *raw* strings, where a trailing backslash is a literal
-        // character and would silently turn the alternative it ends into
-        // "…followed by a newline" — which never matches a single line.
-        //
-        // `memory leak` alone, not the whole sentence: the counts vary and the
-        // dash in "memory leak — allocations (3) != deallocations (2)" is an em
-        // dash, which is not worth spelling in a pattern.
-        let re = re(
-            &RE,
-            concat!(
-                r"(load|compile|emit|link|spawn|instrumented compile) failed:",
-                r"|\(in-language tests\) failed:|Abort trap|SIGSEGV|SIGABRT",
-                r"|memory leak",
-            ),
-        );
+    /// A test is stuck when it printed no [`Fill`] marker, printed one that does
+    /// not parse, or died abnormally (a signal or a timeout, which the JSON
+    /// cannot see and which no refill answers). A test that both asks for a
+    /// refill and fails some other way is the writer's to untangle: the final
+    /// run, which re-runs it after the refill, is what catches a refill that did
+    /// not help.
+    pub fn fillable(&self) -> Fillable {
+        let mut fills: BTreeSet<Fill> = BTreeSet::new();
         // The crash lines first — they are the reason to stop, and a segfault may
         // print nothing else at all.
-        let mut hits = self.abnormal.clone();
+        let mut stuck = self.abnormal.clone();
         for f in &self.failures {
-            for line in f.output.lines().filter(|l| re.is_match(l)) {
-                hits.push(format!("{}: {line}", f.name));
+            if f.is_fillable() {
+                fills.extend(f.fills.iter().cloned());
+                continue;
+            }
+            if f.malformed.is_empty() {
+                stuck.push(format!("{}: {}", f.name, first_line(&f.output)));
+            } else {
+                for why in &f.malformed {
+                    stuck.push(format!("{}: unreadable fill marker: {why}", f.name));
+                }
             }
         }
-        hits.truncate(20);
-        hits
+        stuck.truncate(20);
+        Fillable {
+            fills: fills.into_iter().collect(),
+            stuck,
+        }
     }
 
-    /// Failed tests that are *not* a per-case test, the case-list gate, or a
-    /// known IR-staleness gate — i.e. real test failures.
-    ///
-    /// Each case is its own `#[test]`, named `<prefix>_<display path>` for the
-    /// three case roots; their fillable mismatches are handled by [`Run::plan`].
-    /// [`Run::unfillable`] has already stopped on a case that genuinely broke, so
-    /// what reaches here is a stale section.
-    ///
-    /// The optional `<module>::` prefix matters: the suites under `tests/suites/`
-    /// are `mod`s of the merged `compiler`/`dogfood` targets, so a name arrives
-    /// as `dogfood_ir::checked_in_ir_is_current`, not bare. Matching only the
-    /// bare name silently reclassifies a regenerable staleness as a hard failure,
-    /// and the run then stops at a step it was supposed to fix itself.
-    ///
-    /// `checked_in_docs_are_current` is here for the same reason: the site under
-    /// `docs/` is generated from the source it documents, so any doc-comment
-    /// edit makes it stale, and stopping on that would make the gate refuse
-    /// every documentation change until it was regenerated by hand.
-    ///
-    /// `checked_in_compilers_are_current` is the most extreme case of that
-    /// shape. Each project under `projects/` carries the compiler that builds it
-    /// (DESIGN_PRINCIPLES.md §4), checked against a fingerprint of the compiler's
-    /// source tree — so *any* change to the compiler makes every project stale,
-    /// which is to say it goes stale on almost every run that gets as far as this
-    /// gate. Stopping on it would make the gate unusable.
-    ///
-    /// There are *two* gates that catch a stale artifact, not one.
-    /// `checked_in_ir_is_current` compares the source against the checked-in
-    /// `.clif` directly; `dogfood_lex_hook_matches_fresh_compile_on_corpus`
-    /// catches the same staleness from the other end, by running the production
-    /// hook and a fresh compile of the lexer source over the corpus and
-    /// comparing tokens. A lexer change fails both, and listing only the first
-    /// let the second stop a run that had already planned the regeneration that
-    /// would fix it.
-    pub fn hard_failures(&self) -> Vec<String> {
-        static RE: OnceLock<Regex> = OnceLock::new();
-        // `concat!`, not a `\` continuation — see the note in [`Run::unfillable`].
-        let re = re(
-            &RE,
-            concat!(
-                r"^([A-Za-z0-9_]+::)?((cases|examples|crates)_.*",
-                r"|every_case_has_a_test|checked_in_ir_is_current|no_staged_ir_pending",
-                r"|dogfood_lex_hook_matches_fresh_compile_on_corpus",
-                r"|checked_in_docs_are_current|checked_in_compilers_are_current)$",
-            ),
-        );
-        self.failed_names()
-            .into_iter()
-            .filter(|t| !re.is_match(t))
-            .collect()
-    }
-
-    /// The baseline failures in this run (see [`Baseline`]).
-    ///
-    /// The harness prints ``[<display-path>]: performance baseline moved`` or
-    /// `` … missing`` and, for a move, the lines that follow it — one indented
-    /// `metric: old -> new` per column, up to the "If this change is intended"
-    /// line. That text is a contract with `check_baseline` in `tests/cases.rs`.
+    /// The baseline failures in this run (see [`Baseline`]), from the
+    /// [`Fill::BaselineMoved`] and [`Fill::BaselineMissing`] markers
+    /// `check_baseline` in `tests/cases.rs` prints.
     pub fn baseline(&self) -> Baseline {
-        static HEAD: OnceLock<Regex> = OnceLock::new();
-        let head = re(
-            &HEAD,
-            r"^\[([^\]\n]+)\]: performance baseline (moved|missing)",
-        );
         let mut found = Baseline::default();
-        for f in &self.failures {
-            let mut lines = f.output.lines().peekable();
-            while let Some(line) = lines.next() {
-                let Some(c) = head.captures(line) else {
-                    continue;
-                };
-                let case = c[1].to_string();
-                if &c[2] == "missing" {
-                    found.missing.insert(case);
-                    continue;
+        for fill in self.failures.iter().flat_map(|f| &f.fills) {
+            match fill {
+                Fill::BaselineMoved { case, moves } => {
+                    found.moved.insert(case.clone(), moves.clone());
                 }
-                let mut detail = Vec::new();
-                while let Some(next) = lines.peek() {
-                    if !next.starts_with("  ") {
-                        break;
-                    }
-                    detail.push(next.trim().to_string());
-                    lines.next();
+                Fill::BaselineMissing { case } => {
+                    found.missing.insert(case.clone());
                 }
-                found.moved.insert(case, detail);
+                _ => {}
             }
         }
         found
     }
 
     /// Whether the run failed for nothing but baseline moves: at least one failed
-    /// test, none abnormal, and every one of them a baseline failure.
+    /// test, none abnormal, and every one of them asking only for a baseline row.
     ///
     /// A run like that is complete — every other test passed — so the gate can
     /// refresh the rows and report the moves at the end instead of stopping.
     pub fn only_baseline(&self) -> bool {
         !self.failures.is_empty()
             && self.abnormal.is_empty()
-            && self
-                .failures
-                .iter()
-                .all(|f| f.output.contains("]: performance baseline "))
+            && self.failures.iter().all(|f| {
+                f.is_fillable()
+                    && f.fills.iter().all(|x| {
+                        matches!(x, Fill::BaselineMoved { .. } | Fill::BaselineMissing { .. })
+                    })
+            })
     }
 
     /// Classify the run into the remediation work it implies.
+    ///
+    /// Reads only what the failing tests asked for, so a stuck failure
+    /// contributes nothing here — [`Run::fillable`] is what stops the gate on it.
     pub fn plan(&self) -> Plan {
-        static MISMATCH: OnceLock<Regex> = OnceLock::new();
-        static GATES: OnceLock<Regex> = OnceLock::new();
-        static CASE_TESTS: OnceLock<Regex> = OnceLock::new();
-        static SECTION: OnceLock<Regex> = OnceLock::new();
-        static BEHAVIORAL: OnceLock<Regex> = OnceLock::new();
-        static CASE_PATH: OnceLock<Regex> = OnceLock::new();
-        static DOCS: OnceLock<Regex> = OnceLock::new();
-        static COMPILERS: OnceLock<Regex> = OnceLock::new();
-
-        let out = self.failure_output();
-        let mut plan = Plan {
-            need_fill: re(&MISMATCH, r"`[a-z ]+` mismatch|error mismatch").is_match(&out),
-            ..Plan::default()
-        };
-
-        let failed = self.failed_names();
-        // Both artifact gates imply the same remediation. The lexer corpus test
-        // is a staleness signal in its own right: it runs the production hook
-        // and a fresh compile of the *same* lexer source, so the only thing that
-        // can differ between them is the checked-in artifact.
-        let gates = re(
-            &GATES,
-            concat!(
-                r"^([A-Za-z0-9_]+::)?(checked_in_ir_is_current|no_staged_ir_pending",
-                r"|dogfood_lex_hook_matches_fresh_compile_on_corpus)$",
-            ),
-        );
-        plan.need_ir = failed.iter().any(|t| gates.is_match(t));
-        let case_tests = re(&CASE_TESTS, r"^([A-Za-z0-9_]+::)?every_case_has_a_test$");
-        plan.need_case_tests = failed.iter().any(|t| case_tests.is_match(t));
-        // The docs site is regenerated from source, so it goes stale on any
-        // doc-comment edit — fillable staleness, not a failure to stop on.
-        let docs = re(&DOCS, r"^([A-Za-z0-9_]+::)?checked_in_docs_are_current$");
-        plan.need_docs = failed.iter().any(|t| docs.is_match(t));
-        // A project's checked-in compiler is stale the moment the compiler
-        // changes, so this is the most routinely-fillable staleness there is.
-        let compilers = re(
-            &COMPILERS,
-            r"^([A-Za-z0-9_]+::)?checked_in_compilers_are_current$",
-        );
-        plan.need_compilers = failed.iter().any(|t| compilers.is_match(t));
-
-        // Distinct sections that changed, and whether any are behavioral.
-        plan.changed_sections = re(&SECTION, r"`([a-z ]+)` mismatch")
-            .captures_iter(&out)
-            .map(|c| c[1].to_string())
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect();
-        plan.behavioral_changed = re(
-            &BEHAVIORAL,
-            r"`(stdout|stderr|exit code|errors|check)` mismatch|error mismatch",
-        )
-        .is_match(&out);
-
-        // The exact cases that need refilling. Each mismatch prints
-        // ``[<display-path>]: `<section>` mismatch`` (or `error mismatch`), and
-        // that bracketed display path is precisely what `AIPL_CASE` filters on —
-        // so we refill just the failing cases instead of paying for a
-        // whole-corpus fill. Deduped: one case may report several mismatched
-        // sections, and one scoped fill refreshes all of that case's sections.
-        //
-        // The path may not contain a newline, and that bound is load-bearing
-        // rather than tidiness. Some *other* test's message can contain an
-        // unclosed `[` — a doc comment describing a half-open range as
-        // `[start, end)`, rendered into the HTML that `checked_in_docs_are_current`
-        // prints on a mismatch — and without it the scan runs from there across
-        // every intervening line to the next real case bracket, handing
-        // `AIPL_CASE` one enormous non-existent case name. The refill then fails
-        // with "matched no test cases", which reads like a corpus problem and is
-        // not one.
-        let case_path = re(&CASE_PATH, r"\[([^\]\n]+)\]: (`[a-z ]+`|error) mismatch");
-        let mut cases: BTreeSet<String> = case_path
-            .captures_iter(&out)
-            .map(|c| c[1].to_string())
-            .collect();
-
-        // Cases added since the checked-in `#[test]` list was generated. These
-        // are the reason a brand-new case used to cost a second handoff: with no
-        // `#[test]` yet, the discovery run never *executed* them, so their
-        // unrecorded sections went unseen and `need_fill` stayed false — the
-        // final run (after the list is regenerated) was the first thing to
-        // notice. `every_case_has_a_test` already names them, so fold them into
-        // the fill set and finish them in this pass.
-        let undeclared = undeclared_cases(&out);
-        if !undeclared.is_empty() {
-            plan.need_fill = true;
-            cases.extend(undeclared);
+        let mut plan = Plan::default();
+        let mut cases: BTreeSet<String> = BTreeSet::new();
+        let mut sections: BTreeSet<String> = BTreeSet::new();
+        for fill in self.failures.iter().flat_map(|f| &f.fills) {
+            match fill {
+                // One scoped fill refreshes every section of a case, so the case
+                // list is deduped even when a case mismatched in several.
+                Fill::Section { case, section } => {
+                    plan.need_fill = true;
+                    cases.insert(case.clone());
+                    sections.insert(section.clone());
+                }
+                // A case with no `#[test]` never ran, so its sections were never
+                // compared: fold it into the fill set and finish it in this pass
+                // rather than in a second handoff.
+                Fill::CaseTests { added } => {
+                    plan.need_case_tests = true;
+                    if !added.is_empty() {
+                        plan.need_fill = true;
+                        cases.extend(added.iter().cloned());
+                    }
+                }
+                Fill::Ir => plan.need_ir = true,
+                Fill::Docs => plan.need_docs = true,
+                Fill::Compilers => plan.need_compilers = true,
+                // Settled by `refresh_perfmon` at the end, not a remediation step
+                // of their own.
+                Fill::BaselineMoved { .. } | Fill::BaselineMissing { .. } => {}
+            }
         }
+        // Only a `report` is numbers the compiler produces; every other section
+        // records what a program does, so a change to one deserves a read of the
+        // diff.
+        plan.behavioral_changed = sections.iter().any(|s| s != "report");
+        plan.changed_sections = sections.into_iter().collect();
         plan.fail_cases = cases.into_iter().collect();
         plan
     }
+}
+
+/// What a run's failures ask for, and what they leave unexplained. See
+/// [`Run::fillable`].
+#[derive(Debug, PartialEq, Eq)]
+pub struct Fillable {
+    /// Every distinct remedy the failing tests asked for.
+    pub fills: Vec<Fill>,
+    /// Failures that asked for none, as `name: first line of output` (or the
+    /// abnormal-exit line). Anything here stops the gate.
+    pub stuck: Vec<String>,
+}
+
+/// The first non-blank line of a failed test's output, trimmed, for naming it.
+fn first_line(output: &str) -> String {
+    output
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+        .unwrap_or("(no output)")
+        .to_string()
 }
 
 /// Cases whose row in `tests/performance_metrics.md` disagreed with their run.
@@ -484,37 +406,6 @@ impl Plan {
     }
 }
 
-/// The cases `every_case_has_a_test` reported as having no `#[test]` yet.
-///
-/// Only that half of its message: the other half lists *deleted* cases, which
-/// have no file left to fill.
-fn undeclared_cases(out: &str) -> Vec<String> {
-    static ENTRY: OnceLock<Regex> = OnceLock::new();
-    let entry = re(&ENTRY, r"^\s*(\S+) \([A-Za-z0-9_]+\)$");
-    let mut found = Vec::new();
-    let mut grabbing = false;
-    for line in out.lines() {
-        if line.contains("case(s) with no `#[test]`:") {
-            grabbing = true;
-            continue;
-        }
-        if line.contains("declared `#[test]`(s) with no case file:") || line.trim().is_empty() {
-            grabbing = false;
-        }
-        if grabbing {
-            // A well-formed entry is `<display path> (<test name>)`; anything
-            // else is passed through as-is.
-            match entry.captures(line) {
-                Some(c) => found.push(c[1].to_string()),
-                None => found.push(line.to_string()),
-            }
-        }
-    }
-    found.sort();
-    found.dedup();
-    found
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -523,13 +414,7 @@ mod tests {
     /// have yielded.
     fn run(failures: &[(&str, &str)]) -> Run {
         Run {
-            failures: failures
-                .iter()
-                .map(|(n, o)| Failure {
-                    name: (*n).to_string(),
-                    output: (*o).to_string(),
-                })
-                .collect(),
+            failures: failures.iter().map(|(n, o)| Failure::new(*n, *o)).collect(),
             abnormal: Vec::new(),
             saw_events: true,
         }
@@ -544,6 +429,23 @@ mod tests {
         })
     }
 
+    /// The output of a test that asks for `fills`, with the prose around the
+    /// markers a real panic message has.
+    fn asking(fills: &[Fill]) -> String {
+        let markers: Vec<String> = fills.iter().map(Fill::marker).collect();
+        format!(
+            "thread 'x' panicked:\nsomething is stale\n{}",
+            markers.join("\n")
+        )
+    }
+
+    fn section(case: &str, section: &str) -> Fill {
+        Fill::Section {
+            case: case.to_string(),
+            section: section.to_string(),
+        }
+    }
+
     #[test]
     fn parses_the_json_event_stream() {
         // Real shapes from nextest 0.9.143.
@@ -555,15 +457,23 @@ mod tests {
             r#"{"type":"test","event":"ok","name":"aipl::cases$cases_fine","exec_time":0.1}"#,
             "\n",
             r#"{"type":"test","event":"failed","name":"aipl::cases$cases_x_y","exec_time":0.2,"#,
-            r#""stdout":"[cases/x/y]: `stdout` mismatch\n"}"#,
+            r#""stdout":"[cases/x/y]: `stdout` mismatch\nhandoff-fill: section\tcases/x/y\tstdout\n"}"#,
             "\n",
             r#"{"type":"suite","event":"failed","passed":1,"failed":1}"#,
         );
         let run = parse(stdout, "");
         assert!(run.saw_events());
-        assert_eq!(run.failed_names().len(), 1, "only the failed test counts");
-        assert!(run.failed_names().contains("cases_x_y"));
+        assert_eq!(run.failures().len(), 1, "only the failed test counts");
+        assert_eq!(run.failures()[0].name, "cases_x_y");
         assert!(run.failure_output().contains("`stdout` mismatch"));
+        // The marker survives the JSON round trip, tab and all.
+        assert_eq!(
+            run.fillable(),
+            Fillable {
+                fills: vec![section("cases/x/y", "stdout")],
+                stuck: vec![],
+            }
+        );
     }
 
     #[test]
@@ -588,9 +498,19 @@ mod tests {
                       (test aborted with signal 11: SIGSEGV)";
         let run = parse(stdout, stderr);
         assert!(
-            !run.unfillable().is_empty(),
+            !run.fillable().stuck.is_empty(),
             "a crash must stop the gate, not trigger a refill"
         );
+    }
+
+    /// A crash that happens in a test which had already asked for a refill is
+    /// still a crash: the abnormal line is on its own account.
+    #[test]
+    fn a_crash_is_stuck_even_beside_a_request() {
+        let mut run = run(&[("cases_x_y", &asking(&[section("cases/x/y", "stdout")]))]);
+        run.abnormal.push("SIGSEGV [ 0.008s] cases_x_y".to_string());
+        assert_eq!(run.fillable().stuck, ["SIGSEGV [ 0.008s] cases_x_y"]);
+        assert!(!run.only_baseline());
     }
 
     #[test]
@@ -603,137 +523,125 @@ mod tests {
         assert!(!run.saw_events());
     }
 
+    // ---- The polarity: nothing is fillable unless the test says so.
+
+    /// The whole point. Every one of these used to need a pattern to be told
+    /// apart from staleness, or was waved through as staleness for want of one.
     #[test]
-    fn module_qualified_gates_are_not_hard_failures() {
-        let run = run(&[("dogfood_ir::checked_in_ir_is_current", "")]);
-        assert!(run.hard_failures().is_empty());
-        assert!(run.plan().need_ir);
+    fn a_failure_that_asks_for_nothing_is_stuck() {
+        for (name, output) in [
+            ("cases_x_y", "[cases/x/y]: compile failed: no such function"),
+            (
+                "cases_x_y",
+                "[cases/x/y]: (in-language tests) failed: 1 assertion",
+            ),
+            ("mono::specializes_generics", "assertion failed"),
+            ("cases_x_y", ""),
+            // The report test that started this: a stale pinned report reads as
+            // staleness to anyone, but only the test knows it is one.
+            (
+                "report::report_agrees_with_the_pinned_report",
+                "left: \"allocations 2\"\n right: \"allocations 3\"",
+            ),
+        ] {
+            let stuck = run(&[(name, output)]).fillable().stuck;
+            assert_eq!(stuck.len(), 1, "{name}: {output}");
+            assert!(stuck[0].starts_with(&format!("{name}: ")), "{stuck:?}");
+        }
     }
 
-    /// The lexer corpus test catches a stale artifact from the other end — the
-    /// production hook against a fresh compile of the same source — so it asks
-    /// for the same regeneration and must not stop the run on its own.
+    /// Verbatim from `tests/cases.rs`, second line included: it points at
+    /// `fill_expected`, which reads as fillable. The harness runs the leak gate in
+    /// fill mode too, so a refill cannot fix it — and it asks for nothing, so it
+    /// is not treated as if it could.
     #[test]
-    fn a_stale_docs_site_asks_for_regeneration() {
-        let run = run(&[("docs_site::checked_in_docs_are_current", "")]);
-        assert!(run.hard_failures().is_empty());
-        assert!(run.plan().need_docs);
-        assert!(!run.plan().is_empty());
-    }
-
-    /// A project's checked-in compiler goes stale on *every* compiler change,
-    /// which is most runs that reach the gate at all. Classifying it as a hard
-    /// failure would stop nearly every handoff.
-    #[test]
-    fn a_stale_project_compiler_asks_for_a_re_copy() {
-        let run = run(&[("projects::checked_in_compilers_are_current", "")]);
-        assert!(run.hard_failures().is_empty());
-        assert!(run.plan().need_compilers);
-        assert!(!run.plan().is_empty());
-    }
-
-    /// The other project test is a real failure: a project that does not pass
-    /// its own `aipl check` is broken, and no re-copy fixes that.
-    #[test]
-    fn a_project_failing_its_own_check_is_a_hard_failure() {
-        let run = run(&[("projects::projects_pass_their_own_check", "1 project(s)")]);
+    fn a_leak_that_names_fill_expected_is_still_stuck() {
+        let output = "[cases/structs/x]: memory leak — allocations (3) != deallocations (2)\n\
+                      Fix the leak, then re-run `AIPL_CASE='cases/structs/x' cargo test \
+                      --test cases -- --ignored fill_expected` to refresh the expected counts.";
+        let run = run(&[("cases_structs_x", output)]);
         assert_eq!(
-            run.hard_failures(),
-            vec!["projects::projects_pass_their_own_check"]
+            run.fillable().stuck,
+            vec![
+                "cases_structs_x: [cases/structs/x]: memory leak — allocations (3) \
+                 != deallocations (2)"
+            ]
+        );
+        assert!(run.plan().is_empty());
+    }
+
+    #[test]
+    fn stuck_lines_name_the_test_they_came_from() {
+        let stuck = run(&[("cases_x_y", "\n  \n[cases/x/y]: compile failed: boom")])
+            .fillable()
+            .stuck;
+        assert_eq!(stuck, vec!["cases_x_y: [cases/x/y]: compile failed: boom"]);
+        assert_eq!(
+            run(&[("cases_x_y", "")]).fillable().stuck,
+            vec!["cases_x_y: (no output)"]
         );
     }
 
-    /// An unclosed `[` in one test's message must not reach across the output
-    /// and swallow the next real case bracket.
-    ///
-    /// This is not hypothetical: `checked_in_docs_are_current` prints the whole
-    /// rendered page on a mismatch, and a doc comment describing a half-open
-    /// range as `[start, end)` puts an unclosed bracket in it. The refill then
-    /// ran with a case name hundreds of characters long and failed with
-    /// "AIPL_CASE matched no test cases", which points at the corpus rather than
-    /// at the parser that invented the name.
+    /// A marker the gate cannot read is the writer and the reader disagreeing —
+    /// the one case that must not read as either "nothing asked" or "asked".
     #[test]
-    fn an_unclosed_bracket_does_not_swallow_a_later_case() {
-        let run = run(&[
-            (
-                "docs_site::checked_in_docs_are_current",
-                "left: \"a half-open range [start, end) rendered into a page\"",
-            ),
-            (
-                "cases_structs_point",
-                "[cases/structs/point.aipl]: `stdout` mismatch",
-            ),
-        ]);
-        assert_eq!(run.plan().fail_cases, ["cases/structs/point.aipl"]);
+    fn an_unreadable_marker_is_stuck_and_says_why() {
+        let stuck = run(&[("cases_x_y", "handoff-fill: nonsense\ntext")])
+            .fillable()
+            .stuck;
+        assert_eq!(stuck.len(), 1);
+        assert!(stuck[0].contains("unreadable fill marker"), "{stuck:?}");
+        assert!(stuck[0].contains("unknown kind"), "{stuck:?}");
     }
 
     #[test]
-    fn the_lexer_corpus_gate_asks_for_ir_regeneration() {
-        let run = run(&[(
-            "lexer_dogfood::dogfood_lex_hook_matches_fresh_compile_on_corpus",
-            "",
-        )]);
-        assert!(run.hard_failures().is_empty());
-        assert!(run.plan().need_ir);
-    }
-
-    /// A lexer change fails both artifact gates at once. That is the run that
-    /// used to stop: `need_ir` was already set, and the second gate was
-    /// classified as a hard failure before the regeneration could happen.
-    #[test]
-    fn both_artifact_gates_failing_still_only_asks_for_regeneration() {
-        let run = run(&[
-            ("dogfood_ir::checked_in_ir_is_current", ""),
-            (
-                "lexer_dogfood::dogfood_lex_hook_matches_fresh_compile_on_corpus",
-                "",
-            ),
-        ]);
-        assert!(run.hard_failures().is_empty());
-        assert!(run.plan().need_ir);
+    fn a_request_beside_a_stuck_failure_does_not_unstick_it() {
+        let fillable = run(&[
+            ("cases_a_b", &asking(&[section("cases/a/b", "stdout")])),
+            ("mono::broken", "assertion failed"),
+        ])
+        .fillable();
+        assert_eq!(fillable.fills, vec![section("cases/a/b", "stdout")]);
+        assert_eq!(fillable.stuck, vec!["mono::broken: assertion failed"]);
     }
 
     #[test]
-    fn every_gate_name_is_excluded_from_hard_failures() {
-        for name in [
-            "cases_strings_slice",
-            "examples_hello",
-            "crates_aipl_mono_src_builtin_all",
-            "every_case_has_a_test",
-            "checked_in_ir_is_current",
-            "no_staged_ir_pending",
-            "dogfood_ir::checked_in_ir_is_current",
-            "dogfood_lex_hook_matches_fresh_compile_on_corpus",
-            "lexer_dogfood::dogfood_lex_hook_matches_fresh_compile_on_corpus",
-            "checked_in_docs_are_current",
-            "docs_site::checked_in_docs_are_current",
-            "checked_in_compilers_are_current",
-            "projects::checked_in_compilers_are_current",
-        ] {
-            assert!(
-                run(&[(name, "")]).hard_failures().is_empty(),
-                "{name} should be excluded"
-            );
+    fn requests_are_deduped_across_failures() {
+        let fillable = run(&[
+            ("a", &asking(&[Fill::Docs])),
+            ("b", &asking(&[Fill::Docs, Fill::Ir])),
+        ])
+        .fillable();
+        assert_eq!(fillable.fills, vec![Fill::Ir, Fill::Docs]);
+        assert!(fillable.stuck.is_empty());
+    }
+
+    // ---- The plan, from what was asked for.
+
+    #[test]
+    fn each_artifact_request_asks_for_its_regeneration() {
+        let plan = |fill: Fill| run(&[("t", &asking(&[fill]))]).plan();
+        assert!(plan(Fill::Ir).need_ir);
+        assert!(plan(Fill::Docs).need_docs);
+        assert!(plan(Fill::Compilers).need_compilers);
+        for fill in [Fill::Ir, Fill::Docs, Fill::Compilers] {
+            assert!(!plan(fill).is_empty());
         }
     }
 
     #[test]
-    fn a_real_failure_is_reported() {
-        let run = run(&[("mono::specializes_generics", "assertion failed")]);
-        assert_eq!(run.hard_failures(), vec!["mono::specializes_generics"]);
-    }
-
-    #[test]
-    fn mismatches_name_their_cases_and_sections() {
+    fn sections_name_their_cases() {
         let run = run(&[
             (
                 "cases_strings_slice",
-                "[cases/strings/slice]: `report` mismatch\n\
-                 [cases/strings/slice]: `stdout` mismatch",
+                &asking(&[
+                    section("cases/strings/slice", "report"),
+                    section("cases/strings/slice", "stdout"),
+                ]),
             ),
             (
                 "cases_arrays_take",
-                "[cases/arrays/take]: `errors` mismatch",
+                &asking(&[section("cases/arrays/take", "errors")]),
             ),
         ]);
         let plan = run.plan();
@@ -748,11 +656,24 @@ mod tests {
         assert!(plan.behavioral_changed);
     }
 
+    /// The sections the old pattern (`[a-z ]+`) could not even spell: a case
+    /// whose only stale section was an `expect file:` was never planned, and
+    /// stopped the final run instead.
+    #[test]
+    fn a_section_with_punctuation_in_its_name_is_planned() {
+        let plan = run(&[(
+            "cases_files_write_file",
+            &asking(&[section("cases/files/write_file", "expect file: out.txt")]),
+        )])
+        .plan();
+        assert_eq!(plan.fail_cases, ["cases/files/write_file"]);
+    }
+
     #[test]
     fn a_metrics_only_refill_is_not_behavioral() {
         let plan = run(&[(
-            "cases_strings_slice",
-            "[cases/strings/slice]: `report` mismatch",
+            "report::report_agrees_with_the_pinned_report",
+            &asking(&[section("cases/report/runtime_calls", "report")]),
         )])
         .plan();
         assert!(plan.need_fill);
@@ -761,72 +682,50 @@ mod tests {
 
     #[test]
     fn new_cases_are_folded_into_the_fill_set() {
-        let run = run(&[(
+        let plan = run(&[(
             "every_case_has_a_test",
-            "2 case(s) with no `#[test]`:\n\
-             \x20   cases/optimizations/new_one (cases_optimizations_new_one)\n\
-             \x20   cases/optimizations/new_two (cases_optimizations_new_two)\n\
-             \n\
-             1 declared `#[test]`(s) with no case file:\n\
-             \x20   cases/gone/old (cases_gone_old)",
-        )]);
-        let plan = run.plan();
+            &asking(&[Fill::CaseTests {
+                added: vec![
+                    "cases/optimizations/new_one".into(),
+                    "cases/optimizations/new_two".into(),
+                ],
+            }]),
+        )])
+        .plan();
         assert!(plan.need_fill, "a new case still needs its sections filled");
         assert!(plan.need_case_tests);
         assert_eq!(
             plan.fail_cases,
             ["cases/optimizations/new_one", "cases/optimizations/new_two"],
-            "deleted cases have no file left to fill"
         );
     }
 
+    /// A list that only has *stale* entries has no file left to fill.
     #[test]
-    fn crashes_and_build_breaks_are_unfillable() {
-        for output in [
-            "[cases/x/y]: compile failed: no such function",
-            "[cases/x/y]: (in-language tests) failed: 1 assertion",
-        ] {
-            assert!(
-                !run(&[("cases_x_y", output)]).unfillable().is_empty(),
-                "should be unfillable: {output}"
-            );
-        }
-        assert!(run(&[("cases_x_y", "[cases/x/y]: `stdout` mismatch")])
-            .unfillable()
-            .is_empty());
+    fn deleted_cases_only_regenerate_the_list() {
+        let plan = run(&[(
+            "every_case_has_a_test",
+            &asking(&[Fill::CaseTests { added: vec![] }]),
+        )])
+        .plan();
+        assert!(plan.need_case_tests);
+        assert!(!plan.need_fill);
+        assert!(plan.fail_cases.is_empty());
     }
 
-    /// A leaked allocation stops the run, and is *not* mistaken for staleness.
-    ///
-    /// Verbatim from `tests/cases.rs`, second line included: it points at
-    /// `fill_expected`, which is exactly why this used to read as fillable. The
-    /// harness runs the leak gate in fill mode too, so a refill fails on it as
-    /// well — and with the case excluded from `hard_failures` for being a
-    /// `cases_*` test, nothing else was left to catch it.
+    /// A stuck failure contributes nothing to the plan: it asked for nothing, and
+    /// reading a request into its prose is the mistake this design removes.
     #[test]
-    fn a_leaked_allocation_is_unfillable() {
-        let output = "[cases/structs/x]: memory leak — allocations (3) != deallocations (2)\n\
-                      Fix the leak, then re-run `AIPL_CASE='cases/structs/x' cargo test \
-                      --test cases -- --ignored fill_expected` to refresh the expected counts.";
-        let run = run(&[("cases_structs_x", output)]);
-        assert_eq!(
-            run.unfillable(),
-            vec![
-                "cases_structs_x: [cases/structs/x]: memory leak — allocations (3) \
-                 != deallocations (2)"
-            ]
-        );
-        // And the `fill_expected` it names must not pull the case into a refill.
-        assert!(!run.plan().need_fill);
-        assert!(run.plan().fail_cases.is_empty());
+    fn prose_that_looks_like_a_mismatch_plans_nothing() {
+        let plan = run(&[(
+            "cases_x_y",
+            "[cases/x/y]: `stdout` mismatch\nIf this change is intended, run `fill_expected`.",
+        )])
+        .plan();
+        assert!(plan.is_empty());
     }
 
-    #[test]
-    fn unfillable_lines_name_the_test_they_came_from() {
-        // The attribution the flat-text version could not do.
-        let hits = run(&[("cases_x_y", "[cases/x/y]: compile failed: boom")]).unfillable();
-        assert_eq!(hits, vec!["cases_x_y: [cases/x/y]: compile failed: boom"]);
-    }
+    // ---- Helper output.
 
     #[test]
     fn a_helper_that_did_not_diverge_says_so() {
@@ -846,13 +745,27 @@ mod tests {
         assert!(!err.contains("exited 0"), "{err}");
     }
 
-    /// The messages `check_baseline` prints, as the JSON carries them.
-    const MOVED: &str = "[cases/x/y.aipl]: performance baseline moved (tests/performance_metrics.md):\n  allocations: 3 -> 4 (+33.3%)\n  instructions: 120 -> 130 (+8.3%)\nIf this change is intended, accept it with `AIPL_CASE='cases/x/y.aipl' cargo test --test cases -- --ignored refresh_perfmon`.";
-    const MISSING: &str = "[cases/new/one.aipl]: performance baseline missing: tests/performance_metrics.md has no row for this case.\nAdd it with `AIPL_CASE='cases/new/one.aipl' cargo test --test cases -- --ignored refresh_perfmon`.";
+    // ---- Baseline rows.
+
+    fn moved() -> String {
+        asking(&[Fill::BaselineMoved {
+            case: "cases/x/y.aipl".into(),
+            moves: vec![
+                "allocations: 3 -> 4 (+33.3%)".into(),
+                "instructions: 120 -> 130 (+8.3%)".into(),
+            ],
+        }])
+    }
+
+    fn missing() -> String {
+        asking(&[Fill::BaselineMissing {
+            case: "cases/new/one.aipl".into(),
+        }])
+    }
 
     #[test]
     fn reads_moved_and_missing_baselines() {
-        let r = run(&[("cases_x_y", MOVED), ("cases_new_one", MISSING)]);
+        let r = run(&[("cases_x_y", &moved()), ("cases_new_one", &missing())]);
         let b = r.baseline();
         assert_eq!(
             b.moved.into_iter().collect::<Vec<_>>(),
@@ -872,11 +785,16 @@ mod tests {
 
     #[test]
     fn a_run_of_only_baseline_failures_is_complete() {
-        assert!(run(&[("cases_x_y", MOVED), ("cases_new_one", MISSING)]).only_baseline());
+        assert!(run(&[("cases_x_y", &moved()), ("cases_new_one", &missing())]).only_baseline());
         // One failure of any other kind makes it an ordinary failing run.
         assert!(!run(&[
-            ("cases_x_y", MOVED),
-            ("cases_a_b", "[cases/a/b.aipl]: `stdout` mismatch")
+            ("cases_x_y", &moved()),
+            ("cases_a_b", &asking(&[section("cases/a/b.aipl", "stdout")]))
+        ])
+        .only_baseline());
+        assert!(!run(&[
+            ("cases_x_y", &moved()),
+            ("mono::broken", "assertion failed")
         ])
         .only_baseline());
         // A green run is not "only baseline failures" either.
@@ -885,11 +803,9 @@ mod tests {
 
     #[test]
     fn a_baseline_failure_is_not_a_stale_section_or_a_broken_case() {
-        let r = run(&[("cases_x_y", MOVED), ("cases_new_one", MISSING)]);
-        // Nothing a refill rewrites, nothing that stops the gate, and no case to
-        // refill — the other classifiers must leave it alone.
-        assert!(r.unfillable().is_empty());
-        assert!(r.hard_failures().is_empty());
+        let r = run(&[("cases_x_y", &moved()), ("cases_new_one", &missing())]);
+        // Fixable, not stuck; and no remediation step of its own.
+        assert!(r.fillable().stuck.is_empty());
         assert_eq!(r.plan(), Plan::default());
     }
 }

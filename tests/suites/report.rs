@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use aipl::perf::PerfStats;
+use handoff::protocol::Fill;
 
 fn normalized(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).replace("\r\n", "\n")
@@ -73,10 +74,24 @@ fn pinned_report(case: &str) -> String {
 
 /// `aipl report` on the case prints exactly what the case pins. (A section body has
 /// its trailing newlines stripped, and a report ends in one.)
+///
+/// A difference is the case's `--- report ---` section having gone stale, which a
+/// refill rewrites — so it asks for one. A `report` run that fails outright asks
+/// for nothing.
 fn assert_report_matches_the_case(case: &str) {
     let (stdout, stderr, code) = report(&[case]);
     assert_eq!((stderr.as_str(), code), ("", 0), "{case}");
-    assert_eq!(stdout.trim_end(), pinned_report(case), "{case}");
+    let pinned = pinned_report(case);
+    assert!(
+        stdout.trim_end() == pinned,
+        "{case}\n  left: {:?}\n right: {pinned:?}\n{}",
+        stdout.trim_end(),
+        Fill::Section {
+            case: case.strip_prefix("tests/").unwrap_or(case).to_string(),
+            section: "report".to_string(),
+        }
+        .marker()
+    );
 }
 
 // ---- parity with the harness --------------------------------------------------

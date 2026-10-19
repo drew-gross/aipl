@@ -71,6 +71,8 @@ aipl-docs = { workspace = true }
 object = { workspace = true }
 
 [dev-dependencies]
+# The line a failing test prints to tell `cargo handoff` what fixes it.
+handoff = { path = "handoff" }
 serde_json = { workspace = true }
 regex = { workspace = true }
 

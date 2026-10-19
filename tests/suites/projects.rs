@@ -41,6 +41,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use handoff::protocol::Fill;
+
 /// The `fill_*` helper that fixes a stale copy, named in every failure it would
 /// fix. `cargo handoff` runs it for you.
 const REGENERATE: &str = "cargo test --test compiler -- --ignored projects::fill_project_compilers";
@@ -219,9 +221,10 @@ fn checked_in_compilers_are_current() {
     assert!(
         stale.is_empty(),
         "{} project compiler(s) are not built from this repository's current \
-         sources. Re-copy with:\n    {REGENERATE}\n{}",
+         sources. Re-copy with:\n    {REGENERATE}\n{}\n{}",
         stale.len(),
         stale.join("\n"),
+        Fill::Compilers.marker(),
     );
 }
 
