@@ -17,14 +17,17 @@ it opens the whole empty region and its border. A cell shows `#` hidden, `F`
 flagged, `.` revealed with nothing around it, or a digit counting the mines
 around it. Exits 0 on a win or a quit, 1 on hitting a mine.
 
-Input can be piped, so a game can be scripted: `printf 'r 0 0\nq\n' | ./aipl run`.
+`./aipl run` starts a new game; input can be piped, so a game can be scripted: `printf 'r 0 0\nq\n' | ./aipl run`.
 
-## The mines are always in the same place
+## The mines
 
-There is no random number source in AIPL yet, so the layout is a constant,
-`mine_layout()` in `main.aipl`. Everything else takes the mines as an argument
-(`new_game(width, height, mines)`), so a random layout is a change to the one
-place that calls it.
+Ten mines are placed at random each game. `./aipl run -- SEED` plays the same
+game again for the same whole number, which is also how the tests get a fixed
+board. `main` seeds with `shim random seeded_with_clock()` or
+`shim random seeded_with_int(seed)`: `!random` is an effect with no default
+generator, so `main` cannot declare it and the program has to say where its
+numbers come from. `place_mines` declares `!random`; everything else takes the
+mines as an argument (`new_game(width, height, mines)`).
 
 ## Layout
 
@@ -40,7 +43,6 @@ The rules are pure functions on a `Game` value and carry the tests in their
 
 | need | why |
 |---|---|
-| random numbers (an effect, or a seedable generator value) | place the mines differently each game; a seed from `args` keeps it testable |
 | a way to set one element of an array | the board is a set of revealed cells because an array cell cannot be assigned |
 | read one key without waiting for Enter (raw mode) | `hjkl`/arrow cursor play instead of typed commands |
 | ANSI output: clear screen, move cursor, colour | redraw in place, classic number colours |

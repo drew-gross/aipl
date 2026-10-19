@@ -244,6 +244,12 @@ fn checked_in_compilers_are_current() {
 #[test]
 fn projects_pass_their_own_check() {
     let mut failures: Vec<String> = Vec::new();
+    // Whether every project that failed was carrying a compiler older than this
+    // repository's sources. A project written against a new language feature
+    // cannot pass under the compiler from before it, and re-copying the compiler
+    // is what fixes that; a project that fails under a *current* compiler is
+    // broken for real, and asks for nothing.
+    let mut only_stale = true;
     for project in projects() {
         let compiler = compiler_in(&project);
         if !compiler.exists() {
@@ -257,6 +263,8 @@ fn projects_pass_their_own_check() {
             .output()
             .unwrap_or_else(|e| panic!("spawn {}: {e}", rel(&compiler)));
         if !out.status.success() {
+            only_stale &=
+                recorded_fingerprint(&build_record_in(&project)) != Some(compiler_fingerprint());
             failures.push(format!(
                 "  {} failed `./aipl check`:\n{}{}",
                 rel(&project),
@@ -267,9 +275,14 @@ fn projects_pass_their_own_check() {
     }
     assert!(
         failures.is_empty(),
-        "{} project(s) do not pass their own tests:\n{}",
+        "{} project(s) do not pass their own tests:\n{}{}",
         failures.len(),
         failures.join("\n"),
+        if only_stale {
+            format!("\n{}", Fill::Compilers.marker())
+        } else {
+            String::new()
+        },
     );
 }
 

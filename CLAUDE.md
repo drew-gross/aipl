@@ -834,6 +834,15 @@ it can be shimmed**: list its operations in `SHIMMABLE_EFFECTS`
 to `tests/cases/effects/shim_effects.aipl`. `shims::every_effect_is_shimmable`
 fails otherwise. Only the compiler's own `INTERNAL_EFFECTS` (`measure`) are exempt.
 
+An effect may also have **no default implementation** (`SHIM_ONLY_EFFECTS`; today
+`random`). `main` cannot declare it and test bodies don't get it, so the only way
+to discharge it is a shim, and the real operation is an abort that the checker
+keeps unreachable. Where the shim needs state a function cannot hold (a
+generator), it is a *provider* — `shim random seeded_with_int(n) { .. }` — which
+the parser lowers (`provider_shim_expr` in `grammar_aipl.aipl`) to an ordinary
+shim of a runtime entry point plus a seeding call as the body's first step; the
+state is saved and restored with the shim's slot (the `Shim` arm in codegen).
+
 Nothing else is per-effect: `compile_call_expr` routes any call to a listed
 operation through its slot, whatever the signature, so a new operation needs no
 codegen of its own. Two things a shim author must know. A shim stays installed

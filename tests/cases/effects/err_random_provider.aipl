@@ -1,0 +1,17 @@
+# `shim random` takes one of the providers `seeded_with_int(seed)` and
+# `seeded_with_clock()`; any other name, or the wrong number of arguments, is a
+# parse error that lists them.
+
+import { random_u64 } from builtins;
+
+fn main() {
+    shim random seeded_with_clock(1) {
+        random_u64();
+    };
+}
+--- errors ---
+error: `shim random` has providers `seeded_with_int(seed)` and `seeded_with_clock()`; `seeded_with_clock` with 1 argument(s) is neither
+ --> ./tests/cases/effects/err_random_provider.aipl:8:5
+  |
+8 |     shim random seeded_with_clock(1) {
+  |     ^^^^^^^^^^^

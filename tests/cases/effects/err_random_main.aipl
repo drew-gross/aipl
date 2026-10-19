@@ -1,0 +1,14 @@
+# `!random` has no default implementation, so `main` cannot declare it: nothing is
+# left to discharge it. The program must install a provider with `shim random`.
+
+import { print, random_u64, to_str } from builtins;
+
+fn main() !prints !random {
+    print(to_str(random_u64()));
+}
+--- errors ---
+error: fn "main" cannot declare effect "!random": it has no default implementation, so install one with `shim random <provider> { .. }` and declare only what the provider needs
+ --> ./tests/cases/effects/err_random_main.aipl:6:4
+  |
+6 | fn main() !prints !random {
+  |    ^^^^

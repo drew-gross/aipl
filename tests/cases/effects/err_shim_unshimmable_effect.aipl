@@ -9,7 +9,7 @@ fn main() {
     shim measure { now_nanos = fake } {};
 }
 --- errors ---
-error: effect "!measure" cannot be shimmed; shimmable effects are: "!clock", "!prints", "!read_files", "!read_stdin", "!write_files", "!list_files", "!execute_program"
+error: effect "!measure" cannot be shimmed; shimmable effects are: "!clock", "!prints", "!read_files", "!read_stdin", "!write_files", "!list_files", "!execute_program", "!random"
  --> ./tests/cases/effects/err_shim_unshimmable_effect.aipl:9:5
   |
 9 |     shim measure { now_nanos = fake } {};

@@ -181,6 +181,10 @@ pub enum Callee {
     WriteStringToFile,
     ListFiles,
     ReadLine,
+    /// `random_u64() -> u64` — the next random number. Has no implementation of its
+    /// own: it exists only under a `shim random`, whose provider supplies the
+    /// generator (see `SHIM_ONLY_EFFECTS`).
+    RandomU64,
     NowNanos,
     MonotonicNow,
     ExecuteProgram,
@@ -300,6 +304,16 @@ pub enum Callee {
     /// that synthesizes them is the only caller, and it keeps `i` to itself.
     DictKeyAt,
     DictValueAt,
+    /// `__random_next()`: the generator a `shim random <provider>` installs as
+    /// `random_u64` — a runtime entry point, never called from source (the parser).
+    RandomNext,
+    /// `__random_seed(seed)`: start the sequence at `seed` (the parser, as the first
+    /// thing in a `shim random seeded_with_int(seed)` body).
+    RandomSeed,
+    /// `__random_seed_from_clock()`: the same, seeded from the clock — an ordinary
+    /// `now_nanos` reading, so it carries `!clock` (the parser, for
+    /// `shim random seeded_with_clock()`).
+    RandomSeedFromClock,
 
     // ---- names from source ----
     /// A name that is not the compiler's to know: a user function (mangled
@@ -416,6 +430,7 @@ impl Callee {
         Callee::WriteStringToFile,
         Callee::ListFiles,
         Callee::ReadLine,
+        Callee::RandomU64,
         Callee::NowNanos,
         Callee::MonotonicNow,
         Callee::ExecuteProgram,
@@ -483,6 +498,9 @@ impl Callee {
         Callee::SplitIter,
         Callee::DictKeyAt,
         Callee::DictValueAt,
+        Callee::RandomNext,
+        Callee::RandomSeed,
+        Callee::RandomSeedFromClock,
     ];
 
     /// The canonical name: the reserved `__builtin_*` spelling of a builtin
@@ -591,6 +609,10 @@ impl Callee {
             Callee::WriteStringToFile => "__builtin_write_string_to_file",
             Callee::ListFiles => "__builtin_list_files",
             Callee::ReadLine => "__builtin_read_line",
+            Callee::RandomU64 => "__builtin_random_u64",
+            Callee::RandomNext => "__random_next",
+            Callee::RandomSeed => "__random_seed",
+            Callee::RandomSeedFromClock => "__random_seed_from_clock",
             Callee::NowNanos => "__builtin_now_nanos",
             Callee::MonotonicNow => "__builtin_monotonic_now",
             Callee::ExecuteProgram => "__builtin_execute_program",

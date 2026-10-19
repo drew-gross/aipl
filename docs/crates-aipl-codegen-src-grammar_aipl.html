@@ -673,6 +673,38 @@
 
 
 
+        <section class="item" id="item-provider_shim_expr">
+          <h3>
+            <a class="anchor" href="#item-provider_shim_expr">provider_shim_expr</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn provider_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -&#62; Expr!ParseError</code></pre>
+
+          <div class="doc"><p><code>shim &lt;effect&gt; &lt;provider&gt;(args) { body }</code>, lowered to the shim it stands for.</p><p>A provider is a named way to fill in every operation of an effect, for effects whose operations need state that a function cannot hold. <code>random</code> is the one: <code>random_u64</code> is bound to the runtime's generator, and the first thing the body does is seed it —</p><pre><code>shim random seeded_with_int(n) { body }
+  =&gt; shim random { random_u64 = __random_next } { __random_seed(n); body }
+shim random seeded_with_clock() { body }
+  =&gt; shim random { random_u64 = __random_next } { __random_seed_from_clock(); body }
+</code></pre><p>The seed is read inside the shim's body, so the clock a <code>seeded_with_clock</code> reads is an ordinary <code>now_nanos</code> call: the enclosing function declares <code>!clock</code> for it, and a <code>shim clock</code> around the whole thing makes the seed repeatable.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-random_shim">
+          <h3>
+            <a class="anchor" href="#item-random_shim">random_shim</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn random_shim(seeding: Expr, body: Expr, head: Span) -&#62; Expr</code></pre>
+
+          <div class="doc"><p>The shim a <code>random</code> provider stands for: <code>random_u64</code> is the runtime's generator, and <code>seeding</code> runs before the body.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower_if">
           <h3>
             <a class="anchor" href="#item-lower_if">lower_if</a>
@@ -2094,7 +2126,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$135321: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$138299: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

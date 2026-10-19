@@ -158,6 +158,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/docs/module_docs | 2 | 105 | 105 | 55 | 520 | 5.00 | 78.81 | 1504 |
 | cases/effects/declaring_prints_allows_print_call | 0 | 0 | 0 | 17 | 148 | 3.00 | 76.85 | 1472 |
 | cases/effects/over_declared_effects_are_fine | 0 | 0 | 0 | 2 | 8 | 0.00 | 74.49 | 1408 |
+| cases/effects/random | 7 | 221 | 221 | 1348 | 5044 | 9.00 | 169.04 | 1472 |
 | cases/effects/shim_clock | 7 | 276 | 276 | 300 | 2280 | 7.00 | 83.39 | 1504 |
 | cases/effects/shim_effects | 18 | 1073 | 1073 | 1373 | 8568 | 13.00 | 103.67 | 1520 |
 | cases/effects/transitive_caller_with_declaration_passes | 0 | 0 | 0 | 17 | 156 | 3.00 | 76.03 | 1472 |
@@ -673,9 +674,9 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/find_files | 19 | 1096 | 1040 | 1869 | 6708 | 10.00 | 87.14 | 1552 |
 | crates/aipl-codegen/src/find_trailing_whitespace | 0 | 0 | 0 | 6230 | 2488 | 2.00 | 89.90 | 1440 |
 | crates/aipl-codegen/src/format | 2287 | 185153 | 19208 | 313161 | 180428 | 207.00 | 1021.91 | 1968 |
-| crates/aipl-codegen/src/format_source | 16675 | 4249054 | 491971 | 11316128 | 5944492 | 2453.00 | 20607.33 | 5264 |
+| crates/aipl-codegen/src/format_source | 16815 | 4288414 | 496299 | 11349560 | 5991176 | 2379.00 | 22731.64 | 5264 |
 | crates/aipl-codegen/src/grammar | 767 | 96951 | 49216 | 84139 | 108356 | 81.00 | 588.25 | 1696 |
-| crates/aipl-codegen/src/grammar_aipl | 1831029 | 381571242 | 924143 | 611408125 | 5352428 | 152924.00 | 14970.71 | 9792 |
+| crates/aipl-codegen/src/grammar_aipl | 1868589 | 390483514 | 928367 | 623210075 | 5392068 | 157574.00 | 15053.18 | 9952 |
 | crates/aipl-codegen/src/grammar_calc | 10185 | 1168142 | 42260 | 3434067 | 318128 | 925.00 | 3572.63 | 2448 |
 | crates/aipl-codegen/src/grammar_json | 19773 | 2806348 | 35129 | 7239360 | 341920 | 1847.00 | 3720.05 | 2672 |
 | crates/aipl-codegen/src/grammar_sexp | 5752 | 630255 | 13968 | 2083842 | 308036 | 593.00 | 3527.20 | 2368 |
@@ -710,7 +711,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/trim_suffix | 0 | 0 | 0 | 351 | 1128 | 2.00 | 80.85 | 1424 |
 | crates/aipl-codegen/src/ty | 84 | 6766 | 6362 | 5280 | 14168 | 14.00 | 106.19 | 1520 |
 | crates/aipl-codegen/src/unescape | 6 | 528 | 352 | 10330 | 8116 | 7.00 | 93.62 | 1456 |
-| crates/aipl-codegen/src/walker | 99634 | 23438381 | 861400 | 69145311 | 15735424 | 13846.00 | 36537.84 | 10688 |
+| crates/aipl-codegen/src/walker | 100352 | 23657317 | 865728 | 69331489 | 15782480 | 13691.00 | 34559.68 | 10816 |
 | crates/aipl-mono/src/builtin_all | 1 | 32 | 32 | 1378 | 3444 | 3.00 | 84.19 | 1472 |
 | crates/aipl-mono/src/builtin_any | 1 | 32 | 32 | 1160 | 3336 | 3.00 | 83.99 | 1472 |
 | crates/aipl-mono/src/builtin_count | 1 | 104 | 104 | 1628 | 2292 | 3.00 | 82.53 | 1440 |

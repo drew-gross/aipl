@@ -1,0 +1,17 @@
+# A function that draws random numbers declares `!random`, and so does every
+# caller up to the shim. `main` can't, so a call that reaches it unshimmed is an
+# error rather than a program that quietly runs on a default generator.
+
+import { print, random_u64, to_str } from builtins;
+
+fn roll() !random -> u64 { random_u64() }
+
+fn main() !prints {
+    print(to_str(roll()));
+}
+--- errors ---
+error: fn "roll" has effect "!random" but the calling function does not declare it
+  --> ./tests/cases/effects/err_random_unshimmed.aipl:10:18
+   |
+10 |     print(to_str(roll()));
+   |                  ^^^^^^

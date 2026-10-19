@@ -90,3 +90,20 @@ fn unshimmable_effects_have_no_operations() {
     assert!(effect_operations("teleport").is_none());
     assert!(effect_operations("clock").is_some());
 }
+
+/// An effect with no default implementation must be a real effect, and a shimmable
+/// one: the shim is the only thing that can discharge it.
+#[test]
+fn shim_only_effects_are_known_and_shimmable() {
+    assert!(!aipl_syntax::SHIM_ONLY_EFFECTS.is_empty());
+    for effect in aipl_syntax::SHIM_ONLY_EFFECTS {
+        assert!(
+            aipl_syntax::KNOWN_EFFECTS.contains(effect),
+            "\"!{effect}\" is shim-only but not a known effect"
+        );
+        assert!(
+            effect_operations(effect).is_some(),
+            "\"!{effect}\" is shim-only but has nothing to shim"
+        );
+    }
+}

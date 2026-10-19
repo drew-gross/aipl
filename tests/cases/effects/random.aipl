@@ -1,0 +1,72 @@
+# `!random` is the one effect with no default: there is no generator unless a
+# `shim random` installs one, and `main` cannot declare it. A provider names where
+# the numbers come from — `seeded_with_int(n)` for a repeatable sequence (these
+# values are splitmix64 from seed 42, the same under the JIT and in a built
+# binary), `seeded_with_clock()` for a fresh one each run.
+
+import { equal as ==, not_equal as !=, now_nanos, print, random_u64, to_str } from builtins;
+
+fn two_draws() !random -> u64[] { [random_u64(), random_u64()] }
+
+fn first_three() -> u64[] {
+    shim random seeded_with_int(42) { [random_u64(), random_u64(), random_u64()] }
+}
+
+fn fixed_clock() -> u64 { 7 }
+
+fn same_seed_same_numbers() -> bool {
+    let a = shim random seeded_with_int(42) { two_draws() };
+    let b = shim random seeded_with_int(42) { two_draws() };
+    a == b
+}
+
+fn other_seed_other_numbers() -> bool {
+    let a = shim random seeded_with_int(42) { two_draws() };
+    let b = shim random seeded_with_int(43) { two_draws() };
+    a != b
+}
+
+// The clock provider reads an ordinary `now_nanos`, so a shimmed clock makes it
+// repeatable: seed 7 here is the same as `seeded_with_int(7)`.
+fn clock_provider_follows_the_clock() -> bool {
+    let from_clock = shim clock { now_nanos = fixed_clock, monotonic_now = fixed_clock } {
+        shim random seeded_with_clock() { two_draws() }
+    };
+    let from_int = shim random seeded_with_int(7) { two_draws() };
+    from_clock == from_int
+}
+
+// An inner provider owns the generator for its body and gives the outer one back
+// where it left off: the outer sequence carries on as if the inner never ran.
+fn nested_restores_the_outer() -> bool {
+    let plain = shim random seeded_with_int(42) { [random_u64(), random_u64()] };
+    let interrupted = shim random seeded_with_int(42) {
+        let first = random_u64();
+        let inner = shim random seeded_with_int(1) { random_u64() };
+        [first, random_u64()]
+    };
+    plain == interrupted
+}
+
+fn real_clock_provider_runs() !clock -> bool {
+    shim random seeded_with_clock() { random_u64() == random_u64() }
+}
+
+fn main() !prints !clock {
+    print(to_str(first_three()));
+    print(to_str(same_seed_same_numbers()));
+    print(to_str(other_seed_other_numbers()));
+    print(to_str(clock_provider_follows_the_clock()));
+    print(to_str(nested_restores_the_outer()));
+
+    // Two draws from one sequence are never equal in practice; this only shows
+    // that the clock-seeded provider runs.
+    print(to_str(real_clock_provider_runs()));
+}
+--- stdout ---
+[13679457532755275413, 2949826092126892291, 5139283748462763858]
+true
+true
+true
+true
+false

@@ -16,6 +16,7 @@ import {
     int_parse,
     is_nonempty,
     join,
+    len,
     less_than as <,
     less_than_or_equal as <=,
     logical_and as &&,
@@ -24,6 +25,7 @@ import {
     not_equal as !=,
     print,
     push,
+    random_u64,
     read_line,
     saturating_divide as /,
     saturating_remainder as %,
@@ -48,8 +50,26 @@ variant Command = Reveal(u64) | Flag(u64) | Quit
 # Where a game stands.
 variant Status = Playing | Won | Lost
 
-# The cells holding a mine, on an 8 by 8 board.
-fn mine_layout() -> u64[] { [2, 11, 19, 25, 30, 38, 41, 49, 54, 60] }
+# `count` distinct cell numbers below `cells`, drawn at random.
+fn place_mines(count: u64, cells: u64) !random -> u64[] {
+    mut mines: u64[] = [];
+    while (mines.len() < count) {
+        let cell = random_u64() % cells;
+        if (!mines.any(|mine| mine == cell)) {
+            set mines.push(cell);
+        };
+    }
+    mines
+}.test({
+    let mines = shim random seeded_with_int(1) { place_mines(10, 64) };
+    assert(mines.len() == 10);
+    assert(mines.all(|mine| mine < 64));
+    // No cell twice.
+    assert(mines.to_set().len() == 10);
+    // The same seed, the same mines; every cell can be a mine.
+    assert(mines == shim random seeded_with_int(1) { place_mines(10, 64) });
+    assert(shim random seeded_with_int(1) { place_mines(4, 4) }.to_set().len() == 4);
+})
 
 # A game on a `width` by `height` board with mines at `mines`, nothing revealed.
 fn new_game(width: u64, height: u64, mines: u64[]) -> Game {
@@ -322,5 +342,20 @@ fn play(game: Game) !prints !read_stdin -> i64 {
     }
 }
 
-# Play minesweeper on the standard 8 by 8 board.
-fn main() !prints !read_stdin -> i64 { play(new_game(8, 8, mine_layout())) }
+# Play on the standard 8 by 8 board with 10 mines. The mines are different every
+# game; `./aipl run -- SEED` plays the same game again for the same number.
+fn main(args: str[]) !prints !read_stdin !clock -> i64 {
+    match (args.first()) {
+        none => shim random seeded_with_clock() { play(new_game(8, 8, place_mines(10, 64))) },
+        some(text) => match (text.int_parse()) {
+            none => {
+                print(`not a seed: {text}`);
+                1
+            },
+            some(number) => {
+                let seed: u64 = number;
+                shim random seeded_with_int(seed) { play(new_game(8, 8, place_mines(10, 64))) }
+            },
+        },
+    }
+}

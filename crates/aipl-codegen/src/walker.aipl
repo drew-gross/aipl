@@ -2302,6 +2302,25 @@ fn match_expr(self: W) -> WDoc!FmtError {
 # laid out as an ordinary block.
 fn shim_expr(self: W) -> WDoc!FmtError {
     let effect = self.expect("shim")?.w.bump();
+
+    // `shim <effect> <provider>(args) { body }`: a name where the bindings' brace
+    // would be.
+    if (effect.w.peek_text() != "{") {
+        let provider = effect.w.bump();
+        let opened = provider.w.expect("(")?.w;
+        let args = opened.call_args_until(")", [])?;
+        let closed = args.w.expect(")")?.w;
+        let body = closed.block_layout()?;
+        return ok(WDoc {
+            w: body.w,
+            doc: group(Concat([
+                Text(`shim {effect.text} {provider.text}`),
+                call_arg_list(args.docs, false),
+                Text(" "),
+                body.doc,
+            ])),
+        });
+    };
     let opened = effect.w.expect("{")?.w;
     let binds = opened.shim_bindings([])?;
     let closed = binds.w.expect("}")?.w;

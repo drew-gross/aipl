@@ -247,6 +247,7 @@ bugs:
     It needs the binding held while both a scalar field and the boxed-optional field are read — reading only .next allocates 1 and balances, reading only .val elides the allocation entirely. That's presumably why recursive_struct.aipl and recursive_list.aipl never tripped it. My boxed case is reshaped to cover the boxed store path without hitting it
 
 errors:
+  make "did you mean?" errors that look for nearby words instead of displaying all possibilities
   make it possible to report multiple errors when one of them is an invalid char literal (lexer upgrade)
   report multiple errors when one call site has multiple type errors
   report multiple errors when there is a badly typed let
@@ -274,6 +275,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  minesweeper main is non-DRY because of how shimming works. Should DRY it up.
   make a function composition operator
   ! is used for both effects and errors, we should switch the syntax for effects
   allow return v; as the last statement of a function
@@ -310,6 +312,11 @@ default/kwargs:
   A default cannot reference an earlier parameter — fn f(a: i64, b: i64 = a) gives "unknown identifier". Defaults are evaluated in an empty scope.
   Lambdas can't declare defaults — parse error.
   Variant constructors take no keyword arguments (Rect(w=1, h=2) → "has no keyword parameter"). Constructors aren't functions with signatures in this sense.
+
+random:
+  should declare which kind of RNG you want
+  each shim should make a separate instance, with a new set of state
+  random strings generator, random char, other types, etc.
 
 shim:
   better syntax (shim is a weird keyword)

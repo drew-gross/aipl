@@ -1001,6 +1001,16 @@ fn expressions() -> Production<AiplTok, Ast>[] {
             Many(Named("shim_binding"), sep=Lit(","), nested_in=braces(), spaced=true),
             Named("block"),
         ]),
+        // `shim <effect> <provider>(args) { body }`: the same shim, with the
+        // bindings supplied by a named provider. The token after the effect is
+        // what tells the two forms apart.
+        Then([
+            Lit("shim"),
+            Term(Name),
+            Term(Name),
+            nest("(", Named("args"), ")", loose()),
+            Named("block"),
+        ]),
         Term(IntLit),
         Term(StrLit),
         Term(CharTok),
@@ -1543,6 +1553,9 @@ fn match_expr(kids: Ast[], tsp: Span, sp: Span) -> Expr!ParseError {
 fn shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
     let toks = node.own_texts(src);
     let spans = node.tokens;
+    if (toks[2] != some("{")) {
+        return provider_shim_expr(src, node, kids, sp);
+    };
     let last = kids.len() - 1;
     let body = kid_expr(kids, last, sp)?;
     let binds = kids[..last].try_map(|k| as_bind(k, sp))?;
@@ -1550,6 +1563,60 @@ fn shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
         .first()
         .value_or_err(ParseError { message: "a shim matched no token", span: sp })?;
     ok(at(Shim(toks[1].value_or(""), binds, body), join_spans(head, spans[1].value_or(head))))
+}
+
+# `shim <effect> <provider>(args) { body }`, lowered to the shim it stands for.
+#
+# A provider is a named way to fill in every operation of an effect, for effects
+# whose operations need state that a function cannot hold. `random` is the one:
+# `random_u64` is bound to the runtime's generator, and the first thing the body
+# does is seed it —
+#
+#     shim random seeded_with_int(n) { body }
+#       => shim random { random_u64 = __random_next } { __random_seed(n); body }
+#     shim random seeded_with_clock() { body }
+#       => shim random { random_u64 = __random_next } { __random_seed_from_clock(); body }
+#
+# The seed is read inside the shim's body, so the clock a `seeded_with_clock`
+# reads is an ordinary `now_nanos` call: the enclosing function declares `!clock`
+# for it, and a `shim clock` around the whole thing makes the seed repeatable.
+fn provider_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
+    let toks = node.own_texts(src);
+    let spans = node.tokens;
+    let head = spans
+        .first()
+        .value_or_err(ParseError { message: "a shim matched no token", span: sp })?;
+    let at_head = join_spans(head, spans[1].value_or(head));
+    let effect = toks[1].value_or("");
+    let provider = toks[2].value_or("");
+    let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a shim provider's arguments")?;
+    let body = kid_expr(kids, 1, sp)?;
+    if (effect != "random") {
+        return err(ParseError {
+            message: `effect "!{effect}" has no providers; \`shim {effect}\` takes a list of bindings`,
+            span: at_head,
+        });
+    };
+    if (provider == "seeded_with_int" && args.len() == 1) {
+        return ok(random_shim(at(Call("__random_seed", args, false), at_head), body, at_head));
+    };
+    if (provider == "seeded_with_clock" && args.is_empty()) {
+        return ok(random_shim(
+            at(Call("__random_seed_from_clock", [], false), at_head),
+            body,
+            at_head,
+        ));
+    };
+    err(ParseError {
+        message: `\`shim random\` has providers \`seeded_with_int(seed)\` and \`seeded_with_clock()\`; \`{provider}\` with {args.len()} argument(s) is neither`,
+        span: at_head,
+    })
+}
+
+# The shim a `random` provider stands for: `random_u64` is the runtime's
+# generator, and `seeding` runs before the body.
+fn random_shim(seeding: Expr, body: Expr, head: Span) -> Expr {
+    at(Shim("random", [("random_u64", "__random_next")], at(Seq(seeding, body), body.span)), head)
 }
 
 # `if (..) { .. }` and `if (let p = e) { .. }`, with or without an `else`. Both
@@ -4002,6 +4069,27 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
 
     // `shim`, whose bindings are a list and whose body is a block.
     assert(expr_dump("shim prints { print = p } { g() }") == "Shim(prints, [print = p], g())");
+
+    // A provider lowers to the shim it stands for, seeding as its body's first step.
+    assert(
+        expr_dump(
+            "shim random seeded_with_int(7) { g() }",
+        ) == "Shim(random, [random_u64 = __random_next], Seq(__random_seed(7), g()))",
+    );
+    assert(
+        expr_dump(
+            "shim random seeded_with_clock() { g() }",
+        ) == "Shim(random, [random_u64 = __random_next], Seq(__random_seed_from_clock(), g()))",
+    );
+    assert(expr_dump("shim random seeded_with_int() { g() }").starts_with(
+        "error: `shim random` has providers",
+    ));
+    assert(expr_dump("shim random nonsense(1) { g() }").starts_with(
+        "error: `shim random` has providers",
+    ));
+    assert(expr_dump("shim prints seeded_with_int(1) { g() }").starts_with(
+        `error: effect "!prints" has no providers`,
+    ));
 
     // And a block with a statement in it, which the statement slice completes.
     assert(expr_dump("if (a) { let x = 1; x }") == "If(a, Let(x, 1, x), ())");

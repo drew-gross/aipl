@@ -968,8 +968,8 @@ unsafe fn clock_nanos(id: c_int) -> i64 {
 /// assigns. 0 means "no shim installed" — the state every slot starts in and
 /// returns to. Sized by `aipl_syntax::SHIM_SLOT_COUNT`; `shim_slots_match_runtime`
 /// in `tests/shims.rs` holds the two in sync.
-static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 8] =
-    [const { core::sync::atomic::AtomicI64::new(0) }; 8];
+static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 9] =
+    [const { core::sync::atomic::AtomicI64::new(0) }; 9];
 
 /// The shim installed for slot `idx`, or 0 if none. An out-of-range index reads
 /// as "no shim" rather than trapping (codegen only ever emits valid indices).
@@ -992,6 +992,49 @@ pub extern "C" fn aipl_shim_set(idx: i64, ptr: i64) {
 }
 
 
+
+// ---------- The random generator ----------
+//
+// splitmix64, one word of state, as in the JIT runtime (`aipl_random_next` there):
+// a seed gives the same sequence under both.
+
+/// The generator's whole state. Mirrors `RANDOM_STATE` in the JIT runtime.
+static RANDOM_STATE: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+
+/// The next number of the sequence: advance the state by the golden-ratio
+/// increment, then scramble it.
+#[no_mangle]
+pub extern "C" fn aipl_random_next() -> i64 {
+    let state = RANDOM_STATE
+        .fetch_add(0x9E37_79B9_7F4A_7C15, core::sync::atomic::Ordering::Relaxed)
+        .wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let a = (state ^ (state >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    let b = (a ^ (a >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    (b ^ (b >> 31)) as i64
+}
+
+/// Start the sequence at `seed`. Also how a shim puts back the state it saved.
+#[no_mangle]
+pub extern "C" fn aipl_random_seed(seed: i64) {
+    RANDOM_STATE.store(seed as u64, core::sync::atomic::Ordering::Relaxed);
+}
+
+/// The generator's state, for a shim to save.
+#[no_mangle]
+pub extern "C" fn aipl_random_state() -> i64 {
+    RANDOM_STATE.load(core::sync::atomic::Ordering::Relaxed) as i64
+}
+
+/// `random_u64` called with no `shim random` installed: unreachable past the
+/// checker, so it stops the program rather than hand out numbers from nowhere.
+#[no_mangle]
+pub extern "C" fn aipl_random_unshimmed() {
+    let message = b"error: random_u64 called with no `shim random` installed\n";
+    unsafe {
+        write(2, message.as_ptr() as *const c_void, message.len());
+        abort()
+    }
+}
 
 /// The wide `ExecResult!Error` layout — tag, then either the `Error` message or
 /// `{ stdout, stderr, exit_code }`. Every `str` is a whole value, so the offsets

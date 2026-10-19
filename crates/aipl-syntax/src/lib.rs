@@ -3031,6 +3031,12 @@ fn __builtin_list_files(self: str) !list_files -> str[]!Error { ok([]) }
 // `none` always means end of input. Standard input is read in order across
 // calls, and is not echoed or prompted for: print the prompt first.
 fn __builtin_read_line() !read_stdin -> str? { none }
+// The next random number, uniform over all of `u64`. `!random` is the one effect
+// with no default: there is no generator unless a `shim random` installs one, so
+// `main` cannot declare it and a program that uses it must say where its
+// randomness comes from — `shim random seeded_with_clock() { .. }` for a fresh
+// sequence each run, `shim random seeded_with_int(n) { .. }` for a repeatable one.
+fn __builtin_random_u64() !random -> u64 { 0 }
 
 // Wall-clock nanoseconds since the Unix epoch (1970-01-01 UTC). Unsigned and
 // 64-bit, so it counts up to the year 2554; a clock set before the epoch reads
@@ -3287,6 +3293,14 @@ fn __aipl_arr_append<T: any>(self: T[], x: T) -> T[] { self }
 fn __aipl_arr_concat<T: any>(self: T[], other: T[]) -> T[] { self }
 // Internal: emitted by the compiler for template-literal concatenation.
 fn __aipl_concat(a: str, b: str) -> str { "" }
+// Internal: what a `shim random <provider>(..) { .. }` lowers to. The provider
+// installs `__random_next` as the implementation of `random_u64`, and the first
+// thing in the body seeds the generator it reads: `__random_seed` with a given
+// seed, `__random_seed_from_clock` with the (shimmable) clock. The generator's one
+// word of state is saved and restored with the shim, so a shim nests.
+fn __random_next() -> u64 { 0 }
+fn __random_seed(seed: u64) {}
+fn __random_seed_from_clock() !clock {}
 // Internal: emitted for each interpolation in a template literal.
 // Passes a `str` through unchanged, widens a `char` to the one-char `str`
 // holding it, and converts any other type via `to_str`.
@@ -3754,14 +3768,23 @@ pub const SHIMMABLE_EFFECTS: &[(&str, &[&str])] = &[
     ("write_files", &["write_string_to_file"]),
     ("list_files", &["list_files"]),
     ("execute_program", &["execute_program"]),
+    ("random", &["random_u64"]),
 ];
+
+/// The effects that have no default implementation: the program must install one
+/// with a `shim`. `main` cannot declare them — there is nothing for the real
+/// operation to do — so they can only be discharged by a shim, and the checker
+/// refuses a `main` that leaves one standing. Test bodies don't declare them
+/// either; a test that needs one shims it.
+pub const SHIM_ONLY_EFFECTS: &[&str] = &["random"];
 
 /// Effects the language recognizes. `prints` = writes to stdout; `read_files` =
 /// reads from the filesystem; `read_stdin` = reads standard input;
 /// `write_files` = writes to the filesystem;
 /// `list_files` = enumerates the filesystem (directory listing);
 /// `execute_program` = spawns a child process; `clock` = reads the wall clock
-/// (so a function's result depends on when it ran). `measure` is internal:
+/// (so a function's result depends on when it ran); `random` = draws random
+/// numbers, which only a `shim` can supply ([`SHIM_ONLY_EFFECTS`]). `measure` is internal:
 /// it marks `measure(..)` and the counting window it is built from, so only a
 /// `.performance` block (which declares it, and nothing else) can reach them.
 pub const KNOWN_EFFECTS: &[&str] = &[
@@ -3772,6 +3795,7 @@ pub const KNOWN_EFFECTS: &[&str] = &[
     "list_files",
     "execute_program",
     "clock",
+    "random",
     "measure",
 ];
 
@@ -3805,7 +3829,7 @@ pub fn shim_slot_index(op: &str) -> Option<usize> {
 
 /// How many shim slots the runtimes must reserve. Kept in sync by
 /// `shim_slots_match_runtime` in `tests/shims.rs`.
-pub const SHIM_SLOT_COUNT: usize = 8;
+pub const SHIM_SLOT_COUNT: usize = 9;
 
 /// Built-in *type* names that must be brought into scope with
 /// `import { .. } from builtins;` before use — the type-level analog of

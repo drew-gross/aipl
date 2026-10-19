@@ -1698,6 +1698,22 @@ impl Cx<'_> {
                 )));
             }
         }
+        // An effect with no default implementation can only be discharged by a
+        // shim, and `main` is where nothing is left to discharge it.
+        if f.name == "main" {
+            if let Some(e) = f
+                .sig
+                .effects
+                .iter()
+                .find(|e| aipl_syntax::SHIM_ONLY_EFFECTS.contains(&e.as_str()))
+            {
+                return Err(Error::msg(format!(
+                    "fn \"main\" cannot declare effect \"!{e}\": it has no default \
+                     implementation, so install one with `shim {e} <provider> {{ .. }}` and \
+                     declare only what the provider needs"
+                )));
+            }
+        }
         for (i, p) in f.sig.params.iter().enumerate() {
             if p.mutable && i != 0 {
                 return Err(Error::msg(format!(

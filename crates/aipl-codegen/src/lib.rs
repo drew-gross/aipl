@@ -319,6 +319,52 @@ extern "C" fn aipl_shim_set(idx: i64, ptr: i64) {
     }
 }
 
+// ---------- The random generator ----------
+//
+// `random_u64` has no implementation of its own: a `shim random <provider>` installs
+// `aipl_random_next` for it and seeds the state it reads. The generator is
+// splitmix64 — one word of state, so a shim can save and restore the whole
+// generator around its body — and the linker runtime carries the same algorithm,
+// so a seed gives the same sequence under the JIT and in a built binary.
+
+/// splitmix64's state, which is also the whole generator. Mirrors `RANDOM_STATE`
+/// in the linker runtime.
+static RANDOM_STATE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// The next number of the sequence: advance the state by the golden-ratio
+/// increment, then scramble it.
+#[no_mangle]
+extern "C" fn aipl_random_next() -> i64 {
+    use std::sync::atomic::Ordering::Relaxed;
+    let state = RANDOM_STATE
+        .fetch_add(0x9E37_79B9_7F4A_7C15, Relaxed)
+        .wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let a = (state ^ (state >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    let b = (a ^ (a >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    (b ^ (b >> 31)) as i64
+}
+
+/// Start the sequence at `seed`. Also how a shim puts back the state it saved.
+#[no_mangle]
+extern "C" fn aipl_random_seed(seed: i64) {
+    RANDOM_STATE.store(seed as u64, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// The generator's state, for a shim to save.
+#[no_mangle]
+extern "C" fn aipl_random_state() -> i64 {
+    RANDOM_STATE.load(std::sync::atomic::Ordering::Relaxed) as i64
+}
+
+/// `random_u64` called with no `shim random` installed. The checker makes this
+/// unreachable — `main` cannot declare `!random` — so reaching it is a hole in the
+/// checker, and it stops the program rather than hand out numbers from nowhere.
+#[no_mangle]
+extern "C" fn aipl_random_unshimmed() {
+    eprintln!("error: random_u64 called with no `shim random` installed");
+    std::process::abort();
+}
+
 /// The wide `ExecResult!Error` layout, written by hand because the runtime has
 /// no layout table: tag, then either the `Error` message or the `ExecResult`
 /// struct `{ stdout, stderr, exit_code }`. Both start at `OPT_VALUE_OFFSET` and
@@ -1415,7 +1461,8 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
     // A test body may call anything (incl. `!prints`/`!read_files`/`!read_stdin`/`!write_files`/
     // `!list_files`/`!execute_program`/`!clock` functions), so the synthesized
     // test fns / driver declare every known effect — except `measure`, which only
-    // a `.performance` block has. A performance block declares that and nothing
+    // a `.performance` block has, and the shim-only effects (`random`), which a
+    // test body shims for itself. A performance block declares that and nothing
     // else.
     let all_effects = || match kind {
         TestKind::Tests => vec![
@@ -3194,6 +3241,10 @@ fn new_jit_module() -> Result<JITModule, Error> {
     );
     jit_builder.symbol("aipl_list_files", aipl_list_files as *const u8);
     jit_builder.symbol("aipl_read_line", str24_host::aipl_read_line as *const u8);
+    jit_builder.symbol("aipl_random_next", aipl_random_next as *const u8);
+    jit_builder.symbol("aipl_random_seed", aipl_random_seed as *const u8);
+    jit_builder.symbol("aipl_random_state", aipl_random_state as *const u8);
+    jit_builder.symbol("aipl_random_unshimmed", aipl_random_unshimmed as *const u8);
     jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
     jit_builder.symbol("aipl_str_split_len", str24::aipl_str_split_len as *const u8);
     jit_builder.symbol(
@@ -6678,10 +6729,13 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_rec_inc_weak"
         | "aipl_rec_dec_weak"
         | "aipl_count_insns"
+        | "aipl_random_seed"
         | "aipl_count_call" => (1, Ret::None),
-        "aipl_test_end" | "aipl_test_fail_none" | "aipl_measure_begin" | "aipl_measure_end" => {
-            (0, Ret::None)
-        }
+        "aipl_test_end"
+        | "aipl_test_fail_none"
+        | "aipl_measure_begin"
+        | "aipl_measure_end"
+        | "aipl_random_unshimmed" => (0, Ret::None),
         "aipl_assert"
         | "aipl_shim_set"
         | "aipl_str_iter_init"
@@ -6698,7 +6752,11 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         // (`str24::SplitIter`), written into the caller's stack slot.
         "aipl_str_split_iter_init" => (3, Ret::None),
         // ---- a scalar back ----
-        "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now"
+        "aipl_test_summary"
+        | "aipl_now_nanos"
+        | "aipl_monotonic_now"
+        | "aipl_random_next"
+        | "aipl_random_state"
         | "aipl_str_inline_capacity" => (0, Ret::Word),
         // A counter of the closed measurement window, chosen by index.
         "aipl_measure_read" => (1, Ret::Word),
@@ -6956,6 +7014,11 @@ fn register_builtins(
         (Callee::WriteStringToFile, "aipl_write_string_to_file"),
         (Callee::ListFiles, "aipl_list_files"),
         (Callee::ReadLine, "aipl_read_line"),
+        // `random_u64` has no implementation, so its entry is the one that stops the
+        // program; its arm in `compile_call_expr_direct` is what is actually used.
+        (Callee::RandomU64, "aipl_random_unshimmed"),
+        (Callee::RandomNext, "aipl_random_next"),
+        (Callee::RandomSeed, "aipl_random_seed"),
         (Callee::NowNanos, "aipl_now_nanos"),
         (Callee::MonotonicNow, "aipl_monotonic_now"),
         (Callee::ExecuteProgram, "aipl_execute_program"),
@@ -15529,6 +15592,42 @@ fn compile_call_expr_direct<M: Module>(
                 .push(Tracked::new(ptr, &result_ty));
             (ptr, result_ty)
         }
+        Callee::RandomU64 => {
+            // `() -> u64`, reached here only when no `shim random` is installed
+            // — `compile_call_expr` sends every other call to the shim. The
+            // checker keeps a program from getting here (`main` cannot declare
+            // `!random`), so this stops the program rather than invent numbers.
+            if !args.is_empty() {
+                return Err(arity_bug(name, 0, args.len(), &span));
+            }
+            builtins.call_void(module, builder, "aipl_random_unshimmed", &[]);
+            (
+                builder.ins().iconst(types::I64, 0),
+                ConcreteType::Primitive(Primitive::U64),
+            )
+        }
+        Callee::RandomSeedFromClock => {
+            // `() -> ()`: seed the generator from the clock. The reading is an
+            // ordinary `now_nanos` call, so a `shim clock` in effect supplies it
+            // and the caller must declare `!clock` (the checker has that from the
+            // stub's signature).
+            if !args.is_empty() {
+                return Err(arity_bug(name, 0, args.len(), &span));
+            }
+            let (now, _) = compile_call_expr(
+                module,
+                builder,
+                cx,
+                scopes,
+                &Callee::NowNanos,
+                &[],
+                false,
+                span.clone(),
+                None,
+            )?;
+            builtins.call_void(module, builder, "aipl_random_seed", &[now]);
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
+        }
         Callee::WriteStringToFile => {
             // `(str, str) -> !str`: ok() on success, err(message) on failure. The
             // runtime returns 1/0; codegen wraps it into the void-Ok Result with a
@@ -18872,6 +18971,7 @@ fn compile_expr_inner<M: Module>(
             // makes shims nest and what lets an inner shim shadow an outer one.
             // The checker has already verified coverage and signatures.
             let mut saved: Vec<(Value, Value)> = Vec::with_capacity(bindings.len());
+            let mut random_state: Option<Value> = None;
             for (op, f) in bindings {
                 let slot = aipl_syntax::shim_slot_index(op)
                     .expect("checker verified this is a shimmable operation");
@@ -18883,19 +18983,23 @@ fn compile_expr_inner<M: Module>(
                         expr.span.clone(),
                     ));
                 };
-                let FuncLink::User(id) = info.link else {
-                    return Err(Error::at(
-                        format!(
-                            "shim function {:?} is a runtime builtin, which has no address to \
-                             install",
-                            display_name(f)
-                        ),
-                        expr.span.clone(),
-                    ));
+                // A user function, or a runtime entry point (a provider's
+                // generator): both have an address to install.
+                let addr = match info.link {
+                    FuncLink::User(id) => fn_addr_or_zero(builder, module, Some(id)),
+                    FuncLink::Builtin(sym) => {
+                        let fref = builtins.import(module, builder.func, sym);
+                        builder.ins().func_addr(types::I64, fref)
+                    }
                 };
-                let addr = fn_addr_or_zero(builder, module, Some(id));
                 builtins.call_void(module, builder, "aipl_shim_set", &[idx, addr]);
                 saved.push((idx, old));
+                // The random effect's generator is state the shim owns for its
+                // extent, not just a function: take the outer one's with it so an
+                // inner provider's seed does not leak out when it ends.
+                if op == "random_u64" {
+                    random_state = Some(builtins.call(module, builder, "aipl_random_state", &[]));
+                }
             }
             // The shim covers every operation of `effect`, so the body may call
             // them without the enclosing function declaring it (the checker's
@@ -18916,6 +19020,9 @@ fn compile_expr_inner<M: Module>(
             )?;
             for (idx, old) in saved {
                 builtins.call_void(module, builder, "aipl_shim_set", &[idx, old]);
+            }
+            if let Some(state) = random_state {
+                builtins.call_void(module, builder, "aipl_random_seed", &[state]);
             }
             (v, t)
         }
