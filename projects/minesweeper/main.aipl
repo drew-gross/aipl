@@ -1,0 +1,7 @@
+# Minesweeper for the terminal. Scaffolding only: it cannot be played until the
+# functions listed in README.md exist.
+
+import { print } from builtins;
+
+# Say that the game is not playable yet.
+fn main() !prints { print("minesweeper: not playable yet, see README.md") }
