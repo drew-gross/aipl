@@ -316,6 +316,7 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
+  matrices/2d arrays
   let/match refines scrutinee in remaining arms
   Unicode support
   i64 without 0 should work

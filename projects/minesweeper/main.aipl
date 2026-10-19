@@ -1,7 +1,326 @@
-# Minesweeper for the terminal. Scaffolding only: it cannot be played until the
-# functions listed in README.md exist.
+# Minesweeper for the terminal.
+#
+# The mines are the same every game: there is no random number source yet, so the
+# layout is a constant (`mine_layout`).
 
-import { print } from builtins;
+import {
+    all,
+    any,
+    count_if,
+    drop_first,
+    equal as ==,
+    filter,
+    first,
+    greater_than_or_equal as >=,
+    has,
+    int_parse,
+    is_nonempty,
+    join,
+    less_than as <,
+    less_than_or_equal as <=,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    not_equal as !=,
+    print,
+    push,
+    read_line,
+    saturating_divide as /,
+    saturating_remainder as %,
+    split,
+    to_array,
+    to_set,
+    trim,
+    union,
+    value_or_err,
+    wrapping_add as +,
+    wrapping_mul as *,
+    wrapping_sub as -,
+} from builtins;
 
-# Say that the game is not playable yet.
-fn main() !prints { print("minesweeper: not playable yet, see README.md") }
+# A board and what the player has done to it. Cells are numbered row by row from
+# 0, so the cell at `row`, `column` is `row * width + column`.
+struct Game { width: u64, height: u64, mines: #{u64}, revealed: #{u64}, flagged: #<{u64} }
+
+# What the player asked for.
+variant Command = Reveal(u64) | Flag(u64) | Quit
+
+# Where a game stands.
+variant Status = Playing | Won | Lost
+
+# The cells holding a mine, on an 8 by 8 board.
+fn mine_layout() -> u64[] { [2, 11, 19, 25, 30, 38, 41, 49, 54, 60] }
+
+# A game on a `width` by `height` board with mines at `mines`, nothing revealed.
+fn new_game(width: u64, height: u64, mines: u64[]) -> Game {
+    width,
+    height,
+    mines: mines.to_set(),
+    revealed: [].to_set(),
+    flagged: [].to_set(),
+}.test({
+    let mines: u64[] = [1, 4];
+    assert(new_game(3, 2, mines) == Game {
+        width: 3,
+        height: 2,
+        mines: mines.to_set(),
+        revealed: [].to_set(),
+        flagged: [].to_set(),
+    });
+})
+
+# Every cell number on the board, in order.
+fn cells(self: Game) -> u64[] {
+    mut out: u64[] = [];
+    for (let cell : 0..self.width * self.height) {
+        set out.push(cell);
+    }
+    out
+}.test({
+    assert(new_game(3, 2, []).cells() == [0, 1, 2, 3, 4, 5]);
+})
+
+# The cells touching `cell`, including diagonally, that are on the board.
+#
+# Offsets run 0 to 2 for -1 to +1 so that no row or column is ever negative: a
+# neighbour in row `r` and column `c` has `r` and `c` one more than its real
+# position, and is on the board when both are between 1 and the size.
+fn neighbors(self: Game, cell: u64) -> u64[] {
+    let row = cell / self.width + 1;
+    let column = cell % self.width + 1;
+    mut out: u64[] = [];
+    for (let up : 0..3) {
+        for (let left : 0..3) {
+            let r = row + up - 1;
+            let c = column + left - 1;
+            let on_board = r >= 1 && r <= self.height && c >= 1 && c <= self.width;
+            if (on_board && (up != 1 || left != 1)) {
+                set out.push((r - 1) * self.width + c - 1);
+            };
+        }
+    }
+    out
+}.test({
+    let game = new_game(3, 3, []);
+    assert(game.neighbors(0) == [1, 3, 4]);
+    assert(game.neighbors(4) == [0, 1, 2, 3, 5, 6, 7, 8]);
+    assert(game.neighbors(8) == [4, 5, 7]);
+})
+
+# How many of the cells touching `cell` hold a mine.
+fn adjacent_mines(self: Game, cell: u64) -> u64 {
+    self.neighbors(cell).count_if(|n| self.mines.has(n))
+}.test({
+    let game = new_game(3, 3, [0, 2, 5]);
+    assert(game.adjacent_mines(1) == 3);
+    assert(game.adjacent_mines(4) == 3);
+    assert(game.adjacent_mines(6) == 0);
+})
+
+# Reveal each cell of `frontier` that is still hidden and holds no mine, and
+# whenever nothing around a revealed cell is a mine, the cells around it too: a
+# click on an empty region opens the whole region and its border.
+fn flood(self: Game, frontier: u64[]) -> Game {
+    match (frontier.first()) {
+        none => self, #[allow]
+        some(cell) => {
+            let rest = frontier.drop_first();
+            if (self.revealed.has(cell) || self.flagged.has(cell) || self.mines.has(cell)) {
+                self.flood(rest)
+            } else {
+                let opened = Game { ..self, revealed: self.revealed.union([cell].to_set()) };
+                if (self.adjacent_mines(cell) == 0) {
+                    opened.flood([..rest, ..self.neighbors(cell)])
+                } else {
+                    opened.flood(rest)
+                }
+            }
+        },
+    }
+}
+
+# `self` after the player reveals `cell`. A flagged or already revealed cell is
+# left alone.
+fn reveal(self: Game, cell: u64) -> Game {
+    if (self.flagged.has(cell) || self.revealed.has(cell)) {
+        self
+    } else if (self.mines.has(cell)) {
+        Game { ..self, revealed: self.revealed.union([cell].to_set()) }
+    } else {
+        self.flood([cell])
+    }
+}.test({
+    // A number stops at itself.
+    let game = new_game(3, 3, [8]);
+    assert(game.reveal(7).revealed.has(7));
+    assert(!game.reveal(7).revealed.has(6));
+
+    // A region with no mines around it opens, border and all: here that is
+    // every cell but the mine, so it wins.
+    assert(game.reveal(0).status() == Won);
+})
+
+# `self` after the player flags `cell`, or takes the flag off it. A revealed cell
+# cannot be flagged.
+fn toggle_flag(self: Game, cell: u64) -> Game {
+    if (self.revealed.has(cell)) {
+        self
+    } else if (self.flagged.has(cell)) {
+        Game { ..self, flagged: self.flagged.to_array().filter(|f| f != cell).to_set() }
+    } else {
+        Game { ..self, flagged: self.flagged.union([cell].to_set()) }
+    }
+}.test({
+    let game = new_game(2, 2, [3]);
+    assert(game.toggle_flag(0).flagged.has(0));
+    // Flagging twice takes the flag off again.
+    assert(!game.toggle_flag(0).toggle_flag(0).flagged.has(0));
+    // A flag protects its cell from a reveal.
+    assert(!game.toggle_flag(0).reveal(0).revealed.has(0));
+    // A revealed cell takes no flag.
+    assert(!game.reveal(0).toggle_flag(0).flagged.has(0));
+})
+
+# Whether the game is still going: lost once a mine is revealed, won once every
+# cell without a mine is.
+fn status(self: Game) -> Status {
+    if (self.mines.any(|m| self.revealed.has(m))) {
+        Lost
+    } else if (self.cells().all(|c| self.mines.has(c) || self.revealed.has(c))) {
+        Won
+    } else {
+        Playing
+    }
+}.test({
+    let game = new_game(2, 2, [3]);
+    assert(game.status() == Playing);
+    assert(game.reveal(3).status() == Lost);
+    assert(game.reveal(0).reveal(1).reveal(2).status() == Won);
+})
+
+# What is drawn for `cell`: `#` hidden, `F` flagged, `.` revealed with nothing
+# around it, a digit counting the mines around it, `*` a mine (shown once
+# revealed, or when `show_mines`).
+fn symbol(self: Game, cell: u64, show_mines: bool) -> str {
+    if (self.revealed.has(cell)) {
+        if (self.mines.has(cell)) {
+            "*"
+        } else if (self.adjacent_mines(cell) == 0) {
+            "."
+        } else {
+            `{self.adjacent_mines(cell)}`
+        }
+    } else if (self.flagged.has(cell)) {
+        "F"
+    } else if (show_mines && self.mines.has(cell)) {
+        "*"
+    } else {
+        "#"
+    }
+}
+
+# The board as text: a row of column numbers, then each row led by its number.
+fn render(self: Game, show_mines: bool) -> str {
+    mut heads: str[] = [];
+    for (let column : 0..self.width) {
+        set heads.push(`{column}`);
+    }
+    mut lines: str[] = [`  {heads.join(sep=" ")}`];
+    for (let row : 0..self.height) {
+        mut symbols: str[] = [];
+        for (let column : 0..self.width) {
+            set symbols.push(self.symbol(row * self.width + column, show_mines));
+        }
+        set lines.push(`{row} {symbols.join(sep=" ")}`);
+    }
+    lines.join(sep="\n")
+}.test({
+    let game = new_game(3, 2, [5]).reveal(0);
+    assert(game.render(false) == """
+          0 1 2
+        0 . 1 #
+        1 . 1 #
+    """);
+})
+
+# The number `self` holds at `at`.
+fn number(self: str[], at: u64) -> u64!str {
+    let word = self[at].value_or_err("missing a number")?;
+    let parsed = word.int_parse().value_or_err(`not a number: {word}`)?;
+    // A negative number wraps to a huge one, which no board is as big as.
+    let unsigned: u64 = parsed;
+    ok(unsigned)
+}.test({
+    assert(["r", "4"].number(1) == ok(4));
+    assert(["r"].number(1) == err("missing a number"));
+    assert(["r", "x"].number(1) == err("not a number: x"));
+})
+
+# What the player typed: `r ROW COLUMN` to reveal, `f ROW COLUMN` to flag or
+# unflag, `q` to quit.
+fn parse_command(self: Game, line: str) -> Command!str {
+    let words = line.trim().split(" ").filter(is_nonempty);
+    let verb = words.first().value_or_err("type r ROW COLUMN, f ROW COLUMN or q")?;
+    if (verb == "q") {
+        ok(Quit)
+    } else if (verb == "r" || verb == "f") {
+        let row = words.number(1)?;
+        let column = words.number(2)?;
+        if (row < self.height && column < self.width) {
+            let cell = row * self.width + column;
+            ok(if (verb == "r") { Reveal(cell) } else { Flag(cell) })
+        } else {
+            err("that is off the board")
+        }
+    } else {
+        err(`unknown command: {verb}`)
+    }
+}.test({
+    let game = new_game(3, 2, []);
+    assert(game.parse_command("r 1 2") == ok(Reveal(5)));
+    assert(game.parse_command("  f   0 1 ") == ok(Flag(1)));
+    assert(game.parse_command("q") == ok(Quit));
+    assert(game.parse_command("") == err("type r ROW COLUMN, f ROW COLUMN or q"));
+    assert(game.parse_command("r 2 0") == err("that is off the board"));
+    assert(game.parse_command("r -1 0") == err("that is off the board"));
+    assert(game.parse_command("r 1") == err("missing a number"));
+    assert(game.parse_command("x") == err("unknown command: x"));
+})
+
+# Play from `game` until it is won or lost, or the player quits or input ends.
+# Returns the exit code: 0 for a win or a quit, 1 for a loss.
+fn play(game: Game) !prints !read_stdin -> i64 {
+    match (game.status()) {
+        Won => {
+            print(game.render(true));
+            print("You win!");
+            0
+        },
+        Lost => {
+            print(game.render(true));
+            print("Boom! You hit a mine.");
+            1
+        },
+        Playing => {
+            print(game.render(false));
+            print("r ROW COLUMN to reveal, f ROW COLUMN to flag, q to quit");
+            match (read_line()) {
+                none => 0, #[allow]
+                some(line) => match (game.parse_command(line)) {
+                    err(message) => {
+                        print(message);
+                        play(game)
+                    },
+                    ok(command) => match (command) {
+                        Quit => 0,
+                        Reveal(cell) => play(game.reveal(cell)),
+                        Flag(cell) => play(game.toggle_flag(cell)),
+                    },
+                },
+            }
+        },
+    }
+}
+
+# Play minesweeper on the standard 8 by 8 board.
+fn main() !prints !read_stdin -> i64 { play(new_game(8, 8, mine_layout())) }

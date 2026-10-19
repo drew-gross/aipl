@@ -1,56 +1,48 @@
 # minesweeper
 
-A command-line Minesweeper. **Scaffolding only**: `main` prints a notice and
-exits. The game needs input, randomness and terminal control that AIPL does not
-have yet; this file lists them so they can be added one at a time.
+A command-line Minesweeper on an 8 by 8 board with 10 mines.
 
 ```sh
 $ ./aipl run
-minesweeper: not playable yet, see README.md
+  0 1 2 3 4 5 6 7
+0 # # # # # # # #
+…
+r ROW COLUMN to reveal, f ROW COLUMN to flag, q to quit
+r 0 0
 ```
+
+Commands are typed a line at a time: `r ROW COLUMN` reveals a cell, `f ROW COLUMN`
+flags it (or takes the flag off), `q` quits. Revealing a cell with no mines around
+it opens the whole empty region and its border. A cell shows `#` hidden, `F`
+flagged, `.` revealed with nothing around it, or a digit counting the mines
+around it. Exits 0 on a win or a quit, 1 on hitting a mine.
+
+Input can be piped, so a game can be scripted: `printf 'r 0 0\nq\n' | ./aipl run`.
+
+## The mines are always in the same place
+
+There is no random number source in AIPL yet, so the layout is a constant,
+`mine_layout()` in `main.aipl`. Everything else takes the mines as an argument
+(`new_game(width, height, mines)`), so a random layout is a change to the one
+place that calls it.
 
 ## Layout
 
 | file | what it is |
 |---|---|
-| `main.aipl` | the program |
+| `main.aipl` | the rules (neighbours, flood fill, flag, win/lose), the rendering and the command parser, with their tests; and `main`, the loop that reads a command and redraws |
 | `aipl` | the compiler that builds this project — see [../README.md](../README.md) |
 
-## Planned design
+The rules are pure functions on a `Game` value and carry the tests in their
+`.test` blocks, so `./aipl check` needs no input. Only `play` reads standard input.
 
-Keep the rules (board, mine placement, neighbour counts, reveal/flood-fill,
-flag, win/lose) as pure functions on values, tested from `.test` blocks like
-`word_count`; `main` is the thin shell that reads a command, applies it and
-redraws.
-
-## Functions we need
-
-Existing builtins cover strings, arrays, `print` and files. Missing, by effect
-or capability:
-
-### Must have
+## Still missing
 
 | need | why |
 |---|---|
-| read a line from standard input (a `!reads_stdin`-style effect), returning `str?` at end of input | the whole input loop; with it a line-based game (`r 3 4`, `f 3 4`) is playable |
-| random numbers (a `!random` effect, or a seedable generator value): an integer in `0..n` | place mines. A seedable generator keeps the game testable, with the seed taken from `args` |
-| parse a `str` to an integer, with an error on bad input (`builtin_int_parse` exists; check it covers `u64` and whitespace-trimmed input) | read coordinates |
-| exit code from `main` after a win or loss | already supported (`-> i64`) |
-
-### Pure helpers (can be written in AIPL today)
-
-| need | why |
-|---|---|
-| 2-D grid indexing: `index(row, col, width)` and neighbour enumeration with edge clipping | cell lookup, adjacent-mine counts |
-| Fisher–Yates shuffle or "pick k distinct indices" given a generator | mine placement that never double-places |
-| `split` on whitespace (check what exists) | parse a command line into words |
-| string padding / `repeat` for drawing columns | aligned board output |
-
-### Nice to have (real-time terminal play)
-
-| need | why |
-|---|---|
+| random numbers (an effect, or a seedable generator value) | place the mines differently each game; a seed from `args` keeps it testable |
+| a way to set one element of an array | the board is a set of revealed cells because an array cell cannot be assigned |
 | read one key without waiting for Enter (raw mode) | `hjkl`/arrow cursor play instead of typed commands |
-| ANSI output: clear screen, move cursor, colour (plain `print` of escape codes works once `"\x1b"` escapes exist; check) | redraw in place, classic number colours |
+| ANSI output: clear screen, move cursor, colour | redraw in place, classic number colours |
 | terminal size | fit the board to the window |
-| a clock (`!clock` exists) for the elapsed-time counter | the usual timer display |
+| a clock (`!clock` exists) | the usual elapsed-time counter |
