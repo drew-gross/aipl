@@ -1,0 +1,101 @@
+# Every effect can be shimmed, not only `!clock`: a shim binds each operation of
+# the effect to a function with the operation's own signature, and the body then
+# runs without reaching the real resource. So code that prints, reads and writes
+# files, lists a directory, reads standard input or runs a program can be run
+# against stand-ins, and the function installing the shim declares none of those
+# effects. (`shim_clock` shows the same for a clock, and the nesting and depth
+# rules, which are the same for every effect.)
+
+import {
+    ExecResult,
+    execute_program,
+    list_files,
+    print,
+    read_file_to_string,
+    read_line,
+    to_str,
+    write_string_to_file,
+} from builtins;
+
+// ---- prints: the shim swallows the output. (A shim that printed would reach
+// itself, since the shim stays installed while it runs.)
+fn swallow(s: str) {}
+
+fn greet() !prints {
+    print("hello");
+}
+
+fn shimmed_print() {
+    shim prints { print = swallow } {
+        greet();
+    };
+}
+
+// ---- read_files
+fn canned_file(path: str) -> str!Error { ok(`contents of {path}`) }
+
+fn load(path: str) !read_files -> str!Error { read_file_to_string(path) }
+
+fn shimmed_read() -> str {
+    shim read_files { read_file_to_string = canned_file } { to_str(load("a.txt")) }
+}
+
+// ---- write_files: this one refuses, so the failure path is shimmed too.
+fn refuse_write(path: str, contents: str) -> !Error { err(`cannot write {path}`) }
+
+fn save(path: str) !write_files -> !Error { write_string_to_file(path, "data") }
+
+fn shimmed_write() -> str {
+    shim write_files { write_string_to_file = refuse_write } { to_str(save("out.txt")) }
+}
+
+// ---- list_files
+fn canned_listing(dir: str) -> str[]!Error { ok([`{dir}/a`, `{dir}/b`]) }
+
+fn listing(dir: str) !list_files -> str[]!Error { list_files(dir) }
+
+fn shimmed_listing() -> str {
+    shim list_files { list_files = canned_listing } { to_str(listing("d")) }
+}
+
+// ---- read_stdin: a script of lines, none consumed from the real input.
+fn only_line() -> str? { some("scripted") }
+
+fn prompt() !read_stdin -> str? { read_line() }
+
+fn shimmed_stdin() -> str { shim read_stdin { read_line = only_line } { to_str(prompt()) } }
+
+// ---- execute_program
+fn canned_run(program: str, args: str[]) -> ExecResult!Error {
+    ok(ExecResult { stdout: `ran {program}`, stderr: "", exit_code: 3 })
+}
+
+fn run(program: str) !execute_program -> ExecResult!Error { execute_program(program, args=["x"]) }
+
+fn shimmed_run() -> str {
+    shim execute_program { execute_program = canned_run } {
+        match (run("tool")) {
+            ok(r) => `{r.stdout} exit={r.exit_code}`,
+            err(e) => e,
+        }
+    }
+}
+
+fn main() !prints {
+    shimmed_print();
+    print("after the silenced greeting");
+    print(shimmed_read());
+    print(shimmed_write());
+    print(shimmed_listing());
+    print(shimmed_stdin());
+    print(shimmed_run());
+    greet();
+}
+--- stdout ---
+after the silenced greeting
+ok("contents of a.txt")
+err("cannot write out.txt")
+ok(["d/a", "d/b"])
+some("scripted")
+ran tool exit=3
+hello

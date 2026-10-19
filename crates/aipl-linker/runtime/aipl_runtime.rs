@@ -968,8 +968,8 @@ unsafe fn clock_nanos(id: c_int) -> i64 {
 /// assigns. 0 means "no shim installed" — the state every slot starts in and
 /// returns to. Sized by `aipl_syntax::SHIM_SLOT_COUNT`; `shim_slots_match_runtime`
 /// in `tests/shims.rs` holds the two in sync.
-static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 2] =
-    [const { core::sync::atomic::AtomicI64::new(0) }; 2];
+static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 8] =
+    [const { core::sync::atomic::AtomicI64::new(0) }; 8];
 
 /// The shim installed for slot `idx`, or 0 if none. An out-of-range index reads
 /// as "no shim" rather than trapping (codegen only ever emits valid indices).

@@ -811,6 +811,23 @@ describes: make the call resolvable for one round trip, run
 `fill_staged_ir` → `validate_staged_ir` → `promote_staged_ir`, undo the stopgap,
 then hand off.
 
+## Every effect is shimmable
+A `shim <effect> { op = f, .. } { body }` stands in for every operation of an
+effect, so a program that prints, reads files, reads stdin, runs a program or
+reads the clock can be run against stand-ins. **A new effect is not finished until
+it can be shimmed**: list its operations in `SHIMMABLE_EFFECTS`
+(`crates/aipl-syntax/src/lib.rs`), bump `SHIM_SLOT_COUNT` and both runtimes'
+`SHIM_SLOTS` arrays (JIT in `aipl-codegen`, AOT in `aipl_runtime.rs`), and add it
+to `tests/cases/effects/shim_effects.aipl`. `shims::every_effect_is_shimmable`
+fails otherwise. Only the compiler's own `INTERNAL_EFFECTS` (`measure`) are exempt.
+
+Nothing else is per-effect: `compile_call_expr` routes any call to a listed
+operation through its slot, whatever the signature, so a new operation needs no
+codegen of its own. Two things a shim author must know. A shim stays installed
+while it runs, so a shim for `print` that calls `print` reaches itself; and a
+shim function counts as address-taken (`inspect_only_params`), so its heap
+parameters follow the retained protocol like any function value's.
+
 ## Predicate methods (`is_*` functions)
 Boolean predicates should be written as methods on their receiver, not
 free functions — `c.is_digit()` reads more naturally than `is_digit(c)`.

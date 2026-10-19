@@ -198,6 +198,7 @@ case_tests! {
     cases_effects_err_shim_unshimmable_effect = "cases/effects/err_shim_unshimmable_effect",
     cases_effects_over_declared_effects_are_fine = "cases/effects/over_declared_effects_are_fine",
     cases_effects_shim_clock = "cases/effects/shim_clock",
+    cases_effects_shim_effects = "cases/effects/shim_effects",
     cases_effects_transitive_caller_with_declaration_passes = "cases/effects/transitive_caller_with_declaration_passes",
     cases_equality_arrays = "cases/equality/arrays",
     cases_equality_err_fn_eq = "cases/equality/err_fn_eq",

@@ -64,10 +64,29 @@ fn every_operation_is_a_builtin() {
     }
 }
 
-/// A non-shimmable effect has no operation list — that's exactly what the
-/// checker keys "this effect can't be shimmed" off.
+/// Every effect is shimmable: a program that uses an effect must be able to run
+/// without reaching the real resource, which is what a shim is for. An effect with
+/// no entry in `SHIMMABLE_EFFECTS` cannot be stood in for, so adding one without
+/// its operations fails here rather than leaving the rule to be remembered.
+#[test]
+fn every_effect_is_shimmable() {
+    for effect in aipl_syntax::KNOWN_EFFECTS {
+        if aipl_syntax::INTERNAL_EFFECTS.contains(effect) {
+            continue;
+        }
+        assert!(
+            effect_operations(effect).is_some_and(|ops| !ops.is_empty()),
+            "effect \"!{effect}\" has no shimmable operations; list them in SHIMMABLE_EFFECTS"
+        );
+    }
+}
+
+/// An effect with no operation list is exactly what the checker keys "this effect
+/// can't be shimmed" off. Only the compiler's internal effects, and names that are
+/// not effects at all, are in that position.
 #[test]
 fn unshimmable_effects_have_no_operations() {
-    assert!(effect_operations("prints").is_none());
+    assert!(effect_operations("measure").is_none());
+    assert!(effect_operations("teleport").is_none());
     assert!(effect_operations("clock").is_some());
 }

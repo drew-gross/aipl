@@ -78,8 +78,8 @@ deallocations     48
 reallocations     3
 bytes allocated   2930
 peak live bytes   2842
-instructions      6980
-binary size       19768 bytes (code 12672, data 195, metadata 6901)
+instructions      7028
+binary size       20528 bytes (code 13144, data 195, metadata 7189)
 
 function                 calls  code bytes
 __arr_drop_First             2         152
@@ -92,9 +92,10 @@ aipl_array_dec             104    external
 aipl_array_new               5    external
 aipl_array_with_cap          8    external
 aipl_i64_len                10    external
+aipl_shim_get                8    external
 aipl_u64_len                 4    external
 aipl_write_bytes           105    external
 aipl_write_i64               5    external
 aipl_write_u64               2    external
 fold                         2        1700
-main                         1        7900
+main                         1        8372

@@ -11189,12 +11189,23 @@ pub fn inspect_only_params(program: &MonoProgram) -> HashMap<String, Vec<bool>> 
     let names: HashSet<&str> = program.fns.iter().map(|f| f.name.as_str()).collect();
     let mut address_taken: HashSet<&str> = HashSet::new();
     for f in &program.fns {
-        aipl_syntax::each_subexpr(&f.body, &mut |e| {
-            if let ExprKind::Ident(n) = &e.kind {
+        aipl_syntax::each_subexpr(&f.body, &mut |e| match &e.kind {
+            ExprKind::Ident(n) => {
                 if let Some(name) = names.get(n.as_str()) {
                     address_taken.insert(name);
                 }
             }
+            // A shim installs its functions by address, and the operation's
+            // call sites reach them through `call_indirect`, which retains every
+            // argument.
+            ExprKind::Shim(_, bindings, _) => {
+                for (_, shim) in bindings {
+                    if let Some(name) = names.get(shim.as_str()) {
+                        address_taken.insert(name);
+                    }
+                }
+            }
+            _ => {}
         });
     }
 

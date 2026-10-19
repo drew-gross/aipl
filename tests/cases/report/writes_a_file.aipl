@@ -17,11 +17,12 @@ deallocations     2
 reallocations     0
 bytes allocated   28
 peak live bytes   20
-instructions      62
-binary size       1880 bytes (code 756, data 18, metadata 1106)
+instructions      82
+binary size       2280 bytes (code 988, data 18, metadata 1274)
 
 function                       calls  code bytes
 __to_str_unit$err$Error            1         460
+aipl_shim_get                      2    external
 aipl_write_bytes                   1    external
 aipl_write_string_to_file          1    external
-main                               1         296
+main                               1         528

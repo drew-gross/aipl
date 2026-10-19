@@ -74,8 +74,8 @@ deallocations     35
 reallocations     1
 bytes allocated   2501
 peak live bytes   2074
-instructions      2052
-binary size       8904 bytes (code 5420, data 46, metadata 3438)
+instructions      2082
+binary size       9408 bytes (code 5744, data 46, metadata 3618)
 
 function                                             calls  code bytes
 __builtin_split_map$str$s0$s1$lam$tagged                 3         584
@@ -87,7 +87,8 @@ __to_str_u64$arr                                         2         704
 aipl_arr_inc                                            10    external
 aipl_array_dec                                          13    external
 aipl_array_new                                           1    external
+aipl_shim_get                                            5    external
 aipl_u64_len                                            10    external
 aipl_write_bytes                                         7    external
 aipl_write_u64                                           5    external
-main                                                     1        2868
+main                                                     1        3192

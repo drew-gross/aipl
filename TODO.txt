@@ -201,7 +201,6 @@ clean_trailing_whitespace.aipl:
 
 List files:
   fall back on (l)stat in case of DT_UNKNOWN?
-  implement effect shims
 
 clock:
   make units types
@@ -314,7 +313,6 @@ default/kwargs:
 
 shim:
   better syntax (shim is a weird keyword)
-  shim the rest of the effects
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
@@ -664,9 +662,6 @@ optimizations:
     F. Worth a look, lower confidence
 
     - find_files walks the corpus via the dogfooded engine on every fmt/ffi test — fine, but it's repeated per test binary.
-
-effects:
-  all effects should be shimmable actually
 
 array/str unification:
   turn arrays into fat values

@@ -11727,59 +11727,6 @@ fn define_elem_rc_fn<M: Module>(
     Ok(())
 }
 
-/// Emit a call to a shimmable *operation* — one of the builtins listed in
-/// `aipl_syntax::SHIMMABLE_EFFECTS`. Reads the operation's shim slot and calls
-/// the installed shim through it when one is present, falling back to the real
-/// runtime symbol otherwise:
-///
-/// ```text
-///     cur = aipl_shim_get(slot)
-///     brif cur != 0 -> shim(cur) : real()
-/// ```
-///
-/// The branch is what makes a shim reach every call at any depth: a callee
-/// compiled long before any shim existed still asks the slot each time. Only
-/// zero-argument, single-`i64`-result operations are supported so far, which is
-/// all the clock operations need; widening it means threading args and the sret
-/// ABI through, exactly as `compile_indirect_call` already does.
-fn emit_shimmable_call<M: Module>(
-    module: &mut M,
-    builder: &mut FunctionBuilder,
-    builtins: &Builtins,
-    op: &str,
-    real_sym: &'static str,
-) -> Value {
-    let slot = aipl_syntax::shim_slot_index(op).expect("a shimmable operation has a slot") as i64;
-    let idx = builder.ins().iconst(types::I64, slot);
-    let cur = builtins.call(module, builder, "aipl_shim_get", &[idx]);
-
-    let shim_b = builder.create_block();
-    let real_b = builder.create_block();
-    let merge = builder.create_block();
-    builder.append_block_param(merge, types::I64);
-    let installed = builder.ins().icmp_imm_s(IntCC::NotEqual, cur, 0);
-    builder.ins().brif(installed, shim_b, &[], real_b, &[]);
-
-    // A shim has the operation's own signature, which for these is `() -> i64`.
-    builder.switch_to_block(shim_b);
-    builder.seal_block(shim_b);
-    let mut sig = module.make_signature();
-    sig.returns.push(AbiParam::new(types::I64));
-    let sigref = builder.import_signature(sig);
-    let inst = builder.ins().call_indirect(sigref, cur, &[]);
-    let shimmed = builder.inst_results(inst)[0];
-    builder.ins().jump(merge, &[BlockArg::Value(shimmed)]);
-
-    builder.switch_to_block(real_b);
-    builder.seal_block(real_b);
-    let actual = builtins.call(module, builder, real_sym, &[]);
-    builder.ins().jump(merge, &[BlockArg::Value(actual)]);
-
-    builder.switch_to_block(merge);
-    builder.seal_block(merge);
-    builder.block_params(merge)[0]
-}
-
 fn fn_addr_or_zero<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
@@ -14966,7 +14913,182 @@ fn arity_bug(name: &str, expected: usize, got: usize, span: &Span) -> Error {
 /// call flag; `span` is the call site. The builtin and intrinsic arms are
 /// matched first; the wildcard arm compiles an ordinary (monomorphized) user or
 /// builtin call via [`compile_call`].
+///
+/// This is the ungated half: [`compile_call_expr`] wraps it for the operations
+/// that can be shimmed.
+/// Compile a call, routing it through its shim slot when the callee is an
+/// operation of a shimmable effect (`aipl_syntax::SHIMMABLE_EFFECTS`).
+///
+/// ```text
+///     args evaluated once, in order
+///     cur = aipl_shim_get(slot)
+///     brif cur != 0 -> shim: call_indirect cur(args) | real: the builtin's own lowering
+/// ```
+///
+/// A shim has the operation's own signature, so the shim branch is an ordinary
+/// indirect call (borrow-retained arguments, an sret slot for a composite
+/// result) and the real branch is the unchanged lowering of the builtin, fed the
+/// already-evaluated arguments through synthetic bindings. The branch is what
+/// makes a shim reach every call at any depth: a callee compiled long before any
+/// shim existed still asks the slot each time.
 fn compile_call_expr<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    scopes: &mut Vec<Vec<Tracked>>,
+    callee: &Callee,
+    args: &[Expr],
+    style: bool,
+    span: Span,
+    locked: Option<ConcreteType>,
+) -> Result<(Value, ConcreteType), Error> {
+    let Some(slot) = callee
+        .name()
+        .strip_prefix("__builtin_")
+        .and_then(aipl_syntax::shim_slot_index)
+    else {
+        return compile_call_expr_direct(
+            module, builder, cx, scopes, callee, args, style, span, locked,
+        );
+    };
+    let Cx {
+        env,
+        funcs,
+        structs,
+        builtins,
+        ..
+    } = cx;
+    let cx = Cx { tail: false, ..cx };
+    let name = callee.name();
+    let info = funcs.get(name).ok_or_else(|| {
+        Error::at(
+            format!(
+                "shimmable operation {:?} has no signature",
+                display_name(name)
+            ),
+            span.clone(),
+        )
+    })?;
+    let ptys: Vec<ConcreteType> = info.param_types().cloned().collect();
+    let ret = info.return_ty.clone();
+    if ptys.len() != args.len() {
+        return Err(Error::at(
+            format!(
+                "fn {:?} expects {} arg(s), got {}",
+                display_name(name),
+                ptys.len(),
+                args.len()
+            ),
+            span.clone(),
+        ));
+    }
+
+    // Evaluate each argument once. The real branch reads them back through
+    // bindings, so nothing is evaluated on one path and skipped on the other.
+    let mut shim_env = env.clone();
+    let mut bound: Vec<Expr> = Vec::with_capacity(args.len());
+    let mut values: Vec<Value> = Vec::with_capacity(args.len());
+    for (idx, (arg, expected)) in args.iter().zip(&ptys).enumerate() {
+        let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
+        expect_type(
+            &actual,
+            expected,
+            &format!("{} arg {idx}", display_name(name)),
+            arg.span.clone(),
+        )?;
+        let v = coerce_empty_to_char_array(builder, module, builtins, scopes, v, &actual, expected);
+        let binding = format!("__shim_arg{idx}");
+        shim_env.insert(binding.clone(), EnvBinding::Immut(v, actual));
+        bound.push(Expr::new(ExprKind::Ident(binding), arg.span.clone()));
+        values.push(v);
+    }
+
+    let idx = builder.ins().iconst(types::I64, slot as i64);
+    let installed_fn = builtins.call(module, builder, "aipl_shim_get", &[idx]);
+    let shim_b = builder.create_block();
+    let real_b = builder.create_block();
+    let merge = builder.create_block();
+    builder.append_block_param(merge, types::I64);
+    let installed = builder.ins().icmp_imm_s(IntCC::NotEqual, installed_fn, 0);
+    builder.ins().brif(installed, shim_b, &[], real_b, &[]);
+
+    builder.switch_to_block(shim_b);
+    builder.seal_block(shim_b);
+    for (v, expected) in values.iter().zip(&ptys) {
+        if is_heap(expected) {
+            hand_off_arg(
+                builder, module, builtins, structs, scopes, *v, expected, false,
+            );
+        }
+    }
+    let sret = sret_size(&ret, structs).map(|size| {
+        let slot = builder.create_sized_stack_slot(StackSlotData::new(
+            StackSlotKind::ExplicitSlot,
+            size,
+            3,
+        ));
+        builder.ins().stack_addr(types::I64, slot, 0)
+    });
+    let call_args: Vec<Value> = sret.iter().copied().chain(values).collect();
+    let sigref = builder.import_signature(fn_value_signature(module, &ptys, &ret, structs));
+    let inst = builder
+        .ins()
+        .call_indirect(sigref, installed_fn, &call_args);
+    let shimmed = if let Some(s) = sret {
+        s
+    } else if is_unit(&ret) {
+        builder.ins().iconst(types::I64, 0)
+    } else {
+        builder.inst_results(inst)[0]
+    };
+    builder.ins().jump(merge, &[BlockArg::Value(shimmed)]);
+
+    // The real branch gets a scope of its own, as an `if` arm does: whatever it
+    // allocates is released before the merge, and the result is retained first so
+    // that it survives that. The shim's result arrives owned, with nothing else
+    // allocated, so the merged value carries exactly one reference either way.
+    builder.switch_to_block(real_b);
+    builder.seal_block(real_b);
+    scopes.push(Vec::new());
+    let (actual, actual_ty) = compile_call_expr_direct(
+        module,
+        builder,
+        Cx {
+            env: &shim_env,
+            ..cx
+        },
+        scopes,
+        callee,
+        &bound,
+        style,
+        span,
+        locked,
+    )?;
+    if needs_drop(&actual_ty, structs) {
+        emit_retain(builder, module, builtins, structs, actual, &actual_ty);
+    }
+    drop_scope(
+        builder,
+        module,
+        builtins,
+        structs,
+        scopes.pop().expect("real branch scope"),
+    );
+    builder.ins().jump(merge, &[BlockArg::Value(actual)]);
+
+    builder.switch_to_block(merge);
+    builder.seal_block(merge);
+    let result = builder.block_params(merge)[0];
+    if needs_drop(&actual_ty, structs) {
+        scopes
+            .last_mut()
+            .expect("scope")
+            .push(Tracked::new(result, &actual_ty));
+    }
+    Ok((result, actual_ty))
+}
+
+fn compile_call_expr_direct<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
     cx: Cx,
@@ -15325,9 +15447,9 @@ fn compile_call_expr<M: Module>(
                     span.clone(),
                 ));
             }
-            // Both are shimmable operations, so the call routes through the
-            // shim slot: an installed shim wins, otherwise the real clock.
-            let v = emit_shimmable_call(module, builder, builtins, pretty, sym);
+            // Shimmable, but the slot is consulted by `compile_call_expr`; this
+            // is the real clock.
+            let v = builtins.call(module, builder, sym, &[]);
             (v, ConcreteType::Primitive(Primitive::U64))
         }
         Callee::ListFiles => {
@@ -18743,7 +18865,7 @@ fn compile_expr_inner<M: Module>(
         // Unit carries no value; hand back a placeholder i64 the unit type
         // forbids anyone from consuming, mirroring the unit-call result.
         ExprKind::Unit => (builder.ins().iconst(types::I64, 0), ConcreteType::Unit),
-        ExprKind::Shim(_, bindings, body) => {
+        ExprKind::Shim(effect, bindings, body) => {
             // Install each bound function's address into its operation's slot
             // for the dynamic extent of `body`, then put back whatever was
             // there. Saving the previous occupant (rather than clearing) is what
@@ -18775,7 +18897,23 @@ fn compile_expr_inner<M: Module>(
                 builtins.call_void(module, builder, "aipl_shim_set", &[idx, addr]);
                 saved.push((idx, old));
             }
-            let (v, t) = compile_expr(module, builder, cx, scopes, body)?;
+            // The shim covers every operation of `effect`, so the body may call
+            // them without the enclosing function declaring it (the checker's
+            // discharge rule, repeated for the effect check in `compile_call`).
+            let mut inner_effects = cx.effects.to_vec();
+            if !inner_effects.contains(effect) {
+                inner_effects.push(effect.clone());
+            }
+            let (v, t) = compile_expr(
+                module,
+                builder,
+                Cx {
+                    effects: &inner_effects,
+                    ..cx
+                },
+                scopes,
+                body,
+            )?;
             for (idx, old) in saved {
                 builtins.call_void(module, builder, "aipl_shim_set", &[idx, old]);
             }

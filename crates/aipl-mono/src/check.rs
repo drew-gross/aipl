@@ -27,6 +27,7 @@ use aipl_syntax::ast::{
     Arity, BinOp, Callee, Exclusion, Expr, ExprKind, FieldInit, Function, Item, LambdaParam,
     MatchArm, Pattern, Primitive, Program, Signature, StructDecl, Type, VariantDecl,
 };
+use aipl_syntax::KNOWN_EFFECTS;
 use aipl_syntax::{
     binop_spelling, is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr,
     type_name, unrefined, Error, Span, SPAN_TYPE,
@@ -182,25 +183,6 @@ fn undeclared_effect_message(callee: &str, effect: &str, caller_effects: &[Strin
         )
     }
 }
-
-/// Effects the language recognizes. `prints` = writes to stdout; `read_files` =
-/// reads from the filesystem; `read_stdin` = reads standard input;
-/// `write_files` = writes to the filesystem;
-/// `list_files` = enumerates the filesystem (directory listing);
-/// `execute_program` = spawns a child process; `clock` = reads the wall clock
-/// (so a function's result depends on when it ran). `measure` is internal:
-/// it marks `measure(..)` and the counting window it is built from, so only a
-/// `.performance` block (which declares it, and nothing else) can reach them.
-const KNOWN_EFFECTS: &[&str] = &[
-    "prints",
-    "read_files",
-    "read_stdin",
-    "write_files",
-    "list_files",
-    "execute_program",
-    "clock",
-    "measure",
-];
 
 /// Whether an expression's value is used by whatever encloses it.
 ///

@@ -1,15 +1,16 @@
-# Only effects listed in the compiler's shimmable-effect table can be shimmed —
-# the table is what says which operations make up an effect, and without it
-# there is nothing to bind or to check coverage against.
+# Only an effect with operations in the compiler's shimmable-effect table can be
+# shimmed — the table is what says which operations make up an effect, and
+# without it there is nothing to bind or to check coverage against. Every effect a
+# program can declare is in it; `!measure`, the compiler's internal one, is not.
 
 fn fake() -> u64 { 1 }
 
 fn main() {
-    shim prints { now_nanos = fake } {};
+    shim measure { now_nanos = fake } {};
 }
 --- errors ---
-error: effect "!prints" cannot be shimmed; shimmable effects are: "!clock"
- --> ./tests/cases/effects/err_shim_unshimmable_effect.aipl:8:5
+error: effect "!measure" cannot be shimmed; shimmable effects are: "!clock", "!prints", "!read_files", "!read_stdin", "!write_files", "!list_files", "!execute_program"
+ --> ./tests/cases/effects/err_shim_unshimmable_effect.aipl:9:5
   |
-8 |     shim prints { now_nanos = fake } {};
-  |     ^^^^^^^^^^^
+9 |     shim measure { now_nanos = fake } {};
+  |     ^^^^^^^^^^^^

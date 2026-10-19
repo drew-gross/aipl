@@ -3737,9 +3737,47 @@ pub fn is_internal_builtin(callee: &Callee) -> bool {
 ///
 /// This is the one table that decides what can be shimmed. Every other part of
 /// the feature (parser, checker, codegen, runtime slots) reads it rather than
-/// naming a specific effect, so opening up another effect is an entry here plus
-/// the runtime dispatch for its operations. Only `clock` is listed for now.
-pub const SHIMMABLE_EFFECTS: &[(&str, &[&str])] = &[("clock", &["now_nanos", "monotonic_now"])];
+/// naming a specific effect, so opening up another effect is an entry here, a
+/// bump of [`SHIM_SLOT_COUNT`] and of both runtimes' slot arrays.
+///
+/// **Every effect is shimmable.** A new effect lists its operations here in the
+/// same change that introduces it; `every_effect_is_shimmable` in
+/// `tests/suites/shims.rs` fails otherwise. An operation is a builtin whose call
+/// site codegen routes through its slot, whatever its signature.
+///
+/// New effects go at the end: the order assigns slot indices.
+pub const SHIMMABLE_EFFECTS: &[(&str, &[&str])] = &[
+    ("clock", &["now_nanos", "monotonic_now"]),
+    ("prints", &["print"]),
+    ("read_files", &["read_file_to_string"]),
+    ("read_stdin", &["read_line"]),
+    ("write_files", &["write_string_to_file"]),
+    ("list_files", &["list_files"]),
+    ("execute_program", &["execute_program"]),
+];
+
+/// Effects the language recognizes. `prints` = writes to stdout; `read_files` =
+/// reads from the filesystem; `read_stdin` = reads standard input;
+/// `write_files` = writes to the filesystem;
+/// `list_files` = enumerates the filesystem (directory listing);
+/// `execute_program` = spawns a child process; `clock` = reads the wall clock
+/// (so a function's result depends on when it ran). `measure` is internal:
+/// it marks `measure(..)` and the counting window it is built from, so only a
+/// `.performance` block (which declares it, and nothing else) can reach them.
+pub const KNOWN_EFFECTS: &[&str] = &[
+    "prints",
+    "read_files",
+    "read_stdin",
+    "write_files",
+    "list_files",
+    "execute_program",
+    "clock",
+    "measure",
+];
+
+/// The effects in [`KNOWN_EFFECTS`] that are compiler machinery rather than
+/// something a program does to the world, and so have nothing to shim.
+pub const INTERNAL_EFFECTS: &[&str] = &["measure"];
 
 /// The operations of `effect`, or `None` if it isn't shimmable.
 pub fn effect_operations(effect: &str) -> Option<&'static [&'static str]> {
@@ -3767,7 +3805,7 @@ pub fn shim_slot_index(op: &str) -> Option<usize> {
 
 /// How many shim slots the runtimes must reserve. Kept in sync by
 /// `shim_slots_match_runtime` in `tests/shims.rs`.
-pub const SHIM_SLOT_COUNT: usize = 2;
+pub const SHIM_SLOT_COUNT: usize = 8;
 
 /// Built-in *type* names that must be brought into scope with
 /// `import { .. } from builtins;` before use — the type-level analog of

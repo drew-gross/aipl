@@ -28,8 +28,9 @@ deallocations     4
 reallocations     0
 bytes allocated   352
 peak live bytes   352
-instructions      61
-binary size       1176 bytes (code 456, data 1, metadata 719)
+instructions      73
+binary size       1432 bytes (code 584, data 1, metadata 847)
 
-function      calls  code bytes
-main              1         456
+function           calls  code bytes
+aipl_shim_get          2    external
+main                   1         584

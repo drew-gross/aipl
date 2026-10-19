@@ -286,16 +286,17 @@ deallocations     0
 reallocations     0
 bytes allocated   49
 peak live bytes   49
-instructions      38
-binary size       1240 bytes (code 336, data 1, metadata 903)
+instructions      44
+binary size       1400 bytes (code 400, data 1, metadata 999)
 
 function            calls  code bytes
 __to_str_u64            1         204
 aipl_array_dec          1    external
 aipl_array_new          1    external
+aipl_shim_get           1    external
 aipl_u64_len            2    external
 aipl_write_u64          1    external
-main                    1         132
+main                    1         196
 "
     );
     assert_eq!(
