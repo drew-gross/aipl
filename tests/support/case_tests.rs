@@ -63,6 +63,7 @@ case_tests! {
     cases_arrays_push_push_in_place_amortized = "cases/arrays/push/push_in_place_amortized",
     cases_arrays_push_push_none_element = "cases/arrays/push/push_none_element",
     cases_arrays_push_aliased_array = "cases/arrays/push_aliased_array",
+    cases_arrays_push_through_inlined_function = "cases/arrays/push_through_inlined_function",
     cases_arrays_reduce = "cases/arrays/reduce",
     cases_arrays_reverse = "cases/arrays/reverse",
     cases_arrays_reverse_allocates_nothing = "cases/arrays/reverse_allocates_nothing",

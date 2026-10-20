@@ -75,6 +75,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/arrays/push/push_in_place_amortized | 1 | 64 | 112 | 402 | 1052 | 4.00 | 79.69 | 1472 |
 | cases/arrays/push/push_none_element | 6 | 217 | 217 | 1157 | 5280 | 8.00 | 83.53 | 1504 |
 | cases/arrays/push_aliased_array | 4 | 312 | 384 | 1672 | 2388 | 4.00 | 82.78 | 1488 |
+| cases/arrays/push_through_inlined_function | 10 | 2783 | 3823 | 8228 | 3168 | 12.00 | 269.17 | 1520 |
 | cases/arrays/reduce | 27 | 1587 | 1587 | 3565 | 8656 | 16.00 | 134.41 | 1504 |
 | cases/arrays/reverse | 0 | 0 | 0 | 950 | 2176 | 2.00 | 87.97 | 1440 |
 | cases/arrays/reverse_allocates_nothing | 0 | 0 | 0 | 577 | 1256 | 1.00 | 85.73 | 1424 |
@@ -184,14 +185,14 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/functions/jit_constant | 1 | 18 | 18 | 35 | 360 | 3.00 | 75.86 | 1472 |
 | cases/functions/jit_identity | 0 | 0 | 0 | 39 | 220 | 2.00 | 76.97 | 1456 |
 | cases/functions/nonempty_variadic | 10 | 596 | 596 | 760 | 3440 | 9.00 | 82.50 | 1504 |
-| cases/functions/owned_inplace | 2 | 88 | 88 | 639 | 1420 | 3.00 | 77.69 | 1472 |
-| cases/functions/owned_inplace_bool | 2 | 34 | 34 | 582 | 1172 | 3.00 | 77.83 | 1472 |
+| cases/functions/owned_inplace | 2 | 88 | 88 | 637 | 1344 | 3.00 | 84.34 | 1488 |
+| cases/functions/owned_inplace_bool | 2 | 34 | 34 | 573 | 1080 | 3.00 | 84.03 | 1488 |
 | cases/functions/recursion/factorial_recursion | 0 | 0 | 0 | 111 | 320 | 2.00 | 74.89 | 1456 |
 | cases/functions/recursion/factorial_recursion_large | 0 | 0 | 0 | 136 | 232 | 2.00 | 85.81 | 1440 |
 | cases/functions/recursion/mutual_recursion | 0 | 0 | 0 | 822 | 572 | 2.00 | 79.45 | 1456 |
 | cases/functions/return | 3 | 51 | 51 | 483 | 1728 | 7.00 | 81.03 | 1504 |
 | cases/functions/simple_call | 0 | 0 | 0 | 58 | 288 | 2.00 | 77.48 | 1456 |
-| cases/functions/variadic | 4 | 210 | 210 | 1297 | 4484 | 5.00 | 82.63 | 1488 |
+| cases/functions/variadic | 7 | 265 | 247 | 1381 | 4708 | 4.00 | 89.83 | 1472 |
 | cases/functions/variadic_default | 11 | 265 | 265 | 646 | 2492 | 10.00 | 80.42 | 1504 |
 | cases/functions/variadic_generic | 7 | 197 | 197 | 1012 | 2744 | 7.00 | 81.59 | 1520 |
 | cases/functions/void/main_returns_nothing | 0 | 0 | 0 | 18 | 152 | 3.00 | 75.39 | 1488 |
@@ -344,8 +345,8 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/lints/match_value_or_err_allow | 0 | 0 | 0 | 235 | 1320 | 5.00 | 94.47 | 1488 |
 | cases/lints/match_value_or_err_not_flagged | 5 | 87 | 87 | 325 | 1972 | 9.00 | 90.22 | 1488 |
 | cases/lints/match_value_or_not_flagged | 5 | 85 | 85 | 167 | 836 | 8.00 | 88.39 | 1504 |
-| cases/lints/push_array_literal_allow | 15 | 324 | 205 | 2201 | 4016 | 11.00 | 143.23 | 1520 |
-| cases/lints/push_array_literal_not_flagged | 12 | 303 | 276 | 1213 | 4204 | 12.00 | 91.36 | 1536 |
+| cases/lints/push_array_literal_allow | 15 | 324 | 205 | 2197 | 3856 | 9.00 | 142.73 | 1488 |
+| cases/lints/push_array_literal_not_flagged | 13 | 351 | 300 | 1231 | 4000 | 8.00 | 89.14 | 1488 |
 | cases/lints/push_loop_pipeline_allow | 9 | 184 | 114 | 1858 | 3564 | 8.00 | 89.89 | 1520 |
 | cases/lints/push_loop_pipeline_not_flagged | 40 | 877 | 485 | 6890 | 9752 | 19.00 | 102.28 | 1520 |
 | cases/lints/return_loop_any_all_allow | 12 | 246 | 246 | 1277 | 3548 | 14.00 | 183.90 | 1488 |
@@ -429,7 +430,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/optimizations/map_map_fusion | 25 | 1043 | 754 | 3247 | 7928 | 17.00 | 88.71 | 1520 |
 | cases/optimizations/map_reduce_fusion | 24 | 1282 | 1229 | 2605 | 7012 | 13.00 | 193.87 | 1504 |
 | cases/optimizations/map_value_or_unwraps | 0 | 0 | 0 | 101 | 684 | 5.00 | 79.47 | 1488 |
-| cases/optimizations/move_last_use | 49 | 2475 | 2450 | 8456 | 12672 | 28.00 | 112.96 | 1536 |
+| cases/optimizations/move_last_use | 49 | 2475 | 2450 | 8454 | 12596 | 30.00 | 167.01 | 1504 |
 | cases/optimizations/owned_param_shared_result | 12 | 672 | 720 | 2903 | 3488 | 9.00 | 81.53 | 1536 |
 | cases/optimizations/read_only_builtin_args | 14 | 492 | 395 | 2963 | 5028 | 11.00 | 82.53 | 1520 |
 | cases/optimizations/shared_ctor_wrapper | 9 | 609 | 609 | 1273 | 2724 | 8.00 | 80.24 | 1504 |
@@ -676,7 +677,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/find_files | 19 | 1096 | 1040 | 1869 | 6708 | 10.00 | 87.14 | 1552 |
 | crates/aipl-codegen/src/find_trailing_whitespace | 0 | 0 | 0 | 6230 | 2488 | 2.00 | 89.90 | 1440 |
 | crates/aipl-codegen/src/format | 2287 | 185153 | 19208 | 313161 | 180428 | 207.00 | 1021.91 | 1968 |
-| crates/aipl-codegen/src/format_source | 16815 | 4288414 | 496299 | 11349560 | 5991176 | 2379.00 | 22731.64 | 5264 |
+| crates/aipl-codegen/src/format_source | 16815 | 4288414 | 496299 | 11349203 | 5990920 | 2547.00 | 22570.53 | 5264 |
 | crates/aipl-codegen/src/grammar | 767 | 96951 | 49216 | 84139 | 108356 | 81.00 | 588.25 | 1696 |
 | crates/aipl-codegen/src/grammar_aipl | 1868589 | 390483514 | 928367 | 623210075 | 5392068 | 157574.00 | 15053.18 | 9952 |
 | crates/aipl-codegen/src/grammar_calc | 10185 | 1168142 | 42260 | 3434067 | 318128 | 925.00 | 3572.63 | 2448 |
@@ -713,7 +714,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/trim_suffix | 0 | 0 | 0 | 351 | 1128 | 2.00 | 80.85 | 1424 |
 | crates/aipl-codegen/src/ty | 84 | 6766 | 6362 | 5280 | 14168 | 14.00 | 106.19 | 1520 |
 | crates/aipl-codegen/src/unescape | 6 | 528 | 352 | 10330 | 8116 | 7.00 | 93.62 | 1456 |
-| crates/aipl-codegen/src/walker | 100352 | 23657317 | 865728 | 69331489 | 15782480 | 13691.00 | 34559.68 | 10816 |
+| crates/aipl-codegen/src/walker | 100363 | 23657845 | 865728 | 69319663 | 15782224 | 13826.00 | 37863.32 | 10784 |
 | crates/aipl-mono/src/builtin_all | 1 | 32 | 32 | 1378 | 3444 | 3.00 | 84.19 | 1472 |
 | crates/aipl-mono/src/builtin_any | 1 | 32 | 32 | 1160 | 3336 | 3.00 | 83.99 | 1472 |
 | crates/aipl-mono/src/builtin_count | 1 | 104 | 104 | 1628 | 2292 | 3.00 | 82.53 | 1440 |

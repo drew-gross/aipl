@@ -19777,7 +19777,12 @@ fn compile_expr_inner<M: Module>(
             )?
         }
         ExprKind::LetMut(name, ty, value, body) => {
+            let before = scope_depth(scopes);
             let (v, actual) = compile_expr(module, builder, cx, scopes, value)?;
+            // Whether the value, evaluated, is a fresh temporary this binding
+            // owns outright — what a `__move` of a binding hands over when the
+            // binding held a reference of its own (see `Callee::Move`).
+            let value_is_owned_temp = owned_temp_since(scopes, before, v);
             // The `let`'s annotation rides on `Expr`, which both sides of
             // monomorphization share, so it is abstract; by the time codegen
             // reads it every variable in it has been substituted.
@@ -19810,7 +19815,17 @@ fn compile_expr_inner<M: Module>(
             // `mut y = __move(x)`: another binding's value at its last use
             // (`aipl_mono::move_last_use`), handed over as a fresh temporary —
             // owned like a moved-in parameter, and made unique like one below.
-            let moved_binding = matches!(&value.kind, ExprKind::Call(Callee::Move, _, _));
+            //
+            // Only if the move did hand a reference over. A `__move` of a binding
+            // that holds none of its own — one that reads through another
+            // binding's slot, as an inlined `{ mut out = ..; out }` does — is a
+            // plain read, and the new binding then shares the block with the slot
+            // that still owns it. Treating that as an owned, exclusive block lets
+            // `push` grow it in place and move it, leaving the other owner
+            // holding a stale pointer and the moved block with a reference too
+            // many: the block leaks, and the old address is released.
+            let moved_binding =
+                matches!(&value.kind, ExprKind::Call(Callee::Move, _, _)) && value_is_owned_temp;
             let fresh_literal = moved_binding
                 || match &t {
                     // A reserved-capacity array (`map`'s pre-sized output) is

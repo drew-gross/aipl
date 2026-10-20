@@ -25,14 +25,14 @@ deallocations     2
 reallocations     0
 bytes allocated   88
 peak live bytes   88
-instructions      639
-binary size       3280 bytes (code 1420, data 335, metadata 1525)
+instructions      637
+binary size       3128 bytes (code 1344, data 335, metadata 1449)
 
 function               calls  code bytes
 __eq_i64$arr               3         264
-__test$extended            1        1048
-aipl_arr_inc               3    external
-aipl_array_dec             3    external
+__test$extended            1         972
+aipl_arr_inc               4    external
+aipl_array_dec             4    external
 aipl_assert                3    external
 aipl_test_begin            1    external
 aipl_test_end              1    external

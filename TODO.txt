@@ -213,7 +213,6 @@ lsp:
   IT'S SOOOO SLOW!!!!
 
 bugs:
-  Fix the pre-existing leak: a chain like [1].repeat(64).grown(7).grown(7).grown(7), where grown is a user function that pushes, reported 4 allocations against 3 deallocations. I didn't investigate it.
   main should return u8 since that's what OSes use
   An inlined fn wrapped() -> u8[]? { some([200, 1]) } makes wrapped().value_or([]) fail in monomorphization with "conflicting types for T: i64[] vs u8[]". The build without my changes fails the same way.
   An array literal used as an extend source isn't fitted to the receiver's type: set xs.extend([100000, -1]) on an i32[] is rejected by the checker

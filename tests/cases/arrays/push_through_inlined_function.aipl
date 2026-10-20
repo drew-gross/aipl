@@ -1,0 +1,30 @@
+# A function that pushes onto its parameter, called on an array another binding's
+# slot still owns. `grown` is inlined into `main`, so its `mut next = self` reads
+# the array out of the inlined `repeat`'s `mut out` slot — a binding that holds no
+# reference of its own to hand over. That used to be taken for a moved, exclusive
+# block, so `push` grew it in place (and, since `repeat` sizes its result exactly,
+# moved it with `realloc`): `out`'s slot was left holding the old address and the
+# new block a reference too many, which leaked it. The leak gate is what fails if
+# that comes back; the output only shows the program still computes the answer.
+
+import { len, print, push, repeat, to_str } from builtins;
+
+fn grown(self: i64[], x: i64) -> i64[] {
+    mut next = self; #[allow]
+    set next.push(x);
+    next
+}
+
+fn main() !prints {
+    print(to_str([1].repeat(64).len()));
+    print(to_str([1].repeat(64).grown(7).len()));
+    print(to_str([1].repeat(64).grown(7).grown(8).grown(9).len()));
+    let xs = [1].repeat(2);
+    let ys = xs.grown(7);
+    print(to_str(ys.len()));
+}
+--- stdout ---
+64
+65
+67
+3
