@@ -206,6 +206,7 @@ pub enum Callee {
     Sort,
     SortBy,
     Repeat,
+    With,
 
     // ---- operator impls: `import { wrapping_add as + } from builtins;` ----
     // Importable like the rest, by name (`import { concat }` then `concat(a, b)`)
@@ -449,6 +450,7 @@ impl Callee {
         Callee::Sort,
         Callee::SortBy,
         Callee::Repeat,
+        Callee::With,
         // The operator impls: every arm an operator spelling can resolve to.
         Callee::WrappingAdd,
         Callee::SaturatingAdd,
@@ -631,6 +633,7 @@ impl Callee {
             Callee::Sort => "__builtin_sort",
             Callee::SortBy => "__builtin_sort_by",
             Callee::Repeat => "__builtin_repeat",
+            Callee::With => "__builtin_with",
 
             Callee::WrappingAdd => "__builtin_wrapping_add",
             Callee::SaturatingAdd => "__builtin_saturating_add",

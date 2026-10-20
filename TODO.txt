@@ -323,7 +323,11 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
-  matrices/2d arrays
+  matrices:
+    probably do T[,] syntax for declaring the type, and v[i, j] syntax for accessing.
+    [[1, 2], [3, 4]] syntax for literals, but fail to compile for jagged
+    no named operator for matmul probably, user can import matmul as * if they want
+    option to put the shape in the type e.g. T[5,] or T[5,10] (make this work for 1d too? i.e. T[5])
   let/match refines scrutinee in remaining arms
   Unicode support
   i64 without 0 should work

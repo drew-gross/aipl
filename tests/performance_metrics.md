@@ -92,6 +92,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/arrays/sum_and_len | 0 | 0 | 0 | 295 | 600 | 3.00 | 79.74 | 1440 |
 | cases/arrays/to_str_arrays | 9 | 288 | 304 | 2175 | 4524 | 11.00 | 80.81 | 1520 |
 | cases/arrays/tuple_windows | 19 | 920 | 338 | 2133 | 6104 | 15.00 | 129.15 | 1536 |
+| cases/arrays/with | 6 | 173 | 189 | 2032 | 4712 | 9.00 | 258.02 | 1504 |
 | cases/bindings/let/let_binding_basic | 0 | 0 | 0 | 28 | 172 | 2.00 | 76.28 | 1440 |
 | cases/bindings/let/let_binding_chain | 0 | 0 | 0 | 28 | 172 | 2.00 | 77.76 | 1456 |
 | cases/bindings/let/let_binding_scoping | 0 | 0 | 0 | 28 | 172 | 2.00 | 77.34 | 1456 |
@@ -768,6 +769,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_union_all | 51 | 2181 | 1860 | 3288 | 8768 | 9.00 | 87.28 | 1472 |
 | crates/aipl-mono/src/builtin_value_or | 0 | 0 | 0 | 591 | 2352 | 2.00 | 88.62 | 1424 |
 | crates/aipl-mono/src/builtin_value_or_err | 0 | 0 | 0 | 966 | 4680 | 2.00 | 89.41 | 1424 |
+| crates/aipl-mono/src/builtin_with | 11 | 435 | 392 | 3564 | 6392 | 7.00 | 89.16 | 1536 |
 | examples/arrays | 3 | 168 | 168 | 900 | 1160 | 2.00 | 79.12 | 1440 |
 | examples/hello | 0 | 0 | 0 | 25579118 | 184 | 2953.00 | 76.76 | 1408 |
 | examples/imports | 0 | 0 | 0 | 12 | 60 | 0.00 | 76.75 | 1408 |

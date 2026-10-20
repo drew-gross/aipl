@@ -7883,6 +7883,7 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::JoinIsEmpty, "builtin_join_is_empty.aipl"),
     (Callee::Reduce, "builtin_reduce.aipl"),
     (Callee::Repeat, "builtin_repeat.aipl"),
+    (Callee::With, "builtin_with.aipl"),
     (Callee::MapReduce, "builtin_map_reduce.aipl"),
     (Callee::FilterMapReduce, "builtin_filter_map_reduce.aipl"),
     (Callee::SplitMap, "builtin_split_map.aipl"),

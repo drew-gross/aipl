@@ -1,0 +1,23 @@
+# `with` replaces one element of an array, as a new array: `xs.with(i, v)` is
+# `some(copy)` when `i` is in range and `none` when it is not. Arrays have no
+# element assignment because a write past the end has nowhere to go; this is the
+# version that answers.
+
+import { print, to_str, value_or, with } from builtins;
+
+fn main() !prints {
+    let xs = [10, 20, 30];
+    print(to_str(xs.with(1, 99)));
+    print(to_str(xs.with(3, 99)));
+    // Updating a variable: a write that missed leaves the array as it was.
+    mut ys = xs;
+    set ys = ys.with(0, 1).value_or(ys);
+    set ys = ys.with(7, 2).value_or(ys);
+    print(to_str(ys));
+    print(to_str(xs));
+}
+--- stdout ---
+some([10, 99, 30])
+none
+[1, 20, 30]
+[10, 20, 30]
