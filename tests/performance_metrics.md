@@ -92,6 +92,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/arrays/str_array | 6 | 576 | 576 | 1013 | 2876 | 4.00 | 84.10 | 1472 |
 | cases/arrays/sum_and_len | 0 | 0 | 0 | 295 | 600 | 3.00 | 79.74 | 1440 |
 | cases/arrays/to_str_arrays | 9 | 288 | 304 | 2175 | 4524 | 11.00 | 80.81 | 1520 |
+| cases/arrays/try_with | 3 | 1075 | 1075 | 15847 | 1876 | 6.00 | 281.79 | 1472 |
 | cases/arrays/tuple_windows | 19 | 920 | 338 | 2133 | 6104 | 15.00 | 129.15 | 1536 |
 | cases/arrays/with | 6 | 189 | 189 | 1412 | 3536 | 7.00 | 233.93 | 1488 |
 | cases/arrays/with_in_place | 4 | 1603 | 1603 | 23937 | 2588 | 7.00 | 180.39 | 1472 |
@@ -365,6 +366,8 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/lints/union_loop_union_all_not_flagged | 100 | 3139 | 1419 | 10832 | 12900 | 25.00 | 111.31 | 1504 |
 | cases/lints/unused_import_allow | 0 | 0 | 0 | 17 | 148 | 4.00 | 82.75 | 1488 |
 | cases/lints/value_or_compare_allow | 6 | 124 | 124 | 279 | 1120 | 7.00 | 85.11 | 1488 |
+| cases/lints/with_value_or_self_allow | 4 | 152 | 152 | 1482 | 4200 | 3.00 | 135.22 | 1488 |
+| cases/lints/with_value_or_self_not_flagged | 4 | 104 | 104 | 1221 | 4048 | 3.00 | 85.13 | 1488 |
 | cases/loops/for_body_without_tail_expr | 0 | 0 | 0 | 665 | 628 | 2.00 | 78.21 | 1440 |
 | cases/loops/for_index | 17 | 865 | 394 | 968 | 2064 | 14.00 | 83.98 | 1488 |
 | cases/loops/for_loop_count_specific_char | 0 | 0 | 0 | 390 | 444 | 2.00 | 79.33 | 1456 |

@@ -98,6 +98,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  if callee.name() != names.value_or -> this should just compare directly to the ValueOr builtin enum. Maybe this needs to move linting after name resolution?
   rename prints effect to print
   assign_stmt could be DRYed up probably
   let_stmt could use a Maybe(Then([])) for when it is typed let?
@@ -407,7 +408,6 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
-  try_with (like with but no-op on OOB). Lint requests to use v.try_with(...) instead of v.with(...).value_or(v), replaces __with_or_self
   zip
   int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html
   map on a set is a bit of a weird operation, I feel like I should come up with a name for it (what if the pred isn't injective?)

@@ -1,0 +1,22 @@
+# The squelch: the longhand stays when it is wanted, and the rewrite agrees with it.
+
+import { equal as ==, try_with, value_or, with } from builtins;
+
+fn longhand(xs: i64[], i: u64) -> i64[] {
+    xs.with(i, 9).value_or(xs) #[allow]
+}
+
+fn rewritten(xs: i64[], i: u64) -> i64[] { xs.try_with(i, 9) }
+
+// A field path off a binding is the same place.
+struct Board { cells: i64[] }
+
+fn on_field(b: Board) -> i64[] { b.cells.with(0, 7).value_or(b.cells) } #[allow]
+
+fn agree() {}.test({
+    assert(longhand([1, 2, 3], 1) == rewritten([1, 2, 3], 1));
+    assert(longhand([1, 2, 3], 5) == rewritten([1, 2, 3], 5));
+    assert(longhand([1, 2, 3], 1) == [1, 9, 3]);
+    assert(rewritten([1, 2, 3], 7) == [1, 2, 3]);
+    assert(on_field(Board { cells: [4, 5] }) == [7, 5]);
+})

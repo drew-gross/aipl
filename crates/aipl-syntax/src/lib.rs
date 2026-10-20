@@ -3236,6 +3236,13 @@ fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
 // keeps `xs` alive for the fallback, and so copies; write `xs.with(i, v)` where
 // `xs` is not read again to avoid the copy. Not for a `str`.
 fn __builtin_with<T: any>(self: T[], index: u64, value: T) -> T[]? { none }
+// `self` with the element at `index` replaced by `value`, or `self` unchanged when
+// `index` is past the end: the write that misses does nothing, as removing a key
+// that is not there does nothing. Reach for `with` instead when the miss should be
+// told apart. This is the form that reads `self` once, so it writes in place
+// whenever `with` would — `xs.with(i, v).value_or(xs)` reads `xs` again for the
+// fallback and so never can. Not for a `str`.
+fn __builtin_try_with<T: any>(self: T[], index: u64, value: T) -> T[] { self }
 // NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
 // `join_is_nonempty`, `join_is_empty`, `reduce`, `repeat`, `map_reduce`, `filter_map_reduce`, `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
@@ -3308,8 +3315,6 @@ fn __aipl_concat(a: str, b: str) -> str { "" }
 // thing in the body seeds the generator it reads: `__random_seed` with a given
 // seed, `__random_seed_from_clock` with the (shimmable) clock. The generator's one
 // word of state is saved and restored with the shim, so a shim nests.
-// Internal: `xs.with(i, v).value_or(xs)`, which reads `xs` once.
-fn __with_or_self<T: any>(self: T[], index: u64, value: T) -> T[] { self }
 fn __random_next() -> u64 { 0 }
 fn __random_seed(seed: u64) {}
 fn __random_seed_from_clock() !clock {}

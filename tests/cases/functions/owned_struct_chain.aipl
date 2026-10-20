@@ -10,11 +10,12 @@
 # - a struct parameter whose uses are all calls, field reads of non-heap fields, or
 #   the value returned, may be owned (`param_forwarded`), not only one that reads
 #   each field once;
-# - `xs.with(i, v).value_or(xs)` reads `xs` once (`fuse_with_or_self`);
+# - `try_with` reads its array once (`xs.with(i, v).value_or(xs)` reads `xs` twice,
+#   and so never writes in place);
 # - a `mut` struct binding that the body moves out of is taken from, not copied;
 # - a test that only looks into an array field (`board.cells[i]`) holds nothing.
 
-import { equal as ==, print, repeat, saturating_remainder as %, value_or, with } from builtins;
+import { equal as ==, print, repeat, saturating_remainder as %, try_with } from builtins;
 
 variant Cell = Empty | Flag
 
@@ -25,7 +26,7 @@ fn is_flag(self: Board, at: u64) -> bool { self.cells[at] == some(Flag) }
 fn is_empty(self: Board, at: u64) -> bool { self.cells[at] == some(Empty) }
 
 fn marked(self: Board, at: u64, cell: Cell) -> Board {
-    let cells = self.cells.with(at, cell).value_or(self.cells);
+    let cells = self.cells.try_with(at, cell);
     Board { ..self, cells }
 }
 

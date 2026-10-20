@@ -618,7 +618,7 @@ fn mark(
         ExprKind::Call(callee, args, _) => {
             let user = matches!(callee, Callee::User(f) if !mutating.contains(f));
             // `with` consumes its array (argument 0) to write into it.
-            let takes_array = matches!(callee, Callee::With | Callee::WithOrSelf);
+            let takes_array = matches!(callee, Callee::With | Callee::TryWith);
             // Arguments are evaluated left to right, and each is handed over
             // only once all of them are — but a later argument that reads the
             // binding is a later use all the same.

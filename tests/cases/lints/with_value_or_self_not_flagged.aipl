@@ -1,0 +1,28 @@
+# Near misses: a fallback that is not the array being written into says something
+# else, and so does one that is not a plain place.
+
+import { equal as ==, value_or, with } from builtins;
+
+// A different array: not "leave it alone".
+fn other(xs: i64[], ys: i64[]) -> i64[] { xs.with(0, 9).value_or(ys) }
+
+// An empty fallback, for an index known to be in range.
+fn known_in_range(xs: i64[]) -> i64[] { xs.with(0, 9).value_or([]) }
+
+// A fallback that is computed is not the receiver read again.
+fn computed(xs: i64[]) -> i64[] { xs.with(0, 9).value_or(xs[..1]) }
+
+// A field of something else.
+struct Pair { a: i64[], b: i64[] }
+
+// `with` on its own, and `value_or` on something else.
+fn plain(xs: i64[]) -> i64[]? { xs.with(0, 9) }
+
+fn agree() {}.test({
+    assert(other([1], [2]) == [9]);
+    assert(known_in_range([1]) == [9]);
+    assert(computed([1, 2]) == [9, 2]);
+    assert(plain([]) == none);
+    let p = Pair { a: [1], b: [2] }; #[allow]
+    assert(p.a.with(0, 9).value_or(p.b) == [9]);
+})

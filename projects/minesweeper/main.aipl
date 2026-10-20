@@ -32,9 +32,8 @@ import {
     split,
     to_set,
     trim,
-    value_or,
+    try_with,
     value_or_err,
-    with,
     wrapping_add as +,
     wrapping_mul as *,
     wrapping_sub as -,
@@ -110,7 +109,7 @@ fn is_flagged(self: Game, cell: u64) -> bool { self.marks[cell] == some(Flagged)
 # `self` with `cell` marked as `mark`. A cell off the board has nothing to mark, so
 # the game comes back as it was.
 fn marked(self: Game, cell: u64, mark: Mark) -> Game {
-    let marks = self.marks.with(cell, mark).value_or(self.marks);
+    let marks = self.marks.try_with(cell, mark);
     Game { ..self, marks }
 }.test({
     let game = new_game(2, 2, []);

@@ -6,20 +6,15 @@
 # When nobody else holds the array it is written in place and handed back (see
 # `with_in_place` for the allocation counts); otherwise the original is untouched.
 
-import { equal as ==, print, reverse, to_str, value_or, with } from builtins;
+import { equal as ==, print, reverse, to_str, try_with, with } from builtins;
 
 variant Cell = Mark(i64) | Blank
 
-fn replaced(xs: i64[], i: u64, v: i64) -> i64[] { xs.with(i, v).value_or(xs) }.test({
-    assert(replaced([1, 2, 3], 1, 9) == [1, 9, 3]);
+fn basics() {}.test({
+    assert([1, 2, 3].with(1, 9) == some([1, 9, 3]));
     // The ends.
-    assert(replaced([1, 2, 3], 0, 9) == [9, 2, 3]);
-    assert(replaced([1, 2, 3], 2, 9) == [1, 2, 9]);
-
-    // `value_or` of the receiver itself reads it once (`__with_or_self`): a write
-    // that misses answers the array unchanged.
-    assert(replaced([1, 2, 3], 3, 9) == [1, 2, 3]);
-    assert(replaced([], 0, 9) == []);
+    assert([1, 2, 3].with(0, 9) == some([9, 2, 3]));
+    assert([1, 2, 3].with(2, 9) == some([1, 2, 9]));
     // Past the end, and an empty receiver: nothing to replace.
     assert([1, 2, 3].with(3, 9) == none);
     assert([1, 2, 3].with(100, 9) == none);
@@ -59,10 +54,12 @@ fn main() !prints {
     let xs = [10, 20, 30];
     print(to_str(xs.with(1, 99)));
     print(to_str(xs.with(3, 99)));
-    // Updating a variable: a write that missed leaves the array as it was.
+
+    // Updating a variable: a write that missed leaves the array as it was, which
+    // is what `try_with` says directly.
     mut ys = xs;
-    set ys = ys.with(0, 1).value_or(ys);
-    set ys = ys.with(7, 2).value_or(ys);
+    set ys = ys.try_with(0, 1);
+    set ys = ys.try_with(7, 2);
     print(to_str(ys));
     print(to_str(xs));
 }

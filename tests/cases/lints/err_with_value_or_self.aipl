@@ -1,0 +1,25 @@
+# `xs.with(i, v).value_or(xs)` falls back to the array the write was made into —
+# `xs.try_with(i, v)`, which reads `xs` once and so can write in place.
+
+import { value_or, with } from builtins;
+
+fn local(xs: i64[]) -> i64[] { xs.with(1, 9).value_or(xs) }
+
+fn free_call(xs: i64[]) -> i64[] { value_or(with(xs, 2, 5), xs) }
+
+fn main() {
+    local([1, 2, 3]);
+    free_call([6, 7, 8]);
+}
+--- errors ---
+error: this `value_or` falls back to the array it is replacing in — write "xs.try_with(..)" and drop the fallback, importing `try_with` from builtins (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_with_value_or_self.aipl:6:55
+  |
+6 | fn local(xs: i64[]) -> i64[] { xs.with(1, 9).value_or(xs) }
+  |                                                       ^^
+
+error: this `value_or` falls back to the array it is replacing in — write "xs.try_with(..)" and drop the fallback, importing `try_with` from builtins (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_with_value_or_self.aipl:8:61
+  |
+8 | fn free_call(xs: i64[]) -> i64[] { value_or(with(xs, 2, 5), xs) }
+  |                                                             ^^

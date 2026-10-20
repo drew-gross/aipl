@@ -207,6 +207,7 @@ pub enum Callee {
     SortBy,
     Repeat,
     With,
+    TryWith,
 
     // ---- operator impls: `import { wrapping_add as + } from builtins;` ----
     // Importable like the rest, by name (`import { concat }` then `concat(a, b)`)
@@ -307,9 +308,6 @@ pub enum Callee {
     DictValueAt,
     /// `__random_next()`: the generator a `shim random <provider>` installs as
     /// `random_u64` — a runtime entry point, never called from source (the parser).
-    /// `__with_or_self(xs, i, v) -> T[]`: `with`, answering `xs` itself when `i` is
-    /// past the end (mono's `fuse_with_or_self`, for `xs.with(i, v).value_or(xs)`).
-    WithOrSelf,
     RandomNext,
     /// `__random_seed(seed)`: start the sequence at `seed` (the parser, as the first
     /// thing in a `shim random seeded_with_int(seed)` body).
@@ -454,6 +452,7 @@ impl Callee {
         Callee::SortBy,
         Callee::Repeat,
         Callee::With,
+        Callee::TryWith,
         // The operator impls: every arm an operator spelling can resolve to.
         Callee::WrappingAdd,
         Callee::SaturatingAdd,
@@ -503,7 +502,6 @@ impl Callee {
         Callee::SplitIter,
         Callee::DictKeyAt,
         Callee::DictValueAt,
-        Callee::WithOrSelf,
         Callee::RandomNext,
         Callee::RandomSeed,
         Callee::RandomSeedFromClock,
@@ -616,7 +614,6 @@ impl Callee {
             Callee::ListFiles => "__builtin_list_files",
             Callee::ReadLine => "__builtin_read_line",
             Callee::RandomU64 => "__builtin_random_u64",
-            Callee::WithOrSelf => "__with_or_self",
             Callee::RandomNext => "__random_next",
             Callee::RandomSeed => "__random_seed",
             Callee::RandomSeedFromClock => "__random_seed_from_clock",
@@ -639,6 +636,7 @@ impl Callee {
             Callee::SortBy => "__builtin_sort_by",
             Callee::Repeat => "__builtin_repeat",
             Callee::With => "__builtin_with",
+            Callee::TryWith => "__builtin_try_with",
 
             Callee::WrappingAdd => "__builtin_wrapping_add",
             Callee::SaturatingAdd => "__builtin_saturating_add",

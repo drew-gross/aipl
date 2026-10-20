@@ -45,6 +45,7 @@ mod step_by_one;
 mod union_loop_union_all;
 mod unused_imports;
 mod value_or_compare;
+mod with_value_or_self;
 
 use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
 use crate::{each_expr, each_subexpr, Error, Span};
@@ -85,6 +86,7 @@ use self::step_by_one::{matching_steps, step_by_one};
 use self::union_loop_union_all::{union_loop_union_all, union_names};
 use self::unused_imports::unused_imports;
 use self::value_or_compare::{value_or_compare, value_or_compare_names};
+use self::with_value_or_self::{with_names, with_value_or_self};
 
 /// Run every lint over `program` — function bodies, `.test` blocks, and
 /// keyword-parameter / struct-field default expressions — then drop the
@@ -238,6 +240,14 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     each_expr(program, &mut |e| {
         is_empty_longhand(e, src, &empties, &mut hits)
     });
+    // `xs.with(i, v).value_or(xs)` is `xs.try_with(i, v)`; only where `with` and
+    // `value_or` are the builtins — see `with_names`, which also names the
+    // `try_with` import when it is missing.
+    if let Some(names) = with_names(program) {
+        each_expr(program, &mut |e| {
+            with_value_or_self(e, src, &names, &mut hits)
+        });
+    }
     unused_imports(program, &mut hits);
     destructure_binding(program, &mut hits);
     destructure_param(program, &mut hits);
