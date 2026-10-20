@@ -42,6 +42,9 @@ pub use fold_lengths::fold_lengths;
 mod lower_reductions;
 pub use lower_reductions::lower_reductions;
 
+mod fuse_try_with;
+pub use fuse_try_with::{fuse_try_with, fuse_try_with_post_mono};
+
 mod counting_variants;
 pub use counting_variants::counting_variants;
 

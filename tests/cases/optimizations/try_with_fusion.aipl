@@ -1,0 +1,68 @@
+# `xs.with(i, v).value_or(xs)` is `xs.try_with(i, v)` — the same answer with the
+# receiver read once, so the write can happen in place. The lint `with_value_or_self`
+# steers source to the short spelling; the optimizer fuses the longhand regardless,
+# including where only inlining makes the fallback the receiver (`same(xs)` here is
+# `xs` once `same` is inlined). The pinned report is the claim: three hundred
+# updates, a hundred through each spelling, allocate the three arrays once.
+
+import {
+    equal as ==,
+    logical_and as &&,
+    print,
+    repeat,
+    saturating_remainder as %,
+    to_str,
+    value_or,
+    with,
+} from builtins;
+
+struct Board { cells: i64[] }
+
+fn same(xs: i64[]) -> i64[] { xs }
+
+fn holds(Board { cells }, xs: i64[]) -> bool { cells == xs }
+
+fn direct(xs: i64[], i: u64) -> i64[] { xs.with(i, 7).value_or(xs) } #[allow]
+
+fn through_a_call(xs: i64[], i: u64) -> i64[] { xs.with(i, 7).value_or(same(xs)) }
+
+fn on_a_field(b: Board, i: u64) -> Board { cells: b.cells.with(i, 7).value_or(b.cells) } #[allow]
+
+fn main() !prints {
+    mut a: i64[] = [0].repeat(64);
+    mut b: i64[] = [0].repeat(64);
+    mut c = Board { cells: [0].repeat(64) };
+    for (let i : 0..100) {
+        set a = direct(a, i % 64);
+        set b = through_a_call(b, i % 64);
+        set c = on_a_field(c, i % 64);
+    }
+    // A miss changes nothing, whichever way it is written.
+    print(to_str(direct([1, 2], 5) == [1, 2]));
+    print(to_str(through_a_call([1, 2], 5) == [1, 2]));
+    print(to_str(holds(on_a_field(Board { cells: [1, 2] }, 5), [1, 2])));
+    print(to_str(a == b && holds(c, b)));
+}
+--- stdout ---
+true
+true
+true
+true
+--- report ---
+allocations       10
+deallocations     10
+reallocations     0
+bytes allocated   3248
+peak live bytes   3248
+instructions      48811
+binary size       7360 bytes (code 4848, data 62, metadata 2450)
+
+function                  calls  code bytes
+__builtin_repeat$i64          3         532
+__eq_i64$arr                  5         264
+__to_str_bool                 4         224
+aipl_arr_inc                504    external
+aipl_array_dec              908    external
+aipl_shim_get                 4    external
+aipl_write_bytes              4    external
+main                          1        3828

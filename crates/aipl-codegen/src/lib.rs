@@ -2694,6 +2694,10 @@ fn compile_program<M: Module>(
             let effectful = effectful.clone();
             move |program, scope| aipl_mono::sink_bindings(program, &effectful, scope)
         }),
+        // `xs.with(i, v).value_or(xs)` is `xs.try_with(i, v)`, which reads `xs`
+        // once and so can write in place. After inlining, which is what leaves the
+        // receiver and the fallback as two aliases of one place.
+        Pass::whole_program("fuse_try_with", aipl_mono::fuse_try_with),
     ];
     let rounds = optimization_rounds();
     let folded = aipl_mono::passes::optimize(checked, &pre_mono, rounds, dbg);
@@ -2783,6 +2787,12 @@ fn compile_program<M: Module>(
             let effectful = effectful.clone();
             move |program, scope| aipl_mono::sink_bindings_post_mono(program, &effectful, scope)
         }),
+        // The same fusion once `value_or` has been instantiated and inlined, when
+        // the call is the `match` it stands for. After the inlining that makes it.
+        Pass::whole_program(
+            "fuse_try_with_post_mono",
+            aipl_mono::fuse_try_with_post_mono,
+        ),
     ];
     let program = &aipl_mono::passes::optimize(monomorphized, &post_mono, rounds, dbg);
 

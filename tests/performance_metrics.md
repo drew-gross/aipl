@@ -366,7 +366,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/lints/union_loop_union_all_not_flagged | 100 | 3139 | 1419 | 10832 | 12900 | 25.00 | 111.31 | 1504 |
 | cases/lints/unused_import_allow | 0 | 0 | 0 | 17 | 148 | 4.00 | 82.75 | 1488 |
 | cases/lints/value_or_compare_allow | 6 | 124 | 124 | 279 | 1120 | 7.00 | 85.11 | 1488 |
-| cases/lints/with_value_or_self_allow | 4 | 152 | 152 | 1482 | 4200 | 3.00 | 135.22 | 1488 |
+| cases/lints/with_value_or_self_allow | 4 | 152 | 152 | 1239 | 2660 | 2.00 | 220.89 | 1456 |
 | cases/lints/with_value_or_self_not_flagged | 4 | 104 | 104 | 1221 | 4048 | 3.00 | 85.13 | 1488 |
 | cases/loops/for_body_without_tail_expr | 0 | 0 | 0 | 665 | 628 | 2.00 | 78.21 | 1440 |
 | cases/loops/for_index | 17 | 865 | 394 | 968 | 2064 | 14.00 | 83.98 | 1488 |
@@ -451,6 +451,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/optimizations/subst_single_use_binding | 7 | 150 | 115 | 831 | 2900 | 8.00 | 84.54 | 1504 |
 | cases/optimizations/to_str_len_fusion | 22 | 1234 | 1234 | 768 | 3296 | 12.00 | 81.57 | 1488 |
 | cases/optimizations/to_str_len_fusion_effects | 2 | 38 | 38 | 105 | 892 | 5.00 | 79.79 | 1488 |
+| cases/optimizations/try_with_fusion | 10 | 3248 | 3248 | 48811 | 4848 | 12.00 | 187.96 | 1488 |
 | cases/optimizations/value_or_default_sinks | 5 | 228 | 210 | 203 | 1028 | 5.00 | 81.10 | 1504 |
 | cases/options/if_else_with_none_branch | 0 | 0 | 0 | 51 | 288 | 2.00 | 99.40 | 1440 |
 | cases/options/is_some_and | 0 | 0 | 0 | 51 | 260 | 1.00 | 77.66 | 1408 |
