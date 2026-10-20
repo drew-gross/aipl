@@ -5221,7 +5221,56 @@ impl Cx<'_> {
     /// "Literal" reaches through the value-passing constructs (a block's tail,
     /// an `if`/`match` whose arms are all literals) — see
     /// [`aipl_syntax::flex_int_values`].
+    /// A tuple literal flexes slot by slot into the tuple it is written for
+    /// (`let cell: (u64, u64) = (1, 0)`), alone or as the elements of an array
+    /// literal. Locks what it fitted and says whether it fitted anything.
+    fn flex_tuples(&self, e: &Expr, target: &Type) -> Result<bool, Error> {
+        let fits = |elem: &Expr, slot: &Type| {
+            aipl_syntax::flex_fit(elem, &Type::Unit, slot).map_err(|(v, name)| {
+                Error::at(
+                    format!("integer literal {v} does not fit in {name}"),
+                    elem.span.clone(),
+                )
+            })
+        };
+        match (&e.kind, target) {
+            (ExprKind::TupleLit(elems), _) => {
+                let Some(slots) = self.tuple_elems(target) else {
+                    return Ok(false);
+                };
+                if elems.len() != slots.len() {
+                    return Ok(false);
+                }
+                let mut flexed = false;
+                for (elem, slot) in elems.iter().zip(&slots) {
+                    flexed |= fits(elem, slot)?.is_some() || self.flex_tuples(elem, slot)?;
+                }
+                if flexed {
+                    self.lock_node(node_id(e), target);
+                    for (elem, slot) in elems.iter().zip(&slots) {
+                        self.lock_flexed(elem, slot);
+                    }
+                }
+                Ok(flexed)
+            }
+            (ExprKind::ArrayLit(elems), Type::Array(inner)) => {
+                let mut flexed = false;
+                for elem in elems {
+                    flexed |= self.flex_tuples(elem, inner)?;
+                }
+                if flexed {
+                    self.lock_node(node_id(e), target);
+                }
+                Ok(flexed)
+            }
+            _ => Ok(false),
+        }
+    }
+
     fn flex_int(&self, e: &Expr, ety: &Type, other: &Type) -> Result<Type, Error> {
+        if self.flex_tuples(e, other)? {
+            return Ok(other.clone());
+        }
         match aipl_syntax::flex_fit(e, ety, other) {
             Ok(Some(t)) => {
                 self.lock_flexed(e, &t);
@@ -6282,6 +6331,12 @@ pub(crate) fn collect_args(
         .collect()
 }
 
+/// A tuple written out of integer literals, which flexes slot by slot as a bare
+/// literal does.
+pub(crate) fn is_int_pair(arg: &Expr) -> bool {
+    matches!(&arg.kind, ExprKind::TupleLit(slots) if slots.iter().all(|s| aipl_syntax::const_int(s).is_some()))
+}
+
 /// Whether `arg` is a bare integer literal landing in a slot that is *exactly* a
 /// type variable — the shape whose width the literal must not be the one to
 /// decide.
@@ -6298,7 +6353,7 @@ pub(crate) fn collect_args(
 /// a bare literal, and a concrete payload (`Literal(str)`) pins nothing anyway.
 pub(crate) fn literal_pins_nothing(arg: &Expr, pty: &Type, vars: &HashSet<&str>) -> bool {
     matches!(pty, Type::TypeVar(v) if vars.contains(v.as_str()))
-        && aipl_syntax::const_int(arg).is_some()
+        && (aipl_syntax::const_int(arg).is_some() || is_int_pair(arg))
 }
 
 pub(crate) fn collect_var_bindings(

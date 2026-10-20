@@ -1,13 +1,24 @@
 # A pair of numbers addresses a cell: `grid[cell]` is `grid[row, column]`, for
 # reading and for writing, so a cell can be passed around as one value.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str, value_or } from builtins;
 
 fn at(row: u64, column: u64) -> (u64, u64) { (row, column) }
+
+fn row_of(cell: (u64, u64)) -> u64 { cell.0 }
 
 fn main() !prints {
     mut grid: i64[,] = [[1, 2], [3, 4]];
     let cell = at(1, 0);
+    // A pair of literals takes the type it is written for.
+    let corner: (u64, u64) = (1, 1);
+    print(to_str(grid[corner]));
+    print(to_str(grid[(0, 0)]));
+    print(to_str(row_of((7, 8))));
+    // They flex in an array being compared, and as a default.
+    print(to_str([at(0, 1), at(2, 3)] == [(0, 1), (2, 3)]));
+    let none_at: (u64, u64)? = none;
+    print(to_str(none_at.value_or((4, 5))));
     print(to_str(grid[cell]));
     print(to_str(grid[at(0, 1)]));
     // Off the grid is `none`, as with two indexes.
@@ -19,6 +30,11 @@ fn main() !prints {
     print(to_str(grid));
 }
 --- stdout ---
+some(4)
+some(1)
+7
+true
+(4, 5)
 some(3)
 some(2)
 none

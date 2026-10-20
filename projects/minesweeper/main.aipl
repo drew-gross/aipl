@@ -74,10 +74,6 @@ fn place_mines(count: u64, cells: u64) !random -> u64[] {
     assert(shim random seeded_with_int(1) { place_mines(4, 4) }.to_set().len() == 4);
 })
 
-# The cell at `row`, `column`: a place on the board is that pair, counted from 0
-# at the top left.
-fn cell_at(row: u64, column: u64) -> (u64, u64) { (row, column) }
-
 # A board on a `width` by `height` board with mines at the cell numbers `mines`,
 # every cell hidden.
 fn new_game(width: u64, height: u64, mines: u64[]) -> Mark[,] {
@@ -102,10 +98,10 @@ fn is_mine(self: Mark[,], cell: (u64, u64)) -> bool {
         none => false, #[allow]
     }
 }.test({
-    let game = new_game(2, 2, [3]).toggle_flag(cell_at(1, 1)).reveal(cell_at(0, 0));
-    assert(game.is_mine(cell_at(1, 1)));
-    assert(!game.is_mine(cell_at(0, 0)));
-    assert(!game.is_mine(cell_at(4, 4)));
+    let game = new_game(2, 2, [3]).toggle_flag((1, 1)).reveal((0, 0));
+    assert(game.is_mine((1, 1)));
+    assert(!game.is_mine((0, 0)));
+    assert(!game.is_mine((4, 4)));
 })
 
 # The cells touching `cell`, including diagonally, that are on the board.
@@ -123,25 +119,25 @@ fn neighbors(self: Mark[,], cell: (u64, u64)) -> (u64, u64)[] {
             let c = column + left - 1;
             let on_board = r >= 1 && r <= self.height() && c >= 1 && c <= self.width();
             if (on_board && (up != 1 || left != 1)) {
-                set out.push(cell_at(r - 1, c - 1));
+                set out.push((r - 1, c - 1));
             };
         }
     }
     out
 }.test({
     let game = new_game(3, 3, []);
-    assert(game.neighbors(cell_at(0, 0)) == [cell_at(0, 1), cell_at(1, 0), cell_at(1, 1)]);
-    assert(game.neighbors(cell_at(1, 1)) == [
-        cell_at(0, 0),
-        cell_at(0, 1),
-        cell_at(0, 2),
-        cell_at(1, 0),
-        cell_at(1, 2),
-        cell_at(2, 0),
-        cell_at(2, 1),
-        cell_at(2, 2),
+    assert(game.neighbors((0, 0)) == [(0, 1), (1, 0), (1, 1)]);
+    assert(game.neighbors((1, 1)) == [
+        (0, 0),
+        (0, 1),
+        (0, 2),
+        (1, 0),
+        (1, 2),
+        (2, 0),
+        (2, 1),
+        (2, 2),
     ]);
-    assert(game.neighbors(cell_at(2, 2)) == [cell_at(1, 1), cell_at(1, 2), cell_at(2, 1)]);
+    assert(game.neighbors((2, 2)) == [(1, 1), (1, 2), (2, 1)]);
 })
 
 # How many of the cells touching `cell` hold a mine.
@@ -149,9 +145,9 @@ fn adjacent_mines(self: Mark[,], cell: (u64, u64)) -> u64 {
     self.neighbors(cell).count_if(|n| self.is_mine(n))
 }.test({
     let game = new_game(3, 3, [0, 2, 5]);
-    assert(game.adjacent_mines(cell_at(0, 1)) == 3);
-    assert(game.adjacent_mines(cell_at(1, 1)) == 3);
-    assert(game.adjacent_mines(cell_at(2, 0)) == 0);
+    assert(game.adjacent_mines((0, 1)) == 3);
+    assert(game.adjacent_mines((1, 1)) == 3);
+    assert(game.adjacent_mines((2, 0)) == 0);
 })
 
 # Reveal each cell of `frontier` that is still hidden and holds no mine, and
@@ -160,7 +156,7 @@ fn adjacent_mines(self: Mark[,], cell: (u64, u64)) -> u64 {
 fn flood(mut self: Mark[,], frontier: (u64, u64)[]) {
     mut pending = frontier;
     while (pending.is_nonempty()) {
-        let cell = pending[0].value_or(cell_at(0, 0));
+        let cell = pending[0].value_or((0, 0));
         set pending = pending.drop_first();
         match (self[cell]) {
             some(Hidden(mine)) => {
@@ -192,12 +188,12 @@ fn reveal(mut self: Mark[,], cell: (u64, u64)) {
 }.test({
     // A number stops at itself.
     let game = new_game(3, 3, [8]);
-    assert(game.reveal(cell_at(2, 1))[cell_at(2, 1)] == some(Revealed(false)));
-    assert(game.reveal(cell_at(2, 1))[cell_at(2, 0)] == some(Hidden(false)));
+    assert(game.reveal((2, 1))[(2, 1)] == some(Revealed(false)));
+    assert(game.reveal((2, 1))[(2, 0)] == some(Hidden(false)));
 
     // A region with no mines around it opens, border and all: here that is
     // every cell but the mine, so it wins.
-    assert(game.reveal(cell_at(0, 0)).status() == Won);
+    assert(game.reveal((0, 0)).status() == Won);
 })
 
 # `self` after the player flags `cell`, or takes the flag off it. A revealed cell
@@ -214,7 +210,7 @@ fn toggle_flag(mut self: Mark[,], cell: (u64, u64)) {
     };
 }.test({
     let game = new_game(2, 2, [3]);
-    let corner = cell_at(0, 0);
+    let corner: (u64, u64) = (0, 0);
     assert(game.toggle_flag(corner)[corner] == some(Flagged(false)));
     // Flagging twice takes the flag off again.
     assert(game.toggle_flag(corner).toggle_flag(corner)[corner] == some(Hidden(false)));
@@ -223,7 +219,7 @@ fn toggle_flag(mut self: Mark[,], cell: (u64, u64)) {
     // A revealed cell takes no flag.
     assert(game.reveal(corner).toggle_flag(corner)[corner] == some(Revealed(false)));
     // Off the board: nothing happens.
-    assert(game.toggle_flag(cell_at(9, 9)) == game);
+    assert(game.toggle_flag((9, 9)) == game);
 })
 
 # Whether the game is still going: lost once a mine is revealed, won once every
@@ -239,8 +235,8 @@ fn status(self: Mark[,]) -> Status {
 }.test({
     let game = new_game(2, 2, [3]);
     assert(game.status() == Playing);
-    assert(game.reveal(cell_at(1, 1)).status() == Lost);
-    assert(game.reveal(cell_at(0, 0)).reveal(cell_at(0, 1)).reveal(cell_at(1, 0)).status() == Won);
+    assert(game.reveal((1, 1)).status() == Lost);
+    assert(game.reveal((0, 0)).reveal((0, 1)).reveal((1, 0)).status() == Won);
 })
 
 # What is drawn for `cell`: `#` hidden, `F` flagged, `.` revealed with nothing
@@ -271,13 +267,13 @@ fn render(self: Mark[,], show_mines: bool) -> str {
     for (let row : 0..self.height()) {
         mut symbols: str[] = [];
         for (let column : 0..self.width()) {
-            set symbols.push(self.symbol(cell_at(row, column), show_mines));
+            set symbols.push(self.symbol((row, column), show_mines));
         }
         set lines.push(`{row} {symbols.join(sep=" ")}`);
     }
     lines.join(sep="\n")
 }.test({
-    let game = new_game(3, 2, [5]).reveal(cell_at(0, 0));
+    let game = new_game(3, 2, [5]).reveal((0, 0));
     assert(game.render(false) == """
           0 1 2
         0 . 1 #
@@ -309,7 +305,7 @@ fn parse_command(self: Mark[,], line: str) -> Command!str {
         let row = words.number(1)?;
         let column = words.number(2)?;
         if (row < self.height() && column < self.width()) {
-            let cell = cell_at(row, column);
+            let cell = (row, column);
             ok(if (verb == "r") { Reveal(cell) } else { Flag(cell) })
         } else {
             err("that is off the board")
@@ -319,8 +315,8 @@ fn parse_command(self: Mark[,], line: str) -> Command!str {
     }
 }.test({
     let game = new_game(3, 2, []);
-    assert(game.parse_command("r 1 2") == ok(Reveal(cell_at(1, 2))));
-    assert(game.parse_command("  f   0 1 ") == ok(Flag(cell_at(0, 1))));
+    assert(game.parse_command("r 1 2") == ok(Reveal((1, 2))));
+    assert(game.parse_command("  f   0 1 ") == ok(Flag((0, 1))));
     assert(game.parse_command("q") == ok(Quit));
     assert(game.parse_command("") == err("type r ROW COLUMN, f ROW COLUMN or q"));
     assert(game.parse_command("r 2 0") == err("that is off the board"));

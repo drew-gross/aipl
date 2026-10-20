@@ -4914,6 +4914,12 @@ impl Mono<'_> {
         // instances with the literal inlined (see `ParamSpec::drop_lit`).
         let mut lit_pinned: HashSet<String> = HashSet::new();
         for (_, pty, aty) in &deferred {
+            // A pair of literals flexes to a pair of integers, as a bare literal
+            // flexes to an integer.
+            let is_int_slots = |t: &Type| {
+                self.tuple_field_tys(t)
+                    .is_some_and(|slots| slots.iter().all(aipl_syntax::is_int_ty))
+            };
             // Unpinned: the literal is all there is, so it pins. Pinned to an
             // integer: the literal flexes to that width, which is the whole
             // point of deferring it. Pinned to anything else: flexing cannot
@@ -4922,7 +4928,10 @@ impl Mono<'_> {
             // to surface later against a synthesized binding.
             let flexes = !mentions_unbound(pty, &var_set, &map)
                 && var_set.iter().all(|v| {
-                    !ty_mentions(pty, v) || map.get(*v).is_some_and(aipl_syntax::is_int_ty)
+                    !ty_mentions(pty, v)
+                        || map
+                            .get(*v)
+                            .is_some_and(|t| aipl_syntax::is_int_ty(t) || is_int_slots(t))
                 });
             if !flexes {
                 // Recorded *before* binding: "nothing else reached it" is a
@@ -6445,8 +6454,18 @@ impl Mono<'_> {
             ExprKind::TupleLit(elems) => {
                 let mut elem_tys: Vec<Type> = Vec::with_capacity(elems.len());
                 let mut relems: Vec<Expr> = Vec::with_capacity(elems.len());
-                for e in elems {
+                // A literal slot takes the integer type the checker fitted the whole
+                // tuple to (`let cell: (u64, u64) = (1, 0)`).
+                let fitted = expr.ty.as_deref().and_then(|t| self.tuple_field_tys(t));
+                for (i, e) in elems.iter().enumerate() {
                     let (re, t) = self.infer(e, env)?;
+                    let slot = fitted.as_ref().and_then(|slots| slots.get(i));
+                    let t = match slot {
+                        Some(slot) if matches!(aipl_syntax::flex_fit(e, &t, slot), Ok(Some(_))) => {
+                            slot.clone()
+                        }
+                        _ => t,
+                    };
                     elem_tys.push(decay_concat(t));
                     relems.push(re);
                 }
@@ -7481,10 +7500,32 @@ impl Mono<'_> {
                         .map(|a| {
                             matches!(&a.kind, ExprKind::Num(_))
                                 || matches!(&a.kind, ExprKind::Neg(x) if matches!(x.kind, ExprKind::Num(_)))
+                                || check::is_int_pair(a)
                         })
                         .collect();
                     let (type_args, ret, lit_pinned) =
                         self.instantiate_types(name, &atys, &flexible, span.clone())?;
+                    // A pair of literals takes the integer types the instance gave
+                    // its parameter, as a bare literal does at the call.
+                    let slot_types: HashMap<String, Type> = self.generics[name]
+                        .sig
+                        .type_var_names()
+                        .into_iter()
+                        .zip(type_args.iter().cloned())
+                        .collect();
+                    for (i, a) in args.iter().enumerate() {
+                        let param = self.generics[name].sig.params.get(i).map(|p| p.ty.clone());
+                        let Some(param) = param.map(|t| subst_vars(&t, &slot_types)) else {
+                            continue;
+                        };
+                        if check::is_int_pair(a) && self.tuple_field_tys(&param).is_some() {
+                            let mut fitted = a.clone();
+                            fitted.ty = Some(Box::new(param));
+                            let (ra, t) = self.infer(&fitted, env)?;
+                            rargs[i] = ra;
+                            atys[i] = t;
+                        }
+                    }
                     // A method-style call is the same call with its receiver
                     // first, so the receiver can be moved in like any argument;
                     // `owned_eligible` itself declines the one receiver that
@@ -8346,6 +8387,14 @@ fn grid_call(callee: Callee, receiver: &Expr, pair: &Expr, rest: &[Expr], span: 
             span.clone(),
         )
     };
+    // A pair written out is its two cells already, and as arguments they take
+    // the index type, which a bound pair's `i64` literals could not.
+    if let ExprKind::TupleLit(cells) = &pair.kind {
+        let mut args = vec![receiver.clone()];
+        args.extend(cells.iter().cloned());
+        args.extend(rest.iter().cloned());
+        return Expr::new(ExprKind::Call(callee, args, false), span.clone());
+    }
     let bound = match &pair.kind {
         ExprKind::Ident(name) => name.clone(),
         _ => format!("$cell{}", span.start),
