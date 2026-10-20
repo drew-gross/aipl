@@ -4695,6 +4695,18 @@ impl Cx<'_> {
             // `[[1], [2]].join(sep=0)` is a single separator element, not a
             // shape error.
             let variadic = sig.params.get(i).is_some_and(|p| p.arity.is_variadic());
+            // A grid is walked by its cells, so `any` takes one as the array of
+            // them (monomorphization rewrites the receiver to `grid.cells`).
+            let aty = match &aty {
+                Type::Named(n)
+                    if *callee == Callee::Any && i == 0 && aipl_syntax::is_grid_instance(n) =>
+                {
+                    self.struct_fields(n)
+                        .and_then(|fields| fields.into_iter().find(|(f, _, _)| f == "cells"))
+                        .map_or(aty, |(_, cells, _)| cells)
+                }
+                _ => aty,
+            };
             // A `T+`'s literal argument takes the refinement its context offers
             // (see the concrete path above); with `T` still open the element
             // types are left to the ordinary synthesis.

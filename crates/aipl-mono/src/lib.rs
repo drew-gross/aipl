@@ -7250,6 +7250,23 @@ impl Mono<'_> {
                 {
                     return self.infer_generic_variant_ctor(name, args, env, &span);
                 }
+                // A grid is walked by its cells: `grid.any(pred)` is
+                // `grid.cells.any(pred)`, row by row.
+                if *callee == Callee::Any && args.len() == 2 {
+                    let (_, receiver) = self.infer(&args[0], env)?;
+                    if matches!(&receiver, Type::Named(n) if aipl_syntax::is_grid_instance(n)) {
+                        let cells = Expr::new(
+                            ExprKind::Field(Box::new(args[0].clone()), "cells".to_string()),
+                            args[0].span.clone(),
+                        );
+                        let rewritten = node(ExprKind::Call(
+                            callee.clone(),
+                            vec![cells, args[1].clone()],
+                            method_style,
+                        ));
+                        return self.infer(&rewritten, env);
+                    }
+                }
                 // Builtin `map`/`filter`: `map(arr, f)` and `arr.map(f)` fold to
                 // the same arg list `[arr, f]`, so one path serves both forms.
                 if *callee == Callee::Map {

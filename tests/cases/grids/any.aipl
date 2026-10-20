@@ -1,0 +1,22 @@
+# `any` walks a grid's cells, row by row, and stops at the first that satisfies it.
+
+import { any, equal as ==, greater_than as >, print, to_str } from builtins;
+
+struct Board { cells: str[,] }
+
+fn main() !prints {
+    let grid: i64[,] = [[1, 2], [3, 4]];
+    print(to_str(grid.any(|x| x == 4)));
+    print(to_str(grid.any(|x| x > 4)));
+    print(to_str(any(grid, |x| x == 1)));
+    let board = Board { cells: [["a", "b"]] };
+    print(to_str(board.cells.any(|s| s == "b")));
+    let limit = 2;
+    print(to_str(grid.any(|x| x > limit)));
+}
+--- stdout ---
+true
+false
+true
+true
+true

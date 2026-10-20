@@ -288,6 +288,7 @@ case_tests! {
     cases_generics_two_param_variant = "cases/generics/two_param_variant",
     cases_generics_value_or = "cases/generics/value_or",
     cases_generics_variant_infer_from_expected = "cases/generics/variant_infer_from_expected",
+    cases_grids_any = "cases/grids/any",
     cases_grids_basics = "cases/grids/basics",
     cases_grids_err_literal_without_grid = "cases/grids/err_literal_without_grid",
     cases_grids_err_ragged_literal = "cases/grids/err_ragged_literal",

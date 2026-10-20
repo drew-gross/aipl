@@ -234,22 +234,13 @@ fn toggle_flag(mut self: Game, cell: Cell) {
 # Whether the game is still going: lost once a mine is revealed, won once every
 # cell without a mine is.
 fn status(self: Game) -> Status {
-    mut lost = false;
-    mut won = true;
-    for (let row : 0..self.height) {
-        for (let column : 0..self.width) {
-            match (self.mark(cell_at(row, column))) {
-                some(Revealed(mine)) => {
-                    set lost = lost || mine;
-                },
-                some(Hidden(mine)) | some(Flagged(mine)) => {
-                    set won = won && mine;
-                },
-                none => {},
-            };
-        }
+    if (self.marks.any(|mark| mark == Revealed(true))) {
+        Lost
+    } else if (self.marks.any(|mark| mark == Hidden(false) || mark == Flagged(false))) {
+        Playing
+    } else {
+        Won
     }
-    if (lost) { Lost } else if (won) { Won } else { Playing }
 }.test({
     let game = new_game(2, 2, [3]);
     assert(game.status() == Playing);

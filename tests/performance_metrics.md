@@ -223,6 +223,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/generics/two_param_variant | 4 | 75 | 75 | 269 | 1552 | 7.00 | 82.15 | 1488 |
 | cases/generics/value_or | 0 | 0 | 0 | 61 | 316 | 2.00 | 76.95 | 1456 |
 | cases/generics/variant_infer_from_expected | 8 | 214 | 214 | 1188 | 4964 | 9.00 | 81.44 | 1488 |
+| cases/grids/any | 6 | 181 | 181 | 804 | 2636 | 8.00 | 340.46 | 1488 |
 | cases/grids/basics | 5 | 305 | 305 | 1672 | 3972 | 6.00 | 277.26 | 1472 |
 | cases/hashing/basic | 9 | 511 | 320 | 2527 | 9404 | 5.00 | 89.09 | 1472 |
 | cases/higher-order-in-test | 0 | 0 | 0 | 857 | 1336 | 3.00 | 77.86 | 1472 |
@@ -266,7 +267,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/kwargs/omittable | 57 | 3386 | 3386 | 1448 | 3728 | 26.00 | 81.46 | 1488 |
 | cases/kwargs/omittable_forward | 32 | 1684 | 1684 | 855 | 1712 | 18.00 | 81.51 | 1504 |
 | cases/lambdas/all | 1 | 32 | 32 | 1092 | 2988 | 2.00 | 148.14 | 1472 |
-| cases/lambdas/any | 1 | 32 | 32 | 942 | 2892 | 3.00 | 124.68 | 1456 |
+| cases/lambdas/any | 1 | 32 | 32 | 942 | 3388 | 3.00 | 102.38 | 1472 |
 | cases/lambdas/builtin_filter | 9 | 640 | 640 | 3110 | 5672 | 5.00 | 84.14 | 1488 |
 | cases/lambdas/builtin_map | 10 | 411 | 443 | 1717 | 3612 | 6.00 | 84.11 | 1504 |
 | cases/lambdas/capture_heap_and_fold | 6 | 346 | 370 | 535 | 1804 | 5.00 | 80.83 | 1472 |
