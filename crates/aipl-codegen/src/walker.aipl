@@ -1723,6 +1723,26 @@ fn set_stmt(self: W) -> WDoc!FmtError {
             doc: Concat([Text(`set {p.text}`), call_arg_list(args.docs, hug), Text(";")]),
         });
     };
+    if (p.w.peek_text() == "[") {
+        let index = p.w.bump().w.index_or_from()?;
+        let v = index.w.expect("]")?.w.expect("=")?.w.expr()?;
+        let handler = v.w.expect("else")?.w.block_layout()?;
+        let done = handler.w.expect(";")?.w;
+        return ok(
+            WDoc {
+                w: done,
+                doc: Concat([
+                    Text(`set {p.text}[`),
+                    Concat(index.docs),
+                    Text("] = "),
+                    v.doc,
+                    Text(" else "),
+                    handler.doc,
+                    Text(";"),
+                ]),
+            },
+        );
+    };
     let v = p.w.expect("=")?.w.expr()?;
     let done = v.w.expect(";")?.w;
     ok(WDoc { w: done, doc: Concat([Text(`set {p.text} = `), v.doc, Text(";")]) })
@@ -3196,6 +3216,16 @@ fn walker_of(src: str) -> W!FmtError {
         walker_of("{ mut x = 1 ; x }")?.block().rendered(100)? == "{\n    mut x = 1;\n    x\n}\n",
     );
     assert(walker_of("{ set x = 1 ; }")?.block().rendered(100)? == "{\n    set x = 1;\n}\n");
+    assert(
+        walker_of("{ set  xs[ i ] = 1 else { return none ; } ; }")?
+            .block()
+            .rendered(100)? == "{\n    set xs[i] = 1 else {\n        return none;\n    };\n}\n",
+    );
+    assert(
+        walker_of("{ set g.cells[r,c] = 1 else {} ; }")?
+            .block()
+            .rendered(100)? == "{\n    set g.cells[r, c] = 1 else {};\n}\n",
+    );
     assert(walker_of("{ set x ++ ; }")?.block().rendered(100)? == "{\n    set x++;\n}\n");
     assert(walker_of("{ set x -- ; }")?.block().rendered(100)? == "{\n    set x--;\n}\n");
     // The compound assignments are spaced like the `=` they stand in for.

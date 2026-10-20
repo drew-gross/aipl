@@ -1,0 +1,54 @@
+# `set xs[i] = x else { .. };` replaces an element in place. The index can be off
+# the end, so the write says what happens then: the `else` block runs, and the
+# array is left as it was. A grid takes `set grid[row, column] = x else { .. };`.
+
+import { print, to_str, value_or, wrapping_increment as ++ } from builtins;
+
+struct Board { cells: i64[], grid: i64[,] }
+
+fn bump(self: i64[], i: u64) -> i64[] {
+    mut xs = self;
+    set xs[i] = 100 else {
+        return [];
+    };
+    xs
+}
+
+fn main() !prints {
+    mut xs = [1, 2, 3];
+    set xs[1] = 20 else {};
+    set xs[0] = xs[2].value_or(0) else {};
+    print(to_str(xs));
+
+    // A miss runs the handler and writes nothing.
+    mut misses = 0;
+    set xs[3] = 9 else {
+        set misses++;
+    };
+    print(to_str(xs));
+    print(to_str(misses));
+    print(to_str(bump([1, 2], 1)));
+    print(to_str(bump([1, 2], 2)));
+
+    mut board = Board { cells: [0, 0], grid: [[1, 2], [3, 4]] };
+    set board.cells[1] = 5 else {};
+    set board.grid[1, 0] = 30 else {};
+    set board.grid[0, 2] = 9 else {
+        set misses++;
+    };
+    set board.grid[2, 0] = 9 else {
+        set misses++;
+    };
+    print(to_str(board.cells));
+    print(to_str(board.grid));
+    print(to_str(misses));
+}
+--- stdout ---
+[3, 20, 3]
+[3, 20, 3]
+1
+[1, 100]
+[]
+[0, 5]
+[[1, 2], [30, 4]]
+3

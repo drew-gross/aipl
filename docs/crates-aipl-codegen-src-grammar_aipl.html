@@ -1209,6 +1209,52 @@ shim random seeded_with_clock() { body }
 
 
 
+        <section class="item" id="item-unhandled_index_write">
+          <h3>
+            <a class="anchor" href="#item-unhandled_index_write">unhandled_index_write</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn unhandled_index_write() -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-indexed_write">
+          <h3>
+            <a class="anchor" href="#item-indexed_write">indexed_write</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn indexed_write(target: Expr, indexes: Expr[], value: Expr, handler: Expr, name_span: Span) -&#62; Stmt</code></pre>
+
+          <div class="doc"><p><code>set target[i] = value else { handler };</code> writes the element when there is one and runs the handler when there is not:</p><pre><code>let __iset$N = i;
+if (let some(..) = target[__iset$N]) {
+    set target = __with_or_self(target, __iset$N, value);
+} else { handler }
+</code></pre><p>A grid takes two indexes, <code>target[row, column]</code>, and <code>grid_get</code> / <code>grid_try_set</code>. The value is evaluated only when the element exists. An index that is not a literal, a name or a field is bound first so that it is evaluated once; those three are read twice, which costs nothing and keeps a literal's type open to the index it is used as (<code>let</code> would have made it an <code>i64</code>).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_plain_index">
+          <h3>
+            <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_plain_index(__spat$92067: Expr) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower_for_stmt">
           <h3>
             <a class="anchor" href="#item-lower_for_stmt">lower_for_stmt</a>
@@ -2126,7 +2172,7 @@ shim random seeded_with_clock() { body }
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$138623: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$142099: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

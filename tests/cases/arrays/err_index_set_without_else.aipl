@@ -1,0 +1,12 @@
+# An indexed write can miss, so it must say what happens then.
+
+fn main() {
+    mut xs = [1, 2];
+    set xs[5] = 1;
+}
+--- errors ---
+error: an indexed write can miss, because the index may be off the end: say what happens then, as in `set xs[i] = x else { return none; };`, or `else {}` to do nothing
+ --> ./tests/cases/arrays/err_index_set_without_else.aipl:5:18
+  |
+5 |     set xs[5] = 1;
+  |                  ^

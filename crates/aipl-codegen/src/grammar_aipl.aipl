@@ -175,6 +175,7 @@ import {
     Ident,
     If,
     IfLet,
+    Index,
     KwArg,
     Lambda,
     LambdaParam,
@@ -287,6 +288,7 @@ import {
     Assign as SAssign,
     Block as PBlock,
     Construct as PConstruct,
+    Effect as SEffect,
     FnAttr,
     For as SFor,
     Let as SLet,
@@ -869,6 +871,20 @@ fn statements() -> Production<AiplTok, Ast>[] {
         Then([Lit("set"), assign_target, Lit("/="), Named("expr"), Expect(Lit(";"))]),
         Then([Lit("set"), assign_target, nest("(", Named("args"), ")", loose()), Expect(Lit(";"))]),
         Then([Lit("set"), assign_target, Lit("="), Named("expr"), Expect(Lit(";"))]),
+        Then([
+            Lit("set"),
+            assign_target,
+            one(
+                OneOf([Then([Named("expr"), Lit(","), Named("expr")]), Named("expr")]),
+                nested_in=brackets(),
+            ),
+            Lit("="),
+            Named("expr"),
+            OneOf([
+                Then([Lit("else"), Named("block"), Expect(Lit(";"))]),
+                Refuse(Msg(unhandled_index_write())),
+            ]),
+        ]),
     ]);
 
     // The four `for` shapes, told apart after `for ( let` by one token: `(` is
@@ -2182,6 +2198,17 @@ fn lower_assign_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let op = toks[at_op].value_or("");
     let op_span = spans[at_op].value_or(name_span);
 
+    // `set target[i] = value else { .. };` — see `indexed_write`.
+    if (op == "[") {
+        let two = toks.contains(",");
+        let first = kid_expr(kids, 0, sp)?;
+        let indexes = if (two) { [first, kid_expr(kids, 1, sp)?] } else { [first] };
+        let at_value: u64 = indexes.len();
+        let value = kid_expr(kids, at_value, sp)?;
+        let handler = kid_expr(kids, at_value + 1, sp)?;
+        return ok(AStmt(indexed_write(target, indexes, value, handler, name_span)));
+    };
+
     // `set n++;` is `set n = n ++ 1;`, and `set n--;` its twin. The `1` and the
     // operator carry the operator's own span, so a missing import points at it.
     if (op == "++" || op == "--") {
@@ -2223,6 +2250,72 @@ fn lower_assign_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 }
 
 fn compound_ops() -> str[] { ["+=", "-=", "*=", "/="] }
+
+fn unhandled_index_write() -> str {
+    "an indexed write can miss, because the index may be off the end: say what happens then, as in `set xs[i] = x else { return none; };`, or `else {}` to do nothing"
+}
+
+# `set target[i] = value else { handler };` writes the element when there is one
+# and runs the handler when there is not:
+#
+#     let __iset$N = i;
+#     if (let some(..) = target[__iset$N]) {
+#         set target = __with_or_self(target, __iset$N, value);
+#     } else { handler }
+#
+# A grid takes two indexes, `target[row, column]`, and `grid_get` / `grid_try_set`.
+# The value is evaluated only when the element exists. An index that is not a
+# literal, a name or a field is bound first so that it is evaluated once; those
+# three are read twice, which costs nothing and keeps a literal's type open to
+# the index it is used as (`let` would have made it an `i64`).
+fn indexed_write(
+    target: Expr,
+    indexes: Expr[],
+    value: Expr,
+    handler: Expr,
+    name_span: Span,
+) -> Stmt {
+    let sp = join_spans(name_span, handler.span);
+    let tag = name_span.start;
+    let names = indexes.range().map(|i| `__iset{i}${tag}`);
+    let reads = indexes
+        .range()
+        .map(|i| {
+            let index = indexes[i].value_or(target);
+            if (is_plain_index(index)) { index } else { at(Ident(names[i].value_or("")), sp) }
+        });
+    let grid = indexes.len() == 2;
+    let read = if (grid) {
+        at(Call("__builtin_grid_get", [target, ..reads], false), sp)
+    } else {
+        at(Index(target, reads[0].value_or(target)), sp)
+    };
+    let write_name = if (grid) { "__builtin_grid_try_set" } else { "__with_or_self" };
+    let write = at(Call(write_name, [target, ..reads, value], false), sp);
+    let arm = MatchArm {
+        pattern: PatCtor("some", ignore_payload=true),
+        body: at(Assign(target, write, at(Unit, sp)), sp),
+        span: sp,
+    };
+    mut head = at(IfLet(arm, read, handler), sp);
+    mut i = indexes.len();
+    while (i > 0) {
+        set i--;
+        let index = indexes[i].value_or(target);
+        if (!is_plain_index(index)) {
+            set head = at(Let(names[i].value_or(""), none, index, head), sp);
+        };
+    }
+    SEffect(head, sp)
+}
+
+# Whether `e` is cheap and pure enough to read more than once.
+fn is_plain_index(Expr { kind }) -> bool {
+    match (kind) {
+        Num(..) | Ident(..) | Field(..) => true,
+        _ => false,
+    }
+}
 
 # `for_stmt` — the plain loop and the two patterns a `let` takes apart a value
 # with, tuple and struct, each with or without an index in front: `for (let x`,
@@ -2341,6 +2434,7 @@ fn wrap_stmt(stmt: Stmt, acc: Expr) -> Expr {
         },
         // The rest of the block is unreachable after a `return`, but it stays in
         // the tree so the checker and codegen see a well-formed block.
+        SEffect(head, span) => seq(head, acc, join_spans(span, acc.span)),
         SReturn(value, ret_span) => {
             let span = join_spans(ret_span, acc.span);
             seq(at(Return(value), ret_span), acc, span)
@@ -4162,6 +4256,25 @@ pub fn lower_aipl_block(src: str) -> Expr!ParseError {
     assert(block_dump("{ set a.b.c--; }") == "Assign(a.b.c, --(a.b.c, 1), ())");
     assert(block_dump("{ set a.b += 2; }") == "Assign(a.b, +=(a.b, 2), ())");
     assert(block_dump("{ set a.b.xs.push(1); }") == "Assign(a.b.xs, a.b.xs.push(1), ())");
+
+    // An indexed write is a guarded `try_set`; a plain index is read twice, any
+    // other is bound first.
+    assert(
+        block_dump(
+            "{ set xs[i] = 1 else { return none; }; }",
+        ) == "Seq(IfLet(some(..) => Assign(xs, __with_or_self(xs, i, 1), ()), Index(xs, i), Seq(Return(none), ())), ())",
+    );
+    assert(
+        block_dump(
+            "{ set g[r, c + 1] = 1 else {}; }",
+        ) == "Seq(Let(__iset1$6, +(c, 1), IfLet(some(..) => Assign(g, __builtin_grid_try_set(g, r, __iset1$6, 1), ()), __builtin_grid_get(g, r, __iset1$6), ())), ())",
+    );
+    // The `else` is not optional.
+    assert(
+        block_dump(
+            "{ set xs[i] = 1; }",
+        ) == "error: an indexed write can miss, because the index may be off the end: say what happens then, as in `set xs[i] = x else { return none; };`, or `else {}` to do nothing",
+    );
     assert(
         block_dump(
             "{ set f(1); }",

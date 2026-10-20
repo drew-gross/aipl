@@ -1,0 +1,41 @@
+# The AIPL implementation of the `grid_try_set` builtin. Monomorphization
+# registers this under the canonical name `__builtin_grid_try_set` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`); the parser writes
+# `set grid[row, column] = value else { .. };` as a call to it, guarded by a read
+# that has already shown the cell exists.
+
+import {
+    Grid,
+    equal as ==,
+    grid_get,
+    less_than as <,
+    value_or,
+    with,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
+
+# `self` with the cell at `row`, `column` replaced by `value`, or `self` unchanged
+# when either is off the grid.
+pub fn grid_try_set<T: any>(self: Grid<T>, row: u64, column: u64, value: T) -> Grid<T> {
+    if (column < self.width) {
+        // `try_set` is lowered before an AIPL builtin's body is added to the program,
+        // so the fused shape is written out.
+        let at = row * self.width + column;
+        let cells = self.cells.with(at, value).value_or(self.cells); #[allow]
+        Grid { width: self.width, cells }
+    } else {
+        self
+    }
+}.test({
+    let two: u64 = 2;
+    let grid = Grid { width: two, cells: [1, 2, 3, 4, 5, 6] };
+    assert(grid.grid_try_set(1, 0, 30).grid_get(1, 0) == some(30));
+    assert(grid.grid_try_set(1, 0, 30).grid_get(1, 1) == some(4));
+    assert(grid_try_set(grid, 2, 1, 60).grid_get(2, 1) == some(60));
+
+    // A column off the row would land in the next row; a row off the bottom is
+    // past the cells. Neither changes anything.
+    assert(grid.grid_try_set(0, 2, 9) == grid);
+    assert(grid.grid_try_set(3, 0, 9) == grid);
+})

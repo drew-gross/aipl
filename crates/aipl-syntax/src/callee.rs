@@ -66,6 +66,10 @@ pub enum Callee {
     /// `width` to a row. What a nested array literal in a grid position is
     /// rewritten to.
     GridFrom,
+    /// `grid_try_set(self: T[,], row: u64, column: u64, value: T) -> T[,]` — the grid
+    /// with that cell replaced, or unchanged off the grid. What an indexed write
+    /// `set grid[row, column] = value else { .. }` stores.
+    GridTrySet,
     Last,
     NonemptyFirst,
     NonemptyLast,
@@ -365,6 +369,7 @@ impl Callee {
         Callee::First,
         Callee::GridGet,
         Callee::GridFrom,
+        Callee::GridTrySet,
         Callee::Last,
         Callee::NonemptyFirst,
         Callee::NonemptyLast,
@@ -549,6 +554,7 @@ impl Callee {
             Callee::First => "__builtin_first",
             Callee::GridGet => "__builtin_grid_get",
             Callee::GridFrom => "__builtin_grid_from",
+            Callee::GridTrySet => "__builtin_grid_try_set",
             Callee::Last => "__builtin_last",
             Callee::NonemptyFirst => "__builtin_nonempty_first",
             Callee::NonemptyLast => "__builtin_nonempty_last",

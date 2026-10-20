@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">120 files, 1376 items.</p>
+      <p class="summary">121 files, 1381 items.</p>
 
       <ul class="files">
 
@@ -734,7 +734,7 @@
           <p class="file-summary">AIPL's own syntax, as a <code>Grammar</code> value — the third and largest consumer of the parser library, and the one the whole thing was built for. It is the only description of the language there is: every compile runs this grammar over <code>lex_aipl.aipl</code>'s token stream, the compiler's own sources included.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">174 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">177 private</a></span>
 
 
           <ul class="items">
@@ -2659,6 +2659,24 @@
 
             <li>
               <a href="crates-aipl-mono-src-builtin_grid_get.html#item-grid_get"><code>grid_get</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_grid_try_set.html">crates/aipl-mono/src/builtin_grid_try_set.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>grid_try_set</code> builtin. Monomorphization registers this under the canonical name <code>__builtin_grid_try_set</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>); the parser writes <code>set grid[row, column] = value else { .. };</code> as a call to it, guarded by a read that has already shown the cell exists.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_grid_try_set.html#item-grid_try_set"><code>grid_try_set</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

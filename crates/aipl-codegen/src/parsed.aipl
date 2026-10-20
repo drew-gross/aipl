@@ -27,6 +27,9 @@ variant Stmt =
     | For(name: str, name_span: Span, index: str?, iterable: Expr, body: Expr, span: Span)
     | While(cond: Expr, body: Expr, span: Span)
     | Return(value: Expr, span: Span)
+    # A statement already built as one expression, run for its effect before the
+    # rest of the block.
+    | Effect(head: Expr, span: Span)
 
 # A parsed function body, before the return type is in scope to name the struct
 # the shorthand constructs. Parser-local: by the time a `Function` is built the
