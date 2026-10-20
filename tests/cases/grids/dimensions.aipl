@@ -1,0 +1,17 @@
+# `width` is how many cells a row holds and `height` how many rows there are.
+
+import { height, print, width } from builtins;
+
+struct Board { cells: str[,] }
+
+fn main() !prints {
+    let grid: i64[,] = [[1, 2, 3], [4, 5, 6]];
+    print(`{grid.width()} by {grid.height()}`);
+    print(`{width(grid)} by {height(grid)}`);
+    let board = Board { cells: [["a"], ["b"], ["c"], ["d"]] };
+    print(`{board.cells.width()} by {board.cells.height()}`);
+}
+--- stdout ---
+3 by 2
+3 by 2
+1 by 4

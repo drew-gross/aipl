@@ -7947,6 +7947,8 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::GridGet, "builtin_grid_get.aipl"),
     (Callee::GridFrom, "builtin_grid_from.aipl"),
     (Callee::GridTrySet, "builtin_grid_try_set.aipl"),
+    (Callee::Width, "builtin_width.aipl"),
+    (Callee::Height, "builtin_height.aipl"),
     (Callee::Last, "builtin_last.aipl"),
     (Callee::NonemptyFirst, "builtin_nonempty_first.aipl"),
     (Callee::NonemptyLast, "builtin_nonempty_last.aipl"),

@@ -168,6 +168,9 @@ integer signedness problems:
   2. Literals don't flex through a constructor — ok(0) in a -> u64!E function types its payload i64, so three "declined" sites need let declined: u64 = 0; first. Literals flex fine into an annotated let, a parameter, or a struct field — just not through ok/err/some. Should do this after bounds so "flex" types can propagate as un-chosed bounds until restricted as which point they propagate back through.
   3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.
 
+print:
+  add options like indentation, print grids as grids, quoting, etc.
+
 dev loop:
   Add subset flags to check e.g. aipl check --format
   have the clir IR include the human readable version of data section strings in comments
@@ -335,6 +338,7 @@ matrices:
   support retrieving a row/col
 
 types:
+  add a type that represents "index of 2d array". Maybe tuple works?
   let/match refines scrutinee in remaining arms
   Unicode support
   i64 without 0 should work
@@ -413,6 +417,7 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  in_bounds_of util that says if an index is in bounds for an array (note: NOT a refinement type, yet)
   __builtin_drop_* should be mutating methods
   zip
   int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html

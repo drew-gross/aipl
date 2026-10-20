@@ -1,0 +1,15 @@
+# The AIPL implementation of the `width` builtin. Monomorphization registers this
+# under the canonical name `__builtin_width` (see `AIPL_BUILTIN_SOURCES` in
+# `lib.rs`), so `grid.width()` resolves through the ordinary generic machinery.
+
+import { Grid, equal as == } from builtins;
+
+# How many cells each row of the grid holds. See `height` for the other side.
+pub fn width<T: any>(self: Grid<T>) -> u64 { self.width }.test({
+    let three: u64 = 3;
+    let grid = Grid { width: three, cells: [1, 2, 3, 4, 5, 6] };
+    assert(grid.width() == 3);
+    assert(width(grid) == 3);
+    let words = Grid { width: three, cells: ["a", "b", "c"] };
+    assert(words.width() == 3);
+})

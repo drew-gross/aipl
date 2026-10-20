@@ -70,6 +70,10 @@ pub enum Callee {
     /// with that cell replaced, or unchanged off the grid. What an indexed write
     /// `set grid[row, column] = value else { .. }` stores.
     GridTrySet,
+    /// `width(self: T[,]) -> u64` — how many cells a row of the grid holds.
+    Width,
+    /// `height(self: T[,]) -> u64` — how many rows the grid has.
+    Height,
     Last,
     NonemptyFirst,
     NonemptyLast,
@@ -370,6 +374,8 @@ impl Callee {
         Callee::GridGet,
         Callee::GridFrom,
         Callee::GridTrySet,
+        Callee::Width,
+        Callee::Height,
         Callee::Last,
         Callee::NonemptyFirst,
         Callee::NonemptyLast,
@@ -555,6 +561,8 @@ impl Callee {
             Callee::GridGet => "__builtin_grid_get",
             Callee::GridFrom => "__builtin_grid_from",
             Callee::GridTrySet => "__builtin_grid_try_set",
+            Callee::Width => "__builtin_width",
+            Callee::Height => "__builtin_height",
             Callee::Last => "__builtin_last",
             Callee::NonemptyFirst => "__builtin_nonempty_first",
             Callee::NonemptyLast => "__builtin_nonempty_last",

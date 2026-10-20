@@ -1,0 +1,20 @@
+# The AIPL implementation of the `height` builtin. Monomorphization registers
+# this under the canonical name `__builtin_height` (see `AIPL_BUILTIN_SOURCES` in
+# `lib.rs`), so `grid.height()` resolves through the ordinary generic machinery.
+
+import { Grid, equal as ==, len, saturating_divide as / } from builtins;
+
+# How many rows the grid has: its cells, a row at a time. A grid with no width
+# has no rows. See `width` for the other side.
+pub fn height<T: any>(self: Grid<T>) -> u64 {
+    if (self.width == 0) { 0 } else { self.cells.len() / self.width }
+}.test({
+    let three: u64 = 3;
+    let grid = Grid { width: three, cells: [1, 2, 3, 4, 5, 6] };
+    assert(grid.height() == 2);
+    assert(height(grid) == 2);
+    let none_wide: u64 = 0;
+    assert(Grid { width: none_wide, cells: [1, 2] }.height() == 0);
+    let empty: i64[] = [];
+    assert(Grid { width: three, cells: empty }.height() == 0);
+})
