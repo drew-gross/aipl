@@ -410,6 +410,7 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  __builtin_drop_* should be mutating methods
   zip
   int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html
   map on a set is a bit of a weird operation, I feel like I should come up with a name for it (what if the pred isn't injective?)
