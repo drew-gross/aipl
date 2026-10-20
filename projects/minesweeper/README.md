@@ -43,7 +43,7 @@ The rules are pure functions on a `Game` value and carry the tests in their
 
 | need | why |
 |---|---|
-| a way to set one element of an array | the board is a set of revealed cells because an array cell cannot be assigned |
+| an element update that reuses an array nobody else holds | the board is an array of marks updated with `with`, which copies the whole array on every move |
 | read one key without waiting for Enter (raw mode) | `hjkl`/arrow cursor play instead of typed commands |
 | ANSI output: clear screen, move cursor, colour | redraw in place, classic number colours |
 | terminal size | fit the board to the window |
