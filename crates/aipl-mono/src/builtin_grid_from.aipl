@@ -1,0 +1,14 @@
+# The AIPL implementation of the `grid_from` builtin. Monomorphization registers
+# this under the canonical name `__builtin_grid_from` (see `AIPL_BUILTIN_SOURCES`
+# in `lib.rs`); a nested array literal written where a grid is expected is
+# rewritten to a call to it.
+
+import { Grid, equal as ==, grid_get, not_equal as != } from builtins;
+
+# A grid whose rows are `width` cells long, holding `cells` one row after another.
+pub fn grid_from<T: any>(width: u64, cells: T[]) -> Grid<T> { width, cells }.test({
+    let grid = grid_from(2, [1, 2, 3, 4]);
+    assert(grid == grid_from(2, [1, 2, 3, 4]));
+    assert(grid != grid_from(4, [1, 2, 3, 4]));
+    assert(grid.grid_get(1, 1) == some(4));
+})

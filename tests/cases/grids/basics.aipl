@@ -1,0 +1,38 @@
+# `T[,]` is a grid: a rectangle of cells, `v[row, column]` reads one, and a
+# nested array literal written where a grid is expected is that grid. Reading
+# answers `none` off the grid, as indexing an array does.
+
+import { equal as ==, print, to_str } from builtins;
+
+struct Board { cells: bool[,] }
+
+fn corner(grid: i64[,]) -> i64? { grid[1, 1] }
+
+fn diagonal() -> bool[,] { [[true, false], [false, true]] }
+
+fn basics() {}.test({
+    let grid: i64[,] = [[1, 2, 3], [4, 5, 6]];
+    assert(grid[0, 0] == some(1));
+    assert(grid[1, 2] == some(6));
+    // Off the end of a row is not the next row.
+    assert(grid[0, 3] == none);
+    assert(grid[2, 0] == none);
+    assert(corner([[1, 2], [3, 4]]) == some(4));
+    assert(diagonal()[1, 1] == some(true));
+    assert(diagonal()[0, 1] == some(false));
+    let board = Board { cells: [[true, false, true]] };
+    assert(board.cells[0, 2] == some(true));
+})
+
+fn main() !prints {
+    let grid: str[,] = [["a", "b"], ["c", "d"]];
+    print(to_str(grid));
+    print(to_str(grid[1, 0]));
+    // Without a grid to expect, the same literal is an array of arrays.
+    let rows = [[1, 2], [3, 4]];
+    print(to_str(rows));
+}
+--- stdout ---
+[["a", "b"], ["c", "d"]]
+some("c")
+[[1, 2], [3, 4]]

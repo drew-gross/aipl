@@ -1,0 +1,29 @@
+# The AIPL implementation of the `grid_get` builtin. Monomorphization registers
+# this under the canonical name `__builtin_grid_get` (see `AIPL_BUILTIN_SOURCES`
+# in `lib.rs`); the parser writes `grid[row, column]` as a call to it.
+#
+# A grid keeps its rows one after another, so the cell is `row * width + column`
+# of the flat array. A column past the end of a row would land in the next row,
+# which is why it is checked on its own; a row past the last one is already past
+# the end of the flat array, and indexing answers `none` for that.
+
+import { Grid, equal as ==, less_than as <, wrapping_add as +, wrapping_mul as * } from builtins;
+
+# The cell at `row`, `column`, or `none` when either is off the grid.
+pub fn grid_get<T: any>(self: Grid<T>, row: u64, column: u64) -> T? {
+    if (column < self.width) { self.cells[row * self.width + column] } else { none }
+}.test({
+    let two: u64 = 2;
+    let grid = Grid { width: two, cells: [1, 2, 3, 4, 5, 6] };
+    assert(grid.grid_get(0, 0) == some(1));
+    assert(grid.grid_get(0, 1) == some(2));
+    assert(grid.grid_get(2, 1) == some(6));
+    // A column off the row is not the next row's first cell.
+    assert(grid.grid_get(0, 2) == none);
+    // A row off the bottom.
+    assert(grid.grid_get(3, 0) == none);
+    assert(grid_get(grid, 1, 0) == some(3)); // free-call form
+    let one: u64 = 1;
+    let words = Grid { width: one, cells: ["a", "b"] };
+    assert(words.grid_get(1, 0) == some("b"));
+})

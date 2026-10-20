@@ -1065,7 +1065,7 @@
           </h3>
           <pre class="signature"><code>fn type_suffixes(self: W, acc0: Doc[]) -&#62; WDocs</code></pre>
 
-          <div class="doc"><p>A run of <code>?</code> (optional) and <code>[]</code> (array) suffixes, in source order.</p></div>
+          <div class="doc"><p>A run of <code>?</code> (optional), <code>[]</code> (array) and <code>[,]</code> (grid) suffixes, in source order.</p></div>
 
 
         </section>
@@ -1595,7 +1595,7 @@
             <a class="anchor" href="#item-range_has_stmt">range_has_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$59148: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$59333: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code> or a <code>fn</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 
@@ -1947,7 +1947,7 @@
           </h3>
           <pre class="signature"><code>fn index_seg(self: W) -&#62; WSeg!FmtError</code></pre>
 
-          <div class="doc"><p><code>[i]</code>, <code>[a..b]</code>, <code>[a..]</code>, <code>[..b]</code> — indexing and the slice forms.</p></div>
+          <div class="doc"><p><code>[i]</code>, <code>[a..b]</code>, <code>[a..]</code>, <code>[..b]</code>, <code>[row, column]</code> — indexing and the slice forms.</p></div>
 
 
         </section>
@@ -1975,7 +1975,7 @@
           </h3>
           <pre class="signature"><code>fn index_or_from(self: W) -&#62; WDocs!FmtError</code></pre>
 
-          <div class="doc"><p><code>[i]</code>, <code>[a..b]</code>, or <code>[a..]</code>.</p></div>
+          <div class="doc"><p><code>[i]</code>, <code>[a..b]</code>, <code>[a..]</code>, or <code>[row, column]</code>.</p></div>
 
 
         </section>

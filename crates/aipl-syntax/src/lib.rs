@@ -2988,6 +2988,9 @@ struct __builtin_ExecResult { stdout: str, stderr: str, exit_code: i64 }
 // window opened), and CLIF instructions executed. All deterministic for a given
 // program and compiler.
 struct __builtin_Measurement { allocations: u64, bytes_allocated: u64, peak_live_bytes: u64, instructions: u64 }
+// A rectangular grid of `T`, written `T[,]`: `width` cells to a row, the rows
+// stored one after another in `cells`.
+struct __builtin_Grid<T: any> { width: u64, cells: T[] }
 
 fn __builtin_print(self: str) !prints {}
 // Split on each occurrence of `sep`, returning the parts (slices/views of `self`).
@@ -3552,6 +3555,8 @@ pub fn demangle_named(n: &str) -> String {
         base.to_string()
     } else if base == "__tuple" {
         format!("({})", args.join(", "))
+    } else if base == "Grid" && args.len() == 1 {
+        format!("{}[,]", args[0])
     } else {
         format!("{base}<{}>", args.join(", "))
     }
@@ -3660,6 +3665,9 @@ pub fn type_name(t: &Type) -> String {
         Type::Tuple(elems) => {
             let es = elems.iter().map(type_name).collect::<Vec<_>>().join(", ");
             format!("({es})")
+        }
+        Type::Generic(name, args) if args.len() == 1 && strip_mangle_prefix(name) == "Grid" => {
+            format!("{}[,]", suffix_operand(&args[0], type_name))
         }
         Type::Generic(name, args) => {
             let as_ = args.iter().map(type_name).collect::<Vec<_>>().join(", ");
@@ -3857,12 +3865,22 @@ pub const SHIM_SLOT_COUNT: usize = 9;
 /// needs no import), these behave like any other importable builtin: gated,
 /// and mapped to a reserved canonical name so a user's own type of the same
 /// name can never silently collide.
-pub const IMPORTABLE_BUILTIN_TYPES: &[&str] = &["Span", "ExecResult", "Measurement"];
+pub const IMPORTABLE_BUILTIN_TYPES: &[&str] = &["Span", "ExecResult", "Measurement", "Grid"];
 
 /// The canonical name of the builtin `Span` struct — what an imported `Span`
 /// resolves to, and the name every pass that dispatches on "is this a range?"
 /// compares against (iterating one, slicing by one, `map`ping one).
 pub const SPAN_TYPE: &str = "__builtin_Span";
+
+/// The name of the builtin generic struct behind `T[,]`.
+pub const GRID_TYPE: &str = "__builtin_Grid";
+
+/// Whether `name` is an instance of the builtin grid struct — `__builtin_Grid$i64`
+/// for `i64[,]`.
+pub fn is_grid_instance(name: &str) -> bool {
+    name.strip_prefix(GRID_TYPE)
+        .is_some_and(|rest| rest.starts_with('$'))
+}
 
 /// Canonical internal name for an importable builtin type, or `None` if
 /// `name` isn't one. Mirrors [`builtin_canonical`] for types: the loader

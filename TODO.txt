@@ -251,6 +251,7 @@ bugs:
     It needs the binding held while both a scalar field and the boxed-optional field are read — reading only .next allocates 1 and balances, reading only .val elides the allocation entirely. That's presumably why recursive_struct.aipl and recursive_list.aipl never tripped it. My boxed case is reshaped to cover the boxed store path without hitting it
 
 errors:
+  error: cannot infer a type for "T" in generic "__builtin_grid_get" should not reference the builtin name
   make "did you mean?" errors that look for nearby words instead of displaying all possibilities
   make it possible to report multiple errors when one of them is an invalid char literal (lexer upgrade)
   report multiple errors when one call site has multiple type errors
@@ -326,12 +327,12 @@ shim:
   better syntax (shim is a weird keyword)
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
+matrices:
+  probably do T[,] syntax for declaring the type, and v[i, j] syntax for accessing.
+  no named operator for matmul probably, user can import matmul as * if they want
+  option to put the shape in the type e.g. T[5,] or T[5,10] (make this work for 1d too? i.e. T[5])
+
 types:
-  matrices:
-    probably do T[,] syntax for declaring the type, and v[i, j] syntax for accessing.
-    [[1, 2], [3, 4]] syntax for literals, but fail to compile for jagged
-    no named operator for matmul probably, user can import matmul as * if they want
-    option to put the shape in the type e.g. T[5,] or T[5,10] (make this work for 1d too? i.e. T[5])
   let/match refines scrutinee in remaining arms
   Unicode support
   i64 without 0 should work
@@ -389,7 +390,7 @@ sets:
   support other types
 
 parser:
-  have an "Expect" concept e.g. Then([Lit("let"), Term(Ident), Expect(Lit(";"))]) that a) blocks backtracking b) enables fix-it suggestions to give to the user/tools c) enabled parser recovery so we can find more parse errors at once
+  implement fix-it suggestions using Expect
   support putting a different name in error messages e.g. "expected a doc comment..." instead of "expected a DocComment..."
   cleanup/remove nest/nest2/nest3
   a bracketed list's separator must be a literal, so the printer can write it back <--- lift this restriction

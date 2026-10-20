@@ -1,0 +1,13 @@
+# A nested literal is an array of arrays unless a grid is expected, so reading
+# it with two indexes is an error.
+
+fn main() {
+    let rows = [[1, 2], [3, 4]];
+    let cell = rows[0, 1];
+}
+--- errors ---
+error: cannot infer a type for "T" in generic "__builtin_grid_get"
+ --> ./tests/cases/grids/err_literal_without_grid.aipl:6:16
+  |
+6 |     let cell = rows[0, 1];
+  |                ^^^^^^^^^^

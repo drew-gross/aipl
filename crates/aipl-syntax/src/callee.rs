@@ -59,6 +59,13 @@ pub enum Callee {
     CountIsEqual,
     CountIsNotEqual,
     First,
+    /// `grid_get(self: T[,], row: u64, column: u64) -> T?` — the cell at `row`,
+    /// `column`, or `none` off the grid. What `grid[row, column]` is written as.
+    GridGet,
+    /// `grid_from(width: u64, cells: T[]) -> T[,]` — a grid of `cells` laid out
+    /// `width` to a row. What a nested array literal in a grid position is
+    /// rewritten to.
+    GridFrom,
     Last,
     NonemptyFirst,
     NonemptyLast,
@@ -356,6 +363,8 @@ impl Callee {
         Callee::CountIsEqual,
         Callee::CountIsNotEqual,
         Callee::First,
+        Callee::GridGet,
+        Callee::GridFrom,
         Callee::Last,
         Callee::NonemptyFirst,
         Callee::NonemptyLast,
@@ -538,6 +547,8 @@ impl Callee {
             Callee::CountIsEqual => "__builtin_count_is_equal",
             Callee::CountIsNotEqual => "__builtin_count_is_not_equal",
             Callee::First => "__builtin_first",
+            Callee::GridGet => "__builtin_grid_get",
+            Callee::GridFrom => "__builtin_grid_from",
             Callee::Last => "__builtin_last",
             Callee::NonemptyFirst => "__builtin_nonempty_first",
             Callee::NonemptyLast => "__builtin_nonempty_last",

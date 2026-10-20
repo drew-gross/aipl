@@ -222,6 +222,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/generics/two_param_variant | 4 | 75 | 75 | 269 | 1552 | 7.00 | 82.15 | 1488 |
 | cases/generics/value_or | 0 | 0 | 0 | 61 | 316 | 2.00 | 76.95 | 1456 |
 | cases/generics/variant_infer_from_expected | 8 | 214 | 214 | 1188 | 4964 | 9.00 | 81.44 | 1488 |
+| cases/grids/basics | 5 | 305 | 305 | 1672 | 3972 | 6.00 | 277.26 | 1472 |
 | cases/hashing/basic | 9 | 511 | 320 | 2527 | 9404 | 5.00 | 89.09 | 1472 |
 | cases/higher-order-in-test | 0 | 0 | 0 | 857 | 1336 | 3.00 | 77.86 | 1472 |
 | cases/if_let/basic | 2 | 105 | 105 | 70 | 640 | 6.00 | 77.55 | 1488 |
@@ -665,7 +666,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/variants/variant_in_variant_payload | 0 | 0 | 0 | 59 | 320 | 2.00 | 78.00 | 1456 |
 | cases/variants/without_case | 10 | 222 | 222 | 794 | 3544 | 11.00 | 86.87 | 1504 |
 | cases/variants/without_case_imported | 3 | 59 | 59 | 155 | 1320 | 6.00 | 81.03 | 1504 |
-| crates/aipl-codegen/src/ast | 3 | 272 | 272 | 162 | 2812 | 3.00 | 1480.55 | 1424 |
+| crates/aipl-codegen/src/ast | 3 | 272 | 272 | 165 | 2848 | 3.00 | 2580.30 | 1472 |
 | crates/aipl-codegen/src/bound | 0 | 0 | 0 | 139 | 920 | 2.00 | 93.94 | 1440 |
 | crates/aipl-codegen/src/brace_entry | 74 | 5323 | 4864 | 5430 | 51008 | 13.00 | 1084.11 | 1552 |
 | crates/aipl-codegen/src/caret_block | 179 | 12361 | 12281 | 10601 | 5032 | 14.00 | 91.32 | 1472 |
@@ -682,9 +683,9 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/find_files | 19 | 1096 | 1040 | 1869 | 6708 | 10.00 | 87.14 | 1552 |
 | crates/aipl-codegen/src/find_trailing_whitespace | 0 | 0 | 0 | 6230 | 2488 | 2.00 | 89.90 | 1440 |
 | crates/aipl-codegen/src/format | 2287 | 185153 | 19208 | 314840 | 180748 | 204.00 | 1426.10 | 1968 |
-| crates/aipl-codegen/src/format_source | 16815 | 4288414 | 496299 | 11764330 | 6044580 | 2395.00 | 21474.23 | 5264 |
+| crates/aipl-codegen/src/format_source | 17011 | 4337086 | 502099 | 11805986 | 6160980 | 2415.00 | 23450.32 | 5392 |
 | crates/aipl-codegen/src/grammar | 767 | 96951 | 49216 | 85221 | 108532 | 79.00 | 593.05 | 1728 |
-| crates/aipl-codegen/src/grammar_aipl | 1868589 | 390483514 | 928367 | 638404831 | 5404620 | 155400.00 | 15229.57 | 9392 |
+| crates/aipl-codegen/src/grammar_aipl | 1915015 | 400611646 | 934167 | 653297633 | 5516232 | 161376.00 | 15469.90 | 10080 |
 | crates/aipl-codegen/src/grammar_calc | 10185 | 1168142 | 42260 | 3600517 | 325848 | 916.00 | 3744.52 | 2544 |
 | crates/aipl-codegen/src/grammar_json | 19773 | 2806348 | 35129 | 7509309 | 349560 | 1784.00 | 3701.78 | 2560 |
 | crates/aipl-codegen/src/grammar_sexp | 5752 | 630255 | 13968 | 2170841 | 315652 | 599.00 | 3637.39 | 2432 |
@@ -713,13 +714,13 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/source_loc | 16 | 982 | 982 | 725 | 2008 | 5.00 | 83.61 | 1472 |
 | crates/aipl-codegen/src/split_test_sections | 0 | 0 | 0 | 10117 | 5320 | 6.00 | 87.13 | 1440 |
 | crates/aipl-codegen/src/strip_test_sections | 0 | 0 | 0 | 9135 | 3176 | 5.00 | 86.26 | 1456 |
-| crates/aipl-codegen/src/suffix | 76 | 6025 | 5968 | 3730 | 52800 | 15.00 | 255.64 | 1584 |
+| crates/aipl-codegen/src/suffix | 89 | 6957 | 6866 | 4783 | 54292 | 17.00 | 262.64 | 1616 |
 | crates/aipl-codegen/src/trim_end_while | 0 | 0 | 0 | 1489 | 2300 | 2.00 | 81.65 | 1424 |
 | crates/aipl-codegen/src/trim_prefix | 0 | 0 | 0 | 263 | 1024 | 2.00 | 83.35 | 1440 |
 | crates/aipl-codegen/src/trim_suffix | 0 | 0 | 0 | 351 | 1128 | 2.00 | 80.85 | 1424 |
 | crates/aipl-codegen/src/ty | 84 | 6766 | 6362 | 5280 | 14168 | 14.00 | 106.19 | 1520 |
 | crates/aipl-codegen/src/unescape | 6 | 528 | 352 | 10330 | 8116 | 7.00 | 93.62 | 1456 |
-| crates/aipl-codegen/src/walker | 100372 | 23658349 | 865728 | 71991651 | 15857856 | 13619.00 | 34756.23 | 10800 |
+| crates/aipl-codegen/src/walker | 101563 | 23993775 | 874528 | 72916330 | 16389788 | 13965.00 | 35769.43 | 10912 |
 | crates/aipl-mono/src/builtin_all | 1 | 32 | 32 | 1378 | 3444 | 3.00 | 84.19 | 1472 |
 | crates/aipl-mono/src/builtin_any | 1 | 32 | 32 | 1160 | 3336 | 3.00 | 83.99 | 1472 |
 | crates/aipl-mono/src/builtin_count | 1 | 104 | 104 | 1628 | 2292 | 3.00 | 82.53 | 1440 |
@@ -742,6 +743,8 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_find_index | 2 | 112 | 112 | 1690 | 5448 | 4.00 | 89.05 | 1472 |
 | crates/aipl-mono/src/builtin_find_map | 0 | 0 | 0 | 602 | 1796 | 3.00 | 85.89 | 1440 |
 | crates/aipl-mono/src/builtin_first | 1 | 80 | 80 | 360 | 1568 | 3.00 | 80.52 | 1472 |
+| crates/aipl-mono/src/builtin_grid_from | 0 | 0 | 0 | 586 | 1356 | 1.00 | 134.35 | 1440 |
+| crates/aipl-mono/src/builtin_grid_get | 1 | 80 | 80 | 633 | 1784 | 3.00 | 87.94 | 1456 |
 | crates/aipl-mono/src/builtin_inline_str | 4 | 254 | 254 | 685 | 2476 | 3.00 | 80.88 | 1440 |
 | crates/aipl-mono/src/builtin_int_parse | 0 | 0 | 0 | 20013 | 4560 | 5.00 | 90.81 | 1440 |
 | crates/aipl-mono/src/builtin_intersperse | 14 | 960 | 1440 | 2755 | 4720 | 6.00 | 83.16 | 1472 |

@@ -74,7 +74,6 @@ import {
     is_space,
     join,
     last,
-    left_fold,
     len,
     less_than as <,
     less_than_or_equal as <=,
@@ -325,6 +324,7 @@ import { strip_test_sections } from "./strip_test_sections.aipl";
 import {
     Field as SufField,
     Index as SufIndex,
+    Index2 as SufIndex2,
     Method as SufMethod,
     SliceFrom as SufSliceFrom,
     SliceTo as SufSliceTo,
@@ -722,7 +722,7 @@ fn types() -> Production<AiplTok, Ast>[] {
     // Left-recursive postfix under LR; here a core followed by its suffixes.
     let base_ty: Rule<AiplTok> = Then([
         Named("ty_core"),
-        Many(OneOf([Lit("?"), Then([Lit("["), Lit("]")])])),
+        Many(OneOf([Lit("?"), Then([Lit("["), Lit(","), Lit("]")]), Then([Lit("["), Lit("]")])])),
     ]);
 
     // `#{T}` a set, `#{K: V}` a dict, `#>{T}` / `#<{T}` an ordered set —
@@ -959,10 +959,11 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Then([Lit("."), Term(Name), nest("(", Named("args"), ")", loose())]),
         Then([Lit("."), Term(Name)]),
         Then([Lit("."), Term(IntLit)]),
-        // The three index forms are bracket pairs, not lists: `a[..b]` holds one
+        // The four index forms are bracket pairs, not lists: `a[..b]` holds one
         // expression and a `..`, and there is nothing in it to break at.
         Then([one(Then([Lit(".."), Named("expr")]), nested_in=brackets())]),
         Then([one(Then([Named("expr"), Lit("..")]), nested_in=brackets())]),
+        Then([one(Then([Named("expr"), Lit(","), Named("expr")]), nested_in=brackets())]),
         Then([one(Named("expr"), nested_in=brackets())]),
         Lit("?"),
     ]);
@@ -1417,6 +1418,11 @@ fn lower_suffix(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         [Tok(_)] => ok(ASuffix(SufTry)),
         // `.name`, and `.0` — a tuple slot, which `field_name` spells `_0`.
         [Tok(_), name] => ok(ASuffix(SufField(field_name(name.slot_text(src), sp)?))),
+        // `[row, column]`
+        [Tok(_), Sub(_), Tok(_), Sub(_), Tok(_)] => ok(ASuffix(SufIndex2(
+            kid_expr(kids, 0, sp)?,
+            kid_expr(kids, 1, sp)?,
+        ))),
         // `.name(args)`
         [Tok(_), name, Tok(_), Sub(_), Tok(_)] => {
             let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a method call")?;
@@ -3788,6 +3794,13 @@ pub fn lower_aipl_ty(src: str) -> Ty!ParseError {
     assert(ty_dump("Box<i64>") == "Generic(Box, i64)");
     assert(ty_dump("Map<str, i64>") == "Generic(Map, str, i64)");
     assert(ty_dump("Box<T>[]") == "Array(Generic(Box, T))");
+
+    // A grid is the builtin generic `__builtin_Grid`; `[,]` composes with the
+    // other suffixes in the order written.
+    assert(ty_dump("i64[,]") == "Generic(__builtin_Grid, i64)");
+    assert(ty_dump("i64[,][]") == "Array(Generic(__builtin_Grid, i64))");
+    assert(ty_dump("i64[][,]") == "Generic(__builtin_Grid, Array(i64))");
+    assert(ty_dump("i64[,]?") == "Optional(Generic(__builtin_Grid, i64))");
     assert(ty_dump("Case<V>") == "Case(V)");
     assert(ty_dump("Case<A, B>") == "error: Case<V> takes one type argument, got 2");
 
@@ -4718,6 +4731,12 @@ pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
     // positions, brackets included — in particular `v[..3]` and `v[4..]`, which
     // differ only in which position holds the operand.
     let suffixes = aipl_parse_file("fn h(v: i64) { v.a; v.0; v.m(1); v[2]; v[..3]; v[4..]; v?; }")?;
+    // Two indexes read one cell of a grid, and are the builtin call that answers it.
+    assert(
+        aipl_parse_file(
+            "fn h(g: i64[,]) { g[1, 2]; }",
+        )?.program.show_program() == "fn h(g: Generic(__builtin_Grid, i64)) = Seq(__builtin_grid_get(g, 1, 2), ())",
+    );
     let want_suffixes = "fn h(v: i64) = Seq(v.a, Seq(v._0, Seq(v.m(1), Seq(Index(v, 2), Seq(Slice(v, 0, 3), Seq(Slice(v, 4, ), Seq(Try(v), ())))))))";
     assert(suffixes.program.show_program() == want_suffixes);
 
@@ -5358,15 +5377,31 @@ fn lower_ty_parens(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # nothing and `]` is what closes an array suffix.
 fn lower_base_ty(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let core = as_ty(kid(kids, 0, sp)?, sp)?;
-    ok(ATy(node.tokens.left_fold(
-        core,
-        |t: Ty, tok: Span| match (src[tok]) {
-            "?" => TyOptional(t),
-            "]" => TyArray(t),
-            _ => t,
-        },
-    )))
+    mut ty = as_ty(kid(kids, 0, sp)?, sp)?;
+
+    // `[,]` is three tokens and `[]` is two, so a `]` is an array only when the
+    // `,` that would have made it a grid has not just been seen.
+    mut in_grid = false;
+    for (let tok : node.tokens) {
+        match (src[tok]) {
+            "?" => {
+                set ty = TyOptional(ty);
+            },
+            "," => {
+                set ty = TyGeneric("__builtin_Grid", [ty]);
+                set in_grid = true;
+            },
+            "]" => {
+                if (in_grid) {
+                    set in_grid = false;
+                } else {
+                    set ty = TyArray(ty);
+                };
+            },
+            _ => {},
+        };
+    }
+    ok(ATy(ty))
 }
 
 # `ty_core` — `#{K: V}`, `#{T}`, `Name<A, B>` and a bare `Name`. The `#` is what

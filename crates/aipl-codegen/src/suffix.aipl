@@ -28,6 +28,7 @@ variant Suffix =
     | Field(str)
     | Method(name: str, args: Expr[])
     | Index(Expr)
+    | Index2(Expr, Expr)
     | SliceFrom(Expr)
     | SliceTo(Expr)
     | Try
@@ -40,6 +41,8 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
         Field(name) => at(FieldExpr(recv, name), span),
         Method(name, args) => at(Call(name, [recv, ..args], true), span),
         Index(index) => index_or_slice(recv, index, span),
+        // `recv[row, column]` reads one cell of a grid; the builtin answers `none` off the grid.
+        Index2(row, column) => at(Call("__builtin_grid_get", [recv, row, column], false), span),
         SliceFrom(lo) => at(Slice(recv, lo, none), span),
         // `recv[..end]` is `recv[0..end]`: the start clamps to `[0, len]`
         // regardless, so a synthetic `0` is the whole difference.
@@ -51,6 +54,9 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     assert(apply_suffix(p, Field("x"), 0..0).show_expr() == "p.x");
     assert(apply_suffix(p, Method("f", [num(1)]), 0..0).show_expr() == "p.f(1)");
     assert(apply_suffix(p, Index(num(1)), 0..0).show_expr() == "Index(p, 1)");
+    assert(
+        apply_suffix(p, Index2(num(1), num(2)), 0..0).show_expr() == "__builtin_grid_get(p, 1, 2)",
+    );
     assert(apply_suffix(p, SliceFrom(num(1)), 0..0).show_expr() == "Slice(p, 1, )");
     assert(apply_suffix(p, SliceTo(num(2)), 0..0).show_expr() == "Slice(p, 0, 2)");
     assert(apply_suffix(p, Try, 0..0).show_expr() == "Try(p)");

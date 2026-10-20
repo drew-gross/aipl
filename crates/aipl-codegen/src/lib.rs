@@ -2460,6 +2460,9 @@ pub struct Frontend {
 /// for the frontend alone. It reports every finding the checker collected, not
 /// just the first.
 pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
+    // A nested literal where a grid is expected becomes a call to `grid_from`.
+    // First, so the demand scan below sees the builtin it introduces.
+    let program = &aipl_mono::lower_grid_literals(program).map_err(|e| vec![e])?;
     // Builtin *types* (e.g. `__builtin_Span`) are real struct declarations,
     // unlike builtin functions: a call to a builtin function is intercepted by
     // reserved name in codegen and never needs to reach monomorphization as a
@@ -12423,6 +12426,10 @@ fn emit_render<M: Module>(
         ConcreteType::Named(_) if is_boxed(ty, cx.structs) => {
             emit_render_boxed(module, builder, cx, value, ty, sink)?
         }
+        // A grid is a struct underneath, but reads as its rows.
+        ConcreteType::Named(n) if aipl_syntax::is_grid_instance(n) => {
+            emit_render_grid(module, builder, cx, value, n, sink)?
+        }
         ConcreteType::Named(_) => emit_render_named(module, builder, cx, value, ty, sink)?,
         other => {
             return Err(Error::msg(format!(
@@ -13077,6 +13084,131 @@ fn emit_render_struct<M: Module>(
     }
     let close = emit_lit(module, builder, cx, sink, if tuple { b")" } else { b" }" })?;
     Ok(builder.ins().iadd(len, close))
+}
+
+/// Render a grid as its rows, `[[1, 2], [3, 4]]`; a grid with no cells is `[]`.
+///
+/// The cells are one flat array, so this is [`emit_render_seq`]'s walk with a
+/// different separator: `, ` between cells of a row, `], [` between rows (every
+/// `width`th cell), and the extra bracket at each end.
+fn emit_render_grid<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    base: Value,
+    sname: &str,
+    sink: Sink,
+) -> Result<Value, Error> {
+    let layout = cx
+        .structs
+        .get(sname)
+        .and_then(TypeDef::as_struct)
+        .expect("struct layout");
+    let field = |name: &str| {
+        layout
+            .fields
+            .iter()
+            .find(|f| f.name == name)
+            .map(|f| (f.offset, f.ty.clone()))
+            .expect("a grid has width and cells")
+    };
+    let (width_offset, width_ty) = field("width");
+    let (cells_offset, cells_ty) = field("cells");
+    let ConcreteType::Array(elem_ty) = &cells_ty else {
+        unreachable!("a grid's cells are an array");
+    };
+    let elem_ty = (**elem_ty).clone();
+    let width = component(builder, base, width_offset, &width_ty, cx.structs);
+    let cells = component(builder, base, cells_offset, &cells_ty, cx.structs);
+    let arr = arr_view(builder, cells, &cells_ty, cx.structs);
+    let count = arr.len;
+    // A zero width would divide by zero below; a grid with cells never has one.
+    let one = builder.ins().iconst(types::I64, 1);
+    let width_is_zero = builder.ins().icmp_imm_s(IntCC::Equal, width, 0);
+    let row_width = builder.ins().select(width_is_zero, one, width);
+
+    let len_slot =
+        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
+    let zero = builder.ins().iconst(types::I64, 0);
+    builder.ins().stack_store(types::I64, zero, len_slot, 0);
+    let idx =
+        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
+    builder.ins().stack_store(types::I64, zero, idx, 0);
+
+    let header = builder.create_block();
+    let body = builder.create_block();
+    let exit = builder.create_block();
+    builder.ins().jump(header, &[]);
+
+    builder.switch_to_block(header);
+    let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
+    let more = builder.ins().icmp(IntCC::SignedLessThan, i, count);
+    builder.ins().brif(more, body, &[], exit, &[]);
+
+    builder.switch_to_block(body);
+    builder.seal_block(body);
+    // What comes before cell `i`: `[[` before the first, `], [` before the first
+    // of each later row, `, ` otherwise.
+    let is_first = builder.ins().icmp_imm_s(IntCC::Equal, i, 0);
+    let first_b = builder.create_block();
+    let later_b = builder.create_block();
+    let row_b = builder.create_block();
+    let comma_b = builder.create_block();
+    let after_sep = builder.create_block();
+    builder.ins().brif(is_first, first_b, &[], later_b, &[]);
+    builder.switch_to_block(first_b);
+    builder.seal_block(first_b);
+    let lead = emit_lit(module, builder, cx, sink, b"[[")?;
+    add_len(builder, len_slot, lead);
+    builder.ins().jump(after_sep, &[]);
+    builder.switch_to_block(later_b);
+    builder.seal_block(later_b);
+    let column = builder.ins().urem(i, row_width);
+    let starts_row = builder.ins().icmp_imm_s(IntCC::Equal, column, 0);
+    builder.ins().brif(starts_row, row_b, &[], comma_b, &[]);
+    builder.switch_to_block(row_b);
+    builder.seal_block(row_b);
+    let next_row = emit_lit(module, builder, cx, sink, b"], [")?;
+    add_len(builder, len_slot, next_row);
+    builder.ins().jump(after_sep, &[]);
+    builder.switch_to_block(comma_b);
+    builder.seal_block(comma_b);
+    let comma = emit_lit(module, builder, cx, sink, b", ")?;
+    add_len(builder, len_slot, comma);
+    builder.ins().jump(after_sep, &[]);
+    builder.switch_to_block(after_sep);
+    builder.seal_block(after_sep);
+
+    let elem_val = load_view_elem(builder, arr, i, &elem_ty, cx.structs);
+    let elem_len = emit_render(module, builder, cx, elem_val, &elem_ty, sink)?;
+    add_len(builder, len_slot, elem_len);
+    let next = builder.ins().iadd_imm_s(i, 1);
+    builder.ins().stack_store(types::I64, next, idx, 0);
+    builder.ins().jump(header, &[]);
+    builder.seal_block(header);
+
+    builder.switch_to_block(exit);
+    builder.seal_block(exit);
+    let empty = builder.ins().icmp_imm_s(IntCC::Equal, count, 0);
+    let empty_b = builder.create_block();
+    let full_b = builder.create_block();
+    let done = builder.create_block();
+    builder.ins().brif(empty, empty_b, &[], full_b, &[]);
+    builder.switch_to_block(empty_b);
+    builder.seal_block(empty_b);
+    let none = emit_lit(module, builder, cx, sink, b"[]")?;
+    add_len(builder, len_slot, none);
+    builder.ins().jump(done, &[]);
+    builder.switch_to_block(full_b);
+    builder.seal_block(full_b);
+    let tail = emit_lit(module, builder, cx, sink, b"]]")?;
+    add_len(builder, len_slot, tail);
+    builder.ins().jump(done, &[]);
+    builder.switch_to_block(done);
+    builder.seal_block(done);
+    Ok(builder
+        .ins()
+        .stack_load(types::I64, types::I64, len_slot, 0))
 }
 
 /// Render a variant as `Ctor(f0, f1)` (or just `Ctor` for a nullary case):

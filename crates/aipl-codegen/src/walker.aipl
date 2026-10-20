@@ -787,7 +787,7 @@ fn named_ty(self: W) -> WDoc!FmtError {
     ok(WDoc { w: closed, doc: Concat([Text(n.text), comma_list_docs(args.docs, Angles)]) })
 }
 
-# A run of `?` (optional) and `[]` (array) suffixes, in source order.
+# A run of `?` (optional), `[]` (array) and `[,]` (grid) suffixes, in source order.
 fn type_suffixes(self: W, acc0: Doc[]) -> WDocs {
     mut w = self;
     mut acc = acc0;
@@ -800,6 +800,9 @@ fn type_suffixes(self: W, acc0: Doc[]) -> WDocs {
             if (w.peek_text() == "[" && w.peek_text_n(1) == "]") {
                 set acc.push(Text("[]"));
                 set w = w.bump().w.bump().w;
+            } else if (w.peek_text() == "[" && w.peek_text_n(1) == ",") {
+                set acc.push(Text("[,]"));
+                set w = w.bump().w.bump().w.bump().w;
             } else {
                 set more = false;
             };
@@ -1983,7 +1986,7 @@ fn dot_seg(self: W) -> WSeg!FmtError {
     })
 }
 
-# `[i]`, `[a..b]`, `[a..]`, `[..b]` — indexing and the slice forms.
+# `[i]`, `[a..b]`, `[a..]`, `[..b]`, `[row, column]` — indexing and the slice forms.
 fn index_seg(self: W) -> WSeg!FmtError {
     let opened = self.bump().w;
     let WDocs { w, docs } = if (opened.peek_text() == "..") {
@@ -2001,9 +2004,13 @@ fn slice_to(self: W) -> WDocs!FmtError {
     ok(WDocs { w, docs: [Text(".."), doc] })
 }
 
-# `[i]`, `[a..b]`, or `[a..]`.
+# `[i]`, `[a..b]`, `[a..]`, or `[row, column]`.
 fn index_or_from(self: W) -> WDocs!FmtError {
     let a = self.expr()?;
+    if (a.w.peek_text() == ",") {
+        let column = a.w.bump().w.expr()?;
+        return ok(WDocs { w: column.w, docs: [a.doc, Text(", "), column.doc] });
+    };
     if (a.w.peek_text() != "..") {
         return ok(WDocs { w: a.w, docs: [a.doc] });
     };
@@ -2906,6 +2913,9 @@ fn walker_of(src: str) -> W!FmtError {
     assert(walker_of("i64 [ ] [ ]")?.ty().rendered(100)? == "i64[][]");
     assert(walker_of("i64 ? [ ]")?.ty().rendered(100)? == "i64?[]");
     assert(walker_of("i64 [ ] ?")?.ty().rendered(100)? == "i64[]?");
+    // A grid is a suffix of its own, three tokens where an array's is two.
+    assert(walker_of("i64 [ , ]")?.ty().rendered(100)? == "i64[,]");
+    assert(walker_of("i64 [ , ] [ ] ?")?.ty().rendered(100)? == "i64[,][]?");
 
     // Set and dict types.
     assert(walker_of("#{ str }")?.ty().rendered(100)? == "#{str}");
@@ -3106,6 +3116,7 @@ fn walker_of(src: str) -> W!FmtError {
     assert(walker_of("xs [ a .. b ]")?.expr().rendered(100)? == "xs[a..b]");
     assert(walker_of("xs [ a .. ]")?.expr().rendered(100)? == "xs[a..]");
     assert(walker_of("xs [ .. b ]")?.expr().rendered(100)? == "xs[..b]");
+    assert(walker_of("grid [ r , c + 1 ]")?.expr().rendered(100)? == "grid[r, c + 1]");
 
     // Two or more calls form a chain that breaks before each call when too wide.
     assert(walker_of("a . f ( ) . g ( )")?.expr().rendered(100)? == "a.f().g()");

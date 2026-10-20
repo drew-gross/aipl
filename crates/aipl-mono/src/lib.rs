@@ -43,7 +43,9 @@ mod lower_reductions;
 pub use lower_reductions::lower_reductions;
 
 mod fuse_try_with;
+mod grid_literals;
 pub use fuse_try_with::{fuse_try_with, fuse_try_with_post_mono, lower_try_set};
+pub use grid_literals::lower_grid_literals;
 
 mod counting_variants;
 pub use counting_variants::counting_variants;
@@ -7925,6 +7927,8 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::CountIsEqual, "builtin_count_is_equal.aipl"),
     (Callee::CountIsNotEqual, "builtin_count_is_not_equal.aipl"),
     (Callee::First, "builtin_first.aipl"),
+    (Callee::GridGet, "builtin_grid_get.aipl"),
+    (Callee::GridFrom, "builtin_grid_from.aipl"),
     (Callee::Last, "builtin_last.aipl"),
     (Callee::NonemptyFirst, "builtin_nonempty_first.aipl"),
     (Callee::NonemptyLast, "builtin_nonempty_last.aipl"),
