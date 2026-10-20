@@ -6,7 +6,7 @@
 # When nobody else holds the array it is written in place and handed back (see
 # `with_in_place` for the allocation counts); otherwise the original is untouched.
 
-import { equal as ==, print, reverse, to_str, try_with, with } from builtins;
+import { equal as ==, print, reverse, to_str, try_set, with } from builtins;
 
 variant Cell = Mark(i64) | Blank
 
@@ -56,10 +56,10 @@ fn main() !prints {
     print(to_str(xs.with(3, 99)));
 
     // Updating a variable: a write that missed leaves the array as it was, which
-    // is what `try_with` says directly.
+    // is what `try_set` says directly.
     mut ys = xs;
-    set ys = ys.try_with(0, 1);
-    set ys = ys.try_with(7, 2);
+    set ys = ys.try_set(0, 1);
+    set ys = ys.try_set(7, 2);
     print(to_str(ys));
     print(to_str(xs));
 }

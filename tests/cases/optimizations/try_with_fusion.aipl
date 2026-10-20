@@ -1,4 +1,4 @@
-# `xs.with(i, v).value_or(xs)` is `xs.try_with(i, v)` — the same answer with the
+# `xs.with(i, v).value_or(xs)` is `xs.try_set(i, v)` — the same answer with the
 # receiver read once, so the write can happen in place. The lint `with_value_or_self`
 # steers source to the short spelling; the optimizer fuses the longhand regardless,
 # including where only inlining makes the fallback the receiver (`same(xs)` here is

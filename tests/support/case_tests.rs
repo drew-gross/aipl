@@ -82,7 +82,7 @@ case_tests! {
     cases_arrays_str_array = "cases/arrays/str_array",
     cases_arrays_sum_and_len = "cases/arrays/sum_and_len",
     cases_arrays_to_str_arrays = "cases/arrays/to_str_arrays",
-    cases_arrays_try_with = "cases/arrays/try_with",
+    cases_arrays_try_set = "cases/arrays/try_set",
     cases_arrays_tuple_windows = "cases/arrays/tuple_windows",
     cases_arrays_with = "cases/arrays/with",
     cases_arrays_with_in_place = "cases/arrays/with_in_place",

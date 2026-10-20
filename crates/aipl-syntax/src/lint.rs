@@ -240,9 +240,9 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     each_expr(program, &mut |e| {
         is_empty_longhand(e, src, &empties, &mut hits)
     });
-    // `xs.with(i, v).value_or(xs)` is `xs.try_with(i, v)`; only where `with` and
+    // `xs.with(i, v).value_or(xs)` is `xs.try_set(i, v)`; only where `with` and
     // `value_or` are the builtins — see `with_names`, which also names the
-    // `try_with` import when it is missing.
+    // `try_set` import when it is missing.
     if let Some(names) = with_names(program) {
         each_expr(program, &mut |e| {
             with_value_or_self(e, src, &names, &mut hits)

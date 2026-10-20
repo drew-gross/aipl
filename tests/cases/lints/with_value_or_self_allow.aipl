@@ -1,12 +1,12 @@
 # The squelch: the longhand stays when it is wanted, and the rewrite agrees with it.
 
-import { equal as ==, try_with, value_or, with } from builtins;
+import { equal as ==, try_set, value_or, with } from builtins;
 
 fn longhand(xs: i64[], i: u64) -> i64[] {
     xs.with(i, 9).value_or(xs) #[allow]
 }
 
-fn rewritten(xs: i64[], i: u64) -> i64[] { xs.try_with(i, 9) }
+fn rewritten(xs: i64[], i: u64) -> i64[] { xs.try_set(i, 9) }
 
 // A field path off a binding is the same place.
 struct Board { cells: i64[] }

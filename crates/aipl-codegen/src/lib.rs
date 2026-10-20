@@ -2694,7 +2694,7 @@ fn compile_program<M: Module>(
             let effectful = effectful.clone();
             move |program, scope| aipl_mono::sink_bindings(program, &effectful, scope)
         }),
-        // `xs.with(i, v).value_or(xs)` is `xs.try_with(i, v)`, which reads `xs`
+        // `xs.with(i, v).value_or(xs)` is `xs.try_set(i, v)`, which reads `xs`
         // once and so can write in place. After inlining, which is what leaves the
         // receiver and the fallback as two aliases of one place.
         Pass::whole_program("fuse_try_with", aipl_mono::fuse_try_with),
@@ -2709,6 +2709,7 @@ fn compile_program<M: Module>(
     // reduction, and before monomorphization, which is the last place that can
     // still turn it into a call to an AIPL builtin. See `lower_reductions`.
     let folded = aipl_mono::lower_reductions(&folded);
+    let folded = aipl_mono::lower_try_set(&folded);
     let monomorphized = aipl_mono::monomorphize(&folded, dbg)?;
     // A second inlining pass now that monomorphization has lifted each lambda to
     // its own function and split higher-order callees into per-lambda
@@ -8874,13 +8875,13 @@ fn compile_binding_value<M: Module>(
     compile_expr(module, builder, cx, scopes, value)
 }
 
-/// `try_with`, after its arguments are evaluated and the receiver's
+/// `__with_or_self`, after its arguments are evaluated and the receiver's
 /// reference is this site's: the array with element `idx` replaced when that is in
 /// range, and the receiver itself when it is not. The same write as `with` —
 /// `aipl_arr_writable` for a block this site owns outright, then the element — and
 /// the same consumed reference, which in the miss case simply becomes the result.
 #[allow(clippy::too_many_arguments)]
-fn compile_try_with<M: Module>(
+fn compile_with_or_self<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
     cx: Cx,
@@ -15798,9 +15799,9 @@ fn compile_call_expr_direct<M: Module>(
                 .push(Tracked::new(ptr, &result_ty));
             (ptr, result_ty)
         }
-        Callee::With | Callee::TryWith => {
+        Callee::With | Callee::WithOrSelf => {
             // `with(xs, i, v) -> T[]?`: `some` of `xs` with element `i` replaced, or
-            // `none` when `i` is past the end. `try_with`
+            // `none` when `i` is past the end. `__with_or_self`
             // is the same operation answering `xs` itself in that case, as an array
             // and not an optional.
             //
@@ -15813,7 +15814,7 @@ fn compile_call_expr_direct<M: Module>(
             // the same guard the in-place `map` uses before its plain stores — and
             // the result optional owns it. When `i` is out of range the consumed
             // reference is released and there is no array to hand back.
-            let or_self = *callee == Callee::TryWith;
+            let or_self = *callee == Callee::WithOrSelf;
             let [receiver, index, value] = args else {
                 return Err(arity_bug(name, 3, args.len(), &span));
             };
@@ -15858,7 +15859,7 @@ fn compile_call_expr_direct<M: Module>(
                 arr_ty.clone()
             };
             if or_self {
-                return compile_try_with(
+                return compile_with_or_self(
                     module,
                     builder,
                     cx,

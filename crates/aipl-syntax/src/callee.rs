@@ -207,7 +207,7 @@ pub enum Callee {
     SortBy,
     Repeat,
     With,
-    TryWith,
+    TrySet,
 
     // ---- operator impls: `import { wrapping_add as + } from builtins;` ----
     // Importable like the rest, by name (`import { concat }` then `concat(a, b)`)
@@ -309,6 +309,11 @@ pub enum Callee {
     /// `__random_next()`: the generator a `shim random <provider>` installs as
     /// `random_u64` — a runtime entry point, never called from source (the parser).
     RandomNext,
+    /// `__with_or_self(xs, i, v) -> T[]`: `xs` with element `i` replaced, or `xs`
+    /// itself when `i` is past the end — what `try_set` lowers to (`lower_try_set`),
+    /// and what `xs.with(i, v).value_or(xs)` is fused into (`fuse_try_with`). One
+    /// read of `xs`, so it writes in place when `with` would.
+    WithOrSelf,
     /// `__random_seed(seed)`: start the sequence at `seed` (the parser, as the first
     /// thing in a `shim random seeded_with_int(seed)` body).
     RandomSeed,
@@ -452,7 +457,7 @@ impl Callee {
         Callee::SortBy,
         Callee::Repeat,
         Callee::With,
-        Callee::TryWith,
+        Callee::TrySet,
         // The operator impls: every arm an operator spelling can resolve to.
         Callee::WrappingAdd,
         Callee::SaturatingAdd,
@@ -502,6 +507,7 @@ impl Callee {
         Callee::SplitIter,
         Callee::DictKeyAt,
         Callee::DictValueAt,
+        Callee::WithOrSelf,
         Callee::RandomNext,
         Callee::RandomSeed,
         Callee::RandomSeedFromClock,
@@ -636,7 +642,8 @@ impl Callee {
             Callee::SortBy => "__builtin_sort_by",
             Callee::Repeat => "__builtin_repeat",
             Callee::With => "__builtin_with",
-            Callee::TryWith => "__builtin_try_with",
+            Callee::TrySet => "__builtin_try_set",
+            Callee::WithOrSelf => "__with_or_self",
 
             Callee::WrappingAdd => "__builtin_wrapping_add",
             Callee::SaturatingAdd => "__builtin_saturating_add",

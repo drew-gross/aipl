@@ -17,6 +17,7 @@ projects:
   ray tracer:
     https://raytracing.github.io/books/RayTracingInOneWeekend.html
   minesweeper:
+    Game should just be a Marks[,]. Width and height are available on it directly, and mines can be folded in to marks (rename to cells?)
     make with() calls update in place
     Finish todo items in readme
     use an arrow-keys commands model
@@ -98,6 +99,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  lower_try_set seems like it should be more generic
   if callee.name() != names.value_or -> this should just compare directly to the ValueOr builtin enum. Maybe this needs to move linting after name resolution?
   rename prints effect to print
   assign_stmt could be DRYed up probably

@@ -2,12 +2,12 @@ use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
 use crate::Error;
 
 /// What [`with_value_or_self`] needs from the file's imports: what it calls the
-/// `with` and `value_or` builtins, and what it calls `try_with` (`None` when it
+/// `with` and `value_or` builtins, and what it calls `try_set` (`None` when it
 /// has not imported it, which the advice then says to do).
 pub(super) struct WithNames {
     with: String,
     value_or: String,
-    try_with: Option<String>,
+    try_set: Option<String>,
 }
 
 /// Read those names out of the import list; `None` unless the file imports both
@@ -31,17 +31,17 @@ pub(super) fn with_names(program: &Program) -> Option<WithNames> {
     Some(WithNames {
         with: imported("with")?,
         value_or: imported("value_or")?,
-        try_with: imported("try_with"),
+        try_set: imported("try_set"),
     })
 }
 
 /// `xs.with(i, v).value_or(xs)` — a replacement that falls back to the array it
-/// was replacing in. That is `xs.try_with(i, v)`, which says it directly: a write
+/// was replacing in. That is `xs.try_set(i, v)`, which says it directly: a write
 /// past the end does nothing.
 ///
 /// The longhand also reads `xs` twice, and the first read is the one that wants to
 /// be a move: `with` writes into an array nobody else holds, and the fallback is
-/// someone else holding it. So it can never write in place; `try_with` can.
+/// someone else holding it. So it can never write in place; `try_set` can.
 ///
 /// Only when the fallback is the *same place* as the receiver — a binding, or a
 /// field path off one. A different array (`xs.with(i, v).value_or(ys)`), or an
@@ -70,15 +70,15 @@ pub(super) fn with_value_or_self(e: &Expr, src: &str, names: &WithNames, hits: &
         return;
     }
     let array = super::quote(receiver, src, "<array>");
-    let try_with = names.try_with.as_deref().unwrap_or("try_with");
-    let import = if names.try_with.is_none() {
-        ", importing `try_with` from builtins"
+    let try_set = names.try_set.as_deref().unwrap_or("try_set");
+    let import = if names.try_set.is_none() {
+        ", importing `try_set` from builtins"
     } else {
         ""
     };
     hits.push(Error::at(
         format!(
-            "this `{}` falls back to the array it is replacing in — write \"{array}.{try_with}(..)\" \
+            "this `{}` falls back to the array it is replacing in — write \"{array}.{try_set}(..)\" \
              and drop the fallback{import} (or append #[allow] to this line to keep it)",
             names.value_or
         ),

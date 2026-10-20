@@ -43,7 +43,7 @@ mod lower_reductions;
 pub use lower_reductions::lower_reductions;
 
 mod fuse_try_with;
-pub use fuse_try_with::{fuse_try_with, fuse_try_with_post_mono};
+pub use fuse_try_with::{fuse_try_with, fuse_try_with_post_mono, lower_try_set};
 
 mod counting_variants;
 pub use counting_variants::counting_variants;
@@ -11463,7 +11463,7 @@ fn aliases_or_unsafe(
                         // `with` takes the receiver's reference and writes into
                         // it when nothing else holds the block, or copies it:
                         // it never keeps `name` and the result both.
-                        Callee::With | Callee::TryWith => false,
+                        Callee::With | Callee::WithOrSelf => false,
                         _ => !tail,
                     }
                 } else {
@@ -11499,7 +11499,7 @@ fn aliases_or_unsafe(
                     if is_n(a) {
                         // `with`'s array (argument 0), as in the method form above.
                         let consuming = consuming
-                            || (matches!(fname, Callee::With | Callee::TryWith) && k == 0);
+                            || (matches!(fname, Callee::With | Callee::WithOrSelf) && k == 0);
                         !consuming && !tail && !builtin_reads_arg(fname, k)
                     } else {
                         rec_tail(a)

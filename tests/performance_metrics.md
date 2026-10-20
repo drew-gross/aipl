@@ -92,7 +92,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/arrays/str_array | 6 | 576 | 576 | 1013 | 2876 | 4.00 | 84.10 | 1472 |
 | cases/arrays/sum_and_len | 0 | 0 | 0 | 295 | 600 | 3.00 | 79.74 | 1440 |
 | cases/arrays/to_str_arrays | 9 | 288 | 304 | 2175 | 4524 | 11.00 | 80.81 | 1520 |
-| cases/arrays/try_with | 3 | 1075 | 1075 | 15847 | 1876 | 6.00 | 281.79 | 1472 |
+| cases/arrays/try_set | 3 | 1075 | 1075 | 15847 | 1876 | 7.00 | 293.97 | 1472 |
 | cases/arrays/tuple_windows | 19 | 920 | 338 | 2133 | 6104 | 15.00 | 129.15 | 1536 |
 | cases/arrays/with | 6 | 189 | 189 | 1412 | 3536 | 7.00 | 233.93 | 1488 |
 | cases/arrays/with_in_place | 4 | 1603 | 1603 | 23937 | 2588 | 7.00 | 180.39 | 1472 |

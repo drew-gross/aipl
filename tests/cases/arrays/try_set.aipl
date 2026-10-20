@@ -1,0 +1,112 @@
+# `try_set` replaces one element of an array in place, and does nothing when the
+# index is past the end: `set xs.try_set(i, v);` leaves `xs` with element `i` set
+# to `v`, or as it was when there is no element `i`. Like `push` it is a mutating
+# method, so as an expression `xs.try_set(i, v)` is the updated copy and `xs` is
+# untouched. `with` is the form that says which happened (`some(copy)` or `none`).
+# The pinned report is the claim that it writes in place: a hundred updates of a
+# 64-element array allocate the array once.
+
+import {
+    equal as ==,
+    print,
+    repeat,
+    reverse,
+    saturating_remainder as %,
+    to_str,
+    try_set,
+    wrapping_add_assign as +=,
+} from builtins;
+
+variant Cell = Mark(i64) | Blank
+
+fn basics() {}.test({
+    assert([1, 2, 3].try_set(1, 9) == [1, 9, 3]);
+    // The ends.
+    assert([1, 2, 3].try_set(0, 9) == [9, 2, 3]);
+    assert([1, 2, 3].try_set(2, 9) == [1, 2, 9]);
+    // Past the end, and an empty receiver: the array, as it was.
+    assert([1, 2, 3].try_set(3, 9) == [1, 2, 3]);
+    assert([1, 2, 3].try_set(100, 9) == [1, 2, 3]);
+    assert([1, 2][..0].try_set(0, 9) == []);
+    assert(try_set([1, 2], 0, 7) == [7, 2]); // free-call form
+    // As an expression the receiver is not changed.
+    let xs = [1, 2, 3];
+    let ys = xs.try_set(0, 9);
+    assert(ys == [9, 2, 3]);
+    assert(xs == [1, 2, 3]);
+})
+
+// As a statement it is the receiver that changes.
+fn statement() {}.test({
+    mut xs = [1, 2, 3];
+    set xs.try_set(1, 9);
+    assert(xs == [1, 9, 3]);
+    set xs.try_set(5, 0);
+    assert(xs == [1, 9, 3]);
+    // A field of a struct, through a `mut` binding.
+    mut board = Board { cells: [Blank, Blank] };
+    set board.cells.try_set(1, Mark(4));
+    assert(board.cells == [Blank, Mark(4)]);
+})
+
+struct Board { cells: Cell[] }
+
+// Elements that own something, and ones that don't take a whole word.
+fn other_elements() {}.test({
+    assert(["a", "b"].try_set(1, "z") == ["a", "z"]);
+    assert([[1], [2, 3]].try_set(0, [7, 8]) == [[7, 8], [2, 3]]);
+    assert([true, false, true].try_set(1, true) == [true, true, true]);
+    assert([true, true, true].try_set(2, false) == [true, true, false]);
+    assert([true, false].try_set(2, true) == [true, false]);
+    let narrow: u8[] = [1, 2, 3];
+    assert(narrow.try_set(1, 200) == [1, 200, 3]);
+    assert([Mark(1), Blank].try_set(1, Mark(2)) == [Mark(1), Mark(2)]);
+})
+
+// A view of another array: the write must not reach the array it looks into.
+fn views() {}.test({
+    let xs = [1, 2, 3, 4];
+    let tail = xs[1..];
+    assert(tail.try_set(0, 9) == [9, 3, 4]);
+    assert(xs == [1, 2, 3, 4]);
+    let backwards = xs.reverse();
+    assert(backwards.try_set(0, 9) == [9, 3, 2, 1]);
+    assert(xs == [1, 2, 3, 4]);
+})
+
+fn sum(xs: i64[]) -> i64 {
+    mut total = 0;
+    for (let x : xs) {
+        set total += x;
+    }
+    total
+}
+
+fn main() !prints {
+    mut cells: i64[] = [0].repeat(64);
+    for (let i : 0..100) {
+        set cells.try_set(i % 64, 7);
+    }
+    // A miss changes nothing.
+    set cells.try_set(64, 1);
+    print(to_str(sum(cells)));
+}
+--- stdout ---
+448
+--- report ---
+allocations       3
+deallocations     3
+reallocations     0
+bytes allocated   1075
+peak live bytes   1075
+instructions      15847
+binary size       3400 bytes (code 1876, data 25, metadata 1499)
+
+function            calls  code bytes
+__to_str_i64            1         204
+aipl_arr_inc          167    external
+aipl_array_dec        269    external
+aipl_i64_len            2    external
+aipl_shim_get           1    external
+aipl_write_i64          1    external
+main                    1        1672

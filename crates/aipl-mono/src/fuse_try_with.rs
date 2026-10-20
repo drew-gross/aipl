@@ -1,14 +1,14 @@
-//! `xs.with(i, v).value_or(xs)` as the one operation it is, `xs.try_with(i, v)`.
+//! `xs.with(i, v).value_or(xs)` as the one operation it is, `xs.try_set(i, v)`.
 //!
 //! `with` answers `none` for an index past the end, and the natural way to keep
 //! the array in that case is to fall back to the receiver. Written out that reads
 //! the receiver twice — once to give to `with`, once as the default — and the
 //! first of those is the one that wants to be a *move*: `with` writes into an
 //! array nobody else holds, and a receiver that is read again afterwards is held
-//! by that second read, so the write copies. `try_with` reads it once.
+//! by that second read, so the write copies. `try_set` reads it once.
 //!
 //! ```text
-//! xs.with(i, v).value_or(xs)   →   xs.try_with(i, v)
+//! xs.with(i, v).value_or(xs)   →   xs.try_set(i, v)
 //! ```
 //!
 //! The lint `with_value_or_self` steers source toward the short spelling. This
@@ -36,7 +36,7 @@ use crate::{children, children_mut, MonoProgram};
 /// A binding, and the fields read off it in turn.
 type Place = (String, Vec<String>);
 
-/// `program` with each such shape written as a call to `try_with`.
+/// `program` with each such shape written as a call to `try_set`.
 pub fn fuse_try_with(program: &Program) -> Program {
     Program {
         sources: program.sources.clone(),
@@ -91,7 +91,7 @@ fn fuse(e: &mut Expr, aliases: &mut Vec<(String, Place)>) {
     rewrite(e, aliases);
 }
 
-/// Turn `e` into a `try_with` call if it is either shape.
+/// Turn `e` into a `try_set` call if it is either shape.
 fn rewrite(e: &mut Expr, aliases: &[(String, Place)]) {
     let args = match &e.kind {
         // `value_or(with(x, i, v), x)`.
@@ -110,7 +110,7 @@ fn rewrite(e: &mut Expr, aliases: &[(String, Place)]) {
         _ => None,
     };
     if let Some(args) = args {
-        e.kind = ExprKind::Call(Callee::TryWith, args, false);
+        e.kind = ExprKind::Call(Callee::WithOrSelf, args, false);
     }
 }
 
@@ -206,4 +206,38 @@ fn disturbs(e: &Expr, names: &[&str]) -> bool {
         _ => false,
     };
     here || children(e).into_iter().any(|c| disturbs(c, names))
+}
+
+/// `program` with each `try_set` written as the value-returning operation it is.
+///
+/// `try_set` is a mutating method, and a mutating call is an assignment to its
+/// receiver — `set xs.try_set(i, v)` is `set xs = xs.try_set(i, v)` — or, in
+/// expression position, the updated copy. Both are `__with_or_self(xs, i, v)`:
+/// the first stored back, the second just the value. Lowering it ahead of
+/// monomorphization is what keeps the rest of the pipeline from needing a
+/// mutating builtin of its own: after this it is an ordinary assignment from an
+/// ordinary call, which the in-place analyses already understand, and a
+/// field-path receiver (`set self.marks.try_set(i, v)`) becomes the field
+/// assignment it spells.
+pub fn lower_try_set(program: &Program) -> Program {
+    let mut out = program.clone();
+    for item in &mut out.items {
+        if let Item::Fn(f) = item {
+            lower(&mut f.body);
+            if let Some(t) = f.test_body.as_mut() {
+                lower(t);
+            }
+        }
+    }
+    out
+}
+
+fn lower(e: &mut Expr) {
+    for child in children_mut(e) {
+        lower(child);
+    }
+    if let ExprKind::Call(callee @ Callee::TrySet, _, style) = &mut e.kind {
+        *callee = Callee::WithOrSelf;
+        *style = false;
+    }
 }

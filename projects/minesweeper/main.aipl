@@ -8,6 +8,7 @@ import {
     count_if,
     drop_first,
     equal as ==,
+    extend,
     filter,
     first,
     greater_than_or_equal as >=,
@@ -32,7 +33,8 @@ import {
     split,
     to_set,
     trim,
-    try_with,
+    try_set,
+    value_or,
     value_or_err,
     wrapping_add as +,
     wrapping_mul as *,
@@ -100,27 +102,6 @@ fn cells(self: Game) -> u64[] {
     assert(new_game(3, 2, []).cells() == [0, 1, 2, 3, 4, 5]);
 })
 
-# Whether the player has revealed `cell`.
-fn is_revealed(self: Game, cell: u64) -> bool { self.marks[cell] == some(Revealed) }
-
-# Whether the player has flagged `cell`.
-fn is_flagged(self: Game, cell: u64) -> bool { self.marks[cell] == some(Flagged) }
-
-# `self` with `cell` marked as `mark`. A cell off the board has nothing to mark, so
-# the game comes back as it was.
-fn marked(self: Game, cell: u64, mark: Mark) -> Game {
-    let marks = self.marks.try_with(cell, mark);
-    Game { ..self, marks }
-}.test({
-    let game = new_game(2, 2, []);
-    assert(game.marked(1, Flagged).is_flagged(1));
-    assert(!game.marked(1, Flagged).is_flagged(0));
-    // The game it was made from is not changed.
-    assert(!game.is_flagged(1));
-    // Off the board: nothing to mark.
-    assert(game.marked(9, Revealed) == game);
-})
-
 # The cells touching `cell`, including diagonally, that are on the board.
 #
 # Offsets run 0 to 2 for -1 to +1 so that no row or column is ever negative: a
@@ -161,40 +142,35 @@ fn adjacent_mines(self: Game, cell: u64) -> u64 {
 # Reveal each cell of `frontier` that is still hidden and holds no mine, and
 # whenever nothing around a revealed cell is a mine, the cells around it too: a
 # click on an empty region opens the whole region and its border.
-fn flood(self: Game, frontier: u64[]) -> Game {
-    match (frontier.first()) {
-        none => self, #[allow]
-        some(cell) => {
-            let rest = frontier.drop_first();
-            if (self.is_revealed(cell) || self.is_flagged(cell) || self.mines.has(cell)) {
-                self.flood(rest)
-            } else {
-                let opened = self.marked(cell, Revealed);
-                if (self.adjacent_mines(cell) == 0) {
-                    opened.flood([..rest, ..self.neighbors(cell)])
-                } else {
-                    opened.flood(rest)
-                }
-            }
-        },
+fn flood(mut self: Game, frontier: u64[]) {
+    mut pending = frontier;
+    while (pending.is_nonempty()) {
+        let cell = pending[0].value_or(0);
+        set pending = pending.drop_first();
+        if (self.marks[cell] == some(Hidden) && !self.mines.has(cell)) {
+            set self.marks.try_set(cell, Revealed);
+            if (self.adjacent_mines(cell) == 0) {
+                set pending.extend(self.neighbors(cell));
+            };
+        };
     }
 }
 
 # `self` after the player reveals `cell`. A flagged or already revealed cell is
 # left alone.
-fn reveal(self: Game, cell: u64) -> Game {
-    if (self.is_flagged(cell) || self.is_revealed(cell)) {
-        self
-    } else if (self.mines.has(cell)) {
-        self.marked(cell, Revealed)
-    } else {
-        self.flood([cell])
-    }
+fn reveal(mut self: Game, cell: u64) {
+    if (self.marks[cell] == some(Hidden)) {
+        if (self.mines.has(cell)) {
+            set self.marks.try_set(cell, Revealed);
+        } else {
+            set self.flood([cell]);
+        };
+    };
 }.test({
     // A number stops at itself.
     let game = new_game(3, 3, [8]);
-    assert(game.reveal(7).is_revealed(7));
-    assert(!game.reveal(7).is_revealed(6));
+    assert(game.reveal(7).marks[7] == some(Revealed));
+    assert(game.reveal(7).marks[6] == some(Hidden));
 
     // A region with no mines around it opens, border and all: here that is
     // every cell but the mine, so it wins.
@@ -203,31 +179,31 @@ fn reveal(self: Game, cell: u64) -> Game {
 
 # `self` after the player flags `cell`, or takes the flag off it. A revealed cell
 # cannot be flagged.
-fn toggle_flag(self: Game, cell: u64) -> Game {
-    if (self.is_revealed(cell)) {
-        self
-    } else if (self.is_flagged(cell)) {
-        self.marked(cell, Hidden)
-    } else {
-        self.marked(cell, Flagged)
-    }
+fn toggle_flag(mut self: Game, cell: u64) {
+    if (self.marks[cell] == some(Hidden)) {
+        set self.marks.try_set(cell, Flagged);
+    } else if (self.marks[cell] == some(Flagged)) {
+        set self.marks.try_set(cell, Hidden);
+    };
 }.test({
     let game = new_game(2, 2, [3]);
-    assert(game.toggle_flag(0).is_flagged(0));
+    assert(game.toggle_flag(0).marks[0] == some(Flagged));
     // Flagging twice takes the flag off again.
-    assert(!game.toggle_flag(0).toggle_flag(0).is_flagged(0));
+    assert(game.toggle_flag(0).toggle_flag(0).marks[0] == some(Hidden));
     // A flag protects its cell from a reveal.
-    assert(!game.toggle_flag(0).reveal(0).is_revealed(0));
+    assert(game.toggle_flag(0).reveal(0).marks[0] == some(Flagged));
     // A revealed cell takes no flag.
-    assert(!game.reveal(0).toggle_flag(0).is_flagged(0));
+    assert(game.reveal(0).toggle_flag(0).marks[0] == some(Revealed));
+    // Off the board: nothing happens.
+    assert(game.toggle_flag(9) == game);
 })
 
 # Whether the game is still going: lost once a mine is revealed, won once every
 # cell without a mine is.
 fn status(self: Game) -> Status {
-    if (self.mines.any(|m| self.is_revealed(m))) {
+    if (self.mines.any(|m| self.marks[m] == some(Revealed))) {
         Lost
-    } else if (self.cells().all(|c| self.mines.has(c) || self.is_revealed(c))) {
+    } else if (self.cells().all(|c| self.mines.has(c) || self.marks[c] == some(Revealed))) {
         Won
     } else {
         Playing
@@ -243,7 +219,7 @@ fn status(self: Game) -> Status {
 # around it, a digit counting the mines around it, `*` a mine (shown once
 # revealed, or when `show_mines`).
 fn symbol(self: Game, cell: u64, show_mines: bool) -> str {
-    if (self.is_revealed(cell)) {
+    if (self.marks[cell] == some(Revealed)) {
         if (self.mines.has(cell)) {
             "*"
         } else if (self.adjacent_mines(cell) == 0) {
@@ -251,7 +227,7 @@ fn symbol(self: Game, cell: u64, show_mines: bool) -> str {
         } else {
             `{self.adjacent_mines(cell)}`
         }
-    } else if (self.is_flagged(cell)) {
+    } else if (self.marks[cell] == some(Flagged)) {
         "F"
     } else if (show_mines && self.mines.has(cell)) {
         "*"
