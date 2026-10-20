@@ -226,6 +226,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/grids/any | 6 | 181 | 181 | 804 | 2636 | 8.00 | 340.46 | 1488 |
 | cases/grids/basics | 5 | 305 | 305 | 1672 | 3972 | 6.00 | 277.26 | 1472 |
 | cases/grids/dimensions | 13 | 758 | 758 | 609 | 2616 | 9.00 | 395.13 | 1488 |
+| cases/grids/tuple_index | 5 | 147 | 147 | 1218 | 3764 | 9.00 | 395.78 | 1504 |
 | cases/hashing/basic | 9 | 511 | 320 | 2527 | 9404 | 5.00 | 89.09 | 1472 |
 | cases/higher-order-in-test | 0 | 0 | 0 | 857 | 1336 | 3.00 | 77.86 | 1472 |
 | cases/if_let/basic | 2 | 105 | 105 | 70 | 640 | 6.00 | 77.55 | 1488 |

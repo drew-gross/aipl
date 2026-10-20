@@ -17,6 +17,7 @@ projects:
   ray tracer:
     https://raytracing.github.io/books/RayTracingInOneWeekend.html
   minesweeper:
+    cell_at doesn't need to exist
     do the RNG with a shuffle, not the current nonsense
     Game should just be a Marks[,]. Width and height are available on it directly, and mines can be folded in to marks (rename to cells?)
     make with() calls update in place
@@ -332,6 +333,7 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 matrices:
+  utility for making a new grid from a width, height, and predicate
   no named operator for matmul probably, user can import matmul as * if they want
   option to put the shape in the type e.g. T[5,] or T[5,10] (make this work for 1d too? i.e. T[5])
   support more than 2 dimensions

@@ -78,6 +78,23 @@ pub fn lower_grid_literals(program: &Program) -> Result<Program, Error> {
     })
 }
 
+/// Whether `program` names a grid type anywhere a type is written: a signature,
+/// a struct or variant declaration, or a `let` annotation. Errs toward yes.
+pub fn mentions_grid(program: &Program) -> bool {
+    let named = |written: &dyn std::fmt::Debug| format!("{written:?}").contains("Grid");
+    let mut found = program.items.iter().any(|item| match item {
+        Item::Fn(f) => named(&f.sig),
+        Item::Struct(_) | Item::Variant(_) => named(item),
+        _ => false,
+    });
+    aipl_syntax::each_expr(program, &mut |e| {
+        if let ExprKind::Let(_, Some(ty), ..) | ExprKind::LetMut(_, Some(ty), ..) = &e.kind {
+            found = found || named(ty);
+        }
+    });
+    found
+}
+
 /// The element type of `ty` if it is a grid.
 fn grid_element(ty: &Type) -> Option<&Type> {
     match ty {

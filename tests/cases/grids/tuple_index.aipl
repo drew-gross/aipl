@@ -1,0 +1,26 @@
+# A pair of numbers addresses a cell: `grid[cell]` is `grid[row, column]`, for
+# reading and for writing, so a cell can be passed around as one value.
+
+import { print, to_str } from builtins;
+
+fn at(row: u64, column: u64) -> (u64, u64) { (row, column) }
+
+fn main() !prints {
+    mut grid: i64[,] = [[1, 2], [3, 4]];
+    let cell = at(1, 0);
+    print(to_str(grid[cell]));
+    print(to_str(grid[at(0, 1)]));
+    // Off the grid is `none`, as with two indexes.
+    print(to_str(grid[at(2, 0)]));
+    set grid[cell] = 30 else {};
+    set grid[at(5, 5)] = 9 else {
+        print("missed");
+    };
+    print(to_str(grid));
+}
+--- stdout ---
+some(3)
+some(2)
+none
+missed
+[[1, 2], [30, 4]]

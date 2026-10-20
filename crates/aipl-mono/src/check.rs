@@ -462,6 +462,30 @@ impl<'a> Cx<'a> {
         }
     }
 
+    /// The type of one cell when `index` is the `(row, column)` pair addressing
+    /// the grid `receiver`; `None` for any other receiver or index.
+    fn grid_cell_element(&self, receiver: &Type, index: &Type) -> Option<Type> {
+        let Type::Named(name) = unrefined(receiver) else {
+            return None;
+        };
+        if !aipl_syntax::is_grid_instance(name)
+            || !self
+                .tuple_elems(unrefined(index))
+                .is_some_and(|slots| slots.len() == 2)
+        {
+            return None;
+        }
+        match self
+            .struct_fields(name)?
+            .into_iter()
+            .find(|(f, _, _)| f == "cells")?
+            .1
+        {
+            Type::Array(elem) => Some(*elem),
+            _ => None,
+        }
+    }
+
     fn struct_fields(&self, name: &str) -> Option<Vec<(String, Type, bool)>> {
         self.structs
             .get(name)
@@ -3699,6 +3723,10 @@ impl Cx<'_> {
                 if matches!(&it, Type::Named(n) if n == SPAN_TYPE) {
                     return self.slice_receiver_ty(&ot, obj.span.clone());
                 }
+                // `grid[(row, column)]` is `grid[row, column]`: the cell, or `none`.
+                if let Some(elem) = self.grid_cell_element(&ot, &it) {
+                    return Ok(Type::Optional(Box::new(elem)));
+                }
                 expect_len_operand(&it, "array index", idx.span.clone())?;
                 let elem = match unrefined(&ot).clone() {
                     Type::Array(inner) => *inner,
@@ -4392,6 +4420,17 @@ impl Cx<'_> {
                     args[0].span.clone(),
                     args[1].span.clone(),
                 );
+            }
+        }
+        // `grid.try_set((row, column), value)`: the grid again, with that cell
+        // replaced.
+        if *callee == Callee::WithOrSelf && args.len() == 3 {
+            let receiver = self.check_expr(&args[0], env, effects)?;
+            let index = self.check_expr(&args[1], env, effects)?;
+            if let Some(elem) = self.grid_cell_element(&receiver, &index) {
+                let value = self.check_arg(&args[2], Some(&elem), env, effects, "grid cell")?;
+                expect(&value, &elem, "grid cell", args[2].span.clone())?;
+                return Ok(receiver);
             }
         }
         // `s.starts_with(p)` / `s.ends_with(p)` / `s.contains(n)` /

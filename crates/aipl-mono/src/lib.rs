@@ -45,7 +45,7 @@ pub use lower_reductions::lower_reductions;
 mod fuse_try_with;
 mod grid_literals;
 pub use fuse_try_with::{fuse_try_with, fuse_try_with_post_mono, lower_try_set};
-pub use grid_literals::lower_grid_literals;
+pub use grid_literals::{lower_grid_literals, mentions_grid};
 
 mod counting_variants;
 pub use counting_variants::counting_variants;
@@ -6103,6 +6103,15 @@ impl Mono<'_> {
     /// to a higher-order function)? True for a concrete user function or a
     /// builtin, but not for a name bound as a local in `env` (which shadows any
     /// global) nor a generic (the checker rejects generic functions as values).
+    /// Whether `index` is the `(row, column)` pair that addresses one cell of the
+    /// grid `receiver`.
+    fn is_grid_cell_index(&self, receiver: &Type, index: &Type) -> bool {
+        matches!(receiver, Type::Named(n) if aipl_syntax::is_grid_instance(n))
+            && self
+                .tuple_field_tys(index)
+                .is_some_and(|slots| slots.len() == 2)
+    }
+
     fn is_fn_ref(&self, name: &str, env: &Env) -> bool {
         !env.contains_key(name)
             && (self.concrete.contains_key(name)
@@ -6503,6 +6512,11 @@ impl Mono<'_> {
             ExprKind::Index(obj, idx) => {
                 let (ro, ot) = self.infer(obj, env)?;
                 let (ridx, it) = self.infer(idx, env)?;
+                // `grid[(row, column)]` is `grid[row, column]`.
+                if self.is_grid_cell_index(&ot, &it) {
+                    let rewritten = grid_call(Callee::GridGet, obj, idx, &[], &span);
+                    return self.infer(&rewritten, env);
+                }
                 // `s[span]` — a `Span` index is slice sugar for
                 // `s[span.start..span.end]`, so it yields the receiver's own
                 // type (a `str` slices to `str`, an array to itself), not
@@ -7249,6 +7263,18 @@ impl Mono<'_> {
                 if !method_style && !env.contains_key(name) && self.generic_ctors.contains_key(name)
                 {
                     return self.infer_generic_variant_ctor(name, args, env, &span);
+                }
+                // `grid.try_set((row, column), value)` is
+                // `grid.grid_try_set(row, column, value)`: the same store as the
+                // two-index form, with the cell given as a pair.
+                if *callee == Callee::WithOrSelf && args.len() == 3 {
+                    let (_, receiver) = self.infer(&args[0], env)?;
+                    let (_, index) = self.infer(&args[1], env)?;
+                    if self.is_grid_cell_index(&receiver, &index) {
+                        let rewritten =
+                            grid_call(Callee::GridTrySet, &args[0], &args[1], &args[2..], &span);
+                        return self.infer(&rewritten, env);
+                    }
                 }
                 // A grid is walked by its cells: `grid.any(pred)` is
                 // `grid.cells.any(pred)`, row by row.
@@ -8172,6 +8198,18 @@ pub fn aipl_builtin_demand(program: &Program) -> BTreeSet<&'static str> {
     let mut needed: BTreeSet<&'static str> = BTreeSet::new();
     let mut pending: Vec<&'static str> = Vec::new();
     aipl_syntax::each_expr(program, &mut |e| discover(e, &mut needed, &mut pending));
+    // `grid[(row, column)]` and `grid.try_set((row, column), value)` become
+    // calls to these once the types are known, which is after this scan.
+    if mentions_grid(program) {
+        for grid_builtin in ["__builtin_grid_get", "__builtin_grid_try_set"] {
+            let (canonical, _) = aipl_builtin_slots()
+                .get_key_value(grid_builtin)
+                .expect("a grid builtin is an AIPL_BUILTIN_SOURCES entry");
+            if needed.insert(canonical) {
+                pending.push(canonical);
+            }
+        }
+    }
     while let Some(name) = pending.pop() {
         let body = &aipl_builtin(name)
             .expect("a name only enters `pending` from the slot map")
@@ -8293,6 +8331,35 @@ pub fn builtin_is_mutating(name: &str) -> bool {
 /// added here only once its runtime has been read.
 fn builtin_reads_arg(f: &Callee, i: usize) -> bool {
     matches!((f, i), (Callee::Extend, 1) | (Callee::Union, 1))
+}
+
+/// `callee(receiver, pair._0, pair._1, rest..)`: a grid builtin called with its
+/// cell given as one pair. A pair that is not a plain name is bound first, so it
+/// is evaluated once.
+fn grid_call(callee: Callee, receiver: &Expr, pair: &Expr, rest: &[Expr], span: &Span) -> Expr {
+    let slot = |name: &str, slot: &str| {
+        Expr::new(
+            ExprKind::Field(
+                Box::new(Expr::new(ExprKind::Ident(name.to_string()), span.clone())),
+                slot.to_string(),
+            ),
+            span.clone(),
+        )
+    };
+    let bound = match &pair.kind {
+        ExprKind::Ident(name) => name.clone(),
+        _ => format!("$cell{}", span.start),
+    };
+    let mut args = vec![receiver.clone(), slot(&bound, "_0"), slot(&bound, "_1")];
+    args.extend(rest.iter().cloned());
+    let call = Expr::new(ExprKind::Call(callee, args, false), span.clone());
+    if matches!(pair.kind, ExprKind::Ident(_)) {
+        return call;
+    }
+    Expr::new(
+        ExprKind::Let(bound, None, Box::new(pair.clone()), Box::new(call)),
+        span.clone(),
+    )
 }
 
 /// The declared signature of the builtin `name`: from [`BUILTIN_SIGNATURES`]

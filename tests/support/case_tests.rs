@@ -293,6 +293,7 @@ case_tests! {
     cases_grids_dimensions = "cases/grids/dimensions",
     cases_grids_err_literal_without_grid = "cases/grids/err_literal_without_grid",
     cases_grids_err_ragged_literal = "cases/grids/err_ragged_literal",
+    cases_grids_tuple_index = "cases/grids/tuple_index",
     cases_hashing_basic = "cases/hashing/basic",
     cases_higher_order_in_test = "cases/higher-order-in-test",
     cases_if_let_basic = "cases/if_let/basic",
