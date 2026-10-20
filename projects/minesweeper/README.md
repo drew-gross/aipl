@@ -43,7 +43,7 @@ The rules are pure functions on a `Game` value and carry the tests in their
 
 | need | why |
 |---|---|
-| an element update that reuses an array nobody else holds | the board is an array of marks updated with `with`, which copies the whole array on every move |
+| ownership that reaches `with` through a struct field or a function parameter | `with` writes in place when it is handed the only reference (a fresh array, or a `mut` local at its last use), but the board lives in a `Game` field read through borrowed parameters, so each move copies the 64 marks |
 | read one key without waiting for Enter (raw mode) | `hjkl`/arrow cursor play instead of typed commands |
 | ANSI output: clear screen, move cursor, colour | redraw in place, classic number colours |
 | terminal size | fit the board to the window |

@@ -3226,8 +3226,18 @@ fn __builtin_drop_first<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_last<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_n<T: any>(self: T[], n: u64) -> T[] { self }
 fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
+// A copy of `self` with the element at `index` replaced by `value`, or `none` when
+// `index` is past the end: there is no element to replace, and `self[index]` is
+// `none` there too. Arrays have no element assignment because a write past the end
+// has nowhere to go; this is the version that answers. The receiver is unchanged
+// as far as anything else can tell, but when `self` has no other owner — a fresh
+// array, or a binding at its last use — it is written in place and handed back,
+// so a chain of updates allocates nothing. `set xs = xs.with(i, v).value_or(xs)`
+// keeps `xs` alive for the fallback, and so copies; write `xs.with(i, v)` where
+// `xs` is not read again to avoid the copy. Not for a `str`.
+fn __builtin_with<T: any>(self: T[], index: u64, value: T) -> T[]? { none }
 // NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
-// `join_is_nonempty`, `join_is_empty`, `reduce`, `repeat`, `with`, `map_reduce`, `filter_map_reduce`, `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
+// `join_is_nonempty`, `join_is_empty`, `reduce`, `repeat`, `map_reduce`, `filter_map_reduce`, `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
 // `extend_optional`, `inline_str`, `measure`, `range`, `set_map`, `tuple_windows`, `union_all`,
 // `value_or`, and `value_or_err` are

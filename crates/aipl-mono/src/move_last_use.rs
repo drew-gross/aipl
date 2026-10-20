@@ -58,9 +58,13 @@
 //! restores it. Everything downstream reads the two marks identically, which is
 //! the point of spelling both as `__move`.
 //!
-//! Only `Callee::User` calls take a mark: a builtin's per-argument contract is
-//! its own (codegen never moves into one), and the mark would only cost the
-//! shape a builtin's in-place lowering matches on.
+//! Only `Callee::User` calls take a mark — and `with`'s array, the one builtin
+//! argument that does. A builtin's per-argument contract is its own (codegen
+//! never moves into one), and the mark would only cost the shape a builtin's
+//! in-place lowering matches on; but `with` writes into the array it is given
+//! when that array has no other owner, and a binding at its last use is exactly
+//! an array with no other owner. Its arm in codegen takes a marked array the way
+//! a user call does, as a fresh temporary whose reference it consumes.
 //!
 //! A binding whose value is another binding (`let a = x`) never qualifies: the
 //! two name one reference, and codegen finds a reference by its value, so a
@@ -433,15 +437,17 @@ fn mark(
         }
         ExprKind::Call(callee, args, _) => {
             let user = matches!(callee, Callee::User(f) if !mutating.contains(f));
+            // `with` consumes its array (argument 0) to write into it.
+            let takes_array = matches!(callee, Callee::With);
             // Arguments are evaluated left to right, and each is handed over
             // only once all of them are — but a later argument that reads the
             // binding is a later use all the same.
             let later: Vec<bool> = (0..args.len())
                 .map(|i| args[i + 1..].iter().any(|a| mentions(name, a)))
                 .collect();
-            for (arg, later) in args.iter_mut().zip(later) {
+            for (position, (arg, later)) in args.iter_mut().zip(later).enumerate() {
                 let t = tail && !later;
-                if user && t && is_name(arg, name) {
+                if (user || (takes_array && position == 0)) && t && is_name(arg, name) {
                     let span = arg.span.clone();
                     let inner = std::mem::replace(arg, Expr::new(ExprKind::Unit, span.clone()));
                     *arg = Expr::new(ExprKind::Call(Callee::Move, vec![inner], false), span);

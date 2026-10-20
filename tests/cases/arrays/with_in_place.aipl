@@ -1,0 +1,50 @@
+# `with` writes into the array it is given when nothing else holds it, so updates
+# that hand the array over cost no allocation. Two shapes hand it over: a fresh
+# array (`repeat`'s result here), and a binding at its last use — `set xs =
+# xs.with(..)` ends the old `xs` as it replaces it. The pinned report is the claim:
+# a hundred updates of a 64-element array allocate the array once, plus the
+# program's own bookkeeping, not a hundred more.
+#
+# A `value_or` default that mentions the receiver (`.value_or(xs)`) reads `xs`
+# after `with`, so that call copies; `[]` is the fallback here because an index
+# `i % 64` is never past the end.
+
+import {
+    len,
+    print,
+    repeat,
+    saturating_remainder as %,
+    to_str,
+    value_or,
+    with,
+    wrapping_add as +,
+} from builtins;
+
+fn main() !prints {
+    mut cells: i64[] = [0].repeat(64);
+    for (let i : 0..100) {
+        set cells = cells.with(i % 64, 7).value_or([]);
+    }
+    let fresh = [0].repeat(64).with(1, 2).value_or([]);
+    print(to_str(cells.len() + fresh.len()));
+}
+--- stdout ---
+128
+--- report ---
+allocations       4
+deallocations     4
+reallocations     0
+bytes allocated   1603
+peak live bytes   1603
+instructions      23937
+binary size       4392 bytes (code 2588, data 25, metadata 1779)
+
+function                  calls  code bytes
+__builtin_repeat$i64          2         532
+__to_str_u64                  1         204
+aipl_arr_inc                435    external
+aipl_array_dec              535    external
+aipl_shim_get                 1    external
+aipl_u64_len                  2    external
+aipl_write_u64                1    external
+main                          1        1852

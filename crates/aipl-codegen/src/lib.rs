@@ -15592,6 +15592,144 @@ fn compile_call_expr_direct<M: Module>(
                 .push(Tracked::new(ptr, &result_ty));
             (ptr, result_ty)
         }
+        Callee::With => {
+            // `with(xs, i, v) -> T[]?`: `some` of `xs` with element `i` replaced, or
+            // `none` when `i` is past the end.
+            //
+            // The array's reference is consumed here, which is what lets the write
+            // happen in place. A receiver that is a fresh temporary or a binding at
+            // its last use (`__move`, see `aipl_mono::move_last_use`) arrives with
+            // a reference no one else holds; any other receiver is retained first,
+            // so there are two and the runtime copies. Either way
+            // `aipl_arr_writable` hands back a block this site owns outright —
+            // the same guard the in-place `map` uses before its plain stores — and
+            // the result optional owns it. When `i` is out of range the consumed
+            // reference is released and there is no array to hand back.
+            let [receiver, index, value] = args else {
+                return Err(arity_bug(name, 3, args.len(), &span));
+            };
+            let before = scope_depth(scopes);
+            let (arr_v, arr_ty) = compile_expr(module, builder, cx, scopes, receiver)?;
+            let moved = owned_temp_since(scopes, before, arr_v);
+            let elem = match &arr_ty {
+                ConcreteType::Array(_) if is_char_array(&arr_ty) => {
+                    return Err(Error::at(
+                        "\"with\" does not support a str yet".to_string(),
+                        receiver.span.clone(),
+                    ));
+                }
+                ConcreteType::Array(inner) => (**inner).clone(),
+                _ => {
+                    return Err(Error::at(
+                        format!("\"with\" expects an array, got {}", type_name(&arr_ty)),
+                        receiver.span.clone(),
+                    ));
+                }
+            };
+            let (idx_v, idx_ty) = compile_expr(module, builder, cx, scopes, index)?;
+            expect_len_operand(&idx_ty, "with index", index.span.clone())?;
+            let (val_v, val_ty) = compile_expr(module, builder, cx, scopes, value)?;
+            // An empty literal has no element type of its own; the value gives the
+            // result one. It has no element to replace, so the answer is `none`.
+            let empty_receiver = is_none_inner(&elem);
+            let val_ty = if empty_receiver {
+                val_ty
+            } else {
+                let val_ty = flex_int_ty(value, &val_ty, &elem);
+                expect_type(&val_ty, &elem, "with value", value.span.clone())?;
+                val_ty
+            };
+            hand_off_arg(
+                builder, module, builtins, structs, scopes, arr_v, &arr_ty, moved,
+            );
+
+            let result_arr_ty = if empty_receiver {
+                ConcreteType::Array(Box::new(val_ty.clone()))
+            } else {
+                arr_ty.clone()
+            };
+            let result_ty = ConcreteType::Optional(Box::new(result_arr_ty.clone()));
+            let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                StackSlotKind::ExplicitSlot,
+                OPT_VALUE_OFFSET as u32 + elem_size_of(&result_arr_ty, structs) as u32,
+                3,
+            ));
+            let ptr = builder.ins().stack_addr(types::I64, slot, 0);
+            let val_at = builder.ins().iadd_imm_s(ptr, OPT_VALUE_OFFSET as i64);
+            let zero = builder.ins().iconst(types::I64, 0);
+
+            let miss_b = builder.create_block();
+            let merge = builder.create_block();
+            if empty_receiver {
+                builder.ins().jump(miss_b, &[]);
+            } else {
+                let view = arr_view(builder, arr_v, &arr_ty, structs);
+                let in_range = builder.ins().icmp(IntCC::UnsignedLessThan, idx_v, view.len);
+                let hit_b = builder.create_block();
+                builder.ins().brif(in_range, hit_b, &[], miss_b, &[]);
+
+                builder.switch_to_block(hit_b);
+                builder.seal_block(hit_b);
+                let (drop_fn, retain_fn, esz) = array_descriptors(builder, module, cx, &elem);
+                let out_slot = value_slot(builder, &arr_ty, structs);
+                let owned = builder.ins().stack_addr(types::I64, out_slot, 0);
+                builtins.call_void(
+                    module,
+                    builder,
+                    "aipl_arr_writable",
+                    &[owned, arr_v, drop_fn, retain_fn, esz],
+                );
+                let base = writable_elems(builder, owned, &arr_ty);
+                if is_bit_packed(&elem) {
+                    // A bit in a byte: clear it, then set it to the value.
+                    let byte_off = builder.ins().ushr_imm_u(idx_v, 3);
+                    let byte_addr = builder.ins().iadd(base, byte_off);
+                    let byte = builder
+                        .ins()
+                        .load(types::I8, MemFlagsData::trusted(), byte_addr, 0);
+                    let byte = builder.ins().uextend(types::I64, byte);
+                    let bit = builder.ins().band_imm_u(idx_v, 7);
+                    let one = builder.ins().iconst(types::I64, 1);
+                    let mask = builder.ins().ishl(one, bit);
+                    let keep = builder.ins().bnot(mask);
+                    let cleared = builder.ins().band(byte, keep);
+                    let set = builder.ins().ishl(val_v, bit);
+                    let updated = builder.ins().bor(cleared, set);
+                    builder
+                        .ins()
+                        .istore8(MemFlagsData::trusted(), updated, byte_addr, 0);
+                } else {
+                    // Retain the new element, release the old, *then* write the
+                    // slot — `__map_set`'s order, for the same reason: the old
+                    // element may be read out of the slot by address.
+                    let stride = array_elem_size(&elem, structs);
+                    let off = builder.ins().imul_imm_s(idx_v, stride);
+                    let addr = builder.ins().iadd(base, off);
+                    let old = load_elem_at(builder, base, idx_v, &elem, stride, None, structs);
+                    emit_retain(builder, module, builtins, structs, val_v, &val_ty);
+                    emit_drop(builder, module, builtins, structs, old, &elem);
+                    store_elem(builder, addr, val_v, &val_ty, stride, structs);
+                }
+                let one = builder.ins().iconst(types::I64, 1);
+                builder.ins().store(MemFlagsData::trusted(), one, ptr, 0);
+                store_array_elem(builder, val_at, owned, &arr_ty, structs);
+                builder.ins().jump(merge, &[]);
+            }
+
+            builder.switch_to_block(miss_b);
+            builder.seal_block(miss_b);
+            emit_drop(builder, module, builtins, structs, arr_v, &arr_ty);
+            builder.ins().store(MemFlagsData::trusted(), zero, ptr, 0);
+            builder.ins().jump(merge, &[]);
+
+            builder.switch_to_block(merge);
+            builder.seal_block(merge);
+            scopes
+                .last_mut()
+                .expect("scope")
+                .push(Tracked::new(ptr, &result_ty));
+            (ptr, result_ty)
+        }
         Callee::RandomU64 => {
             // `() -> u64`, reached here only when no `shim random` is installed
             // — `compile_call_expr` sends every other call to the shim. The

@@ -412,7 +412,9 @@ fn run_one(display: &str) {
         .unwrap_or_else(|| {
             panic!(
                 "no case file for {display:?} — the {CASE_TESTS_FILE} list is stale; \
-                 regenerate it with `{CASE_TESTS_CMD}`"
+                 regenerate it with `{CASE_TESTS_CMD}`\n{}",
+                // Only the list is stale: a deleted case has no file left to fill.
+                Fill::CaseTests { added: Vec::new() }.marker()
             )
         });
     let rel_with_prefix = Path::new(prefix).join(path.strip_prefix(root).unwrap_or(path));

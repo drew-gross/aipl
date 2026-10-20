@@ -7883,7 +7883,6 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::JoinIsEmpty, "builtin_join_is_empty.aipl"),
     (Callee::Reduce, "builtin_reduce.aipl"),
     (Callee::Repeat, "builtin_repeat.aipl"),
-    (Callee::With, "builtin_with.aipl"),
     (Callee::MapReduce, "builtin_map_reduce.aipl"),
     (Callee::FilterMapReduce, "builtin_filter_map_reduce.aipl"),
     (Callee::SplitMap, "builtin_split_map.aipl"),
@@ -11423,6 +11422,10 @@ fn aliases_or_unsafe(
                         | Callee::ToStr
                         | Callee::ToStrLen
                         | Callee::Trim => false,
+                        // `with` takes the receiver's reference and writes into
+                        // it when nothing else holds the block, or copies it:
+                        // it never keeps `name` and the result both.
+                        Callee::With => false,
                         _ => !tail,
                     }
                 } else {
@@ -11456,6 +11459,8 @@ fn aliases_or_unsafe(
                 );
                 args.iter().enumerate().any(|(k, a)| {
                     if is_n(a) {
+                        // `with`'s array (argument 0), as in the method form above.
+                        let consuming = consuming || (*fname == Callee::With && k == 0);
                         !consuming && !tail && !builtin_reads_arg(fname, k)
                     } else {
                         rec_tail(a)

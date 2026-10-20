@@ -2,8 +2,53 @@
 # `some(copy)` when `i` is in range and `none` when it is not. Arrays have no
 # element assignment because a write past the end has nowhere to go; this is the
 # version that answers.
+#
+# When nobody else holds the array it is written in place and handed back (see
+# `with_in_place` for the allocation counts); otherwise the original is untouched.
 
-import { print, to_str, value_or, with } from builtins;
+import { equal as ==, print, reverse, to_str, value_or, with } from builtins;
+
+variant Cell = Mark(i64) | Blank
+
+fn replaced(xs: i64[], i: u64, v: i64) -> i64[] { xs.with(i, v).value_or(xs) }.test({
+    assert(replaced([1, 2, 3], 1, 9) == [1, 9, 3]);
+    // The ends.
+    assert(replaced([1, 2, 3], 0, 9) == [9, 2, 3]);
+    assert(replaced([1, 2, 3], 2, 9) == [1, 2, 9]);
+    // Past the end, and an empty receiver: nothing to replace.
+    assert([1, 2, 3].with(3, 9) == none);
+    assert([1, 2, 3].with(100, 9) == none);
+    assert([1, 2][..0].with(0, 9) == none);
+    assert(with([1, 2], 0, 7) == some([7, 2])); // free-call form
+    // The receiver is not changed.
+    let xs = [1, 2, 3];
+    let ys = xs.with(0, 9);
+    assert(ys == some([9, 2, 3]));
+    assert(xs == [1, 2, 3]);
+})
+
+// Elements that own something, and ones that don't take a whole word.
+fn other_elements() {}.test({
+    assert(["a", "b"].with(1, "z") == some(["a", "z"]));
+    assert([[1], [2, 3]].with(0, [7, 8]) == some([[7, 8], [2, 3]]));
+    assert([true, false, true].with(1, true) == some([true, true, true]));
+    assert([true, true, true].with(2, false) == some([true, true, false]));
+    assert([true, false].with(2, true) == none);
+    let narrow: u8[] = [1, 2, 3];
+    assert(narrow.with(1, 200) == some([1, 200, 3]));
+    assert([Mark(1), Blank].with(1, Mark(2)) == some([Mark(1), Mark(2)]));
+})
+
+// A view of another array: the write must not reach the array it looks into.
+fn views() {}.test({
+    let xs = [1, 2, 3, 4];
+    let tail = xs[1..];
+    assert(tail.with(0, 9) == some([9, 3, 4]));
+    assert(xs == [1, 2, 3, 4]);
+    let backwards = xs.reverse();
+    assert(backwards.with(0, 9) == some([9, 3, 2, 1]));
+    assert(xs == [1, 2, 3, 4]);
+})
 
 fn main() !prints {
     let xs = [10, 20, 30];

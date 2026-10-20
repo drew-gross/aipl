@@ -1,7 +1,6 @@
 # Minesweeper for the terminal.
 #
-# The mines are the same every game: there is no random number source yet, so the
-# layout is a constant (`mine_layout`).
+# The mines are placed at random (`place_mines`), seeded in `main`.
 
 import {
     all,
