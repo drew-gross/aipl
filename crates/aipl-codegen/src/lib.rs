@@ -2705,6 +2705,7 @@ fn compile_program<M: Module>(
     // reduction, and before monomorphization, which is the last place that can
     // still turn it into a call to an AIPL builtin. See `lower_reductions`.
     let folded = aipl_mono::lower_reductions(&folded);
+    let folded = aipl_mono::fuse_with_or_self(&folded);
     let monomorphized = aipl_mono::monomorphize(&folded, dbg)?;
     // A second inlining pass now that monomorphization has lifted each lambda to
     // its own function and split higher-order callees into per-lambda
@@ -8370,6 +8371,32 @@ fn take_field<M: Module>(
     }
 }
 
+/// The heap-owning fields of the struct `ty`, as `(offset, type)`, when every one
+/// of them can be [`take_field`]n — a `str`, or a block, array value or boxed
+/// word. `None` for anything else: a variant, or a struct holding a field that
+/// owns heap but is itself an aggregate (a nested struct, an optional), which a
+/// field-wise take cannot empty.
+fn takeable_fields(
+    structs: &HashMap<String, TypeDef>,
+    ty: &ConcreteType,
+) -> Option<Vec<(u32, ConcreteType)>> {
+    let ConcreteType::Named(name) = ty else {
+        return None;
+    };
+    let layout = structs.get(name).and_then(TypeDef::as_struct)?;
+    let mut fields = Vec::new();
+    for f in &layout.fields {
+        if !needs_drop(&f.ty, structs) {
+            continue;
+        }
+        if !(is_str_shaped(&f.ty) || mut_binding_owns_slot_ref(&f.ty, structs)) {
+            return None;
+        }
+        fields.push((f.offset, f.ty.clone()));
+    }
+    Some(fields)
+}
+
 /// A moved-in array block (an array, a set, or a dict — all one block shape)
 /// as one this function holds the sole reference to — or, for an inline array,
 /// the value itself, which owns no block to share. A block whose refcount
@@ -8795,6 +8822,176 @@ fn writable_place<M: Module>(
         }
     }
     compile_expr(module, builder, cx, scopes, arg)
+}
+
+/// The value of a `let`/`let mut`. An owned struct parameter handed to a binding
+/// (`mut w = __move(self)`) keeps the buffer it came in: the binding takes the
+/// parameter's reference as it is — the `owned_move` handling — rather than
+/// receiving a copy with the parameter's fields taken out, which is what a
+/// *call argument* gets (see `Callee::Move`).
+fn compile_binding_value<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    scopes: &mut Vec<Vec<Tracked>>,
+    value: &Expr,
+) -> Result<(Value, ConcreteType), Error> {
+    if let ExprKind::Call(Callee::Move, args, _) = &value.kind {
+        if let [Expr {
+            kind: ExprKind::Ident(param),
+            ..
+        }] = args.as_slice()
+        {
+            if cx.owned_params.contains(param) {
+                let others: HashSet<String> = cx
+                    .owned_params
+                    .iter()
+                    .filter(|p| *p != param)
+                    .cloned()
+                    .collect();
+                return compile_expr(
+                    module,
+                    builder,
+                    Cx {
+                        owned_params: &others,
+                        ..cx
+                    },
+                    scopes,
+                    value,
+                );
+            }
+        }
+    }
+    compile_expr(module, builder, cx, scopes, value)
+}
+
+/// `__with_or_self`, after its arguments are evaluated and the receiver's
+/// reference is this site's: the array with element `idx` replaced when that is in
+/// range, and the receiver itself when it is not. The same write as `with` —
+/// `aipl_arr_writable` for a block this site owns outright, then the element — and
+/// the same consumed reference, which in the miss case simply becomes the result.
+#[allow(clippy::too_many_arguments)]
+fn compile_with_or_self<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    scopes: &mut Vec<Vec<Tracked>>,
+    (arr_v, arr_ty): (Value, &ConcreteType),
+    (idx_v, val_v, val_ty): (Value, Value, &ConcreteType),
+    result_arr_ty: &ConcreteType,
+    empty_receiver: bool,
+) -> Result<(Value, ConcreteType), Error> {
+    let Cx {
+        structs, builtins, ..
+    } = cx;
+    let ConcreteType::Array(elem) = arr_ty else {
+        unreachable!("the caller checked that the receiver is an array")
+    };
+    let elem = (**elem).clone();
+    let merge = builder.create_block();
+    builder.append_block_param(merge, types::I64);
+    if empty_receiver {
+        // Nothing to replace: the receiver, retyped by the value, is the answer.
+        builder.ins().jump(merge, &[BlockArg::Value(arr_v)]);
+    } else {
+        let view = arr_view(builder, arr_v, arr_ty, structs);
+        let in_range = builder.ins().icmp(IntCC::UnsignedLessThan, idx_v, view.len);
+        let hit_b = builder.create_block();
+        let miss_b = builder.create_block();
+        builder.ins().brif(in_range, hit_b, &[], miss_b, &[]);
+
+        builder.switch_to_block(hit_b);
+        builder.seal_block(hit_b);
+        let (drop_fn, retain_fn, esz) = array_descriptors(builder, module, cx, &elem);
+        let out_slot = value_slot(builder, arr_ty, structs);
+        let owned = builder.ins().stack_addr(types::I64, out_slot, 0);
+        builtins.call_void(
+            module,
+            builder,
+            "aipl_arr_writable",
+            &[owned, arr_v, drop_fn, retain_fn, esz],
+        );
+        let base = writable_elems(builder, owned, arr_ty);
+        if is_bit_packed(&elem) {
+            let byte_off = builder.ins().ushr_imm_u(idx_v, 3);
+            let byte_addr = builder.ins().iadd(base, byte_off);
+            let byte = builder
+                .ins()
+                .load(types::I8, MemFlagsData::trusted(), byte_addr, 0);
+            let byte = builder.ins().uextend(types::I64, byte);
+            let bit = builder.ins().band_imm_u(idx_v, 7);
+            let one = builder.ins().iconst(types::I64, 1);
+            let mask = builder.ins().ishl(one, bit);
+            let keep = builder.ins().bnot(mask);
+            let cleared = builder.ins().band(byte, keep);
+            let set = builder.ins().ishl(val_v, bit);
+            let updated = builder.ins().bor(cleared, set);
+            builder
+                .ins()
+                .istore8(MemFlagsData::trusted(), updated, byte_addr, 0);
+        } else {
+            let stride = array_elem_size(&elem, structs);
+            let off = builder.ins().imul_imm_s(idx_v, stride);
+            let addr = builder.ins().iadd(base, off);
+            let old = load_elem_at(builder, base, idx_v, &elem, stride, None, structs);
+            emit_retain(builder, module, builtins, structs, val_v, val_ty);
+            emit_drop(builder, module, builtins, structs, old, &elem);
+            store_elem(builder, addr, val_v, val_ty, stride, structs);
+        }
+        builder.ins().jump(merge, &[BlockArg::Value(owned)]);
+
+        builder.switch_to_block(miss_b);
+        builder.seal_block(miss_b);
+        builder.ins().jump(merge, &[BlockArg::Value(arr_v)]);
+    }
+    builder.switch_to_block(merge);
+    builder.seal_block(merge);
+    let result = builder.block_params(merge)[0];
+    scopes
+        .last_mut()
+        .expect("scope")
+        .push(Tracked::new(result, result_arr_ty));
+    Ok((result, result_arr_ty.clone()))
+}
+
+/// `e`, evaluated to be looked into and not kept: a read of an array field of a
+/// struct binding is the field's own bytes, with no reference taken and nothing
+/// tracked for release.
+///
+/// An ordinary field read retains the field and holds that reference until its
+/// scope ends, so that the value is the reader's own. For a read that finishes
+/// at once — indexing, which copies out the element — that reference only gets
+/// in the way: it keeps the array from being unique for as long as the scope
+/// lasts, so a write made after the test (`if self.marks[i] == .. { self.marks
+/// .with(..) }`) finds a second owner and copies. Anything that is not such a
+/// field read is compiled as usual.
+fn compile_inspected<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    scopes: &mut Vec<Vec<Tracked>>,
+    e: &Expr,
+) -> Result<(Value, ConcreteType), Error> {
+    if let ExprKind::Field(obj, field_name) = &e.kind {
+        if matches!(&obj.kind, ExprKind::Ident(_)) {
+            let (obj_ptr, obj_ty) = compile_expr(module, builder, cx, scopes, obj)?;
+            let field = match &obj_ty {
+                ConcreteType::Named(n) => cx
+                    .structs
+                    .get(n)
+                    .and_then(TypeDef::as_struct)
+                    .and_then(|layout| layout.field(field_name))
+                    .map(|f| (f.offset, f.ty.clone())),
+                _ => None,
+            };
+            if let Some((offset, fty)) = field {
+                if is_block_array(&fty) {
+                    return Ok((component(builder, obj_ptr, offset, &fty, cx.structs), fty));
+                }
+            }
+        }
+    }
+    compile_expr(module, builder, cx, scopes, e)
 }
 
 /// Where the elements of the writable array value at `a` (of type `ty`) start:
@@ -15592,9 +15789,11 @@ fn compile_call_expr_direct<M: Module>(
                 .push(Tracked::new(ptr, &result_ty));
             (ptr, result_ty)
         }
-        Callee::With => {
+        Callee::With | Callee::WithOrSelf => {
             // `with(xs, i, v) -> T[]?`: `some` of `xs` with element `i` replaced, or
-            // `none` when `i` is past the end.
+            // `none` when `i` is past the end. `__with_or_self` (`fuse_with_or_self`)
+            // is the same operation answering `xs` itself in that case, as an array
+            // and not an optional.
             //
             // The array's reference is consumed here, which is what lets the write
             // happen in place. A receiver that is a fresh temporary or a binding at
@@ -15605,6 +15804,7 @@ fn compile_call_expr_direct<M: Module>(
             // the same guard the in-place `map` uses before its plain stores — and
             // the result optional owns it. When `i` is out of range the consumed
             // reference is released and there is no array to hand back.
+            let or_self = *callee == Callee::WithOrSelf;
             let [receiver, index, value] = args else {
                 return Err(arity_bug(name, 3, args.len(), &span));
             };
@@ -15648,6 +15848,18 @@ fn compile_call_expr_direct<M: Module>(
             } else {
                 arr_ty.clone()
             };
+            if or_self {
+                return compile_with_or_self(
+                    module,
+                    builder,
+                    cx,
+                    scopes,
+                    (arr_v, &arr_ty),
+                    (idx_v, val_v, &val_ty),
+                    &result_arr_ty,
+                    empty_receiver,
+                );
+            }
             let result_ty = ConcreteType::Optional(Box::new(result_arr_ty.clone()));
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
@@ -17654,6 +17866,33 @@ fn compile_call_expr_direct<M: Module>(
                 .get(name)
                 .ok_or_else(|| Error::at(format!("unknown identifier {name:?}"), span.clone()))?;
             match binding {
+                // An owned struct parameter whose heap fields can all be taken: its
+                // buffer is the instance's own (a fresh argument moved in, or a
+                // copy made at the call), so the fields' references go to the
+                // temporary and the buffer is left empty — from any scope, since
+                // the exit release passes over empty fields on the paths that
+                // never got here.
+                EnvBinding::Immut(v, t)
+                    if cx.owned_params.contains(name.as_str())
+                        && is_composite(t, structs)
+                        && !lives_in_slot(t)
+                        && !is_str_shaped(t)
+                        && !is_boxed(t, structs)
+                        && takeable_fields(structs, t).is_some_and(|f| !f.is_empty()) =>
+                {
+                    let fields = takeable_fields(structs, t).unwrap_or_default();
+                    let fresh = value_slot(builder, t, structs);
+                    let copy = builder.ins().stack_addr(types::I64, fresh, 0);
+                    copy_composite(builder, copy, *v, t, structs);
+                    for (offset, fty) in fields {
+                        take_field(module, builder, cx, *v, offset, &fty)?;
+                    }
+                    scopes
+                        .last_mut()
+                        .expect("scope")
+                        .push(Tracked::new(copy, t));
+                    (copy, t.clone())
+                }
                 EnvBinding::Immut(v, t) => {
                     // The binding's entry is not relocated but *replaced*: the
                     // old one is neutralized in place (a `Unit` entry drops
@@ -17672,7 +17911,7 @@ fn compile_call_expr_direct<M: Module>(
                     }
                     (*v, t.clone())
                 }
-                EnvBinding::Mut(slot, ty_cell, _) => {
+                EnvBinding::Mut(slot, ty_cell, owns_buffer) => {
                     let t = ty_cell.borrow().clone();
                     if is_str_shaped(&t) {
                         let src = builder.ins().stack_addr(types::I64, *slot, 0);
@@ -17706,11 +17945,25 @@ fn compile_call_expr_direct<M: Module>(
                         // keeps what its owners will release. The copy is what
                         // a read of the binding is anyway; it is a fresh value
                         // now, which is what the call's hand-off wants.
+                        //
+                        // When the binding owns its buffer (`LetMut` gave it one
+                        // because the body moves it), the fields are taken
+                        // instead: the copy keeps the slot's references and the
+                        // buffer is left empty, so the callee that receives them
+                        // is their only owner and a write into one can happen in
+                        // place.
                         let buf = builder.ins().stack_load(types::I64, types::I64, *slot, 0);
                         let fresh = value_slot(builder, &t, structs);
                         let v = builder.ins().stack_addr(types::I64, fresh, 0);
                         copy_composite(builder, v, buf, &t, structs);
-                        emit_retain(builder, module, builtins, structs, v, &t);
+                        match (*owns_buffer, takeable_fields(structs, &t)) {
+                            (true, Some(fields)) => {
+                                for (offset, fty) in fields {
+                                    take_field(module, builder, cx, buf, offset, &fty)?;
+                                }
+                            }
+                            _ => emit_retain(builder, module, builtins, structs, v, &t),
+                        }
                         scopes.last_mut().expect("scope").push(Tracked::new(v, &t));
                         (v, t)
                     } else {
@@ -19566,13 +19819,32 @@ fn compile_expr_inner<M: Module>(
             // The result is borrowed from the struct (which still owns its
             // copy); retain it so it's an independently-owned ref, and track
             // it for release.
-            if needs_drop(&fty, structs) {
+            //
+            // A field that is more than a word is addressed in place, and the
+            // tracking entry releases whatever is at that address when its scope
+            // ends. If the struct's fields are *taken* in the meantime (an owned
+            // parameter handed on whole, see `Callee::Move`), the address then
+            // holds the empty value and the release does nothing — the retain
+            // taken here is never given back. So the entry gets a snapshot of
+            // the field's bytes, which nothing can empty from underneath it.
+            let v = if needs_drop(&fty, structs) {
+                let v = if is_composite(&fty, structs) {
+                    let snapshot = value_slot(builder, &fty, structs);
+                    let copy = builder.ins().stack_addr(types::I64, snapshot, 0);
+                    copy_composite(builder, copy, v, &fty, structs);
+                    copy
+                } else {
+                    v
+                };
                 emit_retain(builder, module, builtins, structs, v, &fty);
                 scopes
                     .last_mut()
                     .expect("scope")
                     .push(Tracked::new(v, &fty));
-            }
+                v
+            } else {
+                v
+            };
             (v, fty)
         }
         ExprKind::Neg(inner) => {
@@ -19692,7 +19964,7 @@ fn compile_expr_inner<M: Module>(
             // string refcounts allocated by the value are already tracked
             // for dec at scope exit). Then extend the env with the new
             // name and compile the body.
-            let (v, actual) = compile_expr(module, builder, cx, scopes, value)?;
+            let (v, actual) = compile_binding_value(module, builder, cx, scopes, value)?;
             // The `let`'s annotation rides on `Expr`, which both sides of
             // monomorphization share, so it is abstract; by the time codegen
             // reads it every variable in it has been substituted.
@@ -19778,7 +20050,7 @@ fn compile_expr_inner<M: Module>(
         }
         ExprKind::LetMut(name, ty, value, body) => {
             let before = scope_depth(scopes);
-            let (v, actual) = compile_expr(module, builder, cx, scopes, value)?;
+            let (v, actual) = compile_binding_value(module, builder, cx, scopes, value)?;
             // Whether the value, evaluated, is a fresh temporary this binding
             // owns outright — what a `__move` of a binding hands over when the
             // binding held a reference of its own (see `Callee::Move`).
@@ -19893,6 +20165,16 @@ fn compile_expr_inner<M: Module>(
                     aipl_mono::builtin_is_mutating(f)
                         || cx.funcs.get(f).is_some_and(|info| info.is_mutating)
                 });
+            // A struct binding the body moves out of, whose heap fields can all be
+            // taken one by one: it owns the buffer its slot points at (see the
+            // composite arm below). Distinct from `exclusive`, which is the array
+            // and `str` in-place model and would send a struct down its arms.
+            let private_struct = is_composite(&t, structs)
+                && !lives_in_slot(&t)
+                && !is_str_shaped(&t)
+                && !is_boxed(&t, structs)
+                && aipl_mono::moves_binding(name, body)
+                && takeable_fields(structs, &t).is_some_and(|f| !f.is_empty());
             // Only on the exclusive path, where the slot becomes the block's
             // sole owner: a non-exclusive binding retains its value and leaves
             // the value's own ownership in place, and a unique copy made for it
@@ -20024,7 +20306,23 @@ fn compile_expr_inner<M: Module>(
                 // The slot keeps pointing at the value's *own* storage rather
                 // than a copy, so an alias taken before a later `set` still sees
                 // the value it was bound to.
-                emit_retain(builder, module, builtins, structs, v, &t);
+                //
+                // A binding the body moves out of (`__move(name)`, see
+                // `Callee::Move`) gets a buffer of its own instead. Its fields can
+                // then be *taken* at the move — the slot's reference handed to the
+                // callee, the buffer left empty — rather than copied and retained,
+                // which is what leaves the callee the only owner of a field it is
+                // going to write into. The value's own tracking entry keeps its
+                // buffer and its reference, as before.
+                if private_struct {
+                    let own = value_slot(builder, &t, structs);
+                    let own_addr = builder.ins().stack_addr(types::I64, own, 0);
+                    copy_composite(builder, own_addr, v, &t, structs);
+                    emit_retain(builder, module, builtins, structs, own_addr, &t);
+                    builder.ins().stack_store(types::I64, own_addr, slot, 0);
+                } else {
+                    emit_retain(builder, module, builtins, structs, v, &t);
+                }
                 scopes
                     .last_mut()
                     .expect("scope")
@@ -20036,7 +20334,7 @@ fn compile_expr_inner<M: Module>(
                 .push((name.clone(), format!("ss{}", slot.as_u32())));
             new_env.insert(
                 name.clone(),
-                EnvBinding::Mut(slot, Rc::new(RefCell::new(t)), exclusive),
+                EnvBinding::Mut(slot, Rc::new(RefCell::new(t)), exclusive || private_struct),
             );
             compile_expr(
                 module,
@@ -21480,7 +21778,7 @@ fn compile_expr_inner<M: Module>(
             (ptr, dict_ty)
         }
         ExprKind::Index(obj, index) => {
-            let (recv_v, recv_ty) = compile_expr(module, builder, cx, scopes, obj)?;
+            let (recv_v, recv_ty) = compile_inspected(module, builder, cx, scopes, obj)?;
             let (idx_v, idx_t) = compile_expr(module, builder, cx, scopes, index)?;
 
             // `s[span]` — a `Span` index is slice sugar for

@@ -42,6 +42,9 @@ pub use fold_lengths::fold_lengths;
 mod lower_reductions;
 pub use lower_reductions::lower_reductions;
 
+mod with_or_self;
+pub use with_or_self::fuse_with_or_self;
+
 mod counting_variants;
 pub use counting_variants::counting_variants;
 
@@ -59,7 +62,7 @@ pub use known_constructor_elimination::eliminate_known_constructors_post_mono;
 
 mod move_last_use;
 pub use move_last_use::move_last_uses_post_mono;
-use move_last_use::{move_field_reads, move_last_uses};
+use move_last_use::{move_field_reads, move_last_uses, move_last_uses_of_param};
 
 mod subst;
 pub use subst::inline_single_use_bindings;
@@ -2694,6 +2697,20 @@ impl Mono<'_> {
         // bindings; an ordinary function has none. Keyed by the template: its
         // per-shape instances (`$ve2`, a variadic passed one element) share it.
         self.cur_lenv = self.lambda_envs.get(template).cloned().unwrap_or_default();
+        // A struct parameter this instance owns is marked like a binding, before
+        // the body is inferred, so that `owned_for_call` sees its last-use
+        // arguments as fresh when it picks each callee's instance.
+        let body = &params
+            .iter()
+            .enumerate()
+            .filter(|(i, p)| {
+                specs.get(*i).is_some_and(|s| s.owned)
+                    && !p.mutable
+                    && self.struct_fields_of(&p.ty).is_some()
+            })
+            .fold(body.clone(), |b, (_, p)| {
+                move_last_uses_of_param(&p.name, &b, &self.heap_fields_of(&p.ty), &self.mutating)
+            });
         let (body, _) = self.infer(body, &env)?;
         Ok(ConcreteFn {
             name: name.to_string(),
@@ -5123,6 +5140,7 @@ impl Mono<'_> {
             &return_ty,
             &body,
             &|t| self.owns_heap(t),
+            &|t| self.heap_fields_of(t),
             &|f| self.mutating.contains(f),
         )
         .into_iter()
@@ -11072,6 +11090,7 @@ fn owned_eligible(
     return_ty: &Option<Type>,
     body: &Expr,
     owns_heap: &dyn Fn(&Type) -> bool,
+    heap_fields_of: &dyn Fn(&Type) -> HashSet<String>,
     mutating: &dyn Fn(&str) -> bool,
 ) -> Vec<usize> {
     if name == "main" {
@@ -11095,7 +11114,12 @@ fn owned_eligible(
                         binding_is_exclusive(y, body_after, true, mutating)
                     })
             } else {
+                // Either each heap field is read once and moved out, or the
+                // parameter is only ever handed on whole (see `param_forwarded`):
+                // a function that reads `self` several times and passes it to
+                // the next at the end still owns what it was given.
                 fields_read_once(&p.name, body)
+                    || move_last_use::param_forwarded(&p.name, body, &heap_fields_of(&p.ty))
             }
         })
         .map(|(i, _)| i)
@@ -11110,31 +11134,45 @@ fn owned_eligible(
 /// read that could run more than once all disqualify.
 pub(crate) fn fields_read_once(param: &str, body: &Expr) -> bool {
     let mut seen: Vec<String> = Vec::new();
-    fields_read_once_into(param, body, false, &mut seen)
+    fields_read_once_into(&[param], body, false, &mut seen)
 }
 
-fn fields_read_once_into(param: &str, e: &Expr, repeats: bool, seen: &mut Vec<String>) -> bool {
+/// `names` are the bindings that stand for the struct: the parameter, and any
+/// `let alias = param` made of it (what a struct spread `T { ..self, f: v }`
+/// and an inlined call both leave). A field read through any of them is a read
+/// of that field of the one struct, so `seen` is shared; the alias itself is
+/// not a whole-value use, and its own bare mentions are.
+fn fields_read_once_into(names: &[&str], e: &Expr, repeats: bool, seen: &mut Vec<String>) -> bool {
+    let is_alias = |x: &Expr| matches!(&x.kind, ExprKind::Ident(n) if names.contains(&n.as_str()));
     match &e.kind {
-        ExprKind::Field(obj, f) if matches!(&obj.kind, ExprKind::Ident(n) if n == param) => {
+        ExprKind::Field(obj, f) if is_alias(obj) => {
             if repeats || seen.contains(f) {
                 return false;
             }
             seen.push(f.clone());
             true
         }
-        ExprKind::Ident(n) => n != param,
+        ExprKind::Ident(n) => !names.contains(&n.as_str()),
+        // `let a = param; body`: `a` is the struct under another name.
+        ExprKind::Let(a, _, value, body) | ExprKind::LetMut(a, _, value, body)
+            if is_alias(value) && !names.contains(&a.as_str()) =>
+        {
+            let mut inner: Vec<&str> = names.to_vec();
+            inner.push(a);
+            fields_read_once_into(&inner, body, repeats, seen)
+        }
         ExprKind::For(_, _, iter, fbody) => {
-            fields_read_once_into(param, iter, repeats, seen)
-                && fields_read_once_into(param, fbody, true, seen)
+            fields_read_once_into(names, iter, repeats, seen)
+                && fields_read_once_into(names, fbody, true, seen)
         }
         ExprKind::While(cond, wbody) => {
-            fields_read_once_into(param, cond, true, seen)
-                && fields_read_once_into(param, wbody, true, seen)
+            fields_read_once_into(names, cond, true, seen)
+                && fields_read_once_into(names, wbody, true, seen)
         }
-        ExprKind::Lambda(_, lbody) => fields_read_once_into(param, lbody, true, seen),
+        ExprKind::Lambda(_, lbody) => fields_read_once_into(names, lbody, true, seen),
         _ => children(e)
             .into_iter()
-            .all(|c| fields_read_once_into(param, c, repeats, seen)),
+            .all(|c| fields_read_once_into(names, c, repeats, seen)),
     }
 }
 
@@ -11425,7 +11463,7 @@ fn aliases_or_unsafe(
                         // `with` takes the receiver's reference and writes into
                         // it when nothing else holds the block, or copies it:
                         // it never keeps `name` and the result both.
-                        Callee::With => false,
+                        Callee::With | Callee::WithOrSelf => false,
                         _ => !tail,
                     }
                 } else {
@@ -11460,7 +11498,8 @@ fn aliases_or_unsafe(
                 args.iter().enumerate().any(|(k, a)| {
                     if is_n(a) {
                         // `with`'s array (argument 0), as in the method form above.
-                        let consuming = consuming || (*fname == Callee::With && k == 0);
+                        let consuming = consuming
+                            || (matches!(fname, Callee::With | Callee::WithOrSelf) && k == 0);
                         !consuming && !tail && !builtin_reads_arg(fname, k)
                     } else {
                         rec_tail(a)

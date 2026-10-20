@@ -1,0 +1,72 @@
+# An array inside a struct is updated in place when the struct is handed down a
+# chain of calls that each hand it on: `toggled` reads `board` several times as a
+# whole (a test, two inlined calls) and gives it to `marked` at its last use, and
+# `marked` gives its `cells` field to `with` — which writes into the array because
+# no one else holds it. The loop in `main` hands its `mut board` over each time.
+#
+# What it takes, and the pinned report is the claim (a hundred toggles allocate the
+# board once, not a hundred times):
+#
+# - a struct parameter whose uses are all calls, field reads of non-heap fields, or
+#   the value returned, may be owned (`param_forwarded`), not only one that reads
+#   each field once;
+# - `xs.with(i, v).value_or(xs)` reads `xs` once (`fuse_with_or_self`);
+# - a `mut` struct binding that the body moves out of is taken from, not copied;
+# - a test that only looks into an array field (`board.cells[i]`) holds nothing.
+
+import { equal as ==, print, repeat, saturating_remainder as %, value_or, with } from builtins;
+
+variant Cell = Empty | Flag
+
+struct Board { width: u64, cells: Cell[] }
+
+fn is_flag(self: Board, at: u64) -> bool { self.cells[at] == some(Flag) }
+
+fn is_empty(self: Board, at: u64) -> bool { self.cells[at] == some(Empty) }
+
+fn marked(self: Board, at: u64, cell: Cell) -> Board {
+    let cells = self.cells.with(at, cell).value_or(self.cells);
+    Board { ..self, cells }
+}
+
+fn toggled(self: Board, at: u64) -> Board {
+    if (self.is_flag(at)) {
+        self.marked(at, Empty)
+    } else if (self.is_empty(at)) {
+        self.marked(at, Flag)
+    } else {
+        self
+    }
+}
+
+fn main() !prints {
+    mut board = Board { width: 8, cells: [Empty].repeat(64) };
+    for (let i : 0..100) {
+        set board = board.toggled(i % 64);
+    }
+    // A second call site keeps `toggled` from being inlined into the loop.
+    let other = Board { width: 2, cells: [Empty].repeat(4) }.toggled(1);
+    print(`{board.is_flag(0)} {board.is_flag(63)} {board.is_flag(36)} {other.is_flag(1)}`);
+}
+--- stdout ---
+false true true true
+--- report ---
+allocations       15
+deallocations     15
+reallocations     0
+bytes allocated   1761
+peak live bytes   1761
+instructions      30334
+binary size       6040 bytes (code 3812, data 22, metadata 2206)
+
+function                   calls  code bytes
+__builtin_repeat$Cell          2         412
+__to_str_bool                  4         224
+aipl_arr_inc                 339    external
+aipl_array_dec               644    external
+aipl_array_new                 2    external
+aipl_shim_get                  1    external
+aipl_write_bytes               4    external
+main                           1        2132
+marked$own0                  101         292
+toggled$own0                 101         752

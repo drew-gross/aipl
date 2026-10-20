@@ -73,13 +73,13 @@ Named { name: "y?", tags: [] }
 Named { name: "z+-", tags: ["r"] }
 Named { name: "k=", tags: ["s", "t", "u"] }
 --- report ---
-allocations       48
-deallocations     48
+allocations       44
+deallocations     44
 reallocations     3
-bytes allocated   2930
+bytes allocated   2802
 peak live bytes   2842
-instructions      7028
-binary size       20528 bytes (code 13144, data 195, metadata 7189)
+instructions      7482
+binary size       21048 bytes (code 13668, data 195, metadata 7185)
 
 function                 calls  code bytes
 __arr_drop_First             2         152
@@ -87,8 +87,8 @@ __arr_retain_First           0         152
 __to_str_First               3        1464
 __to_str_Named               6        1100
 __to_str_u64                 2         204
-aipl_arr_inc                73    external
-aipl_array_dec             104    external
+aipl_arr_inc                63    external
+aipl_array_dec             114    external
 aipl_array_new               5    external
 aipl_array_with_cap          8    external
 aipl_i64_len                10    external
@@ -97,5 +97,5 @@ aipl_u64_len                 4    external
 aipl_write_bytes           105    external
 aipl_write_i64               5    external
 aipl_write_u64               2    external
-fold                         2        1700
-main                         1        8372
+fold                         2        2028
+main                         1        8568

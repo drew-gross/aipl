@@ -407,6 +407,7 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  try_with (like with but no-op on OOB). Lint requests to use v.try_with(...) instead of v.with(...).value_or(v), replaces __with_or_self
   zip
   int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html
   map on a set is a bit of a weird operation, I feel like I should come up with a name for it (what if the pred isn't injective?)
@@ -694,6 +695,7 @@ allocator:
   make own allocator
 
 perfmon:
+  allow comments in report sections
   measure() needs to block optimizations
   show call-sites of each function in the final binary
   show regression and improvements

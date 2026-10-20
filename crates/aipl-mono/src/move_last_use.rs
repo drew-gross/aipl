@@ -110,6 +110,19 @@ use aipl_syntax::ast::{Callee, ConcreteType, Expr, ExprKind, MatchArm, Type};
 
 use crate::{children, children_mut, count_ident, is_heap_concrete, ConcreteFn, MonoProgram};
 
+/// `body` — the scope of the *parameter* `name`, which the instance owns — with
+/// each last use wrapped in `__move`. A parameter has no initializer, which only
+/// the alias check ever looked at.
+pub(crate) fn move_last_uses_of_param(
+    name: &str,
+    body: &Expr,
+    heap_fields: &HashSet<String>,
+    mutating: &HashSet<String>,
+) -> Expr {
+    let no_value = Expr::new(ExprKind::Unit, body.span.clone());
+    move_last_uses(name, &no_value, body, heap_fields, mutating)
+}
+
 /// `body` — the scope of the binding `name`, whose initializer is `value` —
 /// with each last use of `name` that is an argument to a user function wrapped
 /// in `__move`. Unchanged when the binding does not qualify (see the module
@@ -121,9 +134,10 @@ pub(crate) fn move_last_uses(
     heap_fields: &HashSet<String>,
     mutating: &HashSet<String>,
 ) -> Expr {
-    if matches!(&value.kind, ExprKind::Ident(_))
-        || !only_call_arguments(name, body, false, heap_fields)
-    {
+    // A bare mention at the end of the body — the binding returned as the
+    // scope's value — is a move out, as for a parameter (see `forwarded`); so an
+    // inlined `fn f(self) { if c { self } else { g(self) } }` still qualifies.
+    if matches!(&value.kind, ExprKind::Ident(_)) || !forwarded(name, body, true, heap_fields) {
         return body.clone();
     }
     let mut out = body.clone();
@@ -206,7 +220,12 @@ pub fn move_last_uses_post_mono(program: &MonoProgram) -> MonoProgram {
             .iter()
             .map(|f| ConcreteFn {
                 body: move_owned_receivers(
-                    &remark(&strip(&f.body), program, &mutating),
+                    &mark_owned_params(
+                        f,
+                        program,
+                        &remark(&strip(&f.body), program, &mutating),
+                        &mutating,
+                    ),
                     &owns_receiver,
                 ),
                 ..f.clone()
@@ -214,6 +233,48 @@ pub fn move_last_uses_post_mono(program: &MonoProgram) -> MonoProgram {
             .collect(),
         ..program.clone()
     }
+}
+
+/// `body` with the last use of each struct parameter the instance *owns*
+/// wrapped in `__move`, so the next callee receives the reference rather than a
+/// retained copy. A parameter is marked like a binding, after the bindings inside
+/// the body — an inlined call leaves `let $inl_self = param` aliases there, which
+/// this turns into moves — and the aliases' own fields are then moved too.
+fn mark_owned_params(
+    f: &ConcreteFn,
+    program: &MonoProgram,
+    body: &Expr,
+    mutating: &HashSet<String>,
+) -> Expr {
+    let mut out = body.clone();
+    for p in f.params.iter().filter(|p| p.owned && !p.mutable) {
+        let heap_fields = heap_fields_of_concrete(program, &p.ty);
+        if heap_fields.is_empty() || is_heap_concrete(&p.ty) {
+            continue;
+        }
+        out = move_last_uses_of_param(&p.name, &out, &heap_fields, mutating);
+    }
+    marks_of_moved_aliases(&out, program, mutating)
+}
+
+/// The heap-owning fields of the struct `ty` names — [`heap_fields_post_mono`]
+/// for a type already concrete.
+fn heap_fields_of_concrete(program: &MonoProgram, ty: &ConcreteType) -> HashSet<String> {
+    let ConcreteType::Named(name) = ty else {
+        return HashSet::new();
+    };
+    program
+        .structs
+        .iter()
+        .find(|d| &d.name == name)
+        .map(|d| {
+            d.fields
+                .iter()
+                .filter(|f| owns_heap_post_mono(program, &f.ty))
+                .map(|f| f.name.clone())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Hand the receiver over at every call to a mutating method that owns it.
@@ -309,6 +370,57 @@ fn strip(e: &Expr) -> Expr {
     out
 }
 
+/// Moves for the aliases this binding's marking just turned into owners.
+///
+/// A `let a = x` is an alias until `x`'s own analysis, which runs after `a`'s
+/// (inner bindings first), finds it the last use of `x` and makes it `let a =
+/// __move(x)`: `a` then holds the struct's reference, and both its last-use call
+/// arguments and its heap-field reads are moves like any owning binding's. `a`'s
+/// own pass declined them, correctly, for the alias it was then. This is what an
+/// inlined call is — `f(x)` becomes `let $inl_self = x; ..` — so without it a
+/// callee's uses of its parameter never move once the callee is inlined.
+///
+/// Only a binding whose body has no move of it yet is given them, so a binding
+/// the first pass already handled is not wrapped twice.
+fn marks_of_moved_aliases(e: &Expr, program: &MonoProgram, mutating: &HashSet<String>) -> Expr {
+    let mut out = e.clone();
+    for child in children_mut(&mut out) {
+        *child = marks_of_moved_aliases(child, program, mutating);
+    }
+    let (name, ty, value, body) = match &out.kind {
+        ExprKind::Let(n, t, v, b) | ExprKind::LetMut(n, t, v, b) => (n, t, v, b),
+        _ => return out,
+    };
+    let moved_alias = matches!(&value.kind,
+        ExprKind::Call(Callee::Move, args, _) if matches!(args.as_slice(), [a] if matches!(a.kind, ExprKind::Ident(_))));
+    if !moved_alias || already_moves(name, body) {
+        return out;
+    }
+    let heap_fields = ty
+        .as_ref()
+        .map(|t| heap_fields_post_mono(program, t))
+        .unwrap_or_default();
+    let new_body = move_last_uses(name, value, body, &heap_fields, mutating);
+    let new_body = move_field_reads(name, value, &new_body, &heap_fields);
+    match &mut out.kind {
+        ExprKind::Let(_, _, _, b) | ExprKind::LetMut(_, _, _, b) => *b = Box::new(new_body),
+        _ => unreachable!(),
+    }
+    out
+}
+
+/// Whether `body` already contains `__move(name)` or `__move(name.f)`.
+fn already_moves(name: &str, body: &Expr) -> bool {
+    if let ExprKind::Call(Callee::Move, args, _) = &body.kind {
+        if matches!(args.as_slice(), [a] if is_name(a, name)
+            || matches!(&a.kind, ExprKind::Field(obj, _) if is_name(obj, name)))
+        {
+            return true;
+        }
+    }
+    children(body).into_iter().any(|c| already_moves(name, c))
+}
+
 /// `e` with every binding under it marked, innermost first — a binding's marks
 /// touch only its own name, so the order does not matter for correctness and
 /// inner-first means each outer analysis sees its scope in final form.
@@ -325,6 +437,7 @@ fn remark(e: &Expr, program: &MonoProgram, mutating: &HashSet<String>) -> Expr {
                 .unwrap_or_default();
             let body = move_last_uses(name, value, body, &heap_fields, mutating);
             let body = move_field_reads(name, value, &body, &heap_fields);
+            let body = marks_of_moved_aliases(&body, program, mutating);
             match &out.kind {
                 ExprKind::Let(n, t, v, _) => Expr {
                     kind: ExprKind::Let(n.clone(), t.clone(), v.clone(), Box::new(body)),
@@ -407,6 +520,69 @@ fn only_call_arguments(
     }
 }
 
+/// Whether a struct parameter `name` can be held by an instance that *owns* it and
+/// forwarded on piecemeal: every use is a call argument (a borrow, or — at its
+/// last use — a move), a read of a field that owns no heap, or the parameter
+/// returned as the function's value. A read of a heap field, a capture, or the
+/// value used any other way (`mut`, a `for` over it, a rebinding) disqualifies,
+/// as it does for [`move_last_uses`].
+///
+/// The caller has a reference to give away exactly when its argument is fresh or
+/// at its own last use; an instance that owns the parameter may then hand it to
+/// the next callee at *its* last use, so ownership travels down a chain of calls
+/// that each use `self` more than once.
+pub(crate) fn param_forwarded(name: &str, body: &Expr, heap_fields: &HashSet<String>) -> bool {
+    forwarded(name, body, true, heap_fields)
+}
+
+fn forwarded(name: &str, e: &Expr, tail: bool, heap_fields: &HashSet<String>) -> bool {
+    let rec = |x: &Expr| forwarded(name, x, false, heap_fields);
+    let rec_tail = |x: &Expr| forwarded(name, x, tail, heap_fields);
+    match &e.kind {
+        // The parameter as the function's value is a move out, like a call's
+        // last use; anywhere else a bare mention is a use this cannot place.
+        ExprKind::Ident(n) if n == name => tail,
+        ExprKind::Let(n, _, value, body) | ExprKind::LetMut(n, _, value, body) if n != name => {
+            // `let a = name` is a move or an alias, decided by `mark`.
+            (is_name(value, name) || rec(value)) && rec_tail(body)
+        }
+        ExprKind::Seq(first, rest) => rec(first) && rec_tail(rest),
+        ExprKind::If(cond, then_body, else_body) => {
+            rec(cond) && rec_tail(then_body) && rec_tail(else_body)
+        }
+        ExprKind::Match(scrutinee, arms) => {
+            arms.iter().all(|a| !binds(a, name))
+                && rec(scrutinee)
+                && arms.iter().all(|a| rec_tail(&a.body))
+        }
+        ExprKind::Return(value) => forwarded(name, value, true, heap_fields),
+        _ => only_call_arguments(name, e, false, heap_fields),
+    }
+}
+
+/// Whether `e` certainly evaluates to a scalar — a `bool`, a number, a character —
+/// and so cannot hold a reference to anything it was computed from. Conservative:
+/// anything not recognized answers `false`.
+fn scalar_valued(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Bool(_) | ExprKind::Num(_) | ExprKind::Char(_) | ExprKind::Neg(_) => true,
+        ExprKind::Call(callee, _, _) => {
+            aipl_syntax::binop_for_builtin(callee).is_some()
+                || matches!(
+                    callee,
+                    Callee::LogicalNot | Callee::Len | Callee::IsEmpty | Callee::IsNonempty
+                )
+        }
+        ExprKind::If(_, then_body, else_body) => {
+            scalar_valued(then_body) && scalar_valued(else_body)
+        }
+        ExprKind::Match(_, arms) => !arms.is_empty() && arms.iter().all(|a| scalar_valued(&a.body)),
+        ExprKind::Let(_, _, _, body) | ExprKind::LetMut(_, _, _, body) => scalar_valued(body),
+        ExprKind::Seq(_, rest) => scalar_valued(rest),
+        _ => false,
+    }
+}
+
 /// Wrap each last-use argument of `name` under `e`. `tail` is whether the
 /// binding is dead once `e` finishes. `alias_outlives` is set when a
 /// `let a = name` is found that is not `name`'s last use — see the module
@@ -430,7 +606,11 @@ fn mark(
                     ExprKind::Call(Callee::Move, vec![inner], false),
                     span,
                 ));
-            } else {
+            } else if !scalar_valued(body) {
+                // The alias can be read through after a later move only if it
+                // escapes the `let`, and the value of a `let` is the value of its
+                // body: one that is a plain number, test or comparison holds
+                // nothing of `name`. What an inlined `self.is_x()` is, written out.
                 *alias_outlives = true;
             }
             mark(name, body, tail, mutating, alias_outlives);
@@ -438,15 +618,25 @@ fn mark(
         ExprKind::Call(callee, args, _) => {
             let user = matches!(callee, Callee::User(f) if !mutating.contains(f));
             // `with` consumes its array (argument 0) to write into it.
-            let takes_array = matches!(callee, Callee::With);
+            let takes_array = matches!(callee, Callee::With | Callee::WithOrSelf);
             // Arguments are evaluated left to right, and each is handed over
             // only once all of them are — but a later argument that reads the
             // binding is a later use all the same.
             let later: Vec<bool> = (0..args.len())
                 .map(|i| args[i + 1..].iter().any(|a| mentions(name, a)))
                 .collect();
-            for (position, (arg, later)) in args.iter_mut().zip(later).enumerate() {
-                let t = tail && !later;
+            // An argument that follows another which reads the binding is evaluated
+            // while that earlier read is still a live borrow of the same value —
+            // the call has not run yet — so nothing inside it may take the value
+            // out from under it: `f(w, g(__move(w)))` would hand `f` a `w` that `g`
+            // had emptied.
+            let earlier: Vec<bool> = (0..args.len())
+                .map(|i| args[..i].iter().any(|a| mentions(name, a)))
+                .collect();
+            for (position, ((arg, later), earlier)) in
+                args.iter_mut().zip(later).zip(earlier).enumerate()
+            {
+                let t = tail && !later && !earlier;
                 if (user || (takes_array && position == 0)) && t && is_name(arg, name) {
                     let span = arg.span.clone();
                     let inner = std::mem::replace(arg, Expr::new(ExprKind::Unit, span.clone()));
@@ -479,7 +669,13 @@ fn mark(
         }
         ExprKind::If(cond, then_body, else_body) => {
             let t = tail && !mentions(name, then_body) && !mentions(name, else_body);
-            mark(name, cond, t, mutating, alias_outlives);
+            // A condition is a `bool`, consumed where it stands: an alias of the
+            // binding made inside it (what an inlined `self.is_x()` leaves, as
+            // `let $inl_self = name; ..`) is gone before either branch runs, so it
+            // cannot be read through after a move in one. It does not withdraw the
+            // marks the way an alias that escapes into a value would.
+            let mut dies_with_condition = false;
+            mark(name, cond, t, mutating, &mut dies_with_condition);
             mark(name, then_body, tail, mutating, alias_outlives);
             mark(name, else_body, tail, mutating, alias_outlives);
         }

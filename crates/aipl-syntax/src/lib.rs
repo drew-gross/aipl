@@ -3308,6 +3308,8 @@ fn __aipl_concat(a: str, b: str) -> str { "" }
 // thing in the body seeds the generator it reads: `__random_seed` with a given
 // seed, `__random_seed_from_clock` with the (shimmable) clock. The generator's one
 // word of state is saved and restored with the shim, so a shim nests.
+// Internal: `xs.with(i, v).value_or(xs)`, which reads `xs` once.
+fn __with_or_self<T: any>(self: T[], index: u64, value: T) -> T[] { self }
 fn __random_next() -> u64 { 0 }
 fn __random_seed(seed: u64) {}
 fn __random_seed_from_clock() !clock {}

@@ -39,8 +39,8 @@ deallocations     9
 reallocations     0
 bytes allocated   609
 peak live bytes   609
-instructions      1273
-binary size       5320 bytes (code 2724, data 130, metadata 2466)
+instructions      1294
+binary size       5352 bytes (code 2752, data 130, metadata 2470)
 
 function                calls  code bytes
 __ctor$Tagged$Nums          3         192
@@ -51,5 +51,5 @@ aipl_i64_len               10    external
 aipl_shim_get               3    external
 aipl_write_bytes           17    external
 aipl_write_i64              5    external
-applied                     3         536
+applied                     3         564
 main                        1         812
