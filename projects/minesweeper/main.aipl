@@ -23,7 +23,6 @@ import {
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
-    map_err,
     not_equal as !=,
     print,
     push,
@@ -354,37 +353,21 @@ fn play(game: Mark[,]) !prints !read_stdin {
     };
 }
 
-# Play a new game on the standard 8 by 8 board with 10 mines. The mines come from
-# whatever generator `main` seeds.
-fn play_new_game() !prints !read_stdin !random {
-    let size: u64 = 8;
-    play(new_game(size, size, place_mines(10, size * size)))
-}
-
-# The seed given on the command line: none when there is no argument, and an
-# error carrying the argument when it is not a number.
-fn seed_argument(args: str[]) -> u64?!str {
-    match (args.first()) {
-        none => ok(none),
-        some(text) => {
-            let number = text.int_parse().value_or_err(text)?;
-            let seed: u64 = number;
-            ok(some(seed))
-        },
-    }
-}
-
-# Play on the standard board. The mines are different every game;
-# `./aipl run -- SEED` plays the same game again for the same number.
+# Play on the standard 8 by 8 board with 10 mines. The mines are different every
+# game; `./aipl run -- SEED` plays the same game again for the same number.
 fn main(args: str[]) !prints !read_stdin !clock -> !Error {
-    let seed = seed_argument(args).map_err(|text| `not a seed: {text}`)?;
+    let size: u64 = 8;
     shim random {
-        match (seed) {
-            none => seeded_with_clock(),
-            some(number) => seeded_with_int(number),
+        match (args) {
+            [] => seeded_with_clock(),
+            [text] => {
+                let seed: u64 = text.int_parse().value_or_err(`not a seed: {text}`)?;
+                seeded_with_int(seed)
+            },
+            _ => err("usage: minesweeper [SEED]")?,
         }
     } {
-        play_new_game();
+        play(new_game(size, size, place_mines(10, size * size)));
     };
     ok()
 }
