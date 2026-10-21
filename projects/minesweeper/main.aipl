@@ -11,16 +11,15 @@ import {
     extend,
     filter,
     first,
-    greater_than_or_equal as >=,
     grid_from,
     has,
     height,
     int_parse,
+    is_in_bounds_of,
     is_nonempty,
     join,
     len,
     less_than as <,
-    less_than_or_equal as <=,
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
@@ -106,20 +105,15 @@ fn is_mine(self: Mark[,], cell: (u64, u64)) -> bool {
 
 # The cells touching `cell`, including diagonally, that are on the board.
 #
-# Offsets run 0 to 2 for -1 to +1 so that no row or column is ever negative: a
-# neighbour in row `r` and column `c` has `r` and `c` one more than its real
-# position, and is on the board when both are between 1 and the size.
+# Offsets run 0 to 2 for -1 to +1. A neighbour above or to the left of the board
+# wraps around to a huge number, which is off the board like any other.
 fn neighbors(self: Mark[,], cell: (u64, u64)) -> (u64, u64)[] {
-    let row = cell.0 + 1;
-    let column = cell.1 + 1;
     mut out: (u64, u64)[] = [];
     for (let up : 0..3) {
         for (let left : 0..3) {
-            let r = row + up - 1;
-            let c = column + left - 1;
-            let on_board = r >= 1 && r <= self.height() && c >= 1 && c <= self.width();
-            if (on_board && (up != 1 || left != 1)) {
-                set out.push((r - 1, c - 1));
+            let neighbor = (cell.0 + up - 1, cell.1 + left - 1);
+            if (neighbor.is_in_bounds_of(self) && neighbor != cell) {
+                set out.push(neighbor);
             };
         }
     }
@@ -304,7 +298,7 @@ fn parse_command(self: Mark[,], line: str) -> Command!str {
     } else if (verb == "r" || verb == "f") {
         let row = words.number(1)?;
         let column = words.number(2)?;
-        if (row < self.height() && column < self.width()) {
+        if ((row, column).is_in_bounds_of(self)) {
             let cell = (row, column);
             ok(if (verb == "r") { Reveal(cell) } else { Flag(cell) })
         } else {

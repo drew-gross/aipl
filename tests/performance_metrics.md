@@ -226,6 +226,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/grids/any | 6 | 181 | 181 | 804 | 2636 | 8.00 | 340.46 | 1488 |
 | cases/grids/basics | 5 | 305 | 305 | 1672 | 3972 | 6.00 | 277.26 | 1472 |
 | cases/grids/dimensions | 13 | 758 | 758 | 609 | 2616 | 9.00 | 395.13 | 1488 |
+| cases/grids/in_bounds | 7 | 143 | 143 | 683 | 2008 | 10.00 | 592.73 | 1456 |
 | cases/grids/tuple_index | 12 | 348 | 348 | 1842 | 5884 | 16.00 | 514.40 | 1504 |
 | cases/hashing/basic | 9 | 511 | 320 | 2527 | 9404 | 5.00 | 89.09 | 1472 |
 | cases/higher-order-in-test | 0 | 0 | 0 | 857 | 1336 | 3.00 | 77.86 | 1472 |
@@ -749,6 +750,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_first | 1 | 80 | 80 | 360 | 1568 | 3.00 | 80.52 | 1472 |
 | crates/aipl-mono/src/builtin_grid_from | 0 | 0 | 0 | 586 | 1356 | 1.00 | 134.35 | 1440 |
 | crates/aipl-mono/src/builtin_grid_get | 1 | 80 | 80 | 633 | 1784 | 3.00 | 87.94 | 1456 |
+| crates/aipl-mono/src/builtin_grid_is_in_bounds_of | 0 | 0 | 0 | 451 | 904 | 1.00 | 94.54 | 1456 |
 | crates/aipl-mono/src/builtin_grid_try_set | 3 | 192 | 192 | 1273 | 2108 | 3.00 | 139.93 | 1456 |
 | crates/aipl-mono/src/builtin_height | 0 | 0 | 0 | 389 | 1068 | 2.00 | 88.01 | 1456 |
 | crates/aipl-mono/src/builtin_inline_str | 4 | 254 | 254 | 685 | 2476 | 3.00 | 80.88 | 1440 |
@@ -756,6 +758,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_intersperse | 14 | 960 | 1440 | 2755 | 4720 | 6.00 | 83.16 | 1472 |
 | crates/aipl-mono/src/builtin_is_all_whitespace | 0 | 0 | 0 | 2047 | 1500 | 2.00 | 90.28 | 1456 |
 | crates/aipl-mono/src/builtin_is_err_and | 0 | 0 | 0 | 1633 | 5228 | 3.00 | 94.98 | 1472 |
+| crates/aipl-mono/src/builtin_is_in_bounds_of | 1 | 80 | 80 | 312 | 1176 | 3.00 | 91.24 | 1472 |
 | crates/aipl-mono/src/builtin_is_some_and | 0 | 0 | 0 | 144 | 688 | 2.00 | 87.04 | 1440 |
 | crates/aipl-mono/src/builtin_join_is_empty | 10 | 872 | 872 | 2647 | 6152 | 4.00 | 94.06 | 1488 |
 | crates/aipl-mono/src/builtin_join_is_nonempty | 18 | 1560 | 1560 | 6164 | 10856 | 6.00 | 105.41 | 1488 |

@@ -1,0 +1,23 @@
+# The AIPL implementation of the `is_in_bounds_of` builtin. Monomorphization
+# registers this under the canonical name `__builtin_is_in_bounds_of` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so `i.is_in_bounds_of(xs)` resolves through
+# the ordinary generic machinery. A `(row, column)` pair asked about a grid is
+# rewritten to `grid_is_in_bounds_of` before it gets here.
+#
+# No lint steers `i < xs.len()` to it: the two read about the same.
+
+import { equal as ==, len, less_than as <, logical_not as ! } from builtins;
+
+# Whether `self` is the position of an element of `other`, so that `other[self]`
+# is `some`. A `str` is asked about its bytes.
+pub fn is_in_bounds_of<T: any>(self: u64, other: T[]) -> bool { self < other.len() }.test({
+    assert(0.is_in_bounds_of([1, 2, 3]));
+    assert(2.is_in_bounds_of([1, 2, 3]));
+    assert(!3.is_in_bounds_of([1, 2, 3]));
+    let empty: i64[] = [];
+    assert(!0.is_in_bounds_of(empty));
+    let index: u64 = 1;
+    assert(index.is_in_bounds_of(["a", "b"]));
+    assert(is_in_bounds_of(index, ['a']) == false);
+    assert(1.is_in_bounds_of("ab"));
+})

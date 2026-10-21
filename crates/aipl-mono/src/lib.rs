@@ -7283,6 +7283,17 @@ impl Mono<'_> {
                 {
                     return self.infer_generic_variant_ctor(name, args, env, &span);
                 }
+                // `(row, column).is_in_bounds_of(grid)` asks the grid about the
+                // cell, where `i.is_in_bounds_of(array)` asks the array about `i`.
+                if *callee == Callee::IsInBoundsOf && args.len() == 2 {
+                    let (_, index) = self.infer(&args[0], env)?;
+                    let (_, receiver) = self.infer(&args[1], env)?;
+                    if self.is_grid_cell_index(&receiver, &index) {
+                        let rewritten =
+                            grid_call(Callee::GridIsInBoundsOf, &args[1], &args[0], &[], &span);
+                        return self.infer(&rewritten, env);
+                    }
+                }
                 // `grid.try_set((row, column), value)` is
                 // `grid.grid_try_set(row, column, value)`: the same store as the
                 // two-index form, with the cell given as a pair.
@@ -8016,6 +8027,11 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::GridTrySet, "builtin_grid_try_set.aipl"),
     (Callee::Width, "builtin_width.aipl"),
     (Callee::Height, "builtin_height.aipl"),
+    (Callee::IsInBoundsOf, "builtin_is_in_bounds_of.aipl"),
+    (
+        Callee::GridIsInBoundsOf,
+        "builtin_grid_is_in_bounds_of.aipl",
+    ),
     (Callee::Last, "builtin_last.aipl"),
     (Callee::NonemptyFirst, "builtin_nonempty_first.aipl"),
     (Callee::NonemptyLast, "builtin_nonempty_last.aipl"),
@@ -8242,7 +8258,11 @@ pub fn aipl_builtin_demand(program: &Program) -> BTreeSet<&'static str> {
     // `grid[(row, column)]` and `grid.try_set((row, column), value)` become
     // calls to these once the types are known, which is after this scan.
     if mentions_grid(program) {
-        for grid_builtin in ["__builtin_grid_get", "__builtin_grid_try_set"] {
+        for grid_builtin in [
+            "__builtin_grid_get",
+            "__builtin_grid_try_set",
+            "__builtin_grid_is_in_bounds_of",
+        ] {
             let (canonical, _) = aipl_builtin_slots()
                 .get_key_value(grid_builtin)
                 .expect("a grid builtin is an AIPL_BUILTIN_SOURCES entry");

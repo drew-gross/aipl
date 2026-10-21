@@ -4422,6 +4422,14 @@ impl Cx<'_> {
                 );
             }
         }
+        // `(row, column).is_in_bounds_of(grid)`.
+        if *callee == Callee::IsInBoundsOf && args.len() == 2 {
+            let index = self.check_expr(&args[0], env, effects)?;
+            let receiver = self.check_expr(&args[1], env, effects)?;
+            if self.grid_cell_element(&receiver, &index).is_some() {
+                return Ok(Type::Primitive(Primitive::Bool));
+            }
+        }
         // `grid.try_set((row, column), value)`: the grid again, with that cell
         // replaced.
         if *callee == Callee::WithOrSelf && args.len() == 3 {

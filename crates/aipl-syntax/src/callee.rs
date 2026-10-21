@@ -74,6 +74,12 @@ pub enum Callee {
     Width,
     /// `height(self: T[,]) -> u64` — how many rows the grid has.
     Height,
+    /// `is_in_bounds_of(self: u64, other: T[]) -> bool` — whether `other[self]` is an
+    /// element.
+    IsInBoundsOf,
+    /// `grid_is_in_bounds_of(self: T[,], row: u64, column: u64) -> bool` — whether the
+    /// cell is on the grid. What `(row, column).is_in_bounds_of(grid)` is rewritten to.
+    GridIsInBoundsOf,
     Last,
     NonemptyFirst,
     NonemptyLast,
@@ -376,6 +382,8 @@ impl Callee {
         Callee::GridTrySet,
         Callee::Width,
         Callee::Height,
+        Callee::IsInBoundsOf,
+        Callee::GridIsInBoundsOf,
         Callee::Last,
         Callee::NonemptyFirst,
         Callee::NonemptyLast,
@@ -563,6 +571,8 @@ impl Callee {
             Callee::GridTrySet => "__builtin_grid_try_set",
             Callee::Width => "__builtin_width",
             Callee::Height => "__builtin_height",
+            Callee::IsInBoundsOf => "__builtin_is_in_bounds_of",
+            Callee::GridIsInBoundsOf => "__builtin_grid_is_in_bounds_of",
             Callee::Last => "__builtin_last",
             Callee::NonemptyFirst => "__builtin_nonempty_first",
             Callee::NonemptyLast => "__builtin_nonempty_last",

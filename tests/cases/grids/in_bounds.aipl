@@ -1,0 +1,28 @@
+# `index.is_in_bounds_of(xs)` says whether `xs[index]` is an element. For a grid
+# the index is a `(row, column)` pair.
+
+import { equal as ==, is_in_bounds_of, print, to_str } from builtins;
+
+fn at(row: u64, column: u64) -> (u64, u64) { (row, column) }
+
+fn main() !prints {
+    let xs = [10, 20, 30];
+    let index: u64 = 2;
+    print(to_str(index.is_in_bounds_of(xs)));
+    print(to_str(3.is_in_bounds_of(xs)));
+    let grid: i64[,] = [[1, 2, 3], [4, 5, 6]];
+    print(to_str(at(1, 2).is_in_bounds_of(grid)));
+    print(to_str(at(2, 0).is_in_bounds_of(grid)));
+    print(to_str(at(0, 3).is_in_bounds_of(grid)));
+    print(to_str((1, 1).is_in_bounds_of(grid)));
+    // Agrees with indexing.
+    print(to_str(grid[at(0, 3)] == none));
+}
+--- stdout ---
+true
+false
+true
+false
+false
+true
+true

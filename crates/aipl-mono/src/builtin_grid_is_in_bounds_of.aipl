@@ -1,0 +1,19 @@
+# The AIPL implementation of the `grid_is_in_bounds_of` builtin. Monomorphization
+# registers this under the canonical name `__builtin_grid_is_in_bounds_of` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`); `(row, column).is_in_bounds_of(grid)` is
+# rewritten to a call to it.
+
+import { Grid, height, less_than as <, logical_and as &&, logical_not as !, width } from builtins;
+
+# Whether the cell at `row`, `column` is on the grid.
+pub fn grid_is_in_bounds_of<T: any>(self: Grid<T>, row: u64, column: u64) -> bool {
+    row < self.height() && column < self.width()
+}.test({
+    let three: u64 = 3;
+    let grid = Grid { width: three, cells: [1, 2, 3, 4, 5, 6] };
+    assert(grid.grid_is_in_bounds_of(0, 0));
+    assert(grid.grid_is_in_bounds_of(1, 2));
+    assert(!grid.grid_is_in_bounds_of(2, 0));
+    assert(!grid.grid_is_in_bounds_of(0, 3));
+    assert(grid_is_in_bounds_of(grid, 1, 1));
+})
