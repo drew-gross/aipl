@@ -659,6 +659,20 @@
 
 
 
+        <section class="item" id="item-is_block_kid">
+          <h3>
+            <a class="anchor" href="#item-is_block_kid">is_block_kid</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_block_kid(kid: Ast?, sp: Span) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>kid</code> is an expression, as the first block of <code>shim &lt;effect&gt; { provider } { body }</code> is, rather than a <code>name = name</code> binding.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-shim_expr">
           <h3>
             <a class="anchor" href="#item-shim_expr">shim_expr</a>
@@ -685,6 +699,25 @@
 shim random seeded_with_clock() { body }
   =&gt; shim random { random_u64 = __random_next } { __random_seed_from_clock(); body }
 </code></pre><p>The seed is read inside the shim's body, so the clock a <code>seeded_with_clock</code> reads is an ordinary <code>now_nanos</code> call: the enclosing function declares <code>!clock</code> for it, and a <code>shim clock</code> around the whole thing makes the seed repeatable.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-provider_block_shim_expr">
+          <h3>
+            <a class="anchor" href="#item-provider_block_shim_expr">provider_block_shim_expr</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn provider_block_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -&#62; Expr!ParseError</code></pre>
+
+          <div class="doc"><p><code>shim random { provider } { body }</code>: the first block is any expression of type <code>RandomProvider</code>, so which provider to use can be decided at run time. A provider holds the seed to start from, <code>none</code> for the clock, and the seeding reads it:</p><pre><code>shim random { p } { body }
+  =&gt; shim random { random_u64 = __random_next } {
+         if (let some(seed) = p.seed) { __random_seed(seed) } else { __random_seed_from_clock() };
+         body
+     }
+</code></pre></div>
 
 
         </section>
@@ -1246,7 +1279,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$92067: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$94501: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -2172,7 +2205,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$142099: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$144533: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

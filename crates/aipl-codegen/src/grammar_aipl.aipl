@@ -71,6 +71,7 @@ import {
     is_empty,
     is_nonempty,
     is_some,
+    is_some_and,
     is_space,
     join,
     last,
@@ -1018,6 +1019,11 @@ fn expressions() -> Production<AiplTok, Ast>[] {
             Many(Named("shim_binding"), sep=Lit(","), nested_in=braces(), spaced=true),
             Named("block"),
         ]),
+        // `shim <effect> { provider } { body }`: the same shim, with the
+        // bindings supplied by whatever provider the first block evaluates to.
+        // Tried after the bindings form, which a block cannot be mistaken for:
+        // a binding is `name = name` and no statement begins that way.
+        Then([Lit("shim"), Term(Name), Named("block"), Named("block")]),
         // `shim <effect> <provider>(args) { body }`: the same shim, with the
         // bindings supplied by a named provider. The token after the effect is
         // what tells the two forms apart.
@@ -1570,11 +1576,23 @@ fn match_expr(kids: Ast[], tsp: Span, sp: Span) -> Expr!ParseError {
     ok(at(Match(scrutinee, arms), tsp))
 }
 
+# Whether `kid` is an expression, as the first block of `shim <effect> { provider } { body }`
+# is, rather than a `name = name` binding.
+fn is_block_kid(kid: Ast?, sp: Span) -> bool {
+    kid.is_some_and(|k| match (as_expr(k, sp)) {
+        ok(..) => true,
+        err(..) => false,
+    })
+}
+
 # `shim <effect> { op = f, .. } { body }`. Spanned over `shim <effect>` rather
 # than over the whole form: the body's span is empty when it ends in a `;`.
 fn shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
     let toks = node.own_texts(src);
     let spans = node.tokens;
+    if (kids.len() == 2 && is_block_kid(kids[0], sp)) {
+        return provider_block_shim_expr(src, node, kids, sp);
+    };
     if (toks[2] != some("{")) {
         return provider_shim_expr(src, node, kids, sp);
     };
@@ -1633,6 +1651,47 @@ fn provider_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!Pars
         message: `\`shim random\` has providers \`seeded_with_int(seed)\` and \`seeded_with_clock()\`; \`{provider}\` with {args.len()} argument(s) is neither`,
         span: at_head,
     })
+}
+
+# `shim random { provider } { body }`: the first block is any expression of type
+# `RandomProvider`, so which provider to use can be decided at run time. A provider
+# holds the seed to start from, `none` for the clock, and the seeding reads it:
+#
+#     shim random { p } { body }
+#       => shim random { random_u64 = __random_next } {
+#              if (let some(seed) = p.seed) { __random_seed(seed) } else { __random_seed_from_clock() };
+#              body
+#          }
+fn provider_block_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
+    let toks = node.own_texts(src);
+    let spans = node.tokens;
+    let head = spans
+        .first()
+        .value_or_err(ParseError { message: "a shim matched no token", span: sp })?;
+    let at_head = join_spans(head, spans[1].value_or(head));
+    let effect = toks[1].value_or("");
+    if (effect != "random") {
+        return err(ParseError {
+            message: `effect "!{effect}" has no providers; \`shim {effect}\` takes a list of bindings`,
+            span: at_head,
+        });
+    };
+    let provider = kid_expr(kids, 0, sp)?;
+    let body = kid_expr(kids, 1, sp)?;
+    let arm = MatchArm {
+        pattern: PatCtor("some", bindings=["seed$provider"]),
+        body: at(Call("__random_seed", [at(Ident("seed$provider"), at_head)], false), at_head),
+        span: at_head,
+    };
+    let seeding = at(
+        IfLet(
+            arm,
+            at(Field(provider, "seed"), at_head),
+            at(Call("__random_seed_from_clock", [], false), at_head),
+        ),
+        at_head,
+    );
+    ok(random_shim(seeding, body, at_head))
 }
 
 # The shim a `random` provider stands for: `random_u64` is the runtime's
@@ -4188,6 +4247,10 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
             "shim random seeded_with_clock() { g() }",
         ) == "Shim(random, [random_u64 = __random_next], Seq(__random_seed_from_clock(), g()))",
     );
+    assert(expr_dump("shim random { p() } { g() }").contains("__random_seed_from_clock()"));
+    assert(expr_dump("shim prints { p() } { g() }").starts_with(
+        `error: effect "!prints" has no providers`,
+    ));
     assert(expr_dump("shim random seeded_with_int() { g() }").starts_with(
         "error: `shim random` has providers",
     ));

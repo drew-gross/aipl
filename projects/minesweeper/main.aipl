@@ -29,6 +29,8 @@ import {
     random_u64,
     read_line,
     saturating_remainder as %,
+    seeded_with_clock,
+    seeded_with_int,
     split,
     to_set,
     trim,
@@ -354,20 +356,41 @@ fn play(game: Mark[,]) !prints !read_stdin -> i64 {
     }
 }
 
-# Play on the standard 8 by 8 board with 10 mines. The mines are different every
-# game; `./aipl run -- SEED` plays the same game again for the same number.
-fn main(args: str[]) !prints !read_stdin !clock -> i64 {
+# Play a new game on the standard 8 by 8 board with 10 mines. The mines come from
+# whatever generator `main` seeds.
+fn play_new_game() !prints !read_stdin !random -> i64 {
+    let size: u64 = 8;
+    play(new_game(size, size, place_mines(10, size * size)))
+}
+
+# The seed given on the command line: none when there is no argument, and an
+# error carrying the argument when it is not a number.
+fn seed_argument(args: str[]) -> u64?!str {
     match (args.first()) {
-        none => shim random seeded_with_clock() { play(new_game(8, 8, place_mines(10, 64))) },
-        some(text) => match (text.int_parse()) {
-            none => {
-                print(`not a seed: {text}`);
-                1
-            },
-            some(number) => {
-                let seed: u64 = number;
-                shim random seeded_with_int(seed) { play(new_game(8, 8, place_mines(10, 64))) }
-            },
+        none => ok(none),
+        some(text) => {
+            let number = text.int_parse().value_or_err(text)?;
+            let seed: u64 = number;
+            ok(some(seed))
+        },
+    }
+}
+
+# Play on the standard board. The mines are different every game;
+# `./aipl run -- SEED` plays the same game again for the same number.
+fn main(args: str[]) !prints !read_stdin !clock -> i64 {
+    match (seed_argument(args)) {
+        err(text) => {
+            print(`not a seed: {text}`);
+            1
+        },
+        ok(seed) => shim random {
+            match (seed) {
+                none => seeded_with_clock(),
+                some(number) => seeded_with_int(number),
+            }
+        } {
+            play_new_game()
         },
     }
 }

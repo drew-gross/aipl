@@ -72,6 +72,12 @@ pub enum Callee {
     GridTrySet,
     /// `width(self: T[,]) -> u64` — how many cells a row of the grid holds.
     Width,
+    /// `seeded_with_int(seed) -> RandomProvider`: the provider that starts the
+    /// generator at `seed`, for a `shim random { .. }` block.
+    SeededWithInt,
+    /// `seeded_with_clock() -> RandomProvider`: the provider that seeds the
+    /// generator from the clock, for a `shim random { .. }` block.
+    SeededWithClock,
     /// `height(self: T[,]) -> u64` — how many rows the grid has.
     Height,
     /// `is_in_bounds_of(self: u64, other: T[]) -> bool` — whether `other[self]` is an
@@ -381,6 +387,8 @@ impl Callee {
         Callee::GridFrom,
         Callee::GridTrySet,
         Callee::Width,
+        Callee::SeededWithInt,
+        Callee::SeededWithClock,
         Callee::Height,
         Callee::IsInBoundsOf,
         Callee::GridIsInBoundsOf,
@@ -570,6 +578,8 @@ impl Callee {
             Callee::GridFrom => "__builtin_grid_from",
             Callee::GridTrySet => "__builtin_grid_try_set",
             Callee::Width => "__builtin_width",
+            Callee::SeededWithInt => "__builtin_seeded_with_int",
+            Callee::SeededWithClock => "__builtin_seeded_with_clock",
             Callee::Height => "__builtin_height",
             Callee::IsInBoundsOf => "__builtin_is_in_bounds_of",
             Callee::GridIsInBoundsOf => "__builtin_grid_is_in_bounds_of",

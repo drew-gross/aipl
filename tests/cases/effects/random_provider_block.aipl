@@ -1,0 +1,44 @@
+# A `shim random { .. }` block holds any expression that evaluates to a
+# `RandomProvider`, so which provider to use can be decided at run time:
+# `seeded_with_int(n)` for a repeatable sequence, `seeded_with_clock()` for one
+# seeded from the (shimmable) clock. Like the named form, it needs `!clock`.
+
+import {
+    RandomProvider,
+    equal as ==,
+    now_nanos,
+    print,
+    random_u64,
+    seeded_with_clock,
+    seeded_with_int,
+    to_str,
+} from builtins;
+
+fn two_draws() !random -> u64[] { [random_u64(), random_u64()] }
+
+fn fixed_clock() -> u64 { 7 }
+
+fn provider_for(seed: u64?) -> RandomProvider {
+    match (seed) {
+        none => seeded_with_clock(),
+        some(number) => seeded_with_int(number),
+    }
+}
+
+fn draws_with(seed: u64?) !clock -> u64[] { shim random { provider_for(seed) } { two_draws() } }
+
+fn main() !prints !clock {
+    let given: u64 = 42;
+    let named = shim random seeded_with_int(42) { two_draws() };
+    print(to_str(draws_with(some(given)) == named));
+
+    // With no seed the clock is read, so a shimmed clock makes it repeatable.
+    let from_clock = shim clock { now_nanos = fixed_clock, monotonic_now = fixed_clock } {
+        draws_with(none)
+    };
+    let seven = shim random seeded_with_int(7) { two_draws() };
+    print(to_str(from_clock == seven));
+}
+--- stdout ---
+true
+true

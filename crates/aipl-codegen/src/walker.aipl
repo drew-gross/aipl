@@ -2348,6 +2348,19 @@ fn shim_expr(self: W) -> WDoc!FmtError {
             ])),
         });
     };
+
+    // `shim <effect> { provider } { body }`: a block where the bindings' braces
+    // would be. A binding list is empty or begins `name =`; no block does.
+    if (effect.w.peek_text() == "{" && effect.w.peek_text_n(1) != "}" && effect.w.peek_text_n(
+        2,
+    ) != "=") {
+        let provider = effect.w.block_layout()?;
+        let body = provider.w.block_layout()?;
+        return ok(WDoc {
+            w: body.w,
+            doc: group(Concat([Text(`shim {effect.text} `), provider.doc, Text(" "), body.doc])),
+        });
+    };
     let opened = effect.w.expect("{")?.w;
     let binds = opened.shim_bindings([])?;
     let closed = binds.w.expect("}")?.w;
@@ -3225,6 +3238,19 @@ fn walker_of(src: str) -> W!FmtError {
         walker_of("{ set g.cells[r,c] = 1 else {} ; }")?
             .block()
             .rendered(100)? == "{\n    set g.cells[r, c] = 1 else {};\n}\n",
+    );
+
+    // A provider block lays out like the body block beside it; a binding list
+    // keeps its own braces.
+    assert(
+        walker_of("{ shim random {  seeded_with_clock() } { play() } }")?
+            .block()
+            .rendered(100)? == "{ shim random { seeded_with_clock() } { play() } }",
+    );
+    assert(
+        walker_of("{ shim random { print = p } { play() } }")?
+            .block()
+            .rendered(100)? == "{ shim random { print = p } { play() } }",
     );
     assert(walker_of("{ set x ++ ; }")?.block().rendered(100)? == "{\n    set x++;\n}\n");
     assert(walker_of("{ set x -- ; }")?.block().rendered(100)? == "{\n    set x--;\n}\n");

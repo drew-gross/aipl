@@ -1,0 +1,13 @@
+# The AIPL implementation of the `seeded_with_int` builtin. Monomorphization
+# registers this under the canonical name `__builtin_seeded_with_int` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`).
+
+import { RandomProvider, equal as == } from builtins;
+
+# The `random` provider that starts the generator at `seed`, so the same seed
+# plays out the same numbers. Used as the value of a `shim random { .. }` block;
+# see `seeded_with_clock` for a fresh sequence each run.
+pub fn seeded_with_int(seed: u64) -> RandomProvider { seed: some(seed) }.test({
+    assert(seeded_with_int(42) == RandomProvider { seed: some(42) });
+    assert(seeded_with_int(0).seed == some(0));
+})

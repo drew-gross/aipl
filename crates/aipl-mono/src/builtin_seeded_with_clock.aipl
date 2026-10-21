@@ -1,0 +1,13 @@
+# The AIPL implementation of the `seeded_with_clock` builtin. Monomorphization
+# registers this under the canonical name `__builtin_seeded_with_clock` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`).
+
+import { RandomProvider, equal as == } from builtins;
+
+# The `random` provider that seeds the generator from the clock, so each run
+# plays out different numbers. Used as the value of a `shim random { .. }` block;
+# see `seeded_with_int` for a repeatable sequence.
+pub fn seeded_with_clock() -> RandomProvider { seed: none }.test({
+    assert(seeded_with_clock() == RandomProvider { seed: none });
+    assert(seeded_with_clock().seed == none);
+})

@@ -4,20 +4,20 @@
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
 ; array-abi narrow
 ; set-abi wide
-; entry parse_test_section_header 497 str -> str?
-; entry strip_test_sections 537 str -> str
-; entry split_test_sections 536 str -> __tuple$str$str
-; entry source_loc 535 str __builtin_Span -> str
+; entry parse_test_section_header 499 str -> str?
+; entry strip_test_sections 539 str -> str
+; entry split_test_sections 538 str -> __tuple$str$str
+; entry source_loc 537 str __builtin_Span -> str
 ; entry caret_block 72 str __builtin_Span str -> str
 ; entry fill_or_add_sections_file 151 str #{str:str} -> unit!Error
-; entry normalize_output 460 str -> str
-; entry int_fits 396 i64 str -> bool
-; entry is_operator_name 397 str -> bool
-; entry aipl_token_scopes 432 str -> __m19__ScopeSpan[]!__m19__LexError
+; entry normalize_output 462 str -> str
+; entry int_fits 398 i64 str -> bool
+; entry is_operator_name 399 str -> bool
+; entry aipl_token_scopes 434 str -> __m19__ScopeSpan[]!__m19__LexError
 ; entry find_files 152 str str -> str[]!Error
 ; entry companion_files 74 str -> __m25__Companion[]!str
-; entry parse_spec 493 str -> __m26__Spec!str
-; entry aipl_parse_file 355 str -> __m27__ParsedFile!__m27__ParseFailure
+; entry parse_spec 495 str -> __m26__Spec!str
+; entry aipl_parse_file 357 str -> __m27__ParsedFile!__m27__ParseFailure
 ; entry format_source 177 str u64 -> str!__m46__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
@@ -331,4 +331,4 @@
 ; data 201 __tostr_lit_94 52427261636b6574
 
 ; __m28__ast_case_name
-; source-fingerprint 5270507891554904978
+; source-fingerprint 938337305436341813

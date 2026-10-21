@@ -2988,6 +2988,10 @@ struct __builtin_ExecResult { stdout: str, stderr: str, exit_code: i64 }
 // window opened), and CLIF instructions executed. All deterministic for a given
 // program and compiler.
 struct __builtin_Measurement { allocations: u64, bytes_allocated: u64, peak_live_bytes: u64, instructions: u64 }
+// Where a `shim random { .. }` block's numbers come from: the seed to start the
+// sequence at, or `none` to seed from the clock. `seeded_with_int` and
+// `seeded_with_clock` make one.
+struct __builtin_RandomProvider { seed: u64? }
 // A rectangular grid of `T`, written `T[,]`: `width` cells to a row, the rows
 // stored one after another in `cells`.
 struct __builtin_Grid<T: any> { width: u64, cells: T[] }
@@ -3865,7 +3869,13 @@ pub const SHIM_SLOT_COUNT: usize = 9;
 /// needs no import), these behave like any other importable builtin: gated,
 /// and mapped to a reserved canonical name so a user's own type of the same
 /// name can never silently collide.
-pub const IMPORTABLE_BUILTIN_TYPES: &[&str] = &["Span", "ExecResult", "Measurement", "Grid"];
+pub const IMPORTABLE_BUILTIN_TYPES: &[&str] = &[
+    "Span",
+    "ExecResult",
+    "Measurement",
+    "Grid",
+    "RandomProvider",
+];
 
 /// The canonical name of the builtin `Span` struct — what an imported `Span`
 /// resolves to, and the name every pass that dispatches on "is this a range?"

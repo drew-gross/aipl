@@ -8026,6 +8026,8 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::GridFrom, "builtin_grid_from.aipl"),
     (Callee::GridTrySet, "builtin_grid_try_set.aipl"),
     (Callee::Width, "builtin_width.aipl"),
+    (Callee::SeededWithInt, "builtin_seeded_with_int.aipl"),
+    (Callee::SeededWithClock, "builtin_seeded_with_clock.aipl"),
     (Callee::Height, "builtin_height.aipl"),
     (Callee::IsInBoundsOf, "builtin_is_in_bounds_of.aipl"),
     (
