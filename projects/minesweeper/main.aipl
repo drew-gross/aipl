@@ -23,6 +23,7 @@ import {
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
+    map_err,
     not_equal as !=,
     print,
     push,
@@ -322,43 +323,40 @@ fn parse_command(self: Mark[,], line: str) -> Command!str {
 })
 
 # Play from `game` until it is won or lost, or the player quits or input ends.
-# Returns the exit code: 0 for a win or a quit, 1 for a loss.
-fn play(game: Mark[,]) !prints !read_stdin -> i64 {
+fn play(game: Mark[,]) !prints !read_stdin {
     match (game.status()) {
         Won => {
             print(game.render(true));
             print("You win!");
-            0
         },
         Lost => {
             print(game.render(true));
             print("Boom! You hit a mine.");
-            1
         },
         Playing => {
             print(game.render(false));
             print("r ROW COLUMN to reveal, f ROW COLUMN to flag, q to quit");
             match (read_line()) {
-                none => 0, #[allow]
+                none => {},
                 some(line) => match (game.parse_command(line)) {
                     err(message) => {
                         print(message);
-                        play(game)
+                        play(game);
                     },
                     ok(command) => match (command) {
-                        Quit => 0,
+                        Quit => {},
                         Reveal(cell) => play(game.reveal(cell)),
                         Flag(cell) => play(game.toggle_flag(cell)),
                     },
                 },
-            }
+            };
         },
-    }
+    };
 }
 
 # Play a new game on the standard 8 by 8 board with 10 mines. The mines come from
 # whatever generator `main` seeds.
-fn play_new_game() !prints !read_stdin !random -> i64 {
+fn play_new_game() !prints !read_stdin !random {
     let size: u64 = 8;
     play(new_game(size, size, place_mines(10, size * size)))
 }
@@ -378,19 +376,15 @@ fn seed_argument(args: str[]) -> u64?!str {
 
 # Play on the standard board. The mines are different every game;
 # `./aipl run -- SEED` plays the same game again for the same number.
-fn main(args: str[]) !prints !read_stdin !clock -> i64 {
-    match (seed_argument(args)) {
-        err(text) => {
-            print(`not a seed: {text}`);
-            1
-        },
-        ok(seed) => shim random {
-            match (seed) {
-                none => seeded_with_clock(),
-                some(number) => seeded_with_int(number),
-            }
-        } {
-            play_new_game()
-        },
-    }
+fn main(args: str[]) !prints !read_stdin !clock -> !Error {
+    let seed = seed_argument(args).map_err(|text| `not a seed: {text}`)?;
+    shim random {
+        match (seed) {
+            none => seeded_with_clock(),
+            some(number) => seeded_with_int(number),
+        }
+    } {
+        play_new_game();
+    };
+    ok()
 }
