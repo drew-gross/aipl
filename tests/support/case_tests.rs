@@ -124,6 +124,7 @@ case_tests! {
     cases_builtins_err_use_without_import = "cases/builtins/err_use_without_import",
     cases_builtins_err_value_or_type_mismatch = "cases/builtins/err_value_or_type_mismatch",
     cases_builtins_import_then_use = "cases/builtins/import_then_use",
+    cases_builtins_int_parse_through_value_or = "cases/builtins/int_parse_through_value_or",
     cases_builtins_int_parse_widths = "cases/builtins/int_parse_widths",
     cases_builtins_is_nonempty = "cases/builtins/is_nonempty",
     cases_builtins_monotonic_now = "cases/builtins/monotonic_now",

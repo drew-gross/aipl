@@ -222,6 +222,7 @@ char:
 
 lsp:
   warm the cache in the background on start and on edit
+  docs hover should work on Error, err, ok, etc.
 
 bugs:
   Gate bug: the_leak_gate_runs_for_a_case_with_no_sections re-runs examples_arrays and requires it to pass. When that case's baseline row is stale, the test fails without printing a handoff-fill: line. Handoff then stops before it reaches the step that would refresh the row. I got past it once by refreshing that single row with the scoped refresh_perfmon command. The fix would be either to have the test print the Fill it needs, or to have it ignore baseline movement.

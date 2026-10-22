@@ -5485,13 +5485,7 @@ impl Cx<'_> {
     /// [`retargeted_int_parse`] to act on. `None` otherwise, including when the
     /// position wants the `i64` the call produces anyway.
     fn retarget_int_parse(&self, e: &Expr, target: &Type) -> Option<Type> {
-        let (call, wanted) = match &e.kind {
-            ExprKind::Call(Callee::IntParse, ..) => (e, target.clone()),
-            ExprKind::Try(inner) if matches!(inner.kind, ExprKind::Call(Callee::IntParse, ..)) => {
-                (&**inner, Type::Optional(Box::new(target.clone())))
-            }
-            _ => return None,
-        };
+        let (call, wanted) = Self::int_parse_site(e, target)?;
         let Type::Optional(core) = &wanted else {
             return None;
         };
@@ -5500,6 +5494,30 @@ impl Cx<'_> {
         }
         self.lock_node(node_id(call), &wanted);
         Some(target.clone())
+    }
+
+    /// The `int_parse` call whose result `e` passes along into a position that
+    /// declares `target`, with the optional that call is wanted to produce. The
+    /// call itself wants `target`; under a `?` it wants `target?`; and the
+    /// receiver of `value_or` / `value_or_err` wants the optional of what the
+    /// call yields — those two are generic in their payload, so nothing but the
+    /// position the whole expression sits in can say which integer it is.
+    fn int_parse_site<'a>(e: &'a Expr, target: &Type) -> Option<(&'a Expr, Type)> {
+        let optional = |t: &Type| Type::Optional(Box::new(t.clone()));
+        match &e.kind {
+            ExprKind::Call(Callee::IntParse, ..) => Some((e, target.clone())),
+            ExprKind::Call(Callee::ValueOr, args, _) => {
+                Self::int_parse_site(args.first()?, &optional(target))
+            }
+            ExprKind::Try(inner) => match &inner.kind {
+                ExprKind::Call(Callee::IntParse, ..) => Some((inner, optional(target))),
+                ExprKind::Call(Callee::ValueOrErr, args, _) => {
+                    Self::int_parse_site(args.first()?, &optional(target))
+                }
+                _ => None,
+            },
+            _ => None,
+        }
     }
 
     /// Type of an integer add/subtract — the `+`/`-` operators and the

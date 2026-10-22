@@ -362,10 +362,7 @@ fn main(args: str[]) !prints !read_stdin !clock -> !Error {
     shim random {
         match (args) {
             [] => seeded_with_clock(),
-            [text] => {
-                let seed: u64? = text.int_parse();
-                seeded_with_int(seed.value_or_err(`not a seed: {text}`)?)
-            },
+            [text] => seeded_with_int(text.int_parse().value_or_err(`not a seed: {text}`)?),
             _ => err("usage: minesweeper [SEED]")?,
         }
     } {
