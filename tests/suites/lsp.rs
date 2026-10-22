@@ -305,13 +305,17 @@ fn hover_documents_every_kind_of_builtin() {
         hover["contents"]["value"],
         json!(
             "```aipl\nfn len<T: any>(self: T[]) -> u64\n```\n\nbuiltin\n\n\
-             The number of elements. Also works on a `str` (its length in bytes), a set and \
-             a dictionary."
+             Element/byte count. Unsigned: a length is never negative, so `u64` keeps\n\
+             `len`-derived arithmetic (`a.len() - b.len()`, capacity math) in the\n\
+             saturating-at-zero unsigned world rather than silently going negative.\n\
+             Index/slice bounds accept either signedness, so `xs[xs.len() - 1]` still\n\
+             works without a conversion."
         ),
-        "any other shows the table's"
+        "one the compiler expands shows its declaration in the signature list"
     );
 
-    // `equal` in `equal as ==` is not a name the file binds, but it is what the
+    // An operator has no declaration to read, so what it shows is described by
+    // the builtin table. `equal` in `equal as ==` is not a name the file binds, but it is what the
     // author is pointing at.
     let hover = hover_at(&mut server, &uri, cursor_on(USES_BUILTINS, "equal as"));
     assert_eq!(

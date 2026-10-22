@@ -826,8 +826,9 @@ the arg contract being different for builtins caused problems for retain elision
 - should retain elision elide only the top of a structure? Is is already doing that?
 
 docs:
+  make go to def and doc-on-hover work for operators
   aipl doc command should have nicer formatting, and top-level formatting.
-  delete BUILTIN_SIGS, turn it into properties of Callee, integrate into doc
+  delete BUILTIN_SIGNATURES, turn it into properties of Callee, integrate into doc
   docs on struct fields
   docs for top-level lets
   hide privates by default so you have to expand a thing to show them

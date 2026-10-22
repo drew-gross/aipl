@@ -253,37 +253,61 @@ pub struct Builtin {
 ///
 /// One implemented in AIPL is read from its own source file, so the signature
 /// and docs are the ones in the file and the definition is a place in it. Any
-/// other comes from [`aipl_syntax::builtin_docs`], with no place. `None` when
+/// other comes from its declaration in [`aipl_syntax::BUILTIN_SIGNATURES`], or failing
+/// that the description in [`aipl_syntax::builtin`], with no place. `None` when
 /// `name` is no builtin, or when the source of an AIPL-implemented one cannot be
 /// read or parsed — nothing is guessed in its place.
 ///
 /// **The caller must have installed the parser hooks**, as for
 /// [`FileIndex::parse`].
 pub fn builtin(name: &str) -> Option<Builtin> {
-    let callee = aipl_syntax::ast::Callee::importable(name)?;
-    if let Some(path) = aipl_syntax::aipl_builtins::source_path(&callee) {
-        let source = std::fs::read_to_string(&path).ok()?;
-        let file = FileIndex::parse(&path, &source).ok()?;
-        let symbol = file.define(name)?.clone();
-        return Some(Builtin {
-            file: Some((path, source)),
-            symbol,
-        });
+    let found = aipl_syntax::builtin::Builtin::named(name)?;
+    match found.definition {
+        aipl_syntax::builtin::Definition::Aipl { .. } => {
+            let path = found.source_path()?;
+            let source = std::fs::read_to_string(&path).ok()?;
+            let file = FileIndex::parse(&path, &source).ok()?;
+            let symbol = file.define(name)?.clone();
+            Some(Builtin {
+                file: Some((path, source)),
+                symbol,
+            })
+        }
+        aipl_syntax::builtin::Definition::Declared => {
+            let declaration = format!("__builtin_{name}");
+            let mut symbol = declarations()?.define(&declaration)?.clone();
+            // The declaration is spelled under the reserved canonical name,
+            // which no program can write; show the name an import list does.
+            symbol.detail = symbol.detail.replacen(&declaration, name, 1);
+            symbol.name = name.to_string();
+            Some(Builtin { file: None, symbol })
+        }
+        aipl_syntax::builtin::Definition::Described { signature, doc } => Some(Builtin {
+            file: None,
+            symbol: Symbol {
+                name: name.to_string(),
+                kind: SymbolKind::Function,
+                detail: signature.to_string(),
+                doc: Some(doc.to_string()),
+                is_pub: true,
+                name_span: 0..0,
+                parent: None,
+                slots: Vec::new(),
+            },
+        }),
     }
-    let described = aipl_syntax::builtin_docs::builtin_doc(name)?;
-    Some(Builtin {
-        file: None,
-        symbol: Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            detail: described.signature.to_string(),
-            doc: Some(described.doc.to_string()),
-            is_pub: true,
-            name_span: 0..0,
-            parent: None,
-            slots: Vec::new(),
-        },
-    })
+}
+
+/// [`aipl_syntax::BUILTIN_SIGNATURES`] indexed, once: the declarations the
+/// checker types the compiler's own builtins by. `None` if it does not parse,
+/// which the checker, parsing the same text, would have stopped on first.
+fn declarations() -> Option<&'static FileIndex> {
+    static INDEX: std::sync::OnceLock<Option<FileIndex>> = std::sync::OnceLock::new();
+    INDEX
+        .get_or_init(|| {
+            FileIndex::parse("<builtin signatures>", aipl_syntax::BUILTIN_SIGNATURES).ok()
+        })
+        .as_ref()
 }
 
 /// Every declaration in `program`, in source order.
@@ -813,16 +837,22 @@ fn helper(n: i64) !prints -> i64 {
     }
 
     #[test]
-    fn every_aipl_implemented_builtin_defines_the_name_it_is_imported_by() {
+    fn every_builtin_has_a_signature_and_documentation_under_its_import_name() {
         hosted();
-        for callee in aipl_syntax::ast::Callee::IMPORTABLE {
-            if !aipl_syntax::aipl_builtins::is_aipl_implemented(callee) {
-                continue;
-            }
-            let name = callee.import_name();
+        for each in aipl_syntax::builtin::Builtin::all() {
+            let name = each.name();
             let found = builtin(name).unwrap_or_else(|| panic!("`{name}` has no definition"));
-            assert!(found.file.is_some(), "`{name}`");
-            assert!(found.symbol.doc.is_some(), "`{name}` is undocumented");
+            assert_eq!(found.file.is_some(), each.is_aipl_implemented(), "`{name}`");
+            assert_eq!(found.symbol.name, name);
+            assert!(
+                found.symbol.detail.contains(&format!("fn {name}")),
+                "`{name}`: {}",
+                found.symbol.detail
+            );
+            assert!(
+                found.symbol.doc.is_some_and(|d| !d.trim().is_empty()),
+                "`{name}` is undocumented"
+            );
         }
     }
 

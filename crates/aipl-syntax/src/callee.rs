@@ -18,6 +18,8 @@
 //! loader, which resolves an imported `len` to the reserved canonical string
 //! and then to the arm.
 
+use crate::builtin::Builtin;
+
 /// How mono resolved the pattern argument of a shape-variadic sequence builtin
 /// (`starts_with`/`starts_with_at`/`ends_with`/`contains`): its `T*` parameter
 /// accepts a sequence, a single element, or an optional element, and each
@@ -36,7 +38,7 @@ pub enum SeqShape {
 
 /// The callee of a call expression. See the [module docs](self).
 ///
-/// The importable builtins come first, in [`Callee::IMPORTABLE`] order — the
+/// The importable builtins come first, in [`crate::builtin::BUILTINS`] order — the
 /// operator impls among them, since an operator is a function and its impl is
 /// imported like any other — then the names the language reserves without an
 /// import, then the intrinsics passes synthesize.
@@ -360,164 +362,6 @@ pub enum Callee {
 }
 
 impl Callee {
-    /// Every importable builtin, in registry order: the arms a program brings
-    /// into scope with `import { .. } from builtins;` — the by-name callable
-    /// builtins. The operator impls are among them: an operator is a function
-    /// spelled as syntax, and which spelling it answers to is the importer's
-    /// choice (`wrapping_add as +`), recorded in `OPERATOR_BUILTINS` for the
-    /// places that care — diagnostics and lint suggestions. `some`/`ok`/`err` and
-    /// the conversions are language syntax, not importable idents. The
-    /// shape-variadic arms are listed in their undecided (`Seq`) form.
-    pub const IMPORTABLE: &'static [Callee] = &[
-        Callee::Print,
-        Callee::Split,
-        Callee::SplitLen,
-        Callee::Join,
-        Callee::Intersperse,
-        Callee::TupleWindows,
-        Callee::SameCase,
-        Callee::CaseName,
-        Callee::CaseOf,
-        Callee::CountIsLessThan,
-        Callee::CountIsAtMost,
-        Callee::CountIsGreaterThan,
-        Callee::CountIsAtLeast,
-        Callee::CountIsEqual,
-        Callee::CountIsNotEqual,
-        Callee::First,
-        Callee::GridGet,
-        Callee::GridFrom,
-        Callee::GridTrySet,
-        Callee::Width,
-        Callee::SeededWithInt,
-        Callee::SeededWithClock,
-        Callee::Height,
-        Callee::IsInBoundsOf,
-        Callee::GridIsInBoundsOf,
-        Callee::Last,
-        Callee::NonemptyFirst,
-        Callee::NonemptyLast,
-        Callee::EnsureNonempty,
-        Callee::AssumeNonempty,
-        Callee::DropFirst,
-        Callee::DropLast,
-        Callee::DropN,
-        Callee::DropLastN,
-        Callee::ToStr,
-        Callee::ToStrLen,
-        Callee::Map,
-        Callee::TryMap,
-        Callee::Filter,
-        Callee::FilterMap,
-        Callee::All,
-        Callee::Any,
-        Callee::LeftFold,
-        Callee::RightFold,
-        Callee::OptLeftFold,
-        Callee::OptRightFold,
-        Callee::ZipWith,
-        Callee::Trim,
-        Callee::HeapStr,
-        Callee::RopeStr,
-        Callee::InlineStr,
-        Callee::PackInline,
-        Callee::InlineCapacity,
-        Callee::Measure,
-        Callee::MeasureBegin,
-        Callee::MeasureConsume,
-        Callee::MeasureEnd,
-        Callee::MeasureRead,
-        Callee::IsAllWhitespace,
-        Callee::StartsWith(SeqShape::Seq),
-        Callee::StartsWithAt(SeqShape::Seq),
-        Callee::EndsWith(SeqShape::Seq),
-        Callee::Len,
-        Callee::Range,
-        Callee::IsNonempty,
-        Callee::IsEmpty,
-        Callee::Push,
-        Callee::Extend,
-        Callee::ExtendOptional,
-        Callee::Reserve,
-        Callee::IsSome,
-        Callee::IsSomeAnd,
-        Callee::IsErrAnd,
-        Callee::MapErr,
-        Callee::MapOk,
-        Callee::IntParse,
-        Callee::IntParseUnsigned,
-        Callee::IsSpace,
-        Callee::IsWhitespace,
-        Callee::IsDigit,
-        Callee::ToDigit,
-        Callee::Narrow,
-        Callee::TrimWhile,
-        Callee::Count,
-        Callee::CountWhile,
-        Callee::CountIf,
-        Callee::FindIf,
-        Callee::MapFindIf,
-        Callee::MapJoin,
-        Callee::JoinIsNonempty,
-        Callee::JoinIsEmpty,
-        Callee::Reduce,
-        Callee::MapReduce,
-        Callee::FilterMapReduce,
-        Callee::SplitMap,
-        Callee::FindMap,
-        Callee::ReverseFindMap,
-        Callee::FindIndex,
-        Callee::ValueOr,
-        Callee::ValueOrErr,
-        Callee::Contains(SeqShape::Seq),
-        Callee::Has,
-        Callee::ToArray,
-        Callee::ToSet,
-        Callee::ReadFileToString,
-        Callee::WriteStringToFile,
-        Callee::ListFiles,
-        Callee::ReadLine,
-        Callee::RandomU64,
-        Callee::NowNanos,
-        Callee::MonotonicNow,
-        Callee::ExecuteProgram,
-        Callee::Union,
-        Callee::UnionAll,
-        Callee::SetMap,
-        Callee::Get,
-        Callee::ContainsKey,
-        Callee::RemoveKey,
-        Callee::Hash,
-        Callee::Min,
-        Callee::Max,
-        Callee::Minimum,
-        Callee::Maximum,
-        Callee::Reverse,
-        Callee::Sort,
-        Callee::SortBy,
-        Callee::Repeat,
-        Callee::With,
-        Callee::TrySet,
-        // The operator impls: every arm an operator spelling can resolve to.
-        Callee::WrappingAdd,
-        Callee::SaturatingAdd,
-        Callee::WrappingSub,
-        Callee::SaturatingSub,
-        Callee::WrappingMul,
-        Callee::SaturatingDivide,
-        Callee::SaturatingRemainder,
-        Callee::Equal,
-        Callee::NotEqual,
-        Callee::LessThan,
-        Callee::GreaterThan,
-        Callee::LessThanOrEqual,
-        Callee::GreaterThanOrEqual,
-        Callee::LogicalAnd,
-        Callee::LogicalOr,
-        Callee::LogicalNot,
-        Callee::Concat,
-    ];
-
     /// The reserved and synthesized arms — everything
     /// [`Callee::from_canonical`] can yield beyond the importable list above.
     const INTERNAL: &'static [Callee] = &[
@@ -758,8 +602,9 @@ impl Callee {
     /// an import has mapped a spelling to its reserved canonical string. A
     /// shape-variadic builtin comes back undecided ([`SeqShape::Seq`]).
     pub fn from_canonical(name: &str) -> Option<Callee> {
-        Callee::IMPORTABLE
+        Builtin::all()
             .iter()
+            .map(|b| &b.callee)
             .chain(Callee::INTERNAL)
             .find(|c| c.name() == name)
             .cloned()
@@ -775,10 +620,7 @@ impl Callee {
     /// list writes it — or `None`. What `import { len } from builtins;`
     /// resolves through.
     pub fn importable(name: &str) -> Option<Callee> {
-        Callee::IMPORTABLE
-            .iter()
-            .find(|c| c.import_name() == name)
-            .cloned()
+        Builtin::named(name).map(|b| b.callee.clone())
     }
 
     /// The spelling an import list uses for an importable builtin: its
@@ -941,7 +783,11 @@ mod tests {
 
     #[test]
     fn every_known_arm_round_trips_through_its_canonical_name() {
-        for c in Callee::IMPORTABLE.iter().chain(Callee::INTERNAL) {
+        for c in Builtin::all()
+            .iter()
+            .map(|b| &b.callee)
+            .chain(Callee::INTERNAL)
+        {
             assert_eq!(Callee::from_canonical(c.name()).as_ref(), Some(c), "{c}");
         }
         assert_eq!(Callee::from_canonical("i64"), None);
@@ -961,10 +807,14 @@ mod tests {
         assert!(!Callee::Map.is_reduction());
         assert!(!Callee::Len.is_reduction());
         assert!(!Callee::User("minimum".into()).is_reduction());
-        for c in Callee::IMPORTABLE.iter().chain(Callee::INTERNAL) {
+        for c in Builtin::all()
+            .iter()
+            .map(|b| &b.callee)
+            .chain(Callee::INTERNAL)
+        {
             if let Some(step) = c.reduction_step() {
                 assert!(
-                    Callee::IMPORTABLE.contains(&step),
+                    Builtin::of(&step).is_some(),
                     "{c}'s step {step} is not an importable builtin"
                 );
             }
@@ -974,7 +824,11 @@ mod tests {
     #[test]
     fn canonical_names_are_unique() {
         let mut seen = std::collections::HashSet::new();
-        for c in Callee::IMPORTABLE.iter().chain(Callee::INTERNAL) {
+        for c in Builtin::all()
+            .iter()
+            .map(|b| &b.callee)
+            .chain(Callee::INTERNAL)
+        {
             assert!(
                 seen.insert(c.name()),
                 "duplicate canonical name {}",

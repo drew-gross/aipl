@@ -344,7 +344,7 @@ pub fn set_caret_block_hook(f: fn(&str, Span, &str) -> String) {
 }
 
 pub mod aipl_builtins;
-pub mod builtin_docs;
+pub mod builtin;
 pub mod callee;
 
 pub mod ast {
@@ -3024,232 +3024,246 @@ struct __builtin_RandomProvider { seed: u64? }
 // stored one after another in `cells`.
 struct __builtin_Grid<T: any> { width: u64, cells: T[] }
 
+# Write `self` to standard output, followed by a newline.
 fn __builtin_print(self: str) !prints {}
-// Split on each occurrence of `sep`, returning the parts (slices/views of `self`).
+# Split on each occurrence of `sep`, returning the parts (slices/views of `self`).
 fn __builtin_split(self: str, sep: str) -> str[] { [] }
-// `self.split(sep).len()` without building the parts: how many there would be,
-// which is one more than the occurrences of `sep` (an empty `sep` never
-// matches, so it gives 1). Written by the compiler's operation-fusion pass for
-// that chain — `src.lines().len()` is a newline count with no array behind it;
-// also callable directly.
+# `self.split(sep).len()` without building the parts: how many there would be,
+# which is one more than the occurrences of `sep` (an empty `sep` never
+# matches, so it gives 1). Written by the compiler's operation-fusion pass for
+# that chain — `src.lines().len()` is a newline count with no array behind it;
+# also callable directly.
 fn __builtin_split_len(self: str, sep: str) -> u64 { 0 }
-// Concatenate the parts with `sep` between consecutive elements.
-// Flatten a sequence of sequences, placing a separator between consecutive
-// parts: `[[1,2],[3]].join(sep=0)` is `[1,2,0,3]`. Generic in the *element*
-// type, so the receiver is one level deeper than it looks — for `T = char` it
-// reads `str[] -> str` with a `char*` (i.e. `str`) separator, which is the
-// string join. Every separator is variadic (a sequence, one element, or an
-// optional one); `sep` defaults to empty, so `xs.join()` concatenates.
-//
-// `final_sep` goes in the last gap and `only_sep` in the sole gap of a two-part
-// join — the same gap seen two ways, since a list of two has no "rest" for `sep`
-// to appear in. Both default to `sep`, so an ordinary join is unaffected; naming
-// them is what writes an English list in one call:
-// `xs.join(sep=", ", final_sep=", or ", only_sep=" or ")` gives `"a"`,
-// `"a or b"`, `"a, b, or c"`.
+# Concatenate the parts with `sep` between consecutive elements.
+# Flatten a sequence of sequences, placing a separator between consecutive
+# parts: `[[1,2],[3]].join(sep=0)` is `[1,2,0,3]`. Generic in the *element*
+# type, so the receiver is one level deeper than it looks — for `T = char` it
+# reads `str[] -> str` with a `char*` (i.e. `str`) separator, which is the
+# string join. Every separator is variadic (a sequence, one element, or an
+# optional one); `sep` defaults to empty, so `xs.join()` concatenates.
+#
+# `final_sep` goes in the last gap and `only_sep` in the sole gap of a two-part
+# join — the same gap seen two ways, since a list of two has no "rest" for `sep`
+# to appear in. Both default to `sep`, so an ordinary join is unaffected; naming
+# them is what writes an English list in one call:
+# `xs.join(sep=", ", final_sep=", or ", only_sep=" or ")` gives `"a"`,
+# `"a or b"`, `"a, b, or c"`.
 fn __builtin_join<T: any>(self: T[][], sep: T* = [], final_sep: T* = sep, only_sep: T* = sep) -> T[] { [] }
 
-// The file builtins return a Result; the `ok(..)` body coerces to the declared
-// `..!Error` (codegen builds the real ok/err).
+# The file builtins return a Result; the `ok(..)` body coerces to the declared
+# `..!Error` (codegen builds the real ok/err).
 fn __builtin_read_file_to_string(self: str) !read_files -> str!Error { ok("") }
+# Write `contents` to the file at `self`, replacing what was there. `err(..)` if it cannot be written.
 fn __builtin_write_string_to_file(self: str, contents: str) !write_files -> !Error { ok() }
-// Every file at or below the directory `self`, recursively: each element is the
-// path `self` joined with the entry's path beneath it (`"dir/sub/f.txt"`), in
-// unspecified order. Directories are descended into, not listed; a symlink is a
-// file (never followed). `err(..)` if the tree can't be walked at all — an
-// unreadable directory, a non-UTF-8 name, or an entry whose kind the filesystem
-// won't report.
+# Every file at or below the directory `self`, recursively: each element is the
+# path `self` joined with the entry's path beneath it (`"dir/sub/f.txt"`), in
+# unspecified order. Directories are descended into, not listed; a symlink is a
+# file (never followed). `err(..)` if the tree can't be walked at all — an
+# unreadable directory, a non-UTF-8 name, or an entry whose kind the filesystem
+# won't report.
 fn __builtin_list_files(self: str) !list_files -> str[]!Error { ok([]) }
-// The next line of standard input, without its line ending (`\n`, or `\r\n`):
-// `some(line)` for each line, `none` once input is exhausted. A final line with
-// no newline after it is still a line, and an empty line is `some("")`, so
-// `none` always means end of input. Standard input is read in order across
-// calls, and is not echoed or prompted for: print the prompt first.
+# The next line of standard input, without its line ending (`\n`, or `\r\n`):
+# `some(line)` for each line, `none` once input is exhausted. A final line with
+# no newline after it is still a line, and an empty line is `some("")`, so
+# `none` always means end of input. Standard input is read in order across
+# calls, and is not echoed or prompted for: print the prompt first.
 fn __builtin_read_line() !read_stdin -> str? { none }
-// The next random number, uniform over all of `u64`. `!random` is the one effect
-// with no default: there is no generator unless a `shim random` installs one, so
-// `main` cannot declare it and a program that uses it must say where its
-// randomness comes from — `shim random seeded_with_clock() { .. }` for a fresh
-// sequence each run, `shim random seeded_with_int(n) { .. }` for a repeatable one.
+# The next random number, uniform over all of `u64`. `!random` is the one effect
+# with no default: there is no generator unless a `shim random` installs one, so
+# `main` cannot declare it and a program that uses it must say where its
+# randomness comes from — `shim random seeded_with_clock() { .. }` for a fresh
+# sequence each run, `shim random seeded_with_int(n) { .. }` for a repeatable one.
 fn __builtin_random_u64() !random -> u64 { 0 }
 
-// Wall-clock nanoseconds since the Unix epoch (1970-01-01 UTC). Unsigned and
-// 64-bit, so it counts up to the year 2554; a clock set before the epoch reads
-// as 0. This is the system's *wall* clock, which can jump backwards (NTP,
-// manual changes) — successive readings are not guaranteed to increase, so it
-// measures "when", not reliably "how long".
+# Wall-clock nanoseconds since the Unix epoch (1970-01-01 UTC). Unsigned and
+# 64-bit, so it counts up to the year 2554; a clock set before the epoch reads
+# as 0. This is the system's *wall* clock, which can jump backwards (NTP,
+# manual changes) — successive readings are not guaranteed to increase, so it
+# measures "when", not reliably "how long".
 fn __builtin_now_nanos() !clock -> u64 { 0 }
-// Nanoseconds from the system's monotonic clock: it only ever counts up (no NTP
-// step or manual clock change moves it), so a *difference* between two readings
-// is a real elapsed duration. Its origin is unspecified — an absolute reading
-// means nothing on its own, and nothing across processes or machines. Use this
-// to measure "how long"; use `now_nanos` for "when".
+# Nanoseconds from the system's monotonic clock: it only ever counts up (no NTP
+# step or manual clock change moves it), so a *difference* between two readings
+# is a real elapsed duration. Its origin is unspecified — an absolute reading
+# means nothing on its own, and nothing across processes or machines. Use this
+# to measure "how long"; use `now_nanos` for "when".
 fn __builtin_monotonic_now() !clock -> u64 { 0 }
-// Spawn `self` with `args` (no shell involved) and wait for it to finish:
-// `ok(ExecResult)` whenever it was actually launched, whatever it then exited
-// with; `err(message)` only if it couldn't be launched at all (not found,
-// permission denied, ...). `args` is a keyword parameter defaulting to no
-// arguments, so `"true".execute_program()` runs a bare program and
-// `"echo".execute_program(args = ["hi"])` passes argv.
+# Spawn `self` with `args` (no shell involved) and wait for it to finish:
+# `ok(ExecResult)` whenever it was actually launched, whatever it then exited
+# with; `err(message)` only if it couldn't be launched at all (not found,
+# permission denied, ...). `args` is a keyword parameter defaulting to no
+# arguments, so `"true".execute_program()` runs a bare program and
+# `"echo".execute_program(args = ["hi"])` passes argv.
 fn __builtin_execute_program(self: str, args: str[] = []) !execute_program -> __builtin_ExecResult!Error {
     ok(__builtin_ExecResult { stdout: "", stderr: "", exit_code: 0 })
 }
 
+# The text of a value, exactly what `` `{v}` `` interpolates: a `char` or `str` renders bare,
+# and one nested in an array, struct or optional keeps its literal form.
 fn __builtin_to_str<T: any>(self: T) -> str { "" }
-// `self.to_str().len()` without building the string: how long the rendering
-// would be, measured rather than materialized. `to_str` already works in two
-// passes — measure the total length, allocate exactly that, then write — so
-// this is the first pass alone: no buffer, no copy, no refcount. Written by the
-// compiler's operation-fusion pass for that chain; also callable directly.
+# `self.to_str().len()` without building the string: how long the rendering
+# would be, measured rather than materialized. `to_str` already works in two
+# passes — measure the total length, allocate exactly that, then write — so
+# this is the first pass alone: no buffer, no copy, no refcount. Written by the
+# compiler's operation-fusion pass for that chain; also callable directly.
 fn __builtin_to_str_len<T: any>(self: T) -> u64 { 0 }
-// Structural hash, consistent with `==`.
+# Structural hash, consistent with `==`.
 fn __builtin_hash<T: any>(self: T) -> i64 { 0 }
+# `self` without the whitespace at either end.
 fn __builtin_trim(self: str) -> str { self }
-// The content of `self` in one *named* runtime representation, instead of
-// whichever one it arrived in. What they are for, and why naming the result beats
-// the operation that happens to produce it, is DESIGN_PRINCIPLES.md's "Just say
-// what you want"; the representations themselves are described at the top of
-// `crates/aipl-codegen/src/str24.rs`.
-//
-// A fresh refcounted buffer, at every length — so it allocates even where the
-// content would have fit inline, which is the request.
+# The content of `self` in one *named* runtime representation, instead of
+# whichever one it arrived in. What they are for, and why naming the result beats
+# the operation that happens to produce it, is DESIGN_PRINCIPLES.md's "Just say
+# what you want"; the representations themselves are described at the top of
+# `crates/aipl-codegen/src/str24.rs`.
+#
+# A fresh refcounted buffer, at every length — so it allocates even where the
+# content would have fit inline, which is the request.
 fn __builtin_heap_str(self: str) -> str { self }
-// A rope node over the two, built even when an operand is empty (where `+++`
-// hands the other side back instead, and so cannot promise a rope).
+# A rope node over the two, built even when an operand is empty (where `+++`
+# hands the other side back instead, and so cannot promise a rope).
 fn __builtin_rope_str(self: str, other: str) -> str { self }
-// Internal: `inline_str`'s unchecked half. Content past the inline capacity has
-// no inline form and comes back untouched, so `inline_str` does the length check
-// and answers `none` rather than calling this with content that cannot fit.
+# Internal: `inline_str`'s unchecked half. Content past the inline capacity has
+# no inline form and comes back untouched, so `inline_str` does the length check
+# and answers `none` rather than calling this with content that cannot fit.
 fn __builtin_pack_inline(self: str) -> str { self }
-// Internal: the bound `inline_str` checks against, so nothing hardcodes it.
+# Internal: the bound `inline_str` checks against, so nothing hardcodes it.
 fn __builtin_inline_capacity() -> u64 { 0 }
-// Internal: the counting window behind `measure`. `!measure` is an effect only so
-// that nothing outside a `.performance` block can call these (or `measure`), and
-// so that the optimizer, which never reorders or drops an effectful call, keeps
-// the window around exactly the work it was opened for.
+# Internal: the counting window behind `measure`. `!measure` is an effect only so
+# that nothing outside a `.performance` block can call these (or `measure`), and
+# so that the optimizer, which never reorders or drops an effectful call, keeps
+# the window around exactly the work it was opened for.
 fn __builtin_measure_begin() !measure {}
-// Release `self` now, inside the window. The value being measured has to be
-// *used* by something the optimizer cannot remove, or a pure call whose result
-// nobody reads is dropped altogether; and its drop is part of what the work
-// costs, so it happens before the window closes rather than at scope exit.
+# Release `self` now, inside the window. The value being measured has to be
+# *used* by something the optimizer cannot remove, or a pure call whose result
+# nobody reads is dropped altogether; and its drop is part of what the work
+# costs, so it happens before the window closes rather than at scope exit.
 fn __builtin_measure_consume<R: any>(self: R) !measure {}
+# Close the counting window opened by `measure_begin`. Internal to `measure`.
 fn __builtin_measure_end() !measure {}
+# One of the counts of the window just closed. Internal to `measure`.
 fn __builtin_measure_read(which: u64) !measure -> u64 { 0 }
-// True if every byte is ASCII whitespace (or the string is empty).
+# True if the character is whitespace: a space, tab or line break.
 fn __builtin_is_whitespace(self: char) -> bool { false }
-// True if `self` begins / ends with the pattern — `str` bytes or `T[]`
-// elements. The pattern is variadic: the sequence (a `str` for a `str`
-// receiver), one element, or an optional element; the empty pattern — `""`,
-// `[]`, `none` — always matches. Pass a single `char` when that is what is
-// being asked (`s.starts_with('#')`, not a one-char str): the char shape is one
-// byte compare in the runtime, where a one-char `str` is a window compare. A str
-// receiver is dispatched in the checker / codegen (the `T[]` signature doesn't
-// unify with `str`).
+# True if `self` begins / ends with the pattern — `str` bytes or `T[]`
+# elements. The pattern is variadic: the sequence (a `str` for a `str`
+# receiver), one element, or an optional element; the empty pattern — `""`,
+# `[]`, `none` — always matches. Pass a single `char` when that is what is
+# being asked (`s.starts_with('#')`, not a one-char str): the char shape is one
+# byte compare in the runtime, where a one-char `str` is a window compare. A str
+# receiver is dispatched in the checker / codegen (the `T[]` signature doesn't
+# unify with `str`).
 fn __builtin_starts_with<T: any>(self: T[], prefix: T*) -> bool { false }
+# True if `self` ends with `suffix`. The pattern is variadic as `starts_with`'s is.
 fn __builtin_ends_with<T: any>(self: T[], suffix: T*) -> bool { false }
-// `self[at..].starts_with(prefix)` without building the slice: the same answer,
-// comparing in place from `at`. `at` clamps like a slice bound, so an `at` past
-// the end matches only the empty pattern. The pattern is variadic exactly as
-// `starts_with`'s, and dispatched with it in the checker / codegen. Written by
-// the compiler's operation-fusion pass; also callable directly.
+# `self[at..].starts_with(prefix)` without building the slice: the same answer,
+# comparing in place from `at`. `at` clamps like a slice bound, so an `at` past
+# the end matches only the empty pattern. The pattern is variadic exactly as
+# `starts_with`'s, and dispatched with it in the checker / codegen. Written by
+# the compiler's operation-fusion pass; also callable directly.
 fn __builtin_starts_with_at<T: any>(self: T[], prefix: T*, at: u64) -> bool { false }
-// True if `self` contains the needle: a `T[]` (or `str`) needle matches as a
-// contiguous subsequence (substring), a `T` (or `char`) as a single element,
-// and a `T?` as its element when `some` — a `none` needle is nothing to find,
-// so it's `false` (unlike `starts_with`/`ends_with`, whose `none` pattern is
-// the empty pattern and matches). A str receiver is dispatched in the
-// checker / codegen (the `T[]` signature doesn't unify with `str`).
+# True if `self` contains the needle: a `T[]` (or `str`) needle matches as a
+# contiguous subsequence (substring), a `T` (or `char`) as a single element,
+# and a `T?` as its element when `some` — a `none` needle is nothing to find,
+# so it's `false` (unlike `starts_with`/`ends_with`, whose `none` pattern is
+# the empty pattern and matches). A str receiver is dispatched in the
+# checker / codegen (the `T[]` signature doesn't unify with `str`).
 fn __builtin_contains<T: any>(self: T[], needle: T[]) -> bool { false }
-// Smaller / larger of two comparable values (codegen compares and selects).
-// `ord` is the same bound `minimum`/`maximum` carry — integers, `char` and
-// `str` — so these work at any integer width rather than `i64` alone.
+# Smaller / larger of two comparable values (codegen compares and selects).
+# `ord` is the same bound `minimum`/`maximum` carry — integers, `char` and
+# `str` — so these work at any integer width rather than `i64` alone.
 fn __builtin_min<T: ord>(self: T, other: T) -> T { self }
+# The larger of two comparable values. See `min`.
 fn __builtin_max<T: ord>(self: T, other: T) -> T { self }
 // `minimum` and `maximum` are not declared here: they are reductions, and a
 // reduction's signature follows from its step's (`min`, `max`, just above) —
 // `<T: ord>(self: T[]) -> T?` from `<T: ord>(self: T, other: T) -> T`. See
 // `Callee::reduction_step` and `with_reduction_signatures`, which adds them.
-// Element/byte count. Unsigned: a length is never negative, so `u64` keeps
-// `len`-derived arithmetic (`a.len() - b.len()`, capacity math) in the
-// saturating-at-zero unsigned world rather than silently going negative.
-// Index/slice bounds accept either signedness, so `xs[xs.len() - 1]` still
-// works without a conversion.
+# Element/byte count. Unsigned: a length is never negative, so `u64` keeps
+# `len`-derived arithmetic (`a.len() - b.len()`, capacity math) in the
+# saturating-at-zero unsigned world rather than silently going negative.
+# Index/slice bounds accept either signedness, so `xs[xs.len() - 1]` still
+# works without a conversion.
 fn __builtin_len<T: any>(self: T[]) -> u64 { 0 }
-// Whether the receiver holds anything at all — the same question
-// `len(self) != 0` asks, without routing an answer that is already a `bool`
-// through a count and a comparison. Takes every receiver `len` does (array,
-// `str`, set, dict), dispatched the same way in the checker and codegen; the
-// `len_gt_zero` lint points every `0 < x.len()` here.
+# Whether the receiver holds anything at all — the same question
+# `len(self) != 0` asks, without routing an answer that is already a `bool`
+# through a count and a comparison. Takes every receiver `len` does (array,
+# `str`, set, dict), dispatched the same way in the checker and codegen; the
+# `len_gt_zero` lint points every `0 < x.len()` here.
 fn __builtin_is_nonempty<T: any>(self: T[]) -> bool { false }
-// The other half of the same question. Written as its own builtin rather than
-// left to `!x.is_nonempty()` or `x.len() == 0` because those say what the test
-// *isn't*, or make the reader recognize an idiom; the `is_empty` lint is what
-// keeps the corpus on this spelling.
+# The other half of the same question. Written as its own builtin rather than
+# left to `!x.is_nonempty()` or `x.len() == 0` because those say what the test
+# *isn't*, or make the reader recognize an idiom; the `is_empty` lint is what
+# keeps the corpus on this spelling.
 fn __builtin_is_empty<T: any>(self: T[]) -> bool { false }
+# True if the optional holds a value.
 fn __builtin_is_some<T: any>(self: T?) -> bool { false }
-// Character classification: ASCII whitespace (space/tab/newline/carriage return).
+# Character classification: ASCII whitespace (space/tab/newline/carriage return).
 fn __builtin_is_space(self: char) -> bool { false }
-// Character classification: ASCII decimal digit ('0' through '9').
+# Character classification: ASCII decimal digit ('0' through '9').
 fn __builtin_is_digit(self: char) -> bool { false }
-// ASCII decimal digit ('0'..'9') to its 0..9 value, `none` for any other char.
+# ASCII decimal digit ('0'..'9') to its 0..9 value, `none` for any other char.
 fn __builtin_to_digit(self: char) -> i64? { none }
-// An integer as another integer type, `none` when its value does not fit. The
-// target is the use site's: `let b: u8? = n.narrow();` asks for a `u8`, and
-// the checker locks that expected `u8?` onto the call (see `needs_lock`), as
-// it does a `to_set`'s order. With no integer optional expected there is no
-// target, which is an error. The one way to an integer type that cannot hold
-// every value of the source: a lossless widening needs no call at all.
+# An integer as another integer type, `none` when its value does not fit. The
+# target is the use site's: `let b: u8? = n.narrow();` asks for a `u8`, and
+# the checker locks that expected `u8?` onto the call (see `needs_lock`), as
+# it does a `to_set`'s order. With no integer optional expected there is no
+# target, which is an error. The one way to an integer type that cannot hold
+# every value of the source: a lossless widening needs no call at all.
 fn __builtin_narrow<T: any>(self: T) -> T? { none }
 
-// Set ops: membership and union. `#{T}` in a signature takes a set of any
-// order, and a set *returned* takes the receiver's (see `inherit_set_order`).
+# Set ops: membership and union. `#{T}` in a signature takes a set of any
+# order, and a set *returned* takes the receiver's (see `inherit_set_order`).
 fn __builtin_has<T: any>(self: #{T}, x: T) -> bool { false }
+# The elements of either set.
 fn __builtin_union<T: any>(self: #{T}, other: #{T}) -> #{T} { self }
-// The elements of an *ordered* set, in its order, as an array — the checker
-// refuses a `#{T}` receiver, whose order is not one to write code against.
-// Free at runtime: a set is an array block, so this is the same block retained.
+# The elements of an *ordered* set, in its order, as an array — the checker
+# refuses a `#{T}` receiver, whose order is not one to write code against.
+# Free at runtime: a set is an array block, so this is the same block retained.
 fn __builtin_to_array<T: any>(self: #{T}) -> T[] { [] }
-// An array's distinct elements as a set. Which set — `#{T}`, `#>{T}` or
-// `#<{T}` — comes from the use site, like the type of a bare `#{}`: the
-// checker types the call `SetOrder::Context` and locks the expected type onto
-// it, and codegen builds the set in that order (unordered with no context).
+# An array's distinct elements as a set. Which set — `#{T}`, `#>{T}` or
+# `#<{T}` — comes from the use site, like the type of a bare `#{}`: the
+# checker types the call `SetOrder::Context` and locks the expected type onto
+# it, and codegen builds the set in that order (unordered with no context).
 fn __builtin_to_set<T: any>(self: T[]) -> #{T} { #{} }
 
-// Dict ops: lookup (none if absent), membership, and removal.
+# Dict ops: lookup (none if absent), membership, and removal.
 fn __builtin_get<K: any, V: any>(self: #{K: V}, key: K) -> V? { none }
+# True if a value is stored under `key`.
 fn __builtin_contains_key<K: any, V: any>(self: #{K: V}, key: K) -> bool { false }
-// Drop `key`'s entry, in place. A key the dict does not hold is not an error —
-// the point of the call is that the key is gone afterwards, and it already is —
-// so this is the removal counterpart of `push`, not of an indexing read.
-//
-// The surviving entries keep the order they were inserted in, so iterating a
-// dict after a removal hands back what it did before, minus one. A `mut self`
-// receiver, so `set d.remove_key(k);` writes back the way every mutating method
-// does; in expression position it copies-and-modifies like one too.
+# Drop `key`'s entry, in place. A key the dict does not hold is not an error —
+# the point of the call is that the key is gone afterwards, and it already is —
+# so this is the removal counterpart of `push`, not of an indexing read.
+#
+# The surviving entries keep the order they were inserted in, so iterating a
+# dict after a removal hands back what it did before, minus one. A `mut self`
+# receiver, so `set d.remove_key(k);` writes back the way every mutating method
+# does; in expression position it copies-and-modifies like one too.
 fn __builtin_remove_key<K: any, V: any>(mut self: #{K: V}, key: K) {}
 
-// `map` also takes an optional receiver — `opt.map(f)` is `U?`, `some(f(v))`
-// for `some(v)` and `none` for `none` — which the checker and mono dispatch
-// on the receiver's type; this signature is the array form the declaration
-// language can spell.
+# `map` also takes an optional receiver — `opt.map(f)` is `U?`, `some(f(v))`
+# for `some(v)` and `none` for `none` — which the checker and mono dispatch
+# on the receiver's type; this signature is the array form the declaration
+# language can spell.
 fn __builtin_map<T: any, U: any>(self: T[], f: (T) -> U) -> U[] { [] }
+# The elements for which `pred` is true, in order.
 fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
-// `self.filter(keep).map(f)` in one pass over the elements, instead of one pass
-// each with an array between them. Written by the compiler's operation-fusion
-// pass; also callable directly, and worth writing by hand when the two halves
-// belong together.
+# `self.filter(keep).map(f)` in one pass over the elements, instead of one pass
+# each with an array between them. Written by the compiler's operation-fusion
+# pass; also callable directly, and worth writing by hand when the two halves
+# belong together.
 fn __builtin_filter_map<T: any, U: any>(self: T[], keep: (T) -> bool, f: (T) -> U) -> U[] { [] }
 fn __builtin_intersperse<T: any>(self: T[], sep: T) -> T[] { self }
+# True if both values are the same case of the variant, whatever their payloads.
 fn __builtin_same_case<T: variant>(self: T, other: T) -> bool { false }
-// The name of the case `self` was built with, without its payload:
-// `Name("x").case_name()` is `"Name"`, and a payload-free `Space` is
-// `"Space"`. The tag names the case, so this reads no payload — which is
-// what lets it be generic over every variant, like `same_case`.
+# The name of the case `self` was built with, without its payload:
+# `Name("x").case_name()` is `"Name"`, and a payload-free `Space` is
+# `"Space"`. The tag names the case, so this reads no payload — which is
+# what lets it be generic over every variant, like `same_case`.
 fn __builtin_case_name<T: variant>(self: T) -> str { "" }
-// `v.case_of()` — which case `v` is, as a `Case<T>` carrying no payload. The
-// counterpart to naming a case directly (`Term(Str)`): this is how a *value*
-// is compared against one, since `==` on two `Case<T>`s is a tag compare.
-// `same_case(a, b)` remains the way to compare two values.
+# `v.case_of()` — which case `v` is, as a `Case<T>` carrying no payload. The
+# counterpart to naming a case directly (`Term(Str)`): this is how a *value*
+# is compared against one, since `==` on two `Case<T>`s is a tag compare.
+# `same_case(a, b)` remains the way to compare two values.
 fn __builtin_case_of<T: variant>(self: T) -> Case<T> { __builtin_case_of(self) }
 fn __builtin_count_is_less_than<T: any>(self: T[], x: T, limit: u64) -> bool { false }
 fn __builtin_count_is_at_most<T: any>(self: T[], x: T, limit: u64) -> bool { false }
@@ -3259,31 +3273,31 @@ fn __builtin_count_is_equal<T: any>(self: T[], x: T, limit: u64) -> bool { false
 fn __builtin_count_is_not_equal<T: any>(self: T[], x: T, limit: u64) -> bool { false }
 fn __builtin_first<T: any>(self: T[]) -> T? { none }
 fn __builtin_last<T: any>(self: T[]) -> T? { none }
-// The refinement `T[] without []` granted without a test — see
-// `Callee::AssumeNonempty`. A signature only: the checker types the call, and
-// `erase_refinements` then replaces it with its argument, which is what it is
-// at runtime.
+# The refinement `T[] without []` granted without a test — see
+# `Callee::AssumeNonempty`. A signature only: the checker types the call, and
+# `erase_refinements` then replaces it with its argument, which is what it is
+# at runtime.
 fn __builtin_assume_nonempty<T: any>(self: T[]) -> T[] without [] { __builtin_assume_nonempty(self) }
 fn __builtin_drop_first<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_last<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_n<T: any>(self: T[], n: u64) -> T[] { self }
 fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
-// A copy of `self` with the element at `index` replaced by `value`, or `none` when
-// `index` is past the end: there is no element to replace, and `self[index]` is
-// `none` there too. Arrays have no element assignment because a write past the end
-// has nowhere to go; this is the version that answers. The receiver is unchanged
-// as far as anything else can tell, but when `self` has no other owner — a fresh
-// array, or a binding at its last use — it is written in place and handed back,
-// so a chain of updates allocates nothing. `set xs = xs.with(i, v).value_or(xs)`
-// keeps `xs` alive for the fallback, and so copies; write `xs.with(i, v)` where
-// `xs` is not read again to avoid the copy. Not for a `str`.
+# A copy of `self` with the element at `index` replaced by `value`, or `none` when
+# `index` is past the end: there is no element to replace, and `self[index]` is
+# `none` there too. Arrays have no element assignment because a write past the end
+# has nowhere to go; this is the version that answers. The receiver is unchanged
+# as far as anything else can tell, but when `self` has no other owner — a fresh
+# array, or a binding at its last use — it is written in place and handed back,
+# so a chain of updates allocates nothing. `set xs = xs.with(i, v).value_or(xs)`
+# keeps `xs` alive for the fallback, and so copies; write `xs.with(i, v)` where
+# `xs` is not read again to avoid the copy. Not for a `str`.
 fn __builtin_with<T: any>(self: T[], index: u64, value: T) -> T[]? { none }
-// Replace the element at `index` with `value`, in place: `set xs.try_set(i, v);`.
-// When `index` is past the end there is no element to replace and `xs` is left as
-// it was — a write that misses does nothing, as removing a key that is not there
-// does nothing. Reach for `with` when the miss should be told apart. Like `push`
-// it is a mutating method, so `xs.try_set(i, v)` as an expression is the updated
-// copy and leaves `xs` alone. Not for a `str`.
+# Replace the element at `index` with `value`, in place: `set xs.try_set(i, v);`.
+# When `index` is past the end there is no element to replace and `xs` is left as
+# it was — a write that misses does nothing, as removing a key that is not there
+# does nothing. Reach for `with` when the miss should be told apart. Like `push`
+# it is a mutating method, so `xs.try_set(i, v)` as an expression is the updated
+# copy and leaves `xs` alone. Not for a `str`.
 fn __builtin_try_set<T: any>(mut self: T[], index: u64, value: T) {}
 // NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
 // `join_is_nonempty`, `join_is_empty`, `reduce`, `repeat`, `map_reduce`, `filter_map_reduce`, `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
@@ -3293,36 +3307,38 @@ fn __builtin_try_set<T: any>(mut self: T[], index: u64, value: T) {}
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
 // which is the single source of both their body and their signature: the loader
 // loads each as a file of any program that reaches it. See `aipl_builtins`.
+# `f` applied to the elements of both arrays pairwise, stopping at the shorter one.
 fn __builtin_zip_with<T: any, U: any, V: any>(self: T[], other: U[], f: (T, U) -> V) -> V[] { [] }
+# Add `x` at the end of `self`. `set xs.push(x);` appends in place; as an expression it is the extended copy.
 fn __builtin_push<T: any>(mut self: T[], x: T) {}
-// Append `other` to `self` — `push` for a whole array, and the way to grow a
-// `str` in place (`set s.extend(t)`; a `str` is its `char` sequence, so it takes
-// a `str` or a `char[]` source). A builtin rather than an AIPL loop over `push`
-// so it can size the destination once: growing by `other.len()` in a single
-// reserve turns N reallocations into at most one, and the elements move as one
-// `memcpy` plus one retain pass. The `extend_longhand` lint sends the rebuild
-// spelling, `set s = s +++ t;`, here.
-//
-// The source is variadic in shape, like `starts_with`'s pattern: the sequence,
-// one element, or an *optional* element — `set xs.extend(maybe)` appends what
-// `maybe` holds and leaves `xs` alone when it holds nothing, which is what a
-// hand-rolled `push_optional` helper used to be for. Mono resolves the shape at
-// the call site (see its `Extend` arm): one element is exactly `push`, and an
-// optional becomes the sequence it stands for, so codegen keeps a single
-// `extend`.
+# Append `other` to `self` — `push` for a whole array, and the way to grow a
+# `str` in place (`set s.extend(t)`; a `str` is its `char` sequence, so it takes
+# a `str` or a `char[]` source). A builtin rather than an AIPL loop over `push`
+# so it can size the destination once: growing by `other.len()` in a single
+# reserve turns N reallocations into at most one, and the elements move as one
+# `memcpy` plus one retain pass. The `extend_longhand` lint sends the rebuild
+# spelling, `set s = s +++ t;`, here.
+#
+# The source is variadic in shape, like `starts_with`'s pattern: the sequence,
+# one element, or an *optional* element — `set xs.extend(maybe)` appends what
+# `maybe` holds and leaves `xs` alone when it holds nothing, which is what a
+# hand-rolled `push_optional` helper used to be for. Mono resolves the shape at
+# the call site (see its `Extend` arm): one element is exactly `push`, and an
+# optional becomes the sequence it stands for, so codegen keeps a single
+# `extend`.
 fn __builtin_extend<T: any>(mut self: T[], other: T*) {}
-// Make room in `self` for `additional` more elements (bytes, for a `str`)
-// without changing its contents, so that many appends fit in one allocation
-// — `set out.reserve(n)` ahead of a loop of `push`/`extend`, where the loop
-// knows how much it will add and the appends would otherwise grow the buffer
-// by doubling. Exact rather than doubled: the caller has said what it needs. A
-// `str` receiver keeps its representation (an inline value that still fits
-// stays inline).
+# Make room in `self` for `additional` more elements (bytes, for a `str`)
+# without changing its contents, so that many appends fit in one allocation
+# — `set out.reserve(n)` ahead of a loop of `push`/`extend`, where the loop
+# knows how much it will add and the appends would otherwise grow the buffer
+# by doubling. Exact rather than doubled: the caller has said what it needs. A
+# `str` receiver keeps its representation (an inline value that still fits
+# stays inline).
 fn __builtin_reserve<T: any>(mut self: T[], additional: u64) {}
-// Reverse the elements of an array or the bytes of a string.
+# Reverse the elements of an array or the bytes of a string.
 fn __builtin_reverse<T: any>(self: T[]) -> T[] { [] }
-// Ascending sort. `ord` restricts `T` to comparable elements (integer, char, or
-// str), enforced generically by the checker's bound-checking.
+# Ascending sort. `ord` restricts `T` to comparable elements (integer, char, or
+# str), enforced generically by the checker's bound-checking.
 fn __builtin_sort<T: ord>(self: T[]) -> T[] { [] }
 fn some<T: any>(x: T) -> T? { none }
 
@@ -3383,7 +3399,7 @@ fn __template_interp<T: any>(self: T) -> str { "" }
 /// says so rather than inventing a signature.
 pub fn with_reduction_signatures(mut items: Vec<ast::Item>) -> Vec<ast::Item> {
     let mut synthesized = Vec::new();
-    for reduction in Callee::IMPORTABLE {
+    for reduction in builtin::Builtin::all().iter().map(|b| &b.callee) {
         let Some(step) = reduction.reduction_step() else {
             continue;
         };

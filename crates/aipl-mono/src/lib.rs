@@ -7467,7 +7467,8 @@ impl Mono<'_> {
                 // `aipl_builtins::companions` says a pass may introduce it. One
                 // missing here was introduced by a pass with no rule there.
                 assert!(
-                    !aipl_syntax::aipl_builtins::is_aipl_implemented(callee)
+                    !aipl_syntax::builtin::Builtin::of(callee)
+                        .is_some_and(aipl_syntax::builtin::Builtin::is_aipl_implemented)
                         || self.generics.contains_key(name)
                         || self.concrete.contains_key(name),
                     "a call to the AIPL-implemented builtin {name:?} reached monomorphization, \

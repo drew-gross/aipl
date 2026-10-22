@@ -405,17 +405,17 @@ impl Loader {
                 // What a builtin file implements is present too, and may have
                 // companions: the root of `aipl check` defines its builtin
                 // rather than importing it.
-                .chain(
-                    self.builtin_files
-                        .iter()
-                        .filter_map(|p| aipl_syntax::aipl_builtins::implemented_at(p)),
-                )
+                .chain(self.builtin_files.iter().filter_map(|p| {
+                    aipl_syntax::builtin::Builtin::implemented_at(p).map(|b| b.callee.clone())
+                }))
                 .collect();
             let grid = self.files.values().any(|f| f.mentions_grid);
             present.extend(aipl_syntax::aipl_builtins::companions(&present, grid));
             let mut pending = Vec::new();
             for callee in &present {
-                let Some(path) = aipl_syntax::aipl_builtins::source_path(callee) else {
+                let Some(path) =
+                    aipl_syntax::builtin::Builtin::of(callee).and_then(|b| b.source_path())
+                else {
                     continue;
                 };
                 let path = canonicalize(&path)?;
@@ -915,7 +915,9 @@ fn syntax_builtins(items: &[Item]) -> Vec<Callee> {
     let mut out = Vec::new();
     aipl_syntax::each_item_expr(items, &mut |e| {
         if let ExprKind::Call(callee, ..) = &e.kind {
-            if aipl_syntax::aipl_builtins::is_aipl_implemented(callee) && !out.contains(callee) {
+            let implemented = aipl_syntax::builtin::Builtin::of(callee)
+                .is_some_and(aipl_syntax::builtin::Builtin::is_aipl_implemented);
+            if implemented && !out.contains(callee) {
                 out.push(callee.clone());
             }
         }

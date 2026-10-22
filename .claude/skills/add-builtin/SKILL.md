@@ -26,7 +26,7 @@ import { equal as ==, filter, greater_than as > } from builtins;
 
 # The AIPL implementation of the `find_if` builtin. The loader names this
 # function by the canonical name `__builtin_find_if` (see
-# `aipl_syntax::aipl_builtins`), so a user's `xs.find_if(pred)` resolves
+# `aipl_syntax::builtin`), so a user's `xs.find_if(pred)` resolves
 # through the ordinary generic / higher-order machinery — the in-file name
 # `find_if` is only for this file's own tests, which read exactly like user code.
 # What it returns, when it stops, and what an empty receiver gives. Say it is
@@ -82,8 +82,8 @@ Run it in a second: `cargo run -q -- check crates/aipl-mono/src/builtin_<name>.a
 
 | file | edit |
 |---|---|
-| `crates/aipl-syntax/src/callee.rs` | a `Callee::<Name>` arm, its entry in `Callee::IMPORTABLE`, and its `"__builtin_<name>"` in `Callee::name` |
-| `crates/aipl-syntax/src/aipl_builtins.rs` | `(Callee::<Name>, "builtin_<name>.aipl")` in `SOURCES` |
+| `crates/aipl-syntax/src/callee.rs` | a `Callee::<Name>` arm and its `"__builtin_<name>"` in `Callee::name` |
+| `crates/aipl-syntax/src/builtin.rs` | `Builtin::aipl(Callee::<Name>, "builtin_<name>.aipl")` in `BUILTINS` — the one table of everything about a builtin: which callee, and where its signature and docs are |
 | `crates/aipl-syntax/src/lib.rs` | `<name>` in the `// NOTE:` list of AIPL-implemented builtins in `BUILTIN_SIGNATURES` |
 
 **Do not add a signature to `BUILTIN_SIGNATURES`** — that list is for builtins
