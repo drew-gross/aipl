@@ -24,6 +24,12 @@ import {
 # more ASCII digits, nothing else. `none` when the input is empty, a bare
 # `-`, contains any other character (including `+`, spaces, or `_`), or
 # doesn't fit an i64. The full range parses, including i64::MIN.
+#
+# That is the `i64` it gives with nothing asking for another. A position that
+# wants another integer's optional gets that integer instead — `let b: u8? =
+# s.int_parse();`, or `let b: u8 = s.int_parse()?;` under a `?` — with `none`
+# for a number outside it. An unsigned one takes no sign, and a `u64` reaches
+# past `i64::MAX`.
 pub fn int_parse(self: str) -> i64? {
     let neg = self.starts_with('-');
     let body = if (neg) { self.drop_first() } else { self };

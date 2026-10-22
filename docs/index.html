@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">127 files, 1389 items.</p>
+      <p class="summary">128 files, 1390 items.</p>
 
       <ul class="files">
 
@@ -2749,6 +2749,24 @@
 
             <li>
               <a href="crates-aipl-mono-src-builtin_int_parse.html#item-int_parse"><code>int_parse</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_int_parse_unsigned.html">crates/aipl-mono/src/builtin_int_parse_unsigned.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the internal <code>int_parse_unsigned</code> builtin: the unsigned half of <code>int_parse</code>. Monomorphization registers this function under the canonical name <code>__builtin_int_parse_unsigned</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>). Nothing imports it: the checker rewrites an <code>int_parse</code> whose position wants an unsigned integer into a call to this one, which reaches the whole <code>u64</code> range where the signed parse stops at <code>i64::MAX</code>.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_int_parse_unsigned.html#item-int_parse_unsigned"><code>int_parse_unsigned</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

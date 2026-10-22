@@ -1,0 +1,59 @@
+# The AIPL implementation of the internal `int_parse_unsigned` builtin: the
+# unsigned half of `int_parse`. Monomorphization registers this function under
+# the canonical name `__builtin_int_parse_unsigned` (see `AIPL_BUILTIN_SOURCES`
+# in `lib.rs`). Nothing imports it: the checker rewrites an `int_parse` whose
+# position wants an unsigned integer into a call to this one, which reaches the
+# whole `u64` range where the signed parse stops at `i64::MAX`.
+
+import {
+    equal as ==,
+    find_index,
+    greater_than as >,
+    is_empty,
+    logical_and as &&,
+    logical_or as ||,
+    opt_left_fold as opt_fold,
+    wrapping_add as +,
+    wrapping_mul as *,
+    wrapping_sub as -,
+} from builtins;
+
+# Parse `self` as an unsigned decimal integer: one or more ASCII digits and
+# nothing else — no sign, not even `-0`. `none` when the input is empty, holds
+# any other character, or exceeds `u64::MAX` (18446744073709551615).
+pub fn int_parse_unsigned(self: str) -> u64? {
+    if (self.is_empty()) {
+        return none;
+    };
+
+    // `u64::MAX / 10`: an accumulator past it overflows on the next digit, and
+    // one equal to it overflows on any digit past `u64::MAX`'s last, 5.
+    let limit: u64 = 1844674407370955161;
+    let zero: u64 = 0;
+    self.opt_fold(
+        zero,
+        |acc, c| {
+            // A digit's value is its position among the digits, which comes as
+            // the `u64` the accumulator is: `to_digit` gives an `i64`, and a
+            // builtin's body is not checked, so a `narrow` here has no target.
+            let d = "0123456789".find_index(|digit| digit == c)?;
+            if (acc > limit || (acc == limit && d > 5)) { none } else { some(acc * 10 + d) }
+        },
+    )
+}.test({
+    assert("0".int_parse_unsigned() == some(0));
+    assert("255".int_parse_unsigned() == some(255));
+    assert("007".int_parse_unsigned() == some(7));
+    let zero: u64 = 0;
+    let max = zero - 1;
+    assert("18446744073709551615".int_parse_unsigned() == some(max));
+    assert("18446744073709551616".int_parse_unsigned() == none); // one past MAX
+    assert("18446744073709551620".int_parse_unsigned() == none); // past it in the last digit
+    assert("99999999999999999999".int_parse_unsigned() == none); // past it from the first digits
+    assert("000000000000000000000018446744073709551615".int_parse_unsigned() == some(max));
+    assert("".int_parse_unsigned() == none);
+    assert("-1".int_parse_unsigned() == none);
+    assert("-0".int_parse_unsigned() == none);
+    assert("+1".int_parse_unsigned() == none);
+    assert("1a".int_parse_unsigned() == none);
+})

@@ -1774,6 +1774,42 @@ fn stamp_locks(
     {
         stamp_locks(s, o, locks, lambda_params);
     }
+    if let Some(rewritten) = retargeted_int_parse(out) {
+        *out = rewritten;
+    }
+}
+
+/// An `int_parse` recorded as producing an integer other than `i64` (see
+/// `Cx::retarget_int_parse`), as the calls that produce it: the signed parse
+/// for a signed target, the unsigned one for an unsigned target — so a `u64`
+/// reaches past `i64::MAX` — each narrowed to the target unless it already is
+/// one. `None` for any other expression.
+fn retargeted_int_parse(e: &Expr) -> Option<Expr> {
+    let ExprKind::Call(Callee::IntParse, args, style) = &e.kind else {
+        return None;
+    };
+    let Some(Type::Optional(core)) = e.ty.as_deref() else {
+        return None;
+    };
+    let Type::Primitive(target) = **core else {
+        return None;
+    };
+    let parse = if target.int_signed() {
+        Callee::IntParse
+    } else {
+        Callee::IntParseUnsigned
+    };
+    let mut call = Expr::new(ExprKind::Call(parse, args.clone(), *style), e.span.clone());
+    if matches!(target, Primitive::I64 | Primitive::U64) {
+        call.ty = e.ty.clone();
+        return Some(call);
+    }
+    let mut narrowed = Expr::new(
+        ExprKind::Call(Callee::Narrow, vec![call], true),
+        e.span.clone(),
+    );
+    narrowed.ty = e.ty.clone();
+    Some(narrowed)
 }
 
 /// During checking, these types stand in for an as-yet-unknown scalar: the
@@ -5418,6 +5454,9 @@ impl Cx<'_> {
     /// return type, a field or payload — and not for two operands or branches
     /// meeting, where neither side is the declared one.
     fn fit(&self, e: &Expr, ety: &Type, target: &Type) -> Result<Type, Error> {
+        if let Some(t) = self.retarget_int_parse(e, target) {
+            return Ok(t);
+        }
         // A `narrow` types as the placeholder `__none__?`, which renders as
         // `none` — so the ordinary mismatch would say the call *is* `none`.
         if let ExprKind::Call(Callee::Narrow, ..) = &e.kind {
@@ -5438,6 +5477,29 @@ impl Cx<'_> {
             return Ok(target.clone());
         }
         Ok(t)
+    }
+
+    /// `target`, when `e` is an `int_parse` its position asks to produce another
+    /// integer — `let b: u8? = s.int_parse();`, or under a `?`, `let b: u8 =
+    /// s.int_parse()?;` — with that integer's optional recorded on the call for
+    /// [`retargeted_int_parse`] to act on. `None` otherwise, including when the
+    /// position wants the `i64` the call produces anyway.
+    fn retarget_int_parse(&self, e: &Expr, target: &Type) -> Option<Type> {
+        let (call, wanted) = match &e.kind {
+            ExprKind::Call(Callee::IntParse, ..) => (e, target.clone()),
+            ExprKind::Try(inner) if matches!(inner.kind, ExprKind::Call(Callee::IntParse, ..)) => {
+                (&**inner, Type::Optional(Box::new(target.clone())))
+            }
+            _ => return None,
+        };
+        let Type::Optional(core) = &wanted else {
+            return None;
+        };
+        if !aipl_syntax::is_int_ty(core) || **core == Type::Primitive(Primitive::I64) {
+            return None;
+        }
+        self.lock_node(node_id(call), &wanted);
+        Some(target.clone())
     }
 
     /// Type of an integer add/subtract — the `+`/`-` operators and the

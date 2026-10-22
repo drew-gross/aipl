@@ -16501,8 +16501,22 @@ fn compile_call_expr_direct<M: Module>(
             let [receiver] = args else {
                 return Err(arity_bug(name, 1, args.len(), &span));
             };
-            let (v, recv_ty) = compile_expr(module, builder, cx, scopes, receiver)?;
-            let ConcreteType::Primitive(from) = recv_ty else {
+            let (recv, recv_ty) = compile_expr(module, builder, cx, scopes, receiver)?;
+            // An optional receiver is the checker's own rewrite of an `int_parse`
+            // to a narrower integer (`retargeted_int_parse`): a `none` stays one.
+            let (v, present, from_ty) = match &recv_ty {
+                ConcreteType::Optional(core) => {
+                    let flags = MemFlagsData::trusted();
+                    let tag = builder.ins().load(types::I64, flags, recv, 0);
+                    let present = builder.ins().icmp_imm_s(IntCC::NotEqual, tag, 0);
+                    let v = builder
+                        .ins()
+                        .load(types::I64, flags, recv, OPT_VALUE_OFFSET as i32);
+                    (v, Some(present), (**core).clone())
+                }
+                _ => (recv, None, recv_ty.clone()),
+            };
+            let ConcreteType::Primitive(from) = from_ty else {
                 return Err(Error::at(
                     format!(
                         "\"narrow\" is only callable on an integer, got {}",
@@ -16540,6 +16554,10 @@ fn compile_call_expr_direct<M: Module>(
                 builder.ins().band(same, nonneg)
             } else {
                 same
+            };
+            let fits = match present {
+                Some(present) => builder.ins().band(fits, present),
+                None => fits,
             };
             // Branchless, as for `to_digit`: an integer core is a plain scalar,
             // so the value is stored whatever the tag, and ignored under `none`.

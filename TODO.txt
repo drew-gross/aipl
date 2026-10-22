@@ -102,6 +102,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  int_parse should be able to be size-generic in AIPL and not need the retargeting thing
   lower_try_set seems like it should be more generic
   if callee.name() != names.value_or -> this should just compare directly to the ValueOr builtin enum. Maybe this needs to move linting after name resolution?
   rename prints effect to print
@@ -222,6 +223,7 @@ lsp:
   IT'S SOOOO SLOW!!!!
 
 bugs:
+  Gate bug: the_leak_gate_runs_for_a_case_with_no_sections re-runs examples_arrays and requires it to pass. When that case's baseline row is stale, the test fails without printing a handoff-fill: line. Handoff then stops before it reaches the step that would refresh the row. I got past it once by refreshing that single row with the scoped refresh_perfmon command. The fix would be either to have the test print the Fill it needs, or to have it ignore baseline movement.
   main should return u8 since that's what OSes use
   An inlined fn wrapped() -> u8[]? { some([200, 1]) } makes wrapped().value_or([]) fail in monomorphization with "conflicting types for T: i64[] vs u8[]". The build without my changes fails the same way.
   An array literal used as an extend source isn't fitted to the receiver's type: set xs.extend([100000, -1]) on an i32[] is rejected by the checker
@@ -286,6 +288,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  explict type args (not just from context)
   minesweeper main is non-DRY because of how shimming works. Should DRY it up.
   make a function composition operator
   ! is used for both effects and errors, we should switch the syntax for effects
@@ -420,7 +423,6 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
-  int_parse should be able to return small ints when requested
   __builtin_drop_* should be mutating methods
   zip
   int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html

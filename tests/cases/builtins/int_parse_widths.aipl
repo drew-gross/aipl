@@ -1,0 +1,50 @@
+# `int_parse` produces whichever integer its position asks for: in an
+# annotated binding, a parameter, a return type or a field that wants a `u8?`
+# it parses a `u8`, `none` for text that is not a number or does not fit. Under
+# a `?`, the position wants the integer itself (`let b: u8 = s.int_parse()?;`).
+# With nothing asking, it is the `i64?` it has always been.
+#
+# An unsigned target reaches its whole range — a `u64` parses past `i64::MAX` —
+# and takes no sign at all, not even `-0`.
+
+import { int_parse, print, to_str, wrapping_add as + } from builtins;
+
+struct Port { number: u16? }
+
+fn as_u8(s: str) -> u8? { s.int_parse() }
+
+fn as_i8(s: str) -> i8? { s.int_parse() }
+
+fn as_u64(s: str) -> u64? { s.int_parse() }
+
+fn as_i32(s: str) -> i32? { s.int_parse() }
+
+fn takes_u16(n: u16?) -> str { n.to_str() }
+
+fn sum_u8(a: str, b: str) -> u8? {
+    let x: u8 = a.int_parse()?;
+    let y: u8 = b.int_parse()?;
+    some(x + y)
+}
+
+fn main() !prints {
+    print(`{as_u8("255")} {as_u8("256")} {as_u8("-1")} {as_u8("-0")} {as_u8("x")}`);
+    print(`{as_i8("-128")} {as_i8("127")} {as_i8("128")} {as_i8("-129")}`);
+    print(`{as_u64("18446744073709551615")} {as_u64("18446744073709551616")}`);
+    print(`{as_i32("-2147483648")} {as_i32("2147483648")}`);
+    let bound: u16? = "8080".int_parse();
+    let port = Port { number: "443".int_parse() };
+    print(`{bound} {port.number} {takes_u16("70000".int_parse())}`);
+    print(`{sum_u8("200", "55")} {sum_u8("200", "x")}`);
+    // No integer optional asked for: the `i64?` it always was.
+    let wide = "9000000000".int_parse();
+    print(wide.to_str());
+}
+--- stdout ---
+some(255) none none none none
+some(-128) some(127) none none
+some(18446744073709551615) none
+some(-2147483648) none
+some(8080) some(443) none
+some(255) none
+some(9000000000)

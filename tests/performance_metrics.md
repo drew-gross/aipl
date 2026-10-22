@@ -120,6 +120,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/booleans/logical/logical_not | 0 | 0 | 0 | 39 | 224 | 2.00 | 76.79 | 1456 |
 | cases/booleans/logical/logical_op_precedence | 0 | 0 | 0 | 28 | 176 | 2.00 | 75.62 | 1456 |
 | cases/builtins/import_then_use | 1 | 40 | 40 | 111 | 452 | 3.00 | 75.56 | 1456 |
+| cases/builtins/int_parse_widths | 43 | 2571 | 2571 | 34785 | 10192 | 25.00 | 983.47 | 1488 |
 | cases/builtins/is_nonempty | 5 | 288 | 192 | 756 | 3496 | 4.00 | 83.33 | 1472 |
 | cases/builtins/monotonic_now | 4 | 88 | 88 | 314 | 1768 | 1011497.00 | 81.75 | 1520 |
 | cases/builtins/now_nanos | 0 | 0 | 0 | 69 | 356 | 2.00 | 117.59 | 1440 |
@@ -758,6 +759,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_height | 0 | 0 | 0 | 389 | 1068 | 2.00 | 88.01 | 1456 |
 | crates/aipl-mono/src/builtin_inline_str | 4 | 254 | 254 | 685 | 2476 | 3.00 | 80.88 | 1440 |
 | crates/aipl-mono/src/builtin_int_parse | 0 | 0 | 0 | 20013 | 4560 | 5.00 | 90.81 | 1440 |
+| crates/aipl-mono/src/builtin_int_parse_unsigned | 0 | 0 | 0 | 54819 | 2792 | 4.00 | 91.20 | 1472 |
 | crates/aipl-mono/src/builtin_intersperse | 14 | 960 | 1440 | 2755 | 4720 | 6.00 | 83.16 | 1472 |
 | crates/aipl-mono/src/builtin_is_all_whitespace | 0 | 0 | 0 | 2047 | 1500 | 2.00 | 90.28 | 1456 |
 | crates/aipl-mono/src/builtin_is_err_and | 0 | 0 | 0 | 1633 | 5228 | 3.00 | 94.98 | 1472 |

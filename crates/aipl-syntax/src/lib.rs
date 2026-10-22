@@ -3801,6 +3801,10 @@ pub const INTERNAL_BUILTINS: &[Callee] = &[
     Callee::MeasureConsume,
     Callee::MeasureEnd,
     Callee::MeasureRead,
+    // The unsigned half of `int_parse`, reached by the checker rewriting an
+    // `int_parse` whose position wants an unsigned integer. `int_parse` is the
+    // spelling.
+    Callee::IntParseUnsigned,
 ];
 
 /// Whether `callee` is one of [`INTERNAL_BUILTINS`].

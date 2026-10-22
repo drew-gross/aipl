@@ -7999,6 +7999,7 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::MapOk, "builtin_map_ok.aipl"),
     (Callee::TryMap, "builtin_try_map.aipl"),
     (Callee::IntParse, "builtin_int_parse.aipl"),
+    (Callee::IntParseUnsigned, "builtin_int_parse_unsigned.aipl"),
     (Callee::TrimWhile, "builtin_trim_while.aipl"),
     (Callee::ValueOr, "builtin_value_or.aipl"),
     (Callee::ValueOrErr, "builtin_value_or_err.aipl"),
