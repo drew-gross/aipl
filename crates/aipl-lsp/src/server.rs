@@ -7,8 +7,8 @@
 //!
 //! | request | answered by |
 //! |---|---|
-//! | `textDocument/definition` | [`aipl_index::Index::definition_of`] |
-//! | `textDocument/hover` | [`aipl_index::Symbol`]'s `detail` and `doc` |
+//! | `textDocument/definition` | [`aipl_index::Index::definition_of`], and [`aipl_index::builtin`] for a builtin written in AIPL |
+//! | `textDocument/hover` | [`aipl_index::Symbol`]'s `detail` and `doc`, for a builtin from [`aipl_index::builtin`] |
 //! | `textDocument/documentSymbol` | [`aipl_index::FileIndex::outline`] |
 //! | `textDocument/formatting` | [`aipl_fmt::format_source`] |
 //! | `textDocument/publishDiagnostics` | the loader and [`aipl_codegen::frontend`] |
@@ -192,7 +192,12 @@ impl Server {
         let Some((name, _)) = name_at(text, offset) else {
             return Value::Null;
         };
-        let Some((target, symbol, source)) = self.resolve(path, text, &name) else {
+        let Some(found) = self.resolve(path, text, &name, offset) else {
+            return Value::Null;
+        };
+        // A builtin the compiler expands itself is described but not written
+        // anywhere, so there is nowhere to jump.
+        let Some((target, source)) = found.file else {
             return Value::Null;
         };
         json!({
@@ -201,7 +206,7 @@ impl Server {
             // resolved is what an editor compares against the buffer it
             // already has open.
             "uri": path_to_uri(&resolved(&target)),
-            "range": LineIndex::new(&source).range(&symbol.name_span),
+            "range": LineIndex::new(&source).range(&found.symbol.name_span),
         })
     }
 
@@ -212,16 +217,21 @@ impl Server {
         let Some((name, span)) = name_at(text, offset) else {
             return Value::Null;
         };
-        let Some((target, symbol, _)) = self.resolve(path, text, &name) else {
+        let Some(found) = self.resolve(path, text, &name, offset) else {
             return Value::Null;
         };
+        let symbol = &found.symbol;
         // The signature as a code block, then the declaration's own `# ..`
         // lines as prose — the same two parts, in the same order, that `aipl
         // doc` prints and `aipl docs` renders.
         let mut markdown = format!("```aipl\n{}\n```", symbol.detail);
-        if !same_file(&target, path) {
-            let file = target.file_name().unwrap_or(target.as_os_str());
-            markdown.push_str(&format!("\n\nfrom `{}`", file.to_string_lossy()));
+        if found.builtin {
+            markdown.push_str("\n\nbuiltin");
+        } else if let Some((target, _)) = &found.file {
+            if !same_file(target, path) {
+                let file = target.file_name().unwrap_or(target.as_os_str());
+                markdown.push_str(&format!("\n\nfrom `{}`", file.to_string_lossy()));
+            }
         }
         if let Some(doc) = &symbol.doc {
             markdown.push_str("\n\n");
@@ -325,15 +335,42 @@ impl Server {
         Some((document.path.as_deref()?, document.text.as_str(), 0))
     }
 
-    /// Where `name` is declared, as the file at `path` sees it: the defining
-    /// file, its declaration, and that file's source (which the caller needs
-    /// to turn the declaration's span into a range).
-    fn resolve(&self, path: &Path, text: &str, name: &str) -> Option<(PathBuf, Symbol, String)> {
+    /// Where `name` is declared, as the file at `path` sees it: the declaration,
+    /// and — when it is written somewhere — the defining file and its source
+    /// (which the caller needs to turn the declaration's span into a range).
+    ///
+    /// A name imported `from builtins` resolves to the builtin. So does the
+    /// builtin's own name in the import list when the cursor (`offset`) is in
+    /// that import: `equal` in `equal as ==` is not a name the file binds, but
+    /// it is what the author is pointing at.
+    fn resolve(&self, path: &Path, text: &str, name: &str, offset: usize) -> Option<Resolved> {
         let (index, sources) = self.index_with_imports(path, text);
         let file = index.file(path)?;
-        let (target, symbol) = index.definition_of(file, name)?;
-        let source = sources.get(target)?;
-        Some((target.to_path_buf(), symbol.clone(), source.clone()))
+        if let Some((target, symbol)) = index.definition_of(file, name) {
+            let source = sources.get(target)?;
+            return Some(Resolved {
+                symbol: symbol.clone(),
+                file: Some((target.to_path_buf(), source.clone())),
+                builtin: false,
+            });
+        }
+        let builtin_name = match file.import_of(name) {
+            Some(import) if import.from.is_none() => &import.name,
+            Some(_) => return None,
+            None => {
+                &file
+                    .imports
+                    .iter()
+                    .find(|i| i.from.is_none() && i.name == name && i.span.contains(&offset))?
+                    .name
+            }
+        };
+        let found = aipl_index::builtin(builtin_name)?;
+        Some(Resolved {
+            symbol: found.symbol,
+            file: found.file,
+            builtin: true,
+        })
     }
 
     /// Index the document and every file it imports directly, so a lookup can
@@ -393,6 +430,16 @@ impl Server {
         }
         std::fs::read_to_string(path).ok()
     }
+}
+
+/// What a name resolved to — see [`Server::resolve`].
+struct Resolved {
+    symbol: Symbol,
+    /// The file that declares it, and that file's source. `None` for a builtin
+    /// that is described but not written anywhere.
+    file: Option<(PathBuf, String)>,
+    /// Whether it is a builtin rather than something a program declares.
+    builtin: bool,
 }
 
 /// A path with its `.` components and symlinks resolved, or unchanged when it

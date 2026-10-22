@@ -531,6 +531,7 @@ design:
   apis should express intent
 
 optimizations:
+  Cache monomorphizations of the same lambda
   special case seed handling in reduce to avoid optional checks in the generated code. Maybe also fuse reduce().value_or()?. Though .value_or isn't always a valid seed e.g. .minimum().value_or(0) in dedent
   detect if a user function amounts to a reduction (not sure if lint to .reduce() or make eligible for fusion)
   body_size should probably count match arms to prevent function that are huge match tables from getting inlined every time
@@ -740,8 +741,6 @@ tests:
 
 integers:
   unpinned int lits should be passable as struct fields
-
-Cache monomorphizations of the same lambda
 
 error improvements:
   tests/cases/kwargs/err_generic_default_conflicts.aipl is showing a mangled name in it's error. This should type check against the bound and see that T (any) isn't compatible with 0 (num)

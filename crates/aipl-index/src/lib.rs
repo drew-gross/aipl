@@ -213,7 +213,7 @@ impl Index {
     /// wins, and otherwise an `import` says which file to look in. A name
     /// imported `from builtins`, or from a file this index has not been given,
     /// resolves to nothing — the caller is told "no definition", which is the
-    /// honest answer rather than a guess.
+    /// honest answer rather than a guess. (A builtin is [`builtin`]'s to answer.)
     ///
     /// Takes a *name* rather than a cursor offset. Turning an offset into a name
     /// wants every identifier occurrence in the file, which is a token-stream
@@ -235,6 +235,55 @@ impl Index {
         let sym = target.define(&import.name)?;
         Some((target.path.as_path(), sym))
     }
+}
+
+/// A builtin as a tool shows it: the declaration, and where it is written when
+/// it is written in AIPL.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Builtin {
+    /// The file the builtin is implemented in, with that file's source (which a
+    /// caller needs to turn `symbol.name_span` into a position). `None` for a
+    /// builtin the compiler expands itself — it has a signature and docs but
+    /// nowhere to go.
+    pub file: Option<(PathBuf, String)>,
+    pub symbol: Symbol,
+}
+
+/// The builtin an import list spells `name` (`len`, not `__builtin_len`).
+///
+/// One implemented in AIPL is read from its own source file, so the signature
+/// and docs are the ones in the file and the definition is a place in it. Any
+/// other comes from [`aipl_syntax::builtin_docs`], with no place. `None` when
+/// `name` is no builtin, or when the source of an AIPL-implemented one cannot be
+/// read or parsed — nothing is guessed in its place.
+///
+/// **The caller must have installed the parser hooks**, as for
+/// [`FileIndex::parse`].
+pub fn builtin(name: &str) -> Option<Builtin> {
+    let callee = aipl_syntax::ast::Callee::importable(name)?;
+    if let Some(path) = aipl_syntax::aipl_builtins::source_path(&callee) {
+        let source = std::fs::read_to_string(&path).ok()?;
+        let file = FileIndex::parse(&path, &source).ok()?;
+        let symbol = file.define(name)?.clone();
+        return Some(Builtin {
+            file: Some((path, source)),
+            symbol,
+        });
+    }
+    let described = aipl_syntax::builtin_docs::builtin_doc(name)?;
+    Some(Builtin {
+        file: None,
+        symbol: Symbol {
+            name: name.to_string(),
+            kind: SymbolKind::Function,
+            detail: described.signature.to_string(),
+            doc: Some(described.doc.to_string()),
+            is_pub: true,
+            name_span: 0..0,
+            parent: None,
+            slots: Vec::new(),
+        },
+    })
 }
 
 /// Every declaration in `program`, in source order.
@@ -749,6 +798,51 @@ fn helper(n: i64) !prints -> i64 {
 
     /// Source that does not parse is an error, not a partial index — a caller
     /// that gets `Ok` can trust every span in it.
+    #[test]
+    fn an_aipl_implemented_builtin_is_read_from_its_own_file() {
+        hosted();
+        let first = builtin("first").expect("`first` is a builtin");
+        let (path, source) = first.file.expect("`first` is written in AIPL");
+        assert!(path.ends_with("builtin_first.aipl"), "{path:?}");
+        assert_eq!(first.symbol.detail, "pub fn first<T: any>(self: T[]) -> T?");
+        assert_eq!(
+            first.symbol.doc.as_deref(),
+            Some("The first element, or `none` if the array is empty.")
+        );
+        assert_eq!(&source[first.symbol.name_span.clone()], "first");
+    }
+
+    #[test]
+    fn every_aipl_implemented_builtin_defines_the_name_it_is_imported_by() {
+        hosted();
+        for callee in aipl_syntax::ast::Callee::IMPORTABLE {
+            if !aipl_syntax::aipl_builtins::is_aipl_implemented(callee) {
+                continue;
+            }
+            let name = callee.import_name();
+            let found = builtin(name).unwrap_or_else(|| panic!("`{name}` has no definition"));
+            assert!(found.file.is_some(), "`{name}`");
+            assert!(found.symbol.doc.is_some(), "`{name}` is undocumented");
+        }
+    }
+
+    #[test]
+    fn a_builtin_the_compiler_expands_has_a_signature_and_no_place() {
+        hosted();
+        let len = builtin("len").expect("`len` is a builtin");
+        assert_eq!(len.file, None);
+        assert_eq!(len.symbol.detail, "fn len<T: any>(self: T[]) -> u64");
+        assert!(len.symbol.doc.is_some());
+    }
+
+    #[test]
+    fn a_name_that_is_no_builtin_is_none() {
+        hosted();
+        assert_eq!(builtin("no_such_builtin"), None);
+        // The canonical spelling is not what an import list writes.
+        assert_eq!(builtin("__builtin_len"), None);
+    }
+
     #[test]
     fn refuses_source_that_does_not_parse() {
         hosted();

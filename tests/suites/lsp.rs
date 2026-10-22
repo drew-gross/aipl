@@ -191,7 +191,7 @@ fn jumps_to_a_definition_in_the_same_file() {
     assert_eq!(location["range"]["start"], cursor_on(source, "square(n:"));
 }
 
-/// Nothing resolves a local binding, a builtin, or a type name — and saying so
+/// Nothing resolves a local binding, a keyword, or a type name — and saying so
 /// is the point. A server that guessed would send the cursor somewhere wrong,
 /// which is worse than leaving it where it is.
 #[test]
@@ -232,6 +232,95 @@ fn hover_shows_the_signature_then_the_docs() {
     // The range is the name under the cursor, so the editor underlines `add`
     // rather than the whole line.
     assert_eq!(hover["range"]["start"], cursor_on(ROOT, "add(2, 3)"));
+}
+
+/// A file using one builtin written in AIPL, one the compiler expands, and an
+/// operator imported under its alias.
+const USES_BUILTINS: &str = "import { equal as ==, first, len } from builtins;\n\
+                             \n\
+                             fn main() {\n\
+                             \u{20}   let xs = [1, 2];\n\
+                             \u{20}   let head = xs.first();\n\
+                             \u{20}   let count = xs.len();\n\
+                             }\n";
+
+fn hover_at(server: &mut Server, uri: &str, position: Value) -> Value {
+    request(
+        server,
+        "textDocument/hover",
+        json!({ "textDocument": { "uri": uri }, "position": position }),
+    )
+}
+
+/// An AIPL-implemented builtin is a file like any other, so go-to-definition
+/// lands in it, on the name its `pub fn` declares.
+#[test]
+fn jumps_to_the_source_of_an_aipl_implemented_builtin() {
+    let workspace = Workspace::new("builtin-definition", &[("main.aipl", USES_BUILTINS)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+
+    let location = definition_at(&mut server, &uri, cursor_on(USES_BUILTINS, "first()"));
+    let target = location["uri"].as_str().expect("a location");
+    assert!(target.ends_with("/builtin_first.aipl"), "{target}");
+    let source = fs::read_to_string(target.strip_prefix("file://").expect("a file URI")).unwrap();
+    assert_eq!(
+        location["range"]["start"],
+        cursor_on(&source, "first<T: any>"),
+        "the name in `pub fn first`"
+    );
+}
+
+/// A builtin the compiler expands has no source to go to, and says so rather
+/// than landing somewhere unrelated.
+#[test]
+fn a_builtin_the_compiler_expands_has_no_definition() {
+    let workspace = Workspace::new("builtin-no-definition", &[("main.aipl", USES_BUILTINS)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    assert_eq!(
+        definition_at(&mut server, &uri, cursor_on(USES_BUILTINS, "len()")),
+        Value::Null
+    );
+}
+
+#[test]
+fn hover_documents_every_kind_of_builtin() {
+    let workspace = Workspace::new("builtin-hover", &[("main.aipl", USES_BUILTINS)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+
+    let hover = hover_at(&mut server, &uri, cursor_on(USES_BUILTINS, "first()"));
+    assert_eq!(
+        hover["contents"]["value"],
+        json!(
+            "```aipl\npub fn first<T: any>(self: T[]) -> T?\n```\n\nbuiltin\n\n\
+             The first element, or `none` if the array is empty."
+        ),
+        "an AIPL-implemented builtin shows its own file's signature and docs"
+    );
+
+    let hover = hover_at(&mut server, &uri, cursor_on(USES_BUILTINS, "len()"));
+    assert_eq!(
+        hover["contents"]["value"],
+        json!(
+            "```aipl\nfn len<T: any>(self: T[]) -> u64\n```\n\nbuiltin\n\n\
+             The number of elements. Also works on a `str` (its length in bytes), a set and \
+             a dictionary."
+        ),
+        "any other shows the table's"
+    );
+
+    // `equal` in `equal as ==` is not a name the file binds, but it is what the
+    // author is pointing at.
+    let hover = hover_at(&mut server, &uri, cursor_on(USES_BUILTINS, "equal as"));
+    assert_eq!(
+        hover["contents"]["value"],
+        json!(
+            "```aipl\nfn equal<T: any>(a: T, b: T) -> bool\n```\n\nbuiltin\n\n\
+             Whether the two values are equal. Import it as the operator: `equal as ==`."
+        ),
+    );
 }
 
 #[test]

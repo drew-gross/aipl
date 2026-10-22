@@ -344,6 +344,7 @@ pub fn set_caret_block_hook(f: fn(&str, Span, &str) -> String) {
 }
 
 pub mod aipl_builtins;
+pub mod builtin_docs;
 pub mod callee;
 
 pub mod ast {
