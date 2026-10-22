@@ -1,0 +1,26 @@
+# The reason `right_fold` exists: a cons list built from an array keeps the
+# array's order when the fold walks from the right, so each element is consed
+# onto the list of those after it. A left fold would come out reversed. The
+# combiner is the variant's constructor itself, passed as a function.
+#
+# `opt_right_fold` is the same fold with a combiner that can refuse, and stops at
+# the first element it does.
+
+import { equal as ==, not_equal as !=, opt_right_fold, right_fold } from builtins;
+
+variant List = Cons(i64, List) | Nil
+
+fn to_list(xs: i64[]) -> List { xs.right_fold(Nil, Cons) }.test({
+    assert(to_list([1, 2, 3]) == Cons(1, Cons(2, Cons(3, Nil))));
+    assert(to_list([]) == Nil);
+    assert(to_list([1, 2]) != Cons(2, Cons(1, Nil)));
+})
+
+// The same list, but a zero is not accepted anywhere in it.
+fn to_nonzero_list(xs: i64[]) -> List? {
+    xs.opt_right_fold(Nil, |x, rest| if (x == 0) { none } else { some(Cons(x, rest)) })
+}.test({
+    assert(to_nonzero_list([1, 2, 3]) == some(Cons(1, Cons(2, Cons(3, Nil)))));
+    assert(to_nonzero_list([]) == some(Nil)); // empty folds to `some(init)`
+    assert(to_nonzero_list([1, 0, 3]) == none); // the rejected element ends it
+})

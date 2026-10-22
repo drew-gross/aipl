@@ -126,7 +126,7 @@ fn report_does_not_depend_on_where_it_is_run_from() {
     // The file's label is baked into the binary, so rooting it at the working
     // directory would change `binary size` with the directory.
     let case = format!(
-        "{}/tests/cases/lambdas/fold.aipl",
+        "{}/tests/cases/report/test_driver_run.aipl",
         env!("CARGO_MANIFEST_DIR")
     );
     let from_root = report(&["--machine", &case]).0;

@@ -6,22 +6,26 @@ import { equal as ==, print, to_str } from builtins;
 
 struct Board { cells: bool[,] }
 
-fn corner(grid: i64[,]) -> i64? { grid[1, 1] }
-
-fn diagonal() -> bool[,] { [[true, false], [false, true]] }
-
-fn basics() {}.test({
-    let grid: i64[,] = [[1, 2, 3], [4, 5, 6]];
-    assert(grid[0, 0] == some(1));
-    assert(grid[1, 2] == some(6));
-    // Off the end of a row is not the next row.
-    assert(grid[0, 3] == none);
-    assert(grid[2, 0] == none);
+fn corner(grid: i64[,]) -> i64? { grid[1, 1] }.test({
     assert(corner([[1, 2], [3, 4]]) == some(4));
+})
+
+fn diagonal() -> bool[,] { [[true, false], [false, true]] }.test({
     assert(diagonal()[1, 1] == some(true));
     assert(diagonal()[0, 1] == some(false));
-    let board = Board { cells: [[true, false, true]] };
-    assert(board.cells[0, 2] == some(true));
+})
+
+fn cell(grid: i64[,], row: u64, column: u64) -> i64? { grid[row, column] }.test({
+    let grid: i64[,] = [[1, 2, 3], [4, 5, 6]];
+    assert(cell(grid, 0, 0) == some(1));
+    assert(cell(grid, 1, 2) == some(6));
+    // Off the end of a row is not the next row.
+    assert(cell(grid, 0, 3) == none);
+    assert(cell(grid, 2, 0) == none);
+})
+
+fn last_in_first_row(Board { cells }) -> bool? { cells[0, 2] }.test({
+    assert(last_in_first_row(Board { cells: [[true, false, true]] }) == some(true));
 })
 
 fn main() !prints {

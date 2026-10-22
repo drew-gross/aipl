@@ -16,8 +16,8 @@
 # What a measurement contains: the heap allocations made, the bytes they asked
 # for, the most heap live at once *counted from what was live when it began*, and
 # the CLIF instructions executed. Instructions include the measuring itself, a
-# fixed 5 that every measurement below carries (the identity closure is nothing
-# but that).
+# fixed 5 that every measurement carries (a closure that returns its input, as in
+# `builtin_measure.aipl`, is nothing but that).
 #
 # The input is built outside the window, so building it is not measured; the
 # result is released inside it, so freeing it is.
@@ -33,6 +33,11 @@ import {
     wrapping_increment as ++,
 } from builtins;
 
+// Building a hundred-element array is one allocation of 64 bytes that then grows in
+// place. `bytes allocated` counts only that first request; the peak is what the
+// growth reached — the array's block at its final capacity — and it is the
+// growth policy, so a change to it shows here. Three times the elements is the same
+// one allocation, a larger peak, and about three times the instructions.
 fn filled(n: i64, x: i64) -> i64[] {
     mut xs: i64[] = [];
     mut i: i64 = 0;
@@ -41,7 +46,22 @@ fn filled(n: i64, x: i64) -> i64[] {
         set i++;
     }
     xs
-}
+}.performance({
+    let Measurement { allocations, bytes_allocated, peak_live_bytes, instructions } = measure(
+        "build 100",
+        100,
+        |n| filled(n, 7),
+    );
+    assert(allocations == 1);
+    assert(bytes_allocated == 64);
+    assert(peak_live_bytes == 1552);
+    assert(instructions == 2700);
+    let three_times = measure("build 300", 300, |n| filled(n, 7));
+    assert(three_times.allocations == 1);
+    assert(three_times.bytes_allocated == 64);
+    assert(three_times.peak_live_bytes == 3088);
+    assert(three_times.instructions == 7900);
+})
 
 // Counting stops once the answer is settled, so it costs the same on ten elements
 // as on ten thousand. That is a comparison, so it is stated as one; the number it
@@ -59,20 +79,6 @@ fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }.performance({
 
 fn main() {}
 
-fn work() {}.performance({
-    // Work that touches no heap costs none, and holds none. What it does cost is
-    // the fixed few instructions of measuring.
-    let Measurement { allocations, bytes_allocated, peak_live_bytes, instructions } = measure(
-        "scalar",
-        3,
-        |n| n,
-    );
-    assert(allocations == 0);
-    assert(bytes_allocated == 0);
-    assert(peak_live_bytes == 0);
-    assert(instructions == 5);
-})
-
 // A value small enough to live in the value's own words needs no allocation:
 // a one-element array, a short string. The claim is the point of the section's
 // existence — that building one is free — and states it where a change to the
@@ -88,45 +94,4 @@ fn inline_values() {}.performance({
     assert(peak_live_bytes == 0);
     assert(instructions == 17);
     assert(measure("short string", "hi", |s| s).allocations == 0);
-})
-
-// Building a hundred-element array is one allocation of 64 bytes that then grows in
-// place. `bytes allocated` counts only that first request; the peak is what the
-// growth reached — the array's block at its final capacity — and it is the
-// growth policy, so a change to it shows here. Three times the elements is the same
-// one allocation, a larger peak, and about three times the instructions.
-fn building() {}.performance({
-    let Measurement { allocations, bytes_allocated, peak_live_bytes, instructions } = measure(
-        "build 100",
-        100,
-        |n| filled(n, 7),
-    );
-    assert(allocations == 1);
-    assert(bytes_allocated == 64);
-    assert(peak_live_bytes == 1552);
-    assert(instructions == 2700);
-    let three_times = measure("build 300", 300, |n| filled(n, 7));
-    assert(three_times.allocations == 1);
-    assert(three_times.bytes_allocated == 64);
-    assert(three_times.peak_live_bytes == 3088);
-    assert(three_times.instructions == 7900);
-})
-
-// The peak is counted from what was live when the window opened. `held` is a
-// large array alive throughout, and a measurement made while it is held neither
-// sees it nor is changed by it: the same work measures the same with and without
-// it.
-fn peak_is_relative() {}.performance({
-    let alone = measure("build alone", 100, |n| filled(n, 7));
-    let held = filled(1000, 1);
-    let alongside = measure("beside a held array", 3, |n| n);
-    let with_it_held = measure("build with it held", 100, |n| filled(n, 7));
-    assert(alongside.peak_live_bytes == 0);
-    assert(alongside.allocations == 0);
-    assert(alongside.instructions == 5);
-    assert(with_it_held.peak_live_bytes == 1552);
-    assert(with_it_held.peak_live_bytes == alone.peak_live_bytes);
-    assert(with_it_held.allocations == alone.allocations);
-    assert(with_it_held.instructions == alone.instructions);
-    assert(held.count(1) == 1000);
 })

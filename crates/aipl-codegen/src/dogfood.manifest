@@ -4,21 +4,21 @@
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
 ; array-abi narrow
 ; set-abi wide
-; entry parse_test_section_header 540 str -> str?
-; entry strip_test_sections 580 str -> str
-; entry split_test_sections 579 str -> __tuple$str$str
-; entry source_loc 578 str __builtin_Span -> str
-; entry caret_block 113 str __builtin_Span str -> str
-; entry fill_or_add_sections_file 192 str #{str:str} -> unit!Error
-; entry normalize_output 503 str -> str
-; entry int_fits 439 i64 str -> bool
-; entry is_operator_name 440 str -> bool
-; entry aipl_token_scopes 475 str -> __m19__ScopeSpan[]!__m19__LexError
-; entry find_files 193 str str -> str[]!Error
-; entry companion_files 115 str -> __m25__Companion[]!str
-; entry parse_spec 536 str -> __m26__Spec!str
-; entry aipl_parse_file 398 str -> __m27__ParsedFile!__m27__ParseFailure
-; entry format_source 218 str u64 -> str!__m46__FmtError
+; entry parse_test_section_header 541 str -> str?
+; entry strip_test_sections 581 str -> str
+; entry split_test_sections 580 str -> __tuple$str$str
+; entry source_loc 579 str __builtin_Span -> str
+; entry caret_block 114 str __builtin_Span str -> str
+; entry fill_or_add_sections_file 193 str #{str:str} -> unit!Error
+; entry normalize_output 504 str -> str
+; entry int_fits 440 i64 str -> bool
+; entry is_operator_name 441 str -> bool
+; entry aipl_token_scopes 476 str -> __m19__ScopeSpan[]!__m19__LexError
+; entry find_files 194 str str -> str[]!Error
+; entry companion_files 116 str -> __m25__Companion[]!str
+; entry parse_spec 537 str -> __m26__Spec!str
+; entry aipl_parse_file 399 str -> __m27__ParsedFile!__m27__ParseFailure
+; entry format_source 219 str u64 -> str!__m46__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
 ; struct __m19__ScopeSpan 40 span@0:__builtin_Span scope@16:str
@@ -331,4 +331,4 @@
 ; data 201 __tostr_lit_94 52427261636b6574
 
 ; __m48____test$all$is_nine
-; source-fingerprint 8521389443302555437
+; source-fingerprint 15857570150658400727

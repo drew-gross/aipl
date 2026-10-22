@@ -9,8 +9,7 @@ import {
     equal as ==,
     grid_get,
     less_than as <,
-    value_or,
-    with,
+    try_set,
     wrapping_add as +,
     wrapping_mul as *,
 } from builtins;
@@ -19,11 +18,8 @@ import {
 # when either is off the grid.
 pub fn grid_try_set<T: any>(self: Grid<T>, row: u64, column: u64, value: T) -> Grid<T> {
     if (column < self.width) {
-        // `try_set` is lowered before an AIPL builtin's body is added to the program,
-        // so the fused shape is written out.
         let at = row * self.width + column;
-        let cells = self.cells.with(at, value).value_or(self.cells); #[allow]
-        Grid { width: self.width, cells }
+        Grid { width: self.width, cells: self.cells.try_set(at, value) }
     } else {
         self
     }

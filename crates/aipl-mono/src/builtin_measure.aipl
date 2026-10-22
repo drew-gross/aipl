@@ -22,10 +22,13 @@
 import {
     Measurement,
     equal as ==,
+    len,
+    less_than as <,
     measure_begin,
     measure_consume,
     measure_end,
     measure_read,
+    repeat,
 } from builtins;
 
 # What `f(input)` cost, counted from just before it starts to just after its
@@ -77,4 +80,21 @@ pub fn measure<T: any, R: any>(label: str, input: T, f: (T) -> R) !measure -> Me
     assert(peak_live_bytes == 0);
     // Exactly the cost of measuring: the call and the release, nothing else.
     assert(instructions == 5);
+
+    // The peak is counted from what was live when the window opened. A large
+    // array held across a measurement neither shows in it nor changes it: the
+    // same work measures the same with and without it.
+    let hundred: u64 = 100;
+    let alone = measure("build alone", hundred, |n| [7].repeat(n));
+    let held = [1].repeat(1000);
+    let alongside = measure("beside a held array", 3, |n| n);
+    let with_it_held = measure("build with it held", hundred, |n| [7].repeat(n));
+    assert(0 < alone.peak_live_bytes);
+    assert(alongside.peak_live_bytes == 0);
+    assert(alongside.allocations == 0);
+    assert(alongside.instructions == 5);
+    assert(with_it_held.peak_live_bytes == alone.peak_live_bytes);
+    assert(with_it_held.allocations == alone.allocations);
+    assert(with_it_held.instructions == alone.instructions);
+    assert(held.len() == 1000);
 })

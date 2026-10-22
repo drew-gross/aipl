@@ -34,6 +34,7 @@ pub fn left_fold<T: any, A: any>(self: T[], init: A, f: (A, T) -> A) -> A {
     assert(["a", "b", "c"].left_fold("", |acc, s| acc +++ s) == "abc");
     // The accumulator type need not match the element type.
     assert(['x', 'y'].left_fold(0, |acc, c| acc + 1) == 2);
+    assert("hey".left_fold(0, |acc, c| acc + 1) == 3); // a str receiver folds its chars
     assert([1, 2, 3].left_fold(0, add) == 6); // a named combiner, no lambda
     // Empty (a typed empty from `filter`) folds to its init untouched.
     assert([1, 2].filter(is_big).left_fold(5, add) == 5);

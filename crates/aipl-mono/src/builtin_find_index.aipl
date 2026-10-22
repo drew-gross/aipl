@@ -17,7 +17,15 @@
 # a builtin's own source, which panics the compiler for every program that
 # reaches it.
 
-import { equal as ==, filter, greater_than as >, logical_not as ! } from builtins;
+import {
+    equal as ==,
+    filter,
+    greater_than as >,
+    is_some_and,
+    len,
+    less_than as <,
+    logical_not as !,
+} from builtins;
 
 # The position of the first element of `self` satisfying `pred`, or `none` when
 # none does, stopping at the first match. A `str` receiver iterates its chars,
@@ -60,4 +68,19 @@ pub fn find_index<T: any>(self: T[], pred: (T) -> bool) -> u64? {
     assert([1, 5, 9].find_index(|x| x > limit) == some(1)); // a captured bound
     // `none` on an empty array (a typed empty from `filter`).
     assert([1, 2].filter(is_nine).find_index(|x| x == 99) == none);
+
+    // A found position indexes the array it came from, so it is always in range.
+    let xs = [4, 5, 6];
+    assert(xs.find_index(|x| x == 6).is_some_and(|i| i < xs.len()));
+
+    // ... and a parallel array, which is the shape the builtin exists for.
+    fn value_for(keys: str[], vals: i64[], k: str) -> i64? {
+        match (keys.find_index(|key| key == k)) {
+            some(i) => vals[i],
+            none => none,
+        }
+    }
+    let keys = ["a", "b", "c"];
+    assert(value_for(keys, [10, 20, 30], "b") == some(20));
+    assert(value_for(keys, [10, 20, 30], "z") == none);
 })

@@ -81,6 +81,11 @@ pub fn opt_left_fold<T: any, A: any>(self: T[], init: A, f: (A, T) -> A?) -> A? 
     assert(['1', '2', '7'].opt_left_fold(0, |acc, c| some(acc * 10 + c.to_digit()?)) == some(127));
     assert(['1', 'x'].opt_left_fold(0, |acc, c| some(acc * 10 + c.to_digit()?)) == none);
 
+    // A `str` receiver folds its chars, so a digit run parses straight from text.
+    assert("127".opt_left_fold(0, |acc, c| some(acc * 10 + c.to_digit()?)) == some(127));
+    assert("12a3".opt_left_fold(0, |acc, c| some(acc * 10 + c.to_digit()?)) == none);
+    assert("".opt_left_fold(0, |acc, c| some(acc * 10 + c.to_digit()?)) == some(0));
+
     let bump = 10;
     assert([1, 2].opt_left_fold(0, |acc, x| some(acc + x + bump)) == some(23)); // a capture
 })

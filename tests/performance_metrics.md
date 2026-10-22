@@ -129,7 +129,6 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/builtins/reverse | 7 | 403 | 208 | 806 | 2940 | 3.00 | 82.82 | 1456 |
 | cases/builtins/span | 6 | 136 | 136 | 454 | 2284 | 8.00 | 80.68 | 1504 |
 | cases/builtins/user_fn_shadows_builtin | 0 | 0 | 0 | 28 | 176 | 2.00 | 77.51 | 1440 |
-| cases/builtins/value_or | 0 | 0 | 0 | 129 | 612 | 2.00 | 83.93 | 1456 |
 | cases/chars/char_at_out_of_bounds | 0 | 0 | 0 | 87 | 424 | 2.00 | 82.68 | 1456 |
 | cases/chars/char_equality | 0 | 0 | 0 | 91 | 464 | 2.00 | 85.96 | 1456 |
 | cases/chars/char_inequality | 0 | 0 | 0 | 95 | 472 | 2.00 | 83.11 | 1440 |
@@ -273,17 +272,13 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/kwargs/mutating_method | 3 | 81 | 97 | 330 | 1504 | 5.00 | 80.08 | 1504 |
 | cases/kwargs/omittable | 57 | 3386 | 3386 | 1448 | 3728 | 26.00 | 81.46 | 1488 |
 | cases/kwargs/omittable_forward | 32 | 1684 | 1684 | 855 | 1712 | 18.00 | 81.51 | 1504 |
-| cases/lambdas/all | 1 | 32 | 32 | 1092 | 2988 | 2.00 | 148.14 | 1472 |
-| cases/lambdas/any | 1 | 32 | 32 | 942 | 3388 | 3.00 | 102.38 | 1472 |
 | cases/lambdas/builtin_filter | 9 | 640 | 640 | 3110 | 5672 | 5.00 | 84.14 | 1488 |
 | cases/lambdas/builtin_map | 10 | 411 | 443 | 1717 | 3612 | 6.00 | 84.11 | 1504 |
 | cases/lambdas/capture_heap_and_fold | 6 | 346 | 370 | 535 | 1804 | 5.00 | 80.83 | 1472 |
+| cases/lambdas/cons_list_folds | 15 | 840 | 448 | 1872 | 3700 | 9.00 | 212.80 | 1472 |
 | cases/lambdas/filter_in_place | 6 | 448 | 448 | 2425 | 5392 | 5.00 | 86.89 | 1488 |
 | cases/lambdas/filter_map | 28 | 1714 | 936 | 6623 | 9876 | 8.00 | 97.26 | 1504 |
-| cases/lambdas/find_if | 1 | 32 | 32 | 1141 | 3876 | 3.00 | 86.15 | 1456 |
-| cases/lambdas/find_index | 2 | 136 | 136 | 2110 | 6684 | 4.00 | 183.85 | 1488 |
 | cases/lambdas/fn_ref_shadowing | 1 | 40 | 40 | 425 | 1176 | 2.00 | 76.21 | 1440 |
-| cases/lambdas/fold | 4 | 312 | 312 | 1468 | 3560 | 4.00 | 135.60 | 1472 |
 | cases/lambdas/generic_fn_as_value | 12 | 566 | 622 | 3539 | 9860 | 13.00 | 136.48 | 1520 |
 | cases/lambdas/map_capture | 2 | 128 | 128 | 660 | 1364 | 3.00 | 78.13 | 1472 |
 | cases/lambdas/map_empty | 1 | 24 | 24 | 774 | 3184 | 2.00 | 79.24 | 1472 |
@@ -294,11 +289,8 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/lambdas/named_fn_args | 10 | 435 | 363 | 1863 | 4152 | 7.00 | 84.53 | 1504 |
 | cases/lambdas/operator_as_value | 2 | 34 | 34 | 71 | 492 | 5.00 | 78.11 | 1488 |
 | cases/lambdas/operator_as_value_custom | 1 | 20 | 20 | 39 | 368 | 3.00 | 78.42 | 1472 |
-| cases/lambdas/opt_fold | 3 | 280 | 280 | 2394 | 3848 | 4.00 | 133.97 | 1472 |
-| cases/lambdas/opt_right_fold | 13 | 952 | 840 | 2802 | 5548 | 6.00 | 135.16 | 1472 |
 | cases/lambdas/pass_onward | 1 | 64 | 64 | 619 | 1372 | 4.00 | 79.07 | 1456 |
 | cases/lambdas/recursive_hof | 0 | 0 | 0 | 62 | 252 | 2.00 | 78.37 | 1440 |
-| cases/lambdas/right_fold | 17 | 1288 | 1288 | 2316 | 5344 | 5.00 | 137.90 | 1472 |
 | cases/lambdas/try_error_inferred | 3 | 150 | 182 | 1444 | 7492 | 9.00 | 91.84 | 1536 |
 | cases/lambdas/two_lambda_args | 4 | 210 | 210 | 421 | 2188 | 3.00 | 90.26 | 1472 |
 | cases/lambdas/value_lambda_inferred | 0 | 0 | 0 | 3 | 8 | 0.00 | 82.08 | 1408 |
@@ -542,7 +534,6 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/strings/int_to_str/basic | 4 | 140 | 140 | 108 | 684 | 6.00 | 78.59 | 1488 |
 | cases/strings/int_to_str/method_form | 2 | 36 | 36 | 69 | 460 | 5.00 | 76.51 | 1488 |
 | cases/strings/int_to_str/negatives | 3 | 89 | 89 | 98 | 592 | 6.00 | 77.79 | 1504 |
-| cases/strings/is_all_whitespace | 0 | 0 | 0 | 1273 | 996 | 1.00 | 122.38 | 1440 |
 | cases/strings/join | 13 | 825 | 591 | 552 | 2936 | 4.00 | 82.31 | 1456 |
 | cases/strings/join_empty | 13 | 504 | 387 | 1017 | 5268 | 12.00 | 83.38 | 1504 |
 | cases/strings/join_gap_separators | 10 | 720 | 681 | 958 | 2204 | 7.00 | 135.28 | 1520 |
@@ -749,7 +740,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_extend_optional | 5 | 256 | 256 | 1732 | 5800 | 11.00 | 115.93 | 1504 |
 | crates/aipl-mono/src/builtin_filter_map_reduce | 3 | 264 | 264 | 2913 | 7480 | 12.00 | 153.87 | 1504 |
 | crates/aipl-mono/src/builtin_find_if | 2 | 112 | 112 | 1554 | 5348 | 13.00 | 126.51 | 1504 |
-| crates/aipl-mono/src/builtin_find_index | 2 | 112 | 112 | 1690 | 5468 | 10.00 | 121.11 | 1504 |
+| crates/aipl-mono/src/builtin_find_index | 3 | 216 | 216 | 2248 | 7244 | 8.00 | 133.15 | 1488 |
 | crates/aipl-mono/src/builtin_find_map | 0 | 0 | 0 | 602 | 1812 | 6.00 | 114.15 | 1472 |
 | crates/aipl-mono/src/builtin_first | 1 | 80 | 80 | 360 | 1584 | 7.00 | 115.54 | 1472 |
 | crates/aipl-mono/src/builtin_grid_from | 0 | 0 | 0 | 586 | 1376 | 4.00 | 135.63 | 1456 |
@@ -768,7 +759,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_join_is_empty | 10 | 872 | 872 | 2648 | 6136 | 8.00 | 134.73 | 1488 |
 | crates/aipl-mono/src/builtin_join_is_nonempty | 18 | 1560 | 1560 | 6169 | 10292 | 13.00 | 139.05 | 1504 |
 | crates/aipl-mono/src/builtin_last | 1 | 80 | 80 | 420 | 1680 | 7.00 | 110.31 | 1472 |
-| crates/aipl-mono/src/builtin_left_fold | 4 | 312 | 312 | 1291 | 3296 | 7.00 | 123.91 | 1472 |
+| crates/aipl-mono/src/builtin_left_fold | 4 | 312 | 312 | 1499 | 3564 | 10.00 | 119.52 | 1488 |
 | crates/aipl-mono/src/builtin_map_err | 0 | 0 | 0 | 2763 | 12544 | 8.00 | 143.58 | 1472 |
 | crates/aipl-mono/src/builtin_map_find_if | 0 | 0 | 0 | 938 | 2952 | 5.00 | 116.20 | 1456 |
 | crates/aipl-mono/src/builtin_map_join | 24 | 921 | 624 | 5309 | 13524 | 22.00 | 144.59 | 1504 |
@@ -777,7 +768,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_measure | 0 | 0 | 0 | 86 | 424 | 3.00 | 110.86 | 1456 |
 | crates/aipl-mono/src/builtin_nonempty_first | 1 | 56 | 56 | 320 | 1472 | 6.00 | 110.06 | 1472 |
 | crates/aipl-mono/src/builtin_nonempty_last | 1 | 56 | 56 | 376 | 1548 | 8.00 | 105.03 | 1456 |
-| crates/aipl-mono/src/builtin_opt_left_fold | 4 | 312 | 312 | 2449 | 5584 | 11.00 | 133.37 | 1504 |
+| crates/aipl-mono/src/builtin_opt_left_fold | 4 | 312 | 312 | 3268 | 7156 | 12.00 | 144.70 | 1488 |
 | crates/aipl-mono/src/builtin_opt_right_fold | 4 | 312 | 312 | 2609 | 5604 | 11.00 | 136.94 | 1520 |
 | crates/aipl-mono/src/builtin_range | 2 | 120 | 120 | 788 | 2152 | 7.00 | 112.30 | 1472 |
 | crates/aipl-mono/src/builtin_reduce | 3 | 240 | 240 | 3185 | 5708 | 10.00 | 139.46 | 1504 |

@@ -113,13 +113,17 @@ Grep the repo for the shape the builtin replaces and convert the real sites —
 starting with `crates/**/*.aipl`, which is compiler source. This is the honest
 test of the signature (`find_prec` in `crates/aipl-codegen/src/parse.aipl` was
 the shape that motivated `find_if`, and converting it proved the lambda captured
-two outer bindings fine). Add a `tests/cases/` case for the builtin as user code
-too — `tests/cases/lambdas/<name>.aipl` for a higher-order one.
+two outer bindings fine). The builtin's own `.test` block is already a test as
+user code — the file is checked like any other — so it needs no duplicate in
+`tests/cases/`. A case is for what the file cannot hold: how the builtin
+interacts with something else (a fusion, a lint, a `shim`), or output a `main`
+prints.
 
 Expect the conversion to show up as a small instruction-count shift in every
-case that transitively compiles the converted file. Handoff lists those as moved
-baseline rows and exits 1: review them, then accept with the command it prints.
-That is the expected cost of the conversion, not a regression.
+case that transitively compiles the converted file. Handoff refreshes those
+baseline rows itself and lists them in its closing report: review them in the
+diff of `tests/performance_metrics.md`. That is the expected cost of the
+conversion, not a regression.
 
 ## 4. Lint against ad-hoc reimplementations
 
@@ -209,7 +213,7 @@ reaching it if the span turns out to be unsquelchable.
 ## 5. Finish
 
 `cargo handoff`, once, at the end. Expect it to regenerate the case `#[test]`
-list and add a baseline row for each new case. If it exits 1 listing moved
-baseline rows, review them (a builtin that was meant to be free should not move
-them), then accept with the command it prints. Confirm no `--- stdout ---` or
-error *message* body moved.
+list and add a baseline row for each new case, and refresh any row that moved.
+Review the moved rows in its closing report (a builtin that was meant to be free
+should not move them), and confirm no `--- stdout ---` or error *message* body
+moved.
