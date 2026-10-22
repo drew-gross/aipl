@@ -20,17 +20,12 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use aipl_index::{Index, Symbol, SymbolKind};
-use aipl_syntax::{DebugOptions, Error, Span};
+use aipl_index::SymbolKind;
+use aipl_syntax::{DebugOptions, Error};
 use serde_json::{json, Value};
 
+use crate::analysis::Analyses;
 use crate::text::{path_to_uri, uri_to_path, LineIndex};
-
-/// The lexer scope every identifier token carries — the rule in
-/// `lex_aipl.aipl` that matches a name. Turning a cursor position into a name
-/// is a lexical question, so it is asked of the lexer rather than re-derived
-/// from character classes here. `identifier_scope_is_current` pins it.
-const IDENTIFIER_SCOPE: &str = "variable.other.aipl";
 
 /// One open document, as the editor last told us it reads.
 struct Document {
@@ -63,6 +58,9 @@ pub struct Reaction {
 #[derive(Default)]
 pub struct Server {
     documents: HashMap<String, Document>,
+    /// What has been worked out about files, so a request about text it has seen
+    /// does not do that work again.
+    analyses: Analyses,
 }
 
 impl Server {
@@ -185,14 +183,15 @@ impl Server {
         document.version = params["textDocument"]["version"].as_i64();
     }
 
-    fn definition(&self, params: &Value) -> Value {
-        let Some((path, text, offset)) = self.locate(params) else {
+    fn definition(&mut self, params: &Value) -> Value {
+        let Some((path, text, offset)) = locate(&self.documents, params) else {
             return Value::Null;
         };
-        let Some((name, _)) = name_at(text, offset) else {
+        let Some((name, _)) = self.analyses.identifier_at(path, text, offset) else {
             return Value::Null;
         };
-        let Some(found) = self.resolve(path, text, &name, offset) else {
+        let read = |imported: &Path| source_in(&self.documents, imported);
+        let Some(found) = self.analyses.resolve(path, text, &name, offset, &read) else {
             return Value::Null;
         };
         // A builtin the compiler expands itself is described but not written
@@ -210,14 +209,15 @@ impl Server {
         })
     }
 
-    fn hover(&self, params: &Value) -> Value {
-        let Some((path, text, offset)) = self.locate(params) else {
+    fn hover(&mut self, params: &Value) -> Value {
+        let Some((path, text, offset)) = locate(&self.documents, params) else {
             return Value::Null;
         };
-        let Some((name, span)) = name_at(text, offset) else {
+        let Some((name, span)) = self.analyses.identifier_at(path, text, offset) else {
             return Value::Null;
         };
-        let Some(found) = self.resolve(path, text, &name, offset) else {
+        let read = |imported: &Path| source_in(&self.documents, imported);
+        let Some(found) = self.analyses.resolve(path, text, &name, offset, &read) else {
             return Value::Null;
         };
         let symbol = &found.symbol;
@@ -245,21 +245,19 @@ impl Server {
 
     /// The document outline: every top-level declaration in source order, with
     /// a `variant`'s cases nested under it.
-    fn document_symbols(&self, params: &Value) -> Value {
-        let Some((path, text, _)) = self.locate_document(params) else {
+    fn document_symbols(&mut self, params: &Value) -> Value {
+        let Some((path, text, _)) = locate_document(&self.documents, params) else {
             return Value::Null;
         };
-        let mut index = Index::new();
-        if index.add(path, text).is_err() {
-            // A document mid-edit does not parse for most of the time anyone
-            // is looking at it. An empty outline is the honest answer; the
-            // alternative is an error popup per keystroke.
-            return json!([]);
-        }
-        let Some(file) = index.file(path) else {
+        // A document mid-edit does not parse for most of the time anyone is
+        // looking at it, so this is the outline of the last text that did —
+        // laid out against that text — rather than an empty one that flickers
+        // in and out as you type. No parse yet at all is an empty outline: the
+        // alternative is an error popup per keystroke.
+        let Some((file, indexed)) = self.analyses.file(path, text) else {
             return json!([]);
         };
-        let lines = LineIndex::new(text);
+        let lines = LineIndex::new(indexed);
         let mut outline: Vec<Value> = Vec::new();
         for symbol in file.outline() {
             let range = lines.range(&symbol.name_span);
@@ -295,7 +293,7 @@ impl Server {
     /// client's own settings: tab size and insert-spaces arrive in `options`
     /// and are ignored, exactly as the formatter ignores them.
     fn formatting(&self, params: &Value) -> Value {
-        let Some((_, text, _)) = self.locate_document(params) else {
+        let Some((_, text, _)) = locate_document(&self.documents, params) else {
             return Value::Null;
         };
         let Ok(formatted) = aipl_fmt::format_source(text, &aipl_fmt::FmtOptions::default()) else {
@@ -315,131 +313,45 @@ impl Server {
             "newText": formatted,
         }])
     }
-
-    /// The document a request names, and the byte offset of its `position`.
-    fn locate(&self, params: &Value) -> Option<(&Path, &str, usize)> {
-        let (path, text, _) = self.locate_document(params)?;
-        let position = &params["position"];
-        let line = position["line"].as_u64()? as u32;
-        let character = position["character"].as_u64()? as u32;
-        Some((path, text, LineIndex::new(text).offset(line, character)))
-    }
-
-    /// The document a request names. The third element is always 0 — it is
-    /// there so this shares a shape with [`Server::locate`] and the callers
-    /// that want no position can ignore it.
-    fn locate_document(&self, params: &Value) -> Option<(&Path, &str, usize)> {
-        let document = self
-            .documents
-            .get(uri_of(&params["textDocument"]).as_str())?;
-        Some((document.path.as_deref()?, document.text.as_str(), 0))
-    }
-
-    /// Where `name` is declared, as the file at `path` sees it: the declaration,
-    /// and — when it is written somewhere — the defining file and its source
-    /// (which the caller needs to turn the declaration's span into a range).
-    ///
-    /// A name imported `from builtins` resolves to the builtin. So does the
-    /// builtin's own name in the import list when the cursor (`offset`) is in
-    /// that import: `equal` in `equal as ==` is not a name the file binds, but
-    /// it is what the author is pointing at.
-    fn resolve(&self, path: &Path, text: &str, name: &str, offset: usize) -> Option<Resolved> {
-        let (index, sources) = self.index_with_imports(path, text);
-        let file = index.file(path)?;
-        if let Some((target, symbol)) = index.definition_of(file, name) {
-            let source = sources.get(target)?;
-            return Some(Resolved {
-                symbol: symbol.clone(),
-                file: Some((target.to_path_buf(), source.clone())),
-                builtin: false,
-            });
-        }
-        let builtin_name = match file.import_of(name) {
-            Some(import) if import.from.is_none() => &import.name,
-            Some(_) => return None,
-            None => {
-                &file
-                    .imports
-                    .iter()
-                    .find(|i| i.from.is_none() && i.name == name && i.span.contains(&offset))?
-                    .name
-            }
-        };
-        let found = aipl_index::builtin(builtin_name)?;
-        Some(Resolved {
-            symbol: found.symbol,
-            file: found.file,
-            builtin: true,
-        })
-    }
-
-    /// Index the document and every file it imports directly, so a lookup can
-    /// cross a file boundary.
-    ///
-    /// Only the direct imports: a name this file can refer to is declared
-    /// either here or in a file it imports, and nothing further out is
-    /// reachable — `import .. as` is the whole namespace, so there is no
-    /// transitive re-export to follow.
-    ///
-    /// Each imported file is keyed by the path the import spells, relative to
-    /// this file's directory, because that is the key `definition_of` looks it
-    /// up under.
-    fn index_with_imports(&self, path: &Path, text: &str) -> (Index, HashMap<PathBuf, String>) {
-        let mut index = Index::new();
-        let mut sources = HashMap::new();
-        if index.add(path, text).is_err() {
-            return (index, sources);
-        }
-        sources.insert(path.to_path_buf(), text.to_string());
-        let directory = path.parent().unwrap_or(Path::new("")).to_path_buf();
-        let Some(file) = index.file(path) else {
-            return (index, sources);
-        };
-        let targets: Vec<PathBuf> = file
-            .imports
-            .iter()
-            .filter_map(|import| import.from.as_ref())
-            .map(|from| directory.join(from))
-            .collect();
-        for target in targets {
-            if sources.contains_key(&target) {
-                continue;
-            }
-            let Some(source) = self.source_of(&target) else {
-                continue;
-            };
-            if index.add(&target, &source).is_ok() {
-                sources.insert(target, source);
-            }
-        }
-        (index, sources)
-    }
-
-    /// The current text of a file: the open buffer if there is one, otherwise
-    /// what is on disk. The buffer wins because it is what the author is
-    /// looking at — jumping to a definition they just typed and have not saved
-    /// should land on it, not where it used to be.
-    fn source_of(&self, path: &Path) -> Option<String> {
-        for document in self.documents.values() {
-            let Some(open) = &document.path else {
-                continue;
-            };
-            if same_file(open, path) {
-                return Some(document.text.clone());
-            }
-        }
-        std::fs::read_to_string(path).ok()
-    }
 }
 
-/// What a name resolved to — see [`Server::resolve`].
-struct Resolved {
-    symbol: Symbol,
-    /// The file that declares it, and that file's source. `None` for a builtin
-    /// that is described but not written anywhere.
-    file: Option<(PathBuf, String)>,
-    /// Whether it is a builtin rather than something a program declares.
-    builtin: bool,
+/// The document a request names, and the byte offset of its `position`.
+fn locate<'a>(
+    documents: &'a HashMap<String, Document>,
+    params: &Value,
+) -> Option<(&'a Path, &'a str, usize)> {
+    let (path, text, _) = locate_document(documents, params)?;
+    let position = &params["position"];
+    let line = position["line"].as_u64()? as u32;
+    let character = position["character"].as_u64()? as u32;
+    Some((path, text, LineIndex::new(text).offset(line, character)))
+}
+
+/// The document a request names. The third element is always 0 — it is there so
+/// this shares a shape with [`locate`] and the callers that want no position can
+/// ignore it.
+fn locate_document<'a>(
+    documents: &'a HashMap<String, Document>,
+    params: &Value,
+) -> Option<(&'a Path, &'a str, usize)> {
+    let document = documents.get(uri_of(&params["textDocument"]).as_str())?;
+    Some((document.path.as_deref()?, document.text.as_str(), 0))
+}
+
+/// The current text of a file: the open buffer if there is one, otherwise what
+/// is on disk. The buffer wins because it is what the author is looking at —
+/// jumping to a definition they just typed and have not saved should land on it,
+/// not where it used to be.
+fn source_in(documents: &HashMap<String, Document>, path: &Path) -> Option<String> {
+    for document in documents.values() {
+        let Some(open) = &document.path else {
+            continue;
+        };
+        if same_file(open, path) {
+            return Some(document.text.clone());
+        }
+    }
+    std::fs::read_to_string(path).ok()
 }
 
 /// A path with its `.` components and symlinks resolved, or unchanged when it
@@ -615,25 +527,6 @@ fn diagnostic(lines: &LineIndex, error: &Error) -> Value {
             }))
             .collect::<Vec<_>>(),
     })
-}
-
-/// The identifier token at `offset`, with its span.
-///
-/// A cursor sitting immediately after a name counts as being in it — that is
-/// where it lands when you double-click a word and then invoke a command, and
-/// treating it as "between two tokens" would answer nothing for the commonest
-/// gesture there is.
-fn name_at(text: &str, offset: usize) -> Option<(String, Span)> {
-    let tokens = aipl_parser::token_scopes(text).ok()?;
-    let identifiers = || {
-        tokens
-            .iter()
-            .filter(|token| token.scope == IDENTIFIER_SCOPE)
-    };
-    let found = identifiers()
-        .find(|token| token.span.contains(&offset))
-        .or_else(|| identifiers().find(|token| token.span.end == offset))?;
-    Some((text[found.span.clone()].to_string(), found.span.clone()))
 }
 
 /// An AIPL declaration as one of the kinds the protocol defines, which is what

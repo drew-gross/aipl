@@ -14,6 +14,7 @@
 //! |---|---|
 //! | [`jsonrpc`] | the base protocol: `Content-Length`-framed JSON |
 //! | [`text`] | byte offsets ↔ line/character, paths ↔ `file://` URIs |
+//! | `analysis` | what has been worked out about each file, kept between requests |
 //! | [`server`] | the requests, and the open documents they are answered against |
 //! | [`serve_stdio`] | the loop that wires those to a pipe, and the diagnostics worker |
 //!
@@ -23,8 +24,13 @@
 //!
 //! # Why diagnostics get a thread
 //!
-//! Answering "where is this defined" costs one parse of one file — under a
-//! millisecond — so it happens on the reading thread while the editor waits.
+//! Answering "where is this defined" costs one lex and one parse of one file —
+//! about half a second for `grammar_aipl.aipl` (5,600 lines), a few
+//! milliseconds for a typical one — so it happens on the reading thread while
+//! the editor waits, and only once per distinct text: `analysis` remembers what
+//! it worked out, so hover, definition and the outline of text that has not
+//! changed since the last answer cost nothing.
+//!
 //! Type-checking costs the compiler's whole frontend over the import tree,
 //! which on a file the size of `walker.aipl` (5200 lines) was measured at
 //! **11 seconds**. That is too much to pay per keystroke and far too much to
@@ -42,6 +48,7 @@
 //! error comes back from the loader immediately — so the slow path is the one
 //! that runs when the program is already well-formed.
 
+mod analysis;
 pub mod jsonrpc;
 pub mod server;
 pub mod text;

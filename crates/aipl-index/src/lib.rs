@@ -198,6 +198,13 @@ impl Index {
         Ok(())
     }
 
+    /// Put an already-indexed file under its own path, replacing any previous
+    /// index for it. [`Index::add`] without the parse, for a caller that keeps
+    /// the [`FileIndex`]es it has built and so does not pay for one twice.
+    pub fn insert(&mut self, file: FileIndex) {
+        self.files.insert(file.path.clone(), file);
+    }
+
     pub fn file(&self, path: impl AsRef<Path>) -> Option<&FileIndex> {
         self.files.get(path.as_ref())
     }

@@ -327,6 +327,119 @@ fn hover_documents_every_kind_of_builtin() {
     );
 }
 
+fn change(server: &mut Server, uri: &str, version: i64, text: &str) {
+    notify(
+        server,
+        "textDocument/didChange",
+        json!({
+            "textDocument": { "uri": uri, "version": version },
+            "contentChanges": [{ "text": text }],
+        }),
+    );
+}
+
+fn symbol_names(server: &mut Server, uri: &str) -> Vec<String> {
+    request(
+        server,
+        "textDocument/documentSymbol",
+        json!({ "textDocument": { "uri": uri } }),
+    )
+    .as_array()
+    .expect("an outline")
+    .iter()
+    .map(|node| node["name"].as_str().expect("a name").to_string())
+    .collect()
+}
+
+/// While a buffer is being typed in it does not parse, and the outline would
+/// otherwise empty and refill with every keystroke. It keeps showing the last
+/// text that did parse.
+#[test]
+fn the_outline_survives_an_edit_that_does_not_parse() {
+    let source = "fn first() {}\nfn second() {}\n";
+    let workspace = Workspace::new("outline-broken", &[("main.aipl", source)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    assert_eq!(symbol_names(&mut server, &uri), ["first", "second"]);
+
+    change(
+        &mut server,
+        &uri,
+        2,
+        "fn first() {}\nfn second() {}\nfn third(",
+    );
+    assert_eq!(
+        symbol_names(&mut server, &uri),
+        ["first", "second"],
+        "the last good outline, not an empty one"
+    );
+
+    change(
+        &mut server,
+        &uri,
+        3,
+        "fn first() {}\nfn second() {}\nfn third() {}\n",
+    );
+    assert_eq!(
+        symbol_names(&mut server, &uri),
+        ["first", "second", "third"],
+        "and a text that parses again replaces it"
+    );
+}
+
+/// The name under the cursor is read from the text as it is now, and what it
+/// resolves to from the last text that parsed — so a definition one line above
+/// the break still answers.
+#[test]
+fn a_definition_still_resolves_while_the_buffer_does_not_parse() {
+    let workspace = Workspace::new(
+        "definition-broken",
+        &[("main.aipl", ROOT), ("util.aipl", UTIL)],
+    );
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let target = definition_at(&mut server, &uri, cursor_on(ROOT, "add(2, 3)"));
+    assert_eq!(target["uri"], json!(workspace.uri("util.aipl")));
+
+    let broken = format!("{ROOT}\nfn unfinished(");
+    change(&mut server, &uri, 2, &broken);
+    assert_eq!(
+        definition_at(&mut server, &uri, cursor_on(&broken, "add(2, 3)")),
+        target
+    );
+}
+
+/// An answer is remembered per text, so every way the text can change has to
+/// show up in the next one.
+#[test]
+fn an_edit_to_either_file_changes_the_next_answer() {
+    let workspace = Workspace::new(
+        "definition-reindexed",
+        &[("main.aipl", ROOT), ("util.aipl", UTIL)],
+    );
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let before = definition_at(&mut server, &uri, cursor_on(ROOT, "add(2, 3)"));
+    assert_eq!(
+        before["range"]["start"],
+        cursor_on(UTIL, "add(a: i64"),
+        "the declaration in util.aipl"
+    );
+
+    // The imported file changes on disk, shifting the declaration down.
+    let shifted = format!("# One more line.\n{UTIL}");
+    fs::write(workspace.path("util.aipl"), &shifted).expect("write util");
+    let after = definition_at(&mut server, &uri, cursor_on(ROOT, "add(2, 3)"));
+    assert_eq!(after["range"]["start"], cursor_on(&shifted, "add(a: i64"));
+
+    // The importing buffer changes: its own declaration now wins.
+    let own = format!("fn add(a: i64) -> i64 {{ a }}\n{ROOT}");
+    change(&mut server, &uri, 2, &own);
+    let local = definition_at(&mut server, &uri, cursor_on(&own, "add(2, 3)"));
+    assert_eq!(local["uri"], json!(uri));
+    assert_eq!(local["range"]["start"], cursor_on(&own, "add(a: i64"));
+}
+
 #[test]
 fn the_outline_nests_cases_under_their_variant() {
     let source = "variant Shape = Circle(i64) | Point | Rect(i64, i64)\n\
