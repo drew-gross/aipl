@@ -732,6 +732,7 @@ check:
   can for sure recover from format errors
 
 tests:
+  make a better way to test non-aipl-implemented builtins
   make tests unable to write files, using shimming
   make tests leverage better parallelism and caching by using more files
   make ? in tests a _desugaring_ that happens earlier than codegen, then this inlining restriction can also be lifted
@@ -757,6 +758,7 @@ vscode:
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 
 handoff:
+  maybe: fewer executables per case (reuse instrumented, or test behaviour in JIT). Need to decide if I actually want this.
   handoff should be able to regenerated staged ir artifacts on it's own without a two-stage approach
   auto-fix unused imports
   do a better job of showing failures when a non-auto-fixable failure is found

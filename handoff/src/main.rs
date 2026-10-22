@@ -8,6 +8,12 @@
 //!
 //! # Order & why
 //!
+//! 0. Startup. Clears nextest listing processes orphaned by an interrupted run,
+//!    refuses to start over a staged IR artifact left by one, and reports the
+//!    process chain the gate runs under — warning when it does not start from an
+//!    application, since the suite links and runs two binaries per case and
+//!    macOS assesses each new one serially unless the chain starts from a
+//!    terminal exempted under Developer Tools (see [`machine::ancestry`]).
 //! 1. `cargo fmt` (Rust), then a build, then the `format_corpus` helper (every
 //!    checked-in `.aipl`), then a compile check. Formatting is cheap and
 //!    *span-shifting*, so doing it ahead of the test runs means a
@@ -427,6 +433,23 @@ fn handoff() -> ! {
             "{DIM}(cleared {} orphaned nextest listing process(es) from an interrupted run){OFF}",
             orphans.len()
         );
+    }
+
+    // The process chain this gate runs under. Every case links and runs two
+    // binaries, and macOS assesses a new binary one at a time unless the chain
+    // starts from an application exempted under Developer Tools (the terminal
+    // you added). A chain that does not slows the gate without making it wrong,
+    // so it is reported and the run goes on.
+    if cfg!(target_os = "macos") {
+        if let Some(chain) = machine::ancestry(std::process::id()) {
+            match machine::chain_warning(&chain) {
+                Some(warning) => eprintln!("{BOLD}! slow launches{OFF}\n  {warning}\n"),
+                None => eprintln!(
+                    "{DIM}(running under {}){OFF}",
+                    machine::render_chain(&chain)
+                ),
+            }
+        }
     }
 
     // A leftover staged artifact means a previous IR workflow was interrupted; a
