@@ -1,9 +1,8 @@
-# The AIPL implementation of the `find_if` builtin. Monomorphization registers
-# this function under the canonical name `__builtin_find_if` (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.find_if(pred)` resolves
-# through the ordinary generic / higher-order machinery — the in-file name
-# `find_if` is only for this file's own tests, which read exactly like user
-# code.
+# The AIPL implementation of the `find_if` builtin. The loader names this
+# function by the canonical name `__builtin_find_if` (see
+# `aipl_syntax::aipl_builtins`), so a user's `xs.find_if(pred)` resolves through
+# the ordinary generic / higher-order machinery — the in-file name `find_if` is
+# only for this file's own tests, which read exactly like user code.
 #
 # It is `any` with the element handed back: both stop at the first element
 # satisfying `pred`, and where `any` reports only that one existed, this

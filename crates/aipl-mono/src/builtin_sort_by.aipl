@@ -1,8 +1,8 @@
-# The AIPL implementation of the `sort_by` builtin. Monomorphization registers
-# this under the canonical name `__builtin_sort_by` (see `AIPL_BUILTIN_SOURCES`
-# in `lib.rs`), so a user's `xs.sort_by(less)` resolves through the ordinary
-# generic / higher-order machinery — the in-file name `sort_by` is only for
-# this file's own tests, which read exactly like user code.
+# The AIPL implementation of the `sort_by` builtin. The loader names this
+# function by the canonical name `__builtin_sort_by` (see
+# `aipl_syntax::aipl_builtins`), so a user's `xs.sort_by(less)` resolves through
+# the ordinary generic / higher-order machinery — the in-file name `sort_by` is
+# only for this file's own tests, which read exactly like user code.
 #
 # Insertion sort: each element is spliced into the already-sorted prefix at the
 # first position it `less`-precedes, the splice being an array-literal spread —

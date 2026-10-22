@@ -1,8 +1,8 @@
 # The AIPL implementation of the `opt_left_fold` builtin: `left_fold` with a
-# fallible combiner. Monomorphization registers this function under the
-# canonical name `__builtin_opt_left_fold` (see `AIPL_BUILTIN_SOURCES` in
-# `lib.rs`), so a user's `xs.opt_left_fold(init, f)` specializes through the
-# ordinary generic / higher-order machinery.
+# fallible combiner. The loader names this function by the canonical name
+# `__builtin_opt_left_fold` (see `aipl_syntax::aipl_builtins`), so a user's
+# `xs.opt_left_fold(init, f)` specializes through the ordinary generic /
+# higher-order machinery.
 #
 # `f` is not called again once a step has failed, so the fold's *work* stops at
 # the first `none` — but the walk itself continues (AIPL has no `break`). That

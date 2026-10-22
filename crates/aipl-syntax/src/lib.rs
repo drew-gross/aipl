@@ -343,6 +343,7 @@ pub fn set_caret_block_hook(f: fn(&str, Span, &str) -> String) {
     let _ = CARET_BLOCK_HOOK.set(f);
 }
 
+pub mod aipl_builtins;
 pub mod callee;
 
 pub mod ast {
@@ -3289,9 +3290,8 @@ fn __builtin_try_set<T: any>(mut self: T[], index: u64, value: T) {}
 // `extend_optional`, `inline_str`, `measure`, `range`, `set_map`, `tuple_windows`, `union_all`,
 // `value_or`, and `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
-// which is the single source of both their body and their signature.
-// `aipl_mono::aipl_builtin_sig_decls()` feeds those signatures to the checker and
-// codegen; see `AIPL_BUILTIN_SOURCES` in aipl-mono.
+// which is the single source of both their body and their signature: the loader
+// loads each as a file of any program that reaches it. See `aipl_builtins`.
 fn __builtin_zip_with<T: any, U: any, V: any>(self: T[], other: U[], f: (T, U) -> V) -> V[] { [] }
 fn __builtin_push<T: any>(mut self: T[], x: T) {}
 // Append `other` to `self` — `push` for a whole array, and the way to grow a
@@ -3945,7 +3945,12 @@ pub fn builtin_type_canonical(name: &str) -> Option<String> {
 /// keyword-parameter / struct-field / variant-payload default expressions —
 /// pre-order.
 pub fn each_expr(program: &ast::Program, f: &mut impl FnMut(&ast::Expr)) {
-    for item in &program.items {
+    each_item_expr(&program.items, f);
+}
+
+/// [`each_expr`] over `items`, which need not make up a program.
+pub fn each_item_expr(items: &[ast::Item], f: &mut impl FnMut(&ast::Expr)) {
+    for item in items {
         match item {
             ast::Item::Fn(func) => {
                 for p in &func.sig.params {

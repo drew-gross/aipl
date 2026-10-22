@@ -1,5 +1,5 @@
-# The AIPL implementation of the `last` builtin (see `AIPL_BUILTIN_SOURCES` in
-# `lib.rs`); `first`'s mirror.
+# The AIPL implementation of the `last` builtin (see
+# `aipl_syntax::aipl_builtins`); `first`'s mirror.
 #
 # On an empty array `len() - 1` wraps, and an out-of-range index is `none` —
 # the same answer the empty case wants, by the ordinary index rule rather than

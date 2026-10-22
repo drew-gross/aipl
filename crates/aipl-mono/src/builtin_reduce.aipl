@@ -1,8 +1,8 @@
-# The AIPL implementation of the `reduce` builtin. Monomorphization registers this
-# function under the canonical name `__builtin_reduce` (see `AIPL_BUILTIN_SOURCES`
-# in `lib.rs`), so a user's `xs.reduce(step)` resolves through the ordinary
-# generic / higher-order machinery — the in-file name is only for this file's own
-# tests, which read exactly like user code.
+# The AIPL implementation of the `reduce` builtin. The loader names this
+# function by the canonical name `__builtin_reduce` (see
+# `aipl_syntax::aipl_builtins`), so a user's `xs.reduce(step)` resolves through
+# the ordinary generic / higher-order machinery — the in-file name is only for
+# this file's own tests, which read exactly like user code.
 #
 # It is the one implementation of every reduction. A builtin that reduces a
 # sequence to one value — `minimum`, `maximum` — has no body of its own: the

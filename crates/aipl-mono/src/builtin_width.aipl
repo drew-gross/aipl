@@ -1,6 +1,6 @@
-# The AIPL implementation of the `width` builtin. Monomorphization registers this
-# under the canonical name `__builtin_width` (see `AIPL_BUILTIN_SOURCES` in
-# `lib.rs`), so `grid.width()` resolves through the ordinary generic machinery.
+# The AIPL implementation of the `width` builtin. The loader names this function
+# by the canonical name `__builtin_width` (see `aipl_syntax::aipl_builtins`), so
+# `grid.width()` resolves through the ordinary generic machinery.
 
 import { Grid, equal as == } from builtins;
 

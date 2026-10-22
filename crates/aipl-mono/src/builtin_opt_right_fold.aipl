@@ -1,8 +1,7 @@
 # The AIPL implementation of the `opt_right_fold` builtin: `right_fold` with a
 # fallible combiner, and the mirror of `opt_left_fold` (see
-# `builtin_opt_left_fold.aipl`). Monomorphization registers this function under
-# the canonical name `__builtin_opt_right_fold` (see `AIPL_BUILTIN_SOURCES` in
-# `lib.rs`).
+# `builtin_opt_left_fold.aipl`). The loader names this function by the canonical
+# name `__builtin_opt_right_fold` (see `aipl_syntax::aipl_builtins`).
 #
 # Walks the indices backwards, stopping at the first `none` — AIPL has no
 # `break`, so the short-circuit lives in the `while` condition. Nothing is

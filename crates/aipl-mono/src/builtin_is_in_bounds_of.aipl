@@ -1,7 +1,7 @@
-# The AIPL implementation of the `is_in_bounds_of` builtin. Monomorphization
-# registers this under the canonical name `__builtin_is_in_bounds_of` (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so `i.is_in_bounds_of(xs)` resolves through
-# the ordinary generic machinery. A `(row, column)` pair asked about a grid is
+# The AIPL implementation of the `is_in_bounds_of` builtin. The loader names
+# this function by the canonical name `__builtin_is_in_bounds_of` (see
+# `aipl_syntax::aipl_builtins`), so `i.is_in_bounds_of(xs)` resolves through the
+# ordinary generic machinery. A `(row, column)` pair asked about a grid is
 # rewritten to `grid_is_in_bounds_of` before it gets here.
 #
 # No lint steers `i < xs.len()` to it: the two read about the same.

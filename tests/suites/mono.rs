@@ -510,3 +510,52 @@ fn empty_and_none_in_separate_any_params_get_distinct_markers() {
     );
     assert_eq!(names, vec!["h$EmptyArray$NoneLiteral$dn1", "main"]);
 }
+
+/// Every name a loaded program defines, in item order.
+fn defined_names(p: &Program) -> Vec<String> {
+    p.items
+        .iter()
+        .filter_map(|it| match it {
+            Item::Fn(f) => Some(f.name.text.clone()),
+            Item::Struct(s) => Some(s.name.text.clone()),
+            Item::Variant(v) => Some(v.name.text.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn loading_a_program_twice_names_everything_alike() {
+    // The builtins imported here are files of the program, and several hold
+    // private items of their own (a test-support struct, a helper function) whose
+    // names carry the file's index. That index is its place in the load order, so
+    // the load order has to be a function of the program: the dogfood IR is
+    // regenerated and compared as text, and a name that changed from one run to
+    // the next would make it stale every time. Each load builds its own sets,
+    // with their own seeds, so an order left to one would show up within a few.
+    aipl::install_parser_hooks();
+    let src =
+        "import { is_err_and, map_err, map_ok, sort_by, value_or, value_or_err } from builtins;
+               fn main() -> i64 {
+                   let r = ok(1);
+                   let a = r.map_err(|e| e).map_ok(|v| v);
+                   let b = r.is_err_and(|e| e);
+                   let c = value_or_err(none, \"x\");
+                   let d = sort_by([1], |x| x);
+                   value_or(none, 0)
+               }";
+    let load = || {
+        let program =
+            aipl::loader::load_program_sources(&[("./main.aipl", src)], DebugOptions::OFF)
+                .expect("load");
+        defined_names(&program)
+    };
+    let first = load();
+    assert!(
+        first.iter().any(|n| n.contains("LexError")),
+        "this test needs builtin files with private items; got {first:?}"
+    );
+    for _ in 0..16 {
+        assert_eq!(load(), first);
+    }
+}

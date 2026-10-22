@@ -102,6 +102,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  to_digit should return u8 since it can widen to anything (except i8 I guess but we can deal with that later)
   int_parse should be able to be size-generic in AIPL and not need the retargeting thing
   lower_try_set seems like it should be more generic
   if callee.name() != names.value_or -> this should just compare directly to the ValueOr builtin enum. Maybe this needs to move linting after name resolution?
@@ -734,7 +735,6 @@ tests:
   make tests unable to write files, using shimming
   make tests leverage better parallelism and caching by using more files
   make ? in tests a _desugaring_ that happens earlier than codegen, then this inlining restriction can also be lifted
-  find a more natural way of testing builtins
   find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)
 
 integers:

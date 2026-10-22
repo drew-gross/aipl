@@ -1,8 +1,8 @@
-# The AIPL implementation of the `map_join` builtin. Monomorphization registers
-# this function under the canonical name `__builtin_map_join` (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.map_join(f, sep=s)`
-# resolves through the ordinary generic / higher-order machinery — the in-file
-# name is only for this file's own tests, which read exactly like user code.
+# The AIPL implementation of the `map_join` builtin. The loader names this
+# function by the canonical name `__builtin_map_join` (see
+# `aipl_syntax::aipl_builtins`), so a user's `xs.map_join(f, sep=s)` resolves
+# through the ordinary generic / higher-order machinery — the in-file name is
+# only for this file's own tests, which read exactly like user code.
 #
 # It is what `xs.map(f).join(sep=s)` means, in one pass and one buffer: `map`
 # would build an array of every `f(x)` and `join` would then measure and copy

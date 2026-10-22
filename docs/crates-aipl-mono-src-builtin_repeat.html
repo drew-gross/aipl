@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-mono/src/builtin_repeat.aipl</code></h1>
 
-      <div class="module-doc"><p>The AIPL implementation of the <code>repeat</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_repeat</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.repeat(n)</code> resolves through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p>One implementation for every sequence. A <code>str</code> is its <code>char</code> sequence, so <code>&quot; &quot;.repeat(indent)</code> is this with <code>T = char</code>, and <code>[First {}].repeat(n)</code> is this with <code>T = First</code>; there is no second, string-only version.</p></div>
+      <div class="module-doc"><p>The AIPL implementation of the <code>repeat</code> builtin. The loader names this function by the canonical name <code>__builtin_repeat</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>xs.repeat(n)</code> resolves through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p>One implementation for every sequence. A <code>str</code> is its <code>char</code> sequence, so <code>&quot; &quot;.repeat(indent)</code> is this with <code>T = char</code>, and <code>[First {}].repeat(n)</code> is this with <code>T = First</code>; there is no second, string-only version.</p></div>
 
 
 

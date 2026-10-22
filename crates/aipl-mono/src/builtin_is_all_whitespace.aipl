@@ -1,9 +1,8 @@
-# The AIPL implementation of the `is_all_whitespace` builtin. Monomorphization
-# registers this function under the canonical name
-# `__builtin_is_all_whitespace` (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a
-# user's `s.is_all_whitespace()` resolves through the ordinary machinery — the
-# in-file name is only for this file's own tests, which read exactly like user
-# code.
+# The AIPL implementation of the `is_all_whitespace` builtin. The loader names
+# this function by the canonical name `__builtin_is_all_whitespace` (see
+# `aipl_syntax::aipl_builtins`), so a user's `s.is_all_whitespace()` resolves
+# through the ordinary machinery — the in-file name is only for this file's own
+# tests, which read exactly like user code.
 #
 # It was a native runtime function (`aipl_str_is_all_whitespace`) and is now
 # AIPL, which is the direction the whole compiler is headed. Two things made the

@@ -743,10 +743,10 @@ Point the hit at a single-line sub-expression that identifies the shape — for
 `match_is_some_and`, the `none => false` arm rather than the whole `match`. Then
 verify by squelching it somewhere real and re-running `aipl check --fix`.
 
-This matters more than it sounds: an unsquelchable lint that fires on an
-AIPL-implemented builtin (`crates/aipl-mono/src/builtin_*.aipl`) **panics the
-compiler** — "AIPL-implemented builtin sources are valid AIPL" — so every program
-reaching that builtin dies. One such lint took out 66 cases at once.
+This matters more than it sounds: an AIPL-implemented builtin
+(`crates/aipl-mono/src/builtin_*.aipl`) is loaded as a file of every program that
+reaches it, so an unsquelchable lint that fires on one is a compile error in all
+of those programs. One such lint took out 66 cases at once.
 
 ## Two literal gotchas when building strings
 

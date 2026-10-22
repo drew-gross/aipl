@@ -21,7 +21,7 @@
 //! with user functions. Uninstantiated generic templates are simply dropped.
 
 use std::{
-    collections::{BTreeSet, HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     slice::from_ref,
     sync::OnceLock,
 };
@@ -45,7 +45,7 @@ pub use lower_reductions::lower_reductions;
 mod fuse_try_with;
 mod grid_literals;
 pub use fuse_try_with::{fuse_try_with, fuse_try_with_post_mono, lower_try_set};
-pub use grid_literals::{lower_grid_literals, mentions_grid};
+pub use grid_literals::lower_grid_literals;
 
 mod counting_variants;
 pub use counting_variants::counting_variants;
@@ -1667,25 +1667,6 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
     // automatically.
     mutating.extend(mutating_builtins().map(str::to_string));
 
-    // Builtins implemented in AIPL join the generic templates under their
-    // canonical `__builtin_*` names (which no user identifier can spell, so
-    // nothing collides). Calls to them then specialize exactly like calls to
-    // a user generic. Only the ones `program` can actually reach are pulled in —
-    // an unreachable one would be dropped as an uninstantiated template anyway,
-    // and parsing its source is the expensive part.
-    for name in aipl_builtin_demand(program) {
-        let b = aipl_builtin(name).expect("a demanded name is an AIPL_BUILTIN_SOURCES entry");
-        generics.insert(name.to_string(), b.generic.clone());
-        // A tuple template the builtin needs that the program did not declare
-        // itself (`__tuple2` for `tuple_windows`); every template of one arity
-        // is the same declaration, so an existing one is left alone.
-        for t in &b.templates {
-            generic_structs
-                .entry(t.name.text.clone())
-                .or_insert_with(|| t.clone());
-        }
-    }
-
     // Own a copy of each concrete function so the demand-driven driver can pull
     // reachable ones without juggling borrows of `program`. Source functions are
     // already fully resolved (no type parameters) — they just haven't been
@@ -2774,7 +2755,6 @@ impl Mono<'_> {
         span: Span,
     ) -> Result<(Expr, Type), Error> {
         let name = base_name;
-        let effects = self.cur_effects.clone();
         // The shape each forwarded argument gives its parameter: a variadic
         // (`sep: U*`) passed one element or an optional takes the instance that
         // rebuilds the sequence (see `specialize_variadic`), exactly as an
@@ -2921,6 +2901,10 @@ impl Mono<'_> {
             .1
             .iter()
             .fold(format!("{name}$lam"), |acc, f| format!("{acc}${f}"));
+        // Memoized by that key, the instance serves every caller that binds the
+        // same functions — so it does what the template and those functions do,
+        // not whatever the caller that happened to create it may do.
+        let effects = self.specialization_effects(&template.effects, &key.1);
         self.concrete.insert(
             spec_name.clone(),
             ConcreteTemplate {
@@ -3192,6 +3176,29 @@ impl Mono<'_> {
     /// A fresh name for a function synthesized while processing the current
     /// instance: `<instance>$<kind><n>`, `n` counting per instance (see
     /// [`Mono::synth`]).
+    /// The effects of a function with effects `own` whose function-typed
+    /// parameters are bound to the functions `bound`: its own, and each of
+    /// theirs. A bound function whose effects are not known here contributes
+    /// the current function's, which is what it can have at most.
+    fn specialization_effects(&self, own: &[String], bound: &[String]) -> Vec<String> {
+        let mut out = own.to_vec();
+        for f in bound {
+            let theirs = self
+                .concrete
+                .get(f)
+                .map(|t| t.effects.clone())
+                .or_else(|| self.generics.get(f).map(|g| g.sig.effects.clone()))
+                .or_else(|| builtin_sig(f).map(|sig| sig.effects.clone()))
+                .unwrap_or_else(|| self.cur_effects.clone());
+            for e in theirs {
+                if !out.contains(&e) {
+                    out.push(e);
+                }
+            }
+        }
+        out
+    }
+
     fn synth_name(&mut self, kind: &str) -> String {
         let name = format!("{}${kind}{}", self.cur_fn, self.synth);
         self.synth += 1;
@@ -7455,6 +7462,18 @@ impl Mono<'_> {
                 let resolved_extend = self.resolve_extend_shape(callee, &atys, &mut rargs);
                 let callee: &Callee = resolved_extend.as_ref().unwrap_or(callee);
                 let name = callee.name();
+                // An AIPL-implemented builtin is a function of the program, loaded
+                // with it because a file imports it or because
+                // `aipl_builtins::companions` says a pass may introduce it. One
+                // missing here was introduced by a pass with no rule there.
+                assert!(
+                    !aipl_syntax::aipl_builtins::is_aipl_implemented(callee)
+                        || self.generics.contains_key(name)
+                        || self.concrete.contains_key(name),
+                    "a call to the AIPL-implemented builtin {name:?} reached monomorphization, \
+                     but the program does not hold it: the pass that introduced the call needs \
+                     a rule in `aipl_syntax::aipl_builtins::companions`"
+                );
                 // A method call's args aren't move-eligible (a mutating method's
                 // store-back path owns the receiver); only free calls compute the
                 // owned-parameter set used for the move optimization.
@@ -7894,401 +7913,14 @@ fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
     }
 }
 
-/// Builtins *implemented in AIPL*, rather than expanded in Rust here or
-/// intrinsified in codegen. Most builtins stay codegen-generated because the
-/// generated IR beats what compiled AIPL would produce; when it wouldn't, the
-/// implementation belongs in real AIPL source, where it doubles as
-/// documentation and carries its own `.test` block (see `builtin_all.aipl`).
-///
-/// Each entry is `(canonical name, source)`. The source declares exactly one
-/// `pub fn` — under the builtin's user-facing spelling, so the file's tests
-/// read like user code — plus any private helpers those tests need. The source
-/// is run through the real loader ([`load_aipl_builtin_fn`]), so the body may
-/// call *other builtins* the file imports (`import { .. } from builtins;` —
-/// references rewrite to their canonical names exactly as in user code). Only
-/// the `pub fn` is registered (under the canonical `__builtin_*` name, which no
-/// user identifier can spell), so the body still can't call the file's private
-/// helpers or itself. This table is the *single source* of both
-/// the builtin's body and its signature: it is **not** re-declared in
-/// [`BUILTIN_SIGNATURES`]; instead [`aipl_builtin_sig_decls`] extracts the
-/// signature from the same `pub fn` and feeds it to the checker and codegen's
-/// call-site signature registry.
-///
-/// The template joins the `generics` map in [`monomorphize`], so calls
-/// specialize through the ordinary generic / higher-order paths
-/// (`specialize_generic_call`): type arguments inferred from the non-lambda
-/// arguments, lambdas lifted with captures threaded through, `str` receivers
-/// kept in the `str` representation. An entry the program never calls costs
-/// nothing (uninstantiated templates are dropped).
-/// Where the AIPL-implemented builtins' sources live: this crate's `src/`
-/// directory, resolved at compile time but *read at run time* (by
-/// [`aipl_builtin`]).
-///
-/// The same trade `aipl-codegen` makes for its dogfooded sources, for the same
-/// reason: `include_str!` here made every edit to one of these `.aipl` files a
-/// source change to this crate, rebuilding it, everything downstream, and every
-/// test binary. That is paid on a plain edit, and again on each one the test
-/// harness's `fill_expected` refreshes — a perf refill across these files
-/// otherwise rebuilds the workspace once per file.
-const BUILTIN_SRC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src");
-
-const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
-    (Callee::All, "builtin_all.aipl"),
-    (Callee::Range, "builtin_range.aipl"),
-    (Callee::SortBy, "builtin_sort_by.aipl"),
-    (Callee::Any, "builtin_any.aipl"),
-    (Callee::LeftFold, "builtin_left_fold.aipl"),
-    (Callee::RightFold, "builtin_right_fold.aipl"),
-    (Callee::OptLeftFold, "builtin_opt_left_fold.aipl"),
-    (Callee::OptRightFold, "builtin_opt_right_fold.aipl"),
-    (Callee::Count, "builtin_count.aipl"),
-    (Callee::CountWhile, "builtin_count_while.aipl"),
-    (Callee::CountIf, "builtin_count_if.aipl"),
-    (Callee::FindIf, "builtin_find_if.aipl"),
-    (Callee::MapFindIf, "builtin_map_find_if.aipl"),
-    (Callee::MapJoin, "builtin_map_join.aipl"),
-    (Callee::JoinIsNonempty, "builtin_join_is_nonempty.aipl"),
-    (Callee::JoinIsEmpty, "builtin_join_is_empty.aipl"),
-    (Callee::Reduce, "builtin_reduce.aipl"),
-    (Callee::Repeat, "builtin_repeat.aipl"),
-    (Callee::MapReduce, "builtin_map_reduce.aipl"),
-    (Callee::FilterMapReduce, "builtin_filter_map_reduce.aipl"),
-    (Callee::SplitMap, "builtin_split_map.aipl"),
-    (Callee::FindMap, "builtin_find_map.aipl"),
-    (Callee::ReverseFindMap, "builtin_reverse_find_map.aipl"),
-    (Callee::FindIndex, "builtin_find_index.aipl"),
-    (Callee::UnionAll, "builtin_union_all.aipl"),
-    (Callee::SetMap, "builtin_set_map.aipl"),
-    (Callee::ExtendOptional, "builtin_extend_optional.aipl"),
-    (Callee::IsAllWhitespace, "builtin_is_all_whitespace.aipl"),
-    (Callee::IsErrAnd, "builtin_is_err_and.aipl"),
-    (Callee::IsSomeAnd, "builtin_is_some_and.aipl"),
-    (Callee::Intersperse, "builtin_intersperse.aipl"),
-    (Callee::TupleWindows, "builtin_tuple_windows.aipl"),
-    (Callee::CountIsLessThan, "builtin_count_is_less_than.aipl"),
-    (Callee::CountIsAtMost, "builtin_count_is_at_most.aipl"),
-    (
-        Callee::CountIsGreaterThan,
-        "builtin_count_is_greater_than.aipl",
-    ),
-    (Callee::CountIsAtLeast, "builtin_count_is_at_least.aipl"),
-    (Callee::CountIsEqual, "builtin_count_is_equal.aipl"),
-    (Callee::CountIsNotEqual, "builtin_count_is_not_equal.aipl"),
-    (Callee::First, "builtin_first.aipl"),
-    (Callee::GridGet, "builtin_grid_get.aipl"),
-    (Callee::GridFrom, "builtin_grid_from.aipl"),
-    (Callee::GridTrySet, "builtin_grid_try_set.aipl"),
-    (Callee::Width, "builtin_width.aipl"),
-    (Callee::SeededWithInt, "builtin_seeded_with_int.aipl"),
-    (Callee::SeededWithClock, "builtin_seeded_with_clock.aipl"),
-    (Callee::Height, "builtin_height.aipl"),
-    (Callee::IsInBoundsOf, "builtin_is_in_bounds_of.aipl"),
-    (
-        Callee::GridIsInBoundsOf,
-        "builtin_grid_is_in_bounds_of.aipl",
-    ),
-    (Callee::Last, "builtin_last.aipl"),
-    (Callee::NonemptyFirst, "builtin_nonempty_first.aipl"),
-    (Callee::NonemptyLast, "builtin_nonempty_last.aipl"),
-    (Callee::EnsureNonempty, "builtin_ensure_nonempty.aipl"),
-    (Callee::DropFirst, "builtin_drop_first.aipl"),
-    (Callee::DropLast, "builtin_drop_last.aipl"),
-    (Callee::DropN, "builtin_drop_n.aipl"),
-    (Callee::DropLastN, "builtin_drop_last_n.aipl"),
-    (Callee::MapErr, "builtin_map_err.aipl"),
-    (Callee::MapOk, "builtin_map_ok.aipl"),
-    (Callee::TryMap, "builtin_try_map.aipl"),
-    (Callee::IntParse, "builtin_int_parse.aipl"),
-    (Callee::IntParseUnsigned, "builtin_int_parse_unsigned.aipl"),
-    (Callee::TrimWhile, "builtin_trim_while.aipl"),
-    (Callee::ValueOr, "builtin_value_or.aipl"),
-    (Callee::ValueOrErr, "builtin_value_or_err.aipl"),
-    (Callee::InlineStr, "builtin_inline_str.aipl"),
-    (Callee::Measure, "builtin_measure.aipl"),
-];
-
-/// One [`AIPL_BUILTIN_SOURCES`] entry's `pub fn`, loaded through the real
-/// loader rather than a bare parse: the file's `import { .. } from builtins;`
-/// resolves and every imported reference in the body rewrites to its canonical
-/// `__builtin_*` name — so a builtin's body calls other builtins with exactly
-/// the spelling and semantics user code gets. Loading (which parses) needs the
-/// parser hooks installed, like any in-process parse — which every caller
-/// already satisfies, having parsed the program it operates on.
-fn load_aipl_builtin_fn(src: &str) -> (Function, Vec<StructDecl>) {
-    let program = aipl_loader::load_builtin_impl_str(src, DebugOptions::default())
-        .expect("AIPL-implemented builtin sources are valid AIPL");
-    // The same type lowering the user's program gets before mono sees it: a
-    // tuple in the signature (`tuple_windows` returns `(T, T)[]`) becomes the
-    // per-arity template the generic machinery can instantiate, rather than a
-    // `Type::Tuple` that survives specialization as an abstraction. The
-    // templates that lowering synthesizes come back alongside the function:
-    // mono has to know them to instantiate the builtin, and the user's own
-    // program only declares the arities *it* wrote.
-    let program = lower_tuples(&program);
-    let mut func = None;
-    let mut templates = Vec::new();
-    for item in program.items {
-        match item {
-            Item::Fn(f) if f.is_pub => func = Some(f),
-            Item::Struct(s) if s.is_generic() => templates.push(s),
-            _ => {}
-        }
-    }
-    let func = func.expect("an AIPL-implemented builtin source declares its builtin as pub fn");
-    (func, templates)
-}
-
-/// [`fuse_operations`] over one loaded builtin body.
-///
-/// A builtin's body is ordinary AIPL and deserves the same rewrites the user's
-/// program gets — `for (let x : self.reverse())` should no more build a
-/// reversed array here than it does there. It needs its own call because these
-/// sources are loaded *during* monomorphization, long after the pass swept the
-/// program, and nothing runs over them afterwards. It runs on the specialized
-/// template only — see the call site for why the declaration stays as written.
-///
-/// The effect set is the declared builtin signatures. That is the whole set a
-/// builtin body can reach: the loader has rewritten every imported reference to
-/// its canonical `__builtin_*` name, a source declares exactly one top-level
-/// `fn`, and the aborting builtins the loop family also refuses are added by
-/// the guard itself ([`sink::undeferrable_fns`]).
-fn fuse_builtin_body(f: Function) -> Function {
-    let program = Program {
-        items: vec![Item::Fn(f)],
-        sources: Vec::new(),
-        doc: None,
-    };
-    let fused = fuse_operations(&program, &effectful_builtins(), &passes::Scope::Everything);
-    match fused.items.into_iter().next() {
-        Some(Item::Fn(f)) => f,
-        _ => unreachable!("fusion rewrites bodies, not items"),
-    }
-}
-
-/// The builtins whose declared signature carries an effect — [`effectful_fns`]
-/// for the builtin declarations, which are not `Item`s to run that over.
-fn effectful_builtins() -> &'static HashSet<String> {
-    static EFFECTFUL: OnceLock<HashSet<String>> = OnceLock::new();
-    EFFECTFUL.get_or_init(|| {
-        builtin_sigs()
-            .iter()
-            .filter(|(_, sig)| !sig.effects.is_empty())
-            .map(|(name, _)| name.clone())
-            .collect()
-    })
-}
-
-/// `f` with its refinements erased — [`aipl_syntax::erase_refinements`] for a
-/// single function, which is the unit a builtin source is loaded as.
-fn erased_fn(f: &Function) -> Function {
-    let mut program = Program {
-        items: vec![Item::Fn(f.clone())],
-        sources: Vec::new(),
-        doc: None,
-    };
-    aipl_syntax::erase_refinements(&mut program);
-    match program.items.pop() {
-        Some(Item::Fn(f)) => f,
-        _ => unreachable!("erasure rewrites types, not items"),
-    }
-}
-
-/// One [`AIPL_BUILTIN_SOURCES`] entry, loaded on first use: the generic
-/// template mono specializes calls through, and the signature-only declaration
-/// the checker and codegen's call-site registry resolve against (`.test`/`doc`
-/// stripped, renamed to the canonical `__builtin_*` name). Both come from the
-/// same `pub fn`, so a builtin's signature still lives in exactly one place.
-struct AiplBuiltin {
-    generic: Generic,
-    decl: Item,
-    /// The tuple templates (`__tuple2`, ..) its signature or body mention —
-    /// see [`load_aipl_builtin_fn`].
-    templates: Vec<StructDecl>,
-}
-
-/// [`AIPL_BUILTIN_SOURCES`] as a lookup by canonical name, each file name paired
-/// with an empty slot for its loaded form. Building this map neither reads nor
-/// parses *anything* — the slot fills on the entry's first [`aipl_builtin`]
-/// lookup — so the cost of a builtin's source is paid only by a program that
-/// actually reaches it (see [`aipl_builtin_demand`]). Loading every entry
-/// eagerly used to dominate compile time: the sources total ~28 KB and the
-/// parser runs them through the dogfooded AIPL lexer.
-fn aipl_builtin_slots() -> &'static HashMap<&'static str, (&'static str, OnceLock<AiplBuiltin>)> {
-    static SLOTS: OnceLock<HashMap<&'static str, (&'static str, OnceLock<AiplBuiltin>)>> =
-        OnceLock::new();
-    SLOTS.get_or_init(|| {
-        AIPL_BUILTIN_SOURCES
-            .iter()
-            .map(|(canonical, src)| (canonical.name(), (*src, OnceLock::new())))
-            .collect()
-    })
-}
-
-/// The AIPL-implemented builtin named `canonical`, loading and normalizing its
-/// source on first request and reusing it thereafter. `None` if `canonical`
-/// isn't one of them (a native builtin, or a user function).
-fn aipl_builtin(canonical: &str) -> Option<&'static AiplBuiltin> {
-    let (file, slot) = aipl_builtin_slots().get(canonical)?;
-    Some(slot.get_or_init(|| {
-        // Read here, not when the slot map is built, so an unreached builtin
-        // costs no I/O either — the same reason its source isn't parsed until
-        // now. An unreadable file is a loud panic: it is a checked-in source
-        // this compile has just demanded.
-        let path = std::path::Path::new(BUILTIN_SRC_DIR).join(file);
-        let src = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("AIPL builtin source {path:?}: {e}"));
-        let (f, templates) = load_aipl_builtin_fn(&src);
-        // The template mono specializes is a post-checker artifact, so it takes
-        // the same erasure the user's program gets after `check` (see
-        // `erase_refinements`): a `T[] without []` parameter is a `T[]` to it.
-        // The declaration handed to the checker keeps the refinement — that is
-        // where `nonempty_first` refusing a plain array comes from.
-        // Fused only into the template mono specializes, never into the
-        // declaration below: the declaration is what the checker resolves calls
-        // against, and fusion writes calls (`__split_iter`) that exist for
-        // codegen's loop lowering and are not names the checker knows.
-        let generic = normalize(&fuse_builtin_body(erased_fn(&f)))
-            .expect("AIPL-implemented builtin signatures normalize");
-        let mut decl = f;
-        decl.name.text = canonical.to_string();
-        decl.test_body = None;
-        decl.doc = None;
-        AiplBuiltin {
-            generic,
-            decl: Item::Fn(decl),
-            templates,
-        }
-    }))
-}
-
-/// The AIPL-implemented builtins `program` can reach: every canonical
-/// `__builtin_*` name it calls or references, plus — transitively — the ones
-/// *those* builtins' bodies reach (`int_parse` calls `trim_while`, and so on).
-/// The loader has already rewritten every imported reference to its canonical
-/// name, so a plain walk over call and identifier names finds them all.
-///
-/// Only these get parsed. Returning the names rather than the loaded builtins
-/// keeps the callers (mono's `generics` map, codegen's decl list) free to look
-/// each one up in whatever form they need.
-pub fn aipl_builtin_demand(program: &Program) -> BTreeSet<&'static str> {
-    /// The AIPL-implemented builtins mono may resolve a *shape* of `canonical`
-    /// onto, which no source ever names: `extend`'s `T?` source becomes
-    /// `extend_optional` (see mono's `Extend` arm). A program that only ever
-    /// writes `extend` still needs that one loaded, and this scan runs before the
-    /// rewrite that would otherwise be its only mention.
-    fn synthesized_from(canonical: &str) -> &'static [&'static str] {
-        match canonical {
-            "__builtin_extend" => &["__builtin_extend_optional"],
-            _ => &[],
-        }
-    }
-
-    /// Record the builtin `e` names, if it names one and it's new. `pending`
-    /// collects the newly-seen ones, whose own bodies still need scanning.
-    fn discover(e: &Expr, needed: &mut BTreeSet<&'static str>, pending: &mut Vec<&'static str>) {
-        let name = match &e.kind {
-            ExprKind::Call(name, _, _) => name.name(),
-            ExprKind::Ident(name) => name,
-            _ => return,
-        };
-        // Demanded by the *native* builtin that resolves onto them, so this runs
-        // whether or not `name` is itself AIPL-implemented.
-        for syn in synthesized_from(name) {
-            let (canonical, _) = aipl_builtin_slots()
-                .get_key_value(*syn)
-                .expect("a synthesized demand names an AIPL_BUILTIN_SOURCES entry");
-            if needed.insert(canonical) {
-                pending.push(canonical);
-            }
-        }
-        if let Some((canonical, _)) = aipl_builtin_slots().get_key_value(name) {
-            if needed.insert(canonical) {
-                pending.push(canonical);
-            }
-        }
-    }
-
-    let mut needed: BTreeSet<&'static str> = BTreeSet::new();
-    let mut pending: Vec<&'static str> = Vec::new();
-    aipl_syntax::each_expr(program, &mut |e| discover(e, &mut needed, &mut pending));
-    // `grid[(row, column)]` and `grid.try_set((row, column), value)` become
-    // calls to these once the types are known, which is after this scan.
-    if mentions_grid(program) {
-        for grid_builtin in [
-            "__builtin_grid_get",
-            "__builtin_grid_try_set",
-            "__builtin_grid_is_in_bounds_of",
-        ] {
-            let (canonical, _) = aipl_builtin_slots()
-                .get_key_value(grid_builtin)
-                .expect("a grid builtin is an AIPL_BUILTIN_SOURCES entry");
-            if needed.insert(canonical) {
-                pending.push(canonical);
-            }
-        }
-    }
-    while let Some(name) = pending.pop() {
-        let body = &aipl_builtin(name)
-            .expect("a name only enters `pending` from the slot map")
-            .generic
-            .body;
-        aipl_syntax::each_subexpr(body, &mut |e| discover(e, &mut needed, &mut pending));
-    }
-    needed
-}
-
-/// Signature-only AST declarations for the AIPL-implemented builtins in
-/// `needed` (an [`aipl_builtin_demand`] result), under their canonical
-/// `__builtin_*` names, with `.test`/`doc` stripped. These
-/// let a consumer that would otherwise read [`aipl_syntax::BUILTIN_SIGNATURES`]
-/// (the checker's builtin decls, codegen's call-site signature registry) see an
-/// AIPL-implemented builtin's signature without it being duplicated there — the
-/// `pub fn` in the `.aipl` source is the single source of the signature. The
-/// body is kept (it type-checks — operators are native AST nodes, and calls to
-/// other builtins are already rewritten to their canonical names by the loader)
-/// so the decl is a complete, checkable function.
-/// The signature of the AIPL-implemented builtin `canonical`
-/// (`__builtin_map_join`), or `None` for any other name — the loader's keyword-
-/// argument pass asks this (through `aipl_loader::set_aipl_builtin_sig_hook`)
-/// for a `__builtin_*` callee `BUILTIN_SIGNATURES` does not declare, so a
-/// builtin written in AIPL can take keyword parameters like one written in
-/// Rust. Loads the builtin's source on first ask, as any demand does.
-pub fn aipl_builtin_sig(canonical: &str) -> Option<Signature> {
-    let b = aipl_builtin(canonical)?;
-    match &b.decl {
-        Item::Fn(f) => Some(f.sig.clone()),
-        _ => None,
-    }
-}
-
-pub fn aipl_builtin_sig_decls(needed: &BTreeSet<&'static str>) -> Vec<Item> {
-    let mut out = Vec::new();
-    let mut seen_templates: HashSet<String> = HashSet::new();
-    for name in needed {
-        let b = aipl_builtin(name).expect("a demanded name is an AIPL_BUILTIN_SOURCES entry");
-        // The tuple templates its signature was lowered against come first, so a
-        // consumer registering declarations in order has `__tuple2` before the
-        // function that returns one. One arity is one declaration, however many
-        // builtins mention it.
-        for t in &b.templates {
-            if seen_templates.insert(t.name.text.clone()) {
-                out.push(Item::Struct(t.clone()));
-            }
-        }
-        out.push(b.decl.clone());
-    }
-    out
-}
-
 /// [`aipl_syntax::BUILTIN_SIGNATURES`] parsed once and indexed by name, each
 /// normalized (via [`normalize`]) into a [`Signature`] — the same declarations
 /// the checker resolves builtin calls against, reused here so mono's own
 /// return-type inference doesn't hand-duplicate them. A builtin is never
 /// enqueued/specialized like a real [`Generic`], so only its `Signature` is
 /// kept (the body `normalize` produces alongside it is discarded). The
-/// AIPL-implemented builtins ([`AIPL_BUILTIN_SOURCES`]) aren't in
-/// `BUILTIN_SIGNATURES` at all — [`builtin_sig`] falls back to their own source
-/// so return-type inference still sees them.
+/// AIPL-implemented builtins aren't in `BUILTIN_SIGNATURES` at all: their files
+/// are files of the program, so their functions are the program's own.
 fn builtin_sigs() -> &'static HashMap<String, Signature> {
     static SIGS: OnceLock<HashMap<String, Signature>> = OnceLock::new();
     SIGS.get_or_init(|| {
@@ -8314,10 +7946,9 @@ fn builtin_sigs() -> &'static HashMap<String, Signature> {
 /// call site has to name them — `push` is the only one today, but adding
 /// another needs no change here or in codegen.
 ///
-/// Only native builtins are considered: [`AIPL_BUILTIN_SOURCES`] are parsed on
-/// demand (a program that never mentions one never loads it), so probing them
-/// from a hot predicate would be the wrong trade — and none of them is
-/// mutating.
+/// Only native builtins are considered: an AIPL-implemented one is a function of
+/// the program, and joins the mutating set the way any of the program's
+/// functions does.
 pub fn mutating_builtins() -> impl Iterator<Item = &'static str> {
     builtin_sigs()
         .iter()
@@ -8387,14 +8018,11 @@ fn grid_call(callee: Callee, receiver: &Expr, pair: &Expr, rest: &[Expr], span: 
     )
 }
 
-/// The declared signature of the builtin `name`: from [`BUILTIN_SIGNATURES`]
-/// for a native builtin, or from its own `.aipl` source for an
-/// AIPL-implemented one (loaded on demand — a program that never mentions the
-/// builtin never parses it). `None` if `name` isn't a builtin at all.
+/// The declared signature of the native builtin `name`, from
+/// [`BUILTIN_SIGNATURES`]. `None` for any other name — an AIPL-implemented
+/// builtin included, which is a function of the program.
 fn builtin_sig(name: &str) -> Option<&'static Signature> {
-    builtin_sigs()
-        .get(name)
-        .or_else(|| aipl_builtin(name).map(|b| &b.generic.sig))
+    builtin_sigs().get(name)
 }
 
 /// If `param_ty` binds type variable `v` (directly, or nested in a container:

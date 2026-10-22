@@ -1,8 +1,8 @@
-# The AIPL implementation of the `grid_try_set` builtin. Monomorphization
-# registers this under the canonical name `__builtin_grid_try_set` (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`); the parser writes
-# `set grid[row, column] = value else { .. };` as a call to it, guarded by a read
-# that has already shown the cell exists.
+# The AIPL implementation of the `grid_try_set` builtin. The loader names this
+# function by the canonical name `__builtin_grid_try_set` (see
+# `aipl_syntax::aipl_builtins`); the parser writes `set grid[row, column] =
+# value else { .. };` as a call to it, guarded by a read that has already shown
+# the cell exists.
 
 import {
     Grid,

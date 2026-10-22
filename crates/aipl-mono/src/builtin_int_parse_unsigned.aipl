@@ -1,18 +1,20 @@
 # The AIPL implementation of the internal `int_parse_unsigned` builtin: the
-# unsigned half of `int_parse`. Monomorphization registers this function under
-# the canonical name `__builtin_int_parse_unsigned` (see `AIPL_BUILTIN_SOURCES`
-# in `lib.rs`). Nothing imports it: the checker rewrites an `int_parse` whose
-# position wants an unsigned integer into a call to this one, which reaches the
-# whole `u64` range where the signed parse stops at `i64::MAX`.
+# unsigned half of `int_parse`. The loader names this function by the canonical
+# name `__builtin_int_parse_unsigned` (see `aipl_syntax::aipl_builtins`), and
+# loads it with any program that uses `int_parse`: nothing imports it, but the
+# checker rewrites an `int_parse` whose position wants an unsigned integer into
+# a call to this one, which reaches the whole `u64` range where the signed parse
+# stops at `i64::MAX`.
 
 import {
     equal as ==,
-    find_index,
     greater_than as >,
     is_empty,
     logical_and as &&,
     logical_or as ||,
+    narrow,
     opt_left_fold as opt_fold,
+    to_digit,
     wrapping_add as +,
     wrapping_mul as *,
     wrapping_sub as -,
@@ -33,10 +35,7 @@ pub fn int_parse_unsigned(self: str) -> u64? {
     self.opt_fold(
         zero,
         |acc, c| {
-            // A digit's value is its position among the digits, which comes as
-            // the `u64` the accumulator is: `to_digit` gives an `i64`, and a
-            // builtin's body is not checked, so a `narrow` here has no target.
-            let d = "0123456789".find_index(|digit| digit == c)?;
+            let d: u64 = c.to_digit()?.narrow()?;
             if (acc > limit || (acc == limit && d > 5)) { none } else { some(acc * 10 + d) }
         },
     )

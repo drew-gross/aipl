@@ -36,7 +36,6 @@
 //! [`flatten`]: super::Loader::flatten
 
 use std::collections::{HashMap, HashSet};
-use std::sync::OnceLock;
 
 use aipl_syntax::ast::{
     Arity, Callee, Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Param,
@@ -333,29 +332,13 @@ fn case_params(c: &VariantCase) -> Vec<Param> {
         .collect()
 }
 
-/// The signature of an AIPL-implemented builtin (`aipl-mono`'s
-/// `builtin_*.aipl`), by canonical `__builtin_*` name — installed by the
-/// compiler via [`set_aipl_builtin_sig_hook`]. Those builtins are not in
-/// `BUILTIN_SIGNATURES`; their `.aipl` file is the single source of their
-/// signature, and it lives in a crate downstream of this one, so the loader
-/// reaches it through a hook the same way the parser reaches the dogfooded
-/// lexer. Consulted lazily, per called name, so a program pays for reading a
-/// builtin's source only when it calls that builtin. No fallback: an
-/// uninstalled hook means such a builtin's calls take no keyword arguments —
-/// which is exactly what a `.aipl` file with no keyword parameters gets anyway.
-static AIPL_BUILTIN_SIG_HOOK: OnceLock<fn(&str) -> Option<Signature>> = OnceLock::new();
-
-/// Install the AIPL-implemented-builtin signature lookup. First install wins.
-pub fn set_aipl_builtin_sig_hook(f: fn(&str) -> Option<Signature>) {
-    let _ = AIPL_BUILTIN_SIG_HOOK.set(f);
-}
-
 /// Keyword-parameter info for every builtin that declares one, keyed by the
 /// canonical `__builtin_*` name its calls carry after loader rewriting. Parsed
 /// from `BUILTIN_SIGNATURES` so a builtin gains a keyword parameter simply by
 /// declaring a default there — no second list to keep in sync. Builtins with no
 /// defaulted parameter are skipped (an all-positional call needs no info). The
-/// AIPL-implemented builtins are not here; see [`Expander::info`].
+/// AIPL-implemented builtins are not here: their files are files of the program,
+/// so their functions are registered with its own.
 fn builtin_kw_infos() -> Result<HashMap<String, FnKwInfo>, Error> {
     let program = aipl_parser::parse(aipl_syntax::BUILTIN_SIGNATURES)
         .expect("builtin signatures are valid AIPL");
@@ -828,18 +811,8 @@ impl Expander {
 
     /// The keyword info of callee `name`, or `None` for a callee this pass
     /// knows nothing about (a Rust builtin with no defaults, a local binding).
-    /// An AIPL-implemented builtin is looked up through
-    /// [`AIPL_BUILTIN_SIG_HOOK`] on first sight and remembered — including a
-    /// miss, so the hook runs once per name.
     fn info(&mut self, callee: &Callee) -> Result<Option<&FnKwInfo>, Error> {
-        let name = callee.name();
-        if !self.fns.contains_key(name) && callee.is_builtin() {
-            if let Some(sig) = AIPL_BUILTIN_SIG_HOOK.get().and_then(|hook| hook(name)) {
-                let info = FnKwInfo::from_sig(name, &sig)?;
-                self.fns.insert(name.to_string(), info);
-            }
-        }
-        Ok(self.fns.get(name))
+        Ok(self.fns.get(callee.name()))
     }
 
     /// The expanded default expressions of `name`'s keyword parameters, in

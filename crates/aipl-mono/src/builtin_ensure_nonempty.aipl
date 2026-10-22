@@ -1,7 +1,7 @@
 # The AIPL implementation of the `ensure_nonempty` builtin (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`): the runtime road into `T[] without []`.
-# A literal with an element in it takes the refined type on sight; every
-# other array has to be tested, and this is where the test lives.
+# `aipl_syntax::aipl_builtins`): the runtime road into `T[] without []`. A
+# literal with an element in it takes the refined type on sight; every other
+# array has to be tested, and this is where the test lives.
 #
 # `assume_nonempty` is the internal builtin that grants the refinement without
 # a test, and the `is_nonempty` guard here is what makes granting it sound.

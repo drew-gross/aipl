@@ -1,5 +1,5 @@
-# The AIPL implementation of the `drop_n` builtin (see `AIPL_BUILTIN_SOURCES`
-# in `lib.rs`).
+# The AIPL implementation of the `drop_n` builtin (see
+# `aipl_syntax::aipl_builtins`).
 #
 # A start past the end already slices to empty, so dropping more than there is
 # needs no guard.

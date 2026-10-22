@@ -1,8 +1,8 @@
-# The AIPL implementation of the `map_ok` builtin. Monomorphization registers
-# this function under the canonical name `__builtin_map_ok` (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `r.map_ok(f)` specializes
-# through the ordinary generic / higher-order machinery — the in-file name
-# `map_ok` is only for this file's own tests, which read exactly like user code.
+# The AIPL implementation of the `map_ok` builtin. The loader names this
+# function by the canonical name `__builtin_map_ok` (see
+# `aipl_syntax::aipl_builtins`), so a user's `r.map_ok(f)` specializes through
+# the ordinary generic / higher-order machinery — the in-file name `map_ok` is
+# only for this file's own tests, which read exactly like user code.
 #
 # The mirror of `map_err`: this one rewrites the *value* side and leaves the
 # error alone. `?` already covers the case where the error type is the enclosing

@@ -1,6 +1,6 @@
-# The AIPL implementation of the `seeded_with_int` builtin. Monomorphization
-# registers this under the canonical name `__builtin_seeded_with_int` (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`).
+# The AIPL implementation of the `seeded_with_int` builtin. The loader names
+# this function by the canonical name `__builtin_seeded_with_int` (see
+# `aipl_syntax::aipl_builtins`).
 
 import { RandomProvider, equal as == } from builtins;
 

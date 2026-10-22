@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-mono/src/builtin_height.aipl</code></h1>
 
-      <div class="module-doc"><p>The AIPL implementation of the <code>height</code> builtin. Monomorphization registers this under the canonical name <code>__builtin_height</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so <code>grid.height()</code> resolves through the ordinary generic machinery.</p></div>
+      <div class="module-doc"><p>The AIPL implementation of the <code>height</code> builtin. The loader names this function by the canonical name <code>__builtin_height</code> (see <code>aipl_syntax::aipl_builtins</code>), so <code>grid.height()</code> resolves through the ordinary generic machinery.</p></div>
 
 
 

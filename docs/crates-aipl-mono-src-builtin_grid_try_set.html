@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-mono/src/builtin_grid_try_set.aipl</code></h1>
 
-      <div class="module-doc"><p>The AIPL implementation of the <code>grid_try_set</code> builtin. Monomorphization registers this under the canonical name <code>__builtin_grid_try_set</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>); the parser writes <code>set grid[row, column] = value else { .. };</code> as a call to it, guarded by a read that has already shown the cell exists.</p></div>
+      <div class="module-doc"><p>The AIPL implementation of the <code>grid_try_set</code> builtin. The loader names this function by the canonical name <code>__builtin_grid_try_set</code> (see <code>aipl_syntax::aipl_builtins</code>); the parser writes <code>set grid[row, column] = value else { .. };</code> as a call to it, guarded by a read that has already shown the cell exists.</p></div>
 
 
 

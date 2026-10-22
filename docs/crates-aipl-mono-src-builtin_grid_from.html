@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-mono/src/builtin_grid_from.aipl</code></h1>
 
-      <div class="module-doc"><p>The AIPL implementation of the <code>grid_from</code> builtin. Monomorphization registers this under the canonical name <code>__builtin_grid_from</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>); a nested array literal written where a grid is expected is rewritten to a call to it.</p></div>
+      <div class="module-doc"><p>The AIPL implementation of the <code>grid_from</code> builtin. The loader names this function by the canonical name <code>__builtin_grid_from</code> (see <code>aipl_syntax::aipl_builtins</code>); a nested array literal written where a grid is expected is rewritten to a call to it.</p></div>
 
 
 

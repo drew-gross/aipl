@@ -54,9 +54,9 @@
 //!    still stale there fails that run, and handoff would read the failure as
 //!    "the candidate IR is wrong".
 //! 5. Staged dogfood-IR regen: fill → validate → corpus run against the staged
-//!    artifact → auto-promote when that run is green. That corpus run skips one
-//!    test — see [`STAGED_IR_SKIP`]: the per-project compiler check cannot be
-//!    true yet, because the step that repairs it is 5c, which has to come
+//!    artifact → auto-promote when that run is green. That corpus run skips two
+//!    tests — see [`STAGED_IR_SKIP`]: the per-project compiler checks cannot be
+//!    true yet, because the step that repairs them is 5c, which has to come
 //!    after the promote. It is the same hazard step 4b avoids by moving, and
 //!    this one cannot move. Then (step "5b") a
 //!    rebuild, if step 3 regenerated the per-case `#[test]` list — the one thing
@@ -165,7 +165,8 @@ fn nextest() -> Cmd {
         .json()
 }
 
-/// The one test the staged-IR corpus run must not run.
+/// The two tests the staged-IR corpus run must not run, both about the
+/// compilers the projects under `projects/` carry.
 ///
 /// `projects::checked_in_compilers_are_current` asserts each project's
 /// checked-in `aipl` was built from the compiler sources as they stand. That
@@ -174,17 +175,25 @@ fn nextest() -> Cmd {
 /// `fill_project_compilers`, which runs *after* this step. It has to: the
 /// compiler it copies has to be the one built from the promoted artifact.
 ///
+/// `projects::projects_pass_their_own_check` runs each project's own
+/// checked-in compiler, so it is the same property seen from the other side: it
+/// executes a binary with its own embedded artifact, never the candidate. It
+/// fails when that binary cannot compile a source it reads at run time and has
+/// since changed — an AIPL-implemented builtin using a feature the pinned
+/// compiler lacks — and prints the same `handoff-fill: compilers`.
+///
 /// So a change that touches compiler sources *and* regenerates the IR used to
 /// fail here, on the gate's own un-run remediation, and be reported as
 /// "candidate IR is wrong — diff .staged vs live" — which sent you diffing an
-/// artifact that was fine. The test still runs in the discovery run and in the
-/// final run, where it means what it says.
+/// artifact that was fine. Both still run in the discovery run and in the final
+/// run, where they mean what they say.
 ///
 /// This is the reasoning that already suppresses `no_staged_ir_pending` under
 /// `AIPL_DOGFOOD_IR`: a test that cannot be true yet, skipped for the one step
-/// whose job is something else. Matched as a substring so moving the test
+/// whose job is something else. Matched as a substring so moving a test
 /// between modules cannot silently un-skip it.
-const STAGED_IR_SKIP: &str = "not test(checked_in_compilers_are_current)";
+const STAGED_IR_SKIP: &str =
+    "not test(checked_in_compilers_are_current) and not test(projects_pass_their_own_check)";
 
 /// The whole suite minus the per-case tests not named in `keep`: everything
 /// outside the `cases` binary, plus exactly those case tests.
@@ -1228,22 +1237,40 @@ case_tests! {
         );
     }
 
-    /// The staged-IR run skips exactly one test, and skips it by the name the
-    /// suite actually uses. A typo here would be invisible: the run would pass
-    /// the filter to nextest, match nothing, and go back to failing on the
-    /// stale project compiler — the bug this constant exists to fix.
+    /// The staged-IR run skips exactly the two project-compiler tests, and
+    /// skips them by the names the suite actually uses. A typo here would be
+    /// invisible: the run would pass the filter to nextest, match nothing, and
+    /// go back to failing on the stale project compiler — the bug this constant
+    /// exists to fix.
     #[test]
-    fn the_staged_ir_filter_skips_only_the_project_compiler_check() {
-        assert_eq!(STAGED_IR_SKIP, "not test(checked_in_compilers_are_current)");
-        // The name it has to match, spelled out so a rename of the test breaks
-        // this rather than the gate.
-        let skipped = "projects::checked_in_compilers_are_current";
-        assert!(skipped.contains("checked_in_compilers_are_current"));
-        // The near neighbour it must *not* match: `checked_in_ir_is_current` is
-        // about the artifact, and the staged run is exactly where it matters.
-        assert!(
-            !"dogfood_ir::checked_in_ir_is_current".contains("checked_in_compilers_are_current")
+    fn the_staged_ir_filter_skips_only_the_project_compiler_checks() {
+        assert_eq!(
+            STAGED_IR_SKIP,
+            "not test(checked_in_compilers_are_current) \
+             and not test(projects_pass_their_own_check)"
         );
+        // The names it has to match, spelled out so a rename of a test breaks
+        // this rather than the gate.
+        for skipped in [
+            "projects::checked_in_compilers_are_current",
+            "projects::projects_pass_their_own_check",
+        ] {
+            assert!(
+                skipped.contains("checked_in_compilers_are_current")
+                    || skipped.contains("projects_pass_their_own_check")
+            );
+        }
+        // The near neighbours it must *not* match: `checked_in_ir_is_current` is
+        // about the artifact, and the staged run is exactly where it matters.
+        for kept in [
+            "dogfood_ir::checked_in_ir_is_current",
+            "dogfood_ir::no_staged_ir_pending",
+        ] {
+            assert!(
+                !kept.contains("checked_in_compilers_are_current")
+                    && !kept.contains("projects_pass_their_own_check")
+            );
+        }
     }
 
     #[test]

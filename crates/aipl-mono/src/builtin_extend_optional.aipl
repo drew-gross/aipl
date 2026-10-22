@@ -1,9 +1,9 @@
 # The AIPL implementation of the `extend_optional` builtin — the `T?` shape of
-# `extend`'s variadic source, for an array receiver. Monomorphization registers
-# this function under the canonical name `__builtin_extend_optional` (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`), and mono's `Extend` arm is what resolves
-# a `set xs.extend(maybe)` onto it; the in-file name is only for this file's own
-# tests, which read exactly like the user code that never spells it.
+# `extend`'s variadic source, for an array receiver. The loader names this
+# function by the canonical name `__builtin_extend_optional` (see
+# `aipl_syntax::aipl_builtins`), and mono's `Extend` arm is what resolves a `set
+# xs.extend(maybe)` onto it; the in-file name is only for this file's own tests,
+# which read exactly like the user code that never spells it.
 #
 # Internal (`INTERNAL_BUILTINS`), so the import is refused everywhere but a
 # `builtin_*.aipl` source: `extend` is the spelling, and a second name for one of

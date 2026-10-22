@@ -325,35 +325,63 @@ pub fn optimize<P: Optimizable>(
 /// duplicated body's copies all keep the span they came from — so "this span
 /// had its type recorded, and now an expression at that span does not" is
 /// exactly the loss, and duplication cannot fake it.
-fn recorded_spans(program: &impl Optimizable) -> HashSet<(usize, usize)> {
+fn recorded_spans(program: &impl Optimizable) -> HashSet<Site> {
     let mut out = HashSet::new();
     for f in program.functions() {
-        collect_recorded(f.body, &mut out);
+        let file = origin(f.name);
+        collect_recorded(f.body, &file, &mut out);
         if let Some(test_body) = f.test_body {
-            collect_recorded(test_body, &mut out);
+            collect_recorded(test_body, &file, &mut out);
         }
     }
     out
 }
 
-fn collect_recorded(e: &Expr, out: &mut HashSet<(usize, usize)>) {
+/// A context-typed expression's identity for [`recorded_spans`]: the file its
+/// function came from (see [`origin`]) and its span. A span alone is an offset
+/// into *some* file, and a program merges many — its own, and every builtin
+/// it reaches — so two files' expressions share offsets constantly.
+///
+/// The file is the function's, which is the expression's own until a pass
+/// copies a body into a function of another file. A record lost in such a
+/// copy goes unreported, since the copy is filed under its new function; that
+/// is the price of a key that does not mistake one file's expression for
+/// another's.
+type Site = (String, usize, usize);
+
+/// Which file the function `name` came from, as far as its name says: the
+/// `__m<N>__` prefix of one of an imported file's items, the `__builtin_*` name
+/// of a builtin's, or `""` for the root's. A monomorphized instance, or a
+/// function lifted out of one, is named after it (`__m3__f$i64`, `f$lambda2`),
+/// so the part before the first `$` is what decides.
+fn origin(name: &str) -> String {
+    let base = name.split('$').next().unwrap_or(name);
+    match aipl_syntax::mangled_file_index(base) {
+        Some(index) => format!("__m{index}__"),
+        None if base.starts_with("__builtin_") => base.to_string(),
+        None => String::new(),
+    }
+}
+
+fn collect_recorded(e: &Expr, file: &str, out: &mut HashSet<Site>) {
     if is_context_typed(e) && e.ty.is_some() {
-        out.insert((e.span.start, e.span.end));
+        out.insert((file.to_string(), e.span.start, e.span.end));
     }
     for child in crate::children(e) {
-        collect_recorded(child, out);
+        collect_recorded(child, file, out);
     }
 }
 
 /// Context-typed expressions that have lost a record `recorded` says their
-/// span had, ignoring the spans in `inherited` (see the caller).
-fn lost_records(program: &impl Optimizable, recorded: &HashSet<(usize, usize)>) -> Vec<String> {
+/// site had.
+fn lost_records(program: &impl Optimizable, recorded: &HashSet<Site>) -> Vec<String> {
     let mut out = Vec::new();
     for f in program.functions() {
+        let file = origin(f.name);
         let mut found = Vec::new();
-        collect_lost(f.body, recorded, &mut found);
+        collect_lost(f.body, &file, recorded, &mut found);
         if let Some(test_body) = f.test_body {
-            collect_lost(test_body, recorded, &mut found);
+            collect_lost(test_body, &file, recorded, &mut found);
         }
         out.extend(
             found
@@ -368,15 +396,18 @@ fn lost_records(program: &impl Optimizable, recorded: &HashSet<(usize, usize)>) 
 
 fn collect_lost(
     e: &Expr,
-    recorded: &HashSet<(usize, usize)>,
+    file: &str,
+    recorded: &HashSet<Site>,
     out: &mut Vec<(&'static str, (usize, usize))>,
 ) {
-    let span = (e.span.start, e.span.end);
-    if is_context_typed(e) && e.ty.is_none() && recorded.contains(&span) {
-        out.push((context_kind(e), span));
+    if is_context_typed(e)
+        && e.ty.is_none()
+        && recorded.contains(&(file.to_string(), e.span.start, e.span.end))
+    {
+        out.push((context_kind(e), (e.span.start, e.span.end)));
     }
     for child in crate::children(e) {
-        collect_lost(child, recorded, out);
+        collect_lost(child, file, recorded, out);
     }
 }
 

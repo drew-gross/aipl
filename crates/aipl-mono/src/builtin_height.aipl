@@ -1,6 +1,7 @@
-# The AIPL implementation of the `height` builtin. Monomorphization registers
-# this under the canonical name `__builtin_height` (see `AIPL_BUILTIN_SOURCES` in
-# `lib.rs`), so `grid.height()` resolves through the ordinary generic machinery.
+# The AIPL implementation of the `height` builtin. The loader names this
+# function by the canonical name `__builtin_height` (see
+# `aipl_syntax::aipl_builtins`), so `grid.height()` resolves through the
+# ordinary generic machinery.
 
 import { Grid, equal as ==, len, saturating_divide as / } from builtins;
 

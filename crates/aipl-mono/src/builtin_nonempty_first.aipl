@@ -1,6 +1,6 @@
 # The AIPL implementation of the `nonempty_first` builtin (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`); `first` for an array the type system
-# knows is not empty.
+# `aipl_syntax::aipl_builtins`); `first` for an array the type system knows is
+# not empty.
 #
 # A refined array is a plain array at runtime, so indexing it still yields an
 # optional, and the `none` arm has to be written even though the type says it

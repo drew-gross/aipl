@@ -1,9 +1,9 @@
 # The AIPL implementation of the `any` builtin — the dual of `all` (see
-# `builtin_all.aipl`). Monomorphization registers this function under the
-# canonical name `__builtin_any` (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a
-# user's `xs.any(pred)` specializes through the ordinary generic / higher-order
-# machinery — the in-file name `any` is only for this file's own tests, which
-# read exactly like user code.
+# `builtin_all.aipl`). The loader names this function by the canonical name
+# `__builtin_any` (see `aipl_syntax::aipl_builtins`), so a user's `xs.any(pred)`
+# specializes through the ordinary generic / higher-order machinery — the
+# in-file name `any` is only for this file's own tests, which read exactly like
+# user code.
 
 import { equal as ==, filter, greater_than as >, logical_not as ! } from builtins;
 

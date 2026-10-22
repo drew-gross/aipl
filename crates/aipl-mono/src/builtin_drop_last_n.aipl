@@ -1,5 +1,5 @@
 # The AIPL implementation of the `drop_last_n` builtin (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`); `drop_n`'s mirror.
+# `aipl_syntax::aipl_builtins`); `drop_n`'s mirror.
 #
 # The guard is deliberate rather than emergent. Without it, `len() - n` for
 # `n > len` wraps to a value that reads as a *negative* slice bound, which does

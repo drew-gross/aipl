@@ -389,12 +389,10 @@ pub(crate) fn mentions_free(e: &Expr, name: &str) -> bool {
 
 /// Sink again over the *monomorphized* program, after post-mono inlining.
 ///
-/// The pre-mono run cannot see two things. AIPL-implemented builtins
-/// (`AIPL_BUILTIN_SOURCES`) are loaded on demand *during* monomorphization, so
-/// at that point they are not in the program at all; and the lambdas mono lifts
-/// into their own functions, together with any instance that ends up called
-/// once, are only folded into their callers afterwards. Either can expose a
-/// binding that one branch reads and the others ignore.
+/// The pre-mono run cannot see the lambdas mono lifts into their own
+/// functions, nor which instances end up called once: those are only folded
+/// into their callers afterwards, and either can expose a binding that one
+/// branch reads and the others ignore.
 ///
 /// The case this exists for is `value_or`: its default is an ordinary argument,
 /// so a caller evaluates it either way — until the instance is inlined and the

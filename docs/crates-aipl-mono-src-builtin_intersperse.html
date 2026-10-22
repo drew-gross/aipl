@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-mono/src/builtin_intersperse.aipl</code></h1>
 
-      <div class="module-doc"><p>The AIPL implementation of the <code>intersperse</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_intersperse</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.intersperse(sep)</code> specializes through the ordinary generic machinery.</p><p>The array counterpart of <code>join</code>: <code>join</code> is this followed by concatenation, which only <code>str</code> can do — every element type can be interleaved, so that is where the generic version stops. <code>Doc[]</code> is the motivating case, where the result is handed to a <code>Concat</code>.</p></div>
+      <div class="module-doc"><p>The AIPL implementation of the <code>intersperse</code> builtin. The loader names this function by the canonical name <code>__builtin_intersperse</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>xs.intersperse(sep)</code> specializes through the ordinary generic machinery.</p><p>The array counterpart of <code>join</code>: <code>join</code> is this followed by concatenation, which only <code>str</code> can do — every element type can be interleaved, so that is where the generic version stops. <code>Doc[]</code> is the motivating case, where the result is handed to a <code>Concat</code>.</p></div>
 
 
 

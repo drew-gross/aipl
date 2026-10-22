@@ -1,8 +1,8 @@
-# The AIPL implementation of the `repeat` builtin. Monomorphization registers this
-# function under the canonical name `__builtin_repeat` (see `AIPL_BUILTIN_SOURCES`
-# in `lib.rs`), so a user's `xs.repeat(n)` resolves through the ordinary generic
-# machinery — the in-file name is only for this file's own tests, which read
-# exactly like user code.
+# The AIPL implementation of the `repeat` builtin. The loader names this
+# function by the canonical name `__builtin_repeat` (see
+# `aipl_syntax::aipl_builtins`), so a user's `xs.repeat(n)` resolves through the
+# ordinary generic machinery — the in-file name is only for this file's own
+# tests, which read exactly like user code.
 #
 # One implementation for every sequence. A `str` is its `char` sequence, so
 # `" ".repeat(indent)` is this with `T = char`, and `[First {}].repeat(n)` is

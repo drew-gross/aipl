@@ -1,9 +1,8 @@
-# The AIPL implementation of the `join_is_nonempty` builtin. Monomorphization
-# registers this function under the canonical name `__builtin_join_is_nonempty`
-# (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's
-# `xs.join_is_nonempty(sep=s)` resolves through the ordinary generic machinery —
-# the in-file name is only for this file's own tests, which read exactly like
-# user code.
+# The AIPL implementation of the `join_is_nonempty` builtin. The loader names
+# this function by the canonical name `__builtin_join_is_nonempty` (see
+# `aipl_syntax::aipl_builtins`), so a user's `xs.join_is_nonempty(sep=s)`
+# resolves through the ordinary generic machinery — the in-file name is only for
+# this file's own tests, which read exactly like user code.
 #
 # It is what `xs.join(sep=s).is_nonempty()` means, without building the join:
 # `join` measures every piece, allocates the whole result and copies each piece

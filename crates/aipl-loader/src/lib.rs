@@ -15,7 +15,6 @@
 mod bake;
 mod kwargs;
 pub use bake::set_source_loc_hook;
-pub use kwargs::set_aipl_builtin_sig_hook;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
@@ -84,6 +83,7 @@ pub fn load_program_rooted(
         ..Loader::default()
     };
     loader.load(&root_canon)?;
+    loader.load_builtins(&root_canon)?;
     dbg.trace(
         "loader",
         format_args!("flattening {} file(s)", loader.files.len()),
@@ -118,6 +118,7 @@ pub fn load_program_overlay(
         ..Loader::default()
     };
     loader.load_source(&root_canon, source)?;
+    loader.load_builtins(&root_canon)?;
     Ok(loader.flatten(&root_canon)?)
 }
 
@@ -125,20 +126,8 @@ pub fn load_program_overlay(
 /// (used by the embedding FFI). Any `from "..."` path imports resolve relative
 /// to the current directory; `from builtins` works as usual.
 pub fn load_program_str(source: &str, dbg: DebugOptions) -> Result<Program, Vec<Error>> {
-    load_str(source, dbg, false)
-}
-
-/// [`load_program_str`] for the source of an AIPL-implemented builtin
-/// (`aipl-mono`'s `builtin_*.aipl`), which may import the builtins reserved
-/// for that use ([`aipl_syntax::INTERNAL_BUILTINS`]).
-pub fn load_builtin_impl_str(source: &str, dbg: DebugOptions) -> Result<Program, Vec<Error>> {
-    load_str(source, dbg, true)
-}
-
-fn load_str(source: &str, dbg: DebugOptions, builtin_impl: bool) -> Result<Program, Vec<Error>> {
     let mut loader = Loader {
         dbg,
-        builtin_impl,
         ..Loader::default()
     };
     // A synthetic root under the current dir: it need not exist on disk, but
@@ -148,6 +137,7 @@ fn load_str(source: &str, dbg: DebugOptions, builtin_impl: bool) -> Result<Progr
         .join("__aipl_ffi_root__.aipl");
     loader.entry = Some(root.clone());
     loader.load_source(&root, source)?;
+    loader.load_builtins(&root)?;
     Ok(loader.flatten(&root)?)
 }
 
@@ -182,6 +172,7 @@ pub fn load_program_sources(
         loader.register_virtual(PathBuf::from(name), src)?;
     }
     loader.check_virtual_imports()?;
+    loader.load_builtins(&root)?;
     Ok(loader.flatten(&root)?)
 }
 
@@ -237,12 +228,11 @@ struct Loader {
     /// *any other* file are tagged with the source they index — see
     /// `tag_origin`.
     entry: Option<PathBuf>,
-    /// Whether this load is of an AIPL-implemented builtin's own source — the
-    /// one place [`aipl_syntax::INTERNAL_BUILTINS`] may be imported. Set by
-    /// [`load_builtin_impl_str`]; a file on disk qualifies by where it lives
-    /// (`is_builtin_impl_path`), so `aipl check` over `crates/` reaches the same
-    /// sources the same way.
-    builtin_impl: bool,
+    /// The files loaded as the AIPL-implemented builtin they implement (see
+    /// [`Loader::load_builtins`]) — the one place
+    /// [`aipl_syntax::INTERNAL_BUILTINS`] may be imported, and where a `pub fn`
+    /// is named by its builtin's canonical name.
+    builtin_files: HashSet<PathBuf>,
     /// The directory a baked source location names its file relative to — see
     /// [`load_program_rooted`] and [`bake::location_label`]. `None` for the
     /// in-memory entry points, whose files are named by the caller already.
@@ -250,8 +240,7 @@ struct Loader {
 }
 
 /// Whether `path` is an AIPL-implemented builtin's source —
-/// `crates/aipl-mono/src/builtin_<name>.aipl` — which may import
-/// [`aipl_syntax::INTERNAL_BUILTINS`].
+/// `crates/aipl-mono/src/builtin_<name>.aipl`.
 fn is_builtin_impl_path(path: &Path) -> bool {
     let named_like_one = path
         .file_name()
@@ -278,6 +267,12 @@ struct LoadedFile {
     /// `import { ... } from builtins;` — the builtin names this file
     /// brings into scope (each possibly aliased).
     builtin_imports: Vec<ImportName>,
+    /// Whether the file writes a grid type, which makes grid operations of its
+    /// indexes and literals (see [`aipl_syntax::aipl_builtins::companions`]).
+    mentions_grid: bool,
+    /// The AIPL-implemented builtins the file calls without importing them: the
+    /// ones its syntax is written as, such as `v[row, column]`'s `grid_get`.
+    syntax_builtins: Vec<Callee>,
 }
 
 struct ResolvedImport {
@@ -369,6 +364,8 @@ impl Loader {
             LoadedFile {
                 index,
                 source: src.to_string(),
+                mentions_grid: aipl_syntax::aipl_builtins::mentions_grid(&items),
+                syntax_builtins: syntax_builtins(&items),
                 items,
                 imports,
                 builtin_imports,
@@ -378,6 +375,74 @@ impl Loader {
             self.load(&from)?;
         }
         Ok(())
+    }
+
+    /// Load, as files of this program, the AIPL-implemented builtins it
+    /// reaches: every one a loaded file imports — the builtins' own files
+    /// included, so the set closes over what they import in turn — and their
+    /// [`companions`](aipl_syntax::aipl_builtins::companions), which passes
+    /// after the checker introduce without any file naming them.
+    ///
+    /// A builtin file is the program's own only when it is the root, checked
+    /// by `aipl check`: then its `.test` and `.performance` blocks run. Loaded
+    /// for another program, those are dropped, as they are not that program's
+    /// to run.
+    fn load_builtins(&mut self, root: &Path) -> Result<(), Vec<Error>> {
+        if is_builtin_impl_path(root) {
+            self.builtin_files.insert(root.to_path_buf());
+        }
+        loop {
+            let mut present: HashSet<Callee> = self
+                .files
+                .values()
+                .flat_map(|f| &f.builtin_imports)
+                .filter_map(|n| Callee::importable(&n.name))
+                .chain(
+                    self.files
+                        .values()
+                        .flat_map(|f| f.syntax_builtins.iter().cloned()),
+                )
+                // What a builtin file implements is present too, and may have
+                // companions: the root of `aipl check` defines its builtin
+                // rather than importing it.
+                .chain(
+                    self.builtin_files
+                        .iter()
+                        .filter_map(|p| aipl_syntax::aipl_builtins::implemented_at(p)),
+                )
+                .collect();
+            let grid = self.files.values().any(|f| f.mentions_grid);
+            present.extend(aipl_syntax::aipl_builtins::companions(&present, grid));
+            let mut pending = Vec::new();
+            for callee in &present {
+                let Some(path) = aipl_syntax::aipl_builtins::source_path(callee) else {
+                    continue;
+                };
+                let path = canonicalize(&path)?;
+                if self.builtin_files.insert(path.clone()) {
+                    pending.push(path);
+                }
+            }
+            if pending.is_empty() {
+                return Ok(());
+            }
+            // A file's index is its place in the load order, and the index is in
+            // the name of everything it defines (`__m<N>__f`). `present` is a
+            // set with no order of its own, so the order is made here: left to
+            // it, the same program would get different names, and a different
+            // IR, from one run to the next.
+            pending.sort();
+            for path in pending {
+                self.load(&path)?;
+                if path != root {
+                    let file = self.files.get_mut(&path).expect("just loaded");
+                    file.items = std::mem::take(&mut file.items)
+                        .into_iter()
+                        .filter_map(without_tests)
+                        .collect();
+                }
+            }
+        }
     }
 
     /// Register an in-memory virtual file `key` (no disk access, no recursion —
@@ -442,6 +507,8 @@ impl Loader {
                 LoadedFile {
                     index,
                     source: src.to_string(),
+                    mentions_grid: aipl_syntax::aipl_builtins::mentions_grid(&items),
+                    syntax_builtins: syntax_builtins(&items),
                     items,
                     imports,
                     builtin_imports,
@@ -517,15 +584,12 @@ impl Loader {
                     Item::Const(c) => (c.name.text.clone(), c.name.span.clone(), c.is_pub),
                     Item::Import(_) => unreachable!("imports stripped during load"),
                 };
-                // Loaded as the builtin it implements (`load_builtin_impl_str`),
-                // the file's `pub fn` *is* `__builtin_<name>`: mono registers it
-                // under that name, so a reference to it from inside the file — a
-                // recursive call, the one shape a builtin body has for an arm the
-                // type system rules out — has to resolve to it. On disk under
-                // `aipl check` the same function is a local item and resolves as
-                // one, tests included.
+                // Loaded as the builtin it implements, the file's `pub fn` *is*
+                // `__builtin_<name>`: every call to the builtin carries that
+                // name, and a reference from inside the file — a recursive call,
+                // or the file's own tests — resolves to it through this view.
                 let canonical = match item {
-                    Item::Fn(f) if self.builtin_impl && f.is_pub => {
+                    Item::Fn(f) if self.builtin_files.contains(path) && f.is_pub => {
                         Callee::importable(&name).map(|c| c.name().to_string())
                     }
                     _ => None,
@@ -697,7 +761,7 @@ impl Loader {
                         // Reserved for the builtins' own implementations until
                         // it is decided whether programs get it.
                         if aipl_syntax::is_internal_builtin(&builtin)
-                            && !(self.builtin_impl || is_builtin_impl_path(path))
+                            && !self.builtin_files.contains(path)
                         {
                             return Err(self.attribute(
                                 path,
@@ -842,6 +906,35 @@ impl Loader {
             // documents it, so it carries none.
             doc: None,
         })
+    }
+}
+
+/// The AIPL-implemented builtins `items` call by their callee rather than by an
+/// imported name.
+fn syntax_builtins(items: &[Item]) -> Vec<Callee> {
+    let mut out = Vec::new();
+    aipl_syntax::each_item_expr(items, &mut |e| {
+        if let ExprKind::Call(callee, ..) = &e.kind {
+            if aipl_syntax::aipl_builtins::is_aipl_implemented(callee) && !out.contains(callee) {
+                out.push(callee.clone());
+            }
+        }
+    });
+    out
+}
+
+/// `item` with its `.test` block and the functions declared in it dropped, and
+/// `None` for the function a `.performance` block stands as — what a file
+/// keeps when it is loaded for a program that is not its own.
+fn without_tests(item: Item) -> Option<Item> {
+    match item {
+        Item::Fn(f) if aipl_syntax::performance_source_name(&f.name).is_some() => None,
+        Item::Fn(mut f) => {
+            f.test_body = None;
+            f.test_fns = Vec::new();
+            Some(Item::Fn(f))
+        }
+        other => Some(other),
     }
 }
 

@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-mono/src/builtin_is_in_bounds_of.aipl</code></h1>
 
-      <div class="module-doc"><p>The AIPL implementation of the <code>is_in_bounds_of</code> builtin. Monomorphization registers this under the canonical name <code>__builtin_is_in_bounds_of</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so <code>i.is_in_bounds_of(xs)</code> resolves through the ordinary generic machinery. A <code>(row, column)</code> pair asked about a grid is rewritten to <code>grid_is_in_bounds_of</code> before it gets here.</p><p>No lint steers <code>i &lt; xs.len()</code> to it: the two read about the same.</p></div>
+      <div class="module-doc"><p>The AIPL implementation of the <code>is_in_bounds_of</code> builtin. The loader names this function by the canonical name <code>__builtin_is_in_bounds_of</code> (see <code>aipl_syntax::aipl_builtins</code>), so <code>i.is_in_bounds_of(xs)</code> resolves through the ordinary generic machinery. A <code>(row, column)</code> pair asked about a grid is rewritten to <code>grid_is_in_bounds_of</code> before it gets here.</p><p>No lint steers <code>i &lt; xs.len()</code> to it: the two read about the same.</p></div>
 
 
 

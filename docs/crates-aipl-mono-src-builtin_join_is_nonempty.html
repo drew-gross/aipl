@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-mono/src/builtin_join_is_nonempty.aipl</code></h1>
 
-      <div class="module-doc"><p>The AIPL implementation of the <code>join_is_nonempty</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_join_is_nonempty</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.join_is_nonempty(sep=s)</code> resolves through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p>It is what <code>xs.join(sep=s).is_nonempty()</code> means, without building the join: <code>join</code> measures every piece, allocates the whole result and copies each piece in, and this asks only whether anything would be there. Written by the compiler's operation-fusion pass for that chain (see <code>chain_fusions</code> in aipl-mono); also callable directly.</p></div>
+      <div class="module-doc"><p>The AIPL implementation of the <code>join_is_nonempty</code> builtin. The loader names this function by the canonical name <code>__builtin_join_is_nonempty</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>xs.join_is_nonempty(sep=s)</code> resolves through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p>It is what <code>xs.join(sep=s).is_nonempty()</code> means, without building the join: <code>join</code> measures every piece, allocates the whole result and copies each piece in, and this asks only whether anything would be there. Written by the compiler's operation-fusion pass for that chain (see <code>chain_fusions</code> in aipl-mono); also callable directly.</p></div>
 
 
 

@@ -1,6 +1,6 @@
 ---
 name: add-builtin
-description: Add a new builtin utility to AIPL (find_if, count_if, trim_while, …) — the AIPL-implemented builtin file, the two Rust registration points, the `# ..` documentation and `.test` block, dogfooding it in the compiler's own sources, and the lint that flags ad-hoc reimplementations of it. Use when asked to add a builtin, a standard-library function, or a utility to `import { .. } from builtins`.
+description: Add a new builtin utility to AIPL (find_if, count_if, trim_while, …) — the AIPL-implemented builtin file, its Rust registration, the `# ..` documentation and `.test` block, dogfooding it in the compiler's own sources, and the lint that flags ad-hoc reimplementations of it. Use when asked to add a builtin, a standard-library function, or a utility to `import { .. } from builtins`.
 ---
 
 # Adding a builtin utility
@@ -24,11 +24,11 @@ one-liner.
 ```aipl
 import { equal as ==, filter, greater_than as > } from builtins;
 
-// The AIPL implementation of the `find_if` builtin. Monomorphization registers
-// this function under the canonical name `__builtin_find_if` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.find_if(pred)` resolves
-// through the ordinary generic / higher-order machinery — the in-file name
-// `find_if` is only for this file's own tests, which read exactly like user code.
+# The AIPL implementation of the `find_if` builtin. The loader names this
+# function by the canonical name `__builtin_find_if` (see
+# `aipl_syntax::aipl_builtins`), so a user's `xs.find_if(pred)` resolves
+# through the ordinary generic / higher-order machinery — the in-file name
+# `find_if` is only for this file's own tests, which read exactly like user code.
 # What it returns, when it stops, and what an empty receiver gives. Say it is
 # callable as a method, and cross-reference the siblings a reader might have
 # wanted instead (`any` reports only *that* a match existed; `first` is the
@@ -53,11 +53,14 @@ Rules that bite:
 - **A builtin can be internal** — usable by `builtin_*.aipl` sources only —
   by listing it in `INTERNAL_BUILTINS` (`aipl-syntax`); the loader refuses the
   import anywhere else. `reserve` is one, pending a decision on exposing it.
-- **Keyword and variadic parameters work** (`sep: U* = [], final_sep: U* = sep`,
-  as `builtin_map_join.aipl` declares): the loader learns an AIPL builtin's
-  signature through `aipl_loader::set_aipl_builtin_sig_hook` (installed with
-  the parser hooks), reading the file on first call. A default may read an
-  earlier parameter, as a user function's may.
+- **It is an ordinary file.** The loader loads it as one more file of every
+  program that reaches it, so it is checked, linted and compiled like the
+  program's own files: it may import other builtins, hold private helpers,
+  structs and constants, use context-typed calls (`narrow`, `to_set`), and take
+  keyword and variadic parameters (`sep: U* = [], final_sep: U* = sep`, as
+  `builtin_map_join.aipl` declares). Only its `pub fn` is special — it is named
+  `__builtin_<name>`. Its `.test` and `.performance` blocks run when the file
+  itself is checked, not in the programs that use it.
 - Prefer a **void `main`** and, in predicates, the `fn is_x(self: T) -> bool`
   method form.
 
@@ -75,16 +78,24 @@ named predicate — it needs its own `.test` too.
 
 Run it in a second: `cargo run -q -- check crates/aipl-mono/src/builtin_<name>.aipl`.
 
-## 2. Register it — exactly two Rust edits
+## 2. Register it
 
 | file | edit |
 |---|---|
-| `crates/aipl-mono/src/lib.rs` | add `("__builtin_<name>", "builtin_<name>.aipl")` to `AIPL_BUILTIN_SOURCES` |
-| `crates/aipl-syntax/src/lib.rs` | add `"<name>"` to `IMPORTABLE_BUILTINS`, and to the `// NOTE:` list of AIPL-implemented builtins above it |
+| `crates/aipl-syntax/src/callee.rs` | a `Callee::<Name>` arm, its entry in `Callee::IMPORTABLE`, and its `"__builtin_<name>"` in `Callee::name` |
+| `crates/aipl-syntax/src/aipl_builtins.rs` | `(Callee::<Name>, "builtin_<name>.aipl")` in `SOURCES` |
+| `crates/aipl-syntax/src/lib.rs` | `<name>` in the `// NOTE:` list of AIPL-implemented builtins in `BUILTIN_SIGNATURES` |
 
 **Do not add a signature to `BUILTIN_SIGNATURES`** — that list is for builtins
 whose body lives in Rust; the `.aipl` file is the source of the signature for
-these, fed to the checker by `aipl_mono::aipl_builtin_sig_decls()`.
+these.
+
+**A builtin no file names needs a `companions` rule.** The loader loads what a
+program imports. One that a pass after the checker introduces — a fusion's
+target (`map_find_if`), a lowering's (`reduce`, `extend_optional`) — is loaded
+through `aipl_builtins::companions`, which says which callees make it reachable.
+Forget the rule and monomorphization stops on the first program that reaches
+it, naming the table.
 
 Nothing else needs touching. The per-case `#[test]` list
 (`tests/support/case_tests.rs`), the row in `tests/performance_metrics.md` every new
@@ -157,8 +168,8 @@ comment saying *why*.
 
 **The hit's span must be one line that survives `aipl check --fix`.** `#[allow]` is
 line-scoped, so a span covering a multi-line construct can never be squelched —
-and an unsquelchable lint that fires on an AIPL-implemented builtin **panics the
-compiler for every program that reaches that builtin**. Point at a short
+and an unsquelchable lint that fires on an AIPL-implemented builtin **is a compile
+error in every program that reaches that builtin**. Point at a short
 statement inside the shape (the `mut acc = [];` seed; the `return some(x);`).
 Your own new builtin will usually trip the new lint — it *is* the longhand — so
 squelch it there with a trailing `#[allow]` and a comment saying why, then
@@ -192,8 +203,8 @@ edit shifts its line numbers, so its error block gets refilled — expected.
 
 **Fanout:** don't grep-and-patch the corpus ahead of time; implement, run, read
 the failure list. The one grep worth doing first is over `crates/**/*.aipl` for
-the shape, because a compiler-source hit is the one that panics if the span
-turns out to be unsquelchable.
+the shape, because a compiler-source hit is the one that breaks every program
+reaching it if the span turns out to be unsquelchable.
 
 ## 5. Finish
 

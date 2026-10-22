@@ -1,7 +1,7 @@
 # The AIPL implementation of the `nonempty_last` builtin (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`); `nonempty_first`'s mirror, and `last`
-# for an array the type system knows is not empty. The `none` arm recurses
-# for the reason `nonempty_first`'s does.
+# `aipl_syntax::aipl_builtins`); `nonempty_first`'s mirror, and `last` for an
+# array the type system knows is not empty. The `none` arm recurses for the
+# reason `nonempty_first`'s does.
 
 import { equal as ==, len, wrapping_sub as - } from builtins;
 

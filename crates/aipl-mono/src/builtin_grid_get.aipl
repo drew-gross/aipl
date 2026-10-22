@@ -1,6 +1,7 @@
-# The AIPL implementation of the `grid_get` builtin. Monomorphization registers
-# this under the canonical name `__builtin_grid_get` (see `AIPL_BUILTIN_SOURCES`
-# in `lib.rs`); the parser writes `grid[row, column]` as a call to it.
+# The AIPL implementation of the `grid_get` builtin. The loader names this
+# function by the canonical name `__builtin_grid_get` (see
+# `aipl_syntax::aipl_builtins`); the parser writes `grid[row, column]` as a call
+# to it.
 #
 # A grid keeps its rows one after another, so the cell is `row * width + column`
 # of the flat array. A column past the end of a row would land in the next row,

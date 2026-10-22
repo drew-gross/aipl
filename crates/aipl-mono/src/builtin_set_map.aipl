@@ -1,8 +1,8 @@
-# The AIPL implementation of the `set_map` builtin. Monomorphization registers
-# this function under the canonical name `__builtin_set_map` (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `s.set_map(f)` resolves
-# through the ordinary generic / higher-order machinery — the in-file name
-# `set_map` is only for this file's own tests, which read exactly like user code.
+# The AIPL implementation of the `set_map` builtin. The loader names this
+# function by the canonical name `__builtin_set_map` (see
+# `aipl_syntax::aipl_builtins`), so a user's `s.set_map(f)` resolves through the
+# ordinary generic / higher-order machinery — the in-file name `set_map` is only
+# for this file's own tests, which read exactly like user code.
 #
 # No lint steers a hand-written loop here, because the shape a lint could match
 # is not the shape this replaces. `push_loop_pipeline` already flags

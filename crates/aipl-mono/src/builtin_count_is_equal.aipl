@@ -1,5 +1,5 @@
 # The AIPL implementation of the `count_is_equal` builtin. Registered under
-# `__builtin_count_is_equal` (see `AIPL_BUILTIN_SOURCES` in `lib.rs`).
+# `__builtin_count_is_equal` (see `aipl_syntax::aipl_builtins`).
 #
 # A fused comparison: `count(x) == limit` without counting past the point the answer is
 # settled. Once the running count exceeds `limit` it can never come back, so the

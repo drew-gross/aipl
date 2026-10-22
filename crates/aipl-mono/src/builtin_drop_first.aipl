@@ -1,5 +1,5 @@
 # The AIPL implementation of the `drop_first` builtin (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`) — `drop_n(1)`, named for the common case.
+# `aipl_syntax::aipl_builtins`) — `drop_n(1)`, named for the common case.
 
 import { drop_n, equal as ==, first, is_empty, len } from builtins;
 

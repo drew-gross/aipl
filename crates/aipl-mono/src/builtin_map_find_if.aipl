@@ -1,8 +1,8 @@
-# The AIPL implementation of the `map_find_if` builtin. Monomorphization
-# registers this function under the canonical name `__builtin_map_find_if`
-# (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.map_find_if(f, p)`
-# resolves through the ordinary generic / higher-order machinery — the in-file
-# name is only for this file's own tests, which read exactly like user code.
+# The AIPL implementation of the `map_find_if` builtin. The loader names this
+# function by the canonical name `__builtin_map_find_if` (see
+# `aipl_syntax::aipl_builtins`), so a user's `xs.map_find_if(f, p)` resolves
+# through the ordinary generic / higher-order machinery — the in-file name is
+# only for this file's own tests, which read exactly like user code.
 #
 # It is what `xs.map(f).find_if(p)` means, in one pass: `map` would apply `f`
 # to every element and build the whole array before `find_if` looked at any

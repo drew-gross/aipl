@@ -1,5 +1,5 @@
-# The AIPL implementation of the `count_is_greater_than` builtin. Registered under
-# `__builtin_count_is_greater_than` (see `AIPL_BUILTIN_SOURCES` in `lib.rs`).
+# The AIPL implementation of the `count_is_greater_than` builtin. Registered
+# under `__builtin_count_is_greater_than` (see `aipl_syntax::aipl_builtins`).
 #
 # A fused comparison: `count(x) > limit` without counting past the point the answer is
 # settled. `count` itself always walks the whole collection; this stops at the

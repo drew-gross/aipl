@@ -1,9 +1,9 @@
-# The AIPL implementation of the `filter_map_reduce` builtin. Monomorphization
-# registers this function under the canonical name `__builtin_filter_map_reduce`
-# (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's
-# `xs.filter_map_reduce(keep, f, step)` resolves through the ordinary generic /
-# higher-order machinery — the in-file name is only for this file's own tests,
-# which read exactly like user code.
+# The AIPL implementation of the `filter_map_reduce` builtin. The loader names
+# this function by the canonical name `__builtin_filter_map_reduce` (see
+# `aipl_syntax::aipl_builtins`), so a user's `xs.filter_map_reduce(keep, f,
+# step)` resolves through the ordinary generic / higher-order machinery — the
+# in-file name is only for this file's own tests, which read exactly like user
+# code.
 #
 # It is what `xs.filter(keep).map(f).<reduction>()` means, in one pass and with
 # no array built at all: `filter` would allocate the survivors and `map` their

@@ -1,10 +1,10 @@
 # The AIPL implementation of the `join_is_empty` builtin — the other half of
 # `join_is_nonempty` (see `builtin_join_is_nonempty.aipl`, which says what the
-# fusion is for and what rule decides it). Monomorphization registers this
-# function under the canonical name `__builtin_join_is_empty` (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.join_is_empty(sep=s)`
-# resolves through the ordinary generic machinery — the in-file name is only for
-# this file's own tests, which read exactly like user code.
+# fusion is for and what rule decides it). The loader names this function by the
+# canonical name `__builtin_join_is_empty` (see `aipl_syntax::aipl_builtins`),
+# so a user's `xs.join_is_empty(sep=s)` resolves through the ordinary generic
+# machinery — the in-file name is only for this file's own tests, which read
+# exactly like user code.
 #
 # It is what `xs.join(sep=s).is_empty()` means, without building the join. The
 # compiler's operation-fusion pass writes it for that chain (see

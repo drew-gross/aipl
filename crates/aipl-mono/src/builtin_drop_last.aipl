@@ -1,6 +1,5 @@
 # The AIPL implementation of the `drop_last` builtin (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`) — `drop_last_n(1)`, named for the common
-# case.
+# `aipl_syntax::aipl_builtins`) — `drop_last_n(1)`, named for the common case.
 
 import { drop_last_n, equal as ==, is_empty, last, len } from builtins;
 

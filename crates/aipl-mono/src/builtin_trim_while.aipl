@@ -1,11 +1,11 @@
-# The AIPL implementation of the `trim_while` builtin. Monomorphization
-# registers this function under the canonical name `__builtin_trim_while`
-# (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `s.trim_while(pred)`
-# resolves through the ordinary generic / higher-order machinery — the in-file
-# name `trim_while` is only for this file's own tests, which read exactly like
-# user code. A builtin body may call other builtins (loaded through the real
-# loader), so this drops the leading run via the `count_while` builtin — the
-# complement of `count_while`.
+# The AIPL implementation of the `trim_while` builtin. The loader names this
+# function by the canonical name `__builtin_trim_while` (see
+# `aipl_syntax::aipl_builtins`), so a user's `s.trim_while(pred)` resolves
+# through the ordinary generic / higher-order machinery — the in-file name
+# `trim_while` is only for this file's own tests, which read exactly like user
+# code. A builtin body may call other builtins (loaded through the real loader),
+# so this drops the leading run via the `count_while` builtin — the complement
+# of `count_while`.
 
 import { count_while, equal as == } from builtins;
 

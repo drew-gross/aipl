@@ -1,7 +1,7 @@
-# The AIPL implementation of the `intersperse` builtin. Monomorphization
-# registers this function under the canonical name `__builtin_intersperse` (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.intersperse(sep)`
-# specializes through the ordinary generic machinery.
+# The AIPL implementation of the `intersperse` builtin. The loader names this
+# function by the canonical name `__builtin_intersperse` (see
+# `aipl_syntax::aipl_builtins`), so a user's `xs.intersperse(sep)` specializes
+# through the ordinary generic machinery.
 #
 # The array counterpart of `join`: `join` is this followed by concatenation,
 # which only `str` can do — every element type can be interleaved, so that is

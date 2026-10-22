@@ -1,5 +1,5 @@
 # The AIPL implementation of the `count_is_at_least` builtin. Registered under
-# `__builtin_count_is_at_least` (see `AIPL_BUILTIN_SOURCES` in `lib.rs`).
+# `__builtin_count_is_at_least` (see `aipl_syntax::aipl_builtins`).
 #
 # A fused comparison: `count(x) >= limit` without counting past the point the answer is
 # settled. `count` itself always walks the whole collection; this stops at the

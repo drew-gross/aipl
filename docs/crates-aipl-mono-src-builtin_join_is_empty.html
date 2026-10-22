@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-mono/src/builtin_join_is_empty.aipl</code></h1>
 
-      <div class="module-doc"><p>The AIPL implementation of the <code>join_is_empty</code> builtin — the other half of <code>join_is_nonempty</code> (see <code>builtin_join_is_nonempty.aipl</code>, which says what the fusion is for and what rule decides it). Monomorphization registers this function under the canonical name <code>__builtin_join_is_empty</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.join_is_empty(sep=s)</code> resolves through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p>It is what <code>xs.join(sep=s).is_empty()</code> means, without building the join. The compiler's operation-fusion pass writes it for that chain (see <code>chain_fusions</code> in aipl-mono); also callable directly.</p></div>
+      <div class="module-doc"><p>The AIPL implementation of the <code>join_is_empty</code> builtin — the other half of <code>join_is_nonempty</code> (see <code>builtin_join_is_nonempty.aipl</code>, which says what the fusion is for and what rule decides it). The loader names this function by the canonical name <code>__builtin_join_is_empty</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>xs.join_is_empty(sep=s)</code> resolves through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p>It is what <code>xs.join(sep=s).is_empty()</code> means, without building the join. The compiler's operation-fusion pass writes it for that chain (see <code>chain_fusions</code> in aipl-mono); also callable directly.</p></div>
 
 
 

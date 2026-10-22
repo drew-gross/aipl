@@ -462,13 +462,25 @@ fn the_leak_gate_runs_for_a_case_with_no_sections() {
         "this test needs a case that pins nothing"
     );
 
+    // What a child run of that one case reports: whether it ran at all, and the
+    // harness's leak message if it gave one. Whether the case as a whole passed
+    // is not asked: that includes its row in the baseline table, which is stale
+    // between a codegen change and the refresh that settles it, and a leak gate
+    // that only held while a metrics table was current would make that refresh
+    // wait on itself. The leak gate is judged on the message alone.
     let run = |leak: bool| {
+        // A place of its own to link in: the same case is being run, by nextest,
+        // in another process, and a shared executable path is a race between them.
+        let out_root = Path::new(env!("CARGO_TARGET_TMPDIR"))
+            .join(format!("aipl-leak-gate-{}-{leak}", std::process::id()));
         let mut cmd = Command::new(std::env::current_exe().expect("this test binary"));
         cmd.args(["--exact", "examples_arrays", "--test-threads=1"]);
+        cmd.env("AIPL_CASES_OUT", &out_root);
         if leak {
             cmd.env("AIPL_INJECT_LEAK", "1");
         }
         let out = cmd.output().expect("re-run the harness on one case");
+        let _ = fs::remove_dir_all(&out_root);
         let stdout = String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n");
         // libtest's own lines vary; the harness's failure message is the point.
         let message: Vec<String> = stdout
@@ -476,14 +488,14 @@ fn the_leak_gate_runs_for_a_case_with_no_sections() {
             .filter(|l| l.contains("memory leak") || *l == "Fix the leak.")
             .map(str::to_string)
             .collect();
-        (out.status.success(), message)
+        (stdout.contains("running 1 test"), message)
     };
 
     assert_eq!(run(false), (true, vec![]));
     assert_eq!(
         run(true),
         (
-            false,
+            true,
             vec![
                 "[examples/arrays.aipl]: memory leak — allocations (3) != deallocations (0)"
                     .to_string(),
@@ -650,7 +662,14 @@ fn setup_cases() -> &'static (Vec<CaseFile>, PathBuf) {
         aipl::install_parser_hooks();
 
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let out_root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("aipl-cases");
+        // Where each case stages and links. One fixed place per case, so two
+        // processes running the same case at once would link the same
+        // executable; `AIPL_CASES_OUT` gives a process a place of its own (the
+        // leak-gate test re-runs a case in a child while nextest runs it in
+        // another process).
+        let out_root = std::env::var_os("AIPL_CASES_OUT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| Path::new(env!("CARGO_TARGET_TMPDIR")).join("aipl-cases"));
         fs::create_dir_all(&out_root).expect("mkdir cases output");
 
         let cases = collect_all_cases(

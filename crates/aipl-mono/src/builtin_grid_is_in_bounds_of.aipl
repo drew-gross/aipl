@@ -1,6 +1,6 @@
-# The AIPL implementation of the `grid_is_in_bounds_of` builtin. Monomorphization
-# registers this under the canonical name `__builtin_grid_is_in_bounds_of` (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`); `(row, column).is_in_bounds_of(grid)` is
+# The AIPL implementation of the `grid_is_in_bounds_of` builtin. The loader
+# names this function by the canonical name `__builtin_grid_is_in_bounds_of`
+# (see `aipl_syntax::aipl_builtins`); `(row, column).is_in_bounds_of(grid)` is
 # rewritten to a call to it.
 
 import { Grid, height, less_than as <, logical_and as &&, logical_not as !, width } from builtins;

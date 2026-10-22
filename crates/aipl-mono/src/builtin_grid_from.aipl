@@ -1,7 +1,7 @@
-# The AIPL implementation of the `grid_from` builtin. Monomorphization registers
-# this under the canonical name `__builtin_grid_from` (see `AIPL_BUILTIN_SOURCES`
-# in `lib.rs`); a nested array literal written where a grid is expected is
-# rewritten to a call to it.
+# The AIPL implementation of the `grid_from` builtin. The loader names this
+# function by the canonical name `__builtin_grid_from` (see
+# `aipl_syntax::aipl_builtins`); a nested array literal written where a grid is
+# expected is rewritten to a call to it.
 
 import { Grid, equal as ==, grid_get, not_equal as != } from builtins;
 

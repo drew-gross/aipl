@@ -1,7 +1,6 @@
-# The AIPL implementation of the `range` builtin. Monomorphization registers this
-# under the canonical name `__builtin_range` (see `AIPL_BUILTIN_SOURCES` in
-# `lib.rs`), so a user's `xs.range()` resolves through the ordinary generic
-# machinery.
+# The AIPL implementation of the `range` builtin. The loader names this function
+# by the canonical name `__builtin_range` (see `aipl_syntax::aipl_builtins`), so
+# a user's `xs.range()` resolves through the ordinary generic machinery.
 #
 # A `Span` rather than a type of its own, because the language already has one for
 # exactly this: `recv[span]` slices by a `Span`, so `0..len` is the span that names

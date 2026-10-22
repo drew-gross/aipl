@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-mono/src/builtin_int_parse_unsigned.aipl</code></h1>
 
-      <div class="module-doc"><p>The AIPL implementation of the internal <code>int_parse_unsigned</code> builtin: the unsigned half of <code>int_parse</code>. Monomorphization registers this function under the canonical name <code>__builtin_int_parse_unsigned</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>). Nothing imports it: the checker rewrites an <code>int_parse</code> whose position wants an unsigned integer into a call to this one, which reaches the whole <code>u64</code> range where the signed parse stops at <code>i64::MAX</code>.</p></div>
+      <div class="module-doc"><p>The AIPL implementation of the internal <code>int_parse_unsigned</code> builtin: the unsigned half of <code>int_parse</code>. The loader names this function by the canonical name <code>__builtin_int_parse_unsigned</code> (see <code>aipl_syntax::aipl_builtins</code>), and loads it with any program that uses <code>int_parse</code>: nothing imports it, but the checker rewrites an <code>int_parse</code> whose position wants an unsigned integer into a call to this one, which reaches the whole <code>u64</code> range where the signed parse stops at <code>i64::MAX</code>.</p></div>
 
 
 

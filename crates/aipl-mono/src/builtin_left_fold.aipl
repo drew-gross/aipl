@@ -1,9 +1,9 @@
-# The AIPL implementation of the `left_fold` builtin. Monomorphization registers
-# this function under the canonical name `__builtin_left_fold` (see
-# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.left_fold(init, f)`
-# specializes through the ordinary generic / higher-order machinery — the
-# in-file name `left_fold` is only for this file's own tests, which read exactly
-# like user code.
+# The AIPL implementation of the `left_fold` builtin. The loader names this
+# function by the canonical name `__builtin_left_fold` (see
+# `aipl_syntax::aipl_builtins`), so a user's `xs.left_fold(init, f)` specializes
+# through the ordinary generic / higher-order machinery — the in-file name
+# `left_fold` is only for this file's own tests, which read exactly like user
+# code.
 
 import { concat as +++, equal as ==, filter, logical_not as !, wrapping_add as + } from builtins;
 

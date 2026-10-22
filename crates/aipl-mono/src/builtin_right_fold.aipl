@@ -1,8 +1,8 @@
 # The AIPL implementation of the `right_fold` builtin — `left_fold`'s mirror
-# (see `builtin_left_fold.aipl`). Monomorphization registers this function under
-# the canonical name `__builtin_right_fold` (see `AIPL_BUILTIN_SOURCES` in
-# `lib.rs`), so a user's `xs.right_fold(init, f)` specializes through the
-# ordinary generic / higher-order machinery.
+# (see `builtin_left_fold.aipl`). The loader names this function by the
+# canonical name `__builtin_right_fold` (see `aipl_syntax::aipl_builtins`), so a
+# user's `xs.right_fold(init, f)` specializes through the ordinary generic /
+# higher-order machinery.
 #
 # Walks the indices backwards rather than folding over a reversed copy, so
 # nothing is allocated. `self[i]` yields an optional and `i` is always in range,

@@ -1,7 +1,7 @@
-# The AIPL implementation of the `inline_str` builtin. Monomorphization registers
-# this under the canonical name `__builtin_inline_str` (see `AIPL_BUILTIN_SOURCES`
-# in `lib.rs`), so a user's `s.inline_str()` resolves through the ordinary
-# machinery.
+# The AIPL implementation of the `inline_str` builtin. The loader names this
+# function by the canonical name `__builtin_inline_str` (see
+# `aipl_syntax::aipl_builtins`), so a user's `s.inline_str()` resolves through
+# the ordinary machinery.
 #
 # It is the one member of the `*_str` family written in AIPL rather than as a
 # runtime entry point, because it is the one that can fail: an inline value holds

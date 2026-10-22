@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-mono/src/builtin_trim_while.aipl</code></h1>
 
-      <div class="module-doc"><p>The AIPL implementation of the <code>trim_while</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_trim_while</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>s.trim_while(pred)</code> resolves through the ordinary generic / higher-order machinery — the in-file name <code>trim_while</code> is only for this file's own tests, which read exactly like user code. A builtin body may call other builtins (loaded through the real loader), so this drops the leading run via the <code>count_while</code> builtin — the complement of <code>count_while</code>.</p></div>
+      <div class="module-doc"><p>The AIPL implementation of the <code>trim_while</code> builtin. The loader names this function by the canonical name <code>__builtin_trim_while</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>s.trim_while(pred)</code> resolves through the ordinary generic / higher-order machinery — the in-file name <code>trim_while</code> is only for this file's own tests, which read exactly like user code. A builtin body may call other builtins (loaded through the real loader), so this drops the leading run via the <code>count_while</code> builtin — the complement of <code>count_while</code>.</p></div>
 
 
 
