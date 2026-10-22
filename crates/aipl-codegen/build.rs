@@ -20,8 +20,9 @@
 //!
 //! The IR has not gone anywhere — it is still what the artifact is *generated*
 //! as, and still what the staged-IR workflow validates through
-//! `AIPL_DOGFOOD_IR` (`Compilation::from_artifact` JITs it). It is simply a
-//! working-tree intermediate now rather than a checked-in file. The manifest's
+//! `AIPL_DOGFOOD_IR` (the compiler compiles it once to a shared library and
+//! loads that; see `staged_library`). It is simply a working-tree intermediate
+//! now rather than a checked-in file. The manifest's
 //! `; source-fingerprint` line is what still ties the checked-in object to the
 //! AIPL sources it came from; `checked_in_ir_is_current` regenerates the IR in
 //! memory and compares against it.

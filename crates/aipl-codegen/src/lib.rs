@@ -33,6 +33,10 @@ pub mod ffi_ast;
 #[allow(dead_code)]
 mod str24;
 
+// The staged-IR override: a candidate artifact compiled once to a shared library
+// and loaded by every process, in place of each process JIT-compiling it.
+mod staged_library;
+
 // The 24-byte *array* value, `str24`'s shape on purpose, and the operations over
 // the block under it. Shared with the AOT runtime, for the same reason `str24`
 // is: a divergence in a layout constant is silent memory corruption rather than a
@@ -1717,7 +1721,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
 ///
 /// Nothing reads this on the ordinary run path, and nothing checks it in: the
 /// IR is a *working-tree intermediate*. It is what the artifact is generated
-/// as, what the staged-IR workflow JITs through [`DOGFOOD_IR_ENV`] to validate a
+/// as, what the staged-IR workflow loads through [`DOGFOOD_IR_ENV`] to validate a
 /// candidate, and what `promote_staged_ir` compiles into the checked-in
 /// `dogfood.o`. The machine code it describes is already in the binary.
 ///
@@ -1777,6 +1781,9 @@ fn optimization_rounds() -> usize {
 /// does (including its own source) then runs off that file instead of the
 /// checked-in [`DOGFOOD_CLIF_PATH`], so `AIPL_DOGFOOD_IR=…staged cargo test`
 /// exercises staged IR across the whole corpus before it's promoted to live.
+///
+/// The file is compiled once into a shared library beside it and loaded from
+/// there by every process; see [`staged_library`].
 pub const DOGFOOD_IR_ENV: &str = "AIPL_DOGFOOD_IR";
 
 /// The manifest header of the prebuilt artifact, emitted alongside its object
@@ -1818,41 +1825,73 @@ pub fn dogfood_compilation() -> Compilation {
     dogfood_engine()
 }
 
-/// The dogfood engine for this process: the prebuilt object normally, or a
-/// fresh JIT link of the file named by [`DOGFOOD_IR_ENV`] when that override is
-/// set.
+/// The dogfood engine for this process: the prebuilt object normally, or the
+/// shared library compiled from the file named by [`DOGFOOD_IR_ENV`] when that
+/// override is set.
 fn dogfood_engine() -> Compilation {
     engine(
         DOGFOOD_IR_ENV,
+        &DOGFOOD,
         DOGFOOD_MANIFEST,
         DOGFOOD_PREBUILT,
         "dogfood engine",
     )
 }
 
+/// The dogfood engine for the candidate artifact at `clif`, as
+/// [`DOGFOOD_IR_ENV`] would have the compiler run it: loaded from the shared
+/// library compiled from it, which is built first if nothing has built this
+/// version of the file.
+pub fn staged_compilation(clif: &std::path::Path) -> Result<Compilation, Error> {
+    let loaded = staged_library::load(clif, DOGFOOD.name, DOGFOOD.prefix).map_err(Error::msg)?;
+    Compilation::from_prebuilt(loaded.manifest, loaded.entries)
+}
+
+/// The dogfood engine for the shared library `library`, with `manifest` the
+/// header that goes with it. For a library built some way other than
+/// [`staged_compilation`] builds it.
+pub fn compilation_from_library(
+    library: &std::path::Path,
+    manifest: &std::path::Path,
+) -> Result<Compilation, Error> {
+    let loaded =
+        staged_library::open_library(library, manifest, DOGFOOD.prefix).map_err(Error::msg)?;
+    Compilation::from_prebuilt(loaded.manifest, loaded.entries)
+}
+
+/// Delete the libraries compiled from the candidate artifact at `clif`. For the
+/// commands that replace or retire it, which would otherwise leave libraries
+/// nothing refers to.
+pub fn remove_staged_libraries(clif: &std::path::Path) {
+    staged_library::remove_libraries(clif);
+}
+
 /// Build the dogfood engine.
 ///
 /// The default is the prebuilt object: the same artifact, already lowered to
 /// machine code inside this binary, so there is no IR to parse and nothing to
-/// compile. Setting `$env` to a `.clif` path swaps in the run-time JIT link of
-/// *that* file instead, which is how the staged-IR workflow validates candidate
-/// IR across the whole corpus before promoting it — the object in the binary
-/// was built from the live artifact and cannot speak for a staged one.
+/// compile. Setting `$env` to a `.clif` path swaps in the shared library
+/// compiled from *that* file instead, which is how the staged-IR workflow
+/// validates candidate IR across the whole corpus before promoting it — the
+/// object in the binary was built from the live artifact and cannot speak for a
+/// staged one.
 ///
 /// Either way a failure is a panic: the compiler cannot parse its own source
 /// without this engine, and there is deliberately no fallback (see "No native
 /// fallbacks for dogfooded functions").
 fn engine(
     env: &str,
+    files: &ArtifactFiles,
     manifest: &'static str,
     prebuilt: &'static [(&'static str, PrebuiltFn)],
     what: &str,
 ) -> Compilation {
     match std::env::var(env) {
         Ok(path) if !path.is_empty() => {
-            let text = std::fs::read_to_string(&path)
-                .unwrap_or_else(|e| panic!("{env}: could not read IR at {path:?}: {e}"));
-            Compilation::from_artifact(&text)
+            let loaded =
+                staged_library::load(std::path::Path::new(&path), files.name, files.prefix)
+                    .unwrap_or_else(|e| panic!("{env}: {e}"));
+            Compilation::from_prebuilt(loaded.manifest, loaded.entries)
                 .unwrap_or_else(|e| panic!("{what} builds from {path:?}: {e:?}"))
         }
         _ => Compilation::from_prebuilt(manifest, prebuilt)
@@ -3744,10 +3783,11 @@ pub type PrebuiltFn = unsafe extern "C" fn();
 /// Where a [`Compilation`]'s machine code lives.
 enum Code {
     /// Compiled in this process, and owned by this module — source compilation,
-    /// and the `AIPL_DOGFOOD_IR` staging override.
+    /// and the artifact tests' re-link of generated IR.
     Jit(JITModule),
-    /// Compiled at build time into the binary, addressed by a generated
-    /// name→address table. See [`Compilation::from_prebuilt`].
+    /// Compiled ahead of time and addressed by a name→address table: into the
+    /// binary at build time, or into the shared library a staged artifact is
+    /// loaded from. See [`Compilation::from_prebuilt`].
     Prebuilt(&'static [(&'static str, PrebuiltFn)]),
 }
 

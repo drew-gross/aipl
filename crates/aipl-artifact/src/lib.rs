@@ -10,9 +10,13 @@
 //!   [`cranelift_object::ObjectModule`], producing machine code that ships
 //!   inside the `aipl` binary — so a normal run pays no Cranelift cost at all.
 //! * **At run time**, `Compilation::from_artifact` links them into a
-//!   `JITModule`. That path is what the `AIPL_DOGFOOD_IR` staging override
-//!   uses, so candidate IR can be validated across the corpus
-//!   before it is promoted.
+//!   `JITModule`. The regeneration helpers use it to check IR they have
+//!   generated before writing it out.
+//!
+//! The `AIPL_DOGFOOD_IR` staging override, which validates candidate IR across
+//! the corpus before it is promoted, does not JIT: it lowers the candidate with
+//! [`emit_object`], as promotion does, into a shared library that every process
+//! loads, so the cost of compiling it is paid once and not once per process.
 //!
 //! Keeping one implementation is the point. The declaration order below is not
 //! incidental — it reproduces the exact id↔name mapping the artifact's

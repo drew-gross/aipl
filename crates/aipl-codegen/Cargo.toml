@@ -32,6 +32,8 @@ cranelift-module = { workspace = true }
 cranelift-native = { workspace = true }
 cranelift-object = { workspace = true }
 target-lexicon = { workspace = true }
+# `dlopen`/`dlsym`/`flock` for the staged-IR shared library (`staged_library`).
+libc = { workspace = true }
 
 [lib]
 path = "src/lib.rs"

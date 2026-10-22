@@ -10,6 +10,8 @@
 # leaves these behind, and neither belongs in a commit.
 /crates/aipl-codegen/src/*.clif
 /crates/aipl-codegen/src/*.clif.staged
+# What the compiler builds from a staged file: the library it loads, its manifest, and the lock.
+/crates/aipl-codegen/src/*.clif.staged.*
 
 # The VS Code extension's npm dependencies: `package-lock.json` pins them,
 # and `npm install` in `editors/vscode` restores them.

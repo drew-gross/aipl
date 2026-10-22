@@ -464,8 +464,9 @@ fn handoff() -> ! {
     {}
 Resolve the interrupted workflow first — promote it
     cargo nextest run --run-ignored only -E 'test(=dogfood_ir::promote_staged_ir)'
-or discard it
-    rm -f '{}'",
+or discard it, with the library built from it
+    rm -f '{}' '{}'.*",
+                staged.display(),
                 staged.display(),
                 staged.display(),
             ),

@@ -63,6 +63,7 @@ dependencies = [
  "cranelift-module",
  "cranelift-native",
  "cranelift-object",
+ "libc",
  "stacker",
  "target-lexicon",
 ]

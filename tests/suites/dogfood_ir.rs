@@ -824,6 +824,48 @@ fn artifact_round_trips_rich_types() {
     }
 }
 
+/// The live artifact, relinked as a shared library the way a staged candidate
+/// is, loads into this binary and runs.
+///
+/// A candidate is run from a library the corpus run loads into the compiler and
+/// into every test binary, and the library leaves the runtime calls it makes
+/// (`aipl_str_alloc`, …) undefined, to bind to the host's when it is loaded. This
+/// is what fails if a host stops exporting one: loading is `RTLD_NOW`, so a
+/// missing function is an error here and not a crash in the middle of a parse.
+/// The object is the live one, not a candidate, so it needs no IR and no
+/// regeneration; building a library from a candidate's text is the staged-IR
+/// run itself.
+#[test]
+fn a_shared_library_of_the_artifact_loads_into_this_binary_and_runs() {
+    for a in ARTIFACTS {
+        let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("shared-library");
+        std::fs::create_dir_all(&dir).expect("create the scratch directory");
+        let library = dir.join(format!("{}-{}.so", a.files.name, std::process::id()));
+        let mut link = std::process::Command::new("cc");
+        if cfg!(target_os = "macos") {
+            link.args(["-dynamiclib", "-undefined", "dynamic_lookup"]);
+        } else {
+            link.arg("-shared");
+        }
+        let linked = link
+            .arg("-o")
+            .arg(&library)
+            .arg(object_path_of(a))
+            .output()
+            .expect("run cc");
+        assert!(
+            linked.status.success(),
+            "cc failed to link {}:\n{}",
+            object_path_of(a).display(),
+            String::from_utf8_lossy(&linked.stderr)
+        );
+        let comp = aipl::codegen::compilation_from_library(&library, &manifest_path_of(a))
+            .unwrap_or_else(|e| panic!("load {}: {e:?}", library.display()));
+        sanity_check_entries(a, &comp);
+        let _ = std::fs::remove_file(&library);
+    }
+}
+
 /// Fails if a `.clif.staged` file is present, signalling a staged IR workflow
 /// is in progress. See CLAUDE.md for the full workflow.
 ///
@@ -857,9 +899,11 @@ fn no_staged_ir_pending() {
 /// promoting.
 ///
 /// The staged candidate stays *IR*, not an object: the corpus validation run
-/// points `AIPL_DOGFOOD_IR` at it and the compiler JITs it, which is the whole
+/// points `AIPL_DOGFOOD_IR` at it and the compiler loads it, which is the whole
 /// point of staging — the object in the binary was built from the live artifact
-/// and cannot speak for a candidate.
+/// and cannot speak for a candidate. Loading it means compiling it once into a
+/// shared library beside it (`aipl_codegen::staged_library`): the first process
+/// to need the file does that, and every other process loads the result.
 ///
 /// See CLAUDE.md for the full staged IR workflow.
 #[test]
@@ -870,6 +914,8 @@ fn fill_staged_ir() {
         let artifact = generate_for(a);
         sanity_check_of(a, &artifact);
         let path = staged_path_of(a);
+        // The libraries compiled from the previous candidate are not this one's.
+        aipl::codegen::remove_staged_libraries(&path);
         std::fs::write(&path, &artifact)
             .unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
         eprintln!("wrote {}", path.display());
@@ -884,11 +930,16 @@ fn fill_staged_ir() {
 }
 
 /// Entry-level pre-check: load `dogfood.clif.staged` and sanity-call every
-/// entry, without modifying anything. This is the *fast* gate — it confirms the
-/// staged IR links and each entry computes correctly, but it does not exercise
-/// the compiler running on it. The real validation is running the whole corpus
-/// against the staged IR via [`validate_staged_corpus_cmd`] (the compiler links
-/// the staged file through `AIPL_DOGFOOD_IR`), which this message points at.
+/// entry. This is the *fast* gate — it confirms the staged IR links and each
+/// entry computes correctly, but it does not exercise the compiler running on
+/// it. The real validation is running the whole corpus against the staged IR via
+/// [`validate_staged_corpus_cmd`] (the compiler loads the staged file through
+/// `AIPL_DOGFOOD_IR`), which this message points at.
+///
+/// Both ways of running the candidate are checked: the JIT link of its text, and
+/// the shared library compiled from it that the corpus run will load. The
+/// library is built here if nothing has built it yet, which leaves it ready, so
+/// the first process of the corpus run does not pay for it.
 ///
 /// See CLAUDE.md for the full staged IR workflow.
 #[test]
@@ -903,6 +954,9 @@ fn validate_staged_ir() {
             )
         });
         sanity_check_of(a, &artifact);
+        let library = aipl::codegen::staged_compilation(&path)
+            .unwrap_or_else(|e| panic!("load the library compiled from {}: {e:?}", path.display()));
+        sanity_check_entries(a, &library);
         eprintln!("entry-level check passed for {}.", path.display());
     }
     eprintln!(
@@ -937,6 +991,7 @@ fn promote_staged_ir() {
         let changed = write_compiled_of(a, &artifact);
         std::fs::remove_file(&staged)
             .unwrap_or_else(|e| panic!("remove staged {}: {e}", staged.display()));
+        aipl::codegen::remove_staged_libraries(&staged);
         let live = object_path_of(a);
         if changed {
             eprintln!("promoted {} → {}", staged.display(), live.display());

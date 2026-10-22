@@ -1055,7 +1055,10 @@ The steps, for those cases:
    linking the staged file, via the `AIPL_DOGFOOD_IR` env var (which points the
    engine at an alternate `.clif` instead of the baked-in one), so every parse
    in the corpus — including the compiler parsing its own source — exercises
-   the candidate:
+   the candidate. The first process to need the file compiles it once, the way
+   promotion does, into a shared library beside it
+   (`dogfood.clif.staged.<size>-<mtime>.dylib`); every other process loads that
+   (0.16s and ~20 MB, against 3.9s and ~750 MB for a JIT of the text in each):
    `AIPL_DOGFOOD_IR=<abs>/dogfood.clif.staged cargo test`
    The path **must be absolute** — the cases harness spawns the compiler as a
    subprocess whose CWD isn't the repo root, so a relative path won't resolve
@@ -1081,7 +1084,9 @@ exists (the `no_staged_ir_pending` test in `tests/dogfood_ir.rs`) — so the
 transition is never silently left half-done. The only exception is the step-3
 validation run, where `AIPL_DOGFOOD_IR` is set and that check is deliberately
 suppressed. To abort a staged workflow, delete the `*.clif.staged` files from
-`crates/aipl-codegen/src/`.
+`crates/aipl-codegen/src/` (the `*.clif.staged.*` files beside them are the
+library built from one and its lock; they are gitignored, and the next
+`fill_staged_ir` removes whatever it finds).
 
 `fill_dogfood_ir` (writes directly to live) is still available for obviously-safe
 regenerations (e.g. a source comment changed the artifact with no logic change),
