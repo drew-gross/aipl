@@ -91,7 +91,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/arrays/spread/spread_value_semantics | 3 | 152 | 152 | 1327 | 3372 | 3.00 | 80.70 | 1456 |
 | cases/arrays/starts_ends_with | 14 | 1096 | 1096 | 4747 | 14444 | 4.00 | 103.17 | 1440 |
 | cases/arrays/str_array | 6 | 576 | 576 | 1013 | 2876 | 4.00 | 84.10 | 1472 |
-| cases/arrays/sum_and_len | 0 | 0 | 0 | 295 | 600 | 3.00 | 79.74 | 1440 |
+| cases/arrays/sum_and_len | 0 | 0 | 0 | 307 | 648 | 2.00 | 475.06 | 1472 |
 | cases/arrays/to_str_arrays | 9 | 288 | 304 | 2175 | 4524 | 11.00 | 80.81 | 1520 |
 | cases/arrays/try_set | 3 | 1075 | 1075 | 15847 | 1876 | 7.00 | 293.97 | 1472 |
 | cases/arrays/tuple_windows | 19 | 920 | 338 | 2133 | 6104 | 15.00 | 129.15 | 1536 |
@@ -209,7 +209,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/generics/empty_array_arg | 0 | 0 | 0 | 43 | 220 | 2.00 | 76.57 | 1456 |
 | cases/generics/higher_order_struct | 0 | 0 | 0 | 138 | 632 | 2.00 | 77.03 | 1456 |
 | cases/generics/higher_order_variant | 0 | 0 | 0 | 66 | 348 | 2.00 | 76.52 | 1456 |
-| cases/generics/int_literal_arg | 5 | 93 | 93 | 521 | 2088 | 7.00 | 78.33 | 1488 |
+| cases/generics/int_literal_arg | 4 | 74 | 74 | 489 | 1764 | 6.00 | 84.20 | 1456 |
 | cases/generics/int_literal_arg_pinned_by_other_param | 4 | 72 | 36 | 169 | 960 | 6.00 | 78.65 | 1504 |
 | cases/generics/is_len_greater_than_5 | 0 | 0 | 0 | 132 | 544 | 2.00 | 78.55 | 1440 |
 | cases/generics/is_present_any_optional | 0 | 0 | 0 | 81 | 404 | 2.00 | 76.78 | 1440 |
@@ -249,13 +249,15 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/integers/flexible_literals | 3 | 59 | 59 | 109 | 1020 | 5.00 | 79.76 | 1488 |
 | cases/integers/literal_flex_boundaries | 0 | 0 | 0 | 157 | 760 | 1.00 | 78.26 | 1440 |
 | cases/integers/literal_flexing | 11 | 198 | 198 | 375 | 1964 | 10.00 | 82.14 | 1488 |
+| cases/integers/narrow | 12 | 669 | 669 | 433 | 1580 | 8.00 | 93.36 | 1472 |
 | cases/integers/narrow_int_elements | 10 | 332 | 332 | 2019 | 5852 | 11.00 | 96.46 | 1536 |
 | cases/integers/narrow_literal_inlined_into_generic_call | 25 | 1504 | 1504 | 2270 | 6500 | 13.00 | 175.66 | 1472 |
 | cases/integers/negative_literals | 0 | 0 | 0 | 153 | 684 | 2.00 | 77.26 | 1440 |
 | cases/integers/saturating_add | 0 | 0 | 0 | 250 | 1156 | 1.00 | 79.68 | 1456 |
 | cases/integers/saturating_sub | 0 | 0 | 0 | 256 | 1156 | 1.00 | 81.84 | 1440 |
-| cases/integers/sized_in_aggregates | 7 | 291 | 271 | 659 | 2784 | 7.00 | 88.84 | 1488 |
-| cases/integers/u64_elements | 4 | 120 | 120 | 665 | 2332 | 6.00 | 82.53 | 1504 |
+| cases/integers/sized_in_aggregates | 7 | 291 | 271 | 661 | 2788 | 6.00 | 94.19 | 1472 |
+| cases/integers/u64_elements | 4 | 120 | 120 | 667 | 2336 | 6.00 | 87.20 | 1488 |
+| cases/integers/widening | 28 | 1770 | 1770 | 400 | 2944 | 11.00 | 88.44 | 1472 |
 | cases/integers/widths | 2 | 46 | 46 | 73 | 708 | 6.00 | 79.82 | 1504 |
 | cases/kwargs/basic | 3 | 54 | 54 | 99 | 592 | 7.00 | 77.81 | 1488 |
 | cases/kwargs/cross_file | 4 | 352 | 352 | 59 | 528 | 6.00 | 76.92 | 1472 |
@@ -265,7 +267,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/kwargs/default_reads_param_once | 2 | 35 | 35 | 120 | 848 | 8.00 | 79.24 | 1488 |
 | cases/kwargs/default_reads_self | 1 | 39 | 39 | 95 | 660 | 5.00 | 78.28 | 1488 |
 | cases/kwargs/generic_default | 7 | 292 | 292 | 1359 | 3444 | 7.00 | 80.87 | 1520 |
-| cases/kwargs/generic_fn | 3 | 91 | 91 | 129 | 680 | 5.00 | 78.07 | 1472 |
+| cases/kwargs/generic_fn | 3 | 91 | 91 | 153 | 768 | 5.00 | 80.87 | 1472 |
 | cases/kwargs/method_style | 2 | 35 | 35 | 67 | 480 | 5.00 | 78.34 | 1504 |
 | cases/kwargs/mutating_method | 3 | 81 | 97 | 330 | 1504 | 5.00 | 80.08 | 1504 |
 | cases/kwargs/omittable | 57 | 3386 | 3386 | 1448 | 3728 | 26.00 | 81.46 | 1488 |
@@ -577,7 +579,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/strings/trim_alias_keeps_value_semantics | 0 | 0 | 0 | 168 | 940 | 2.00 | 82.74 | 1440 |
 | cases/strings/trim_in_place | 0 | 0 | 0 | 159 | 896 | 2.00 | 82.49 | 1440 |
 | cases/structs/array_of_boxed_field_structs | 9 | 359 | 359 | 534 | 2352 | 7.00 | 80.62 | 1504 |
-| cases/structs/boxed_field_with_array | 139 | 4673 | 1758 | 12053 | 10280 | 18.00 | 101.39 | 1504 |
+| cases/structs/boxed_field_with_array | 139 | 4673 | 1758 | 12089 | 10336 | 18.00 | 104.24 | 1488 |
 | cases/structs/defaults | 0 | 0 | 0 | 322 | 1744 | 2.00 | 193.60 | 1440 |
 | cases/structs/destructure | 6 | 106 | 106 | 320 | 1524 | 8.00 | 80.99 | 1488 |
 | cases/structs/destructure_imported | 5 | 227 | 227 | 158 | 964 | 5.00 | 77.66 | 1504 |
@@ -599,7 +601,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/structs/fields/struct_optional_field | 1 | 39 | 39 | 298 | 1292 | 2.00 | 80.43 | 1440 |
 | cases/structs/fields/struct_optional_field_match | 0 | 0 | 0 | 106 | 468 | 2.00 | 82.11 | 1456 |
 | cases/structs/fields/struct_param_field_access | 0 | 0 | 0 | 40 | 212 | 2.00 | 77.31 | 1440 |
-| cases/structs/fields/struct_with_array_field | 1 | 56 | 80 | 317 | 1404 | 4.00 | 78.74 | 1472 |
+| cases/structs/fields/struct_with_array_field | 1 | 56 | 80 | 329 | 1448 | 4.00 | 84.76 | 1504 |
 | cases/structs/fields/struct_with_str_field | 0 | 0 | 0 | 96 | 488 | 1.00 | 79.69 | 1456 |
 | cases/structs/fields/variant_field | 0 | 0 | 0 | 289 | 1800 | 2.00 | 78.96 | 1440 |
 | cases/structs/fields/variant_field_heap | 2 | 93 | 93 | 471 | 2364 | 7.00 | 81.21 | 1488 |
@@ -792,7 +794,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_value_or | 0 | 0 | 0 | 591 | 2352 | 2.00 | 88.62 | 1424 |
 | crates/aipl-mono/src/builtin_value_or_err | 0 | 0 | 0 | 966 | 4680 | 2.00 | 89.41 | 1424 |
 | crates/aipl-mono/src/builtin_width | 1 | 104 | 104 | 174 | 768 | 2.00 | 88.20 | 1472 |
-| examples/arrays | 3 | 168 | 168 | 900 | 1160 | 2.00 | 79.12 | 1440 |
+| examples/arrays | 3 | 168 | 168 | 912 | 1204 | 2.00 | 498.36 | 1424 |
 | examples/hello | 0 | 0 | 0 | 25579118 | 184 | 2953.00 | 76.76 | 1408 |
 | examples/imports | 0 | 0 | 0 | 12 | 60 | 0.00 | 76.75 | 1408 |
 | examples/strings | 1 | 88 | 88 | 71 | 680 | 5.00 | 76.54 | 1488 |

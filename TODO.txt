@@ -17,6 +17,7 @@ projects:
   ray tracer:
     https://raytracing.github.io/books/RayTracingInOneWeekend.html
   minesweeper:
+    remove seed arg after int conversion improvements land
     cell_at doesn't need to exist
     do the RNG with a shuffle, not the current nonsense
     Game should just be a Marks[,]. Width and height are available on it directly, and mines can be folded in to marks (rename to cells?)
@@ -419,6 +420,7 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  int_parse should be able to return small ints when requested
   __builtin_drop_* should be mutating methods
   zip
   int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html
@@ -712,7 +714,7 @@ perfmon:
   measure() needs to block optimizations
   show call-sites of each function in the final binary
   show regression and improvements
-  functions in external libs don't get size instrumented
+  functions in external libs should get size instrumented
   split out binary size changes due to tests
 
 report:
@@ -734,7 +736,6 @@ tests:
   find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)
 
 integers:
-  type conversions: should return none when out of range. Remove automatic conversion.
   unpinned int lits should be passable as struct fields
 
 Cache monomorphizations of the same lambda

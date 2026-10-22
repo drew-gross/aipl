@@ -7348,6 +7348,25 @@ fn expect_type(
     ))
 }
 
+/// [`expect_type`] for a value in a position that declares its type — a
+/// binding's annotation, a parameter, a return type, a field or payload — where
+/// an integer also widens to a type that holds all of its values
+/// ([`Primitive::widens_to`]). Nothing is emitted for the widening: the value is
+/// already canonical for the wider type.
+fn expect_value_type(
+    actual: &ConcreteType,
+    expected: &ConcreteType,
+    context: &str,
+    span: Span,
+) -> Result<(), Error> {
+    if let (ConcreteType::Primitive(a), ConcreteType::Primitive(e)) = (actual, expected) {
+        if a.widens_to(*e) {
+            return Ok(());
+        }
+    }
+    expect_type(actual, expected, context, span)
+}
+
 /// A length-like operand — an index, a slice bound, a `Span` field, or a
 /// capacity — accepted as `i64` *or* `u64`. Mirrors the checker's
 /// `expect_len_operand`: an integer literal or loop counter is `i64` while
@@ -7376,39 +7395,26 @@ fn expect_len_operand(actual: &ConcreteType, context: &str, span: Span) -> Resul
 /// initializer flexes to it — the same `flex_int_ty` retype a literal gets
 /// flowing into a narrow parameter or return type, and correct for the same
 /// reason: a literal that fits is already canonical in its i64 register, so
-/// only the static type changes. The checker has verified all of this; this is
-/// the codegen-side mirror.
+/// only the static type changes. The same holds for an integer that widens to
+/// the annotation. The checker has verified all of this; this is the
+/// codegen-side mirror.
 fn binding_ty(
-    builder: &mut FunctionBuilder,
     value: &Expr,
-    v: Value,
     actual: &ConcreteType,
     declared: Option<&ConcreteType>,
     name: &str,
-) -> Result<(Value, ConcreteType), Error> {
+) -> Result<ConcreteType, Error> {
     let Some(declared) = declared else {
-        return Ok((v, actual.clone()));
+        return Ok(actual.clone());
     };
     let actual = flex_int_ty(value, actual, declared);
-    // Widths that genuinely differ: the annotation *converts*, which is what
-    // replaced the `u8(..)` form — re-canonicalize the i64-register value to the
-    // declared width (wrapping for a narrowing, extending for a widening),
-    // exactly as the old conversion builtin did. Skipped when flexing already
-    // settled the type, so a literal initializer emits no extra instructions.
-    if actual != *declared {
-        if let (ConcreteType::Primitive(pa), ConcreteType::Primitive(pd)) = (&actual, declared) {
-            if pa.is_int() && pd.is_int() {
-                return Ok((canon_int(builder, v, *pd), declared.clone()));
-            }
-        }
-    }
-    expect_type(
+    expect_value_type(
         &actual,
         declared,
         &format!("binding {name:?}"),
         value.span.clone(),
     )?;
-    Ok((v, declared.clone()))
+    Ok(declared.clone())
 }
 
 /// Reject binding a unit value (the result of a function that returns
@@ -7723,7 +7729,7 @@ fn define_fn<M: Module>(
         // copy below uses the declared layout.
         // A bare-literal body flexes to a narrow-int return type.
         let body_ty = flex_int_ty(&func.body, &body_ty, &declared_ret);
-        expect_type(
+        expect_value_type(
             &body_ty,
             &declared_ret,
             "return value",
@@ -14608,7 +14614,7 @@ fn compile_variant<M: Module>(
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
         // A bare literal takes the payload field's int type.
         let actual = flex_int_ty(arg, &actual, fty);
-        expect_type(&actual, fty, "constructor argument", arg.span.clone())?;
+        expect_value_type(&actual, fty, "constructor argument", arg.span.clone())?;
         vals.push((*offset, fty.clone(), v, owned_temp_since(scopes, before, v)));
     }
 
@@ -14999,7 +15005,7 @@ fn compile_indirect_call<M: Module>(
         let before = scope_depth(scopes);
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
         let actual = flex_int_ty(arg, &actual, expected);
-        expect_type(
+        expect_value_type(
             &actual,
             expected,
             &format!("function value {name:?} arg {idx}"),
@@ -15110,7 +15116,7 @@ fn compile_call<M: Module>(
         // A bare literal argument flexes to a narrow-int parameter (its
         // i64-register value is already canonical when it fits — checker-verified).
         let actual = flex_int_ty(arg, &actual, expected);
-        expect_type(
+        expect_value_type(
             &actual,
             expected,
             &format!("fn {disp:?} arg {idx}"),
@@ -15309,6 +15315,21 @@ fn arity_bug(name: &str, expected: usize, got: usize, span: &Span) -> Error {
     )
 }
 
+/// The error for a `narrow` call that reached codegen without an integer
+/// optional recorded as its type. The checker refuses one with no such target,
+/// so this is a pass that rebuilt the call and dropped its `ty`.
+fn narrow_target_bug(locked: &Option<ConcreteType>, span: &Span) -> Error {
+    let found = locked.as_ref().map_or("nothing".to_string(), type_name);
+    Error::at(
+        format!(
+            "internal error: a `narrow` call reached codegen with {found} recorded as its \
+             target — the checker records an integer optional on every one, so a pass \
+             rebuilt the call without carrying its `ty`"
+        ),
+        span.clone(),
+    )
+}
+
 /// Compile a call expression, dispatched on the `callee` — the
 /// `ExprKind::Call` handling extracted from [`compile_expr`] so expression
 /// dispatch stays readable. `args`/`style` are the call's arguments and method-
@@ -15392,7 +15413,7 @@ fn compile_call_expr<M: Module>(
     let mut values: Vec<Value> = Vec::with_capacity(args.len());
     for (idx, (arg, expected)) in args.iter().zip(&ptys).enumerate() {
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
-        expect_type(
+        expect_value_type(
             &actual,
             expected,
             &format!("{} arg {idx}", display_name(name)),
@@ -16472,6 +16493,68 @@ fn compile_call_expr_direct<M: Module>(
             builder
                 .ins()
                 .store(MemFlagsData::trusted(), value, ptr, OPT_VALUE_OFFSET as i32);
+            (ptr, opt_ty)
+        }
+        Callee::Narrow => {
+            // `n.narrow() -> T?` — `n` as integer type `T`, the one the checker
+            // locked onto the call; `none` when its value is outside `T`.
+            let [receiver] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (v, recv_ty) = compile_expr(module, builder, cx, scopes, receiver)?;
+            let ConcreteType::Primitive(from) = recv_ty else {
+                return Err(Error::at(
+                    format!(
+                        "\"narrow\" is only callable on an integer, got {}",
+                        type_name(&recv_ty)
+                    ),
+                    receiver.span.clone(),
+                ));
+            };
+            let to = match &locked {
+                Some(ConcreteType::Optional(core)) => match **core {
+                    ConcreteType::Primitive(p) if p.is_int() => p,
+                    _ => return Err(narrow_target_bug(&locked, &span)),
+                },
+                _ => return Err(narrow_target_bug(&locked, &span)),
+            };
+            // Both are canonical in their registers (see `canon_int`), so the
+            // value fits `to` exactly when canonicalizing it to `to` leaves it
+            // alone — except across the sign at full width, where the two
+            // readings of one 64-bit pattern differ and canonicalizing is the
+            // identity: a `u64` above `i64::MAX` into a signed type, or a
+            // negative signed value into `u64`. Those also need the value to be
+            // non-negative as an `i64`.
+            let same = if to.int_bits() == Some(64) {
+                builder.ins().iconst(types::I8, 1)
+            } else {
+                let canon = canon_int(builder, v, to);
+                builder.ins().icmp(IntCC::Equal, canon, v)
+            };
+            let crosses_sign = (from == Primitive::U64 && to.int_signed())
+                || (from.int_signed() && to == Primitive::U64);
+            let fits = if crosses_sign {
+                let nonneg = builder
+                    .ins()
+                    .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, v, 0);
+                builder.ins().band(same, nonneg)
+            } else {
+                same
+            };
+            // Branchless, as for `to_digit`: an integer core is a plain scalar,
+            // so the value is stored whatever the tag, and ignored under `none`.
+            let tag = builder.ins().uextend(types::I64, fits);
+            let opt_ty = ConcreteType::Optional(Box::new(ConcreteType::Primitive(to)));
+            let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                StackSlotKind::ExplicitSlot,
+                elem_size_of(&opt_ty, structs) as u32,
+                3,
+            ));
+            let ptr = builder.ins().stack_addr(types::I64, slot, 0);
+            builder.ins().store(MemFlagsData::trusted(), tag, ptr, 0);
+            builder
+                .ins()
+                .store(MemFlagsData::trusted(), v, ptr, OPT_VALUE_OFFSET as i32);
             (ptr, opt_ty)
         }
         Callee::Len | Callee::IsNonempty | Callee::IsEmpty => {
@@ -19773,7 +19856,7 @@ fn compile_expr_inner<M: Module>(
                 } else {
                     // A bare literal takes the field's int type.
                     let actual = flex_int_ty(&init.value, &actual, &fty);
-                    expect_type(&actual, &fty, &ctx, init.value.span.clone())?;
+                    expect_value_type(&actual, &fty, &ctx, init.value.span.clone())?;
                 }
                 let owned_temp = owned_temp_since(scopes, before, v);
                 // The narrower of the two types, which is how many bytes the
@@ -20111,7 +20194,7 @@ fn compile_expr_inner<M: Module>(
             // monomorphization share, so it is abstract; by the time codegen
             // reads it every variable in it has been substituted.
             let declared = ty.as_ref().and_then(|t| t.to_concrete());
-            let (v, t) = binding_ty(builder, value, v, &actual, declared.as_ref(), name)?;
+            let t = binding_ty(value, &actual, declared.as_ref(), name)?;
             // An annotated empty `[]` bound at `char[]` must become the
             // *str-shaped* empty, not the array-shaped placeholder: a `char[]`
             // and a `str` are the same representation, and every `char[]`
@@ -20201,7 +20284,7 @@ fn compile_expr_inner<M: Module>(
             // monomorphization share, so it is abstract; by the time codegen
             // reads it every variable in it has been substituted.
             let declared = ty.as_ref().and_then(|t| t.to_concrete());
-            let (v, t) = binding_ty(builder, value, v, &actual, declared.as_ref(), name)?;
+            let t = binding_ty(value, &actual, declared.as_ref(), name)?;
             // An annotated empty `[]` bound at `char[]` must become the
             // *str-shaped* empty, not the array-shaped placeholder: a `char[]`
             // and a `str` are the same representation, and every `char[]`
@@ -20681,7 +20764,7 @@ fn compile_expr_inner<M: Module>(
             };
             // A bare literal takes the binding's int type.
             let t = flex_int_ty(value, &t, &expected_ty);
-            expect_type(&t, &expected_ty, "set", value.span.clone())?;
+            expect_value_type(&t, &expected_ty, "set", value.span.clone())?;
             // A binding seeded with an empty literal (`mut s = #{};`) is typed by
             // its placeholder until something concrete lands in it — as `push`
             // refines an `[]` binding, a `set` refines here, so a later read

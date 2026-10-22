@@ -14,8 +14,8 @@ fn sorted_listing(dir: str) !list_files -> str[]!Error { list_files(dir).map_ok(
 // `?` unwraps the listing instead of matching on it, and the array it yields is
 // released with the rest of this scope — the balanced allocation/deallocation
 // counts below are what hold that down.
-fn count_files(dir: str) !list_files -> i64!Error {
-    let n: i64 = list_files(dir)?.len();
+fn count_files(dir: str) !list_files -> u64!Error {
+    let n = list_files(dir)?.len();
     ok(n)
 }
 

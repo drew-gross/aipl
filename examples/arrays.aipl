@@ -14,6 +14,7 @@
 import {
     greater_than as >,
     len,
+    narrow,
     push,
     value_or,
     wrapping_add as +,
@@ -48,7 +49,9 @@ fn main() -> i64 {
     let xs = range(5); // [1, 2, 3, 4, 5]
     // sum(xs) = 15, len(xs) = 5; out-of-bounds index is `none`.
     let missing = xs[99].value_or(0);
-    // 15 + 5 + 0 - 20 = 0
-    let n: i64 = len(xs);
+
+    // 15 + 5 + 0 - 20 = 0. A length is a `u64`, which `narrow` converts — it
+    // would be `none` past `i64::MAX`.
+    let n: i64 = len(xs).narrow().value_or(0);
     sum(xs) + n + missing - 20
 }

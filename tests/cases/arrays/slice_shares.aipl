@@ -58,11 +58,11 @@ fn main() !prints {
     let big = numbers(1000);
     let head = big[..500];
     let tail = big[500..];
-    print(`{head.len()} {tail.len()} {head[499].value_or(-1)} {tail[0].value_or(-1)}`);
+    print(`{head.len()} {tail.len()} {head[499].value_or(0)} {tail[0].value_or(0)}`);
 
     // A slice of a slice: one view, over the original block.
     let middle = big[100..900][300..500];
-    print(`{middle.len()} {middle[0].value_or(-1)} {middle[199].value_or(-1)}`);
+    print(`{middle.len()} {middle[0].value_or(0)} {middle[199].value_or(0)}`);
 
     // The whole array is the array itself; an empty window is nothing at all.
     let all = big[0..big.len()]; #[allow]

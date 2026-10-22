@@ -5080,49 +5080,6 @@ impl Mono<'_> {
         aipl_syntax::const_int(&body)
     }
 
-    /// Reject an out-of-range integer literal initializer for an annotated
-    /// binding, using the checker's own message.
-    ///
-    /// This exists for one thing: the literals [`Mono::folds_to_literal`]
-    /// produces. It turns `identity(300)` into `300`, which the checker only
-    /// ever saw as a *call* — and without a re-check codegen's `binding_ty`
-    /// reads the narrowing annotation as a conversion (the form that replaced
-    /// `u8(..)`) and silently wraps it to 44.
-    ///
-    /// Hence the two guards, both load-bearing:
-    ///
-    /// - **The source expression must be a call.** Mono infers a more-folded
-    ///   AST than the checker did, so plenty of literals reach here that the
-    ///   checker deliberately never range-checked: `let m: u64 = 0 - 1` is a
-    ///   `Binop` in the source and a `Num(-1)` by the time it is inferred, and
-    ///   reading `u64::MAX` out of it that way is intentional. Only a value the
-    ///   checker could not see through — a call — is re-checked.
-    /// - **The annotated binding is the context**, not `cur_expected`, which is
-    ///   inherited by nested argument inference: testing at the fold site
-    ///   instead would reject `let r: u8 = wrap(identity(300))`, where the
-    ///   literal goes through an `i64` parameter and never reaches `u8`.
-    fn check_folded_literal_fits(
-        &self,
-        src: &Expr,
-        folded: &Expr,
-        vt: &Type,
-        declared: Option<&Type>,
-    ) -> Result<(), Error> {
-        let Some(declared) = declared else {
-            return Ok(());
-        };
-        if !matches!(src.kind, ExprKind::Call(..)) {
-            return Ok(());
-        }
-        match aipl_syntax::flex_fit(folded, vt, declared) {
-            Err((v, name)) => Err(Error::at(
-                format!("integer literal {v} does not fit in {name}"),
-                folded.span.clone(),
-            )),
-            _ => Ok(()),
-        }
-    }
-
     /// Which parameters the call to `template` (with the given concrete
     /// `type_args`) takes ownership of: every parameter the template is
     /// owned-eligible for whose argument is a fresh, uniquely-owned heap value.
@@ -6712,8 +6669,8 @@ impl Mono<'_> {
                 self.cur_expected = prev;
                 let (rv, vt) = inferred?;
                 // An annotation is the binding's type, not merely a check on the
-                // initializer — it is also what *converts* an integer to another
-                // width, so the body must see the declared type.
+                // initializer — an integer widens to it — so the body must see the
+                // declared type.
                 // A written `Rule<Tok>` is a generic *application*; everything downstream
                 // works in resolved instances (`Rule$Tok`), so resolve it here rather
                 // than handing codegen a spelling it will compare unequal to the
@@ -6722,7 +6679,6 @@ impl Mono<'_> {
                     Some(t) => Some(self.resolve_generic_ty(t)?),
                     None => None,
                 };
-                self.check_folded_literal_fits(val, &rv, &vt, ty.as_ref())?;
                 let vt = ty.clone().unwrap_or(vt);
                 let body = self.with_last_uses_moved(name, &vt, val, body);
                 let ty = self.recorded_struct_ty(&ty, &vt);
@@ -6754,7 +6710,6 @@ impl Mono<'_> {
                     Some(t) => Some(self.resolve_generic_ty(t)?),
                     None => None,
                 };
-                self.check_folded_literal_fits(val, &rv, &vt, ty.as_ref())?;
                 let vt = ty.clone().unwrap_or(vt);
                 let body = self.with_last_uses_moved(name, &vt, val, body);
                 let ty = self.recorded_struct_ty(&ty, &vt);
@@ -7563,9 +7518,7 @@ impl Mono<'_> {
                         .map(|(_, a)| a)
                         .collect();
                     // A call whose body reduces to a literal *is* that literal:
-                    // fold it in place and emit no instance, so the ordinary
-                    // flex machinery sees a literal at the call site
-                    // (`let r: u8 = identity(5)` narrows instead of converting).
+                    // fold it in place and emit no instance.
                     if let Some(v) = self.folds_to_literal(name, &params) {
                         return Ok((node(ExprKind::Num(v)), ret));
                     }
@@ -8620,6 +8573,10 @@ fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
                 )),
             ))
         }
+        // `n.narrow()`: an optional of whichever integer the use site asked for,
+        // which the checker recorded on the call. A placeholder here, so the
+        // record is what the call types as (see the end of `Mono::infer`).
+        Callee::Narrow => return Some(Type::Optional(Box::new(Type::NoneInner))),
         // `xs.to_set()`: the set whose order the use site decides (see
         // `SetOrder::Context`), of the array's element type.
         Callee::ToSet => {

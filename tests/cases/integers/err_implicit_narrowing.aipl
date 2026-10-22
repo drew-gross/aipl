@@ -1,0 +1,53 @@
+# An integer does not convert on its own to a type that cannot hold all of its
+# values — not in an annotated binding, a parameter, a return type or a field.
+# Each of these is a narrowing, and says to use `.narrow()`. A signed type does
+# not widen to an unsigned one even when it is narrower, since it has negatives.
+
+struct Byte { b: u8 }
+
+fn takes_u8(b: u8) -> u8 { b }
+
+fn bound(n: i64) -> u8 {
+    let b: u8 = n;
+    b
+}
+
+fn argument(n: i64) -> u8 { takes_u8(n) }
+
+fn returned(n: u16) -> u8 { n }
+
+fn field(n: i32) -> Byte { b: n }
+
+fn signed_to_unsigned(n: i8) -> u64 { n }
+
+fn main() {}
+--- errors ---
+error: binding "b" is declared u8, but its value is i64 — u8 cannot hold every i64, so convert with `.narrow()`, which gives `none` when the value does not fit
+  --> ./tests/cases/integers/err_implicit_narrowing.aipl:11:17
+   |
+11 |     let b: u8 = n;
+   |                 ^
+
+error: fn "takes_u8" arg 0: expected u8, got i64 — u8 cannot hold every i64, so convert with `.narrow()`, which gives `none` when the value does not fit
+  --> ./tests/cases/integers/err_implicit_narrowing.aipl:15:38
+   |
+15 | fn argument(n: i64) -> u8 { takes_u8(n) }
+   |                                      ^
+
+error: fn "returned": body returns u16, but the declared return type is u8 — u8 cannot hold every u16, so convert with `.narrow()`, which gives `none` when the value does not fit
+  --> ./tests/cases/integers/err_implicit_narrowing.aipl:17:29
+   |
+17 | fn returned(n: u16) -> u8 { n }
+   |                             ^
+
+error: struct "Byte" field "b": expected u8, got i32 — u8 cannot hold every i32, so convert with `.narrow()`, which gives `none` when the value does not fit
+  --> ./tests/cases/integers/err_implicit_narrowing.aipl:19:31
+   |
+19 | fn field(n: i32) -> Byte { b: n }
+   |                               ^
+
+error: fn "signed_to_unsigned": body returns i8, but the declared return type is u64 — u64 cannot hold every i8, so convert with `.narrow()`, which gives `none` when the value does not fit
+  --> ./tests/cases/integers/err_implicit_narrowing.aipl:21:39
+   |
+21 | fn signed_to_unsigned(n: i8) -> u64 { n }
+   |                                       ^

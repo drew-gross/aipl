@@ -45,14 +45,16 @@ fn deepest(self: W) -> u64 {
 }
 
 fn main() !prints {
-    let umax: u64 = 0 - 1; // 18446744073709551615, by wraparound
+    let zero: u64 = 0;
+    let umax = zero - 1; // 18446744073709551615, by wraparound
     let p = P { w: 5, b: 9, big: umax };
     print(to_str(p));
     let ws: u32[] = [1, 4294967295];
     print(to_str(ws));
     print(to_str(WC(7, true, WNil)));
 }.test({
-    let umax: u64 = 0 - 1;
+    let zero: u64 = 0;
+    let umax = zero - 1;
 
     // Struct fields, including a `u64` past `i64::MAX`.
     let p = P { w: 5, b: 9, big: umax };

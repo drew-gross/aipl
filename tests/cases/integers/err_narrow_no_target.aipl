@@ -1,0 +1,26 @@
+# `narrow` takes the type it converts to from where its value goes, so it needs
+# a position that declares an optional of an integer. These are settled once the
+# rest of the program has checked, which is why they are a file of their own.
+
+import { narrow, print, to_str } from builtins;
+
+fn no_target(n: i64) !prints {
+    let b = n.narrow();
+    print(b.to_str());
+}
+
+fn not_an_integer(n: i64) -> str? { n.narrow() }
+
+fn main() {}
+--- errors ---
+error: "narrow" takes the integer type it converts to from where its value goes, and nothing here says which — bind it with one, as in `let b: u8? = n.narrow();`
+ --> ./tests/cases/integers/err_narrow_no_target.aipl:8:13
+  |
+8 |     let b = n.narrow();
+  |             ^^^^^^^^^^
+
+error: "narrow" converts to an integer type, giving an optional of it, but str? is expected here
+  --> ./tests/cases/integers/err_narrow_no_target.aipl:12:37
+   |
+12 | fn not_an_integer(n: i64) -> str? { n.narrow() }
+   |                                     ^^^^^^^^^^

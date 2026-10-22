@@ -556,6 +556,37 @@ impl<'a> Cx<'a> {
         if needs_lock(&e.kind) || aipl_syntax::ctor_ref_case(e).is_some() {
             self.lock_node(node_id(e), ty);
         }
+        self.lock_narrow(e, ty);
+    }
+
+    /// Record `ty` on each `narrow` call whose value is `e`'s. Its target is the
+    /// type of the position it sits in, and that position may be the tail of a
+    /// block or a branch — the constructs that only pass a value along, which
+    /// `flex_fit` reaches through for a literal — or the operand of a `?`,
+    /// whose own position wants the core of the `T?` that `narrow` gives.
+    fn lock_narrow(&self, e: &Expr, ty: &Type) {
+        match &e.kind {
+            ExprKind::Call(Callee::Narrow, ..) => self.lock_node(node_id(e), ty),
+            ExprKind::Seq(_, tail)
+            | ExprKind::Let(_, _, _, tail)
+            | ExprKind::LetMut(_, _, _, tail)
+            | ExprKind::Assign(_, _, tail) => self.lock_narrow(tail, ty),
+            ExprKind::If(_, a, b) => {
+                self.lock_narrow(a, ty);
+                self.lock_narrow(b, ty);
+            }
+            ExprKind::IfLet(arm, _, else_b) => {
+                self.lock_narrow(&arm.body, ty);
+                self.lock_narrow(else_b, ty);
+            }
+            ExprKind::Match(_, arms) => {
+                for arm in arms {
+                    self.lock_narrow(&arm.body, ty);
+                }
+            }
+            ExprKind::Try(inner) => self.lock_narrow(inner, &Type::Optional(Box::new(ty.clone()))),
+            _ => {}
+        }
     }
 
     /// Lock every array literal a successful [`Cx::flex_int`] re-typed, at the
@@ -1124,6 +1155,9 @@ impl<'a> Cx<'a> {
                 .find(|(n, _, _)| *n == fi.name)
                 .expect("field validated above");
             let (vt, vspan) = &provided[&fi.name];
+            if aipl_syntax::int_widens(vt, expected) {
+                continue;
+            }
             expect(
                 vt,
                 expected,
@@ -1331,7 +1365,7 @@ impl<'a> Cx<'a> {
         if type_args.iter().any(mentions_typevar) {
             for ((arg, at), pty) in arg_tys.iter().zip(case.payload.iter().map(|p| &p.ty)) {
                 let target = crate::subst_type_params(pty, &subst);
-                let at = self.flex_int(arg, at, &target)?;
+                let at = self.fit(arg, at, &target)?;
                 expect(
                     &at,
                     &target,
@@ -1355,7 +1389,7 @@ impl<'a> Cx<'a> {
             // (see the `ctors` branch of `check_call`). Without this the
             // deferral above only got as far as resolving `Box<u8>` and then
             // rejected its own `200` for being an `i64`.
-            let at = self.flex_int(arg, at, pty)?;
+            let at = self.fit(arg, at, pty)?;
             expect(
                 &at,
                 pty,
@@ -1613,6 +1647,18 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
     // Stamp what checking learned onto a copy. A span that resolved two ways is
     // recorded as `None` and stamps nothing — see `Cx::locks`.
     let locks = cx.locks.borrow();
+    // Only `body`: a `.test` block is checked as a function of its own when the
+    // tests run, and is otherwise not checked at all, so it has no locks.
+    for item in &program.items {
+        if let Item::Fn(f) = item {
+            for e in narrow_target_errors(&f.body, &locks) {
+                errors.push(attribute(e, &f.name, &program.sources));
+            }
+        }
+    }
+    if !errors.is_empty() {
+        return Err(errors);
+    }
     let lambda_params = cx.lambda_params.borrow();
     let mut out = program.clone();
     // Walked in lockstep with the input: the clone is structurally identical, so
@@ -1662,6 +1708,37 @@ fn drain_recovered(cx: &Cx, sources: &[aipl_syntax::ast::FileSource], errors: &m
     for (fname, e) in cx.recovered.borrow_mut().drain(..) {
         errors.push(attribute(e, &fname, sources));
     }
+}
+
+/// An error for each `narrow` call in `e` whose position gave it no integer
+/// target: none recorded at all (nothing around it declares a type), two that
+/// disagree, or one that is not an integer optional.
+fn narrow_target_errors(e: &Expr, locks: &HashMap<usize, Option<Type>>) -> Vec<Error> {
+    let mut out = Vec::new();
+    if let ExprKind::Call(Callee::Narrow, ..) = &e.kind {
+        match locks.get(&node_id(e)) {
+            Some(Some(Type::Optional(core))) if aipl_syntax::is_int_ty(core) => {}
+            Some(Some(other)) => out.push(Error::at(
+                format!(
+                    "\"narrow\" converts to an integer type, giving an optional of it, but \
+                     {} is expected here",
+                    tyname(other)
+                ),
+                e.span.clone(),
+            )),
+            Some(None) | None => out.push(Error::at(
+                "\"narrow\" takes the integer type it converts to from where its value goes, \
+                 and nothing here says which — bind it with one, as in \
+                 `let b: u8? = n.narrow();`"
+                    .to_string(),
+                e.span.clone(),
+            )),
+        }
+    }
+    for child in crate::children(e) {
+        out.extend(narrow_target_errors(child, locks));
+    }
+    out
 }
 
 /// The identity of an expression node — its address in the program being
@@ -1815,7 +1892,7 @@ impl Cx<'_> {
             if let Some(default) = &p.default {
                 let dt = self.check_expr(default, &earlier, &f.sig.effects)?;
                 if !mentions_typevar(&pty) {
-                    let dt = self.flex_int(default, &dt, &pty)?;
+                    let dt = self.fit(default, &dt, &pty)?;
                     expect(
                         &dt,
                         &pty,
@@ -1870,17 +1947,18 @@ impl Cx<'_> {
         let body_ty = self.check_expr(&f.body, &env, &f.sig.effects)?;
         // A bare-literal body flexes to a narrow-int return type (`fn g() -> u8
         // { 200 }`).
-        let body_ty = self.flex_int(&f.body, &body_ty, &declared)?;
+        let body_ty = self.fit(&f.body, &body_ty, &declared)?;
         // The return type is the body's context, and inlining is precisely what
         // takes it away.
         self.lock(&f.body, &declared);
         coerce(&body_ty, &declared).map_err(|()| {
             Error::at(
                 format!(
-                    "fn {:?}: body returns {}, but the declared return type is {}",
+                    "fn {:?}: body returns {}, but the declared return type is {}{}",
                     display(&f.name),
                     tyname(&body_ty),
-                    tyname(&declared)
+                    tyname(&declared),
+                    narrow_hint(&body_ty, &declared)
                 ),
                 // The *value*'s span, not the body's: a block's span covers the
                 // whole block, so reporting it underlined whichever statement
@@ -2113,17 +2191,7 @@ impl Cx<'_> {
         // typevar rule applies instead.
         let declared = self.resolve_generic_ty(&declared).unwrap_or(declared);
         self.lock(val, &declared);
-        let vt = self.flex_int(val, &vt, &declared)?;
-        // An annotated binding *converts* between integer widths rather than
-        // merely checking: `let n: u8 = some_i64;` re-canonicalizes to 8 bits
-        // (wrapping, exactly like the arithmetic operators), and `let n: i64 =
-        // some_u8;` widens. This is the replacement for the removed `u8(..)`
-        // conversion form — the annotation is now the one place a value changes
-        // integer type, which is why it is allowed to be lossy here and nowhere
-        // else. Non-integer pairs still have to coerce normally.
-        if aipl_syntax::is_int_ty(&vt) && aipl_syntax::is_int_ty(&declared) {
-            return Ok(declared);
-        }
+        let vt = self.fit(val, &vt, &declared)?;
         coerce(&vt, &declared).map_err(|()| {
             // The binding the loader synthesizes for a `..base` struct spread
             // carries the target's type, so a cross-type spread lands here — but
@@ -2151,9 +2219,10 @@ impl Cx<'_> {
                 )
             } else {
                 format!(
-                    "binding {name:?} is declared {}, but its value is {}",
+                    "binding {name:?} is declared {}, but its value is {}{}",
                     tyname(&declared),
-                    tyname(&vt)
+                    tyname(&vt),
+                    narrow_hint(&vt, &declared)
                 )
             };
             Error::at(msg, val.span.clone())
@@ -3348,13 +3417,15 @@ impl Cx<'_> {
                 // return type (a bare literal flexes to a narrow-int return).
                 let vt = self.check_expr(value, env, effects)?;
                 let declared = self.current_ret.borrow().clone();
-                let vt = self.flex_int(value, &vt, &declared)?;
+                self.lock_narrow(value, &declared);
+                let vt = self.fit(value, &vt, &declared)?;
                 coerce(&vt, &declared).map_err(|()| {
                     Error::at(
                         format!(
-                            "return value is {}, but the function returns {}",
+                            "return value is {}, but the function returns {}{}",
                             tyname(&vt),
-                            tyname(&declared)
+                            tyname(&declared),
+                            narrow_hint(&vt, &declared)
                         ),
                         span.clone(),
                     )
@@ -3499,7 +3570,7 @@ impl Cx<'_> {
                 self.lock(val, &expected);
                 let vt = self.check_expr(val, env, effects)?;
                 // A bare literal takes the binding's (or field's) int type.
-                let vt = self.flex_int(val, &vt, &expected)?;
+                let vt = self.fit(val, &vt, &expected)?;
                 expect(&vt, &expected, "set", val.span.clone())?;
                 self.check_expr_at(body, env, effects, pos)?
             }
@@ -3857,7 +3928,7 @@ impl Cx<'_> {
                         expect_len_operand(&vt, &ctx, fi.value.span.clone())?;
                     } else {
                         // A bare literal takes the field's int type.
-                        let vt = self.flex_int(&fi.value, &vt, expected)?;
+                        let vt = self.fit(&fi.value, &vt, expected)?;
                         expect(&vt, expected, &ctx, fi.value.span.clone())?;
                     }
                 }
@@ -4231,7 +4302,7 @@ impl Cx<'_> {
                     // lock it does has to be repeated here.
                     self.lock(arg, pty);
                     let at = self.check_in_position(arg, pty, env, effects)?;
-                    let at = self.flex_int(arg, &at, pty)?;
+                    let at = self.fit(arg, &at, pty)?;
                     expect(
                         &at,
                         pty,
@@ -4247,18 +4318,20 @@ impl Cx<'_> {
                 return self.infer_generic_variant_ctor(base, name, args, env, effects, span, node);
             }
         }
-        // The integer conversion builtins `i8(x)`/`u64(x)`/… are gone. A typed
-        // binding does the job — and it is the *only* place a value changes
-        // integer type, so a lossy narrowing is always written down. A bare
-        // literal needs nothing at all: it takes whatever integer type its
-        // context expects. Recognized here only to say so, since otherwise this
-        // reads as a call to an undefined function.
+        // There is no `i8(x)`/`u64(x)`/… conversion form. An integer widens on
+        // its own wherever a type is declared for it, a narrowing is a
+        // `.narrow()` whose failure is visible as a `none`, and a bare literal
+        // takes whatever integer type its context expects. Recognized here only
+        // to say so, since otherwise this reads as a call to an undefined
+        // function.
         if !env.contains_key(name) && aipl_syntax::int_bits(name).is_some() {
             return Err(Error::at(
                 format!(
-                    "{name}(..) conversions were removed — bind with the type instead \
-                     (`let n: {name} = ..;`), or drop the conversion entirely if the \
-                     argument is a literal, which takes the type its context expects"
+                    "there is no {name}(..) conversion — an integer whose every value a \
+                     {name} can hold widens on its own wherever a {name} is declared \
+                     (`let n: {name} = ..;`), any other converts with `.narrow()` \
+                     (`let n: {name}? = x.narrow();`), and a literal takes the type its \
+                     context expects"
                 ),
                 span.clone(),
             ));
@@ -4298,6 +4371,24 @@ impl Cx<'_> {
         // `to_set` builds whichever set the use site wants: its order is the
         // placeholder until `lock` records the expected type on the call (see
         // `needs_lock`), and a plain `#{T}` where nothing does.
+        // `narrow` converts to whichever integer the use site asks for: it types
+        // as the placeholder `__none__?`, which fits any optional, until `lock`
+        // records the expected `T?` on the call. Whether one was recorded, and
+        // whether it is an integer, is settled once every lock is in
+        // (`narrow_target_errors`).
+        if *callee == Callee::Narrow && args.len() == 1 {
+            let t = self.check_expr(&args[0], env, effects)?;
+            if !aipl_syntax::is_int_ty(&t) && !is_unknown(&t) {
+                return Err(Error::at(
+                    format!(
+                        "\"narrow\" converts an integer, but its receiver is {}",
+                        tyname(&t)
+                    ),
+                    args[0].span.clone(),
+                ));
+            }
+            return Ok(Type::Optional(Box::new(Type::NoneInner)));
+        }
         if *callee == Callee::ToSet && args.len() == 1 {
             let t = self.check_expr(&args[0], env, effects)?;
             // A `str` receiver gives a `#{char}`: a string *is* a sequence of
@@ -4727,6 +4818,7 @@ impl Cx<'_> {
         let mut map: HashMap<String, Type> = HashMap::new();
         let mut atys: Vec<Type> = vec![Type::Unit; args.len()];
         // Pass 1: non-function arguments — type them and collect type-var bindings.
+        let mut literal_args = Vec::new();
         for (i, (arg, pty)) in args.iter().zip(&params).enumerate() {
             if matches!(pty, Type::Fn(_, _)) {
                 continue;
@@ -4789,8 +4881,19 @@ impl Cx<'_> {
                 };
                 return Err(Error::at(msg, arg.span.clone()));
             }
-            self.bind_field(pty, &aty, &vars, &mut map);
+            // A bare integer literal says only `i64` for itself, while every other
+            // argument says what it is — so it pins a variable only once they
+            // have all had the chance, and otherwise flexes to what they pinned
+            // (`max(1, xs.len())` is a `u64` max). Variables bind first-wins.
+            if aipl_syntax::is_int_ty(&aty) && aipl_syntax::flex_int_values(arg, &mut Vec::new()) {
+                literal_args.push(i);
+            } else {
+                self.bind_field(pty, &aty, &vars, &mut map);
+            }
             atys[i] = aty;
+        }
+        for i in literal_args {
+            self.bind_field(&params[i], &atys[i], &vars, &mut map);
         }
         // A `T+` argument has to be one of the two shapes that cannot be empty.
         // Judged after pass 1 so that a `T` another argument pinned is known —
@@ -4820,7 +4923,23 @@ impl Cx<'_> {
             {
                 continue;
             }
-            self.lock(arg, &subst_vars(pty, &map, &vars));
+            let target = subst_vars(pty, &map, &vars);
+            self.lock(arg, &target);
+            // An integer argument is held to the integer its parameter settled
+            // on: a literal flexes to it, and any other integer is refused here —
+            // where the mismatch is the argument's, rather than in codegen against
+            // the binding the inliner gives the parameter. `x_u64.value_or(-1)`
+            // is that case. Nothing widens: the type was inferred from another
+            // argument, not declared, and every argument pinning `T` has to agree.
+            if aipl_syntax::is_int_ty(&target) && aipl_syntax::is_int_ty(&atys[i]) {
+                let at = self.flex_int(arg, &atys[i], &target)?;
+                expect(
+                    &at,
+                    &target,
+                    &format!("fn {:?} arg {i}", display(name)),
+                    arg.span.clone(),
+                )?;
+            }
         }
         // Pass 2: function-typed arguments — check against the substituted type.
         for (i, (arg, pty)) in args.iter().zip(&params).enumerate() {
@@ -5016,7 +5135,7 @@ impl Cx<'_> {
         let aty = checked?;
         if let Some(e) = expected {
             // A bare literal argument flexes to a narrow-int parameter type.
-            let aty = self.flex_int(arg, &aty, e)?;
+            let aty = self.fit(arg, &aty, e)?;
             expect(&aty, e, ctx, arg.span.clone())?;
             return Ok(aty);
         }
@@ -5292,11 +5411,35 @@ impl Cx<'_> {
         }
     }
 
-    /// Type of an integer addition — the `+` operator and the `wrapping_add` /
-    /// `saturating_add` builtins it resolves to. Both operands must be the *same*
-    /// integer width (convert explicitly with `i32(x)` etc.; no implicit mixing);
-    /// `i64` is the common default. An unresolved generic operand stays permissive.
-    /// Non-integers are rejected — `+` is integer-only (string concat is `+++`).
+    /// The type `e` (of type `ety`) takes in a position that declares `target`:
+    /// what [`Self::flex_int`] gives a literal, and `target` itself for an integer
+    /// that widens to it losslessly ([`aipl_syntax::int_widens`]). For the
+    /// positions that *declare* a type — a binding's annotation, a parameter, a
+    /// return type, a field or payload — and not for two operands or branches
+    /// meeting, where neither side is the declared one.
+    fn fit(&self, e: &Expr, ety: &Type, target: &Type) -> Result<Type, Error> {
+        // A `narrow` types as the placeholder `__none__?`, which renders as
+        // `none` — so the ordinary mismatch would say the call *is* `none`.
+        if let ExprKind::Call(Callee::Narrow, ..) = &e.kind {
+            if !matches!(target, Type::Optional(_)) && !is_unknown(target) {
+                return Err(Error::at(
+                    format!(
+                        "\"narrow\" gives an optional, `none` when the value does not fit, but \
+                         {0} is expected here — handle the `none` to get a {0} (with `?`, \
+                         `value_or` or a `match`)",
+                        tyname(target)
+                    ),
+                    e.span.clone(),
+                ));
+            }
+        }
+        let t = self.flex_int(e, ety, target)?;
+        if aipl_syntax::int_widens(&t, target) {
+            return Ok(target.clone());
+        }
+        Ok(t)
+    }
+
     /// Type of an integer add/subtract — the `+`/`-` operators and the
     /// `wrapping_*`/`saturating_*` builtins they resolve to. `op` is the spelling
     /// (`"+"` or `"-"`), used only for diagnostics. Both operands must be the same
@@ -5363,8 +5506,9 @@ impl Cx<'_> {
         span: Span,
     ) -> Result<Type, Error> {
         // Arithmetic/comparison operate within a single integer type — both
-        // operands must be the *same* width and signedness (convert explicitly
-        // with `i32(x)` etc.; no implicit mixing). `i64` is the common default.
+        // operands must be the *same* width and signedness: neither operand is
+        // the declared type the other widens to, so nothing widens here. `i64`
+        // is the common default.
         let same_int = aipl_syntax::is_int_ty(lt) && lt == rt;
         match op {
             // Integer add only — the increment sugar `set n++` lowers to a
@@ -5719,9 +5863,13 @@ pub(crate) fn needs_lock(k: &ExprKind) -> bool {
         ExprKind::None => true,
         ExprKind::ArrayLit(v) | ExprKind::SetLit(v, _) => v.is_empty(),
         ExprKind::DictLit(v) => v.is_empty(),
-        // `to_set` leaves its *order* to context (see `SetOrder::Context`).
+        // `to_set` leaves its *order* to context (see `SetOrder::Context`), and
+        // `narrow` its whole target type.
         ExprKind::Call(n, _, _) => {
-            matches!(n, Callee::Ok | Callee::Err | Callee::Some | Callee::ToSet)
+            matches!(
+                n,
+                Callee::Ok | Callee::Err | Callee::Some | Callee::ToSet | Callee::Narrow
+            )
         }
         _ => false,
     }
@@ -6210,6 +6358,25 @@ fn expect(actual: &Type, expected: &Type, ctx: &str, span: Span) -> Result<(), E
         .map_err(|()| Error::at(mismatch_msg(actual, expected, ctx), span.clone()))
 }
 
+/// What to add to a type mismatch between two integer types: the one way from
+/// `actual` to `expected` when it does not widen. Empty for any other pair, and
+/// for a widening refused where nothing widens (two arguments pinning one `T`).
+fn narrow_hint(actual: &Type, expected: &Type) -> String {
+    if aipl_syntax::is_int_ty(actual)
+        && aipl_syntax::is_int_ty(expected)
+        && !aipl_syntax::int_widens(actual, expected)
+    {
+        format!(
+            " — {} cannot hold every {}, so convert with `.narrow()`, which gives `none` \
+             when the value does not fit",
+            tyname(expected),
+            tyname(actual)
+        )
+    } else {
+        String::new()
+    }
+}
+
 /// "expected X, got Y" — and, when the two render *identically*, enough extra to
 /// tell them apart.
 ///
@@ -6222,7 +6389,10 @@ fn expect(actual: &Type, expected: &Type, ctx: &str, span: Span) -> Result<(), E
 fn mismatch_msg(actual: &Type, expected: &Type, ctx: &str) -> String {
     let (e, a) = (tyname(expected), tyname(actual));
     if e != a {
-        return format!("{ctx}: expected {e}, got {a}");
+        return format!(
+            "{ctx}: expected {e}, got {a}{}",
+            narrow_hint(actual, expected)
+        );
     }
     format!(
         "{ctx}: expected {e}, got a different type that is also written {a:?} \

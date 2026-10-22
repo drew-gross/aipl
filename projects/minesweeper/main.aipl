@@ -23,6 +23,7 @@ import {
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
+    narrow,
     not_equal as !=,
     print,
     push,
@@ -281,11 +282,12 @@ fn render(self: Mark[,], show_mines: bool) -> str {
 fn number(self: str[], at: u64) -> u64!str {
     let word = self[at].value_or_err("missing a number")?;
     let parsed = word.int_parse().value_or_err(`not a number: {word}`)?;
-    // A negative number wraps to a huge one, which no board is as big as.
-    let unsigned: u64 = parsed;
-    ok(unsigned)
+    let unsigned: u64? = parsed.narrow();
+    // A negative number is no position on any board.
+    unsigned.value_or_err("that is off the board")
 }.test({
     assert(["r", "4"].number(1) == ok(4));
+    assert(["r", "-4"].number(1) == err("that is off the board"));
     assert(["r"].number(1) == err("missing a number"));
     assert(["r", "x"].number(1) == err("not a number: x"));
 })
@@ -361,8 +363,9 @@ fn main(args: str[]) !prints !read_stdin !clock -> !Error {
         match (args) {
             [] => seeded_with_clock(),
             [text] => {
-                let seed: u64 = text.int_parse().value_or_err(`not a seed: {text}`)?;
-                seeded_with_int(seed)
+                let parsed = text.int_parse().value_or_err(`not a seed: {text}`)?;
+                let seed: u64? = parsed.narrow();
+                seeded_with_int(seed.value_or_err(`not a seed: {text}`)?)
             },
             _ => err("usage: minesweeper [SEED]")?,
         }

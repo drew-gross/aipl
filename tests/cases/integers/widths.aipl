@@ -4,14 +4,15 @@
 #
 # A value reaches a given width by *context*: a bare literal takes the type its
 # position expects (a parameter, a return type, the other operand of a binop),
-# and a binding says the type outright with `let n: u8 = ..`. There is no
-# conversion form — the annotated binding is the only place a value changes
-# integer type, and it is also how a *non*-literal is converted (`let n: i8 =
-# some_i64;` wraps to 8 bits).
+# and a binding says the type outright with `let n: u8 = ..`. A *non*-literal
+# widens on its own to a type that holds all its values (`widening.aipl`), and
+# converts to any other with `.narrow()`, which is `none` when the value does
+# not fit (`narrow.aipl`).
 
 import {
     equal as ==,
     greater_than as >,
+    narrow,
     print,
     saturating_divide as /,
     to_str,
@@ -45,9 +46,9 @@ fn add8(a: i8, b: i8) -> i8 { a + b }.test({
 
     // Unsigned comparison treats the top bit as magnitude (255 > 1, not -1 < 1).
     assert(umax8 > 1);
-    // The same bit pattern read as `i8`: an annotation converts, so 255 wraps.
-    let as_signed: i8 = umax8;
-    assert(as_signed == -1);
+    // 255 is not an `i8`, so converting it gives nothing rather than wrapping.
+    let as_signed: i8? = umax8.narrow();
+    assert(as_signed == none);
 
     // Rendering: signed shows the sign; unsigned shows the magnitude.
     assert(to_str(add8(127, 1)) == "-128");

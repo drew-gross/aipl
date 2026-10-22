@@ -35,9 +35,9 @@ fn point() -> Point!Error { ok(Point { x: 1, y: 2 }) }
 fn shape() -> Shape!Error { ok(Circle(3)) }
 
 // `?` unwraps a container payload and the unwrapped value outlives the result.
-fn count_evens(n: i64) -> i64!Error {
+fn count_evens(n: i64) -> u64!Error {
     let s = evens(n)?;
-    let n: i64 = s.len();
+    let n = s.len();
     ok(n)
 }
 

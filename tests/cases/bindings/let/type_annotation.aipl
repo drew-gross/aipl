@@ -10,10 +10,10 @@
 # flowing into a parameter or a declared return type — and that reaches into
 # container literals too (`let xs: u8[] = [200];`).
 #
-# The annotation is also the only place a value *changes* integer type: `let n:
-# u8 = some_i64;` wraps to 8 bits and `let n: i64 = some_u8;` widens. That is
-# deliberate — there is no conversion form, so a lossy narrowing is always
-# written down as a declaration rather than buried in an expression.
+# An annotation widens an integer it can hold every value of — `let n: i64 =
+# some_u8;` — as every declared type does, and refuses one it cannot: `let n: u8
+# = some_i64;` is an error, and the conversion is `let n: u8? = some_i64.narrow();`,
+# whose `none` says the value did not fit (see `integers/narrow.aipl`).
 #
 # One limit: only the plain `let name`/`mut name` forms take an annotation, not
 # the `let (a, b) = ..` / `let P { x, y } = ..` destructuring forms.

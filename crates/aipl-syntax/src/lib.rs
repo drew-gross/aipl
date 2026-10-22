@@ -974,6 +974,24 @@ pub mod ast {
                 Primitive::I8 | Primitive::I16 | Primitive::I32 | Primitive::I64
             )
         }
+
+        /// Whether every value of integer type `self` is also a value of
+        /// integer type `to`, so a value can change from one to the other
+        /// without losing anything: a narrower type of the same signedness
+        /// (`u8` → `u32`), or an unsigned type into a strictly wider signed one
+        /// (`u32` → `i64`). A signed type never widens to an unsigned one,
+        /// whose range has no negatives. `false` when either is not an
+        /// integer, and for a type and itself.
+        ///
+        /// Free at runtime: an integer is held canonically in an `i64`
+        /// register (sign-extended for `i*`, zero-extended for `u*`), and a
+        /// value both types can represent has the same canonical bits in each.
+        pub fn widens_to(self, to: Primitive) -> bool {
+            let (Some(from_bits), Some(to_bits)) = (self.int_bits(), to.int_bits()) else {
+                return false;
+            };
+            from_bits < to_bits && !(self.int_signed() && !to.int_signed())
+        }
     }
 
     pub fn is_unit(t: &Type) -> bool {
@@ -2061,6 +2079,14 @@ pub const INT_TYPES: &[&str] = &["i8", "i16", "i32", "i64", "u8", "u16", "u32", 
 
 pub fn is_int_ty(t: &Type) -> bool {
     matches!(t, Type::Primitive(p) if p.is_int())
+}
+
+/// Whether a value of type `from` widens losslessly to `to` — both integer
+/// types, per [`Primitive::widens_to`]. Only the scalar itself: an `u8[]` is not
+/// an `i64[]` (narrow elements are packed at their own width) and a `(i64) ->
+/// bool` is not a `(u8) -> bool`.
+pub fn int_widens(from: &Type, to: &Type) -> bool {
+    matches!((from, to), (Type::Primitive(a), Type::Primitive(b)) if a.widens_to(*b))
 }
 
 /// Bit width of an integer type *name* (`"i8"` → 8, `"u64"` → 64), or `None` if
@@ -3165,6 +3191,13 @@ fn __builtin_is_space(self: char) -> bool { false }
 fn __builtin_is_digit(self: char) -> bool { false }
 // ASCII decimal digit ('0'..'9') to its 0..9 value, `none` for any other char.
 fn __builtin_to_digit(self: char) -> i64? { none }
+// An integer as another integer type, `none` when its value does not fit. The
+// target is the use site's: `let b: u8? = n.narrow();` asks for a `u8`, and
+// the checker locks that expected `u8?` onto the call (see `needs_lock`), as
+// it does a `to_set`'s order. With no integer optional expected there is no
+// target, which is an error. The one way to an integer type that cannot hold
+// every value of the source: a lossless widening needs no call at all.
+fn __builtin_narrow<T: any>(self: T) -> T? { none }
 
 // Set ops: membership and union. `#{T}` in a signature takes a set of any
 // order, and a set *returned* takes the receiver's (see `inherit_set_order`).

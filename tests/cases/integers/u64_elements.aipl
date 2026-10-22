@@ -46,8 +46,8 @@ fn grown() -> u64[] {
 // The value that distinguishes unsigned from signed: `u64::MAX` shares its bit
 // pattern with `-1`. It must *render* as a huge number and *sort* last.
 fn u64_max() -> u64 {
-    let m: u64 = 0 - 1; // -1's bit pattern, read unsigned
-    m
+    let zero: u64 = 0;
+    zero - 1 // -1's bit pattern, read unsigned
 }.test({
     assert(u64_max().to_str() == "18446744073709551615");
 

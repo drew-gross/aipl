@@ -1,0 +1,104 @@
+# `n.narrow()` converts an integer to another integer type, and is `none` when
+# the value does not fit. It is the one way to a type that cannot hold every
+# value of the source; a widening needs no call (see `widening.aipl`).
+#
+# The type it converts to is not written on the call. It comes from where the
+# value goes — an annotated binding, a parameter, a return type, a field — which
+# wants an optional of the target: `let b: u8? = n.narrow();`. With nothing
+# around it saying which, the call is an error.
+
+import {
+    equal as ==,
+    narrow,
+    not_equal as !=,
+    print,
+    to_str,
+    wrapping_add as +,
+    wrapping_sub as -,
+} from builtins;
+
+struct MaybeByte { b: u8? }
+
+fn as_u8(n: i64) -> u8? { n.narrow() }.test({
+    assert(as_u8(0) == some(0));
+    assert(as_u8(255) == some(255));
+    assert(as_u8(256) == none);
+    assert(as_u8(-1) == none);
+})
+
+fn as_i8(n: i64) -> i8? { n.narrow() }.test({
+    assert(as_i8(127) == some(127));
+    assert(as_i8(-128) == some(-128));
+    assert(as_i8(128) == none);
+    assert(as_i8(-129) == none);
+})
+
+// Across signedness at full width, one bit pattern reads as two different
+// values; `narrow` goes by the value.
+fn u64_as_i64(n: u64) -> i64? { n.narrow() }.test({
+    assert(u64_as_i64(5) == some(5));
+    let zero: u64 = 0;
+    assert(u64_as_i64(zero - 1) == none);
+})
+
+fn i64_as_u64(n: i64) -> u64? { n.narrow() }.test({
+    assert(i64_as_u64(5) == some(5));
+    assert(i64_as_u64(-1) == none);
+})
+
+// Between two narrow types, and from a narrow type to a wide one of the other
+// signedness.
+fn i8_as_u16(n: i8) -> u16? { n.narrow() }.test({
+    assert(i8_as_u16(100) == some(100));
+    assert(i8_as_u16(-1) == none);
+})
+
+fn u16_as_i8(n: u16) -> i8? { n.narrow() }.test({
+    assert(u16_as_i8(127) == some(127));
+    assert(u16_as_i8(200) == none);
+})
+
+// Each position that declares a type gives the call its target.
+fn takes_byte(b: u8?) -> str { b.to_str() }
+
+fn positions(n: i64) -> str {
+    let bound: u8? = n.narrow();
+    let field = MaybeByte { b: n.narrow() };
+    let early: u8? = if (n == 0) { none } else { n.narrow() };
+    `{bound} {takes_byte(n.narrow())} {field.b} {early}`
+}.test({
+    assert(positions(7) == "some(7) some(7) some(7) some(7)");
+    assert(positions(300) == "none none none none");
+})
+
+// A `?` unwraps the optional, so its operand's target is an optional of the
+// position's own type.
+fn sum_as_u8(a: i64, b: i64) -> u8? {
+    let x: u8 = a.narrow()?;
+    let y: u8 = b.narrow()?;
+    some(x + y)
+}.test({
+    assert(sum_as_u8(1, 2) == some(3));
+    assert(sum_as_u8(1, 256) == none);
+})
+
+fn returned(n: i64) -> i16? {
+    if (n != 0) {
+        return n.narrow();
+    };
+    none
+}.test({
+    assert(returned(0) == none);
+    assert(returned(-32768) == some(-32768));
+    assert(returned(40000) == none);
+})
+
+fn main() !prints {
+    print(as_u8(200).to_str());
+    print(as_u8(300).to_str());
+    print(positions(42));
+}
+--- stdout ---
+some(200)
+none
+some(42) some(42) some(42) some(42)

@@ -10,6 +10,7 @@ import {
     equal as ==,
     less_than as <,
     map,
+    narrow,
     not_equal as !=,
     print,
     to_str,
@@ -55,7 +56,7 @@ fn spine(n: i64) -> Both {
     mut b = Both { head: Nil, nums: [7, 8] };
     for (let i : 0..n) {
         // A range's variable is a `u64`; the list holds `i64`s.
-        let v: i64 = i;
+        let v: i64 = i.narrow().value_or(0);
         set b.head = Cons(v, b.head);
     }
     b

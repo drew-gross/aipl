@@ -18,13 +18,9 @@ fn wrap<T: any>(x: T) -> T[] { [x] }
 
 fn main() !prints {
     // Once the literal is inlined, `identity`'s body *is* the literal, so the
-    // call folds to it — and the folded literal then flexes to the annotation,
-    // exactly as a written `let narrow: u8 = 200` would. Before, the call
-    // returned `i64` and the annotation silently converted it.
-    let narrow: u8 = identity(200);
-    print(to_str(narrow)); // 200
-
-    // The same call in an `i64` context is still an `i64`.
+    // call folds to it. Its type is still the `i64` the call returns: a fold is
+    // not a literal the checker saw, so `let narrow: u8 = identity(200)` is a
+    // narrowing, refused like any other.
     let wide: i64 = identity(200);
     print(to_str(wide)); // 200
 
@@ -37,7 +33,6 @@ fn main() !prints {
     print(to_str(b)); // [7]
 }
 --- stdout ---
-200
 200
 2
 [5]

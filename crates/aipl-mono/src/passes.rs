@@ -398,6 +398,7 @@ fn context_kind(e: &Expr) -> &'static str {
             Callee::Err => "an `err(..)`",
             Callee::Some => "a `some(..)`",
             Callee::ToSet => "a `to_set()`",
+            Callee::Narrow => "a `narrow()`",
             _ => "a call",
         },
         _ => "a constructor reference",

@@ -1,0 +1,56 @@
+# An integer widens on its own to a type that holds every one of its values: a
+# wider type of the same signedness (`u8` → `u32`), or an unsigned type into a
+# strictly wider signed one (`u32` → `i64`). It does so wherever a type is
+# declared for it — an annotated binding, a parameter, a return type, a struct
+# field, a variant payload, a `set` of a declared binding — and costs nothing at
+# runtime.
+#
+# A signed type never widens to an unsigned one (it has negatives), and no type
+# widens to a narrower one: those convert with `.narrow()` (see `narrow.aipl`).
+# Two operands do not widen to meet each other either — `a_u8 + b_i64` is an
+# error — because neither is the declared type of the other.
+
+import { equal as ==, print, wrapping_add as + } from builtins;
+
+struct Wide { n: i64 }
+
+variant Boxed = Big(i64) | Nothing
+
+fn takes_i64(n: i64) -> i64 { n }
+
+fn returns_i64(n: u8) -> i64 { n }
+
+fn early_i32(n: i16) -> i32 {
+    if (n == 0) {
+        return n;
+    };
+    n + 1
+}
+
+fn payload(b: Boxed) -> i64 {
+    match (b) {
+        Big(n) => n,
+        Nothing => 0,
+    }
+}
+
+fn positions() -> str {
+    let small: u8 = 200;
+    let negative: i8 = -5;
+    let bound: i64 = small;
+    let signed: i16 = negative;
+    let unsigned: u64 = small;
+    let into_signed: i32 = small;
+    mut total: i64 = 0;
+    set total = negative;
+    let field = Wide { n: small };
+    `{bound} {signed} {unsigned} {into_signed} {total} {takes_i64(small)} {returns_i64(small)} {early_i32(negative)} {field.n} {payload(Big(negative))}`
+}.test({
+    assert(positions() == "200 -5 200 200 -5 200 200 -4 200 -5");
+})
+
+fn main() !prints {
+    print(positions());
+}
+--- stdout ---
+200 -5 200 200 -5 200 200 -4 200 -5

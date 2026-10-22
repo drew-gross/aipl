@@ -1,7 +1,14 @@
 # Array literal, passing an array to a function, for-each iteration,
 # and len().
 
-import { equal as ==, len, wrapping_add as +, wrapping_add_assign as += } from builtins;
+import {
+    equal as ==,
+    len,
+    narrow,
+    value_or,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+} from builtins;
 
 fn sum(xs: i64[]) -> i64 {
     mut total = 0;
@@ -13,6 +20,6 @@ fn sum(xs: i64[]) -> i64 {
     let xs = [10, 20, 30];
     assert(sum(xs) == 60);
     assert(len(xs) == 3);
-    let n: i64 = len(xs);
+    let n: i64 = len(xs).narrow().value_or(0);
     assert(sum(xs) + n == 63);
 })

@@ -1,7 +1,7 @@
-# A generic call that folds to its literal is checked like the literal it
-# became. Before per-value instances, `identity(300)` returned `i64` and the
-# `u8` annotation *converted* it — silently producing 44. Now the fold puts the
-# literal where the annotation can see it, and it is out of range.
+# A generic call whose body is its literal argument still has the type the call
+# returns — `identity(300)` is an `i64` — so binding it as a `u8` is a
+# narrowing, refused like any other. Only a literal the checker sees takes its
+# type from the annotation.
 
 import { print, to_str } from builtins;
 
@@ -12,7 +12,7 @@ fn main() !prints {
     print(to_str(r));
 }
 --- errors ---
-error: integer literal 300 does not fit in u8
+error: binding "r" is declared u8, but its value is i64 — u8 cannot hold every i64, so convert with `.narrow()`, which gives `none` when the value does not fit
   --> ./tests/cases/generics/errors/err_int_literal_arg_out_of_range.aipl:11:17
    |
 11 |     let r: u8 = identity(300);
