@@ -221,7 +221,8 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 lsp:
-  IT'S SOOOO SLOW!!!!
+  Cache things: token scopes, FileIndex, indexes of imported files
+  keep last good index so hoven and go-to-definition still work mid-edit
 
 bugs:
   Gate bug: the_leak_gate_runs_for_a_case_with_no_sections re-runs examples_arrays and requires it to pass. When that case's baseline row is stale, the test fails without printing a handoff-fill: line. Handoff then stops before it reaches the step that would refresh the row. I got past it once by refreshing that single row with the scoped refresh_perfmon command. The fix would be either to have the test print the Fill it needs, or to have it ignore baseline movement.

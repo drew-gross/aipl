@@ -547,6 +547,13 @@ fn forwarded(name: &str, e: &Expr, tail: bool, heap_fields: &HashSet<String>) ->
             (is_name(value, name) || rec(value)) && rec_tail(body)
         }
         ExprKind::Seq(first, rest) => rec(first) && rec_tail(rest),
+        // The target of `set name = ..` is a place, not a read; what follows is
+        // where the binding may end.
+        ExprKind::Assign(lhs, value, rest) => {
+            (is_name(lhs, name) || only_call_arguments(name, lhs, false, heap_fields))
+                && rec(value)
+                && rec_tail(rest)
+        }
         ExprKind::If(cond, then_body, else_body) => {
             rec(cond) && rec_tail(then_body) && rec_tail(else_body)
         }
@@ -556,8 +563,48 @@ fn forwarded(name: &str, e: &Expr, tail: bool, heap_fields: &HashSet<String>) ->
                 && arms.iter().all(|a| rec_tail(&a.body))
         }
         ExprKind::Return(value) => forwarded(name, value, true, heap_fields),
+        // A value built at the tail from the binding — `Out { scopes, n }`,
+        // `(xs, 1)`, `[xs]`, and any of those handed to a call (`ok(Out { xs })`)
+        // — takes its reference as the function's value does: nothing runs
+        // afterwards that could read the binding. Only when the name occurs once
+        // in the whole construction, so no sibling is evaluated between another's
+        // read of it and the move; a name read twice keeps the borrow.
+        ExprKind::Construct(..)
+        | ExprKind::TupleLit(..)
+        | ExprKind::ArrayLit(..)
+        | ExprKind::SetLit(..)
+        | ExprKind::DictLit(..)
+        | ExprKind::Call(..)
+            if tail && count_ident(name, e) == 1 =>
+        {
+            let call = matches!(&e.kind, ExprKind::Call(..));
+            children(e).into_iter().all(|part| {
+                if is_name(part, name) {
+                    true
+                } else if is_composite_literal(part) {
+                    forwarded(name, part, true, heap_fields)
+                } else if call {
+                    only_call_arguments(name, part, true, heap_fields)
+                } else {
+                    forwarded(name, part, true, heap_fields)
+                }
+            })
+        }
         _ => only_call_arguments(name, e, false, heap_fields),
     }
+}
+
+/// Whether `e` builds a value out of its parts: a struct, tuple, array, set or
+/// dictionary literal.
+fn is_composite_literal(e: &Expr) -> bool {
+    matches!(
+        &e.kind,
+        ExprKind::Construct(..)
+            | ExprKind::TupleLit(..)
+            | ExprKind::ArrayLit(..)
+            | ExprKind::SetLit(..)
+            | ExprKind::DictLit(..)
+    )
 }
 
 /// Whether `e` certainly evaluates to a scalar — a `bool`, a number, a character —
@@ -842,6 +889,62 @@ mod tests {
             "f",
             vec![id("x"), e(ExprKind::Call(Callee::Len, vec![id("x")], true))],
         );
+        assert_eq!(run(body.clone()), body);
+    }
+
+    fn construct(fields: Vec<Expr>) -> Expr {
+        let inits = fields
+            .into_iter()
+            .enumerate()
+            .map(|(i, value)| aipl_syntax::ast::FieldInit {
+                name: format!("f{i}"),
+                value,
+            })
+            .collect();
+        e(ExprKind::Construct("S".to_string(), inits))
+    }
+
+    /// `set x = f(x); S { x }`: the struct built at the tail takes the binding
+    /// the way a bare tail does, so the `f(x)` that rewrites it is a move.
+    #[test]
+    fn a_value_built_at_the_tail_is_a_move_out() {
+        let body = |arg: Expr| {
+            e(ExprKind::Assign(
+                Box::new(id("x")),
+                Box::new(call("f", vec![arg])),
+                Box::new(construct(vec![id("x"), e(ExprKind::Num(1))])),
+            ))
+        };
+        assert_eq!(run(body(id("x"))), body(moved("x")));
+
+        // Handed to a constructor call, the way `ok(S { x })` is.
+        let wrapped = |arg: Expr| {
+            e(ExprKind::Assign(
+                Box::new(id("x")),
+                Box::new(call("f", vec![arg])),
+                Box::new(call("ok", vec![construct(vec![id("x")])])),
+            ))
+        };
+        assert_eq!(run(wrapped(id("x"))), wrapped(moved("x")));
+    }
+
+    /// A name read twice in the construction keeps the borrow: one of the reads
+    /// is evaluated while the other is still live.
+    #[test]
+    fn a_name_read_twice_in_the_tail_value_is_not_a_move_out() {
+        let body = e(ExprKind::Assign(
+            Box::new(id("x")),
+            Box::new(call("f", vec![id("x")])),
+            Box::new(construct(vec![id("x"), id("x")])),
+        ));
+        assert_eq!(run(body.clone()), body);
+    }
+
+    /// Only the tail: a struct built mid-body and used again afterwards is a
+    /// read that something later follows.
+    #[test]
+    fn a_value_built_before_the_end_is_not_a_move_out() {
+        let body = seq(construct(vec![id("x")]), call("g", vec![id("x")]));
         assert_eq!(run(body.clone()), body);
     }
 

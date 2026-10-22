@@ -1,0 +1,80 @@
+# An array grown in a loop and handed back inside a struct, a tuple or an `ok(..)`
+# is still written in place: the cost of building it does not depend on how
+# long it grows.
+#
+# Putting the binding in a value built at the tail used to count as a use the
+# analysis could not place, so the array was never moved into the `mut self`
+# method that grows it. Every append then copied the array and retained each
+# element, and building it took time quadratic in its length; returning the
+# array bare was fast. The three shapes below are held to the same cost as each
+# other and to the cost of the bare return.
+
+import { equal as ==, less_than as <, measure, push, wrapping_increment as ++ } from builtins;
+
+struct Batch { items: i64[], count: i64 }
+
+fn add(mut self: i64[], item: i64?) {
+    match (item) {
+        some(v) => {
+            set self.push(v);
+        },
+        none => {},
+    };
+}
+
+fn bare(n: i64) -> i64[] {
+    mut items: i64[] = [];
+    mut i: i64 = 0;
+    while (i < n) {
+        set items.add(some(i));
+        set i++;
+    }
+    items
+}.test({
+    assert(bare(3) == [0, 1, 2]);
+})
+
+fn in_struct(n: i64) -> Batch {
+    mut items: i64[] = [];
+    mut i: i64 = 0;
+    while (i < n) {
+        set items.add(some(i));
+        set i++;
+    }
+    Batch { items, count: n }
+}.test({
+    assert(in_struct(3) == Batch { items: [0, 1, 2], count: 3 });
+})
+
+fn in_tuple(n: i64) -> (i64[], i64) {
+    mut items: i64[] = [];
+    mut i: i64 = 0;
+    while (i < n) {
+        set items.add(some(i));
+        set i++;
+    }
+    (items, n)
+}.test({
+    assert(in_tuple(3) == ([0, 1, 2], 3));
+})
+
+fn in_ok(n: i64) -> Batch!str {
+    mut items: i64[] = [];
+    mut i: i64 = 0;
+    while (i < n) {
+        set items.add(some(i));
+        set i++;
+    }
+    ok(Batch { items, count: n })
+}.test({
+    assert(in_ok(3) == ok(Batch { items: [0, 1, 2], count: 3 }));
+})
+
+fn main() {}.performance({
+    let short = measure("bare, short", 10, bare);
+    let long = measure("bare, long", 1000, bare);
+    assert(short.allocations == long.allocations);
+    assert(measure("struct", 1000, in_struct).allocations == long.allocations);
+    assert(measure("tuple", 1000, in_tuple).allocations == long.allocations);
+    assert(measure("ok", 1000, in_ok).allocations == long.allocations);
+})

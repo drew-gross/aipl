@@ -581,6 +581,7 @@ case_tests! {
     cases_methods_mutating_set_writeback_form = "cases/methods/mutating/set_writeback_form",
     cases_optimizations_appending_variant = "cases/optimizations/appending_variant",
     cases_optimizations_appending_variant_not_minted = "cases/optimizations/appending_variant_not_minted",
+    cases_optimizations_builds_into_struct_stays_in_place = "cases/optimizations/builds_into_struct_stays_in_place",
     cases_optimizations_const_array_literal = "cases/optimizations/const_array_literal",
     cases_optimizations_const_fold = "cases/optimizations/const_fold",
     cases_optimizations_const_fold_concat = "cases/optimizations/const_fold_concat",
