@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">128 files, 1397 items.</p>
+      <p class="summary">131 files, 1429 items.</p>
 
       <ul class="files">
 
@@ -407,7 +407,7 @@
           <p class="file-summary"><code>aipl_syntax::ast::Expr</code> and <code>ExprKind</code> as AIPL declares them, with the structural dump the lowering's tests assert against. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-expr.html#private">10 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-expr.html#private">16 private</a></span>
 
 
           <ul class="items">
@@ -469,6 +469,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-expr.html#item-show_exprs"><code>show_exprs</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-expr.html#item-map_subexprs"><code>map_subexprs</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -551,6 +556,46 @@
 
             <li>
               <a href="crates-aipl-codegen-src-find_trailing_whitespace.html#item-find_trailing_whitespace"><code>find_trailing_whitespace</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-fn_names.html">crates/aipl-codegen/src/fn_names.aipl</a>
+
+          <p class="file-summary">The names the parser gives functions it synthesizes from a declaration's attributes, and the inverse: what a function's name says it is.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-fn_names.html#private">7 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-fn_names.html#item-FnRole"><code>FnRole</code></a>
+              <span class="kind kind-variant">variant</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-fn_names.html#item-test_fn_name"><code>test_fn_name</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-fn_names.html#item-performance_fn_name"><code>performance_fn_name</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-fn_names.html#item-test_helper_name"><code>test_helper_name</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-fn_names.html#item-fn_role"><code>fn_role</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -1119,6 +1164,26 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-codegen-src-hoist_test_fns.html">crates/aipl-codegen/src/hoist_test_fns.aipl</a>
+
+          <p class="file-summary">The two rewrites that turn a function's <code>.test</code> and <code>.performance</code> attributes into ordinary top-level functions, so that everything after the parse — the loader's rewrites included, which is how they recognize test code — sees only functions.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-hoist_test_fns.html#private">6 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-hoist_test_fns.html#item-hoist_test_fns"><code>hoist_test_fns</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-codegen-src-indent.html">crates/aipl-codegen/src/indent.aipl</a>
 
           <p class="file-summary">The content half of the formatter's raw-block re-layout (see <code>reindent_block</code>): indents a block of text — the lines <em>between</em> a raw-string / template atom's delimiters, with no <code>&quot;&quot;&quot;</code> / <code>```</code> framing — by a chosen column. Split out so <code>reindent_block</code> deals only with the delimiters. Assumes the input is already fully dedented (its common indent is 0): it <em>adds</em> <code>target</code> spaces, it does not rebase an existing indent — <code>reindent_block</code> dedents first (via <code>dedent</code>).</p>
@@ -1653,6 +1718,26 @@
             <li>
               <a href="crates-aipl-codegen-src-parse.html#item-Node"><code>Node</code></a>
               <span class="kind kind-variant">variant</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-parse_and_partial_load.html">crates/aipl-codegen/src/parse_and_partial_load.aipl</a>
+
+          <p class="file-summary">A source file parsed and loaded as far as the loader has been ported to AIPL.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-parse_and_partial_load.html#private">1 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-parse_and_partial_load.html#item-parse_and_partial_load"><code>parse_and_partial_load</code></a>
+              <span class="kind kind-fn">fn</span>
             </li>
 
           </ul>

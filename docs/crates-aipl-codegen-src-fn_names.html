@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/fn_names.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/fn_names.aipl</code></h1>
+
+      <div class="module-doc"><p>The names the parser gives functions it synthesizes from a declaration's attributes, and the inverse: what a function's name says it is.</p><p>A <code>.test({ .. })</code> block on <code>f</code> becomes the function <code>__test$f</code>; a function declared inside that block is hoisted to <code>__test$f$helper</code>; a <code>.performance({ .. })</code> block on <code>f</code> becomes <code>__performance$f</code>, whose own <code>.test</code> body is the block. A <code>$</code> cannot appear in a source name, so no program can spell any of them, and a <code>$</code> past the prefix is the mark of something synthesized from a body rather than the body itself — a lambda lifted out of a test body is <code>__test$f$lambda0</code>, and its <code>?</code> acts on the lambda's own return type.</p><p>Rust asks the questions of this file through the FFI (<code>fn_role</code>, <code>test_fn_name</code>, <code>performance_fn_name</code>); <code>test_helper_name</code> is only asked by the pass that hoists helpers, which is AIPL too.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-FnRole">
+          <h3>
+            <a class="anchor" href="#item-FnRole">FnRole</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant FnRole</code></pre>
+
+          <div class="doc"><p>What a function's name says it is. A source name is <code>Plain</code>.</p><ul><li><code>TestBody</code>: exactly a <code>.test</code> body (<code>__test$f</code>, or <code>__test$__performance$f</code></li></ul><p>for a <code>.performance</code> block).</p><ul><li><code>TestHelper(helper)</code>: a function hoisted out of a <code>.test</code> block, with the</li></ul><p>name it was declared with.</p><ul><li><code>Performance(source)</code>: the function standing for <code>source</code>'s <code>.performance</code></li></ul><p>block.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-Plain"><code>Plain</code>
+
+
+            </li>
+
+            <li id="item-TestBody"><code>TestBody</code>
+
+
+            </li>
+
+            <li id="item-TestHelper"><code>TestHelper(helper: str)</code>
+
+
+            </li>
+
+            <li id="item-Performance"><code>Performance(source: str)</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-test_fn_name">
+          <h3>
+            <a class="anchor" href="#item-test_fn_name">test_fn_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn test_fn_name(f: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>The name of the function a <code>.test</code> block on <code>f</code> becomes.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-performance_fn_name">
+          <h3>
+            <a class="anchor" href="#item-performance_fn_name">performance_fn_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn performance_fn_name(f: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>The name of the function standing for <code>f</code>'s <code>.performance</code> block.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-test_helper_name">
+          <h3>
+            <a class="anchor" href="#item-test_helper_name">test_helper_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn test_helper_name(f: str, helper: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>The top-level name a function declared inside <code>f</code>'s <code>.test</code> block is hoisted to. Under the test body's prefix so it reads as the test's, and past it so <code>fn_role</code> says <code>TestHelper</code> rather than <code>TestBody</code>: a helper's <code>?</code> acts on its own return type, like any function's.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-fn_role">
+          <h3>
+            <a class="anchor" href="#item-fn_role">fn_role</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn fn_role(self: str) -&#62; FnRole</code></pre>
+
+          <div class="doc"><p>Classify a function by its name — see <code>FnRole</code>.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-TEST_PREFIX">
+          <h3>
+            <a class="anchor" href="#item-TEST_PREFIX">TEST_PREFIX</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let TEST_PREFIX = &#34;__test$&#34;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-PERFORMANCE_PREFIX">
+          <h3>
+            <a class="anchor" href="#item-PERFORMANCE_PREFIX">PERFORMANCE_PREFIX</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let PERFORMANCE_PREFIX = &#34;__performance$&#34;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-after">
+          <h3>
+            <a class="anchor" href="#item-after">after</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn after(self: str, prefix: str) -&#62; str?</code></pre>
+
+          <div class="doc"><p>What follows <code>prefix</code> in <code>self</code>, or <code>none</code> when <code>self</code> does not start with it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-split_test_owner">
+          <h3>
+            <a class="anchor" href="#item-split_test_owner">split_test_owner</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn split_test_owner(rest: str) -&#62; (str, str)?</code></pre>
+
+          <div class="doc"><p>What follows <code>__test$</code>, split into the function the test belongs to and whatever was synthesized under it (empty for the body itself, <code>$&lt;..&gt;</code> for anything else). The owner is <code>&lt;f&gt;</code>, or <code>__performance$&lt;f&gt;</code> for a <code>.performance</code> block; one with no name is no owner.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-test_tail">
+          <h3>
+            <a class="anchor" href="#item-test_tail">test_tail</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn test_tail(self: str) -&#62; str?</code></pre>
+
+          <div class="doc"><p>What follows the owner in a <code>__test$</code> name, or <code>none</code> when <code>self</code> is not one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-test_role">
+          <h3>
+            <a class="anchor" href="#item-test_role">test_role</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn test_role(self: str) -&#62; FnRole</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-tail_role">
+          <h3>
+            <a class="anchor" href="#item-tail_role">tail_role</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn tail_role(tail: str) -&#62; FnRole</code></pre>
+
+          <div class="doc"><p>The role of a <code>__test$</code> name from what follows its owner.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

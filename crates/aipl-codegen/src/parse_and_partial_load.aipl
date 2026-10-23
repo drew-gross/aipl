@@ -1,0 +1,73 @@
+# A source file parsed and loaded as far as the loader has been ported to AIPL.
+#
+# `aipl_parse_file` is only the parse. The loader then does more to a file than
+# parse it, and each part of that which has moved into AIPL is a step here, so
+# this function is what is left to burn down: a step moves in from the Rust
+# loader, and when the last one has, the loader is this.
+#
+# What has moved so far:
+#
+# - `hoist_test_fns`: a `.test` or `.performance` attribute becomes ordinary
+#   top-level functions.
+#
+# The formatter parses with `aipl_parse_file` and not this, because it lays out
+# the program the author wrote, attributes and all.
+
+import { contains, equal as ==, logical_not as !, map } from builtins;
+import { ParseFailure, ParsedFile, aipl_parse_file } from "./grammar_aipl.aipl";
+import { hoist_test_fns } from "./hoist_test_fns.aipl";
+import { Fn, Item, show_program } from "./item.aipl";
+
+# `aipl_parse_file`, then the steps of loading that happen per file and need
+# nothing from any other.
+pub fn parse_and_partial_load(src: str) -> ParsedFile!ParseFailure {
+    let ParsedFile { program, allows } = aipl_parse_file(src)?;
+    ok(ParsedFile { program: program.hoist_test_fns(), allows })
+}.test({
+    // A file with neither attribute is as it was parsed.
+    let plain = parse_and_partial_load("fn f() { }")?;
+    assert(plain.program == aipl_parse_file("fn f() { }")?.program);
+
+    // A `.test` helper is hoisted right after its function, and its uses in the
+    // block and in the other helpers are renamed with it.
+    let hoisted = parse_and_partial_load("""
+        fn double(n: i64) -> i64 { n }.test({
+            fn four() -> i64 { 4 }
+            fn five() -> i64 { four() }
+            assert(double(four()) == five());
+        })
+        fn after() { }
+    """)?;
+    let names = hoisted.program.show_program();
+    assert(names.contains("fn __test$double$four() "));
+    assert(names.contains("fn __test$double$five() "));
+    assert(names.contains("__test$double$five()"));
+    assert(!names.contains(" four()"));
+
+    // A `.performance` block becomes `__performance$<f>`, after `f` and its
+    // helpers, with the block's own helpers after it.
+    let performance = parse_and_partial_load("""
+        fn answer() -> i64 { 42 }.test({
+            fn t() -> i64 { 1 }
+            assert(t() == 1);
+        }).performance({
+            fn p() -> i64 { 2 }
+            assert(p() == 2);
+        })
+    """)?;
+    let order = performance.program.items.map(item_name);
+    assert(order == [
+        "answer",
+        "__test$answer$t",
+        "__performance$answer",
+        "__test$__performance$answer$p",
+    ]);
+})
+
+// A function's name, and the empty string for any other item.
+fn item_name(self: Item) -> str {
+    match (self) {
+        Fn(f) => f.name.text,
+        Struct(..) | Variant(..) | Refinement(..) | Import(..) | Const(..) => "",
+    }
+}

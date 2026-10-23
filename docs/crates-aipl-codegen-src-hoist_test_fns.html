@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/hoist_test_fns.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/hoist_test_fns.aipl</code></h1>
+
+      <div class="module-doc"><p>The two rewrites that turn a function's <code>.test</code> and <code>.performance</code> attributes into ordinary top-level functions, so that everything after the parse — the loader's rewrites included, which is how they recognize test code — sees only functions.</p><ul><li>A <code>.performance({ .. })</code> attribute becomes <code>__performance$&lt;f&gt;</code>: private, no</li></ul><p>parameters, a unit body, and the block as its <code>.test</code> body (so <code>aipl check</code> runs it, <code>assert</code> works in it, and an imported file's is dropped, all by the machinery <code>.test</code> already has). It sits right after <code>f</code> and the helpers <code>f</code>'s own <code>.test</code> block declared.</p><ul><li>A function declared inside a <code>.test</code> block moves out to the top level under</li></ul><p><code>test_helper_name</code>, reachable only from where it was declared: its uses in the test body and in the block's other helpers (a helper may call itself and its siblings) are renamed with it, and nothing else in the file can spell the hoisted name. The helpers of one test land right after the function that carries it, in declaration order.</p><p>Renaming is by name, not by scope: a <code>let</code> in the test body that shadows a helper's name is not tracked, the same way a call's name resolves in the loader.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-hoist_test_fns">
+          <h3>
+            <a class="anchor" href="#item-hoist_test_fns">hoist_test_fns</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn hoist_test_fns(self: Program) -&#62; Program</code></pre>
+
+          <div class="doc"><p><code>program</code> with every <code>.test</code> helper and <code>.performance</code> block moved out to a top-level function of its own.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-hoisted_items">
+          <h3>
+            <a class="anchor" href="#item-hoisted_items">hoisted_items</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn hoisted_items(self: Item) -&#62; Item[]</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-function_items">
+          <h3>
+            <a class="anchor" href="#item-function_items">function_items</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn function_items(self: Function) -&#62; Item[]</code></pre>
+
+          <div class="doc"><p><code>f</code>, then its helpers, then the function standing for its <code>.performance</code> block and that block's helpers.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-performance_function">
+          <h3>
+            <a class="anchor" href="#item-performance_function">performance_function</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn performance_function(self: Function, block: PerformanceBlock) -&#62; Function</code></pre>
+
+          <div class="doc"><p>The function standing for <code>self</code>'s <code>.performance</code> block. Named at the attribute, which is where a diagnostic about the function itself points.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-hoisted">
+          <h3>
+            <a class="anchor" href="#item-hoisted">hoisted</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn hoisted(self: Function) -&#62; Function[]</code></pre>
+
+          <div class="doc"><p><code>self</code> followed by the functions declared in its <code>.test</code> block, renamed. A function with no helpers is itself.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-renamed">
+          <h3>
+            <a class="anchor" href="#item-renamed">renamed</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn renamed(self: str, renames: (str, str)[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>What <code>name</code> is renamed to by <code>renames</code>, or <code>name</code> itself.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-rename_uses">
+          <h3>
+            <a class="anchor" href="#item-rename_uses">rename_uses</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn rename_uses(self: Expr, renames: (str, str)[]) -&#62; Expr</code></pre>
+
+          <div class="doc"><p><code>self</code> with every call to, and every value use of, a name in <code>renames</code> renamed.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

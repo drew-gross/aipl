@@ -395,18 +395,21 @@ fn sanity_check_entries(_a: &Artifact, comp: &Compilation) {
     // returns.
     let parsed = comp
         .call_values(
-            "aipl_parse_file",
+            "parse_and_partial_load",
             &[FfiValue::Str(
                 "fn f(x: i64) -> i64 { x } #[allow]\n".to_string(),
             )],
         )
         .unwrap();
     let (program, allows) = aipl::ffi_ast::parse_file_from_ffi(&parsed)
-        .unwrap_or_else(|e| panic!("dogfooded aipl_parse_file did not rebuild: {e:?}"));
+        .unwrap_or_else(|e| panic!("dogfooded parse_and_partial_load did not rebuild: {e:?}"));
     assert_eq!(program.items.len(), 1);
     assert_eq!(allows, vec![26..34]);
     let refused = comp
-        .call_values("aipl_parse_file", &[FfiValue::Str("fn f( {".to_string())])
+        .call_values(
+            "parse_and_partial_load",
+            &[FfiValue::Str("fn f( {".to_string())],
+        )
         .unwrap();
     assert!(
         aipl::ffi_ast::parse_file_from_ffi(&refused).is_err(),

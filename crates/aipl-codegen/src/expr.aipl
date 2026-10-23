@@ -2,7 +2,17 @@
 # structural dump the lowering's tests assert against. One of the files the
 # AST is declared across; see `ast.aipl`.
 
-import { Span, equal as ==, first, is_empty, join, logical_not as !, map, value_or } from builtins;
+import {
+    Span,
+    equal as ==,
+    first,
+    is_empty,
+    join,
+    logical_not as !,
+    map,
+    push,
+    value_or,
+} from builtins;
 import { Ctor, Pat, show_pat } from "./pat.aipl";
 import { I64 } from "./prim.aipl";
 import { Desc, Primitive, SetOrder, Ty, Unordered, show_order, show_ty } from "./ty.aipl";
@@ -260,3 +270,154 @@ fn show_dict_entry(self: (Expr, Expr)) -> str { `{self.0.show_expr()}: {self.1.s
 fn show_binds(self: (str, str)[]) -> str { self.map(show_bind).join(sep=", ") }
 
 fn show_bind(self: (str, str)) -> str { `{self.0} = {self.1}` }
+
+// The helpers below are loops rather than `xs.map(..)`: a function-typed
+// parameter can be called from a loop, but not captured by a lambda (`call to
+// undefined fn "f"`) and not passed to `map` by name (`expected (Expr) -> _,
+// got (Expr) -> Expr`). Each carries the `#[allow]` the loop lint wants.
+# `f` applied to each of `xs`.
+fn each_mapped(xs: Expr[], f: (Expr) -> Expr) -> Expr[] {
+    mut mapped: Expr[] = []; #[allow]
+    for (let x : xs) {
+        set mapped.push(f(x));
+    }
+    mapped
+}
+
+# `f` applied to `x` when it is present.
+fn optional_mapped(x: Expr?, f: (Expr) -> Expr) -> Expr? {
+    if (let some(e) = x) { some(f(e)) } else { none }
+}
+
+# `f` applied to the value of each field initializer.
+fn inits_mapped(inits: FieldInit[], f: (Expr) -> Expr) -> FieldInit[] {
+    mut mapped: FieldInit[] = []; #[allow]
+    for (let i : inits) {
+        set mapped.push(FieldInit { ..i, value: f(i.value) });
+    }
+    mapped
+}
+
+# `f` applied to the body of each arm.
+fn arms_mapped(arms: MatchArm[], f: (Expr) -> Expr) -> MatchArm[] {
+    mut mapped: MatchArm[] = []; #[allow]
+    for (let a : arms) {
+        set mapped.push(MatchArm { ..a, body: f(a.body) });
+    }
+    mapped
+}
+
+# Both halves of each entry of a dict literal mapped by `f`. (`pairs.map(|p|
+# (f(p.0), f(p.1)))` panics the compiler: "Synthetic-type members cannot be
+# unit".)
+fn pairs_mapped(pairs: (Expr, Expr)[], f: (Expr) -> Expr) -> (Expr, Expr)[] {
+    mut mapped: (Expr, Expr)[] = []; #[allow]
+    for (let p : pairs) {
+        set mapped.push((f(p.0), f(p.1)));
+    }
+    mapped
+}
+
+# `Neg(e)`: the node `map_subexprs`'s tests map with, easy to see in a dump.
+fn wrap(e: Expr) -> Expr { expr(Neg(e)) }
+
+# `self` with `f` applied to each of its direct sub-expressions, and nothing
+# else changed: not `self`'s own kind payload (names, types, patterns), not its
+# spans, and not the sub-expressions' own children — a pass that wants to reach
+# those recurses through `f`. The sub-expressions are the same ones Rust's
+# `each_subexpr` walks: a `Shim`'s bindings name functions and a pattern binds
+# names, so only a shim's body and an arm's body nest expressions.
+pub fn map_subexprs(self: Expr, f: (Expr) -> Expr) -> Expr {
+    let kind = match (self.kind) {
+        Num(..) | Bool(..) | Str(..) | Char(..) | Ident(..) | None | Unit => self.kind,
+        Call(name, args, method_style) => Call(name, each_mapped(args, f), method_style),
+        Neg(x) => Neg(f(x)),
+        If(cond, then_branch, else_branch) => If(f(cond), f(then_branch), f(else_branch)),
+        Construct(name, inits) => Construct(name, inits_mapped(inits, f)),
+        Field(x, name) => Field(f(x), name),
+        Let(name, ty, value, body) => Let(name, ty, f(value), f(body)),
+        LetMut(name, ty, value, body) => LetMut(name, ty, f(value), f(body)),
+        Assign(lhs, value, body) => Assign(f(lhs), f(value), f(body)),
+        For(name, iterable, body, index) => For(name, f(iterable), f(body), index=index),
+        While(cond, body) => While(f(cond), f(body)),
+        Shim(effect, bindings, body) => Shim(effect, bindings, f(body)),
+        Match(scrutinee, arms) => Match(f(scrutinee), arms_mapped(arms, f)),
+        IfLet(arm, scrutinee, else_branch) => IfLet(
+            MatchArm { ..arm, body: f(arm.body) },
+            f(scrutinee),
+            f(else_branch),
+        ),
+        ArrayLit(elements) => ArrayLit(each_mapped(elements, f)),
+        Spread(x) => Spread(f(x)),
+        SetLit(elements, order) => SetLit(each_mapped(elements, f), order),
+        DictLit(pairs) => DictLit(pairs_mapped(pairs, f)),
+        Index(obj, index) => Index(f(obj), f(index)),
+        Slice(obj, start, end) => Slice(f(obj), f(start), optional_mapped(end, f)),
+        Try(x) => Try(f(x)),
+        Seq(first, rest) => Seq(f(first), f(rest)),
+        Return(x) => Return(f(x)),
+        Lambda(params, body) => Lambda(params, f(body)),
+        TupleLit(elements) => TupleLit(each_mapped(elements, f)),
+        KwArg(name, value, forwarded) => KwArg(name, f(value), forwarded),
+        TypeArgs(x, types) => TypeArgs(f(x), types),
+    };
+    Expr { ..self, kind }
+}.test({
+    // A leaf has nothing to map.
+    assert(ident("x").map_subexprs(wrap).show_expr() == "x");
+    // Only the direct children are wrapped, not their children.
+    let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false));
+    assert(
+        call.map_subexprs(wrap).show_expr() == show_expr(expr(Call(
+            "f",
+            [expr(Neg(ident("a"))), expr(Neg(expr(Neg(ident("b")))))],
+            false,
+        ))),
+    );
+    // A binder's name and type are not sub-expressions; its value and body are.
+    let bound = expr(Let("v", none, ident("a"), ident("b")));
+    assert(
+        bound.map_subexprs(wrap).show_expr() == show_expr(expr(Let(
+            "v",
+            none,
+            wrap(ident("a")),
+            wrap(ident("b")),
+        ))),
+    );
+    // An optional child is mapped when present and left absent otherwise.
+    let open = expr(Slice(ident("s"), num(1), none));
+    assert(
+        open.map_subexprs(wrap).show_expr() == show_expr(expr(Slice(
+            wrap(ident("s")),
+            wrap(num(1)),
+            none,
+        ))),
+    );
+    let closed = expr(Slice(ident("s"), num(1), some(num(2))));
+    assert(
+        closed.map_subexprs(wrap).show_expr() == show_expr(expr(Slice(
+            wrap(ident("s")),
+            wrap(num(1)),
+            some(wrap(num(2))),
+        ))),
+    );
+    // A match arm's body is mapped; its pattern is not.
+    let arms = expr(Match(
+        ident("s"),
+        [MatchArm { pattern: Ctor("some", bindings=["v"]), body: ident("v"), span: 0..0 }],
+    ));
+    assert(
+        arms.map_subexprs(wrap).show_expr() == show_expr(expr(Match(
+            wrap(ident("s")),
+            [
+                MatchArm {
+                    pattern: Ctor("some", bindings=["v"]),
+                    body: wrap(ident("v")),
+                    span: 0..0,
+                },
+            ],
+        ))),
+    );
+    // The node's span survives.
+    assert(at(Neg(ident("x")), 3..7).map_subexprs(wrap).span == 3..7);
+})

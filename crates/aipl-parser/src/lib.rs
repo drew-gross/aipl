@@ -4,18 +4,17 @@
 //! is the grammar as data, `parse.aipl` the driver that runs it, and `ast.aipl`
 //! the tree it lowers to — and is compiled into the checked-in dogfood artifact
 //! the compiler links. This crate is the Rust side of that boundary: the hook
-//! the compiler installs to reach it (`set_parse_hook`), the two rewrites that
-//! follow a parse but are no part of one (`post_parse`), the lexer's token
+//! the compiler installs to reach it (`set_parse_hook`), the rewrite that
+//! follows a parse but is no part of one (`post_parse`), the lexer's token
 //! types as they cross the FFI, and the other dogfooded helpers a parse leans
 //! on (section stripping, companion files, assertion locations).
 //!
 //! Nothing here parses by hand, and there is **no native fallback**: a parse
 //! without the hook installed is a panic, not a slower path.
 
-use std::collections::HashMap;
 use std::path::Path;
 
-use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, Program};
+use aipl_syntax::ast::Program;
 use aipl_syntax::{Error, Span};
 
 /// One token's span and the TextMate scope AIPL's own rule set declares for it —
@@ -223,7 +222,7 @@ static PARSE_HOOK: std::sync::OnceLock<fn(&str) -> Result<(Program, Vec<Span>), 
     std::sync::OnceLock::new();
 
 /// Install the parser. The compiler points this at the dogfooded
-/// `aipl_parse_file` (`grammar_aipl.aipl`), run through the embedding FFI and
+/// `parse_and_partial_load` (`parse_and_partial_load.aipl`), run through the embedding FFI and
 /// rebuilt into a `Program` on this side. First install wins (the hook is
 /// process-global).
 pub fn set_parse_hook(f: fn(&str) -> Result<(Program, Vec<Span>), Vec<Error>>) {
@@ -231,7 +230,7 @@ pub fn set_parse_hook(f: fn(&str) -> Result<(Program, Vec<Span>), Vec<Error>>) {
 }
 
 /// Parse `input` — a whole source file, expected-output sections and all — to
-/// its [`Program`], with the two post-parse rewrites applied.
+/// its [`Program`], with the post-parse rewrite applied.
 ///
 /// Everything a parse involves happens on the AIPL side of the hook: the
 /// sections are stripped, trailing whitespace is refused, the source is lexed
@@ -270,14 +269,14 @@ pub fn parse_with_allows(input: &str) -> Result<(Program, Vec<Span>), Vec<Error>
     Ok((program, allows))
 }
 
-/// The two rewrites that follow a parse but are no part of one.
+/// The rewrite that follows a parse but is no part of one.
 ///
-/// Neither belongs to a grammar. `hoist_test_fns` restructures a `.test` block's
-/// own declarations, and `promote_type_vars` needs a declaration's own signature,
-/// so both are things done *to* a `Program` once it exists — which is why they
-/// stayed on this side of the hook when the parser moved to AIPL, and why they
-/// are a named function: [`parse_with_allows`] calls it on what the hook hands
-/// back.
+/// `promote_type_vars` needs a declaration's own signature, so it is a thing
+/// done *to* a `Program` once it exists — which is why it stayed on this side of
+/// the hook when the parser moved to AIPL, and why it is a named function:
+/// [`parse_with_allows`] calls it on what the hook hands back. The per-file
+/// steps that need nothing from Rust have moved to AIPL, into
+/// `parse_and_partial_load`, whose hook this is called on; this is what is left.
 ///
 /// What is *not* here is the pair of source-text rewrites, `assert(cond)` and
 /// `trace(expr)`. Both bake a source location into the program, and a location
@@ -286,81 +285,8 @@ pub fn parse_with_allows(input: &str) -> Result<(Program, Vec<Span>), Vec<Error>
 /// together; see `aipl_loader::bake`. `assert`'s rewrite used to be here, and its
 /// locations read `input:LINE:` for exactly that reason.
 pub fn post_parse(program: &mut Program) {
-    // Functions declared inside a `.test` block become top-level items, so
-    // everything after this — the loader's rewrites included, which is how they
-    // recognize test code — sees them as ordinary private functions.
-    hoist_test_fns(program);
-
     // A declaration's own type parameters stop being ordinary names here, at the
     // one point every path shares: source files reach the checker through the
     // loader, but the builtin signatures are parsed directly.
     aipl_syntax::promote_type_vars(program);
-}
-
-/// Move every function declared inside a `.test` block out to the top level,
-/// renamed by [`aipl_syntax::test_helper_name`] so it is reachable only from
-/// where it was declared: its uses in the test body and in the block's other
-/// helpers (a helper may call itself and its siblings) are renamed with it, and
-/// nothing else in the file can spell the hoisted name. The helpers of one test
-/// land right after the function that carries it, in declaration order.
-///
-/// Renaming is by name, not by scope: a `let` in the test body that shadows a
-/// helper's name is not tracked, the same way a call's name resolves in the
-/// loader.
-fn hoist_test_fns(program: &mut Program) {
-    let mut items = Vec::with_capacity(program.items.len());
-    for item in std::mem::take(&mut program.items) {
-        let Item::Fn(mut f) = item else {
-            items.push(item);
-            continue;
-        };
-        let helpers = std::mem::take(&mut f.test_fns);
-        if helpers.is_empty() {
-            items.push(Item::Fn(f));
-            continue;
-        }
-        let renames: HashMap<String, String> = helpers
-            .iter()
-            .map(|h| {
-                (
-                    h.name.text.clone(),
-                    aipl_syntax::test_helper_name(&f.name, &h.name),
-                )
-            })
-            .collect();
-        if let Some(tb) = &mut f.test_body {
-            rename_uses(tb, &renames);
-        }
-        items.push(Item::Fn(f));
-        for mut h in helpers {
-            // The hoisted name is one this pass invented, so it keeps the span
-            // of the name the author *did* write — the helper's own, which is
-            // where a diagnostic about it should point.
-            h.name.text = renames[&h.name.text].clone();
-            rename_uses(&mut h.body, &renames);
-            items.push(Item::Fn(h));
-        }
-    }
-    program.items = items;
-}
-
-/// Rename every call to, and every value use of, a name in `renames` within
-/// `e`.
-fn rename_uses(e: &mut Expr, renames: &HashMap<String, String>) {
-    match &mut e.kind {
-        ExprKind::Ident(name) => {
-            if let Some(to) = renames.get(name.as_str()) {
-                *name = to.clone();
-            }
-        }
-        ExprKind::Call(callee, _, _) => {
-            if let Some(to) = callee.user().and_then(|n| renames.get(n)) {
-                *callee = Callee::User(to.clone());
-            }
-        }
-        _ => {}
-    }
-    for child in aipl_syntax::each_subexpr_mut(e) {
-        rename_uses(child, renames);
-    }
 }

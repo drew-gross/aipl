@@ -362,6 +362,20 @@
         </section>
 
 
+
+        <section class="item" id="item-map_subexprs">
+          <h3>
+            <a class="anchor" href="#item-map_subexprs">map_subexprs</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn map_subexprs(self: Expr, f: (Expr) -&#62; Expr) -&#62; Expr</code></pre>
+
+          <div class="doc"><p><code>self</code> with <code>f</code> applied to each of its direct sub-expressions, and nothing else changed: not <code>self</code>'s own kind payload (names, types, patterns), not its spans, and not the sub-expressions' own children — a pass that wants to reach those recurses through <code>f</code>. The sub-expressions are the same ones Rust's <code>each_subexpr</code> walks: a <code>Shim</code>'s bindings name functions and a pattern binds names, so only a shim's body and an arm's body nest expressions.</p></div>
+
+
+        </section>
+
+
       </section>
 
 
@@ -504,6 +518,90 @@
           <pre class="signature"><code>fn show_bind(self: (str, str)) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-each_mapped">
+          <h3>
+            <a class="anchor" href="#item-each_mapped">each_mapped</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn each_mapped(xs: Expr[], f: (Expr) -&#62; Expr) -&#62; Expr[]</code></pre>
+
+          <div class="doc"><p><code>f</code> applied to each of <code>xs</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-optional_mapped">
+          <h3>
+            <a class="anchor" href="#item-optional_mapped">optional_mapped</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn optional_mapped(x: Expr?, f: (Expr) -&#62; Expr) -&#62; Expr?</code></pre>
+
+          <div class="doc"><p><code>f</code> applied to <code>x</code> when it is present.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-inits_mapped">
+          <h3>
+            <a class="anchor" href="#item-inits_mapped">inits_mapped</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn inits_mapped(inits: FieldInit[], f: (Expr) -&#62; Expr) -&#62; FieldInit[]</code></pre>
+
+          <div class="doc"><p><code>f</code> applied to the value of each field initializer.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-arms_mapped">
+          <h3>
+            <a class="anchor" href="#item-arms_mapped">arms_mapped</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn arms_mapped(arms: MatchArm[], f: (Expr) -&#62; Expr) -&#62; MatchArm[]</code></pre>
+
+          <div class="doc"><p><code>f</code> applied to the body of each arm.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-pairs_mapped">
+          <h3>
+            <a class="anchor" href="#item-pairs_mapped">pairs_mapped</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn pairs_mapped(pairs: (Expr, Expr)[], f: (Expr) -&#62; Expr) -&#62; (Expr, Expr)[]</code></pre>
+
+          <div class="doc"><p>Both halves of each entry of a dict literal mapped by <code>f</code>. (<code>pairs.map(|p| (f(p.0), f(p.1)))</code> panics the compiler: &quot;Synthetic-type members cannot be unit&quot;.)</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-wrap">
+          <h3>
+            <a class="anchor" href="#item-wrap">wrap</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn wrap(e: Expr) -&#62; Expr</code></pre>
+
+          <div class="doc"><p><code>Neg(e)</code>: the node <code>map_subexprs</code>'s tests map with, easy to see in a dump.</p></div>
 
 
         </section>

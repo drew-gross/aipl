@@ -4,21 +4,24 @@
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
 ; array-abi narrow
 ; set-abi wide
-; entry parse_test_section_header 542 str -> str?
-; entry strip_test_sections 582 str -> str
-; entry split_test_sections 581 str -> __tuple$str$str
-; entry source_loc 580 str __builtin_Span -> str
+; entry parse_test_section_header 561 str -> str?
+; entry strip_test_sections 601 str -> str
+; entry split_test_sections 600 str -> __tuple$str$str
+; entry source_loc 599 str __builtin_Span -> str
 ; entry caret_block 114 str __builtin_Span str -> str
-; entry fill_or_add_sections_file 193 str #{str:str} -> unit!Error
-; entry normalize_output 505 str -> str
-; entry int_fits 441 i64 str -> bool
-; entry is_operator_name 442 str -> bool
-; entry aipl_token_scopes 477 str -> __m19__ScopeSpan[]!__m19__LexError
-; entry find_files 194 str str -> str[]!Error
+; entry fill_or_add_sections_file 194 str #{str:str} -> unit!Error
+; entry normalize_output 522 str -> str
+; entry int_fits 458 i64 str -> bool
+; entry is_operator_name 459 str -> bool
+; entry aipl_token_scopes 494 str -> __m19__ScopeSpan[]!__m19__LexError
+; entry find_files 195 str str -> str[]!Error
 ; entry companion_files 116 str -> __m25__Companion[]!str
-; entry parse_spec 538 str -> __m26__Spec!str
-; entry aipl_parse_file 400 str -> __m27__ParsedFile!__m27__ParseFailure
-; entry format_source 219 str u64 -> str!__m46__FmtError
+; entry parse_spec 557 str -> __m26__Spec!str
+; entry parse_and_partial_load 555 str -> __m27__ParsedFile!__m27__ParseFailure
+; entry fn_role 204 str -> __m44__FnRole
+; entry test_fn_name 199 str -> str
+; entry performance_fn_name 200 str -> str
+; entry format_source 229 str u64 -> str!__m49__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
 ; struct __m19__ScopeSpan 40 span@0:__builtin_Span scope@16:str
@@ -60,7 +63,8 @@
 ; struct __m36__ConstDecl 104 name@0:__m19__SpanStr is_pub@40:bool ty@48:__m30__Ty? value@64:__m31__Expr doc@72:str?
 ; struct __m27__ParseFailure 24 errors@0:__m39__ParseError[]
 ; struct __m39__ParseError 40 message@0:str span@24:__builtin_Span
-; struct __m46__FmtError 40 message@0:str span@24:__builtin_Span
+; variant __m44__FnRole 32 Plain TestBody TestHelper(8:str) Performance(8:str)
+; struct __m49__FmtError 40 message@0:str span@24:__builtin_Span
 ; import 0 aipl_arr_drop_str
 ; import 1 aipl_arr_drop_warr
 ; import 2 aipl_arr_elem_ptr
@@ -332,5 +336,5 @@
 ; data 202 __tostr_lit_94 4c427261636b6574
 ; data 203 __tostr_lit_95 52427261636b6574
 
-; __m48____test$all$is_nine
-; source-fingerprint 9841176600672706098
+; __m51____test$all$is_nine
+; source-fingerprint 12509051745796325678

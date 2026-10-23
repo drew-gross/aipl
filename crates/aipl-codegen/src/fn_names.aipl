@@ -1,0 +1,157 @@
+# The names the parser gives functions it synthesizes from a declaration's
+# attributes, and the inverse: what a function's name says it is.
+#
+# A `.test({ .. })` block on `f` becomes the function `__test$f`; a function
+# declared inside that block is hoisted to `__test$f$helper`; a
+# `.performance({ .. })` block on `f` becomes `__performance$f`, whose own
+# `.test` body is the block. A `$` cannot appear in a source name, so no program
+# can spell any of them, and a `$` past the prefix is the mark of something
+# synthesized from a body rather than the body itself — a lambda lifted out of a
+# test body is `__test$f$lambda0`, and its `?` acts on the lambda's own return
+# type.
+#
+# Rust asks the questions of this file through the FFI (`fn_role`, `test_fn_name`,
+# `performance_fn_name`); `test_helper_name` is only asked by the pass that
+# hoists helpers, which is AIPL too.
+
+import {
+    contains,
+    equal as ==,
+    find_index,
+    is_nonempty,
+    len,
+    logical_and as &&,
+    logical_not as !,
+    map,
+    starts_with,
+    value_or,
+    wrapping_add as +,
+} from builtins;
+
+let TEST_PREFIX = "__test$";
+
+let PERFORMANCE_PREFIX = "__performance$";
+
+# What a function's name says it is. A source name is `Plain`.
+#
+# - `TestBody`: exactly a `.test` body (`__test$f`, or `__test$__performance$f`
+#   for a `.performance` block).
+# - `TestHelper(helper)`: a function hoisted out of a `.test` block, with the
+#   name it was declared with.
+# - `Performance(source)`: the function standing for `source`'s `.performance`
+#   block.
+variant FnRole = Plain | TestBody | TestHelper(helper: str) | Performance(source: str)
+
+# The name of the function a `.test` block on `f` becomes.
+pub fn test_fn_name(f: str) -> str { `{TEST_PREFIX}{f}` }.test({
+    assert(test_fn_name("map") == "__test$map");
+})
+
+# The name of the function standing for `f`'s `.performance` block.
+pub fn performance_fn_name(f: str) -> str { `{PERFORMANCE_PREFIX}{f}` }.test({
+    assert(performance_fn_name("map") == "__performance$map");
+})
+
+# The top-level name a function declared inside `f`'s `.test` block is hoisted
+# to. Under the test body's prefix so it reads as the test's, and past it so
+# `fn_role` says `TestHelper` rather than `TestBody`: a helper's `?` acts on its
+# own return type, like any function's.
+pub fn test_helper_name(f: str, helper: str) -> str { `{test_fn_name(f)}${helper}` }.test({
+    assert(test_helper_name("map", "fixture") == "__test$map$fixture");
+})
+
+# What follows `prefix` in `self`, or `none` when `self` does not start with it.
+fn after(self: str, prefix: str) -> str? {
+    if (self.starts_with(prefix)) { some(self[prefix.len()..]) } else { none }
+}.test({
+    assert("__test$f".after("__test$") == some("f"));
+    assert("__test$".after("__test$") == some(""));
+    assert("map".after("__test$") == none);
+})
+
+# What follows `__test$`, split into the function the test belongs to and
+# whatever was synthesized under it (empty for the body itself, `$<..>` for
+# anything else). The owner is `<f>`, or `__performance$<f>` for a
+# `.performance` block; one with no name is no owner.
+fn split_test_owner(rest: str) -> (str, str)? {
+    let owner_start = match (rest.after(PERFORMANCE_PREFIX)) {
+        some(..) => PERFORMANCE_PREFIX.len(),
+        none => 0,
+    };
+    let end = rest[owner_start..]
+        .find_index(|c| c == '$')
+        .map(|i| owner_start + i)
+        .value_or(rest.len());
+    let owner = rest[..end];
+    let named = match (owner.after(PERFORMANCE_PREFIX)) {
+        some(f) => f.is_nonempty(),
+        none => owner.is_nonempty(),
+    };
+    if (named) { some((owner, rest[end..])) } else { none }
+}.test({
+    assert(split_test_owner("f") == some(("f", "")));
+    assert(split_test_owner("f$lambda0") == some(("f", "$lambda0")));
+    assert(split_test_owner("__performance$f") == some(("__performance$f", "")));
+    assert(split_test_owner("__performance$f$g") == some(("__performance$f", "$g")));
+    assert(split_test_owner("") == none);
+    assert(split_test_owner("$x") == none);
+    assert(split_test_owner("__performance$") == none);
+})
+
+# Classify a function by its name — see `FnRole`.
+pub fn fn_role(self: str) -> FnRole {
+    match (self.after(PERFORMANCE_PREFIX)) {
+        some(source) => if (source.is_nonempty() && !source.contains("$")) {
+            Performance(source)
+        } else {
+            Plain
+        },
+        none => self.test_role(),
+    }
+}.test({
+    assert("map".fn_role() == Plain);
+    assert("__m9__at_end".fn_role() == Plain);
+    assert(test_fn_name("map").fn_role() == TestBody);
+    assert(test_fn_name("__m9__at_end").fn_role() == TestBody);
+    assert(test_helper_name("map", "fixture").fn_role() == TestHelper("fixture"));
+    assert(performance_fn_name("map").fn_role() == Performance("map"));
+
+    // Something synthesized under a test body is neither the body nor a helper.
+    assert("__test$map$lambda0".fn_role() == TestHelper("lambda0"));
+    assert("__test$map$fixture$lambda0".fn_role() == Plain);
+    assert("__test$map$".fn_role() == Plain);
+    assert("__test$".fn_role() == Plain);
+    assert("__test_main".fn_role() == Plain);
+    assert("__performance$".fn_role() == Plain);
+    assert("__performance$a$b".fn_role() == Plain);
+
+    // A `.performance` block is test code attached to a function the parser
+    // invented, so its body and helpers are named under `__test$__performance$`.
+    let perf = performance_fn_name("map");
+    assert(test_fn_name(perf).fn_role() == TestBody);
+    assert(test_helper_name(perf, "fixture").fn_role() == TestHelper("fixture"));
+    assert("__test$__performance$".fn_role() == Plain);
+    assert(`{test_fn_name(perf)}$lambda0`.fn_role() == TestHelper("lambda0"));
+})
+
+# What follows the owner in a `__test$` name, or `none` when `self` is not one.
+fn test_tail(self: str) -> str? {
+    match (self.after(TEST_PREFIX)) {
+        some(rest) => split_test_owner(rest).map(|parts| parts.1),
+        none => none,
+    }
+}
+
+fn test_role(self: str) -> FnRole { self.test_tail().map(tail_role).value_or(Plain) }
+
+# The role of a `__test$` name from what follows its owner.
+fn tail_role(tail: str) -> FnRole {
+    match (tail.after("$")) {
+        none => if (tail.is_nonempty()) { Plain } else { TestBody },
+        some(helper) => if (helper.is_nonempty() && !helper.contains("$")) {
+            TestHelper(helper)
+        } else {
+            Plain
+        },
+    }
+}

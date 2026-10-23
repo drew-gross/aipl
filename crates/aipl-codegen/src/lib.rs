@@ -1640,6 +1640,12 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./ebnf.aipl",
     "./format.aipl",
     "./doc.aipl",
+    // The loader's per-file steps that have moved to AIPL, and the function-name
+    // conventions they and Rust's test-code checks share. `parse_and_partial_load`
+    // is what every compile calls where it used to call `aipl_parse_file`.
+    "./fn_names.aipl",
+    "./hoist_test_fns.aipl",
+    "./parse_and_partial_load.aipl",
     // The formatter: `format_source` is the whole pipeline, and its walker
     // parses with the same `aipl_parse_file` every compile calls — which is why
     // it lives in this artifact rather than one of its own. It used to have
@@ -1710,7 +1716,10 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "find_files",
     "companion_files",
     "parse_spec",
-    "aipl_parse_file",
+    "parse_and_partial_load",
+    "fn_role",
+    "test_fn_name",
+    "performance_fn_name",
     "format_source",
 ];
 
@@ -2126,8 +2135,8 @@ pub struct SpecFields {
 /// FFI. `none` maps to `None`, `some(span.clone())` to `Some(span.clone())` — no sentinel. No
 /// native fallback; panics if it can't be built or called.
 /// The parser hook (see [`install_parser_hooks`]): a whole source file to its
-/// `Program` and `#[allow]` spans, through the dogfooded `aipl_parse_file`
-/// (`grammar_aipl.aipl`) and the bridge in [`ffi_ast`] that rebuilds the
+/// `Program` and `#[allow]` spans, through the dogfooded `parse_and_partial_load`
+/// (`parse_and_partial_load.aipl`) and the bridge in [`ffi_ast`] that rebuilds the
 /// marshalled AST on this side. A parse failure comes back as the error it was;
 /// a value that does not have the declared shape is a panic, since that is the
 /// two AST declarations disagreeing rather than anything in the source.
@@ -2148,9 +2157,9 @@ fn parse_file(src: &str) -> Result<(Program, Vec<Span>), Vec<aipl_syntax::Error>
     // its own.
     stacker::maybe_grow(PARSE_RED_ZONE, PARSE_SEGMENT, || {
         DOGFOOD_ENGINE.with(|comp| {
-            match comp.call_values("aipl_parse_file", &[FfiValue::Str(src.to_string())]) {
+            match comp.call_values("parse_and_partial_load", &[FfiValue::Str(src.to_string())]) {
                 Ok(value) => ffi_ast::parse_file_from_ffi(&value),
-                Err(e) => panic!("dogfooded aipl_parse_file() call: {e:?}"),
+                Err(e) => panic!("dogfooded parse_and_partial_load() call: {e:?}"),
             }
         })
     })
@@ -2348,6 +2357,45 @@ fn is_operator_name(s: &str) -> bool {
     })
 }
 
+/// The function-name hook (see [`aipl_syntax::set_fn_names_hooks`]): what `name`
+/// says its function is, from the dogfooded AIPL `fn_role`. The `FnRole` variant
+/// crosses the FFI as its case name and payload. No native fallback; panics if it
+/// can't be built or called, or if the case is one `FnRole` doesn't have.
+fn fn_role(name: &str) -> aipl_syntax::FnRole {
+    use aipl_syntax::FnRole;
+    DOGFOOD_ENGINE.with(|comp| {
+        match comp.call_values("fn_role", &[FfiValue::Str(name.to_string())]) {
+            Ok(FfiValue::Variant(case, payload)) => match (case.as_str(), payload.as_slice()) {
+                ("Plain", []) => FnRole::Plain,
+                ("TestBody", []) => FnRole::TestBody,
+                ("TestHelper", [FfiValue::Str(helper)]) => FnRole::TestHelper(helper.clone()),
+                ("Performance", [FfiValue::Str(source)]) => FnRole::Performance(source.clone()),
+                other => panic!("dogfooded fn_role() returned an unknown role: {other:?}"),
+            },
+            other => panic!("dogfooded fn_role() call: {other:?}"),
+        }
+    })
+}
+
+/// One of the dogfooded function-name constructors (`test_fn_name`,
+/// `performance_fn_name`): `f` to the name it is given. No native fallback.
+fn fn_name_of(entry: &str, f: &str) -> String {
+    DOGFOOD_ENGINE.with(
+        |comp| match comp.call_values(entry, &[FfiValue::Str(f.to_string())]) {
+            Ok(FfiValue::Str(name)) => name,
+            other => panic!("dogfooded {entry}() call: {other:?}"),
+        },
+    )
+}
+
+fn test_fn_name(f: &str) -> String {
+    fn_name_of("test_fn_name", f)
+}
+
+fn performance_fn_name(f: &str) -> String {
+    fn_name_of("performance_fn_name", f)
+}
+
 /// Marshal the dogfooded `aipl_token_scopes` from the dogfood engine: call it on
 /// `src` and mirror the returned `ScopeSpan[]` — each token's span and the scope
 /// AIPL's own rule set declares for it — into
@@ -2455,6 +2503,7 @@ pub fn install_parser_hooks() {
     aipl_syntax::set_caret_block_hook(caret_block);
     aipl_syntax::set_int_fits_hook(int_fits);
     aipl_syntax::set_is_operator_name_hook(is_operator_name);
+    aipl_syntax::set_fn_names_hooks(fn_role, test_fn_name, performance_fn_name);
 }
 
 /// What [`frontend`] produces: a program that has passed the type checker, plus
