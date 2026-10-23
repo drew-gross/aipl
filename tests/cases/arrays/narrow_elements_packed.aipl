@@ -30,7 +30,7 @@ import {
 } from builtins;
 
 fn bytes(n: u64) -> u8[] {
-    mut out: u8[] = []; #[allow]
+    mut out: u8[] = [];
     for (let i : 0..n) {
         set out.push(7);
     }

@@ -49,7 +49,7 @@ pub fn opt_right_fold<T: any, A: any>(self: T[], init: A, f: (T, A) -> A?) -> A?
         // `map` here would lift a lambda per fold to say the same thing.
         let step = match (self[i]) {
             some(x) => f(x, acc),
-            none => none, #[allow]
+            none => none,
         };
         set acc = step.value_or(acc);
         set ok = step.is_some();

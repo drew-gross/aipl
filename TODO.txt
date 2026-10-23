@@ -462,6 +462,7 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  test that one allow squelches multiple errors on the same line
   linter should apply after import resolution so that it doesn't rely on function names as selected by the user (i.e. import as can't interfere with a lint)
   lint against unused variables, apparently there are 2 in callers of own_texts
   tok_span should be value_or, with a lint (but also should make sure inlining and code sinking doens't result in the argument being actually evaluated)
@@ -489,7 +490,6 @@ lint:
   for (let x : xs) { if (p(x)) { set out.push(f(x)) } } should lint to a filter->map
   lint against set literals that contain duplicates
   set out = [..out, o]; should lint to set out.push(a);
-  we probably don't need a separate test that #[allow] works for each kind of lint, since the machinery is generic anyway
    for (let sub : rs) { if (cond(sub)) return true } else return false => lint require this to return any
   xs.fold(0, +) should be sum probably? I guess with wrapping and saturating variants
   any lint that works on bare assignment should work on field assignment (e.g. lint to use --)
@@ -509,7 +509,6 @@ lint:
   lint errors should result in aipl check failing but not terminate compilation - it should still finish compiling run tests, and if there are test failures report them in addition to lint failures
   don't count locals toward unused imports lint - if the import can be removed without causing a compile error, it should trigger
   recognize ad-hoc implementations of min/max an request using the function
-  forbid unnecessary allow
   lint fix mode
     first need an import-insert probably
   "use value_or" lint should recommend value_or even when the arg is expensive, IF the arg has no effects.

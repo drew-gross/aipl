@@ -23,7 +23,7 @@ fn step<K: any>(k: K, text: str) -> Step<K> {
     plain: Tok { kind: k, text: "plain" },
     label: "L",
 }.test({
-    let s = step(Word, "hi"); #[allow]
+    let s = step(Word, "hi");
 
     // `map` over an optional field — the shape that failed.
     assert(s.tok.map(|t| t.text) == some("hi"));
@@ -35,7 +35,7 @@ fn step<K: any>(k: K, text: str) -> Step<K> {
 
     // Nested through another generic instance, and at a second instantiation
     // so the two do not share a synthesized type.
-    let n = step(7, "num"); #[allow]
+    let n = step(7, "num");
     assert(n.tok.map(|t| t.kind) == some(7));
     assert(n.tok.map(|t| t.text) == some("num"));
 

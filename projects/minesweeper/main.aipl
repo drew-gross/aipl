@@ -97,7 +97,7 @@ fn new_game(width: u64, height: u64, mines: u64[]) -> Mark[,] {
 fn is_mine(self: Mark[,], cell: (u64, u64)) -> bool {
     match (self[cell]) {
         some(Hidden(mine)) | some(Flagged(mine)) | some(Revealed(mine)) => mine,
-        none => false, #[allow]
+        none => false,
     }
 }.test({
     let game = new_game(2, 2, [3]).toggle_flag((1, 1)).reveal((0, 0));
@@ -250,7 +250,7 @@ fn symbol(self: Mark[,], cell: (u64, u64), show_mines: bool) -> str {
         },
         some(Flagged(..)) => "F",
         some(Hidden(mine)) => if (show_mines && mine) { "*" } else { "#" },
-        none => "#", #[allow]
+        none => "#",
     }
 }
 

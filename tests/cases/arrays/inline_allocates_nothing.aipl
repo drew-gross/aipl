@@ -26,7 +26,7 @@ import {
 } from builtins;
 
 fn ones(n: u64) -> i64[] {
-    mut out: i64[] = []; #[allow]
+    mut out: i64[] = [];
     for (let i : 0..n) {
         set out.push(1);
     }
@@ -48,7 +48,7 @@ fn ones(n: u64) -> i64[] {
 })
 
 fn bytes(n: u64) -> u8[] {
-    mut out: u8[] = []; #[allow]
+    mut out: u8[] = [];
     for (let i : 0..n) {
         set out.push(1);
     }

@@ -23,7 +23,7 @@ fn main() !prints {
     print(s[0..2]);
 
     // `#[allow]` is line-scoped, so a marker on the *neighbouring* line
-    // squelches nothing.
+    // squelches nothing — and is itself reported for it.
     #[allow]
     print(s[4..s.len()]);
 }
@@ -63,3 +63,9 @@ error: slice starts at 0 — drop it for the open-ended "s[..end]" (or append #[
    |
 23 |     print(s[0..2]);
    |             ^
+
+error: this `#[allow]` squelches nothing — remove it
+  --> ./tests/cases/lints/err_slices.aipl:27:5
+   |
+27 |     #[allow]
+   |     ^^^^^^^^

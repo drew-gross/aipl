@@ -23,6 +23,6 @@ fn agree() {}.test({
     assert(known_in_range([1]) == [9]);
     assert(computed([1, 2]) == [9, 2]);
     assert(plain([]) == none);
-    let p = Pair { a: [1], b: [2] }; #[allow]
+    let p = Pair { a: [1], b: [2] };
     assert(p.a.with(0, 9).value_or(p.b) == [9]);
 })

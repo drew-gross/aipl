@@ -23,7 +23,7 @@ fn collect<T: any>(xs: T[]) -> T[] {
 })
 
 fn rebuilt<T: any>(xs: T[]) -> T[] {
-    mut out: T[] = []; #[allow]
+    mut out: T[] = [];
     for (let x : xs) {
         set out = [..out, x]; #[allow]
     }

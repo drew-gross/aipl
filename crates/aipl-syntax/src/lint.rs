@@ -3,7 +3,8 @@
 //! these) can be squelched by appending `#[allow]` to the offending line. The
 //! marker is line-scoped: it silences every lint whose reported span starts on
 //! its line, and nothing else. Regular errors (type mismatches, unknown names,
-//! parse errors, ...) take no notice of `#[allow]`.
+//! parse errors, ...) take no notice of `#[allow]`. A marker on a line where no
+//! lint fires is itself an error, so a marker never outlives the code it excused.
 //!
 //! A lint flags code that is *legal but has a clearly better spelling*; its
 //! message must name that better spelling. The loader runs `aipl_mono::check` on every
@@ -94,6 +95,9 @@ use self::with_value_or_self::{with_names, with_value_or_self};
 /// the lexer collected). Returns every surviving lint error.
 pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Error>> {
     let allowed: HashSet<usize> = allows.iter().map(|sp| line_of(src, sp.start)).collect();
+    // The lines whose marker squelched a hit; a marker on any other line is
+    // reported below.
+    let mut squelched: HashSet<usize> = HashSet::new();
     let mut hits: Vec<Error> = Vec::new();
     // The three slice lints partition the range forms rather than overlap:
     // a whole-receiver range belongs to `slice_whole` and the other two bow
@@ -253,9 +257,28 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     destructure_param(program, &mut hits);
     fn_body_type_stutter(program, src, &mut hits);
     hits.retain(|e| match &e.span {
-        Some(sp) => !allowed.contains(&line_of(src, sp.start)),
+        Some(sp) => {
+            let line = line_of(src, sp.start);
+            if allowed.contains(&line) {
+                squelched.insert(line);
+                false
+            } else {
+                true
+            }
+        }
         None => true,
     });
+    // A marker is an acknowledgement of a lint that fired, so one with nothing to
+    // squelch is stale: the code was fixed, or the marker was never needed. It is
+    // not itself squelchable — what it would squelch is itself.
+    for sp in allows {
+        if !squelched.contains(&line_of(src, sp.start)) {
+            hits.push(Error::at(
+                "this `#[allow]` squelches nothing — remove it",
+                sp.clone(),
+            ));
+        }
+    }
     // Every surviving hit, not just the first: lints are independent
     // findings over the whole file, so there is nothing to recover from and
     // no reason to make the reader re-run to see the next one.
