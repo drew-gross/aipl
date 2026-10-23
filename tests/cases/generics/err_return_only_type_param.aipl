@@ -1,0 +1,24 @@
+# A call whose type parameter only the return type mentions needs its position
+# to say which type it is. Nothing around the first call does; the second is
+# told a type that breaks the parameter's bound.
+
+fn nothing<T: int>(s: str) -> T? { none }
+
+fn empty<T: any>() -> T[] { [] }
+
+fn main() {
+    let unpinned = empty();
+    let text: str? = nothing("x");
+}
+--- errors ---
+error: fn "empty" takes a type from where its result goes, and nothing here says which — bind the result to a declared type, as in `let n: u8? = ..;`
+  --> ./tests/cases/generics/err_return_only_type_param.aipl:10:20
+   |
+10 |     let unpinned = empty();
+   |                    ^^^^^^^
+
+error: fn "nothing": type parameter "T" requires "int", but was inferred as str
+  --> ./tests/cases/generics/err_return_only_type_param.aipl:11:22
+   |
+11 |     let text: str? = nothing("x");
+   |                      ^^^^^^^^^^^^

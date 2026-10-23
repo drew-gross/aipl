@@ -221,6 +221,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/generics/nullary_ctor_from_context | 8 | 438 | 438 | 573 | 4608 | 8.00 | 129.75 | 1488 |
 | cases/generics/ord_bound | 0 | 0 | 0 | 45 | 256 | 2.00 | 75.89 | 1456 |
 | cases/generics/recursive_variant | 41 | 2204 | 2002 | 2585 | 6172 | 13.00 | 84.08 | 1536 |
+| cases/generics/return_only_type_param | 4 | 72 | 72 | 364 | 2700 | 6.00 | 118.20 | 1472 |
 | cases/generics/same_length_distinct_types | 0 | 0 | 0 | 195 | 688 | 2.00 | 77.02 | 1440 |
 | cases/generics/str_as_char_array | 0 | 0 | 0 | 1100 | 1256 | 1.00 | 78.09 | 1456 |
 | cases/generics/two_param_variant | 4 | 75 | 75 | 269 | 1552 | 7.00 | 82.15 | 1488 |

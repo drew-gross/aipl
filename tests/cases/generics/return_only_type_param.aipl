@@ -1,0 +1,29 @@
+# A type parameter that only the return type mentions is taken from where the
+# call's result goes: an annotated binding, a parameter, or — through a `?` or
+# another generic call such as `value_or` — whatever that position wants. No
+# argument can say which type it is, so a call with nothing around it to say
+# so is an error (see `err_return_only_type_param`).
+
+import { print, value_or } from builtins;
+
+fn nothing<T: int>(s: str) -> T? { none }
+
+fn empty<T: any>() -> T[] { [] }
+
+fn takes_u8s(xs: u8[]) -> u64 { 7 }
+
+fn takes_u8(n: u8) -> u8 { n }
+
+fn main() !prints {
+    let a: u8? = nothing("x");
+    print(`{a}`);
+    let b: i32[] = empty();
+    print(`{b}`);
+    print(`{takes_u8s(empty())}`);
+    print(`{takes_u8(nothing("y").value_or(4))}`);
+}
+--- stdout ---
+none
+[]
+7
+4

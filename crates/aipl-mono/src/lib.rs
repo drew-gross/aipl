@@ -4837,6 +4837,9 @@ impl Mono<'_> {
         gname: &str,
         arg_tys: &[Type],
         flexible: &[bool],
+        // The type the checker recorded for the call's result, when the position
+        // it sits in gave it one (see `Expr::ty`).
+        locked: Option<&Type>,
         span: Span,
     ) -> Result<(Vec<Type>, Type, HashSet<String>), Error> {
         // Copy the bits we need so we don't borrow `self.generics` across the
@@ -4967,6 +4970,23 @@ impl Mono<'_> {
                     map.insert(v.clone(), marker);
                     break;
                 }
+            }
+        }
+        // A variable only the return type mentions is the recorded result type's
+        // to give. It binds only what no argument did, so a variable an argument
+        // pinned keeps that answer.
+        if let (Some(locked), Some(declared)) = (locked, &return_ty) {
+            let mut from_result: HashMap<String, Type> = HashMap::new();
+            self.bind_generic_or(
+                declared,
+                locked,
+                &var_set,
+                &mut from_result,
+                gname,
+                span.clone(),
+            )?;
+            for (v, t) in from_result {
+                map.entry(v).or_insert(t);
             }
         }
         let mut targs = Vec::with_capacity(type_vars.len());
@@ -6119,7 +6139,7 @@ impl Mono<'_> {
         // position's, so `expected` lines up with the parameters one to one.
         let flexible = vec![false; expected.len()];
         let (type_args, ret, _) =
-            self.instantiate_types(name, expected, &flexible, span.clone())?;
+            self.instantiate_types(name, expected, &flexible, None, span.clone())?;
         // Substitution can leave a generic application (`(A, B)` is
         // `__tuple2<A, B>`); the consumers of a function value's result — a
         // wrapper deciding whether the result fits an array slot — read a
@@ -7489,8 +7509,13 @@ impl Mono<'_> {
                                 || check::is_int_pair(a)
                         })
                         .collect();
-                    let (type_args, ret, lit_pinned) =
-                        self.instantiate_types(name, &atys, &flexible, span.clone())?;
+                    let (type_args, ret, lit_pinned) = self.instantiate_types(
+                        name,
+                        &atys,
+                        &flexible,
+                        expr.ty.as_deref(),
+                        span.clone(),
+                    )?;
                     // A pair of literals takes the integer types the instance gave
                     // its parameter, as a bare literal does at the call.
                     let slot_types: HashMap<String, Type> = self.generics[name]
@@ -8402,12 +8427,18 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
         )));
     }
 
-    // Every declared type parameter must appear in a parameter, or it could
-    // never be inferred from a call.
+    // Every declared type parameter must appear in a parameter or in the return
+    // type, or nothing at a call could ever say what it is. One that only the
+    // return type mentions is taken from where the call's result goes.
     for tp in &f.sig.type_vars {
-        if !params.iter().any(|p| ty_mentions(&p.ty, &tp.name)) {
+        let in_return = f
+            .sig
+            .return_ty
+            .as_ref()
+            .is_some_and(|t| ty_mentions(t, &tp.name));
+        if !in_return && !params.iter().any(|p| ty_mentions(&p.ty, &tp.name)) {
             return Err(Error::msg(format!(
-                "fn \"{}\": type parameter \"{}\" is not used by any parameter, so it can't be inferred",
+                "fn \"{}\": type parameter \"{}\" is not used by any parameter or the return type, so it can't be inferred",
                 f.name, tp.name
             )));
         }

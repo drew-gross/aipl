@@ -393,6 +393,13 @@ struct Cx<'a> {
     /// `None` as a value means "seen with conflicting types", so nothing can be
     /// locked for it — a wrong lock is far worse than a missing one.
     locks: std::cell::RefCell<HashMap<usize, Option<Type>>>,
+    /// Each call to a generic function with a type variable that only its
+    /// return type mentions and that no argument pinned, by [`node_id`]: the
+    /// callee, the function the call sits in, and the call's span. Nothing at
+    /// such a call says what the variable is except the position its result
+    /// goes to, which reaches it through [`Cx::lock`] into `locks`;
+    /// [`Cx::return_pinned_errors`] reports the ones nothing reached.
+    return_pinned: std::cell::RefCell<HashMap<usize, (String, String, Span)>>,
     /// The parameter types a *value* lambda took from its position — a
     /// constructor payload, a struct field, an annotated binding — for every
     /// parameter written without an annotation. Keyed like `locks`, and stamped
@@ -559,7 +566,117 @@ impl<'a> Cx<'a> {
         if needs_lock(&e.kind) || aipl_syntax::ctor_ref_case(e).is_some() {
             self.lock_node(node_id(e), ty);
         }
+        self.lock_return_pinned(e, ty);
         self.lock_narrow(e, ty);
+    }
+
+    /// Record `ty` on each call in `e` whose generic function has a type
+    /// variable only its return type mentions (see [`Cx::return_pinned`]).
+    ///
+    /// `ty` is what `e` itself is expected to be. The call that owns the
+    /// variable takes it directly. Anything that passes a result along reaches
+    /// one further in: a `?` wants the optional or result that unwraps to
+    /// `ty`, and any other generic call matches `ty` against its declared
+    /// return type, which pins the variables that type names, and wants each
+    /// argument to be its parameter's type with those substituted.
+    fn lock_return_pinned(&self, e: &Expr, ty: &Type) {
+        match &e.kind {
+            ExprKind::Call(callee, args, _) => {
+                let Some(sig) = self.sigs.get(callee.name()) else {
+                    return;
+                };
+                // Asked of the signature, not of `return_pinned`: a position
+                // locks its expression before the expression is checked, so the
+                // call is not recorded there yet.
+                if has_return_only_var(sig) {
+                    self.lock_node(node_id(e), ty);
+                }
+                if !sig.is_generic() || sig.params.len() != args.len() {
+                    return;
+                }
+                let vars: HashSet<&str> = sig.type_vars.iter().map(|tp| tp.name.as_str()).collect();
+                let mut map = HashMap::new();
+                self.bind_field(&sig.return_type(), ty, &vars, &mut map);
+                for (arg, pty) in args.iter().zip(sig.param_types()) {
+                    self.lock_return_pinned(arg, &subst_vars(&pty, &map, &vars));
+                }
+            }
+            ExprKind::Try(inner) => {
+                let wanted = match &inner.kind {
+                    ExprKind::Call(callee, ..) => match self.sigs.get(callee.name()) {
+                        Some(sig) => match sig.return_type() {
+                            Type::Result(_, err) => Type::Result(Box::new(ty.clone()), err),
+                            _ => Type::Optional(Box::new(ty.clone())),
+                        },
+                        None => return,
+                    },
+                    _ => return,
+                };
+                self.lock_return_pinned(inner, &wanted);
+            }
+            _ => {}
+        }
+    }
+
+    /// An error for each call in [`Cx::return_pinned`] whose position gave its
+    /// result no type, or gave one that leaves a variable unpinned or breaks
+    /// the variable's bound.
+    fn return_pinned_errors(&self, locks: &HashMap<usize, Option<Type>>) -> Vec<(String, Error)> {
+        let mut out = Vec::new();
+        for (node, (callee, in_fn, span)) in self.return_pinned.borrow().iter() {
+            let Some(sig) = self.sigs.get(callee.as_str()) else {
+                continue;
+            };
+            let vars: HashSet<&str> = sig.type_vars.iter().map(|tp| tp.name.as_str()).collect();
+            let name = display(callee);
+            let Some(Some(ty)) = locks.get(node) else {
+                out.push((
+                    in_fn.clone(),
+                    Error::at(
+                        format!(
+                            "fn {name:?} takes a type from where its result goes, and nothing \
+                             here says which — bind the result to a declared type, as in \
+                             `let n: u8? = ..;`"
+                        ),
+                        span.clone(),
+                    ),
+                ));
+                continue;
+            };
+            let mut map = HashMap::new();
+            self.bind_field(&sig.return_type(), ty, &vars, &mut map);
+            for tp in &sig.type_vars {
+                match map.get(&tp.name) {
+                    Some(t) if !self.bound_satisfied(tp.bound, t) => out.push((
+                        in_fn.clone(),
+                        Error::at(
+                            format!(
+                                "fn {name:?}: type parameter {:?} requires \"{}\", but was \
+                                 inferred as {}",
+                                tp.name,
+                                tp.bound.name(),
+                                tyname(t)
+                            ),
+                            span.clone(),
+                        ),
+                    )),
+                    Some(_) => {}
+                    None => out.push((
+                        in_fn.clone(),
+                        Error::at(
+                            format!(
+                                "fn {name:?}: the type expected here, {}, does not say what \
+                                 type parameter {:?} is",
+                                tyname(ty),
+                                tp.name
+                            ),
+                            span.clone(),
+                        ),
+                    )),
+                }
+            }
+        }
+        out
     }
 
     /// Record `ty` on each `narrow` call whose value is `e`'s. Its target is the
@@ -1509,6 +1626,7 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
         current_type_params: std::cell::RefCell::new(Vec::new()),
         current_expected: std::cell::RefCell::new(None),
         locks: std::cell::RefCell::new(HashMap::new()),
+        return_pinned: std::cell::RefCell::new(HashMap::new()),
         lambda_params: std::cell::RefCell::new(HashMap::new()),
         current_type_bounds: std::cell::RefCell::new(std::collections::HashMap::new()),
         resolving: std::cell::RefCell::new(HashSet::new()),
@@ -1659,6 +1777,9 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
             }
         }
     }
+    for (in_fn, e) in cx.return_pinned_errors(&locks) {
+        errors.push(attribute(e, &in_fn, &program.sources));
+    }
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -1742,6 +1863,17 @@ fn narrow_target_errors(e: &Expr, locks: &HashMap<usize, Option<Type>>) -> Vec<E
         out.extend(narrow_target_errors(child, locks));
     }
     out
+}
+
+/// Whether `sig` has a type variable that its return type mentions and no
+/// parameter does — one a call's arguments cannot pin.
+fn has_return_only_var(sig: &Signature) -> bool {
+    let return_ty = sig.return_type();
+    let params = sig.param_types();
+    sig.type_vars.iter().any(|tp| {
+        super::ty_mentions(&return_ty, &tp.name)
+            && !params.iter().any(|p| super::ty_mentions(p, &tp.name))
+    })
 }
 
 /// The identity of an expression node — its address in the program being
@@ -5033,6 +5165,19 @@ impl Cx<'_> {
                     ));
                 }
             }
+        }
+        // A variable only the return type mentions was pinned by no argument.
+        // Its type is the position's to give (see `Cx::return_pinned`); until
+        // `lock` hears from the position it stays open in the result below.
+        if has_return_only_var(sig) {
+            self.return_pinned.borrow_mut().insert(
+                node,
+                (
+                    name.to_string(),
+                    self.current_fn.borrow().clone(),
+                    span.clone(),
+                ),
+            );
         }
         // A mutating method yields its (mutated) receiver; otherwise the
         // substituted return type.
