@@ -525,7 +525,10 @@ impl<'a> Cx<'a> {
     fn bound_satisfied(&self, need: Bound, ty: &Type) -> bool {
         if let Some(var) = typevar_name(ty) {
             let have = self.current_type_bounds.borrow().get(var).copied();
-            return need == Bound::Any || have == Some(need);
+            // An integer is ordered, so a variable bound `int` satisfies `ord`.
+            return need == Bound::Any
+                || have == Some(need)
+                || (need == Bound::Ord && have == Some(Bound::Int));
         }
         need.accepts(ty, &|n: &str| self.has_variant(n))
     }

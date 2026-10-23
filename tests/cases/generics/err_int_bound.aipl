@@ -1,0 +1,29 @@
+# `int` is narrower than `ord`: `char` and `str` are ordered but not integers,
+# and a variable bound `ord` does not satisfy a callee that wants `int`.
+
+fn identity<T: int>(x: T) -> T { x }
+
+fn needs_int<T: ord>(x: T) -> T { identity(x) }
+
+fn main() {
+    identity('a');
+    identity("text");
+}
+--- errors ---
+error: fn "identity": type parameter "T" requires "int", but the enclosing "T" is declared "ord"
+ --> ./tests/cases/generics/err_int_bound.aipl:6:35
+  |
+6 | fn needs_int<T: ord>(x: T) -> T { identity(x) }
+  |                                   ^^^^^^^^^^^
+
+error: fn "identity": type parameter "T" requires "int", but was inferred as char
+ --> ./tests/cases/generics/err_int_bound.aipl:9:5
+  |
+9 |     identity('a');
+  |     ^^^^^^^^^^^^^
+
+error: fn "identity": type parameter "T" requires "int", but was inferred as str
+  --> ./tests/cases/generics/err_int_bound.aipl:10:5
+   |
+10 |     identity("text");
+   |     ^^^^^^^^^^^^^^^^

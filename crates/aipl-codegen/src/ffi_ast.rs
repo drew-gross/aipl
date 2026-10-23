@@ -257,6 +257,7 @@ fn bound(v: &FfiValue) -> R<ast::Bound> {
     Ok(match case {
         "Any" => ast::Bound::Any,
         "Ord" => ast::Bound::Ord,
+        "Int" => ast::Bound::Int,
         "Variant" => ast::Bound::Variant,
         other => return Err(unknown("Bound", other)),
     })

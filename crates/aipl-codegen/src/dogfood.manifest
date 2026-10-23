@@ -33,7 +33,7 @@
 ; struct __m19__SpanStr 40 text@0:str span@24:__builtin_Span
 ; struct __m36__Signature 88 type_vars@0:__m36__TypeParam[] params@24:__m36__Param[] effects@48:str[] return_ty@72:__m30__Ty?
 ; struct __m36__TypeParam 32 name@0:str bound@24:__m35__Bound
-; variant __m35__Bound 8 Any Ord Variant
+; variant __m35__Bound 8 Any Ord Int Variant
 ; struct __m36__Param 72 name@0:str ty@24:__m30__Ty mutable@32:bool arity@40:__m36__Arity default@48:__m31__Expr? implicit_some@64:bool
 ; variant __m30__Ty 56 boxed Unit Primitive(8:__m29__Prim) Named(8:str) Case(8:__m30__Ty) TypeVar(8:str) Optional(8:__m30__Ty) Array(8:__m30__Ty) Set(8:__m30__Ty,16:__m30__SetOrder) Dict(8:__m30__Ty,16:__m30__Ty) Result(8:__m30__Ty,16:__m30__Ty) Fn(8:__m30__Ty[],32:__m30__Ty) Tuple(8:__m30__Ty[]) Generic(8:str,32:__m30__Ty[]) Any Without(8:__m30__Ty,16:__m30__Exclusion)
 ; variant __m29__Prim 8 I8 I16 I32 I64 U8 U16 U32 U64 Bool Char Str
@@ -331,4 +331,4 @@
 ; data 201 __tostr_lit_94 52427261636b6574
 
 ; __m48____test$all$is_nine
-; source-fingerprint 7370107898609058098
+; source-fingerprint 5747986466867669944

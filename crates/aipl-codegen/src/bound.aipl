@@ -4,9 +4,10 @@
 import { equal as == } from builtins;
 
 # `aipl_syntax::ast::Bound` — a constraint on a declared type variable. `any`
-# accepts anything, `ord` narrows to the primitives usable with `<`/`>`, and
-# `variant` to the tagged types a `match` can inspect.
-variant Bound = Any | Ord | Variant
+# accepts anything, `ord` narrows to the primitives usable with `<`/`>`, `int`
+# to the integer primitives, and `variant` to the tagged types a `match` can
+# inspect.
+variant Bound = Any | Ord | Int | Variant
 
 # The bound a keyword names, or `none` when it names none of them. The
 # `variant` bound has a keyword of its own in the grammar and so never reaches
@@ -15,11 +16,13 @@ pub fn bound_from_name(name: str) -> Bound? {
     match (name) {
         "any" => some(Any),
         "ord" => some(Ord),
+        "int" => some(Int),
         _ => none,
     }
 }.test({
     assert(bound_from_name("any") == some(Any));
     assert(bound_from_name("ord") == some(Ord));
+    assert(bound_from_name("int") == some(Int));
     assert(bound_from_name("eq") == none);
 
     // `variant` is its own keyword in type-parameter position, so it is not a
@@ -31,6 +34,7 @@ pub fn show_bound(self: Bound) -> str {
     match (self) {
         Any => "any",
         Ord => "ord",
+        Int => "int",
         Variant => "variant",
     }
 }

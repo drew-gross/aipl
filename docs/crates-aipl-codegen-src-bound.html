@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>variant Bound</code></pre>
 
-          <div class="doc"><p><code>aipl_syntax::ast::Bound</code> — a constraint on a declared type variable. <code>any</code> accepts anything, <code>ord</code> narrows to the primitives usable with <code>&lt;</code>/<code>&gt;</code>, and <code>variant</code> to the tagged types a <code>match</code> can inspect.</p></div>
+          <div class="doc"><p><code>aipl_syntax::ast::Bound</code> — a constraint on a declared type variable. <code>any</code> accepts anything, <code>ord</code> narrows to the primitives usable with <code>&lt;</code>/<code>&gt;</code>, <code>int</code> to the integer primitives, and <code>variant</code> to the tagged types a <code>match</code> can inspect.</p></div>
 
 
           <ul class="cases">
@@ -40,6 +40,11 @@
             </li>
 
             <li id="item-Ord"><code>Ord</code>
+
+
+            </li>
+
+            <li id="item-Int"><code>Int</code>
 
 
             </li>

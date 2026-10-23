@@ -498,11 +498,13 @@ pub mod ast {
     /// generic uses) accepts anything; `ord` narrows a variable to the
     /// primitives usable with `<`/`>` — currently the integers and `char` —
     /// so a signature like `minimum`/`maximum`'s can declare comparability
-    /// itself instead of a caller hand-checking element types by name.
+    /// itself instead of a caller hand-checking element types by name. `int`
+    /// narrows further, to the integer primitives alone.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum Bound {
         Any,
         Ord,
+        Int,
         Variant,
     }
 
@@ -513,6 +515,7 @@ pub mod ast {
             match name {
                 "any" => Some(Bound::Any),
                 "ord" => Some(Bound::Ord),
+                "int" => Some(Bound::Int),
                 "variant" => Some(Bound::Variant),
                 _ => None,
             }
@@ -523,13 +526,14 @@ pub mod ast {
             match self {
                 Bound::Any => "any",
                 Bound::Ord => "ord",
+                Bound::Int => "int",
                 Bound::Variant => "variant",
             }
         }
 
         /// Does `ty` satisfy this bound? `Any` accepts everything; `Ord`
         /// accepts only the primitives usable with `<`/`>` — integers and
-        /// `char`.
+        /// `char`; `Int` accepts only the integers.
         ///
         /// `Variant` accepts only a named variant type, which the `Type` alone
         /// cannot decide — `Type::Named("Foo")` is equally a struct — so the
@@ -543,6 +547,7 @@ pub mod ast {
                     Type::Primitive(p)
                         if p.is_int() || *p == Primitive::Char || *p == Primitive::Str
                 ),
+                Bound::Int => matches!(ty, Type::Primitive(p) if p.is_int()),
                 // A `Case<V>` satisfies it too: the bound exists so a body can
                 // ask which case a value is, and a case is exactly that answer
                 // with the payload dropped. `case_name` therefore reads one the
