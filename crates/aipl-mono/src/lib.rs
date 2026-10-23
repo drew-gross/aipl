@@ -2779,7 +2779,7 @@ impl Mono<'_> {
             if let Type::Fn(ptys, lret) = &param.ty {
                 let (fn_name, forwards): (String, Vec<Expr>) = match &arg.kind {
                     ExprKind::Lambda(lparams, lbody) => {
-                        let captures = free_vars(lbody, lparams, env);
+                        let captures = self.lambda_captures(lbody, lparams, env);
                         let fn_name = self.synth_lambda(lparams, lbody, ptys, lret, &captures);
                         let forwards = captures
                             .iter()
@@ -3248,6 +3248,78 @@ impl Mono<'_> {
     /// Synthesize a top-level function from a lambda: its parameters (typed from
     /// the expected function type) followed by one parameter per captured
     /// variable. Returns the function's name (it's inserted and queued).
+    /// The function-typed parameters of the function being processed that
+    /// `body` calls or forwards, by name — the ones a lambda lifted out of it
+    /// must still be able to resolve. A lambda parameter of the same name hides
+    /// the outer one.
+    fn lenv_names_used(&self, body: &Expr, params: &[LambdaParam]) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        if self.cur_lenv.is_empty() {
+            return out;
+        }
+        aipl_syntax::each_subexpr(body, &mut |e| {
+            let name = match &e.kind {
+                ExprKind::Call(Callee::User(n), ..) | ExprKind::Ident(n) => n,
+                _ => return,
+            };
+            if self.cur_lenv.contains_key(name)
+                && !params.iter().any(|p| &p.name == name)
+                && !out.contains(name)
+            {
+                out.push(name.clone());
+            }
+        });
+        out
+    }
+
+    /// A function-typed parameter of the function being processed, used as the
+    /// function a builtin takes (`xs.map(f)`): the function it is bound to, the
+    /// captures that function needs (the `$capN` parameters of this one), and
+    /// what it returns for `elem`. `None` when `name` is not such a parameter.
+    fn lenv_fn_value(
+        &self,
+        name: &str,
+        elem: &Type,
+        env: &Env,
+    ) -> Option<(String, Vec<(String, Type)>, Type)> {
+        let lb = self.cur_lenv.get(name)?;
+        let captures = lb
+            .captures
+            .iter()
+            .filter_map(|c| match &c.kind {
+                ExprKind::Ident(cn) => env.get(cn).map(|t| (cn.clone(), t.clone())),
+                _ => None,
+            })
+            .collect();
+        let ret = self.ref_return(&lb.fn_name, from_ref(elem));
+        Some((lb.fn_name.clone(), captures, ret))
+    }
+
+    /// What a lambda captures from the scope around it: the locals its body
+    /// reads ([`free_vars`]), and the captures of each function-typed parameter
+    /// it calls — a parameter is not a value in scope, but the function it was
+    /// bound to may itself capture some, and those arrive as parameters of this
+    /// function (`$capN`).
+    fn lambda_captures(
+        &self,
+        body: &Expr,
+        params: &[LambdaParam],
+        env: &Env,
+    ) -> Vec<(String, Type)> {
+        let mut out = free_vars(body, params, env);
+        for name in self.lenv_names_used(body, params) {
+            for cap in &self.cur_lenv[&name].captures {
+                let ExprKind::Ident(cn) = &cap.kind else {
+                    continue;
+                };
+                if let (false, Some(t)) = (out.iter().any(|(n, _)| n == cn), env.get(cn)) {
+                    out.push((cn.clone(), t.clone()));
+                }
+            }
+        }
+        out
+    }
+
     fn synth_lambda(
         &mut self,
         lparams: &[LambdaParam],
@@ -3278,6 +3350,22 @@ impl Mono<'_> {
                 default: None,
                 implicit_some: false,
             });
+        }
+        // The function parameters the body calls resolve to the same functions
+        // here, with the same captures: those arrived as `captures` above, under
+        // the names the enclosing function knew them by.
+        let mut lenv: LambdaEnv = HashMap::new();
+        for name in self.lenv_names_used(lbody, lparams) {
+            let lb = &self.cur_lenv[&name];
+            let carried = lb.captures.iter().all(
+                |c| matches!(&c.kind, ExprKind::Ident(cn) if captures.iter().any(|(n, _)| n == cn)),
+            );
+            if carried {
+                lenv.insert(name, lb.clone());
+            }
+        }
+        if !lenv.is_empty() {
+            self.lambda_envs.insert(fn_name.clone(), lenv);
         }
         self.concrete.insert(
             fn_name.clone(),
@@ -3390,7 +3478,7 @@ impl Mono<'_> {
                         pred.span.clone(),
                     ));
                 }
-                let captures = free_vars(body, params, env);
+                let captures = self.lambda_captures(body, params, env);
                 let fname = self.synth_lambda(
                     params,
                     body,
@@ -3398,6 +3486,12 @@ impl Mono<'_> {
                     &Type::Primitive(Primitive::Bool),
                     &captures,
                 );
+                (fname, captures)
+            }
+            ExprKind::Ident(g) if self.cur_lenv.contains_key(g) => {
+                let (fname, captures, _) = self
+                    .lenv_fn_value(g, &elem, env)
+                    .expect("a name found in cur_lenv resolves");
                 (fname, captures)
             }
             ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
@@ -3426,13 +3520,16 @@ impl Mono<'_> {
                         lambda.span.clone(),
                     ));
                 }
-                let captures = free_vars(body, params, env);
+                let captures = self.lambda_captures(body, params, env);
                 let mut benv = env.clone();
                 benv.insert(params[0].name.clone(), elem.clone());
                 let (_, u) = self.infer(body, &benv)?;
                 let fname = self.synth_lambda(params, body, from_ref(&elem), &u, &captures);
                 (fname, captures, u)
             }
+            ExprKind::Ident(g) if self.cur_lenv.contains_key(g) => self
+                .lenv_fn_value(g, &elem, env)
+                .expect("a name found in cur_lenv resolves"),
             ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
                 let (fname, u) = self.fn_value(g, from_ref(&elem), &lambda.span)?;
                 (fname, Vec::new(), u)
@@ -3750,7 +3847,7 @@ impl Mono<'_> {
                         lambda.span.clone(),
                     ));
                 }
-                let captures = free_vars(body, params, env);
+                let captures = self.lambda_captures(body, params, env);
                 // `U` is the lambda body's type with its parameter bound to `T`.
                 let mut benv = env.clone();
                 benv.insert(params[0].name.clone(), elem.clone());
@@ -3758,6 +3855,12 @@ impl Mono<'_> {
                 // Lift the lambda to `__lambda(x: T, captures..) -> U`.
                 let fname = self.synth_lambda(params, body, from_ref(&elem), &u, &captures);
                 (fname, captures, u)
+            }
+            ExprKind::Ident(g) if self.cur_lenv.contains_key(g) => {
+                // A function-typed parameter of this function: the function it
+                // is bound to, with the captures it was bound with.
+                self.lenv_fn_value(g, &elem, env)
+                    .expect("a name found in cur_lenv resolves")
             }
             ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
                 // A named function (or builtin): `U` is its return type for an
@@ -4099,7 +4202,7 @@ impl Mono<'_> {
                         f.span.clone(),
                     ));
                 }
-                let captures = free_vars(body, params, env);
+                let captures = self.lambda_captures(body, params, env);
                 // `R` is the body's type with the two params bound to `T`/`U`.
                 let mut benv = env.clone();
                 benv.insert(params[0].name.clone(), elem_a.clone());
@@ -4553,7 +4656,7 @@ impl Mono<'_> {
                         pred.span.clone(),
                     ));
                 }
-                let captures = free_vars(body, params, env);
+                let captures = self.lambda_captures(body, params, env);
                 // Lift to `__lambda(x: T, captures..) -> bool`.
                 let fname = self.synth_lambda(
                     params,
@@ -4562,6 +4665,12 @@ impl Mono<'_> {
                     &Type::Primitive(Primitive::Bool),
                     &captures,
                 );
+                (fname, captures)
+            }
+            ExprKind::Ident(g) if self.cur_lenv.contains_key(g) => {
+                let (fname, captures, _) = self
+                    .lenv_fn_value(g, &elem, env)
+                    .expect("a name found in cur_lenv resolves");
                 (fname, captures)
             }
             ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
@@ -6491,6 +6600,18 @@ impl Mono<'_> {
                         }
                         _ => t,
                     };
+                    // A call nothing defines infers as unit, and a unit slot has no
+                    // struct to go in. Reported as the call it is, which is what the
+                    // same call says on its own — the likeliest cause is a lambda
+                    // calling a function-typed parameter of the function around it.
+                    if matches!(t, Type::Unit) {
+                        if let ExprKind::Call(callee, ..) = &e.kind {
+                            return Err(Error::at(
+                                format!("call to undefined fn {:?}", callee.name()),
+                                e.span.clone(),
+                            ));
+                        }
+                    }
                     elem_tys.push(decay_concat(t));
                     relems.push(re);
                 }

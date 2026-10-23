@@ -403,6 +403,7 @@ case_tests! {
     cases_kwargs_omittable_forward = "cases/kwargs/omittable_forward",
     cases_lambdas_builtin_filter = "cases/lambdas/builtin_filter",
     cases_lambdas_builtin_map = "cases/lambdas/builtin_map",
+    cases_lambdas_calls_function_parameter = "cases/lambdas/calls_function_parameter",
     cases_lambdas_capture_heap_and_fold = "cases/lambdas/capture_heap_and_fold",
     cases_lambdas_cons_list_folds = "cases/lambdas/cons_list_folds",
     cases_lambdas_err_generic_fn_value_arity = "cases/lambdas/err_generic_fn_value_arity",

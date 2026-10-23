@@ -280,6 +280,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/kwargs/omittable_forward | 32 | 1684 | 1684 | 855 | 1712 | 14.00 | 67.99 | 1440 |
 | cases/lambdas/builtin_filter | 8 | 592 | 592 | 2875 | 5116 | 5.00 | 115.22 | 1456 |
 | cases/lambdas/builtin_map | 10 | 411 | 443 | 1717 | 3612 | 7.00 | 84.25 | 1504 |
+| cases/lambdas/calls_function_parameter | 12 | 379 | 395 | 2740 | 5756 | 12.00 | 136.39 | 1520 |
 | cases/lambdas/capture_heap_and_fold | 6 | 346 | 370 | 535 | 1804 | 6.00 | 65.15 | 1472 |
 | cases/lambdas/cons_list_folds | 15 | 840 | 448 | 1702 | 3276 | 4.00 | 144.56 | 1440 |
 | cases/lambdas/filter_in_place | 6 | 448 | 448 | 2425 | 5392 | 5.00 | 133.85 | 1488 |

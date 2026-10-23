@@ -6723,6 +6723,15 @@ pub(crate) fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
         (Type::Result(ao, ae), Type::Result(bo, be)) => {
             coerce(ao, bo).and_then(|()| coerce(ae, be))
         }
+        // A function value goes where a function of the same shape is wanted. What
+        // it is given has to fit what it takes, and what it returns has to fit
+        // what is wanted back — which is how a generic caller's still-open return
+        // (`map`'s `U`) accepts a function parameter whose return is known.
+        (Type::Fn(ap, ar), Type::Fn(bp, br)) if ap.len() == bp.len() => ap
+            .iter()
+            .zip(bp)
+            .try_for_each(|(a, b)| coerce(b, a))
+            .and_then(|()| coerce(ar, br)),
         _ => Err(()),
     }
 }

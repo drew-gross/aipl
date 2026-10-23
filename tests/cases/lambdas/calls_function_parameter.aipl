@@ -1,0 +1,44 @@
+# A lambda may call a function-typed parameter of the function around it. The
+# lambda is lifted out into a function of its own, so the parameter has to be
+# resolved there to what it was bound to at the call — including the locals that
+# function captured.
+
+import { filter, greater_than as >, map, print, wrapping_add as + } from builtins;
+
+fn inc(x: i64) -> i64 { x + 1 }
+
+fn twice(f: (i64) -> i64, pairs: (i64, i64)[]) -> (i64, i64)[] { pairs.map(|p| (f(p.0), f(p.1))) }
+
+fn on_all(f: (i64) -> i64, xs: i64[]) -> i64[] { xs.map(f) }
+
+fn keep(pred: (i64) -> bool, xs: i64[]) -> i64[] { xs.filter(pred) }
+
+# The function parameter is forwarded on, from inside the lambda, to another
+# function that takes one.
+fn via(f: (i64) -> i64, xs: i64[]) -> i64[] { xs.map(|x| apply_to(f, x)) }
+
+fn apply_to(f: (i64) -> i64, x: i64) -> i64 { f(x) }
+
+# Two function parameters, one used under a lambda that also captures a local.
+fn both(f: (i64) -> i64, g: (i64) -> i64, offset: i64, xs: i64[]) -> i64[] {
+    xs.map(|x| f(x) + g(x) + offset)
+}
+
+fn main() !prints {
+    print(`{twice(inc, [(1, 2), (3, 4)])}`);
+    // The bound function captures a local of the caller.
+    let step = 10;
+    print(`{twice(|x| x + step, [(1, 2)])}`);
+    print(`{on_all(inc, [1, 2, 3])}`);
+    let limit = 1;
+    print(`{keep(|x| x > limit, [1, 2, 3])}`);
+    print(`{via(|x| x + step, [1, 2])}`);
+    print(`{both(inc, |x| x + step, 100, [1, 2])}`);
+}
+--- stdout ---
+[(2, 3), (4, 5)]
+[(11, 12)]
+[2, 3, 4]
+[2, 3]
+[11, 12]
+[113, 115]
