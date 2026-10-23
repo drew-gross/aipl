@@ -1371,6 +1371,9 @@ impl Expander {
                     .transpose()?,
             ),
             ExprKind::Try(x) => ExprKind::Try(Box::new(self.expand_expr(x, locals)?)),
+            ExprKind::TypeArgs(x, tys) => {
+                ExprKind::TypeArgs(Box::new(self.expand_expr(x, locals)?), tys.clone())
+            }
             ExprKind::Spread(x) => ExprKind::Spread(Box::new(self.expand_expr(x, locals)?)),
             ExprKind::Seq(a, b) => ExprKind::Seq(
                 Box::new(self.expand_expr(a, locals)?),

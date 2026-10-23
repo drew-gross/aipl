@@ -193,6 +193,7 @@ import {
     Spread,
     Str,
     TupleLit,
+    TypeArgs,
     Unit,
     While,
     at,
@@ -329,6 +330,7 @@ import {
     Index as SufIndex,
     Index2 as SufIndex2,
     Method as SufMethod,
+    MethodTyped as SufMethodTyped,
     SliceFrom as SufSliceFrom,
     SliceTo as SufSliceTo,
     Suffix,
@@ -973,6 +975,15 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     // The method call comes before the field access — both open `. IDENT` — and
     // the two open-ended slices before the plain index.
     let suffix: Rule<AiplTok> = OneOf([
+        // The type arguments of `.name::<A, B>(args)`: written between the angles
+        // as they are in a generic type, and then the call's own arguments.
+        Then([
+            Lit("."),
+            Term(Name),
+            Lit("::"),
+            Many(Named("ty"), min=1, sep=Lit(","), trailing_sep=false, nested_in=angles()),
+            nest("(", Named("args"), ")", loose()),
+        ]),
         Then([Lit("."), Term(Name), nest("(", Named("args"), ")", loose())]),
         Then([Lit("."), Term(Name)]),
         Then([Lit("."), Term(IntLit)]),
@@ -1040,6 +1051,13 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Lit("true"),
         Lit("false"),
         Lit("none"),
+        // `name::<A, B>(args)` — a call with its type arguments written out.
+        Then([
+            Term(Name),
+            Lit("::"),
+            Many(Named("ty"), min=1, sep=Lit(","), trailing_sep=false, nested_in=angles()),
+            nest("(", Named("args"), ")", loose()),
+        ]),
         Then([Term(Name), nest("(", Named("args"), ")", loose())]),
         Then([
             Term(Name),
@@ -1425,6 +1443,21 @@ fn lower_postfix(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     ok(AExpr(e))
 }
 
+# What follows a callee's name in `name::<A, B>(args)`: the types between the
+# angles and then the argument list. They arrive as the call's children in that
+# order, the arguments last.
+struct TypedCall { tys: Ty[], args: Expr[] }
+
+fn typed_call(kids: Ast[], sp: Span) -> TypedCall!ParseError {
+    let last = kids
+        .last()
+        .value_or_err(ParseError { message: "a typed call has no argument list", span: sp })?;
+    ok(TypedCall {
+        tys: kids[..kids.len() - 1].try_map(|k| as_ty(k, sp))?,
+        args: no_spread(as_exprs(last, sp)?, "a call argument list")?,
+    })
+}
+
 # `suffix` — the seven postfix steps. `.` opens the three member forms, `[` the
 # three bracket forms, and `?` is the whole of the seventh.
 fn lower_suffix(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
@@ -1435,6 +1468,13 @@ fn lower_suffix(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // forms in particular: `a[..b]` puts its operand third and `a[b..]` second,
     // where reading it off the source meant comparing the `..`'s start against
     // the operand's to find which side it sat on.
+    // `.name::<A, B>(args)` has as many type children as it was given types, so
+    // no slot pattern can name its shape; the `::` after the name does.
+    let texts = node.own_texts(src);
+    if (texts[2] == some("::")) {
+        let TypedCall { tys, args } = typed_call(kids, sp)?;
+        return ok(ASuffix(SufMethodTyped(texts[1].value_or(""), tys, args)));
+    };
     match (node.slots()) {
         // `?`
         [Tok(_)] => ok(ASuffix(SufTry)),
@@ -1540,6 +1580,10 @@ fn lower_atom(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // What is left opens with an identifier, and the token after it says which
     // of the three name forms was written.
     let second = toks[1].value_or("");
+    if (second == "::") {
+        let TypedCall { tys, args } = typed_call(kids, sp)?;
+        return ok(AExpr(at(TypeArgs(at(Call(head, args, false), tsp), tys), sp)));
+    };
     if (second == "(") {
         let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a call argument list")?;
         return ok(AExpr(at(Call(head, args, false), tsp)));
@@ -4091,6 +4135,13 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
 }.test({
     // Literals, and the identifier that is not one.
     assert(expr_dump("1") == "1");
+
+    // Type arguments follow the callee's name, in a free call and a method call.
+    assert(expr_dump("f::<u8>(x)") == "TypeArgs(f(x), [u8])");
+    assert(expr_dump("xs.g::<u8, str>(1)") == "TypeArgs(xs.g(1), [u8, str])");
+    assert(expr_dump("f::<u8[]>()") == "TypeArgs(f(), [Array(u8)])");
+    // A comparison is still a comparison.
+    assert(expr_dump("a < b") == "<(a, b)");
     assert(expr_dump("true") == "true");
     assert(expr_dump("false") == "false");
     assert(expr_dump("none") == "none");

@@ -178,6 +178,18 @@ fn producer_shape(f: &Function) -> Option<Counted> {
     if f.sig.is_mutating() || f.name.text.ends_with(COUNTING_SUFFIX) {
         return None;
     }
+    // A type variable only the return type mentions is the call site's to give,
+    // and a counting variant answers `u64`, which mentions none: there would be
+    // nothing left for a call to the variant to learn it from.
+    let returns_only = |tp: &aipl_syntax::ast::TypeParam| {
+        !f.sig
+            .params
+            .iter()
+            .any(|p| crate::ty_mentions(&p.ty, &tp.name))
+    };
+    if f.sig.type_vars.iter().any(returns_only) {
+        return None;
+    }
     match aipl_syntax::unrefined(f.sig.return_ty.as_ref()?) {
         Type::Array(_) => Some(Counted::Array),
         Type::Optional(inner) if is_array(inner) => Some(Counted::Optional),

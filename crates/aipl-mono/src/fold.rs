@@ -167,6 +167,7 @@ fn fold_expr(e: &Expr, env: &HashMap<String, ExprKind>) -> Expr {
     let f = |x: &Expr| Box::new(fold_expr(x, env));
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::TypeArgs(..) => unreachable!("type arguments are resolved by the checker"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         // Nothing to fold in a shim's bindings — they are function names.
         ExprKind::Shim(effect, bindings, body) => {

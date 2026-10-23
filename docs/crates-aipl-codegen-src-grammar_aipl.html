@@ -36,6 +36,20 @@
 
 
 
+        <section class="item" id="item-TypedCall">
+          <h3>
+            <a class="anchor" href="#item-TypedCall">TypedCall</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct TypedCall</code></pre>
+
+          <div class="doc"><p>What follows a callee's name in <code>name::&lt;A, B&gt;(args)</code>: the types between the angles and then the argument list. They arrive as the call's children in that order, the arguments last.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-FieldBinders">
           <h3>
             <a class="anchor" href="#item-FieldBinders">FieldBinders</a>
@@ -597,6 +611,20 @@
           <pre class="signature"><code>fn lower_postfix(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>postfix</code> — an atom and the run of suffixes applied to it, left to right, each step spanning from the atom's start to that suffix's end.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-typed_call">
+          <h3>
+            <a class="anchor" href="#item-typed_call">typed_call</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn typed_call(kids: Ast[], sp: Span) -&#62; TypedCall!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>
@@ -1279,7 +1307,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$94501: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$96387: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -2205,7 +2233,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$144533: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$146419: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

@@ -19604,6 +19604,7 @@ fn compile_expr_inner<M: Module>(
     let span = expr.span.clone();
     Ok(match &expr.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::TypeArgs(..) => unreachable!("type arguments are resolved by the checker"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::IfLet(..) => {
             unreachable!("`if let` is desugared to an exhaustive `Match` by mono's `infer`")

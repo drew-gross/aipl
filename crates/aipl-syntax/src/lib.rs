@@ -1813,6 +1813,14 @@ pub mod ast {
         /// valid against a [`Param::implicit_some`] parameter, whose call sites
         /// otherwise pass a bare `T` — see the `kwargs` module in `aipl-loader`.
         KwArg(String, Box<Expr>, bool),
+        /// `f::<T, U>(args)` and `recv.f::<T, U>()` — a call with its type
+        /// arguments written out: the wrapped expression is the call, and the
+        /// types are the callee's declared type parameters, in declaration
+        /// order. Only the parser through the checker see this: checking
+        /// resolves the arguments into the call's recorded result type and
+        /// stamps the call without the wrapper, so every later pass can treat
+        /// it as unreachable.
+        TypeArgs(Box<Expr>, Vec<Type>),
     }
 
     /// A lambda parameter: a name and an optional type annotation (inferred
@@ -2910,9 +2918,12 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
             out.insert("-".to_string());
             collect_operators(x, out);
         }
-        K::Field(x, _) | K::Try(x) | K::Return(x) | K::KwArg(_, x, _) | K::Spread(x) => {
-            collect_operators(x, out)
-        }
+        K::Field(x, _)
+        | K::Try(x)
+        | K::Return(x)
+        | K::KwArg(_, x, _)
+        | K::TypeArgs(x, _)
+        | K::Spread(x) => collect_operators(x, out),
         // An `Assign` LHS is a place (idents/fields only), so it can't
         // contain an operator — only the value and body need walking.
         K::Seq(a, b)
@@ -4496,6 +4507,11 @@ fn each_type_in_expr_mut(e: &mut ast::Expr, f: &mut impl FnMut(&mut Type)) {
                 }
             }
         }
+        K::TypeArgs(_, tys) => {
+            for t in tys {
+                f(t);
+            }
+        }
         _ => {}
     }
     for child in each_subexpr_mut(e) {
@@ -4529,6 +4545,7 @@ pub fn each_subexpr_mut(e: &mut ast::Expr) -> Vec<&mut ast::Expr> {
         | K::Try(x)
         | K::Return(x)
         | K::KwArg(_, x, _)
+        | K::TypeArgs(x, _)
         | K::Spread(x)
         | K::Lambda(_, x) => vec![x.as_mut()],
         K::Match(scrutinee, arms) => {
@@ -4591,6 +4608,7 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
         | K::Try(x)
         | K::Return(x)
         | K::KwArg(_, x, _)
+        | K::TypeArgs(x, _)
         | K::Spread(x)
         | K::Lambda(_, x) => each_subexpr(x, f),
         K::Match(scrutinee, arms) => {
@@ -4733,6 +4751,7 @@ fn children(e: &ast::Expr) -> Vec<&ast::Expr> {
         | K::Try(x)
         | K::Return(x)
         | K::KwArg(_, x, _)
+        | K::TypeArgs(x, _)
         | K::Spread(x)
         | K::Lambda(_, x) => vec![x],
         K::Match(scrutinee, arms) => {

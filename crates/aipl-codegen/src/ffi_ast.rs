@@ -548,6 +548,7 @@ fn expr_kind(v: &FfiValue) -> R<ast::ExprKind> {
         "Lambda" => K::Lambda(each(at(payload, 0, case)?, lambda_param)?, sub(1)?),
         "TupleLit" => K::TupleLit(each(at(payload, 0, case)?, expr)?),
         "KwArg" => K::KwArg(name(0)?, sub(1)?, flag(at(payload, 2, case)?)?),
+        "TypeArgs" => K::TypeArgs(sub(0)?, each(at(payload, 1, case)?, ty)?),
         other => return Err(unknown("ExprKind", other)),
     })
 }

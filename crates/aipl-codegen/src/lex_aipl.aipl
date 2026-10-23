@@ -134,6 +134,7 @@ variant AiplTok =
     | Period
     | Comma
     | Colon
+    | ColonColon
     | Semi
     | Question
     | Hash
@@ -625,6 +626,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         op("|", Pipe, S_OPERATOR),
         op(".", Period, S_PUNCT),
         op(",", Comma, S_PUNCT),
+        op("::", ColonColon, S_PUNCT),
         op(":", Colon, S_PUNCT),
         op(";", Semi, S_PUNCT),
         op("?", Question, S_PUNCT),

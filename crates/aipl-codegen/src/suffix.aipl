@@ -11,11 +11,13 @@ import {
     Index as IndexExpr,
     Slice,
     Try as TryExpr,
+    TypeArgs,
     at,
     ident,
     num,
     show_expr,
 } from "./expr.aipl";
+import { Ty, Unit as UnitTy } from "./ty.aipl";
 
 # One postfix step, before it has a receiver to apply to. `postfix` is an atom
 # followed by a run of these, and a `suffix` on its own is not an expression —
@@ -27,6 +29,7 @@ import {
 variant Suffix =
     | Field(str)
     | Method(name: str, args: Expr[])
+    | MethodTyped(name: str, tys: Ty[], args: Expr[])
     | Index(Expr)
     | Index2(Expr, Expr)
     | SliceFrom(Expr)
@@ -40,6 +43,10 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     match (suf) {
         Field(name) => at(FieldExpr(recv, name), span),
         Method(name, args) => at(Call(name, [recv, ..args], true), span),
+        MethodTyped(name, tys, args) => at(
+            TypeArgs(at(Call(name, [recv, ..args], true), span), tys),
+            span,
+        ),
         Index(index) => index_or_slice(recv, index, span),
         // `recv[row, column]` reads one cell of a grid; the builtin answers `none` off the grid.
         Index2(row, column) => at(Call("__builtin_grid_get", [recv, row, column], false), span),
@@ -53,6 +60,13 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     let p = ident("p");
     assert(apply_suffix(p, Field("x"), 0..0).show_expr() == "p.x");
     assert(apply_suffix(p, Method("f", [num(1)]), 0..0).show_expr() == "p.f(1)");
+    assert(
+        apply_suffix(
+            p,
+            MethodTyped("f", [UnitTy], [num(1)]),
+            0..0,
+        ).show_expr() == "TypeArgs(p.f(1), [()])",
+    );
     assert(apply_suffix(p, Index(num(1)), 0..0).show_expr() == "Index(p, 1)");
     assert(
         apply_suffix(p, Index2(num(1), num(2)), 0..0).show_expr() == "__builtin_grid_get(p, 1, 2)",

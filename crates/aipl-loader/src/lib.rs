@@ -1200,6 +1200,7 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
         | ExprKind::Try(x)
         | ExprKind::Return(x)
         | ExprKind::KwArg(_, x, _)
+        | ExprKind::TypeArgs(x, _)
         | ExprKind::Spread(x) => check_operators(x, view)?,
         // An `Assign` LHS is a place (idents/fields only), so it can't
         // contain an operator — only the value and body need walking.
@@ -1899,6 +1900,10 @@ fn rewrite_expr(
                 .map(|e| Box::new(rewrite_expr(e, view, sc, locals))),
         ),
         ExprKind::Try(e) => ExprKind::Try(Box::new(rewrite_expr(e, view, sc, locals))),
+        ExprKind::TypeArgs(e, tys) => ExprKind::TypeArgs(
+            Box::new(rewrite_expr(e, view, sc, locals)),
+            tys.iter().map(|t| rewrite_type(t, view, &[])).collect(),
+        ),
         ExprKind::Spread(e) => ExprKind::Spread(Box::new(rewrite_expr(e, view, sc, locals))),
         // The keyword name refers to the callee's parameter, not a global —
         // only the value is rewritten.

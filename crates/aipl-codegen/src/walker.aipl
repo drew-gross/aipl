@@ -507,7 +507,7 @@ fn fmt_kind(k: AiplTok) -> FmtKind {
         PlusPlusPlus | PlusPlus | MinusMinus | Eq | Lt | Le | Gt | Ge | Bang => Op,
         Plus | Minus | Star | Slash | Percent => Op,
         PlusEq | MinusEq | StarEq | SlashEq => Op,
-        Period | Comma | Colon | Semi | Question | Hash => Punct,
+        Period | Comma | Colon | ColonColon | Semi | Question | Hash => Punct,
         LParen | RParen | LBrace | RBrace | LBracket | RBracket => Punct,
         // Trivia never reaches the token stream (whitespace is skipped, comments
         // go to the trivia sink); classify them harmlessly rather than diverge.
@@ -1994,16 +1994,32 @@ fn postfix_segs(self: W, acc0: Seg[]) -> WSegs!FmtError {
 # tagged so the chain layout can break before it.
 fn dot_seg(self: W) -> WSeg!FmtError {
     let m = self.bump().w.bump();
-    if (m.w.peek_text() != "(") {
-        return ok(WSeg { w: m.w, seg: Seg { is_call: false, doc: Text(`.{m.text}`) } });
+    let typed = m.w.turbofish_if_any()?;
+    if (typed.w.peek_text() != "(") {
+        return ok(WSeg { w: typed.w, seg: Seg { is_call: false, doc: Text(`.{m.text}`) } });
     };
-    let hug = m.w.bump().w.hugs_sole_arg();
-    let args = m.w.bump().w.call_args_until(")", [])?;
+    let hug = typed.w.bump().w.hugs_sole_arg();
+    let args = typed.w.bump().w.call_args_until(")", [])?;
     let closed = args.w.expect(")")?.w;
     ok(WSeg {
         w: closed,
-        seg: Seg { is_call: true, doc: Concat([Text(`.{m.text}`), call_arg_list(args.docs, hug)]) },
+        seg: Seg {
+            is_call: true,
+            doc: Concat([Text(`.{m.text}`), typed.doc, call_arg_list(args.docs, hug)]),
+        },
     })
+}
+
+# The `::<T, U>` after a callee's name, when there is one, and nothing when
+# there is not. It glues to the name on its left and lays its types out as any
+# angle list.
+fn turbofish_if_any(self: W) -> WDoc!FmtError {
+    if (self.peek_text() != "::") {
+        return ok(WDoc { w: self, doc: Concat([]) });
+    };
+    let WDocs { w, docs } = self.bump().w.expect("<")?.w.ty_list(">", [])?;
+    let closed = w.expect(">")?.w;
+    ok(WDoc { w: closed, doc: Concat([Text("::"), comma_list_docs(docs, Angles)]) })
 }
 
 # `[i]`, `[a..b]`, `[a..]`, `[..b]`, `[row, column]` — indexing and the slice forms.
@@ -2186,11 +2202,15 @@ fn name_atom(self: W) -> WDoc!FmtError {
         return err(self.err_here(`formatter: expected an expression, found "{self.peek_text()}"`));
     };
     let n = self.bump();
-    if (n.w.peek_text() == "(") {
-        let hug = n.w.bump().w.hugs_sole_arg();
-        let args = n.w.bump().w.call_args_until(")", [])?;
+    let typed = n.w.turbofish_if_any()?;
+    if (typed.w.peek_text() == "(") {
+        let hug = typed.w.bump().w.hugs_sole_arg();
+        let args = typed.w.bump().w.call_args_until(")", [])?;
         let closed = args.w.expect(")")?.w;
-        return ok(WDoc { w: closed, doc: Concat([Text(n.text), call_arg_list(args.docs, hug)]) });
+        return ok(WDoc {
+            w: closed,
+            doc: Concat([Text(n.text), typed.doc, call_arg_list(args.docs, hug)]),
+        });
     };
     if (n.w.peek_text() == "{") {
         return n.w.bump().w.struct_atom(n.text);

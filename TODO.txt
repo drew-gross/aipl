@@ -291,6 +291,9 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  explore simpler syntax than turbofish for type arguments
+  type arguments with defaults
+  wildcard syntax in turbofish that means "infer this one"
   explict type args (not just from context)
   minesweeper main is non-DRY because of how shimming works. Should DRY it up.
   make a function composition operator
@@ -759,6 +762,7 @@ vscode:
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 
 handoff:
+  checked_in_tmlanguage_is_current needs a handoff-fill
   maybe: fewer executables per case (reuse instrumented, or test behaviour in JIT). Need to decide if I actually want this.
   handoff should be able to regenerated staged ir artifacts on it's own without a two-stage approach
   auto-fix unused imports

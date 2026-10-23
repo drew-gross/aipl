@@ -475,6 +475,7 @@ fn lcr_expr(e: &Expr, lcr: &Lcr<'_>, scope: &mut Vec<String>) -> Expr {
             Box::new(lcr_expr(x, lcr, scope)),
             *fwd,
         )),
+        K::TypeArgs(x, tys) => rw(K::TypeArgs(Box::new(lcr_expr(x, lcr, scope)), tys.clone())),
         K::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         K::Lambda(params, body) => {
             for p in params {
@@ -825,6 +826,9 @@ pub(crate) fn op_call(canonical: Callee, args: Vec<Expr>, span: Span) -> Expr {
 fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<String>) -> Expr {
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::TypeArgs(x, tys) => {
+            ExprKind::TypeArgs(Box::new(lt_expr(x, fm, ord)), tys.clone())
+        }
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         // A shim carries no type annotations of its own; only its body can.
         ExprKind::Shim(effect, bindings, body) => ExprKind::Shim(
@@ -1292,6 +1296,7 @@ impl GenericLowerer {
                 e.kind.clone()
             }
             K::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+            K::TypeArgs(x, tys) => K::TypeArgs(b(self, x)?, tys.clone()),
             K::Spread(..) => unreachable!("array spreads are desugared by the loader"),
             K::Neg(x) => K::Neg(b(self, x)?),
             K::Field(x, f) => K::Field(b(self, x)?, f.clone()),
@@ -6358,6 +6363,7 @@ impl Mono<'_> {
         }
         let (rewritten, inferred) = match &expr.kind {
             ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+            ExprKind::TypeArgs(..) => unreachable!("type arguments are resolved by the checker"),
             ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
             ExprKind::Unit => (expr.clone(), Type::Unit),
             // A shim evaluates to its body. Its bindings are function
@@ -8696,6 +8702,7 @@ fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
         K::TupleLit(es) => K::TupleLit(es.iter().map(|x| *r(x)).collect()),
         K::DictLit(entries) => K::DictLit(entries.iter().map(|(k, v)| (*r(k), *r(v))).collect()),
         K::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        K::TypeArgs(x, tys) => K::TypeArgs(r(x), tys.iter().map(|t| subst_vars(t, map)).collect()),
         K::Spread(..) => unreachable!("array spreads are desugared by the loader"),
     };
     Expr {
@@ -8895,6 +8902,7 @@ fn collect_free(
 ) {
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::TypeArgs(x, _) => collect_free(x, bound, env, out, seen),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         // A shim binds global functions, which are never free *locals*.
         ExprKind::Shim(_, _, body) => collect_free(body, bound, env, out, seen),
@@ -9082,6 +9090,7 @@ pub(crate) fn count_uses(
 ) {
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::TypeArgs(x, _) => count_uses(x, bound, counts),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         // A shim installs its bound functions by address, which is a use like
         // any other — without counting them here they'd look dead and be pruned.
@@ -10014,6 +10023,9 @@ fn collect_body_binders(e: &Expr, set: &mut HashSet<String>) {
 pub fn children(e: &Expr) -> Vec<&Expr> {
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        // Checking walks through the wrapper to the call it holds; it is gone
+        // once checking has stamped the program.
+        ExprKind::TypeArgs(call, _) => vec![call],
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::Shim(_, _, body) => vec![body],
         ExprKind::Num(_)
@@ -10107,6 +10119,7 @@ fn has_placeholder(t: &Type) -> bool {
 pub fn children_mut(e: &mut Expr) -> Vec<&mut Expr> {
     match &mut e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::TypeArgs(call, _) => vec![call],
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::Shim(_, _, body) => vec![body],
         ExprKind::Num(_)
@@ -10303,6 +10316,7 @@ fn replace_call(
         |x: &Expr, replaced: &mut bool| replace_call(x, fname, fparams, fbody, replaced, sites);
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::TypeArgs(x, tys) => ExprKind::TypeArgs(Box::new(rc(x, replaced)), tys.clone()),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         // Only the body is rewritten: a binding names a function whose *address*
         // is installed, so there is no call there to inline.
@@ -10532,6 +10546,9 @@ pub(crate) fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
     };
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::TypeArgs(x, tys) => {
+            ExprKind::TypeArgs(Box::new(rename_params(x, map)), tys.clone())
+        }
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         // A shim binds global functions, which parameter renaming never touches.
         ExprKind::Shim(effect, bindings, body) => ExprKind::Shim(
@@ -11177,6 +11194,7 @@ fn aliases_or_unsafe(
     let rec_tail = |x: &Expr| aliases_or_unsafe(name, x, iterating, tail, mutating);
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::TypeArgs(x, _) => rec(x),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         // The shim's bindings name globals, so only the body can alias `name`.
         // Its value is the shim's value, so tail position carries through.
@@ -11411,6 +11429,7 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
     let c = |x: &Expr| count_ident(name, x);
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::TypeArgs(x, _) => c(x),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::Shim(_, _, body) => c(body),
         ExprKind::Ident(n) => usize::from(n == name),
@@ -11458,6 +11477,7 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
 fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::TypeArgs(x, _) => find_move_into(param, x),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::Shim(_, _, body) => find_move_into(param, body),
         ExprKind::LetMut(y, _, val, body) if matches!(&val.kind, ExprKind::Ident(n) if n == param) => {

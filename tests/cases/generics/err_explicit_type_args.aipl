@@ -1,0 +1,49 @@
+# Type arguments are checked: one per declared type parameter (or none), each
+# satisfying its bound, on a function that has type parameters, and agreeing
+# with what the arguments are.
+
+fn nothing<T: int>(s: str) -> T? { none }
+
+fn pair<A: any, B: any>(a: A, b: B) -> A { a }
+
+fn plain(x: i64) -> i64 { x }
+
+fn identity<T: any>(x: T) -> T { x }
+
+fn main() {
+    nothing::<u8, u8>("x");
+    nothing::<str>("x");
+    plain::<u8>(1);
+    pair::<i64>(1, 2);
+    identity::<str>(5);
+}
+--- errors ---
+error: fn "nothing" takes 1 type argument(s) (T), got 2; name all of them or none
+  --> ./tests/cases/generics/err_explicit_type_args.aipl:14:5
+   |
+14 |     nothing::<u8, u8>("x");
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+
+error: fn "nothing": type parameter "T" requires "int", but str was given
+  --> ./tests/cases/generics/err_explicit_type_args.aipl:15:5
+   |
+15 |     nothing::<str>("x");
+   |     ^^^^^^^^^^^^^^^^^^^
+
+error: fn "plain" takes no type arguments
+  --> ./tests/cases/generics/err_explicit_type_args.aipl:16:5
+   |
+16 |     plain::<u8>(1);
+   |     ^^^^^^^^^^^^^^
+
+error: fn "pair" takes 2 type argument(s) (A, B), got 1; name all of them or none
+  --> ./tests/cases/generics/err_explicit_type_args.aipl:17:5
+   |
+17 |     pair::<i64>(1, 2);
+   |     ^^^^^^^^^^^^^^^^^
+
+error: fn "identity" arg 0: expected str, got i64
+  --> ./tests/cases/generics/err_explicit_type_args.aipl:18:21
+   |
+18 |     identity::<str>(5);
+   |                     ^

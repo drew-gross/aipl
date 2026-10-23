@@ -1,0 +1,22 @@
+import { print } from builtins;
+fn nothing<T: int>(self: str) -> T? { none }
+fn empty<T: any>() -> T[] { [] }
+fn main() {
+    let a = nothing::< u8 >("x");
+    let b = "y".nothing::<u8>();
+    let c = empty::<   Pair<i64,str>  >();
+    let d = "z".nothing::<u8>().value_or(1).wrapping_add::<u8>(2);
+}
+--- formatted ---
+import { print } from builtins;
+
+fn nothing<T: int>(self: str) -> T? { none }
+
+fn empty<T: any>() -> T[] { [] }
+
+fn main() {
+    let a = nothing::<u8>("x");
+    let b = "y".nothing::<u8>();
+    let c = empty::<Pair<i64, str>>();
+    let d = "z".nothing::<u8>().value_or(1).wrapping_add::<u8>(2);
+}

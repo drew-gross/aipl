@@ -400,6 +400,10 @@ struct Cx<'a> {
     /// goes to, which reaches it through [`Cx::lock`] into `locks`;
     /// [`Cx::return_pinned_errors`] reports the ones nothing reached.
     return_pinned: std::cell::RefCell<HashMap<usize, (String, String, Span)>>,
+    /// The type arguments written at a call (`f::<u8>(x)`), by the call's
+    /// [`node_id`], recorded by [`Cx::check_type_args`] just before the call is
+    /// checked so that [`Cx::check_call`] starts from them instead of inferring.
+    explicit_type_args: std::cell::RefCell<HashMap<usize, Vec<Type>>>,
     /// The parameter types a *value* lambda took from its position — a
     /// constructor payload, a struct field, an annotated binding — for every
     /// parameter written without an annotation. Keyed like `locks`, and stamped
@@ -570,6 +574,89 @@ impl<'a> Cx<'a> {
         self.lock_narrow(e, ty);
     }
 
+    /// `f::<T, U>(args)`: the call with its type arguments given. They are the
+    /// callee's declared type parameters in order, all of them or none, and each
+    /// has to satisfy its parameter's bound. [`Cx::check_call`] then starts from
+    /// them instead of inferring, so arguments are held to the types they name
+    /// and a variable only the return type mentions needs no position to say
+    /// what it is.
+    fn check_type_args(
+        &self,
+        call: &Expr,
+        tys: &[Type],
+        env: &Env,
+        effects: &[String],
+    ) -> Result<Type, Error> {
+        let ExprKind::Call(callee, ..) = &call.kind else {
+            return Err(Error::at(
+                "type arguments follow the name of the function being called",
+                call.span.clone(),
+            ));
+        };
+        let name = callee.name();
+        let Some(sig) = self.sigs.get(name) else {
+            // An undefined name is reported by the call itself.
+            self.check_expr(call, env, effects)?;
+            return Err(Error::at(
+                format!("call to undefined fn {:?}", display(name)),
+                call.span.clone(),
+            ));
+        };
+        if !sig.is_generic() || sig.type_vars.is_empty() {
+            return Err(Error::at(
+                format!("fn {:?} takes no type arguments", display(name)),
+                call.span.clone(),
+            ));
+        }
+        if tys.len() != sig.type_vars.len() {
+            let declared: Vec<&str> = sig.type_vars.iter().map(|tp| tp.name.as_str()).collect();
+            return Err(Error::at(
+                format!(
+                    "fn {:?} takes {} type argument(s) ({}), got {}; name all of them or none",
+                    display(name),
+                    declared.len(),
+                    declared.join(", "),
+                    tys.len()
+                ),
+                call.span.clone(),
+            ));
+        }
+        for (tp, ty) in sig.type_vars.iter().zip(tys) {
+            if !self.bound_satisfied(tp.bound, ty) {
+                return Err(Error::at(
+                    format!(
+                        "fn {:?}: type parameter {:?} requires \"{}\", but {} was given",
+                        display(name),
+                        tp.name,
+                        tp.bound.name(),
+                        tyname(ty)
+                    ),
+                    call.span.clone(),
+                ));
+            }
+        }
+        self.explicit_type_args
+            .borrow_mut()
+            .insert(node_id(call), tys.to_vec());
+        let checked = self.check_expr(call, env, effects)?;
+        if sig.is_mutating() {
+            return Ok(checked);
+        }
+        let vars: HashSet<&str> = sig.type_vars.iter().map(|tp| tp.name.as_str()).collect();
+        let map: HashMap<String, Type> = sig
+            .type_vars
+            .iter()
+            .map(|tp| tp.name.clone())
+            .zip(tys.iter().cloned())
+            .collect();
+        let ret = subst_vars(&sig.return_type(), &map, &vars);
+        if mentions_typevar(&ret) {
+            Ok(ret)
+        } else {
+            self.resolve_generic_ty(&ret)
+        }
+    }
+
     /// Record `ty` on each call in `e` whose generic function has a type
     /// variable only its return type mentions (see [`Cx::return_pinned`]).
     ///
@@ -623,7 +710,11 @@ impl<'a> Cx<'a> {
     /// the variable's bound.
     fn return_pinned_errors(&self, locks: &HashMap<usize, Option<Type>>) -> Vec<(String, Error)> {
         let mut out = Vec::new();
-        for (node, (callee, in_fn, span)) in self.return_pinned.borrow().iter() {
+        // In source order: the map's own order differs from run to run.
+        let pinned = self.return_pinned.borrow();
+        let mut ordered: Vec<_> = pinned.iter().collect();
+        ordered.sort_by(|a, b| (&a.1 .1, a.1 .2.start).cmp(&(&b.1 .1, b.1 .2.start)));
+        for (node, (callee, in_fn, span)) in ordered {
             let Some(sig) = self.sigs.get(callee.as_str()) else {
                 continue;
             };
@@ -1627,6 +1718,7 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
         current_expected: std::cell::RefCell::new(None),
         locks: std::cell::RefCell::new(HashMap::new()),
         return_pinned: std::cell::RefCell::new(HashMap::new()),
+        explicit_type_args: std::cell::RefCell::new(HashMap::new()),
         lambda_params: std::cell::RefCell::new(HashMap::new()),
         current_type_bounds: std::cell::RefCell::new(std::collections::HashMap::new()),
         resolving: std::cell::RefCell::new(HashSet::new()),
@@ -1889,6 +1981,16 @@ fn stamp_locks(
     locks: &HashMap<usize, Option<Type>>,
     lambda_params: &HashMap<usize, Vec<Type>>,
 ) {
+    // Type arguments are spent once checking is done: they went into the call's
+    // recorded result type, so the call stands alone from here on.
+    if let (ExprKind::TypeArgs(inner_src, _), ExprKind::TypeArgs(inner_out, _)) =
+        (&src.kind, &mut out.kind)
+    {
+        let mut inner = (**inner_out).clone();
+        stamp_locks(inner_src, &mut inner, locks, lambda_params);
+        *out = inner;
+        return;
+    }
     if let Some(Some(ty)) = locks.get(&node_id(src)) {
         out.ty = Some(Box::new(ty.clone()));
     }
@@ -3423,6 +3525,7 @@ impl Cx<'_> {
         let span = expr.span.clone();
         Ok(match &expr.kind {
             ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+            ExprKind::TypeArgs(call, tys) => self.check_type_args(call, tys, env, effects)?,
             ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
             ExprKind::Unit => Type::Unit,
             ExprKind::Shim(effect, bindings, body) => {
@@ -4986,7 +5089,18 @@ impl Cx<'_> {
         let params = sig.param_types();
         let return_ty = sig.return_type();
         let is_mutating = sig.is_mutating();
-        let mut map: HashMap<String, Type> = HashMap::new();
+        let explicit = self.explicit_type_args.borrow().get(&node).cloned();
+        // Type arguments written at the call are the answer for their variables;
+        // arguments are then checked against them and cannot rebind them.
+        let mut map: HashMap<String, Type> = match &explicit {
+            Some(tys) => sig
+                .type_vars
+                .iter()
+                .map(|tp| tp.name.clone())
+                .zip(tys.iter().cloned())
+                .collect(),
+            None => HashMap::new(),
+        };
         let mut atys: Vec<Type> = vec![Type::Unit; args.len()];
         // Pass 1: non-function arguments — type them and collect type-var bindings.
         let mut literal_args = Vec::new();
@@ -5065,6 +5179,29 @@ impl Cx<'_> {
         }
         for i in literal_args {
             self.bind_field(&params[i], &atys[i], &vars, &mut map);
+        }
+        // An argument is held to the parameter's type with the written arguments
+        // substituted — the declared position it fills — so an integer literal
+        // (or an array of them) takes that type and anything else that is not it
+        // is the argument's mistake.
+        if explicit.is_some() {
+            for (i, (arg, pty)) in args.iter().zip(&params).enumerate() {
+                let variadic = sig.params.get(i).is_some_and(|p| p.arity.is_variadic());
+                if matches!(pty, Type::Fn(_, _)) || variadic {
+                    continue;
+                }
+                let target = subst_vars(pty, &map, &vars);
+                if mentions_typevar(&target) || mentions_unknown(&target) {
+                    continue;
+                }
+                let at = self.flex_int(arg, &atys[i], &target)?;
+                expect(
+                    &at,
+                    &target,
+                    &format!("fn {:?} arg {i}", display(name)),
+                    arg.span.clone(),
+                )?;
+            }
         }
         // A `T+` argument has to be one of the two shapes that cannot be empty.
         // Judged after pass 1 so that a `T` another argument pinned is known —
@@ -5169,7 +5306,11 @@ impl Cx<'_> {
         // A variable only the return type mentions was pinned by no argument.
         // Its type is the position's to give (see `Cx::return_pinned`); until
         // `lock` hears from the position it stays open in the result below.
-        if has_return_only_var(sig) {
+        if explicit.is_some() {
+            // The written arguments settle the result type outright.
+            let ret = subst_vars(&return_ty, &map, &vars);
+            self.lock_node(node, &ret);
+        } else if has_return_only_var(sig) {
             self.return_pinned.borrow_mut().insert(
                 node,
                 (

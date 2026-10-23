@@ -96,6 +96,9 @@ variant ExprKind =
     | Lambda(LambdaParam[], Expr)
     | TupleLit(Expr[])
     | KwArg(name: str, value: Expr, forwarded: bool)
+    # `f::<T, U>(args)`: the call, and the types written between the angles.
+    # Last in the variant so an artifact built before it decodes as it always did.
+    | TypeArgs(Expr, Ty[])
 
 # An expression as a one-line structural dump. Spans are left out: they are what
 # 5e has to settle and what would make every assertion unreadable in the
@@ -142,6 +145,7 @@ pub fn show_expr(self: Expr) -> str {
         Return(e) => `Return({e.show_expr()})`,
         Lambda(ps, body) => `Lambda([{ps.map(show_lambda_param).join(sep=", ")}], {body.show_expr()})`,
         TupleLit(es) => `Tuple({show_exprs(es)})`,
+        TypeArgs(call, tys) => `TypeArgs({call.show_expr()}, [{tys.map(show_ty).join(sep=", ")}])`,
         KwArg(name, value, forwarded) => if (forwarded) {
             `KwFwd({name}, {value.show_expr()})`
         } else {
@@ -175,6 +179,12 @@ pub fn show_expr(self: Expr) -> str {
     // The annotation is written where the source writes it, and vanishes when
     // there is none.
     let i64_ty: Ty = Primitive(I64);
+    assert(
+        expr(TypeArgs(
+            expr(Call("f", [three], false)),
+            [i64_ty],
+        )).show_expr() == "TypeArgs(f(3), [i64])",
+    );
     assert(expr(Let("x", none, three, ident("x"))).show_expr() == "Let(x, 3, x)");
     assert(expr(LetMut("x", some(i64_ty), three, ident("x"))).show_expr() == "Mut(x: i64, 3, x)");
     assert(

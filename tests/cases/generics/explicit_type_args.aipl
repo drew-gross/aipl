@@ -1,0 +1,35 @@
+# `f::<T, U>(args)` writes a call's type arguments out: the callee's declared
+# type parameters, in order, all of them or none. They are the answer for their
+# variables, so a variable only the return type mentions needs no position to
+# say what it is, and an argument is held to the type written for it — a bare
+# literal flexes to it. A method call puts them after the method's name.
+
+import { len, print, value_or } from builtins;
+
+fn nothing<T: int>(s: str) -> T? { none }
+
+fn first_or_none<T: int>(self: T[]) -> T? { self[0] }
+
+fn empty<T: any>() -> T[] { [] }
+
+fn identity<T: any>(x: T) -> T { x }
+
+fn takes_u8s(xs: u8[]) -> u64 { 7 }
+
+fn main() !prints {
+    print(`{nothing::<u8>("x").value_or(9)}`);
+    print(`{empty::<i32>().len()}`);
+    print(`{takes_u8s(empty::<u8>())}`);
+    // A literal argument takes the written type.
+    let small = identity::<u8>(200);
+    print(`{small}`);
+    print(`{[3, 4].first_or_none::<u16>()}`);
+    print(`{nothing::<u8>("y").value_or(4)}`);
+}
+--- stdout ---
+9
+0
+7
+200
+some(3)
+4
