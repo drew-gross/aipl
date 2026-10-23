@@ -59,6 +59,10 @@
 //!    because step 5's staged-IR corpus run executes the whole suite — a site
 //!    still stale there fails that run, and handoff would read the failure as
 //!    "the candidate IR is wrong".
+//! 4c. `fill_tmlanguage` regenerates the checked-in TextMate grammar from the
+//!    lexer rules. Beside step 4b for the same reason: it is stale-able by a
+//!    lexer change, and the staged-IR corpus run would read the stale file as a
+//!    bad candidate.
 //! 5. Staged dogfood-IR regen: fill → validate → corpus run against the staged
 //!    artifact → auto-promote when that run is green. That corpus run skips two
 //!    tests — see [`STAGED_IR_SKIP`]: the per-project compiler checks cannot be
@@ -788,6 +792,26 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
         }
     }
 
+    // --- 4c. Regenerate the checked-in TextMate grammar --------------------
+
+    // Beside the docs site, and before the IR steps, for the same reason: the
+    // staged-IR corpus run executes the whole suite, so a grammar still stale
+    // there would be reported as a bad candidate artifact. It is generated from
+    // the lexer rules by running their source, so it does not depend on the
+    // artifact.
+    if plan.need_tmlanguage {
+        r.step(
+            "fill_tmlanguage (checked-in TextMate grammar)",
+            helper("highlighting::fill_tmlanguage"),
+        );
+        let out = helper_output(&mut r, "fill_tmlanguage");
+        if !out.contains("review the diff") {
+            r.save_out();
+            let detail = tail(&out, 40);
+            r.fail("fill_tmlanguage", &detail);
+        }
+    }
+
     // --- 5. Regenerate + validate + promote dogfood IR ---------------------
 
     // Skipped when step 1b already promoted: the artifact is current, and the
@@ -1007,6 +1031,9 @@ fn conclude(
     }
     if plan.need_docs {
         eprintln!("  regenerated the checked-in docs site");
+    }
+    if plan.need_tmlanguage {
+        eprintln!("  regenerated the checked-in TextMate grammar");
     }
     if plan.need_compilers || regenerated_ir || plan.need_ir {
         eprintln!("  re-copied each project's checked-in compiler");

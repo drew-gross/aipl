@@ -24,6 +24,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use aipl::{parse_test_section_header, token_scopes};
+use handoff::protocol::Fill;
 use regex::Regex;
 use serde_json::Value;
 
@@ -453,8 +454,9 @@ fn checked_in_tmlanguage_is_current() {
         generated,
         "{} is out of date with its generator \
          (crates/aipl-codegen/src/highlight_aipl.aipl). Regenerate it with:\n    \
-         cargo test --test compiler -- --ignored highlighting::fill_tmlanguage",
-        path.display()
+         cargo test --test compiler -- --ignored highlighting::fill_tmlanguage\n{}",
+        path.display(),
+        Fill::TmLanguage.marker()
     );
 }
 

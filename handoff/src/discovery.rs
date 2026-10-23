@@ -297,6 +297,7 @@ impl Run {
                 }
                 Fill::Ir => plan.need_ir = true,
                 Fill::Docs => plan.need_docs = true,
+                Fill::TmLanguage => plan.need_tmlanguage = true,
                 Fill::Compilers => plan.need_compilers = true,
                 // Settled by `refresh_perfmon` at the end, not a remediation step
                 // of their own.
@@ -383,6 +384,9 @@ pub struct Plan {
     /// The checked-in documentation site under `docs/` no longer matches the
     /// source it documents.
     pub need_docs: bool,
+    /// The checked-in TextMate grammar no longer matches the lexer rules it is
+    /// generated from.
+    pub need_tmlanguage: bool,
     /// A project under `projects/` is carrying a compiler that is not the one
     /// this repository now builds.
     pub need_compilers: bool,
@@ -402,6 +406,7 @@ impl Plan {
             && !self.need_ir
             && !self.need_case_tests
             && !self.need_docs
+            && !self.need_tmlanguage
             && !self.need_compilers
     }
 }
@@ -623,8 +628,9 @@ mod tests {
         let plan = |fill: Fill| run(&[("t", &asking(&[fill]))]).plan();
         assert!(plan(Fill::Ir).need_ir);
         assert!(plan(Fill::Docs).need_docs);
+        assert!(plan(Fill::TmLanguage).need_tmlanguage);
         assert!(plan(Fill::Compilers).need_compilers);
-        for fill in [Fill::Ir, Fill::Docs, Fill::Compilers] {
+        for fill in [Fill::Ir, Fill::Docs, Fill::TmLanguage, Fill::Compilers] {
             assert!(!plan(fill).is_empty());
         }
     }
