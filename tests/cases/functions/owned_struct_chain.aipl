@@ -57,17 +57,17 @@ deallocations     15
 reallocations     0
 bytes allocated   1761
 peak live bytes   1761
-instructions      30334
-binary size       6040 bytes (code 3812, data 22, metadata 2206)
+instructions      29006
+binary size       5848 bytes (code 3716, data 22, metadata 2110)
 
 function                   calls  code bytes
 __builtin_repeat$Cell          2         412
 __to_str_bool                  4         224
-aipl_arr_inc                 339    external
-aipl_array_dec               644    external
+aipl_arr_inc                 173    external
+aipl_array_dec               478    external
 aipl_array_new                 2    external
 aipl_shim_get                  1    external
 aipl_write_bytes               4    external
 main                           1        2132
 marked$own0                  101         292
-toggled$own0                 101         752
+toggled$own0                 101         656

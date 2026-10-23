@@ -43,9 +43,36 @@ pub fn companions(present: &HashSet<Callee>, mentions_grid: bool) -> HashSet<Cal
         (has(C::Join) && has(C::IsEmpty), C::JoinIsEmpty),
         (has(C::Split) && has(C::Map), C::SplitMap),
         (reduction, C::Reduce),
+        // `xs.sort().first()` / `.last()` become `minimum` / `maximum`, which are
+        // reductions.
+        (has(C::Sort) && (has(C::First) || has(C::Last)), C::Reduce),
         (reduction && has(C::Map), C::MapReduce),
         (reduction && filters, C::FilterMapReduce),
         (filters, C::CountIf),
+        // `xs.filter(p).first()` / `.last()` become a `find_if`.
+        (has(C::Filter) && (has(C::First) || has(C::Last)), C::FindIf),
+        // `xs.filter(p).is_nonempty()` / `.is_empty()` become an `any`.
+        (filters && (has(C::IsEmpty) || has(C::IsNonempty)), C::Any),
+        // `xs.count_if(p) <op> n` stops counting once the answer is settled; each
+        // comparison, in either operand order, is its own builtin.
+        (
+            has(C::CountIf) && (has(C::LessThan) || has(C::GreaterThan)),
+            C::CountIfIsLessThan,
+        ),
+        (
+            has(C::CountIf) && (has(C::LessThanOrEqual) || has(C::GreaterThanOrEqual)),
+            C::CountIfIsAtMost,
+        ),
+        (
+            has(C::CountIf) && (has(C::LessThan) || has(C::GreaterThan)),
+            C::CountIfIsGreaterThan,
+        ),
+        (
+            has(C::CountIf) && (has(C::LessThanOrEqual) || has(C::GreaterThanOrEqual)),
+            C::CountIfIsAtLeast,
+        ),
+        (has(C::CountIf) && has(C::Equal), C::CountIfIsEqual),
+        (has(C::CountIf) && has(C::NotEqual), C::CountIfIsNotEqual),
         (has(C::Count), C::CountIsLessThan),
         (has(C::Count), C::CountIsAtMost),
         (has(C::Count), C::CountIsGreaterThan),

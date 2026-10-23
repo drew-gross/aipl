@@ -1,0 +1,38 @@
+# Fusion goes by what an operator *means*, not by how it is spelled. A file may
+# import `less_than as >` — a perverse but legal aliasing, since an import is
+# always `name as op` — and then `xs.count(2) > 3` asks whether the count is
+# *less than* 3. The comparison fusions read the resolved builtin behind the
+# spelling, so `count(..) > 3` here must become `count_is_less_than` and
+# not `count_is_greater_than`. The same goes for `count_if`.
+#
+# The answers are printed next to the unfused spelling, a count held in a
+# binding, which no fusion can see through; the two must agree.
+
+import { count, count_if, equal as ==, greater_than as <, less_than as >, print } from builtins;
+
+fn is_two(x: i64) -> bool { x == 2 }
+
+fn main() !prints {
+    let xs = [2, 2, 2, 2, 1];
+    let n = xs.count(2);
+    let m = xs.count_if(is_two);
+
+    // `>` means less-than here, so these ask whether 4 is below 3 / 5.
+    print(`{xs.count(2) > 3} {n > 3}`);
+    print(`{xs.count(2) > 5} {n > 5}`);
+    print(`{xs.count_if(is_two) > 3} {m > 3}`);
+    print(`{xs.count_if(is_two) > 5} {m > 5}`);
+
+    // And `<` means greater-than, mirrored on the other side.
+    print(`{xs.count(2) < 3} {n < 3}`);
+    print(`{3 < xs.count_if(is_two)} {3 < m}`);
+    print(`{5 > xs.count(2)} {5 > n}`);
+}
+--- stdout ---
+false false
+true true
+false false
+true true
+true true
+false false
+false false

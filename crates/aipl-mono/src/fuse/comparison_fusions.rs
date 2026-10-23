@@ -1,5 +1,6 @@
 //! `count` against a comparison: `xs.count(x) < 4` is settled the moment a
-//! fourth match appears, so the pair collapses into `count_is_less_than`.
+//! fourth match appears, so the pair collapses into `count_is_less_than`. The
+//! same holds for `count_if`: `xs.count_if(p) < 4` becomes `count_if_is_less_than`.
 
 use aipl_syntax::ast::{BinOp, Callee, Expr, ExprKind};
 
@@ -44,6 +45,36 @@ const COMPARISON_FUSIONS: &[Fusion] = &[
         call: Callee::Count,
         op: BinOp::Ne,
         into: Callee::CountIsNotEqual,
+    },
+    Fusion {
+        call: Callee::CountIf,
+        op: BinOp::Lt,
+        into: Callee::CountIfIsLessThan,
+    },
+    Fusion {
+        call: Callee::CountIf,
+        op: BinOp::Le,
+        into: Callee::CountIfIsAtMost,
+    },
+    Fusion {
+        call: Callee::CountIf,
+        op: BinOp::Gt,
+        into: Callee::CountIfIsGreaterThan,
+    },
+    Fusion {
+        call: Callee::CountIf,
+        op: BinOp::Ge,
+        into: Callee::CountIfIsAtLeast,
+    },
+    Fusion {
+        call: Callee::CountIf,
+        op: BinOp::Eq,
+        into: Callee::CountIfIsEqual,
+    },
+    Fusion {
+        call: Callee::CountIf,
+        op: BinOp::Ne,
+        into: Callee::CountIfIsNotEqual,
     },
 ];
 

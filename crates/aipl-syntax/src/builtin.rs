@@ -151,6 +151,24 @@ const BUILTINS: &[Builtin] = &[
     Builtin::aipl(Callee::CountIsAtLeast, "builtin_count_is_at_least.aipl"),
     Builtin::aipl(Callee::CountIsEqual, "builtin_count_is_equal.aipl"),
     Builtin::aipl(Callee::CountIsNotEqual, "builtin_count_is_not_equal.aipl"),
+    Builtin::aipl(
+        Callee::CountIfIsLessThan,
+        "builtin_count_if_is_less_than.aipl",
+    ),
+    Builtin::aipl(Callee::CountIfIsAtMost, "builtin_count_if_is_at_most.aipl"),
+    Builtin::aipl(
+        Callee::CountIfIsGreaterThan,
+        "builtin_count_if_is_greater_than.aipl",
+    ),
+    Builtin::aipl(
+        Callee::CountIfIsAtLeast,
+        "builtin_count_if_is_at_least.aipl",
+    ),
+    Builtin::aipl(Callee::CountIfIsEqual, "builtin_count_if_is_equal.aipl"),
+    Builtin::aipl(
+        Callee::CountIfIsNotEqual,
+        "builtin_count_if_is_not_equal.aipl",
+    ),
     Builtin::aipl(Callee::First, "builtin_first.aipl"),
     Builtin::aipl(Callee::GridGet, "builtin_grid_get.aipl"),
     Builtin::aipl(Callee::GridFrom, "builtin_grid_from.aipl"),

@@ -1,0 +1,20 @@
+# `count_if` compared against a bound fuses only when its predicate does nothing
+# observable: stopping at the answer would skip the predicate's calls on the
+# elements after it. A predicate that prints is called once per element, as
+# written, even though the first match already settles `> 0`.
+
+import { count_if, greater_than as >, print, to_str } from builtins;
+
+fn loud(x: i64) !prints -> bool {
+    print(`p{x}`);
+    x > 1
+}
+
+fn main() !prints {
+    print((count_if([1, 2, 3], loud) > 0).to_str());
+}
+--- stdout ---
+p1
+p2
+p3
+true

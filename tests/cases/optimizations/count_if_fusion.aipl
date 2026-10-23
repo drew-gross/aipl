@@ -1,0 +1,75 @@
+# Operation fusion: `xs.count_if(p)` compared against a bound collapses into one
+# builtin that stops as soon as the answer is settled, instead of counting every
+# match and then comparing — `count_fusion` for a predicate in place of a value.
+#
+# All six comparisons fuse, in both operand orders. Each is checked against the
+# same comparison made on a count held in a binding, which is a plain `u64` the
+# fusion cannot see through, for every bound from zero past the number of
+# matches. The `.performance` block holds the cost: a comparison decided at the
+# second match costs the same on two hundred matches as on a handful, and a
+# bound the count never reaches walks them all.
+
+import {
+    count_if,
+    equal as ==,
+    greater_than as >,
+    greater_than_or_equal as >=,
+    less_than as <,
+    less_than_or_equal as <=,
+    measure,
+    not_equal as !=,
+    print,
+    repeat,
+    to_str,
+} from builtins;
+
+fn is_two(x: i64) -> bool { x == 2 }
+
+fn many() -> i64[] { [2].repeat(201) }
+
+fn some_matches(xs: i64[]) -> bool { xs.count_if(is_two) > 1 }.performance({
+    let xs = many();
+    let few = [2, 2, 1];
+    // Decided at the second match: the same instructions however many follow.
+    assert(
+        measure("many", xs, some_matches).instructions == measure(
+            "few",
+            few,
+            some_matches,
+        ).instructions,
+    );
+    assert(measure("no allocation", xs, some_matches).allocations == 0);
+    // A bound the count never reaches cannot stop early.
+    let bounded = measure("never reached", xs, |v| v.count_if(is_two) < 500).instructions;
+    assert(measure("stops early", xs, |v| v.count_if(is_two) < 3).instructions < bounded);
+})
+
+fn fused(xs: i64[], k: u64) -> str {
+    `{xs.count_if(is_two) < k} {xs.count_if(is_two) <= k} {xs.count_if(is_two) > k} {xs.count_if(is_two) >= k} {xs.count_if(is_two) == k} {xs.count_if(is_two) != k} {k > xs.count_if(is_two)} {k >= xs.count_if(is_two)} {k < xs.count_if(is_two)} {k <= xs.count_if(is_two)} {k == xs.count_if(is_two)} {k != xs.count_if(is_two)}`
+}
+
+fn plain(xs: i64[], k: u64) -> str {
+    let n = xs.count_if(is_two);
+    `{n < k} {n <= k} {n > k} {n >= k} {n == k} {n != k} {k > n} {k >= n} {k < n} {k <= n} {k == n} {k != n}`
+}
+
+fn main() !prints {
+    let empty: i64[] = [];
+    let bounds: u64[] = [0, 1, 2, 3, 5];
+    for (let xs : [empty, [1], [2], [2, 1, 2], [2, 2, 2, 1, 2]]) {
+        for (let k : bounds) {
+            if (fused(xs, k) != plain(xs, k)) {
+                print(`MISMATCH {xs} {k}`);
+            };
+        }
+    }
+    print((many().count_if(is_two) < 3).to_str());
+    print((many().count_if(is_two) >= 2).to_str());
+    print((3 > [2, 2, 1, 2].count_if(is_two)).to_str());
+    print(plain([2, 1, 2], 2));
+}
+--- stdout ---
+false
+true
+false
+false true false true true false false true false true true false

@@ -1,0 +1,47 @@
+# The AIPL implementation of the `count_if_is_greater_than` builtin. Registered under
+# `__builtin_count_if_is_greater_than` (see `aipl_syntax::aipl_builtins`).
+#
+# A fused comparison: `count_if(pred) > limit` without counting past the point
+# the answer is settled. `count_if` itself always walks the whole collection; this
+# stops as soon as the count passes `limit`, which is the entire reason the fusion pass exists. It is
+# `count_is_greater_than` with a predicate in place of a value to compare against.
+
+import { count_if, equal as ==, greater_than as >, wrapping_increment as ++ } from builtins;
+
+# Fused form of `count_if(pred) > limit` — see `count_if`. Counts only as far
+# as the answer needs, so an early match decides it without walking the rest.
+#
+# Written by the compiler's operation-fusion pass, which rewrites
+# `xs.count_if(p) > n` (and the mirrored `n < xs.count_if(p)`) into this.
+# Also callable directly.
+pub fn count_if_is_greater_than<T: any>(self: T[], pred: (T) -> bool, limit: u64) -> bool {
+    mut n: u64 = 0;
+    for (let x : self) {
+        if (pred(x)) {
+            set n++;
+            if (n > limit) {
+                return true;
+            };
+        };
+    }
+    false
+}.test({
+    fn is_two(self: i64) -> bool { self == 2 }
+    assert(is_two(2));
+    assert([1, 2, 2, 3].count_if_is_greater_than(is_two, 2) == ([1, 2, 2, 3].count_if(is_two) > 2));
+    assert([1, 2, 2, 3].count_if_is_greater_than(is_two, 3) == ([1, 2, 2, 3].count_if(is_two) > 3));
+    assert([1, 2, 2, 3].count_if_is_greater_than(is_two, 1) == ([1, 2, 2, 3].count_if(is_two) > 1));
+    assert([1, 2, 2, 3].count_if_is_greater_than(is_two, 0) == ([1, 2, 2, 3].count_if(is_two) > 0));
+    assert([1, 3].count_if_is_greater_than(is_two, 0) == ([1, 3].count_if(
+        is_two,
+    ) > 0)); // no matches
+    assert([1, 3].count_if_is_greater_than(is_two, 1) == ([1, 3].count_if(is_two) > 1));
+    assert([1, 2][..0].count_if_is_greater_than(is_two, 0) == (0 > 0)); // empty
+    assert([1, 2][..0].count_if_is_greater_than(is_two, 1) == (0 > 1));
+    // A lambda, a captured bound, and a non-i64 element type.
+    let wanted = 3;
+    assert([3, 3, 4].count_if_is_greater_than(|x| x == wanted, 1) == ([3, 3, 4].count_if(
+        |x| x == wanted,
+    ) > 1));
+    assert(['a', 'b', 'a'].count_if_is_greater_than(|c| c == 'a', 2) == (2 > 2));
+})

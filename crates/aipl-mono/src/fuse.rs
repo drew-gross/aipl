@@ -1,7 +1,7 @@
 //! Operation fusion: rewriting a composite expression into one builtin that
 //! computes the same answer with less work.
 //!
-//! There are six families, each in its own file with its own table:
+//! There are seven families, each in its own file with its own table:
 //!
 //! - [`comparison_fusions`] — a call against a comparison. `xs.count(x)` always
 //!   walks the whole collection, but `xs.count(x) < 4` is settled the moment a
@@ -37,6 +37,11 @@
 //!   because the call it becomes is a `map` of a function built from the two,
 //!   and because a row makes the inner call stand aside for a parent that, here,
 //!   may refuse.
+//! - [`predicate_fusions`] — a `map` or `filter` feeding a call that asks a
+//!   predicate of each element. `xs.map(f).any(p)` builds an array of every
+//!   `f(x)` for `any` to read the front of, so it collapses into
+//!   `xs.any(|x| p(f(x)))`; `xs.filter(p).count_if(q)` into
+//!   `xs.count_if(|x| p(x) && q(x))`. Composed the way `map(f).map(g)` is.
 //! - [`slice_fusions`] — a call on a sliced receiver. `xs[i..].starts_with(p)`
 //!   builds the whole tail of `xs` — for an array, a fresh block with every
 //!   element copied — only to look at its first few elements, so it collapses
@@ -101,6 +106,7 @@ mod index_fusions;
 // the loop family's, and `fold_lengths` asks the same two questions of the same
 // arguments (see [`crate::fold_lengths`]).
 pub(crate) mod loop_fusions;
+mod predicate_fusions;
 mod slice_fusions;
 
 use crate::passes::Scope;
@@ -200,6 +206,9 @@ fn try_fuse(e: &Expr, outer: Option<&Callee>, guards: &Guards) -> Option<Expr> {
                 // Composition first, and on its own terms rather than as a row in
                 // the chain table: see [`compose_fusions`].
                 _ => compose_fusions::build(e, guards.blocked)
+                    .or_else(|| predicate_fusions::build(e, guards.blocked))
+                    .or_else(|| predicate_fusions::build_end(e, guards.blocked))
+                    .or_else(|| predicate_fusions::build_emptiness(e, guards.blocked))
                     .or_else(|| slice_fusions::build(e))
                     .or_else(|| chain_fusions::build(e, outer)),
             }
@@ -272,6 +281,10 @@ pub(crate) fn under_bindings(bindings: Vec<Binding<'_>>, whole: &Expr, body: Exp
 fn has_effect(e: &Expr, effectful: &HashSet<String>) -> bool {
     let here = match &e.kind {
         ExprKind::Call(name, _, _) => effectful.contains(name.name()),
+        // A function named as a value — `xs.map(loud)` — is called by whatever
+        // it is handed to, so naming one that declares an effect is as good as
+        // calling it: fusing the consumer would change how often it runs.
+        ExprKind::Ident(name) => effectful.contains(name),
         // A shim installs handlers for an effect; that is the effect happening.
         ExprKind::Shim(..) => true,
         _ => false,

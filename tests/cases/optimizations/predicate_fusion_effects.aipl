@@ -1,0 +1,68 @@
+# The predicate fusions stand aside when either function does anything
+# observable. Composing `xs.map(f).any(p)` into `xs.any(|x| p(f(x)))` interleaves
+# the two functions and stops `f` at the first hit, where the chain runs `f` on
+# every element before `any` looks at one — so a `f` that prints would print a
+# different transcript, and the `stdout` below is the proof that it still prints
+# for every element, in the unfused order.
+
+import {
+    all,
+    any,
+    filter,
+    first,
+    greater_than as >,
+    last,
+    map,
+    print,
+    wrapping_mul as *,
+} from builtins;
+
+fn loud(n: i64) !prints -> i64 {
+    print(`f{n}`);
+    n * 2
+}
+
+fn loud_big(n: i64) !prints -> bool {
+    print(`p{n}`);
+    n > 2
+}
+
+fn main() !prints {
+    let v = [1, 2, 3];
+
+    // `loud` prints for all three elements even though the second already
+    // settles `any`: the chain maps everything before `any` looks at anything.
+    print(`{v.map(loud).any(|y| y > 2)}`);
+
+    // An effectful predicate after a pure `map`: the predicate prints as `any`
+    // visits elements, which stops at the first hit.
+    print(`{v.map(|x| x * 3).any(loud_big)}`);
+
+    // An effectful `filter` predicate: printed for every element, in order, before
+    // `all` sees the survivors.
+    print(`{v.filter(loud_big).all(|x| x > 2)}`);
+
+    // The ends of a stage drop the calls on every other element, so an effectful
+    // function keeps the chain: `loud` still runs three times for one `first`.
+    print(`{v.map(loud).first()}`);
+    print(`{v.filter(loud_big).last()}`);
+}
+--- stdout ---
+f1
+f2
+f3
+true
+p3
+true
+p1
+p2
+p3
+true
+f1
+f2
+f3
+some(2)
+p1
+p2
+p3
+some(3)

@@ -1,0 +1,70 @@
+# A `match` arm that rebuilds the case it matched, from the payloads it matched,
+# is the scrutinee: variants are values, so `Num(n) => Num(n)` has nothing to
+# build. A tree rewrite that changes some cases and passes the rest through
+# (`simplify` below) therefore allocates only for the nodes it really changes —
+# a leaf comes back as the very value it was.
+#
+# The `.performance` block holds that: simplifying a leaf allocates nothing, and
+# neither does a tree with nothing to fold. `convert` is the soundness check: `A`
+# and `B` have a case of the same name with the same payload, but a `B` is not an
+# `A`, so rebuilding `X(v)` as a `B` must still build one.
+
+import { equal as ==, measure, print, to_str } from builtins;
+
+variant Expr = Num(n: i64) | Neg(inner: Expr) | Add(left: Expr, right: Expr) | Zero
+
+fn simplify(e: Expr) -> Expr {
+    match (e) {
+        Num(n) => Num(n),
+        Zero => Zero,
+        Neg(x) => Neg(simplify(x)),
+        Add(l, r) => Add(simplify(l), simplify(r)),
+    }
+}.performance({
+    let leaf = Num(7);
+    assert(measure("leaf", leaf, simplify).allocations == 0);
+    let nothing = Zero;
+    assert(measure("nullary case", nothing, simplify).allocations == 0);
+    // A node that is rebuilt still allocates; its leaves do not.
+    let sum = Add(Num(1), Num(2));
+    assert(measure("sum", sum, simplify).allocations == 1);
+})
+
+fn show(e: Expr) -> str {
+    match (e) {
+        Num(n) => n.to_str(),
+        Zero => "0",
+        Neg(x) => `-{show(x)}`,
+        Add(l, r) => `({show(l)} + {show(r)})`,
+    }
+}
+
+variant A = X(v: i64) | Y
+
+variant B = X(v: i64) | Y
+
+fn convert(a: A) -> B {
+    match (a) {
+        A.X(v) => B.X(v),
+        A.Y => B.Y,
+    }
+}
+
+fn describe(b: B) -> str {
+    match (b) {
+        B.X(v) => `B.X({v})`,
+        B.Y => "B.Y",
+    }
+}
+
+fn main() !prints {
+    print(show(simplify(Add(Num(1), Neg(Neg(Add(Num(2), Zero)))))));
+    print(show(simplify(Num(5))));
+    print(describe(convert(A.X(3))));
+    print(describe(convert(A.Y)));
+}
+--- stdout ---
+(1 + --(2 + 0))
+5
+B.X(3)
+B.Y

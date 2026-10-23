@@ -1,0 +1,47 @@
+# Operation fusion: `xs.sort().first()` is the smallest element and
+# `xs.sort().last()` the largest. `sort` copies the array and orders all of it to
+# hand back one end, so the pair collapses into `minimum` / `maximum`: one pass,
+# nothing built. Equal elements are the same value, so no ordering of ties is
+# lost.
+#
+# Each result is compared with the same question asked of a sorted array kept
+# alive by a second use (`slow`), which keeps the `sort` unfused. The empty array
+# has no ends, in both spellings.
+
+import { equal as ==, first, last, len, measure, not_equal as !=, print, sort } from builtins;
+
+fn smallest(xs: i64[]) -> i64? { xs.sort().first() }.performance({
+    let xs = [5, 3, 9, 1, 7, 1, 8];
+    assert(measure("smallest", xs, smallest).allocations == 0);
+})
+
+fn largest(xs: i64[]) -> i64? { xs.sort().last() }.performance({
+    let xs = [5, 3, 9, 1, 7, 1, 8];
+    assert(measure("largest", xs, largest).allocations == 0);
+})
+
+fn slow(xs: i64[]) -> str {
+    let sorted = xs.sort();
+    `{sorted.first()} {sorted.last()} {sorted.len()}`
+}
+
+fn fast(xs: i64[]) -> str { `{xs.sort().first()} {xs.sort().last()} {xs.len()}` }
+
+fn main() !prints {
+    let empty: i64[] = [];
+    for (let xs : [empty, [4], [2, 2], [5, 3, 9, 1, 7, 1, 8], [-3, 0, -3, 6]]) {
+        print(fast(xs));
+        if (fast(xs) != slow(xs)) {
+            print("MISMATCH");
+        };
+    }
+    // Strings and chars order too.
+    print(`{["pear", "apple", "fig"].sort().first()} {"hello".sort().last()}`);
+}
+--- stdout ---
+none none 0
+some(4) some(4) 1
+some(2) some(2) 2
+some(1) some(9) 7
+some(-3) some(6) 4
+some("apple") some('o')

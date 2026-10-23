@@ -1,0 +1,65 @@
+# Operation fusion: the emptiness questions of a `filter`. `xs.filter(p).is_nonempty()`
+# asks whether any element passes, and builds the array of every one that does to
+# find out; it is `xs.any(p)`, which stops at the first. `is_empty` is the same
+# question negated. A `filter_map` is the same with its mapping dropped.
+#
+# Each result is compared with the same chain through a binding that is used
+# twice, which keeps the intermediate array alive and so the chain unfused. The
+# `.performance` block holds the cost: nothing is allocated, and a hit at the
+# front costs less than a hit at the back.
+
+import {
+    equal as ==,
+    filter,
+    greater_than as >,
+    is_empty,
+    is_nonempty,
+    less_than as <,
+    map,
+    measure,
+    not_equal as !=,
+    print,
+    wrapping_mul as *,
+} from builtins;
+
+fn dbl(x: i64) -> i64 { x * 2 }
+
+fn big(x: i64) -> bool { x > 5 }
+
+fn has_big(xs: i64[]) -> bool { xs.filter(big).is_nonempty() }.performance({
+    let near = [9, 1, 1, 1];
+    let far = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 9];
+    let first = measure("hit first", near, has_big);
+    let last = measure("hit last", far, has_big);
+    assert(first.allocations == 0);
+    assert(last.allocations == 0);
+    // Stops at the first hit: the instructions do not grow with what follows.
+    assert(first.instructions < last.instructions);
+})
+
+fn slow(xs: i64[]) -> str {
+    let kept = xs.filter(big);
+    let mapped = xs.filter(big).map(dbl);
+    `{kept.is_empty()} {kept.is_nonempty()} {mapped.is_empty()} {mapped.is_nonempty()}`
+}
+
+fn fast(xs: i64[]) -> str {
+    `{xs.filter(big).is_empty()} {xs.filter(big).is_nonempty()} {xs.filter(big).map(dbl).is_empty()} {xs.filter(big).map(dbl).is_nonempty()}`
+}
+
+fn main() !prints {
+    let empty: i64[] = [];
+    for (let xs : [empty, [1], [7], [1, 2, 3], [9, 1, 8, 2], [3, 4, 5, 6, 7]]) {
+        print(fast(xs));
+        if (fast(xs) != slow(xs)) {
+            print("MISMATCH");
+        };
+    }
+}
+--- stdout ---
+true false true false
+true false true false
+false true false true
+true false true false
+false true false true
+false true false true

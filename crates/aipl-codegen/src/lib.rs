@@ -2846,6 +2846,11 @@ fn compile_program<M: Module>(
                 )
             }
         }),
+        // A `match` arm that rebuilds the case it matched, from the payloads it
+        // matched, is the scrutinee: `Term(k) => ok(Term(k))` hands `r` back
+        // instead of allocating, retaining and dropping a copy. After
+        // elimination, so a constructor it exposed is not mistaken for one.
+        Pass::scoped("reuse_matched_values", aipl_mono::reuse_matched_values),
         // Sink again over the monomorphized program: mono instantiates the
         // AIPL-implemented builtins the pre-mono run could not see, and
         // post-mono inlining folds each lifted lambda and single-use instance
@@ -7656,6 +7661,7 @@ fn define_fn<M: Module>(
         // here — and nothing else in the loop wants one.
         let no_env: Env = HashMap::new();
         let unit_ty = ConcreteType::Unit;
+        let no_stable: HashSet<Value> = HashSet::new();
         let entry_cx = Cx {
             env: &no_env,
             funcs,
@@ -7673,6 +7679,7 @@ fn define_fn<M: Module>(
             bindings: &bindings,
             can_tail: false,
             tail: false,
+            stable: &no_stable,
         };
         for (idx, (p, v)) in func.params.iter().zip(bound.iter()).enumerate() {
             if p.mutable {
@@ -7761,6 +7768,15 @@ fn define_fn<M: Module>(
             }
         }
 
+        // The immutable parameters stay alive for the whole body: the caller (or
+        // the entry scope) holds the reference until the function returns.
+        let stable_params: HashSet<Value> = func
+            .params
+            .iter()
+            .zip(bound.iter())
+            .filter(|(p, _)| !p.mutable)
+            .map(|(_, v)| *v)
+            .collect();
         let cx = Cx {
             env: &env,
             funcs,
@@ -7782,6 +7798,7 @@ fn define_fn<M: Module>(
             // `can_tail`, in one flag.
             can_tail: tail_id.is_some(),
             tail: tail_id.is_some(),
+            stable: &stable_params,
         };
         let body_mark = scope_depth(&scopes);
         let (body_ret, body_ty) = compile_expr(module, &mut builder, cx, &mut scopes, &func.body)?;
@@ -13845,6 +13862,7 @@ fn define_test_fail_fn<M: Module>(
         let owned_params: HashSet<String> = HashSet::new();
         let unit = ConcreteType::Unit;
         let no_bindings: RefCell<Vec<(String, String)>> = RefCell::new(Vec::new());
+        let no_stable: HashSet<Value> = HashSet::new();
         let mut scopes: Vec<Vec<Tracked>> = vec![Vec::new()];
         let cx = Cx {
             env: &env,
@@ -13865,6 +13883,7 @@ fn define_test_fail_fn<M: Module>(
             // participant, so nothing inside it is ever in tail position.
             can_tail: false,
             tail: false,
+            stable: &no_stable,
         };
 
         // Render the borrowed payload to a fresh `str`, report it, then release
@@ -13938,6 +13957,7 @@ fn define_eq_fn<M: Module>(
         let owned_params: HashSet<String> = HashSet::new();
         let unit = ConcreteType::Unit;
         let no_bindings: RefCell<Vec<(String, String)>> = RefCell::new(Vec::new());
+        let no_stable: HashSet<Value> = HashSet::new();
         let cx = Cx {
             env: &env,
             funcs,
@@ -13957,6 +13977,7 @@ fn define_eq_fn<M: Module>(
             // participant, so nothing inside it is ever in tail position.
             can_tail: false,
             tail: false,
+            stable: &no_stable,
         };
 
         let res = emit_eq_body(module, &mut builder, cx, lv, rv, ty)?;
@@ -14026,6 +14047,7 @@ fn define_tostr_fn<M: Module>(
         // A synthesized renderer has no source-level bindings, so its legend is
         // empty (and never printed — this Cx isn't on the `define_fn` path).
         let no_bindings: RefCell<Vec<(String, String)>> = RefCell::new(Vec::new());
+        let no_stable: HashSet<Value> = HashSet::new();
         let cx = Cx {
             env: &env,
             funcs,
@@ -14045,6 +14067,7 @@ fn define_tostr_fn<M: Module>(
             // participant, so nothing inside it is ever in tail position.
             can_tail: false,
             tail: false,
+            stable: &no_stable,
         };
 
         // A boxed (recursive) type's helper renders its top level *inline* (via
@@ -14272,6 +14295,13 @@ struct Cx<'a> {
     /// each arm that genuinely passes tail position on (a `Seq`/`Let` body, both
     /// `if` branches, every `match` arm, a `return` operand) has to say so.
     tail: bool,
+    /// The values that stay alive for as long as the code being compiled can run:
+    /// the function's immutable parameters, whose reference the caller (or the
+    /// entry scope) holds until the function returns, and the payload bindings of
+    /// an enclosing `match` arm, which are retained for the arm or borrowed from
+    /// something in this set. A `match` on one of these may let its own payload
+    /// bindings borrow rather than retain — see `arm_borrows_payload`.
+    stable: &'a HashSet<Value>,
 }
 
 /// Per-element-type array drop/retain helpers, generated on demand. `fns` maps a
@@ -14554,6 +14584,53 @@ fn plan_match(
             scrut_span.clone(),
         )),
     }
+}
+
+/// Whether the payload bindings of an arm of `match (scrutinee) { .. }` may skip
+/// their retain: the scrutinee is a stable value (see [`Cx::stable`]) the arm
+/// cannot take away.
+///
+/// A payload binding is a pointer into the scrutinee's block. Retaining it for
+/// the arm and releasing it at arm exit only matters if the block could die in
+/// between, and it cannot while its owner is alive and the arm does not consume
+/// that owner. So the scrutinee must be
+///
+/// - a name, or a field path off one, rooted at a stable value — an immutable
+///   parameter, or a payload binding of an enclosing arm — so the reference that
+///   keeps it alive outlasts the arm;
+/// - not an `owned` parameter, whose block the function may consume or reuse in
+///   place; and
+/// - not moved by the arm (`__move(root)`, `__move(root.f)`), and not re-owned
+///   through a `mut` binding's slot, either of which could hand the block to
+///   something that frees it.
+///
+/// What is left per binding — that the arm does not move or re-own *it* — the
+/// caller asks of each name.
+fn arm_borrows_payload(cx: &Cx, scrutinee: &Expr, arm_body: &Expr) -> bool {
+    scrutinee_is_stable(cx, scrutinee, arm_body)
+}
+
+/// Whether `e` — a `match` scrutinee or a `for` iterable — is a name, or a field
+/// path off one, rooted at a stable value (see [`Cx::stable`]) that `body` cannot
+/// take away: not an `owned` parameter, and neither moved nor re-owned in `body`.
+fn scrutinee_is_stable(cx: &Cx, e: &Expr, body: &Expr) -> bool {
+    fn root(e: &Expr) -> Option<&str> {
+        match &e.kind {
+            ExprKind::Ident(n) => Some(n),
+            ExprKind::Field(obj, _) => root(obj),
+            _ => None,
+        }
+    }
+    let Some(root) = root(e) else {
+        return false;
+    };
+    let Some(EnvBinding::Immut(value, _)) = cx.env.get(root) else {
+        return false;
+    };
+    cx.stable.contains(value)
+        && !cx.owned_params.contains(root)
+        && !aipl_mono::moves_binding(root, body)
+        && !aipl_mono::reowns_binding(root, body)
 }
 
 /// Read arm `i`'s payload bindings from the scrutinee at `ptr` (tag already in
@@ -15605,6 +15682,7 @@ fn compile_call_expr_direct<M: Module>(
         bindings: _,
         can_tail: _,
         tail,
+        stable: _,
     } = cx;
     // Only the ordinary-call arm at the bottom can become a tail call: the
     // intrinsic arms below compile sub-expressions and then do further work with
@@ -19643,6 +19721,7 @@ fn compile_expr_inner<M: Module>(
         bindings: _,
         can_tail: _,
         tail,
+        stable: _,
     } = cx;
     // Tail position belongs to *this* expression, never automatically to what it
     // evaluates: clear it before any recursion, so a sub-expression is in tail
@@ -20190,9 +20269,13 @@ fn compile_expr_inner<M: Module>(
             scopes.push(Vec::new());
             // Both branches are in tail position when the `if` is: whichever one
             // runs, its value is the `if`'s value.
+            let before = scope_depth(scopes);
             let (then_v, then_ty) =
                 compile_expr(module, builder, Cx { tail, ..cx }, scopes, then_e)?;
-            if needs_drop(&then_ty, structs) {
+            // A fresh temporary the branch produced hands its reference to the
+            // merge value; anything else is borrowed and the merge value takes a
+            // reference of its own.
+            if needs_drop(&then_ty, structs) && !move_owned_temp(scopes, before, then_v) {
                 emit_retain(builder, module, builtins, structs, then_v, &then_ty);
             }
             drop_scope(
@@ -20207,6 +20290,7 @@ fn compile_expr_inner<M: Module>(
             builder.switch_to_block(else_block);
             builder.seal_block(else_block);
             scopes.push(Vec::new());
+            let before = scope_depth(scopes);
             let (else_v, else_ty) =
                 compile_expr(module, builder, Cx { tail, ..cx }, scopes, else_e)?;
             // Branch types must agree, with one twist: if one branch is
@@ -20227,7 +20311,7 @@ fn compile_expr_inner<M: Module>(
                     span.clone(),
                 )
             })?;
-            if needs_drop(&else_ty, structs) {
+            if needs_drop(&else_ty, structs) && !move_owned_temp(scopes, before, else_v) {
                 emit_retain(builder, module, builtins, structs, else_v, &else_ty);
             }
             drop_scope(
@@ -21004,7 +21088,18 @@ fn compile_expr_inner<M: Module>(
                 }
                 _ => (&**iterable, false, None),
             };
+            let iterable_mark = scope_depth(scopes);
             let (it_ptr, it_ty) = compile_expr(module, builder, cx, scopes, iterable)?;
+            // Whether the array being walked stays alive and unchanged for the
+            // whole loop, so each element can be borrowed from it rather than
+            // retained: it is either a fresh temporary, tracked by the scope
+            // around the loop and out of the body's reach, or an immutable name
+            // the function holds a reference to throughout and the body does not
+            // consume — see `arm_borrows_payload` for the same argument about a
+            // `match` scrutinee.
+            let iterable_outlives_loop = !(reverse && is_str_shaped(&it_ty))
+                && (owned_temp_since(scopes, iterable_mark, it_ptr)
+                    || scrutinee_is_stable(&cx, iterable, body));
             let it_ptr = if reverse && is_str_shaped(&it_ty) {
                 // As the `reverse` builtin's str arm: the entry consumes its
                 // receiver (the caller incs to balance its own track) and hands
@@ -21243,19 +21338,30 @@ fn compile_expr_inner<M: Module>(
             scopes.push(Vec::new());
             // The element is borrowed from the array (which still owns its
             // copy); take a fresh ref so the binding owns one for the
-            // iteration, and track it for drop at iteration end.
+            // iteration, and track it for drop at iteration end — unless the
+            // array outlives the loop and the body only inspects the element,
+            // when that retain and release are a pair that cancels.
+            let mut body_stable: HashSet<Value> = cx.stable.clone();
             if needs_drop(&var_ty, cx.structs) {
-                emit_retain(builder, module, builtins, cx.structs, var_value, &var_ty);
-                scopes
-                    .last_mut()
-                    .expect("for-body scope")
-                    .push(Tracked::new(var_value, &var_ty));
+                let inspected = iterable_outlives_loop
+                    && !aipl_mono::moves_binding(var, body)
+                    && !aipl_mono::reowns_binding(var, body);
+                if !inspected {
+                    emit_retain(builder, module, builtins, cx.structs, var_value, &var_ty);
+                    scopes
+                        .last_mut()
+                        .expect("for-body scope")
+                        .push(Tracked::new(var_value, &var_ty));
+                }
+                // Either way it stays valid for the iteration.
+                body_stable.insert(var_value);
             }
             let _ = compile_expr(
                 module,
                 builder,
                 Cx {
                     env: &body_env,
+                    stable: &body_stable,
                     ..cx
                 },
                 scopes,
@@ -21578,21 +21684,38 @@ fn compile_expr_inner<M: Module>(
                     }
                 };
                 let mut arm_env = env.clone();
+                // The scrutinee stays alive, unmoved, across this arm, so a
+                // payload binding that the arm only inspects can borrow from it.
+                let borrows = plan.is_some() && arm_borrows_payload(&cx, scrutinee, &arm.body);
+                let mut arm_stable: HashSet<Value> = cx.stable.clone();
                 for (name, value, ty) in &binds {
                     cx.bindings
                         .borrow_mut()
                         .push((name.clone(), format!("v{}", value.as_u32())));
                     arm_env.insert(name.clone(), EnvBinding::Immut(*value, ty.clone()));
                     // The binding is borrowed from the scrutinee (which still
-                    // owns its copy); retain it for the arm, released at arm exit.
+                    // owns its copy); retain it for the arm, released at arm
+                    // exit — unless the scrutinee provably outlives the arm and
+                    // the arm only inspects the binding, when the retain and the
+                    // release are a pair that cancels (the same pair
+                    // `inspect_only_params` cancels for a parameter).
                     if needs_drop(ty, structs) {
-                        emit_retain(builder, module, builtins, structs, *value, ty);
-                        scopes
-                            .last_mut()
-                            .expect("arm scope")
-                            .push(Tracked::new(*value, ty));
+                        let inspected = borrows
+                            && !aipl_mono::moves_binding(name, &arm.body)
+                            && !aipl_mono::reowns_binding(name, &arm.body);
+                        if !inspected {
+                            emit_retain(builder, module, builtins, structs, *value, ty);
+                            scopes
+                                .last_mut()
+                                .expect("arm scope")
+                                .push(Tracked::new(*value, ty));
+                        }
+                        // Either way it stays valid for the arm, so a `match` on
+                        // it inside the arm may borrow from it in turn.
+                        arm_stable.insert(*value);
                     }
                 }
+                let before = scope_depth(scopes);
                 // Every arm is in tail position when the `match` is: whichever
                 // one runs, its value is the `match`'s value.
                 let (av, at) = compile_expr(
@@ -21601,12 +21724,15 @@ fn compile_expr_inner<M: Module>(
                     Cx {
                         env: &arm_env,
                         tail,
+                        stable: &arm_stable,
                         ..cx
                     },
                     scopes,
                     &arm.body,
                 )?;
-                if needs_drop(&at, structs) {
+                // A fresh temporary the arm produced hands its reference to the
+                // `match`'s value; anything else is borrowed and takes a retain.
+                if needs_drop(&at, structs) && !move_owned_temp(scopes, before, av) {
                     emit_retain(builder, module, builtins, structs, av, &at);
                 }
                 // A composite travels as a *pointer*, and an arm whose value is

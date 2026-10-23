@@ -1,0 +1,21 @@
+# An effectful function handed to a chain *by name* keeps the chain unfused. The
+# pass refuses to fuse around an effect, and an effect is as much "named as a
+# value" as "called": `xs.map(loud)` calls `loud` on every element, and the fused
+# `map_find_if` would stop at the first match and skip it on the rest. The
+# stdout shows `loud` running for all three elements.
+
+import { find_if, greater_than as >, map, print, to_str, wrapping_mul as * } from builtins;
+
+fn loud(x: i64) !prints -> i64 {
+    print(`f{x}`);
+    x * 2
+}
+
+fn main() !prints {
+    print([1, 2, 3].map(loud).find_if(|y| y > 2).to_str());
+}
+--- stdout ---
+f1
+f2
+f3
+some(4)

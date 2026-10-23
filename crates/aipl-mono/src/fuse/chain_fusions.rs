@@ -121,6 +121,21 @@ const CHAIN_FUSIONS: &[ChainFusion] = &[
         outer: Callee::Len,
         into: Callee::ToStrLen,
     },
+    // `xs.sort().first()` is the smallest element and `xs.sort().last()` the
+    // largest: `sort` copies the array and orders all of it (a pass of
+    // comparisons per level of the merge) to hand back one end of it. `minimum`
+    // and `maximum` are the one pass that finds it. Equal elements are the same
+    // value, so which of them comes first cannot be told apart.
+    ChainFusion {
+        inner: Callee::Sort,
+        outer: Callee::First,
+        into: Callee::Minimum,
+    },
+    ChainFusion {
+        inner: Callee::Sort,
+        outer: Callee::Last,
+        into: Callee::Maximum,
+    },
 ];
 
 /// `inner(recv, ..).outer(..)` as a single call to the [`CHAIN_FUSIONS`] row's

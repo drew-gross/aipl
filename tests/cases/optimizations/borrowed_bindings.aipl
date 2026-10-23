@@ -1,0 +1,118 @@
+# A `match` payload binding or a `for` element that the body only inspects
+# borrows from its owner instead of retaining and releasing a reference of its
+# own. The pair cancels only while the owner stays alive and unchanged, so every
+# way a body could take that away has to keep the retain: moving the owner,
+# re-owning the binding through a `mut` slot, returning or storing it. This case
+# is those, each checked by value, so a missing retain shows up as a corrupt
+# print or as the leak gate refusing the run.
+
+import { len, print, push, wrapping_add as + } from builtins;
+
+variant Tree = Leaf(items: i64[]) | Node(left: Tree, right: Tree, tag: str)
+
+struct Box { values: i64[], name: str }
+
+fn total(t: Tree) -> u64 {
+    match (t) {
+        Leaf(items) => items.len(),
+        Node(l, r, _) => total(l) + total(r),
+    }
+}
+
+// Hands a payload back: the result must hold a reference of its own.
+fn leftmost(t: Tree) -> Tree {
+    match (t) {
+        Leaf(items) => Leaf(items),
+        Node(l, _, _) => leftmost(l),
+    }
+}
+
+fn first_tag(t: Tree) -> str {
+    match (t) {
+        Leaf(_) => "leaf",
+        Node(_, r, tag) => tag,
+    }
+}
+
+// Re-owns a payload through a `mut` slot and grows it: the tree must not change.
+fn grown(t: Tree) -> i64[] {
+    match (t) {
+        Leaf(items) => {
+            mut copy = items; #[allow]
+            set copy.push(99);
+            copy
+        },
+        Node(l, _, _) => grown(l),
+    }
+}
+
+// Stores a payload in a longer-lived structure.
+fn boxed(t: Tree) -> Box {
+    match (t) {
+        Leaf(items) => Box { values: items, name: "leaf" },
+        Node(l, _, tag) => Box { ..boxed(l), name: tag },
+    }
+}
+
+// Elements of a parameter array, kept past the iteration.
+fn keep_all(rows: i64[][]) -> i64[][] {
+    mut kept: i64[][] = []; #[allow]
+    for (let row : rows) {
+        set kept.push(row);
+    }
+    kept
+}
+
+// An element re-owned through a `mut` slot and grown.
+fn grow_each(rows: i64[][]) -> u64 {
+    mut sum: u64 = 0;
+    for (let row : rows) {
+        mut longer = row;
+        set longer.push(1);
+        set sum = sum + longer.len(); #[allow]
+    }
+    sum
+}
+
+// Nested: a `match` on a payload binding, inside a loop over a borrowed array.
+fn nested(trees: Tree[]) -> u64 {
+    mut n: u64 = 0;
+    for (let t : trees) {
+        match (t) {
+            Node(l, r, _) => {
+                match (l) {
+                    Leaf(items) => {
+                        set n = n + items.len(); #[allow]
+                    },
+                    Node(..) => {
+                        set n = n + total(r); #[allow]
+                    },
+                };
+            },
+            Leaf(items) => {
+                set n = n + items.len(); #[allow]
+            },
+        };
+    }
+    n
+}
+
+fn main() !prints {
+    let small = Node(Leaf([1, 2]), Leaf([3]), "small");
+    let deep = Node(small, Node(Leaf([4, 5, 6]), Leaf([7]), "inner"), "deep");
+    print(`{total(deep)} {first_tag(deep)} {first_tag(small)}`);
+    print(`{total(leftmost(deep))}`);
+    print(`{grown(deep)} {total(deep)}`);
+    let Box { values, name } = boxed(deep);
+    print(`{values} {name}`);
+    let rows = [[1, 2], [3], []];
+    print(`{keep_all(rows)} {grow_each(rows)} {rows}`);
+    print(`{nested([deep, small, Leaf([8, 9])])}`);
+}
+--- stdout ---
+7 deep small
+2
+[1, 2, 99] 7
+[1, 2] deep
+[[1, 2], [3], []] 6 [[1, 2], [3], []]
+8

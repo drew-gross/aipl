@@ -1,0 +1,157 @@
+# Operation fusion: a `map` or `filter` feeding a call that asks a predicate of
+# each element collapses into one pass over the source. `xs.map(f).any(p)` is
+# `xs.any(|x| p(f(x)))`, and `xs.filter(p).count_if(q)` is
+# `xs.count_if(|x| p(x) && q(x))` — no array of mapped values or survivors is
+# built, and `any`, `all` and `find_if` stop at the answer without having run
+# the first stage on the elements past it.
+#
+# Every fused result is compared against the same chain through a binding that is
+# used twice (`slow`), which keeps the intermediate array alive and so keeps the
+# chain unfused: the two must agree, including on the empty array, where `all`
+# is true and `any` is false. The `.performance` blocks hold the cost: nothing is
+# allocated, and the work does not grow with the part of the array past the hit.
+
+import {
+    all,
+    any,
+    count_if,
+    equal as ==,
+    filter,
+    find_if,
+    find_index,
+    find_map,
+    first,
+    greater_than as >,
+    last,
+    len,
+    less_than as <,
+    map,
+    measure,
+    not_equal as !=,
+    print,
+    saturating_remainder as %,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
+
+fn dbl(x: i64) -> i64 { x * 2 }
+
+fn big(x: i64) -> bool { x > 5 }
+
+fn even(x: i64) -> bool { x % 2 == 0 }
+
+fn huge(x: i64) -> bool { x > 12 }
+
+fn any_mapped(xs: i64[]) -> bool { xs.map(dbl).any(big) }.performance({
+    let near = [3, 1, 1, 1];
+    let far = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3];
+    assert(measure("hit first", near, any_mapped).allocations == 0);
+    assert(measure("hit last", far, any_mapped).allocations == 0);
+    // The first element answers: the instructions do not depend on the rest.
+    let stops = measure("stops at the hit", near, any_mapped).instructions;
+    assert(stops < measure("walks to the hit", far, any_mapped).instructions);
+})
+
+fn count_filtered(xs: i64[]) -> u64 { xs.filter(big).count_if(even) }.performance({
+    let xs = [1, 7, 8, 2, 9, 10];
+    assert(measure("count", xs, count_filtered).allocations == 0);
+})
+
+// The ends of a stage: `first` and `last` want one element, so the first
+// stage runs on that element alone (a `map`) or only until the answer (a
+// `filter`, whose `last` walks backwards).
+fn first_big(xs: i64[]) -> i64? { xs.filter(big).first() }.performance({
+    let xs = [1, 2, 9, 4, 5, 6];
+    assert(measure("first of filter", xs, first_big).allocations == 0);
+})
+
+fn last_big(xs: i64[]) -> i64? { xs.filter(big).last() }.performance({
+    let xs = [1, 2, 9, 4, 5, 6];
+    assert(measure("last of filter", xs, last_big).allocations == 0);
+})
+
+fn first_doubled(xs: i64[]) -> i64? { xs.map(dbl).first() }.performance({
+    let xs = [1, 2, 3];
+    assert(measure("first of map", xs, first_doubled).allocations == 0);
+})
+
+fn last_doubled(xs: i64[]) -> i64? { xs.map(dbl).last() }.performance({
+    let xs = [1, 2, 3];
+    assert(measure("last of map", xs, last_doubled).allocations == 0);
+})
+
+fn udbl(x: u64) -> u64 { x * 2 }
+
+fn ubig(x: u64) -> bool { x > 3 }
+
+fn positive(x: i64) -> i64? { if (x > 6) { some(x) } else { none } }
+
+fn slow_search(xs: i64[]) -> str {
+    let mapped = xs.map(dbl);
+    let kept = xs.filter(big);
+    `{mapped.find_map(positive)} {mapped.find_index(big)} {kept.find_map(positive)} {kept.map(dbl).find_map(positive)} {mapped.len() + kept.len()}`
+}
+
+fn fast_search(xs: i64[]) -> str {
+    `{xs.map(dbl).find_map(positive)} {xs.map(dbl).find_index(big)} {xs.filter(big).find_map(positive)} {xs.filter(big).map(dbl).find_map(positive)} {xs.map(dbl).len() + xs.filter(big).len()}`
+}
+
+fn filter_twice(xs: i64[]) -> i64[] { xs.filter(big).filter(even) }
+
+fn slow(xs: i64[]) -> str {
+    let mapped = xs.map(dbl);
+    let kept = xs.filter(big);
+    `{mapped.any(big)} {mapped.all(big)} {mapped.count_if(even)} {kept.any(even)} {kept.all(even)} {kept.count_if(even)} {kept.find_if(even)} {kept.filter(even)} {mapped.first()} {mapped.last()} {kept.first()} {kept.last()} {kept.map(dbl).any(huge)} {kept.map(dbl).all(huge)} {kept.map(dbl).count_if(huge)} {kept.map(dbl).first()} {kept.map(dbl).last()} {mapped.len() + mapped.len()}`
+}
+
+fn fast(xs: i64[]) -> str {
+    `{xs.map(dbl).any(big)} {xs.map(dbl).all(big)} {xs.map(dbl).count_if(even)} {xs.filter(big).any(even)} {xs.filter(big).all(even)} {xs.filter(big).count_if(even)} {xs.filter(big).find_if(even)} {xs.filter(big).filter(even)} {first_doubled(xs)} {last_doubled(xs)} {first_big(xs)} {last_big(xs)} {xs.filter(big).map(dbl).any(huge)} {xs.filter(big).map(dbl).all(huge)} {xs.filter(big).map(dbl).count_if(huge)} {xs.filter(big).map(dbl).first()} {xs.filter(big).map(dbl).last()} {xs.len() + xs.len()}`
+}
+
+fn main() !prints {
+    let empty: i64[] = [];
+    let arrays = [empty, [1], [7], [3, 8], [1, 2, 3], [7, 9, 11], [6, 7, 8, 9, 10]];
+    for (let xs : arrays) {
+        print(fast(xs));
+        print(slow(xs));
+        if (fast_search(xs) != slow_search(xs)) {
+            print("SEARCH MISMATCH");
+        };
+        print(fast_search(xs));
+        if (fast(xs) != slow(xs)) {
+            print("MISMATCH");
+        };
+    }
+    print(`{filter_twice([1, 6, 7, 8, 12, 5])}`);
+
+    // A `Span` is mappable but is not an array, so each of these hands the fused
+    // call a range: it is the array of positions `map` makes of it.
+    let positions = 0..6;
+    print(
+        `{positions.map(udbl).any(ubig)} {positions.map(udbl).all(ubig)} {positions.map(udbl).count_if(ubig)} {positions.map(udbl).first()} {positions.map(udbl).last()}`,
+    );
+}
+--- stdout ---
+false true 0 false true 0 none [] none none none none false true 0 none none 0
+false true 0 false true 0 none [] none none none none false true 0 none none 0
+none none none none 0
+false false 1 false true 0 none [] some(2) some(2) none none false true 0 none none 2
+false false 1 false true 0 none [] some(2) some(2) none none false true 0 none none 2
+none none none none 1
+true true 1 false false 0 none [] some(14) some(14) some(7) some(7) true true 1 some(14) some(14) 2
+true true 1 false false 0 none [] some(14) some(14) some(7) some(7) true true 1 some(14) some(14) 2
+some(14) some(0) some(7) some(14) 2
+true true 2 true true 1 some(8) [8] some(6) some(16) some(8) some(8) true true 1 some(16) some(16) 4
+true true 2 true true 1 some(8) [8] some(6) some(16) some(8) some(8) true true 1 some(16) some(16) 4
+some(16) some(0) some(8) some(16) 3
+true false 3 false true 0 none [] some(2) some(6) none none false true 0 none none 6
+true false 3 false true 0 none [] some(2) some(6) none none false true 0 none none 6
+none some(2) none none 3
+true true 3 false false 0 none [] some(14) some(22) some(7) some(11) true true 3 some(14) some(22) 6
+true true 3 false false 0 none [] some(14) some(22) some(7) some(11) true true 3 some(14) some(22) 6
+some(14) some(0) some(7) some(14) 6
+true true 5 true false 3 some(6) [6, 8, 10] some(12) some(20) some(6) some(10) true false 4 some(12) some(20) 10
+true true 5 true false 3 some(6) [6, 8, 10] some(12) some(20) some(6) some(10) true false 4 some(12) some(20) 10
+some(12) some(0) some(7) some(12) 10
+[6, 8, 12]
+true false 4 some(0) some(10)

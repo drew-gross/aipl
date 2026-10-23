@@ -74,12 +74,12 @@ deallocations     35
 reallocations     1
 bytes allocated   2501
 peak live bytes   2074
-instructions      2081
-binary size       9696 bytes (code 6064, data 46, metadata 3586)
+instructions      2057
+binary size       9568 bytes (code 6000, data 46, metadata 3522)
 
 function                                             calls  code bytes
-__builtin_split_map$str$s0$s1$lam$tagged                 3         584
-__builtin_split_map$u64$s0$s1$lam$__builtin_len          2         516
+__builtin_split_map$str$s0$s1$lam$tagged                 3         552
+__builtin_split_map$u64$s0$s1$lam$__builtin_len          2         484
 __eq_str$arr                                             1         320
 __to_str_bool                                            1         224
 __to_str_u64                                             1         204

@@ -60,7 +60,9 @@ mod sink;
 pub use sink::{sink_bindings, sink_bindings_post_mono};
 
 mod known_constructor_elimination;
+mod reuse_matched_values;
 pub use known_constructor_elimination::eliminate_known_constructors_post_mono;
+pub use reuse_matched_values::reuse_matched_values;
 
 mod move_last_use;
 pub use move_last_use::move_last_uses_post_mono;
@@ -2964,6 +2966,29 @@ impl Mono<'_> {
         }
     }
 
+    /// `span` as the `u64[]` of its positions: `span.map(|i| i)`, which is what
+    /// [`Self::expand_map`] builds for a `Span` receiver.
+    fn span_as_array(
+        &mut self,
+        span_expr: &Expr,
+        env: &Env,
+        span: Span,
+    ) -> Result<(Expr, Type), Error> {
+        let index = "$span_index".to_string();
+        let identity = Expr::new(
+            ExprKind::Lambda(
+                vec![LambdaParam {
+                    name: index.clone(),
+                    ty: None,
+                    span: span.clone(),
+                }],
+                Box::new(Expr::new(ExprKind::Ident(index), span.clone())),
+            ),
+            span.clone(),
+        );
+        self.expand_map(span_expr, &identity, env, span)
+    }
+
     /// Specialize a call to a *generic* higher-order function (e.g. a
     /// `count_while<T>(self: T[], pred: (T) -> bool)`): infer the type variables
     /// from the non-lambda arguments, substitute them into a concrete template
@@ -3025,6 +3050,16 @@ impl Mono<'_> {
                 continue;
             }
             let (ra, aty) = self.infer(arg, env)?;
+            // A `Span` is mappable but is not an array, so a call the fusion pass
+            // built (`(0..n).map(f).find_if(p)` becomes `map_find_if` of the
+            // span) can hand one to a `T[]` parameter. It is the array `map`
+            // would have made of it — one `u64` per position.
+            let (ra, aty) = match (&param.ty, &aty) {
+                (Type::Array(_), Type::Named(n)) if n == SPAN_TYPE => {
+                    self.span_as_array(arg, env, span.clone())?
+                }
+                _ => (ra, aty),
+            };
             self.bind_generic_or(&param.ty, &aty, &var_set, &mut map, gname, span.clone())?;
             str_arg[i] = aty == Type::Primitive(Primitive::Str);
             if let (Type::Set(_, order), Type::Array(_)) = (&aty, &param.ty) {
@@ -7479,6 +7514,22 @@ impl Mono<'_> {
                     rargs.push(ra);
                     atys.push(t);
                 }
+                // A `Span` handed to a builtin's `T[]` parameter is the array of
+                // its positions — see `specialize_generic_call`.
+                if aipl_syntax::builtin::Builtin::of(callee).is_some() {
+                    for (i, a) in args.iter().enumerate() {
+                        let takes_array = self
+                            .generics
+                            .get(name)
+                            .and_then(|g| g.sig.params.get(i))
+                            .is_some_and(|p| matches!(p.ty, Type::Array(_)));
+                        if takes_array && matches!(&atys[i], Type::Named(n) if n == SPAN_TYPE) {
+                            let (ra, t) = self.span_as_array(a, env, span.clone())?;
+                            rargs[i] = ra;
+                            atys[i] = t;
+                        }
+                    }
+                }
                 // `extend`'s source is shape-variadic, and the shape picks a
                 // *different callee* (see `resolve_extend_shape`). Resolved here,
                 // before the dispatch chain below, because one of those callees is
@@ -11076,6 +11127,15 @@ pub fn inspect_only_params(program: &MonoProgram) -> HashMap<String, Vec<bool>> 
 /// so these never elide.
 fn is_empty_array_placeholder(ty: &ConcreteType) -> bool {
     matches!(ty, ConcreteType::Array(inner) if aipl_syntax::concrete::is_none_inner(inner))
+}
+
+/// Whether `body` re-owns the binding `name` through a `mut` binding's slot
+/// (`mut y = name` / `set y = name`) — the one shape where codegen may transfer a
+/// value's existing reference instead of retaining a fresh one, and so the one
+/// use that makes a borrowed binding (an inspect-only parameter, or a `match`
+/// payload that did not retain) unsafe to leave unretained.
+pub fn reowns_binding(name: &str, body: &Expr) -> bool {
+    !param_is_inspect_only(name, body)
 }
 
 /// Whether every use of the parameter `name` in `body` merely inspects it: no
