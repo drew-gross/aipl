@@ -5485,7 +5485,7 @@ impl Cx<'_> {
     /// [`retargeted_int_parse`] to act on. `None` otherwise, including when the
     /// position wants the `i64` the call produces anyway.
     fn retarget_int_parse(&self, e: &Expr, target: &Type) -> Option<Type> {
-        let (call, wanted) = Self::int_parse_site(e, target)?;
+        let (call, wanted) = self.int_parse_site(e, target)?;
         let Type::Optional(core) = &wanted else {
             return None;
         };
@@ -5497,25 +5497,48 @@ impl Cx<'_> {
     }
 
     /// The `int_parse` call whose result `e` passes along into a position that
-    /// declares `target`, with the optional that call is wanted to produce. The
-    /// call itself wants `target`; under a `?` it wants `target?`; and the
-    /// receiver of `value_or` / `value_or_err` wants the optional of what the
-    /// call yields — those two are generic in their payload, so nothing but the
-    /// position the whole expression sits in can say which integer it is.
-    fn int_parse_site<'a>(e: &'a Expr, target: &Type) -> Option<(&'a Expr, Type)> {
-        let optional = |t: &Type| Type::Optional(Box::new(t.clone()));
+    /// declares `target`, with the optional that call is wanted to produce.
+    ///
+    /// The call itself wants `target`. Under a `?` it wants the optional or
+    /// result that `?` unwraps to `target`. Through any other generic call the
+    /// expected type runs backward along the signature: `target` is matched
+    /// against the declared return type to pin the type variables it names, and
+    /// each argument is then wanted to have its parameter's type with those
+    /// variables substituted. So `n.int_parse().value_or(0)` in a `u8` position
+    /// wants a `u8?` receiver, because `value_or` is `(T?, T) -> T`. Nothing but
+    /// the position the whole expression sits in can say which integer a
+    /// generic call's payload is, since the checker types a call from its
+    /// arguments alone.
+    fn int_parse_site<'a>(&self, e: &'a Expr, target: &Type) -> Option<(&'a Expr, Type)> {
         match &e.kind {
             ExprKind::Call(Callee::IntParse, ..) => Some((e, target.clone())),
-            ExprKind::Call(Callee::ValueOr, args, _) => {
-                Self::int_parse_site(args.first()?, &optional(target))
-            }
-            ExprKind::Try(inner) => match &inner.kind {
-                ExprKind::Call(Callee::IntParse, ..) => Some((inner, optional(target))),
-                ExprKind::Call(Callee::ValueOrErr, args, _) => {
-                    Self::int_parse_site(args.first()?, &optional(target))
+            ExprKind::Call(callee, args, _) => {
+                let sig = self.sigs.get(callee.name())?;
+                if !sig.is_generic() || sig.params.len() != args.len() {
+                    return None;
                 }
-                _ => None,
-            },
+                let vars: HashSet<&str> = sig.type_vars.iter().map(|tp| tp.name.as_str()).collect();
+                let mut map = HashMap::new();
+                self.bind_field(&sig.return_type(), target, &vars, &mut map);
+                args.iter()
+                    .zip(sig.param_types())
+                    .find_map(|(arg, pty)| self.int_parse_site(arg, &subst_vars(&pty, &map, &vars)))
+            }
+            ExprKind::Try(inner) => {
+                let wanted = match &inner.kind {
+                    ExprKind::Call(Callee::IntParse, ..) => {
+                        Type::Optional(Box::new(target.clone()))
+                    }
+                    ExprKind::Call(callee, ..) => match self.sigs.get(callee.name())?.return_type()
+                    {
+                        Type::Optional(_) => Type::Optional(Box::new(target.clone())),
+                        Type::Result(_, err) => Type::Result(Box::new(target.clone()), err),
+                        _ => return None,
+                    },
+                    _ => return None,
+                };
+                self.int_parse_site(inner, &wanted)
+            }
             _ => None,
         }
     }

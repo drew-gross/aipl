@@ -120,7 +120,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/booleans/logical/logical_not | 0 | 0 | 0 | 39 | 224 | 2.00 | 76.79 | 1456 |
 | cases/booleans/logical/logical_op_precedence | 0 | 0 | 0 | 28 | 176 | 2.00 | 75.62 | 1456 |
 | cases/builtins/import_then_use | 1 | 40 | 40 | 111 | 452 | 3.00 | 75.56 | 1456 |
-| cases/builtins/int_parse_through_value_or | 11 | 627 | 627 | 6178 | 3720 | 9.00 | 168.23 | 1472 |
+| cases/builtins/int_parse_through_generics | 15 | 839 | 839 | 6890 | 4340 | 11.00 | 176.16 | 1488 |
 | cases/builtins/int_parse_widths | 43 | 2571 | 2571 | 15725 | 9840 | 39.00 | 162.33 | 1488 |
 | cases/builtins/is_nonempty | 5 | 288 | 192 | 756 | 3496 | 4.00 | 83.33 | 1472 |
 | cases/builtins/monotonic_now | 4 | 88 | 88 | 314 | 1768 | 1011497.00 | 81.75 | 1520 |

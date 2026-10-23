@@ -1,0 +1,31 @@
+# An `int_parse` handed to a generic function takes the integer that function's
+# result is declared to be. The expected type runs backward along the callee's
+# signature: matching the declared result against the position pins the type
+# variables, and each argument is then expected to have its parameter's type
+# with those substituted. That reaches through `value_or`, `value_or_err` with
+# a `?` after it, and a function written in the program. A `u64` still parses
+# past `i64::MAX` this way.
+
+import { int_parse, print, value_or, value_or_err } from builtins;
+
+fn takes_u64(n: u64) -> u64 { n }
+
+fn takes_u8(n: u8) -> u8 { n }
+
+fn or_default<T: any>(self: T?, fallback: T) -> T { self.value_or(fallback) }
+
+fn seed(text: str) -> u64!str {
+    ok(takes_u64(text.int_parse().value_or_err(`not a seed: {text}`)?))
+}
+
+fn main() !prints {
+    print(`{seed("18446744073709551615")} {seed("x")}`);
+    print(`{takes_u64("18446744073709551615".int_parse().value_or(0))}`);
+    print(`{takes_u8("255".int_parse().value_or(0))} {takes_u8("256".int_parse().value_or(7))}`);
+    print(`{takes_u8("255".int_parse().or_default(0))} {takes_u8("x".int_parse().or_default(9))}`);
+}
+--- stdout ---
+ok(18446744073709551615) err("not a seed: x")
+18446744073709551615
+255 7
+255 9
