@@ -369,7 +369,11 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_random_state"
         | "aipl_str_inline_capacity" => sig(0, true),
         // Shim slots: read one, or write one (returns nothing).
-        "aipl_shim_get" | "aipl_measure_read" => sig(1, true),
+        "aipl_shim_get" | "aipl_measure_read" | "aipl_const_peek" => sig(1, true),
+        // A constant's cache slot (index, byte size), and the registration of the
+        // function that releases the cache at exit.
+        "aipl_const_slot" => sig(2, true),
+        "aipl_const_on_exit" => sig(1, false),
         "aipl_shim_set" => sig(2, false),
         "aipl_arr_drop_warr"
         | "aipl_arr_retain_warr"

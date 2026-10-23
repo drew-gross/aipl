@@ -1,0 +1,86 @@
+# A top-level constant whose value is computed — `let TABLE: Table = build();` —
+# is built on its first use and shared by every use after. The annotation is
+# required (the declaration is all there is to say what the computation returns),
+# and the computation can't have effects, so running it once is the same as
+# running it at each use.
+#
+# Every use is a retained copy of the cached value, so a use that mutates (`push`,
+# `set`) copies rather than writing into the cache.
+
+import {
+    equal as ==,
+    greater_than as >,
+    has,
+    len,
+    map,
+    measure,
+    print,
+    push,
+    to_set,
+    wrapping_add as +,
+    wrapping_mul as *,
+    wrapping_sub as -,
+} from builtins;
+
+struct Table { squares: i64[], label: str }
+
+fn square(x: i64) -> i64 { x * x }
+
+fn build() -> Table { squares: [1, 2, 3].map(square), label: `t{[1, 2].len()}` }
+
+let TABLE: Table = build();
+
+let SQUARES: i64[] = [4, 5, 6].map(square);
+
+let NAME: str = `name{1 + 1}`;
+
+# Scalars are cached too, and a constant may be built from another.
+let COUNT: u64 = SQUARES.len() + 1;
+
+fn vowels() -> char[] { "aeiou" }
+
+# A character class built from a computed receiver is cached as the bitfield it is.
+let VOWELS: #{char} = vowels().to_set();
+
+let MAYBE: u64? = some(COUNT);
+
+fn total() -> u64 { TABLE.squares.len() + SQUARES.len() + NAME.len() + COUNT }.test({
+    assert(total() == 15);
+    assert(total() == 15);
+})
+
+fn grow() -> (i64[], i64[]) {
+    mut xs = SQUARES;
+    set xs.push(7);
+    (xs, SQUARES)
+}
+
+fn relabel() -> Table {
+    mut t = TABLE;
+    set t.label = "changed";
+    t
+}
+
+fn read_after(depth: u64) -> u64 {
+    if (depth == 0) { SQUARES.len() } else { read_after(depth - 1) + SQUARES.len() }
+}
+
+fn main() !prints {
+    print(`{TABLE.squares} {TABLE.label} {SQUARES} {NAME} {COUNT}`);
+    print(`{total()} {total()}`);
+    // A mutated copy leaves the cached value alone.
+    print(`{grow()} {SQUARES} {grow()}`);
+    print(`{relabel().label} {TABLE.label} {relabel().squares}`);
+    print(`{read_after(4)} {MAYBE} {VOWELS.has('e')} {VOWELS.has('z')}`);
+}.performance({
+    let first = measure("first use", 0, |_| SQUARES.len());
+    let second = measure("second use", 0, |_| SQUARES.len());
+    assert(second.allocations == 0);
+    assert(first.allocations > second.allocations);
+})
+--- stdout ---
+[1, 4, 9] t2 [16, 25, 36] name2 4
+15 15
+([16, 25, 36, 7], [16, 25, 36]) [16, 25, 36] ([16, 25, 36, 7], [16, 25, 36])
+changed t2 [1, 4, 9]
+15 some(4) true false

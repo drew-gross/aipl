@@ -278,12 +278,13 @@ import {
 import { LexResult, keep_skipped, lex, span_str } from "./lexer.aipl";
 import { operator_named_forms } from "./operator_named_forms.aipl";
 import {
+    Prepared,
     Recovered,
     lower,
     parse,
     parse_cst,
-    parse_cst_recovering,
     parse_prepared,
+    parse_prepared_recovering,
     prepare,
 } from "./parse.aipl";
 import {
@@ -4912,6 +4913,16 @@ struct ParseFailure { errors: ParseError[] }
 # `e` as the failure it is by itself.
 fn failure(e: ParseError) -> ParseFailure { errors: [e] }
 
+# The grammar of AIPL, built the first time a file is parsed and shared by every
+# parse after it.
+let GRAMMAR: Grammar<AiplTok, Ast> = aipl_grammar();
+
+# The grammar linked and analysed (`prepare`), likewise built once. Both are a
+# function of the grammar alone, so a process that parses many files — the
+# compiler parses the program, everything it imports and every builtin it
+# reaches — does the work once instead of per file.
+let PREPARED_GRAMMAR: Prepared<AiplTok, Ast>!ParseError = prepare(aipl_grammar());
+
 # The whole of `aipl_parser::parse_with_allows`, on this side: strip the
 # expected-output sections, refuse trailing whitespace, lex losslessly, keep the
 # `#[allow]` spans, parse and lower.
@@ -4926,8 +4937,8 @@ pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
     let text = reject_trailing_whitespace(aipl_source(src)).map_err(failure)?;
     let lexed = lex_lossless(text).map_err(failure)?;
     let allows = allow_spans(lexed);
-    let g = aipl_grammar();
-    let Recovered { cst, errors } = parse_cst_recovering(text, lexed, g, "program").map_err(
+    let prep = PREPARED_GRAMMAR.map_err(failure)?;
+    let Recovered { cst, errors } = parse_prepared_recovering(text, lexed, prep, "program").map_err(
         failure,
     )?;
     if (errors.is_nonempty()) {
@@ -4937,7 +4948,7 @@ pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
         message: "the start rule built no node",
         span: 0..0,
     }))?;
-    let ast = lower(text, tree, g).map_err(failure)?;
+    let ast = lower(text, tree, GRAMMAR).map_err(failure)?;
     let program = as_program(ast, 0..text.len()).map_err(failure)?;
     ok(ParsedFile { program, allows })
 }.test({

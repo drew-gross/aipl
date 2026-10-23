@@ -997,13 +997,10 @@ fn check_refinement_target(
     Ok(())
 }
 
-/// A top-level constant must be ALL_CAPS and stand for a literal.
+/// A top-level constant must be ALL_CAPS.
 ///
-/// Both rules exist to keep a substituted use readable at the site that reads
-/// it: ALL_CAPS says "this name is not a binding from around here", and a
-/// literal is the only value that can be spliced without an evaluation order to
-/// argue about. A negative number is a literal too — the parser builds it as a
-/// `Neg` around one, which is the one non-leaf shape allowed through.
+/// The rule keeps a use readable at the site that reads it: ALL_CAPS says "this
+/// name is not a binding from around here".
 fn check_const_name(c: &aipl_syntax::ast::ConstDecl) -> Result<(), Error> {
     if !is_screaming_snake_case(&c.name) {
         return Err(Error::at(
@@ -1024,13 +1021,16 @@ fn check_const_name(c: &aipl_syntax::ast::ConstDecl) -> Result<(), Error> {
 /// canonical name — which is what tells the `to_set` builtin apart from a user
 /// function of the same spelling. `written` is the name the author gave the
 /// constant, since the rewritten one is mangled.
+///
+/// A value that is not a literal is computed once, on first use, and the type
+/// of what it computes is the one thing the loader cannot infer for it.
 fn check_const_value(written: &str, c: &aipl_syntax::ast::ConstDecl) -> Result<(), Error> {
-    if !is_const_literal(&c.value) {
+    if !is_const_literal(&c.value) && c.ty.is_none() {
         return Err(Error::at(
             format!(
-                "a top-level constant stands for a literal, and {written:?} is given something \
-                 to evaluate — a constant is substituted into each use, so there is no point at \
-                 which a computation would run"
+                "a top-level constant that is given something to evaluate needs a type — \
+                 write `let {written}: <type> = ...;`, since a constant computed on first use \
+                 has no declaration to say what it returns"
             ),
             c.value.span.clone(),
         ));
@@ -1085,7 +1085,7 @@ fn is_const_literal(e: &Expr) -> bool {
         // that can be spliced with no evaluation order to argue about.
         //
         // Only a *literal* receiver qualifies. `xs.to_set()` over a binding is
-        // a computation like any other and stays refused.
+        // a computation like any other, and is computed once on first use.
         ExprKind::Call(callee, args, _) if is_to_set(callee) => {
             matches!(args.as_slice(), [arg] if matches!(arg.kind, ExprKind::Str(_)))
         }
@@ -1093,19 +1093,49 @@ fn is_const_literal(e: &Expr) -> bool {
     }
 }
 
-/// Replace every use of a top-level constant with the literal it stands for,
-/// and drop the declarations.
+/// Replace every use of a top-level constant with what it stands for, and drop
+/// the declarations.
+///
+/// A literal is spliced into each use. Anything else becomes a nullary function
+/// (`constant_initializer_name`) and each use a call to it: codegen answers
+/// that call from a cache, so the value is built once and every later use
+/// shares it.
 fn substitute_constants(items: Vec<Item>) -> Vec<Item> {
-    let values: HashMap<String, Expr> = items
-        .iter()
-        .filter_map(|i| match i {
-            Item::Const(c) => Some((c.name.text.clone(), c.value.clone())),
-            _ => None,
-        })
-        .collect();
+    let mut values: HashMap<String, Expr> = HashMap::new();
+    let mut initializers: Vec<Item> = Vec::new();
+    for item in &items {
+        let Item::Const(c) = item else { continue };
+        if is_const_literal(&c.value) {
+            values.insert(c.name.text.clone(), c.value.clone());
+            continue;
+        }
+        let name = aipl_syntax::constant_initializer_name(&c.name);
+        values.insert(
+            c.name.text.clone(),
+            Expr::new(
+                ExprKind::Call(Callee::User(name.clone()), Vec::new(), false),
+                c.value.span.clone(),
+            ),
+        );
+        initializers.push(Item::Fn(aipl_syntax::ast::Function {
+            name: c.name.renamed(name),
+            is_pub: false,
+            sig: aipl_syntax::ast::Signature {
+                type_vars: Vec::new(),
+                params: Vec::new(),
+                effects: Vec::new(),
+                return_ty: c.ty.clone(),
+            },
+            body: c.value.clone(),
+            test_body: None,
+            test_fns: Vec::new(),
+            doc: c.doc.clone(),
+        }));
+    }
     let mut items: Vec<Item> = items
         .into_iter()
         .filter(|i| !matches!(i, Item::Const(_)))
+        .chain(initializers)
         .collect();
     if values.is_empty() {
         return items;

@@ -1,0 +1,21 @@
+# A constant's value is built once, on first use, so it can't do anything that
+# running it at each use would do differently: no effects.
+
+import { print } from builtins;
+
+fn noisy() !prints -> str {
+    print("built");
+    "value"
+}
+
+let VALUE: str = noisy();
+
+fn main() !prints {
+    print(VALUE);
+}
+--- errors ---
+error: fn "noisy" has effect "!prints" but the calling function does not declare it
+  --> ./tests/cases/constants/err_computed_effect.aipl:11:18
+   |
+11 | let VALUE: str = noisy();
+   |                  ^^^^^^^

@@ -323,6 +323,64 @@ extern "C" fn aipl_shim_set(idx: i64, ptr: i64) {
     }
 }
 
+// ---------- Cached constants ----------
+//
+// A top-level constant whose value is computed (`let TABLE: Table = build();`)
+// is built on its first use and shared by every use after. The cache is one
+// zeroed block per constant, handed out by index: word 0 says whether the value
+// has been built, and the value follows. Codegen decides the block's size, and
+// does the building, copying and reference counting; this only owns the memory.
+//
+// The cache is per thread. The compiler's own dogfooded code runs in whichever
+// thread asked for it, and a value shared between threads would be retained and
+// released without synchronization.
+
+/// The most constants one program may cache. Mirrors `CONST_SLOTS` in the
+/// linker runtime.
+const CONST_SLOT_COUNT: usize = aipl_syntax::CONST_SLOT_COUNT;
+
+/// Where a compilation's constants start in the slot table. The table is the
+/// process's, and two compilations can share a process: the dogfooded compiler
+/// (the checked-in object, or the artifact being generated, numbered from here)
+/// and the program a JIT is running (numbered from [`JIT_CONST_BASE`]) — each
+/// would otherwise find the other's value in its slot 0. A compiled binary is
+/// its own process and starts here too.
+const ARTIFACT_CONST_BASE: usize = 0;
+
+/// See [`ARTIFACT_CONST_BASE`]. Half the table each.
+const JIT_CONST_BASE: usize = CONST_SLOT_COUNT / 2;
+
+thread_local! {
+    static CONST_SLOTS: [std::cell::Cell<i64>; CONST_SLOT_COUNT] =
+        const { [const { std::cell::Cell::new(0) }; CONST_SLOT_COUNT] };
+}
+
+/// The cache block for constant `idx`, allocating `bytes` zeroed bytes on the
+/// first request.
+#[no_mangle]
+extern "C" fn aipl_const_slot(idx: i64, bytes: i64) -> i64 {
+    CONST_SLOTS.with(|slots| {
+        let slot = &slots[idx as usize];
+        if slot.get() == 0 {
+            let block = vec![0u64; (bytes as usize).div_ceil(8)].into_boxed_slice();
+            slot.set(Box::leak(block).as_mut_ptr() as i64);
+        }
+        slot.get()
+    })
+}
+
+/// The cache block for constant `idx` if one was ever requested, else 0.
+#[no_mangle]
+extern "C" fn aipl_const_peek(idx: i64) -> i64 {
+    CONST_SLOTS.with(|slots| slots[idx as usize].get())
+}
+
+/// Registration of the function that releases the cache at exit. A compiled
+/// binary runs it after `main`; the JIT's caches live as long as their thread,
+/// so nothing is kept.
+#[no_mangle]
+extern "C" fn aipl_const_on_exit(_teardown: i64) {}
+
 // ---------- The random generator ----------
 //
 // `random_u64` has no implementation of its own: a `shim random <provider>` installs
@@ -2644,6 +2702,7 @@ fn compile_program<M: Module>(
     // builds — it adds a per-block call — and on only for the test harness's
     // separate measurement object.
     instrument: bool,
+    const_base: usize,
 ) -> Result<(HashMap<String, FuncInfo>, HashMap<String, TypeDef>, String), Vec<Error>> {
     // The frontend — resolve, lower and type-check — then compile what it
     // hands back. Split out so a caller that only wants the diagnostics can
@@ -2891,7 +2950,8 @@ fn compile_program<M: Module>(
 
     // Register builtin signatures/types so user code can `print("...")`. The
     // actual `aipl_*` imports are declared lazily on first use (see `Builtins`).
-    let builtins = register_builtins(&mut funcs);
+    let mut builtins = register_builtins(&mut funcs);
+    builtins.const_base = const_base;
 
     // Monomorphization has already split each function into the instances the
     // program reaches — borrow and owned forms alike, each its own `ConcreteFn`
@@ -2984,6 +3044,16 @@ fn compile_program<M: Module>(
         define_fn(
             module, &mut ctx, &mut fbc, id, f, &funcs, &structs, &builtins, &lit_ctr, &literals,
             &elem_rc, &mut ir, instrument, dbg,
+        )?;
+    }
+
+    // The function that releases cached constants at exit, if any body used one.
+    // Defined before the helper drains below: dropping a constant's value can
+    // request a drop helper of its own.
+    if let Some(id) = builtins.constant_teardown.get() {
+        let constants = builtins.constants.borrow().clone();
+        define_constant_teardown_fn(
+            module, &mut ctx, &mut fbc, &builtins, &structs, id, &constants, &mut ir, instrument,
         )?;
     }
 
@@ -3348,6 +3418,9 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_monotonic_now", aipl_monotonic_now as *const u8);
     jit_builder.symbol("aipl_shim_get", aipl_shim_get as *const u8);
     jit_builder.symbol("aipl_shim_set", aipl_shim_set as *const u8);
+    jit_builder.symbol("aipl_const_slot", aipl_const_slot as *const u8);
+    jit_builder.symbol("aipl_const_peek", aipl_const_peek as *const u8);
+    jit_builder.symbol("aipl_const_on_exit", aipl_const_on_exit as *const u8);
     jit_builder.symbol("aipl_array_new", aipl_array_new as *const u8);
     jit_builder.symbol("aipl_array_with_cap", aipl_array_with_cap as *const u8);
     jit_builder.symbol("aipl_array_dec", aipl_array_dec as *const u8);
@@ -3628,7 +3701,8 @@ pub fn generate_dogfood_artifact(
     // one useful fact — which file — buried in it.
     let program = aipl_loader::load_program_sources(sources, dbg)?;
     let mut module = new_jit_module().unwrap();
-    let (funcs, structs, ir) = compile_program(&mut module, &program, None, dbg, false)?;
+    let (funcs, structs, ir) =
+        compile_program(&mut module, &program, None, dbg, false, ARTIFACT_CONST_BASE)?;
 
     // Collect static data objects (e.g. string literals longer than the 7-byte
     // inline SSO threshold). Finalize the JIT module only when any exist so we
@@ -3985,7 +4059,8 @@ impl Compilation {
         let mut module = new_jit_module()?;
 
         // The JIT never reports perf counters, so it's never instrumented.
-        let (funcs, structs, ir) = compile_program(&mut module, program, None, dbg, false)?;
+        let (funcs, structs, ir) =
+            compile_program(&mut module, program, None, dbg, false, JIT_CONST_BASE)?;
 
         module
             .finalize_definitions()
@@ -5997,6 +6072,7 @@ impl ObjectCompilation {
             Some(BINARY_USER_MAIN),
             dbg,
             instrument,
+            ARTIFACT_CONST_BASE,
         )?;
         emit_main_wants_args_flag(&mut module, main_wants_args)?;
 
@@ -6699,6 +6775,16 @@ struct Builtins {
     /// A `FuncRef` is scoped to one `Function`; this is cleared at the start of
     /// each `define_*` call (before `module.clear_context` makes old refs stale).
     func_refs: RefCell<HashMap<FuncId, FuncRef>>,
+    /// The top-level constants computed on first use, in slot order: the
+    /// initializer's name and the type it returns. A constant's index here is
+    /// its slot in the runtime's cache (`aipl_const_slot`).
+    constants: RefCell<Vec<(String, ConcreteType)>>,
+    /// The function that releases every cached constant at exit, once a use has
+    /// asked for one (see [`constant_teardown_id`]).
+    constant_teardown: Cell<Option<FuncId>>,
+    /// Where this compilation's constants start in the runtime's slot table; see
+    /// [`ARTIFACT_CONST_BASE`].
+    const_base: usize,
 }
 
 /// What one runtime-call parameter or result is, in ABI terms.
@@ -6854,9 +6940,13 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_arr_drop_opt_warr"
         | "aipl_arr_retain_opt_warr" => (2, Ret::None),
         "aipl_shim_get" | "aipl_read_line" | "aipl_str_len" | "aipl_str_hash" | "aipl_str_iter_next"
-        | "aipl_str_write_ptr" | "aipl_i64_len" | "aipl_u64_len" => {
+        | "aipl_str_write_ptr" | "aipl_i64_len" | "aipl_u64_len" | "aipl_const_peek" => {
             (1, Ret::Word)
         }
+        // A constant's cache slot: the index and the byte size to give it on
+        // first request.
+        "aipl_const_slot" => (2, Ret::Word),
+        "aipl_const_on_exit" => (1, Ret::None),
         "aipl_char_at"
         | "aipl_str_cmp"
         | "aipl_str_eq"
@@ -7196,6 +7286,9 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
     Builtins {
         imports: RefCell::new(HashMap::new()),
         func_refs: RefCell::new(HashMap::new()),
+        constants: RefCell::new(Vec::new()),
+        constant_teardown: Cell::new(None),
+        const_base: 0,
     }
 }
 
@@ -19313,6 +19406,9 @@ fn compile_call_expr_direct<M: Module>(
                     span.clone(),
                 ));
             }
+            if aipl_syntax::is_constant_initializer(name) && args.is_empty() {
+                return compile_constant_use(module, builder, cx, scopes, name, &info, span);
+            }
             // `name` already names the right instance (borrow or owned) chosen
             // by monomorphization; `compile_call` moves the owned args in. The
             // only path that may emit a `return_call`, so the only one that gets
@@ -19329,6 +19425,204 @@ fn compile_call_expr_direct<M: Module>(
             )?
         }
     })
+}
+
+/// Compile a use of a constant computed on first use: a call to its
+/// initializer, answered from the runtime's cache.
+///
+/// ```text
+///     block = aipl_const_slot(idx, 8 + size)      // zeroed on first request
+///     brif block[0] != 0 -> read | build
+///     build: block[1..] = initializer(); block[0] = 1; register the teardown
+///     read:  a copy of block[1..], retained — an owned temporary like any call's
+/// ```
+///
+/// The cache holds one reference to the value, which is what makes every use a
+/// retained copy rather than a move: the value must outlive the use. Composites
+/// (structs, optionals, arrays, `str`) are stored inline and copied out into a
+/// stack slot of the use's own, because a consumer may take their fields.
+fn compile_constant_use<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    scopes: &mut Vec<Vec<Tracked>>,
+    name: &str,
+    info: &FuncInfo,
+    span: Span,
+) -> Result<(Value, ConcreteType), Error> {
+    let Cx {
+        structs, builtins, ..
+    } = cx;
+    let ty = info.return_ty.clone();
+    let idx = {
+        let mut constants = builtins.constants.borrow_mut();
+        match constants.iter().position(|(n, _)| n == name) {
+            Some(i) => i,
+            None if builtins.const_base + constants.len() >= aipl_syntax::CONST_SLOT_COUNT => {
+                return Err(Error::at(
+                    format!(
+                        "a program may have at most {} constants computed on first use",
+                        aipl_syntax::CONST_SLOT_COUNT - builtins.const_base
+                    ),
+                    span,
+                ));
+            }
+            None => {
+                constants.push((name.to_string(), ty.clone()));
+                constants.len() - 1
+            }
+        }
+    };
+    let composite = is_composite(&ty, structs);
+    let size = if composite {
+        sret_size(&ty, structs).unwrap_or(8)
+    } else {
+        8
+    };
+    let idx_v = builder
+        .ins()
+        .iconst(types::I64, (builtins.const_base + idx) as i64);
+    let bytes = builder.ins().iconst(types::I64, 8 + size as i64);
+    let block = builtins.call(module, builder, "aipl_const_slot", &[idx_v, bytes]);
+    let built = builder
+        .ins()
+        .load(types::I64, MemFlagsData::trusted(), block, 0);
+    let build_b = builder.create_block();
+    let read_b = builder.create_block();
+    builder.ins().brif(built, read_b, &[], build_b, &[]);
+
+    builder.switch_to_block(build_b);
+    builder.seal_block(build_b);
+    // The cache takes the initializer's reference, so nothing here tracks the
+    // result for release.
+    scopes.push(Vec::new());
+    let (value, _) = compile_call(
+        module,
+        builder,
+        Cx { tail: false, ..cx },
+        scopes,
+        name,
+        info,
+        &[],
+        span,
+    )?;
+    scopes.pop();
+    if composite {
+        let dst = builder.ins().iadd_imm_s(block, 8);
+        copy_composite(builder, dst, value, &ty, structs);
+    } else {
+        builder
+            .ins()
+            .store(MemFlagsData::trusted(), value, block, 8);
+    }
+    let one = builder.ins().iconst(types::I64, 1);
+    builder.ins().store(MemFlagsData::trusted(), one, block, 0);
+    let teardown = constant_teardown_id(module, builtins);
+    let teardown_ref = module.declare_func_in_func(teardown, builder.func);
+    let teardown_addr = builder.ins().func_addr(types::I64, teardown_ref);
+    builtins.call_void(module, builder, "aipl_const_on_exit", &[teardown_addr]);
+    builder.ins().jump(read_b, &[]);
+
+    builder.switch_to_block(read_b);
+    builder.seal_block(read_b);
+    let v = if composite {
+        let src = builder.ins().iadd_imm_s(block, 8);
+        copy_slot_value(builder, src, size)
+    } else {
+        builder
+            .ins()
+            .load(types::I64, MemFlagsData::trusted(), block, 8)
+    };
+    if needs_drop(&ty, structs) {
+        emit_retain(builder, module, builtins, structs, v, &ty);
+        scopes.last_mut().expect("scope").push(Tracked::new(v, &ty));
+    }
+    Ok((v, ty))
+}
+
+/// The function that releases every cached constant, declared on the first use
+/// that registers it and defined by [`define_constant_teardown_fn`] once every
+/// constant is known.
+fn constant_teardown_id<M: Module>(module: &mut M, builtins: &Builtins) -> FuncId {
+    if let Some(id) = builtins.constant_teardown.get() {
+        return id;
+    }
+    let sig = module.make_signature();
+    let id = module
+        .declare_function("__aipl_const_teardown", Linkage::Local, &sig)
+        .unwrap_or_else(|e| panic!("declare __aipl_const_teardown: {e}"));
+    builtins.constant_teardown.set(Some(id));
+    id
+}
+
+/// Define the teardown function: release each constant that was built, and mark
+/// it unbuilt. The runtime calls it once, after `main` returns, so the program's
+/// allocation tallies see every block the cache held freed.
+fn define_constant_teardown_fn<M: Module>(
+    module: &mut M,
+    ctx: &mut Context,
+    fbc: &mut FunctionBuilderContext,
+    builtins: &Builtins,
+    structs: &HashMap<String, TypeDef>,
+    id: FuncId,
+    constants: &[(String, ConcreteType)],
+    ir_out: &mut String,
+    instrument: bool,
+) -> Result<(), Error> {
+    builtins.clear_func_cache();
+    {
+        let mut builder = FunctionBuilder::new(&mut ctx.func, fbc);
+        let entry = builder.create_block();
+        builder.switch_to_block(entry);
+        for (idx, (_, ty)) in constants.iter().enumerate() {
+            if !needs_drop(ty, structs) {
+                continue;
+            }
+            let idx_v = builder
+                .ins()
+                .iconst(types::I64, (builtins.const_base + idx) as i64);
+            let block = builtins.call(module, &mut builder, "aipl_const_peek", &[idx_v]);
+            let requested_b = builder.create_block();
+            let drop_b = builder.create_block();
+            let next_b = builder.create_block();
+            builder.ins().brif(block, requested_b, &[], next_b, &[]);
+            builder.switch_to_block(requested_b);
+            let built = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), block, 0);
+            builder.ins().brif(built, drop_b, &[], next_b, &[]);
+            builder.switch_to_block(drop_b);
+            let v = if is_composite(ty, structs) {
+                builder.ins().iadd_imm_s(block, 8)
+            } else {
+                builder
+                    .ins()
+                    .load(types::I64, MemFlagsData::trusted(), block, 8)
+            };
+            emit_drop(&mut builder, module, builtins, structs, v, ty);
+            let zero = builder.ins().iconst(types::I64, 0);
+            builder.ins().store(MemFlagsData::trusted(), zero, block, 0);
+            builder.ins().jump(next_b, &[]);
+            builder.switch_to_block(next_b);
+        }
+        builder.ins().return_(&[]);
+        builder.seal_all_blocks();
+        builder.finalize(module.target_config());
+    }
+    ctx.func.name = UserFuncName::user(0, id.as_u32());
+    ir_out.push_str(&fix_data_ref_names(
+        &ctx.func,
+        &format!("{}\n", ctx.func.display()),
+    ));
+    if instrument {
+        let call_fn = builtins.id(module, "aipl_count_call");
+        instrument_call_count(module, &mut ctx.func, id, call_fn)?;
+    }
+    module
+        .define_function(id, ctx)
+        .map_err(|e| Error::msg(format!("define constant teardown fn: {e}")))?;
+    module.clear_context(ctx);
+    Ok(())
 }
 
 /// Emit `recv[a..b]` for any sliceable receiver — the shared tail of

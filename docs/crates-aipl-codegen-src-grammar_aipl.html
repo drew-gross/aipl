@@ -1307,7 +1307,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$96387: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$96406: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -2233,7 +2233,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$146419: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$146438: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -2376,6 +2376,34 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn failure(e: ParseError) -&#62; ParseFailure</code></pre>
 
           <div class="doc"><p><code>e</code> as the failure it is by itself.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-GRAMMAR">
+          <h3>
+            <a class="anchor" href="#item-GRAMMAR">GRAMMAR</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let GRAMMAR: Grammar&#60;AiplTok, Ast&#62; = aipl_grammar()</code></pre>
+
+          <div class="doc"><p>The grammar of AIPL, built the first time a file is parsed and shared by every parse after it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-PREPARED_GRAMMAR">
+          <h3>
+            <a class="anchor" href="#item-PREPARED_GRAMMAR">PREPARED_GRAMMAR</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let PREPARED_GRAMMAR: Prepared&#60;AiplTok, Ast&#62;!ParseError = prepare(aipl_grammar())</code></pre>
+
+          <div class="doc"><p>The grammar linked and analysed (<code>prepare</code>), likewise built once. Both are a function of the grammar alone, so a process that parses many files — the compiler parses the program, everything it imports and every builtin it reaches — does the work once instead of per file.</p></div>
 
 
         </section>

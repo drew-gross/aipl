@@ -19,6 +19,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 
 extern "C" {
     fn malloc(size: usize) -> *mut c_void;
+    fn calloc(count: usize, size: usize) -> *mut c_void;
     fn realloc(ptr: *mut c_void, size: usize) -> *mut c_void;
     fn free(ptr: *mut c_void);
     fn abort() -> !;
@@ -993,6 +994,55 @@ pub extern "C" fn aipl_shim_set(idx: i64, ptr: i64) {
 
 
 
+// ---------- Cached constants ----------
+//
+// A top-level constant whose value is computed is built on its first use and
+// shared by every use after. The cache is one zeroed block per constant, handed
+// out by index: word 0 says whether the value has been built, and the value
+// follows. Codegen decides the block's size, and does the building, copying and
+// reference counting; this only owns the memory. Mirrors the JIT runtime's
+// `aipl_const_slot`, which keeps a block per thread where this keeps one: a
+// compiled program has a single thread.
+//
+// The blocks come from `calloc` directly, so the allocation tallies never see
+// them — what a block *holds* is released by the teardown function codegen
+// registers, before `main` returns to the tallies.
+
+/// The most constants one program may cache. Sized by
+/// `aipl_syntax::CONST_SLOT_COUNT`.
+static CONST_SLOTS: [core::sync::atomic::AtomicI64; 256] =
+    [const { core::sync::atomic::AtomicI64::new(0) }; 256];
+
+/// The function registered by `aipl_const_on_exit`, or 0.
+static CONST_TEARDOWN: core::sync::atomic::AtomicI64 = core::sync::atomic::AtomicI64::new(0);
+
+/// The cache block for constant `idx`, allocating `bytes` zeroed bytes on the
+/// first request.
+#[no_mangle]
+pub extern "C" fn aipl_const_slot(idx: i64, bytes: i64) -> i64 {
+    let slot = &CONST_SLOTS[idx as usize];
+    let block = slot.load(core::sync::atomic::Ordering::Relaxed);
+    if block != 0 {
+        return block;
+    }
+    let block = unsafe { calloc(1, bytes as usize) } as i64;
+    slot.store(block, core::sync::atomic::Ordering::Relaxed);
+    block
+}
+
+/// The cache block for constant `idx` if one was ever requested, else 0.
+#[no_mangle]
+pub extern "C" fn aipl_const_peek(idx: i64) -> i64 {
+    CONST_SLOTS[idx as usize].load(core::sync::atomic::Ordering::Relaxed)
+}
+
+/// Register the function that releases every cached constant; `main` runs it
+/// after the program does.
+#[no_mangle]
+pub extern "C" fn aipl_const_on_exit(teardown: i64) {
+    CONST_TEARDOWN.store(teardown, core::sync::atomic::Ordering::Relaxed);
+}
+
 // ---------- The random generator ----------
 //
 // splitmix64, one word of state, as in the JIT runtime (`aipl_random_next` there):
@@ -1774,6 +1824,11 @@ pub extern "C" fn main(argc: c_int, argv: *const *const c_char) -> c_int {
     let perfmon = !perfmon_path.is_null();
     let t0 = if perfmon { perfmon_os::now_ns() } else { 0 };
     let code = unsafe { __aipl_user_main(args) as c_int };
+    let teardown = CONST_TEARDOWN.load(core::sync::atomic::Ordering::Relaxed);
+    if teardown != 0 {
+        let release: extern "C" fn() = unsafe { core::mem::transmute(teardown as usize) };
+        release();
+    }
     let t1 = if perfmon { perfmon_os::now_ns() } else { 0 };
     // Instrumented build only: after the program (and all its frees) finish,
     // dump the allocation tallies if a destination was requested.

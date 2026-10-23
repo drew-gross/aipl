@@ -1,5 +1,5 @@
-# A constant is substituted into each use, so there is no point at which a
-# computation would run.
+# A constant whose value is computed is built on its first use, and the
+# declaration is the only place to say what it builds — so it needs a type.
 
 fn two() -> i64 { 2 }
 
@@ -9,7 +9,7 @@ fn main() {
     let x = VALUE;
 }
 --- errors ---
-error: a top-level constant stands for a literal, and "VALUE" is given something to evaluate — a constant is substituted into each use, so there is no point at which a computation would run
+error: a top-level constant that is given something to evaluate needs a type — write `let VALUE: <type> = ...;`, since a constant computed on first use has no declaration to say what it returns
  --> ./tests/cases/constants/err_computed_value.aipl:6:13
   |
 6 | let VALUE = two();

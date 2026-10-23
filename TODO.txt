@@ -267,6 +267,7 @@ bugs:
     It needs the binding held while both a scalar field and the boxed-optional field are read — reading only .next allocates 1 and balances, reading only .val elides the allocation entirely. That's presumably why recursive_struct.aipl and recursive_list.aipl never tripped it. My boxed case is reshaped to cover the boxed store path without hitting it
 
 errors:
+  effects in functions called for top level consts should get a more specific error message
   error: cannot infer a type for "T" in generic "__builtin_grid_get" should not reference the builtin name
   make "did you mean?" errors that look for nearby words instead of displaying all possibilities
   make it possible to report multiple errors when one of them is an invalid char literal (lexer upgrade)
@@ -614,6 +615,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    extend(xs.map(f))
     make a way for the same code to work as a lint when written directly and as a fusion when it shows up after inlining
     equality operator fusion for many operations, match fusion, etc.
     add some dict building fusions ie.g. foo()['key'] should fuse and throw out most of the dict inside foo()
@@ -665,6 +667,7 @@ optimizations:
     fold mutable consts before they get mutated
     fold constant function arguments
     concat with empty string should constant fold
+    constant fold zero-arg functions since they must always result in the same value
   make functions that generate an array accept a write target under the hood, which is a pre-allocated span. For spreads this can generate directly into the destination buffer, probably has applications elsewhere also.
   make array reserve grow geometrically
   make arrays work sorta like strings i.e. have a rope representation
@@ -822,10 +825,6 @@ debugging:
   line numbers on test assertion failures, err/none propagations, etc.
   tools for debugging infinite loops
   add optional inc/dec instrumentation. I'ts been useful before, might as well keep it around.
-
-some sort of with_capacity option? Use in unescape
-
-destination-passing: build elements directly in output slot
 
 the arg contract being different for builtins caused problems for retain elision
 - Make retain elision more generic, maybe it should be applied at a lower layer?

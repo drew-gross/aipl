@@ -427,28 +427,31 @@ pub mod ast {
         pub target: Type,
     }
 
-    /// A top-level constant: `pub let NAME: T = <literal>;`.
+    /// A top-level constant: `pub let NAME: T = <value>;`.
     ///
-    /// The value is a literal and nothing else, so a constant needs no
-    /// evaluation order and no initialization pass — the loader substitutes each
-    /// use with the literal itself and drops the declaration, and nothing past
-    /// the loader knows constants exist. That is also why there is no `mut`
-    /// form: a mutable one would need storage, and storage would need all of
-    /// the above.
+    /// A literal needs no evaluation order and no initialization pass — the
+    /// loader substitutes each use with the literal itself and drops the
+    /// declaration. Any other value is computed once, on first use: the loader
+    /// turns the declaration into a nullary function
+    /// ([`constant_initializer_name`](crate::constant_initializer_name)) and each
+    /// use into a call to it, and codegen answers those calls from a cache. Either
+    /// way nothing past the loader knows constants exist. There is no `mut` form:
+    /// a mutable one would need storage that uses could disagree about.
     ///
-    /// `name` is ALL_CAPS by rule, which is what keeps a substituted use
-    /// distinguishable from an ordinary binding at the site that reads it.
+    /// `name` is ALL_CAPS by rule, which is what keeps a use distinguishable from
+    /// an ordinary binding at the site that reads it.
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct ConstDecl {
         /// The name, with its own span — what the diagnostics checking a
-        /// constant's two rules point at (ALL_CAPS, and a literal value).
+        /// constant's two rules point at (ALL_CAPS, and a type on a computed value).
         pub name: SpanStr,
         /// Declared `pub`: importable by other files, like a `pub fn`.
         pub is_pub: bool,
-        /// The written annotation, if any. A literal types itself, so this is
-        /// only ever a narrowing (`let PORT: u16 = 8080;`).
+        /// The written annotation. A literal types itself, so for one it is only
+        /// ever a narrowing (`let PORT: u16 = 8080;`); any other value must have
+        /// it, since it becomes the initializer's return type.
         pub ty: Option<Type>,
-        /// The literal this name stands for.
+        /// The value this name stands for.
         pub value: Expr,
         /// The `# ..` doc comment above the declaration.
         pub doc: Option<String>,
@@ -2699,6 +2702,22 @@ pub fn performance_source_name(name: &str) -> Option<&str> {
     }
 }
 
+/// The name of the function that computes the top-level constant `name`:
+/// `__const$<name>`. A constant whose value is not a literal is a nullary
+/// function of this name, and each use is a call to it that codegen answers
+/// from a cache, so the body runs once per thread, on first use.
+pub fn constant_initializer_name(name: &str) -> String {
+    format!("{CONSTANT_INITIALIZER_PREFIX}{name}")
+}
+
+/// Whether `name` is a function made by [`constant_initializer_name`]. A `$`
+/// cannot appear in a source name, so no program spells one.
+pub fn is_constant_initializer(name: &str) -> bool {
+    name.starts_with(CONSTANT_INITIALIZER_PREFIX)
+}
+
+const CONSTANT_INITIALIZER_PREFIX: &str = "__const$";
+
 /// Whether `name` is exactly a `.test` body — see [`test_fn_name`].
 pub fn is_test_body(name: &str) -> bool {
     matches!(fn_role(name), FnRole::TestBody)
@@ -3906,6 +3925,11 @@ pub fn shim_slot_index(op: &str) -> Option<usize> {
 /// How many shim slots the runtimes must reserve. Kept in sync by
 /// `shim_slots_match_runtime` in `tests/shims.rs`.
 pub const SHIM_SLOT_COUNT: usize = 9;
+
+/// How many constants computed on first use ([`constant_initializer_name`]) a
+/// program may have. Each owns a cache slot in the runtime, and both runtimes
+/// size their slot array to this.
+pub const CONST_SLOT_COUNT: usize = 256;
 
 /// Built-in *type* names that must be brought into scope with
 /// `import { .. } from builtins;` before use — the type-level analog of

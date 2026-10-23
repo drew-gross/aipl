@@ -9646,6 +9646,10 @@ fn inline_candidates(
                 if body_size(&f.body) <= max_exprs
                     && wanted.is_none_or(|w| w.contains(f.name.as_str()))
                     && f.name != "main"
+                    // A constant's initializer runs once, on first use, because
+                    // its calls are answered from a cache; a copy of its body in
+                    // each caller would run on every call.
+                    && !aipl_syntax::is_constant_initializer(&f.name)
                     // A generic function is instantiated per call site by
                     // monomorphization.
                     && f.sig.type_vars.is_empty()
@@ -9826,6 +9830,8 @@ pub fn inline_small_post_mono(
                 // A `.test` body's name changes what `?` means inside it — see
                 // `is_inline_candidate_mono`.
                 && !aipl_syntax::is_test_body(&f.name)
+                // See `inline_candidates`.
+                && !aipl_syntax::is_constant_initializer(&f.name)
                 // Never rebound by a local, so a call site means the function it
                 // appears to.
                 && !binders.contains(f.name.as_str())
@@ -9907,6 +9913,8 @@ fn is_inline_candidate(
         // count understates its references.
         && !f.is_pub
         && f.name != "main"
+        // See `inline_candidates`.
+        && !aipl_syntax::is_constant_initializer(&f.name)
         && !skip.contains(f.name.as_str())
         // Never shadowed by a local anywhere, so the single counted use is the
         // only `Call`/`Ident` of this name in the whole program.
@@ -9988,6 +9996,8 @@ fn is_inline_candidate_mono(
         // propagate (see `in_test` in codegen). Folding one into `__test_main`
         // would silently change what `?` means inside it.
         && !aipl_syntax::is_test_body(&f.name)
+        // See `inline_candidates`.
+        && !aipl_syntax::is_constant_initializer(&f.name)
         && f.name != "__test_main"
         && !skip.contains(f.name.as_str())
         && !binders.contains(f.name.as_str())

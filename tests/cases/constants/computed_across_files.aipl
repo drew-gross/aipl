@@ -1,0 +1,38 @@
+# A computed constant is importable like any other, and its cache is the
+# program's: the importing file and the defining file share one built value.
+# Types the cache holds by pointer (a recursive variant) are shared the same
+# way as those it holds inline.
+
+import { len, print } from builtins;
+import { ITEMS, TREE, depth, tree } from "./tree_constants.aipl";
+
+fn main() !prints {
+    print(`{ITEMS.len()} {depth(tree())} {depth(TREE)}`);
+}
+--- file: tree_constants.aipl ---
+import { equal as ==, greater_than as >, map, wrapping_add as +, wrapping_sub as - } from builtins;
+
+variant Tree = Leaf | Node(left: Tree, right: Tree)
+
+pub fn depth(self: Tree) -> u64 {
+    match (self) {
+        Leaf => 0,
+        Node(l, r) => 1 + deeper(depth(l), depth(r)),
+    }
+}
+
+fn build(levels: u64) -> Tree {
+    if (levels == 0) { Leaf } else { Node(build(levels - 1), Leaf) }
+}
+
+fn deeper(a: u64, b: u64) -> u64 { if (a > b) { a } else { b } }
+
+pub fn tree() -> Tree { build(3) }
+
+pub let ITEMS: str[] = ["a", "b", "c"].map(shout);
+
+pub let TREE: Tree = build(3);
+
+fn shout(s: str) -> str { s }
+--- stdout ---
+3 3 3
