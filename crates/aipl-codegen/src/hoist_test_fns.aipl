@@ -19,7 +19,7 @@
 # helper's name is not tracked, the same way a call's name resolves in the
 # loader.
 
-import { equal as ==, extend, find_if, is_empty, map, value_or } from builtins;
+import { equal as ==, find_if, is_empty, join, map, value_or } from builtins;
 import { Call, Expr, Ident, Unit, at, expr, ident, map_subexprs, show_expr } from "./expr.aipl";
 import { performance_fn_name, test_helper_name } from "./fn_names.aipl";
 import { Fn, Function, Item, PerformanceBlock, Program, Signature } from "./item.aipl";
@@ -28,11 +28,8 @@ import { SpanStr } from "./lexer.aipl";
 # `program` with every `.test` helper and `.performance` block moved out to a
 # top-level function of its own.
 pub fn hoist_test_fns(self: Program) -> Program {
-    mut items: Item[] = []; #[allow]
-    for (let item : self.items) {
-        set items.extend(item.hoisted_items());
-    }
-    Program { ..self, items }
+    ..self,
+    items: self.items.map(hoisted_items).join(),
 }
 
 fn hoisted_items(self: Item) -> Item[] {

@@ -709,7 +709,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/normalize_output | 16 | 880 | 143 | 2750 | 1968 | 7.00 | 107.08 | 1440 |
 | crates/aipl-codegen/src/operator_named_forms | 16 | 1040 | 1040 | 3288 | 8980 | 7.00 | 105.55 | 1456 |
 | crates/aipl-codegen/src/parse | 8710 | 1064802 | 146456 | 4200050 | 676736 | 1125.00 | 3710.20 | 2800 |
-| crates/aipl-codegen/src/parse_and_partial_load | 21483 | 4247091 | 610697 | 11571061 | 7613668 | 2672.00 | 11467.15 | 6976 |
+| crates/aipl-codegen/src/parse_and_partial_load | 21483 | 4247091 | 610825 | 11571495 | 7618536 | 2921.00 | 11247.40 | 6880 |
 | crates/aipl-codegen/src/parse_spec | 147 | 4236 | 2155 | 76704 | 113360 | 33.00 | 177.87 | 1600 |
 | crates/aipl-codegen/src/parse_test_section_header | 0 | 0 | 0 | 1472 | 3344 | 4.00 | 82.47 | 1440 |
 | crates/aipl-codegen/src/parsed | 40 | 2981 | 2521 | 2355 | 53840 | 10.00 | 730.28 | 1552 |

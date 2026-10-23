@@ -720,8 +720,10 @@ Rules worth knowing before reaching for it:
   which is why a *generic* target can't be pinned: `Box` names a template, not a
   type. Its field types are still checked against the instance, so a mismatched
   instance is caught; a different struct sharing the field names is not.)
-- It does **not** work in the fn-body shorthand (`fn f() -> T { ..x }`): that
-  production is led by a field name, so `..` can't start one.
+- It works in the fn-body shorthand too — `fn f(w: W) -> W { ..w, pos: 1 }` —
+  where the function's own braces are the literal's. Don't add a second pair
+  (`{ { ..w } }` is a block holding a struct literal, and the type name is then
+  needed).
 
 ## Authoring a lint: the hit's span must be one line that survives `aipl check --fix`
 **One lint, one file.** Each lint lives in `crates/aipl-syntax/src/lint/<name>.rs`,
