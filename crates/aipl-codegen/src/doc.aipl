@@ -25,7 +25,6 @@ import {
     len,
     less_than as <,
     logical_not as !,
-    map,
     push,
     repeat,
     right_fold,
@@ -280,7 +279,7 @@ fn blank_str(sp: u64) -> str { "\n\n" +++ " ".repeat(sp) }
 # text is trimmed first so a break the layout left dangling at the end (a
 # newline plus its indentation) does not become a trailing blank line.
 fn cleanup(out: str) -> str {
-    let lines = out.trim_end_while(is_space).split("\n").map(|line| line.trim_end_while(is_space));
+    let lines = out.trim_end_while(is_space).split("\n")$trim_end_while(is_space);
     let body = lines.join(sep="\n");
     if (lines.len() > 1) { body +++ "\n" } else { body }
 }.test({

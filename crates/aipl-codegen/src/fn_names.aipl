@@ -137,7 +137,7 @@ pub fn fn_role(self: str) -> FnRole {
 # What follows the owner in a `__test$` name, or `none` when `self` is not one.
 fn test_tail(self: str) -> str? {
     match (self.after(TEST_PREFIX)) {
-        some(rest) => split_test_owner(rest).map(|parts| parts.1),
+        some(rest) => split_test_owner(rest)$1,
         none => none,
     }
 }

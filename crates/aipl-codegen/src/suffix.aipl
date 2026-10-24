@@ -9,6 +9,8 @@ import {
     Field as FieldExpr,
     FieldInit,
     Index as IndexExpr,
+    Lambda,
+    LambdaParam,
     Slice,
     Try as TryExpr,
     TypeArgs,
@@ -35,6 +37,8 @@ variant Suffix =
     | SliceFrom(Expr)
     | SliceTo(Expr)
     | Try
+    | MapField(str)
+    | MapMethod(name: str, args: Expr[])
 
 # One postfix step, given the receiver it applies to. A method call folds the
 # receiver in as `args[0]` and flags the method form, so `recv.f(a)` is stored
@@ -55,6 +59,12 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
         // regardless, so a synthetic `0` is the whole difference.
         SliceTo(hi) => at(Slice(recv, num(0), some(hi)), span),
         Try => at(TryExpr(recv), span),
+        MapField(name) => mapped(recv, at(FieldExpr(ident(MAPPED_ELEMENT), name), span), span),
+        MapMethod(name, args) => mapped(
+            recv,
+            at(Call(name, [ident(MAPPED_ELEMENT), ..args], true), span),
+            span,
+        ),
     }
 }.test({
     let p = ident("p");
@@ -74,6 +84,23 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     assert(apply_suffix(p, SliceFrom(num(1)), 0..0).show_expr() == "Slice(p, 1, )");
     assert(apply_suffix(p, SliceTo(num(2)), 0..0).show_expr() == "Slice(p, 0, 2)");
     assert(apply_suffix(p, Try, 0..0).show_expr() == "Try(p)");
+
+    // `$` maps the step over the receiver: `p$x` is `p.map(|x| x.x)`, with the
+    // element named by something no source can spell.
+    assert(
+        apply_suffix(
+            p,
+            MapField("x"),
+            0..0,
+        ).show_expr() == "p.__builtin_map(Lambda([__map$], __map$.x))",
+    );
+    assert(
+        apply_suffix(
+            p,
+            MapMethod("f", [num(1)]),
+            0..0,
+        ).show_expr() == "p.__builtin_map(Lambda([__map$], __map$.f(1)))",
+    );
     // A range literal written as an index is the closed slice form.
     let range = at(
         Construct(
@@ -84,6 +111,17 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     );
     assert(apply_suffix(p, Index(range), 0..0).show_expr() == "Slice(p, 1, 2)");
 })
+
+# What `recv$step` means: `recv.map(|e| step)`, where `step` is the postfix step
+# written against the element `e`. The element's name has a `$` in it, so no
+# source can spell it and an argument of the step can never mean it by accident —
+# which also means a mapped step nested in another's arguments shadows harmlessly.
+let MAPPED_ELEMENT = "__map$";
+
+fn mapped(recv: Expr, step: Expr, span: Span) -> Expr {
+    let element = LambdaParam { name: MAPPED_ELEMENT, ty: none, span };
+    at(Call("__builtin_map", [recv, at(Lambda([element], step), span)], true), span)
+}
 
 # `recv[a..b]` — a range literal written *as* an index is the closed slice form,
 # folded straight into a `Slice` rather than constructing a `Span` only to

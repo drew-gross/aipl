@@ -1,6 +1,6 @@
 # `Point?` returned from a function — built and handed back via sret.
 
-import { equal as ==, map, value_or } from builtins;
+import { equal as ==, value_or } from builtins;
 
 struct Point { x: i64, y: i64 }
 
@@ -10,7 +10,7 @@ fn wrap(p: Point) -> Point? { some(p) }.test({
     // Construct and match-unwrap a struct optional.
     let op = some(Point { x: 7, y: 8 });
     assert(op == some(Point { x: 7, y: 8 }));
-    let x = op.map(|p| p.x).value_or(-1);
+    let x = op$x.value_or(-1);
     assert(x == 7);
 
     // As a function return (sret), round-tripped.
@@ -19,6 +19,6 @@ fn wrap(p: Point) -> Point? { some(p) }.test({
     // Optional of a heap-field struct (alloc balance through some/match).
     let on = some(Named { id: 9, label: "z" });
     assert(on == some(Named { id: 9, label: "z" }));
-    let lbl = on.map(|n| n.label).value_or("?");
+    let lbl = on$label.value_or("?");
     assert(lbl == "z");
 })

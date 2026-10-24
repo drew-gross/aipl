@@ -10,14 +10,7 @@
 # `check.rs` and `lib.rs` both carry a copy): a re-entrant lookup bows out, and
 # the type's other cases — `Term(K)` here — do the pinning.
 
-import {
-    equal as ==,
-    map,
-    print,
-    to_str,
-    wrapping_add as +,
-    wrapping_add_assign as +=,
-} from builtins;
+import { equal as ==, print, to_str, wrapping_add as +, wrapping_add_assign as += } from builtins;
 
 variant Tok = Space | Name(str)
 
@@ -54,7 +47,7 @@ fn shift<K: variant>(self: Rule<K>, by: u64) -> Rule<K> {
         Term(k) => Term(k),
         Idx(i) => Idx(i + by),
         Repeat(inner) => Repeat(inner.shift(by)),
-        Then(rs) => Then(rs.map(|r| r.shift(by))),
+        Then(rs) => Then(rs$shift(by)),
     }
 }
 

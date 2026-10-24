@@ -1,0 +1,44 @@
+# `xs.map(|x| x.name)` — a lambda whose whole body reads one member of its
+# argument, or calls one method on it — is `xs$name`, `xs$0` and `xs$f(args)`.
+
+import { len, map, print, to_str } from builtins;
+
+struct Point { x: i64, y: i64 }
+
+fn scale(self: i64, by: i64) -> i64 { self }
+
+fn xs_of(ps: Point[]) -> i64[] { ps.map(|p| p.x) }
+
+fn firsts(pairs: (i64, str)[]) -> i64[] { pairs.map(|p| p.0) }
+
+fn texts(xs: i64[]) -> str[] { xs.map(|x| x.to_str()) }
+
+fn scaled(xs: i64[], by: i64) -> i64[] { xs.map(|x| x.scale(by)) }
+
+fn main() !prints {
+    print(xs_of([Point { x: 1, y: 2 }]).len().to_str());
+}
+--- errors ---
+error: "map" with a lambda that only uses a member of its argument — write "ps$x" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:10:41
+   |
+10 | fn xs_of(ps: Point[]) -> i64[] { ps.map(|p| p.x) }
+   |                                         ^^^^^^^
+
+error: "map" with a lambda that only uses a member of its argument — write "pairs$0" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:12:53
+   |
+12 | fn firsts(pairs: (i64, str)[]) -> i64[] { pairs.map(|p| p.0) }
+   |                                                     ^^^^^^^
+
+error: "map" with a lambda that only uses a member of its argument — write "xs$to_str()" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:14:39
+   |
+14 | fn texts(xs: i64[]) -> str[] { xs.map(|x| x.to_str()) }
+   |                                       ^^^^^^^^^^^^^^
+
+error: "map" with a lambda that only uses a member of its argument — write "xs$scale(...)" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:16:49
+   |
+16 | fn scaled(xs: i64[], by: i64) -> i64[] { xs.map(|x| x.scale(by)) }
+   |                                                 ^^^^^^^^^^^^^^^

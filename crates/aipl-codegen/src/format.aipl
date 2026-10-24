@@ -654,9 +654,9 @@ fn list_items(mid: Piece[], ListStyle { sep, sorted }, space: (str, str) -> bool
     if (sorted) {
         set items = items.sort_by(|a, b| a.key < b.key);
     };
-    items.map(|i| i.doc)
+    items$doc
 }.test({
-    fn texts(ds: Doc[]) -> str[] { ds.map(|d| d.at(80)) }
+    fn texts(ds: Doc[]) -> str[] { ds$at(80) }
 
     let a = Node(Text("a"), "a", "a");
     let b = Node(Text("b"), "b", "b");

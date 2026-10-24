@@ -75,11 +75,7 @@ fn hoisted(self: Function) -> Function[] {
         h.name.text,
         test_helper_name(self.name.text, h.name.text),
     ));
-    let owner = Function {
-        ..self,
-        test_body: self.test_body.map(|b| b.rename_uses(renames)),
-        test_fns: [],
-    };
+    let owner = Function { ..self, test_body: self.test_body$rename_uses(renames), test_fns: [] };
 
     // The hoisted name is one this pass invented, so it keeps the span of the
     // name the author *did* write — the helper's own, which is where a
@@ -94,7 +90,7 @@ fn hoisted(self: Function) -> Function[] {
 
 # What `name` is renamed to by `renames`, or `name` itself.
 fn renamed(self: str, renames: (str, str)[]) -> str {
-    renames.find_if(|r| r.0 == self).map(|r| r.1).value_or(self)
+    renames.find_if(|r| r.0 == self)$1.value_or(self)
 }.test({
     assert("a".renamed([("a", "b"), ("c", "d")]) == "b");
     assert("c".renamed([("a", "b"), ("c", "d")]) == "d");

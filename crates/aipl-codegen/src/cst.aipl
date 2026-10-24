@@ -471,14 +471,14 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
         Trivia(sp) => `~{src[sp]}`,
         Missing(_, expected, _) => `<missing {expected.sort().join(sep=" | ")}>`,
         Tree(i, kids) => {
-            let parts = kids.map(|k| k.show(src, names));
+            let parts = kids$show(src, names);
             let name = names[i].value_or("?");
             if (parts.is_empty()) { `({name})` } else { `({name} {parts.join(sep=" ")})` }
         },
         // A group has no name to print, so it renders as its own brackets: what
         // it holds, between `[` and `]`, whatever the source spelled them.
         Group(_, open, body, close) => {
-            let parts = [..open, ..body, ..close].map(|k| k.show(src, names));
+            let parts = [..open, ..body, ..close]$show(src, names);
             `[{parts.join(sep=" ")}]`
         },
     }

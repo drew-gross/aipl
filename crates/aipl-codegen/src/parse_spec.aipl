@@ -13,7 +13,6 @@ import {
     is_err_and,
     len,
     logical_or as ||,
-    map,
     push,
     starts_with,
     trim,
@@ -135,10 +134,10 @@ pub fn parse_spec(src: str) -> Spec!str {
     // Companions, both flavors.
     let Spec { extra_files } = parse_spec("x\n--- file: m.aipl ---\nbody\n")?;
     assert(extra_files.len() == 1);
-    assert(extra_files[0].map(|f| f.path) == some("m.aipl"));
+    assert(extra_files[0]$path == some("m.aipl"));
     let Spec { expect_files } = parse_spec("x\n--- expect file: out.txt ---\nwritten\n")?;
     assert(expect_files.len() == 1);
-    assert(expect_files[0].map(|f| f.contents) == some("written"));
+    assert(expect_files[0]$contents == some("written"));
 
     // Rejections: a mistyped marker, and unusable companion paths.
     assert(parse_spec("x\n--- stdou ---\n").is_err_and(|m| m.contains("unknown section")));

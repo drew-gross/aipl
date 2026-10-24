@@ -1,0 +1,30 @@
+# What `$` cannot say stays a lambda.
+
+import { equal as ==, filter, len, map, print, to_str, wrapping_add as + } from builtins;
+
+struct Point { x: i64, y: i64 }
+
+struct Line { origin: Point }
+
+fn double(self: i64, other: i64) -> i64 { self + other }
+
+# The parameter is used again, so it needs its name.
+fn both(xs: i64[]) -> i64[] { xs.map(|x| x.double(x)) }
+
+# More than the member: the lambda does something with it.
+fn shifted(ps: Point[]) -> i64[] { ps.map(|p| p.x + 1) }
+
+# A member of a member is not one step.
+fn nested(lines: Line[]) -> i64[] { lines.map(|l| l.origin.x) }
+
+# A typed parameter has nowhere to write its type under `$`.
+fn typed(ps: Point[]) -> i64[] { ps.map(|p: Point| p.x) }
+
+# A lambda that is not a `map`'s.
+fn xs_filtered(ps: Point[]) -> u64 { ps.filter(|p| p.x == 1).len() }
+
+fn main() !prints {
+    print(both([1]).len().to_str());
+}
+--- stdout ---
+1

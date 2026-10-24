@@ -645,6 +645,20 @@
 
 
 
+        <section class="item" id="item-map_step">
+          <h3>
+            <a class="anchor" href="#item-map_step">map_step</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn map_step(src: str, node: Parts, kids: Ast[], sp: Span) -&#62; Suffix!ParseError</code></pre>
+
+          <div class="doc"><p><code>$name</code>, <code>$0</code> and <code>$name(args)</code> — the three member forms, each mapped over the receiver. The shapes are the <code>.</code> forms', so the slots say which one matched.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-field_name">
           <h3>
             <a class="anchor" href="#item-field_name">field_name</a>
@@ -1307,7 +1321,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$96406: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$97530: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -2233,7 +2247,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$146438: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$147551: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

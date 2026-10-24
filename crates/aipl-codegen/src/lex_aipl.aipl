@@ -138,6 +138,7 @@ variant AiplTok =
     | Semi
     | Question
     | Hash
+    | Dollar
     | LParen
     | RParen
     | LBrace
@@ -631,6 +632,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         op(";", Semi, S_PUNCT),
         op("?", Question, S_PUNCT),
         op("#", Hash, S_PUNCT),
+        op("$", Dollar, S_PUNCT),
         op("(", LParen, S_PUNCT),
         op(")", RParen, S_PUNCT),
         // A brace pushes and pops the base mode wherever it appears, not just in
@@ -746,6 +748,9 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     });
     // The ordered-set brackets are three tokens each, not a doc comment.
     assert(lex_aipl_kinds("#>{")? == [Hash, Gt, LBrace]);
+    // `$` maps the step after it over a sequence: `v$f`, `v$0`, `v$f()`.
+    assert(lex_aipl_kinds("v$f")? == [Name("v"), Dollar, Name("f")]);
+    assert(lex_aipl_kinds("v$0")? == [Name("v"), Dollar, IntLit(0)]);
     assert(lex_aipl_kinds("#<{")? == [Hash, Lt, LBrace]);
 
     // Block comments are trivia, and `Nested` depth-tracks them, so the inner

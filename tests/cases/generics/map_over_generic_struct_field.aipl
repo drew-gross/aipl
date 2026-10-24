@@ -1,7 +1,7 @@
 # A generic struct whose field is an *application of another generic* — the
 # field type mentions the outer struct's own type variable.
 
-import { equal as ==, map } from builtins;
+import { equal as == } from builtins;
 
 struct Tok<K> { kind: K, text: str }
 
@@ -26,8 +26,8 @@ fn step<K: any>(k: K, text: str) -> Step<K> {
     let s = step(Word, "hi");
 
     // `map` over an optional field — the shape that failed.
-    assert(s.tok.map(|t| t.text) == some("hi"));
-    assert(s.tok.map(|t| t.kind) == some(Word));
+    assert(s.tok$text == some("hi"));
+    assert(s.tok$kind == some(Word));
 
     // The non-optional application resolves too, as do the ordinary fields.
     assert(s.plain.text == "plain");
@@ -36,10 +36,10 @@ fn step<K: any>(k: K, text: str) -> Step<K> {
     // Nested through another generic instance, and at a second instantiation
     // so the two do not share a synthesized type.
     let n = step(7, "num");
-    assert(n.tok.map(|t| t.kind) == some(7));
-    assert(n.tok.map(|t| t.text) == some("num"));
+    assert(n.tok$kind == some(7));
+    assert(n.tok$text == some("num"));
 
     // An absent one still maps to `none` rather than to the default's type.
     let e: Step<Kind> = Step { tok: none, plain: Tok { kind: Num, text: "p" }, label: "L" };
-    assert(e.tok.map(|t| t.text) == none);
+    assert(e.tok$text == none);
 })

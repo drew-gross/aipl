@@ -523,7 +523,7 @@ fn merge_runs(items: Item[]) -> Item[] {
                 if (n == 1) {
                     set out.push(it);
                 } else {
-                    let re = rest[..n].map(|x| x.re).join(sep="|");
+                    let re = rest[..n]$re.join(sep="|");
                     set out.push(Item { ..it, re, pat: Match(re, it.scope) });
                 };
             },
@@ -691,7 +691,7 @@ fn arr_fld(key: str, items: str[]) -> str {
     if (items.is_empty()) {
         return `{json_str(key)}: []`;
     };
-    let body = items.map(|x| x.indent(2)).join(sep=",\n");
+    let body = items$indent(2).join(sep=",\n");
     `{json_str(key)}: [\n{body}\n]`
 }
 
@@ -699,7 +699,7 @@ fn obj_fld(key: str, entries: str[]) -> str {
     if (entries.is_empty()) {
         return `{json_str(key)}: \{\}`;
     };
-    let body = entries.map(|x| x.indent(2)).join(sep=",\n");
+    let body = entries$indent(2).join(sep=",\n");
     `{json_str(key)}: \{\n{body}\n\}`
 }
 
@@ -718,7 +718,7 @@ fn caps_fld(key: str, scopes: str[], base: u64) -> str {
 fn inline_arr(items: str[]) -> str { `[{items.join(sep=", ")}]` }
 
 fn obj_of(fields: str[]) -> str {
-    let body = fields.map(|f| f.indent(2)).join(sep=",\n");
+    let body = fields$indent(2).join(sep=",\n");
     `\{\n{body}\n\}`
 }
 

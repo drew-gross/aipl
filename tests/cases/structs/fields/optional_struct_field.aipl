@@ -3,7 +3,7 @@
 # flat — `{ tag, Core }` — so `Inner?` is a tag plus `Inner`'s own layout, and
 # `Inner??` is no wider than `Inner?`.
 
-import { equal as ==, heap_str, map, not_equal as !=, value_or } from builtins;
+import { equal as ==, heap_str, not_equal as !=, value_or } from builtins;
 
 struct Inner { a: i64, b: str }
 
@@ -55,8 +55,8 @@ fn present(n: i64) -> Holder {
     assert(Holder { ..p, lead: 9 }.mid == p.mid);
 
     // Unwrapping reaches the inner struct's own fields.
-    assert(p.mid.map(|i| i.a) == some(7));
-    assert(e.mid.map(|i| i.a) == none);
+    assert(p.mid$a == some(7));
+    assert(e.mid$a == none);
 
     // A statement `match` sees the payload as an ordinary inline struct.
     match (p.mid) {

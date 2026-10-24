@@ -909,15 +909,17 @@ impl Loader {
     }
 }
 
-/// The AIPL-implemented builtins `items` call by their callee rather than by an
-/// imported name.
+/// The builtins `items` call by their callee rather than by an imported name —
+/// the ones the syntax itself introduces (`xs[r, c]` calls `grid_get`, `xs$f`
+/// calls `map`). An AIPL-implemented one is loaded with the program; a native
+/// one has nothing to load, but its presence is what the companion rules read,
+/// so a `map` the program never imported still brings `map_join` when the
+/// program joins its result.
 fn syntax_builtins(items: &[Item]) -> Vec<Callee> {
     let mut out = Vec::new();
     aipl_syntax::each_item_expr(items, &mut |e| {
         if let ExprKind::Call(callee, ..) = &e.kind {
-            let implemented = aipl_syntax::builtin::Builtin::of(callee)
-                .is_some_and(aipl_syntax::builtin::Builtin::is_aipl_implemented);
-            if implemented && !out.contains(callee) {
+            if aipl_syntax::builtin::Builtin::of(callee).is_some() && !out.contains(callee) {
                 out.push(callee.clone());
             }
         }

@@ -330,6 +330,8 @@ import {
     Field as SufField,
     Index as SufIndex,
     Index2 as SufIndex2,
+    MapField as SufMapField,
+    MapMethod as SufMapMethod,
     Method as SufMethod,
     MethodTyped as SufMethodTyped,
     SliceFrom as SufSliceFrom,
@@ -994,6 +996,11 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Then([one(Then([Named("expr"), Lit("..")]), nested_in=brackets())]),
         Then([one(Then([Named("expr"), Lit(","), Named("expr")]), nested_in=brackets())]),
         Then([one(Named("expr"), nested_in=brackets())]),
+        // `$` maps the step after it over the receiver — `v$name`, `v$0`,
+        // `v$name(args)` — as the three member forms above do for a single value.
+        Then([Lit("$"), Term(Name), nest("(", Named("args"), ")", loose())]),
+        Then([Lit("$"), Term(Name)]),
+        Then([Lit("$"), Term(IntLit)]),
         Lit("?"),
     ]);
 
@@ -1472,6 +1479,9 @@ fn lower_suffix(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // `.name::<A, B>(args)` has as many type children as it was given types, so
     // no slot pattern can name its shape; the `::` after the name does.
     let texts = node.own_texts(src);
+    if (texts[0] == some("$")) {
+        return ok(ASuffix(map_step(src, node, kids, sp)?));
+    };
     if (texts[2] == some("::")) {
         let TypedCall { tys, args } = typed_call(kids, sp)?;
         return ok(ASuffix(SufMethodTyped(texts[1].value_or(""), tys, args)));
@@ -1498,6 +1508,19 @@ fn lower_suffix(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         // `[e..]`
         [Tok(_), Sub(_), Tok(_), Tok(_)] => ok(ASuffix(SufSliceFrom(kid_expr(kids, 0, sp)?))),
         _ => err(ParseError { message: "a suffix matched no alternative", span: sp }),
+    }
+}
+
+# `$name`, `$0` and `$name(args)` — the three member forms, each mapped over the
+# receiver. The shapes are the `.` forms', so the slots say which one matched.
+fn map_step(src: str, node: Parts, kids: Ast[], sp: Span) -> Suffix!ParseError {
+    match (node.slots()) {
+        [Tok(_), name] => ok(SufMapField(field_name(name.slot_text(src), sp)?)),
+        [Tok(_), name, Tok(_), Sub(_), Tok(_)] => {
+            let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a mapped call")?;
+            ok(SufMapMethod(name.slot_text(src), args))
+        },
+        _ => err(ParseError { message: "a mapped step matched no alternative", span: sp }),
     }
 }
 
@@ -2338,7 +2361,7 @@ fn lower_assign_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     if (op == "(") {
         if (let Field(recv, method) = target.kind) {
             let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a method call")?;
-            let end = args.last().map(|a| a.span).value_or(target.span);
+            let end = args.last()$span.value_or(target.span);
             let span = join_spans(name_span, end);
             let value = at(Call(method, [recv, ..args], true), span);
             return ok(AStmt(SAssign(recv, value, span)));
@@ -3067,7 +3090,7 @@ struct DocSplit { detached: Span[], attached: Span[] }
 fn split_doc_lines(src: str, lines: Span[], decl_at: u64) -> DocSplit {
     mut cut = lines.len();
     while (0 < cut) {
-        let after = lines[cut - 1].map(|l| l.end).value_or(decl_at);
+        let after = lines[cut - 1]$end.value_or(decl_at);
         if (blank_line_follows(src, after)) {
             return DocSplit { detached: lines[..cut], attached: lines[cut..] };
         };
@@ -4183,6 +4206,23 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     assert(expr_dump("x?") == "Try(x)");
     assert(expr_dump("a.b.c") == "a.b.c");
 
+    // `$` maps a member over the receiver: a field, a tuple slot, or a call.
+    assert(expr_dump("v$f") == "v.__builtin_map(Lambda([__map$], __map$.f))");
+    assert(expr_dump("v$0") == "v.__builtin_map(Lambda([__map$], __map$._0))");
+    assert(expr_dump("v$f(1, w)") == "v.__builtin_map(Lambda([__map$], __map$.f(1, w)))");
+    assert(
+        expr_dump(
+            "v$f$g",
+        ) == "v.__builtin_map(Lambda([__map$], __map$.f)).__builtin_map(Lambda([__map$], __map$.g))",
+    );
+    assert(
+        expr_dump(
+            "v$f(w$g)",
+        ) == "v.__builtin_map(Lambda([__map$], __map$.f(w.__builtin_map(Lambda([__map$], __map$.g)))))",
+    );
+    assert(expr_dump("v$f.len()") == "v.__builtin_map(Lambda([__map$], __map$.f)).len()");
+    assert(expr_dump("v$-1") == "error: tuple index must be a non-negative integer");
+
     // A method call folds its receiver in as the first argument, so `xs.f(1)`
     // and `f(xs, 1)` are the same call with one bit between them.
     assert(expr_dump("xs.push(1)") == "xs.push(1)");
@@ -5000,7 +5040,7 @@ pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
     assert(
         match (aipl_parse_file("fn f() { } \n")) {
             ok(..) => "parsed",
-            err(f) => f.errors.map(|e| e.message).join(sep="; "),
+            err(f) => f.errors$message.join(sep="; "),
         } == "trailing whitespace is not allowed",
     );
 
@@ -5009,7 +5049,7 @@ pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
     fn messages(src: str) -> str[] {
         match (aipl_parse_file(src)) {
             ok(..) => [],
-            err(f) => f.errors.map(|e| e.message),
+            err(f) => f.errors$message,
         }
     }
 
@@ -5038,7 +5078,7 @@ pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
     // Where they are is part of the answer: each error points at the token found.
     let spans = match (aipl_parse_file("fn f() { let x = 1 let y = 2; }")) {
         ok(..) => [],
-        err(f) => f.errors.map(|e| e.span),
+        err(f) => f.errors$span,
     };
     assert(spans == [19..22]);
 
@@ -5193,7 +5233,7 @@ pub fn aipl_parses(src: str) -> bool {
     assert(
         why(
             "fn f() {\n    g(1,\n    2",
-        ) == "expected `)`, `,`, `.`, `?`, `[`, or an operator, found end of input (`(` at line 2 is never closed)",
+        ) == "expected `$`, `)`, `,`, `.`, `?`, `[`, or an operator, found end of input (`(` at line 2 is never closed)",
     );
 
     // A bracket that *is* closed is never blamed. Both of these fail with a real

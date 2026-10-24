@@ -24,11 +24,7 @@ pub fn dedent(self: str) -> str {
     // The common indent `n` is the smallest leading-space run over the non-blank
     // lines: count each non-blank line's leading spaces, then take the minimum.
     // With no non-blank lines there's nothing to strip, so `value_or(0)`.
-    let n = ls
-        .filter(|l| !l.is_all_whitespace())
-        .map(|l| l.count_while(|c| c == ' '))
-        .minimum()
-        .value_or(0);
+    let n = ls.filter(|l| !l.is_all_whitespace())$count_while(|c| c == ' ').minimum().value_or(0);
 
     // Rebuild: strip the first `n` bytes from each non-blank line (blank lines
     // become empty), rejoined with `\n` so the original line count is preserved.

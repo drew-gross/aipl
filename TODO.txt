@@ -320,7 +320,6 @@ syntax:
   only allow doc comments at the start of lines (after the whitespace)
   expr! should return the err held in expr, or exit the test if expr is not an error (only valid in tests for now)
   locally mutable args
-  l.map(|v| v.field) stutters, should come up with a syntax that doesn't stutter
   allow default args to refer to each other (requires 1 to be set to break the cycle)
   add match (v) val if expr => r syntax
   allow match arm grouping to bind vars with the same type and name, or ignore bindings

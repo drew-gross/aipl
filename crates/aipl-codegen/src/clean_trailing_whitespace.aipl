@@ -3,7 +3,7 @@
 # The language rejects trailing whitespace, so removing it can't change the
 # meaning of a program the parser would accept.
 
-import { equal as ==, join, logical_or as ||, map } from builtins;
+import { equal as ==, join, logical_or as || } from builtins;
 import { lines } from "./lines.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
 
@@ -16,7 +16,7 @@ import { trim_end_while } from "./trim_end_while.aipl";
 # it survives. The formatter's input has already been through the parser's
 # trailing-whitespace check, which treats CRLF the same way.
 pub fn clean_trailing_whitespace(src: str) -> str {
-    src.lines().map(|l| l.trim_end_while(|c| c == ' ' || c == '\t')).join(sep="\n")
+    src.lines()$trim_end_while(|c| c == ' ' || c == '\t').join(sep="\n")
 }.test({
     // The point of the function: a trailing run comes off, per line.
     assert(clean_trailing_whitespace("a  \nb\t\n") == "a\nb\n");

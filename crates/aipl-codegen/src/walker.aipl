@@ -507,7 +507,7 @@ fn fmt_kind(k: AiplTok) -> FmtKind {
         PlusPlusPlus | PlusPlus | MinusMinus | Eq | Lt | Le | Gt | Ge | Bang => Op,
         Plus | Minus | Star | Slash | Percent => Op,
         PlusEq | MinusEq | StarEq | SlashEq => Op,
-        Period | Comma | Colon | ColonColon | Semi | Question | Hash => Punct,
+        Period | Comma | Colon | ColonColon | Semi | Question | Hash | Dollar => Punct,
         LParen | RParen | LBrace | RBrace | LBracket | RBracket => Punct,
         // Trivia never reaches the token stream (whitespace is skipped, comments
         // go to the trivia sink); classify them harmlessly rather than diverge.
@@ -1154,7 +1154,7 @@ fn program_items(self: W, imports0: ImportEntry[], items0: Doc[]) -> WProgram!Fm
 # The imports in hoist order. Two imports from the same source share a key;
 # `sort_by` is stable, so they stay in source order.
 fn sorted_imports(entries: ImportEntry[]) -> Doc[] {
-    entries.sort_by(|a, b| import_source_precedes(a.source, b.source)).map(|e| e.doc)
+    entries.sort_by(|a, b| import_source_precedes(a.source, b.source))$doc
 }
 
 fn item(self: W) -> WDoc!FmtError {
@@ -1957,7 +1957,7 @@ fn postfix(self: W) -> WDoc!FmtError {
     // first line and each `.method(..)` starts its own indented line. Fewer than
     // two calls: no chain break (a lone call's own argument list may still break).
     if (segs.count_if(|s| s.is_call) < 2) {
-        return ok(WDoc { w, doc: Concat([head.doc, ..segs.map(|s| s.doc)]) });
+        return ok(WDoc { w, doc: Concat([head.doc, ..segs$doc]) });
     };
     ok(WDoc { w, doc: group(Concat([head.doc, Indent(Concat(chain_docs(segs)))])) })
 }
@@ -1968,7 +1968,7 @@ fn postfix_segs(self: W, acc0: Seg[]) -> WSegs!FmtError {
     mut more = true;
     while (more) {
         let t = w.peek_text();
-        if (t == ".") {
+        if (t == "." || t == "$") {
             let d = w.dot_seg()?;
             set acc.push(d.seg);
             set w = d.w;
@@ -1991,12 +1991,14 @@ fn postfix_segs(self: W, acc0: Seg[]) -> WSegs!FmtError {
 }
 
 # `.member` or `.method(args)` — field access glues to its left; a call is
-# tagged so the chain layout can break before it.
+# tagged so the chain layout can break before it. `$member` and `$method(args)`
+# are the same shapes, mapped over the receiver, and lay out the same way.
 fn dot_seg(self: W) -> WSeg!FmtError {
+    let sigil = self.peek_text();
     let m = self.bump().w.bump();
     let typed = m.w.turbofish_if_any()?;
     if (typed.w.peek_text() != "(") {
-        return ok(WSeg { w: typed.w, seg: Seg { is_call: false, doc: Text(`.{m.text}`) } });
+        return ok(WSeg { w: typed.w, seg: Seg { is_call: false, doc: Text(`{sigil}{m.text}`) } });
     };
     let hug = typed.w.bump().w.hugs_sole_arg();
     let args = typed.w.bump().w.call_args_until(")", [])?;
@@ -2005,7 +2007,7 @@ fn dot_seg(self: W) -> WSeg!FmtError {
         w: closed,
         seg: Seg {
             is_call: true,
-            doc: Concat([Text(`.{m.text}`), typed.doc, call_arg_list(args.docs, hug)]),
+            doc: Concat([Text(`{sigil}{m.text}`), typed.doc, call_arg_list(args.docs, hug)]),
         },
     })
 }
@@ -3397,6 +3399,13 @@ fn walker_of(src: str) -> W!FmtError {
     );
 
     assert(walker_of("fn f ( ) { }")?.fn_item().rendered(100)? == "fn f() {}");
+
+    // `$` maps a member over its receiver and glues on both sides, as `.` does.
+    assert(
+        walker_of("fn f ( ) -> i64 { v $ a $ 0 $ g ( 1 ) . len ( ) }")?
+            .fn_item()
+            .rendered(100)? == "fn f() -> i64 { v$a$0$g(1).len() }",
+    );
 
     // A parameter destructured in place of being named: no `: T`, and laid out
     // flat like the `let Point { x, y } = v;` it mirrors.

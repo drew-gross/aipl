@@ -2,7 +2,7 @@
 # payload — so its fields are stored through that pointer rather than into a
 # stack slot. An optional-of-struct field has to work down that path too.
 
-import { equal as ==, map } from builtins;
+import { equal as == } from builtins;
 
 struct Wide { p: i64, q: i64, r: i64, s: str }
 
@@ -19,8 +19,8 @@ fn make(n: i64) -> Node { val: n, next: none, extra: some(Wide { p: n, q: 5, r: 
     assert(w.val == 3);
 
     // The inline-struct payload, read back field by field through the box.
-    assert(w.extra.map(|x| x.p) == some(3));
-    assert(w.extra.map(|x| x.s) == some("z"));
+    assert(w.extra$p == some(3));
+    assert(w.extra$s == some("z"));
 
     // The boxed-pointer optional beside it is unaffected.
     assert(w.next == none);

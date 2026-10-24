@@ -74,6 +74,16 @@
 
             </li>
 
+            <li id="item-MapField"><code>MapField(str)</code>
+
+
+            </li>
+
+            <li id="item-MapMethod"><code>MapMethod(name: str, args: Expr[])</code>
+
+
+            </li>
+
           </ul>
 
         </section>
@@ -99,6 +109,34 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-MAPPED_ELEMENT">
+          <h3>
+            <a class="anchor" href="#item-MAPPED_ELEMENT">MAPPED_ELEMENT</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let MAPPED_ELEMENT = &#34;__map$&#34;</code></pre>
+
+          <div class="doc"><p>What <code>recv$step</code> means: <code>recv.map(|e| step)</code>, where <code>step</code> is the postfix step written against the element <code>e</code>. The element's name has a <code>$</code> in it, so no source can spell it and an argument of the step can never mean it by accident — which also means a mapped step nested in another's arguments shadows harmlessly.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-mapped">
+          <h3>
+            <a class="anchor" href="#item-mapped">mapped</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn mapped(recv: Expr, step: Expr, span: Span) -&#62; Expr</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
 
 
         <section class="item" id="item-index_or_slice">

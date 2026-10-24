@@ -11,7 +11,7 @@
 # The `?` is what names it: propagating an `i64!str` out of the lambda makes
 # the lambda's own type `W!str`.
 
-import { equal as ==, is_err_and, map, print, to_str, try_map } from builtins;
+import { equal as ==, is_err_and, print, to_str, try_map } from builtins;
 
 struct Wrapped { n: i64, tag: str }
 
@@ -32,7 +32,7 @@ fn main() !prints {
     // element is wrapped, and the first failure comes back whole.
     let ws = [3, 4].try_map(|n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
     print(match (ws) {
-        ok(list) => list.map(|w| w.n).to_str(),
+        ok(list) => list$n.to_str(),
         err(e) => e,
     });
     let bad = [3, 0, 5].try_map(|n| ok(Wrapped { n: checked(n)?, tag: "keep" }));

@@ -1,6 +1,6 @@
 # `|x| to_str(x)` — a lambda that only forwards its argument to a single call
-# is redundant; pass `to_str` itself. The method form `|x| x.to_str()` is
-# stored as the same free call, so it is covered too.
+# is redundant; pass `to_str` itself. The method form of a `map`'s lambda,
+# `|x| x.to_str()`, is `xs$to_str()` instead (`err_map_lambda_member_dollar`).
 
 import { len, map, print, to_str } from builtins;
 

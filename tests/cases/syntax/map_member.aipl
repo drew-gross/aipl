@@ -1,0 +1,41 @@
+# `v$member` maps a member over `v`: `v.map(|x| x.member)`. It reads a field, a
+# tuple slot (`v$0`) or calls a method (`v$f(args)`), and each `$` is one step,
+# so a chain of them is a chain of maps.
+
+import { join, len, print, reverse, wrapping_mul as * } from builtins;
+
+struct Point { x: i64, y: i64 }
+
+fn scaled(self: Point, by: i64) -> i64 { self.x * by }
+
+fn others(self: Point, ys: i64[]) -> u64 { ys.len() }
+
+fn main() !prints {
+    let ps = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];
+    print(`{ps$x} {ps$y}`);
+    let pairs = [(1, "a"), (2, "bb")];
+    print(`{pairs$0} {pairs$1}`);
+    // A method call, with and without arguments, and the sequence it yields.
+    print(`{ps$scaled(10)} {pairs$1$len()}`);
+
+    // Each step maps the result of the one before; a `.` after it applies to the
+    // whole result.
+    print(`{pairs$1$len().reverse()} {ps$x.reverse()}`);
+
+    // The mapped sequence fuses with what consumes it, as a written `map` does,
+    // though the program never imported `map`.
+    print(pairs$1.join(sep="+"));
+    // An optional maps too, as `map` does.
+    let maybe: Point? = some(Point { x: 7, y: 8 });
+    print(`{maybe$y}`);
+    // An argument may map in turn.
+    print(`{ps$others(ps$y)}`);
+}
+--- stdout ---
+[1, 3] [2, 4]
+[1, 2] ["a", "bb"]
+[10, 30] [1, 2]
+[2, 1] [3, 1]
+a+bb
+some(8)
+[2, 2]

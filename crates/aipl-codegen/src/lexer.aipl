@@ -962,7 +962,7 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
     // that never mentions modes never touches this.
     mut modes: ModeFrame[] = [];
     while (pos < self.len()) {
-        let step = lex_step(self, pos, rules, modes.last().map(|f| f.mode).value_or(0))?;
+        let step = lex_step(self, pos, rules, modes.last()$mode.value_or(0))?;
         if (step.end == pos) {
             // No rule matched: a lex error at the offending byte (slice the
             // source with the span to show it).
@@ -980,7 +980,7 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
             // never sees a comment.
             Kinds => {
                 if (!step.trivia) {
-                    set kinds.extend(step.token.map(|t| t.kind));
+                    set kinds.extend(step.token$kind);
                 };
             },
             Scopes => {

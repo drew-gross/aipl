@@ -405,7 +405,7 @@ fn prec_note(precs: Prec[]) -> str {
 # The distinct binding powers in `precs`, tightest first — an ordered set, so
 # the dedup and the order are the type's: `to_set` builds the `#>{u64}` the
 # return type asks for.
-fn powers_desc(precs: Prec[]) -> #>{u64} { precs.map(|pr| pr.power).to_set() }
+fn powers_desc(precs: Prec[]) -> #>{u64} { precs$power.to_set() }
 
 # One level: its operators, gathered across every `Prec` sharing that power,
 # since a power written twice is one level as far as binding goes.

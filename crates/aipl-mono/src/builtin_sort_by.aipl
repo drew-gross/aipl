@@ -24,7 +24,6 @@ import {
     less_than as <,
     logical_and as &&,
     logical_not as !,
-    map,
     wrapping_increment as ++,
 } from builtins;
 
@@ -86,7 +85,7 @@ pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
     // imports. Equal keys keep their source order, which is the stability
     // callers depend on.
     let es = [E { key: "b", tag: "b1" }, E { key: "a", tag: "a1" }, E { key: "b", tag: "b2" }];
-    assert(es.sort_by(|x, y| x.key < y.key).map(|e| e.tag) == ["a1", "b1", "b2"]);
+    assert(es.sort_by(|x, y| x.key < y.key)$tag == ["a1", "b1", "b2"]);
 
     // Function-call form too.
     assert(sort_by([2, 1], |a, b| a < b) == [1, 2]);
