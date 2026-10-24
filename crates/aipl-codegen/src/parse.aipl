@@ -1341,8 +1341,11 @@ pub fn parse_prepared_recovering<K: variant, A: any>(
 
 # What a parse that ran to a result made of it: the tree and its errors, or the
 # failure that ended it with the `Expect`s met on the way.
-fn finished<K: variant, A: any>(p: Parser<K, A>, src: str, step: Step) -> Recovered!ParseError {
-    let Step { hit, far, pos, kids } = step;
+fn finished<K: variant, A: any>(
+    p: Parser<K, A>,
+    src: str,
+    Step { hit, far, pos, kids },
+) -> Recovered!ParseError {
     if (!hit) {
         let missed = error_at(p, src, far);
         return ok(Recovered {

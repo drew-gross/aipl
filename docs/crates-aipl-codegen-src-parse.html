@@ -865,7 +865,7 @@
             <a class="anchor" href="#item-finished">finished</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn finished&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, src: str, step: Step) -&#62; Recovered!ParseError</code></pre>
+          <pre class="signature"><code>fn finished&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, src: str, __spat$56211: Step) -&#62; Recovered!ParseError</code></pre>
 
           <div class="doc"><p>What a parse that ran to a result made of it: the tree and its errors, or the failure that ended it with the <code>Expect</code>s met on the way.</p></div>
 
@@ -879,7 +879,7 @@
             <a class="anchor" href="#item-stopped">stopped</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn stopped&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, src: str, __spat$57538: Abort) -&#62; Recovered!ParseError</code></pre>
+          <pre class="signature"><code>fn stopped&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, src: str, __spat$57526: Abort) -&#62; Recovered!ParseError</code></pre>
 
           <div class="doc"><p>A parse that a <code>Refuse</code> ended: the input's error, after the <code>Expect</code>s met before it. Anything else that aborts is the grammar's fault, and the call's.</p></div>
 
@@ -977,7 +977,7 @@
             <a class="anchor" href="#item-build_node">build_node</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn build_node(src: str, __spat$101755: Parts, kids: Node[]) -&#62; Node</code></pre>
+          <pre class="signature"><code>fn build_node(src: str, __spat$101743: Parts, kids: Node[]) -&#62; Node</code></pre>
 
           <div class="doc"><p>The lowering every fixture production uses: a node with no interior children is a leaf carrying its text, anything else a branch carrying its children.</p></div>
 

@@ -33,15 +33,28 @@ fn shadowing(p: Pos) -> i64 {
     p.line + p.col + line
 }
 
+// A destructuring `let` that renames a field: the signature's pattern would have
+// to spell the rename too.
+fn renamed(p: Pos) -> i64 {
+    let Pos { line as row, col } = p;
+    row + col
+}
+
+// The parameter is used again after the `let`, so it has to stay a name.
+fn kept(p: Pos) -> i64 {
+    let Pos { line, col } = p;
+    line + col + take(p)
+}
+
 fn main() !prints {
     let p = Pos { line: 1, col: 2 };
     print(`{total(p)} {keyworded(1)} {passed(p)} {between(p, p)}`);
-    print(`{shadowing(p)}`);
+    print(`{shadowing(p)} {renamed(p)} {kept(p)}`);
     mut q = p;
     set q.bumped();
     print(`{q.line}`);
 }
 --- stdout ---
 3 1 4 6
-8
+8 3 6
 2

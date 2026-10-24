@@ -315,7 +315,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/lints/decr_user_minus | 1 | 21 | 21 | 49 | 396 | 5.00 | 64.22 | 1456 |
 | cases/lints/destructure_binding_not_flagged | 20 | 1054 | 1054 | 486 | 2604 | 13.00 | 66.24 | 1456 |
 | cases/lints/destructure_param_allow | 2 | 40 | 40 | 138 | 856 | 5.00 | 64.20 | 1456 |
-| cases/lints/destructure_param_not_flagged | 12 | 630 | 630 | 354 | 1708 | 9.00 | 74.67 | 1456 |
+| cases/lints/destructure_param_not_flagged | 18 | 1016 | 1016 | 436 | 2052 | 9.00 | 157.07 | 1456 |
 | cases/lints/extend_longhand_not_flagged | 3 | 264 | 264 | 291 | 1664 | 7.00 | 66.46 | 1440 |
 | cases/lints/field_init_range_value | 0 | 0 | 0 | 3 | 8 | 0.00 | 60.54 | 1408 |
 | cases/lints/fn_body_type_stutter_not_flagged | 0 | 0 | 0 | 3 | 8 | 0.00 | 63.45 | 1392 |

@@ -1,5 +1,5 @@
 use super::{field_reads, has_tuple_field, mentions_any, shared_fields, uses_of, Uses};
-use crate::ast::{Function, Item, Param, Program, Type};
+use crate::ast::{Expr, ExprKind, Function, Item, Param, Program, Type};
 use crate::Error;
 
 /// `fn f(p: Point) { .. p.x .. p.y .. }` where **every** mention of `p` is a
@@ -14,6 +14,10 @@ use crate::Error;
 /// The parameter's type is right there in the signature, so unlike the binding
 /// lint this one can name the struct in its advice rather than leaving a
 /// placeholder.
+///
+/// A parameter whose only use is a `let T { a, b } = p;` that opens the body is
+/// the same pattern written one step late, and is flagged too: the pattern
+/// moves into the signature unchanged.
 ///
 /// **What is left alone**, beyond everything the shared conditions already
 /// exclude (a bare mention, a name the pattern would collide with, a field read
@@ -65,6 +69,22 @@ fn one_param(
         fields,
         shadowed,
     } = uses_of(&f.body, &p.name);
+    if !shadowed && field_reads == 0 && mentions == 1 {
+        if let Some((value_span, fields)) = opening_destructure(&f.body, p, struct_name) {
+            hits.push(Error::at(
+                format!(
+                    "parameter \"{}\" is only taken apart by a destructuring `let` — destructure \
+                     it in the signature instead: \"{struct_name} {{ {} }}\" in place of \
+                     \"{}: {struct_name}\" (or append #[allow] to this line to keep it)",
+                    p.name,
+                    fields.join(", "),
+                    p.name,
+                ),
+                value_span,
+            ));
+            return;
+        }
+    }
     if shadowed || field_reads == 0 || field_reads != mentions {
         return;
     }
@@ -96,4 +116,43 @@ fn one_param(
         ),
         f.body.span.clone(),
     ));
+}
+
+/// The span of the value and the field names of a `let T { a, b } = <p>;` that
+/// is the first statement of `body`, when it binds each field to a name of its
+/// own spelling and names the parameter's type.
+///
+/// The parser lowers the statement to a `__spat$` temporary holding the value,
+/// then one `let` per field reading it. A field bound under another name
+/// (`T { a: x }`) is not recognised: the signature's pattern would have to
+/// spell the rename too.
+fn opening_destructure(
+    body: &Expr,
+    p: &Param,
+    struct_name: &str,
+) -> Option<(crate::Span, Vec<String>)> {
+    let ExprKind::Let(temporary, Some(Type::Named(named)), value, rest) = &body.kind else {
+        return None;
+    };
+    if !temporary.starts_with(crate::DESTRUCTURE_BASE_PREFIX) || named != struct_name {
+        return None;
+    }
+    if !matches!(&value.kind, ExprKind::Ident(n) if *n == p.name) {
+        return None;
+    }
+    let mut fields = Vec::new();
+    let mut next = &**rest;
+    while let ExprKind::Let(name, None, read, inner) = &next.kind {
+        let ExprKind::Field(base, field) = &read.kind else {
+            break;
+        };
+        if !matches!(&base.kind, ExprKind::Ident(b) if b == temporary) || name != field {
+            break;
+        }
+        fields.push(field.clone());
+        next = inner;
+    }
+    // Every read of the temporary must have been one of the plain bindings above.
+    let reads = uses_of(rest, temporary).mentions;
+    (!fields.is_empty() && reads == fields.len()).then(|| (value.span.clone(), fields))
 }

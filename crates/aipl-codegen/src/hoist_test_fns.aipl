@@ -51,8 +51,7 @@ fn function_items(self: Function) -> Item[] {
 
 # The function standing for `self`'s `.performance` block. Named at the
 # attribute, which is where a diagnostic about the function itself points.
-fn performance_function(self: Function, block: PerformanceBlock) -> Function {
-    let PerformanceBlock { body, fns, span } = block;
+fn performance_function(self: Function, PerformanceBlock { body, fns, span }) -> Function {
     Function {
         name: SpanStr { text: performance_fn_name(self.name.text), span },
         is_pub: false,

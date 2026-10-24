@@ -20,6 +20,12 @@ pub fn area(p: Pos) -> i64 { p.line + p.col }
 struct Wide { a: i64, b: i64, c: i64, d: i64 }
 
 fn wide(w: Wide) -> i64 { w.a + w.b + w.c + w.d }
+
+// Taken apart by a `let` that opens the body: the same pattern, written late.
+fn late(p: Pos) -> i64 {
+    let Pos { line, col } = p;
+    line + col
+}
 --- errors ---
 error: only the fields of parameter "p" are read — destructure it instead: "Pos { line, col }" in place of "p: Pos" (or append #[allow] to this line to keep it)
  --> ./tests/cases/lints/err_destructure_param.aipl:9:23
@@ -44,3 +50,9 @@ error: only the fields of parameter "w" are read — destructure it instead: "Wi
    |
 22 | fn wide(w: Wide) -> i64 { w.a + w.b + w.c + w.d }
    |                           ^^^^^^^^^^^^^^^^^^^^^
+
+error: parameter "p" is only taken apart by a destructuring `let` — destructure it in the signature instead: "Pos { line, col }" in place of "p: Pos" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_destructure_param.aipl:26:29
+   |
+26 |     let Pos { line, col } = p;
+   |                             ^
