@@ -350,7 +350,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/lints/push_array_literal_allow | 15 | 324 | 205 | 2197 | 4176 | 11.00 | 77.42 | 1488 |
 | cases/lints/push_array_literal_not_flagged | 13 | 351 | 300 | 1231 | 4316 | 10.00 | 79.40 | 1456 |
 | cases/lints/push_loop_pipeline_allow | 9 | 184 | 114 | 1856 | 3884 | 9.00 | 125.51 | 1472 |
-| cases/lints/push_loop_pipeline_not_flagged | 40 | 877 | 485 | 6883 | 10392 | 23.00 | 129.21 | 1504 |
+| cases/lints/push_loop_pipeline_not_flagged | 50 | 1155 | 661 | 8486 | 11248 | 23.00 | 160.93 | 1504 |
 | cases/lints/return_loop_any_all_allow | 12 | 246 | 246 | 1277 | 3548 | 13.00 | 113.34 | 1456 |
 | cases/lints/return_loop_any_all_not_flagged | 6 | 124 | 124 | 753 | 3060 | 10.00 | 77.42 | 1456 |
 | cases/lints/return_loop_find_if_allow | 4 | 86 | 86 | 559 | 1768 | 7.00 | 106.60 | 1440 |

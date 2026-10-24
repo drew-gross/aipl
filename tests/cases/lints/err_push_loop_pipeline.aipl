@@ -64,12 +64,22 @@ fn from_call(n: i64) -> i64[] {
     out
 }
 
+// A range: `map` takes one, so a transformed push over it is a `map` alone.
+fn squares(n: u64) -> u64[] {
+    mut out: u64[] = [];
+    for (let i : 0..n) {
+        set out.push(i * i);
+    }
+    out
+}
+
 fn main() !prints {
     print(scaled_above([1, 5], 2).len().to_str());
     print(doubled([1, 5]).len().to_str());
     print(above([1, 5], 2).len().to_str());
     print(copied([1, 5]).len().to_str());
     print(from_call(3).len().to_str());
+    print(squares(3).len().to_str());
 }
 --- errors ---
 error: "out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.filter(|x| ..).map(|x| ..);" and drop the loop, importing `filter` and `map` from builtins (or append #[allow] to this line to keep it)
@@ -100,4 +110,10 @@ error: "out" is seeded empty and filled by this loop and nothing else — write 
   --> ./tests/cases/lints/err_push_loop_pipeline.aipl:60:22
    |
 60 |     mut out: i64[] = [];
+   |                      ^^
+
+error: "out" is seeded empty and filled by this loop and nothing else — write "mut out = (<range>).map(|i| ..);" and drop the loop, importing `map` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_push_loop_pipeline.aipl:69:22
+   |
+69 |     mut out: u64[] = [];
    |                      ^^

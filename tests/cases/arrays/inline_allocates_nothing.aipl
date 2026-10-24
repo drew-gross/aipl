@@ -26,7 +26,8 @@ import {
 } from builtins;
 
 fn ones(n: u64) -> i64[] {
-    mut out: i64[] = [];
+    // The loop is the subject: its pushes are what grow the array.
+    mut out: i64[] = []; #[allow]
     for (let i : 0..n) {
         set out.push(1);
     }
@@ -48,7 +49,8 @@ fn ones(n: u64) -> i64[] {
 })
 
 fn bytes(n: u64) -> u8[] {
-    mut out: u8[] = [];
+    // As in `ones`, the pushes are what is measured.
+    mut out: u8[] = []; #[allow]
     for (let i : 0..n) {
         set out.push(1);
     }

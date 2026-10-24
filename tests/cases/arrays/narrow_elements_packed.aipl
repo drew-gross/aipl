@@ -30,7 +30,8 @@ import {
 } from builtins;
 
 fn bytes(n: u64) -> u8[] {
-    mut out: u8[] = [];
+    // The pushes are what is measured.
+    mut out: u8[] = []; #[allow]
     for (let i : 0..n) {
         set out.push(7);
     }

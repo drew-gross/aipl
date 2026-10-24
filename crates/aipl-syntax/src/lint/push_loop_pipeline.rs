@@ -94,12 +94,10 @@ pub(super) fn push_loop_pipeline(
     let ExprKind::For(var, None, iterable, loop_body) = &first.kind else {
         return;
     };
-    // A range (`a..b`, a `__builtin_Span` construction) is not an array: the
-    // loop that pushes each of its values is the one way to spell that array,
-    // and `filter`/`map` have no range to take.
-    if matches!(&iterable.kind, ExprKind::Construct(n, _) if n == "__builtin_Span") {
-        return;
-    }
+    // A range (`a..b`, a `__builtin_Span` construction) is not an array, and only
+    // `map` takes one: a guard has no `filter` to become, and a push of the
+    // index itself is the range as an array, which has no spelling to advise.
+    let is_range = matches!(&iterable.kind, ExprKind::Construct(n, _) if n == "__builtin_Span");
     let Some(stmt) = lone_stmt(loop_body) else {
         return;
     };
@@ -124,12 +122,23 @@ pub(super) fn push_loop_pipeline(
     // A push of the loop variable itself is the identity map, which the
     // pipeline just leaves out.
     let maps = !matches!(&elem.kind, ExprKind::Ident(n) if n == var);
+    if is_range && (guard.is_some() || !maps) {
+        return;
+    }
     // Quote the iterable back only where its span really covers its text —
     // see [`spans_its_text`]. The alternative, checking the source for the
     // header's own `)`, is exactly the case that fails: a call-shaped span
     // stops *before* its closing paren, so `evens(n)` passes that test and
     // splices back as `evens(n`.
-    let recv = spans_its_text(iterable).then(|| &src[iterable.span.clone()]);
+    let recv = spans_its_text(iterable).then(|| {
+        let text = &src[iterable.span.clone()];
+        // A method call on a range needs the range parenthesized.
+        if is_range {
+            format!("({text})")
+        } else {
+            text.to_string()
+        }
+    });
     // Name whichever of the two the file hasn't imported: like `++` and
     // `is_nonempty`, a builtin has to be in scope before the advice can be
     // followed, and following it without the import only trades this error
@@ -158,7 +167,9 @@ pub(super) fn push_loop_pipeline(
     };
     // A quotable iterable is spliced in; anything else leaves a placeholder,
     // the way `slice_from_zero` writes `[..end]`.
-    let recv = recv.unwrap_or("<iterable>");
+    let recv = recv
+        .as_deref()
+        .unwrap_or(if is_range { "(<range>)" } else { "<iterable>" });
     let advice = if chain.is_empty() {
         // Neither half: the loop copies the iterable one element at a time.
         format!("it is \"{recv}\" already — assign that and drop the loop")
