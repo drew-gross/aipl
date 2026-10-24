@@ -396,7 +396,12 @@ impl Loader {
                 .files
                 .values()
                 .flat_map(|f| &f.builtin_imports)
-                .filter_map(|n| Callee::importable(&n.name))
+                .filter_map(|n| {
+                    Callee::importable(&n.name).or_else(|| {
+                        aipl_syntax::builtin::Builtin::exporting_name(&n.name)
+                            .map(|b| b.callee.clone())
+                    })
+                })
                 .chain(
                     self.files
                         .values()
@@ -740,52 +745,74 @@ impl Loader {
                 // here: the grammar refuses it during the parse, with the
                 // aliases to write instead (`bare_operator_import` in
                 // `grammar_aipl.aipl`), so `n.name` is always a name.
-                let canonical =
-                    if let Some((_op, canonical_impl)) = aipl_syntax::operator_builtin(&n.name) {
-                        // A named operator builtin can be aliased to any operator
-                        // name, though aliasing to a different operator than the one
-                        // it provides is confusing and generally a bad idea. The view
-                        // maps the operator spelling to the reserved `__builtin_*`
-                        // impl, so a use of the operator resolves (in `rewrite_expr`)
-                        // to a call to that impl — codegen intrinsifies it. Different
-                        // builtins on the same operator (`wrapping_add`/`saturating_add`
-                        // → `+`) thus dispatch to different impls, spelling-agnostically.
-                        // Imported bare (`import { concat }`), the name binds to the
-                        // same canonical as the aliased form, so it is callable as an
-                        // ordinary function: `concat(a, b)`. That does *not* make the
-                        // operator itself available — `a +++ b` still needs
-                        // `concat as +++`, because gating looks up the operator's
-                        // spelling in the view and a bare import adds only its name.
-                        canonical_impl.to_string()
-                    } else if let Some(builtin) = Callee::importable(&n.name) {
-                        // Reserved for the builtins' own implementations until
-                        // it is decided whether programs get it.
-                        if aipl_syntax::is_internal_builtin(&builtin)
-                            && !self.builtin_files.contains(path)
-                        {
+                let canonical = if let Some(builtin) =
+                    aipl_syntax::builtin::Builtin::exporting_name(&n.name)
+                {
+                    // A type or case the builtin's source defines: the name it has
+                    // in that file, which is loaded because this file imports it.
+                    let source = builtin.source_path().and_then(|p| p.canonicalize().ok());
+                    let found = source
+                        .as_ref()
+                        .and_then(|p| local_views.get(p))
+                        .and_then(|v| v.get(&n.name));
+                    match found {
+                        Some(mangled) => mangled.clone(),
+                        None => {
                             return Err(self.attribute(
                                 path,
                                 root,
                                 Error::at(
-                                    format!(
-                                        "\"{}\" is internal to the builtins' implementation \
-                                         and not available to programs",
-                                        n.name
-                                    ),
+                                    format!("\"{}\" is not exported by its builtin", n.name),
                                     n.span.clone(),
                                 ),
-                            ));
+                            ))
                         }
-                        builtin.name().to_string()
-                    } else if let Some(canonical) = aipl_syntax::builtin_type_canonical(&n.name) {
-                        canonical
-                    } else {
+                    }
+                } else if let Some((_op, canonical_impl)) = aipl_syntax::operator_builtin(&n.name) {
+                    // A named operator builtin can be aliased to any operator
+                    // name, though aliasing to a different operator than the one
+                    // it provides is confusing and generally a bad idea. The view
+                    // maps the operator spelling to the reserved `__builtin_*`
+                    // impl, so a use of the operator resolves (in `rewrite_expr`)
+                    // to a call to that impl — codegen intrinsifies it. Different
+                    // builtins on the same operator (`wrapping_add`/`saturating_add`
+                    // → `+`) thus dispatch to different impls, spelling-agnostically.
+                    // Imported bare (`import { concat }`), the name binds to the
+                    // same canonical as the aliased form, so it is callable as an
+                    // ordinary function: `concat(a, b)`. That does *not* make the
+                    // operator itself available — `a +++ b` still needs
+                    // `concat as +++`, because gating looks up the operator's
+                    // spelling in the view and a bare import adds only its name.
+                    canonical_impl.to_string()
+                } else if let Some(builtin) = Callee::importable(&n.name) {
+                    // Reserved for the builtins' own implementations until
+                    // it is decided whether programs get it.
+                    if aipl_syntax::is_internal_builtin(&builtin)
+                        && !self.builtin_files.contains(path)
+                    {
                         return Err(self.attribute(
                             path,
                             root,
-                            Error::at(format!("\"{}\" is not a builtin", n.name), n.span.clone()),
+                            Error::at(
+                                format!(
+                                    "\"{}\" is internal to the builtins' implementation \
+                                         and not available to programs",
+                                    n.name
+                                ),
+                                n.span.clone(),
+                            ),
                         ));
-                    };
+                    }
+                    builtin.name().to_string()
+                } else if let Some(canonical) = aipl_syntax::builtin_type_canonical(&n.name) {
+                    canonical
+                } else {
+                    return Err(self.attribute(
+                        path,
+                        root,
+                        Error::at(format!("\"{}\" is not a builtin", n.name), n.span.clone()),
+                    ));
+                };
                 if view.insert(local.to_string(), canonical).is_some() {
                     return Err(self.attribute(
                         path,

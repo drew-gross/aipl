@@ -221,6 +221,9 @@ pub enum Callee {
     /// `read_byte() -> u8?` — one byte of standard input, read without waiting for
     /// a line (`!read_stdin_raw`).
     ReadByte,
+    /// `read_key() -> Key?` — one key press, an arrow key decoded from the bytes
+    /// `read_byte` returns (`!read_stdin_raw`).
+    ReadKey,
     /// `random_u64() -> u64` — the next random number. Has no implementation of its
     /// own: it exists only under a `shim random`, whose provider supplies the
     /// generator (see `SHIM_ONLY_EFFECTS`).
@@ -536,6 +539,7 @@ impl Callee {
             Callee::ListFiles => "__builtin_list_files",
             Callee::ReadLine => "__builtin_read_line",
             Callee::ReadByte => "__builtin_read_byte",
+            Callee::ReadKey => "__builtin_read_key",
             Callee::RandomU64 => "__builtin_random_u64",
             Callee::RandomNext => "__random_next",
             Callee::RandomSeed => "__random_seed",

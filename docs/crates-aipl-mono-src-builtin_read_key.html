@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-mono/src/builtin_read_key.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-mono/src/builtin_read_key.aipl</code></h1>
+
+      <div class="module-doc"><p>The AIPL implementation of the <code>read_key</code> builtin. The loader names this function by the canonical name <code>__builtin_read_key</code> (see <code>aipl_syntax::aipl_builtins</code>). The file also defines <code>Key</code> and its cases, which a program imports from builtins beside <code>read_key</code>.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-Key">
+          <h3>
+            <a class="anchor" href="#item-Key">Key</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Key</code></pre>
+
+          <div class="doc"><p>One key press: an arrow key, or the byte of any other key.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-Up"><code>Up</code>
+
+
+            </li>
+
+            <li id="item-Down"><code>Down</code>
+
+
+            </li>
+
+            <li id="item-Left"><code>Left</code>
+
+
+            </li>
+
+            <li id="item-Right"><code>Right</code>
+
+
+            </li>
+
+            <li id="item-Other"><code>Other(u8)</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-read_key">
+          <h3>
+            <a class="anchor" href="#item-read_key">read_key</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn read_key() !read_stdin_raw -&#62; Key?</code></pre>
+
+          <div class="doc"><p>The next key press, without waiting for Enter: <code>some(key)</code>, or <code>none</code> once input is exhausted. An arrow key is the three bytes <code>ESC [ A</code>..<code>D</code> that <code>read_byte</code> returns, and arrives as <code>Up</code>, <code>Down</code>, <code>Right</code> or <code>Left</code>; any other key is <code>Other</code> with its first byte, and an escape sequence that is not an arrow ends at the byte that breaks it. Carries <code>!read_stdin_raw</code>, like <code>read_byte</code>.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-ESCAPE">
+          <h3>
+            <a class="anchor" href="#item-ESCAPE">ESCAPE</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let ESCAPE: u8 = 27</code></pre>
+
+          <div class="doc"><p>The first two bytes of an arrow key's three, <code>ESC [ A</code> for up.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-BRACKET">
+          <h3>
+            <a class="anchor" href="#item-BRACKET">BRACKET</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let BRACKET: u8 = 91</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-arrow_ending">
+          <h3>
+            <a class="anchor" href="#item-arrow_ending">arrow_ending</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn arrow_ending(last: u8) -&#62; Key</code></pre>
+
+          <div class="doc"><p>The arrow key whose escape sequence ends in <code>last</code>, or <code>Other(last)</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-typed_a">
+          <h3>
+            <a class="anchor" href="#item-typed_a">typed_a</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn typed_a() -&#62; u8?</code></pre>
+
+          <div class="doc"><p>Stand-ins for <code>read_byte</code> that return the same answer every time, which is what the <code>read_key</code> tests can shim: they pin the cases that end on the first byte.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-typed_escape">
+          <h3>
+            <a class="anchor" href="#item-typed_escape">typed_escape</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn typed_escape() -&#62; u8?</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-no_input">
+          <h3>
+            <a class="anchor" href="#item-no_input">no_input</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn no_input() -&#62; u8?</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

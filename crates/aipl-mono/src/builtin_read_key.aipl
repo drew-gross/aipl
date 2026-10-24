@@ -1,0 +1,81 @@
+# The AIPL implementation of the `read_key` builtin. The loader names this
+# function by the canonical name `__builtin_read_key` (see
+# `aipl_syntax::aipl_builtins`). The file also defines `Key` and its cases, which
+# a program imports from builtins beside `read_key`.
+
+import { equal as ==, not_equal as !=, read_byte } from builtins;
+
+# One key press: an arrow key, or the byte of any other key.
+variant Key = Up | Down | Left | Right | Other(u8)
+
+# The first two bytes of an arrow key's three, `ESC [ A` for up.
+let ESCAPE: u8 = 27;
+
+let BRACKET: u8 = 91;
+
+# The arrow key whose escape sequence ends in `last`, or `Other(last)`.
+fn arrow_ending(last: u8) -> Key {
+    if (last == 65) {
+        Up
+    } else if (last == 66) {
+        Down
+    } else if (last == 67) {
+        Right
+    } else if (last == 68) {
+        Left
+    } else {
+        Other(last)
+    }
+}.test({
+    assert(arrow_ending(65) == Up);
+    assert(arrow_ending(66) == Down);
+    assert(arrow_ending(67) == Right);
+    assert(arrow_ending(68) == Left);
+    assert(arrow_ending(69) == Other(69));
+})
+
+# Stand-ins for `read_byte` that return the same answer every time, which is what
+# the `read_key` tests can shim: they pin the cases that end on the first byte.
+fn typed_a() -> u8? { some(97) }.test({
+    assert(typed_a() == some(97));
+})
+
+fn typed_escape() -> u8? { some(27) }.test({
+    assert(typed_escape() == some(27));
+})
+
+fn no_input() -> u8? { none }.test({
+    assert(no_input() == none);
+})
+
+# The next key press, without waiting for Enter: `some(key)`, or `none` once input
+# is exhausted. An arrow key is the three bytes `ESC [ A`..`D` that `read_byte`
+# returns, and arrives as `Up`, `Down`, `Right` or `Left`; any other key is `Other`
+# with its first byte, and an escape sequence that is not an arrow ends at the
+# byte that breaks it. Carries `!read_stdin_raw`, like `read_byte`.
+pub fn read_key() !read_stdin_raw -> Key? {
+    match (read_byte()) {
+        none => none,
+        some(first) => {
+            if (first != ESCAPE) {
+                return some(Other(first));
+            };
+            match (read_byte()) {
+                none => some(Other(first)),
+                some(second) => {
+                    if (second != BRACKET) {
+                        return some(Other(second));
+                    };
+                    match (read_byte()) {
+                        none => some(Other(second)),
+                        some(last) => some(arrow_ending(last)),
+                    }
+                },
+            }
+        },
+    }
+}.test({
+    assert(shim read_stdin_raw { read_byte = typed_a } { read_key() } == some(Other(97)));
+    assert(shim read_stdin_raw { read_byte = no_input } { read_key() } == none);
+    assert(shim read_stdin_raw { read_byte = typed_escape } { read_key() } == some(Other(27)));
+})

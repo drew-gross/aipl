@@ -253,3 +253,49 @@ fn read_byte_reads_piped_bytes_in_a_built_binary() {
     assert_eq!(code, 0, "stderr:\n{stderr}");
     assert_eq!(echo_lines(Command::new(exe), BYTES_IN), BYTES_OUT);
 }
+
+/// Prints the name of each key press until input ends.
+const READ_KEYS: &str =
+    "import { Down, Key, Left, Other, Right, Up, print, read_key } from builtins;\n\n\
+     fn name(self: Key) -> str {\n\
+     \x20   match (self) {\n\
+     \x20       Up => \"up\",\n\
+     \x20       Down => \"down\",\n\
+     \x20       Left => \"left\",\n\
+     \x20       Right => \"right\",\n\
+     \x20       Other(byte) => `other {byte}`,\n\
+     \x20   }\n\
+     }\n\n\
+     fn show() !prints !read_stdin_raw {\n\
+     \x20   match (read_key()) {\n\
+     \x20       none => {},\n\
+     \x20       some(key) => {\n\
+     \x20           print(key.name());\n\
+     \x20           show();\n\
+     \x20       },\n\
+     \x20   };\n\
+     }\n\n\
+     fn main() !prints !read_stdin_raw {\n\
+     \x20   show();\n\
+     }\n";
+
+/// The four arrows, a plain key, and an escape that is not an arrow.
+const KEYS_IN: &str = "\x1b[A\x1b[B\x1b[C\x1b[Dx\x1bz";
+const KEYS_OUT: &str = "up\ndown\nright\nleft\nother 120\nother 122\n";
+
+#[test]
+fn read_key_decodes_piped_arrow_keys_under_run() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("build_cmd_read_key_run");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    std::fs::write(dir.join("main.aipl"), READ_KEYS).expect("write temp source");
+    let mut command = Command::new(env!("CARGO_BIN_EXE_aipl"));
+    command.arg("run").current_dir(&dir);
+    assert_eq!(echo_lines(command, KEYS_IN), KEYS_OUT);
+}
+
+#[test]
+fn read_key_decodes_piped_arrow_keys_in_a_built_binary() {
+    let (stderr, code, exe) = build("read_key", READ_KEYS);
+    assert_eq!(code, 0, "stderr:\n{stderr}");
+    assert_eq!(echo_lines(Command::new(exe), KEYS_IN), KEYS_OUT);
+}

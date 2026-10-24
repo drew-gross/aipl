@@ -127,6 +127,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/builtins/now_nanos | 0 | 0 | 0 | 69 | 356 | 1.00 | 79.53 | 1440 |
 | cases/builtins/range | 18 | 889 | 921 | 1441 | 3928 | 14.00 | 67.90 | 1488 |
 | cases/builtins/read_byte | 1 | 20 | 20 | 58 | 632 | 4.00 | 97.88 | 1440 |
+| cases/builtins/read_key | 2 | 106 | 106 | 141 | 2008 | 5.00 | 103.03 | 1472 |
 | cases/builtins/read_line | 4 | 168 | 84 | 139 | 1128 | 6.00 | 60.35 | 1456 |
 | cases/builtins/reverse | 7 | 403 | 208 | 806 | 2940 | 4.00 | 65.56 | 1440 |
 | cases/builtins/span | 6 | 136 | 136 | 454 | 2284 | 8.00 | 62.87 | 1472 |
@@ -789,6 +790,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_opt_left_fold | 4 | 312 | 312 | 3220 | 7100 | 6.00 | 130.14 | 1472 |
 | crates/aipl-mono/src/builtin_opt_right_fold | 4 | 312 | 312 | 2561 | 5568 | 8.00 | 125.36 | 1488 |
 | crates/aipl-mono/src/builtin_range | 2 | 120 | 120 | 788 | 2152 | 3.00 | 68.86 | 1440 |
+| crates/aipl-mono/src/builtin_read_key | 0 | 0 | 0 | 663 | 3116 | 2.00 | 66.09 | 1472 |
 | crates/aipl-mono/src/builtin_reduce | 3 | 240 | 240 | 3089 | 5476 | 5.00 | 129.92 | 1504 |
 | crates/aipl-mono/src/builtin_repeat | 22 | 1115 | 1064 | 5001 | 7068 | 7.00 | 78.75 | 1472 |
 | crates/aipl-mono/src/builtin_reverse_find_map | 1 | 39 | 39 | 685 | 2004 | 3.00 | 79.46 | 1456 |

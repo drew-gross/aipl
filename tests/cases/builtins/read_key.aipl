@@ -1,0 +1,31 @@
+# `read_key` takes the next key press of standard input as a `Key?`: an arrow key
+# as `Up`, `Down`, `Left` or `Right`, any other key as `Other` with its byte, and
+# `none` once input is exhausted. `Key` and its cases are imported beside it, and
+# it carries `!read_stdin_raw`. The harness runs a case with no standard input, so
+# the key sequences are covered by `build_cmd::read_key_*`, which pipe input to a
+# program; here a shimmed `read_byte` stands in for the keyboard.
+
+import { Down, Key, Left, Other, Right, Up, print, read_byte, read_key } from builtins;
+
+fn name(self: Key) -> str {
+    match (self) {
+        Up => "up",
+        Down => "down",
+        Left => "left",
+        Right => "right",
+        Other(byte) => `other {byte}`,
+    }
+}
+
+fn typed_b() -> u8? { some(98) }
+
+fn main() !prints {
+    shim read_stdin_raw { read_byte = typed_b } {
+        match (read_key()) {
+            none => print("end"),
+            some(key) => print(key.name()),
+        };
+    };
+}
+--- stdout ---
+other 98

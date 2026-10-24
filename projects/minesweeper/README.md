@@ -44,7 +44,7 @@ The rules are pure functions on a `Game` value and carry the tests in their
 | need | why |
 |---|---|
 | ownership that reaches `with` through a struct field or a function parameter | `with` writes in place when it is handed the only reference (a fresh array, or a `mut` local at its last use), but the board lives in a `Game` field read through borrowed parameters, so each move copies the 64 marks |
-| a cursor driven by `read_key` | `read_key` returns one arrow key (or other byte) without waiting for Enter, using `read_byte` under `!read_stdin_raw`; `play` still reads typed commands |
+| a cursor driven by `read_key` | the `read_key` builtin returns one arrow key (or other key) without waiting for Enter; `play` still reads typed commands |
 | ANSI output: clear screen, move cursor, colour | redraw in place, classic number colours |
 | terminal size | fit the board to the window |
 | a clock (`!clock` exists) | the usual elapsed-time counter |

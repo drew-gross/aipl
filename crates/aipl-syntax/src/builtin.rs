@@ -54,6 +54,10 @@ pub struct Builtin {
     /// listed in its undecided ([`SeqShape::Seq`]) form.
     pub callee: Callee,
     pub definition: Definition,
+    /// The other names its AIPL source makes importable: a type it defines and
+    /// the cases of a variant among them. Importing any of them loads the
+    /// source, as importing the builtin does.
+    pub exports: &'static [&'static str],
 }
 
 /// The directory the AIPL sources live in, `aipl-mono/src/`: resolved at
@@ -68,6 +72,21 @@ impl Builtin {
         Builtin {
             callee,
             definition: Definition::Aipl { file },
+            exports: &[],
+        }
+    }
+
+    /// Written in AIPL like [`Builtin::aipl`], and also exporting `exports` from
+    /// its source.
+    const fn aipl_exporting(
+        callee: Callee,
+        file: &'static str,
+        exports: &'static [&'static str],
+    ) -> Builtin {
+        Builtin {
+            callee,
+            definition: Definition::Aipl { file },
+            exports,
         }
     }
 
@@ -75,6 +94,7 @@ impl Builtin {
         Builtin {
             callee,
             definition: Definition::Declared,
+            exports: &[],
         }
     }
 
@@ -82,6 +102,7 @@ impl Builtin {
         Builtin {
             callee,
             definition: Definition::Described { signature, doc },
+            exports: &[],
         }
     }
 
@@ -102,6 +123,11 @@ impl Builtin {
     /// `__builtin_len` — or `None`.
     pub fn named(name: &str) -> Option<&'static Builtin> {
         BUILTINS.iter().find(|b| b.name() == name)
+    }
+
+    /// The builtin whose source exports `name` — a type or a case — or `None`.
+    pub fn exporting_name(name: &str) -> Option<&'static Builtin> {
+        BUILTINS.iter().find(|b| b.exports.contains(&name))
     }
 
     /// The builtin whose AIPL source is the file at `path`, judged by its file
@@ -266,6 +292,11 @@ const BUILTINS: &[Builtin] = &[
     Builtin::declared(Callee::ListFiles),
     Builtin::declared(Callee::ReadLine),
     Builtin::declared(Callee::ReadByte),
+    Builtin::aipl_exporting(
+        Callee::ReadKey,
+        "builtin_read_key.aipl",
+        &["Key", "Up", "Down", "Left", "Right", "Other"],
+    ),
     Builtin::declared(Callee::RandomU64),
     Builtin::declared(Callee::NowNanos),
     Builtin::declared(Callee::MonotonicNow),
