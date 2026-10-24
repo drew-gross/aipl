@@ -265,6 +265,7 @@ const BUILTINS: &[Builtin] = &[
     Builtin::declared(Callee::WriteStringToFile),
     Builtin::declared(Callee::ListFiles),
     Builtin::declared(Callee::ReadLine),
+    Builtin::declared(Callee::ReadByte),
     Builtin::declared(Callee::RandomU64),
     Builtin::declared(Callee::NowNanos),
     Builtin::declared(Callee::MonotonicNow),

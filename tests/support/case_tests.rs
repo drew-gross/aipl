@@ -130,6 +130,7 @@ case_tests! {
     cases_builtins_monotonic_now = "cases/builtins/monotonic_now",
     cases_builtins_now_nanos = "cases/builtins/now_nanos",
     cases_builtins_range = "cases/builtins/range",
+    cases_builtins_read_byte = "cases/builtins/read_byte",
     cases_builtins_read_line = "cases/builtins/read_line",
     cases_builtins_reverse = "cases/builtins/reverse",
     cases_builtins_span = "cases/builtins/span",

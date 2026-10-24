@@ -101,6 +101,46 @@ pub(crate) extern "C" fn aipl_read_line(out: *mut Str) -> i64 {
     1
 }
 
+/// Standard input taken out of line mode and stopped from echoing, for as long as
+/// the value lives. Standard input that is not a terminal is left as it is.
+struct UnbufferedTerminal(Option<libc::termios>);
+
+impl UnbufferedTerminal {
+    fn enter() -> Self {
+        let mut saved = unsafe { std::mem::zeroed::<libc::termios>() };
+        if unsafe { libc::tcgetattr(0, &mut saved) } != 0 {
+            return Self(None);
+        }
+        let mut raw = saved;
+        raw.c_lflag &= !(libc::ICANON | libc::ECHO);
+        raw.c_cc[libc::VMIN] = 1;
+        raw.c_cc[libc::VTIME] = 0;
+        unsafe { libc::tcsetattr(0, libc::TCSANOW, &raw) };
+        Self(Some(saved))
+    }
+}
+
+impl Drop for UnbufferedTerminal {
+    fn drop(&mut self) {
+        if let Some(saved) = &self.0 {
+            unsafe { libc::tcsetattr(0, libc::TCSANOW, saved) };
+        }
+    }
+}
+
+/// `read_byte()`: the next byte of standard input as it is typed, or -1 at end of
+/// input or on a read error. Reads through the same buffer as `aipl_read_line`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_read_byte() -> i64 {
+    use std::io::Read;
+    let _terminal = UnbufferedTerminal::enter();
+    let mut byte = [0u8; 1];
+    match std::io::stdin().lock().read(&mut byte) {
+        Ok(1) => i64::from(byte[0]),
+        _ => -1,
+    }
+}
+
 /// `print(s)` under the new ABI — the `aipl_*` counterpart of `aipl_print`.
 #[no_mangle]
 pub(crate) extern "C" fn aipl_print(s: *const Str) {

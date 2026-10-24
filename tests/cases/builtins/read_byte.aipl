@@ -1,0 +1,13 @@
+# `read_byte` takes the next byte of standard input as a `u8?`: `some(byte)`, or
+# `none` once input is exhausted. It carries the `!read_stdin_raw` effect, so
+# `main` must declare it. The harness runs a case with no standard input, so this
+# pins the end-of-input answer; the bytes themselves are covered by
+# `build_cmd::read_byte_*`, which pipe input to a program.
+
+import { print, read_byte, to_str } from builtins;
+
+fn main() !prints !read_stdin_raw {
+    print(to_str(read_byte()));
+}
+--- stdout ---
+none

@@ -11,6 +11,7 @@ import {
     execute_program,
     list_files,
     print,
+    read_byte,
     read_file_to_string,
     read_line,
     to_str,
@@ -65,6 +66,13 @@ fn prompt() !read_stdin -> str? { read_line() }
 
 fn shimmed_stdin() -> str { shim read_stdin { read_line = only_line } { to_str(prompt()) } }
 
+// ---- read_stdin_raw: a scripted key press, none consumed from the real input.
+fn only_byte() -> u8? { some(65) }
+
+fn press() !read_stdin_raw -> u8? { read_byte() }
+
+fn shimmed_key() -> str { shim read_stdin_raw { read_byte = only_byte } { to_str(press()) } }
+
 // ---- execute_program
 fn canned_run(program: str, args: str[]) -> ExecResult!Error {
     ok(ExecResult { stdout: `ran {program}`, stderr: "", exit_code: 3 })
@@ -88,6 +96,7 @@ fn main() !prints {
     print(shimmed_write());
     print(shimmed_listing());
     print(shimmed_stdin());
+    print(shimmed_key());
     print(shimmed_run());
     greet();
 }
@@ -97,5 +106,6 @@ ok("contents of a.txt")
 err("cannot write out.txt")
 ok(["d/a", "d/b"])
 some("scripted")
+some(65)
 ran tool exit=3
 hello

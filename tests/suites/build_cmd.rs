@@ -221,3 +221,35 @@ fn read_line_returns_long_lines_whole() {
         format!("[{long}]\n1 lines\n")
     );
 }
+
+/// Reads two bytes, the rest of the line, one more byte, then past the end: the
+/// bytes and the line come from one stream, in order.
+const READ_BYTES: &str = "import { print, read_byte, read_line, to_str } from builtins;\n\n\
+     fn main() !prints !read_stdin !read_stdin_raw {\n\
+     \x20   print(to_str(read_byte()));\n\
+     \x20   print(to_str(read_byte()));\n\
+     \x20   print(to_str(read_line()));\n\
+     \x20   print(to_str(read_byte()));\n\
+     \x20   print(to_str(read_byte()));\n\
+     }\n";
+
+/// An arrow key's bytes, a newline, then a letter with nothing after it.
+const BYTES_IN: &str = "\x1b[A\nz";
+const BYTES_OUT: &str = "some(27)\nsome(91)\nsome(\"A\")\nsome(122)\nnone\n";
+
+#[test]
+fn read_byte_reads_piped_bytes_under_run() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("build_cmd_read_byte_run");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    std::fs::write(dir.join("main.aipl"), READ_BYTES).expect("write temp source");
+    let mut command = Command::new(env!("CARGO_BIN_EXE_aipl"));
+    command.arg("run").current_dir(&dir);
+    assert_eq!(echo_lines(command, BYTES_IN), BYTES_OUT);
+}
+
+#[test]
+fn read_byte_reads_piped_bytes_in_a_built_binary() {
+    let (stderr, code, exe) = build("read_byte", READ_BYTES);
+    assert_eq!(code, 0, "stderr:\n{stderr}");
+    assert_eq!(echo_lines(Command::new(exe), BYTES_IN), BYTES_OUT);
+}

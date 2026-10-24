@@ -364,6 +364,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         // Takes nothing, returns the reading.
         "aipl_test_summary"
         | "aipl_now_nanos"
+        | "aipl_read_byte"
         | "aipl_monotonic_now"
         | "aipl_random_next"
         | "aipl_random_state"

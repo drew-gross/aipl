@@ -126,6 +126,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/builtins/monotonic_now | 4 | 88 | 88 | 314 | 1768 | 1008339.00 | 65.05 | 1488 |
 | cases/builtins/now_nanos | 0 | 0 | 0 | 69 | 356 | 1.00 | 79.53 | 1440 |
 | cases/builtins/range | 18 | 889 | 921 | 1441 | 3928 | 14.00 | 67.90 | 1488 |
+| cases/builtins/read_byte | 1 | 20 | 20 | 58 | 632 | 4.00 | 97.88 | 1440 |
 | cases/builtins/read_line | 4 | 168 | 84 | 139 | 1128 | 6.00 | 60.35 | 1456 |
 | cases/builtins/reverse | 7 | 403 | 208 | 806 | 2940 | 4.00 | 65.56 | 1440 |
 | cases/builtins/span | 6 | 136 | 136 | 454 | 2284 | 8.00 | 62.87 | 1472 |
@@ -170,7 +171,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/effects/random | 7 | 221 | 221 | 1348 | 5044 | 12.00 | 69.28 | 1456 |
 | cases/effects/random_provider_block | 2 | 40 | 40 | 536 | 2056 | 7.00 | 80.83 | 1440 |
 | cases/effects/shim_clock | 7 | 276 | 276 | 300 | 2280 | 8.00 | 66.56 | 1472 |
-| cases/effects/shim_effects | 18 | 1073 | 1073 | 1378 | 8528 | 20.00 | 71.90 | 1472 |
+| cases/effects/shim_effects | 19 | 1097 | 1097 | 1464 | 9240 | 15.00 | 69.35 | 1504 |
 | cases/effects/transitive_caller_with_declaration_passes | 0 | 0 | 0 | 17 | 156 | 3.00 | 62.87 | 1440 |
 | cases/equality/arrays | 8 | 640 | 640 | 1882 | 3724 | 4.00 | 77.96 | 1456 |
 | cases/equality/optionals | 0 | 0 | 0 | 205 | 820 | 2.00 | 63.63 | 1440 |

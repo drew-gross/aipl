@@ -619,6 +619,81 @@ pub extern "C" fn aipl_read_line(out: *mut str24::Str) -> i64 {
     }
 }
 
+/// `struct termios` and the constants this file needs from it, per platform.
+#[cfg(target_os = "macos")]
+mod terminal {
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct Termios {
+        pub input_flags: u64,
+        pub output_flags: u64,
+        pub control_flags: u64,
+        pub local_flags: u64,
+        pub control_chars: [u8; 20],
+        pub input_speed: u64,
+        pub output_speed: u64,
+    }
+    pub const ICANON: u64 = 0x100;
+    pub const ECHO: u64 = 0x8;
+    pub const VMIN: usize = 16;
+    pub const VTIME: usize = 17;
+}
+#[cfg(not(target_os = "macos"))]
+mod terminal {
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct Termios {
+        pub input_flags: u32,
+        pub output_flags: u32,
+        pub control_flags: u32,
+        pub local_flags: u32,
+        pub line: u8,
+        pub control_chars: [u8; 32],
+        pub input_speed: u32,
+        pub output_speed: u32,
+    }
+    pub const ICANON: u32 = 0x2;
+    pub const ECHO: u32 = 0x8;
+    pub const VMIN: usize = 6;
+    pub const VTIME: usize = 5;
+}
+
+extern "C" {
+    fn tcgetattr(fd: c_int, settings: *mut terminal::Termios) -> c_int;
+    fn tcsetattr(fd: c_int, when: c_int, settings: *const terminal::Termios) -> c_int;
+}
+
+/// `read_byte()`: the next byte of standard input as it is typed, or -1 at end of
+/// input or on a read error. A terminal is taken out of line mode and stops echoing
+/// while the call waits, and its settings are put back before it returns; input
+/// that is not a terminal is read as it is. Reads through the buffer
+/// `aipl_read_line` uses.
+#[no_mangle]
+pub extern "C" fn aipl_read_byte() -> i64 {
+    unsafe {
+        let mut saved = core::mem::zeroed::<terminal::Termios>();
+        let is_terminal = tcgetattr(0, &mut saved) == 0;
+        // Bytes already buffered are handed out without waiting, so the terminal
+        // only needs its settings changed when a read is actually coming.
+        let buffered = STDIN_POS != STDIN_LEN;
+        if is_terminal && !buffered {
+            let mut unbuffered = saved;
+            unbuffered.local_flags &= !(terminal::ICANON | terminal::ECHO);
+            unbuffered.control_chars[terminal::VMIN] = 1;
+            unbuffered.control_chars[terminal::VTIME] = 0;
+            tcsetattr(0, 0, &unbuffered);
+        }
+        let byte = stdin_byte();
+        if is_terminal && !buffered {
+            tcsetattr(0, 0, &saved);
+        }
+        match byte {
+            Some(byte) => i64::from(byte),
+            None => -1,
+        }
+    }
+}
+
 /// `write_string_to_file` under the wide ABI. Streams the contents chunk by
 /// chunk, so a rope is written without being flattened. Borrows both arguments.
 #[no_mangle]
@@ -969,8 +1044,8 @@ unsafe fn clock_nanos(id: c_int) -> i64 {
 /// assigns. 0 means "no shim installed" — the state every slot starts in and
 /// returns to. Sized by `aipl_syntax::SHIM_SLOT_COUNT`; `shim_slots_match_runtime`
 /// in `tests/shims.rs` holds the two in sync.
-static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 9] =
-    [const { core::sync::atomic::AtomicI64::new(0) }; 9];
+static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 10] =
+    [const { core::sync::atomic::AtomicI64::new(0) }; 10];
 
 /// The shim installed for slot `idx`, or 0 if none. An out-of-range index reads
 /// as "no shim" rather than trapping (codegen only ever emits valid indices).

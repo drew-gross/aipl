@@ -1519,6 +1519,7 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
             "prints".to_string(),
             "read_files".to_string(),
             "read_stdin".to_string(),
+            "read_stdin_raw".to_string(),
             "write_files".to_string(),
             "list_files".to_string(),
             "execute_program".to_string(),
@@ -3397,6 +3398,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
     );
     jit_builder.symbol("aipl_list_files", aipl_list_files as *const u8);
     jit_builder.symbol("aipl_read_line", str24_host::aipl_read_line as *const u8);
+    jit_builder.symbol("aipl_read_byte", str24_host::aipl_read_byte as *const u8);
     jit_builder.symbol("aipl_random_next", aipl_random_next as *const u8);
     jit_builder.symbol("aipl_random_seed", aipl_random_seed as *const u8);
     jit_builder.symbol("aipl_random_state", aipl_random_state as *const u8);
@@ -6927,6 +6929,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         // ---- a scalar back ----
         "aipl_test_summary"
         | "aipl_now_nanos"
+        | "aipl_read_byte"
         | "aipl_monotonic_now"
         | "aipl_random_next"
         | "aipl_random_state"
@@ -7187,6 +7190,7 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
         (Callee::WriteStringToFile, "aipl_write_string_to_file"),
         (Callee::ListFiles, "aipl_list_files"),
         (Callee::ReadLine, "aipl_read_line"),
+        (Callee::ReadByte, "aipl_read_byte"),
         // `random_u64` has no implementation, so its entry is the one that stops the
         // program; its arm in `compile_call_expr_direct` is what is actually used.
         (Callee::RandomU64, "aipl_random_unshimmed"),
@@ -16185,6 +16189,24 @@ fn compile_call_expr_direct<M: Module>(
                 .last_mut()
                 .expect("scope")
                 .push(Tracked::new(ptr, &result_ty));
+            (ptr, result_ty)
+        }
+        Callee::ReadByte => {
+            // `() -> u8?`: `some(byte)` for the next byte of standard input, `none`
+            // at end of input. The runtime returns the byte, or -1 for no byte, on
+            // the shared i64 ABI; the optional is built here. Nothing is allocated,
+            // so there is nothing to track. The `!read_stdin_raw` effect is
+            // checker-enforced.
+            if !args.is_empty() {
+                return Err(arity_bug(name, 0, args.len(), &span));
+            }
+            let byte_ty = ConcreteType::Primitive(Primitive::U8);
+            let result_ty = ConcreteType::Optional(Box::new(byte_ty.clone()));
+            let byte = builtins.call(module, builder, "aipl_read_byte", &[]);
+            let is_some = builder
+                .ins()
+                .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, byte, 0);
+            let ptr = emit_optional_split(builder, cx, is_some, byte, &byte_ty);
             (ptr, result_ty)
         }
         Callee::With | Callee::WithOrSelf => {

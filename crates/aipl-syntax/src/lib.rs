@@ -3077,6 +3077,13 @@ fn __builtin_list_files(self: str) !list_files -> str[]!Error { ok([]) }
 # `none` always means end of input. Standard input is read in order across
 # calls, and is not echoed or prompted for: print the prompt first.
 fn __builtin_read_line() !read_stdin -> str? { none }
+# The next byte of standard input, as soon as it is typed: `some(byte)` for each
+# byte, `none` once input is exhausted. While the call waits, a terminal on
+# standard input is taken out of line mode and stops echoing, so a key arrives
+# without Enter (an arrow key is the three bytes `27 91 65`..`68`); the terminal's
+# settings are put back before the call returns. Input that is not a terminal is
+# read as it is. Bytes come from the same stream as `read_line`, in order.
+fn __builtin_read_byte() !read_stdin_raw -> u8? { none }
 # The next random number, uniform over all of `u64`. `!random` is the one effect
 # with no default: there is no generator unless a `shim random` installs one, so
 # `main` cannot declare it and a program that uses it must say where its
@@ -3871,6 +3878,7 @@ pub const SHIMMABLE_EFFECTS: &[(&str, &[&str])] = &[
     ("list_files", &["list_files"]),
     ("execute_program", &["execute_program"]),
     ("random", &["random_u64"]),
+    ("read_stdin_raw", &["read_byte"]),
 ];
 
 /// The effects that have no default implementation: the program must install one
@@ -3881,7 +3889,8 @@ pub const SHIMMABLE_EFFECTS: &[(&str, &[&str])] = &[
 pub const SHIM_ONLY_EFFECTS: &[&str] = &["random"];
 
 /// Effects the language recognizes. `prints` = writes to stdout; `read_files` =
-/// reads from the filesystem; `read_stdin` = reads standard input;
+/// reads from the filesystem; `read_stdin` = reads standard input a line at a
+/// time; `read_stdin_raw` = reads standard input a byte at a time, as it is typed;
 /// `write_files` = writes to the filesystem;
 /// `list_files` = enumerates the filesystem (directory listing);
 /// `execute_program` = spawns a child process; `clock` = reads the wall clock
@@ -3893,6 +3902,7 @@ pub const KNOWN_EFFECTS: &[&str] = &[
     "prints",
     "read_files",
     "read_stdin",
+    "read_stdin_raw",
     "write_files",
     "list_files",
     "execute_program",
@@ -3931,7 +3941,7 @@ pub fn shim_slot_index(op: &str) -> Option<usize> {
 
 /// How many shim slots the runtimes must reserve. Kept in sync by
 /// `shim_slots_match_runtime` in `tests/shims.rs`.
-pub const SHIM_SLOT_COUNT: usize = 9;
+pub const SHIM_SLOT_COUNT: usize = 10;
 
 /// How many constants computed on first use ([`constant_initializer_name`]) a
 /// program may have. Each owns a cache slot in the runtime, and both runtimes

@@ -102,6 +102,8 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  promoted_annotations' vars arg should be a set
+  in ty.aipl use Type instead of ty
   function_items should return a type that doesn't include the performance field (leverage refinement types)
   avoid relinking the grammar too often
   variant Item seems like it could have Struct(name: SpanStr, doc: str?, type_vars: TypeParam[], fields: FieldDecl[]) instead of Struct(StructDecl) and so-on
@@ -739,7 +741,7 @@ allocator:
   make own allocator
 
 perfmon:
-  allow comments in report sections
+  allow comments in report   sections
   measure() needs to block optimizations
   show call-sites of each function in the final binary
   show regression and improvements
@@ -747,6 +749,7 @@ perfmon:
   split out binary size changes due to tests
 
 report:
+  count lines of code, split by comments, tests, perf, blank, etc.
   show syntehsized functions
   make a flamegraph option
   options to dump the clif, the binary, the asm, etc.
