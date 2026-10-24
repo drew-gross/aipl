@@ -45,9 +45,9 @@ pub fn arity_marker(self: Arity) -> str {
 struct Signature { type_vars: TypeParam[], params: Param[], effects: str[], return_ty: Ty? }
 
 # `test_fns` are the functions declared inside the `.test` block — helpers
-# private to the test, never `pub`. The parser hands them over here and the
-# Rust side hoists them to top-level items under a name only the test can
-# reach (`aipl_parser::post_parse`), so nothing past it sees the nesting.
+# private to the test, never `pub`. The parser hands them over here and
+# `hoist_test_fns` moves them to top-level items under a name only the test can
+# reach, so nothing past it sees the nesting.
 #
 # `performance` is the function's `.performance({ .. })` attribute, if it has
 # one. The Rust AST has no such field: the bridge turns the attribute into a

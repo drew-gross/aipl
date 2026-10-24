@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>variant Ty</code></pre>
 
-          <div class="doc"><p><code>aipl_syntax::ast::Type</code>, less the four checker sentinels (see the header).</p><p><code>TypeVar</code> is here for completeness rather than for the parser: a type parameter is written as an ordinary identifier and reaches the AST as <code>Named</code>, and <code>promote_type_vars</code> is what turns the ones a signature declared into type variables afterwards.</p></div>
+          <div class="doc"><p><code>aipl_syntax::ast::Type</code>, less the four checker sentinels (see the header).</p><p>A type parameter is written as an ordinary identifier and reaches the parser's output as <code>Named</code>; <code>promoted</code> is what turns the ones a declaration declared into <code>TypeVar</code>s afterwards.</p></div>
 
 
           <ul class="cases">
@@ -212,6 +212,20 @@
           <pre class="signature"><code>pub fn show_ty(self: Ty) -&#62; str</code></pre>
 
           <div class="doc"><p>A type as a one-line structural dump: constructors named, leaves bare. It is the oracle the lowering's tests assert against, so it is deliberately <em>not</em> the source spelling — <code>Array(Optional(i64))</code> says which way <code>i64?[]</code> nested, where re-rendering the source could not.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-promoted">
+          <h3>
+            <a class="anchor" href="#item-promoted">promoted</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn promoted(self: Ty, vars: str[]) -&#62; Ty</code></pre>
+
+          <div class="doc"><p><code>self</code> with every <code>Named</code> whose name is one of <code>vars</code> made a <code>TypeVar</code>, at any depth. A declared type parameter shadows a type of the same name, so the promotion is by name alone.</p></div>
 
 
         </section>

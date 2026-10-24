@@ -174,7 +174,7 @@
           </h3>
           <pre class="signature"><code>struct Function</code></pre>
 
-          <div class="doc"><p><code>test_fns</code> are the functions declared inside the <code>.test</code> block — helpers private to the test, never <code>pub</code>. The parser hands them over here and the Rust side hoists them to top-level items under a name only the test can reach (<code>aipl_parser::post_parse</code>), so nothing past it sees the nesting.</p><p><code>performance</code> is the function's <code>.performance({ .. })</code> attribute, if it has one. The Rust AST has no such field: the bridge turns the attribute into a function of its own before anything else sees the program (see <code>ffi_ast.rs</code>), the way the <code>.test</code> helpers are hoisted, so this is the parser's account of what was written and nothing downstream of the bridge reads it.</p></div>
+          <div class="doc"><p><code>test_fns</code> are the functions declared inside the <code>.test</code> block — helpers private to the test, never <code>pub</code>. The parser hands them over here and <code>hoist_test_fns</code> moves them to top-level items under a name only the test can reach, so nothing past it sees the nesting.</p><p><code>performance</code> is the function's <code>.performance({ .. })</code> attribute, if it has one. The Rust AST has no such field: the bridge turns the attribute into a function of its own before anything else sees the program (see <code>ffi_ast.rs</code>), the way the <code>.test</code> helpers are hoisted, so this is the parser's account of what was written and nothing downstream of the bridge reads it.</p></div>
 
 
         </section>

@@ -1,15 +1,14 @@
 # `aipl_syntax::ast::Type` as AIPL declares it. One of the files the AST is
 # declared across; see `ast.aipl`.
 
-import { equal as ==, join, map } from builtins;
+import { contains, equal as ==, join, map } from builtins;
 import { I64, Prim, Str, prim_name } from "./prim.aipl";
 
 # `aipl_syntax::ast::Type`, less the four checker sentinels (see the header).
 #
-# `TypeVar` is here for completeness rather than for the parser: a type
-# parameter is written as an ordinary identifier and reaches the AST as
-# `Named`, and `promote_type_vars` is what turns the ones a signature declared
-# into type variables afterwards.
+# A type parameter is written as an ordinary identifier and reaches the parser's
+# output as `Named`; `promoted` is what turns the ones a declaration declared
+# into `TypeVar`s afterwards.
 variant Ty =
     | Unit
     | Primitive(Prim)
@@ -100,6 +99,49 @@ pub fn show_ty(self: Ty) -> str {
     assert(TypeVar("T").show_ty() == "TypeVar(T)");
     assert(Without(Array(i64_ty), EmptyArray).show_ty() == "Without(Array(i64), [])");
     assert(Without(Named("V"), NamedCase("C")).show_ty() == "Without(V, C)");
+})
+
+# `self` with every `Named` whose name is one of `vars` made a `TypeVar`, at any
+# depth. A declared type parameter shadows a type of the same name, so the
+# promotion is by name alone.
+pub fn promoted(self: Ty, vars: str[]) -> Ty {
+    match (self) {
+        Named(n) => if (vars.contains(n)) { TypeVar(n) } else { self },
+        Unit | Primitive(..) | TypeVar(..) | Any => self,
+        Case(t) => Case(t.promoted(vars)),
+        Optional(t) => Optional(t.promoted(vars)),
+        Array(t) => Array(t.promoted(vars)),
+        Set(t, order) => Set(t.promoted(vars), order),
+        Without(t, excluded) => Without(t.promoted(vars), excluded),
+        Dict(k, v) => Dict(k.promoted(vars), v.promoted(vars)),
+        Result(o, e) => Result(o.promoted(vars), e.promoted(vars)),
+        Fn(params, ret) => Fn(params$promoted(vars), ret.promoted(vars)),
+        Tuple(elements) => Tuple(elements$promoted(vars)),
+        Generic(n, args) => Generic(n, args$promoted(vars)),
+    }
+}.test({
+    let vars = ["T"];
+    assert(Named("T").promoted(vars) == TypeVar("T"));
+    assert(Named("P").promoted(vars) == Named("P")); // not declared
+    assert(Primitive(I64).promoted(vars) == Primitive(I64));
+    // At every depth, through every constructor that holds a type.
+    assert(Array(Optional(Named("T"))).promoted(vars) == Array(Optional(TypeVar("T"))));
+    assert(Set(Named("T"), Desc).promoted(vars) == Set(TypeVar("T"), Desc));
+    assert(Dict(Named("T"), Named("P")).promoted(vars) == Dict(TypeVar("T"), Named("P")));
+    assert(Result(Named("T"), Named("T")).promoted(vars) == Result(TypeVar("T"), TypeVar("T")));
+    assert(Case(Named("T")).promoted(vars) == Case(TypeVar("T")));
+    assert(Without(Array(Named("T")), EmptyArray).promoted(vars) == Without(
+        Array(TypeVar("T")),
+        EmptyArray,
+    ));
+    assert(Fn([Named("T"), Unit], Named("T")).promoted(vars) == Fn(
+        [TypeVar("T"), Unit],
+        TypeVar("T"),
+    ));
+    assert(Tuple([Named("T"), Any]).promoted(vars) == Tuple([TypeVar("T"), Any]));
+    assert(Generic("Box", [Named("T")]).promoted(vars) == Generic("Box", [TypeVar("T")]));
+    let none_declared: str[] = [];
+    assert(Named("T").promoted(none_declared) == Named("T"));
 })
 
 # The elements of a type list, comma-separated. An empty list renders empty,

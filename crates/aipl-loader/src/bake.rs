@@ -151,8 +151,8 @@ pub(crate) fn bake(items: &mut [Item], src: &str, label: &str) -> Result<(), Err
         next_trace_value: 0,
     };
     for item in items {
-        // A `.test` block's own functions were hoisted to top level by the
-        // parser's `post_parse`, under a name `is_test_helper` recognizes — so a
+        // A `.test` block's own functions were hoisted to top level while
+        // the file is parsed, under a name `is_test_helper` recognizes — so a
         // function has exactly two bodies to walk, and test code is identifiable
         // by name.
         let Item::Fn(f) = item else { continue };

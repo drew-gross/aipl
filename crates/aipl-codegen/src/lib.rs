@@ -1703,6 +1703,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     // is what every compile calls where it used to call `aipl_parse_file`.
     "./fn_names.aipl",
     "./hoist_test_fns.aipl",
+    "./promote_type_vars.aipl",
     "./parse_and_partial_load.aipl",
     // The formatter: `format_source` is the whole pipeline, and its walker
     // parses with the same `aipl_parse_file` every compile calls — which is why

@@ -284,7 +284,7 @@ pub enum Callee {
 
     // ---- intrinsics synthesized by the compiler ----
     /// `assert(cond)` inside a `.test({ .. })` body, with its source location
-    /// (the parser's `post_parse` rewrite).
+    /// (the loader's `bake` rewrite).
     Assert,
     /// `trace(expr)` anywhere in a program: the message to print, already
     /// composed from the expression's source location, its own text and its

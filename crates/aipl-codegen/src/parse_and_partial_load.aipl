@@ -9,6 +9,8 @@
 #
 # - `hoist_test_fns`: a `.test` or `.performance` attribute becomes ordinary
 #   top-level functions.
+# - `promote_type_vars`: a declaration's own type parameters become type
+#   variables.
 #
 # The formatter parses with `aipl_parse_file` and not this, because it lays out
 # the program the author wrote, attributes and all.
@@ -17,16 +19,28 @@ import { contains, equal as ==, logical_not as !, map } from builtins;
 import { ParseFailure, ParsedFile, aipl_parse_file } from "./grammar_aipl.aipl";
 import { hoist_test_fns } from "./hoist_test_fns.aipl";
 import { Fn, Item, show_program } from "./item.aipl";
+import { promote_type_vars } from "./promote_type_vars.aipl";
 
 # `aipl_parse_file`, then the steps of loading that happen per file and need
 # nothing from any other.
 pub fn parse_and_partial_load(src: str) -> ParsedFile!ParseFailure {
     let ParsedFile { program, allows } = aipl_parse_file(src)?;
-    ok(ParsedFile { program: program.hoist_test_fns(), allows })
+    ok(ParsedFile { program: program.hoist_test_fns().promote_type_vars(), allows })
 }.test({
-    // A file with neither attribute is as it was parsed.
+    // A file with neither attribute and no type parameters is as it was parsed.
     let plain = parse_and_partial_load("fn f() { }")?;
     assert(plain.program == aipl_parse_file("fn f() { }")?.program);
+
+    // A declared type parameter is a type variable, in a hoisted helper too.
+    let generic = parse_and_partial_load("""
+        fn id<T>(x: T) -> T { x }.test({
+            fn pick<U>(u: U) -> U { u }
+            assert(pick(1) == 1);
+        })
+    """)?;
+    let shown = generic.program.show_program();
+    assert(shown.contains("fn id<T: any>(x: TypeVar(T)) -> TypeVar(T)"));
+    assert(shown.contains("(u: TypeVar(U)) -> TypeVar(U)"));
 
     // A `.test` helper is hoisted right after its function, and its uses in the
     // block and in the other helpers are renamed with it.

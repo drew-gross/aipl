@@ -1,0 +1,120 @@
+# A declaration's own type parameters, made type variables.
+#
+# A type parameter is written as an ordinary identifier, so a parse leaves every
+# mention of one as a `Named` type. Once the declaration is known, the mentions
+# that are its own parameters are `TypeVar`s: in a function's signature and
+# annotations, in a struct's fields, in a variant's payloads, in a refinement's
+# target. A type parameter shadows a type of the same name.
+#
+# It is done to a whole `Program` rather than inside the parse because it needs
+# a declaration's own parameter list, and it is done for every path alike, so no
+# later pass has to ask whether a `Named` is really a variable.
+
+import { equal as ==, is_empty, map } from builtins;
+import { promoted_annotations } from "./expr.aipl";
+import { aipl_parse_file } from "./grammar_aipl.aipl";
+import {
+    CaseParam,
+    Const,
+    FieldDecl,
+    Fn,
+    Function,
+    Import,
+    Item,
+    Param,
+    Program,
+    Refinement,
+    RefinementDecl,
+    Signature,
+    Struct,
+    StructDecl,
+    Variant,
+    VariantCase,
+    VariantDecl,
+    show_program,
+} from "./item.aipl";
+import { promoted } from "./ty.aipl";
+
+# `self` with the type parameters each declaration declares made `TypeVar`s
+# throughout it. A `const` declares none, and an import holds no type.
+pub fn promote_type_vars(self: Program) -> Program {
+    ..self,
+    items: self.items.map(promote_item),
+}.test({
+    let parsed = aipl_parse_file("""
+        struct Box<T> { value: T, label: str }
+        fn first<T>(self: T[]) -> T? {
+            let seed: T? = none;
+            seed
+        }
+        fn plain(b: Box) -> Box { b }
+    """)?.program;
+    let shown = parsed.promote_type_vars().show_program();
+    assert(shown == """
+        struct Box<T: any>(value: TypeVar(T), label: str)
+        fn first<T: any>(self: Array(TypeVar(T))) -> Optional(TypeVar(T)) = Let(seed: Optional(TypeVar(T)), none, seed)
+        fn plain(b: Box) -> Box = b
+    """);
+})
+
+fn promote_item(self: Item) -> Item {
+    match (self) {
+        Fn(f) => Fn(f.promoted_function()),
+        Struct(s) => Struct(s.promoted_struct()),
+        Variant(v) => Variant(v.promoted_variant()),
+        Refinement(r) => Refinement(RefinementDecl {
+            ..r,
+            target: r.target.promoted(r.type_vars$name),
+        }),
+        Const(..) | Import(..) => self,
+    }
+}
+
+fn promoted_function(self: Function) -> Function {
+    let vars = self.sig.type_vars$name;
+    if (vars.is_empty()) {
+        return self;
+    };
+    Function {
+        ..self,
+        sig: Signature {
+            ..self.sig,
+            params: self.sig.params.map(|p| Param { ..p, ty: p.ty.promoted(vars) }),
+            return_ty: self.sig.return_ty$promoted(vars),
+        },
+        body: self.body.promoted_annotations(vars),
+        test_body: self.test_body$promoted_annotations(vars),
+    }
+}
+
+fn promoted_struct(self: StructDecl) -> StructDecl {
+    let vars = self.type_vars$name;
+    if (vars.is_empty()) {
+        return self;
+    };
+    StructDecl {
+        ..self,
+        fields: self.fields.map(|f| FieldDecl {
+            ..f,
+            ty: f.ty.promoted(vars),
+            default: f.default$promoted_annotations(vars),
+        }),
+    }
+}
+
+fn promoted_variant(self: VariantDecl) -> VariantDecl {
+    let vars = self.type_vars$name;
+    if (vars.is_empty()) {
+        return self;
+    };
+    VariantDecl { ..self, cases: self.cases$promoted_case(vars) }
+}
+
+fn promoted_case(self: VariantCase, vars: str[]) -> VariantCase {
+    ..self,
+    payload: self.payload.map(|slot| CaseParam {
+        ..slot,
+        ty: slot.ty.promoted(vars),
+        default: slot.default$promoted_annotations(vars),
+    }),
+}

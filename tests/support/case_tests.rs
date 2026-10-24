@@ -967,6 +967,7 @@ case_tests! {
     crates_aipl_codegen_src_pat = "crates/aipl-codegen/src/pat",
     crates_aipl_codegen_src_prim = "crates/aipl-codegen/src/prim",
     crates_aipl_codegen_src_process_raw_string = "crates/aipl-codegen/src/process_raw_string",
+    crates_aipl_codegen_src_promote_type_vars = "crates/aipl-codegen/src/promote_type_vars",
     crates_aipl_codegen_src_reindent_block = "crates/aipl-codegen/src/reindent_block",
     crates_aipl_codegen_src_requote = "crates/aipl-codegen/src/requote",
     crates_aipl_codegen_src_sexp = "crates/aipl-codegen/src/sexp",

@@ -267,7 +267,7 @@
           </h3>
           <pre class="signature"><code>pub fn aipl_parse_file(src: str) -&#62; ParsedFile!ParseFailure</code></pre>
 
-          <div class="doc"><p>The whole of <code>aipl_parser::parse_with_allows</code>, on this side: strip the expected-output sections, refuse trailing whitespace, lex losslessly, keep the <code>#[allow]</code> spans, parse and lower.</p><p>What it deliberately does <em>not</em> do is <code>post_parse</code> — <code>bake_asserts</code> and <code>promote_type_vars</code> follow a parse but are no part of one, and they stay on the Rust side where they already live.</p><p>A tree that recovered from a missing token is a tree of broken input, and is never lowered: the errors come back instead.</p></div>
+          <div class="doc"><p>The whole of <code>aipl_parser::parse_with_allows</code>, on this side: strip the expected-output sections, refuse trailing whitespace, lex losslessly, keep the <code>#[allow]</code> spans, parse and lower.</p><p>What it deliberately does <em>not</em> do is what follows a parse but is no part of one: <code>parse_and_partial_load</code> hoists test functions and promotes type variables, and the loader bakes the locations of <code>assert</code> and <code>trace</code>.</p><p>A tree that recovered from a missing token is a tree of broken input, and is never lowered: the errors come back instead.</p></div>
 
 
         </section>

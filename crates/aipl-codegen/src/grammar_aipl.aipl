@@ -4967,9 +4967,9 @@ let PREPARED_GRAMMAR: Prepared<AiplTok, Ast>!ParseError = prepare(aipl_grammar()
 # expected-output sections, refuse trailing whitespace, lex losslessly, keep the
 # `#[allow]` spans, parse and lower.
 #
-# What it deliberately does *not* do is `post_parse` — `bake_asserts` and
-# `promote_type_vars` follow a parse but are no part of one, and they stay on
-# the Rust side where they already live.
+# What it deliberately does *not* do is what follows a parse but is no part of
+# one: `parse_and_partial_load` hoists test functions and promotes type
+# variables, and the loader bakes the locations of `assert` and `trace`.
 #
 # A tree that recovered from a missing token is a tree of broken input, and is
 # never lowered: the errors come back instead.

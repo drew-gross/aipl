@@ -6434,8 +6434,8 @@ fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
     match t {
         Type::Case(v) => Type::Case(Box::new(subst_typevars(v, type_params))),
         Type::Any => typevar_ty(""),
-        // A declared parameter is already a `TypeVar` (`promote_type_vars`, at
-        // the end of parsing); `type_params` now only decides which variables
+        // A declared parameter is already a `TypeVar` (`promote_type_vars.aipl`,
+        // at the end of parsing); `type_params` now only decides which variables
         // belong to *this* signature, and every variable in a body does.
         Type::TypeVar(n) if n.is_empty() || type_params.iter().any(|p| p == n) => t.clone(),
         Type::TypeVar(_)

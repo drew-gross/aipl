@@ -15,7 +15,19 @@ import {
 } from builtins;
 import { Ctor, Pat, show_pat } from "./pat.aipl";
 import { I64 } from "./prim.aipl";
-import { Desc, Primitive, SetOrder, Ty, Unordered, show_order, show_ty } from "./ty.aipl";
+import {
+    Array,
+    Desc,
+    Named,
+    Primitive,
+    SetOrder,
+    Ty,
+    TypeVar,
+    Unordered,
+    promoted,
+    show_order,
+    show_ty,
+} from "./ty.aipl";
 
 # block) where its *value* is.
 #
@@ -420,4 +432,50 @@ pub fn map_subexprs(self: Expr, f: (Expr) -> Expr) -> Expr {
     );
     // The node's span survives.
     assert(at(Neg(ident("x")), 3..7).map_subexprs(wrap).span == 3..7);
+})
+
+# `self` and every expression under it with the declared type parameters in
+# `vars` made `TypeVar`s in the annotations a body holds: a `let` or `mut`
+# binding's, and a lambda parameter's.
+pub fn promoted_annotations(self: Expr, vars: str[]) -> Expr {
+    let kind = match (self.kind) {
+        Let(name, ty, value, body) => Let(name, ty$promoted(vars), value, body),
+        LetMut(name, ty, value, body) => LetMut(name, ty$promoted(vars), value, body),
+        Lambda(params, body) => Lambda(
+            params.map(|p| LambdaParam { ..p, ty: p.ty$promoted(vars) }),
+            body,
+        ),
+        _ => self.kind,
+    };
+    Expr { ..self, kind }.map_subexprs(|child| child.promoted_annotations(vars))
+}.test({
+    let vars = ["T"];
+    let annotated = expr(Let("x", some(Array(Named("T"))), ident("a"), ident("b")));
+    assert(
+        annotated.promoted_annotations(vars).show_expr() == show_expr(expr(Let(
+            "x",
+            some(Array(TypeVar("T"))),
+            ident("a"),
+            ident("b"),
+        ))),
+    );
+    // A lambda's parameter, nested under a binding with no annotation.
+    let lambda = expr(Lambda(
+        [LambdaParam { name: "p", ty: some(Named("T")), span: 0..0 }],
+        ident("p"),
+    ));
+    let nested = expr(Let("f", none, lambda, ident("f")));
+    assert(
+        nested.promoted_annotations(vars).show_expr() == show_expr(expr(Let(
+            "f",
+            none,
+            expr(Lambda(
+                [LambdaParam { name: "p", ty: some(TypeVar("T")), span: 0..0 }],
+                ident("p"),
+            )),
+            ident("f"),
+        ))),
+    );
+    // A name that is not declared is left alone.
+    assert(annotated.promoted_annotations(["U"]).show_expr() == annotated.show_expr());
 })

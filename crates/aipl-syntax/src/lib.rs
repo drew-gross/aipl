@@ -4023,131 +4023,6 @@ pub fn each_item_expr(items: &[ast::Item], f: &mut impl FnMut(&ast::Expr)) {
     }
 }
 
-/// Visit `e` and every expression nested inside it, pre-order.
-/// Rewrite every mention of a declaration's own type parameters from
-/// [`ast::Type::Named`] to [`ast::Type::TypeVar`], throughout its signature,
-/// its field/payload types, and any annotation inside its body.
-///
-/// Run once at the end of parsing, which is the earliest point the distinction
-/// is knowable and the last point at which *every* path agrees on it: source
-/// files reach the checker through the loader, but the builtin signatures are
-/// parsed directly (`native_builtin_decls`), and a promotion living in the
-/// loader would leave those spelling `T` as an ordinary name. Doing it here
-/// means no later pass has to ask "is this `Named` really a variable?" — the
-/// question the string-sentinel encodings existed to answer, each differently.
-///
-/// A type parameter shadows a struct of the same name, which is what the
-/// previous name-keyed substitutions effectively assumed and could not enforce.
-pub fn promote_type_vars(program: &mut ast::Program) {
-    for item in &mut program.items {
-        match item {
-            ast::Item::Fn(f) => {
-                let vars: Vec<String> = f.sig.type_var_names();
-                for p in &mut f.sig.params {
-                    promote_ty(&mut p.ty, &vars);
-                }
-                if let Some(r) = &mut f.sig.return_ty {
-                    promote_ty(r, &vars);
-                }
-                promote_in_expr(&mut f.body, &vars);
-                if let Some(t) = &mut f.test_body {
-                    promote_in_expr(t, &vars);
-                }
-            }
-            ast::Item::Struct(s) => {
-                let vars: Vec<String> = s.type_vars.iter().map(|v| v.name.clone()).collect();
-                for fd in &mut s.fields {
-                    promote_ty(&mut fd.ty, &vars);
-                    if let Some(d) = &mut fd.default {
-                        promote_in_expr(d, &vars);
-                    }
-                }
-            }
-            ast::Item::Variant(v) => {
-                let vars: Vec<String> = v.type_vars.iter().map(|t| t.name.clone()).collect();
-                for case in &mut v.cases {
-                    for slot in &mut case.payload {
-                        promote_ty(&mut slot.ty, &vars);
-                        if let Some(d) = &mut slot.default {
-                            promote_in_expr(d, &vars);
-                        }
-                    }
-                }
-            }
-            ast::Item::Const(c) => {
-                if let Some(t) = &mut c.ty {
-                    promote_ty(t, &[]);
-                }
-            }
-            ast::Item::Refinement(r) => {
-                let vars: Vec<String> = r.type_vars.iter().map(|t| t.name.clone()).collect();
-                promote_ty(&mut r.target, &vars);
-            }
-            ast::Item::Import(_) => {}
-        }
-    }
-}
-
-/// [`promote_type_vars`] for one type: every `Named` whose name is one of
-/// `vars` becomes a `TypeVar`, recursively.
-fn promote_ty(ty: &mut ast::Type, vars: &[String]) {
-    use ast::Type as T;
-    match ty {
-        T::Named(n) if vars.iter().any(|v| v == n) => *ty = T::TypeVar(n.clone()),
-        T::Case(v) => promote_ty(v, vars),
-        T::Unit
-        | T::Primitive(_)
-        | T::Named(_)
-        | T::TypeVar(_)
-        | T::Any
-        | T::NoneInner
-        | T::EmptyArrayArg
-        | T::NoneLiteralArg
-        | T::Unknown
-        | T::ConcatStr => {}
-        T::Optional(i) | T::Array(i) | T::Set(i, _) | T::Without(i, _) => promote_ty(i, vars),
-        T::Dict(a, b) | T::Result(a, b) => {
-            promote_ty(a, vars);
-            promote_ty(b, vars);
-        }
-        T::Tuple(es) | T::Generic(_, es) => {
-            for e in es {
-                promote_ty(e, vars);
-            }
-        }
-        T::Fn(ps, r) => {
-            for p in ps {
-                promote_ty(p, vars);
-            }
-            promote_ty(r, vars);
-        }
-    }
-}
-
-/// [`promote_type_vars`] for the annotations inside a body — `let x: T[] = ..`,
-/// `mut n: T = ..`, and a lambda parameter's declared type.
-fn promote_in_expr(e: &mut ast::Expr, vars: &[String]) {
-    use ast::ExprKind as K;
-    match &mut e.kind {
-        K::Let(_, ty, _, _) | K::LetMut(_, ty, _, _) => {
-            if let Some(t) = ty {
-                promote_ty(t, vars);
-            }
-        }
-        K::Lambda(params, _) => {
-            for p in params {
-                if let Some(t) = &mut p.ty {
-                    promote_ty(t, vars);
-                }
-            }
-        }
-        _ => {}
-    }
-    for child in each_subexpr_mut(e) {
-        promote_in_expr(child, vars);
-    }
-}
-
 /// The type under any `without` refinement — `T[]` for `T[] without []`, and
 /// `t` itself when it carries none. What a refined value *is* at runtime, and
 /// so the type to ask structural questions of: whether it can be indexed,
@@ -4423,8 +4298,9 @@ fn expand_refinement_ty(
     })
 }
 
-/// Every type written or recorded in `program`, mutably: the places
-/// [`promote_type_vars`] visits, plus each expression's stamped [`Expr::ty`].
+/// Every type written or recorded in `program`, mutably: signatures, field and
+/// payload declarations, and the annotations inside bodies, plus each
+/// expression's stamped [`Expr::ty`].
 fn each_type_mut(program: &mut ast::Program, f: &mut impl FnMut(&mut Type)) {
     for item in &mut program.items {
         match item {

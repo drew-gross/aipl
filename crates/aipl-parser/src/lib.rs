@@ -4,8 +4,7 @@
 //! is the grammar as data, `parse.aipl` the driver that runs it, and `ast.aipl`
 //! the tree it lowers to — and is compiled into the checked-in dogfood artifact
 //! the compiler links. This crate is the Rust side of that boundary: the hook
-//! the compiler installs to reach it (`set_parse_hook`), the rewrite that
-//! follows a parse but is no part of one (`post_parse`), the lexer's token
+//! the compiler installs to reach it (`set_parse_hook`), the lexer's token
 //! types as they cross the FFI, and the other dogfooded helpers a parse leans
 //! on (section stripping, companion files, assertion locations).
 //!
@@ -230,12 +229,12 @@ pub fn set_parse_hook(f: fn(&str) -> Result<(Program, Vec<Span>), Vec<Error>>) {
 }
 
 /// Parse `input` — a whole source file, expected-output sections and all — to
-/// its [`Program`], with the post-parse rewrite applied.
+/// its [`Program`].
 ///
 /// Everything a parse involves happens on the AIPL side of the hook: the
 /// sections are stripped, trailing whitespace is refused, the source is lexed
 /// losslessly and parsed, and the tree is lowered. What comes back is that
-/// `Program`, which [`post_parse`] then finishes.
+/// `Program`.
 ///
 /// A file with several syntax errors fails here with the first; a caller that
 /// reports them all wants [`parse_with_allows`].
@@ -264,29 +263,5 @@ pub fn parse_with_allows(input: &str) -> Result<(Program, Vec<Span>), Vec<Error>
     let hook = PARSE_HOOK
         .get()
         .expect("parse hook not installed before parsing (call install_parser_hooks)");
-    let (mut program, allows) = hook(input)?;
-    post_parse(&mut program);
-    Ok((program, allows))
-}
-
-/// The rewrite that follows a parse but is no part of one.
-///
-/// `promote_type_vars` needs a declaration's own signature, so it is a thing
-/// done *to* a `Program` once it exists — which is why it stayed on this side of
-/// the hook when the parser moved to AIPL, and why it is a named function:
-/// [`parse_with_allows`] calls it on what the hook hands back. The per-file
-/// steps that need nothing from Rust have moved to AIPL, into
-/// `parse_and_partial_load`, whose hook this is called on; this is what is left.
-///
-/// What is *not* here is the pair of source-text rewrites, `assert(cond)` and
-/// `trace(expr)`. Both bake a source location into the program, and a location
-/// names a file — which `parse` is never told, since it takes a `&str`. They live
-/// in the loader instead, the first place that holds a source and its path
-/// together; see `aipl_loader::bake`. `assert`'s rewrite used to be here, and its
-/// locations read `input:LINE:` for exactly that reason.
-pub fn post_parse(program: &mut Program) {
-    // A declaration's own type parameters stop being ordinary names here, at the
-    // one point every path shares: source files reach the checker through the
-    // loader, but the builtin signatures are parsed directly.
-    aipl_syntax::promote_type_vars(program);
+    hook(input)
 }
