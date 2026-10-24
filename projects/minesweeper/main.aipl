@@ -23,6 +23,7 @@ import {
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
+    map,
     narrow,
     not_equal as !=,
     print,
@@ -80,11 +81,7 @@ fn place_mines(count: u64, cells: u64) !random -> u64[] {
 # every cell hidden.
 fn new_game(width: u64, height: u64, mines: u64[]) -> Mark[,] {
     let mined = mines.to_set();
-    mut marks: Mark[] = [];
-    for (let number : 0..width * height) {
-        set marks.push(Hidden(mined.has(number)));
-    }
-    grid_from(width, marks)
+    grid_from(width, (0..width * height).map(|number| Hidden(mined.has(number))))
 }.test({
     let expected: Mark[,] = [
         [Hidden(false), Hidden(true), Hidden(false)],
@@ -256,19 +253,12 @@ fn symbol(self: Mark[,], cell: (u64, u64), show_mines: bool) -> str {
 
 # The board as text: a row of column numbers, then each row led by its number.
 fn render(self: Mark[,], show_mines: bool) -> str {
-    mut heads: str[] = [];
-    for (let column : 0..self.width()) {
-        set heads.push(`{column}`);
-    }
-    mut lines: str[] = [`  {heads.join(sep=" ")}`];
-    for (let row : 0..self.height()) {
-        mut symbols: str[] = [];
-        for (let column : 0..self.width()) {
-            set symbols.push(self.symbol((row, column), show_mines));
-        }
-        set lines.push(`{row} {symbols.join(sep=" ")}`);
-    }
-    lines.join(sep="\n")
+    let heads = (0..self.width()).map(|column| `{column}`);
+    let rows = (0..self.height()).map(|row| {
+        let symbols = (0..self.width()).map(|column| self.symbol((row, column), show_mines));
+        `{row} {symbols.join(sep=" ")}`
+    });
+    [`  {heads.join(sep=" ")}`, ..rows].join(sep="\n")
 }.test({
     let game = new_game(3, 2, [5]).reveal((0, 0));
     assert(game.render(false) == """
