@@ -1,0 +1,21 @@
+# `to_dict` turns an array of `(key, value)` pairs into a dict. A key that occurs
+# more than once takes the value of its last pair: the later write wins.
+
+import { contains_key, get, len, print, to_dict } from builtins;
+
+fn main() !prints {
+    let ages = [("ana", 31), ("bo", 27), ("cy", 45)].to_dict();
+    print(`{ages.get("bo")} {ages.get("zed")} {ages.len()}`);
+
+    // The later of two pairs for one key wins; the key keeps one entry.
+    let last = [(1, "first"), (2, "other"), (1, "last")].to_dict();
+    print(`{last.get(1)} {last.len()}`);
+
+    // Keys of any dict key type.
+    let by_char = [('a', 1), ('b', 2)].to_dict();
+    print(`{by_char.contains_key('b')}`);
+}
+--- stdout ---
+some(27) none 3
+some("last") 2
+true

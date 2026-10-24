@@ -407,7 +407,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" => sig(4, true),
         "aipl_set_insert" => sig(7, false),
         "aipl_set_union" => sig(9, false),
-        "aipl_dict_insert" | "aipl_dict_remove" => sig(6, false),
+        "aipl_dict_insert" | "aipl_dict_remove" | "aipl_dict_set" => sig(6, false),
         "aipl_arr_join" => sig(8, false),
         "aipl_arr_settle" => sig(4, false),
         // The parts, `join`'s three separators, and the element type's three

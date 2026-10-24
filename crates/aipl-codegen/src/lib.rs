@@ -3331,6 +3331,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
     );
     jit_builder.symbol("aipl_dict_insert", arr24::aipl_dict_insert as *const u8);
     jit_builder.symbol("aipl_dict_remove", arr24::aipl_dict_remove as *const u8);
+    jit_builder.symbol("aipl_dict_set", arr24::aipl_dict_set as *const u8);
     jit_builder.symbol("aipl_arr_join", arr24::aipl_arr_join as *const u8);
     jit_builder.symbol("aipl_arr_new", arr24::aipl_arr_new as *const u8);
     jit_builder.symbol("aipl_arr_with_cap", arr24::aipl_arr_with_cap as *const u8);
@@ -6995,7 +6996,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" => (4, Ret::Word),
         "aipl_set_insert" => (7, Ret::None),
         "aipl_set_union" => (9, Ret::None),
-        "aipl_dict_insert" | "aipl_dict_remove" => (6, Ret::None),
+        "aipl_dict_insert" | "aipl_dict_remove" | "aipl_dict_set" => (6, Ret::None),
         "aipl_arr_join" => (8, Ret::None),
         // The parts and `join`'s three separators; the `str` comes back through
         // the out pointer, as `aipl_str_join`'s does.
@@ -18012,6 +18013,72 @@ fn compile_call_expr_direct<M: Module>(
             }
             *ty_cell.borrow_mut() = dict_ty;
             // `remove_key` mutates; it produces no value.
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
+        }
+        Callee::InsertKey => {
+            // `set d.insert_key(k, v);` — the in-place writeback form, as
+            // `remove_key` reaches codegen: receiver in `args[0]`, the result
+            // stored back into its slot, `arr24::aipl_dict_set` taking the
+            // slot's reference and handing back one owned dict.
+            //
+            // A dict that is still the empty literal has no key or value type
+            // yet; the first pair gives it both.
+            let [receiver, key, value] = args else {
+                return Err(arity_bug(name, 3, args.len(), &span));
+            };
+            let (slot, ty_cell, exclusive, held_key_ty, held_val_ty) =
+                mut_dict_receiver(env, receiver, "insert_key")?;
+            let (key_v, key_t) = compile_expr(module, builder, cx, scopes, key)?;
+            let (val_v, val_t) = compile_expr(module, builder, cx, scopes, value)?;
+            let (key_ty, val_ty) = if is_none_inner(&held_key_ty) {
+                (key_t.clone(), val_t.clone())
+            } else {
+                (held_key_ty, held_val_ty)
+            };
+            if !is_dict_key(&key_ty) {
+                return Err(Error::at(
+                    format!(
+                        "dict keys must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
+                        type_name(&key_ty)
+                    ),
+                    key.span.clone(),
+                ));
+            }
+            let key_t = flex_int_ty(key, &key_t, &key_ty);
+            let val_t = flex_int_ty(value, &val_t, &val_ty);
+            expect_type(&key_t, &key_ty, "insert_key key", key.span.clone())?;
+            expect_type(&val_t, &val_ty, "insert_key value", value.span.clone())?;
+            let dict_ty = ConcreteType::Dict(Box::new(key_ty.clone()), Box::new(val_ty.clone()));
+            let pair_size = dict_pair_size(&key_ty, &val_ty, structs);
+            let psz = builder.ins().iconst(types::I64, pair_size);
+            let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&key_ty));
+            let (drop_fn, retain_fn) = pair_rc_fn_addrs(builder, module, cx, &key_ty, &val_ty);
+            // The pair `[key][value]` is assembled in a scratch slot; the
+            // inserter copies the bytes and retains both halves, so the dict
+            // co-owns them alongside the originals in scope.
+            let pbuf = builder.create_sized_stack_slot(StackSlotData::new(
+                StackSlotKind::ExplicitSlot,
+                pair_size as u32,
+                3,
+            ));
+            let pbase = builder.ins().stack_addr(types::I64, pbuf, 0);
+            store_array_elem(builder, pbase, key_v, &key_ty, structs);
+            let vaddr = builder
+                .ins()
+                .iadd_imm_s(pbase, dict_key_size(&key_ty, structs));
+            store_array_elem(builder, vaddr, val_v, &val_ty, structs);
+            let addr = builder.ins().stack_addr(types::I64, slot, 0);
+            builtins.call_void(
+                module,
+                builder,
+                "aipl_dict_set",
+                &[addr, pbase, drop_fn, retain_fn, psz, str_cmp],
+            );
+            if !exclusive {
+                region_track_slot(builder, module, cx, scopes, slot, &dict_ty);
+            }
+            *ty_cell.borrow_mut() = dict_ty;
+            // `insert_key` mutates; it produces no value.
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         Callee::DictKeyAt | Callee::DictValueAt => {

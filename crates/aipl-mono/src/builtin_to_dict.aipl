@@ -1,0 +1,36 @@
+# The AIPL implementation of the `to_dict` builtin. The loader names this
+# function by the canonical name `__builtin_to_dict` (see
+# `aipl_syntax::builtin`), so a user's `pairs.to_dict()` resolves through the
+# ordinary generic machinery — the in-file name `to_dict` is only for this
+# file's own tests, which read exactly like user code.
+#
+# No lint steers a hand-written loop here: the loop this replaces is
+# `mut d = #{}; for (let p : pairs) { set d.insert_key(p.0, p.1); }`, and
+# `insert_key` is not importable outside the builtins' own sources, so no
+# program can have written it.
+
+import { equal as ==, get, insert_key, is_empty } from builtins;
+
+# The `(key, value)` pairs of `self` as a dict. A key that occurs more than once
+# takes the value of its last pair, and keeps the place of its first — the way a
+# dict literal with a repeated key does. Keys must be what a dict key can be (an
+# integer, `bool`, `char` or `str`).
+#
+# Callable as a method (`pairs.to_dict()`). `xs.map(f).to_dict()` is computed by
+# `map_to_dict`, without the array of pairs `map` would build.
+pub fn to_dict<K: any, V: any>(self: (K, V)[]) -> #{K: V} {
+    mut out: #{K: V} = #{};
+    for (let pair : self) {
+        set out.insert_key(pair.0, pair.1);
+    }
+    out
+}.test({
+    assert([(1, "a"), (2, "b")].to_dict() == #{1: "a", 2: "b"});
+    assert([("x", 1), ("y", 2)].to_dict() == #{"x": 1, "y": 2}); // str keys
+    assert(to_dict([(1, 10)]) == #{1: 10}); // free-call form
+    let none_at_all: (i64, str)[] = [];
+    assert(none_at_all.to_dict().is_empty()); // empty
+    let last_wins = [(1, "a"), (2, "b"), (1, "c")].to_dict();
+    assert(last_wins == #{1: "c", 2: "b"}); // last write wins
+    assert(last_wins.get(1) == some("c"));
+})

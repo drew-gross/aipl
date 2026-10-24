@@ -1143,6 +1143,30 @@ pub(crate) extern "C" fn aipl_dict_insert(
     }
 }
 
+/// `insert_key` on a `mut` binding's slot: the dict made uniquely owned
+/// (`array_ops::reserve` with nothing extra, which keeps a unique block and
+/// copies a shared one), the pair bound in it, and the dict written back. The
+/// pair replaces an existing binding of its key in place, and is appended
+/// otherwise.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_dict_set(
+    slot: *mut ArrValue,
+    pair: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    pair_size: i64,
+    str_cmp: i64,
+) {
+    unsafe {
+        let v = *slot;
+        let len = v.run_len();
+        let dict = super::array_ops::reserve(v.block, len, 0, drop_fn, retain_fn, pair_size);
+        let (dict, len) =
+            super::array_ops::dict_insert(dict, len, pair, drop_fn, retain_fn, pair_size, str_cmp);
+        core::ptr::write(slot, ArrValue::whole_of(dict, len));
+    }
+}
+
 /// `remove_key` on a `mut` binding's slot: the dict made uniquely owned
 /// (`array_ops::reserve` with nothing extra, which keeps a unique block and
 /// copies a shared one), the key's pair removed, and the dict written back.

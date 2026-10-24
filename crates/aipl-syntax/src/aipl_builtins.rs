@@ -39,6 +39,7 @@ pub fn companions(present: &HashSet<Callee>, mentions_grid: bool) -> HashSet<Cal
     let rules: &[(bool, C)] = &[
         (has(C::Map) && has(C::FindIf), C::MapFindIf),
         (has(C::Map) && has(C::Join), C::MapJoin),
+        (has(C::Map) && has(C::ToDict), C::MapToDict),
         (has(C::Join) && has(C::IsNonempty), C::JoinIsNonempty),
         (has(C::Join) && has(C::IsEmpty), C::JoinIsEmpty),
         (has(C::Split) && has(C::Map), C::SplitMap),

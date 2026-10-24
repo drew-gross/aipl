@@ -70,6 +70,14 @@ const CHAIN_FUSIONS: &[ChainFusion] = &[
         outer: Callee::Join,
         into: Callee::MapJoin,
     },
+    // `xs.map(f).to_dict()`: `map` builds the array of every `(key, value)` pair
+    // and `to_dict` then walks it to bind them; `map_to_dict` binds each pair as
+    // `f` produces it, so the array is never built.
+    ChainFusion {
+        inner: Callee::Map,
+        outer: Callee::ToDict,
+        into: Callee::MapToDict,
+    },
     // `xs.join(sep=s).is_nonempty()`: `join` measures every piece, allocates the
     // whole result and copies each piece in, for a caller that asks only
     // whether anything is there. `join_is_nonempty` stops at the first piece

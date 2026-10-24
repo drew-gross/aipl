@@ -6720,8 +6720,28 @@ pub(crate) fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
         }
         (Type::Set(a, oa), Type::Set(b, ob)) if oa == ob => coerce(a, b),
         (Type::Dict(ak, av), Type::Dict(bk, bv)) => coerce(ak, bk).and_then(|()| coerce(av, bv)),
+        // Two instances of one generic type (a tuple is `__tuple2<A, B>`) agree
+        // when their arguments do, which is how a position that is still open
+        // (`(K, V)` before `K` and `V` are pinned) accepts a settled one.
+        (Type::Generic(an, aa), Type::Generic(bn, ba)) if an == bn && aa.len() == ba.len() => {
+            aa.iter().zip(ba).try_for_each(|(a, b)| coerce(a, b))
+        }
         (Type::Result(ao, ae), Type::Result(bo, be)) => {
             coerce(ao, bo).and_then(|()| coerce(ae, be))
+        }
+        // A tuple with settled elements is the struct named for them
+        // (`tuple_struct_name`), and one with an element still open is an
+        // instance of its arity's template. The settled one fits when the open
+        // ones are all there is to compare, or when the names agree.
+        (Type::Named(an), Type::Generic(bn, ba))
+            if an.starts_with("__tuple$") && bn.starts_with(TUPLE_TEMPLATE) =>
+        {
+            let open = |t: &Type| is_typevar(t) || is_unknown(t);
+            if ba.iter().any(open) || *an == tuple_struct_name(ba) {
+                Ok(())
+            } else {
+                Err(())
+            }
         }
         // A function value goes where a function of the same shape is wanted. What
         // it is given has to fit what it takes, and what it returns has to fit

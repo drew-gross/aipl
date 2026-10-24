@@ -76,7 +76,7 @@
             <a class="anchor" href="#item-performance_function">performance_function</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn performance_function(self: Function, __spat$2508: PerformanceBlock) -&#62; Function</code></pre>
+          <pre class="signature"><code>fn performance_function(self: Function, __spat$2513: PerformanceBlock) -&#62; Function</code></pre>
 
           <div class="doc"><p>The function standing for <code>self</code>'s <code>.performance</code> block. Named at the attribute, which is where a diagnostic about the function itself points.</p></div>
 
@@ -104,7 +104,7 @@
             <a class="anchor" href="#item-renamed">renamed</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn renamed(self: str, renames: (str, str)[]) -&#62; str</code></pre>
+          <pre class="signature"><code>fn renamed(self: str, renames: #{str: str}) -&#62; str</code></pre>
 
           <div class="doc"><p>What <code>name</code> is renamed to by <code>renames</code>, or <code>name</code> itself.</p></div>
 
@@ -118,7 +118,7 @@
             <a class="anchor" href="#item-rename_uses">rename_uses</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn rename_uses(self: Expr, renames: (str, str)[]) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn rename_uses(self: Expr, renames: #{str: str}) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>self</code> with every call to, and every value use of, a name in <code>renames</code> renamed.</p></div>
 

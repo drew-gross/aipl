@@ -161,6 +161,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/dicts/equality | 12 | 864 | 864 | 979 | 4096 | 5.00 | 65.64 | 1472 |
 | cases/dicts/iteration | 82 | 4962 | 1415 | 2906 | 7904 | 21.00 | 87.20 | 1504 |
 | cases/dicts/remove_key | 55 | 4132 | 3900 | 5241 | 14788 | 30.00 | 86.09 | 1504 |
+| cases/dicts/to_dict | 18 | 1118 | 1262 | 1345 | 6104 | 12.00 | 102.92 | 1520 |
 | cases/dicts/values | 13 | 892 | 284 | 1687 | 7776 | 6.00 | 76.83 | 1488 |
 | cases/docs/doc_comments | 8 | 427 | 427 | 340 | 2040 | 9.00 | 65.63 | 1440 |
 | cases/docs/module_docs | 2 | 105 | 105 | 55 | 520 | 5.00 | 74.50 | 1440 |
@@ -434,6 +435,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/optimizations/map_find_if_fusion | 8 | 1926 | 3958 | 15172 | 3024 | 14.00 | 139.21 | 1504 |
 | cases/optimizations/map_map_fusion | 25 | 1043 | 754 | 3247 | 7928 | 20.00 | 91.53 | 1488 |
 | cases/optimizations/map_reduce_fusion | 24 | 1282 | 1229 | 2541 | 6900 | 12.00 | 150.92 | 1456 |
+| cases/optimizations/map_to_dict_fusion | 14 | 732 | 852 | 962 | 3028 | 10.00 | 67.73 | 1504 |
 | cases/optimizations/map_value_or_unwraps | 0 | 0 | 0 | 101 | 684 | 6.00 | 88.47 | 1456 |
 | cases/optimizations/move_last_use | 49 | 2475 | 2450 | 8454 | 12596 | 35.00 | 107.25 | 1488 |
 | cases/optimizations/owned_param_shared_result | 12 | 672 | 720 | 2903 | 3488 | 11.00 | 64.46 | 1504 |
@@ -696,7 +698,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/grammar_sexp | 5209 | 488871 | 13320 | 1968214 | 282464 | 588.00 | 1919.24 | 2320 |
 | crates/aipl-codegen/src/highlight | 506 | 40334 | 7383 | 113014 | 82120 | 72.00 | 547.08 | 1616 |
 | crates/aipl-codegen/src/highlight_aipl | 3961 | 349509 | 112171 | 1361498 | 158348 | 533.00 | 672.91 | 2144 |
-| crates/aipl-codegen/src/hoist_test_fns | 62 | 5055 | 3591 | 4865 | 54684 | 14.00 | 589.13 | 1552 |
+| crates/aipl-codegen/src/hoist_test_fns | 62 | 5055 | 3591 | 3938 | 55036 | 12.00 | 515.11 | 1584 |
 | crates/aipl-codegen/src/indent | 36 | 1886 | 393 | 5204 | 3856 | 8.00 | 154.42 | 1472 |
 | crates/aipl-codegen/src/int_fits | 0 | 0 | 0 | 2177 | 3520 | 4.00 | 67.95 | 1456 |
 | crates/aipl-codegen/src/is_operator_name | 0 | 0 | 0 | 4605 | 42580 | 9.00 | 109.02 | 1488 |
@@ -708,7 +710,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/normalize_output | 16 | 880 | 143 | 2750 | 1968 | 5.00 | 64.27 | 1440 |
 | crates/aipl-codegen/src/operator_named_forms | 16 | 1040 | 1040 | 3256 | 8316 | 7.00 | 66.69 | 1472 |
 | crates/aipl-codegen/src/parse | 7616 | 828498 | 144080 | 3741762 | 642840 | 1004.00 | 3751.20 | 2768 |
-| crates/aipl-codegen/src/parse_and_partial_load | 19092 | 2469059 | 657353 | 8680142 | 4288400 | 2905.00 | 8278.55 | 6544 |
+| crates/aipl-codegen/src/parse_and_partial_load | 19092 | 2469059 | 657353 | 8678946 | 4288660 | 2715.00 | 8225.03 | 6672 |
 | crates/aipl-codegen/src/parse_spec | 147 | 4236 | 2155 | 75000 | 108664 | 39.00 | 268.43 | 1568 |
 | crates/aipl-codegen/src/parse_test_section_header | 0 | 0 | 0 | 1296 | 3232 | 4.00 | 64.92 | 1472 |
 | crates/aipl-codegen/src/parsed | 40 | 2981 | 2521 | 2259 | 47588 | 12.00 | 801.33 | 1520 |
@@ -778,6 +780,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_map_join | 24 | 921 | 624 | 5299 | 13456 | 13.00 | 95.99 | 1504 |
 | crates/aipl-mono/src/builtin_map_ok | 8 | 704 | 704 | 2222 | 14080 | 5.00 | 99.62 | 1424 |
 | crates/aipl-mono/src/builtin_map_reduce | 3 | 216 | 216 | 2840 | 6940 | 6.00 | 145.05 | 1488 |
+| crates/aipl-mono/src/builtin_map_to_dict | 13 | 736 | 864 | 2200 | 6264 | 7.00 | 61.15 | 1536 |
 | crates/aipl-mono/src/builtin_measure | 0 | 0 | 0 | 86 | 424 | 1.00 | 77.87 | 1440 |
 | crates/aipl-mono/src/builtin_nonempty_first | 1 | 56 | 56 | 320 | 1472 | 3.00 | 64.07 | 1440 |
 | crates/aipl-mono/src/builtin_nonempty_last | 1 | 56 | 56 | 376 | 1548 | 3.00 | 74.36 | 1456 |
@@ -793,6 +796,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_set_map | 50 | 1866 | 1738 | 4686 | 12220 | 10.00 | 93.66 | 1488 |
 | crates/aipl-mono/src/builtin_sort_by | 33 | 1816 | 1216 | 13684 | 21372 | 14.00 | 92.55 | 1520 |
 | crates/aipl-mono/src/builtin_split_map | 39 | 3153 | 3153 | 2809 | 6004 | 12.00 | 73.63 | 1504 |
+| crates/aipl-mono/src/builtin_to_dict | 12 | 896 | 992 | 1639 | 5828 | 6.00 | 59.99 | 1536 |
 | crates/aipl-mono/src/builtin_trim_while | 0 | 0 | 0 | 1394 | 3476 | 5.00 | 79.98 | 1456 |
 | crates/aipl-mono/src/builtin_try_map | 42 | 2365 | 2163 | 4408 | 13160 | 10.00 | 96.92 | 1472 |
 | crates/aipl-mono/src/builtin_tuple_windows | 10 | 568 | 664 | 2844 | 5632 | 8.00 | 69.78 | 1504 |

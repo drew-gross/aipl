@@ -234,6 +234,12 @@ pub enum Callee {
     Get,
     ContainsKey,
     RemoveKey,
+    /// `insert_key(mut self: #{K: V}, key: K, value: V)` — bind `key` to `value`,
+    /// replacing whatever it was bound to. The mutating half `to_dict` and
+    /// `map_to_dict` are written with.
+    InsertKey,
+    ToDict,
+    MapToDict,
     Hash,
     Min,
     Max,
@@ -539,6 +545,9 @@ impl Callee {
             Callee::Get => "__builtin_get",
             Callee::ContainsKey => "__builtin_contains_key",
             Callee::RemoveKey => "__builtin_remove_key",
+            Callee::InsertKey => "__builtin_insert_key",
+            Callee::ToDict => "__builtin_to_dict",
+            Callee::MapToDict => "__builtin_map_to_dict",
             Callee::Hash => "__builtin_hash",
             Callee::Min => "__builtin_min",
             Callee::Max => "__builtin_max",

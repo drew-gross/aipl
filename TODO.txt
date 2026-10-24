@@ -535,6 +535,7 @@ Spreading:
   spread in args e.g. fn foo(self: Span { start, end })
 
 dict:
+  dict set key should exist via "set d[k] = v" syntax
   make hash based dicts
 
 nonempty lists:

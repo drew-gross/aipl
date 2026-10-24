@@ -19,7 +19,7 @@
 # helper's name is not tracked, the same way a call's name resolves in the
 # loader.
 
-import { equal as ==, find_if, is_empty, join, map, value_or } from builtins;
+import { equal as ==, get, is_empty, join, map, to_dict, value_or } from builtins;
 import { Call, Expr, Ident, Unit, at, expr, ident, map_subexprs, show_expr } from "./expr.aipl";
 import { performance_fn_name, test_helper_name } from "./fn_names.aipl";
 import { Fn, Function, Item, PerformanceBlock, Program, Signature } from "./item.aipl";
@@ -68,10 +68,9 @@ fn hoisted(self: Function) -> Function[] {
     if (self.test_fns.is_empty()) {
         return [self];
     };
-    let renames = self.test_fns.map(|h| (
-        h.name.text,
-        test_helper_name(self.name.text, h.name.text),
-    ));
+    let renames = self.test_fns
+        .map(|h| (h.name.text, test_helper_name(self.name.text, h.name.text)))
+        .to_dict();
     let owner = Function { ..self, test_body: self.test_body$rename_uses(renames), test_fns: [] };
 
     // The hoisted name is one this pass invented, so it keeps the span of the
@@ -86,18 +85,16 @@ fn hoisted(self: Function) -> Function[] {
 }
 
 # What `name` is renamed to by `renames`, or `name` itself.
-fn renamed(self: str, renames: (str, str)[]) -> str {
-    renames.find_if(|r| r.0 == self)$1.value_or(self)
-}.test({
-    assert("a".renamed([("a", "b"), ("c", "d")]) == "b");
-    assert("c".renamed([("a", "b"), ("c", "d")]) == "d");
-    assert("e".renamed([("a", "b")]) == "e");
-    assert("a".renamed([]) == "a");
+fn renamed(self: str, renames: #{str: str}) -> str { renames.get(self).value_or(self) }.test({
+    assert("a".renamed(#{"a": "b", "c": "d"}) == "b");
+    assert("c".renamed(#{"a": "b", "c": "d"}) == "d");
+    assert("e".renamed(#{"a": "b"}) == "e");
+    assert("a".renamed(#{}) == "a");
 })
 
 # `self` with every call to, and every value use of, a name in `renames`
 # renamed.
-fn rename_uses(self: Expr, renames: (str, str)[]) -> Expr {
+fn rename_uses(self: Expr, renames: #{str: str}) -> Expr {
     let kind = match (self.kind) {
         Ident(name) => Ident(name.renamed(renames)),
         Call(name, args, method_style) => Call(name.renamed(renames), args, method_style),
@@ -105,7 +102,7 @@ fn rename_uses(self: Expr, renames: (str, str)[]) -> Expr {
     };
     Expr { ..self, kind }.map_subexprs(|child| child.rename_uses(renames))
 }.test({
-    let renames = [("four", "__test$f$four")];
+    let renames = #{"four": "__test$f$four"};
     // A call, a value use, and a use nested in both.
     let used = expr(Call("four", [ident("four"), expr(Call("g", [ident("four")], false))], false));
     assert(

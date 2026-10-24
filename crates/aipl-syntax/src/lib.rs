@@ -3248,6 +3248,11 @@ fn __builtin_contains_key<K: any, V: any>(self: #{K: V}, key: K) -> bool { false
 # receiver, so `set d.remove_key(k);` writes back the way every mutating method
 # does; in expression position it copies-and-modifies like one too.
 fn __builtin_remove_key<K: any, V: any>(mut self: #{K: V}, key: K) {}
+# Bind `key` to `value`, in place: a key the dict already holds takes the new
+# value and keeps its place, any other is added after the existing ones — so
+# the last write to a key wins. The counterpart of `remove_key`, with the same
+# `mut self` receiver. Internal: `to_dict` is the spelling.
+fn __builtin_insert_key<K: any, V: any>(mut self: #{K: V}, key: K, value: V) {}
 
 # `map` also takes an optional receiver — `opt.map(f)` is `U?`, `some(f(v))`
 # for `some(v)` and `none` for `none` — which the checker and mono dispatch
@@ -3311,7 +3316,7 @@ fn __builtin_try_set<T: any>(mut self: T[], index: u64, value: T) {}
 // NOTE: `all`, `count_while`, `count_if`, `count_if_is_less_than` and its five siblings, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
 // `join_is_nonempty`, `join_is_empty`, `reduce`, `repeat`, `map_reduce`, `filter_map_reduce`, `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
-// `extend_optional`, `inline_str`, `measure`, `range`, `set_map`, `tuple_windows`, `union_all`,
+// `extend_optional`, `inline_str`, `measure`, `range`, `set_map`, `to_dict`, `map_to_dict`, `tuple_windows`, `union_all`,
 // `value_or`, and `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
 // which is the single source of both their body and their signature: the loader
@@ -3812,8 +3817,10 @@ pub fn is_none_literal_arg(t: &Type) -> bool {
 /// has made the test, and nothing else gets to skip it. `extend_optional` is one
 /// *shape* of `extend` rather than an operation of its own — `extend` is the
 /// spelling, and a public second name for the shape would be the hand-rolled
-/// helper it replaced.
+/// helper it replaced. `insert_key` is what `to_dict` and `map_to_dict` are
+/// written with; `to_dict` is the way to build a dict from outside.
 pub const INTERNAL_BUILTINS: &[Callee] = &[
+    Callee::InsertKey,
     Callee::Reserve,
     Callee::AssumeNonempty,
     Callee::ExtendOptional,
