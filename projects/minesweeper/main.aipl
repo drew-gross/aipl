@@ -5,6 +5,7 @@
 import {
     all,
     any,
+    cartesian_product,
     count_if,
     drop_first,
     equal as ==,
@@ -107,13 +108,11 @@ fn is_mine(self: Mark[,], cell: (u64, u64)) -> bool {
 # wraps around to a huge number, which is off the board like any other.
 fn neighbors(self: Mark[,], cell: (u64, u64)) -> (u64, u64)[] {
     mut out: (u64, u64)[] = [];
-    for (let up : 0..3) {
-        for (let left : 0..3) {
-            let neighbor = (cell.0 + up - 1, cell.1 + left - 1);
-            if (neighbor.is_in_bounds_of(self) && neighbor != cell) {
-                set out.push(neighbor);
-            };
-        }
+    for (let offset : (0..3).cartesian_product(0..3)) {
+        let neighbor = (cell.0 + offset.0 - 1, cell.1 + offset.1 - 1);
+        if (neighbor.is_in_bounds_of(self) && neighbor != cell) {
+            set out.push(neighbor);
+        };
     }
     out
 }.test({
@@ -150,16 +149,11 @@ fn flood(mut self: Mark[,], frontier: (u64, u64)[]) {
     while (pending.is_nonempty()) {
         let cell = pending[0].value_or((0, 0));
         set pending = pending.drop_first();
-        match (self[cell]) {
-            some(Hidden(mine)) => {
-                if (!mine) {
-                    set self[cell] = Revealed(false) else {};
-                    if (self.adjacent_mines(cell) == 0) {
-                        set pending.extend(self.neighbors(cell));
-                    };
-                };
-            },
-            some(Flagged(..)) | some(Revealed(..)) | none => {},
+        if (self[cell] == some(Hidden(false))) {
+            set self[cell] = Revealed(false) else {};
+            if (self.adjacent_mines(cell) == 0) {
+                set pending.extend(self.neighbors(cell));
+            };
         };
     }
 }

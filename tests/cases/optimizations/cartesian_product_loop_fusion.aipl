@@ -1,0 +1,58 @@
+# Loop fusion: `for (let pair : xs.cartesian_product(ys))` walks the pairs with two
+# nested loops instead of building the array of every pairing first.
+#
+# The `--- report ---` is the evidence: `weighted_sum` never builds the pairs, so
+# the one `aipl_array_with_cap` in the program is the array of `numbered`, whose
+# index binder numbers the pairs and so keeps the loop as written.
+
+import {
+    cartesian_product,
+    print,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+    wrapping_mul as *,
+} from builtins;
+
+fn weighted_sum(n: u64) -> u64 {
+    mut total: u64 = 0;
+    for (let pair : (0..n).cartesian_product(0..n)) {
+        set total += pair.0 * pair.1;
+    }
+    total
+}
+
+fn numbered(n: u64) -> u64 {
+    mut total: u64 = 0;
+    for (let index, pair : (0..n).cartesian_product(0..n)) {
+        set total += index + pair.0;
+    }
+    total
+}
+
+fn main() !prints {
+    print(`{weighted_sum(3)}`);
+    print(`{numbered(3)}`);
+}
+--- stdout ---
+9
+45
+--- report ---
+allocations       5
+deallocations     5
+reallocations     4
+bytes allocated   147
+peak live bytes   387
+instructions      1535
+binary size       4728 bytes (code 2968, data 9, metadata 1751)
+
+function                 calls  code bytes
+__to_str_u64                 2         204
+aipl_arr_inc                 1    external
+aipl_array_dec               3    external
+aipl_array_with_cap          2    external
+aipl_shim_get                2    external
+aipl_u64_len                 4    external
+aipl_write_u64               2    external
+main                         1        1956
+main$map3                    0         404
+main$map5                    0         404

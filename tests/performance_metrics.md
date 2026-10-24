@@ -400,6 +400,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/optimizations/appending_variant_not_minted | 12 | 556 | 452 | 508 | 2152 | 8.00 | 73.02 | 1456 |
 | cases/optimizations/borrowed_bindings | 35 | 2223 | 2223 | 4546 | 10216 | 23.00 | 77.48 | 1488 |
 | cases/optimizations/builds_into_struct_stays_in_place | 0 | 0 | 0 | 3 | 8 | 0.00 | 84.94 | 1408 |
+| cases/optimizations/cartesian_product_loop_fusion | 5 | 147 | 387 | 1535 | 2968 | 8.00 | 112.54 | 1520 |
 | cases/optimizations/const_array_literal | 36 | 1970 | 1970 | 5895 | 9680 | 26.00 | 138.28 | 1472 |
 | cases/optimizations/const_fold | 0 | 0 | 0 | 2 | 8 | 0.00 | 82.31 | 1392 |
 | cases/optimizations/const_fold_concat | 0 | 0 | 0 | 18 | 160 | 4.00 | 85.33 | 1424 |
@@ -735,6 +736,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/walker | 75399 | 18321577 | 813580 | 64928816 | 15730248 | 12131.00 | 28940.66 | 10784 |
 | crates/aipl-mono/src/builtin_all | 0 | 0 | 0 | 1265 | 2884 | 3.00 | 108.24 | 1456 |
 | crates/aipl-mono/src/builtin_any | 0 | 0 | 0 | 1043 | 2784 | 2.00 | 105.91 | 1456 |
+| crates/aipl-mono/src/builtin_cartesian_product | 10 | 680 | 1016 | 3339 | 6536 | 7.00 | 70.18 | 1520 |
 | crates/aipl-mono/src/builtin_count | 1 | 104 | 104 | 1717 | 2556 | 3.00 | 93.41 | 1440 |
 | crates/aipl-mono/src/builtin_count_if | 1 | 104 | 104 | 2196 | 4752 | 4.00 | 106.45 | 1472 |
 | crates/aipl-mono/src/builtin_count_if_is_at_least | 0 | 0 | 0 | 1664 | 2824 | 3.00 | 113.74 | 1456 |

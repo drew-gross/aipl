@@ -203,6 +203,19 @@ pub(super) fn build(whole: &Expr, blocked: &HashSet<String>) -> Option<Expr> {
             whole,
         )));
     }
+    if *name == Callee::CartesianProduct {
+        // `for (let pair : xs.cartesian_product(ys))`: the pairs are walked by two
+        // nested loops instead of an array of every pair being built first. An
+        // index binder would number the pairs, which the nested loops do not
+        // count, so it keeps the loop as written.
+        let [recv, other] = args.as_slice() else {
+            return None;
+        };
+        if index.is_some() {
+            return None;
+        }
+        return Some(rebuild(build_product(whole, var, recv, other, body)));
+    }
     // Every fusion below loops over the *source* sequence with the derivation
     // folded into the body, so an index binder would change what it counts: over
     // `xs.filter(p)` it numbers the survivors, and over `xs` with the test
@@ -432,6 +445,56 @@ fn build_windows(
     Expr::rebuilt(
         ExprKind::Let(src, None, Box::new(recv.clone()), Box::new(counted)),
         whole,
+    )
+}
+
+/// `for (let var : recv.cartesian_product(other)) { body }` as two nested loops:
+///
+/// ```text
+/// let $left = recv;
+/// let $right = other;
+/// for (let $a : $left) { for (let $b : $right) { let var = ($a, $b); body } }
+/// ```
+///
+/// Both sides are evaluated once, first the receiver, before the first iteration,
+/// as the call evaluates its arguments. The pairs reach `body` in the order the
+/// array holds them: every `$b` for the first `$a`, then for the next.
+fn build_product(whole: &Expr, var: &str, recv: &Expr, other: &Expr, body: &Expr) -> Expr {
+    let id = crate::next_inline_id();
+    let sp = || recv.span.clone();
+    let name = |what: &str| format!("$fuse{id}_{what}");
+    let ident = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), sp());
+    let unit = || Expr::new(ExprKind::Unit, sp());
+    let (left, right, a, b) = (name("left"), name("right"), name("a"), name("b"));
+    // The pair is spanned as the call it replaces, so a diagnostic about it points
+    // at what was written.
+    let pair = Expr::new(ExprKind::TupleLit(vec![ident(&a), ident(&b)]), sp());
+    let paired = Expr::new(
+        ExprKind::Let(
+            var.to_string(),
+            None,
+            Box::new(pair),
+            Box::new(body.clone()),
+        ),
+        sp(),
+    );
+    let inner = Expr::new(
+        ExprKind::For(b, None, Box::new(ident(&right)), Box::new(paired)),
+        sp(),
+    );
+    // A loop's own value is an `i64`; sequenced to unit so the outer body is unit.
+    let outer_body = Expr::new(ExprKind::Seq(Box::new(inner), Box::new(unit())), sp());
+    let outer = Expr::rebuilt(
+        ExprKind::For(a, None, Box::new(ident(&left)), Box::new(outer_body)),
+        whole,
+    );
+    let right_bound = Expr::new(
+        ExprKind::Let(right, None, Box::new(other.clone()), Box::new(outer)),
+        sp(),
+    );
+    Expr::new(
+        ExprKind::Let(left, None, Box::new(recv.clone()), Box::new(right_bound)),
+        sp(),
     )
 }
 

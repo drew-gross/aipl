@@ -5122,6 +5122,11 @@ impl Cx<'_> {
             // A grid is walked by its cells, so `any` takes one as the array of
             // them (monomorphization rewrites the receiver to `grid.cells`).
             let aty = match &aty {
+                // A span given to `cartesian_product` is the array of its positions,
+                // so `(0..3).cartesian_product(0..3)` is a `(u64, u64)[]`.
+                Type::Named(n) if *callee == Callee::CartesianProduct && n == SPAN_TYPE => {
+                    Type::Array(Box::new(Type::Primitive(Primitive::U64)))
+                }
                 Type::Named(n)
                     if *callee == Callee::Any && i == 0 && aipl_syntax::is_grid_instance(n) =>
                 {

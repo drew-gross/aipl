@@ -267,6 +267,7 @@ const BUILTINS: &[Builtin] = &[
     Builtin::declared(Callee::Narrow),
     Builtin::aipl(Callee::TrimWhile, "builtin_trim_while.aipl"),
     Builtin::aipl(Callee::Words, "builtin_words.aipl"),
+    Builtin::aipl(Callee::CartesianProduct, "builtin_cartesian_product.aipl"),
     Builtin::aipl(Callee::Count, "builtin_count.aipl"),
     Builtin::aipl(Callee::CountWhile, "builtin_count_while.aipl"),
     Builtin::aipl(Callee::CountIf, "builtin_count_if.aipl"),

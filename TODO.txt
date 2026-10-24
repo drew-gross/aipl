@@ -392,8 +392,7 @@ companion_files.aipl:
 
 formatter:
   some way to allow really long string literals to wrap
-  my new pattern walker laid out a constructor's payload with comma_list_docs, which breaks long lists across lines with a trailing comma — and the pattern grammar takes no trailing comma, so aipl fmt rewrote three compiler sources (Let(\n name,\n …,\n) =>) into something that no longer parsed. <--- the formatter should decide whether to output a trailing comma based on the grammer definition. Why isn't it doing that?
-  variant_case_docs.aipl is weird: having the leading | should force splitting each onto own line
+  the formatter should decide whether to output a trailing comma based on the grammer definition
   wrap comments
   make the formatter work on the ast, not the token stream. Needs to make the ast not desugar (or at least be able to recover from desugaring)
   formatter gets list separater directly off the Many,
@@ -785,6 +784,7 @@ expression matcher:
   use it for operation fusion
 
 vscode:
+  have the server able to run tests and show how many are passing (probably needs to have tests auto-shim first)
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 
 handoff:
