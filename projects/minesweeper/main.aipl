@@ -288,10 +288,8 @@ fn parse_command(self: Mark[,], line: str) -> Command!str {
     if (verb == "q") {
         ok(Quit)
     } else if (verb == "r" || verb == "f") {
-        let row = words.number(1)?;
-        let column = words.number(2)?;
-        if ((row, column).is_in_bounds_of(self)) {
-            let cell = (row, column);
+        let cell = (words.number(1)?, words.number(2)?);
+        if (cell.is_in_bounds_of(self)) {
             ok(if (verb == "r") { Reveal(cell) } else { Flag(cell) })
         } else {
             err("that is off the board")
