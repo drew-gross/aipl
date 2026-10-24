@@ -1,0 +1,44 @@
+# The AIPL implementation of the `words` builtin. The loader names this function
+# by the canonical name `__builtin_words` (see `aipl_syntax::aipl_builtins`), so a
+# user's `line.words()` resolves through the ordinary machinery — the in-file name
+# is only for this file's own tests, which read exactly like user code.
+#
+# No lint points `s.trim().split(" ").filter(is_nonempty)` here: it is one site so
+# far, and it splits on spaces only, so the rewrite would also change what a tab
+# does.
+
+import {
+    count_while,
+    equal as ==,
+    is_empty,
+    is_nonempty,
+    is_whitespace,
+    logical_not as !,
+    push,
+    trim_while,
+} from builtins;
+
+# The words of `self`: the runs of characters between ASCII whitespace (space, tab,
+# newline, carriage return, vertical tab and form feed), in order. Leading,
+# trailing and repeated whitespace separate words but never make an empty one, so
+# a string with no words, empty or all whitespace, gives `[]`.
+#
+# See `split` to cut at one exact separator and keep the empty pieces between.
+pub fn words(self: str) -> str[] {
+    mut out: str[] = [];
+    mut rest = self.trim_while(is_whitespace);
+    while (rest.is_nonempty()) {
+        let length = rest.count_while(|c| !c.is_whitespace());
+        set out.push(rest[..length]);
+        set rest = rest[length..].trim_while(is_whitespace);
+    }
+    out
+}.test({
+    assert("r 0 1".words() == ["r", "0", "1"]);
+    assert("  r   0 1  ".words() == ["r", "0", "1"]); // runs and edges of spaces
+    assert("a\tb\nc".words() == ["a", "b", "c"]); // any whitespace separates
+    assert("one".words() == ["one"]);
+    assert("".words().is_empty()); // no words
+    assert("   ".words().is_empty()); // only whitespace
+    assert(words("a b") == ["a", "b"]); // free-call form
+})

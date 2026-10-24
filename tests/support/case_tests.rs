@@ -1058,6 +1058,7 @@ case_tests! {
     crates_aipl_mono_src_builtin_value_or = "crates/aipl-mono/src/builtin_value_or",
     crates_aipl_mono_src_builtin_value_or_err = "crates/aipl-mono/src/builtin_value_or_err",
     crates_aipl_mono_src_builtin_width = "crates/aipl-mono/src/builtin_width",
+    crates_aipl_mono_src_builtin_words = "crates/aipl-mono/src/builtin_words",
     examples_arrays = "examples/arrays",
     examples_hello = "examples/hello",
     examples_imports = "examples/imports",

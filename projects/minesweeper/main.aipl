@@ -9,7 +9,6 @@ import {
     drop_first,
     equal as ==,
     extend,
-    filter,
     first,
     grid_from,
     has,
@@ -33,12 +32,11 @@ import {
     saturating_remainder as %,
     seeded_with_clock,
     seeded_with_int,
-    split,
     to_set,
-    trim,
     value_or,
     value_or_err,
     width,
+    words,
     wrapping_add as +,
     wrapping_mul as *,
     wrapping_sub as -,
@@ -285,7 +283,7 @@ fn number(self: str[], at: u64) -> u64!str {
 # What the player typed: `r ROW COLUMN` to reveal, `f ROW COLUMN` to flag or
 # unflag, `q` to quit.
 fn parse_command(self: Mark[,], line: str) -> Command!str {
-    let words = line.trim().split(" ").filter(is_nonempty);
+    let words = line.words();
     let verb = words.first().value_or_err("type r ROW COLUMN, f ROW COLUMN or q")?;
     if (verb == "q") {
         ok(Quit)

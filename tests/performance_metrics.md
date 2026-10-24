@@ -808,6 +808,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_value_or | 0 | 0 | 0 | 591 | 2368 | 2.00 | 70.91 | 1456 |
 | crates/aipl-mono/src/builtin_value_or_err | 0 | 0 | 0 | 918 | 4348 | 3.00 | 77.03 | 1440 |
 | crates/aipl-mono/src/builtin_width | 1 | 104 | 104 | 174 | 784 | 3.00 | 81.93 | 1440 |
+| crates/aipl-mono/src/builtin_words | 10 | 728 | 968 | 6989 | 6036 | 7.00 | 107.26 | 1504 |
 | examples/arrays | 3 | 168 | 168 | 822 | 1132 | 2.00 | 68.65 | 1424 |
 | examples/hello | 0 | 0 | 0 | 25579118 | 184 | 3136.00 | 69.78 | 1408 |
 | examples/imports | 0 | 0 | 0 | 12 | 60 | 0.00 | 62.26 | 1392 |
