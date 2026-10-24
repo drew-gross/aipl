@@ -355,6 +355,7 @@ matrices:
   support retrieving a row/col
 
 types:
+  make without work for fields, then you can spread the original type into them
   function-typed parameters can't be passed as values or forwarded to helpers like map
   lambdas can't capture function typed parameters. eta-lint conflicts
   let/match refines scrutinee in remaining arms
@@ -463,6 +464,17 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  - Lints see the written form of a destructuring parameter. Today the parser
+    lowers `fn f(P { a, b })` to a synthetic `__spat$N` parameter plus a `let`
+    per field at the head of the body, before the lints run, so each lint that
+    cares has to recognise that lowering (`through_parameter_patterns` in
+    lint.rs, `opening_destructure` in destructure_param.rs). Keep the pattern in
+    the AST instead (e.g. a `parameter_patterns` field on `Function`, filled by
+    the lowering in grammar_aipl.aipl from `ParsedParam`'s `fields`/`names`), then
+    delete the recognisers. Wait until the Rust AST bindings have moved into AIPL,
+    since the field would otherwise be added to both sides. Same question applies
+    to the `for (let P { .. } : xs)` and `let P { .. } = v;` lowerings (`__fpat$`,
+    `__spat$` temporaries).
   test that one allow squelches multiple errors on the same line
   linter should apply after import resolution so that it doesn't rely on function names as selected by the user (i.e. import as can't interfere with a lint)
   lint against unused variables, apparently there are 2 in callers of own_texts

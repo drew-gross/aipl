@@ -24,10 +24,15 @@ fn tag(id: i64) -> Tag { Tag { id: id + 0 } }
 // instead of a block whose value is `id`.
 fn tag_short(id: i64) -> Tag { Tag { id } }
 
+// A destructured parameter is not a statement in the body, so the literal is
+// still the whole body.
+fn from_tag(Tag { id }) -> Tag { Tag { id: id + 1 } }
+
 fn main() !prints {
     print(make(1, 2).x.to_str());
     print(tag(1).id.to_str());
     print(tag_short(2).id.to_str());
+    print(from_tag(Tag { id: 1 }).id.to_str());
 }
 --- errors ---
 error: field "x" is set to the identifier of the same name — use the shorthand "x" (or append #[allow] to this line to keep it)
@@ -59,3 +64,9 @@ error: fn "tag_short" returns "Tag" and its body is a "Tag" literal, naming the 
    |
 25 | fn tag_short(id: i64) -> Tag { Tag { id } }
    |                                ^^^^^^^^^^
+
+error: fn "from_tag" returns "Tag" and its body is a "Tag" literal, naming the type twice — write the fields directly as the body (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_struct_literals.aipl:29:34
+   |
+29 | fn from_tag(Tag { id }) -> Tag { Tag { id: id + 1 } }
+   |                                  ^^^^^^^^^^^^^^^^^^

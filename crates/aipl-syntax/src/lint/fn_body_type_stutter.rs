@@ -1,3 +1,4 @@
+use super::through_parameter_patterns;
 use crate::ast::{ExprKind, Item, Program, Type};
 use crate::Error;
 
@@ -14,7 +15,9 @@ use crate::Error;
 ///
 /// Only a body that is *exactly* the literal qualifies: a block with any
 /// statement in it parses to a `Let`/`Seq` wrapping the literal, and the
-/// shorthand replaces the whole body, so those are left alone.
+/// shorthand replaces the whole body, so those are left alone. The bindings a
+/// parameter pattern lowers to are not statements anyone wrote, so they do not
+/// count against that.
 pub(super) fn fn_body_type_stutter(program: &Program, src: &str, hits: &mut Vec<Error>) {
     for item in &program.items {
         let Item::Fn(f) = item else {
@@ -27,7 +30,10 @@ pub(super) fn fn_body_type_stutter(program: &Program, src: &str, hits: &mut Vec<
             Some(Type::Generic(base, _)) => base,
             _ => continue,
         };
-        let ExprKind::Construct(name, inits) = &f.body.kind else {
+        // A destructured parameter lowers to bindings at the head of the body,
+        // so the literal is what is left once they are looked through.
+        let literal = through_parameter_patterns(f);
+        let ExprKind::Construct(name, inits) = &literal.kind else {
             continue;
         };
         // A construct the parser synthesized from other syntax (a range is
@@ -39,7 +45,7 @@ pub(super) fn fn_body_type_stutter(program: &Program, src: &str, hits: &mut Vec<
         // `{}` has no shorthand (it would read as an empty block), and the
         // source scan below needs the body to start at the type name.
         let Some(rest) = src
-            .get(f.body.span.start..)
+            .get(literal.span.start..)
             .and_then(|s| s.strip_prefix(name.as_str()))
         else {
             continue;
@@ -67,7 +73,7 @@ pub(super) fn fn_body_type_stutter(program: &Program, src: &str, hits: &mut Vec<
                  twice — {advice} (or append #[allow] to this line to keep it)",
                 f.name
             ),
-            f.body.span.clone(),
+            literal.span.clone(),
         ));
     }
 }

@@ -31,6 +31,13 @@ fn main() {}.test({
     // A literal nested inside the shorthand body still names its own type.
     fn nested(x: i64) -> Other { n: Point { x, y: x }.y }
 
+    // A destructuring `let` is a statement the user wrote, unlike a parameter
+    // pattern, and the shorthand would drop it.
+    fn unpacked(source: Point) -> Point {
+        let Point { x, y } = source; #[allow]
+        Point { x: y, y: x }
+    }
+
     // No declared return type, so there is nothing for the shorthand to name.
     fn discards(x: i64) {
         let _ = Point { x, y: 0 };
@@ -41,5 +48,6 @@ fn main() {}.test({
     assert(projected(3) == 3);
     assert(forwarded(4) == Point { x: 4, y: 0 });
     assert(nested(5).n == 5);
+    assert(unpacked(Point { x: 1, y: 2 }) == Point { x: 2, y: 1 });
     discards(6);
 })

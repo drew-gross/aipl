@@ -49,7 +49,7 @@ mod unused_imports;
 mod value_or_compare;
 mod with_value_or_self;
 
-use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
+use crate::ast::{Expr, ExprKind, Function, ImportSource, Item, Program};
 use crate::{each_expr, each_subexpr, Error, Span};
 use std::collections::{HashMap, HashSet};
 
@@ -638,4 +638,26 @@ fn rebinds(e: &Expr, name: &str) -> bool {
             .any(|a| a.pattern.bindings().iter().any(|b| b == name)),
         _ => false,
     }
+}
+
+/// `function`'s body without the bindings its destructuring parameters lower to:
+/// a synthetic `__spat$` parameter, and at the head of the body one `let` per
+/// field reading it. What remains is the body the user wrote. A destructuring
+/// `let` in the body binds a temporary of its own rather than a parameter, so it
+/// is not looked through.
+fn through_parameter_patterns(function: &Function) -> &Expr {
+    let mut current = &function.body;
+    while let ExprKind::Let(_, None, read, rest) = &current.kind {
+        let ExprKind::Field(base, _) = &read.kind else {
+            break;
+        };
+        let reads_pattern_parameter = matches!(&base.kind, ExprKind::Ident(b)
+            if b.starts_with(crate::DESTRUCTURE_BASE_PREFIX)
+                && function.sig.params.iter().any(|p| p.name == *b));
+        if !reads_pattern_parameter {
+            break;
+        }
+        current = rest;
+    }
+    current
 }

@@ -52,16 +52,14 @@ fn function_items(self: Function) -> Item[] {
 # The function standing for `self`'s `.performance` block. Named at the
 # attribute, which is where a diagnostic about the function itself points.
 fn performance_function(self: Function, PerformanceBlock { body, fns, span }) -> Function {
-    Function {
-        name: SpanStr { text: performance_fn_name(self.name.text), span },
-        is_pub: false,
-        sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
-        body: at(Unit, span),
-        test_body: some(body),
-        test_fns: fns,
-        performance: none,
-        doc: none,
-    }
+    name: SpanStr { text: performance_fn_name(self.name.text), span },
+    is_pub: false,
+    sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
+    body: at(Unit, span),
+    test_body: some(body),
+    test_fns: fns,
+    performance: none,
+    doc: none,
 }
 
 # `self` followed by the functions declared in its `.test` block, renamed. A
