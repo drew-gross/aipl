@@ -177,6 +177,17 @@ pub(crate) extern "C" fn aipl_print(s: *const Str) {
     print(unsafe { *s });
 }
 
+/// `put(s)`: the value's bytes with no newline, streamed to stdout and flushed,
+/// since standard output is line buffered and nothing else would release them.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_put(s: *const Str) {
+    use std::io::Write;
+    let stdout = std::io::stdout();
+    let mut out = stdout.lock();
+    let _ = write_to(unsafe { *s }, &mut out);
+    let _ = out.flush();
+}
+
 /// `error: <msg>` under the new ABI.
 #[no_mangle]
 pub(crate) extern "C" fn aipl_print_error(s: *const Str) {

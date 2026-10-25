@@ -46,6 +46,8 @@ pub enum SeqShape {
 pub enum Callee {
     // ---- importable builtins: `import { name } from builtins;` ----
     Print,
+    /// `put(s)` — `print` without the newline (`!prints`).
+    Put,
     Split,
     SplitLen,
     Join,
@@ -433,6 +435,7 @@ impl Callee {
     pub fn name(&self) -> &str {
         match self {
             Callee::Print => "__builtin_print",
+            Callee::Put => "__builtin_put",
             Callee::Split => "__builtin_split",
             Callee::SplitLen => "__builtin_split_len",
             Callee::Join => "__builtin_join",

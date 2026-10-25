@@ -160,6 +160,7 @@ impl Builtin {
 
 const BUILTINS: &[Builtin] = &[
     Builtin::declared(Callee::Print),
+    Builtin::declared(Callee::Put),
     Builtin::declared(Callee::Split),
     Builtin::declared(Callee::SplitLen),
     Builtin::declared(Callee::Join),

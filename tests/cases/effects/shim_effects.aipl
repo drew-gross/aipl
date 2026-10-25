@@ -13,6 +13,7 @@ import {
     list_files,
     move_to,
     print,
+    put,
     read_byte,
     read_file_to_string,
     read_line,
@@ -25,11 +26,12 @@ import {
 fn swallow(s: str) {}
 
 fn greet() !prints {
-    print("hello");
+    put("hel");
+    print("lo");
 }
 
 fn shimmed_print() {
-    shim prints { print = swallow } {
+    shim prints { print = swallow, put = swallow } {
         greet();
     };
 }

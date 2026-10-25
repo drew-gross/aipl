@@ -3267,6 +3267,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
     // the 8-byte originals, which an artifact may still name — that is what let
     // the switch be tested one case at a time, and codegen now emits only these.
     jit_builder.symbol("aipl_print", str24_host::aipl_print as *const u8);
+    jit_builder.symbol("aipl_put", str24_host::aipl_put as *const u8);
     jit_builder.symbol(
         "aipl_print_error",
         str24_host::aipl_print_error as *const u8,
@@ -6898,6 +6899,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
     match sym {
         // ---- nothing back ----
         "aipl_print"
+        | "aipl_put"
         | "aipl_print_error"
         | "aipl_inc"
         | "aipl_dec"
@@ -7192,6 +7194,7 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
     // arguments — see `borrowed_param` — so there is nothing else to record.
     const SIG_REGS: &[(Callee, &str)] = &[
         (Callee::Print, "aipl_print"),
+        (Callee::Put, "aipl_put"),
         (Callee::Split, "aipl_str_split"),
         (Callee::SplitLen, "aipl_str_split_len"),
         (Callee::ReadFileToString, "aipl_read_file_to_string"),

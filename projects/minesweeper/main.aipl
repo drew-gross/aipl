@@ -3,6 +3,12 @@
 # The mines are placed at random (`place_mines`), seeded in `main`.
 
 import {
+    Down,
+    Key,
+    Left,
+    Other,
+    Right,
+    Up,
     all,
     any,
     cartesian_product,
@@ -11,7 +17,6 @@ import {
     drop_first,
     equal as ==,
     extend,
-    first,
     grid_from,
     has,
     height,
@@ -25,12 +30,13 @@ import {
     logical_not as !,
     logical_or as ||,
     map,
-    narrow,
+    move_to,
     not_equal as !=,
     print,
     push,
+    put,
     random_u64,
-    read_line,
+    read_key,
     saturating_remainder as %,
     seeded_with_clock,
     seeded_with_int,
@@ -38,7 +44,6 @@ import {
     value_or,
     value_or_err,
     width,
-    words,
     wrapping_add as +,
     wrapping_mul as *,
     wrapping_sub as -,
@@ -47,9 +52,6 @@ import {
 # What the player has done to a cell, and whether it holds a mine. A board is a
 # `Mark[,]`: one `Mark` for each cell.
 variant Mark = Hidden(bool) | Flagged(bool) | Revealed(bool)
-
-# What the player asked for.
-variant Command = Reveal((u64, u64)) | Flag((u64, u64)) | Quit
 
 # Where a game stands.
 variant Status = Playing | Won | Lost
@@ -245,102 +247,192 @@ fn symbol(self: Mark[,], cell: (u64, u64), show_mines: bool) -> str {
 }
 
 # The board as text: a row of column numbers, then each row led by its number.
-fn render(self: Mark[,], show_mines: bool) -> str {
-    let heads = (0..self.width()).map(|column| `{column}`);
+# Every cell is three characters wide, so the cell at `cursor` can be drawn in
+# brackets, `[#]`, where the others have a space either side; `none` marks no cell.
+fn render(self: Mark[,], show_mines: bool, cursor: (u64, u64)?) -> str {
+    let heads = (0..self.width()).map(|column| ` {column} `);
     let rows = (0..self.height()).map(|row| {
-        let symbols = (0..self.width()).map(|column| self.symbol((row, column), show_mines));
-        `{row} {symbols.join(sep=" ")}`
+        let cells = (0..self.width()).map(|column| {
+            let symbol = self.symbol((row, column), show_mines);
+            if (cursor == some((row, column))) { `[{symbol}]` } else { ` {symbol} ` }
+        });
+        `{row} {cells.join(sep="")}`
     });
-    [`  {heads.join(sep=" ")}`, ..rows].join(sep="\n")
+    [`  {heads.join(sep="")}`, ..rows].join(sep="\n")
 }.test({
     let game = new_game(3, 2, [5]).reveal((0, 0));
-    assert(game.render(false) == """
-          0 1 2
-        0 . 1 #
-        1 . 1 #
-    """);
+    assert(
+        game.render(false, none) == ["   0  1  2 ", "0  .  1  # ", "1  .  1  # "].join(sep="\n"),
+    );
+    let cell: (u64, u64) = (1, 1);
+    assert(
+        game.render(false, some(cell)) == ["   0  1  2 ", "0  .  1  # ", "1  . [1] # "].join(
+            sep="\n",
+        ),
+    );
 })
 
-# The number `self` holds at `at`.
-fn number(self: str[], at: u64) -> u64!str {
-    let word = self[at].value_or_err("missing a number")?;
-    let parsed = word.int_parse().value_or_err(`not a number: {word}`)?;
-    let unsigned: u64? = parsed.narrow();
-    // A negative number is no position on any board.
-    unsigned.value_or_err("that is off the board")
-}.test({
-    assert(["r", "4"].number(1) == ok(4));
-    assert(["r", "-4"].number(1) == err("that is off the board"));
-    assert(["r"].number(1) == err("missing a number"));
-    assert(["r", "x"].number(1) == err("not a number: x"));
+# One step toward the start of a board's side, stopping at the first cell.
+fn before(self: u64) -> u64 { if (self == 0) { self } else { self - 1 } }.test({
+    assert(0.before() == 0);
+    assert(3.before() == 2);
 })
 
-# What the player typed: `r ROW COLUMN` to reveal, `f ROW COLUMN` to flag or
-# unflag, `q` to quit.
-fn parse_command(self: Mark[,], line: str) -> Command!str {
-    let words = line.words();
-    let verb = words.first().value_or_err("type r ROW COLUMN, f ROW COLUMN or q")?;
-    if (verb == "q") {
-        ok(Quit)
-    } else if (verb == "r" || verb == "f") {
-        let cell = (words.number(1)?, words.number(2)?);
-        if (cell.is_in_bounds_of(self)) {
-            ok(if (verb == "r") { Reveal(cell) } else { Flag(cell) })
+# One step toward the end of a side `length` cells long, stopping at the last.
+fn after(self: u64, length: u64) -> u64 { if (self + 1 < length) { self + 1 } else { self } }.test({
+    assert(0.after(3) == 1);
+    assert(2.after(3) == 2);
+    assert(0.after(0) == 0);
+})
+
+# A game, and the cell the player's cursor is on.
+struct Session { game: Mark[,], cursor: (u64, u64) }
+
+# Whether play goes on, and if so from where.
+variant Turn = Continue(Session) | Quit
+
+# The keys that are not arrows, as the bytes `read_key` reports for them.
+let REVEAL_KEY: u8 = 114;
+
+let FLAG_KEY: u8 = 102;
+
+let QUIT_KEY: u8 = 113;
+
+# What a key press does: an arrow key moves the cursor, but not off the board;
+# `r` reveals the cell under it, `f` flags or unflags it, `q` quits, and any other
+# key does nothing.
+fn press(self: Session, key: Key) -> Turn {
+    let game = self.game;
+    let row = self.cursor.0;
+    let column = self.cursor.1;
+    match (key) {
+        Up => Continue(Session { game, cursor: (row.before(), column) }),
+        Down => Continue(Session { game, cursor: (row.after(game.height()), column) }),
+        Left => Continue(Session { game, cursor: (row, column.before()) }),
+        Right => Continue(Session { game, cursor: (row, column.after(game.width())) }),
+        Other(byte) => if (byte == REVEAL_KEY) {
+            Continue(Session { game: game.reveal(self.cursor), cursor: self.cursor })
+        } else if (byte == FLAG_KEY) {
+            Continue(Session { game: game.toggle_flag(self.cursor), cursor: self.cursor })
+        } else if (byte == QUIT_KEY) {
+            Quit
         } else {
-            err("that is off the board")
-        }
-    } else {
-        err(`unknown command: {verb}`)
+            Continue(self)
+        },
     }
 }.test({
-    let game = new_game(3, 2, []);
-    assert(game.parse_command("r 1 2") == ok(Reveal((1, 2))));
-    assert(game.parse_command("  f   0 1 ") == ok(Flag((0, 1))));
-    assert(game.parse_command("q") == ok(Quit));
-    assert(game.parse_command("") == err("type r ROW COLUMN, f ROW COLUMN or q"));
-    assert(game.parse_command("r 2 0") == err("that is off the board"));
-    assert(game.parse_command("r -1 0") == err("that is off the board"));
-    assert(game.parse_command("r 1") == err("missing a number"));
-    assert(game.parse_command("x") == err("unknown command: x"));
+    let origin: (u64, u64) = (0, 0);
+    let start = Session { game: new_game(2, 2, [3]), cursor: origin };
+    let corner: (u64, u64) = (1, 1);
+    // Arrows move the cursor and stop at the edges.
+    assert(start.press(Up) == Continue(start));
+    assert(start.press(Left) == Continue(start));
+    let down: (u64, u64) = (1, 0);
+    assert(start.press(Down) == Continue(Session { game: start.game, cursor: down }));
+    assert(
+        start
+            .press(Down)
+            .press_continuing(Right)
+            .press_continuing(Down)
+            .press_continuing(Right) == Continue(Session { game: start.game, cursor: corner }),
+    );
+    // `r` reveals under the cursor, `f` flags, `q` quits, other keys are ignored.
+    assert(start.press(Other(114)) == Continue(Session {
+        game: start.game.reveal(origin),
+        cursor: origin,
+    }));
+    assert(start.press(Other(102)) == Continue(Session {
+        game: start.game.toggle_flag(origin),
+        cursor: origin,
+    }));
+    assert(start.press(Other(113)) == Quit);
+    assert(start.press(Other(120)) == Continue(start));
 })
 
-# Play from `game` until it is won or lost, or the player quits or input ends.
-fn play(game: Mark[,]) !prints !read_stdin !terminal {
-    match (game.status()) {
-        Won => {
-            print(game.render(true));
-            print("You win!");
-        },
-        Lost => {
-            print(game.render(true));
-            print("Boom! You hit a mine.");
-        },
+# `self` after `key`, when `self` is a turn that goes on; a turn that has quit stays so.
+fn press_continuing(self: Turn, key: Key) -> Turn {
+    match (self) {
+        Continue(session) => session.press(key),
+        Quit => Quit,
+    }
+}.test({
+    let origin: (u64, u64) = (0, 0);
+    let session = Session { game: new_game(2, 2, []), cursor: origin };
+    assert(Quit.press_continuing(Right) == Quit);
+    assert(Continue(session).press_continuing(Other(113)) == Quit);
+})
+
+# Draw the board from the top left of the terminal, in place, and the keys below it.
+fn draw(self: Session) !prints !terminal {
+    put(self.game.render(false, some(self.cursor)));
+    move_to(self.game.height() + 2, 0);
+    put("arrows move, r reveals, f flags, q quits");
+    move_to(0, 0);
+}
+
+# Show a finished game with its mines, and how it ended.
+fn finish(self: Mark[,], message: str) !prints !terminal {
+    clear_terminal();
+    print(self.render(true, none));
+    print(message);
+}
+
+# Stand-ins for the terminal and for printing, which draw nothing.
+fn nothing() {}
+
+fn ignore(row: u64, column: u64) {}
+
+fn swallow(text: str) {}
+
+# Stand-ins for `read_byte` that answer the same every time: no input, `q`, `r`.
+fn no_key() -> u8? { none }
+
+fn quit_key() -> u8? { some(QUIT_KEY) }
+
+fn reveal_key() -> u8? { some(REVEAL_KEY) }
+
+# `play` with nothing drawn or printed, for its tests.
+fn play_silently(session: Session) !read_stdin_raw {
+    shim terminal { clear_terminal = nothing, move_to = ignore } {
+        shim prints { print = swallow, put = swallow } { play(session) };
+    };
+}
+
+# Play from `self` until it is won or lost, or the player quits or input ends.
+fn play(self: Session) !prints !read_stdin_raw !terminal {
+    match (self.game.status()) {
+        Won => self.game.finish("You win!"),
+        Lost => self.game.finish("Boom! You hit a mine."),
         Playing => {
-            clear_terminal();
-            print(game.render(false));
-            print("r ROW COLUMN to reveal, f ROW COLUMN to flag, q to quit");
-            match (read_line()) {
+            self.draw();
+            match (read_key()) {
                 none => {},
-                some(line) => match (game.parse_command(line)) {
-                    err(message) => {
-                        print(message);
-                        play(game);
-                    },
-                    ok(command) => match (command) {
-                        Quit => {},
-                        Reveal(cell) => play(game.reveal(cell)),
-                        Flag(cell) => play(game.toggle_flag(cell)),
-                    },
+                some(key) => match (self.press(key)) {
+                    Quit => {},
+                    Continue(next) => play(next),
                 },
             };
         },
     };
-}
+}.test({
+    let origin: (u64, u64) = (0, 0);
+    let mined = Session { game: new_game(2, 2, [0]), cursor: origin };
+    let safe = Session { game: new_game(2, 2, []), cursor: origin };
+
+    // Nothing reaches the terminal. Every key press is the same one, because a
+    // stand-in has no state to step through a script with, so each of these ends
+    // the game on its own: the end of input, a quit, a mine and a win.
+    shim read_stdin_raw { read_byte = no_key } { play_silently(mined) };
+    shim read_stdin_raw { read_byte = quit_key } { play_silently(mined) };
+    shim read_stdin_raw { read_byte = reveal_key } { play_silently(mined) };
+    shim read_stdin_raw { read_byte = reveal_key } { play_silently(safe) };
+})
 
 # Play on the standard 8 by 8 board with 10 mines. The mines are different every
 # game; `./aipl run -- SEED` plays the same game again for the same number.
-fn main(args: str[]) !prints !read_stdin !terminal !clock -> !Error {
+fn main(args: str[]) !prints !read_stdin_raw !terminal !clock -> !Error {
     let size: u64 = 8;
+    let origin: (u64, u64) = (0, 0);
     shim random {
         match (args) {
             [] => seeded_with_clock(),
@@ -348,7 +440,8 @@ fn main(args: str[]) !prints !read_stdin !terminal !clock -> !Error {
             _ => err("usage: minesweeper [SEED]")?,
         }
     } {
-        play(new_game(size, size, place_mines(10, size * size)));
+        clear_terminal();
+        play(Session { game: new_game(size, size, place_mines(10, size * size)), cursor: origin });
     };
     ok()
 }

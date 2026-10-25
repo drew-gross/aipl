@@ -3035,6 +3035,10 @@ struct __builtin_Grid<T: any> { width: u64, cells: T[] }
 
 # Write `self` to standard output, followed by a newline.
 fn __builtin_print(self: str) !prints {}
+# Write `self` to standard output with nothing after it, and have it appear at
+# once: the next `put` or `print` carries on from where this one stopped. With
+# `move_to` it redraws part of the screen in place.
+fn __builtin_put(self: str) !prints {}
 # Split on each occurrence of `sep`, returning the parts (slices/views of `self`).
 fn __builtin_split(self: str, sep: str) -> str[] { [] }
 # `self.split(sep).len()` without building the parts: how many there would be,
@@ -3880,7 +3884,7 @@ pub fn is_internal_builtin(callee: &Callee) -> bool {
 /// New effects go at the end: the order assigns slot indices.
 pub const SHIMMABLE_EFFECTS: &[(&str, &[&str])] = &[
     ("clock", &["now_nanos", "monotonic_now"]),
-    ("prints", &["print"]),
+    ("prints", &["print", "put"]),
     ("read_files", &["read_file_to_string"]),
     ("read_stdin", &["read_line"]),
     ("write_files", &["write_string_to_file"]),
@@ -3954,7 +3958,7 @@ pub fn shim_slot_index(op: &str) -> Option<usize> {
 
 /// How many shim slots the runtimes must reserve. Kept in sync by
 /// `shim_slots_match_runtime` in `tests/shims.rs`.
-pub const SHIM_SLOT_COUNT: usize = 12;
+pub const SHIM_SLOT_COUNT: usize = 13;
 
 /// How many constants computed on first use ([`constant_initializer_name`]) a
 /// program may have. Each owns a cache slot in the runtime, and both runtimes

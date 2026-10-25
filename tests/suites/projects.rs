@@ -369,3 +369,112 @@ mod tests {
         );
     }
 }
+
+/// Scripted games of minesweeper: the project is run with keys piped in, and what it
+/// writes to the terminal is read back. A shim cannot count calls — a stand-in
+/// function holds no state — so the number of `clear_terminal` calls is counted
+/// in the bytes they wrote.
+mod minesweeper_sessions {
+    use super::*;
+    use std::io::Write;
+    use std::process::Stdio;
+
+    const CLEAR: &str = "\x1b[2J\x1b[H";
+    const RIGHT: &str = "\x1b[C";
+    const DOWN: &str = "\x1b[B";
+    const LEFT: &str = "\x1b[D";
+
+    /// What a game writes to the terminal when it is played with `keys`, on the
+    /// board the seed 1 deals.
+    fn play(keys: &str) -> String {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_aipl"))
+            .args(["run", "--", "1"])
+            .current_dir(projects_dir().join("minesweeper"))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("run minesweeper");
+        child
+            .stdin
+            .take()
+            .expect("stdin")
+            .write_all(keys.as_bytes())
+            .expect("send the keys");
+        let out = child.wait_with_output().expect("wait for minesweeper");
+        assert!(
+            out.status.success(),
+            "stderr:\n{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8(out.stdout).expect("utf-8 output")
+    }
+
+    fn clears(output: &str) -> usize {
+        output.matches(CLEAR).count()
+    }
+
+    /// Clears once to start, and draws the cursor on the first cell.
+    #[test]
+    fn a_game_that_ends_at_once_clears_once() {
+        for keys in ["q", ""] {
+            let output = play(keys);
+            assert_eq!(clears(&output), 1, "keys {keys:?}:\n{output}");
+            assert!(output.contains("0 [#] # "), "{output}");
+            assert!(output.contains("arrows move, r reveals, f flags, q quits"));
+        }
+    }
+
+    /// The cursor follows the arrow keys: down and right put it on row 1,
+    /// column 1, and left puts it back on column 0.
+    #[test]
+    fn arrow_keys_move_the_cursor() {
+        let output = play(&format!("{DOWN}{RIGHT}{LEFT}q"));
+        assert_eq!(clears(&output), 1, "{output}");
+        let frames: Vec<&str> = output
+            .split("arrows move, r reveals, f flags, q quits")
+            .collect();
+        // Before the first key, and after each of the three.
+        assert!(frames[0].contains("0 [#] # "), "{output}");
+        assert!(frames[1].contains("1 [#] # "), "{output}");
+        assert!(frames[2].contains("1  # [#] # "), "{output}");
+        assert!(frames[3].contains("1 [#] # "), "{output}");
+    }
+
+    /// `f` flags the cell under the cursor, and the next frame shows it.
+    #[test]
+    fn f_flags_the_cell_under_the_cursor() {
+        let output = play("fq");
+        assert!(output.contains("0 [F] # "), "{output}");
+    }
+
+    /// Revealing every cell ends the game, which clears the screen once more to
+    /// show the whole board, with its mines, and how it ended.
+    #[test]
+    fn a_game_that_is_decided_clears_twice() {
+        let mut keys = String::new();
+        for _ in 0..8 {
+            for column in 0..8 {
+                keys.push('r');
+                if column < 7 {
+                    keys.push_str(RIGHT);
+                }
+            }
+            keys.push_str(DOWN);
+            for _ in 0..7 {
+                keys.push_str(LEFT);
+            }
+        }
+        let output = play(&keys);
+        assert_eq!(clears(&output), 2, "{output}");
+        let ending = output.rsplit(CLEAR).next().expect("the last screen");
+        assert!(
+            ending.ends_with("Boom! You hit a mine.\n") || ending.ends_with("You win!\n"),
+            "{ending}"
+        );
+        assert!(
+            !ending.contains('['),
+            "no cursor on a finished board:\n{ending}"
+        );
+    }
+}

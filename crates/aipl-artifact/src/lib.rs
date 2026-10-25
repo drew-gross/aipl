@@ -419,7 +419,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         // like any other; a `str` *result* is written through a leading out
         // pointer, which is why the producers below take one more argument than
         // their arity suggests and return nothing.
-        "aipl_inc" | "aipl_dec" | "aipl_print" | "aipl_print_error"
+        "aipl_inc" | "aipl_dec" | "aipl_print" | "aipl_put" | "aipl_print_error"
         | "aipl_test_begin" | "aipl_test_fail" => sig(1, false),
         "aipl_assert" => sig(2, false),
         "aipl_str_len"

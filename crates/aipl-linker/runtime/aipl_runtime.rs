@@ -465,6 +465,16 @@ pub extern "C" fn aipl_print(s: *const str24::Str) {
     unsafe { write(1, b"\n".as_ptr() as *const c_void, 1) };
 }
 
+/// `put(s)` under the wide ABI: `print` without the newline. Streams leaf by
+/// leaf, like `aipl_print`.
+#[no_mangle]
+pub extern "C" fn aipl_put(s: *const str24::Str) {
+    str24::for_each_chunk(unsafe { *s }, &mut |chunk| {
+        unsafe { write(1, chunk.as_ptr() as *const c_void, chunk.len()) };
+        true
+    });
+}
+
 /// `fn main() -> !Error`'s failure path under the wide ABI: `error: <msg>` on
 /// stderr.
 #[no_mangle]
@@ -1093,8 +1103,8 @@ unsafe fn clock_nanos(id: c_int) -> i64 {
 /// assigns. 0 means "no shim installed" — the state every slot starts in and
 /// returns to. Sized by `aipl_syntax::SHIM_SLOT_COUNT`; `shim_slots_match_runtime`
 /// in `tests/shims.rs` holds the two in sync.
-static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 12] =
-    [const { core::sync::atomic::AtomicI64::new(0) }; 12];
+static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 13] =
+    [const { core::sync::atomic::AtomicI64::new(0) }; 13];
 
 /// The shim installed for slot `idx`, or 0 if none. An out-of-range index reads
 /// as "no shim" rather than trapping (codegen only ever emits valid indices).

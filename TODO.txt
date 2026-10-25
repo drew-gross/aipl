@@ -102,6 +102,8 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  read file needs to decode to meet the "no terminal escapes in strings" constraint.  Or just return byte array.
+  should maybe have a "in raw mode" effect that blocks !prints i.e. stdin mode is "scoped"
   "shimmable effects are" error is unweildy, don't have it list everything
   allow map over a range
   promoted_annotations' vars arg should be a set
@@ -214,6 +216,7 @@ highlighter:
 
 test framework:
   list number of assertions that were run
+  generalize the concept of shims that count calls for test purposes
 
 env:
   make env a possible argument to main
@@ -350,6 +353,8 @@ random:
 shim:
   better syntax (shim is a weird keyword)
   whole program optimization: if an effect is never shimmed, don't install the shimming code
+  if switch to raw mode is never used, don't install the handlers
+  dynamic shim slots based on what is actually used
 
 matrices:
   utility for making a new grid from a width, height, and predicate

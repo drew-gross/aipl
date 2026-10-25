@@ -8355,7 +8355,7 @@ fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
         Callee::WithCapacity => return Some(Type::Array(Box::new(Type::NoneInner))),
         // Declared void (it's a statement); mono needs an `i64` value for the
         // expression it emits (see the `expr`-position uses of `print`).
-        Callee::Print => return Some(Type::Primitive(Primitive::I64)),
+        Callee::Print | Callee::Put => return Some(Type::Primitive(Primitive::I64)),
         // Internal: a single `char` to a one-char `str`, emitted by variadic
         // `char*` specialization (see `specialize_variadic`).
         Callee::CharToStr => return Some(Type::Primitive(Primitive::Str)),
@@ -11475,6 +11475,7 @@ fn aliases_or_unsafe(
                         | Callee::ToStr
                         | Callee::ToStrLen
                         | Callee::Print
+                        | Callee::Put
                         | Callee::Trim
                         // In-place-filter/map intrinsics mutate the array in place
                         // without aliasing it (see `expand_filter`/`expand_map`/

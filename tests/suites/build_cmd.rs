@@ -336,3 +336,38 @@ fn terminal_operations_send_their_control_sequences_under_run() {
     );
     assert_eq!(out.stdout, TERMINAL_BYTES);
 }
+
+/// Two `put`s and a `print`: only the `print` ends the line.
+const PUT: &str = "import { print, put } from builtins;\n\n\
+     fn main() !prints {\n\
+     \x20   put(\"ab\");\n\
+     \x20   put(\"cd\");\n\
+     \x20   print(\"ef\");\n\
+     }\n";
+
+#[test]
+fn put_writes_without_a_newline() {
+    let (stderr, code, exe) = build("put", PUT);
+    assert_eq!(code, 0, "stderr:\n{stderr}");
+    let out = Command::new(exe).output().expect("run the program");
+    assert!(out.status.success());
+    assert_eq!(out.stdout, b"abcdef\n");
+}
+
+#[test]
+fn put_writes_without_a_newline_under_run() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("build_cmd_put_run");
+    std::fs::create_dir_all(&dir).expect("create the scratch directory");
+    std::fs::write(dir.join("main.aipl"), PUT).expect("write the source");
+    let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
+        .arg("run")
+        .current_dir(&dir)
+        .output()
+        .expect("run the program");
+    assert!(
+        out.status.success(),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(out.stdout, b"abcdef\n");
+}
