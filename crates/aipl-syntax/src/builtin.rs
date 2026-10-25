@@ -268,7 +268,6 @@ const BUILTINS: &[Builtin] = &[
     Builtin::aipl(Callee::TrimWhile, "builtin_trim_while.aipl"),
     Builtin::aipl(Callee::Words, "builtin_words.aipl"),
     Builtin::aipl(Callee::CartesianProduct, "builtin_cartesian_product.aipl"),
-    Builtin::aipl(Callee::ClearScreen, "builtin_clear_screen.aipl"),
     Builtin::aipl(Callee::Count, "builtin_count.aipl"),
     Builtin::aipl(Callee::CountWhile, "builtin_count_while.aipl"),
     Builtin::aipl(Callee::CountIf, "builtin_count_if.aipl"),
@@ -295,6 +294,8 @@ const BUILTINS: &[Builtin] = &[
     Builtin::declared(Callee::ListFiles),
     Builtin::declared(Callee::ReadLine),
     Builtin::declared(Callee::ReadByte),
+    Builtin::declared(Callee::ClearTerminal),
+    Builtin::declared(Callee::MoveTo),
     Builtin::aipl_exporting(
         Callee::ReadKey,
         "builtin_read_key.aipl",

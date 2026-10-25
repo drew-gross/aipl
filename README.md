@@ -68,16 +68,16 @@ interpolate, two do not.
 
 | form | escapes | interpolation | dedent |
 |---|---|---|---|
-| `"..."` | `\n` `\t` `\r` `\e` `\\` `\"` | no | no |
+| `"..."` | `\n` `\t` `\r` `\\` `\"` | no | no |
 | `"""..."""` | none — verbatim | no | yes |
-| `` `...` `` | `\n` `\t` `\r` `\e` `\\` `` \` `` `\{` `\}` | `{expr}` | no |
+| `` `...` `` | `\n` `\t` `\r` `\\` `` \` `` `\{` `\}` | `{expr}` | no |
 | ```` ```...``` ```` | `\{` `\}` only | `{expr}` | yes |
 
 (A char literal `'x'` takes the same escapes as `"..."` plus `\'`, and must hold
 exactly one char.)
 
 **Escapes.** In a form that decodes them, a backslash always claims the next
-character: `\n`, `\t`, `\r` and `\e` (the escape character, which starts a terminal's control sequences) become the control characters, and any other
+character: `\n`, `\t` and `\r` become the control characters, and any other
 escapable character stands for itself. An escape outside the form's set is a
 compile error (`unknown escape sequence \q`), not a literal backslash — so a
 backslash in a `"..."` string is always written `\\`.

@@ -300,17 +300,39 @@ fn read_key_decodes_piped_arrow_keys_in_a_built_binary() {
     assert_eq!(echo_lines(Command::new(exe), KEYS_IN), KEYS_OUT);
 }
 
-/// Clears the screen and says nothing else.
-const CLEAR_SCREEN: &str = "import { clear_screen } from builtins;\n\n\
-     fn main() !prints {\n\
-     \x20   clear_screen();\n\
+/// Clears the terminal, then puts the cursor at the third row, fifth column.
+const TERMINAL: &str = "import { clear_terminal, move_to } from builtins;\n\n\
+     fn main() !terminal {\n\
+     \x20   clear_terminal();\n\
+     \x20   move_to(2, 4);\n\
      }\n";
 
+/// Both control sequences, with nothing after them: no newline, unlike `print`.
+const TERMINAL_BYTES: &[u8] = b"\x1b[2J\x1b[H\x1b[3;5H";
+
 #[test]
-fn clear_screen_prints_the_clear_sequence() {
-    let (stderr, code, exe) = build("clear_screen", CLEAR_SCREEN);
+fn terminal_operations_send_their_control_sequences() {
+    let (stderr, code, exe) = build("terminal", TERMINAL);
     assert_eq!(code, 0, "stderr:\n{stderr}");
     let out = Command::new(exe).output().expect("run the program");
     assert!(out.status.success());
-    assert_eq!(out.stdout, b"\x1b[2J\x1b[H\n");
+    assert_eq!(out.stdout, TERMINAL_BYTES);
+}
+
+#[test]
+fn terminal_operations_send_their_control_sequences_under_run() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("build_cmd_terminal_run");
+    std::fs::create_dir_all(&dir).expect("create the scratch directory");
+    std::fs::write(dir.join("main.aipl"), TERMINAL).expect("write the source");
+    let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
+        .arg("run")
+        .current_dir(&dir)
+        .output()
+        .expect("run the program");
+    assert!(
+        out.status.success(),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(out.stdout, TERMINAL_BYTES);
 }

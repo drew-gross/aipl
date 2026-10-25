@@ -3084,6 +3084,15 @@ fn __builtin_read_line() !read_stdin -> str? { none }
 # settings are put back before the call returns. Input that is not a terminal is
 # read as it is. Bytes come from the same stream as `read_line`, in order.
 fn __builtin_read_byte() !read_stdin_raw -> u8? { none }
+# Erase everything on the terminal and put its cursor at the top left. The terminal
+# is told by the runtime, in the control sequence it understands: no `str` or
+# `char` can hold one, so this and `move_to` are the only ways to send it. Output
+# that is not a terminal receives the sequence as text.
+fn __builtin_clear_terminal() !terminal {}
+# Put the terminal's cursor at `row` and `column`, counting from 0 at the top left;
+# what is printed next starts there. A position past the terminal's edge is
+# answered however the terminal answers it.
+fn __builtin_move_to(row: u64, column: u64) !terminal {}
 # The next random number, uniform over all of `u64`. `!random` is the one effect
 # with no default: there is no generator unless a `shim random` installs one, so
 # `main` cannot declare it and a program that uses it must say where its
@@ -3320,7 +3329,7 @@ fn __builtin_with<T: any>(self: T[], index: u64, value: T) -> T[]? { none }
 # it is a mutating method, so `xs.try_set(i, v)` as an expression is the updated
 # copy and leaves `xs` alone. Not for a `str`.
 fn __builtin_try_set<T: any>(mut self: T[], index: u64, value: T) {}
-// NOTE: `all`, `clear_screen`, `words`, `cartesian_product`, `count_while`, `count_if`, `count_if_is_less_than` and its five siblings, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
+// NOTE: `all`, `words`, `cartesian_product`, `count_while`, `count_if`, `count_if_is_less_than` and its five siblings, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
 // `join_is_nonempty`, `join_is_empty`, `reduce`, `repeat`, `map_reduce`, `filter_map_reduce`, `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
 // `extend_optional`, `inline_str`, `measure`, `range`, `set_map`, `to_dict`, `map_to_dict`, `tuple_windows`, `union_all`,
@@ -3879,6 +3888,7 @@ pub const SHIMMABLE_EFFECTS: &[(&str, &[&str])] = &[
     ("execute_program", &["execute_program"]),
     ("random", &["random_u64"]),
     ("read_stdin_raw", &["read_byte"]),
+    ("terminal", &["clear_terminal", "move_to"]),
 ];
 
 /// The effects that have no default implementation: the program must install one
@@ -3891,6 +3901,8 @@ pub const SHIM_ONLY_EFFECTS: &[&str] = &["random"];
 /// Effects the language recognizes. `prints` = writes to stdout; `read_files` =
 /// reads from the filesystem; `read_stdin` = reads standard input a line at a
 /// time; `read_stdin_raw` = reads standard input a byte at a time, as it is typed;
+/// `terminal` = controls the terminal itself — clears it, moves its cursor — which
+/// is not the same as writing text to it (`prints`);
 /// `write_files` = writes to the filesystem;
 /// `list_files` = enumerates the filesystem (directory listing);
 /// `execute_program` = spawns a child process; `clock` = reads the wall clock
@@ -3903,6 +3915,7 @@ pub const KNOWN_EFFECTS: &[&str] = &[
     "read_files",
     "read_stdin",
     "read_stdin_raw",
+    "terminal",
     "write_files",
     "list_files",
     "execute_program",
@@ -3941,7 +3954,7 @@ pub fn shim_slot_index(op: &str) -> Option<usize> {
 
 /// How many shim slots the runtimes must reserve. Kept in sync by
 /// `shim_slots_match_runtime` in `tests/shims.rs`.
-pub const SHIM_SLOT_COUNT: usize = 10;
+pub const SHIM_SLOT_COUNT: usize = 12;
 
 /// How many constants computed on first use ([`constant_initializer_name`]) a
 /// program may have. Each owns a cache slot in the runtime, and both runtimes

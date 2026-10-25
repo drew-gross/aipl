@@ -196,7 +196,6 @@ pub enum Callee {
     TrimWhile,
     Words,
     CartesianProduct,
-    ClearScreen,
     Count,
     CountWhile,
     CountIf,
@@ -227,6 +226,12 @@ pub enum Callee {
     /// `read_key() -> Key?` — one key press, an arrow key decoded from the bytes
     /// `read_byte` returns (`!read_stdin_raw`).
     ReadKey,
+    /// `clear_terminal()` — erase the terminal and put the cursor at its top left
+    /// (`!terminal`).
+    ClearTerminal,
+    /// `move_to(row, column)` — put the terminal's cursor at a cell, counting from
+    /// 0 at the top left (`!terminal`).
+    MoveTo,
     /// `random_u64() -> u64` — the next random number. Has no implementation of its
     /// own: it exists only under a `shim random`, whose provider supplies the
     /// generator (see `SHIM_ONLY_EFFECTS`).
@@ -519,7 +524,6 @@ impl Callee {
             Callee::TrimWhile => "__builtin_trim_while",
             Callee::Words => "__builtin_words",
             Callee::CartesianProduct => "__builtin_cartesian_product",
-            Callee::ClearScreen => "__builtin_clear_screen",
             Callee::Count => "__builtin_count",
             Callee::CountWhile => "__builtin_count_while",
             Callee::CountIf => "__builtin_count_if",
@@ -545,6 +549,8 @@ impl Callee {
             Callee::ListFiles => "__builtin_list_files",
             Callee::ReadLine => "__builtin_read_line",
             Callee::ReadByte => "__builtin_read_byte",
+            Callee::ClearTerminal => "__builtin_clear_terminal",
+            Callee::MoveTo => "__builtin_move_to",
             Callee::ReadKey => "__builtin_read_key",
             Callee::RandomU64 => "__builtin_random_u64",
             Callee::RandomNext => "__random_next",

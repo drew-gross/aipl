@@ -694,6 +694,55 @@ pub extern "C" fn aipl_read_byte() -> i64 {
     }
 }
 
+/// Sends the terminal a control sequence, straight to standard output.
+fn write_terminal_sequence(sequence: &[u8]) {
+    unsafe { write(1, sequence.as_ptr() as *const c_void, sequence.len()) };
+}
+
+/// `clear_terminal()`: erase the display (`ESC [ 2 J`), then home the cursor
+/// (`ESC [ H`).
+#[no_mangle]
+pub extern "C" fn aipl_clear_terminal() {
+    write_terminal_sequence(b"\x1b[2J\x1b[H");
+}
+
+/// `move_to(row, column)`: put the cursor at a cell counted from 0 at the top
+/// left, which the terminal counts from 1 (`ESC [ row ; column H`).
+#[no_mangle]
+pub extern "C" fn aipl_move_to(row: u64, column: u64) {
+    // `ESC [`, two 20-digit numbers (a u64 is at most 20 digits) with a `;`
+    // between, and `H`.
+    let mut sequence = [0u8; 44];
+    let mut length = 0;
+    sequence[length] = 0x1b;
+    sequence[length + 1] = b'[';
+    length += 2;
+    for (index, cell) in [row, column].into_iter().enumerate() {
+        // One past the cell so that 0 is the terminal's 1. Saturating keeps u64::MAX
+        // an answer rather than a wrap to 0.
+        let mut number = cell.saturating_add(1);
+        let mut digits = [0u8; 20];
+        let mut count = 0;
+        while number > 0 {
+            digits[count] = b'0' + (number % 10) as u8;
+            number /= 10;
+            count += 1;
+        }
+        while count > 0 {
+            count -= 1;
+            sequence[length] = digits[count];
+            length += 1;
+        }
+        if index == 0 {
+            sequence[length] = b';';
+            length += 1;
+        }
+    }
+    sequence[length] = b'H';
+    length += 1;
+    write_terminal_sequence(&sequence[..length]);
+}
+
 /// `write_string_to_file` under the wide ABI. Streams the contents chunk by
 /// chunk, so a rope is written without being flattened. Borrows both arguments.
 #[no_mangle]
@@ -1044,8 +1093,8 @@ unsafe fn clock_nanos(id: c_int) -> i64 {
 /// assigns. 0 means "no shim installed" — the state every slot starts in and
 /// returns to. Sized by `aipl_syntax::SHIM_SLOT_COUNT`; `shim_slots_match_runtime`
 /// in `tests/shims.rs` holds the two in sync.
-static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 10] =
-    [const { core::sync::atomic::AtomicI64::new(0) }; 10];
+static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 12] =
+    [const { core::sync::atomic::AtomicI64::new(0) }; 12];
 
 /// The shim installed for slot `idx`, or 0 if none. An out-of-range index reads
 /// as "no shim" rather than trapping (codegen only ever emits valid indices).

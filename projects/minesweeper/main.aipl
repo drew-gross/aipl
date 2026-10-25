@@ -6,7 +6,7 @@ import {
     all,
     any,
     cartesian_product,
-    clear_screen,
+    clear_terminal,
     count_if,
     drop_first,
     equal as ==,
@@ -305,7 +305,7 @@ fn parse_command(self: Mark[,], line: str) -> Command!str {
 })
 
 # Play from `game` until it is won or lost, or the player quits or input ends.
-fn play(game: Mark[,]) !prints !read_stdin {
+fn play(game: Mark[,]) !prints !read_stdin !terminal {
     match (game.status()) {
         Won => {
             print(game.render(true));
@@ -316,7 +316,7 @@ fn play(game: Mark[,]) !prints !read_stdin {
             print("Boom! You hit a mine.");
         },
         Playing => {
-            clear_screen();
+            clear_terminal();
             print(game.render(false));
             print("r ROW COLUMN to reveal, f ROW COLUMN to flag, q to quit");
             match (read_line()) {
@@ -339,7 +339,7 @@ fn play(game: Mark[,]) !prints !read_stdin {
 
 # Play on the standard 8 by 8 board with 10 mines. The mines are different every
 # game; `./aipl run -- SEED` plays the same game again for the same number.
-fn main(args: str[]) !prints !read_stdin !clock -> !Error {
+fn main(args: str[]) !prints !read_stdin !terminal !clock -> !Error {
     let size: u64 = 8;
     shim random {
         match (args) {

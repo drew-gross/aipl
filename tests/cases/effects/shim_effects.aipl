@@ -8,8 +8,10 @@
 
 import {
     ExecResult,
+    clear_terminal,
     execute_program,
     list_files,
+    move_to,
     print,
     read_byte,
     read_file_to_string,
@@ -73,6 +75,23 @@ fn press() !read_stdin_raw -> u8? { read_byte() }
 
 fn shimmed_key() -> str { shim read_stdin_raw { read_byte = only_byte } { to_str(press()) } }
 
+// ---- terminal: the stand-ins say what they were asked, and no control sequence is
+// sent. (They print, so the function installing the shim still declares `!prints`.)
+fn wiped() !prints {
+    print("wiped");
+}
+
+fn placed(row: u64, column: u64) !prints {
+    print(`placed at {row},{column}`);
+}
+
+fn shimmed_terminal() !prints {
+    shim terminal { clear_terminal = wiped, move_to = placed } {
+        move_to(2, 5);
+        clear_terminal();
+    };
+}
+
 // ---- execute_program
 fn canned_run(program: str, args: str[]) -> ExecResult!Error {
     ok(ExecResult { stdout: `ran {program}`, stderr: "", exit_code: 3 })
@@ -97,6 +116,7 @@ fn main() !prints {
     print(shimmed_listing());
     print(shimmed_stdin());
     print(shimmed_key());
+    shimmed_terminal();
     print(shimmed_run());
     greet();
 }
@@ -107,5 +127,7 @@ err("cannot write out.txt")
 ok(["d/a", "d/b"])
 some("scripted")
 some(65)
+placed at 2,5
+wiped
 ran tool exit=3
 hello

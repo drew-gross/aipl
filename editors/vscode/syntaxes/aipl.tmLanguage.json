@@ -62,7 +62,7 @@
           "name": "string.quoted.double.aipl",
           "patterns": [
             {
-              "match": "\\\\[\\\\`enrt{}]",
+              "match": "\\\\[\\\\`nrt{}]",
               "name": "constant.character.escape.aipl"
             },
             {
@@ -124,7 +124,7 @@
           "name": "string.quoted.double.aipl",
           "patterns": [
             {
-              "match": "\\\\[\"\\\\enrt]",
+              "match": "\\\\[\"\\\\nrt]",
               "name": "constant.character.escape.aipl"
             }
           ]
@@ -135,7 +135,7 @@
           "name": "string.quoted.single.aipl",
           "patterns": [
             {
-              "match": "\\\\[\"'\\\\enrt]",
+              "match": "\\\\[\"'\\\\nrt]",
               "name": "constant.character.escape.aipl"
             }
           ]

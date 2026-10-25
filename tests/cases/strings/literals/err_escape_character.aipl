@@ -1,0 +1,7 @@
+fn f() -> str { "\e" }
+--- errors ---
+error: unknown escape sequence \e
+ --> ./tests/cases/strings/literals/err_escape_character.aipl:1:18
+  |
+1 | fn f() -> str { "\e" }
+  |                  ^^

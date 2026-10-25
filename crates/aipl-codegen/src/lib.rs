@@ -1520,6 +1520,7 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
             "read_files".to_string(),
             "read_stdin".to_string(),
             "read_stdin_raw".to_string(),
+            "terminal".to_string(),
             "write_files".to_string(),
             "list_files".to_string(),
             "execute_program".to_string(),
@@ -3399,6 +3400,11 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_list_files", aipl_list_files as *const u8);
     jit_builder.symbol("aipl_read_line", str24_host::aipl_read_line as *const u8);
     jit_builder.symbol("aipl_read_byte", str24_host::aipl_read_byte as *const u8);
+    jit_builder.symbol(
+        "aipl_clear_terminal",
+        str24_host::aipl_clear_terminal as *const u8,
+    );
+    jit_builder.symbol("aipl_move_to", str24_host::aipl_move_to as *const u8);
     jit_builder.symbol("aipl_random_next", aipl_random_next as *const u8);
     jit_builder.symbol("aipl_random_seed", aipl_random_seed as *const u8);
     jit_builder.symbol("aipl_random_state", aipl_random_state as *const u8);
@@ -6910,9 +6916,11 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_test_fail_none"
         | "aipl_measure_begin"
         | "aipl_measure_end"
+        | "aipl_clear_terminal"
         | "aipl_random_unshimmed" => (0, Ret::None),
         "aipl_assert"
         | "aipl_shim_set"
+        | "aipl_move_to"
         | "aipl_str_iter_init"
         | "aipl_str_grew"
         | "aipl_str_push_byte"
@@ -7191,6 +7199,8 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
         (Callee::ListFiles, "aipl_list_files"),
         (Callee::ReadLine, "aipl_read_line"),
         (Callee::ReadByte, "aipl_read_byte"),
+        (Callee::ClearTerminal, "aipl_clear_terminal"),
+        (Callee::MoveTo, "aipl_move_to"),
         // `random_u64` has no implementation, so its entry is the one that stops the
         // program; its arm in `compile_call_expr_direct` is what is actually used.
         (Callee::RandomU64, "aipl_random_unshimmed"),
@@ -15651,6 +15661,7 @@ fn compile_call_expr<M: Module>(
     let mut values: Vec<Value> = Vec::with_capacity(args.len());
     for (idx, (arg, expected)) in args.iter().zip(&ptys).enumerate() {
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
+        let actual = flex_int_ty(arg, &actual, expected);
         expect_value_type(
             &actual,
             expected,

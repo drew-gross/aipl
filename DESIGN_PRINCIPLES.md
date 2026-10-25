@@ -8,11 +8,52 @@ downstream of that principle.
 
 ---
 
-## 1. The language cannot abort
+## 1. It is safe to call an untrusted function
 
-**No expression in AIPL can terminate the program.** Every operation is total:
-for every input it has an answer, and the answer is a value. There is no
-trapping, no panicking, no `exit`, no undefined behaviour to be caught later.
+**The effects system exists so that a caller is never surprised by what a function
+does, even when whoever wrote the function means harm.** A function's signature
+lists every way it can reach outside itself, and nothing else is reachable. So in
+AIPL one can call a function written by a stranger, knowing only its signature,
+and know the worst it can do: what its effects allow, and nothing more.
+
+That is a stronger claim than "effects document what a function does". A
+documentation system can be vague, because an honest author fills in the rest. A
+safety system cannot, because the author who is not honest will use every gap.
+The test for any effect is therefore adversarial: *given only the name of this
+effect, what is the most surprising thing a function holding it could do?* If the
+answer is more than a reader of the signature would expect, the effect is too
+coarse and has to be split.
+
+### Downstream decisions
+
+| Surprise a coarse effect would allow | Split into |
+|---|---|
+| `!prints` also redraws, clears or recolours the terminal, rewrites its title, or reads back from it | `!prints` writes text; `!terminal` controls the terminal (`clear_terminal`, `move_to`) |
+| `!read_stdin` also puts the terminal into raw mode and consumes keystrokes as they are typed | `!read_stdin` reads lines; `!read_stdin_raw` reads bytes as typed |
+| `!read_files` also writes or lists | `!read_files`, `!write_files`, `!list_files` |
+| `!clock` also supplies randomness | `!random`, which only a `shim` can supply |
+| any function can stop the program | no effect lets it: every operation is total (below), unless an `!aborts` effect is added |
+
+The terminal row is why `str` and `char` cannot hold a control sequence. A string
+that could carry `ESC [ 2 J` would let `!prints` do what only `!terminal` should,
+so there is no `\e` escape, and the terminal operations are runtime builtins that
+write the sequences themselves. A type that *can* hold escape sequences, if one is
+ever added, is a decision about this principle and not only about strings: what
+holds one has to be something only `!terminal` can write.
+
+Every effect is also shimmable, which is the same principle from the other side:
+a caller can run an untrusted function against stand-ins and observe, instead of
+trusting, what it asks for.
+
+### Aborting is escaping
+
+**No expression in AIPL can terminate the program.** An abort is a way out of
+the effect system: a function that can terminate the program can do it on a
+condition only it knows, so it can end a program it was only supposed to read
+from, and a runtime that must be able to abort has a channel from the function
+to the host that no signature mentions. So every operation is total: for every
+input it has an answer, and the answer is a value. There is no trapping, no
+panicking, no `exit`, no undefined behaviour to be caught later.
 
 This is not "errors are values" — that is a separate and weaker claim, about how
 *failure* is represented. This is stronger: the operations that in most languages
@@ -21,7 +62,7 @@ Integer division is the type case. `a / b` is not a fallible operation the way
 opening a file is; it is arithmetic, and arithmetic returns numbers. So it
 returns a number for `b == 0` too.
 
-### Downstream decisions
+### Totality: the answers chosen
 
 | Operation | Could have | Does |
 |---|---|---|
@@ -58,7 +99,7 @@ all. `MIN / -1` saturating to `MAX` had already conceded that. The rule is that
 where coherence is available it decides the answer, and where it is not, totality
 trumps coherence.
 
-### What it buys, beyond not dying
+### What totality buys, beyond not dying
 
 The payoff most worth knowing is that **totality is what lets the optimizer move
 code**. If an expression can abort, its position in the program is observable:
@@ -66,7 +107,10 @@ hoisting it into a branch that does not run turns a program that dies into one
 that returns, and sinking it out of one does the reverse. So an abortable
 expression pins every binding that reaches it, transitively through calls.
 
-### The exceptions, named
+### The holes, named
+
+Each is a way for a function to end the program without an effect, so each is a
+hole in the principle, not an accepted cost.
 
 - **Out of memory panics the runtime.** `alloc_buffer` and its siblings in
   `str24.rs` do `assert!(!raw.is_null(), "out of memory")`. This is a genuine
@@ -77,7 +121,7 @@ expression pins every binding that reaches it, transitively through calls.
 - **Unbounded recursion overflows the stack.** No depth limit, no trampolining
   outside the tail-call path. Same status as OOM: a hole, not a decision.
 
-### What it does not mean
+### What totality does not mean
 
 It does not mean programs cannot fail. A `main` returning `!Error` prints
 `error: <msg>` to stderr and exits 1; a `main` returning `i64` sets the exit
@@ -91,6 +135,25 @@ type domain (`xs[i]` is `T?`), and it turns on whether the out-of-range case
 is something a caller plausibly wants to *branch* on. An index out of bounds
 usually is. A zero divisor usually is not — the caller who cares tests `b == 0`
 themselves, and the one who does not should not pay an unwrap.
+
+### What the principle does not mean
+
+It does not mean a function with `!read_files` is harmless. Effects bound *which
+kinds* of thing a function does, not which instances: it may read any file the
+process can. Scoping an effect to a path or a host is a separate question.
+
+It does not close what the signature cannot see. A function that never ends,
+allocates without bound or recurses without limit costs its caller without using
+an effect, and there is no effect for it yet. Data is the other gap: text read
+from a file or from standard input may itself contain control bytes, and
+`!prints` will write it as it was given. Neither is a decision. They are what is
+left to close.
+
+It does not mean every effect must be as fine as the smallest thing it could do.
+The split is made where two actions under one name differ in a way a reader would
+call surprising. `!write_files` covers writing any file, because a reader does
+not expect that name to mean less; `!terminal` covers clearing and moving
+together, because a reader of either would not be surprised by the other.
 
 ---
 

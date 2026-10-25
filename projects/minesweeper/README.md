@@ -17,7 +17,7 @@ it opens the whole empty region and its border. A cell shows `#` hidden, `F`
 flagged, `.` revealed with nothing around it, or a digit counting the mines
 around it. Exits 0 on a win or a quit, 1 on hitting a mine.
 
-`./aipl run` starts a new game; input can be piped, so a game can be scripted: `printf 'r 0 0\nq\n' | ./aipl run`. Each redraw clears the screen first, so a scripted run's output carries the clear sequence (`ESC [ 2 J ESC [ H`) before every board.
+`./aipl run` starts a new game; input can be piped, so a game can be scripted: `printf 'r 0 0\nq\n' | ./aipl run`.  Each redraw clears the terminal first (`clear_terminal`, the `!terminal` effect), so a scripted run's output carries the clear sequence before every board.
 
 ## The mines
 
@@ -45,6 +45,6 @@ The rules are pure functions on a `Game` value and carry the tests in their
 |---|---|
 | ownership that reaches `with` through a struct field or a function parameter | `with` writes in place when it is handed the only reference (a fresh array, or a `mut` local at its last use), but the board lives in a `Game` field read through borrowed parameters, so each move copies the 64 marks |
 | a cursor driven by `read_key` | the `read_key` builtin returns one arrow key (or other key) without waiting for Enter; `play` still reads typed commands |
-| ANSI output: move cursor, colour | redraw in place, classic number colours (the `clear_screen` builtin clears) |
+| terminal control: colour | classic number colours (`clear_terminal` and `move_to` exist, so the board can be redrawn in place) |
 | terminal size | fit the board to the window |
 | a clock (`!clock` exists) | the usual elapsed-time counter |

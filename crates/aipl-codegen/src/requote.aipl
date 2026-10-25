@@ -53,12 +53,11 @@ fn needs_escape(self: char, delim: char) -> bool {
 # Whether `\X` with `self` as X is an escape both delimiters share — so a swap
 # copies it as-is rather than deciding it afresh for the new delimiter.
 fn is_shared_escape(self: char) -> bool {
-    self == 'n' || self == 't' || self == 'r' || self == 'e' || self == '\\'
+    self == 'n' || self == 't' || self == 'r' || self == '\\'
 }.test({
     assert('n'.is_shared_escape());
     assert('t'.is_shared_escape());
     assert('r'.is_shared_escape());
-    assert('e'.is_shared_escape());
     assert('\\'.is_shared_escape());
     assert(!'"'.is_shared_escape());
     assert(!'`'.is_shared_escape());

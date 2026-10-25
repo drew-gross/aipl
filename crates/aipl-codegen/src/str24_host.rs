@@ -141,6 +141,36 @@ pub(crate) extern "C" fn aipl_read_byte() -> i64 {
     }
 }
 
+/// Sends the terminal a control sequence. Flushed, because standard output is
+/// line buffered and a sequence has no newline to release it.
+fn write_terminal_sequence(sequence: &[u8]) {
+    use std::io::Write;
+    let stdout = std::io::stdout();
+    let mut out = stdout.lock();
+    let _ = out.write_all(sequence);
+    let _ = out.flush();
+}
+
+/// `clear_terminal()`: erase the display (`ESC [ 2 J`), then home the cursor
+/// (`ESC [ H`).
+#[no_mangle]
+pub(crate) extern "C" fn aipl_clear_terminal() {
+    write_terminal_sequence(b"\x1b[2J\x1b[H");
+}
+
+/// `move_to(row, column)`: put the cursor at a cell counted from 0 at the top
+/// left, which the terminal counts from 1 (`ESC [ row ; column H`). Saturating
+/// keeps `u64::MAX` an answer rather than a wrap to 0.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_move_to(row: u64, column: u64) {
+    let sequence = format!(
+        "\x1b[{};{}H",
+        row.saturating_add(1),
+        column.saturating_add(1)
+    );
+    write_terminal_sequence(sequence.as_bytes());
+}
+
 /// `print(s)` under the new ABI — the `aipl_*` counterpart of `aipl_print`.
 #[no_mangle]
 pub(crate) extern "C" fn aipl_print(s: *const Str) {
