@@ -4,8 +4,10 @@ A command-line Minesweeper on an 8 by 8 board with 10 mines.
 
 ```sh
 $ ./aipl run
-   0  1  2  3  4  5  6  7
-0 [#] #  #  #  #  #  #  #
+  0 1 2 3 4 5 6 7
+0 # # # # # # # #
+1 # # # # # # # #
+2 # #[#]# # # # #
 …
 arrows move, r reveals, f flags, q quits
 ```

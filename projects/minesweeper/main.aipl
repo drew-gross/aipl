@@ -40,6 +40,7 @@ import {
     saturating_remainder as %,
     seeded_with_clock,
     seeded_with_int,
+    split,
     to_set,
     value_or,
     value_or_err,
@@ -246,30 +247,46 @@ fn symbol(self: Mark[,], cell: (u64, u64), show_mines: bool) -> str {
     }
 }
 
-# The board as text: a row of column numbers, then each row led by its number.
-# Every cell is three characters wide, so the cell at `cursor` can be drawn in
-# brackets, `[#]`, where the others have a space either side; `none` marks no cell.
+# The board as text: a row of column numbers, then each row led by its number,
+# with a space before every cell. The cell at `cursor` is bracketed, `[#]`, by
+# taking the spaces either side of it; `none` marks no cell.
 fn render(self: Mark[,], show_mines: bool, cursor: (u64, u64)?) -> str {
-    let heads = (0..self.width()).map(|column| ` {column} `);
+    let heads = (0..self.width()).map(|column| `{column}`);
     let rows = (0..self.height()).map(|row| {
         let cells = (0..self.width()).map(|column| {
-            let symbol = self.symbol((row, column), show_mines);
-            if (cursor == some((row, column))) { `[{symbol}]` } else { ` {symbol} ` }
+            let before = if (cursor == some((row, column))) {
+                "["
+            } else if (column != 0 && cursor == some((row, column - 1))) {
+                "]"
+            } else {
+                " "
+            };
+            `{before}{self.symbol((row, column), show_mines)}`
         });
-        `{row} {cells.join(sep="")}`
+        // A cursor on the last cell has no cell after it to carry its closing bracket.
+        let last = if (cursor == some((row, self.width() - 1))) { "]" } else { "" };
+        `{row}{cells.join(sep="")}{last}`
     });
-    [`  {heads.join(sep="")}`, ..rows].join(sep="\n")
+    [`  {heads.join(sep=" ")}`, ..rows].join(sep="\n")
 }.test({
     let game = new_game(3, 2, [5]).reveal((0, 0));
-    assert(
-        game.render(false, none) == ["   0  1  2 ", "0  .  1  # ", "1  .  1  # "].join(sep="\n"),
-    );
-    let cell: (u64, u64) = (1, 1);
-    assert(
-        game.render(false, some(cell)) == ["   0  1  2 ", "0  .  1  # ", "1  . [1] # "].join(
-            sep="\n",
-        ),
-    );
+    assert(game.render(false, none) == """
+          0 1 2
+        0 . 1 #
+        1 . 1 #
+    """);
+    // The cursor takes the spaces either side of its cell...
+    let middle: (u64, u64) = (1, 1);
+    assert(game.render(false, some(middle)) == """
+          0 1 2
+        0 . 1 #
+        1 .[1]#
+    """);
+    // ...and at the edges, the row's own end.
+    let first: (u64, u64) = (0, 0);
+    let last: (u64, u64) = (0, 2);
+    assert(game.render(false, some(first)).split("\n")[1] == some("0[.]1 #"));
+    assert(game.render(false, some(last)).split("\n")[1] == some("0 . 1[#]"));
 })
 
 # One step toward the start of a board's side, stopping at the first cell.

@@ -420,7 +420,7 @@ mod minesweeper_sessions {
         for keys in ["q", ""] {
             let output = play(keys);
             assert_eq!(clears(&output), 1, "keys {keys:?}:\n{output}");
-            assert!(output.contains("0 [#] # "), "{output}");
+            assert!(output.contains("0[#]# # "), "{output}");
             assert!(output.contains("arrows move, r reveals, f flags, q quits"));
         }
     }
@@ -435,17 +435,17 @@ mod minesweeper_sessions {
             .split("arrows move, r reveals, f flags, q quits")
             .collect();
         // Before the first key, and after each of the three.
-        assert!(frames[0].contains("0 [#] # "), "{output}");
-        assert!(frames[1].contains("1 [#] # "), "{output}");
-        assert!(frames[2].contains("1  # [#] # "), "{output}");
-        assert!(frames[3].contains("1 [#] # "), "{output}");
+        assert!(frames[0].contains("0[#]# # "), "{output}");
+        assert!(frames[1].contains("1[#]# # "), "{output}");
+        assert!(frames[2].contains("1 #[#]# # "), "{output}");
+        assert!(frames[3].contains("1[#]# # "), "{output}");
     }
 
     /// `f` flags the cell under the cursor, and the next frame shows it.
     #[test]
     fn f_flags_the_cell_under_the_cursor() {
         let output = play("fq");
-        assert!(output.contains("0 [F] # "), "{output}");
+        assert!(output.contains("0[F]# "), "{output}");
     }
 
     /// Revealing every cell ends the game, which clears the screen once more to

@@ -17,6 +17,7 @@ projects:
   ray tracer:
     https://raytracing.github.io/books/RayTracingInOneWeekend.html
   minesweeper:
+    make it so mines aren't placed until first reveal, so that you can't accidentally die immediately. Then, make sure that the first reveal isn't adjacent to any bombs.
     remove seed arg after int conversion improvements land
     cell_at doesn't need to exist
     do the RNG with a shuffle, not the current nonsense
@@ -351,6 +352,7 @@ random:
   random strings generator, random char, other types, etc.
 
 shim:
+  make it so shim functions can hold state (is closure)
   better syntax (shim is a weird keyword)
   whole program optimization: if an effect is never shimmed, don't install the shimming code
   if switch to raw mode is never used, don't install the handlers
