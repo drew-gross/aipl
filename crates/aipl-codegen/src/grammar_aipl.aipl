@@ -130,6 +130,7 @@ import {
     Program as AProgram,
     Refinement as ARefinement,
     ShimBind as AShimBind,
+    ShimClosure as AShimClosure,
     Stmt as AStmt,
     Struct as AStruct,
     Suffix as ASuffix,
@@ -1132,7 +1133,13 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Term(TplClose),
     ]);
 
-    let shim_binding: Rule<AiplTok> = Then([Term(Name), Lit("="), Term(Name)]);
+    // What an operation is bound to is a function's name, which lowers to a plain
+    // binding, or a closure: the lambda forms an argument can be.
+    let shim_binding: Rule<AiplTok> = Then([
+        Term(Name),
+        Lit("="),
+        OneOf([Named("expr"), Named("lambda")]),
+    ]);
     let args: Rule<AiplTok> = Many(Named("arg"), sep=Lit(","));
 
     // The spread and the keyword argument lead with tokens no expression can, so
@@ -1196,7 +1203,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         p("atom", atom, TryMk(lower_atom)),
         p("else_branch", else_branch, TryMk(lower_else_branch)),
         p("template", template, TryMk(lower_template)),
-        p("shim_binding", shim_binding, Mk(lower_shim_binding)),
+        p("shim_binding", shim_binding, TryMk(lower_shim_binding)),
         p("args", args, TryMk(lower_args)),
         p("arg", arg, TryMk(lower_arg)),
         p("op_value", op_value, Mk(lower_op_value)),
@@ -1384,9 +1391,22 @@ fn as_arms(v: Ast, span: Span) -> MatchArm[]!ParseError {
     err(wrong_kind("a list of match arms", v, span))
 }
 
-fn as_bind(v: Ast, span: Span) -> (str, str)!ParseError {
+# A shim binding: the operation, the name of the function it is bound to, and the
+# closure that function is made of, when it is bound to one. A closure is bound
+# under a name of its own, so everything after the parser sees every binding as the
+# name of a function.
+struct ShimTarget { op: str, name: str, closure: Expr? }
+
+fn as_bind(v: Ast, span: Span) -> ShimTarget!ParseError {
     if (let AShimBind(op, f) = v) {
-        return ok((op, f));
+        return ok(ShimTarget { op, name: f, closure: none });
+    };
+    if (let AShimClosure(op, closure) = v) {
+        return ok(ShimTarget {
+            op,
+            name: `$shimfn${op}${closure.span.start}`,
+            closure: some(closure),
+        });
     };
     err(wrong_kind("a shim binding", v, span))
 }
@@ -1666,11 +1686,20 @@ fn shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
     };
     let last = kids.len() - 1;
     let body = kid_expr(kids, last, sp)?;
-    let binds = kids[..last].try_map(|k| as_bind(k, sp))?;
+    let named = kids[..last].try_map(|k| as_bind(k, sp))?;
     let head = spans
         .first()
         .value_or_err(ParseError { message: "a shim matched no token", span: sp })?;
-    ok(at(Shim(toks[1].value_or(""), binds, body), join_spans(head, spans[1].value_or(head))))
+    let at_head = join_spans(head, spans[1].value_or(head));
+    let binds = named.map(|b| (b.op, b.name));
+    mut wrapped = at(Shim(toks[1].value_or(""), binds, body), at_head);
+    // Each closure is a `let` around the shim, named by the binding that uses it.
+    for (let bind : named) {
+        if (let some(closure) = bind.closure) {
+            set wrapped = at(Let(bind.name, none, closure, wrapped), at_head);
+        };
+    }
+    ok(wrapped)
 }
 
 # `shim <effect> <provider>(args) { body }`, lowered to the shim it stands for.
@@ -2052,9 +2081,18 @@ fn lower_entry(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     }
 }
 
-fn lower_shim_binding(src: str, node: Parts, kids: Ast[]) -> Ast {
-    let toks = node.own_texts(src);
-    AShimBind(toks[0].value_or(""), toks[2].value_or(""))
+fn lower_shim_binding(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let op = node.own_texts(src)[0].value_or("");
+    let value = kid_expr(kids, 0, sp)?;
+    match (value.kind) {
+        Ident(f) => ok(AShimBind(op, f)),
+        Lambda(..) => ok(AShimClosure(op, value)),
+        _ => err(ParseError {
+            message: `"{op}" is bound to a function's name or to a closure \`|args| body\``,
+            span: value.span,
+        }),
+    }
 }
 
 // ---------- lowering: blocks ----------
@@ -4327,6 +4365,21 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
 
     // `shim`, whose bindings are a list and whose body is a block.
     assert(expr_dump("shim prints { print = p } { g() }") == "Shim(prints, [print = p], g())");
+
+    // A closure is bound under a name of its own and lowers to a `let` around the shim.
+    assert(
+        expr_dump(
+            "shim prints { print = |s| { g(s); } } { h() }",
+        ) == "Let($shimfn$print$22, Lambda([s], Seq(g(s), ())), Shim(prints, [print = $shimfn$print$22], h()))",
+    );
+    assert(
+        expr_dump(
+            "shim clock { now_nanos = || 5, monotonic_now = f } { h() }",
+        ) == "Let($shimfn$now_nanos$28, Lambda([], 5), Shim(clock, [now_nanos = $shimfn$now_nanos$28, monotonic_now = f], h()))",
+    );
+    assert(expr_dump("shim prints { print = 1 } { g() }").starts_with(
+        `error: "print" is bound to a function's name or to a closure`,
+    ));
 
     // A provider lowers to the shim it stands for, seeding as its body's first step.
     assert(

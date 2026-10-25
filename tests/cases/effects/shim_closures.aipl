@@ -1,0 +1,87 @@
+# A shim's operations can be bound to closures as well as to named functions, and
+# a closure can keep state: what it captures is read when it runs, and what it
+# `set`s is the shim's to hand back when it ends. So a stand-in can record the
+# calls made through it, or step through a script, without any function holding
+# state of its own.
+
+import {
+    first,
+    join,
+    len,
+    monotonic_now,
+    now_nanos,
+    print,
+    push,
+    put,
+    read_line,
+    to_str,
+    value_or,
+    wrapping_add as +,
+    wrapping_increment as ++,
+} from builtins;
+
+fn greet() !prints {
+    print("a");
+    put("b");
+    print("c");
+}
+
+fn elapsed() !clock -> u64 { now_nanos() + monotonic_now() }
+
+fn ask_twice() !read_stdin -> str {
+    let one = read_line().value_or("-");
+    let two = read_line().value_or("-");
+    `{one},{two}`
+}
+
+fn deeper() !prints {
+    greet();
+}
+
+fn main() !prints {
+    // Two operations recording into one array, and one counting: the closures share
+    // what they capture.
+    mut log: str[] = [];
+    mut calls = 0;
+    shim prints {
+        print = |text| {
+            set log.push(`print {text}`);
+            set calls++;
+        },
+        put = |text| {
+            set log.push(`put {text}`);
+            set calls++;
+        },
+    } {
+        deeper();
+    };
+    print(log.join(sep=", "));
+    print(to_str(calls));
+
+    // A closure that returns reads what it captures, and a bare literal takes the
+    // operation's integer width.
+    let start: u64 = 1000;
+    print(to_str(shim clock { now_nanos = || start, monotonic_now = || 7 } { elapsed() }));
+
+    // A script: each call takes the next line. The shim sets what it captures, so it
+    // is a statement, and what its body made is carried out in a variable.
+    mut lines = ["first", "second", "third"];
+    mut answer = "";
+    shim read_stdin {
+        read_line = || {
+            let next = lines.first();
+            set lines = lines[1..];
+            next
+        },
+    } {
+        set answer = ask_twice();
+    };
+    print(answer);
+    print(to_str(lines.len()));
+}
+--- stdout ---
+print a, put b, print c
+3
+1007
+first,second
+1

@@ -3,7 +3,7 @@
 # `aipl_syntax::aipl_builtins`). The file also defines `Key` and its cases, which
 # a program imports from builtins beside `read_key`.
 
-import { equal as ==, not_equal as !=, read_byte } from builtins;
+import { drop_first, equal as ==, first, not_equal as !=, push, read_byte } from builtins;
 
 # One key press: an arrow key, or the byte of any other key.
 variant Key = Up | Down | Left | Right | Other(u8)
@@ -34,20 +34,6 @@ fn arrow_ending(last: u8) -> Key {
     assert(arrow_ending(69) == Other(69));
 })
 
-# Stand-ins for `read_byte` that return the same answer every time, which is what
-# the `read_key` tests can shim: they pin the cases that end on the first byte.
-fn typed_a() -> u8? { some(97) }.test({
-    assert(typed_a() == some(97));
-})
-
-fn typed_escape() -> u8? { some(27) }.test({
-    assert(typed_escape() == some(27));
-})
-
-fn no_input() -> u8? { none }.test({
-    assert(no_input() == none);
-})
-
 # The next key press, without waiting for Enter: `some(key)`, or `none` once input
 # is exhausted. An arrow key is the three bytes `ESC [ A`..`D` that `read_byte`
 # returns, and arrives as `Up`, `Down`, `Right` or `Left`; any other key is `Other`
@@ -75,7 +61,44 @@ pub fn read_key() !read_stdin_raw -> Key? {
         },
     }
 }.test({
-    assert(shim read_stdin_raw { read_byte = typed_a } { read_key() } == some(Other(97)));
-    assert(shim read_stdin_raw { read_byte = no_input } { read_key() } == none);
-    assert(shim read_stdin_raw { read_byte = typed_escape } { read_key() } == some(Other(27)));
+    // A key that is one byte arrives as that byte, and an arrow key as its three.
+    assert(keys_from([97], 1) == [some(Other(97))]);
+    assert(keys_from([27, 91, 65], 1) == [some(Up)]);
+    assert(keys_from([27, 91, 66], 1) == [some(Down)]);
+    assert(keys_from([27, 91, 67], 1) == [some(Right)]);
+    assert(keys_from([27, 91, 68], 1) == [some(Left)]);
+    // Keys come one at a time, in order, and `none` once the bytes run out.
+    assert(keys_from([27, 91, 65, 97, 27, 91, 68], 4) == [
+        some(Up),
+        some(Other(97)),
+        some(Left),
+        none,
+    ]);
+
+    // An escape sequence that is not an arrow ends at the byte that breaks it, and
+    // one that stops short ends at the last byte it had.
+    assert(keys_from([27, 91, 69], 1) == [some(Other(69))]);
+    assert(keys_from([27, 120], 1) == [some(Other(120))]);
+    assert(keys_from([27], 2) == [some(Other(27)), none]);
+    assert(keys_from([27, 91], 2) == [some(Other(91)), none]);
+    assert(keys_from([], 1) == [none]);
 })
+
+# The first `count` answers of `read_key` when `typed` is all that is typed, one byte
+# after another.
+fn keys_from(typed: u8[], count: u64) -> Key?[] {
+    mut remaining = typed;
+    mut keys: Key?[] = [];
+    shim read_stdin_raw {
+        read_byte = || {
+            let next = remaining.first();
+            set remaining = remaining.drop_first();
+            next
+        },
+    } {
+        for (let _ : 0..count) {
+            set keys.push(read_key());
+        }
+    };
+    keys
+}

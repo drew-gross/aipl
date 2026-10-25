@@ -1,0 +1,132 @@
+# What a closure bound to a shim operation is held to: the operation's own
+# parameters and result, and a shim body that leaves alone what the closure sets.
+
+import { print, push, put, read_line, to_str } from builtins;
+
+fn noisy() !prints {
+    print("hi");
+}
+
+// The operation takes one parameter.
+fn wrong_arity() {
+    shim prints { print = |a, b| {}, put = |text| {} } {
+        noisy();
+    };
+}
+
+// The operation's parameter is a `str`.
+fn wrong_parameter_type() {
+    shim prints { print = |text: i64| {}, put = |text| {} } {
+        noisy();
+    };
+}
+
+// `print` returns nothing.
+fn wrong_result() {
+    shim prints { print = |text| text, put = |text| {} } {
+        noisy();
+    };
+}
+
+// `read_line` returns a line, or `none`.
+fn wrong_line_type() {
+    shim read_stdin { read_line = || 5 } {
+        let line = read_line();
+    };
+}
+
+// A closure leaves the function it is written in no way out.
+fn leaves() {
+    shim prints {
+        print = |text| {
+            return 1;
+        },
+        put = |text| {},
+    } {
+        noisy();
+    };
+}
+
+// The body of a shim cannot use what a closure of it sets: the closure holds it
+// until the shim ends.
+fn body_uses_what_a_closure_sets() {
+    mut seen: str[] = [];
+    shim prints {
+        print = |text| {
+            set seen.push(text);
+        },
+        put = |text| {},
+    } {
+        print(to_str(seen.len()));
+    };
+}
+
+// And a shim that sets something is a statement, not a value.
+fn shim_as_a_value() -> u64 {
+    mut seen: str[] = [];
+    let n = shim prints {
+        print = |text| {
+            set seen.push(text);
+        },
+        put = |text| {},
+    } {
+        noisy();
+        5
+    };
+    n
+}
+
+// A closure is bound to an operation of the effect.
+fn not_an_operation() {
+    shim prints { print = |text| {}, put = |text| {}, flush = || {} } {
+        noisy();
+    };
+}
+--- errors ---
+error: the closure bound to "print" takes 2 parameter(s), but "print" takes 1
+  --> ./tests/cases/effects/err_shim_closures.aipl:12:27
+   |
+12 |     shim prints { print = |a, b| {}, put = |text| {} } {
+   |                           ^^^^^^^^^
+
+error: closure parameter "text" is i64, but "print" passes a str
+  --> ./tests/cases/effects/err_shim_closures.aipl:19:27
+   |
+19 |     shim prints { print = |text: i64| {}, put = |text| {} } {
+   |                           ^^^^^^^^^^^^^^
+
+error: the closure bound to "print" returns str, but "print" returns ()
+  --> ./tests/cases/effects/err_shim_closures.aipl:26:34
+   |
+26 |     shim prints { print = |text| text, put = |text| {} } {
+   |                                  ^^^^
+
+error: the closure bound to "read_line" returns i64, but "read_line" returns str?
+  --> ./tests/cases/effects/err_shim_closures.aipl:33:38
+   |
+33 |     shim read_stdin { read_line = || 5 } {
+   |                                      ^
+
+error: a closure bound to a shim cannot `return` or use `?`; its value is its last expression
+  --> ./tests/cases/effects/err_shim_closures.aipl:42:20
+   |
+42 |             return 1;
+   |                    ^
+
+error: "seen" is set by the closure bound to "print", which holds it until the shim ends; the shim's body cannot use it
+  --> ./tests/cases/effects/err_shim_closures.aipl:60:22
+   |
+60 |         print(to_str(seen.len()));
+   |                      ^^^^
+
+error: the closure bound to "print" sets "seen", so this shim changes the scope around it: end it with `;`
+  --> ./tests/cases/effects/err_shim_closures.aipl:68:17
+   |
+68 |         print = |text| {
+   |                 ^^^^^^^^
+
+error: "flush" is not an operation of effect "!prints"; its operations are: print, put
+  --> ./tests/cases/effects/err_shim_closures.aipl:81:5
+   |
+81 |     shim prints { print = |text| {}, put = |text| {}, flush = || {} } {
+   |     ^^^^^^^^^^^

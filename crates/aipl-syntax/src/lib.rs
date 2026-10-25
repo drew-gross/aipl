@@ -1669,6 +1669,11 @@ pub mod ast {
         /// operation bound the body cannot reach the underlying resource. The
         /// bound functions' *own* effects still propagate to the enclosing
         /// function. See `SHIMMABLE_EFFECTS`.
+        ///
+        /// A binding may be written as a closure, `op = |args| body`. The parser
+        /// gives it a name of its own ([`SHIM_CLOSURE_PREFIX`]) and wraps the shim
+        /// in a `let` of that name whose value is the lambda, so this node still
+        /// binds names only; `aipl-mono`'s `shim_closures` lowers the `let`.
         Shim(String, Vec<(String, String)>, Box<Expr>),
         /// `none` — the None value. Its type is determined by context
         /// (function return, function arg, or the other branch of an
@@ -3105,6 +3110,15 @@ fn __builtin_enter_alternate_screen() !terminal {}
 # Switch the terminal back to the screen that `enter_alternate_screen` left, with
 # its contents and cursor as they were.
 fn __builtin_leave_alternate_screen() !terminal {}
+# What the cell `id` holds, which is where a shim closure keeps a variable it
+# captured: a shim stands in for an operation at every call site below it, so the
+# closure it installs is a plain function with nowhere to carry what it captured.
+# The result has the type the lowering of the closure shim (`aipl-mono`) recorded
+# for the cell. Only that lowering writes it.
+fn __builtin_shim_cell_get(id: u64) -> u64 { 0 }
+# Put `value` in the cell `id`, which takes a reference of its own to it and lets
+# go of what it held. The other half of `shim_cell_get`.
+fn __builtin_shim_cell_set<R: any>(id: u64, value: R) {}
 # The next random number, uniform over all of `u64`. `!random` is the one effect
 # with no default: there is no generator unless a `shim random` installs one, so
 # `main` cannot declare it and a program that uses it must say where its
@@ -3848,6 +3862,8 @@ pub fn is_none_literal_arg(t: &Type) -> bool {
 /// helper it replaced. `insert_key` is what `to_dict` and `map_to_dict` are
 /// written with; `to_dict` is the way to build a dict from outside.
 pub const INTERNAL_BUILTINS: &[Callee] = &[
+    Callee::ShimCellGet,
+    Callee::ShimCellSet,
     Callee::InsertKey,
     Callee::Reserve,
     Callee::AssumeNonempty,
@@ -4488,6 +4504,55 @@ pub fn each_subexpr_mut(e: &mut ast::Expr) -> Vec<&mut ast::Expr> {
             v
         }
     }
+}
+
+/// What the parser names the function a shim binds a closure to: the closure is
+/// the value of a `let` of this name around the shim, and the shim binds the
+/// operation to the name. Everything between the parser and `aipl-mono`'s lowering
+/// of closure shims (`shim_closures`) sees a closure as that `let`.
+pub const SHIM_CLOSURE_PREFIX: &str = "$shimfn$";
+
+/// Whether `name` is the name the parser gave a shim's closure.
+pub fn is_shim_closure_name(name: &str) -> bool {
+    name.starts_with(SHIM_CLOSURE_PREFIX)
+}
+
+/// The closures a shim binds and the shim itself: `e` is a chain of `let`s of
+/// shim-closure names (one per closure the shim binds) around a [`ShimExpr`].
+/// `None` for any other expression.
+///
+/// [`ShimExpr`]: ast::ExprKind::Shim
+pub fn shim_closure_chain(e: &ast::Expr) -> Option<(Vec<(&str, &ast::Expr)>, &ast::Expr)> {
+    let mut closures = Vec::new();
+    let mut cur = e;
+    while let ast::ExprKind::Let(name, _, closure, rest) = &cur.kind {
+        if !is_shim_closure_name(name) {
+            return None;
+        }
+        closures.push((name.as_str(), closure.as_ref()));
+        cur = rest;
+    }
+    match cur.kind {
+        ast::ExprKind::Shim(..) if !closures.is_empty() => Some((closures, cur)),
+        _ => None,
+    }
+}
+
+/// The variables `set` anywhere in `e`: the root name of every assignment target
+/// (`set a.b.c = ..` and `set a.push(..)` both name `a`), in order of first
+/// assignment.
+pub fn assigned_names(e: &ast::Expr) -> Vec<String> {
+    let mut names: Vec<String> = Vec::new();
+    each_subexpr(e, &mut |x| {
+        if let ast::ExprKind::Assign(lhs, _, _) = &x.kind {
+            if let Some((name, _)) = ast::assign_target(lhs) {
+                if !names.iter().any(|n| n == name) {
+                    names.push(name.to_string());
+                }
+            }
+        }
+    });
+    names
 }
 
 pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {

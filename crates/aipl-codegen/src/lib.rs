@@ -2955,6 +2955,7 @@ fn compile_program<M: Module>(
     // actual `aipl_*` imports are declared lazily on first use (see `Builtins`).
     let mut builtins = register_builtins(&mut funcs);
     builtins.const_base = const_base;
+    builtins.shim_cells = program.shim_cells.clone();
 
     // Monomorphization has already split each function into the instances the
     // program reaches — borrow and owned forms alike, each its own `ConcreteFn`
@@ -6804,6 +6805,9 @@ struct Builtins {
     /// Where this compilation's constants start in the runtime's slot table; see
     /// [`ARTIFACT_CONST_BASE`].
     const_base: usize,
+    /// The type of each cell a shim closure keeps a captured variable in, by cell
+    /// number (`aipl_mono::MonoProgram::shim_cells`).
+    shim_cells: Vec<ConcreteType>,
 }
 
 /// What one runtime-call parameter or result is, in ABI terms.
@@ -7320,6 +7324,7 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
         constants: RefCell::new(Vec::new()),
         constant_teardown: Cell::new(None),
         const_base: 0,
+        shim_cells: Vec::new(),
     }
 }
 
@@ -16217,6 +16222,80 @@ fn compile_call_expr_direct<M: Module>(
                 .push(Tracked::new(ptr, &result_ty));
             (ptr, result_ty)
         }
+        Callee::ShimCellGet => {
+            // `(cell) -> T`: a copy of what the cell holds, retained, as an owned
+            // temporary. The cell keeps its own reference, so the closure's copy
+            // can be changed without disturbing it. A shim sets the cell before
+            // it installs anything that reads it.
+            let [number] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let cell = shim_cell(module, builder, cx, number, span.clone())?;
+            let v = if cell.composite {
+                let src = builder.ins().iadd_imm_s(cell.block, 8);
+                copy_slot_value(builder, src, cell.size)
+            } else {
+                builder
+                    .ins()
+                    .load(types::I64, MemFlagsData::trusted(), cell.block, 8)
+            };
+            if needs_drop(&cell.ty, structs) {
+                emit_retain(builder, module, builtins, structs, v, &cell.ty);
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(v, &cell.ty));
+            }
+            (v, cell.ty)
+        }
+        Callee::ShimCellSet => {
+            // `(cell, value)`: the cell takes a reference of its own to `value`,
+            // and lets go of whatever it held before.
+            let [number, value] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (v, _) = compile_expr(module, builder, cx, scopes, value)?;
+            let cell = shim_cell(module, builder, cx, number, span.clone())?;
+            if needs_drop(&cell.ty, structs) {
+                let held = builder
+                    .ins()
+                    .load(types::I64, MemFlagsData::trusted(), cell.block, 0);
+                let release_b = builder.create_block();
+                let store_b = builder.create_block();
+                builder.ins().brif(held, release_b, &[], store_b, &[]);
+                builder.switch_to_block(release_b);
+                builder.seal_block(release_b);
+                let old = if cell.composite {
+                    builder.ins().iadd_imm_s(cell.block, 8)
+                } else {
+                    builder
+                        .ins()
+                        .load(types::I64, MemFlagsData::trusted(), cell.block, 8)
+                };
+                emit_drop(builder, module, builtins, structs, old, &cell.ty);
+                builder.ins().jump(store_b, &[]);
+                builder.switch_to_block(store_b);
+                builder.seal_block(store_b);
+                emit_retain(builder, module, builtins, structs, v, &cell.ty);
+            }
+            if cell.composite {
+                let dst = builder.ins().iadd_imm_s(cell.block, 8);
+                copy_composite(builder, dst, v, &cell.ty, structs);
+            } else {
+                builder
+                    .ins()
+                    .store(MemFlagsData::trusted(), v, cell.block, 8);
+            }
+            let one = builder.ins().iconst(types::I64, 1);
+            builder
+                .ins()
+                .store(MemFlagsData::trusted(), one, cell.block, 0);
+            let teardown = constant_teardown_id(module, builtins);
+            let teardown_ref = module.declare_func_in_func(teardown, builder.func);
+            let teardown_addr = builder.ins().func_addr(types::I64, teardown_ref);
+            builtins.call_void(module, builder, "aipl_const_on_exit", &[teardown_addr]);
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
+        }
         Callee::ReadByte => {
             // `() -> u8?`: `some(byte)` for the next byte of standard input, `none`
             // at end of input. The runtime returns the byte, or -1 for no byte, on
@@ -19543,6 +19622,82 @@ fn compile_call_expr_direct<M: Module>(
     })
 }
 
+/// The runtime cache slot of the constant-like value called `name`, of type `ty`:
+/// registered on its first request, and answered with the same slot after. The
+/// teardown function releases what a slot holds at exit, so every request for a
+/// name must agree on its type.
+fn constant_slot(
+    builtins: &Builtins,
+    name: &str,
+    ty: &ConcreteType,
+    span: Span,
+) -> Result<usize, Error> {
+    let mut constants = builtins.constants.borrow_mut();
+    let index = match constants.iter().position(|(n, _)| n == name) {
+        Some(i) => i,
+        None if builtins.const_base + constants.len() >= aipl_syntax::CONST_SLOT_COUNT => {
+            return Err(Error::at(
+                format!(
+                    "a program may have at most {} constants computed on first use",
+                    aipl_syntax::CONST_SLOT_COUNT - builtins.const_base
+                ),
+                span,
+            ));
+        }
+        None => {
+            constants.push((name.to_string(), ty.clone()));
+            constants.len() - 1
+        }
+    };
+    Ok(builtins.const_base + index)
+}
+
+/// A use of a shim closure's cell: the cache block that holds the value of the
+/// variable a closure captured, and what its type makes of it. The block is the
+/// layout a constant's is — a flag word, then the value — so the teardown that
+/// releases constants at exit releases cells too.
+struct ShimCell {
+    block: Value,
+    ty: ConcreteType,
+    composite: bool,
+    size: u32,
+}
+
+fn shim_cell<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    cell: &Expr,
+    span: Span,
+) -> Result<ShimCell, Error> {
+    let Cx {
+        structs, builtins, ..
+    } = cx;
+    let ExprKind::Num(number) = cell.kind else {
+        return Err(Error::at(
+            "a shim cell is named by its number".to_string(),
+            span,
+        ));
+    };
+    let ty = builtins.shim_cells[number as usize].clone();
+    let slot = constant_slot(builtins, &format!("$shim_cell{number}"), &ty, span)?;
+    let composite = is_composite(&ty, structs);
+    let size = if composite {
+        sret_size(&ty, structs).unwrap_or(8)
+    } else {
+        8
+    };
+    let slot_v = builder.ins().iconst(types::I64, slot as i64);
+    let bytes = builder.ins().iconst(types::I64, 8 + size as i64);
+    let block = builtins.call(module, builder, "aipl_const_slot", &[slot_v, bytes]);
+    Ok(ShimCell {
+        block,
+        ty,
+        composite,
+        size,
+    })
+}
+
 /// Compile a use of a constant computed on first use: a call to its
 /// initializer, answered from the runtime's cache.
 ///
@@ -19570,34 +19725,14 @@ fn compile_constant_use<M: Module>(
         structs, builtins, ..
     } = cx;
     let ty = info.return_ty.clone();
-    let idx = {
-        let mut constants = builtins.constants.borrow_mut();
-        match constants.iter().position(|(n, _)| n == name) {
-            Some(i) => i,
-            None if builtins.const_base + constants.len() >= aipl_syntax::CONST_SLOT_COUNT => {
-                return Err(Error::at(
-                    format!(
-                        "a program may have at most {} constants computed on first use",
-                        aipl_syntax::CONST_SLOT_COUNT - builtins.const_base
-                    ),
-                    span,
-                ));
-            }
-            None => {
-                constants.push((name.to_string(), ty.clone()));
-                constants.len() - 1
-            }
-        }
-    };
+    let idx = constant_slot(builtins, name, &ty, span.clone())?;
     let composite = is_composite(&ty, structs);
     let size = if composite {
         sret_size(&ty, structs).unwrap_or(8)
     } else {
         8
     };
-    let idx_v = builder
-        .ins()
-        .iconst(types::I64, (builtins.const_base + idx) as i64);
+    let idx_v = builder.ins().iconst(types::I64, idx as i64);
     let bytes = builder.ins().iconst(types::I64, 8 + size as i64);
     let block = builtins.call(module, builder, "aipl_const_slot", &[idx_v, bytes]);
     let built = builder

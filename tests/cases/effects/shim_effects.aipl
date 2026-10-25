@@ -11,10 +11,12 @@ import {
     clear_terminal,
     enter_alternate_screen,
     execute_program,
+    join,
     leave_alternate_screen,
     list_files,
     move_to,
     print,
+    push,
     put,
     read_byte,
     read_file_to_string,
@@ -79,36 +81,29 @@ fn press() !read_stdin_raw -> u8? { read_byte() }
 
 fn shimmed_key() -> str { shim read_stdin_raw { read_byte = only_byte } { to_str(press()) } }
 
-// ---- terminal: the stand-ins say what they were asked, and no control sequence is
-// sent. (They print, so the function installing the shim still declares `!prints`.)
-fn wiped() !prints {
-    print("wiped");
-}
-
-fn entered() !prints {
-    print("entered");
-}
-
-fn left() !prints {
-    print("left");
-}
-
-fn placed(row: u64, column: u64) !prints {
-    print(`placed at {row},{column}`);
-}
-
-fn shimmed_terminal() !prints {
+// ---- terminal: a closure writes down what it was asked, and no control sequence is sent.
+fn shimmed_terminal() -> str {
+    mut asked: str[] = [];
     shim terminal {
-        clear_terminal = wiped,
-        move_to = placed,
-        enter_alternate_screen = entered,
-        leave_alternate_screen = left,
+        clear_terminal = || {
+            set asked.push("clear");
+        },
+        move_to = |row, column| {
+            set asked.push(`move to {row},{column}`);
+        },
+        enter_alternate_screen = || {
+            set asked.push("enter");
+        },
+        leave_alternate_screen = || {
+            set asked.push("leave");
+        },
     } {
         enter_alternate_screen();
         move_to(2, 5);
         clear_terminal();
         leave_alternate_screen();
     };
+    asked.join(sep=", ")
 }
 
 // ---- execute_program
@@ -135,7 +130,7 @@ fn main() !prints {
     print(shimmed_listing());
     print(shimmed_stdin());
     print(shimmed_key());
-    shimmed_terminal();
+    print(shimmed_terminal());
     print(shimmed_run());
     greet();
 }
@@ -146,9 +141,6 @@ err("cannot write out.txt")
 ok(["d/a", "d/b"])
 some("scripted")
 some(65)
-entered
-placed at 2,5
-wiped
-left
+enter, move to 2,5, clear, leave
 ran tool exit=3
 hello

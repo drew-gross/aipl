@@ -845,6 +845,16 @@ the parser lowers (`provider_shim_expr` in `grammar_aipl.aipl`) to an ordinary
 shim of a runtime entry point plus a seeding call as the body's first step; the
 state is saved and restored with the shim's slot (the `Shim` arm in codegen).
 
+A binding can be a closure — `shim prints { print = |text| { set seen.push(text); } } { .. }` —
+which reads what it captures and may `set` captured `mut` variables: the shim writes them back
+when it ends, so a stand-in can record its calls or step through a script (see
+`tests/cases/effects/shim_closures.aipl`). It is lowered in `aipl-mono/src/shim_closures.rs`:
+each captured variable lives in a cell (a constant-style runtime slot) for the shim's extent, and
+the closure becomes an ordinary function reading and writing its cells. Because the closure holds
+a variable it sets until the shim ends, the shim's body may not use it, and such a shim is a
+statement. A cell belongs to its shim site, so a function whose closure shim is re-entered while
+active (recursion through the shim's own body) shares the cells between the activations.
+
 Nothing else is per-effect: `compile_call_expr` routes any call to a listed
 operation through its slot, whatever the signature, so a new operation needs no
 codegen of its own. Two things a shim author must know. A shim stays installed

@@ -128,42 +128,14 @@
 
 
 
-        <section class="item" id="item-typed_a">
+        <section class="item" id="item-keys_from">
           <h3>
-            <a class="anchor" href="#item-typed_a">typed_a</a>
+            <a class="anchor" href="#item-keys_from">keys_from</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn typed_a() -&#62; u8?</code></pre>
+          <pre class="signature"><code>fn keys_from(typed: u8[], count: u64) -&#62; Key?[]</code></pre>
 
-          <div class="doc"><p>Stand-ins for <code>read_byte</code> that return the same answer every time, which is what the <code>read_key</code> tests can shim: they pin the cases that end on the first byte.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-typed_escape">
-          <h3>
-            <a class="anchor" href="#item-typed_escape">typed_escape</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn typed_escape() -&#62; u8?</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-no_input">
-          <h3>
-            <a class="anchor" href="#item-no_input">no_input</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn no_input() -&#62; u8?</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p>The first <code>count</code> answers of <code>read_key</code> when <code>typed</code> is all that is typed, one byte after another.</p></div>
 
 
         </section>

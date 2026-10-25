@@ -2394,14 +2394,15 @@ fn shim_expr(self: W) -> WDoc!FmtError {
     })
 }
 
-# `op = f` pairs up to (not consuming) the closing brace, trailing comma allowed.
+# `op = f` pairs up to (not consuming) the closing brace, trailing comma allowed. `f` is
+# a function's name or a closure, laid out as an argument is.
 fn shim_bindings(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
     while (w.more_before("}")) {
         let op = w.bump();
-        let f = op.w.expect("=")?.w.bump();
-        set acc.push(Text(`{op.text} = {f.text}`));
+        let f = op.w.expect("=")?.w.call_arg()?;
+        set acc.push(Concat([Text(`{op.text} = `), f.doc]));
         set w = if (f.w.peek_text() == ",") { f.w.bump().w } else { f.w };
     }
     ok(WDocs { w, docs: acc })
@@ -3273,6 +3274,14 @@ fn walker_of(src: str) -> W!FmtError {
         walker_of("{ shim random { print = p } { play() } }")?
             .block()
             .rendered(100)? == "{ shim random { print = p } { play() } }",
+    );
+    // A binding may be a closure, laid out as an argument is.
+    assert(
+        walker_of("{ shim prints { print = | s | { g ( s ) ; } , put = q } { play() } }")?
+            .block()
+            .rendered(
+                100,
+            )? == "{\n    shim prints {\n        print = |s| {\n            g(s);\n        },\n        put = q,\n    } {\n        play()\n    }\n}\n",
     );
     assert(walker_of("{ set x ++ ; }")?.block().rendered(100)? == "{\n    set x++;\n}\n");
     assert(walker_of("{ set x -- ; }")?.block().rendered(100)? == "{\n    set x--;\n}\n");

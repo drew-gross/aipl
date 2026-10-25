@@ -353,7 +353,6 @@ random:
   random strings generator, random char, other types, etc.
 
 shim:
-  make it so shim functions can hold state (is closure)
   better syntax (shim is a weird keyword)
   whole program optimization: if an effect is never shimmed, don't install the shimming code
   if switch to raw mode is never used, don't install the handlers

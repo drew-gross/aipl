@@ -90,6 +90,8 @@ variant Ast =
     | Entries(BraceEntry[])
     | Arms(MatchArm[])
     | ShimBind(str, str)
+    # An operation bound to a closure, `op = |args| body`, rather than to a function's name.
+    | ShimClosure(str, ExprNode)
     | Stmt(StmtNode)
     | Name(str)
     | Program(ProgramNode)
@@ -134,7 +136,7 @@ pub fn ast_case_name(self: Ast) -> str {
         Entry(..) => "a brace-literal entry",
         Entries(..) => "a list of brace-literal entries",
         Arms(..) => "a list of match arms",
-        ShimBind(..) => "a shim binding",
+        ShimBind(..) | ShimClosure(..) => "a shim binding",
         Stmt(..) => "a statement",
         Name(..) => "a name",
         Program(..) => "a program",

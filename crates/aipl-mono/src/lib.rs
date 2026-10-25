@@ -72,6 +72,7 @@ mod subst;
 pub use subst::inline_single_use_bindings;
 
 mod early_exit;
+mod shim_closures;
 
 /// The optimization pass manager: the pass list, and the loop that runs it
 /// until the passes stop finding anything. See the module docs for the
@@ -1714,6 +1715,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         cur_receiver: None,
         synth: 0,
         cur_effects: Vec::new(),
+        shim_cells: Vec::new(),
         cur_lenv: HashMap::new(),
         lambda_envs: HashMap::new(),
         spec_memo: HashMap::new(),
@@ -2008,6 +2010,11 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                     .collect(),
                 name: v.name.text,
             })
+            .collect(),
+        shim_cells: mono
+            .shim_cells
+            .iter()
+            .map(|ty| settled(ty, "a variable a shim closure captures"))
             .collect(),
         fns: out_fns,
     })
@@ -2375,6 +2382,9 @@ pub struct MonoProgram {
     pub structs: Vec<ConcreteStructDecl>,
     pub variants: Vec<ConcreteVariantDecl>,
     pub fns: Vec<ConcreteFn>,
+    /// The type of each cell a shim closure keeps a captured variable in, by cell
+    /// number: `__shim_cell_get(n)` answers a value of the type at index `n`.
+    pub shim_cells: Vec<ConcreteType>,
 }
 
 /// How a *single parameter* is specialized in an instance — the per-parameter
@@ -2525,6 +2535,9 @@ struct Mono<'a> {
     /// the checker guarantees the enclosing function's effects cover the
     /// lambda's, so this is a sound (and per-call-site precise) over-approximation.
     cur_effects: Vec<String>,
+    /// The type of each cell a shim closure keeps a captured variable in, by cell number
+    /// (`shim_closures`).
+    shim_cells: Vec<Type>,
     /// Lambda bindings (function-typed parameter → its synthesized function +
     /// capture forwards) for the function currently being processed.
     cur_lenv: LambdaEnv,
@@ -6850,6 +6863,9 @@ impl Mono<'_> {
                     Type::Fn(ptys, Box::new(ret)),
                 )
             }
+            ExprKind::Let(name, ..) if aipl_syntax::is_shim_closure_name(name) => {
+                self.infer_shim_closures(expr, env)?
+            }
             ExprKind::Let(name, ty, val, body) => {
                 // The annotation is the value's expected type while it is
                 // inferred, not just a check afterwards — see `cur_expected`.
@@ -7933,7 +7949,13 @@ impl Mono<'_> {
                 } else {
                     // Builtin (`push`, `len`, …) or undefined (codegen reports
                     // the latter).
-                    let ret = self.call_return(callee, &atys);
+                    let ret = match (callee, rargs.first().map(|a| &a.kind)) {
+                        // A shim closure's cell answers the type its variable has.
+                        (Callee::ShimCellGet, Some(ExprKind::Num(cell))) => {
+                            self.shim_cells[*cell as usize].clone()
+                        }
+                        _ => self.call_return(callee, &atys),
+                    };
                     (
                         node(ExprKind::Call(callee.clone(), rargs, method_style)),
                         ret,

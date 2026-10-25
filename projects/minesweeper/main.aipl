@@ -17,6 +17,7 @@ import {
     enter_alternate_screen,
     equal as ==,
     extend,
+    first,
     grid_from,
     has,
     height,
@@ -411,32 +412,6 @@ fn report(self: Mark[,]) !prints {
     };
 }
 
-# Stand-ins for the terminal and for printing, which draw nothing.
-fn nothing() {}
-
-fn ignore(row: u64, column: u64) {}
-
-fn swallow(text: str) {}
-
-# Stand-ins for `read_byte` that answer the same every time: no input, `q`, `r`.
-fn no_key() -> u8? { none }
-
-fn quit_key() -> u8? { some(QUIT_KEY) }
-
-fn reveal_key() -> u8? { some(REVEAL_KEY) }
-
-# `play` with nothing drawn or printed, for its tests.
-fn play_silently(session: Session) !read_stdin_raw -> Mark[,] {
-    shim terminal {
-        clear_terminal = nothing,
-        move_to = ignore,
-        enter_alternate_screen = nothing,
-        leave_alternate_screen = nothing,
-    } {
-        shim prints { print = swallow, put = swallow } { play(session) }
-    }
-}
-
 # Play from `self` until it is won or lost, or the player quits or input ends, and
 # answer the game as it stood then.
 fn play(self: Session) !prints !read_stdin_raw !terminal -> Mark[,] {
@@ -456,17 +431,87 @@ fn play(self: Session) !prints !read_stdin_raw !terminal -> Mark[,] {
     let origin: (u64, u64) = (0, 0);
     let mined = Session { game: new_game(2, 2, [0]), cursor: origin };
     let safe = Session { game: new_game(2, 2, []), cursor: origin };
+    let board_moves = ["move 4,0", "move 0,0"];
 
-    // Nothing reaches the terminal. Every key press is the same one, because a
-    // stand-in has no state to step through a script with, so each of these ends
-    // the game on its own: the end of input, a quit, a mine and a win.
-    assert(shim read_stdin_raw { read_byte = no_key } { play_silently(mined) } == mined.game);
-    assert(shim read_stdin_raw { read_byte = quit_key } { play_silently(mined) } == mined.game);
-    assert(
-        shim read_stdin_raw { read_byte = reveal_key } { play_silently(mined) }.status() == Lost,
-    );
-    assert(shim read_stdin_raw { read_byte = reveal_key } { play_silently(safe) }.status() == Won);
+    // Input that ends at once: one frame drawn, and the game as it was.
+    let nothing = mined.play_typed([]);
+    assert(nothing.game == mined.game);
+    assert(nothing.moves == board_moves);
+    assert(nothing.written == [
+        mined.game.render(false, some(origin)),
+        "arrows move, r reveals, f flags, q quits",
+    ]);
+
+    // `q` quits after the first frame, and keys past it are never read.
+    assert(mined.play_typed([QUIT_KEY, REVEAL_KEY]) == nothing);
+
+    // An arrow key is three bytes; this one moves the cursor down, and the next
+    // frame shows it there.
+    let down: (u64, u64) = (1, 0);
+    let moved = mined.play_typed([27, 91, 66]);
+    assert(moved.game == mined.game);
+    assert(moved.moves == [..board_moves, ..board_moves]);
+    assert(moved.written[2] == some(mined.game.render(false, some(down))));
+
+    // `r` on a mine ends the game, and on the one safe cell of a board wins it; a
+    // finished game is not drawn again.
+    assert(mined.play_typed([REVEAL_KEY]).game.status() == Lost);
+    assert(safe.play_typed([REVEAL_KEY]).game.status() == Won);
+    assert(mined.play_typed([REVEAL_KEY]).moves == board_moves);
+
+    // `f` flags the cell, and the next frame shows the flag under the cursor.
+    let flagged = mined.play_typed([FLAG_KEY]);
+    assert(flagged.game == mined.game.toggle_flag(origin));
+    assert(flagged.written[2] == some(flagged.game.render(false, some(origin))));
 })
+
+# What a game made of `typed` keys, pressed one after another, left behind: the game
+# at the end, the terminal operations that moved its cursor, and what was written to
+# it.
+struct Played { game: Mark[,], moves: str[], written: str[] }
+
+# `play` from `self`, with `typed` as the keys pressed and nothing reaching the real
+# terminal.
+fn play_typed(self: Session, typed: u8[]) -> Played {
+    mut remaining = typed;
+    mut moves: str[] = [];
+    mut written: str[] = [];
+    mut game = self.game;
+    shim read_stdin_raw {
+        read_byte = || {
+            let next = remaining.first();
+            set remaining = remaining.drop_first();
+            next
+        },
+    } {
+        shim terminal {
+            clear_terminal = || {
+                set moves.push("clear");
+            },
+            move_to = |row, column| {
+                set moves.push(`move {row},{column}`);
+            },
+            enter_alternate_screen = || {
+                set moves.push("enter");
+            },
+            leave_alternate_screen = || {
+                set moves.push("leave");
+            },
+        } {
+            shim prints {
+                print = |text| {
+                    set written.push(text);
+                },
+                put = |text| {
+                    set written.push(text);
+                },
+            } {
+                set game = play(self);
+            };
+        };
+    };
+    Played { game, moves, written }
+}
 
 # Play on the standard 8 by 8 board with 10 mines. The mines are different every
 # game; `./aipl run -- SEED` plays the same game again for the same number. The

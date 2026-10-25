@@ -3417,6 +3417,11 @@ impl Cx<'_> {
             }
         }
         for (op, f) in bindings {
+            // A closure was checked against the operation's signature when its
+            // `let` was (`check_shim_closures`).
+            if aipl_syntax::is_shim_closure_name(f) {
+                continue;
+            }
             let Some(shim_sig) = self.sigs.get(f) else {
                 return Err(Error::at(
                     format!("unknown function {:?} bound to \"{op}\"", display(f)),
@@ -3479,6 +3484,148 @@ impl Cx<'_> {
             no_outer_assign(body, &HashSet::new(), ValueForm::Shim)?;
         }
         Ok(ty)
+    }
+
+    /// A shim whose operations are bound to closures (`shim prints { print = |s| .. }
+    /// { body }`): `expr` is the chain of `let`s the parser wraps around the shim.
+    ///
+    /// A closure stands in for its operation at every call site below the shim, so
+    /// it is held to what a named function would be: the operation's own parameter
+    /// types, its return type, and effects the installing function declares. It
+    /// reads whatever it captures from the scope around the shim, and may `set` a
+    /// captured `mut` variable — the shim's body is where those writes surface, so
+    /// the body may not touch such a variable until the shim ends (the closure
+    /// holds it in the meantime), and the shim must be a statement, because an
+    /// expression may not mutate the scope it sits in.
+    fn check_shim_closures(
+        &self,
+        expr: &Expr,
+        env: &Env,
+        effects: &[String],
+        pos: Pos,
+    ) -> Result<Type, Error> {
+        let Some((closures, shim)) = aipl_syntax::shim_closure_chain(expr) else {
+            return Err(Error::at(
+                "a shim closure's name is reserved for the parser's own lowering",
+                expr.span.clone(),
+            ));
+        };
+        let ExprKind::Shim(_, bindings, shim_body) = &shim.kind else {
+            unreachable!("a closure chain ends in a shim")
+        };
+        for (name, closure) in closures {
+            let op = bindings
+                .iter()
+                .find(|(_, f)| f == name)
+                .map(|(op, _)| op.as_str())
+                .expect("the parser binds each closure it names");
+            let ExprKind::Lambda(params, body) = &closure.kind else {
+                return Err(Error::at(
+                    format!("\"{op}\" is bound to something that is not a closure"),
+                    closure.span.clone(),
+                ));
+            };
+            // An unknown operation is reported by `check_shim`, which names the
+            // effect's operations; there is no signature to hold the closure to yet.
+            let Some(op_sig) = self.sigs.get(&format!("__builtin_{op}")) else {
+                continue;
+            };
+            let expected: Vec<Type> = op_sig.param_types();
+            if params.len() != expected.len() {
+                return Err(Error::at(
+                    format!(
+                        "the closure bound to \"{op}\" takes {} parameter(s), but \"{op}\" takes {}",
+                        params.len(),
+                        expected.len()
+                    ),
+                    closure.span.clone(),
+                ));
+            }
+            let mut inner = env.clone();
+            for (p, ty) in params.iter().zip(&expected) {
+                if let Some(written) = &p.ty {
+                    if written != ty {
+                        return Err(Error::at(
+                            format!(
+                                "closure parameter {:?} is {}, but \"{op}\" passes a {}",
+                                p.name,
+                                tyname(written),
+                                tyname(ty)
+                            ),
+                            closure.span.clone(),
+                        ));
+                    }
+                }
+                inner.insert(
+                    p.name.clone(),
+                    Binding {
+                        ty: ty.clone(),
+                        mutable: false,
+                    },
+                );
+            }
+            // `return` and `?` leave the function they are written in, and a closure's
+            // writes to what it captured happen as it ends.
+            let mut leaves: Option<Span> = None;
+            aipl_syntax::each_subexpr(body, &mut |x| {
+                if leaves.is_none() && matches!(x.kind, ExprKind::Return(_) | ExprKind::Try(_)) {
+                    leaves = Some(x.span.clone());
+                }
+            });
+            if let Some(at) = leaves {
+                return Err(Error::at(
+                    "a closure bound to a shim cannot `return` or use `?`; its value is its last expression",
+                    at,
+                ));
+            }
+            let got = self.check_expr(body, &inner, effects)?;
+            let want = op_sig.return_type();
+            // A bare literal takes the operation's integer width, as a returned one does.
+            self.lock_narrow(body, &want);
+            let got = self.fit(body, &got, &want)?;
+            if coerce(&got, &want).is_err() {
+                return Err(Error::at(
+                    format!(
+                        "the closure bound to \"{op}\" returns {}, but \"{op}\" returns {}",
+                        tyname(&got),
+                        tyname(&want)
+                    ),
+                    body.span.clone(),
+                ));
+            }
+            // What the closure sets of its captures, which the shim's body must leave
+            // alone and which the shim writes back when it ends.
+            for name in aipl_syntax::assigned_names(body) {
+                if params.iter().any(|p| p.name == name) || !env.contains_key(&name) {
+                    continue;
+                }
+                if pos == Pos::Value {
+                    return Err(Error::at(
+                        format!(
+                            "the closure bound to \"{op}\" sets \"{name}\", so this shim changes \
+                             the scope around it: end it with `;`"
+                        ),
+                        closure.span.clone(),
+                    ));
+                }
+                let mut touched: Option<Span> = None;
+                aipl_syntax::each_subexpr(shim_body, &mut |x| {
+                    if touched.is_none() && matches!(&x.kind, ExprKind::Ident(n) if *n == name) {
+                        touched = Some(x.span.clone());
+                    }
+                });
+                if let Some(at) = touched {
+                    return Err(Error::at(
+                        format!(
+                            "\"{name}\" is set by the closure bound to \"{op}\", which holds it \
+                             until the shim ends; the shim's body cannot use it"
+                        ),
+                        at,
+                    ));
+                }
+            }
+        }
+        self.check_expr_at(shim, env, effects, pos)
     }
 
     /// Check `expr` and return its type. `effects` is the enclosing function's
@@ -3760,6 +3907,9 @@ impl Cx<'_> {
                     self.add_syn_struct(name.clone(), fields);
                 }
                 Type::Named(name)
+            }
+            ExprKind::Let(name, ..) if aipl_syntax::is_shim_closure_name(name) => {
+                self.check_shim_closures(expr, env, effects, pos)?
             }
             ExprKind::Let(name, ty, val, body) => {
                 let bt = self.check_binding(name, ty.as_ref(), val, body, env, effects)?;

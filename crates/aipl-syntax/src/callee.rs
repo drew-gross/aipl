@@ -240,6 +240,11 @@ pub enum Callee {
     /// `leave_alternate_screen()` — switch back to the screen, and the cursor, that
     /// `enter_alternate_screen` left (`!terminal`).
     LeaveAlternateScreen,
+    /// `__shim_cell_get(id) -> T` — the value a shim closure's captured variable
+    /// holds, read from the cell `id` (internal: `shim_closures`).
+    ShimCellGet,
+    /// `__shim_cell_set(id, value)` — put `value` in the cell `id` (internal).
+    ShimCellSet,
     /// `random_u64() -> u64` — the next random number. Has no implementation of its
     /// own: it exists only under a `shim random`, whose provider supplies the
     /// generator (see `SHIM_ONLY_EFFECTS`).
@@ -562,6 +567,8 @@ impl Callee {
             Callee::MoveTo => "__builtin_move_to",
             Callee::EnterAlternateScreen => "__builtin_enter_alternate_screen",
             Callee::LeaveAlternateScreen => "__builtin_leave_alternate_screen",
+            Callee::ShimCellGet => "__builtin_shim_cell_get",
+            Callee::ShimCellSet => "__builtin_shim_cell_set",
             Callee::ReadKey => "__builtin_read_key",
             Callee::RandomU64 => "__builtin_random_u64",
             Callee::RandomNext => "__random_next",
