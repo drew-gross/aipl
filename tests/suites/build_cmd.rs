@@ -299,3 +299,18 @@ fn read_key_decodes_piped_arrow_keys_in_a_built_binary() {
     assert_eq!(code, 0, "stderr:\n{stderr}");
     assert_eq!(echo_lines(Command::new(exe), KEYS_IN), KEYS_OUT);
 }
+
+/// Clears the screen and says nothing else.
+const CLEAR_SCREEN: &str = "import { clear_screen } from builtins;\n\n\
+     fn main() !prints {\n\
+     \x20   clear_screen();\n\
+     }\n";
+
+#[test]
+fn clear_screen_prints_the_clear_sequence() {
+    let (stderr, code, exe) = build("clear_screen", CLEAR_SCREEN);
+    assert_eq!(code, 0, "stderr:\n{stderr}");
+    let out = Command::new(exe).output().expect("run the program");
+    assert!(out.status.success());
+    assert_eq!(out.stdout, b"\x1b[2J\x1b[H\n");
+}

@@ -1,0 +1,21 @@
+# `\e` is the escape character, one byte, which starts a terminal's control
+# sequences (`\e[2J` clears the screen). It is an escape in the three forms that
+# decode them: a string, a char literal and a template.
+
+import { equal as ==, len, print } from builtins;
+
+fn main() !prints {
+    print(`{"a\eb".len()}`);
+    let dash = "-";
+    print(`{`x\ey{dash}`.len()}`);
+    print(`{"\e"[0] == some('\e')}`);
+    print(`{"\e[2J".len()}`);
+    // A raw string decodes nothing, so its `\e` is a backslash and a letter.
+    print(`{"""\e""".len()}`);
+}
+--- stdout ---
+3
+4
+true
+4
+2

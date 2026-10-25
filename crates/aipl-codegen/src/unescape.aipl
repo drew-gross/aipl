@@ -4,14 +4,16 @@ import {
     concat as +++,
     equal as ==,
     extend,
+    len,
     less_than_or_equal as <=,
     logical_and as &&,
     logical_or as ||,
+    not_equal as !=,
     tuple_windows,
     wrapping_add as +,
 } from builtins;
 
-# Map a `\X` escape's X to its meaning: `n`/`t`/`r` to the control chars, and
+# Map a `\X` escape's X to its meaning: `n`/`t`/`r` to the control chars, `e` to the escape character, and
 # any other escaped char (`"`, `\`, `` ` ``, `{`) to itself. Validity was
 # already enforced by the matcher's scan (its `escapes` set), so an unknown `\X`
 # never reaches here. `self` is the char following the backslash.
@@ -20,6 +22,7 @@ pub fn escape_text(self: char) -> str {
         'n' => "\n",
         't' => "\t",
         'r' => "\r",
+        'e' => "",
         _ => `{self}`,
     }
 }.test({
@@ -27,6 +30,9 @@ pub fn escape_text(self: char) -> str {
     assert(escape_text('n') == "\n");
     assert(escape_text('t') == "\t");
     assert(escape_text('r') == "\r");
+    // `\e` is the escape character, one byte.
+    assert(escape_text('e').len() == 1);
+    assert(escape_text('e') != "e");
     // Every other escaped char decodes to itself.
     assert(escape_text('\\') == """\""");
     assert(escape_text('"') == `"`);

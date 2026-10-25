@@ -3320,7 +3320,7 @@ fn __builtin_with<T: any>(self: T[], index: u64, value: T) -> T[]? { none }
 # it is a mutating method, so `xs.try_set(i, v)` as an expression is the updated
 # copy and leaves `xs` alone. Not for a `str`.
 fn __builtin_try_set<T: any>(mut self: T[], index: u64, value: T) {}
-// NOTE: `all`, `words`, `cartesian_product`, `count_while`, `count_if`, `count_if_is_less_than` and its five siblings, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
+// NOTE: `all`, `clear_screen`, `words`, `cartesian_product`, `count_while`, `count_if`, `count_if_is_less_than` and its five siblings, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
 // `join_is_nonempty`, `join_is_empty`, `reduce`, `repeat`, `map_reduce`, `filter_map_reduce`, `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
 // `extend_optional`, `inline_str`, `measure`, `range`, `set_map`, `to_dict`, `map_to_dict`, `tuple_windows`, `union_all`,

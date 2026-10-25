@@ -6,6 +6,7 @@ import {
     all,
     any,
     cartesian_product,
+    clear_screen,
     count_if,
     drop_first,
     equal as ==,
@@ -315,6 +316,7 @@ fn play(game: Mark[,]) !prints !read_stdin {
             print("Boom! You hit a mine.");
         },
         Playing => {
+            clear_screen();
             print(game.render(false));
             print("r ROW COLUMN to reveal, f ROW COLUMN to flag, q to quit");
             match (read_line()) {

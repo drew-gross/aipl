@@ -93,7 +93,7 @@ pub fn aipl_tmlanguage() -> str {
         // Triple-backtick first, so a tie at the opening backtick goes to the
         // longer delimiter, exactly as the lexer's rule order does.
         template_pat("```", #{}),
-        template_pat("`", """\`ntr""".to_set()),
+        template_pat("`", """\`ntre""".to_set()),
         ..pats,
     ];
     tm_json(Tm {

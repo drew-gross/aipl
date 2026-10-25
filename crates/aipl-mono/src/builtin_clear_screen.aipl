@@ -1,0 +1,29 @@
+# The AIPL implementation of the `clear_screen` builtin. The loader names this
+# function by the canonical name `__builtin_clear_screen` (see
+# `aipl_syntax::aipl_builtins`) — the in-file name is only for this file's own
+# tests, which read exactly like user code.
+
+import { equal as ==, len, print } from builtins;
+
+# What a terminal is sent to clear its screen: the control sequence "erase the whole
+# display" (`ESC [ 2 J`), then "move the cursor to the top left" (`ESC [ H`).
+fn clear_sequence() -> str { "[2J[H" }.test({
+    assert(clear_sequence().len() == 7);
+    assert(clear_sequence()[..1] == "");
+    assert(clear_sequence()[1..] == "[2J[H");
+})
+
+fn swallow(text: str) {}.test({
+    swallow(clear_sequence());
+})
+
+# Clears the terminal and puts the cursor at the start of its second line: it prints
+# the control sequence that clears and homes, and `print` ends what it writes with
+# a newline. Output that is not a terminal receives the sequence as
+# text, so a program that is piped should not call it. Carries `!prints`, so a
+# `shim prints` can stand in for the terminal.
+pub fn clear_screen() !prints { print(clear_sequence()) }.test({
+    // Nothing reaches the real output; what is printed is pinned by
+    // `build_cmd::clear_screen_prints_the_clear_sequence`.
+    shim prints { print = swallow } { clear_screen() };
+})

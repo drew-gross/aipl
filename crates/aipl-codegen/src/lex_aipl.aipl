@@ -519,7 +519,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
             scope: S_STRING,
         },
         TokenRule {
-            matcher: Delimited(`"`.to_set(), escaped=`ntr\\"`.to_set()),
+            matcher: Delimited(`"`.to_set(), escaped=`ntre\\"`.to_set()),
             emit: Of(|text: str| StrLit(text.unescape(), Quoted)),
             unterminated: "unterminated string literal",
             scope: S_STRING,
@@ -533,7 +533,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // (not `Char`) to avoid the library test `Kind`'s arm (shared constructor
         // namespace). The escape set matches the string rule plus `\'`.
         TokenRule {
-            matcher: Delimited("'".to_set(), escaped=`ntr\\'"`.to_set()),
+            matcher: Delimited("'".to_set(), escaped=`ntre\\'"`.to_set()),
             emit: Try(char_lit_emit),
             unterminated: "unterminated char literal",
             scope: S_CHAR,
@@ -582,7 +582,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         TokenRule { matcher: Exact("`"), emit: Bare(TplClose), mode: M_TEMPLATE, pop: true },
         TokenRule { matcher: Exact("{"), emit: Bare(LBrace), mode: M_TEMPLATE, push: M_BASE },
         TokenRule {
-            matcher: UpToAny(["`", "{"], """\`ntr{}""".to_set()),
+            matcher: UpToAny(["`", "{"], """\`ntre{}""".to_set()),
             emit: Of(tpl_text),
             mode: M_TEMPLATE,
         },
