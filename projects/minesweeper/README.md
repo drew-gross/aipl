@@ -19,15 +19,18 @@ region and its border. A cell shows `#` hidden, `F` flagged, `.` revealed with
 nothing around it, or a digit counting the mines around it. Exits 0 on a win or a
 quit.
 
-The screen is cleared once when the game starts and once more to show a finished
-game with its mines; in between each move redraws the board in place
-(`move_to`, `put`). Keys are read one at a time with `read_key`, which puts the
+The game is drawn on the terminal's second screen (`enter_alternate_screen`), the
+way a pager or an editor is, and each move redraws the board in place (`move_to`,
+`put`; every row is kept the same width so a redraw leaves nothing of the last
+board behind). When play ends the screen is put away (`leave_alternate_screen`), so the shell comes back
+as it was, prompt included, and a finished game's board, mines and result are
+printed there. Keys are read one at a time with `read_key`, which puts the
 terminal into raw mode for the length of each call.
 
 `./aipl run` starts a new game; input can be piped, so a game can be scripted:
 `printf 'rq' | ./aipl run`. The output of a scripted run carries the control sequences
-`clear_terminal` and `move_to` write. `tests/suites/projects.rs` plays scripted games and
-counts the clears in what they wrote.
+the terminal operations write. `tests/suites/projects.rs` plays scripted games and
+checks the screen switches and the boards in what they wrote.
 
 ## The mines
 

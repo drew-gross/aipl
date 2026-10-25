@@ -372,14 +372,19 @@ mod tests {
 
 /// Scripted games of minesweeper: the project is run with keys piped in, and what it
 /// writes to the terminal is read back. A shim cannot count calls — a stand-in
-/// function holds no state — so the number of `clear_terminal` calls is counted
-/// in the bytes they wrote.
+/// function holds no state — so how often the terminal was told to switch screens
+/// is counted in the bytes that were written.
 mod minesweeper_sessions {
     use super::*;
     use std::io::Write;
     use std::process::Stdio;
 
+    const ENTER: &str = "\x1b[?1049h";
+    const LEAVE: &str = "\x1b[?1049l";
     const CLEAR: &str = "\x1b[2J\x1b[H";
+    const HOME: &str = "\x1b[1;1H";
+    /// Where the keys' reminder is drawn, under the board.
+    const HINT_ROW: &str = "\x1b[11;1H";
     const RIGHT: &str = "\x1b[C";
     const DOWN: &str = "\x1b[B";
     const LEFT: &str = "\x1b[D";
@@ -410,16 +415,33 @@ mod minesweeper_sessions {
         String::from_utf8(out.stdout).expect("utf-8 output")
     }
 
-    fn clears(output: &str) -> usize {
-        output.matches(CLEAR).count()
+    /// The boards drawn on the second screen, one text for each, in order.
+    fn boards(output: &str) -> Vec<&str> {
+        let screen = output.split(LEAVE).next().expect("the second screen");
+        let mut drawn: Vec<&str> = screen.split(HINT_ROW).collect();
+        // What follows the last reminder is the tail of the screen, not a board.
+        drawn.pop();
+        drawn
+            .into_iter()
+            .map(|chunk| {
+                let chunk = chunk.strip_prefix(ENTER).unwrap_or(chunk);
+                chunk.rsplit(HOME).next().expect("a board")
+            })
+            .collect()
     }
 
-    /// Clears once to start, and draws the cursor on the first cell.
+    /// The game is played on the second screen, which is entered once and left
+    /// once, and the board is drawn without clearing anything. A quit leaves
+    /// nothing on the screen the shell gets back.
     #[test]
-    fn a_game_that_ends_at_once_clears_once() {
+    fn a_game_is_played_on_the_second_screen() {
         for keys in ["q", ""] {
             let output = play(keys);
-            assert_eq!(clears(&output), 1, "keys {keys:?}:\n{output}");
+            assert_eq!(output.matches(ENTER).count(), 1, "keys {keys:?}:\n{output}");
+            assert_eq!(output.matches(LEAVE).count(), 1, "keys {keys:?}:\n{output}");
+            assert_eq!(output.matches(CLEAR).count(), 0, "keys {keys:?}:\n{output}");
+            assert!(output.starts_with(ENTER), "{output}");
+            assert!(output.ends_with(LEAVE), "{output}");
             assert!(output.contains("0[#]# # "), "{output}");
             assert!(output.contains("arrows move, r reveals, f flags, q quits"));
         }
@@ -430,15 +452,29 @@ mod minesweeper_sessions {
     #[test]
     fn arrow_keys_move_the_cursor() {
         let output = play(&format!("{DOWN}{RIGHT}{LEFT}q"));
-        assert_eq!(clears(&output), 1, "{output}");
-        let frames: Vec<&str> = output
-            .split("arrows move, r reveals, f flags, q quits")
-            .collect();
+        let boards = boards(&output);
         // Before the first key, and after each of the three.
-        assert!(frames[0].contains("0[#]# # "), "{output}");
-        assert!(frames[1].contains("1[#]# # "), "{output}");
-        assert!(frames[2].contains("1 #[#]# # "), "{output}");
-        assert!(frames[3].contains("1[#]# # "), "{output}");
+        assert_eq!(boards.len(), 4, "{output}");
+        assert!(boards[0].contains("0[#]# # "), "{output}");
+        assert!(boards[1].contains("1[#]# # "), "{output}");
+        assert!(boards[2].contains("1 #[#]# # "), "{output}");
+        assert!(boards[3].contains("1[#]# # "), "{output}");
+    }
+
+    /// A board is drawn over the one before it without clearing, so every row of it
+    /// has to be as wide as the row it replaces — a cursor on the last cell
+    /// closes its bracket after the row, and the next board must not leave that
+    /// bracket behind.
+    #[test]
+    fn every_row_is_as_wide_wherever_the_cursor_is() {
+        let output = play(&format!("{}{}q", RIGHT.repeat(7), LEFT));
+        let boards = boards(&output);
+        assert_eq!(boards.len(), 9, "{output}");
+        for board in boards {
+            for row in board.lines().skip(1) {
+                assert_eq!(row.chars().count(), 18, "row {row:?} of:\n{board}");
+            }
+        }
     }
 
     /// `f` flags the cell under the cursor, and the next frame shows it.
@@ -448,10 +484,11 @@ mod minesweeper_sessions {
         assert!(output.contains("0[F]# "), "{output}");
     }
 
-    /// Revealing every cell ends the game, which clears the screen once more to
-    /// show the whole board, with its mines, and how it ended.
+    /// Revealing every cell ends the game. The second screen is left, and the
+    /// whole board, with its mines, and how the game ended are printed on the
+    /// first.
     #[test]
-    fn a_game_that_is_decided_clears_twice() {
+    fn a_game_that_is_decided_is_reported_after_leaving() {
         let mut keys = String::new();
         for _ in 0..8 {
             for column in 0..8 {
@@ -466,8 +503,12 @@ mod minesweeper_sessions {
             }
         }
         let output = play(&keys);
-        assert_eq!(clears(&output), 2, "{output}");
-        let ending = output.rsplit(CLEAR).next().expect("the last screen");
+        assert_eq!(output.matches(ENTER).count(), 1, "{output}");
+        assert_eq!(output.matches(LEAVE).count(), 1, "{output}");
+        let ending = output
+            .rsplit(LEAVE)
+            .next()
+            .expect("what follows the screen");
         assert!(
             ending.ends_with("Boom! You hit a mine.\n") || ending.ends_with("You win!\n"),
             "{ending}"

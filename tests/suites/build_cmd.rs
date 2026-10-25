@@ -300,15 +300,18 @@ fn read_key_decodes_piped_arrow_keys_in_a_built_binary() {
     assert_eq!(echo_lines(Command::new(exe), KEYS_IN), KEYS_OUT);
 }
 
-/// Clears the terminal, then puts the cursor at the third row, fifth column.
-const TERMINAL: &str = "import { clear_terminal, move_to } from builtins;\n\n\
+/// Switches to the second screen, clears it, puts the cursor at the third row,
+/// fifth column, and switches back.
+const TERMINAL: &str = "import { clear_terminal, enter_alternate_screen, leave_alternate_screen, move_to } from builtins;\n\n\
      fn main() !terminal {\n\
+     \x20   enter_alternate_screen();\n\
      \x20   clear_terminal();\n\
      \x20   move_to(2, 4);\n\
+     \x20   leave_alternate_screen();\n\
      }\n";
 
-/// Both control sequences, with nothing after them: no newline, unlike `print`.
-const TERMINAL_BYTES: &[u8] = b"\x1b[2J\x1b[H\x1b[3;5H";
+/// The control sequences, with nothing after them: no newline, unlike `print`.
+const TERMINAL_BYTES: &[u8] = b"\x1b[?1049h\x1b[2J\x1b[H\x1b[3;5H\x1b[?1049l";
 
 #[test]
 fn terminal_operations_send_their_control_sequences() {

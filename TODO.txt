@@ -17,6 +17,7 @@ projects:
   ray tracer:
     https://raytracing.github.io/books/RayTracingInOneWeekend.html
   minesweeper:
+    none => self.game, #[allow], why the allow?
     make it so mines aren't placed until first reveal, so that you can't accidentally die immediately. Then, make sure that the first reveal isn't adjacent to any bombs.
     remove seed arg after int conversion improvements land
     cell_at doesn't need to exist
@@ -103,6 +104,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  enforce appropriate use of enter_alternate_screen() and leave_alternate_screen() somehow
   read file needs to decode to meet the "no terminal escapes in strings" constraint.  Or just return byte array.
   should maybe have a "in raw mode" effect that blocks !prints i.e. stdin mode is "scoped"
   "shimmable effects are" error is unweildy, don't have it list everything
@@ -309,7 +311,6 @@ syntax:
   type arguments with defaults
   wildcard syntax in turbofish that means "infer this one"
   explict type args (not just from context)
-  minesweeper main is non-DRY because of how shimming works. Should DRY it up.
   make a function composition operator
   ! is used for both effects and errors, we should switch the syntax for effects
   allow return v; as the last statement of a function

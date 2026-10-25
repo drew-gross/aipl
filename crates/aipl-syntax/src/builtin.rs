@@ -297,6 +297,8 @@ const BUILTINS: &[Builtin] = &[
     Builtin::declared(Callee::ReadByte),
     Builtin::declared(Callee::ClearTerminal),
     Builtin::declared(Callee::MoveTo),
+    Builtin::declared(Callee::EnterAlternateScreen),
+    Builtin::declared(Callee::LeaveAlternateScreen),
     Builtin::aipl_exporting(
         Callee::ReadKey,
         "builtin_read_key.aipl",

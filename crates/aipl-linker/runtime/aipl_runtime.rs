@@ -716,6 +716,20 @@ pub extern "C" fn aipl_clear_terminal() {
     write_terminal_sequence(b"\x1b[2J\x1b[H");
 }
 
+/// `enter_alternate_screen()`: save the cursor and switch to the blank second
+/// screen (`ESC [ ? 1049 h`).
+#[no_mangle]
+pub extern "C" fn aipl_enter_alternate_screen() {
+    write_terminal_sequence(b"\x1b[?1049h");
+}
+
+/// `leave_alternate_screen()`: switch back to the first screen and put the cursor
+/// where it was (`ESC [ ? 1049 l`).
+#[no_mangle]
+pub extern "C" fn aipl_leave_alternate_screen() {
+    write_terminal_sequence(b"\x1b[?1049l");
+}
+
 /// `move_to(row, column)`: put the cursor at a cell counted from 0 at the top
 /// left, which the terminal counts from 1 (`ESC [ row ; column H`).
 #[no_mangle]
@@ -1103,8 +1117,8 @@ unsafe fn clock_nanos(id: c_int) -> i64 {
 /// assigns. 0 means "no shim installed" — the state every slot starts in and
 /// returns to. Sized by `aipl_syntax::SHIM_SLOT_COUNT`; `shim_slots_match_runtime`
 /// in `tests/shims.rs` holds the two in sync.
-static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 13] =
-    [const { core::sync::atomic::AtomicI64::new(0) }; 13];
+static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 15] =
+    [const { core::sync::atomic::AtomicI64::new(0) }; 15];
 
 /// The shim installed for slot `idx`, or 0 if none. An out-of-range index reads
 /// as "no shim" rather than trapping (codegen only ever emits valid indices).

@@ -234,6 +234,12 @@ pub enum Callee {
     /// `move_to(row, column)` — put the terminal's cursor at a cell, counting from
     /// 0 at the top left (`!terminal`).
     MoveTo,
+    /// `enter_alternate_screen()` — switch the terminal to a second, blank screen
+    /// that `leave_alternate_screen` puts away (`!terminal`).
+    EnterAlternateScreen,
+    /// `leave_alternate_screen()` — switch back to the screen, and the cursor, that
+    /// `enter_alternate_screen` left (`!terminal`).
+    LeaveAlternateScreen,
     /// `random_u64() -> u64` — the next random number. Has no implementation of its
     /// own: it exists only under a `shim random`, whose provider supplies the
     /// generator (see `SHIM_ONLY_EFFECTS`).
@@ -554,6 +560,8 @@ impl Callee {
             Callee::ReadByte => "__builtin_read_byte",
             Callee::ClearTerminal => "__builtin_clear_terminal",
             Callee::MoveTo => "__builtin_move_to",
+            Callee::EnterAlternateScreen => "__builtin_enter_alternate_screen",
+            Callee::LeaveAlternateScreen => "__builtin_leave_alternate_screen",
             Callee::ReadKey => "__builtin_read_key",
             Callee::RandomU64 => "__builtin_random_u64",
             Callee::RandomNext => "__random_next",

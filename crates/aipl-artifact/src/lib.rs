@@ -361,6 +361,8 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_measure_begin"
         | "aipl_measure_end"
         | "aipl_clear_terminal"
+        | "aipl_enter_alternate_screen"
+        | "aipl_leave_alternate_screen"
         | "aipl_random_unshimmed" => sig(0, false),
         // Takes nothing, returns the reading.
         "aipl_test_summary"

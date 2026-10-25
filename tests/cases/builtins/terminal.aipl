@@ -1,15 +1,23 @@
-# `clear_terminal` and `move_to` control the terminal itself, which is what the
+# `clear_terminal`, `move_to` and the alternate screen control the terminal itself, which is what the
 # `!terminal` effect means: a function that only prints cannot do it. The
 # control sequences belong to the runtime — no `str` or `char` holds one — so a
 # program cannot send the terminal anything these do not. A shim stands in for
-# both operations here; the bytes they write are pinned by
+# every operation here; the bytes they write are pinned by
 # `build_cmd::terminal_operations_send_their_control_sequences`.
 
-import { clear_terminal, move_to, print } from builtins;
+import {
+    clear_terminal,
+    enter_alternate_screen,
+    leave_alternate_screen,
+    move_to,
+    print,
+} from builtins;
 
 fn redraw(row: u64, column: u64) !terminal {
+    enter_alternate_screen();
     clear_terminal();
     move_to(row, column);
+    leave_alternate_screen();
 }
 
 fn nothing() {}
@@ -17,7 +25,14 @@ fn nothing() {}
 fn ignore(row: u64, column: u64) {}
 
 fn main() !prints {
-    shim terminal { clear_terminal = nothing, move_to = ignore } { redraw(3, 4) };
+    shim terminal {
+        clear_terminal = nothing,
+        move_to = ignore,
+        enter_alternate_screen = nothing,
+        leave_alternate_screen = nothing,
+    } {
+        redraw(3, 4)
+    };
     print("redrawn");
 }
 --- stdout ---

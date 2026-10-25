@@ -3406,6 +3406,14 @@ fn new_jit_module() -> Result<JITModule, Error> {
         str24_host::aipl_clear_terminal as *const u8,
     );
     jit_builder.symbol("aipl_move_to", str24_host::aipl_move_to as *const u8);
+    jit_builder.symbol(
+        "aipl_enter_alternate_screen",
+        str24_host::aipl_enter_alternate_screen as *const u8,
+    );
+    jit_builder.symbol(
+        "aipl_leave_alternate_screen",
+        str24_host::aipl_leave_alternate_screen as *const u8,
+    );
     jit_builder.symbol("aipl_random_next", aipl_random_next as *const u8);
     jit_builder.symbol("aipl_random_seed", aipl_random_seed as *const u8);
     jit_builder.symbol("aipl_random_state", aipl_random_state as *const u8);
@@ -6919,6 +6927,8 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_measure_begin"
         | "aipl_measure_end"
         | "aipl_clear_terminal"
+        | "aipl_enter_alternate_screen"
+        | "aipl_leave_alternate_screen"
         | "aipl_random_unshimmed" => (0, Ret::None),
         "aipl_assert"
         | "aipl_shim_set"
@@ -7204,6 +7214,8 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
         (Callee::ReadByte, "aipl_read_byte"),
         (Callee::ClearTerminal, "aipl_clear_terminal"),
         (Callee::MoveTo, "aipl_move_to"),
+        (Callee::EnterAlternateScreen, "aipl_enter_alternate_screen"),
+        (Callee::LeaveAlternateScreen, "aipl_leave_alternate_screen"),
         // `random_u64` has no implementation, so its entry is the one that stops the
         // program; its arm in `compile_call_expr_direct` is what is actually used.
         (Callee::RandomU64, "aipl_random_unshimmed"),

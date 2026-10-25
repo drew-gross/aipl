@@ -9,7 +9,9 @@
 import {
     ExecResult,
     clear_terminal,
+    enter_alternate_screen,
     execute_program,
+    leave_alternate_screen,
     list_files,
     move_to,
     print,
@@ -83,14 +85,29 @@ fn wiped() !prints {
     print("wiped");
 }
 
+fn entered() !prints {
+    print("entered");
+}
+
+fn left() !prints {
+    print("left");
+}
+
 fn placed(row: u64, column: u64) !prints {
     print(`placed at {row},{column}`);
 }
 
 fn shimmed_terminal() !prints {
-    shim terminal { clear_terminal = wiped, move_to = placed } {
+    shim terminal {
+        clear_terminal = wiped,
+        move_to = placed,
+        enter_alternate_screen = entered,
+        leave_alternate_screen = left,
+    } {
+        enter_alternate_screen();
         move_to(2, 5);
         clear_terminal();
+        leave_alternate_screen();
     };
 }
 
@@ -129,7 +146,9 @@ err("cannot write out.txt")
 ok(["d/a", "d/b"])
 some("scripted")
 some(65)
+entered
 placed at 2,5
 wiped
+left
 ran tool exit=3
 hello

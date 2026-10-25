@@ -3097,6 +3097,14 @@ fn __builtin_clear_terminal() !terminal {}
 # what is printed next starts there. A position past the terminal's edge is
 # answered however the terminal answers it.
 fn __builtin_move_to(row: u64, column: u64) !terminal {}
+# Switch the terminal to a second, blank screen to draw on. What was on the screen
+# before, and where its cursor was, comes back at `leave_alternate_screen`, so
+# nothing drawn in between is left behind. A program that enters should leave
+# before it ends. Terminals that have no second screen draw on the first.
+fn __builtin_enter_alternate_screen() !terminal {}
+# Switch the terminal back to the screen that `enter_alternate_screen` left, with
+# its contents and cursor as they were.
+fn __builtin_leave_alternate_screen() !terminal {}
 # The next random number, uniform over all of `u64`. `!random` is the one effect
 # with no default: there is no generator unless a `shim random` installs one, so
 # `main` cannot declare it and a program that uses it must say where its
@@ -3892,7 +3900,15 @@ pub const SHIMMABLE_EFFECTS: &[(&str, &[&str])] = &[
     ("execute_program", &["execute_program"]),
     ("random", &["random_u64"]),
     ("read_stdin_raw", &["read_byte"]),
-    ("terminal", &["clear_terminal", "move_to"]),
+    (
+        "terminal",
+        &[
+            "clear_terminal",
+            "move_to",
+            "enter_alternate_screen",
+            "leave_alternate_screen",
+        ],
+    ),
 ];
 
 /// The effects that have no default implementation: the program must install one
@@ -3958,7 +3974,7 @@ pub fn shim_slot_index(op: &str) -> Option<usize> {
 
 /// How many shim slots the runtimes must reserve. Kept in sync by
 /// `shim_slots_match_runtime` in `tests/shims.rs`.
-pub const SHIM_SLOT_COUNT: usize = 13;
+pub const SHIM_SLOT_COUNT: usize = 15;
 
 /// How many constants computed on first use ([`constant_initializer_name`]) a
 /// program may have. Each owns a cache slot in the runtime, and both runtimes

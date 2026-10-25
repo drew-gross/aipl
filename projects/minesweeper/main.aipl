@@ -12,9 +12,9 @@ import {
     all,
     any,
     cartesian_product,
-    clear_terminal,
     count_if,
     drop_first,
+    enter_alternate_screen,
     equal as ==,
     extend,
     grid_from,
@@ -23,7 +23,9 @@ import {
     int_parse,
     is_in_bounds_of,
     is_nonempty,
+    is_some,
     join,
+    leave_alternate_screen,
     len,
     less_than as <,
     logical_and as &&,
@@ -263,8 +265,17 @@ fn render(self: Mark[,], show_mines: bool, cursor: (u64, u64)?) -> str {
             };
             `{before}{self.symbol((row, column), show_mines)}`
         });
-        // A cursor on the last cell has no cell after it to carry its closing bracket.
-        let last = if (cursor == some((row, self.width() - 1))) { "]" } else { "" };
+
+        // The closing bracket of a cursor on the last cell goes after it, and a space
+        // goes there otherwise, so that every row is as wide as the one it replaces
+        // when the board is drawn over itself.
+        let last = if (cursor == some((row, self.width() - 1))) {
+            "]"
+        } else if (cursor.is_some()) {
+            " "
+        } else {
+            ""
+        };
         `{row}{cells.join(sep="")}{last}`
     });
     [`  {heads.join(sep=" ")}`, ..rows].join(sep="\n")
@@ -275,17 +286,14 @@ fn render(self: Mark[,], show_mines: bool, cursor: (u64, u64)?) -> str {
         0 . 1 #
         1 . 1 #
     """);
-    // The cursor takes the spaces either side of its cell...
+
+    // The cursor takes the spaces either side of its cell, and every row keeps its
+    // width, so a row drawn over a longer one leaves nothing of it.
     let middle: (u64, u64) = (1, 1);
-    assert(game.render(false, some(middle)) == """
-          0 1 2
-        0 . 1 #
-        1 .[1]#
-    """);
-    // ...and at the edges, the row's own end.
+    assert(game.render(false, some(middle)) == ["  0 1 2", "0 . 1 # ", "1 .[1]# "].join(sep="\n"));
     let first: (u64, u64) = (0, 0);
     let last: (u64, u64) = (0, 2);
-    assert(game.render(false, some(first)).split("\n")[1] == some("0[.]1 #"));
+    assert(game.render(false, some(first)).split("\n")[1] == some("0[.]1 # "));
     assert(game.render(false, some(last)).split("\n")[1] == some("0 . 1[#]"));
 })
 
@@ -387,11 +395,20 @@ fn draw(self: Session) !prints !terminal {
     move_to(0, 0);
 }
 
-# Show a finished game with its mines, and how it ended.
-fn finish(self: Mark[,], message: str) !prints !terminal {
-    clear_terminal();
-    print(self.render(true, none));
-    print(message);
+# Say how `self` ended, and show it with its mines. Prints nothing for a game
+# that is still going: the player quit.
+fn report(self: Mark[,]) !prints {
+    match (self.status()) {
+        Won => {
+            print(self.render(true, none));
+            print("You win!");
+        },
+        Lost => {
+            print(self.render(true, none));
+            print("Boom! You hit a mine.");
+        },
+        Playing => {},
+    };
 }
 
 # Stand-ins for the terminal and for printing, which draw nothing.
@@ -409,28 +426,35 @@ fn quit_key() -> u8? { some(QUIT_KEY) }
 fn reveal_key() -> u8? { some(REVEAL_KEY) }
 
 # `play` with nothing drawn or printed, for its tests.
-fn play_silently(session: Session) !read_stdin_raw {
-    shim terminal { clear_terminal = nothing, move_to = ignore } {
-        shim prints { print = swallow, put = swallow } { play(session) };
-    };
+fn play_silently(session: Session) !read_stdin_raw -> Mark[,] {
+    shim terminal {
+        clear_terminal = nothing,
+        move_to = ignore,
+        enter_alternate_screen = nothing,
+        leave_alternate_screen = nothing,
+    } {
+        shim prints { print = swallow, put = swallow } { play(session) }
+    }
 }
 
-# Play from `self` until it is won or lost, or the player quits or input ends.
-fn play(self: Session) !prints !read_stdin_raw !terminal {
+# Play from `self` until it is won or lost, or the player quits or input ends, and
+# answer the game as it stood then.
+fn play(self: Session) !prints !read_stdin_raw !terminal -> Mark[,] {
     match (self.game.status()) {
-        Won => self.game.finish("You win!"),
-        Lost => self.game.finish("Boom! You hit a mine."),
+        Won | Lost => self.game,
         Playing => {
             self.draw();
             match (read_key()) {
-                none => {},
+                // The `some` arm is the game going on: it reads the next key, so it is not a
+                // mapping over the key.
+                none => self.game, #[allow]
                 some(key) => match (self.press(key)) {
-                    Quit => {},
+                    Quit => self.game,
                     Continue(next) => play(next),
                 },
-            };
+            }
         },
-    };
+    }
 }.test({
     let origin: (u64, u64) = (0, 0);
     let mined = Session { game: new_game(2, 2, [0]), cursor: origin };
@@ -439,14 +463,19 @@ fn play(self: Session) !prints !read_stdin_raw !terminal {
     // Nothing reaches the terminal. Every key press is the same one, because a
     // stand-in has no state to step through a script with, so each of these ends
     // the game on its own: the end of input, a quit, a mine and a win.
-    shim read_stdin_raw { read_byte = no_key } { play_silently(mined) };
-    shim read_stdin_raw { read_byte = quit_key } { play_silently(mined) };
-    shim read_stdin_raw { read_byte = reveal_key } { play_silently(mined) };
-    shim read_stdin_raw { read_byte = reveal_key } { play_silently(safe) };
+    assert(shim read_stdin_raw { read_byte = no_key } { play_silently(mined) } == mined.game);
+    assert(shim read_stdin_raw { read_byte = quit_key } { play_silently(mined) } == mined.game);
+    assert(
+        shim read_stdin_raw { read_byte = reveal_key } { play_silently(mined) }.status() == Lost,
+    );
+    assert(shim read_stdin_raw { read_byte = reveal_key } { play_silently(safe) }.status() == Won);
 })
 
 # Play on the standard 8 by 8 board with 10 mines. The mines are different every
-# game; `./aipl run -- SEED` plays the same game again for the same number.
+# game; `./aipl run -- SEED` plays the same game again for the same number. The
+# board is drawn on the terminal's second screen, which is put away when play
+# ends, so the shell's screen and prompt are as they were; the result is then
+# printed on the first.
 fn main(args: str[]) !prints !read_stdin_raw !terminal !clock -> !Error {
     let size: u64 = 8;
     let origin: (u64, u64) = (0, 0);
@@ -457,8 +486,13 @@ fn main(args: str[]) !prints !read_stdin_raw !terminal !clock -> !Error {
             _ => err("usage: minesweeper [SEED]")?,
         }
     } {
-        clear_terminal();
-        play(Session { game: new_game(size, size, place_mines(10, size * size)), cursor: origin });
+        enter_alternate_screen();
+        let game = play(Session {
+            game: new_game(size, size, place_mines(10, size * size)),
+            cursor: origin,
+        });
+        leave_alternate_screen();
+        game.report();
     };
     ok()
 }

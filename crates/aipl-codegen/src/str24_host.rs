@@ -158,6 +158,20 @@ pub(crate) extern "C" fn aipl_clear_terminal() {
     write_terminal_sequence(b"\x1b[2J\x1b[H");
 }
 
+/// `enter_alternate_screen()`: save the cursor and switch to the blank second
+/// screen (`ESC [ ? 1049 h`).
+#[no_mangle]
+pub(crate) extern "C" fn aipl_enter_alternate_screen() {
+    write_terminal_sequence(b"\x1b[?1049h");
+}
+
+/// `leave_alternate_screen()`: switch back to the first screen and put the cursor
+/// where it was (`ESC [ ? 1049 l`).
+#[no_mangle]
+pub(crate) extern "C" fn aipl_leave_alternate_screen() {
+    write_terminal_sequence(b"\x1b[?1049l");
+}
+
 /// `move_to(row, column)`: put the cursor at a cell counted from 0 at the top
 /// left, which the terminal counts from 1 (`ESC [ row ; column H`). Saturating
 /// keeps `u64::MAX` an answer rather than a wrap to 0.

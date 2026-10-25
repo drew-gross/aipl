@@ -131,7 +131,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/builtins/read_line | 4 | 168 | 84 | 139 | 1128 | 6.00 | 60.35 | 1456 |
 | cases/builtins/reverse | 7 | 403 | 208 | 806 | 2940 | 4.00 | 65.56 | 1440 |
 | cases/builtins/span | 6 | 136 | 136 | 454 | 2284 | 8.00 | 62.87 | 1472 |
-| cases/builtins/terminal | 0 | 0 | 0 | 51 | 452 | 6.00 | 98.22 | 1456 |
+| cases/builtins/terminal | 0 | 0 | 0 | 81 | 704 | 3.00 | 115.84 | 1440 |
 | cases/builtins/user_fn_shadows_builtin | 0 | 0 | 0 | 28 | 176 | 1.00 | 61.11 | 1440 |
 | cases/chars/char_at_out_of_bounds | 0 | 0 | 0 | 87 | 424 | 2.00 | 62.84 | 1424 |
 | cases/chars/char_equality | 0 | 0 | 0 | 91 | 464 | 2.00 | 67.07 | 1424 |
@@ -173,7 +173,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/effects/random | 7 | 221 | 221 | 1348 | 5044 | 12.00 | 69.28 | 1456 |
 | cases/effects/random_provider_block | 2 | 40 | 40 | 536 | 2056 | 7.00 | 80.83 | 1440 |
 | cases/effects/shim_clock | 7 | 276 | 276 | 300 | 2280 | 8.00 | 66.56 | 1472 |
-| cases/effects/shim_effects | 24 | 1395 | 1097 | 1639 | 10612 | 19.00 | 108.18 | 1504 |
+| cases/effects/shim_effects | 24 | 1395 | 1097 | 1699 | 11156 | 19.00 | 74.80 | 1488 |
 | cases/effects/transitive_caller_with_declaration_passes | 0 | 0 | 0 | 17 | 156 | 3.00 | 62.87 | 1440 |
 | cases/equality/arrays | 8 | 640 | 640 | 1882 | 3724 | 4.00 | 77.96 | 1456 |
 | cases/equality/optionals | 0 | 0 | 0 | 205 | 820 | 2.00 | 63.63 | 1440 |

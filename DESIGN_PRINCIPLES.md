@@ -28,7 +28,7 @@ coarse and has to be split.
 
 | Surprise a coarse effect would allow | Split into |
 |---|---|
-| `!prints` also redraws, clears or recolours the terminal, rewrites its title, or reads back from it | `!prints` writes text; `!terminal` controls the terminal (`clear_terminal`, `move_to`) |
+| `!prints` also redraws, clears or recolours the terminal, rewrites its title, or reads back from it | `!prints` writes text; `!terminal` controls the terminal (`clear_terminal`, `move_to`, `enter_alternate_screen`) |
 | `!read_stdin` also puts the terminal into raw mode and consumes keystrokes as they are typed | `!read_stdin` reads lines; `!read_stdin_raw` reads bytes as typed |
 | `!read_files` also writes or lists | `!read_files`, `!write_files`, `!list_files` |
 | `!clock` also supplies randomness | `!random`, which only a `shim` can supply |
