@@ -444,15 +444,12 @@ fn play(self: Session) !prints !read_stdin_raw !terminal -> Mark[,] {
         Won | Lost => self.game,
         Playing => {
             self.draw();
-            match (read_key()) {
-                // The `some` arm is the game going on: it reads the next key, so it is not a
-                // mapping over the key.
-                none => self.game, #[allow]
-                some(key) => match (self.press(key)) {
+            read_key()
+                .map(|key| match (self.press(key)) {
                     Quit => self.game,
                     Continue(next) => play(next),
-                },
-            }
+                })
+                .value_or(self.game)
         },
     }
 }.test({
