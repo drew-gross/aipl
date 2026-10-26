@@ -24,6 +24,8 @@ argparser:
   make it
 
 vscode extension:
+  better features for builtins (go to docs? go to impl?)
+  split go-to-references by category (in tests vs. actual uses vs. import locations)
   one language server per workspace folder, so a multi-root workspace uses each
     project's own compiler (today: one server, from the first folder carrying an
     `aipl`; `aipl.serverPath` is the override)
