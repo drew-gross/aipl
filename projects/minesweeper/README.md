@@ -34,13 +34,20 @@ checks the screen switches and the boards in what they wrote.
 
 ## The mines
 
-Ten mines are placed at random each game. `./aipl run -- SEED` plays the same
-game again for the same whole number, which is also how the tests get a fixed
-board. `main` seeds with `shim random seeded_with_clock()` or
-`shim random seeded_with_int(seed)`: `!random` is an effect with no default
-generator, so `main` cannot declare it and the program has to say where its
-numbers come from. `place_mines` declares `!random`; everything else takes the
-mines as an argument (`new_game(width, height, mines)`).
+Ten mines are placed at random, but not until the first reveal, so a game cannot be
+lost on its first move. The first `r` puts the mines anywhere but the cell under the
+cursor and the cells touching it, which makes the cell empty and opens at least it
+and its neighbours (a 3 by 3 area, less at an edge or a corner). A flag put down
+before then stays. A first `r` on a flagged cell reveals nothing, so it places
+nothing either.
+
+`./aipl run -- SEED` plays the same game again for the same whole number and the
+same first cell, which is also how the tests get a fixed board. `main` seeds with
+`shim random seeded_with_clock()` or `shim random seeded_with_int(seed)`: `!random`
+is an effect with no default generator, so `main` cannot declare it and the program
+has to say where its numbers come from. `play` and `place_mines` declare it; the
+rules take the mines as an argument (`new_game(width, height, mines)`,
+`with_mines`).
 
 ## Layout
 

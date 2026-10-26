@@ -392,8 +392,13 @@ mod minesweeper_sessions {
     /// What a game writes to the terminal when it is played with `keys`, on the
     /// board the seed 1 deals.
     fn play(keys: &str) -> String {
+        play_seeded("1", keys)
+    }
+
+    /// [`play`], on the board a different seed deals.
+    fn play_seeded(seed: &str, keys: &str) -> String {
         let mut child = Command::new(env!("CARGO_BIN_EXE_aipl"))
-            .args(["run", "--", "1"])
+            .args(["run", "--", seed])
             .current_dir(projects_dir().join("minesweeper"))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -474,6 +479,35 @@ mod minesweeper_sessions {
             for row in board.lines().skip(1) {
                 assert_eq!(row.chars().count(), 18, "row {row:?} of:\n{board}");
             }
+        }
+    }
+
+    /// The first reveal places the mines away from the cursor, so it is never a loss and
+    /// opens the cell and the cells around it: in a corner, the cell is an empty `.` and
+    /// the three beside it are revealed too.
+    #[test]
+    fn the_first_reveal_opens_an_area_and_never_loses() {
+        for seed in ["1", "2", "3", "4", "5", "6", "7", "8"] {
+            let output = play_seeded(seed, "rq");
+            let boards = boards(&output);
+            assert_eq!(boards.len(), 2, "seed {seed}:\n{output}");
+            let revealed = boards[1].lines().skip(1).take(2).collect::<Vec<_>>();
+            assert!(
+                revealed[0].starts_with("0[.]"),
+                "seed {seed}:\n{}",
+                boards[1]
+            );
+            assert!(
+                !revealed[0][4..].starts_with('#'),
+                "seed {seed}:\n{}",
+                boards[1]
+            );
+            assert!(
+                !revealed[1][1..].starts_with('#'),
+                "seed {seed}:\n{}",
+                boards[1]
+            );
+            assert!(!output.contains("Boom"), "seed {seed}:\n{output}");
         }
     }
 

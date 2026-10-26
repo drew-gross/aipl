@@ -17,15 +17,7 @@ projects:
   ray tracer:
     https://raytracing.github.io/books/RayTracingInOneWeekend.html
   minesweeper:
-    none => self.game, #[allow], why the allow?
-    make it so mines aren't placed until first reveal, so that you can't accidentally die immediately. Then, make sure that the first reveal isn't adjacent to any bombs.
-    remove seed arg after int conversion improvements land
-    cell_at doesn't need to exist
     do the RNG with a shuffle, not the current nonsense
-    Game should just be a Marks[,]. Width and height are available on it directly, and mines can be folded in to marks (rename to cells?)
-    make with() calls update in place
-    Finish todo items in readme
-    use an arrow-keys commands model
 
 argparser:
   make it
