@@ -1,0 +1,41 @@
+# An optional may carry a set payload (`#{i64}?`), as it may an array: a set is one
+# heap pointer, which fits the optional slot. The `some` arm owns the set; `none`
+# falls back to an empty one. An ordered set keeps its order through the optional.
+
+import {
+    equal as ==,
+    has,
+    is_some,
+    len,
+    to_array,
+    union,
+    value_or,
+    wrapping_add as +,
+} from builtins;
+
+fn pick(b: bool) -> #{i64}? { if (b) { some(#{1, 2, 3}) } else { none } }
+
+fn ordered() -> #>{i64}? { some(#>{5, 9, 7}) }
+
+fn main() {}.test({
+    let present = pick(true).value_or(#{});
+    assert(present.has(2));
+    let absent = pick(false).value_or(#{});
+    assert(len(present) + len(absent) == 3); // 3 + 0
+
+    // Equality and matching see through it.
+    assert(pick(true) == some(#{3, 2, 1}));
+    assert(pick(false) == none);
+    assert(pick(true).is_some());
+    if (let some(s) = pick(true)) {
+        assert(s.union(#{4}).len() == 4);
+    } else {
+        assert(false);
+    };
+
+    // The order of an ordered set survives.
+    assert(ordered().value_or(#>{}).to_array() == [9, 7, 5]);
+
+    // `$` maps over it.
+    assert(pick(true)$len() == some(3));
+})

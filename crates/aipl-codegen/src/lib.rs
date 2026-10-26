@@ -19438,9 +19438,10 @@ fn compile_call_expr_direct<M: Module>(
                 // Every scalar: any integer width, `bool`, `char`, `str`.
                 _ if is_set_elem(&t) => {}
                 // A struct (`Point?`) is stored inline, as is a nested optional
-                // (`some(some(..))` → `T??`) and an array.
+                // (`some(some(..))` → `T??`). An array and a set are each one
+                // heap pointer, which fits the optional slot.
                 ConcreteType::Named(n) if structs.contains_key(n) => {}
-                ConcreteType::Array(_) | ConcreteType::Optional(_) => {}
+                ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Optional(_) => {}
                 _ => {
                     return Err(Error::at(
                         format!(

@@ -2450,7 +2450,7 @@ impl Cx<'_> {
             }
             // Optional core types: a scalar, `str`, a nested array, or an
             // optional (`T??`) — never a struct.
-            Type::Optional(inner) => self.check_elem_ty(inner, type_params, ctx),
+            Type::Optional(inner) => self.check_optional_core_ty(inner, type_params, ctx),
             // A set element: a scalar (i64/bool/char), `str`, or a type
             // parameter (pinned to one of those when monomorphized). No nested
             // containers, no struct/variant.
@@ -2629,9 +2629,9 @@ impl Cx<'_> {
     /// carries them unchanged (`aipl_arr_drop_arr` decs each element block, and a
     /// set or dict block is what it is given).
     ///
-    /// Deliberately not extended to an optional core or a dict value. Those store
-    /// their payload inline rather than behind the array-element helpers, so they
-    /// are a separate piece of work rather than the same one.
+    /// A set is also an optional's core ([`Self::check_optional_core_ty`]), which
+    /// stores it inline, but a dict is not, and neither is a dict value. Those are
+    /// separate pieces of work rather than the same one.
     fn check_array_elem_ty(
         &self,
         t: &Type,
@@ -2643,6 +2643,22 @@ impl Cx<'_> {
             // key and value — which is exactly what `check_ty` does for one
             // written anywhere else.
             Type::Set(..) | Type::Dict(_, _) => self.check_ty(t, type_params, ctx),
+            _ => self.check_elem_ty(t, type_params, ctx),
+        }
+    }
+
+    /// An optional's core type: everything [`Self::check_elem_ty`] allows, plus a
+    /// set. A set is one heap pointer, which an optional stores inline as it does
+    /// an array's, so the optional's retain, drop and comparison carry it.
+    /// A dict is not yet taken: it is a separate piece of work.
+    fn check_optional_core_ty(
+        &self,
+        t: &Type,
+        type_params: &[String],
+        ctx: &str,
+    ) -> Result<(), Error> {
+        match t {
+            Type::Set(..) => self.check_ty(t, type_params, ctx),
             _ => self.check_elem_ty(t, type_params, ctx),
         }
     }
@@ -2690,13 +2706,16 @@ impl Cx<'_> {
             }
             // Nested arrays (`T[][]`) and nested optionals (`T??`) are allowed.
             Type::Array(inner) => self.check_array_elem_ty(inner, type_params, ctx),
-            Type::Optional(inner) => self.check_elem_ty(inner, type_params, ctx),
-            // A set or dict is allowed as an *array* element, which reaches here
-            // through `check_array_elem_ty`; in an optional core or a dict value
-            // it is not, and this is that refusal.
-            Type::Set(..) | Type::Dict(_, _) => Err(Error::msg(format!(
-                "{ctx}: a set or dict can be an array element but not an optional \
-                 or dict element"
+            Type::Optional(inner) => self.check_optional_core_ty(inner, type_params, ctx),
+            // A set is allowed as an *array* element or an optional's core, which
+            // reach here through `check_array_elem_ty` and `check_optional_core_ty`;
+            // a dict value is neither, and this is that refusal.
+            Type::Set(..) => Err(Error::msg(format!(
+                "{ctx}: a set can be an array or optional element but not a dict value"
+            ))),
+            // A dict is allowed as an *array* element only.
+            Type::Dict(_, _) => Err(Error::msg(format!(
+                "{ctx}: a dict can be an array element but not an optional or dict element"
             ))),
             Type::Result(_, _) => Err(Error::msg(format!(
                 "{ctx}: a result cannot be an array, optional, or dict element"

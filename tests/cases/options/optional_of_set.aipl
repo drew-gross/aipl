@@ -1,0 +1,34 @@
+# An optional of a set, `#{i64}?`, built, passed, compared, matched and stored in a
+# struct field and an array, with an ordered set keeping its order through it. A set
+# is one heap pointer, so the optional stores it inline as it does an array, and the
+# leak gate holds the retains and drops to balance.
+
+import { equal as ==, len, print, to_array, union, value_or } from builtins;
+
+struct Holder { name: str, tags: #{str}? }
+
+fn pick(b: bool) -> #{i64}? { if (b) { some(#{1, 2, 3}) } else { none } }
+
+fn grow(s: #{i64}?) -> #{i64}? {
+    if (let some(inner) = s) { some(inner.union(#{9})) } else { none }
+}
+
+fn main() !prints {
+    let a = pick(true);
+    let b = grow(a);
+    print(`{a} {b} {pick(false)}`);
+    print(`{b.value_or(#{}).len()} {a == b} {a == pick(true)}`);
+    let h = Holder { name: "h", tags: some(#{"x", "y"}) };
+    let g = Holder { ..h, tags: none };
+    print(`{h.tags.value_or(#{}).len()} {g.tags.value_or(#{}).len()}`);
+    let many: #{i64}?[] = [pick(true), pick(false), grow(pick(true))];
+    print(`{many.len()}`);
+    let o: #>{i64}? = some(#>{5, 9, 7});
+    print(`{o.value_or(#>{}).to_array()}`);
+}
+--- stdout ---
+some({1, 2, 3}) some({1, 2, 3, 9}) none
+4 false true
+2 0
+3
+[9, 7, 5]

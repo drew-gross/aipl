@@ -162,7 +162,7 @@
           </h3>
           <pre class="signature"><code>fn optional_ty_names(self: Ty?) -&#62; #{str}</code></pre>
 
-          <div class="doc"><p>The names an annotation mentions, none when it was not written. (An optional set is not a type yet, so this cannot be <code>self.map(ty_names).value_or(#{})</code>.)</p></div>
+          <div class="doc"><p>The names an annotation mentions, none when it was not written. (An optional set is not a type yet, so this is not <code>self$ty_names().value_or(#{})</code>.)</p></div>
 
 
         </section>

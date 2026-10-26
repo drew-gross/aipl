@@ -471,6 +471,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/options/map | 13 | 723 | 723 | 505 | 2752 | 11.00 | 72.23 | 1456 |
 | cases/options/match_trailing_comma | 0 | 0 | 0 | 45 | 252 | 2.00 | 64.65 | 1424 |
 | cases/options/none_is_not_some | 0 | 0 | 0 | 68 | 312 | 1.00 | 59.95 | 1440 |
+| cases/options/optional_of_set | 31 | 1651 | 1563 | 2157 | 9076 | 15.00 | 110.38 | 1504 |
 | cases/options/optional_of_struct | 0 | 0 | 0 | 323 | 1380 | 2.00 | 77.32 | 1440 |
 | cases/options/optional_param | 0 | 0 | 0 | 63 | 316 | 2.00 | 66.72 | 1424 |
 | cases/options/return_optional | 0 | 0 | 0 | 77 | 420 | 2.00 | 67.35 | 1424 |
@@ -480,6 +481,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/options/types/bool_optional | 0 | 0 | 0 | 67 | 340 | 1.00 | 67.16 | 1424 |
 | cases/options/types/boxed_variant_optional | 5 | 280 | 280 | 152 | 1016 | 2.00 | 69.43 | 1456 |
 | cases/options/types/char_optional | 0 | 0 | 0 | 104 | 404 | 2.00 | 77.23 | 1424 |
+| cases/options/types/set_optional | 0 | 0 | 0 | 3 | 8 | 0.00 | 65.35 | 1424 |
 | cases/options/types/str_optional | 0 | 0 | 0 | 98 | 656 | 2.00 | 62.50 | 1456 |
 | cases/options/value_or_err | 6 | 388 | 388 | 458 | 2104 | 8.00 | 70.71 | 1472 |
 | cases/perf/instructions_executed | 1 | 18 | 18 | 647 | 612 | 5.00 | 77.15 | 1440 |

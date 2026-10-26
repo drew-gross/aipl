@@ -99,6 +99,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  collect_names looks like it can be a set spread
   dict_spread_message and co should be consts not functions
   referenced_names() should return a set
   referenced_names() looks simplifiable
@@ -477,6 +478,7 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  lint to use my_opt$foo().value_or(fallback) rather than in if/else
   assert(fn() == ok(val)) should be assert(fn()? == val)
   unused imports should be #[allow] able (generally clean up #[allow] architecture after lint is all aipl)
   - Lints see the written form of a destructuring parameter. Today the parser
@@ -643,6 +645,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    make consecutive set operations fuse when all adding to the same set (e.g. union chains)
     extend(xs.map(f))
     make a way for the same code to work as a lint when written directly and as a fusion when it shows up after inlining
     equality operator fusion for many operations, match fusion, etc.

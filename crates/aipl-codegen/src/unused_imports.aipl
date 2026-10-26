@@ -264,7 +264,7 @@ fn path_names(name: str) -> #{str} {
 }
 
 # The names an annotation mentions, none when it was not written. (An optional
-# set is not a type yet, so this cannot be `self.map(ty_names).value_or(#{})`.)
+# set is not a type yet, so this is not `self$ty_names().value_or(#{})`.)
 fn optional_ty_names(self: Ty?) -> #{str} {
     if (let some(ty) = self) { ty.ty_names() } else { #{} }
 }

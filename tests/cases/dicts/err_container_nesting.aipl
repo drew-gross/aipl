@@ -3,9 +3,10 @@
 # retain/drop helpers carry them (see `tests/cases/arrays/of_sets_and_dicts`).
 #
 # An optional core and a dict value are different: those store their payload
-# inline rather than behind those helpers, so neither takes a set or a dict yet.
-# This fixture pins that boundary — the positions that are still refused, and
-# the reason the message gives.
+# inline rather than behind those helpers. An optional takes a set (see
+# `tests/cases/options/optional_of_set`) but not yet a dict, and a dict value takes
+# neither. This fixture pins that boundary — the positions that are still refused,
+# and the reason the message gives.
 
 import { wrapping_add as + } from builtins;
 
@@ -21,14 +22,14 @@ fn dict_value() -> i64 {
 
 fn main() -> i64 { opt_core() + dict_value() }
 --- errors ---
-error: fn "opt_core": a set or dict can be an array element but not an optional or dict element
-  --> ./tests/cases/dicts/err_container_nesting.aipl:13:27
+error: fn "opt_core": a dict can be an array element but not an optional or dict element
+  --> ./tests/cases/dicts/err_container_nesting.aipl:14:27
    |
-13 |     let d: #{i64: i64}? = none;
+14 |     let d: #{i64: i64}? = none;
    |                           ^^^^
 
-error: fn "dict_value": a set or dict can be an array element but not an optional or dict element
-  --> ./tests/cases/dicts/err_container_nesting.aipl:18:29
+error: fn "dict_value": a set can be an array or optional element but not a dict value
+  --> ./tests/cases/dicts/err_container_nesting.aipl:19:29
    |
-18 |     let d: #{str: #{i64}} = #{};
+19 |     let d: #{str: #{i64}} = #{};
    |                             ^^^
