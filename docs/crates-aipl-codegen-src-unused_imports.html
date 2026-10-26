@@ -90,7 +90,7 @@
             <a class="anchor" href="#item-referenced_names">referenced_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn referenced_names(__spat$3489: Program) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn referenced_names(__spat$3482: Program) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>Every name the file mentions outside its own import lists: called and referenced idents, constructed structs, match constructors, operator spellings, and every name appearing in a type — signatures, struct fields, variant payloads, and inline <code>let</code>/lambda annotations.</p></div>
 
@@ -104,7 +104,7 @@
             <a class="anchor" href="#item-collect_names">collect_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn collect_names(self: str[], e: Expr)</code></pre>
+          <pre class="signature"><code>fn collect_names(self: #{str}, e: Expr)</code></pre>
 
           <div class="doc"><p><code>self</code> with the names <code>e</code> and every expression under it mention.</p></div>
 
@@ -118,7 +118,7 @@
             <a class="anchor" href="#item-own_names">own_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn own_names(self: Expr) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn own_names(self: Expr) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>The names <code>e</code> itself mentions, not those of its sub-expressions.</p></div>
 
@@ -132,7 +132,7 @@
             <a class="anchor" href="#item-ctor_names">ctor_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn ctor_names(self: Pat) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn ctor_names(self: Pat) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>The constructors a pattern names, at any depth. A <code>V.A</code> path names the variant as well as the case. Written with the variant's name because <code>Str</code> and <code>Char</code> are also expression cases here.</p></div>
 
@@ -146,7 +146,7 @@
             <a class="anchor" href="#item-path_names">path_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn path_names(name: str) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn path_names(name: str) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>The names a constructor written <code>name</code> mentions: the name, and the variant too when it is qualified.</p></div>
 
@@ -155,14 +155,14 @@
 
 
 
-        <section class="item" id="item-flat_ctor_names">
+        <section class="item" id="item-optional_ty_names">
           <h3>
-            <a class="anchor" href="#item-flat_ctor_names">flat_ctor_names</a>
+            <a class="anchor" href="#item-optional_ty_names">optional_ty_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn flat_ctor_names(self: Pat[]) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn optional_ty_names(self: Ty?) -&#62; #{str}</code></pre>
 
-          <div class="doc"><p>The constructors each of <code>self</code> names, together.</p></div>
+          <div class="doc"><p>The names an annotation mentions, none when it was not written. (An optional set is not a type yet, so this cannot be <code>self.map(ty_names).value_or(#{})</code>.)</p></div>
 
 
         </section>
@@ -174,23 +174,9 @@
             <a class="anchor" href="#item-ty_names">ty_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn ty_names(self: Ty) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn ty_names(self: Ty) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>Every name <code>self</code> mentions, so an import used only in a type position still counts as used. Variants are spelled out rather than wildcarded so a new <code>Ty</code> forces a decision here.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-flat_ty_names">
-          <h3>
-            <a class="anchor" href="#item-flat_ty_names">flat_ty_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn flat_ty_names(self: Ty[]) -&#62; str[]</code></pre>
-
-          <div class="doc"><p>The names of each of <code>self</code>, together.</p></div>
 
 
         </section>

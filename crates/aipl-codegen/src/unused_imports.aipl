@@ -12,7 +12,6 @@
 import {
     Span,
     equal as ==,
-    extend,
     first,
     greater_than as >,
     has,
@@ -22,7 +21,8 @@ import {
     not_equal as !=,
     push,
     split,
-    to_set,
+    union,
+    union_all,
     value_or,
 } from builtins;
 import {
@@ -97,7 +97,7 @@ import {
 
 # A hit for each name `program` imports and nothing in it references.
 pub fn unused_imports(program: Program) -> LintHit[] {
-    let used = referenced_names(program).to_set();
+    let used = referenced_names(program);
     mut hits: LintHit[] = [];
     for (let item : program.items) {
         if (let Import(decl) = item) {
@@ -137,22 +137,20 @@ fn hit_span(self: ImportName, source: ImportSource) -> Span {
 # referenced idents, constructed structs, match constructors, operator spellings,
 # and every name appearing in a type — signatures, struct fields, variant
 # payloads, and inline `let`/lambda annotations.
-fn referenced_names(Program { items }) -> str[] {
-    mut names: str[] = [];
+fn referenced_names(Program { items }) -> #{str} {
+    mut names: #{str} = #{};
     for (let item : items) {
         // Type positions that belong to the item rather than to any expression,
         // then the expressions it holds.
         match (item) {
             Fn(f) => {
                 for (let param : f.sig.params) {
-                    set names.extend(param.ty.ty_names());
+                    set names = names.union(param.ty.ty_names());
                     if (let some(default) = param.default) {
                         set names.collect_names(default);
                     };
                 }
-                if (let some(ty) = f.sig.return_ty) {
-                    set names.extend(ty.ty_names());
-                };
+                set names = names.union(f.sig.return_ty.optional_ty_names());
                 set names.collect_names(f.body);
                 if (let some(test) = f.test_body) {
                     set names.collect_names(test);
@@ -160,7 +158,7 @@ fn referenced_names(Program { items }) -> str[] {
             },
             Struct(s) => {
                 for (let field : s.fields) {
-                    set names.extend(field.ty.ty_names());
+                    set names = names.union(field.ty.ty_names());
                     if (let some(default) = field.default) {
                         set names.collect_names(default);
                     };
@@ -169,7 +167,7 @@ fn referenced_names(Program { items }) -> str[] {
             Variant(v) => {
                 for (let case : v.cases) {
                     for (let slot : case.payload) {
-                        set names.extend(slot.ty.ty_names());
+                        set names = names.union(slot.ty.ty_names());
                         if (let some(default) = slot.default) {
                             set names.collect_names(default);
                         };
@@ -179,13 +177,11 @@ fn referenced_names(Program { items }) -> str[] {
             // A constant's annotation may name an imported type; its value is a
             // literal, so it names nothing.
             Const(c) => {
-                if (let some(ty) = c.ty) {
-                    set names.extend(ty.ty_names());
-                };
+                set names = names.union(c.ty.optional_ty_names());
                 set names.collect_names(c.value);
             },
             Refinement(r) => {
-                set names.extend(r.target.ty_names());
+                set names = names.union(r.target.ty_names());
             },
             Import(..) => {},
         };
@@ -194,46 +190,28 @@ fn referenced_names(Program { items }) -> str[] {
 }
 
 # `self` with the names `e` and every expression under it mention.
-fn collect_names(mut self: str[], e: Expr) {
-    set self.extend(e.own_names());
+fn collect_names(mut self: #{str}, e: Expr) {
+    set self = self.union(e.own_names());
     for (let child : e.subexprs()) {
         set self.collect_names(child);
     }
 }
 
 # The names `e` itself mentions, not those of its sub-expressions.
-fn own_names(self: Expr) -> str[] {
+fn own_names(self: Expr) -> #{str} {
     match (self.kind) {
-        Ident(name) | Construct(name, _) | Call(name, _, _) => [name],
+        Ident(name) | Construct(name, _) | Call(name, _, _) => #{name},
         // Unary `-` is the one operator with no named builtin behind it, so it
         // stays a node; every other operator use is a `Call` on its spelling.
-        Neg(..) => ["-"],
+        Neg(..) => #{"-"},
         // A shim's name and bindings all name functions.
-        Shim(effect, bindings, _) => {
-            mut names = [effect];
-            for (let binding : bindings) {
-                set names.push(binding.0);
-                set names.push(binding.1);
-            }
-            names
+        Shim(effect, bindings, _) => #{
+            effect,
+            ..bindings.map(|binding| #{binding.0, binding.1}).union_all(),
         },
-        Let(_, ty, _, _) | LetMut(_, ty, _, _) => ty.map(ty_names).value_or([]),
-        Lambda(params, _) => {
-            mut names: str[] = [];
-            for (let param : params) {
-                if (let some(ty) = param.ty) {
-                    set names.extend(ty.ty_names());
-                };
-            }
-            names
-        },
-        Match(_, arms) => {
-            mut names: str[] = [];
-            for (let arm : arms) {
-                set names.extend(arm.pattern.ctor_names());
-            }
-            names
-        },
+        Let(_, ty, _, _) | LetMut(_, ty, _, _) => ty.optional_ty_names(),
+        Lambda(params, _) => params.map(|param| param.ty.optional_ty_names()).union_all(),
+        Match(_, arms) => arms.map(|arm| arm.pattern.ctor_names()).union_all(),
         // `if (let P = e)` is one arm without the `match`; its pattern names a
         // constructor just as an arm's does.
         IfLet(arm, _, _) => arm.pattern.ctor_names(),
@@ -259,47 +237,44 @@ fn own_names(self: Expr) -> str[] {
         | Return(..)
         | TupleLit(..)
         | KwArg(..)
-        | TypeArgs(..) => [],
+        | TypeArgs(..) => #{},
     }
 }
 
 # The constructors a pattern names, at any depth. A `V.A` path names the variant
 # as well as the case. Written with the variant's name because `Str` and `Char`
 # are also expression cases here.
-fn ctor_names(self: Pat) -> str[] {
+fn ctor_names(self: Pat) -> #{str} {
     match (self) {
         Pat.Ctor(name, _, _) => path_names(name),
-        Pat.Nested(name, args) => [..path_names(name), ..args.flat_ctor_names()],
-        Pat.ArrayNested(patterns) | Pat.Tuple(patterns) => patterns.flat_ctor_names(),
-        Pat.Str(..) | Pat.Char(..) | Pat.Array(..) | Pat.Wildcard | Pat.Int(..) => [],
+        Pat.Nested(name, args) => #{..path_names(name), ..args.map(ctor_names).union_all()},
+        Pat.ArrayNested(patterns) | Pat.Tuple(patterns) => patterns.map(ctor_names).union_all(),
+        Pat.Str(..) | Pat.Char(..) | Pat.Array(..) | Pat.Wildcard | Pat.Int(..) => #{},
     }
 }
 
 # The names a constructor written `name` mentions: the name, and the variant too
 # when it is qualified.
-fn path_names(name: str) -> str[] {
+fn path_names(name: str) -> #{str} {
     let parts = name.split(".");
     if (parts.len() > 1) {
-        return [parts.first().value_or(name), name];
+        return #{parts.first().value_or(name), name};
     };
-    [name]
+    #{name}
 }
 
-# The constructors each of `self` names, together.
-fn flat_ctor_names(self: Pat[]) -> str[] {
-    mut names: str[] = [];
-    for (let pattern : self) {
-        set names.extend(pattern.ctor_names());
-    }
-    names
+# The names an annotation mentions, none when it was not written. (An optional
+# set is not a type yet, so this cannot be `self.map(ty_names).value_or(#{})`.)
+fn optional_ty_names(self: Ty?) -> #{str} {
+    if (let some(ty) = self) { ty.ty_names() } else { #{} }
 }
 
 # Every name `self` mentions, so an import used only in a type position still
 # counts as used. Variants are spelled out rather than wildcarded so a new `Ty`
 # forces a decision here.
-fn ty_names(self: Ty) -> str[] {
+fn ty_names(self: Ty) -> #{str} {
     match (self) {
-        Named(name) => [name],
+        Named(name) => #{name},
         // `Case<V>` mentions `V`, so importing a variant to name one of its cases
         // counts as using the import.
         Case(inner)
@@ -308,21 +283,12 @@ fn ty_names(self: Ty) -> str[] {
         | TySet(inner, _)
         | Without(inner, _) => inner.ty_names(),
         // A type parameter is bound by the signature, not imported.
-        TypeVar(..) | TyUnit | Primitive(..) | Any => [],
-        Generic(base, args) => [base, ..args.flat_ty_names()],
-        Dict(a, b) | Result(a, b) => [..a.ty_names(), ..b.ty_names()],
-        TyFn(params, ret) => [..params.flat_ty_names(), ..ret.ty_names()],
-        TyTuple(elements) => elements.flat_ty_names(),
+        TypeVar(..) | TyUnit | Primitive(..) | Any => #{},
+        Generic(base, args) => #{base, ..args.map(ty_names).union_all()},
+        Dict(a, b) | Result(a, b) => #{..a.ty_names(), ..b.ty_names()},
+        TyFn(params, ret) => #{..params.map(ty_names).union_all(), ..ret.ty_names()},
+        TyTuple(elements) => elements.map(ty_names).union_all(),
     }
-}
-
-# The names of each of `self`, together.
-fn flat_ty_names(self: Ty[]) -> str[] {
-    mut names: str[] = [];
-    for (let ty : self) {
-        set names.extend(ty.ty_names());
-    }
-    names
 }
 
 fn dead_names(src: str) -> str[]!ParseFailure {

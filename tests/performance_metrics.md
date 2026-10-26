@@ -715,12 +715,12 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/lexer | 178 | 40680 | 44256 | 602785 | 540840 | 157.00 | 1172.69 | 2224 |
 | crates/aipl-codegen/src/line_at | 0 | 0 | 0 | 3536 | 2044 | 2.00 | 64.81 | 1440 |
 | crates/aipl-codegen/src/lines | 12 | 1008 | 1008 | 1143 | 2656 | 5.00 | 62.64 | 1440 |
-| crates/aipl-codegen/src/lint | 1 | 32 | 32 | 337 | 21712 | 3.00 | 3290.97 | 1472 |
+| crates/aipl-codegen/src/lint | 0 | 0 | 0 | 303 | 28084 | 2.00 | 5684.49 | 1488 |
 | crates/aipl-codegen/src/lint_hit | 0 | 0 | 0 | 146 | 656 | 1.00 | 57.15 | 1456 |
 | crates/aipl-codegen/src/normalize_output | 16 | 880 | 143 | 2750 | 1968 | 5.00 | 64.27 | 1440 |
 | crates/aipl-codegen/src/operator_named_forms | 16 | 1040 | 1040 | 3256 | 8316 | 7.00 | 66.69 | 1472 |
 | crates/aipl-codegen/src/parse | 7616 | 828498 | 144080 | 3741762 | 642840 | 1004.00 | 3751.20 | 2768 |
-| crates/aipl-codegen/src/parse_and_partial_load | 21263 | 2702241 | 671258 | 11317815 | 4491856 | 3392.00 | 9525.97 | 6736 |
+| crates/aipl-codegen/src/parse_and_partial_load | 21326 | 2707929 | 671258 | 11316220 | 4497752 | 3361.00 | 11558.05 | 6816 |
 | crates/aipl-codegen/src/parse_spec | 147 | 4236 | 2155 | 75000 | 108664 | 39.00 | 268.43 | 1568 |
 | crates/aipl-codegen/src/parse_test_section_header | 0 | 0 | 0 | 1296 | 3232 | 4.00 | 64.92 | 1472 |
 | crates/aipl-codegen/src/parsed | 40 | 2981 | 2521 | 2259 | 47588 | 12.00 | 801.33 | 1520 |
@@ -740,7 +740,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/trim_suffix | 0 | 0 | 0 | 351 | 1128 | 2.00 | 70.38 | 1456 |
 | crates/aipl-codegen/src/ty | 151 | 12230 | 6362 | 8813 | 24896 | 25.00 | 130.49 | 1536 |
 | crates/aipl-codegen/src/unescape | 6 | 528 | 352 | 10330 | 8116 | 8.00 | 77.06 | 1472 |
-| crates/aipl-codegen/src/unused_imports | 23007 | 2846573 | 663098 | 14287060 | 4350812 | 4818.00 | 8039.91 | 7120 |
+| crates/aipl-codegen/src/unused_imports | 23067 | 2851037 | 663098 | 14285845 | 4356676 | 3792.00 | 10301.43 | 6992 |
 | crates/aipl-codegen/src/walker | 77210 | 18630735 | 837796 | 66913251 | 16460620 | 13031.00 | 30892.91 | 11184 |
 | crates/aipl-mono/src/builtin_all | 0 | 0 | 0 | 1265 | 2884 | 3.00 | 108.24 | 1456 |
 | crates/aipl-mono/src/builtin_any | 0 | 0 | 0 | 1043 | 2784 | 2.00 | 105.91 | 1456 |
