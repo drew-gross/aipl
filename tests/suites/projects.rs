@@ -384,7 +384,7 @@ mod minesweeper_sessions {
     const CLEAR: &str = "\x1b[2J\x1b[H";
     const HOME: &str = "\x1b[1;1H";
     /// Where the keys' reminder is drawn, under the board.
-    const HINT_ROW: &str = "\x1b[11;1H";
+    const HINT_ROW: &str = "\x1b[14;1H";
     const RIGHT: &str = "\x1b[C";
     const DOWN: &str = "\x1b[B";
     const LEFT: &str = "\x1b[D";
@@ -447,7 +447,7 @@ mod minesweeper_sessions {
             assert_eq!(output.matches(CLEAR).count(), 0, "keys {keys:?}:\n{output}");
             assert!(output.starts_with(ENTER), "{output}");
             assert!(output.ends_with(LEAVE), "{output}");
-            assert!(output.contains("0[#]# # "), "{output}");
+            assert!(output.contains("|[#]# # "), "{output}");
             assert!(output.contains("arrows move, r reveals, f flags, q quits"));
         }
     }
@@ -460,10 +460,11 @@ mod minesweeper_sessions {
         let boards = boards(&output);
         // Before the first key, and after each of the three.
         assert_eq!(boards.len(), 4, "{output}");
-        assert!(boards[0].contains("0[#]# # "), "{output}");
-        assert!(boards[1].contains("1[#]# # "), "{output}");
-        assert!(boards[2].contains("1 #[#]# # "), "{output}");
-        assert!(boards[3].contains("1[#]# # "), "{output}");
+        let second_row = |board: &str| board.lines().nth(3).expect("the second row").to_string();
+        assert!(boards[0].contains("|[#]# # "), "{output}");
+        assert!(second_row(boards[1]).starts_with("|[#]# # "), "{output}");
+        assert!(second_row(boards[2]).starts_with("| #[#]# # "), "{output}");
+        assert!(second_row(boards[3]).starts_with("|[#]# # "), "{output}");
     }
 
     /// A board is drawn over the one before it without clearing, so every row of it
@@ -476,8 +477,8 @@ mod minesweeper_sessions {
         let boards = boards(&output);
         assert_eq!(boards.len(), 9, "{output}");
         for board in boards {
-            for row in board.lines().skip(1) {
-                assert_eq!(row.chars().count(), 18, "row {row:?} of:\n{board}");
+            for row in board.lines() {
+                assert_eq!(row.chars().count(), 19, "row {row:?} of:\n{board}");
             }
         }
     }
@@ -491,9 +492,9 @@ mod minesweeper_sessions {
             let output = play_seeded(seed, "rq");
             let boards = boards(&output);
             assert_eq!(boards.len(), 2, "seed {seed}:\n{output}");
-            let revealed = boards[1].lines().skip(1).take(2).collect::<Vec<_>>();
+            let revealed = boards[1].lines().skip(2).take(2).collect::<Vec<_>>();
             assert!(
-                revealed[0].starts_with("0[.]"),
+                revealed[0].starts_with("|[.]"),
                 "seed {seed}:\n{}",
                 boards[1]
             );
@@ -515,7 +516,7 @@ mod minesweeper_sessions {
     #[test]
     fn f_flags_the_cell_under_the_cursor() {
         let output = play("fq");
-        assert!(output.contains("0[F]# "), "{output}");
+        assert!(output.contains("|[F]# "), "{output}");
     }
 
     /// Revealing every cell ends the game. The second screen is left, and the

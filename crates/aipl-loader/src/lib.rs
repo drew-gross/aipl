@@ -308,12 +308,55 @@ impl Loader {
         // Keep the original Error (including span) so `render()` can show
         // the caret pointing into the imported file's source. The path
         // tied to that source is implicit from the source line itself.
-        let (mut program, allows) = parse_with_allows(src)?;
-        // Lints run right after the parse, per file, while the source (for
-        // line-scoped `#[allow]` squelching) is in hand. Before the `trace`
-        // rewrite below, so a lint sees what the author wrote rather than the
-        // block it desugars to.
+        let program = self.parse_and_lint(src)?;
+        let (items, imports, builtin_imports) =
+            self.prepare(program, path, src, |from, span| {
+                let parent = path.parent().unwrap_or_else(|| Path::new("."));
+                let candidate = parent.join(from);
+                // Before the file is looked for, so a wrong extension is
+                // reported as that and not as a file that does not exist.
+                require_source_extension(&candidate).map_err(|_| {
+                    Error::at(
+                        format!(
+                        "import {from:?}: an imported file's name must end in `.{SOURCE_EXTENSION}`"
+                    ),
+                        span.clone(),
+                    )
+                })?;
+                canonicalize(&candidate)
+                    .map_err(|e| Error::at(format!("import {from:?}: {}", e.message), span))
+            })?;
+
+        // Reserve the slot *before* recursing so cycles short-circuit at
+        // `files.contains_key` above.
+        let import_paths: Vec<PathBuf> = imports.iter().map(|i| i.from.clone()).collect();
+        self.insert_file(path, src, items, imports, builtin_imports);
+        for from in import_paths {
+            self.load(&from)?;
+        }
+        Ok(())
+    }
+
+    /// Parse `src`, and run the per-file lints while the source (for line-scoped
+    /// `#[allow]` squelching) is in hand. Before the `trace` rewrite in
+    /// [`Loader::prepare`], so a lint sees what the author wrote rather than the
+    /// block it desugars to.
+    fn parse_and_lint(&self, src: &str) -> Result<Program, Vec<Error>> {
+        let (program, allows) = parse_with_allows(src)?;
         aipl_syntax::lint::check(&program, src, &allows)?;
+        Ok(program)
+    }
+
+    /// Check `program`, bake its reserved calls, and split its items into the
+    /// declarations, the path imports (each resolved to a file by `resolve`, given
+    /// the import's text and span) and the names imported from builtins.
+    fn prepare(
+        &self,
+        mut program: Program,
+        path: &Path,
+        src: &str,
+        mut resolve: impl FnMut(&str, Span) -> Result<PathBuf, Error>,
+    ) -> Result<(Vec<Item>, Vec<ResolvedImport>, Vec<ImportName>), Vec<Error>> {
         check_no_duplicate_import_sources(&program)?;
         bake::reserved_names_not_bound(&program)?;
         bake::bake(
@@ -329,52 +372,43 @@ impl Loader {
             match item {
                 Item::Import(ImportDecl { names, source }) => match source {
                     ImportSource::Path { path: from, span } => {
-                        let parent = path.parent().unwrap_or_else(|| Path::new("."));
-                        let candidate = parent.join(&from);
-                        // Before the file is looked for, so a wrong extension is
-                        // reported as that and not as a file that does not exist.
-                        require_source_extension(&candidate).map_err(|_| {
-                            Error::at(
-                                format!(
-                                    "import {from:?}: an imported file's name must end in `.{SOURCE_EXTENSION}`"
-                                ),
-                                span.clone(),
-                            )
-                        })?;
-                        let canon = canonicalize(&candidate).map_err(|e| {
-                            Error::at(format!("import {from:?}: {}", e.message), span)
-                        })?;
-                        imports.push(ResolvedImport { names, from: canon });
+                        let from = resolve(&from, span)?;
+                        imports.push(ResolvedImport { names, from });
                     }
-                    ImportSource::Builtins { .. } => {
-                        builtin_imports.extend(names);
-                    }
+                    ImportSource::Builtins { .. } => builtin_imports.extend(names),
                 },
                 other => items.push(other),
             }
         }
+        Ok((items, imports, builtin_imports))
+    }
 
-        // Reserve the slot *before* recursing so cycles short-circuit at
-        // `files.contains_key` above.
+    /// Give the file at `path` the next index and record it, answering whether
+    /// `path` already held one (which it replaces).
+    fn insert_file(
+        &mut self,
+        path: &Path,
+        src: &str,
+        items: Vec<Item>,
+        imports: Vec<ResolvedImport>,
+        builtin_imports: Vec<ImportName>,
+    ) -> bool {
         let index = self.next_index;
         self.next_index += 1;
-        let import_paths: Vec<PathBuf> = imports.iter().map(|i| i.from.clone()).collect();
-        self.files.insert(
-            path.to_path_buf(),
-            LoadedFile {
-                index,
-                source: src.to_string(),
-                mentions_grid: aipl_syntax::aipl_builtins::mentions_grid(&items),
-                syntax_builtins: syntax_builtins(&items),
-                items,
-                imports,
-                builtin_imports,
-            },
-        );
-        for from in import_paths {
-            self.load(&from)?;
-        }
-        Ok(())
+        self.files
+            .insert(
+                path.to_path_buf(),
+                LoadedFile {
+                    index,
+                    source: src.to_string(),
+                    mentions_grid: aipl_syntax::aipl_builtins::mentions_grid(&items),
+                    syntax_builtins: syntax_builtins(&items),
+                    items,
+                    imports,
+                    builtin_imports,
+                },
+            )
+            .is_some()
     }
 
     /// Load, as files of this program, the AIPL-implemented builtins it
@@ -465,8 +499,7 @@ impl Loader {
     }
 
     fn register_virtual_inner(&mut self, key: PathBuf, src: &str) -> Result<(), Vec<Error>> {
-        let (mut program, allows) = parse_with_allows(src)?;
-        aipl_syntax::lint::check(&program, src, &allows)?;
+        let program = self.parse_and_lint(src)?;
         // A caller-supplied name, so a wrong one is a caller error to report,
         // not an invariant to assert: `load_program_sources` returns a `Result`
         // precisely so a host learns what to fix.
@@ -481,46 +514,9 @@ impl Loader {
             ))
             .into());
         }
-        check_no_duplicate_import_sources(&program)?;
-        bake::reserved_names_not_bound(&program)?;
-        bake::bake(
-            &mut program.items,
-            src,
-            &bake::location_label(&key, self.project_root.as_deref()),
-        )?;
-        let mut items = Vec::new();
-        let mut imports = Vec::new();
-        let mut builtin_imports = Vec::new();
-        for item in program.items {
-            match item {
-                Item::Import(ImportDecl { names, source }) => match source {
-                    ImportSource::Path { path: from, .. } => imports.push(ResolvedImport {
-                        names,
-                        from: PathBuf::from(&from),
-                    }),
-                    ImportSource::Builtins { .. } => builtin_imports.extend(names),
-                },
-                other => items.push(other),
-            }
-        }
-        let index = self.next_index;
-        self.next_index += 1;
-        if self
-            .files
-            .insert(
-                key.clone(),
-                LoadedFile {
-                    index,
-                    source: src.to_string(),
-                    mentions_grid: aipl_syntax::aipl_builtins::mentions_grid(&items),
-                    syntax_builtins: syntax_builtins(&items),
-                    items,
-                    imports,
-                    builtin_imports,
-                },
-            )
-            .is_some()
-        {
+        let (items, imports, builtin_imports) =
+            self.prepare(program, &key, src, |from, _| Ok(PathBuf::from(from)))?;
+        if self.insert_file(&key, src, items, imports, builtin_imports) {
             return Err(Error::msg(format!(
                 "duplicate source {:?} in compile_sources",
                 file_label(&key)
