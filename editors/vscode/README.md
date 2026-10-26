@@ -1,7 +1,7 @@
 # AIPL for VS Code
 
 Language support for [AIPL](../..): syntax highlighting, go-to-definition,
-hover, the document outline, formatting, and diagnostics.
+find references, hover, the document outline, formatting, and diagnostics.
 
 Everything but the highlighting comes from the compiler. The extension starts
 `aipl lsp` — the language server built into the compiler itself — and forwards
@@ -13,6 +13,7 @@ resolution, formatting or type checking here to drift out of step.
 |---|---|
 | syntax highlighting | the TextMate grammar in `syntaxes/`, generated from the lexer's own rules |
 | go to definition | the server, via `aipl-index` — crosses files through `import` |
+| find references | the server: every identifier that resolves to the same declaration, in the open files and the workspace's `.aipl` files — an `import ... as` alias counts, a same-named function in an unrelated file does not |
 | hover | the declaration's signature and its `# ..` documentation |
 | outline / breadcrumbs / symbol search | the file's declarations, with a `variant`'s cases nested under it |
 | format document | the formatter (`aipl check --fix`), which is canonical — it decides the layout, not your settings |

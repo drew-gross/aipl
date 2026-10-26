@@ -33,6 +33,8 @@ use std::path::{Path, PathBuf};
 use aipl_index::{FileIndex, Index, Symbol};
 use aipl_syntax::Span;
 
+use crate::server::resolved;
+
 /// The lexer scope every identifier token carries — the rule in
 /// `lex_aipl.aipl` that matches a name. Turning a cursor position into a name
 /// is a lexical question, so it is asked of the lexer rather than re-derived
@@ -48,6 +50,31 @@ pub(crate) struct Resolved {
     pub file: Option<(PathBuf, String)>,
     /// Whether it is a builtin rather than something a program declares.
     pub builtin: bool,
+}
+
+/// What a name stands for, whichever way a file spells it: the same value for
+/// `add` where it is declared, for `add` where it is imported, and for `plus`
+/// where it is imported `as plus`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Declaration {
+    /// A declaration in a file: the file, resolved, and the span of its name.
+    Written { file: PathBuf, name_span: Span },
+    /// A builtin, by the name an import list spells it.
+    Builtin(String),
+}
+
+impl Resolved {
+    /// What this name stands for, for comparing it with another resolution.
+    pub fn declaration(&self) -> Option<Declaration> {
+        if self.builtin {
+            return Some(Declaration::Builtin(self.symbol.name.clone()));
+        }
+        let (file, _) = self.file.as_ref()?;
+        Some(Declaration::Written {
+            file: resolved(file),
+            name_span: self.symbol.name_span.clone(),
+        })
+    }
 }
 
 /// The remembered work on one file.
@@ -113,6 +140,17 @@ impl Analyses {
         text: &str,
         offset: usize,
     ) -> Option<(String, Span)> {
+        let spans = self.identifiers(path, text)?;
+        let found = spans
+            .iter()
+            .find(|span| span.contains(&offset))
+            .or_else(|| spans.iter().find(|span| span.end == offset))?;
+        Some((text[found.clone()].to_string(), found.clone()))
+    }
+
+    /// The span of every identifier in `text`, or `None` if it does not lex.
+    /// Lexed once per distinct text.
+    fn identifiers(&mut self, path: &Path, text: &str) -> Option<&[Span]> {
         let entry = self.entries.entry(path.to_path_buf()).or_default();
         if entry.lexed.as_ref().map(|(seen, _)| seen.as_str()) != Some(text) {
             let spans = aipl_parser::token_scopes(text).ok().map(|tokens| {
@@ -124,12 +162,49 @@ impl Analyses {
             });
             entry.lexed = Some((text.to_string(), spans));
         }
-        let spans = entry.lexed.as_ref()?.1.as_ref()?;
-        let found = spans
-            .iter()
-            .find(|span| span.contains(&offset))
-            .or_else(|| spans.iter().find(|span| span.end == offset))?;
-        Some((text[found.clone()].to_string(), found.clone()))
+        entry.lexed.as_ref()?.1.as_deref()
+    }
+
+    /// The spans in `text` (the file at `path`) of every identifier that stands
+    /// for `target`, which `name` is the declared name of.
+    ///
+    /// A file spells `target` by `name`, or by the alias an import gives it, so
+    /// only identifiers spelled one of those are resolved — and each is resolved
+    /// as [`Analyses::resolve`] resolves a cursor on it, because a spelling that
+    /// reaches a different declaration (another file's `add`) is not a mention.
+    pub fn mentions(
+        &mut self,
+        path: &Path,
+        text: &str,
+        target: &Declaration,
+        name: &str,
+        read: &dyn Fn(&Path) -> Option<String>,
+    ) -> Vec<Span> {
+        let Some((file, _)) = self.file(path, text) else {
+            return Vec::new();
+        };
+        let mut spellings = vec![name.to_string()];
+        spellings.extend(
+            file.imports
+                .iter()
+                .filter(|import| import.name == name)
+                .map(|import| import.local.clone()),
+        );
+        let Some(spans) = self.identifiers(path, text).map(<[Span]>::to_vec) else {
+            return Vec::new();
+        };
+        let mut found = Vec::new();
+        for span in spans {
+            let spelled = &text[span.clone()];
+            if !spellings.iter().any(|spelling| spelling == spelled) {
+                continue;
+            }
+            let resolved = self.resolve(path, text, spelled, span.start, read);
+            if resolved.and_then(|r| r.declaration()).as_ref() == Some(target) {
+                found.push(span);
+            }
+        }
+        found
     }
 
     /// Where `name` is declared, as the file at `path` (whose text is `text`)
@@ -156,19 +231,35 @@ impl Analyses {
         read: &dyn Fn(&Path) -> Option<String>,
     ) -> Option<Resolved> {
         let (file, _) = self.file(path, text)?;
+        // `add` in `add as plus` binds nothing here — `plus` is the local name —
+        // but in the import list it is what the author is pointing at, so it
+        // stands for the import that spells it.
+        let spelled_in_import = file
+            .imports
+            .iter()
+            .find(|i| i.local != name && i.name == name && i.span.contains(&offset))
+            .cloned();
         // An import path is relative to the importing file's directory, exactly
         // as `definition_of` resolves it, and the imported file is keyed by it.
-        let imported = file
-            .import_of(name)
+        let imported = spelled_in_import
+            .as_ref()
+            .or_else(|| file.import_of(name))
             .and_then(|import| import.from.as_ref())
             .map(|from| path.parent().unwrap_or(Path::new("")).join(from));
-        if let Some(target) = imported {
-            if let Some(source) = read(&target) {
-                self.refresh(&target, &source);
+        if let Some(target) = &imported {
+            if let Some(source) = read(target) {
+                self.refresh(target, &source);
             }
         }
         let file = self.index.file(path)?;
-        if let Some((target, symbol)) = self.index.definition_of(file, name) {
+        let declaration = match (&spelled_in_import, &imported) {
+            (Some(import), Some(target)) => self
+                .index
+                .file(target)
+                .and_then(|file| Some((file.path.as_path(), file.define(&import.name)?))),
+            _ => self.index.definition_of(file, name),
+        };
+        if let Some((target, symbol)) = declaration {
             let source = self.entries.get(target)?.indexed.clone()?;
             return Some(Resolved {
                 symbol: symbol.clone(),

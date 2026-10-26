@@ -123,7 +123,7 @@ grammar under `editors/` is generated from the same rule table.
 
 `editors/vscode/` is a VS Code extension: highlighting from the generated
 TextMate grammar, and everything else — go to definition (across files),
-hover with the declaration's `# ..` docs, the outline, format-on-save, and
+find references, hover with the declaration's `# ..` docs, the outline, format-on-save, and
 diagnostics — from `aipl lsp`, the language server built into the compiler
 (`crates/aipl-lsp`). The editor spawns the `aipl` the project carries, so what
 it reports is what `aipl check` reports. Any LSP-speaking editor can use the

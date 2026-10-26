@@ -18,6 +18,7 @@ projects:
     https://raytracing.github.io/books/RayTracingInOneWeekend.html
   minesweeper:
     do the RNG with a shuffle, not the current nonsense
+    minesweeper probably doens't need the row/col numbers anymore. Maybe an ascii window though?
 
 argparser:
   make it

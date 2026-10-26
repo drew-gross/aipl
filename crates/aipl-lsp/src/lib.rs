@@ -1,4 +1,4 @@
-//! The AIPL language server: go-to-definition, hover, the document outline,
+//! The AIPL language server: go-to-definition, find references, hover, the document outline,
 //! formatting, and diagnostics, over the Language Server Protocol.
 //!
 //! It exists so that an editor asks the *compiler* where a name is defined
@@ -15,6 +15,7 @@
 //! | [`jsonrpc`] | the base protocol: `Content-Length`-framed JSON |
 //! | [`text`] | byte offsets ↔ line/character, paths ↔ `file://` URIs |
 //! | `analysis` | what has been worked out about each file, kept between requests |
+//! | `workspace` | which `.aipl` files a workspace holds |
 //! | [`server`] | the requests, and the open documents they are answered against |
 //! | [`serve_stdio`] | the loop that wires those to a pipe, and the diagnostics worker |
 //!
@@ -52,6 +53,7 @@ mod analysis;
 pub mod jsonrpc;
 pub mod server;
 pub mod text;
+mod workspace;
 
 use std::collections::BTreeSet;
 use std::io::{self, Stdout};

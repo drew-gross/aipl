@@ -1,6 +1,6 @@
 // The AIPL extension's whole job is to start the language server and get out
-// of the way: every feature it provides — go-to-definition, hover, the
-// outline, formatting, diagnostics — is answered by `aipl lsp`, so that what
+// of the way: every feature it provides — go-to-definition, find references,
+// hover, the outline, formatting, diagnostics — is answered by `aipl lsp`, so that what
 // the editor says about a program is what the compiler says about it.
 //
 // The one decision made here is *which* `aipl` to run. See `discoverServer`.

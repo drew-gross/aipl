@@ -211,6 +211,194 @@ fn declines_what_it_cannot_resolve() {
     );
 }
 
+/// A server for a client that opened the workspace folder and then `name` in it,
+/// so files it has not opened are the server's to find.
+fn opened_in_folder(workspace: &Workspace, name: &str) -> Server {
+    let mut server = opened(workspace, name);
+    let folder = fs::canonicalize(&workspace.dir).expect("resolve workspace");
+    request(
+        &mut server,
+        "initialize",
+        json!({ "workspaceFolders": [{ "uri": format!("file://{}", folder.display()), "name": "w" }] }),
+    );
+    server
+}
+
+/// The references request, as `(uri, line, character)` triples in the order
+/// the server gave them.
+fn references_at(
+    server: &mut Server,
+    uri: &str,
+    position: Value,
+    include_declaration: bool,
+) -> Vec<(String, u64, u64)> {
+    let found = request(
+        server,
+        "textDocument/references",
+        json!({
+            "textDocument": { "uri": uri },
+            "position": position,
+            "context": { "includeDeclaration": include_declaration },
+        }),
+    );
+    found
+        .as_array()
+        .unwrap_or_else(|| panic!("no list of references: {found}"))
+        .iter()
+        .map(|location| {
+            (
+                location["uri"].as_str().expect("uri").to_string(),
+                location["range"]["start"]["line"].as_u64().expect("line"),
+                location["range"]["start"]["character"]
+                    .as_u64()
+                    .expect("character"),
+            )
+        })
+        .collect()
+}
+
+fn triple(uri: &str, at: Value) -> (String, u64, u64) {
+    (
+        uri.to_string(),
+        at["line"].as_u64().expect("line"),
+        at["character"].as_u64().expect("character"),
+    )
+}
+
+#[test]
+fn finds_every_use_across_files_that_were_never_opened() {
+    let workspace = Workspace::new("references", &[("main.aipl", ROOT), ("util.aipl", UTIL)]);
+    // Only `main.aipl` is open: `util.aipl` is found by walking the folder.
+    let mut server = opened_in_folder(&workspace, "main.aipl");
+    let (main, util) = (workspace.uri("main.aipl"), workspace.uri("util.aipl"));
+
+    let uses = vec![
+        triple(&main, cursor_on(ROOT, "add }")),
+        triple(&main, cursor_on(ROOT, "add(2, 3)")),
+        triple(&main, cursor_on(ROOT, "add(total, 1)")),
+    ];
+    let declaration = triple(&util, cursor_on(UTIL, "add(a: i64"));
+
+    let mut everything = uses.clone();
+    everything.push(declaration);
+    assert_eq!(
+        references_at(&mut server, &main, cursor_on(ROOT, "add(2, 3)"), true),
+        everything
+    );
+    assert_eq!(
+        references_at(&mut server, &main, cursor_on(ROOT, "add(2, 3)"), false),
+        uses,
+        "includeDeclaration: false leaves out the declaration only"
+    );
+}
+
+#[test]
+fn asking_from_the_declaration_finds_the_same_uses() {
+    let workspace = Workspace::new(
+        "references-from-declaration",
+        &[("main.aipl", ROOT), ("util.aipl", UTIL)],
+    );
+    let mut server = opened_in_folder(&workspace, "util.aipl");
+    let (main, util) = (workspace.uri("main.aipl"), workspace.uri("util.aipl"));
+    assert_eq!(
+        references_at(&mut server, &util, cursor_on(UTIL, "add(a: i64"), true),
+        vec![
+            triple(&main, cursor_on(ROOT, "add }")),
+            triple(&main, cursor_on(ROOT, "add(2, 3)")),
+            triple(&main, cursor_on(ROOT, "add(total, 1)")),
+            triple(&util, cursor_on(UTIL, "add(a: i64")),
+        ]
+    );
+}
+
+/// What makes a name the same name is the declaration it resolves to, not its
+/// spelling: an unrelated file's `add` is not a use, and an alias is.
+#[test]
+fn a_use_is_what_resolves_to_the_declaration() {
+    let aliased = "import { add as plus } from \"./util.aipl\";\n\
+                   \n\
+                   fn main() {\n\
+                   \u{20}   mut total = plus(1, 2);\n\
+                   }\n";
+    let unrelated = "pub fn add(a: i64) -> i64 { a }\n\
+                     \n\
+                     fn main() {\n\
+                     \u{20}   mut total = add(1);\n\
+                     }\n";
+    let workspace = Workspace::new(
+        "references-resolution",
+        &[
+            ("aliased.aipl", aliased),
+            ("unrelated.aipl", unrelated),
+            ("util.aipl", UTIL),
+        ],
+    );
+    let mut server = opened_in_folder(&workspace, "util.aipl");
+    let (alias, util) = (workspace.uri("aliased.aipl"), workspace.uri("util.aipl"));
+    assert_eq!(
+        references_at(&mut server, &util, cursor_on(UTIL, "add(a: i64"), true),
+        vec![
+            triple(&alias, cursor_on(aliased, "add as")),
+            triple(&alias, cursor_on(aliased, "plus }")),
+            triple(&alias, cursor_on(aliased, "plus(1, 2)")),
+            triple(&util, cursor_on(UTIL, "add(a: i64")),
+        ]
+    );
+}
+
+#[test]
+fn finds_every_use_of_a_builtin() {
+    let first = "import { wrapping_add as + } from builtins;\n\
+                 \n\
+                 fn one() -> i64 { 1 + 1 }\n";
+    let second = "import { wrapping_add as + } from builtins;\n\
+                  \n\
+                  fn two() -> i64 { 2 + 2 }\n";
+    let workspace = Workspace::new(
+        "references-builtin",
+        &[("first.aipl", first), ("second.aipl", second)],
+    );
+    let mut server = opened_in_folder(&workspace, "first.aipl");
+    assert_eq!(
+        references_at(
+            &mut server,
+            &workspace.uri("first.aipl"),
+            cursor_on(first, "wrapping_add"),
+            true
+        ),
+        vec![
+            triple(
+                &workspace.uri("first.aipl"),
+                cursor_on(first, "wrapping_add")
+            ),
+            triple(
+                &workspace.uri("second.aipl"),
+                cursor_on(second, "wrapping_add")
+            ),
+        ]
+    );
+}
+
+#[test]
+fn declines_references_to_what_it_cannot_resolve() {
+    let workspace = Workspace::new(
+        "references-none",
+        &[("main.aipl", ROOT), ("util.aipl", UTIL)],
+    );
+    let mut server = opened_in_folder(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let found = request(
+        &mut server,
+        "textDocument/references",
+        json!({
+            "textDocument": { "uri": uri },
+            "position": cursor_on(ROOT, "total = add(2"),
+            "context": { "includeDeclaration": true },
+        }),
+    );
+    assert_eq!(found, Value::Null, "a local binding has no declaration");
+}
+
 #[test]
 fn hover_shows_the_signature_then_the_docs() {
     let workspace = Workspace::new("hover", &[("main.aipl", ROOT), ("util.aipl", UTIL)]);

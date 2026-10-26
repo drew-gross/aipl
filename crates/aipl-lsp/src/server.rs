@@ -8,6 +8,7 @@
 //! | request | answered by |
 //! |---|---|
 //! | `textDocument/definition` | [`aipl_index::Index::definition_of`], and [`aipl_index::builtin`] for a builtin written in AIPL |
+//! | `textDocument/references` | `Analyses::mentions`: each identifier that resolves to the same declaration, in the open documents and the workspace's `.aipl` files |
 //! | `textDocument/hover` | [`aipl_index::Symbol`]'s `detail` and `doc`, for a builtin from [`aipl_index::builtin`] |
 //! | `textDocument/documentSymbol` | [`aipl_index::FileIndex::outline`] |
 //! | `textDocument/formatting` | [`aipl_fmt::format_source`] |
@@ -17,15 +18,16 @@
 //! resolved names its own way would answer a question the compiler does not
 //! ask, and the two would drift.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use aipl_index::SymbolKind;
 use aipl_syntax::{DebugOptions, Error};
 use serde_json::{json, Value};
 
-use crate::analysis::Analyses;
+use crate::analysis::{Analyses, Declaration};
 use crate::text::{path_to_uri, uri_to_path, LineIndex};
+use crate::workspace::{aipl_files, mentions_word};
 
 /// One open document, as the editor last told us it reads.
 struct Document {
@@ -61,6 +63,10 @@ pub struct Server {
     /// What has been worked out about files, so a request about text it has seen
     /// does not do that work again.
     analyses: Analyses,
+    /// The folders the client has open, which a search for uses looks through
+    /// besides the documents it has open. Empty until `initialize`, and for a
+    /// client that opened a file on its own.
+    roots: Vec<PathBuf>,
 }
 
 impl Server {
@@ -80,7 +86,10 @@ impl Server {
         let id = message.get("id").cloned();
         let params = &message["params"];
         match method {
-            "initialize" => reply(id, initialize_result()),
+            "initialize" => {
+                self.roots = workspace_roots(params);
+                reply(id, initialize_result())
+            }
             "shutdown" => reply(id, Value::Null),
             "exit" => Reaction {
                 exit: true,
@@ -112,6 +121,7 @@ impl Server {
                 }
             }
             "textDocument/definition" => reply(id, self.definition(params)),
+            "textDocument/references" => reply(id, self.references(params)),
             "textDocument/hover" => reply(id, self.hover(params)),
             "textDocument/documentSymbol" => reply(id, self.document_symbols(params)),
             "textDocument/formatting" => reply(id, self.formatting(params)),
@@ -207,6 +217,90 @@ impl Server {
             "uri": path_to_uri(&resolved(&target)),
             "range": LineIndex::new(&source).range(&found.symbol.name_span),
         })
+    }
+
+    /// Every place the name under the cursor is used.
+    ///
+    /// A use is an identifier that [`Analyses::resolve`] takes to the same
+    /// declaration the cursor's does — so a same-named function in a file that
+    /// does not import this one is not a use, and an alias is. That is the whole
+    /// of the resolution, and so also its limit: a local binding or a field that
+    /// shares a declaration's name is indistinguishable from a use of it, which
+    /// is the same gap go-to-definition has.
+    ///
+    /// Looks in the open documents, the file that declares the name, and every
+    /// `.aipl` file under the client's workspace folders. A file that does not
+    /// spell the name at all is not parsed.
+    fn references(&mut self, params: &Value) -> Value {
+        let Some((path, text, offset)) = locate(&self.documents, params) else {
+            return Value::Null;
+        };
+        let Some((name, _)) = self.analyses.identifier_at(path, text, offset) else {
+            return Value::Null;
+        };
+        let read = |imported: &Path| source_in(&self.documents, imported);
+        let Some(found) = self.analyses.resolve(path, text, &name, offset, &read) else {
+            return Value::Null;
+        };
+        let Some(target) = found.declaration() else {
+            return Value::Null;
+        };
+        let include_declaration = params["context"]["includeDeclaration"]
+            .as_bool()
+            .unwrap_or(true);
+
+        // An open document keeps the spelling of its path, which is the key its
+        // analysis is remembered under; the others are found by walking.
+        let mut seen: HashSet<PathBuf> = HashSet::new();
+        let mut candidates: Vec<PathBuf> = Vec::new();
+        let declaring = match &target {
+            Declaration::Written { file, .. } => Some(file.clone()),
+            Declaration::Builtin(_) => None,
+        };
+        let open = self.documents.values().filter_map(|d| d.path.clone());
+        let walked = self.roots.iter().flat_map(|root| aipl_files(root));
+        for candidate in open.chain(declaring).chain(walked) {
+            if seen.insert(resolved(&candidate)) {
+                candidates.push(candidate);
+            }
+        }
+
+        let mut locations: Vec<(String, Value)> = Vec::new();
+        for candidate in candidates {
+            let Some(source) = source_in(&self.documents, &candidate) else {
+                continue;
+            };
+            if !mentions_word(&source, &found.symbol.name) {
+                continue;
+            }
+            let uri = path_to_uri(&resolved(&candidate));
+            let lines = LineIndex::new(&source);
+            let spans =
+                self.analyses
+                    .mentions(&candidate, &source, &target, &found.symbol.name, &read);
+            for span in spans {
+                let is_declaration = matches!(
+                    &target,
+                    Declaration::Written { file, name_span }
+                        if *file == resolved(&candidate) && *name_span == span
+                );
+                if include_declaration || !is_declaration {
+                    locations.push((
+                        uri.clone(),
+                        json!({ "uri": uri, "range": lines.range(&span) }),
+                    ));
+                }
+            }
+        }
+        // Documents come out of a hash map, so order by file; the sort is stable,
+        // which keeps each file's uses in source order.
+        locations.sort_by(|a, b| a.0.cmp(&b.0));
+        Value::Array(
+            locations
+                .into_iter()
+                .map(|(_, location)| location)
+                .collect(),
+        )
     }
 
     fn hover(&mut self, params: &Value) -> Value {
@@ -315,6 +409,19 @@ impl Server {
     }
 }
 
+/// The folders a client opened, from `initialize`: its workspace folders, or
+/// the single root an older client sends instead.
+fn workspace_roots(params: &Value) -> Vec<PathBuf> {
+    let folders: Vec<&str> = match params["workspaceFolders"].as_array() {
+        Some(folders) => folders
+            .iter()
+            .filter_map(|folder| folder["uri"].as_str())
+            .collect(),
+        None => params["rootUri"].as_str().into_iter().collect(),
+    };
+    folders.into_iter().filter_map(uri_to_path).collect()
+}
+
 /// The document a request names, and the byte offset of its `position`.
 fn locate<'a>(
     documents: &'a HashMap<String, Document>,
@@ -357,7 +464,7 @@ fn source_in(documents: &HashMap<String, Document>, path: &Path) -> Option<Strin
 /// A path with its `.` components and symlinks resolved, or unchanged when it
 /// names nothing on disk — which is the case for a buffer that has not been
 /// saved, and not a reason to refuse to answer about it.
-fn resolved(path: &Path) -> PathBuf {
+pub(crate) fn resolved(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
@@ -402,6 +509,7 @@ fn initialize_result() -> Value {
                 "save": true,
             },
             "definitionProvider": true,
+            "referencesProvider": true,
             "hoverProvider": true,
             "documentSymbolProvider": true,
             "documentFormattingProvider": true,

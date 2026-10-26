@@ -1,7 +1,7 @@
 {
   "name": "aipl",
   "displayName": "AIPL",
-  "description": "Language support for AIPL: syntax highlighting, go-to-definition, hover, outline, formatting and diagnostics.",
+  "description": "Language support for AIPL: syntax highlighting, go-to-definition, find references, hover, outline, formatting and diagnostics.",
   "version": "0.2.0",
   "publisher": "aipl",
   "license": "MIT",
