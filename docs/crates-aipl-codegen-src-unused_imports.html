@@ -90,7 +90,7 @@
             <a class="anchor" href="#item-referenced_names">referenced_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn referenced_names(__spat$3482: Program) -&#62; #{str}</code></pre>
+          <pre class="signature"><code>fn referenced_names(__spat$3492: Program) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>Every name the file mentions outside its own import lists: called and referenced idents, constructed structs, match constructors, operator spellings, and every name appearing in a type — signatures, struct fields, variant payloads, and inline <code>let</code>/lambda annotations.</p></div>
 
@@ -99,14 +99,56 @@
 
 
 
-        <section class="item" id="item-collect_names">
+        <section class="item" id="item-item_names">
           <h3>
-            <a class="anchor" href="#item-collect_names">collect_names</a>
+            <a class="anchor" href="#item-item_names">item_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn collect_names(self: #{str}, e: Expr)</code></pre>
+          <pre class="signature"><code>fn item_names(self: Item) -&#62; #{str}</code></pre>
 
-          <div class="doc"><p><code>self</code> with the names <code>e</code> and every expression under it mention.</p></div>
+          <div class="doc"><p>The names an item mentions: the type positions that belong to it rather than to any expression, and the expressions it holds.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-param_names">
+          <h3>
+            <a class="anchor" href="#item-param_names">param_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn param_names(self: Param) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The names a parameter mentions: its type, and its default.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-field_names">
+          <h3>
+            <a class="anchor" href="#item-field_names">field_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn field_names(ty: Ty, default: Expr?) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The names a declared type and an optional default expression mention.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-names_in">
+          <h3>
+            <a class="anchor" href="#item-names_in">names_in</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn names_in(self: Expr) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The names <code>self</code> and every expression under it mention.</p></div>
 
 
         </section>
@@ -162,7 +204,7 @@
           </h3>
           <pre class="signature"><code>fn optional_ty_names(self: Ty?) -&#62; #{str}</code></pre>
 
-          <div class="doc"><p>The names an annotation mentions, none when it was not written. (An optional set is not a type yet, so this is not <code>self$ty_names().value_or(#{})</code>.)</p></div>
+          <div class="doc"><p>The names an annotation mentions, none when it was not written.</p></div>
 
 
         </section>

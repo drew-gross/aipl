@@ -21,7 +21,6 @@ import {
     not_equal as !=,
     push,
     split,
-    union,
     union_all,
     value_or,
 } from builtins;
@@ -68,6 +67,8 @@ import {
     Import,
     ImportName,
     ImportSource,
+    Item,
+    Param,
     Path,
     Program,
     Refinement,
@@ -137,64 +138,41 @@ fn hit_span(self: ImportName, source: ImportSource) -> Span {
 # referenced idents, constructed structs, match constructors, operator spellings,
 # and every name appearing in a type — signatures, struct fields, variant
 # payloads, and inline `let`/lambda annotations.
-fn referenced_names(Program { items }) -> #{str} {
-    mut names: #{str} = #{};
-    for (let item : items) {
-        // Type positions that belong to the item rather than to any expression,
-        // then the expressions it holds.
-        match (item) {
-            Fn(f) => {
-                for (let param : f.sig.params) {
-                    set names = names.union(param.ty.ty_names());
-                    if (let some(default) = param.default) {
-                        set names.collect_names(default);
-                    };
-                }
-                set names = names.union(f.sig.return_ty.optional_ty_names());
-                set names.collect_names(f.body);
-                if (let some(test) = f.test_body) {
-                    set names.collect_names(test);
-                };
-            },
-            Struct(s) => {
-                for (let field : s.fields) {
-                    set names = names.union(field.ty.ty_names());
-                    if (let some(default) = field.default) {
-                        set names.collect_names(default);
-                    };
-                }
-            },
-            Variant(v) => {
-                for (let case : v.cases) {
-                    for (let slot : case.payload) {
-                        set names = names.union(slot.ty.ty_names());
-                        if (let some(default) = slot.default) {
-                            set names.collect_names(default);
-                        };
-                    }
-                }
-            },
-            // A constant's annotation may name an imported type; its value is a
-            // literal, so it names nothing.
-            Const(c) => {
-                set names = names.union(c.ty.optional_ty_names());
-                set names.collect_names(c.value);
-            },
-            Refinement(r) => {
-                set names = names.union(r.target.ty_names());
-            },
-            Import(..) => {},
-        };
+fn referenced_names(Program { items }) -> #{str} { items.map(item_names).union_all() }
+
+# The names an item mentions: the type positions that belong to it rather than to
+# any expression, and the expressions it holds.
+fn item_names(self: Item) -> #{str} {
+    match (self) {
+        Fn(f) => #{
+            ..f.sig.params.map(param_names).union_all(),
+            ..f.sig.return_ty.optional_ty_names(),
+            ..f.body.names_in(),
+            ..f.test_body$names_in().value_or(#{}),
+        },
+        Struct(s) => s.fields.map(|field| field_names(field.ty, field.default)).union_all(),
+        Variant(v) => v.cases
+            .map(|case| case.payload.map(|slot| field_names(slot.ty, slot.default)).union_all())
+            .union_all(),
+        // A constant's annotation may name an imported type; its value is a
+        // literal, so it names nothing.
+        Const(c) => #{..c.ty.optional_ty_names(), ..c.value.names_in()},
+        Refinement(r) => r.target.ty_names(),
+        Import(..) => #{},
     }
-    names
 }
 
-# `self` with the names `e` and every expression under it mention.
-fn collect_names(mut self: #{str}, e: Expr) {
-    set self = self.union(e.own_names());
-    for (let child : e.subexprs()) {
-        set self.collect_names(child);
-    }
+# The names a parameter mentions: its type, and its default.
+fn param_names(self: Param) -> #{str} { field_names(self.ty, self.default) }
+
+# The names a declared type and an optional default expression mention.
+fn field_names(ty: Ty, default: Expr?) -> #{str} {
+    #{..ty.ty_names(), ..default$names_in().value_or(#{})}
+}
+
+# The names `self` and every expression under it mention.
+fn names_in(self: Expr) -> #{str} {
+    #{..self.own_names(), ..self.subexprs().map(names_in).union_all()}
 }
 
 # The names `e` itself mentions, not those of its sub-expressions.
@@ -263,11 +241,8 @@ fn path_names(name: str) -> #{str} {
     #{name}
 }
 
-# The names an annotation mentions, none when it was not written. (An optional
-# set is not a type yet, so this is not `self$ty_names().value_or(#{})`.)
-fn optional_ty_names(self: Ty?) -> #{str} {
-    if (let some(ty) = self) { ty.ty_names() } else { #{} }
-}
+# The names an annotation mentions, none when it was not written.
+fn optional_ty_names(self: Ty?) -> #{str} { self$ty_names().value_or(#{}) }
 
 # Every name `self` mentions, so an import used only in a type position still
 # counts as used. Variants are spelled out rather than wildcarded so a new `Ty`
