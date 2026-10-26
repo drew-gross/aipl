@@ -99,6 +99,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  dict_spread_message and co should be consts not functions
   referenced_names() should return a set
   referenced_names() looks simplifiable
   enforce appropriate use of enter_alternate_screen() and leave_alternate_screen() somehow
@@ -477,7 +478,7 @@ format:
 
 lint:
   assert(fn() == ok(val)) should be assert(fn()? == val)
-  unused imports should be #[allow] able
+  unused imports should be #[allow] able (generally clean up #[allow] architecture after lint is all aipl)
   - Lints see the written form of a destructuring parameter. Today the parser
     lowers `fn f(P { a, b })` to a synthetic `__spat$N` parameter plus a `let`
     per field at the head of the body, before the lints run, so each lint that

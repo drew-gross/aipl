@@ -39,7 +39,7 @@ use std::collections::{HashMap, HashSet};
 
 use aipl_syntax::ast::{
     Arity, Callee, Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Param,
-    Program, Signature, Type, VariantCase, VariantDecl,
+    Program, SetOrder, Signature, Type, VariantCase, VariantDecl,
 };
 use aipl_syntax::{Error, Span};
 
@@ -401,6 +401,42 @@ fn mentionable(e: &Expr) -> bool {
             | ExprKind::None
             | ExprKind::Lambda(..)
     )
+}
+
+/// `#{..a, x, y, ..b}` as `#{}.union(a).union(#{x, y}).union(b)`: the literal's
+/// leading plain elements seed the set, which gives it the literal's order, and
+/// each later spread operand — or run of plain elements, as a set of their own —
+/// is unioned in. `union` takes any set of the element type on its right, so an
+/// operand's own order does not matter; the receiver keeps the literal's.
+///
+/// Each operand appears once, and the unions nest left to right, so the operands
+/// are evaluated in the order they are written.
+fn desugar_set_spread(elems: Vec<Expr>, order: SetOrder, span: Span) -> ExprKind {
+    let is_spread = |x: &Expr| matches!(x.kind, ExprKind::Spread(_));
+    let lead = elems.iter().take_while(|x| !is_spread(x)).count();
+    let mut elems = elems.into_iter();
+    let seed: Vec<Expr> = elems.by_ref().take(lead).collect();
+    let mut acc = Expr::new(ExprKind::SetLit(seed, order), span.clone());
+    let mut rest = elems.peekable();
+    while let Some(elem) = rest.next() {
+        let operand = match elem.kind {
+            ExprKind::Spread(inner) => *inner,
+            _ => {
+                let mut run = vec![elem];
+                while let Some(next) = rest.next_if(|x| !is_spread(x)) {
+                    run.push(next);
+                }
+                let run_span = run[0].span.clone();
+                Expr::new(ExprKind::SetLit(run, SetOrder::Unordered), run_span)
+            }
+        };
+        let operand_span = operand.span.clone();
+        acc = Expr::new(
+            ExprKind::Call(Callee::Union, vec![acc, operand], false),
+            operand_span,
+        );
+    }
+    acc.kind
 }
 
 /// Whether this init is a `..base` struct spread rather than a named field.
@@ -1351,7 +1387,19 @@ impl Expander {
                     ExprKind::ArrayLit(expanded)
                 }
             }
-            ExprKind::SetLit(elems, o) => ExprKind::SetLit(self.expand_all(elems, locals)?, *o),
+            // A set literal with a `..` element becomes a chain of unions, in the
+            // literal's order — see `desugar_set_spread`.
+            ExprKind::SetLit(elems, o) => {
+                let expanded = self.expand_all(elems, locals)?;
+                if expanded
+                    .iter()
+                    .any(|x| matches!(x.kind, ExprKind::Spread(_)))
+                {
+                    desugar_set_spread(expanded, *o, e.span.clone())
+                } else {
+                    ExprKind::SetLit(expanded, *o)
+                }
+            }
             ExprKind::TupleLit(elems) => ExprKind::TupleLit(self.expand_all(elems, locals)?),
             ExprKind::DictLit(pairs) => ExprKind::DictLit(
                 pairs

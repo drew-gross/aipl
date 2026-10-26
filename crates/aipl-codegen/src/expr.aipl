@@ -434,6 +434,15 @@ pub fn map_subexprs(self: Expr, f: (Expr) -> Expr) -> Expr {
     assert(at(Neg(ident("x")), 3..7).map_subexprs(wrap).span == 3..7);
 })
 
+# Whether `self` is a `..xs` spread: an element of an array or set literal that
+# splices a collection in, rather than an expression of its own.
+pub fn is_spread(self: Expr) -> bool {
+    if (let Spread(..) = self.kind) { true } else { false }
+}.test({
+    assert(expr(Spread(ident("xs"))).is_spread());
+    assert(!ident("xs").is_spread());
+})
+
 # The direct sub-expressions of `self`, in the order Rust's `each_subexpr` visits
 # them: not `self`'s own names, types or patterns, and not their children. A
 # `Shim`'s bindings name functions and a pattern binds names, so only a shim's

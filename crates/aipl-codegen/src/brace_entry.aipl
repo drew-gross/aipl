@@ -4,6 +4,7 @@
 
 import {
     Span,
+    any,
     equal as ==,
     is_err_and,
     is_nonempty,
@@ -12,7 +13,7 @@ import {
     push,
     same_case,
 } from builtins;
-import { DictLit, Expr, SetLit, at, num, show_expr } from "./expr.aipl";
+import { DictLit, Expr, SetLit, at, is_spread, num, show_expr } from "./expr.aipl";
 import { ParseError } from "./grammar.aipl";
 import { Asc, Desc, SetOrder, Unordered } from "./ty.aipl";
 
@@ -39,6 +40,9 @@ pub fn brace_literal(entries: BraceEntry[], order: SetOrder, span: Span) -> Expr
             },
         };
     }
+    if (pairs.is_nonempty() && keys.any(is_spread)) {
+        return err(ParseError { message: dict_spread_message(), span });
+    };
     if (keys.is_nonempty() && pairs.is_nonempty()) {
         return err(ParseError { message: brace_mix_message(), span });
     };
@@ -71,6 +75,10 @@ pub fn brace_literal(entries: BraceEntry[], order: SetOrder, span: Span) -> Expr
 
 fn ordered_pairs_message() -> str {
     """an ordered "#>{ .. }" / "#<{ .. }" literal is a set, so it holds bare elements — a "key: value" pair belongs in a "#{ .. }" dict"""
+}
+
+fn dict_spread_message() -> str {
+    """a `..` spread is only allowed in a set literal — a "#{ .. }" holding "key: value" pairs is a dict"""
 }
 
 fn brace_mix_message() -> str {

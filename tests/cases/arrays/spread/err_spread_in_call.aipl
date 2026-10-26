@@ -10,7 +10,7 @@ fn main() {
     takes(..a);
 }
 --- errors ---
-error: `..` spread is only allowed in an array literal, not in a call argument list
+error: `..` spread is only allowed in an array or set literal, not in a call argument list
   --> ./tests/cases/arrays/spread/err_spread_in_call.aipl:10:13
    |
 10 |     takes(..a);

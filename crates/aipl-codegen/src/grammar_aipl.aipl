@@ -198,6 +198,7 @@ import {
     Unit,
     While,
     at,
+    is_spread,
     show_expr,
 } from "./expr.aipl";
 import { find_trailing_whitespace } from "./find_trailing_whitespace.aipl";
@@ -1198,7 +1199,13 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     // rule for all three, so `expr` is reachable from a single place under the
     // brace.
     let brace_body: Rule<AiplTok> = Maybe(Many(Named("entry"), min=1, sep=Lit(",")));
-    let entry: Rule<AiplTok> = Then([Named("expr"), Maybe(Then([Lit(":"), Named("expr")]))]);
+
+    // A `..` entry spreads a set into a set literal; `brace_literal` refuses one in
+    // a dict.
+    let entry: Rule<AiplTok> = OneOf([
+        Then([Lit(".."), Named("expr")]),
+        Then([Named("expr"), Maybe(Then([Lit(":"), Named("expr")]))]),
+    ]);
 
     [
         pl("expr", expr, "an expression", TryMk(lower_expr)),
@@ -1601,7 +1608,7 @@ fn lower_atom(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         };
         return ok(AExpr(at(TupleLit(kids.try_map(|k| as_expr(k, sp))?), tsp)));
     };
-    // The array literal is the one place a `..` spread survives.
+    // The array literal and the set literal are the places a `..` spread survives.
     if (head == "[") {
         return ok(AExpr(at(ArrayLit(as_exprs(kid(kids, 0, sp)?, sp)?), tsp)));
     };
@@ -1935,14 +1942,12 @@ fn lower_args(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 fn no_spread(args: Expr[], context: str) -> Expr[]!ParseError {
     if (let some(a) = args.find_if(is_spread)) {
         return err(ParseError {
-            message: `\`..\` spread is only allowed in an array literal, not in {context}`,
+            message: `\`..\` spread is only allowed in an array or set literal, not in {context}`,
             span: a.span,
         });
     };
     ok(args)
 }
-
-fn is_spread(self: Expr) -> bool { if (let Spread(..) = self.kind) { true } else { false } }
 
 # `arg` — a spread, a keyword argument, or an ordinary expression. The three
 # pass-through alternatives (an expression, a lambda, a bare operator) match no
@@ -2076,11 +2081,18 @@ fn lower_brace_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 fn lower_entry(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
 
-    // The rule's two alternatives are `Then([expr, ":", expr])` and a bare
-    // `expr` — three positions against one — so the arm that binds three is the
-    // pair. Nothing counts children or looks for the `:`.
+    // The rule's alternatives are `Then([expr, ":", expr])`, a bare `expr`, and
+    // `Then(["..", expr])` — three positions, one and two — so the arm that binds
+    // three is the pair. Nothing counts children or looks for the `:`.
     match (node.slots()) {
         [k, _, v] => ok(AEntry(Pair(slot_expr(k, kids, sp)?, slot_expr(v, kids, sp)?))),
+        // `..xs`. The `..` carries no meaning of its own, so the node takes the
+        // operand's span, as an array literal's spread does.
+        [_, x] => {
+            let value = slot_expr(x, kids, sp)?;
+            let span = value.span;
+            ok(AEntry(Key(at(Spread(value), span))))
+        },
         [k] => ok(AEntry(Key(slot_expr(k, kids, sp)?))),
         _ => err(ParseError { message: "an entry matched no alternative", span: sp }),
     }
@@ -4281,7 +4293,7 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     assert(
         expr_dump(
             "xs.f(..ys)",
-        ) == "error: `..` spread is only allowed in an array literal, not in a method call",
+        ) == "error: `..` spread is only allowed in an array or set literal, not in a method call",
     );
     assert(expr_dump("push(xs, 1)") == "push(xs, 1)");
     assert(expr_dump("f()") == "f()");
@@ -4304,7 +4316,7 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     assert(
         expr_dump(
             "f(..xs)",
-        ) == "error: `..` spread is only allowed in an array literal, not in a call argument list",
+        ) == "error: `..` spread is only allowed in an array or set literal, not in a call argument list",
     );
 
     // `#{ .. }` is a set, a dict, or an empty of either — and never a mix.
@@ -4314,6 +4326,11 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     assert(expr_dump("#{1: 2}") == "Dict([1: 2])");
     assert(expr_dump("#{}") == "Set([])");
     assert(expr_dump("#{1, 2: 3}").starts_with("""error: a "#{ .. }" literal can't mix"""));
+
+    // A set literal takes `..` spreads, among its elements or alone; a dict does not.
+    assert(expr_dump("#{..a, 1}") == "Set([..a, 1])");
+    assert(expr_dump("#>{1, ..a, ..b}") == "Set([1, ..a, ..b], Desc)");
+    assert(expr_dump("#{1: 2, ..a}").starts_with("error: a `..` spread is only allowed in a set"));
 
     // A template is a concat chain over `__template_interp` of each
     // interpolation, folded from the tail backwards.

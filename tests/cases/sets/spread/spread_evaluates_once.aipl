@@ -1,0 +1,31 @@
+# Every operand and element of a set literal holding a spread is evaluated exactly
+# once, in the order it is written. The `print`s pin it down: `a b c`, not a
+# repeat of any of them.
+
+import { len, print } from builtins;
+
+fn a() !prints -> #{i64} {
+    print("a");
+    #{1}
+}
+
+fn b() !prints -> #{i64} {
+    print("b");
+    #{2}
+}
+
+fn plain(n: i64) !prints -> i64 {
+    print(`p{n}`);
+    n
+}
+
+fn main() !prints {
+    print(`{(#{..a(), plain(1), plain(2), ..b(), plain(3)}).len()}`);
+}
+--- stdout ---
+a
+p1
+p2
+b
+p3
+3

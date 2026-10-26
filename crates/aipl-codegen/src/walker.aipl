@@ -2189,11 +2189,18 @@ fn dict_entries(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut acc = acc0;
     while (w.more_before("}")) {
         let l = w.lead();
-        let k = l.w.expr()?;
-        let e = if (k.w.peek_text() == ":") {
-            k.w.dict_value(l.doc, k.doc)?
+
+        // `..xs` — a set literal's spread, spelled tight against its operand.
+        let e = if (l.w.peek_text() == "..") {
+            let v = l.w.bump().w.expr()?;
+            WDoc { w: v.w, doc: Concat([l.doc, Text(".."), v.doc]) }
         } else {
-            WDoc { w: k.w, doc: Concat([l.doc, k.doc]) }
+            let k = l.w.expr()?;
+            if (k.w.peek_text() == ":") {
+                k.w.dict_value(l.doc, k.doc)?
+            } else {
+                WDoc { w: k.w, doc: Concat([l.doc, k.doc]) }
+            }
         };
         set acc.push(e.doc);
         set w = if (e.w.peek_text() == ",") { e.w.bump().w } else { e.w };
@@ -3200,6 +3207,8 @@ fn walker_of(src: str) -> W!FmtError {
     assert(walker_of("[ ]")?.expr().rendered(100)? == "[]");
     assert(walker_of("#{ a , b }")?.expr().rendered(100)? == "#{a, b}");
     assert(walker_of("#{ k : v }")?.expr().rendered(100)? == "#{k: v}");
+    assert(walker_of("#{ .. a , b , .. c }")?.expr().rendered(100)? == "#{..a, b, ..c}");
+    assert(walker_of("#> { 1 , .. a }")?.expr().rendered(100)? == "#>{1, ..a}");
     assert(walker_of("#>{ b , a }")?.expr().rendered(100)? == "#>{b, a}");
     assert(walker_of("#<{ }")?.expr().rendered(100)? == "#<{}");
     assert(walker_of("#{ }")?.expr().rendered(100)? == "#{}");

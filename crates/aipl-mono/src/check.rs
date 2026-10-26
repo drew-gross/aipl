@@ -568,7 +568,18 @@ impl<'a> Cx<'a> {
         // which. Recording it is what lets mono lower it to a tag without
         // re-deriving the context the checker already had.
         if needs_lock(&e.kind) || aipl_syntax::ctor_ref_case(e).is_some() {
-            self.lock_node(node_id(e), ty);
+            // An empty `#>{}` / `#<{}` states its order, and an unordered `#{T}` in
+            // a signature is order-agnostic — it accepts a set of any order — so
+            // locking the literal to it would drop the order it wrote.
+            match (&e.kind, ty) {
+                (
+                    ExprKind::SetLit(_, order),
+                    Type::Set(elem, aipl_syntax::ast::SetOrder::Unordered),
+                ) if *order != aipl_syntax::ast::SetOrder::Unordered => {
+                    self.lock_node(node_id(e), &Type::Set(elem.clone(), *order));
+                }
+                _ => self.lock_node(node_id(e), ty),
+            }
         }
         self.lock_return_pinned(e, ty);
         self.lock_narrow(e, ty);
