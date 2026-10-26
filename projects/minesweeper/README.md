@@ -51,13 +51,3 @@ mines as an argument (`new_game(width, height, mines)`).
 
 The rules are pure functions on a `Game` value and carry the tests in their
 `.test` blocks, so `./aipl check` needs no input. Only `play` reads keys; its own test plays against stand-ins for the terminal and the keyboard.
-
-## Still missing
-
-| need | why |
-|---|---|
-| ownership that reaches `with` through a struct field or a function parameter | `with` writes in place when it is handed the only reference (a fresh array, or a `mut` local at its last use), but the board lives in a `Game` field read through borrowed parameters, so each move copies the 64 marks |
-| raw mode for the whole game | `read_key` switches the terminal into raw mode per call, so a key pressed between two calls is echoed by the terminal |
-| terminal control: colour | classic number colours, and a cursor that is drawn as colour instead of brackets |
-| terminal size | fit the board to the window |
-| a clock (`!clock` exists) | the usual elapsed-time counter |
