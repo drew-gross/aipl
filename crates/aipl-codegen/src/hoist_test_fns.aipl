@@ -27,10 +27,7 @@ import { SpanStr } from "./lexer.aipl";
 
 # `program` with every `.test` helper and `.performance` block moved out to a
 # top-level function of its own.
-pub fn hoist_test_fns(self: Program) -> Program {
-    ..self,
-    items: self.items.map(hoisted_items).join(),
-}
+pub fn hoist_test_fns(self: Program) -> Program { ..self, items: self.items$hoisted_items().join() }
 
 fn hoisted_items(self: Item) -> Item[] {
     match (self) {

@@ -17,7 +17,7 @@
 # The formatter parses with `aipl_parse_file` and not this, because it lays out
 # the program the author wrote, attributes and all.
 
-import { Span, contains, equal as ==, logical_not as !, map } from builtins;
+import { Span, contains, equal as ==, logical_not as ! } from builtins;
 import { ParseFailure, ParsedFile, aipl_parse_file } from "./grammar_aipl.aipl";
 import { hoist_test_fns } from "./hoist_test_fns.aipl";
 import { Fn, Item, Program, show_program } from "./item.aipl";
@@ -83,7 +83,7 @@ pub fn parse_and_partial_load(src: str) -> PartialLoad!ParseFailure {
             assert(p() == 2);
         })
     """)?;
-    let order = performance.program.items.map(item_name);
+    let order = performance.program.items$item_name();
     assert(order == [
         "answer",
         "__test$answer$t",

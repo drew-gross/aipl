@@ -12,5 +12,5 @@ fn empty_ints() -> i64[] { [] }.test({
     assert(empty_ints().map(|x| x + 1) == []);
 
     // A type-changing map (i64 -> str) over an empty array is still empty.
-    assert(empty_ints().map(to_str) == []);
+    assert(empty_ints()$to_str() == []);
 })

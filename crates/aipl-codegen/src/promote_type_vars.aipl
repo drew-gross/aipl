@@ -39,7 +39,7 @@ import { promoted } from "./ty.aipl";
 # throughout it. A `const` declares none, and an import holds no type.
 pub fn promote_type_vars(self: Program) -> Program {
     ..self,
-    items: self.items.map(promote_item),
+    items: self.items$promote_item(),
 }.test({
     let parsed = aipl_parse_file("""
         struct Box<T> { value: T, label: str }

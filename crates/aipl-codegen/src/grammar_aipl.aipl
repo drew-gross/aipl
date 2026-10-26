@@ -1343,9 +1343,7 @@ fn child_span(self: Cst) -> Span {
 
 # The token span of interior child `i`, for the nodes whose parts want their own
 # spans — a match arm's pattern, one step of a postfix chain.
-fn sub_span(subs: Cst[], i: u64, fallback: Span) -> Span {
-    subs[i].map(child_span).value_or(fallback)
-}
+fn sub_span(subs: Cst[], i: u64, fallback: Span) -> Span { subs[i]$child_span().value_or(fallback) }
 
 fn as_expr(v: Ast, span: Span) -> Expr!ParseError {
     if (let AExpr(e) = v) {
@@ -3088,7 +3086,7 @@ fn lower_program(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # the only production that can see whether it sits at the top of the file.
 fn lower_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let decl_at = node.children.first().map(child_span).value_or(sp);
+    let decl_at = node.children.first()$child_span().value_or(sp);
     let DocSplit { detached, attached } = split_doc_lines(src, node.tokens, decl_at.start);
     let item = lower_decl(src, kid(kids, 0, sp)?, attached, sp)?;
     match (detached.first(), detached.last()) {
@@ -3556,7 +3554,7 @@ fn lower_test_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     };
     if (let AFunction(f) = kid(kids, 0, sp)?) {
         // The refusals point at the declaration — the first child node.
-        let fn_span = node.children.first().map(child_span).value_or(sp);
+        let fn_span = node.children.first()$child_span().value_or(sp);
         if (f.is_pub) {
             return err(ParseError {
                 message: `a function inside a \`.test\` block cannot be \`pub\`: "{f.name.text}" exists only for that test`,
@@ -3679,7 +3677,7 @@ fn lower_variant_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     mut after = sp.start;
     for (let i, k : kids[1..]) {
         let c = as_variant_case(k, sp)?;
-        let at = case_nodes[i].map(child_span).value_or(sp);
+        let at = case_nodes[i]$child_span().value_or(sp);
         for (let case : cases) {
             if (c.name.text == case.name.text) {
                 return err(ParseError {
@@ -3820,7 +3818,7 @@ fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     ok(AFunction(Function {
         name,
         is_pub,
-        sig: Signature { type_vars, params: params.map(param_of), effects, return_ty },
+        sig: Signature { type_vars, params: params$param_of(), effects, return_ty },
         body: bind_param_fields(params, resolved),
         test_body,
         test_fns,
@@ -5210,7 +5208,7 @@ fn reject_trailing_whitespace(src: str) -> str!ParseError {
 # Every `#[allow]` marker's span, in source order. The lexer records them as
 # trivia under a kind of their own, so this is a filter rather than a re-scan.
 fn allow_spans(lexed: LexResult<AiplTok>) -> Span[] {
-    lexed.trivia.filter(|t| t.kind == AllowMarker).map(|t| t.text.span)
+    lexed.trivia.filter(|t| t.kind == AllowMarker)$text$span
 }
 
 # Why `src` does not parse, or `none` when it does — the FFI entry the

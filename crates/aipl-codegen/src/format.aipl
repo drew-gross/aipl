@@ -384,7 +384,7 @@ fn item_key(ps: Piece[]) -> str {
 #
 # A comment still ends its line where the author ended theirs — that is not
 # spacing, it is what the comment means.
-fn tight(ps: Piece[]) -> Doc { Concat(ps.map(piece_doc)) }.test({
+fn tight(ps: Piece[]) -> Doc { Concat(ps$piece_doc()) }.test({
     assert(tight([Tok("-"), Tok("2")]).at(80) == "-2");
     assert(tight([]).at(80) == "");
     assert(tight([Tok("a"), Note("/* c */", false), Tok("b")]).at(80) == "a/* c */b");

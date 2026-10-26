@@ -158,14 +158,14 @@ pub fn show_expr(self: Expr) -> str {
         ArrayLit(es) => `[{show_exprs(es)}]`,
         Spread(e) => `..{e.show_expr()}`,
         SetLit(es, o) => `Set([{show_exprs(es)}]{o.show_order()})`,
-        DictLit(ps) => `Dict([{ps.map(show_dict_entry).join(sep=", ")}])`,
+        DictLit(ps) => `Dict([{ps$show_dict_entry().join(sep=", ")}])`,
         Index(a, i) => `Index({a.show_expr()}, {i.show_expr()})`,
         Slice(a, lo, hi) => `Slice({a.show_expr()}, {lo.show_expr()}, {show_opt_expr(hi)})`,
         Try(e) => `Try({e.show_expr()})`,
         Unit => "()",
         Seq(a, b) => `Seq({a.show_expr()}, {b.show_expr()})`,
         Return(e) => `Return({e.show_expr()})`,
-        Lambda(ps, body) => `Lambda([{ps.map(show_lambda_param).join(sep=", ")}], {body.show_expr()})`,
+        Lambda(ps, body) => `Lambda([{ps$show_lambda_param().join(sep=", ")}], {body.show_expr()})`,
         TupleLit(es) => `Tuple({show_exprs(es)})`,
         TypeArgs(call, tys) => `TypeArgs({call.show_expr()}, [{tys.map(show_ty).join(sep=", ")}])`,
         KwArg(name, value, forwarded) => if (forwarded) {
@@ -244,7 +244,7 @@ pub fn ident(name: str) -> Expr { expr(Ident(name)) }
 # One match arm as `pattern => body`.
 pub fn show_arm(self: MatchArm) -> str { `{self.pattern.show_pat()} => {self.body.show_expr()}` }
 
-fn show_arms(self: MatchArm[]) -> str { self.map(show_arm).join(sep=", ") }
+fn show_arms(self: MatchArm[]) -> str { self$show_arm().join(sep=", ") }
 
 # A call, in the spelling its `method_style` flag says was written: the receiver
 # is `args[0]` for a method call and an ordinary argument for a free one.
@@ -258,9 +258,9 @@ fn show_call(name: str, args: Expr[], method_style: bool) -> str {
     }
 }
 
-pub fn show_exprs(self: Expr[]) -> str { self.map(show_expr).join(sep=", ") }
+pub fn show_exprs(self: Expr[]) -> str { self$show_expr().join(sep=", ") }
 
-fn show_opt_expr(self: Expr?) -> str { self.map(show_expr).value_or("") }
+fn show_opt_expr(self: Expr?) -> str { self$show_expr().value_or("") }
 
 # `: T` when a binding or a lambda parameter was annotated, and nothing when it
 # was not — so the dump reads like the source did.
@@ -275,11 +275,11 @@ fn show_field_init(self: FieldInit) -> str {
     `{self.name}: {self.value.show_expr()}`
 }
 
-fn show_field_inits(self: FieldInit[]) -> str { self.map(show_field_init).join(sep=", ") }
+fn show_field_inits(self: FieldInit[]) -> str { self$show_field_init().join(sep=", ") }
 
 fn show_dict_entry(self: (Expr, Expr)) -> str { `{self.0.show_expr()}: {self.1.show_expr()}` }
 
-fn show_binds(self: (str, str)[]) -> str { self.map(show_bind).join(sep=", ") }
+fn show_binds(self: (str, str)[]) -> str { self$show_bind().join(sep=", ") }
 
 fn show_bind(self: (str, str)) -> str { `{self.0} = {self.1}` }
 

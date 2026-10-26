@@ -40,15 +40,15 @@ fn filled(n: i64) -> i64[] {
     xs
 }
 
-fn shortest(xs: i64[]) -> u64? { xs.map(to_str).map(len).minimum() }
+fn shortest(xs: i64[]) -> u64? { xs$to_str()$len().minimum() }
 
-fn longest(xs: i64[]) -> u64? { xs.map(to_str).map(len).maximum() }
+fn longest(xs: i64[]) -> u64? { xs$to_str()$len().maximum() }
 
 fn smallest_square(xs: i64[]) -> i64? { xs.map(|x| x * x).minimum() }
 
-fn largest_text(xs: i64[]) -> str? { xs.map(to_str).maximum() }
+fn largest_text(xs: i64[]) -> str? { xs$to_str().maximum() }
 
-fn shortest_nonblank(lines: str[]) -> u64? { lines.filter(is_nonempty).map(len).minimum() }
+fn shortest_nonblank(lines: str[]) -> u64? { lines.filter(is_nonempty)$len().minimum() }
 
 fn main() !prints {
     let xs = [3, -4, 12, 7];

@@ -1,7 +1,7 @@
 # The shape has to be exactly "seed, pushes, the binding" — these are the
 # near-misses, and none of them is an array literal in disguise.
 
-import { join, len, map, print, push, to_str } from builtins;
+import { join, len, print, push, to_str } from builtins;
 
 // A pushed element that mentions the binding: `out.len()` is a running index,
 // and the literal has no `out` for it to refer to.
@@ -37,7 +37,7 @@ fn counted(xs: i64[], x: i64) -> u64 {
     out.len()
 }
 
-fn show(xs: i64[]) -> str { xs.map(to_str).join(sep=",") }
+fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }
 
 fn main() !prints {
     print(indexed([1, 2]).len().to_str());

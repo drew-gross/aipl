@@ -1,7 +1,7 @@
 # `aipl_syntax::ast::Type` as AIPL declares it. One of the files the AST is
 # declared across; see `ast.aipl`.
 
-import { contains, equal as ==, join, map } from builtins;
+import { contains, equal as ==, join } from builtins;
 import { I64, Prim, Str, prim_name } from "./prim.aipl";
 
 # `aipl_syntax::ast::Type`, less the four checker sentinels (see the header).
@@ -146,7 +146,7 @@ pub fn promoted(self: Ty, vars: str[]) -> Ty {
 
 # The elements of a type list, comma-separated. An empty list renders empty,
 # which is what `() -> R` and `Foo<>` would need if either could be written.
-pub fn show_tys(self: Ty[]) -> str { self.map(show_ty).join(sep=", ") }.test({
+pub fn show_tys(self: Ty[]) -> str { self$show_ty().join(sep=", ") }.test({
     let empty: Ty[] = [];
     assert(empty.show_tys() == "");
     assert([Unit].show_tys() == "()");

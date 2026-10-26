@@ -3,7 +3,7 @@
 # idea at two levels, and a file holds one of each: `grammar_sexp.aipl`
 # imports this one as `AtomNode`.
 
-import { equal as ==, join, map, maximum, repeat, value_or, wrapping_add as + } from builtins;
+import { equal as ==, join, maximum, repeat, value_or, wrapping_add as + } from builtins;
 import { parse_sexp } from "./grammar_sexp.aipl";
 
 # The AST an S-expression lowers to: a bare atom, or a list of them. Recursive
@@ -19,7 +19,7 @@ variant Sexp = Atom(str) | List(Sexp[])
 pub fn render_sexp(self: Sexp) -> str {
     match (self) {
         Atom(a) => a,
-        List(xs) => `({xs.map(render_sexp).join(sep=" ")})`,
+        List(xs) => `({xs$render_sexp().join(sep=" ")})`,
     }
 }.test({
     // ---- round trip: parse -> lower -> render -> parse ----
@@ -65,6 +65,6 @@ pub fn render_sexp(self: Sexp) -> str {
 fn depth(self: Sexp) -> u64 {
     match (self) {
         Atom(_) => 0,
-        List(xs) => xs.map(depth).maximum().value_or(0) + 1,
+        List(xs) => xs$depth().maximum().value_or(0) + 1,
     }
 }

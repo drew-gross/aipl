@@ -26,7 +26,6 @@ mod is_empty_longhand;
 mod len_gt_zero;
 mod map_constant_repeat;
 mod map_find_if_some;
-mod map_lambda_member_dollar;
 mod match_is_some_and;
 mod match_map_err;
 mod match_map_ok;
@@ -57,7 +56,7 @@ use self::char_set_literal::char_set_literal;
 use self::compound_assign::{compound_assign, matching_compound};
 use self::destructure_binding::destructure_binding;
 use self::destructure_param::destructure_param;
-use self::eta_lambda::eta_lambda;
+use self::eta_lambda::{eta_lambda, Forwarding};
 use self::extend_longhand::{extend_longhand, extend_names};
 use self::field_init_shorthand::field_init_shorthand;
 use self::fn_body_type_stutter::fn_body_type_stutter;
@@ -67,7 +66,6 @@ use self::is_empty_longhand::{empty_names, is_empty_longhand};
 use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
 use self::map_constant_repeat::{map_constant_repeat, repeat_names};
 use self::map_find_if_some::{find_map_names, map_find_if_some};
-use self::map_lambda_member_dollar::map_lambda_member_dollar;
 use self::match_is_some_and::match_is_some_and;
 use self::match_map_err::match_map_err;
 use self::match_map_ok::match_map_ok;
@@ -112,14 +110,14 @@ pub fn check(
     each_expr(program, &mut |e| slice_whole(e, src, &mut hits));
     each_expr(program, &mut |e| slice_to_len(e, src, &mut hits));
     each_expr(program, &mut |e| slice_from_zero(e, src, &mut hits));
-    // `xs.map(|x| x.name)` is `xs$name`. Before `eta_lambda`, which would also
-    // see `|x| x.f()` as a lambda that only forwards to `f`.
+    // `xs.map(|x| x.name)` is `xs$name`, `xs.map(f)` is `xs$f()`, and a lambda that
+    // only forwards its arguments to a call is that function.
     let map = imported_as(program, "map");
-    let mut member_lambdas: Vec<Span> = Vec::new();
+    let forwarding = Forwarding::of(program, map.clone());
+    let mut advised: Vec<Span> = Vec::new();
     each_expr(program, &mut |e| {
-        map_lambda_member_dollar(e, src, map.as_deref(), &mut member_lambdas, &mut hits)
+        eta_lambda(e, src, &forwarding, &mut advised, &mut hits)
     });
-    each_expr(program, &mut |e| eta_lambda(e, &member_lambdas, &mut hits));
     // A `to_str` inside a template interpolation, which already renders its
     // value the same way. Only where the file's `to_str` is the builtin.
     if let Some(to_str) = to_str_name(program) {

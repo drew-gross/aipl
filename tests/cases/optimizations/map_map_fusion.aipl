@@ -38,9 +38,9 @@ fn filled(n: i64) -> i64[] {
     xs
 }
 
-fn digits(xs: i64[]) -> u64[] { xs.map(to_str).map(len) }
+fn digits(xs: i64[]) -> u64[] { xs$to_str()$len() }
 
-fn plus_one_digits(xs: i64[]) -> u64[] { xs.map(|x| x + 1).map(to_str).map(len) }
+fn plus_one_digits(xs: i64[]) -> u64[] { xs.map(|x| x + 1)$to_str()$len() }
 
 fn double(x: i64) -> i64 { x * 2 }
 
@@ -59,7 +59,7 @@ fn main() !prints {
     print(`{digits(xs)} {plus_one_digits(xs)}`);
 
     // A named function on each side, and a lambda in the middle.
-    print(`{xs.map(double).map(|x| x + 1).map(to_str)}`);
+    print(`{xs.map(double).map(|x| x + 1)$to_str()}`);
 
     // An optional is mapped the same way, and may be mapped through twice.
     print(`{some(4).map(double).map(|x| x + 1)}`);

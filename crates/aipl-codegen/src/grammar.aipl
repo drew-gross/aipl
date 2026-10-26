@@ -457,8 +457,8 @@ pub fn show<K: variant>(self: Rule<K>) -> str {
     match (self) {
         Term(k) => `Term({k.case_name()})`,
         Literal(s) => `Literal("{s}")`,
-        Then(rs) => `Then([{rs.map(show).join(sep=", ")}])`,
-        OneOf(rs) => `OneOf([{rs.map(show).join(sep=", ")}])`,
+        Then(rs) => `Then([{rs$show().join(sep=", ")}])`,
+        OneOf(rs) => `OneOf([{rs$show().join(sep=", ")}])`,
         Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, spaced, sorted, style, group) => {
             mut args = [show(sub)];
             if (min != 0) {
@@ -852,7 +852,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // grammar value nor a rule can be compared with `==` (both may hold function
     // values), so a rule is asserted on through its `show` text.
     fn shown_rule<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
-        g.prods[i].map(|p| show(p.rule)).value_or("")
+        g.prods[i]$rule$show().value_or("")
     }
 
     fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {

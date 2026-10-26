@@ -17,7 +17,7 @@ fn apply(f: (i64) -> i64, x: i64) -> i64 { f(x) }.test({
     // A named function and a lambda are interchangeable as the map function.
     assert(xs.map(double).map(inc) == [3, 5, 7]);
     // A builtin (`to_str`) passed by name as the mapping function.
-    assert(xs.map(to_str) == ["1", "2", "3"]);
+    assert(xs$to_str() == ["1", "2", "3"]);
 
     // Pass a named function to a user-defined HOF (function-call form).
     assert(apply(double, 20) == 40);

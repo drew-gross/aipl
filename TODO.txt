@@ -99,6 +99,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  path_names looks like it can be a match to drop the value_or
   collect_names looks like it can be a set spread
   dict_spread_message and co should be consts not functions
   referenced_names() should return a set
@@ -478,6 +479,7 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  map->$ lint should apply through self function that aren't being used as self
   lint to use my_opt$foo().value_or(fallback) rather than in if/else
   assert(fn() == ok(val)) should be assert(fn()? == val)
   unused imports should be #[allow] able (generally clean up #[allow] architecture after lint is all aipl)

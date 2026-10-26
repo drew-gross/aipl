@@ -132,15 +132,15 @@ struct FnAttr { body: Expr, span: Span }
 # tests assert against. Near the source it came from rather than structural,
 # because an item's shape is its declaration and a dump that hid that would be
 # harder to read than the thing it describes.
-pub fn show_program(self: Program) -> str { self.items.map(show_item).join(sep="\n") }
+pub fn show_program(self: Program) -> str { self.items$show_item().join(sep="\n") }
 
 pub fn show_item(self: Item) -> str {
     match (self) {
         Fn(f) => show_fn(f),
-        Struct(s) => `{show_doc(s.doc)}struct {s.name.text}{show_type_params(s.type_vars)}({s.fields.map(show_field_decl).join(sep=", ")})`,
-        Variant(v) => `{show_doc(v.doc)}variant {v.name.text}{show_type_params(v.type_vars)}({v.cases.map(show_case).join(sep=" | ")})`,
+        Struct(s) => `{show_doc(s.doc)}struct {s.name.text}{show_type_params(s.type_vars)}({s.fields$show_field_decl().join(sep=", ")})`,
+        Variant(v) => `{show_doc(v.doc)}variant {v.name.text}{show_type_params(v.type_vars)}({v.cases$show_case().join(sep=" | ")})`,
         Refinement(r) => `{show_doc(r.doc)}variant {r.name.text}{show_type_params(r.type_vars)} = {r.target.show_ty()}`,
-        Import(d) => `import [{d.names.map(show_import_name).join(sep=", ")}] from {show_import_source(d.source)}`,
+        Import(d) => `import [{d.names$show_import_name().join(sep=", ")}] from {show_import_source(d.source)}`,
         Const(c) => `{show_doc(c.doc)}let {c.name.text}{show_const_ty(c.ty)} = {show_expr(c.value)}`,
     }
 }.test({
@@ -170,11 +170,11 @@ fn show_fn(self: Function) -> str {
     let vis = if (self.is_pub) { "pub " } else { "" };
     let sig = self.sig;
     let ret = sig.return_ty.map(|t| ` -> {t.show_ty()}`).value_or("");
-    let effects = sig.effects.map(effect_marker).join();
+    let effects = sig.effects$effect_marker().join();
     let helpers = self.test_fns.map(|h| ` {h.show_fn()}`).join();
     let test = self.test_body.map(|b| ` .test({b.show_expr()}{helpers})`).value_or("");
-    let performance = self.performance.map(show_performance).value_or("");
-    `{show_doc(self.doc)}{vis}fn {self.name.text}{show_type_params(sig.type_vars)}({sig.params.map(show_param).join(sep=", ")}){effects}{ret} = {self.body.show_expr()}{test}{performance}`
+    let performance = self.performance$show_performance().value_or("");
+    `{show_doc(self.doc)}{vis}fn {self.name.text}{show_type_params(sig.type_vars)}({sig.params$show_param().join(sep=", ")}){effects}{ret} = {self.body.show_expr()}{test}{performance}`
 }
 
 fn show_performance(self: PerformanceBlock) -> str {
@@ -192,7 +192,7 @@ fn show_type_params(self: TypeParam[]) -> str {
     if (self.is_empty()) {
         return "";
     };
-    `<{self.map(show_type_param).join(sep=", ")}>`
+    `<{self$show_type_param().join(sep=", ")}>`
 }
 
 fn show_type_param(self: TypeParam) -> str {
@@ -216,7 +216,7 @@ fn show_case(self: VariantCase) -> str {
     if (self.payload.is_empty()) {
         return head;
     };
-    `{head}({self.payload.map(show_case_param).join(sep=", ")})`
+    `{head}({self.payload$show_case_param().join(sep=", ")})`
 }
 
 fn show_case_param(self: CaseParam) -> str {

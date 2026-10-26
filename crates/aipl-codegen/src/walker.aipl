@@ -315,8 +315,8 @@ fn err_here(self: W, msg: str) -> FmtError {
 # Where the next syntactic entity begins: the next comment or token, whichever
 # comes first. Past both, the end of the source.
 fn next_start(self: W) -> u64 {
-    let tok = self.peek().map(|t| t.span.start).value_or(self.src.len());
-    self.comments[self.cpos].map(|c| min(c.start, tok)).value_or(tok)
+    let tok = self.peek()$span$start.value_or(self.src.len());
+    self.comments[self.cpos]$start$min(tok).value_or(tok)
 }
 
 # Whether the source across a span holds a blank line (two newlines).
@@ -473,7 +473,7 @@ pub fn format_program(src: str, width: u64) -> str!FmtError {
     // comments and `#[allow]` markers only — whitespace is a `skip` rule, so it
     // never reaches the trivia stream, and only its spans are kept.
     let toks = tokens.map(|t| FmtTok { kind: fmt_kind(t.kind), span: t.text.span });
-    let w = new_walker(src, toks, trivia.map(|t| t.text.span));
+    let w = new_walker(src, toks, trivia$text$span);
     let d = w.program()?;
 
     // Every comment must have been carried into the output; one left behind
@@ -2862,8 +2862,8 @@ fn is_block_tok(self: W, i: u64) -> bool {
         return text.contains("\n") && (text.starts_with(`"""`) || text.starts_with("```"));
     };
     if (self.toks[i].is_some_and(|t| t.kind == TplCloseTok)) {
-        let start = self.toks[self.template_head(i)].map(|t| t.span.start).value_or(0);
-        let end = self.toks[i].map(|t| t.span.end).value_or(0);
+        let start = self.toks[self.template_head(i)]$span$start.value_or(0);
+        let end = self.toks[i]$span$end.value_or(0);
         let text = self.src[start..end];
         return text.contains("\n") && text.starts_with("```");
     };
@@ -2964,7 +2964,7 @@ fn walker_of(src: str) -> W!FmtError {
         span: e.span,
     })?;
     let toks = tokens.map(|t| FmtTok { kind: fmt_kind(t.kind), span: t.text.span });
-    ok(new_walker(src, toks, trivia.map(|t| t.text.span)))
+    ok(new_walker(src, toks, trivia$text$span))
 }.test({
     // The real lexer, so a test writes source and gets the tokens the formatter
     // gets. Spacing in an input is therefore *input*, not a token separator: an

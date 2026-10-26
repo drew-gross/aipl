@@ -20,9 +20,9 @@ import {
     wrapping_mul as *,
 } from builtins;
 
-fn show(xs: i64[]) -> str { xs.map(to_str).join(sep=",") }
+fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }
 
-fn show_u(xs: u64[]) -> str { xs.map(to_str).join(sep=",") }
+fn show_u(xs: u64[]) -> str { xs$to_str().join(sep=",") }
 
 // The loop does something else as well. A pipeline has nowhere to put it.
 fn logged(xs: i64[]) !prints -> i64[] {

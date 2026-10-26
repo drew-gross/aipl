@@ -3,7 +3,7 @@
 # so the hit has to name a line that survives the formatter, and `mut out = xs;`
 # is a short statement that always occupies one.
 
-import { join, map, print, push, to_str } from builtins;
+import { join, print, push, to_str } from builtins;
 
 fn appended(xs: i64[], x: i64) -> i64[] {
     mut out = xs; #[allow]
@@ -15,7 +15,7 @@ fn appended(xs: i64[], x: i64) -> i64[] {
 // and proven to agree.
 fn appended_short(xs: i64[], x: i64) -> i64[] { [..xs, x] }
 
-fn show(xs: i64[]) -> str { xs.map(to_str).join(sep=",") }
+fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }
 
 fn main() !prints {
     print(show(appended([1, 2], 3)));

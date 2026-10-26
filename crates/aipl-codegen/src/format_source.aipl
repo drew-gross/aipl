@@ -410,7 +410,7 @@ fn token_fingerprint(lexed: LexResult<AiplTok>) -> TokenFingerprint {
     TokenFingerprint {
         imports: imports.sort(),
         rest: collapse_templates(rest),
-        comments: lexed.trivia.map(|t| t.text.text).sort(),
+        comments: lexed.trivia$text$text.sort(),
     }
 }
 

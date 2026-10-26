@@ -321,9 +321,7 @@ fn miss(far: Far, pos: u64, label: str) -> Step { no(far_miss(far, pos, label), 
 
 # The source text of token `i`, or `""` past the end. Empty is a safe sentinel
 # because no matcher in `lexer.aipl` ever produces an empty token.
-fn tok_text<K: variant, A: any>(p: Parser<K, A>, i: u64) -> str {
-    p.toks[i].map(|t| t.text.text).value_or("")
-}
+fn tok_text<K: variant, A: any>(p: Parser<K, A>, i: u64) -> str { p.toks[i]$text$text.value_or("") }
 
 # The CST children consuming token `i` contributes: every trivia record between
 # the previous token and this one, then the token's own leaf. Attaching trivia
@@ -387,7 +385,7 @@ fn trivia_starts_before<K: variant>(trivia: Token<K>[], j: u64, at: u64) -> bool
 }
 
 fn trivia_span<K: variant>(trivia: Token<K>[], j: u64) -> Span {
-    trivia[j].map(|tr| tr.text.span).value_or(0..0)
+    trivia[j]$text$span.value_or(0..0)
 }
 
 # The trivia after the last token, appended to the root node so the tree still
@@ -461,7 +459,7 @@ fn refusal<K: variant, A: any>(p: Parser<K, A>, what: Refusal, start: u64, end: 
     let matched = p.toks[start..end];
     let span = match (matched.first()) {
         some(f) => f.text.span.start..matched.last().value_or(f).text.span.end,
-        none => p.toks[end].map(|t| t.text.span).value_or(p.end..p.end),
+        none => p.toks[end]$text$span.value_or(p.end..p.end),
     };
     let message = match (what) {
         Msg(m) => m,
@@ -1161,7 +1159,7 @@ fn error_at<K: variant, A: any>(p: Parser<K, A>, src: str, far: Far) -> ParseErr
     } else {
         "end of input"
     };
-    let span = p.toks[far.pos].map(|t| t.text.span).value_or(p.end..p.end);
+    let span = p.toks[far.pos]$text$span.value_or(p.end..p.end);
     let hint = unclosed_hint(src, far.unclosed);
     if (far.expected.is_empty()) {
         return ParseError { message: `unexpected {found}{hint}`, span };

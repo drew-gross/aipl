@@ -5,11 +5,11 @@
 import { join, map, print, to_str } from builtins;
 
 fn main() !prints {
-    print([1, 2, 3].map(to_str).join(sep=", "));
-    print([1, 2, 3].map(to_str).join(sep=", ", final_sep=", or ", only_sep=" or "));
-    print([1, 2].map(to_str).join(sep=", ", final_sep=", or ", only_sep=" or "));
-    print([7].map(to_str).join(sep=", "));
-    print(`[{[1, 2][..0].map(to_str).join(sep=", ")}]`);
+    print([1, 2, 3]$to_str().join(sep=", "));
+    print([1, 2, 3]$to_str().join(sep=", ", final_sep=", or ", only_sep=" or "));
+    print([1, 2]$to_str().join(sep=", ", final_sep=", or ", only_sep=" or "));
+    print([7]$to_str().join(sep=", "));
+    print(`[{[1, 2][..0]$to_str().join(sep=", ")}]`);
     // No separator: a plain concatenation of the pieces.
     print([1, 2, 3].map(|x| `<{x}>`).join());
 

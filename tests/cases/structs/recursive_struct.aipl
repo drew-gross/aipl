@@ -5,13 +5,13 @@
 # (weak) reference to another boxed node. Freeing the root cascades down every
 # still-reachable child. Balanced allocation counts prove no leak/double-free.
 
-import { equal as ==, map, print, to_str, value_or, wrapping_add as + } from builtins;
+import { equal as ==, print, to_str, value_or, wrapping_add as + } from builtins;
 
 struct Tree { value: i64, left: Tree?, right: Tree? }
 
 fn total(self: Tree) -> i64 {
-    let l = self.left.map(total).value_or(0);
-    let r = self.right.map(total).value_or(0);
+    let l = self.left$total().value_or(0);
+    let r = self.right$total().value_or(0);
     self.value + l + r
 }
 

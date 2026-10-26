@@ -392,8 +392,8 @@ pub fn render_json(self: Json) -> str {
         Bool(b) => if (b) { "true" } else { "false" },
         Number(n) => n,
         String(s) => `"{escape_json(s)}"`,
-        Array(xs) => `[{xs.map(render_json).join(sep=",")}]`,
-        Object(ms) => `\{{ms.map(render_json).join(sep=",")}}`,
+        Array(xs) => `[{xs$render_json().join(sep=",")}]`,
+        Object(ms) => `\{{ms$render_json().join(sep=",")}}`,
         Member(k, v) => `"{escape_json(k)}":{v.render_json()}`,
     }
 }.test({

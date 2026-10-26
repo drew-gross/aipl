@@ -138,21 +138,22 @@ fn hit_span(self: ImportName, source: ImportSource) -> Span {
 # referenced idents, constructed structs, match constructors, operator spellings,
 # and every name appearing in a type — signatures, struct fields, variant
 # payloads, and inline `let`/lambda annotations.
-fn referenced_names(Program { items }) -> #{str} { items.map(item_names).union_all() }
+fn referenced_names(Program { items }) -> #{str} { items$item_names().union_all() }
 
 # The names an item mentions: the type positions that belong to it rather than to
 # any expression, and the expressions it holds.
 fn item_names(self: Item) -> #{str} {
     match (self) {
         Fn(f) => #{
-            ..f.sig.params.map(param_names).union_all(),
+            ..f.sig.params$param_names().union_all(),
             ..f.sig.return_ty.optional_ty_names(),
             ..f.body.names_in(),
             ..f.test_body$names_in().value_or(#{}),
         },
         Struct(s) => s.fields.map(|field| field_names(field.ty, field.default)).union_all(),
-        Variant(v) => v.cases
-            .map(|case| case.payload.map(|slot| field_names(slot.ty, slot.default)).union_all())
+        Variant(v) => v.cases$payload
+            $map(|slot| field_names(slot.ty, slot.default))
+            $union_all()
             .union_all(),
         // A constant's annotation may name an imported type; its value is a
         // literal, so it names nothing.
@@ -172,7 +173,7 @@ fn field_names(ty: Ty, default: Expr?) -> #{str} {
 
 # The names `self` and every expression under it mention.
 fn names_in(self: Expr) -> #{str} {
-    #{..self.own_names(), ..self.subexprs().map(names_in).union_all()}
+    #{..self.own_names(), ..self.subexprs()$names_in().union_all()}
 }
 
 # The names `e` itself mentions, not those of its sub-expressions.
@@ -188,8 +189,8 @@ fn own_names(self: Expr) -> #{str} {
             ..bindings.map(|binding| #{binding.0, binding.1}).union_all(),
         },
         Let(_, ty, _, _) | LetMut(_, ty, _, _) => ty.optional_ty_names(),
-        Lambda(params, _) => params.map(|param| param.ty.optional_ty_names()).union_all(),
-        Match(_, arms) => arms.map(|arm| arm.pattern.ctor_names()).union_all(),
+        Lambda(params, _) => params$ty$optional_ty_names().union_all(),
+        Match(_, arms) => arms$pattern$ctor_names().union_all(),
         // `if (let P = e)` is one arm without the `match`; its pattern names a
         // constructor just as an arm's does.
         IfLet(arm, _, _) => arm.pattern.ctor_names(),
@@ -225,8 +226,8 @@ fn own_names(self: Expr) -> #{str} {
 fn ctor_names(self: Pat) -> #{str} {
     match (self) {
         Pat.Ctor(name, _, _) => path_names(name),
-        Pat.Nested(name, args) => #{..path_names(name), ..args.map(ctor_names).union_all()},
-        Pat.ArrayNested(patterns) | Pat.Tuple(patterns) => patterns.map(ctor_names).union_all(),
+        Pat.Nested(name, args) => #{..path_names(name), ..args$ctor_names().union_all()},
+        Pat.ArrayNested(patterns) | Pat.Tuple(patterns) => patterns$ctor_names().union_all(),
         Pat.Str(..) | Pat.Char(..) | Pat.Array(..) | Pat.Wildcard | Pat.Int(..) => #{},
     }
 }
@@ -259,10 +260,10 @@ fn ty_names(self: Ty) -> #{str} {
         | Without(inner, _) => inner.ty_names(),
         // A type parameter is bound by the signature, not imported.
         TypeVar(..) | TyUnit | Primitive(..) | Any => #{},
-        Generic(base, args) => #{base, ..args.map(ty_names).union_all()},
+        Generic(base, args) => #{base, ..args$ty_names().union_all()},
         Dict(a, b) | Result(a, b) => #{..a.ty_names(), ..b.ty_names()},
-        TyFn(params, ret) => #{..params.map(ty_names).union_all(), ..ret.ty_names()},
-        TyTuple(elements) => elements.map(ty_names).union_all(),
+        TyFn(params, ret) => #{..params$ty_names().union_all(), ..ret.ty_names()},
+        TyTuple(elements) => elements$ty_names().union_all(),
     }
 }
 

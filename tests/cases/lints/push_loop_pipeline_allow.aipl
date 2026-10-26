@@ -35,7 +35,7 @@ fn scaled_above(xs: i64[], lo: i64) -> i64[] {
 // and proven to agree.
 fn scaled_above_short(xs: i64[], lo: i64) -> i64[] { xs.filter(|x| lo <= x).map(|x| x * 2) }
 
-fn show(xs: i64[]) -> str { xs.map(to_str).join(sep=",") }
+fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }
 
 fn main() !prints {
     print(show(scaled_above([1, 5, 3], 2)));

@@ -27,7 +27,7 @@ fn big_doubled(xs: i64[]) -> i64[] {
     kept.map(|x| x * 2)
 }
 
-fn show(xs: i64[]) -> str { xs.map(to_str).join(sep=",") }
+fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }
 
 // The three shapes that keep their binding.
 

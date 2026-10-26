@@ -67,7 +67,7 @@ fn show(s: #{i64}) -> str {
     for (let x : s) {
         set out.push(x);
     }
-    out.sort().map(to_str).join(sep=",")
+    out.sort()$to_str().join(sep=",")
 }
 
 fn main() !prints {

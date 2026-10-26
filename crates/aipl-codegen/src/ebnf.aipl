@@ -667,7 +667,7 @@ pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
 # double quotes, each set in its own order — with `<empty>` appended when the
 # rule is nullable. A debug rendering, like `cst.aipl`'s `show`.
 pub fn show_first<K: variant>(self: First<K>) -> str {
-    let kinds = self.kinds.map(case_name).join(sep=" ");
+    let kinds = self.kinds$case_name().join(sep=" ");
     let texts = self.texts.map(|t| `"{t}"`).join(sep=" ");
     let syms = [kinds, texts].filter(is_nonempty).join(sep=" ");
     if (!self.nullable) {

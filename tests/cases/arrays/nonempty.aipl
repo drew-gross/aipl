@@ -11,7 +11,6 @@ import {
     equal as ==,
     first,
     len,
-    map,
     nonempty_first,
     nonempty_last,
     print,
@@ -52,7 +51,7 @@ fn one() -> i64[] without [] { [1] }
 fn describe(ys: i64[]) -> str { `{ys.len()} elements` }
 
 fn last_or(names: str[], fallback: str) -> str {
-    names.ensure_nonempty().map(nonempty_last).value_or(fallback)
+    names.ensure_nonempty()$nonempty_last().value_or(fallback)
 }
 --- stdout ---
 3

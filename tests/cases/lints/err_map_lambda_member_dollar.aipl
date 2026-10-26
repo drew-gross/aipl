@@ -1,11 +1,18 @@
-# `xs.map(|x| x.name)` — a lambda whose whole body reads one member of its
-# argument, or calls one method on it — is `xs$name`, `xs$0` and `xs$f(args)`.
+# `xs.map(|x| x.name)` — a lambda whose whole body is its argument taken through a
+# chain of member reads and calls — is `xs$name`, `xs$0`, `xs$f(args)` and
+# `xs$a$f(b)$c`. A call written as a plain function, `|x| to_str(x)`, is the same
+# step when `$` can make it: the function is a builtin, or declared here with a
+# `self` receiver. And a bare function name, `xs.map(f)`, is `xs$f()`.
 
-import { len, map, print, to_str } from builtins;
+import { len, map, print, to_str, wrapping_add as + } from builtins;
 
 struct Point { x: i64, y: i64 }
 
-fn scale(self: i64, by: i64) -> i64 { self }
+struct Line { origin: Point }
+
+fn scale(self: i64, by: i64) -> i64 { self + by }
+
+fn twice(self: i64) -> i64 { self + self }
 
 fn xs_of(ps: Point[]) -> i64[] { ps.map(|p| p.x) }
 
@@ -15,30 +22,62 @@ fn texts(xs: i64[]) -> str[] { xs.map(|x| x.to_str()) }
 
 fn scaled(xs: i64[], by: i64) -> i64[] { xs.map(|x| x.scale(by)) }
 
+fn originals(lines: Line[]) -> i64[] { lines.map(|l| l.origin.x) }
+
+fn scaled_xs(ps: Point[], by: i64) -> i64[] { ps.map(|p| p.x.scale(by)) }
+
+fn shown(ps: Point[]) -> str[] { ps.map(|p| to_str(p.x)) }
+
+fn doubled(xs: i64[]) -> i64[] { xs.map(twice) }
+
 fn main() !prints {
     print(xs_of([Point { x: 1, y: 2 }]).len().to_str());
 }
 --- errors ---
 error: "map" with a lambda that only uses a member of its argument — write "ps$x" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:10:41
+  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:17:41
    |
-10 | fn xs_of(ps: Point[]) -> i64[] { ps.map(|p| p.x) }
+17 | fn xs_of(ps: Point[]) -> i64[] { ps.map(|p| p.x) }
    |                                         ^^^^^^^
 
 error: "map" with a lambda that only uses a member of its argument — write "pairs$0" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:12:53
+  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:19:53
    |
-12 | fn firsts(pairs: (i64, str)[]) -> i64[] { pairs.map(|p| p.0) }
+19 | fn firsts(pairs: (i64, str)[]) -> i64[] { pairs.map(|p| p.0) }
    |                                                     ^^^^^^^
 
 error: "map" with a lambda that only uses a member of its argument — write "xs$to_str()" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:14:39
+  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:21:39
    |
-14 | fn texts(xs: i64[]) -> str[] { xs.map(|x| x.to_str()) }
+21 | fn texts(xs: i64[]) -> str[] { xs.map(|x| x.to_str()) }
    |                                       ^^^^^^^^^^^^^^
 
 error: "map" with a lambda that only uses a member of its argument — write "xs$scale(...)" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:16:49
+  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:23:49
    |
-16 | fn scaled(xs: i64[], by: i64) -> i64[] { xs.map(|x| x.scale(by)) }
+23 | fn scaled(xs: i64[], by: i64) -> i64[] { xs.map(|x| x.scale(by)) }
    |                                                 ^^^^^^^^^^^^^^^
+
+error: "map" with a lambda that only uses a member of its argument — write "lines$origin$x" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:25:50
+   |
+25 | fn originals(lines: Line[]) -> i64[] { lines.map(|l| l.origin.x) }
+   |                                                  ^^^^^^^^^^^^^^
+
+error: "map" with a lambda that only uses a member of its argument — write "ps$x$scale(...)" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:27:54
+   |
+27 | fn scaled_xs(ps: Point[], by: i64) -> i64[] { ps.map(|p| p.x.scale(by)) }
+   |                                                      ^^^^^^^^^^^^^^^^^
+
+error: "map" with a lambda that only uses a member of its argument — write "ps$x$to_str()" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:29:41
+   |
+29 | fn shown(ps: Point[]) -> str[] { ps.map(|p| to_str(p.x)) }
+   |                                         ^^^^^^^^^^^^^^^
+
+error: "map" over the function "twice" — write "xs$twice()" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_lambda_member_dollar.aipl:31:41
+   |
+31 | fn doubled(xs: i64[]) -> i64[] { xs.map(twice) }
+   |                                         ^^^^^

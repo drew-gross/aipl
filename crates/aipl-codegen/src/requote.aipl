@@ -403,7 +403,7 @@ pub fn retemplate(raw: bool, segs: str[], interps: str[]) -> str {
     if (want_raw == raw) {
         return join_template(raw, segs, interps);
     };
-    let moved = if (want_raw) { segs.map(single_to_raw) } else { segs };
+    let moved = if (want_raw) { segs$single_to_raw() } else { segs };
     join_template(want_raw, moved, interps)
 }.test({
     // Escape-free segments: the single form is preferred, from either side.

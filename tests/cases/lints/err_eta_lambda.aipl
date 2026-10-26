@@ -1,17 +1,19 @@
-# `|x| to_str(x)` — a lambda that only forwards its argument to a single call
-# is redundant; pass `to_str` itself. The method form of a `map`'s lambda,
-# `|x| x.to_str()`, is `xs$to_str()` instead (`err_map_lambda_member_dollar`).
+# `|x| is_big(x)` — a lambda that only forwards its argument to a single call is
+# redundant; pass `is_big` itself. A `map`'s lambda is advised as `$` instead:
+# `xs.map(|x| to_str(x))` is `xs$to_str()` (`err_map_lambda_member_dollar`).
 
-import { len, map, print, to_str } from builtins;
+import { filter, greater_than as >, len, print, to_str } from builtins;
 
-fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
+fn is_big(x: i64) -> bool { x > 100 }
+
+fn big(xs: i64[]) -> i64[] { xs.filter(|x| is_big(x)) }
 
 fn main() !prints {
-    print(stringify([1]).len().to_str());
+    print(big([1]).len().to_str());
 }
 --- errors ---
-error: lambda only forwards its argument(s) to "to_str" — pass "to_str" directly (or append #[allow] to this line to keep it)
- --> ./tests/cases/lints/err_eta_lambda.aipl:7:43
+error: lambda only forwards its argument(s) to "is_big" — pass "is_big" directly (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_eta_lambda.aipl:9:40
   |
-7 | fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
-  |                                           ^^^^^^^^^^^^^
+9 | fn big(xs: i64[]) -> i64[] { xs.filter(|x| is_big(x)) }
+  |                                        ^^^^^^^^^^^^^
