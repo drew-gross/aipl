@@ -1,0 +1,26 @@
+# The AIPL implementation of the `grid_of` builtin. The loader names this function
+# by the canonical name `__builtin_grid_of` (see `aipl_syntax::aipl_builtins`).
+#
+# No lint: the shape this replaces is `grid_from(width, (0..width * height).map(|_|
+# value))`, and a program that writes it is saying the same thing at greater length;
+# nothing in the corpus but the program this was written for does.
+
+import { Grid, equal as ==, grid_from, grid_get, map, wrapping_mul as * } from builtins;
+
+# A grid `width` cells wide and `height` high with a copy of `value` in every cell.
+pub fn grid_of<T: any>(width: u64, height: u64, value: T) -> Grid<T> {
+    grid_from(width, (0..width * height).map(|cell| value))
+}.test({
+    let grid = grid_of(3, 2, "x");
+    assert(grid == grid_from(3, ["x", "x", "x", "x", "x", "x"]));
+    assert(grid.grid_get(1, 2) == some("x"));
+    // Off the grid, as in any grid.
+    assert(grid.grid_get(2, 0) == none);
+    assert(grid.grid_get(0, 3) == none);
+    // Without cells, whatever the other side is.
+    let nothing: i64[] = [];
+    assert(grid_of(0, 5, 1) == grid_from(0, nothing));
+    assert(grid_of(4, 0, 1) == grid_from(4, nothing));
+    // Free-call form and a non-scalar value.
+    assert(grid_of(2, 1, [1, 2]) == grid_from(2, [[1, 2], [1, 2]]));
+})

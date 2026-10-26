@@ -76,6 +76,9 @@ pub enum Callee {
     /// `width` to a row. What a nested array literal in a grid position is
     /// rewritten to.
     GridFrom,
+    /// `grid_of(width: u64, height: u64, value: T) -> T[,]` — a grid with `value` in
+    /// every cell.
+    GridOf,
     /// `grid_try_set(self: T[,], row: u64, column: u64, value: T) -> T[,]` — the grid
     /// with that cell replaced, or unchanged off the grid. What an indexed write
     /// `set grid[row, column] = value else { .. }` stores.
@@ -470,6 +473,7 @@ impl Callee {
             Callee::First => "__builtin_first",
             Callee::GridGet => "__builtin_grid_get",
             Callee::GridFrom => "__builtin_grid_from",
+            Callee::GridOf => "__builtin_grid_of",
             Callee::GridTrySet => "__builtin_grid_try_set",
             Callee::Width => "__builtin_width",
             Callee::SeededWithInt => "__builtin_seeded_with_int",

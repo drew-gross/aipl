@@ -357,6 +357,7 @@ matrices:
   support retrieving a row/col
 
 types:
+  allow sets of more complex things (tuples, structs, variants)
   spans with signed bounds should work, so that we can e.g. (-1..2).cartesian_product(-1..2) in neighbours
   make without work for fields, then you can spread the original type into them
   function-typed parameters can't be passed as values or forwarded to helpers like map

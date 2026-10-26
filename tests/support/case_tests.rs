@@ -1023,6 +1023,7 @@ case_tests! {
     crates_aipl_mono_src_builtin_grid_from = "crates/aipl-mono/src/builtin_grid_from",
     crates_aipl_mono_src_builtin_grid_get = "crates/aipl-mono/src/builtin_grid_get",
     crates_aipl_mono_src_builtin_grid_is_in_bounds_of = "crates/aipl-mono/src/builtin_grid_is_in_bounds_of",
+    crates_aipl_mono_src_builtin_grid_of = "crates/aipl-mono/src/builtin_grid_of",
     crates_aipl_mono_src_builtin_grid_try_set = "crates/aipl-mono/src/builtin_grid_try_set",
     crates_aipl_mono_src_builtin_height = "crates/aipl-mono/src/builtin_height",
     crates_aipl_mono_src_builtin_inline_str = "crates/aipl-mono/src/builtin_inline_str",

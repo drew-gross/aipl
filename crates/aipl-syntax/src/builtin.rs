@@ -199,6 +199,7 @@ const BUILTINS: &[Builtin] = &[
     Builtin::aipl(Callee::First, "builtin_first.aipl"),
     Builtin::aipl(Callee::GridGet, "builtin_grid_get.aipl"),
     Builtin::aipl(Callee::GridFrom, "builtin_grid_from.aipl"),
+    Builtin::aipl(Callee::GridOf, "builtin_grid_of.aipl"),
     Builtin::aipl(Callee::GridTrySet, "builtin_grid_try_set.aipl"),
     Builtin::aipl(Callee::Width, "builtin_width.aipl"),
     Builtin::aipl(Callee::SeededWithInt, "builtin_seeded_with_int.aipl"),

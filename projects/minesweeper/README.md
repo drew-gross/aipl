@@ -45,9 +45,10 @@ nothing either.
 same first cell, which is also how the tests get a fixed board. `main` seeds with
 `shim random seeded_with_clock()` or `shim random seeded_with_int(seed)`: `!random`
 is an effect with no default generator, so `main` cannot declare it and the program
-has to say where its numbers come from. `play` and `place_mines` declare it; the
-rules take the mines as an argument (`with_mines`), and `new_game(width, height)`
-makes the mine-free board they are placed on.
+has to say where its numbers come from. `play`, `start_mining` and `place_mines`
+declare it. `new_game(width, height)` makes the mine-free board, `place_mines` mines it
+at random (`set game.place_mines(count, away_from)`), and `add_mines` puts mines at
+given cells, which is how the tests build the boards they need.
 
 ## Layout
 

@@ -769,6 +769,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_grid_from | 0 | 0 | 0 | 586 | 1376 | 1.00 | 81.35 | 1424 |
 | crates/aipl-mono/src/builtin_grid_get | 1 | 80 | 80 | 617 | 1744 | 3.00 | 78.70 | 1440 |
 | crates/aipl-mono/src/builtin_grid_is_in_bounds_of | 0 | 0 | 0 | 452 | 876 | 2.00 | 87.44 | 1456 |
+| crates/aipl-mono/src/builtin_grid_of | 5 | 456 | 560 | 1972 | 4848 | 7.00 | 139.90 | 1488 |
 | crates/aipl-mono/src/builtin_grid_try_set | 3 | 192 | 192 | 1185 | 2056 | 3.00 | 77.47 | 1456 |
 | crates/aipl-mono/src/builtin_height | 0 | 0 | 0 | 389 | 1084 | 2.00 | 76.44 | 1440 |
 | crates/aipl-mono/src/builtin_inline_str | 4 | 254 | 254 | 605 | 2384 | 4.00 | 63.86 | 1456 |
