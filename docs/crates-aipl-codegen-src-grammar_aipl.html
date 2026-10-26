@@ -1335,7 +1335,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$99017: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$99281: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -1997,7 +1997,7 @@ if (let some(..) = target[__iset$N]) {
           </h3>
           <pre class="signature"><code>fn lower_type_param(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>type_param</code> — <code>name</code>, <code>name: bound</code>, or <code>name: variant</code>. A bare name takes the <code>any</code> bound, which almost every generic uses.</p></div>
+          <div class="doc"><p><code>type_param</code> — <code>name</code>, <code>name: bound</code>, or <code>name: variant</code>, with a default type after <code>=</code> for any of them. A bare name takes the <code>any</code> bound, which almost every generic uses.</p></div>
 
 
         </section>
@@ -2261,7 +2261,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$149038: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$149660: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

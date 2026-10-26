@@ -1,0 +1,47 @@
+# A type parameter's default is the type it takes when a call leaves nothing to infer
+# it from: an empty array, a bare `none`, or a result that goes nowhere that names
+# one. Anything that does say — an argument, the position the result sits in, or
+# type arguments written out — wins over it. The width here is `u8`, which no literal
+# or inference would pick, so a function that takes `u8`s proves the default was used.
+
+import { first, len, print } from builtins;
+
+fn make<T: any = u8>() -> T[] { [] }
+
+fn first_or<T: any = u8>(xs: T[]) -> T? { xs.first() }
+
+// Only the last has a default, so a call may name just the first.
+fn pair<T: any, U: any = u8>(a: T[], b: U[]) -> U[] { b }
+
+fn bytes(xs: u8[]) -> str { `{xs.len()} bytes` }
+
+fn maybe_byte(x: u8?) -> str { `{x}` }
+
+fn words(xs: str[]) -> str { `{xs.len()} words` }
+
+fn main() !prints {
+    // Nothing pins `T`: the default.
+    let none_given = make();
+    print(bytes(none_given));
+    print(maybe_byte(first_or([])));
+
+    // An argument pins it, and the default stays out of the way.
+    print(`{first_or(["x"])}`);
+
+    // So does the position the result sits in.
+    let wide: u64[] = make();
+    print(`{wide.len()} wide`);
+
+    // Type arguments written out win, and the defaulted ones may be left off.
+    print(words(make::<str>()));
+    print(bytes(pair::<str>([], [])));
+    print(words(pair::<str, str>([], [])));
+}
+--- stdout ---
+0 bytes
+none
+some("x")
+0 wide
+0 words
+0 bytes
+0 words

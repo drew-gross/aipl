@@ -10,7 +10,7 @@ import { SpanStr, span_str } from "./lexer.aipl";
 import { I64 } from "./prim.aipl";
 import { Named, NamedCase, Primitive, Ty, Without, show_ty } from "./ty.aipl";
 
-struct TypeParam { name: str, bound: Bound }
+struct TypeParam { name: str, bound: Bound, default: Ty? }
 
 variant ImportSource = Path(path: str, span: Span) | Builtins(span: Span)
 
@@ -195,7 +195,9 @@ fn show_type_params(self: TypeParam[]) -> str {
     `<{self.map(show_type_param).join(sep=", ")}>`
 }
 
-fn show_type_param(self: TypeParam) -> str { `{self.name}: {self.bound.show_bound()}` }
+fn show_type_param(self: TypeParam) -> str {
+    `{self.name}: {self.bound.show_bound()}{self.default.map(|d| ` = {show_ty(d)}`).value_or("")}`
+}
 
 fn show_param(self: Param) -> str {
     let prefix = if (self.mutable) { "mut " } else { "" };

@@ -182,6 +182,7 @@ fn type_param(v: &FfiValue) -> R<ast::TypeParam> {
     Ok(ast::TypeParam {
         name: text(field(v, "name")?)?,
         bound: bound(field(v, "bound")?)?,
+        default: maybe(field(v, "default")?, ty)?,
     })
 }
 

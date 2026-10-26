@@ -608,11 +608,30 @@ impl<'a> Cx<'a> {
                 call.span.clone(),
             ));
         }
-        if tys.len() != sig.type_vars.len() {
-            let declared: Vec<&str> = sig.type_vars.iter().map(|tp| tp.name.as_str()).collect();
+        // The parameters with a default come last (`check_fn` sees to it), and a call
+        // may leave off any of them.
+        let required = sig
+            .type_vars
+            .iter()
+            .take_while(|tp| tp.default.is_none())
+            .count();
+        if tys.len() < required || tys.len() > sig.type_vars.len() {
+            let declared: Vec<String> = sig
+                .type_vars
+                .iter()
+                .map(|tp| match &tp.default {
+                    Some(default) => format!("{} = {}", tp.name, tyname(default)),
+                    None => tp.name.clone(),
+                })
+                .collect();
+            let which = if required == sig.type_vars.len() {
+                "all of them or none".to_string()
+            } else {
+                "all of them, all but the defaulted ones, or none".to_string()
+            };
             return Err(Error::at(
                 format!(
-                    "fn {:?} takes {} type argument(s) ({}), got {}; name all of them or none",
+                    "fn {:?} takes {} type argument(s) ({}), got {}; name {which}",
                     display(name),
                     declared.len(),
                     declared.join(", "),
@@ -621,6 +640,11 @@ impl<'a> Cx<'a> {
                 call.span.clone(),
             ));
         }
+        let mut given: Vec<Type> = tys.to_vec();
+        for tp in &sig.type_vars[tys.len()..] {
+            given.push(tp.default.clone().expect("the rest have defaults"));
+        }
+        let tys = given.as_slice();
         for (tp, ty) in sig.type_vars.iter().zip(tys) {
             if !self.bound_satisfied(tp.bound, ty) {
                 return Err(Error::at(
@@ -721,6 +745,19 @@ impl<'a> Cx<'a> {
             let vars: HashSet<&str> = sig.type_vars.iter().map(|tp| tp.name.as_str()).collect();
             let name = display(callee);
             let Some(Some(ty)) = locks.get(node) else {
+                // A position that says nothing leaves each of these variables to its
+                // default, which is what the default is for; one without a default is
+                // what the message is about.
+                let params = sig.param_types();
+                let return_ty = sig.return_type();
+                let unpinned_without_default = sig.type_vars.iter().any(|tp| {
+                    tp.default.is_none()
+                        && super::ty_mentions(&return_ty, &tp.name)
+                        && !params.iter().any(|p| super::ty_mentions(p, &tp.name))
+                });
+                if !unpinned_without_default {
+                    continue;
+                }
                 out.push((
                     in_fn.clone(),
                     Error::at(
@@ -752,6 +789,7 @@ impl<'a> Cx<'a> {
                         ),
                     )),
                     Some(_) => {}
+                    None if tp.default.is_some() => {}
                     None => out.push((
                         in_fn.clone(),
                         Error::at(
@@ -1612,6 +1650,19 @@ impl<'a> Cx<'a> {
     }
 }
 
+/// The refusal of a default on the type parameter of a declaration other than a
+/// function: only a call has an inference for a default to stand in for.
+fn defaults_only_on_functions(kind: &str, name: &aipl_syntax::SpanStr) -> Error {
+    Error::at(
+        format!(
+            "{kind} {:?}: a type parameter's default is for a function, where a call can leave \
+             the type for inference; a {kind}'s type arguments are always written",
+            name.text
+        ),
+        name.span.clone(),
+    )
+}
+
 /// Type-check `program`. The checker recovers at each item, so this returns
 /// *every* error found — in source order — or `Ok` if every function is
 /// well-formed.
@@ -1640,6 +1691,12 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
     // instance — those are resolved by type, not through the unique `ctors` map.
     for item in &program.items {
         match item {
+            Item::Struct(s) if s.type_vars.iter().any(|tp| tp.default.is_some()) => {
+                return Err(vec![defaults_only_on_functions("struct", &s.name)]);
+            }
+            Item::Variant(v) if v.type_vars.iter().any(|tp| tp.default.is_some()) => {
+                return Err(vec![defaults_only_on_functions("variant", &v.name)]);
+            }
             Item::Struct(s) if s.is_generic() => {
                 generic_structs.insert(s.name.text.clone(), s.clone());
             }
@@ -2086,6 +2143,58 @@ impl Cx<'_> {
                      implementation, so install one with `shim {e} <provider> {{ .. }}` and \
                      declare only what the provider needs"
                 )));
+            }
+        }
+        // A type parameter's default is the type it takes when nothing pins it, so it
+        // has to be a type that parameter could have been pinned to, and a parameter
+        // that follows one with a default needs one too: a call that names its type
+        // arguments names a leading run of them.
+        let mut defaulted = false;
+        for tp in &f.sig.type_vars {
+            match &tp.default {
+                Some(default) => {
+                    defaulted = true;
+                    // Written inside the signature's own `<..>`, the default is not promoted
+                    // to a type variable the way the parameters are, so another parameter's
+                    // name reaches here as the name of a type.
+                    let own: Vec<&str> = f.sig.type_vars.iter().map(|t| t.name.as_str()).collect();
+                    if mentions_typevar(default) || names_a_type_named(default, &own) {
+                        return Err(Error::msg(format!(
+                            "fn {:?}: the default of type parameter {:?} must be a type that \
+                             names no type parameter",
+                            display(&f.name),
+                            tp.name
+                        )));
+                    }
+                    self.check_ty(
+                        default,
+                        &[],
+                        &format!(
+                            "fn {:?} type parameter {:?} default",
+                            display(&f.name),
+                            tp.name
+                        ),
+                    )?;
+                    if !self.bound_satisfied(tp.bound, default) {
+                        return Err(Error::msg(format!(
+                            "fn {:?}: type parameter {:?} requires \"{}\", but its default {} \
+                             is not one",
+                            display(&f.name),
+                            tp.name,
+                            tp.bound.name(),
+                            tyname(default)
+                        )));
+                    }
+                }
+                None if defaulted => {
+                    return Err(Error::msg(format!(
+                        "fn {:?}: type parameter {:?} has no default but follows one that does; \
+                         give it one or move it before the defaulted ones",
+                        display(&f.name),
+                        tp.name
+                    )));
+                }
+                None => {}
             }
         }
         for (i, p) in f.sig.params.iter().enumerate() {
@@ -6543,6 +6652,28 @@ fn mentions_unknown(t: &Type) -> bool {
         | Type::EmptyArrayArg
         | Type::NoneLiteralArg
         | Type::ConcatStr => false,
+    }
+}
+
+/// Whether `t` names a type called one of `names`, anywhere inside it.
+fn names_a_type_named(t: &Type, names: &[&str]) -> bool {
+    match t {
+        Type::Named(n) => names.contains(&n.as_str()),
+        Type::Case(inner)
+        | Type::Optional(inner)
+        | Type::Array(inner)
+        | Type::Set(inner, _)
+        | Type::Without(inner, _) => names_a_type_named(inner, names),
+        Type::Dict(k, v) => names_a_type_named(k, names) || names_a_type_named(v, names),
+        Type::Result(ok, err) => names_a_type_named(ok, names) || names_a_type_named(err, names),
+        Type::Fn(ps, ret) => {
+            ps.iter().any(|p| names_a_type_named(p, names)) || names_a_type_named(ret, names)
+        }
+        Type::Tuple(elems) => elems.iter().any(|e| names_a_type_named(e, names)),
+        Type::Generic(n, args) => {
+            names.contains(&n.as_str()) || args.iter().any(|a| names_a_type_named(a, names))
+        }
+        _ => false,
     }
 }
 

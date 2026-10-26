@@ -579,6 +579,9 @@ pub mod ast {
     pub struct TypeParam {
         pub name: String,
         pub bound: Bound,
+        /// The type the parameter takes when a call leaves nothing to infer it from,
+        /// written `<T: any = i64>`. Only a function's parameter has one.
+        pub default: Option<Type>,
     }
 
     /// A function's shape apart from its body and source-only concerns (name,
@@ -607,6 +610,14 @@ pub mod ast {
         /// Each parameter's declared type, discarding name/mutability/variadic.
         pub fn param_types(&self) -> Vec<Type> {
             self.params.iter().map(|p| p.ty.clone()).collect()
+        }
+
+        /// The default of each type parameter that declares one, by name.
+        pub fn type_var_defaults(&self) -> std::collections::HashMap<String, Type> {
+            self.type_vars
+                .iter()
+                .filter_map(|tp| tp.default.clone().map(|d| (tp.name.clone(), d)))
+                .collect()
         }
 
         /// The declared return type, defaulting to `Unit` — a function with no
@@ -1824,7 +1835,7 @@ pub mod ast {
         /// `f::<T, U>(args)` and `recv.f::<T, U>()` — a call with its type
         /// arguments written out: the wrapped expression is the call, and the
         /// types are the callee's declared type parameters, in declaration
-        /// order. Only the parser through the checker see this: checking
+        /// order, less any trailing ones that have a default. Only the parser through the checker see this: checking
         /// resolves the arguments into the call's recorded result type and
         /// stamps the call without the wrapper, so every later pass can treat
         /// it as unreachable.

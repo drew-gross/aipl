@@ -697,6 +697,7 @@ pub(crate) fn tuple_template_vars(name: &str) -> Vec<TypeParam> {
         .map(|i| TypeParam {
             name: tuple_var_name(i),
             bound: aipl_syntax::ast::Bound::Any,
+            default: None,
         })
         .collect()
 }
@@ -3120,16 +3121,20 @@ impl Mono<'_> {
         }
         let mut type_args = Vec::with_capacity(sig.type_vars.len());
         for tp in &sig.type_vars {
-            let t = map.get(&tp.name).cloned().ok_or_else(|| {
-                Error::at(
-                    format!(
+            let t = map
+                .get(&tp.name)
+                .cloned()
+                .or_else(|| tp.default.clone())
+                .ok_or_else(|| {
+                    Error::at(
+                        format!(
                         "cannot infer a type for \"{}\" in generic \"{gname}\" — it appears only \
                          in a function-typed parameter, so it can't be pinned by a lambda argument",
                         display_var(&tp.name)
                     ),
-                    span.clone(),
-                )
-            })?;
+                        span.clone(),
+                    )
+                })?;
             type_args.push(t);
         }
         // Concrete (type-substituted) template; its function-typed parameter is now
@@ -5006,7 +5011,7 @@ impl Mono<'_> {
     ) -> Result<(Vec<Type>, Type, HashSet<String>), Error> {
         // Copy the bits we need so we don't borrow `self.generics` across the
         // `&mut self` enqueue.
-        let (type_vars, param_tys, variadic, return_ty) = {
+        let (type_vars, param_tys, variadic, return_ty, defaults) = {
             let Generic { sig, .. } = &self.generics[gname];
             (
                 sig.type_var_names(),
@@ -5016,6 +5021,7 @@ impl Mono<'_> {
                     .map(|p| p.arity.is_variadic())
                     .collect::<Vec<_>>(),
                 sig.return_ty.clone(),
+                sig.type_var_defaults(),
             )
         };
         let var_set: HashSet<&str> = type_vars.iter().map(String::as_str).collect();
@@ -5124,7 +5130,9 @@ impl Mono<'_> {
         // (`EmptyArray` / `NoneLiteral`), substituted to `Array(__none__)` /
         // `Optional(__none__)` for codegen.
         for v in &type_vars {
-            if map.contains_key(v) {
+            // A variable with a default takes it below, once the call's result has had
+            // its say, rather than standing for the empty array or `none` it was given.
+            if map.contains_key(v) || defaults.contains_key(v) {
                 continue;
             }
             for (pty, aty) in param_tys.iter().zip(arg_tys) {
@@ -5150,6 +5158,11 @@ impl Mono<'_> {
             for (v, t) in from_result {
                 map.entry(v).or_insert(t);
             }
+        }
+        // What nothing pinned — no argument, and not the position the result sits in —
+        // is the variable's default, if it was declared one.
+        for (v, default) in defaults {
+            map.entry(v).or_insert(default);
         }
         let mut targs = Vec::with_capacity(type_vars.len());
         for v in &type_vars {
@@ -8647,14 +8660,14 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
     let type_vars = var_names
         .into_iter()
         .map(|name| {
-            let bound = f
-                .sig
-                .type_vars
-                .iter()
-                .find(|tp| tp.name == name)
-                .map(|tp| tp.bound)
-                .unwrap_or(Bound::Any);
-            TypeParam { name, bound }
+            let declared = f.sig.type_vars.iter().find(|tp| tp.name == name);
+            let bound = declared.map(|tp| tp.bound).unwrap_or(Bound::Any);
+            let default = declared.and_then(|tp| tp.default.clone());
+            TypeParam {
+                name,
+                bound,
+                default,
+            }
         })
         .collect();
 

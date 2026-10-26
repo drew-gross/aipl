@@ -308,7 +308,6 @@ grammer ideas:
 
 syntax:
   explore simpler syntax than turbofish for type arguments
-  type arguments with defaults
   wildcard syntax in turbofish that means "infer this one"
   explict type args (not just from context)
   make a function composition operator

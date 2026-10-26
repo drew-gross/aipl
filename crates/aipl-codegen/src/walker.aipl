@@ -832,12 +832,12 @@ fn type_params(self: W) -> WDoc!FmtError {
     if (self.peek_text() != "<") {
         return ok(WDoc { w: self, doc: Text("") });
     };
-    let WDocs { w, docs } = self.bump().w.type_param_list([]);
+    let WDocs { w, docs } = self.bump().w.type_param_list([])?;
     let closed = w.expect(">")?.w;
     ok(WDoc { w: closed, doc: comma_list_docs(docs, Angles) })
 }
 
-fn type_param_list(self: W, acc0: Doc[]) -> WDocs {
+fn type_param_list(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
     while (w.more_before(">")) {
@@ -847,10 +847,19 @@ fn type_param_list(self: W, acc0: Doc[]) -> WDocs {
         } else {
             WDoc { w: n.w, doc: Text(n.text) }
         };
-        set acc.push(p.doc);
-        set w = if (p.w.peek_text() == ",") { p.w.bump().w } else { p.w };
+
+        // `= ty`: the type the parameter takes when a call leaves nothing to infer
+        // it from.
+        let defaulted = if (p.w.peek_text() == "=") {
+            let default = p.w.bump().w.ty()?;
+            WDoc { w: default.w, doc: Concat([p.doc, Text(" = "), default.doc]) }
+        } else {
+            p
+        };
+        set acc.push(defaulted.doc);
+        set w = if (defaulted.w.peek_text() == ",") { defaulted.w.bump().w } else { defaulted.w };
     }
-    WDocs { w, docs: acc }
+    ok(WDocs { w, docs: acc })
 }
 
 # `T: ord` — the `: bound` half of a type parameter.
@@ -3036,6 +3045,12 @@ fn walker_of(src: str) -> W!FmtError {
     assert(walker_of("< T >")?.type_params().rendered(100)? == "<T>");
     assert(walker_of("< T : any >")?.type_params().rendered(100)? == "<T: any>");
     assert(walker_of("< T , U : ord >")?.type_params().rendered(100)? == "<T, U: ord>");
+    assert(walker_of("< T : any = i64 >")?.type_params().rendered(100)? == "<T: any = i64>");
+    assert(
+        walker_of("< T=str , U : ord= u8 >")?
+            .type_params()
+            .rendered(100)? == "<T = str, U: ord = u8>",
+    );
 
     // --- end to end, on real source ---------------------------------------------
     // `format_program` lexes for itself, so these are genuine AIPL programs, not

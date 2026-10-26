@@ -507,8 +507,13 @@ fn items() -> Production<AiplTok, Ast>[] {
         trailing_sep=false,
         nested_in=angles(),
     ));
+
+    // `T`, `T: bound`, and either with a default type after `=`: `T = i64`,
+    // `T: ord = u8`. Longest first.
     let type_param: Rule<AiplTok> = OneOf([
+        Then([Term(Name), Lit(":"), OneOf([Term(Name), Lit("variant")]), Lit("="), Named("ty")]),
         Then([Term(Name), Lit(":"), OneOf([Term(Name), Lit("variant")])]),
+        Then([Term(Name), Lit("="), Named("ty")]),
         Term(Name),
     ]);
 
@@ -3287,24 +3292,32 @@ fn lower_type_params(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     ok(ATypeParams(kids.try_map(|k| as_type_param(k, sp))?))
 }
 
-# `type_param` — `name`, `name: bound`, or `name: variant`. A bare name takes
-# the `any` bound, which almost every generic uses.
+# `type_param` — `name`, `name: bound`, or `name: variant`, with a default type after
+# `=` for any of them. A bare name takes the `any` bound, which almost every
+# generic uses.
 fn lower_type_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let toks = node.own_texts(src);
     let spans = node.tokens;
+    let sp = node.span();
     let name = toks[0].value_or("");
-    if (toks.len() == 1) {
-        return ok(ATypeParam(TypeParam { name, bound: BoundAny }));
+    // The default is the one child the rule has: a type.
+    mut default: Ty? = none;
+    if (let some(kid) = kids.first()) {
+        set default = some(as_ty(kid, sp)?);
+    };
+    // `name`, or `name = ty`: no bound was written.
+    if (toks.len() == 1 || toks[1] == some("=")) {
+        return ok(ATypeParam(TypeParam { name, bound: BoundAny, default }));
     };
     let bound_name = toks[2].value_or("");
     if (bound_name == "variant") {
-        return ok(ATypeParam(TypeParam { name, bound: BoundVariant }));
+        return ok(ATypeParam(TypeParam { name, bound: BoundVariant, default }));
     };
     let bound = bound_from_name(bound_name).value_or_err(ParseError {
         message: `unknown type parameter bound "{bound_name}"; expected "any" or "ord"`,
         span: spans[2].value_or(node.tok_span()),
     })?;
-    ok(ATypeParam(TypeParam { name, bound }))
+    ok(ATypeParam(TypeParam { name, bound, default }))
 }
 
 # `param` — the seven shapes. The destructuring one is the only one that is not
@@ -4688,6 +4701,16 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     // A bare type parameter takes the `any` bound, which is what almost every
     // generic uses.
     assert(program_dump("fn f<T>(a: T) { }") == "fn f<T: any>(a: T) = ()");
+    // A type parameter may carry a default, with or without a bound.
+    assert(
+        program_dump("fn f<T: any = i64>(a: T[]) { }") == "fn f<T: any = i64>(a: Array(T)) = ()",
+    );
+    assert(program_dump("fn f<T = str>(a: T) { }") == "fn f<T: any = str>(a: T) = ()");
+    assert(
+        program_dump(
+            "fn f<T: ord = u8, U>(a: T, b: U) { }",
+        ) == "fn f<T: ord = u8, U: any>(a: T, b: U) = ()",
+    );
     assert(
         program_dump(
             "fn f<T: eq>(a: T) { }",

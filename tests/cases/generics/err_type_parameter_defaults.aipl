@@ -1,0 +1,63 @@
+# What a type parameter's default is held to: a type that parameter could be, naming
+# no other parameter, and nothing without a default after one that has it. And how
+# many type arguments a call may write.
+
+fn not_the_bound<T: int = str>(x: T[]) -> u64 { 0 }
+
+fn not_a_type<T: any = Nope>(x: T[]) -> u64 { 0 }
+
+fn names_a_parameter<T: any, U: any = T>(x: T[], y: U[]) -> u64 { 0 }
+
+fn out_of_order<T: any = i64, U: any>(x: T[], y: U[]) -> u64 { 0 }
+
+fn two<T: any, U: any = u8>(x: T[], y: U[]) -> u64 { 0 }
+
+fn three<T: any, U: any, V: any = u8>(x: T[], y: U[]) -> u64 { 0 }
+
+fn too_few() -> u64 { three::<str>([], []) }
+
+fn too_many() -> u64 { two::<str, u8, bool>([], []) }
+
+fn a_type_to_hold_it() -> u64 { two::<str, str>(["a"], [1]) }
+--- errors ---
+error: fn "not_the_bound": type parameter "T" requires "int", but its default str is not one
+ --> ./tests/cases/generics/err_type_parameter_defaults.aipl:5:4
+  |
+5 | fn not_the_bound<T: int = str>(x: T[]) -> u64 { 0 }
+  |    ^^^^^^^^^^^^^
+
+error: fn "not_a_type" type parameter "T" default: unknown type "Nope"
+ --> ./tests/cases/generics/err_type_parameter_defaults.aipl:7:4
+  |
+7 | fn not_a_type<T: any = Nope>(x: T[]) -> u64 { 0 }
+  |    ^^^^^^^^^^
+
+error: fn "names_a_parameter": the default of type parameter "U" must be a type that names no type parameter
+ --> ./tests/cases/generics/err_type_parameter_defaults.aipl:9:4
+  |
+9 | fn names_a_parameter<T: any, U: any = T>(x: T[], y: U[]) -> u64 { 0 }
+  |    ^^^^^^^^^^^^^^^^^
+
+error: fn "out_of_order": type parameter "U" has no default but follows one that does; give it one or move it before the defaulted ones
+  --> ./tests/cases/generics/err_type_parameter_defaults.aipl:11:4
+   |
+11 | fn out_of_order<T: any = i64, U: any>(x: T[], y: U[]) -> u64 { 0 }
+   |    ^^^^^^^^^^^^
+
+error: fn "three" takes 3 type argument(s) (T, U, V = u8), got 1; name all of them, all but the defaulted ones, or none
+  --> ./tests/cases/generics/err_type_parameter_defaults.aipl:17:23
+   |
+17 | fn too_few() -> u64 { three::<str>([], []) }
+   |                       ^^^^^^^^^^^^^^^^^^^^
+
+error: fn "two" takes 2 type argument(s) (T, U = u8), got 3; name all of them, all but the defaulted ones, or none
+  --> ./tests/cases/generics/err_type_parameter_defaults.aipl:19:24
+   |
+19 | fn too_many() -> u64 { two::<str, u8, bool>([], []) }
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: fn "two" arg 1: expected str[], got i64[]
+  --> ./tests/cases/generics/err_type_parameter_defaults.aipl:21:56
+   |
+21 | fn a_type_to_hold_it() -> u64 { two::<str, str>(["a"], [1]) }
+   |                                                        ^^^

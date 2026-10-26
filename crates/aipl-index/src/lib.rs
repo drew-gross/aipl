@@ -466,7 +466,10 @@ fn type_vars(vars: &[aipl_syntax::ast::TypeParam]) -> String {
     }
     let inner = vars
         .iter()
-        .map(|v| format!("{}: {}", v.name, v.bound.name()))
+        .map(|v| match &v.default {
+            Some(default) => format!("{}: {} = {}", v.name, v.bound.name(), type_name(default)),
+            None => format!("{}: {}", v.name, v.bound.name()),
+        })
         .collect::<Vec<_>>()
         .join(", ");
     format!("<{inner}>")

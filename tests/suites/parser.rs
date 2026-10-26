@@ -866,7 +866,8 @@ fn generic_type_params_parse() {
         f.sig.type_vars,
         vec![TypeParam {
             name: "T".to_string(),
-            bound: Bound::Any
+            bound: Bound::Any,
+            default: None
         }]
     );
     // A declared parameter is a `TypeVar`, not a `Named` that happens to match
@@ -912,8 +913,29 @@ fn ord_bound_parses() {
         fn_item(&p, 0).sig.type_vars,
         vec![TypeParam {
             name: "T".to_string(),
-            bound: Bound::Ord
+            bound: Bound::Ord,
+            default: None
         }]
+    );
+}
+
+#[test]
+fn type_param_defaults_parse() {
+    let p = parse("fn f<T: any = i64, U = str>(a: T, b: U) -> i64 { 0 }").unwrap();
+    assert_eq!(
+        fn_item(&p, 0).sig.type_vars,
+        vec![
+            TypeParam {
+                name: "T".to_string(),
+                bound: Bound::Any,
+                default: Some(Type::Primitive(Primitive::I64))
+            },
+            TypeParam {
+                name: "U".to_string(),
+                bound: Bound::Any,
+                default: Some(Type::Primitive(Primitive::Str))
+            }
+        ]
     );
 }
 
@@ -931,11 +953,13 @@ fn multiple_type_params_parse() {
         vec![
             TypeParam {
                 name: "T".to_string(),
-                bound: Bound::Any
+                bound: Bound::Any,
+                default: None
             },
             TypeParam {
                 name: "U".to_string(),
-                bound: Bound::Any
+                bound: Bound::Any,
+                default: None
             }
         ]
     );
