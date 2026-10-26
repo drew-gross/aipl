@@ -1706,6 +1706,10 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./fn_names.aipl",
     "./hoist_test_fns.aipl",
     "./promote_type_vars.aipl",
+    // The lints that have moved to AIPL, run by `parse_and_partial_load`.
+    "./lint_hit.aipl",
+    "./unused_imports.aipl",
+    "./lint.aipl",
     "./parse_and_partial_load.aipl",
     // The formatter: `format_source` is the whole pipeline, and its walker
     // parses with the same `aipl_parse_file` every compile calls — which is why
@@ -2207,7 +2211,7 @@ pub struct SpecFields {
 const PARSE_RED_ZONE: usize = 8 * 1024 * 1024;
 const PARSE_SEGMENT: usize = 64 * 1024 * 1024;
 
-fn parse_file(src: &str) -> Result<(Program, Vec<Span>), Vec<aipl_syntax::Error>> {
+fn parse_file(src: &str) -> Result<aipl_parser::Parsed, Vec<aipl_syntax::Error>> {
     // A recursive-descent parse recurses once per production per level of
     // source nesting, and the lowering once per node — several megabytes of
     // native stack on the largest compiler sources. The CLI runs on a 256 MB

@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">144 files, 1469 items.</p>
+      <p class="summary">147 files, 1487 items.</p>
 
       <ul class="files">
 
@@ -474,6 +474,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-expr.html#item-map_subexprs"><code>map_subexprs</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-expr.html#item-subexprs"><code>subexprs</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -1606,6 +1611,47 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-codegen-src-lint.html">crates/aipl-codegen/src/lint.aipl</a>
+
+          <p class="file-summary">The lints that have moved to AIPL, run over a parsed file.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint.html#item-lint"><code>lint</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint_hit.html">crates/aipl-codegen/src/lint_hit.aipl</a>
+
+          <p class="file-summary">What a lint reports: the message, and the span the caret goes under. The Rust side rebuilds each as an <code>aipl_syntax::Error</code> and runs it through the same <code>#[allow]</code> squelching as the lints still written in Rust.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint_hit.html#item-LintHit"><code>LintHit</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint_hit.html#item-hit"><code>hit</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-codegen-src-normalize_output.html">crates/aipl-codegen/src/normalize_output.aipl</a>
 
           <p class="file-summary">The cases harness's captured-output normalizer: the test harness calls this through the embedding FFI (see <code>aipl::codegen::normalize_output</code>) to compare a child program's stdout/stderr against the expected sections, and <code>aipl check</code> exercises it via the <code>.test</code> block below. Collapsing CRLF to LF matters on Windows, where libc text-mode stdout rewrites the runtime's <code>\n</code> to <code>\r\n</code>.</p>
@@ -1744,6 +1790,11 @@
 
 
           <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-parse_and_partial_load.html#item-PartialLoad"><code>PartialLoad</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
 
             <li>
               <a href="crates-aipl-codegen-src-parse_and_partial_load.html#item-parse_and_partial_load"><code>parse_and_partial_load</code></a>
@@ -2237,6 +2288,26 @@
 
             <li>
               <a href="crates-aipl-codegen-src-unescape.html#item-unescape_braces"><code>unescape_braces</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-unused_imports.html">crates/aipl-codegen/src/unused_imports.aipl</a>
+
+          <p class="file-summary">The <code>unused_imports</code> lint: an imported name nothing in the file references. Legal — an unused import changes no behavior — but it misstates what the file depends on and outlives whatever once used it; the better spelling is to drop the name.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-unused_imports.html#private">12 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-unused_imports.html#item-unused_imports"><code>unused_imports</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

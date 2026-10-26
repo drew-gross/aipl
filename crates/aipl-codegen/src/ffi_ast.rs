@@ -53,9 +53,7 @@ pub fn program_from_ffi(v: &FfiValue) -> R<ast::Program> {
 /// them all. A value that does not have the declared shape is one spanless
 /// error naming the mismatch, since that is a bug in the two declarations
 /// rather than in the source.
-pub fn parse_file_from_ffi(
-    v: &FfiValue,
-) -> Result<(ast::Program, Vec<Span>), Vec<aipl_syntax::Error>> {
+pub fn parse_file_from_ffi(v: &FfiValue) -> Result<aipl_parser::Parsed, Vec<aipl_syntax::Error>> {
     let mismatch = |m: String| vec![aipl_syntax::Error::msg(m)];
     match v {
         FfiValue::Res(Ok(inner)) => parsed_file(inner).map_err(mismatch),
@@ -74,11 +72,12 @@ fn parse_failure(v: &FfiValue) -> Vec<aipl_syntax::Error> {
     }
 }
 
-fn parsed_file(v: &FfiValue) -> R<(ast::Program, Vec<Span>)> {
-    Ok((
-        program(field(v, "program")?)?,
-        each(field(v, "allows")?, span)?,
-    ))
+fn parsed_file(v: &FfiValue) -> R<aipl_parser::Parsed> {
+    Ok(aipl_parser::Parsed {
+        program: program(field(v, "program")?)?,
+        allows: each(field(v, "allows")?, span)?,
+        lints: each(field(v, "lints")?, |hit| Ok(parse_error(hit)))?,
+    })
 }
 
 /// A `ParseError` struct as the error the compiler reports: its message at its

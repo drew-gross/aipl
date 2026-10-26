@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/parse_and_partial_load.aipl</code></h1>
 
-      <div class="module-doc"><p>A source file parsed and loaded as far as the loader has been ported to AIPL.</p><p><code>aipl_parse_file</code> is only the parse. The loader then does more to a file than parse it, and each part of that which has moved into AIPL is a step here, so this function is what is left to burn down: a step moves in from the Rust loader, and when the last one has, the loader is this.</p><p>What has moved so far:</p><ul><li><code>hoist_test_fns</code>: a <code>.test</code> or <code>.performance</code> attribute becomes ordinary</li></ul><p>top-level functions.</p><ul><li><code>promote_type_vars</code>: a declaration's own type parameters become type</li></ul><p>variables.</p><p>The formatter parses with <code>aipl_parse_file</code> and not this, because it lays out the program the author wrote, attributes and all.</p></div>
+      <div class="module-doc"><p>A source file parsed and loaded as far as the loader has been ported to AIPL.</p><p><code>aipl_parse_file</code> is only the parse. The loader then does more to a file than parse it, and each part of that which has moved into AIPL is a step here, so this function is what is left to burn down: a step moves in from the Rust loader, and when the last one has, the loader is this.</p><p>What has moved so far:</p><ul><li><code>hoist_test_fns</code>: a <code>.test</code> or <code>.performance</code> attribute becomes ordinary</li></ul><p>top-level functions.</p><ul><li><code>promote_type_vars</code>: a declaration's own type parameters become type</li></ul><p>variables.</p><ul><li><code>lint</code>: the lints that have been ported to AIPL. Their hits ride beside the</li></ul><p>program, for the Rust driver to squelch and report with its own.</p><p>The formatter parses with <code>aipl_parse_file</code> and not this, because it lays out the program the author wrote, attributes and all.</p></div>
 
 
 
@@ -22,12 +22,26 @@
         <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-PartialLoad">
+          <h3>
+            <a class="anchor" href="#item-PartialLoad">PartialLoad</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct PartialLoad</code></pre>
+
+          <div class="doc"><p>A file as far as the loader has been ported: the program, the spans of its <code>#[allow]</code> markers, and what the ported lints found in the program.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-parse_and_partial_load">
           <h3>
             <a class="anchor" href="#item-parse_and_partial_load">parse_and_partial_load</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn parse_and_partial_load(src: str) -&#62; ParsedFile!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn parse_and_partial_load(src: str) -&#62; PartialLoad!ParseFailure</code></pre>
 
           <div class="doc"><p><code>aipl_parse_file</code>, then the steps of loading that happen per file and need nothing from any other.</p></div>
 

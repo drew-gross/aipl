@@ -377,6 +377,20 @@
 
 
 
+        <section class="item" id="item-subexprs">
+          <h3>
+            <a class="anchor" href="#item-subexprs">subexprs</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn subexprs(self: Expr) -&#62; Expr[]</code></pre>
+
+          <div class="doc"><p>The direct sub-expressions of <code>self</code>, in the order Rust's <code>each_subexpr</code> visits them: not <code>self</code>'s own names, types or patterns, and not their children. A <code>Shim</code>'s bindings name functions and a pattern binds names, so only a shim's body and an arm's body nest expressions.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-promoted_annotations">
           <h3>
             <a class="anchor" href="#item-promoted_annotations">promoted_annotations</a>

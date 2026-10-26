@@ -1,0 +1,12 @@
+# What a lint reports: the message, and the span the caret goes under. The Rust
+# side rebuilds each as an `aipl_syntax::Error` and runs it through the same
+# `#[allow]` squelching as the lints still written in Rust.
+
+import { Span, equal as == } from builtins;
+
+struct LintHit { message: str, span: Span }
+
+# A hit at `span`.
+pub fn hit(message: str, span: Span) -> LintHit { message, span }.test({
+    assert(hit("m", 3..5) == LintHit { message: "m", span: 3..5 });
+})

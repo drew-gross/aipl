@@ -1,0 +1,17 @@
+# The lints that have moved to AIPL, run over a parsed file.
+#
+# `aipl_syntax::lint::check` is the driver: it runs the lints still written in
+# Rust, adds what this returns, and squelches the hits an `#[allow]` marker covers.
+# A lint moves here by getting its own file and a line in `lint`; the hits come
+# back in the order the lints are listed.
+
+import { equal as == } from builtins;
+import { Program } from "./item.aipl";
+import { LintHit } from "./lint_hit.aipl";
+import { unused_imports } from "./unused_imports.aipl";
+
+# Every hit the ported lints find in `program`.
+pub fn lint(program: Program) -> LintHit[] { unused_imports(program) }.test({
+    let program = Program { items: [], doc: none };
+    assert(lint(program) == []);
+})

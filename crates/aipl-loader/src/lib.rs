@@ -342,9 +342,9 @@ impl Loader {
     /// [`Loader::prepare`], so a lint sees what the author wrote rather than the
     /// block it desugars to.
     fn parse_and_lint(&self, src: &str) -> Result<Program, Vec<Error>> {
-        let (program, allows) = parse_with_allows(src)?;
-        aipl_syntax::lint::check(&program, src, &allows)?;
-        Ok(program)
+        let parsed = parse_with_allows(src)?;
+        aipl_syntax::lint::check(&parsed.program, src, &parsed.allows, parsed.lints)?;
+        Ok(parsed.program)
     }
 
     /// Check `program`, bake its reserved calls, and split its items into the

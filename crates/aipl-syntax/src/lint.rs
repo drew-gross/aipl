@@ -45,7 +45,6 @@ mod slice_to_len;
 mod slice_whole;
 mod step_by_one;
 mod union_loop_union_all;
-mod unused_imports;
 mod value_or_compare;
 mod with_value_or_self;
 
@@ -87,7 +86,6 @@ use self::slice_to_len::slice_to_len;
 use self::slice_whole::slice_whole;
 use self::step_by_one::{matching_steps, step_by_one};
 use self::union_loop_union_all::{union_loop_union_all, union_names};
-use self::unused_imports::unused_imports;
 use self::value_or_compare::{value_or_compare, value_or_compare_names};
 use self::with_value_or_self::{with_names, with_value_or_self};
 
@@ -95,7 +93,12 @@ use self::with_value_or_self::{with_names, with_value_or_self};
 /// keyword-parameter / struct-field default expressions — then drop the
 /// hits squelched by a same-line `#[allow]` (`allows` are the marker spans
 /// the lexer collected). Returns every surviving lint error.
-pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Error>> {
+pub fn check(
+    program: &Program,
+    src: &str,
+    allows: &[Span],
+    ported: Vec<Error>,
+) -> Result<(), Vec<Error>> {
     let allowed: HashSet<usize> = allows.iter().map(|sp| line_of(src, sp.start)).collect();
     // The lines whose marker squelched a hit; a marker on any other line is
     // reported below.
@@ -261,7 +264,10 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
             with_value_or_self(e, src, &names, &mut hits)
         });
     }
-    unused_imports(program, &mut hits);
+    // The lints ported to AIPL ran with the parse. `unused_imports` is the only one
+    // so far, and its place in the order among the lints still written in Rust is
+    // kept.
+    hits.extend(ported);
     destructure_binding(program, &mut hits);
     destructure_param(program, &mut hits);
     fn_body_type_stutter(program, src, &mut hits);

@@ -99,6 +99,8 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  referenced_names() should return a set
+  referenced_names() looks simplifiable
   enforce appropriate use of enter_alternate_screen() and leave_alternate_screen() somehow
   read file needs to decode to meet the "no terminal escapes in strings" constraint.  Or just return byte array.
   should maybe have a "in raw mode" effect that blocks !prints i.e. stdin mode is "scoped"
@@ -302,6 +304,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  set spead i.e. #{..a, b, ..c} (use in collect_names())
   explore simpler syntax than turbofish for type arguments
   wildcard syntax in turbofish that means "infer this one"
   explict type args (not just from context)
@@ -442,6 +445,8 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  tuple to array function (simplify DictLit(pairs) in subexprs)
+  utility for turning SomeVariant[] into OneArm[], use in unused_imports()
   words() util for use in parse_command()
   __builtin_drop_* should be mutating methods
   zip
@@ -471,6 +476,8 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  assert(fn() == ok(val)) should be assert(fn()? == val)
+  unused imports should be #[allow] able
   - Lints see the written form of a destructuring parameter. Today the parser
     lowers `fn f(P { a, b })` to a synthetic `__spat$N` parameter plus a `let`
     per field at the head of the body, before the lints run, so each lint that
@@ -561,6 +568,7 @@ design:
   apis should express intent
 
 optimizations:
+  exending a set with a function call that returns a set should fuse and not materialize an intermediate set
   Cache monomorphizations of the same lambda
   special case seed handling in reduce to avoid optional checks in the generated code. Maybe also fuse reduce().value_or()?. Though .value_or isn't always a valid seed e.g. .minimum().value_or(0) in dedent
   detect if a user function amounts to a reduction (not sure if lint to .reduce() or make eligible for fusion)

@@ -1,0 +1,376 @@
+# The `unused_imports` lint: an imported name nothing in the file references.
+# Legal — an unused import changes no behavior — but it misstates what the file
+# depends on and outlives whatever once used it; the better spelling is to drop
+# the name.
+#
+# "Referenced" is deliberately syntactic and *generous*: any expression, pattern,
+# operator, or type position mentioning the local name counts, including one a
+# local definition or type parameter shadows. That is the safe direction — a lint
+# is a hard error here, so a missed dead import costs one stale line, while a
+# false hit costs a build that cannot be made to pass except by `#[allow]`.
+
+import {
+    Span,
+    equal as ==,
+    extend,
+    first,
+    greater_than as >,
+    has,
+    len,
+    logical_not as !,
+    map,
+    not_equal as !=,
+    push,
+    split,
+    to_set,
+    value_or,
+} from builtins;
+import {
+    ArrayLit,
+    Assign,
+    Bool,
+    Call,
+    Char,
+    Construct,
+    DictLit,
+    Expr,
+    Field,
+    For,
+    Ident,
+    If,
+    IfLet,
+    Index,
+    KwArg,
+    Lambda,
+    Let,
+    LetMut,
+    Match,
+    Neg,
+    Num,
+    Return,
+    Seq,
+    SetLit,
+    Shim,
+    Slice,
+    Spread,
+    Str,
+    Try,
+    TupleLit,
+    TypeArgs,
+    While,
+    subexprs,
+} from "./expr.aipl";
+import { ParseFailure, aipl_parse_file } from "./grammar_aipl.aipl";
+import {
+    Builtins,
+    Const,
+    Fn,
+    Import,
+    ImportName,
+    ImportSource,
+    Path,
+    Program,
+    Refinement,
+    Struct,
+    Variant,
+} from "./item.aipl";
+import { LintHit, hit } from "./lint_hit.aipl";
+import { Pat } from "./pat.aipl";
+import {
+    Any,
+    Array as TyArray,
+    Case,
+    Dict,
+    Fn as TyFn,
+    Generic,
+    Named,
+    Optional,
+    Primitive,
+    Result,
+    Set as TySet,
+    Tuple as TyTuple,
+    Ty,
+    TypeVar,
+    Unit as TyUnit,
+    Without,
+} from "./ty.aipl";
+
+# A hit for each name `program` imports and nothing in it references.
+pub fn unused_imports(program: Program) -> LintHit[] {
+    let used = referenced_names(program).to_set();
+    mut hits: LintHit[] = [];
+    for (let item : program.items) {
+        if (let Import(decl) = item) {
+            for (let name : decl.names) {
+                if (!used.has(name.local())) {
+                    set hits.push(hit(unused_message(name.local()), name.hit_span(decl.source)));
+                };
+            }
+        };
+    }
+    hits
+}
+
+# What is said of the import `name`.
+fn unused_message(name: str) -> str {
+    `unused import "{name}": nothing in this file references it; drop it from the import list`
+}
+
+# The name an import binds in the importing file: the alias if given, else the
+# exported name.
+fn local(self: ImportName) -> str { self.alias.value_or(self.name) }
+
+# Where an unused import's caret goes. The bare `-`/`<`/`>`/`||`/`!` operator
+# tokens carry no span of their own, so the import statement is pointed at
+# instead — an empty span would put the caret on the file's first line, nowhere
+# near the import.
+fn hit_span(self: ImportName, source: ImportSource) -> Span {
+    if (self.span.start != self.span.end) {
+        return self.span;
+    };
+    match (source) {
+        Path(_, span) | Builtins(span) => span,
+    }
+}
+
+# Every name the file mentions outside its own import lists: called and
+# referenced idents, constructed structs, match constructors, operator spellings,
+# and every name appearing in a type — signatures, struct fields, variant
+# payloads, and inline `let`/lambda annotations.
+fn referenced_names(Program { items }) -> str[] {
+    mut names: str[] = [];
+    for (let item : items) {
+        // Type positions that belong to the item rather than to any expression,
+        // then the expressions it holds.
+        match (item) {
+            Fn(f) => {
+                for (let param : f.sig.params) {
+                    set names.extend(param.ty.ty_names());
+                    if (let some(default) = param.default) {
+                        set names.collect_names(default);
+                    };
+                }
+                if (let some(ty) = f.sig.return_ty) {
+                    set names.extend(ty.ty_names());
+                };
+                set names.collect_names(f.body);
+                if (let some(test) = f.test_body) {
+                    set names.collect_names(test);
+                };
+            },
+            Struct(s) => {
+                for (let field : s.fields) {
+                    set names.extend(field.ty.ty_names());
+                    if (let some(default) = field.default) {
+                        set names.collect_names(default);
+                    };
+                }
+            },
+            Variant(v) => {
+                for (let case : v.cases) {
+                    for (let slot : case.payload) {
+                        set names.extend(slot.ty.ty_names());
+                        if (let some(default) = slot.default) {
+                            set names.collect_names(default);
+                        };
+                    }
+                }
+            },
+            // A constant's annotation may name an imported type; its value is a
+            // literal, so it names nothing.
+            Const(c) => {
+                if (let some(ty) = c.ty) {
+                    set names.extend(ty.ty_names());
+                };
+                set names.collect_names(c.value);
+            },
+            Refinement(r) => {
+                set names.extend(r.target.ty_names());
+            },
+            Import(..) => {},
+        };
+    }
+    names
+}
+
+# `self` with the names `e` and every expression under it mention.
+fn collect_names(mut self: str[], e: Expr) {
+    set self.extend(e.own_names());
+    for (let child : e.subexprs()) {
+        set self.collect_names(child);
+    }
+}
+
+# The names `e` itself mentions, not those of its sub-expressions.
+fn own_names(self: Expr) -> str[] {
+    match (self.kind) {
+        Ident(name) | Construct(name, _) | Call(name, _, _) => [name],
+        // Unary `-` is the one operator with no named builtin behind it, so it
+        // stays a node; every other operator use is a `Call` on its spelling.
+        Neg(..) => ["-"],
+        // A shim's name and bindings all name functions.
+        Shim(effect, bindings, _) => {
+            mut names = [effect];
+            for (let binding : bindings) {
+                set names.push(binding.0);
+                set names.push(binding.1);
+            }
+            names
+        },
+        Let(_, ty, _, _) | LetMut(_, ty, _, _) => ty.map(ty_names).value_or([]),
+        Lambda(params, _) => {
+            mut names: str[] = [];
+            for (let param : params) {
+                if (let some(ty) = param.ty) {
+                    set names.extend(ty.ty_names());
+                };
+            }
+            names
+        },
+        Match(_, arms) => {
+            mut names: str[] = [];
+            for (let arm : arms) {
+                set names.extend(arm.pattern.ctor_names());
+            }
+            names
+        },
+        // `if (let P = e)` is one arm without the `match`; its pattern names a
+        // constructor just as an arm's does.
+        IfLet(arm, _, _) => arm.pattern.ctor_names(),
+        Num(..)
+        | Bool(..)
+        | Str(..)
+        | Char(..)
+        | None
+        | Unit
+        | If(..)
+        | Field(..)
+        | Assign(..)
+        | For(..)
+        | While(..)
+        | ArrayLit(..)
+        | Spread(..)
+        | SetLit(..)
+        | DictLit(..)
+        | Index(..)
+        | Slice(..)
+        | Try(..)
+        | Seq(..)
+        | Return(..)
+        | TupleLit(..)
+        | KwArg(..)
+        | TypeArgs(..) => [],
+    }
+}
+
+# The constructors a pattern names, at any depth. A `V.A` path names the variant
+# as well as the case. Written with the variant's name because `Str` and `Char`
+# are also expression cases here.
+fn ctor_names(self: Pat) -> str[] {
+    match (self) {
+        Pat.Ctor(name, _, _) => path_names(name),
+        Pat.Nested(name, args) => [..path_names(name), ..args.flat_ctor_names()],
+        Pat.ArrayNested(patterns) | Pat.Tuple(patterns) => patterns.flat_ctor_names(),
+        Pat.Str(..) | Pat.Char(..) | Pat.Array(..) | Pat.Wildcard | Pat.Int(..) => [],
+    }
+}
+
+# The names a constructor written `name` mentions: the name, and the variant too
+# when it is qualified.
+fn path_names(name: str) -> str[] {
+    let parts = name.split(".");
+    if (parts.len() > 1) {
+        return [parts.first().value_or(name), name];
+    };
+    [name]
+}
+
+# The constructors each of `self` names, together.
+fn flat_ctor_names(self: Pat[]) -> str[] {
+    mut names: str[] = [];
+    for (let pattern : self) {
+        set names.extend(pattern.ctor_names());
+    }
+    names
+}
+
+# Every name `self` mentions, so an import used only in a type position still
+# counts as used. Variants are spelled out rather than wildcarded so a new `Ty`
+# forces a decision here.
+fn ty_names(self: Ty) -> str[] {
+    match (self) {
+        Named(name) => [name],
+        // `Case<V>` mentions `V`, so importing a variant to name one of its cases
+        // counts as using the import.
+        Case(inner)
+        | Optional(inner)
+        | TyArray(inner)
+        | TySet(inner, _)
+        | Without(inner, _) => inner.ty_names(),
+        // A type parameter is bound by the signature, not imported.
+        TypeVar(..) | TyUnit | Primitive(..) | Any => [],
+        Generic(base, args) => [base, ..args.flat_ty_names()],
+        Dict(a, b) | Result(a, b) => [..a.ty_names(), ..b.ty_names()],
+        TyFn(params, ret) => [..params.flat_ty_names(), ..ret.ty_names()],
+        TyTuple(elements) => elements.flat_ty_names(),
+    }
+}
+
+# The names of each of `self`, together.
+fn flat_ty_names(self: Ty[]) -> str[] {
+    mut names: str[] = [];
+    for (let ty : self) {
+        set names.extend(ty.ty_names());
+    }
+    names
+}
+
+fn dead_names(src: str) -> str[]!ParseFailure {
+    ok(unused_imports(aipl_parse_file(src)?.program)$message)
+}.test({
+    // Each unused name is reported, and a used one is not.
+    assert(dead_names("""
+        import { filter, len, map } from builtins;
+        fn f(xs: i64[]) -> i64 { xs.map(|x| x).len() }
+    """)? == [unused_message("filter")]);
+
+    // The caret goes under the name in the import list.
+    let src = "import { map, filter } from builtins;\nfn f() { }";
+    assert(unused_imports(aipl_parse_file(src)?.program)$span == [9..12, 14..20]);
+
+    // An alias is the local name: the operator is used, the exported name is not.
+    assert(dead_names("""
+        import { equal as ==, less_than as < } from builtins;
+        fn f(a: i64) -> bool { a == 1 }
+    """)? == [unused_message("<")]);
+
+    // A type position counts, in a signature, a field, a variant payload, an
+    // annotation and a nested type.
+    assert(dead_names("""
+        import { Span } from builtins;
+        import { A, B, C, D, E } from "./other.aipl";
+        struct S { a: A[] }
+        variant V = X(B?)
+        fn f(s: S) -> (C, Span) { let d: D = g(); s }
+    """)? == [unused_message("E")]);
+
+    // A match arm's constructor, qualified or not, and a pattern in `if let`.
+    assert(dead_names("""
+        import { Q, R, some } from "./other.aipl";
+        fn f(x: i64) -> i64 {
+            if (let some(v) = x) { v } else { match (x) { Q.Z => 1, _ => 2 } }
+        }
+    """)? == [unused_message("R")]);
+
+    // A constructor inside another pattern counts, however deep.
+    assert(dead_names("""
+        import { A, B, C, D } from "./other.aipl";
+        fn f(x: i64) -> i64 { match (x) { A(B(_), C(_)) => 1, _ => 2 } }
+    """)? == [unused_message("D")]);
+
+    // A shim names the functions it binds, and a struct literal the struct.
+    assert(dead_names("""
+        import { P, hook, other } from "./other.aipl";
+        fn f() { shim prints { print = hook } { P { x: 1 } }; }
+    """)? == [unused_message("other")]);
+})

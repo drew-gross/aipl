@@ -11,25 +11,39 @@
 #   top-level functions.
 # - `promote_type_vars`: a declaration's own type parameters become type
 #   variables.
+# - `lint`: the lints that have been ported to AIPL. Their hits ride beside the
+#   program, for the Rust driver to squelch and report with its own.
 #
 # The formatter parses with `aipl_parse_file` and not this, because it lays out
 # the program the author wrote, attributes and all.
 
-import { contains, equal as ==, logical_not as !, map } from builtins;
+import { Span, contains, equal as ==, logical_not as !, map } from builtins;
 import { ParseFailure, ParsedFile, aipl_parse_file } from "./grammar_aipl.aipl";
 import { hoist_test_fns } from "./hoist_test_fns.aipl";
-import { Fn, Item, show_program } from "./item.aipl";
+import { Fn, Item, Program, show_program } from "./item.aipl";
+import { lint } from "./lint.aipl";
+import { LintHit } from "./lint_hit.aipl";
 import { promote_type_vars } from "./promote_type_vars.aipl";
+
+# A file as far as the loader has been ported: the program, the spans of its
+# `#[allow]` markers, and what the ported lints found in the program.
+struct PartialLoad { program: Program, allows: Span[], lints: LintHit[] }
 
 # `aipl_parse_file`, then the steps of loading that happen per file and need
 # nothing from any other.
-pub fn parse_and_partial_load(src: str) -> ParsedFile!ParseFailure {
+pub fn parse_and_partial_load(src: str) -> PartialLoad!ParseFailure {
     let ParsedFile { program, allows } = aipl_parse_file(src)?;
-    ok(ParsedFile { program: program.hoist_test_fns().promote_type_vars(), allows })
+    let loaded = program.hoist_test_fns().promote_type_vars();
+    ok(PartialLoad { program: loaded, allows, lints: lint(loaded) })
 }.test({
     // A file with neither attribute and no type parameters is as it was parsed.
     let plain = parse_and_partial_load("fn f() { }")?;
     assert(plain.program == aipl_parse_file("fn f() { }")?.program);
+    assert(plain.lints == []);
+
+    // The ported lints' hits come with it.
+    let unused = parse_and_partial_load("import { map } from builtins;\nfn f() { }")?;
+    assert(unused.lints$span == [9..12]);
 
     // A declared type parameter is a type variable, in a hoisted helper too.
     let generic = parse_and_partial_load("""

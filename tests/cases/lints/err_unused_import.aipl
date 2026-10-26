@@ -1,0 +1,23 @@
+# An imported name nothing in the file references is dead weight: the import list
+# says the file depends on something it does not.
+#
+# A name counts as referenced anywhere it appears — a call, a type, a match
+# constructor — and an aliased import is known by its alias.
+
+import { filter, len, map, print, wrapping_add as + } from builtins;
+
+fn main() !prints {
+    print(`{[1, 2].map(|x| x).len()}`);
+}
+--- errors ---
+error: unused import "filter": nothing in this file references it; drop it from the import list
+ --> ./tests/cases/lints/err_unused_import.aipl:7:10
+  |
+7 | import { filter, len, map, print, wrapping_add as + } from builtins;
+  |          ^^^^^^
+
+error: unused import "+": nothing in this file references it; drop it from the import list
+ --> ./tests/cases/lints/err_unused_import.aipl:7:35
+  |
+7 | import { filter, len, map, print, wrapping_add as + } from builtins;
+  |                                   ^^^^^^^^^^^^

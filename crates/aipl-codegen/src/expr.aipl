@@ -434,6 +434,64 @@ pub fn map_subexprs(self: Expr, f: (Expr) -> Expr) -> Expr {
     assert(at(Neg(ident("x")), 3..7).map_subexprs(wrap).span == 3..7);
 })
 
+# The direct sub-expressions of `self`, in the order Rust's `each_subexpr` visits
+# them: not `self`'s own names, types or patterns, and not their children. A
+# `Shim`'s bindings name functions and a pattern binds names, so only a shim's
+# body and an arm's body nest expressions.
+pub fn subexprs(self: Expr) -> Expr[] {
+    match (self.kind) {
+        Num(..) | Bool(..) | Str(..) | Char(..) | Ident(..) | None | Unit => [],
+        Call(_, args, _) | ArrayLit(args) | SetLit(args, _) | TupleLit(args) => args,
+        Neg(x)
+        | Field(x, _)
+        | Try(x)
+        | Return(x)
+        | KwArg(_, x, _)
+        | TypeArgs(x, _)
+        | Spread(x)
+        | Lambda(_, x)
+        | Shim(_, _, x) => [x],
+        Construct(_, inits) => inits$value,
+        DictLit(pairs) => {
+            mut out: Expr[] = [];
+            for (let pair : pairs) {
+                set out.push(pair.0);
+                set out.push(pair.1);
+            }
+            out
+        },
+        Seq(a, b)
+        | Index(a, b)
+        | Let(_, _, a, b)
+        | LetMut(_, _, a, b)
+        | For(_, a, b, _)
+        | While(a, b) => [a, b],
+        Assign(a, b, c) | If(a, b, c) => [a, b, c],
+        Match(scrutinee, arms) => [scrutinee, ..arms$body],
+        IfLet(arm, scrutinee, else_branch) => [scrutinee, arm.body, else_branch],
+        Slice(a, b, end) => end.map(|c| [a, b, c]).value_or([a, b]),
+    }
+}.test({
+    assert(ident("x").subexprs() == []);
+    let call = expr(Call("f", [ident("a"), num(1)], false));
+    assert(call.subexprs() == [ident("a"), num(1)]);
+    // A binder's name and type are not sub-expressions; its value and body are.
+    assert(expr(Let("v", none, ident("a"), ident("b"))).subexprs() == [ident("a"), ident("b")]);
+    // The scrutinee comes before the arms' bodies.
+    let arms = expr(Match(
+        ident("s"),
+        [MatchArm { pattern: Ctor("some", bindings=["v"]), body: ident("v"), span: 0..0 }],
+    ));
+    assert(arms.subexprs() == [ident("s"), ident("v")]);
+    assert(expr(DictLit([(ident("k"), ident("v"))])).subexprs() == [ident("k"), ident("v")]);
+    assert(expr(Slice(ident("s"), num(1), none)).subexprs() == [ident("s"), num(1)]);
+    assert(expr(Slice(ident("s"), num(1), some(num(2)))).subexprs() == [
+        ident("s"),
+        num(1),
+        num(2),
+    ]);
+})
+
 # `self` and every expression under it with the declared type parameters in
 # `vars` made `TypeVar`s in the annotations a body holds: a `let` or `mut`
 # binding's, and a lambda parameter's.
