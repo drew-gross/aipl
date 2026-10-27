@@ -10735,7 +10735,7 @@ fn build_inlined(fparams: &[InlineParam], fbody: &Expr, args: &[Expr], span: Spa
             nm
         })
         .collect();
-    let mut expr = rename_params(fbody, &map);
+    let mut expr = rename_scoped(fbody, &map, true);
 
     // A mutating method is declared void and mutates its receiver; what a call
     // to it *produces* is that receiver, which is why its ABI return is the
@@ -10789,30 +10789,57 @@ fn build_inlined(fparams: &[InlineParam], fbody: &Expr, args: &[Expr], span: Spa
 /// name is the local, not the parameter). Body-internal binders are left as-is —
 /// only the substituted *parameter* references are renamed.
 pub(crate) fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
+    rename_scoped(e, map, false)
+}
+
+/// [`rename_params`], and with `fresh` also every binder the body introduces: each
+/// `let`, loop variable, pattern binder and lambda parameter becomes a new
+/// `$inl<N>_<name>`, so a body copied under a caller's variables can neither
+/// shadow one nor be shadowed, and two copies of one body share no binder.
+pub(crate) fn rename_scoped(e: &Expr, map: &HashMap<String, String>, fresh: bool) -> Expr {
     let sub = |n: &String| map.get(n).cloned().unwrap_or_else(|| n.clone());
-    let without = |n: &str| -> HashMap<String, String> {
-        let mut m = map.clone();
-        m.remove(n);
-        m
-    };
-    let without_all = |names: &[String]| -> HashMap<String, String> {
-        let mut m = map.clone();
+    // The map inside a scope that binds `names`: they are the locals there, not
+    // the parameters, and under `fresh` each is known by a new name, returned
+    // alongside.
+    let scope = |names: &[String]| -> (HashMap<String, String>, HashMap<String, String>) {
+        let mut inner = map.clone();
+        let mut renamed = HashMap::new();
         for n in names {
-            m.remove(n);
+            inner.remove(n);
+            if fresh && n != "_" {
+                // A shim's closure is found by its prefix, which a fresh name keeps.
+                let nm = match n.strip_prefix(aipl_syntax::SHIM_CLOSURE_PREFIX) {
+                    Some(rest) => format!(
+                        "{}$inl{}_{rest}",
+                        aipl_syntax::SHIM_CLOSURE_PREFIX,
+                        next_inline_id()
+                    ),
+                    None => format!("$inl{}_{}", next_inline_id(), n),
+                };
+                inner.insert(n.clone(), nm.clone());
+                renamed.insert(n.clone(), nm);
+            }
         }
-        m
+        (inner, renamed)
+    };
+    let known_as = |renamed: &HashMap<String, String>, n: &String| {
+        renamed.get(n).cloned().unwrap_or_else(|| n.clone())
     };
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::TypeArgs(x, tys) => {
-            ExprKind::TypeArgs(Box::new(rename_params(x, map)), tys.clone())
+            ExprKind::TypeArgs(Box::new(rename_scoped(x, map, fresh)), tys.clone())
         }
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
-        // A shim binds global functions, which parameter renaming never touches.
+        // A shim binds a function by name: a global, which renaming never touches,
+        // or a closure `let` the parser put just outside it, which it does.
         ExprKind::Shim(effect, bindings, body) => ExprKind::Shim(
             effect.clone(),
-            bindings.clone(),
-            Box::new(rename_params(body, map)),
+            bindings
+                .iter()
+                .map(|(op, f)| (op.clone(), sub(f)))
+                .collect(),
+            Box::new(rename_scoped(body, map, fresh)),
         ),
         ExprKind::Ident(n) => ExprKind::Ident(sub(n)),
         // Only a name can be a renamed parameter: a call through one is a
@@ -10823,7 +10850,7 @@ pub(crate) fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
                 Callee::Local(n) => Callee::Local(sub(n)),
                 known => known.clone(),
             },
-            args.iter().map(|a| rename_params(a, map)).collect(),
+            args.iter().map(|a| rename_scoped(a, map, fresh)).collect(),
             *m,
         ),
         ExprKind::Num(_)
@@ -10832,45 +10859,48 @@ pub(crate) fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
         | ExprKind::Char(_)
         | ExprKind::None
         | ExprKind::Unit => e.kind.clone(),
-        ExprKind::Neg(x) => ExprKind::Neg(Box::new(rename_params(x, map))),
-        ExprKind::Try(x) => ExprKind::Try(Box::new(rename_params(x, map))),
-        ExprKind::Return(x) => ExprKind::Return(Box::new(rename_params(x, map))),
-        ExprKind::Field(x, fld) => ExprKind::Field(Box::new(rename_params(x, map)), fld.clone()),
+        ExprKind::Neg(x) => ExprKind::Neg(Box::new(rename_scoped(x, map, fresh))),
+        ExprKind::Try(x) => ExprKind::Try(Box::new(rename_scoped(x, map, fresh))),
+        ExprKind::Return(x) => ExprKind::Return(Box::new(rename_scoped(x, map, fresh))),
+        ExprKind::Field(x, fld) => {
+            ExprKind::Field(Box::new(rename_scoped(x, map, fresh)), fld.clone())
+        }
         ExprKind::Seq(a, b) => ExprKind::Seq(
-            Box::new(rename_params(a, map)),
-            Box::new(rename_params(b, map)),
+            Box::new(rename_scoped(a, map, fresh)),
+            Box::new(rename_scoped(b, map, fresh)),
         ),
         ExprKind::Index(a, b) => ExprKind::Index(
-            Box::new(rename_params(a, map)),
-            Box::new(rename_params(b, map)),
+            Box::new(rename_scoped(a, map, fresh)),
+            Box::new(rename_scoped(b, map, fresh)),
         ),
         ExprKind::While(a, b) => ExprKind::While(
-            Box::new(rename_params(a, map)),
-            Box::new(rename_params(b, map)),
+            Box::new(rename_scoped(a, map, fresh)),
+            Box::new(rename_scoped(b, map, fresh)),
         ),
         ExprKind::If(a, b, c) => ExprKind::If(
-            Box::new(rename_params(a, map)),
-            Box::new(rename_params(b, map)),
-            Box::new(rename_params(c, map)),
+            Box::new(rename_scoped(a, map, fresh)),
+            Box::new(rename_scoped(b, map, fresh)),
+            Box::new(rename_scoped(c, map, fresh)),
         ),
         ExprKind::Slice(a, b, c) => ExprKind::Slice(
-            Box::new(rename_params(a, map)),
-            Box::new(rename_params(b, map)),
-            c.as_ref().map(|c| Box::new(rename_params(c, map))),
+            Box::new(rename_scoped(a, map, fresh)),
+            Box::new(rename_scoped(b, map, fresh)),
+            c.as_ref().map(|c| Box::new(rename_scoped(c, map, fresh))),
         ),
         ExprKind::ArrayLit(xs) => {
-            ExprKind::ArrayLit(xs.iter().map(|x| rename_params(x, map)).collect())
+            ExprKind::ArrayLit(xs.iter().map(|x| rename_scoped(x, map, fresh)).collect())
         }
-        ExprKind::SetLit(xs, o) => {
-            ExprKind::SetLit(xs.iter().map(|x| rename_params(x, map)).collect(), *o)
-        }
+        ExprKind::SetLit(xs, o) => ExprKind::SetLit(
+            xs.iter().map(|x| rename_scoped(x, map, fresh)).collect(),
+            *o,
+        ),
         ExprKind::TupleLit(xs) => {
-            ExprKind::TupleLit(xs.iter().map(|x| rename_params(x, map)).collect())
+            ExprKind::TupleLit(xs.iter().map(|x| rename_scoped(x, map, fresh)).collect())
         }
         ExprKind::DictLit(pairs) => ExprKind::DictLit(
             pairs
                 .iter()
-                .map(|(k, v)| (rename_params(k, map), rename_params(v, map)))
+                .map(|(k, v)| (rename_scoped(k, map, fresh), rename_scoped(v, map, fresh)))
                 .collect(),
         ),
         ExprKind::Construct(name, inits) => ExprKind::Construct(
@@ -10879,7 +10909,7 @@ pub(crate) fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
                 .iter()
                 .map(|i| FieldInit {
                     name: i.name.clone(),
-                    value: rename_params(&i.value, map),
+                    value: rename_scoped(&i.value, map, fresh),
                 })
                 .collect(),
         ),
@@ -10891,57 +10921,78 @@ pub(crate) fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
         // expression never introduced. Renaming it is right either way — a
         // caller-side local is simply absent from the map.
         ExprKind::Assign(lhs, a, b) => ExprKind::Assign(
-            Box::new(rename_params(lhs, map)),
-            Box::new(rename_params(a, map)),
-            Box::new(rename_params(b, map)),
+            Box::new(rename_scoped(lhs, map, fresh)),
+            Box::new(rename_scoped(a, map, fresh)),
+            Box::new(rename_scoped(b, map, fresh)),
         ),
-        ExprKind::Let(n, ty, a, b) => ExprKind::Let(
-            n.clone(),
-            ty.clone(),
-            Box::new(rename_params(a, map)),
-            Box::new(rename_params(b, &without(n))),
-        ),
-        ExprKind::LetMut(n, ty, a, b) => ExprKind::LetMut(
-            n.clone(),
-            ty.clone(),
-            Box::new(rename_params(a, map)),
-            Box::new(rename_params(b, &without(n))),
-        ),
-        ExprKind::For(v, index, iter, b) => ExprKind::For(
-            v.clone(),
-            index.clone(),
-            Box::new(rename_params(iter, map)),
+        ExprKind::Let(n, ty, a, b) => {
+            let (inner, renamed) = scope(std::slice::from_ref(n));
+            ExprKind::Let(
+                known_as(&renamed, n),
+                ty.clone(),
+                Box::new(rename_scoped(a, map, fresh)),
+                Box::new(rename_scoped(b, &inner, fresh)),
+            )
+        }
+        ExprKind::LetMut(n, ty, a, b) => {
+            let (inner, renamed) = scope(std::slice::from_ref(n));
+            ExprKind::LetMut(
+                known_as(&renamed, n),
+                ty.clone(),
+                Box::new(rename_scoped(a, map, fresh)),
+                Box::new(rename_scoped(b, &inner, fresh)),
+            )
+        }
+        ExprKind::For(v, index, iter, b) => {
             // Both binders shadow a parameter of the same name.
-            Box::new(rename_params(
-                b,
-                &without_all(&aipl_syntax::loop_binders(v, index)),
-            )),
-        ),
+            let (inner, renamed) = scope(&aipl_syntax::loop_binders(v, index));
+            ExprKind::For(
+                known_as(&renamed, v),
+                index.as_ref().map(|i| known_as(&renamed, i)),
+                Box::new(rename_scoped(iter, map, fresh)),
+                Box::new(rename_scoped(b, &inner, fresh)),
+            )
+        }
         ExprKind::Match(s, arms) => ExprKind::Match(
-            Box::new(rename_params(s, map)),
-            arms.iter()
-                .map(|a| MatchArm {
-                    pattern: a.pattern.clone(),
-                    body: rename_params(&a.body, &without_all(&a.pattern.bindings())),
-                    span: a.span.clone(),
-                })
-                .collect(),
+            Box::new(rename_scoped(s, map, fresh)),
+            arms.iter().map(|a| arm_scoped(a, &scope, fresh)).collect(),
         ),
         ExprKind::IfLet(arm, s, else_b) => ExprKind::IfLet(
-            Box::new(MatchArm {
-                pattern: arm.pattern.clone(),
-                body: rename_params(&arm.body, &without_all(&arm.pattern.bindings())),
-                span: arm.span.clone(),
-            }),
-            Box::new(rename_params(s, map)),
-            Box::new(rename_params(else_b, map)),
+            Box::new(arm_scoped(arm, &scope, fresh)),
+            Box::new(rename_scoped(s, map, fresh)),
+            Box::new(rename_scoped(else_b, map, fresh)),
         ),
         ExprKind::Lambda(ps, b) => {
             let names: Vec<String> = ps.iter().map(|p| p.name.clone()).collect();
-            ExprKind::Lambda(ps.clone(), Box::new(rename_params(b, &without_all(&names))))
+            let (inner, renamed) = scope(&names);
+            let ps = ps
+                .iter()
+                .map(|p| LambdaParam {
+                    name: known_as(&renamed, &p.name),
+                    ..p.clone()
+                })
+                .collect();
+            ExprKind::Lambda(ps, Box::new(rename_scoped(b, &inner, fresh)))
         }
     };
     Expr::rebuilt(kind, e)
+}
+
+/// A match arm under [`rename_scoped`]: its pattern's binders open a scope over
+/// the body.
+fn arm_scoped(
+    arm: &MatchArm,
+    scope: &dyn Fn(&[String]) -> (HashMap<String, String>, HashMap<String, String>),
+    fresh: bool,
+) -> MatchArm {
+    let (inner, renamed) = scope(&arm.pattern.bindings());
+    MatchArm {
+        pattern: arm
+            .pattern
+            .rename_bindings(&mut |n| renamed.get(n).cloned().unwrap_or_else(|| n.to_string())),
+        body: rename_scoped(&arm.body, &inner, fresh),
+        span: arm.span.clone(),
+    }
 }
 
 // ---- Ownership analysis -----------------------------------------------------

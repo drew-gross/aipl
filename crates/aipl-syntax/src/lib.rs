@@ -1966,6 +1966,48 @@ pub mod ast {
             }
         }
 
+        /// This pattern with each binder replaced by `rename(binder)`, called once
+        /// per binder in [`Pattern::bindings`] order. Literals and the wildcard
+        /// bind nothing and are kept.
+        pub fn rename_bindings(&self, rename: &mut impl FnMut(&str) -> String) -> Pattern {
+            let elems = |elems: &[Expr], rename: &mut dyn FnMut(&str) -> String| {
+                elems
+                    .iter()
+                    .map(|e| match &e.kind {
+                        ExprKind::Ident(name) => Expr::rebuilt(ExprKind::Ident(rename(name)), e),
+                        _ => e.clone(),
+                    })
+                    .collect::<Vec<_>>()
+            };
+            match self {
+                Pattern::Ctor {
+                    name,
+                    bindings,
+                    ignore_payload,
+                } => Pattern::Ctor {
+                    name: name.clone(),
+                    bindings: bindings.iter().map(|b| rename(b)).collect(),
+                    ignore_payload: *ignore_payload,
+                },
+                Pattern::Array(es) => Pattern::Array(elems(es, rename)),
+                Pattern::ArrayRest(es) => Pattern::ArrayRest(elems(es, rename)),
+                Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard | Pattern::Int(_) => {
+                    self.clone()
+                }
+                Pattern::Bind(name) => Pattern::Bind(rename(name)),
+                Pattern::Tuple(ps) => {
+                    Pattern::Tuple(ps.iter().map(|p| p.rename_bindings(rename)).collect())
+                }
+                Pattern::ArrayNested(ps) => {
+                    Pattern::ArrayNested(ps.iter().map(|p| p.rename_bindings(rename)).collect())
+                }
+                Pattern::Nested { name, args } => Pattern::Nested {
+                    name: name.clone(),
+                    args: args.iter().map(|p| p.rename_bindings(rename)).collect(),
+                },
+            }
+        }
+
         /// The constructor name for a `Ctor` (or nested constructor) pattern;
         /// `None` otherwise.
         pub fn ctor_name(&self) -> Option<&str> {
