@@ -771,8 +771,11 @@ perfmon:
 report:
   count lines of code, split by comments, tests, perf, blank, etc.
   show syntehsized functions
-  make a flamegraph option
   options to dump the clif, the binary, the asm, etc.
+
+flamegraph:
+  collapse recursive functions
+  profile other things than run e.g. formatting, running tests, etc.
 
 check:
   check should print it's runtime

@@ -83,7 +83,7 @@ fn cli() -> ExitCode {
 fn usage(prog: &str) -> String {
     format!(
         "usage:
-  {prog} run   [-- args...]                 compile and JIT-execute `main` from ./main.aipl, exiting with its result
+  {prog} run   [--flamegraph <out.svg>] [-- args...]  compile and JIT-execute `main` from ./main.aipl, exiting with its result
   {prog} ir    <file.aipl>                  print cranelift IR for a source file
   {prog} doc   <file.aipl>                  print the file's and each declaration's `# ..` docs
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
@@ -142,7 +142,12 @@ command refuses any other before reading it.
 
 `run` always runs `main` from `main.aipl` in the working directory; arguments
 after `--` go to it. A `main` that doesn't take `str[]` gets them parsed as i64
-(arity 0, 1, or 2 is supported).
+(arity 0, 1, or 2 is supported). `--flamegraph <out.svg>` samples where `main`
+spends its CPU time (at 997 Hz, by walking the stack) and writes it as an
+interactive flame graph: one box per function, stacked caller below callee, each
+as wide as its share of the samples. Click a box to zoom to it; Search highlights
+the functions matching a regular expression. Green is the program's own code,
+yellow the AIPL runtime, red the system libraries under it. Only on arm64 macOS.
 `build` requires `clang` on PATH (used as linker driver).
 
 pass `--debug` to any command to trace each compiler pass (loader,
@@ -171,41 +176,71 @@ const RUN_FILE: &str = "main.aipl";
 
 fn run_cmd(args: &[String]) -> Result<ExitCode, String> {
     let (args, dbg) = take_debug_flag(args);
-    // `run` takes no options of its own yet: everything after `--` is for `main`.
-    let trailing = match args.split_first() {
-        None => &[][..],
-        Some((sep, rest)) if sep == "--" => rest,
-        Some((other, _)) => {
-            return Err(format!(
-                "unexpected argument {other:?}; `run` always runs `main` in {RUN_FILE}, \
-                 so pass its arguments after `--`"
-            ));
+    // `run`'s own options come first; everything after `--` is for `main`.
+    let mut flamegraph = None;
+    let mut rest = &args[..];
+    let trailing = loop {
+        match rest {
+            [] => break &[][..],
+            [sep, after @ ..] if sep == "--" => break after,
+            [flag, path, after @ ..] if flag == "--flamegraph" => {
+                flamegraph = Some(PathBuf::from(path));
+                rest = after;
+            }
+            [other, ..] => {
+                return Err(format!(
+                    "unexpected argument {other:?}; `run` always runs `main` in {RUN_FILE}, \
+                     so pass its arguments after `--`"
+                ));
+            }
         }
     };
     let (file, fn_name) = (RUN_FILE, "main");
 
     let program = loader::load_program(Path::new(file), dbg).map_err(|e| render_err(file, e))?;
-    let comp = Compilation::new(&program, dbg).map_err(|e| render_err(file, e))?;
+    let comp = match flamegraph {
+        Some(_) => Compilation::new_profiled(&program, dbg),
+        None => Compilation::new(&program, dbg),
+    }
+    .map_err(|e| render_err(file, e))?;
 
     // A `str[]`-taking function (e.g. `fn main(args: str[])`) receives the
     // trailing tokens as CLI arguments; otherwise they're parsed as i64.
-    let result = if comp.takes_cli_args(fn_name) {
-        comp.run_cli(fn_name, trailing).map_err(|e| e.to_string())?
-    } else {
+    let call = || -> Result<i64, String> {
+        if comp.takes_cli_args(fn_name) {
+            return comp.run_cli(fn_name, trailing).map_err(|e| e.to_string());
+        }
         let fn_args: Vec<i64> = trailing
             .iter()
             .map(|s| s.parse::<i64>().map_err(|e| format!("bad arg {s:?}: {e}")))
             .collect::<Result<_, _>>()?;
         match fn_args.as_slice() {
-            [] => comp.run_0(fn_name).map_err(|e| e.to_string())?,
-            [a] => comp.run_1(fn_name, *a).map_err(|e| e.to_string())?,
-            [a, b] => comp.run_2(fn_name, *a, *b).map_err(|e| e.to_string())?,
+            [] => comp.run_0(fn_name),
+            [a] => comp.run_1(fn_name, *a),
+            [a, b] => comp.run_2(fn_name, *a, *b),
             _ => {
                 return Err(format!(
                     "too many args ({}); only 0-2 supported for now",
                     fn_args.len()
                 ));
             }
+        }
+        .map_err(|e| e.to_string())
+    };
+    let result = match &flamegraph {
+        None => call()?,
+        Some(path) => {
+            let (result, profile) = aipl::profile::sample(&comp.code_symbols(), call)?;
+            let result = result?;
+            let subtitle = format!(
+                "{RUN_FILE}: {} samples of CPU time at {} Hz",
+                profile.samples(),
+                profile.hz
+            );
+            let svg = aipl::flamegraph::svg(&profile, "Flame Graph", &subtitle);
+            std::fs::write(path, svg)
+                .map_err(|e| format!("could not write {}: {e}", path.display()))?;
+            result
         }
     };
     // Like a native binary, the process exits with `main`'s return value, which

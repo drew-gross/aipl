@@ -20,6 +20,8 @@ mod doc_cmd;
 mod doc_comments;
 #[path = "suites/docs_site.rs"]
 mod docs_site;
+#[path = "suites/flamegraph.rs"]
+mod flamegraph;
 #[path = "suites/fmt.rs"]
 mod fmt;
 #[path = "suites/highlighting.rs"]

@@ -3239,7 +3239,10 @@ fn u0_ref_id(line: &str) -> Option<u32> {
     digits.parse().ok()
 }
 
-fn host_isa() -> Result<std::sync::Arc<dyn TargetIsa>, Error> {
+/// The ISA the JIT compiles for. `frame_pointers` makes every function, leaves
+/// included, keep a frame record, so a profiler can walk the stack by frame
+/// pointer from any instruction.
+fn host_isa(frame_pointers: bool) -> Result<std::sync::Arc<dyn TargetIsa>, Error> {
     let mut flag_builder = settings::builder();
     flag_builder
         .set("use_colocated_libcalls", "false")
@@ -3247,6 +3250,11 @@ fn host_isa() -> Result<std::sync::Arc<dyn TargetIsa>, Error> {
     flag_builder
         .set("is_pic", "false")
         .map_err(|e| Error::msg(format!("flag: {e}")))?;
+    if frame_pointers {
+        flag_builder
+            .set("preserve_frame_pointers", "true")
+            .map_err(|e| Error::msg(format!("flag: {e}")))?;
+    }
     let isa_builder = cranelift_native::builder()
         .map_err(|msg| Error::msg(format!("host machine not supported: {msg}")))?;
     isa_builder
@@ -3264,8 +3272,8 @@ fn host_isa() -> Result<std::sync::Arc<dyn TargetIsa>, Error> {
 /// the system linker — which is why every one of them carries `#[no_mangle]`:
 /// an address registered here is invisible to a linker, so the object has to be
 /// able to find them by symbol name instead.
-fn new_jit_module() -> Result<JITModule, Error> {
-    let isa = host_isa()?;
+fn new_jit_module(frame_pointers: bool) -> Result<JITModule, Error> {
+    let isa = host_isa(frame_pointers)?;
     let mut jit_builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
     // Expose builtins to the JIT linker.
     // The wide ABI: 24-byte `str` values passed by pointer. Registered alongside
@@ -3724,7 +3732,7 @@ pub fn generate_dogfood_artifact(
     // raised against (`Error::origin`), that dump is tens of kilobytes with the
     // one useful fact — which file — buried in it.
     let program = aipl_loader::load_program_sources(sources, dbg)?;
-    let mut module = new_jit_module().unwrap();
+    let mut module = new_jit_module(false).unwrap();
     let (funcs, structs, ir) =
         compile_program(&mut module, &program, None, dbg, false, ARTIFACT_CONST_BASE)?;
 
@@ -4080,7 +4088,18 @@ fn manifest_type_head(toks: &[&str], kind: &str) -> Result<(String, u32, bool, u
 }
 impl Compilation {
     pub fn new(program: &Program, dbg: DebugOptions) -> Result<Self, Vec<Error>> {
-        let mut module = new_jit_module()?;
+        Self::jit(program, dbg, false)
+    }
+
+    /// [`Compilation::new`] for a run that will be profiled: every function
+    /// keeps a frame record, so a sampler can walk the stack from wherever it
+    /// interrupts, and [`Compilation::code_symbols`] names what it finds.
+    pub fn new_profiled(program: &Program, dbg: DebugOptions) -> Result<Self, Vec<Error>> {
+        Self::jit(program, dbg, true)
+    }
+
+    fn jit(program: &Program, dbg: DebugOptions, frame_pointers: bool) -> Result<Self, Vec<Error>> {
+        let mut module = new_jit_module(frame_pointers)?;
 
         // The JIT never reports perf counters, so it's never instrumented.
         let (funcs, structs, ir) =
@@ -4118,7 +4137,7 @@ impl Compilation {
     /// shared with `build.rs` so the two can't drift.
     pub fn from_artifact(text: &str) -> Result<Self, Error> {
         let manifest = aipl_artifact::parse_manifest(text).map_err(Error::msg)?;
-        let mut module = new_jit_module()?;
+        let mut module = new_jit_module(false)?;
         let ids = aipl_artifact::link_artifact(
             text,
             &manifest,
@@ -4573,6 +4592,43 @@ impl Compilation {
     /// signature. The two [`Code`] backings resolve it differently — a JIT
     /// module by `FuncId`, a prebuilt object by exported symbol name — and this
     /// is the only place that distinction is visible.
+    /// The start address of every function this compilation defined, with the
+    /// name to show for it, sorted by address. A user function is named as
+    /// the program spells it (each monomorphized instance under its mangled
+    /// name); a helper codegen synthesized, under its symbol name. Empty for
+    /// prebuilt code, whose functions belong to the binary's own symbol table.
+    ///
+    /// Only starts are known — the JIT does not report sizes — so an address
+    /// belongs to the closest start at or below it, which holds only for an
+    /// address already known to be in JIT-compiled code.
+    pub fn code_symbols(&self) -> Vec<(usize, String)> {
+        let Code::Jit(module) = &self.code else {
+            return Vec::new();
+        };
+        let user: HashMap<FuncId, &str> = self
+            .funcs
+            .iter()
+            .filter_map(|(name, info)| match info.link {
+                FuncLink::User(id) => Some((id, name.as_str())),
+                FuncLink::Builtin(_) => None,
+            })
+            .collect();
+        let mut out: Vec<(usize, String)> = module
+            .declarations()
+            .get_functions()
+            .filter(|(_, decl)| decl.linkage != Linkage::Import)
+            .map(|(id, decl)| {
+                let name = match user.get(&id) {
+                    Some(name) => name.to_string(),
+                    None => decl.linkage_name(id).into_owned(),
+                };
+                (module.get_finalized_function(id) as usize, name)
+            })
+            .collect();
+        out.sort();
+        out
+    }
+
     fn code_ptr(&self, name: &str) -> Result<*const u8, Error> {
         match &self.code {
             Code::Jit(module) => Ok(module.get_finalized_function(self.lookup(name)?)),

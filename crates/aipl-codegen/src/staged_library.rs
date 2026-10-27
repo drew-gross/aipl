@@ -241,7 +241,7 @@ fn open(files: &Files, prefix: &str) -> Result<Loaded, String> {
     // with them the runtime functions only they reach; but the library holds
     // every entry. `new_jit_module` takes the address of every runtime function,
     // so a binary that can load a library keeps them all, and exports them.
-    std::hint::black_box(crate::new_jit_module as fn() -> _);
+    std::hint::black_box(crate::new_jit_module as fn(bool) -> _);
     let manifest_text = fs::read_to_string(&files.manifest)
         .map_err(|e| format!("could not read {:?}: {e}", files.manifest))?;
     let manifest = aipl_artifact::parse_manifest(&manifest_text)?;
