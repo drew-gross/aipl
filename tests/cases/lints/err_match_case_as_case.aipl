@@ -1,0 +1,53 @@
+# `match (x) { Circle(..) => some(x), _ => none }` — a variant value handed back
+# when it is one case and `none` otherwise. `x.as_case(Circle)` says that without
+# the second arm, and types the result as the one case it holds.
+
+import { print } from builtins;
+
+variant Shape = Circle(i64) | Rect(i64, i64) | Empty
+
+// A payload-carrying case, its payload ignored.
+fn circle(s: Shape) -> Shape? {
+    match (s) {
+        Circle(..) => some(s),
+        _ => none,
+    }
+}
+
+// A case with no payload.
+fn empty(s: Shape) -> Shape? {
+    match (s) {
+        Empty => some(s),
+        _ => none,
+    }
+}
+
+// Binders the body never reads change nothing.
+fn rect(s: Shape) -> Shape? {
+    match (s) {
+        Rect(w, h) => some(s),
+        _ => none,
+    }
+}
+
+fn main() !prints {
+    print(`{circle(Circle(1))} {empty(Circle(1))} {rect(Empty)}`);
+}
+--- errors ---
+error: this match only asks whether the value is Circle — write "s.as_case(Circle)" and drop the match, importing `as_case` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_case_as_case.aipl:13:9
+   |
+13 |         _ => none,
+   |         ^
+
+error: this match only asks whether the value is Empty — write "s.as_case(Empty)" and drop the match, importing `as_case` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_case_as_case.aipl:21:9
+   |
+21 |         _ => none,
+   |         ^
+
+error: this match only asks whether the value is Rect — write "s.as_case(Rect)" and drop the match, importing `as_case` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_case_as_case.aipl:29:9
+   |
+29 |         _ => none,
+   |         ^

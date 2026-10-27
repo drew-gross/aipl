@@ -341,6 +341,8 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/lints/map_constant_repeat_not_flagged | 6 | 195 | 195 | 1518 | 2656 | 8.00 | 63.49 | 1472 |
 | cases/lints/map_find_if_some_not_flagged | 8 | 476 | 476 | 442 | 2176 | 8.00 | 120.65 | 1472 |
 | cases/lints/map_lambda_member_dollar_not_flagged | 1 | 17 | 17 | 187 | 820 | 4.00 | 127.68 | 1472 |
+| cases/lints/match_case_as_case_allow | 8 | 454 | 454 | 429 | 1836 | 7.00 | 105.83 | 1456 |
+| cases/lints/match_case_as_case_not_flagged | 8 | 453 | 453 | 427 | 2660 | 7.00 | 62.38 | 1472 |
 | cases/lints/match_is_some_and_allow | 6 | 124 | 124 | 249 | 1012 | 7.00 | 65.61 | 1456 |
 | cases/lints/match_is_some_and_not_flagged | 4 | 77 | 77 | 153 | 936 | 6.00 | 63.00 | 1456 |
 | cases/lints/match_map_err_allow | 4 | 68 | 68 | 247 | 1480 | 7.00 | 133.08 | 1456 |
@@ -668,6 +670,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/tuples/trailing_comma | 2 | 34 | 34 | 83 | 592 | 6.00 | 72.75 | 1456 |
 | cases/tuples/vec_of_tuples | 4 | 179 | 145 | 319 | 1244 | 9.00 | 63.77 | 1440 |
 | cases/variants/arm_types | 28 | 1563 | 861 | 1687 | 6676 | 19.00 | 117.35 | 1504 |
+| cases/variants/as_case | 9 | 508 | 508 | 281 | 1524 | 7.00 | 65.57 | 1472 |
 | cases/variants/basic | 0 | 0 | 0 | 364 | 1152 | 2.00 | 69.50 | 1456 |
 | cases/variants/boxed_array_param | 17 | 783 | 807 | 871 | 2408 | 11.00 | 66.39 | 1488 |
 | cases/variants/boxed_match_arm_payload | 23 | 1423 | 1071 | 1960 | 5820 | 12.00 | 81.32 | 1504 |
@@ -759,6 +762,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/walker | 80795 | 20107953 | 879834 | 70700506 | 17478896 | 15765.00 | 47815.56 | 11552 |
 | crates/aipl-mono/src/builtin_all | 0 | 0 | 0 | 1265 | 2884 | 3.00 | 108.24 | 1456 |
 | crates/aipl-mono/src/builtin_any | 0 | 0 | 0 | 1043 | 2784 | 2.00 | 105.91 | 1456 |
+| crates/aipl-mono/src/builtin_as_case | 0 | 0 | 0 | 272 | 1200 | 1.00 | 60.87 | 1440 |
 | crates/aipl-mono/src/builtin_cartesian_product | 10 | 680 | 1016 | 3339 | 6536 | 7.00 | 70.18 | 1520 |
 | crates/aipl-mono/src/builtin_collect_arms | 9 | 480 | 480 | 1701 | 2740 | 6.00 | 106.56 | 1488 |
 | crates/aipl-mono/src/builtin_collect_ok | 7 | 512 | 584 | 2606 | 5228 | 12.00 | 176.06 | 1504 |

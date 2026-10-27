@@ -5716,8 +5716,8 @@ impl Cx<'_> {
             // `xs.collect_arms(Circle)`: the elements are all that one case, so the
             // call is typed as such — and recorded on the node, since mono
             // monomorphizes the builtin as `T[] -> T[]` and would lose it.
-            let ret = if *callee == Callee::CollectArms {
-                let refined = self.refine_collected_arms(ret, args)?;
+            let ret = if matches!(callee, Callee::CollectArms | Callee::AsCase) {
+                let refined = self.refine_collected_arms(ret, args, callee.name())?;
                 self.lock_node(node, &refined);
                 refined
             } else {
@@ -5736,15 +5736,23 @@ impl Cx<'_> {
         }
     }
 
-    /// The type of `xs.collect_arms(Circle)`: an array of `xs`'s variant less
-    /// every case but the one named, so a `match` on an element needs that arm
-    /// alone and refuses any other. `ret` is the array type the builtin's
-    /// signature gives; the case is read off the constructor reference written as
-    /// the second argument, which is the only place it is known — a `Case<V>`
-    /// value held in a variable says which variant but not which case.
-    fn refine_collected_arms(&self, ret: Type, args: &[Expr]) -> Result<Type, Error> {
-        let Type::Array(elem) = &ret else {
-            return Ok(ret);
+    /// The type of `xs.collect_arms(Circle)` or `x.as_case(Circle)`: the array (or
+    /// optional) of `x`'s variant less every case but the one named, so a `match`
+    /// on the value needs that arm alone and refuses any other. `ret` is the type
+    /// the builtin's signature gives; the case is read off the constructor
+    /// reference written as the second argument, which is the only place it is
+    /// known — a `Case<V>` value held in a variable says which variant but not
+    /// which case. `builtin` names the call in a diagnostic.
+    fn refine_collected_arms(
+        &self,
+        ret: Type,
+        args: &[Expr],
+        builtin: &str,
+    ) -> Result<Type, Error> {
+        let (elem, wrap): (&Type, fn(Type) -> Type) = match &ret {
+            Type::Array(elem) => (elem, |t| Type::Array(Box::new(t))),
+            Type::Optional(elem) => (elem, |t| Type::Optional(Box::new(t))),
+            _ => return Ok(ret),
         };
         // Inside a generic body the variant is a type variable and has no cases
         // to name.
@@ -5756,9 +5764,12 @@ impl Cx<'_> {
         };
         let Some((case, _)) = aipl_syntax::ctor_ref_case(arm) else {
             return Err(Error::at(
-                "\"collect_arms\" needs the case written as a constructor name, as in \
-                 `shapes.collect_arms(Circle)` — a value of type `Case<..>` does not say \
-                 which case it holds until run time, so the result could not be typed by it",
+                format!(
+                    "{short:?} needs the case written as a constructor name, as in \
+                     `x.{short}(Circle)` — a value of type `Case<..>` does not say \
+                     which case it holds until run time, so the result could not be typed by it",
+                    short = builtin.trim_start_matches("__builtin_"),
+                ),
                 arm.span.clone(),
             ));
         };
@@ -5772,10 +5783,10 @@ impl Cx<'_> {
         let refined = cases
             .iter()
             .filter(|(c, _)| c != case)
-            .fold((**elem).clone(), |acc, (c, _)| {
+            .fold(elem.clone(), |acc, (c, _)| {
                 Type::Without(Box::new(acc), Exclusion::NamedCase(c.clone()))
             });
-        Ok(Type::Array(Box::new(refined)))
+        Ok(wrap(refined))
     }
 
     /// Refuse an argument of type `aty` that a variadic parameter of `arity`
@@ -6694,6 +6705,7 @@ pub(crate) fn needs_lock(k: &ExprKind) -> bool {
                     | Callee::ToSet
                     | Callee::Narrow
                     | Callee::CollectArms
+                    | Callee::AsCase
             )
         }
         _ => false,

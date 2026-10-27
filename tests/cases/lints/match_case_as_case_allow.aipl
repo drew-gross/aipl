@@ -1,0 +1,25 @@
+# `#[allow]` keeps the match. The marker goes on the `_ => none` arm, which is where
+# this lint points: a short line the formatter leaves where it is.
+
+import { as_case, print } from builtins;
+
+variant Shape = Circle(i64) | Empty
+
+fn circle(s: Shape) -> Shape? {
+    match (s) {
+        Circle(..) => some(s),
+        _ => none, #[allow]
+    }
+}
+
+// The rewrite the lint asks for, so the two spellings are checked side by side
+// and proven to agree.
+fn circle_short(s: Shape) -> Shape? { s.as_case(Circle) }
+
+fn main() !prints {
+    print(`{circle(Circle(1))} {circle_short(Circle(1))}`);
+    print(`{circle(Empty)} {circle_short(Empty)}`);
+}
+--- stdout ---
+some(Circle(1)) some(Circle(1))
+none none

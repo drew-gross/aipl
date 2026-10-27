@@ -1,0 +1,44 @@
+# The AIPL implementation of the `as_case` builtin. The loader names this
+# function by the canonical name `__builtin_as_case` (see
+# `aipl_syntax::aipl_builtins`), so a user's `shape.as_case(Circle)` resolves
+# through the ordinary generic machinery — the in-file name `as_case` is only for
+# this file's own tests, which read exactly like user code.
+#
+# What the body returns is a `T?`, but a call in a user's file is typed more
+# precisely than that: the checker reads the case off the constructor reference
+# passed as `arm` and types the result as an optional of `T` *without every other
+# case* — `Circle?`, the one case's own type — exactly as `collect_arms` types its
+# array. The value is the same either way, so the refinement costs nothing at run
+# time, and `if (let some(c) = shape.as_case(Circle))` hands back something a
+# `let Circle(r) = c;` takes apart with no `match`.
+#
+# The shorthand for `match (x) { Circle(..) => some(x), _ => none }`, which the
+# `match_case_as_case` lint asks for.
+
+import { case_of, equal as ==, not_equal as != } from builtins;
+
+# What the tests convert.
+variant Shape = Circle(i64) | Square(i64) | Dot
+
+# `self` as the case `arm`, or `none` when it is another. `arm` is a constructor
+# name, payload-carrying or not: `shape.as_case(Circle)`.
+#
+# See `collect_arms` for keeping the elements of an array that are one case, and
+# `case_of` for reading which case a single value is.
+pub fn as_case<T: variant>(self: T, arm: Case<T>) -> T? {
+    if (self.case_of() == arm) { some(self) } else { none }
+}.test({
+    assert(Circle(1).as_case(Circle) == some(Circle(1)));
+    assert(Square(2).as_case(Circle) == none);
+    assert(Dot.as_case(Dot) == some(Dot));
+    // The function-call form is the same call.
+    assert(as_case(Square(2), Square) == some(Square(2)));
+    // The payload decides nothing: only which case it is.
+    assert(Circle(1).as_case(Circle) != Circle(2).as_case(Circle));
+    if (let some(c) = Circle(7).as_case(Circle)) {
+        let Circle(r) = c;
+        assert(r == 7);
+    } else {
+        assert(false);
+    };
+})

@@ -8018,7 +8018,12 @@ impl Mono<'_> {
             Some(t) if narrows_literal_array(&expr.kind, &inferred, t) => (**t).clone(),
             // `collect_arms` is monomorphized as `T[] -> T[]`; the checker typed the
             // call as an array of the one case collected and recorded it.
-            Some(t) if matches!(&expr.kind, ExprKind::Call(Callee::CollectArms, ..)) => {
+            Some(t)
+                if matches!(
+                    &expr.kind,
+                    ExprKind::Call(Callee::CollectArms | Callee::AsCase, ..)
+                ) =>
+            {
                 (**t).clone()
             }
             _ => inferred,

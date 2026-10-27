@@ -1,0 +1,48 @@
+# The shapes the as-case lint must leave alone. It rewrites exactly one shape — a
+# two-arm `match` whose first arm hands back `some` of the matched value itself,
+# and whose second is `_ => none` — so everything here compiles.
+
+import { print } from builtins;
+
+variant Shape = Circle(i64) | Rect(i64, i64) | Empty
+
+// The arm hands back its payload, not the value: `as_case` is not its spelling.
+fn radius(s: Shape) -> i64? {
+    match (s) {
+        Circle(r) => some(r),
+        _ => none,
+    }
+}
+
+// A third arm: this is asking about more than one case.
+fn sized(s: Shape) -> Shape? {
+    match (s) {
+        Circle(..) => some(s),
+        Rect(..) => some(s),
+        _ => none,
+    }
+}
+
+// The fallthrough is not `none`.
+fn circle_or_empty(s: Shape) -> Shape? {
+    match (s) {
+        Circle(..) => some(s),
+        _ => some(Empty),
+    }
+}
+
+// Not the value matched: a different value is a different program.
+fn unit_circle(s: Shape) -> Shape? {
+    match (s) {
+        Circle(..) => some(Circle(1)),
+        _ => none,
+    }
+}
+
+fn main() !prints {
+    print(`{radius(Circle(2))} {sized(Empty)} {circle_or_empty(Empty)}`);
+    print(`{unit_circle(Circle(5))}`);
+}
+--- stdout ---
+some(2) none some(Empty)
+some(Circle(1))
