@@ -22144,7 +22144,7 @@ fn compile_expr_inner<M: Module>(
                     .iter()
                     .map(|arm| {
                         let mut vals = Vec::new();
-                        if let Pattern::Array(elems) = &arm.pattern {
+                        if let Pattern::Array(elems) | Pattern::ArrayRest(elems) = &arm.pattern {
                             for (j, e) in elems.iter().enumerate() {
                                 if matches!(e.kind, ExprKind::Ident(_)) {
                                     continue; // a binder, not a comparison
@@ -22159,7 +22159,10 @@ fn compile_expr_inner<M: Module>(
                 // `seq_len` is only needed by array-pattern arms; a pure
                 // string-literal match (no array arms) skips it, so it compiles
                 // exactly as before this path was unified.
-                let scrut_len = if arms.iter().any(|a| matches!(a.pattern, Pattern::Array(_))) {
+                let scrut_len = if arms
+                    .iter()
+                    .any(|a| matches!(a.pattern, Pattern::Array(_) | Pattern::ArrayRest(_)))
+                {
                     Some(seq_len(builder, ptr, &seq_ty))
                 } else {
                     None
@@ -22188,11 +22191,17 @@ fn compile_expr_inner<M: Module>(
                             builder.switch_to_block(next);
                             builder.seal_block(next);
                         }
-                        Pattern::Array(elems) => {
+                        Pattern::Array(elems) | Pattern::ArrayRest(elems) => {
                             // Length must match before any element load (else out of
-                            // bounds).
+                            // bounds): exactly the elements written, or — for a `..`
+                            // pattern — at least that many.
+                            let len_cmp = if matches!(arm.pattern, Pattern::ArrayRest(_)) {
+                                IntCC::SignedGreaterThanOrEqual
+                            } else {
+                                IntCC::Equal
+                            };
                             let len_ok = builder.ins().icmp_imm_s(
-                                IntCC::Equal,
+                                len_cmp,
                                 scrut_len.expect("an array arm implies scrut_len is computed"),
                                 elems.len() as i64,
                             );
@@ -22273,7 +22282,7 @@ fn compile_expr_inner<M: Module>(
                 let binds = match &plan {
                     Some((plan, tag)) => bind_match_arm(builder, plan, arm, i, ptr, *tag, structs),
                     None => {
-                        if let Pattern::Array(elems) = &arm.pattern {
+                        if let Pattern::Array(elems) | Pattern::ArrayRest(elems) = &arm.pattern {
                             // A `str` scrutinee is read as its `char[]` view.
                             let seq_ty = match &scrut_ty {
                                 ConcreteType::Array(_) => scrut_ty.clone(),

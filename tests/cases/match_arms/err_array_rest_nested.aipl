@@ -1,0 +1,17 @@
+# The elements before the `..` are plain: names, `_` and literals. A pattern
+# inside one belongs in an array pattern of an exact length.
+
+fn f(xs: i64?[]) -> i64 {
+    match (xs) {
+        [some(a), ..] => a,
+        _ => 0,
+    }
+}
+
+fn main() {}
+--- errors ---
+error: an array pattern ending in `..` holds only names, `_` and literals
+ --> ./tests/cases/match_arms/err_array_rest_nested.aipl:6:9
+  |
+6 |         [some(a), ..] => a,
+  |         ^^^^^^^^^^^^^^^^^^

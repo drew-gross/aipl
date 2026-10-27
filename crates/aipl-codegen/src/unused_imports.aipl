@@ -12,10 +12,7 @@
 import {
     Span,
     equal as ==,
-    first,
-    greater_than as >,
     has,
-    len,
     logical_not as !,
     map,
     not_equal as !=,
@@ -226,18 +223,22 @@ fn ctor_names(self: Pat) -> #{str} {
         Pat.Ctor(name, _, _) => path_names(name),
         Pat.Nested(name, args) => #{..path_names(name), ..args$ctor_names().union_all()},
         Pat.ArrayNested(patterns) | Pat.Tuple(patterns) => patterns$ctor_names().union_all(),
-        Pat.Str(..) | Pat.Char(..) | Pat.Array(..) | Pat.Wildcard | Pat.Int(..) => #{},
+        Pat.Str(..)
+        | Pat.Char(..)
+        | Pat.Array(..)
+        | Pat.ArrayRest(..)
+        | Pat.Wildcard
+        | Pat.Int(..) => #{},
     }
 }
 
 # The names a constructor written `name` mentions: the name, and the variant too
 # when it is qualified.
 fn path_names(name: str) -> #{str} {
-    let parts = name.split(".");
-    if (parts.len() > 1) {
-        return #{parts.first().value_or(name), name};
-    };
-    #{name}
+    match (name.split(".")) {
+        [part, ..] => #{part, name},
+        _ => #{name},
+    }
 }
 
 # The names an annotation mentions, none when it was not written.

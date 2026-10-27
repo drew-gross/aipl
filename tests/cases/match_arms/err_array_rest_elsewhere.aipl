@@ -1,0 +1,17 @@
+# `..` belongs to array patterns. A constructor pattern already has its own `Ctor(..)`.
+
+variant Pair = Both(i64, i64)
+
+fn f(p: Pair) -> i64 {
+    match (p) {
+        Both(a, ..) => a,
+    }
+}
+
+fn main() {}
+--- errors ---
+error: `..` is only allowed as the last element of an array pattern, as in `[a, ..]`
+ --> ./tests/cases/match_arms/err_array_rest_elsewhere.aipl:7:16
+  |
+7 |         Both(a, ..) => a,
+  |                ^^^

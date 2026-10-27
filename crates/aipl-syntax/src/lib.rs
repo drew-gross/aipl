@@ -1899,6 +1899,12 @@ pub mod ast {
         /// expression matched by equality (validated by the checker). An
         /// all-literal pattern (e.g. `[1, 2]`) still introduces no bindings.
         Array(Vec<Expr>),
+        /// `[e0, e1, ..]` — the same, but of an array or `str` of *at least* that
+        /// many elements: the elements written are the first ones, and the `..`
+        /// accepts whatever follows. Only the simple elements of [`Pattern::Array`]
+        /// (a binder, `_`, or a literal) are taken, so this is compiled directly,
+        /// as that is, with a length test of `>=` where `Array`'s is `==`.
+        ArrayRest(Vec<Expr>),
         /// The wildcard / default arm `_ => body` (matches anything). Only valid
         /// for a `str` or array match, where it must be the last arm.
         Wildcard,
@@ -1943,7 +1949,7 @@ pub mod ast {
         pub fn bindings(&self) -> Vec<String> {
             match self {
                 Pattern::Ctor { bindings, .. } => bindings.clone(),
-                Pattern::Array(elems) => elems
+                Pattern::Array(elems) | Pattern::ArrayRest(elems) => elems
                     .iter()
                     .filter_map(|e| match &e.kind {
                         ExprKind::Ident(name) => Some(name.clone()),
@@ -1968,6 +1974,7 @@ pub mod ast {
                 Pattern::Str(_)
                 | Pattern::Char(_)
                 | Pattern::Array(_)
+                | Pattern::ArrayRest(_)
                 | Pattern::ArrayNested(_)
                 | Pattern::Wildcard
                 | Pattern::Tuple(_)
@@ -2016,6 +2023,7 @@ pub mod ast {
                 | Pattern::Str(_)
                 | Pattern::Char(_)
                 | Pattern::Array(_)
+                | Pattern::ArrayRest(_)
                 | Pattern::Wildcard => false,
             }
         }

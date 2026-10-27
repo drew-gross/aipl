@@ -129,6 +129,7 @@ import {
     Payload as APayload,
     Program as AProgram,
     Refinement as ARefinement,
+    Rest as ARest,
     ShimBind as AShimBind,
     ShimClosure as AShimClosure,
     Stmt as AStmt,
@@ -312,6 +313,7 @@ import {
 import {
     Array as PatArray,
     ArrayNested as PatArrayNested,
+    ArrayRest as PatArrayRest,
     Char as PatChar,
     Ctor as PatCtor,
     Int as PatInt,
@@ -1269,6 +1271,10 @@ fn patterns() -> Production<AiplTok, Ast>[] {
         Term(CharTok),
         Term(IntLit),
         nest("(", Many(Named("pattern"), min=2, sep=Lit(","), trailing_sep=false), ")", strict()),
+        // `..` is only a pattern at the end of an array arm's elements — `[a, ..]`
+        // — where it says "and more". It is a pattern here so the elements are one
+        // list, and `as_pat` refuses it everywhere that is not that end.
+        Lit(".."),
     ]);
 
     // `Ctor(p, q)` matches each slot against a pattern; `Ctor(..)` says the
@@ -2788,8 +2794,13 @@ fn lower_match_arm(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // from the single-pattern arm; the elements are ordinary patterns, so the
     // grammar reaches them through `pattern` like every other slot.
     if (node.tokens.first().map(|t| src[t]) == some("[")) {
-        let elems = kids[..last].try_map(|k| as_pat(k, sp))?;
-        return ok(AArms([MatchArm { pattern: array_pattern(elems, subs), body, span: tsp }]));
+        // A trailing `..` is not an element: it says the elements are only the
+        // first ones.
+        let rest = last > 0 && kids[last - 1].is_some_and(is_rest);
+        let written = if (rest) { kids[..last - 1] } else { kids[..last] };
+        let elems = written.try_map(|k| as_pat(k, sp))?;
+        let pattern = array_pattern(elems, subs, rest, tsp)?;
+        return ok(AArms([MatchArm { pattern, body, span: tsp }]));
     };
     let heads = same_bindings(kids[..last].try_map(|k| as_pat(k, sp))?, subs, tsp)?;
     mut arms: MatchArm[] = [];
@@ -2805,16 +2816,31 @@ fn lower_match_arm(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # that carries a span per element — and the nested `ArrayNested` otherwise. The
 # same split `nested_or_ctor` makes between `Ctor` and `Nested`, for the same
 # reason: an arm written the old way lowers exactly as it always did.
-fn array_pattern(elems: Pat[], subs: Cst[]) -> Pat {
+#
+# With a trailing `..` the elements must be plain: the length test of "at least"
+# is the simple form's, and the decision tree that compiles the nested form
+# dispatches on exact lengths.
+fn array_pattern(elems: Pat[], subs: Cst[], rest: bool, span: Span) -> Pat!ParseError {
     if (!elems.all(is_plain_elem)) {
-        return PatArrayNested(elems);
+        if (rest) {
+            return err(ParseError {
+                message: "an array pattern ending in `..` holds only names, `_` and literals",
+                span,
+            });
+        };
+        return ok(PatArrayNested(elems));
     };
     mut exprs: Expr[] = [];
     for (let i, p : elems) {
         set exprs.push(plain_elem_expr(p, sub_span(subs, i, 0..0)));
     }
-    PatArray(exprs)
+    if (rest) {
+        return ok(PatArrayRest(exprs));
+    };
+    ok(PatArray(exprs))
 }
+
+fn is_rest(v: Ast) -> bool { if (let ARest(..) = v) { true } else { false } }
 
 # Whether an element needs no sub-pattern machinery: a binder name, `_`, or a
 # literal. A bare name that is *not* a binder — `none`, or a capitalised case —
@@ -2824,7 +2850,7 @@ fn is_plain_elem(self: Pat) -> bool {
     match (self) {
         Ctor(name, bindings, ignore) => bindings.is_empty() && !ignore && name.is_binder_name(),
         Wildcard | Str(..) | Char(..) | Int(..) => true,
-        Array(..) | ArrayNested(..) | Tuple(..) | Nested(..) => false,
+        Array(..) | ArrayRest(..) | ArrayNested(..) | Tuple(..) | Nested(..) => false,
     }
 }
 
@@ -2838,7 +2864,10 @@ fn plain_elem_expr(self: Pat, span: Span) -> Expr {
         Str(s) => at(Str(s), span),
         Char(c) => at(Char(c), span),
         Int(n) => at(Num(n), span),
-        Array(..) | ArrayNested(..) | Tuple(..) | Nested(..) => at(Ident("_"), span),
+        Array(..) | ArrayRest(..) | ArrayNested(..) | Tuple(..) | Nested(..) => at(
+            Ident("_"),
+            span,
+        ),
     }
 }
 
@@ -2885,6 +2914,12 @@ fn same_bindings(heads: Pat[], subs: Cst[], tsp: Span) -> Pat[]!ParseError {
 fn as_pat(v: Ast, span: Span) -> Pat!ParseError {
     if (let APat(pat) = v) {
         return ok(pat);
+    };
+    if (let ARest(at) = v) {
+        return err(ParseError {
+            message: "`..` is only allowed as the last element of an array pattern, as in `[a, ..]`",
+            span: at,
+        });
     };
     err(wrong_kind("a pattern", v, span))
 }
@@ -2943,6 +2978,9 @@ fn lower_pattern(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         return ok(APat(PatChar(c)));
     };
     // A tuple pattern: the parenthesized run of two or more patterns.
+    if (head == "..") {
+        return ok(ARest(sp));
+    };
     if (head == "(") {
         return ok(APat(PatTuple(kids.try_map(|k| as_pat(k, sp))?)));
     };
@@ -4376,6 +4414,25 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     );
     assert(expr_dump("match (v) { A(..) => 1, _ => 0 }") == "Match(v, [A(..) => 1, _ => 0])");
     assert(expr_dump("match (xs) { [a, b] => a, _ => 0 }") == "Match(xs, [[a, b] => a, _ => 0])");
+
+    // A trailing `..` makes the array pattern "at least these", and is only that.
+    assert(expr_dump("match (xs) { [a, ..] => a, _ => 0 }") == "Match(xs, [[a, ..] => a, _ => 0])");
+    assert(expr_dump("match (xs) { [..] => 0 }") == "Match(xs, [[..] => 0])");
+    assert(
+        expr_dump(
+            "match (xs) { [a, .., b] => a, _ => 0 }",
+        ) == "error: `..` is only allowed as the last element of an array pattern, as in `[a, ..]`",
+    );
+    assert(
+        expr_dump(
+            "match (xs) { [some(a), ..] => a, _ => 0 }",
+        ) == "error: an array pattern ending in `..` holds only names, `_` and literals",
+    );
+    assert(
+        expr_dump(
+            "match (v) { A(x, ..) => x, _ => 0 }",
+        ) == "error: `..` is only allowed as the last element of an array pattern, as in `[a, ..]`",
+    );
     assert(expr_dump("""match (s) { "a" => 1, _ => 0 }""") == "Match(s, [Str(a) => 1, _ => 0])");
 
     // Alternatives that disagree about what they bind are refused here rather

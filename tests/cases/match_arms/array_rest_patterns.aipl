@@ -1,0 +1,76 @@
+# A trailing `..` makes an array pattern "at least these": `[first, ..]` takes any
+# array with a first element and ignores the rest, where `[first]` takes only one
+# of exactly one. The elements written are the first ones, and a `str` is read as
+# its chars.
+#
+# The arms are tried in order, so an exact arm above a `..` arm is its special
+# case, as with any pattern.
+
+import { print, split } from builtins;
+
+fn head(xs: i64[]) -> str {
+    match (xs) {
+        [a, ..] => `starts {a}`,
+        _ => "empty",
+    }
+}
+
+// Several leading elements, a literal among them.
+fn shape(xs: i64[]) -> str {
+    match (xs) {
+        [1, b, ..] => `one then {b}`,
+        [a, b, ..] => `{a} then {b}`,
+        _ => "short",
+    }
+}
+
+// An exact arm first, then the open one.
+fn count(xs: i64[]) -> str {
+    match (xs) {
+        [] => "none",
+        [only] => `just {only}`,
+        [_, ..] => "several",
+        _ => "unreachable",
+    }
+}
+
+// The same on a `str`, whose elements are chars.
+fn opens(s: str) -> str {
+    match (s) {
+        ['#', ..] => "comment",
+        [first, ..] => `starts with {first}`,
+        _ => "blank",
+    }
+}
+
+fn main() !prints {
+    print(head([7, 8]));
+    print(head([]));
+    print(shape([1, 5, 9]));
+    print(shape([2, 5]));
+    print(shape([2]));
+    print(count([]));
+    print(count([4]));
+    print(count([4, 5, 6]));
+    print(opens("# note"));
+    print(opens("abc"));
+    print(opens(""));
+    // The first of the parts of a split.
+    match ("a.b.c".split(".")) {
+        [part, ..] => print(part),
+        _ => print("no parts"),
+    };
+}
+--- stdout ---
+starts 7
+empty
+one then 5
+2 then 5
+short
+none
+just 4
+several
+comment
+starts with a
+blank
+a

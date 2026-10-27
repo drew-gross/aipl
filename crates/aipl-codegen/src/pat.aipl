@@ -50,6 +50,11 @@ variant Pat =
     # patterns because that is the shape codegen compiles directly, and because
     # an expression carries the span a diagnostic about one element wants.
     | Array(Expr[])
+    # The same, of an array of *at least* that many elements, written with a
+    # trailing `..` — `[first, ..]`. The elements are the first ones; the rest are
+    # not looked at. Only the plain elements `Array` takes are allowed, so it is
+    # compiled the way `Array` is, with a length test of `>=` in place of `==`.
+    | ArrayRest(Expr[])
     # The same arm where at least one element is a real sub-pattern —
     # `[n, Tok("?"), _, ty]`, `[some(v), none]`. The counterpart of `Array`
     # exactly as `Nested` is of `Ctor`, and chosen by the same kind of test:
@@ -129,6 +134,7 @@ pub fn show_pat(self: Pat) -> str {
         Str(s) => `Str({s})`,
         Char(c) => `Char({c})`,
         Array(elems) => `[{show_exprs(elems)}]`,
+        ArrayRest(elems) => if (elems.is_empty()) { "[..]" } else { `[{show_exprs(elems)}, ..]` },
         ArrayNested(ps) => `[{show_pats(ps)}]`,
         Ctor(name, bindings, ignore_payload) => if (ignore_payload) {
             `{name}(..)`
@@ -148,6 +154,8 @@ pub fn show_pat(self: Pat) -> str {
     assert(Str("hi").show_pat() == "Str(hi)");
     assert(Char('x').show_pat() == "Char(x)");
     assert(Array([num(1), ident("x")]).show_pat() == "[1, x]");
+    assert(ArrayRest([ident("x")]).show_pat() == "[x, ..]");
+    assert(ArrayRest([]).show_pat() == "[..]");
     assert(Tuple([Int(1), Nested("some", [Int(1)])]).show_pat() == "(1, some(1))");
     assert(Nested("Pair", [Ctor("lo"), Wildcard]).show_pat() == "Pair(lo, _)");
 })
@@ -164,7 +172,7 @@ fn show_pats(self: Pat[]) -> str { self$show_pat().join(sep=", ") }
 pub fn pat_bindings(self: Pat) -> str[] {
     match (self) {
         Ctor(_, bindings, _) => bindings,
-        Array(elems) => elems.filter_map(is_ident, ident_name),
+        Array(elems) | ArrayRest(elems) => elems.filter_map(is_ident, ident_name),
         ArrayNested(ps) => ps$nested_bindings().join(),
         Str(..) | Char(..) | Wildcard | Int(..) => no_names(),
         // A nested slot binds where a bare binder name sits, at any depth.
@@ -179,6 +187,7 @@ pub fn pat_bindings(self: Pat) -> str[] {
     assert(Str("s").pat_bindings() == none_bound);
     // A literal element of an array pattern is matched, not bound.
     assert(Array([ident("a"), num(1), ident("b")]).pat_bindings() == ["a", "b"]);
+    assert(ArrayRest([ident("a"), num(1)]).pat_bindings() == ["a"]);
     // Nested: every binder, depth first, left to right; a case name is not one.
     assert(Tuple([Ctor("lo"), Nested("some", [Ctor("hi")])]).pat_bindings() == ["lo", "hi"]);
     assert(Nested("Pair", [Ctor("Nil"), Int(1)]).pat_bindings() == none_bound);
@@ -224,7 +233,7 @@ pub fn pat_label(self: Pat) -> str {
         Nested(name, _) => `"{name}"`,
         Str(..) => "a string pattern",
         Char(..) => "a char pattern",
-        Array(..) | ArrayNested(..) => "an array pattern",
+        Array(..) | ArrayRest(..) | ArrayNested(..) => "an array pattern",
         Wildcard => `"_"`,
         Tuple(..) => "a tuple pattern",
         Int(..) => "an integer pattern",

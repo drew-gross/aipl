@@ -329,7 +329,7 @@ fn pattern_binds(pattern: &Pattern, name: &str) -> bool {
         Pattern::Ctor { bindings, .. } => bindings.iter().any(|b| b == name),
         // An array pattern's identifier elements are binders; its literal
         // elements are not, but treating both as binders only over-vetoes.
-        Pattern::Array(elems) => elems
+        Pattern::Array(elems) | Pattern::ArrayRest(elems) => elems
             .iter()
             .any(|el| matches!(&el.kind, ExprKind::Ident(n) if n == name)),
         Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard | Pattern::Int(_) => false,

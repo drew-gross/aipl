@@ -81,6 +81,10 @@ variant Ast =
     | Exclusion(ExclusionNode)
     | Pat(PatNode)
     | Payload(PatNode[], bool)
+    # A bare `..` in a pattern position. Only the end of an array arm's elements
+    # accepts one, where it says "and more"; anywhere else it is refused when the
+    # pattern around it is lowered.
+    | Rest(Span)
     | Expr(ExprNode)
     | Exprs(ExprNode[])
     | Suffix(SuffixNode)
@@ -128,6 +132,7 @@ pub fn ast_case_name(self: Ast) -> str {
         Exclusion(..) => "a `without` exclusion",
         Pat(..) => "a pattern",
         Payload(..) => "a constructor payload",
+        Rest(..) => "a `..`",
         Expr(..) => "an expression",
         Exprs(..) => "a list of expressions",
         Suffix(..) => "a postfix suffix",

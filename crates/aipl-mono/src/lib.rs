@@ -5690,6 +5690,9 @@ impl Mono<'_> {
                     .flat_map(|(p, t)| self.nested_binders(p, &t))
                     .collect()
             }
+            Pattern::ArrayRest(_) => {
+                unreachable!("the checker refuses a `..` array in a nested match")
+            }
             Pattern::Array(_) | Pattern::ArrayNested(_) => {
                 let elem = match ty {
                     Type::Array(e) => (**e).clone(),
@@ -7296,7 +7299,7 @@ impl Mono<'_> {
                         Pattern::Ctor { name, bindings, .. } => {
                             self.match_payload_tys(&st, name, bindings.len())
                         }
-                        Pattern::Array(_) => {
+                        Pattern::Array(_) | Pattern::ArrayRest(_) => {
                             let elem = match &st {
                                 Type::Array(e) => (**e).clone(),
                                 _ => Type::Primitive(Primitive::Char), // str, as char[]
@@ -7361,7 +7364,7 @@ impl Mono<'_> {
                     Pattern::Ctor { name, bindings, .. } => {
                         self.match_payload_tys(&st, name, bindings.len())
                     }
-                    Pattern::Array(_) => {
+                    Pattern::Array(_) | Pattern::ArrayRest(_) => {
                         let elem = match &st {
                             Type::Array(e) => (**e).clone(),
                             _ => Type::Primitive(Primitive::Char), // str, as char[]
@@ -12061,6 +12064,9 @@ impl MatchTree<'_, '_> {
                     ExprKind::Match(Box::new(self.ident(&var)), arms),
                     self.span.clone(),
                 ))
+            }
+            Pattern::ArrayRest(_) => {
+                unreachable!("the checker refuses a `..` array in a nested match")
             }
             Pattern::Wildcard | Pattern::Bind(_) => unreachable!("absorbed above"),
         }

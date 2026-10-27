@@ -364,6 +364,7 @@ fn pattern(v: &FfiValue) -> R<ast::Pattern> {
         "Str" => ast::Pattern::Str(text(at(payload, 0, case)?)?),
         "Char" => ast::Pattern::Char(byte(at(payload, 0, case)?)?),
         "Array" => ast::Pattern::Array(each(at(payload, 0, case)?, expr)?),
+        "ArrayRest" => ast::Pattern::ArrayRest(each(at(payload, 0, case)?, expr)?),
         "ArrayNested" => ast::Pattern::ArrayNested(each(at(payload, 0, case)?, pattern)?),
         "Wildcard" => ast::Pattern::Wildcard,
         "Tuple" => ast::Pattern::Tuple(each(at(payload, 0, case)?, pattern)?),

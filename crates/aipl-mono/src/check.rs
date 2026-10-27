@@ -2830,7 +2830,7 @@ impl Cx<'_> {
         if is_str_repr(st) {
             return match &arm.pattern {
                 Pattern::Str(_) | Pattern::Wildcard => Ok(vec![]),
-                Pattern::Array(elems) => self.array_pattern_bind_tys(
+                Pattern::Array(elems) | Pattern::ArrayRest(elems) => self.array_pattern_bind_tys(
                     elems,
                     &Type::Primitive(Primitive::Char),
                     env,
@@ -2856,7 +2856,9 @@ impl Cx<'_> {
         // patterns.
         if let Type::Array(elem) = st {
             return match &arm.pattern {
-                Pattern::Array(elems) => self.array_pattern_bind_tys(elems, elem, env, effects),
+                Pattern::Array(elems) | Pattern::ArrayRest(elems) => {
+                    self.array_pattern_bind_tys(elems, elem, env, effects)
+                }
                 Pattern::Wildcard => Ok(vec![]),
                 Pattern::Ctor { .. } | Pattern::Str(_) | Pattern::Char(_) => Err(Error::at(
                     "\"match\" on an array expects `[..]` patterns or `_`".to_string(),
@@ -2877,7 +2879,10 @@ impl Cx<'_> {
         if matches!(st, Type::Primitive(Primitive::Char)) {
             return match &arm.pattern {
                 Pattern::Char(_) | Pattern::Wildcard => Ok(vec![]),
-                Pattern::Ctor { .. } | Pattern::Str(_) | Pattern::Array(_) => Err(Error::at(
+                Pattern::Ctor { .. }
+                | Pattern::Str(_)
+                | Pattern::Array(_)
+                | Pattern::ArrayRest(_) => Err(Error::at(
                     "\"match\" on a char expects char literals or `_`".to_string(),
                     arm.span.clone(),
                 )),
@@ -2904,7 +2909,7 @@ impl Cx<'_> {
                     arm.span.clone(),
                 ))
             }
-            Pattern::Array(_) | Pattern::ArrayNested(_) => {
+            Pattern::Array(_) | Pattern::ArrayRest(_) | Pattern::ArrayNested(_) => {
                 return Err(Error::at(
                     format!("array-literal pattern matches an array, not {}", tyname(st)),
                     arm.span.clone(),
@@ -3137,6 +3142,16 @@ impl Cx<'_> {
                     ));
                 }
                 (Pat::Lit(Lit::Char(*c)), Vec::new())
+            }
+            // A `..` array pattern is compiled directly, by length, and a nested
+            // match is a decision tree over exact lengths; the two do not mix.
+            Pattern::ArrayRest(_) => {
+                return Err(Error::at(
+                    "an array pattern ending in `..` cannot share a `match` with a nested \
+                     pattern — write the nested arms in their own `match`"
+                        .to_string(),
+                    span.clone(),
+                ))
             }
             Pattern::Array(_) | Pattern::ArrayNested(_) => {
                 let ps = &pattern

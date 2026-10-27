@@ -84,6 +84,13 @@
 
             </li>
 
+            <li id="item-ArrayRest"><code>ArrayRest(Expr[])</code>
+
+              <div class="doc"><p>The same, of an array of <em>at least</em> that many elements, written with a trailing <code>..</code> — <code>[first, ..]</code>. The elements are the first ones; the rest are not looked at. Only the plain elements <code>Array</code> takes are allowed, so it is compiled the way <code>Array</code> is, with a length test of <code>&gt;=</code> in place of <code>==</code>.</p></div>
+
+
+            </li>
+
             <li id="item-ArrayNested"><code>ArrayNested(Pat[])</code>
 
               <div class="doc"><p>The same arm where at least one element is a real sub-pattern — <code>[n, Tok(&quot;?&quot;), _, ty]</code>, <code>[some(v), none]</code>. The counterpart of <code>Array</code> exactly as <code>Nested</code> is of <code>Ctor</code>, and chosen by the same kind of test: <code>array_pattern</code> in <code>grammar_aipl.aipl</code> keeps the simple form whenever every element is plain.</p></div>

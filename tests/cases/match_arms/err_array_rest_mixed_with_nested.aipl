@@ -1,0 +1,18 @@
+# A `..` array pattern is compiled by its length, and a nested array pattern is
+# compiled by a decision tree over exact lengths, so one `match` cannot hold both.
+
+fn f(xs: i64?[]) -> i64 {
+    match (xs) {
+        [some(a), none] => a,
+        [_, ..] => 1,
+        _ => 0,
+    }
+}
+
+fn main() {}
+--- errors ---
+error: an array pattern ending in `..` cannot share a `match` with a nested pattern — write the nested arms in their own `match`
+ --> ./tests/cases/match_arms/err_array_rest_mixed_with_nested.aipl:7:9
+  |
+7 |         [_, ..] => 1,
+  |         ^^^^^^^^^^^^

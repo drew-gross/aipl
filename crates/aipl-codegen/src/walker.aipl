@@ -3264,6 +3264,13 @@ fn walker_of(src: str) -> W!FmtError {
             )? == "match (p) {\n    (1, some(1)) => a,\n    (lo, none) => b,\n    Q(..) => c,\n}\n",
     );
 
+    // An array pattern's trailing `..` lays out as another element.
+    assert(
+        walker_of("match ( xs ) { [ a , .. ] => a , [ .. ] => 0 , }")?
+            .expr()
+            .rendered(100)? == "match (xs) {\n    [a, ..] => a,\n    [..] => 0,\n}\n",
+    );
+
     // --- statements & blocks --------------------------------------------------
     assert(walker_of("{ }")?.block().rendered(100)? == "{}");
     assert(walker_of("{ a }")?.block().rendered(100)? == "{ a }");
