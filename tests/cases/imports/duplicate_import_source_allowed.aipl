@@ -1,0 +1,10 @@
+# A duplicate import is a lint, so `#[allow]` on the redundant line keeps it.
+
+import { print } from builtins;
+import { to_str } from builtins; #[allow]
+
+fn main() !prints {
+    print(to_str(1));
+}
+--- stdout ---
+1

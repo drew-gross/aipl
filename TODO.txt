@@ -107,6 +107,7 @@ misc cleanup:
     subexprs -> subexpressions
     ty -> type
     show_* to just show, make into self, callers can import as if necessary (if multiple in same file, can stick to show_* but still use self)
+  unused_imports should be a self method
   dict_spread_message and co should be consts not functions
   enforce appropriate use of enter_alternate_screen() and leave_alternate_screen() somehow
   read file needs to decode to meet the "no terminal escapes in strings" constraint.  Or just return byte array.

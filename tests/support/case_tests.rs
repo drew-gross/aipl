@@ -330,6 +330,7 @@ case_tests! {
     cases_imports_cross_file_call_within_imported_module = "cases/imports/cross_file_call_within_imported_module",
     cases_imports_custom_operator_function = "cases/imports/custom_operator_function",
     cases_imports_cyclic_imports_terminate = "cases/imports/cyclic_imports_terminate",
+    cases_imports_duplicate_import_source_allowed = "cases/imports/duplicate_import_source_allowed",
     cases_imports_err_alias_collides_with_local = "cases/imports/err_alias_collides_with_local",
     cases_imports_err_bare_decr_operator = "cases/imports/err_bare_decr_operator",
     cases_imports_err_bare_incr_operator = "cases/imports/err_bare_incr_operator",

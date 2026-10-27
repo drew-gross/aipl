@@ -9,7 +9,7 @@ fn main() !prints {
     print(to_str(1));
 }
 --- errors ---
-error: duplicate import from "builtins"; merge the names into the first `import { .. } from builtins;`
+error: duplicate import from "builtins"; merge the names into the first `import { .. } from builtins;` (or append #[allow] to this line to keep it)
  --> ./tests/cases/imports/err_duplicate_import_source.aipl:6:24
   |
 6 | import { to_str } from builtins;

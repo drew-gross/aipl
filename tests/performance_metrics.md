@@ -253,6 +253,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/imports/cross_file_call_within_imported_module | 1 | 18 | 18 | 35 | 360 | 5.00 | 75.85 | 1456 |
 | cases/imports/custom_operator_function | 1 | 20 | 20 | 35 | 360 | 5.00 | 61.38 | 1440 |
 | cases/imports/cyclic_imports_terminate | 1 | 18 | 18 | 35 | 360 | 5.00 | 61.93 | 1456 |
+| cases/imports/duplicate_import_source_allowed | 1 | 17 | 17 | 35 | 360 | 6.00 | 151.67 | 1456 |
 | cases/imports/import_alias | 1 | 18 | 18 | 50 | 480 | 6.00 | 60.92 | 1456 |
 | cases/imports/imports_pull_named_items_into_scope | 1 | 17 | 17 | 35 | 360 | 5.00 | 61.21 | 1456 |
 | cases/imports/operator_alias | 1 | 17 | 17 | 35 | 360 | 5.00 | 61.51 | 1456 |

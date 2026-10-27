@@ -176,44 +176,6 @@ pub fn load_program_sources(
     Ok(loader.flatten(&root)?)
 }
 
-/// Reject importing from the same place on more than one line: every import from
-/// a given source (`builtins`, or one path) must be a single `import { .. }`
-/// statement. Errors at the redundant import, so its names can be merged into the
-/// first. Run per file, before resolving paths.
-fn check_no_duplicate_import_sources(program: &Program) -> Result<(), Error> {
-    let mut seen_builtins = false;
-    let mut seen_paths: HashSet<String> = HashSet::new();
-    for item in &program.items {
-        let Item::Import(ImportDecl { source, .. }) = item else {
-            continue;
-        };
-        match source {
-            ImportSource::Builtins { span } => {
-                if seen_builtins {
-                    return Err(Error::at(
-                        "duplicate import from \"builtins\"; merge the names into the first \
-                         `import { .. } from builtins;`",
-                        span.clone(),
-                    ));
-                }
-                seen_builtins = true;
-            }
-            ImportSource::Path { path, span } => {
-                if !seen_paths.insert(path.clone()) {
-                    return Err(Error::at(
-                        format!(
-                            "duplicate import from {path:?}; merge the names into the first \
-                             `import {{ .. }} from {path:?};`"
-                        ),
-                        span.clone(),
-                    ));
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
 #[derive(Default)]
 struct Loader {
     /// Loaded files keyed by canonical path. A `BTreeMap` (not `HashMap`) so
@@ -357,7 +319,6 @@ impl Loader {
         src: &str,
         mut resolve: impl FnMut(&str, Span) -> Result<PathBuf, Error>,
     ) -> Result<(Vec<Item>, Vec<ResolvedImport>, Vec<ImportName>), Vec<Error>> {
-        check_no_duplicate_import_sources(&program)?;
         bake::reserved_names_not_bound(&program)?;
         bake::bake(
             &mut program.items,
