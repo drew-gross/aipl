@@ -6,6 +6,7 @@
 # back in the order the lints are listed.
 
 import { equal as == } from builtins;
+import { destructure_binding } from "./destructure_binding.aipl";
 import { duplicate_import_source } from "./duplicate_import_source.aipl";
 import { Program } from "./item.aipl";
 import { LintHit } from "./lint_hit.aipl";
@@ -13,7 +14,7 @@ import { unused_imports } from "./unused_imports.aipl";
 
 # Every hit the ported lints find in `program`.
 pub fn lint(program: Program) -> LintHit[] {
-    [..unused_imports(program), ..duplicate_import_source(program)]
+    [..unused_imports(program), ..duplicate_import_source(program), ..destructure_binding(program)]
 }.test({
     let program = Program { items: [], doc: none };
     assert(lint(program) == []);

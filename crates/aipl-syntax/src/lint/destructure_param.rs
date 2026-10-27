@@ -5,8 +5,8 @@ use crate::Error;
 /// `fn f(p: Point) { .. p.x .. p.y .. }` where **every** mention of `p` is a
 /// field read — destructure the parameter instead: `fn f(Point { x, y })`.
 ///
-/// The same argument [`super::destructure_binding`] makes about a `let`, one
-/// step earlier. A parameter that is only ever taken apart is a pattern written
+/// The same argument `destructure_binding` (in `destructure_binding.aipl`) makes
+/// about a `let`, one step earlier. A parameter that is only ever taken apart is a pattern written
 /// the long way, and the signature is where a reader looks first: `fn f(Point {
 /// x, y })` says what the function needs, where `fn f(p: Point)` says only that
 /// it needs a `Point` and leaves the body to be scanned for how much of it.

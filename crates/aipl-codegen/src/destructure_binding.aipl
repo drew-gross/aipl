@@ -1,0 +1,361 @@
+# The `destructure_binding` lint: `let p = value; ... p.a ... p.b ...` where
+# **every** mention of `p` is a field read. Say so with a pattern instead:
+# `let T { a, b } = value;`.
+#
+# The binding then names what it actually holds. A reader of
+# `let P { line, col } = pos_of(i);` knows the two fields are the whole story;
+# with `let p = pos_of(i);` they have to scan the rest of the block to find out
+# whether `p` is also passed somewhere, compared, or returned.
+#
+# One bare mention is enough to stay quiet, because a pattern cannot reproduce
+# it — the value itself is gone, only its fields survive. That covers the
+# obvious escapes (`f(p)`, `p == q`, a trailing `p`) without special-casing any
+# of them.
+#
+# Only an immutable `let` is flagged. A `mut` binding is a different question —
+# whether it should be `mut` at all — and answering it here would advise a
+# rewrite that changes more than the spelling.
+#
+# **A pattern binds one name per field, so it is only available when each of
+# those names would mean one thing in the function.** Two conditions take the
+# lint out, and between them they are most of what it would otherwise flag:
+#
+# - **The name is already spoken for.** `let b = w.bump();` reading `b.text` and
+#   `b.w` cannot become `let Bump { text, w } = w.bump();` where a `w` is in
+#   scope: the new binding shadows it and every later mention of the old one
+#   silently changes meaning.
+#
+#   The binding's *own* name does not count, even when a field shares it (`let
+#   segs = ..` reading `segs.segs`). That binding is the one going away, and
+#   every mention of it is the base of a field read the pattern replaces — so
+#   there is provably nothing left for the new name to shadow.
+#
+# - **The field is read off more than one value.** Three `let`s binding the same
+#   struct in one block are told apart by their *names* (`plain.cleaned`,
+#   `empty.cleaned`); destructuring them all binds `cleaned` three times,
+#   shadowing in sequence, and the distinction the names carried is gone. So a
+#   field read off two different bases anywhere in the function disqualifies
+#   every binding it belongs to — which is why the reads are those of the whole
+#   function rather than of the binding's own body.
+#
+#   Reads inside the binding's **own value** are the exception, and they are not
+#   a rarity: threading a cursor writes `let segs = head.w.next()?` and then reads
+#   `segs.w`, so `w` has two bases and neither is ambiguous. The value is
+#   evaluated before the pattern binds anything, so no name the pattern
+#   introduces can be confused with a read in it.
+#
+# The lint runs before type checking, so it cannot know the type of a call's
+# result: the advice names the struct only where an annotation already does.
+
+import {
+    all,
+    any,
+    collect_arms,
+    contains,
+    count_if,
+    equal as ==,
+    filter,
+    greater_than as >,
+    is_digit,
+    is_some_and,
+    join,
+    len,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+    push,
+    starts_with,
+    value_or,
+} from builtins;
+import {
+    Construct,
+    Expr,
+    Field,
+    For,
+    Ident,
+    Lambda,
+    Let,
+    LetMut,
+    Match,
+    subexprs,
+} from "./expr.aipl";
+import { ParseFailure, aipl_parse_file } from "./grammar_aipl.aipl";
+import { Fn, Function, Program } from "./item.aipl";
+import { LintHit, hit } from "./lint_hit.aipl";
+import { pat_bindings } from "./pat.aipl";
+import { Named } from "./ty.aipl";
+
+# A field read off a plain name: `base.field`.
+struct Read { field: str, base: str }
+
+# How a name is used inside an expression. `mentions == field_reads` is the whole
+# question: it says the value itself is never used, only its parts, which is
+# exactly when a pattern can replace it.
+struct Uses {
+    mentions: u64,
+    field_reads: u64,
+    // The distinct fields read, in first-read order — the order the advised
+    // pattern lists them in.
+    fields: str[],
+    // Whether something inside the expression rebinds the name, which splits the
+    // mentions between two values this walk cannot tell apart.
+    shadowed: bool,
+}
+
+# A hit for each immutable `let` in the program whose binding is only ever taken
+# apart by field reads.
+pub fn destructure_binding(Program { items }) -> LintHit[] {
+    items.collect_arms(Fn)$function_hits().join()
+}
+
+# The hits in a function's body and in its `.test` block.
+fn function_hits(self: Fn(function)) -> LintHit[] { function.bodies()$body_hits().join() }
+
+# The expressions of a function the lint reads: its body, and its `.test` block.
+fn bodies(self: Function) -> Expr[] { self.test_body.map(|t| [self.body, t]).value_or([self.body]) }
+
+# The hits in one body. Every read is those of the whole body, so that a field read
+# off two bases anywhere in it counts against each binding it belongs to.
+fn body_hits(self: Expr) -> LintHit[] {
+    let reads = self.field_reads();
+    self.descendants()$kind.collect_arms(Let)$binding_hit(reads).join()
+}
+
+# `self` and every expression under it, outermost first.
+fn descendants(self: Expr) -> Expr[] { [self, ..self.subexprs()$descendants().join()] }
+
+# Every field `self` and the expressions under it read off a plain name, with a
+# read for each time it is read.
+fn field_reads(self: Expr) -> Read[] {
+    mut found: Read[] = [];
+    for (let node : self.descendants()) {
+        if (let some(r) = node.read()) {
+            set found.push(r);
+        };
+    }
+    found
+}
+
+# The field read `self` is, when it reads one off a plain name.
+fn read(self: Expr) -> Read? {
+    match (self.kind) {
+        Field(base, field) => match (base.kind) {
+            Ident(name) => some(Read { field, base: name }),
+            _ => none,
+        },
+        _ => none,
+    }
+}
+
+# The hit for one `let`, or none: `reads` are every field read in its body.
+fn binding_hit(self: Let(name, annotation, value, body), reads: Read[]) -> LintHit[] {
+    // The parser's own desugarings bind temporaries whose only use *is* a field
+    // read — a `let T { .. }` pattern lowers to exactly that, and so does a
+    // destructured parameter, so linting them would advise rewriting the
+    // rewrite, on a name the user never wrote and cannot put an `#[allow]` on.
+    if (name.starts_with("__")) {
+        return [];
+    };
+
+    // ...nor the field bindings such a desugaring introduces, whose value is a
+    // read off that temporary: advising a pattern *inside* a pattern is the lint
+    // chasing its own output.
+    if (value.is_read_off_temporary()) {
+        return [];
+    };
+    let Uses { mentions, field_reads, fields, shadowed } = body.uses_of(name);
+
+    // A rebinding of the same name inside the body splits the mentions between two
+    // different values, and this walk cannot tell which is which. Rather than
+    // track scopes for a case that is rare and confusing to read anyway, say
+    // nothing.
+    if (shadowed || field_reads == 0 || field_reads != mentions) {
+        return [];
+    };
+
+    // Is one of these field names also read off some *other* value that is still
+    // around once the pattern binds it? Then the bare name would mean two things
+    // and the binding names are what tell them apart today.
+    if (fields.is_shared(reads, value) || fields.any(is_tuple_field)) {
+        return [];
+    };
+
+    // The binding's own name is exempt in the body — it is the name going away,
+    // and every mention of it there is the base of a read the pattern replaces.
+    // In the *value* nothing is exempt: that is evaluated before the pattern
+    // binds, so a name it mentions is an outer one the pattern would shadow for
+    // the rest of the block.
+    if (body.mentions_any(fields, some(name)) || value.mentions_any(fields, none)) {
+        return [];
+    };
+
+    // Taking apart a value built on the same line is not an improvement: the
+    // pattern restates the type name that literal just wrote and re-lists the
+    // fields it just set.
+    if (value.is_construct()) {
+        return [];
+    };
+    // The struct is named only where the source already names it — an annotation.
+    let ty = match (annotation) {
+        some(Named(struct_name)) => struct_name,
+        _ => "<Type>",
+    };
+    [hit(message(name, fields.join(sep=", "), ty), value.span)]
+}
+
+# What is said of the binding `name`, whose `fields` are the ones read.
+fn message(name: str, fields: str, ty: str) -> str {
+    `only the fields of "{name}" are read — destructure the binding instead: "let {ty} \{ {fields} } = ..."`
+}
+
+# Whether `self` is a read off one of the parser's own temporaries (`__spat$N`).
+fn is_read_off_temporary(self: Expr) -> bool {
+    match (self.kind) {
+        Field(base, _) => match (base.kind) {
+            Ident(name) => name.starts_with("__"),
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+fn is_construct(self: Expr) -> bool {
+    match (self.kind) {
+        Construct(..) => true,
+        _ => false,
+    }
+}
+
+# How `name` is used inside `body`.
+fn uses_of(self: Expr, name: str) -> Uses {
+    let nodes = self.descendants();
+    mut fields: str[] = [];
+    for (let read : self.field_reads().filter(|r| r.base == name)) {
+        if (!fields.contains(read.field)) {
+            set fields.push(read.field);
+        };
+    }
+    Uses {
+        mentions: nodes.count_if(|node| node.is_name(name)),
+        field_reads: nodes.count_if(|node| node.is_read_off(name)),
+        fields,
+        shadowed: nodes.any(|node| node.rebinds(name)),
+    }
+}
+
+fn is_name(self: Expr, name: str) -> bool {
+    match (self.kind) {
+        Ident(n) => n == name,
+        _ => false,
+    }
+}
+
+fn is_read_off(self: Expr, name: str) -> bool { self.read().is_some_and(|r| r.base == name) }
+
+# Whether `self` introduces a binding called `name`, in any of the positions that
+# can: the two `let` forms, a lambda parameter, a loop variable, and a match
+# arm's payload binders.
+fn rebinds(self: Expr, name: str) -> bool {
+    match (self.kind) {
+        Let(n, _, _, _) | LetMut(n, _, _, _) => n == name,
+        // Both of a loop's binders shadow, the element one and the index one.
+        For(n, _, _, index) => n == name || index == some(name),
+        Lambda(params, _) => params.any(|p| p.name == name),
+        Match(_, arms) => arms.any(|arm| arm.pattern.pat_bindings().contains(name)),
+        _ => false,
+    }
+}
+
+# Whether one of `fields` is read off more than one base, outside `value` — the
+# reads inside a `let`'s own right-hand side run before the pattern binds
+# anything. A pair read as often inside `value` as anywhere has no read outside
+# it, so it counts for nothing.
+fn is_shared(self: str[], everywhere: Read[], value: Expr) -> bool {
+    let inside = value.field_reads();
+    self.any(|field| bases_outside(field, everywhere, inside).len() > 1)
+}
+
+# The distinct bases `field` is read off, counting only those read somewhere
+# other than `inside`.
+fn bases_outside(field: str, everywhere: Read[], inside: Read[]) -> str[] {
+    let mine = everywhere.filter(|r| r.field == field);
+    let local = inside.filter(|r| r.field == field);
+    mut bases: str[] = [];
+    for (let read : mine) {
+        let counted = mine.count_if(|r| r.base == read.base);
+        if (!bases.contains(read.base) && counted > local.count_if(|r| r.base == read.base)) {
+            set bases.push(read.base);
+        };
+    }
+    bases
+}
+
+# Whether `self` mentions any of `names` as a bare identifier, ignoring `skip`.
+fn mentions_any(self: Expr, names: str[], skip: str?) -> bool {
+    self
+        .descendants()
+        .any(|node| match (node.kind) {
+            Ident(n) => some(n) != skip && names.contains(n),
+            _ => false,
+        })
+}
+
+# Whether `self` is a tuple position (`t._0`).
+#
+# No struct pattern can take a tuple apart — there is no type name to write — and
+# `let (a, b) = t;` has to name every position, where the lint sees only the ones
+# that were read. So tuples are left alone rather than advised into a pattern
+# that would not compile.
+fn is_tuple_field(self: str) -> bool {
+    self.len() > 1 && self.starts_with("_") && self[1..].all(is_digit)
+}
+
+fn hits(src: str) -> str[]!ParseFailure {
+    ok(destructure_binding(aipl_parse_file(src)?.program)$message)
+}.test({
+    // Only fields are read: take it apart in the pattern.
+    assert(hits("fn f() -> i64 { let p = g(); p.a + p.b }")? == [message("p", "a, b", "<Type>")]);
+
+    // An annotation names the struct for the advice.
+    assert(hits("fn f() -> i64 { let p: P = g(); p.a }")? == [message("p", "a", "P")]);
+
+    // One bare mention keeps the value whole, so a pattern could not replace it.
+    assert(hits("fn f() -> i64 { let p = g(); h(p); p.a }")? == []);
+
+    // The name is spoken for: the field's name would shadow one in scope.
+    assert(hits("fn f(a: i64) -> i64 { let p = g(); p.a + a }")? == []);
+
+    // A field read off two values is told apart by the names of the values...
+    assert(hits("fn f() -> i64 { let p = g(); let q = g(); p.a + q.a }")? == []);
+
+    // ...but a read inside the binding's own value runs before the pattern binds.
+    assert(hits("fn f() -> i64 { let p = h(q.a); p.a }")? == [message("p", "a", "<Type>")]);
+
+    // A rebinding of the name splits its mentions between two values.
+    assert(hits("fn f() -> i64 { let p = g(); h(|p| p); p.a }")? == []);
+
+    // ...and a later `let` of the same name is judged on its own.
+    assert(hits("fn f() -> i64 { let p = g(); let p = h(); p.a }")? == [
+        message("p", "a", "<Type>"),
+    ]);
+
+    // A tuple cannot be taken apart by a struct pattern.
+    assert(hits("fn f() -> i64 { let p = g(); p._0 }")? == []);
+
+    // The parser's own temporaries are not the user's to rewrite.
+    assert(hits("fn f(P { a }) -> i64 { a }")? == []);
+    assert(hits("fn f() -> i64 { let P { a } = g(); a }")? == []);
+
+    // A value built on the same line is not taken apart.
+    assert(hits("fn f() -> i64 { let p = P { a: 1 }; p.a }")? == []);
+
+    // A `mut` binding is a different question.
+    assert(hits("fn f() -> i64 { mut p = g(); p.a }")? == []);
+
+    // The `.test` block is held to it too.
+    assert(hits("fn f() { }.test({ let p = g(); assert(p.a == 1); })")? == [
+        message("p", "a", "<Type>"),
+    ]);
+})

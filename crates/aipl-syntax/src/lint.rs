@@ -14,7 +14,6 @@
 mod arm_block_value;
 mod char_set_literal;
 mod compound_assign;
-mod destructure_binding;
 mod destructure_param;
 mod eta_lambda;
 mod extend_longhand;
@@ -54,7 +53,6 @@ use std::collections::{HashMap, HashSet};
 use self::arm_block_value::arm_block_value;
 use self::char_set_literal::char_set_literal;
 use self::compound_assign::{compound_assign, matching_compound};
-use self::destructure_binding::destructure_binding;
 use self::destructure_param::destructure_param;
 use self::eta_lambda::{eta_lambda, Forwarding};
 use self::extend_longhand::{extend_longhand, extend_names};
@@ -267,11 +265,10 @@ pub fn check(
             with_value_or_self(e, src, &names, &mut hits)
         });
     }
-    // The lints ported to AIPL ran with the parse. `unused_imports` and
-    // `duplicate_import_source` so far, and their place in the order among the
-    // lints still written in Rust is kept.
+    // The lints ported to AIPL ran with the parse: `unused_imports`,
+    // `duplicate_import_source` and `destructure_binding`, so far. Their place in
+    // the order among the lints still written in Rust is kept.
     hits.extend(ported);
-    destructure_binding(program, &mut hits);
     destructure_param(program, &mut hits);
     fn_body_type_stutter(program, src, &mut hits);
     hits.retain(|e| match &e.span {
@@ -525,13 +522,12 @@ fn quote<'a>(e: &Expr, src: &'a str, placeholder: &'a str) -> &'a str {
     }
 }
 
-// ---------- shared by the two destructuring lints ----------
+// ---------- what `destructure_param` asks ----------
 //
-// `destructure_binding` asks whether a `let` can become a pattern and
-// `destructure_param` asks the same of a parameter. The question is identical
-// once the thing being asked about has a name and a scope, so the answering
-// lives here and each lint contributes only what is its own: which names are
-// candidates, and what the advice reads like.
+// `destructure_param` asks whether a parameter can become a pattern: whether
+// every use of it is a field read, and whether the names the pattern would bind
+// are free. `destructure_binding`, in `destructure_binding.aipl`, asks the same
+// of a `let`; the two answer it with the same rules.
 
 /// Every `base.field` read in `e`, counted per `(field, base)` pair.
 ///
