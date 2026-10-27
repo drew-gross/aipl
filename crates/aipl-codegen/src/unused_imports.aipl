@@ -100,17 +100,12 @@ import {
 # A hit for each name `program` imports and nothing in it references.
 pub fn unused_imports(program: Program) -> LintHit[] {
     let used = referenced_names(program);
-    program.items
-        .collect_arms(Import)
-        .map(|item| match (item) {
-            Import(decl) => decl,
-        })
-        .map(|decl| unused_in(decl, used))
-        .join()
+    program.items.collect_arms(Import)$unused_in(used).join()
 }
 
-# A hit for each name `decl` imports that is not in `used`.
-fn unused_in(ImportDecl { names, source }, used: #{str}) -> LintHit[] {
+# A hit for each name `self` imports that is not in `used`.
+fn unused_in(self: Import(decl), used: #{str}) -> LintHit[] {
+    let ImportDecl { names, source } = decl;
     names
         .filter(|name| !used.has(name.local()))
         .map(|name| hit(unused_message(name.local()), name.hit_span(source)))

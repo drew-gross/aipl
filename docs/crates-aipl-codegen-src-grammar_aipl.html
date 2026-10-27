@@ -776,7 +776,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$67785: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$68149: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1277,7 +1277,7 @@ shim random seeded_with_clock() { body }
           </h3>
           <pre class="signature"><code>fn lower_let_stmt(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>let_stmt</code> — the plain binding, the annotated one, and the two destructuring forms. The token after the name says which: <code>(</code> opens a tuple pattern, <code>{</code> a struct pattern, <code>:</code> an annotation.</p></div>
+          <div class="doc"><p><code>let_stmt</code> — the plain binding, the annotated one, and the three destructuring forms. The token after <code>let</code> says which: <code>(</code> opens a tuple pattern; after a name, <code>(</code> opens a case pattern, <code>{</code> a struct pattern, <code>:</code> an annotation.</p></div>
 
 
         </section>
@@ -1391,7 +1391,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$102216: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$102912: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -1438,6 +1438,21 @@ if (let some(..) = target[__iset$N]) {
 
           <div class="doc"><p><code>for (let T { a, b as c } : xs) { body }</code> is a plain loop over a temporary whose fields are read in front of the body, as <code>let T { a, b as c } = value;</code> reads them — and through the same desugaring, so the pattern's type is checked the same way: the temporary is rebound under the struct's name before its fields are taken, which is what rejects a pattern naming a different struct.</p><pre><code>for (let __fpat$N : xs) { let __spat$N: T = __fpat$N; let a = __spat$N.a; body }
 </code></pre><p>With an <code>index</code> it is the indexed loop over that temporary, as <code>for_tuple</code>'s is.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-for_arm">
+          <h3>
+            <a class="anchor" href="#item-for_arm">for_arm</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn for_arm(case_name: str, names: str[], index: str?, iterable: Expr, body: Expr) -&#62; Stmt</code></pre>
+
+          <div class="doc"><p><code>for (let Import(decl) : xs) { body }</code> is a plain loop over a temporary whose payload is bound in front of the body, as <code>let Import(decl) = value;</code> binds it:</p><pre><code>for (let __fpat$N : xs) { let decl = match (__fpat$N) { Import(decl) =&gt; decl }; body }
+</code></pre><p>With an <code>index</code> it is the indexed loop over that temporary, as <code>for_struct</code>'s is.</p></div>
 
 
         </section>
@@ -1508,6 +1523,20 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn bind_fields_mut(names: str[], tmp: str, span: Span, rest: Expr, fields: str[], mutable: bool) -&#62; Expr</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-bind_arm">
+          <h3>
+            <a class="anchor" href="#item-bind_arm">bind_arm</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn bind_arm(case_name: str, names: str[], tmp: str, span: Span, rest: Expr) -&#62; Expr</code></pre>
+
+          <div class="doc"><p><code>let a = match (&lt;tmp&gt;) { Case(a, _) =&gt; a }; let b = match (&lt;tmp&gt;) { Case(_, b) =&gt; b }; rest</code>, innermost last — what <code>let Case(a, b) = value; rest</code> binds, one <code>match</code> per name. The scrutinee is a value that can only be <code>Case</code>, which is what makes each <code>match</code> exhaustive with the one arm; any other value is refused by that check. A <code>match</code> for each name, rather than one around the rest of the block, keeps <code>rest</code> out of an arm: a block that is an expression may not assign to a binding from outside it.</p></div>
 
 
         </section>
@@ -2130,12 +2159,26 @@ if (let some(..) = target[__iset$N]) {
 
 
 
+        <section class="item" id="item-arm_param">
+          <h3>
+            <a class="anchor" href="#item-arm_param">arm_param</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn arm_param(name: str, case_name: str, names: str[], span: Span) -&#62; Ast</code></pre>
+
+          <div class="doc"><p>A parameter named <code>name</code>, of the type <code>case_name</code> — the case of its variant and no other — whose payload is bound to <code>names</code> at the top of the body.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-destructured_param">
           <h3>
             <a class="anchor" href="#item-destructured_param">destructured_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$139982: FieldBinders, span: Span) -&#62; Ast</code></pre>
+          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$144083: FieldBinders, span: Span) -&#62; Ast</code></pre>
 
           <div class="doc"><p>A parameter named <code>name</code>, of the struct <code>struct_name</code>, whose <code>fields</code> are bound to <code>names</code> at the top of the body.</p></div>
 
@@ -2401,7 +2444,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$156020: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$160151: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -2760,6 +2803,20 @@ if (let some(..) = target[__iset$N]) {
 
 
 
+        <section class="item" id="item-arm_binders">
+          <h3>
+            <a class="anchor" href="#item-arm_binders">arm_binders</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn arm_binders() -&#62; Rule&#60;AiplTok&#62;</code></pre>
+
+          <div class="doc"><p>The braces of a struct pattern: the fields it reads, each optionally bound under another name — <code>Point { x, y as py }</code>. The field leads and the name it is bound as follows <code>as</code>, so the pattern reads like the import that renames (<code>wrapping_add as +</code>) and a reader can tell which side is the struct's. <code>(a, b)</code> after a case's name: one binder per payload slot, <code>_</code> for a slot not wanted. Only a <code>let</code>, a <code>for</code> and a parameter take one, and only over a value that can be nothing but that case.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-field_binders">
           <h3>
             <a class="anchor" href="#item-field_binders">field_binders</a>
@@ -2767,7 +2824,7 @@ if (let some(..) = target[__iset$N]) {
           </h3>
           <pre class="signature"><code>fn field_binders() -&#62; Rule&#60;AiplTok&#62;</code></pre>
 
-          <div class="doc"><p>The braces of a struct pattern: the fields it reads, each optionally bound under another name — <code>Point { x, y as py }</code>. The field leads and the name it is bound as follows <code>as</code>, so the pattern reads like the import that renames (<code>wrapping_add as +</code>) and a reader can tell which side is the struct's.</p></div>
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>

@@ -21,6 +21,7 @@ variant Stmt =
     | Let(name: str, name_span: Span, ty: Ty?, value: Expr)
     | Mut(name: str, name_span: Span, ty: Ty?, value: Expr)
     | LetTuple(names: str[], value: Expr, span: Span)
+    | LetArm(case_name: str, names: str[], value: Expr, span: Span)
     | LetStruct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span)
     | MutStruct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span)
     | Assign(lhs: Expr, value: Expr, span: Span)
@@ -42,7 +43,10 @@ variant ParsedBody = Block(Expr) | Construct(FieldInit[], Span)
 # function's own lowering then binds those fields off. `names` is what each field
 # is bound *as*, one per field: the field's own name, or the one written after
 # `as` in `Point { x as px, y }`.
-struct ParsedParam { param: Param, fields: str[], names: str[], span: Span }
+#
+# `arm` is the case a `Circle(r)` pattern names, whose payload slots `names` binds
+# in order and whose `fields` is empty; `none` for every other parameter.
+struct ParsedParam { param: Param, fields: str[], names: str[], arm: str?, span: Span }
 
 # One function attribute, `.test({ .. })` or `.performance({ .. })`: which one
 # (`name`), its block, the functions declared inside the block, and the span of

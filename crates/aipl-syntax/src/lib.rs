@@ -4251,6 +4251,12 @@ pub fn subst_type_params(t: &Type, map: &HashMap<String, Type>) -> Type {
 /// error the name of the declaration is returned beside it, so the caller can
 /// attribute the diagnostic to the file that declared it.
 ///
+/// The arm types of a variant are expanded the same way, from declarations the
+/// program never wrote: see [`arm_type_decls`]. They are not among the
+/// declarations returned, which are the ones to hold to the rules for a
+/// `variant W = V without C` — an arm type is `V` less every case but one
+/// by construction.
+///
 /// Each declaration's own target comes back fully expanded, used or not: a
 /// declaration nothing mentions leaves no type behind for the checker to
 /// validate, so the caller holds it to the same rules from this.
@@ -4265,15 +4271,19 @@ pub fn expand_refinements(
         }
         _ => true,
     });
+    // In source order, so which of several faults is reported first does not
+    // depend on the map.
+    let mut written: Vec<&ast::RefinementDecl> = decls.values().collect();
+    written.sort_by_key(|d| d.name.span.start);
+    let written: Vec<String> = written.iter().map(|d| d.name.text.clone()).collect();
+    for arm in arm_type_decls(program) {
+        decls.insert(arm.name.text.clone(), arm);
+    }
     if decls.is_empty() {
         return Ok(Vec::new());
     }
-    // In source order, so which of several faults is reported first does not
-    // depend on the map.
-    let mut in_order: Vec<&ast::RefinementDecl> = decls.values().collect();
-    in_order.sort_by_key(|d| d.name.span.start);
     let mut declared = Vec::new();
-    for decl in in_order {
+    for decl in written.iter().map(|name| &decls[name]) {
         // Seeded with the declaration itself, so one that reaches itself
         // through its own target is found from here as well as from a use.
         let mut stack = vec![decl.name.text.clone()];
@@ -4293,6 +4303,107 @@ pub fn expand_refinements(
         }
     });
     first_error.map_or(Ok(declared), Err)
+}
+
+/// The declarations of the arm types `program` writes: a case's name where a
+/// type goes, which the loader resolves to the case-qualified `Case@Variant` it
+/// resolves a constructor to. An arm type is its variant less every other case —
+/// the type `xs.collect_arms(Case)` has for its elements — so a `match` on a
+/// value of it needs that arm and no other, and the value goes wherever its
+/// variant does.
+///
+/// Only the arm types the program mentions are declared, found by reading every
+/// type it holds. A generic variant's arm type takes the variant's own type
+/// arguments (`Some<i64>`), which is what declaring it with the variant's type
+/// parameters makes it do.
+fn arm_type_decls(program: &mut ast::Program) -> Vec<ast::RefinementDecl> {
+    fn qualified_names(t: &Type, out: &mut std::collections::HashSet<String>) {
+        match t {
+            Type::Named(n) if n.contains('@') => {
+                out.insert(n.clone());
+            }
+            Type::Generic(n, args) => {
+                if n.contains('@') {
+                    out.insert(n.clone());
+                }
+                args.iter().for_each(|a| qualified_names(a, out));
+            }
+            Type::Case(i)
+            | Type::Optional(i)
+            | Type::Array(i)
+            | Type::Without(i, _)
+            | Type::Set(i, _) => qualified_names(i, out),
+            Type::Dict(a, b) | Type::Result(a, b) => {
+                qualified_names(a, out);
+                qualified_names(b, out);
+            }
+            Type::Fn(ps, r) => {
+                ps.iter().for_each(|p| qualified_names(p, out));
+                qualified_names(r, out);
+            }
+            Type::Tuple(es) => es.iter().for_each(|e| qualified_names(e, out)),
+            Type::Unit
+            | Type::Primitive(_)
+            | Type::Named(_)
+            | Type::TypeVar(_)
+            | Type::Any
+            | Type::NoneInner
+            | Type::EmptyArrayArg
+            | Type::NoneLiteralArg
+            | Type::Unknown
+            | Type::ConcatStr => {}
+        }
+    }
+    let mut written = std::collections::HashSet::new();
+    each_type_mut(program, &mut |t| qualified_names(t, &mut written));
+    if written.is_empty() {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for item in &program.items {
+        let ast::Item::Variant(v) = item else {
+            continue;
+        };
+        for case in &v.cases {
+            let key = format!("{}@{}", case.name.text, v.name.text);
+            if !written.contains(&key) {
+                continue;
+            }
+            let base = if v.is_generic() {
+                Type::Generic(
+                    v.name.text.clone(),
+                    v.type_vars
+                        .iter()
+                        .map(|p| Type::TypeVar(p.name.clone()))
+                        .collect(),
+                )
+            } else {
+                Type::Named(v.name.text.clone())
+            };
+            // Folded in declaration order, as `collect_arms` types its result,
+            // so the two spell one type.
+            let target = v
+                .cases
+                .iter()
+                .filter(|c| c.name.text != case.name.text)
+                .fold(base, |acc, c| {
+                    Type::Without(
+                        Box::new(acc),
+                        ast::Exclusion::NamedCase(c.name.text.clone()),
+                    )
+                });
+            out.push(ast::RefinementDecl {
+                name: ast::SpanStr {
+                    text: key,
+                    span: case.name.span.clone(),
+                },
+                doc: None,
+                type_vars: v.type_vars.clone(),
+                target,
+            });
+        }
+    }
+    out
 }
 
 /// A refinement declaration with its target expanded — see

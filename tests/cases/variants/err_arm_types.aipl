@@ -1,0 +1,49 @@
+# An arm type is its variant less every other case, so a value of one is refused
+# where it is not — and a pattern for the case is refused for a value that could
+# be another, which would leave the `match` it stands for incomplete.
+
+variant Shape = Circle(i64) | Square(i64) | Dot
+
+// A `Shape` could be a `Square` or a `Dot`.
+fn from_shape(s: Shape) -> i64 {
+    let Circle(r) = s;
+    r
+}
+
+// A `Square` is not a `Circle`.
+fn square_as_circle(s: Square) -> Circle { s }
+
+// A pattern names a case of the value's variant, and no other.
+fn wrong_case(s: Square) -> i64 {
+    let Circle(r) = s;
+    r
+}
+
+// A parameter's pattern is held to the same rule: a `Circle` has one slot.
+fn too_many(Circle(a, b)) -> i64 { a }
+
+fn main() {}
+--- errors ---
+error: non-exhaustive match: missing Square, Dot
+ --> ./tests/cases/variants/err_arm_types.aipl:9:21
+  |
+9 |     let Circle(r) = s;
+  |                     ^
+
+error: fn "square_as_circle": body returns Shape without Circle without Dot, but the declared return type is Shape without Square without Dot
+  --> ./tests/cases/variants/err_arm_types.aipl:14:44
+   |
+14 | fn square_as_circle(s: Square) -> Circle { s }
+   |                                            ^
+
+error: Shape without Circle without Dot has no constructor "Circle"
+  --> ./tests/cases/variants/err_arm_types.aipl:18:21
+   |
+18 |     let Circle(r) = s;
+   |                     ^
+
+error: constructor "Circle@Shape" binds 1 value(s), but 2 given
+  --> ./tests/cases/variants/err_arm_types.aipl:23:13
+   |
+23 | fn too_many(Circle(a, b)) -> i64 { a }
+   |             ^^^^^^

@@ -296,6 +296,7 @@ import {
     FnAttr,
     For as SFor,
     Let as SLet,
+    LetArm as SLetArm,
     LetStruct as SLetStruct,
     LetTuple as SLetTuple,
     Mut as SMut,
@@ -526,8 +527,10 @@ fn items() -> Production<AiplTok, Ast>[] {
         Then([Lit("mut"), Term(Name), Lit(":"), Named("ty")]),
         // `self: Span { start, end }` — a named parameter destructured as well.
         // Ahead of `name: T`, which would otherwise take `self: Span` and leave
-        // the `{` unparsed.
+        // the `{` unparsed. The same goes for `self: Import(decl)`, which takes
+        // apart a value that can only be the one case.
         Then([Term(Name), Lit(":"), Term(Name), field_binders()]),
+        Then([Term(Name), Lit(":"), Term(Name), arm_binders()]),
         Then([Term(Name), Lit(":"), Named("ty"), variadic, Lit("="), Named("expr")]),
         // `k?: T = none` — a parameter that may be *omitted*, as against `k: T?`
         // whose type is optional. Ordered choice makes this an ordinary
@@ -541,6 +544,8 @@ fn items() -> Production<AiplTok, Ast>[] {
         // the same pattern `let Point { x, y } = v;` writes. It names no
         // parameter, so there is no `: T` to follow.
         Then([Term(Name), field_binders()]),
+        // `Import(decl)` — the same for a parameter that can only be one case.
+        Then([Term(Name), arm_binders()]),
     ]);
 
     // A body is a block, or the struct-literal shorthand. The shorthand is tried
@@ -844,6 +849,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
     let bind_target: Rule<AiplTok> = OneOf([
         Many(Term(Name), min=1, sep=Lit(","), trailing_sep=false, nested_in=parens()),
         Then([Term(Name), field_binders()]),
+        Then([Term(Name), arm_binders()]),
         Term(Name),
     ]);
     let let_stmt: Rule<AiplTok> = OneOf([
@@ -2328,9 +2334,9 @@ fn as_stmt(v: Ast, span: Span) -> Stmt!ParseError {
     err(wrong_kind("a statement", v, span))
 }
 
-# `let_stmt` — the plain binding, the annotated one, and the two destructuring
-# forms. The token after the name says which: `(` opens a tuple pattern, `{` a
-# struct pattern, `:` an annotation.
+# `let_stmt` — the plain binding, the annotated one, and the three destructuring
+# forms. The token after `let` says which: `(` opens a tuple pattern; after a
+# name, `(` opens a case pattern, `{` a struct pattern, `:` an annotation.
 fn lower_let_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     lower_binding(src, node, kids, false)
 }
@@ -2359,6 +2365,12 @@ fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!Parse
             let value = kid_expr(kids, 0, sp)?;
             let span = value.span;
             ok(AStmt(SLetTuple(names, value, span)))
+        },
+        // `let Import(decl) = e;` — the case name, then its payload's binders.
+        [_, case_name, "(", ..] => {
+            let value = kid_expr(kids, 0, sp)?;
+            let span = value.span;
+            ok(AStmt(SLetArm(case_name, binder_names(toks[2..]), value, span)))
         },
         // `let T { x, y as py } = e;` — the struct name, then the braces.
         [_, struct_name, "{", ..] => {
@@ -2563,6 +2575,14 @@ fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         },
         // `for (let (a, b) : xs)`
         [_, _, _, "(", ..] => ok(AStmt(for_tuple(names, none, iterable, body, sp)?)),
+        // `for (let i, Import(decl) : xs)` — the case name and then its binders.
+        [_, _, _, index, ",", case_name, "(", ..] => {
+            ok(AStmt(for_arm(case_name, binder_names(toks[6..]), some(index), iterable, body)))
+        },
+        // `for (let Import(decl) : xs)`
+        [_, _, _, case_name, "(", ..] => {
+            ok(AStmt(for_arm(case_name, binder_names(toks[4..]), none, iterable, body)))
+        },
         // `for (let i, T { x, y as b } : xs)` — the struct name and then its braces.
         [_, _, _, index, ",", struct_name, "{", ..] => {
             let FieldBinders { fields, names as bound } = field_binders_of(toks, 7);
@@ -2629,6 +2649,20 @@ fn for_struct(
     SFor(tmp, tmp_span, index, iterable, inner, span)
 }
 
+# `for (let Import(decl) : xs) { body }` is a plain loop over a temporary whose
+# payload is bound in front of the body, as `let Import(decl) = value;` binds it:
+#
+#     for (let __fpat$N : xs) { let decl = match (__fpat$N) { Import(decl) => decl }; body }
+#
+# With an `index` it is the indexed loop over that temporary, as `for_struct`'s is.
+fn for_arm(case_name: str, names: str[], index: str?, iterable: Expr, body: Expr) -> Stmt {
+    let tmp_span = iterable.span;
+    let tmp = `__fpat${tmp_span.start}`;
+    let inner = bind_arm(case_name, names, tmp, tmp_span, body);
+    let span = join_spans(tmp_span, inner.span);
+    SFor(tmp, tmp_span, index, iterable, inner, span)
+}
+
 # `wrap_stmt` — one statement and the rest of the block, folded into the chain
 # the block is. Every arm here is a node whose last slot is that rest, or a
 # `Seq` in front of it for the statements that produce no binding.
@@ -2671,6 +2705,11 @@ fn wrap_stmt(stmt: Stmt, acc: Expr) -> Expr {
             let inner = bind_fields(names, tmp, tup_span, acc, tuple_slot_names(names));
             let span = join_spans(tup_span, inner.span);
             at(Let(tmp, none, value, inner), span)
+        },
+        SLetArm(case_name, names, value, span) => {
+            let tmp = `__cpat${span.start}`;
+            let inner = bind_arm(case_name, names, tmp, span, acc);
+            at(Let(tmp, none, value, inner), join_spans(span, inner.span))
         },
         SLetStruct(struct_name, fields, names, value, span) => destructure_struct(
             struct_name,
@@ -2726,6 +2765,32 @@ fn bind_fields_mut(
         } else {
             at(Let(name, none, field, result), inner_span)
         };
+    }
+    result
+}
+
+# `let a = match (<tmp>) { Case(a, _) => a }; let b = match (<tmp>) { Case(_, b) => b };
+# rest`, innermost last — what `let Case(a, b) = value; rest` binds, one `match`
+# per name. The scrutinee is a value that can only be `Case`, which is what makes
+# each `match` exhaustive with the one arm; any other value is refused by that
+# check. A `match` for each name, rather than one around the rest of the block,
+# keeps `rest` out of an arm: a block that is an expression may not assign to a
+# binding from outside it.
+fn bind_arm(case_name: str, names: str[], tmp: str, span: Span, rest: Expr) -> Expr {
+    mut result = rest;
+    mut i = names.len();
+    while (i > 0) {
+        set i--;
+        let name = names[i].value_or("");
+        let slot = i;
+        let slots = names.range().map(|j| if (j == slot) { name } else { "_" });
+        let arm = MatchArm {
+            pattern: PatCtor(case_name, bindings=slots),
+            body: at(Ident(name), span),
+            span,
+        };
+        let read = at(Match(at(Ident(tmp), span), [arm]), span);
+        set result = at(Let(name, none, read, result), join_spans(span, result.span));
     }
     result
 }
@@ -3456,8 +3521,35 @@ fn lower_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             field_binders_of(toks, 4),
             name_span,
         )),
+        [case_name, "(", ..] => ok(arm_param(
+            `__cpat${name_span.start}`,
+            case_name,
+            binder_names(toks[2..]),
+            name_span,
+        )),
+        [name, ":", case_name, "(", ..] => ok(arm_param(
+            name,
+            case_name,
+            binder_names(toks[4..]),
+            name_span,
+        )),
         _ => named_param_by_shape(src, node, kids, sp),
     }
+}
+
+# A parameter named `name`, of the type `case_name` — the case of its variant and
+# no other — whose payload is bound to `names` at the top of the body.
+fn arm_param(name: str, case_name: str, names: str[], span: Span) -> Ast {
+    let param = Param {
+        name,
+        ty: TyNamed(case_name),
+        mutable: false,
+        arity: One,
+        default: none,
+        implicit_some: false,
+    };
+    let no_fields: str[] = [];
+    AParam(ParsedParam { param, fields: no_fields, names, arm: some(case_name), span })
 }
 
 # A parameter named `name`, of the struct `struct_name`, whose `fields` are bound
@@ -3476,7 +3568,7 @@ fn destructured_param(
         default: none,
         implicit_some: false,
     };
-    AParam(ParsedParam { param, fields, names, span })
+    AParam(ParsedParam { param, fields, names, arm: none, span })
 }
 
 # The six named shapes. Every sub-rule is one position, and *which*
@@ -3552,6 +3644,7 @@ fn named_param(
         param: Param { name: name.slot_text(src), ty, mutable, arity, default, implicit_some },
         fields: no_fields,
         names: no_fields,
+        arm: none,
         span: name.slot_span().value_or(sp),
     }))
 }
@@ -3971,6 +4064,9 @@ fn bind_param_fields(params: ParsedParam[], body: Expr) -> Expr {
 }
 
 fn bind_one_param(p: ParsedParam, body: Expr) -> Expr {
+    if (let some(case_name) = p.arm) {
+        return bind_arm(case_name, p.names, p.param.name, p.span, body);
+    };
     let reads = zip_with(p.fields, p.names, |field: str, name: str| (field, name));
     reads.right_fold(
         body,
@@ -4699,6 +4795,14 @@ pub fn lower_aipl_block(src: str) -> Expr!ParseError {
     );
     assert(block_dump("{ mut P { x } = p; x }") == "Let(__spat$16: P, p, Mut(x, __spat$16.x, x))");
 
+    // `let Case(a, b) = e;` reads each name with a `match` of its own, so the rest
+    // of the block stays outside any arm.
+    assert(
+        block_dump(
+            "{ let Pair(a, b) = p; a }",
+        ) == "Let(__cpat$19, p, Let(a, Match(__cpat$19, [Pair(a, _) => a]), Let(b, Match(__cpat$19, [Pair(_, b) => b]), a)))",
+    );
+
     // A field is bound under another name with `as`: the field is the one read
     // off the scrutinee, the name the one bound. Renamed and plain mix freely, in
     // either form, and the order the fields are written is the order they bind.
@@ -4736,6 +4840,19 @@ pub fn lower_aipl_block(src: str) -> Expr!ParseError {
         block_dump(
             "{ for (let P { x, y as b } : ps) { f(x); } }",
         ) == "Seq(For(__fpat$29, ps, Let(__spat$29: P, __fpat$29, Let(x, __spat$29.x, Let(b, __spat$29.y, Seq(f(x), 0))))), ())",
+    );
+
+    // A case pattern in the header reads the payload in front of the body, as the
+    // `let` does — each name by a `match` of its own over the loop's temporary.
+    assert(
+        block_dump(
+            "{ for (let Wrap(x) : ps) { f(x); } }",
+        ) == "Seq(For(__fpat$21, ps, Let(x, Match(__fpat$21, [Wrap(x) => x]), Seq(f(x), 0))), ())",
+    );
+    assert(
+        block_dump(
+            "{ for (let i, Wrap(x) : ps) { f(x); } }",
+        ) == "Seq(For([i], __fpat$24, ps, Let(x, Match(__fpat$24, [Wrap(x) => x]), Seq(f(x), 0))), ())",
     );
 
     // With an index, which stays on the loop and leads the pattern.
@@ -4913,6 +5030,19 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
         program_dump(
             "fn f(self: Span { start, end as e }) -> Span { self }",
         ) == "fn f(self: Span) -> Span = Let(start, self.start, Let(e, self.end, self))",
+    );
+
+    // `Import(decl)` is the same for a parameter that can only be one case: its
+    // type is the case's name, and the payload is read by a one-arm `match`.
+    assert(
+        program_dump(
+            "fn f(Import(decl)) -> i64 { decl }",
+        ) == "fn f(__cpat$5: Import) -> i64 = Let(decl, Match(__cpat$5, [Import(decl) => decl]), decl)",
+    );
+    assert(
+        program_dump(
+            "fn f(self: Pair(a, b)) -> i64 { b }",
+        ) == "fn f(self: Pair) -> i64 = Let(a, Match(self, [Pair(a, _) => a]), Let(b, Match(self, [Pair(_, b) => b]), b))",
     );
 
     // The `{ field: value }` body shorthand, which resolves against the return
@@ -5701,6 +5831,13 @@ fn nest3(
 # under another name — `Point { x, y as py }`. The field leads and the name it is
 # bound as follows `as`, so the pattern reads like the import that renames
 # (`wrapping_add as +`) and a reader can tell which side is the struct's.
+# `(a, b)` after a case's name: one binder per payload slot, `_` for a slot not
+# wanted. Only a `let`, a `for` and a parameter take one, and only over a value
+# that can be nothing but that case.
+fn arm_binders() -> Rule<AiplTok> {
+    Many(Term(Name), min=1, sep=Lit(","), trailing_sep=false, nested_in=parens())
+}
+
 fn field_binders() -> Rule<AiplTok> {
     let binder: Rule<AiplTok> = Then([Term(Name), Maybe(Then([Lit("as"), Term(Name)]))]);
     Many(binder, min=1, sep=Lit(","), nested_in=braces(), spaced=true)

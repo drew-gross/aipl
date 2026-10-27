@@ -1372,7 +1372,8 @@ fn params_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
 # `Point { x, y }` names no parameter, so it has no `: T` after it — the pattern
 # names the struct instead, exactly as `let Point { x, y } = v;` does, and it is
 # laid out the same flat way that statement is. `p: Point { x, y }` names one,
-# and its pattern follows the `:` laid out the same way.
+# and its pattern follows the `:` laid out the same way. So do `Import(decl)` and
+# `p: Import(decl)`, whose pattern names the one case the value can be.
 fn one_param(self: W) -> WDoc!FmtError {
     let l = self.lead();
     let m = if (l.w.peek_text() == "mut") {
@@ -1389,6 +1390,14 @@ fn one_param(self: W) -> WDoc!FmtError {
             doc: Concat([..m.docs, Text(`{n.text} \{ {ids.names.join(sep=", ")} }`)]),
         });
     };
+    if (n.w.peek_text() == "(") {
+        let ids = n.w.bump().w.ident_list(")", []);
+        let closed = ids.w.expect(")")?.w;
+        return ok(WDoc {
+            w: closed,
+            doc: Concat([..m.docs, Text(`{n.text}({ids.names.join(sep=", ")})`)]),
+        });
+    };
 
     // `k?: T = none` — the `?` marks a parameter that may be *omitted*, against
     // `k: T?` where the type itself is optional. It belongs to the name, so it
@@ -1402,6 +1411,12 @@ fn one_param(self: W) -> WDoc!FmtError {
         let ids = t.w.bump().w.field_binder_list();
         let closed = ids.w.expect("}")?.w;
         let pattern = Text(` \{ {ids.names.join(sep=", ")} }`);
+        return ok(WDoc { w: closed, doc: Concat([..m.docs, named, Text(": "), t.doc, pattern]) });
+    };
+    if (t.w.peek_text() == "(") {
+        let ids = t.w.bump().w.ident_list(")", []);
+        let closed = ids.w.expect(")")?.w;
+        let pattern = Text(`({ids.names.join(sep=", ")})`);
         return ok(WDoc { w: closed, doc: Concat([..m.docs, named, Text(": "), t.doc, pattern]) });
     };
     let typed = [..m.docs, named, Text(": "), t.doc];
@@ -1605,7 +1620,8 @@ fn statement(self: W) -> WDoc!FmtError {
     ok(WDoc { w: e.w.bump().w, doc: Concat([e.doc, Text(";")]) })
 }
 
-# `let x = e;`, `let x: T = e;`, `let (a, b) = e;`, or `let Name { a, b } = e;`.
+# `let x = e;`, `let x: T = e;`, `let (a, b) = e;`, `let Name { a, b } = e;`, or
+# `let Case(a, b) = e;`.
 fn let_stmt(self: W) -> WDoc!FmtError {
     let kw = self.bump().w;
     if (kw.peek_text() == "(") {
@@ -1620,6 +1636,21 @@ fn let_stmt(self: W) -> WDoc!FmtError {
     let n = kw.bump();
     if (n.w.peek_text() == "{") {
         return n.w.struct_pattern("let", n.text);
+    };
+    if (n.w.peek_text() == "(") {
+        let ids = n.w.bump().w.ident_list(")", []);
+        let v = ids.w.expect(")")?.w.expect("=")?.w.expr()?;
+        let done = v.w.expect(";")?.w;
+        return ok(
+            WDoc {
+                w: done,
+                doc: Concat([
+                    Text(`let {n.text}({ids.names.join(sep=", ")}) = `),
+                    v.doc,
+                    Text(";"),
+                ]),
+            },
+        );
     };
     let a = n.w.binding_ann()?;
     let v = a.w.expect("=")?.w.expr()?;
@@ -1796,13 +1827,18 @@ fn for_stmt(self: W) -> WDoc!FmtError {
     })
 }
 
-# One binder of a `for` header: a name, a tuple pattern `(a, b)`, or a struct
-# pattern `T { a, b as c }` — the name followed by its braces.
+# One binder of a `for` header: a name, a tuple pattern `(a, b)`, a case pattern
+# `Case(a, b)`, or a struct pattern `T { a, b as c }` — the name followed by its
+# parentheses or braces.
 fn binder_item(self: W) -> WStr {
     if (self.peek_text() == "(") {
         return self.tuple_binder();
     };
     let n = self.bump();
+    if (n.w.peek_text() == "(") {
+        let tuple = n.w.tuple_binder();
+        return WStr { w: tuple.w, text: `{n.text}{tuple.text}` };
+    };
     if (n.w.peek_text() != "{") {
         return WStr { w: n.w, text: n.text };
     };
@@ -3369,6 +3405,11 @@ fn walker_of(src: str) -> W!FmtError {
             .rendered(100)? == "{\n    let S { a, b } = p;\n}\n",
     );
     assert(
+        walker_of("{ let Pair ( a , _ ) = p ; }")?
+            .block()
+            .rendered(100)? == "{\n    let Pair(a, _) = p;\n}\n",
+    );
+    assert(
         walker_of("{ mut S { a , b } = p ; }")?
             .block()
             .rendered(100)? == "{\n    mut S { a, b } = p;\n}\n",
@@ -3408,6 +3449,16 @@ fn walker_of(src: str) -> W!FmtError {
         walker_of("{ for ( let i , P { x } : xs ) { f ( ) ; } }")?
             .block()
             .rendered(100)? == "{\n    for (let i, P { x } : xs) {\n        f();\n    }\n}\n",
+    );
+    assert(
+        walker_of("{ for ( let Wrap ( x ) : xs ) { f ( ) ; } }")?
+            .block()
+            .rendered(100)? == "{\n    for (let Wrap(x) : xs) {\n        f();\n    }\n}\n",
+    );
+    assert(
+        walker_of("{ for ( let i , Wrap ( x ) : xs ) { f ( ) ; } }")?
+            .block()
+            .rendered(100)? == "{\n    for (let i, Wrap(x) : xs) {\n        f();\n    }\n}\n",
     );
 
     // --- items ------------------------------------------------------------------
@@ -3470,6 +3521,16 @@ fn walker_of(src: str) -> W!FmtError {
         walker_of("fn f ( Point { x  as  px , y } ) -> i64 { px }")?
             .fn_item()
             .rendered(100)? == "fn f(Point { x as px, y }) -> i64 { px }",
+    );
+    assert(
+        walker_of("fn f ( Import ( decl ) , n : i64 ) -> i64 { n }")?
+            .fn_item()
+            .rendered(100)? == "fn f(Import(decl), n: i64) -> i64 { n }",
+    );
+    assert(
+        walker_of("fn f ( self : Pair ( a , _ ) ) -> i64 { a }")?
+            .fn_item()
+            .rendered(100)? == "fn f(self: Pair(a, _)) -> i64 { a }",
     );
     assert(
         walker_of("fn f ( self : Span { start , end  as  e } , n : i64 ) -> i64 { e }")?

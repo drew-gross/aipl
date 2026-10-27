@@ -7,9 +7,11 @@
 # What the body returns is a `T[]`, but a call in a user's file is typed more
 # precisely than that: the checker reads the case off the constructor reference
 # passed as `arm` and types the result as an array of `T` *without every other
-# case* (see `refine_collected_arms` in `aipl-mono`). The elements are the same
-# values either way — the refinement costs nothing at run time — but a `match` on
-# one needs only the arm that was collected, and refuses any other.
+# case* (see `refine_collected_arms` in `aipl-mono`) — the array of that case's
+# own type, so `shapes.collect_arms(Circle)` is a `Circle[]`. The elements are the
+# same values either way — the refinement costs nothing at run time — but a
+# `match` on one needs only the arm that was collected and refuses any other, and
+# `for (let Circle(r) : ..)` takes its payload with no `match` at all.
 #
 # There is no lint steering callers here: the longhand,
 # `xs.filter(|x| x.case_of() == Circle)`, is a different program (its elements are

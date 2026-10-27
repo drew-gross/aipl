@@ -102,6 +102,9 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  collect_arms should accept a type param, not a case as a value
+  use SpanStr in ImportSource and other parts of linter
+  make template literals able to hold escaped `'s instead of using let TICK: str = "`";
   renames:
     tok -> token
     subexprs -> subexpressions
@@ -370,10 +373,8 @@ matrices:
   no named operator for matmul probably, user can import matmul as * if they want
   option to put the shape in the type e.g. T[5,] or T[5,10] (make this work for 1d too? i.e. T[5])
   support more than 2 dimensions
-  support retrieving a row/col
 
 types:
-  each variant arms should implicitly become a type, then collect_arms can work better, and unused_imports can use it better
   allow sets of more complex things (tuples, structs, variants)
   spans with signed bounds should work, so that we can e.g. (-1..2).cartesian_product(-1..2) in neighbours
   make without work for fields, then you can spread the original type into them
@@ -456,6 +457,7 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  set add operation
   __builtin_drop_* should be mutating methods
   zip
   int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html
@@ -810,6 +812,7 @@ expression matcher:
   use it for operation fusion
 
 vscode:
+  find all references is finding local variables with the same name that aren't actually references
   have the server able to run tests and show how many are passing (probably needs to have tests auto-shim first)
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 

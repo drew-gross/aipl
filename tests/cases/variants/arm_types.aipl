@@ -1,0 +1,81 @@
+# Every case of a variant is also a type: `Circle` written where a type goes is
+# `Shape` with every other case left out, so a value of it can only be a `Circle`
+# and its payload is there to read without handling the rest. It is what
+# `shapes.collect_arms(Circle)` has for its elements, and it goes wherever its
+# variant does — at run time they are the same `Shape`.
+#
+# Since the one case is known, a `let`, a `for` and a parameter may take the
+# payload apart by that case's own pattern, with nothing to say about the others.
+
+import {
+    collect_arms,
+    print,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+    wrapping_mul as *,
+} from builtins;
+
+variant Shape = Circle(i64) | Square(i64) | Dot | Rect(i64, i64)
+
+variant Opt<T> = Has(T) | Nothing
+
+fn circles(shapes: Shape[]) -> Circle[] { shapes.collect_arms(Circle) }
+
+// An arm type is a `Shape`, so it goes where one is wanted, singly or in an array.
+fn as_shape(c: Circle) -> Shape { c }
+
+fn as_shapes(cs: Circle[]) -> Shape[] { cs }
+
+// A parameter takes the payload by the case's pattern: unnamed, or named — and
+// `self` is what makes the function a method, with the whole value still in hand.
+fn radius(Circle(r)) -> i64 { r }
+
+fn doubled(self: Circle(r)) -> Shape { Circle(r + r) }
+
+// A `_` leaves a slot alone.
+fn area(self: Rect(width, height)) -> i64 { width * height }
+
+fn height(self: Rect(_, h)) -> i64 { h }
+
+// A generic variant's arm type takes the variant's type arguments.
+fn held(o: Has<i64>) -> i64 {
+    let Has(v) = o;
+    v
+}
+
+fn main() !prints {
+    let shapes = [Circle(1), Square(2), Dot, Circle(3), Rect(4, 5)];
+    let found = circles(shapes);
+
+    // `let` takes a value that can only be the case apart.
+    mut total = 0;
+    for (let Circle(r) : found) {
+        set total += r;
+    }
+    print(`{total}`);
+
+    for (let i, Circle(r) : found) {
+        print(`{i}: {r}`);
+    }
+
+    let first = found[0];
+    if (let some(c) = first) {
+        let Circle(r) = c;
+        print(`{r} {radius(c)} {c.doubled()} {as_shape(c)}`);
+    };
+    print(`{as_shapes(found)}`);
+
+    let rects = shapes.collect_arms(Rect);
+    for (let r : rects) {
+        print(`{r.height()} {r.area()}`);
+    }
+    print(`{held(Has(7))}`);
+}
+--- stdout ---
+4
+0: 1
+1: 3
+1 1 Circle(2) Circle(1)
+[Circle(1), Circle(3)]
+5 20
+7
