@@ -698,6 +698,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/cst | 321 | 23032 | 15752 | 59438 | 62608 | 47.00 | 362.03 | 1600 |
 | crates/aipl-codegen/src/dedent | 20 | 1037 | 320 | 20840 | 4908 | 10.00 | 187.74 | 1472 |
 | crates/aipl-codegen/src/doc | 310 | 21209 | 4705 | 35335 | 23488 | 37.00 | 303.99 | 1520 |
+| crates/aipl-codegen/src/duplicate_import_source | 17431 | 2320248 | 653376 | 6341967 | 4356332 | 2609.00 | 10856.47 | 5424 |
 | crates/aipl-codegen/src/ebnf | 1439 | 140994 | 19328 | 256384 | 112268 | 156.00 | 561.34 | 1856 |
 | crates/aipl-codegen/src/expr | 742 | 60645 | 20280 | 34022 | 128912 | 62.00 | 391.61 | 1712 |
 | crates/aipl-codegen/src/fill_or_add_sections | 133 | 10761 | 6469 | 34842 | 11452 | 24.00 | 92.10 | 1504 |
@@ -723,12 +724,12 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/lexer | 178 | 40680 | 44256 | 602785 | 540840 | 157.00 | 1172.69 | 2224 |
 | crates/aipl-codegen/src/line_at | 0 | 0 | 0 | 3536 | 2044 | 2.00 | 64.81 | 1440 |
 | crates/aipl-codegen/src/lines | 12 | 1008 | 1008 | 1143 | 2656 | 5.00 | 62.64 | 1440 |
-| crates/aipl-codegen/src/lint | 1 | 72 | 72 | 557 | 43712 | 4.00 | 3178.12 | 1520 |
+| crates/aipl-codegen/src/lint | 2 | 144 | 144 | 856 | 45780 | 7.00 | 3487.00 | 1520 |
 | crates/aipl-codegen/src/lint_hit | 0 | 0 | 0 | 146 | 656 | 1.00 | 57.15 | 1456 |
 | crates/aipl-codegen/src/normalize_output | 16 | 880 | 143 | 2750 | 1968 | 5.00 | 64.27 | 1440 |
 | crates/aipl-codegen/src/operator_named_forms | 16 | 1040 | 1040 | 3256 | 8316 | 7.00 | 66.69 | 1472 |
 | crates/aipl-codegen/src/parse | 7617 | 828674 | 144080 | 3741800 | 649844 | 908.00 | 3446.41 | 2752 |
-| crates/aipl-codegen/src/parse_and_partial_load | 21628 | 2745497 | 678170 | 11372243 | 4547304 | 3539.00 | 11201.39 | 6656 |
+| crates/aipl-codegen/src/parse_and_partial_load | 21638 | 2746201 | 678130 | 11373898 | 4549544 | 4540.00 | 11639.25 | 6960 |
 | crates/aipl-codegen/src/parse_spec | 147 | 4236 | 2155 | 75000 | 108664 | 39.00 | 268.43 | 1568 |
 | crates/aipl-codegen/src/parse_test_section_header | 0 | 0 | 0 | 1296 | 3232 | 4.00 | 64.92 | 1472 |
 | crates/aipl-codegen/src/parsed | 40 | 2981 | 2521 | 2259 | 49156 | 11.00 | 794.35 | 1552 |

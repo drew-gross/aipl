@@ -16,7 +16,6 @@ mod char_set_literal;
 mod compound_assign;
 mod destructure_binding;
 mod destructure_param;
-mod duplicate_import_source;
 mod eta_lambda;
 mod extend_longhand;
 mod field_init_shorthand;
@@ -57,7 +56,6 @@ use self::char_set_literal::char_set_literal;
 use self::compound_assign::{compound_assign, matching_compound};
 use self::destructure_binding::destructure_binding;
 use self::destructure_param::destructure_param;
-use self::duplicate_import_source::duplicate_import_source;
 use self::eta_lambda::{eta_lambda, Forwarding};
 use self::extend_longhand::{extend_longhand, extend_names};
 use self::field_init_shorthand::field_init_shorthand;
@@ -264,13 +262,12 @@ pub fn check(
             with_value_or_self(e, src, &names, &mut hits)
         });
     }
-    // The lints ported to AIPL ran with the parse. `unused_imports` is the only one
-    // so far, and its place in the order among the lints still written in Rust is
-    // kept.
+    // The lints ported to AIPL ran with the parse. `unused_imports` and
+    // `duplicate_import_source` so far, and their place in the order among the
+    // lints still written in Rust is kept.
     hits.extend(ported);
     destructure_binding(program, &mut hits);
     destructure_param(program, &mut hits);
-    duplicate_import_source(program, &mut hits);
     fn_body_type_stutter(program, src, &mut hits);
     hits.retain(|e| match &e.span {
         Some(sp) => {

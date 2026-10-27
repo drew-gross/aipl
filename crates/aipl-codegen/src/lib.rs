@@ -1709,6 +1709,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     // The lints that have moved to AIPL, run by `parse_and_partial_load`.
     "./lint_hit.aipl",
     "./unused_imports.aipl",
+    "./duplicate_import_source.aipl",
     "./lint.aipl",
     "./parse_and_partial_load.aipl",
     // The formatter: `format_source` is the whole pipeline, and its walker
