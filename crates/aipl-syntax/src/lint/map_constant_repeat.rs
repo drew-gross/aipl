@@ -83,8 +83,7 @@ pub(super) fn map_constant_repeat(e: &Expr, src: &str, names: &RepeatNames, hits
     hits.push(Error::at(
         format!(
             "\"{map}\" with a function that ignores its argument builds the same value once \
-             per element — for a sequence, write \"[{element}].{repeat}({items}.{len}())\"{import} \
-             (or append #[allow] to this line to keep it)"
+             per element — for a sequence, write \"[{element}].{repeat}({items}.{len}())\"{import}"
         ),
         lambda.span.clone(),
     ));

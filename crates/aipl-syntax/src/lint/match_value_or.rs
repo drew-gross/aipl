@@ -168,7 +168,7 @@ pub(super) fn match_value_or(e: &Expr, src: &str, hits: &mut Vec<Error>) {
     hits.push(Error::at(
         format!(
             "this `match` hands back the optional's payload or a default — \
-             {advice} (or append #[allow] to this line to keep it)"
+             {advice}"
         ),
         some_arm.body.span.clone(),
     ));

@@ -99,10 +99,7 @@ fn map_step(
     match &arg.kind {
         ExprKind::Ident(name) if cx.methods.contains(name) => {
             hits.push(Error::at(
-                format!(
-                    "\"map\" over the function \"{name}\" — write \"{recv}${name}()\" \
-                     (or append #[allow] to this line to keep it)"
-                ),
+                format!("\"map\" over the function \"{name}\" — write \"{recv}${name}()\""),
                 arg.span.clone(),
             ));
         }
@@ -123,7 +120,7 @@ fn map_step(
             hits.push(Error::at(
                 format!(
                     "\"map\" with a lambda that only uses a member of its argument — write \
-                     \"{recv}{}\" (or append #[allow] to this line to keep it)",
+                     \"{recv}{}\"",
                     steps.concat()
                 ),
                 arg.span.clone(),
@@ -203,7 +200,7 @@ fn forwarded(e: &Expr, params: &[crate::ast::LambdaParam], body: &Expr, hits: &m
     hits.push(Error::at(
         format!(
             "lambda only forwards its argument(s) to \"{name}\" — pass \
-             \"{name}\" directly (or append #[allow] to this line to keep it)"
+             \"{name}\" directly"
         ),
         e.span.clone(),
     ));

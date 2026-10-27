@@ -26,7 +26,7 @@ pub(super) fn slice_to_len(e: &Expr, src: &str, hits: &mut Vec<Error>) {
     hits.push(Error::at(
         format!(
             "slice end is the receiver's whole length — use the open-ended \
-             \"{recv}[{st}..]\" (or append #[allow] to this line to keep it)"
+             \"{recv}[{st}..]\""
         ),
         end.span.clone(),
     ));

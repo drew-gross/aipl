@@ -107,8 +107,7 @@ pub(super) fn extend_longhand(e: &Expr, names: &ExtendNames, hits: &mut Vec<Erro
     hits.push(Error::at(
         format!(
             "\"{name}\" is rebuilt to append to it — grow it in place with \
-             \"set {name}.{extend}(...);\"{per_operand}{import} (or append #[allow] to this \
-             line to keep it)"
+             \"set {name}.{extend}(...);\"{per_operand}{import}"
         ),
         e.span.clone(),
     ));

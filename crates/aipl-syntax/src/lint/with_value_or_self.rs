@@ -79,7 +79,7 @@ pub(super) fn with_value_or_self(e: &Expr, src: &str, names: &WithNames, hits: &
     hits.push(Error::at(
         format!(
             "this `{}` falls back to the array it is replacing in — write \"{array}.{try_set}(..)\" \
-             and drop the fallback{import} (or append #[allow] to this line to keep it)",
+             and drop the fallback{import}",
             names.value_or
         ),
         default.span.clone(),

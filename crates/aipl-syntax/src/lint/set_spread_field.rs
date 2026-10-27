@@ -58,7 +58,7 @@ pub(super) fn set_spread_field(e: &Expr, src: &str, hits: &mut Vec<Error>) {
     hits.push(Error::at(
         format!(
             "this \"set\" rebuilds {target:?} from itself only to {what} — {advice} \
-             directly: \"{stores}\" (or append #[allow] to this line to keep it)"
+             directly: \"{stores}\""
         ),
         spread.value.span.clone(),
     ));

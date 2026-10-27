@@ -99,8 +99,7 @@ pub(super) fn return_loop_find_index(
     hits.push(Error::at(
         format!(
             "this loop returns the position of the first element passing a test, and \"none\" \
-             otherwise — write \"return {recv}.{name}(|{var}| ..);\" and drop the loop{import} \
-             (or append #[allow] to this line to keep it)"
+             otherwise — write \"return {recv}.{name}(|{var}| ..);\" and drop the loop{import}"
         ),
         ret.span.clone(),
     ));

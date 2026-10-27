@@ -104,7 +104,6 @@ benchmark:
 misc cleanup:
   collect_arms should accept a type param, not a case as a value
   use SpanStr in ImportSource and other parts of linter
-  make template literals able to hold escaped `'s instead of using let TICK: str = "`";
   renames:
     tok -> token
     subexprs -> subexpressions

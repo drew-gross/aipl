@@ -101,8 +101,7 @@ pub(super) fn return_loop_find_if(
     hits.push(Error::at(
         format!(
             "this loop returns the first element passing a test, and \"none\" otherwise — \
-             write \"return {recv}.{name}(|{var}| ..);\" and drop the loop{import} \
-             (or append #[allow] to this line to keep it)"
+             write \"return {recv}.{name}(|{var}| ..);\" and drop the loop{import}"
         ),
         ret.span.clone(),
     ));

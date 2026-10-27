@@ -65,7 +65,7 @@ pub(super) fn map_find_if_some(e: &Expr, names: &FindMapNames, hits: &mut Vec<Er
         format!(
             "\"{map}\" then \"{find_if}({is_some})\" is the first element with an answer, \
              wrapped twice — write \"{find_map}(..)\" over the mapping function, which hands \
-             the answer back once{import} (or append #[allow] to this line to keep it)"
+             the answer back once{import}"
         ),
         e.span.clone(),
     ));

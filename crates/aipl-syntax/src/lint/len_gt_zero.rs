@@ -130,7 +130,7 @@ pub(super) fn len_gt_zero(e: &Expr, src: &str, cmp: &LenZeroCmp, hits: &mut Vec<
         format!("use \"{name}\" on the receiver")
     };
     hits.push(Error::at(
-        format!("{what} — {advice}{import} (or append #[allow] to this line to keep it)"),
+        format!("{what} — {advice}{import}"),
         e.span.clone(),
     ));
 }

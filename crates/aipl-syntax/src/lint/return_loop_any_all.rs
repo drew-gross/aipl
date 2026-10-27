@@ -163,7 +163,7 @@ pub(super) fn return_loop_any_all(e: &Expr, src: &str, names: &AnyAllNames, hits
     hits.push(Error::at(
         format!(
             "this loop reports {what} — write \"return {recv}.{name}(|{var}| ..);\"{note} and \
-             drop the loop{import} (or append #[allow] to this line to keep it)"
+             drop the loop{import}"
         ),
         ret.span.clone(),
     ));

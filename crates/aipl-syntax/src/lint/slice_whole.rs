@@ -63,10 +63,7 @@ pub(super) fn slice_whole(e: &Expr, src: &str, hits: &mut Vec<Error>) {
         start.span.clone()
     };
     hits.push(Error::at(
-        format!(
-            "slice covers the whole receiver — {use_it} \
-             (or append #[allow] to this line to keep it)"
-        ),
+        format!("slice covers the whole receiver — {use_it}"),
         span,
     ));
 }

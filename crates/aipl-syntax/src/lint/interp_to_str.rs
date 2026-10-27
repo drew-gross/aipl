@@ -38,7 +38,7 @@ pub(super) fn interp_to_str(e: &Expr, src: &str, to_str: &str, hits: &mut Vec<Er
     hits.push(Error::at(
         format!(
             "\"{to_str}\" inside an interpolation is redundant — the interpolation already \
-             renders its value, so {advice} (or append #[allow] to this line to keep it)"
+             renders its value, so {advice}"
         ),
         inner.span.clone(),
     ));

@@ -122,10 +122,7 @@ pub(super) fn is_empty_longhand(e: &Expr, src: &str, names: &EmptyNames, hits: &
         format!("use \"{name}\" on the receiver")
     };
     hits.push(Error::at(
-        format!(
-            "emptiness asked the long way — {advice}{import} (or append #[allow] to this \
-             line to keep it)"
-        ),
+        format!("emptiness asked the long way — {advice}{import}"),
         e.span.clone(),
     ));
 }

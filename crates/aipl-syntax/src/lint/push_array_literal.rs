@@ -88,8 +88,7 @@ pub(super) fn push_array_literal(e: &Expr, src: &str, push: &str, hits: &mut Vec
     hits.push(Error::at(
         format!(
             "\"{acc}\" is seeded and then only appended to before being returned — \
-             write \"{literal}\" and drop the mut \
-             (or append #[allow] to this line to keep it)"
+             write \"{literal}\" and drop the mut"
         ),
         seed.span.clone(),
     ));

@@ -59,8 +59,7 @@ pub(super) fn step_by_one(e: &Expr, src: &str, steps: &Steps, hits: &mut Vec<Err
     let (what, form) = step.wording(name);
     hits.push(Error::at(
         format!(
-            "{what} — use the {form} form \"set {name}{};\"{import} \
-             (or append #[allow] to this line to keep it)",
+            "{what} — use the {form} form \"set {name}{};\"{import}",
             step.spelling
         ),
         e.span.clone(),

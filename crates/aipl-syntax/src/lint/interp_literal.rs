@@ -32,7 +32,7 @@ pub(super) fn interp_literal(e: &Expr, src: &str, hits: &mut Vec<Error>) {
     hits.push(Error::at(
         format!(
             "a {what} literal interpolated into a template is just its text — write it into \
-             the template directly (or append #[allow] to this line to keep it)"
+             the template directly"
         ),
         inner.span.clone(),
     ));

@@ -76,7 +76,7 @@ fn one_param(
                 format!(
                     "parameter \"{}\" is only taken apart by a destructuring `let` — destructure \
                      it in the signature instead: \"{struct_name} {{ {} }}\" in place of \
-                     \"{}: {struct_name}\" (or append #[allow] to this line to keep it)",
+                     \"{}: {struct_name}\"",
                     p.name,
                     fields.join(", "),
                     p.name,
@@ -109,8 +109,7 @@ fn one_param(
     hits.push(Error::at(
         format!(
             "only the fields of parameter \"{}\" are read — destructure it instead: \
-             \"{struct_name} {{ {} }}\" in place of \"{}: {struct_name}\" \
-             (or append #[allow] to this line to keep it)",
+             \"{struct_name} {{ {} }}\" in place of \"{}: {struct_name}\"",
             p.name,
             fields.join(", "),
             p.name,

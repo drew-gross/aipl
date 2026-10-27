@@ -133,7 +133,7 @@ fn one_binding(e: &Expr, all: &HashMap<(String, String), usize>, hits: &mut Vec<
     hits.push(Error::at(
         format!(
             "only the fields of \"{name}\" are read — destructure the binding instead: \
-             \"let {ty} {{ {} }} = ...\" (or append #[allow] to this line to keep it)",
+             \"let {ty} {{ {} }} = ...\"",
             fields.join(", ")
         ),
         value.span.clone(),

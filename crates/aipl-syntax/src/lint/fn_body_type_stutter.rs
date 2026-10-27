@@ -70,7 +70,7 @@ pub(super) fn fn_body_type_stutter(program: &Program, src: &str, hits: &mut Vec<
         hits.push(Error::at(
             format!(
                 "fn {:?} returns {name:?} and its body is a {name:?} literal, naming the type \
-                 twice — {advice} (or append #[allow] to this line to keep it)",
+                 twice — {advice}",
                 f.name
             ),
             literal.span.clone(),

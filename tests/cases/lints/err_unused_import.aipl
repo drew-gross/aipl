@@ -10,13 +10,13 @@ fn main() !prints {
     print(`{[1, 2].map(|x| x).len()}`);
 }
 --- errors ---
-error: unused import "filter": nothing in this file references it; drop it from the import list
+error: unused import "filter": nothing in this file references it; drop it from the import list (or append #[allow] to this line to keep it)
  --> ./tests/cases/lints/err_unused_import.aipl:7:10
   |
 7 | import { filter, len, map, print, wrapping_add as + } from builtins;
   |          ^^^^^^
 
-error: unused import "+": nothing in this file references it; drop it from the import list
+error: unused import "+": nothing in this file references it; drop it from the import list (or append #[allow] to this line to keep it)
  --> ./tests/cases/lints/err_unused_import.aipl:7:35
   |
 7 | import { filter, len, map, print, wrapping_add as + } from builtins;

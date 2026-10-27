@@ -82,8 +82,7 @@ pub(super) fn match_is_some_and(e: &Expr, hits: &mut Vec<Error>) {
     hits.push(Error::at(
         format!(
             "this `match` only asks whether the optional holds a value the arm \
-             accepts — write \"{call}\" instead (or append #[allow] to this line \
-             to keep it)"
+             accepts — write \"{call}\" instead"
         ),
         none_arm.body.span.clone(),
     ));

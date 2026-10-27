@@ -87,6 +87,11 @@ use self::union_loop_union_all::{union_loop_union_all, union_names};
 use self::value_or_compare::{value_or_compare, value_or_compare_names};
 use self::with_value_or_self::{with_names, with_value_or_self};
 
+/// What a lint's message ends with: the way to keep what it flagged. Appended by
+/// [`check`] to each hit it returns, so a lint's message says only what is wrong
+/// and what to write instead.
+const SQUELCH_ADVICE: &str = " (or append #[allow] to this line to keep it)";
+
 /// Run every lint over `program` — function bodies, `.test` blocks, and
 /// keyword-parameter / struct-field default expressions — then drop the
 /// hits squelched by a same-line `#[allow]` (`allows` are the marker spans
@@ -281,6 +286,11 @@ pub fn check(
         }
         None => true,
     });
+    // Every hit that survives says how to keep it, so no lint spells that out in
+    // its own message. A hit with no span has no line for a marker to go on.
+    for hit in hits.iter_mut().filter(|e| e.span.is_some()) {
+        hit.message.push_str(SQUELCH_ADVICE);
+    }
     // A marker is an acknowledgement of a lint that fired, so one with nothing to
     // squelch is stale: the code was fixed, or the marker was never needed. It is
     // not itself squelchable — what it would squelch is itself.

@@ -87,8 +87,7 @@ pub(super) fn value_or_compare(e: &Expr, src: &str, names: &ValueOrCompare, hits
     hits.push(Error::at(
         format!(
             "`{value_or}` here only supplies a value for the comparison to reject; compare \
-             the optional directly: `{opt_src} {cmp} some({lit_src})` (or append #[allow] to \
-             this line to keep it)"
+             the optional directly: `{opt_src} {cmp} some({lit_src})`"
         ),
         default.span.clone(),
     ));

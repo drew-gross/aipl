@@ -102,8 +102,7 @@ pub(super) fn char_set_literal(e: &Expr, src: &str, to_set: Option<&str>, hits: 
     // advice *is* a string literal, and `""abc".to_set()"` reads as neither.
     hits.push(Error::at(
         format!(
-            "a char set of {} elements spelled out — write `{literal}.{name}()`{import} \
-             (or append #[allow] to this line to keep it)",
+            "a char set of {} elements spelled out — write `{literal}.{name}()`{import}",
             elems.len()
         ),
         e.span.clone(),

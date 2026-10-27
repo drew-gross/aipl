@@ -185,7 +185,7 @@ pub(super) fn push_loop_pipeline(
     hits.push(Error::at(
         format!(
             "\"{acc}\" is seeded empty and filled by this loop and nothing else — \
-             {advice}{import} (or append #[allow] to this line to keep it)"
+             {advice}{import}"
         ),
         seed.span.clone(),
     ));

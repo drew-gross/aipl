@@ -90,8 +90,7 @@ pub(super) fn match_map_value_or(e: &Expr, src: &str, hits: &mut Vec<Error>) {
             hits.push(Error::at(
                 format!(
                     "this `match` maps the optional's payload and keeps `none` — write \
-                     \"{receiver}.map(|{binder}| ..)\" with the value the `some` arm wraps \
-                     (or append #[allow] to this line to keep it)"
+                     \"{receiver}.map(|{binder}| ..)\" with the value the `some` arm wraps"
                 ),
                 none_arm.body.span.clone(),
             ));
@@ -133,7 +132,7 @@ pub(super) fn match_map_value_or(e: &Expr, src: &str, hits: &mut Vec<Error>) {
     hits.push(Error::at(
         format!(
             "this `match` transforms the optional's payload or falls back to a default — \
-             {advice} (or append #[allow] to this line to keep it)"
+             {advice}"
         ),
         none_arm.body.span.clone(),
     ));

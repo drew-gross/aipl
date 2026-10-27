@@ -68,7 +68,7 @@ pub(super) fn arm_block_value(e: &Expr, src: &str, hits: &mut Vec<Error>) {
         let close = src.len() - after_value.len();
         hits.push(Error::at(
             "this arm's block holds nothing but its value — write the value as the arm's body, \
-             without the braces (or append #[allow] to this line to keep it)"
+             without the braces"
                 .to_string(),
             close..close + 1,
         ));

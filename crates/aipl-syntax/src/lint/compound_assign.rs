@@ -70,7 +70,7 @@ pub(super) fn compound_assign(
     hits.push(Error::at(
         format!(
             "\"{name}\" accumulates onto itself — use the compound form \
-             \"set {name} {spelling} ...;\"{import} (or append #[allow] to this line to keep it)"
+             \"set {name} {spelling} ...;\"{import}"
         ),
         e.span.clone(),
     ));

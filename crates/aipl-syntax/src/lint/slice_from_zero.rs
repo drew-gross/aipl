@@ -28,10 +28,7 @@ pub(super) fn slice_from_zero(e: &Expr, src: &str, hits: &mut Vec<Error>) {
     // source text produced malformed advice like `s[..s.len]`.
     let recv = &src[obj.span.clone()];
     hits.push(Error::at(
-        format!(
-            "slice starts at 0 — drop it for the open-ended \"{recv}[..end]\" \
-             (or append #[allow] to this line to keep it)"
-        ),
+        format!("slice starts at 0 — drop it for the open-ended \"{recv}[..end]\""),
         start.span.clone(),
     ));
 }

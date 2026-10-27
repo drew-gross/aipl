@@ -88,8 +88,7 @@ pub(super) fn match_map_ok(e: &Expr, hits: &mut Vec<Error>) {
     hits.push(Error::at(
         format!(
             "this `match` rewrites the result's value side and passes its error \
-             through — write \"{call}\" instead (or append #[allow] to this line \
-             to keep it)"
+             through — write \"{call}\" instead"
         ),
         err_arm.body.span.clone(),
     ));

@@ -180,10 +180,7 @@ pub(super) fn match_value_or_err(e: &Expr, src: &str, pure_fn: bool, hits: &mut 
     // marker after the arm's `{` would not survive formatting.
     let at = leaves.unwrap_or(&none_arm.body);
     hits.push(Error::at(
-        format!(
-            "this `match` turns an optional into a result — {advice} \
-             (or append #[allow] to this line to keep it)"
-        ),
+        format!("this `match` turns an optional into a result — {advice}"),
         at.span.clone(),
     ));
 }

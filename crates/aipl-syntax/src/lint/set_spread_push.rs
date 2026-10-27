@@ -115,7 +115,7 @@ pub(super) fn set_spread_push(e: &Expr, src: &str, names: &AppendNames, hits: &m
     hits.push(Error::at(
         format!(
             "this \"set\" rebuilds {target:?} from itself only to append to it — {advice}: \
-             \"{calls}\"{import} (or append #[allow] to this line to keep it)"
+             \"{calls}\"{import}"
         ),
         spread.span.clone(),
     ));

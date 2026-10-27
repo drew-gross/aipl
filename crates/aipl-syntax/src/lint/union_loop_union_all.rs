@@ -202,7 +202,7 @@ pub(super) fn union_loop_union_all(e: &Expr, src: &str, names: &UnionNames, hits
         format!(
             "\"{acc}\" is seeded empty and unioned into by this loop {how} and nothing else — \
              write \"mut {acc}{ann} = {recv}{chain};\" and drop the loop\
-             {import} (or append #[allow] to this line to keep it)"
+             {import}"
         ),
         seed.span.clone(),
     ));

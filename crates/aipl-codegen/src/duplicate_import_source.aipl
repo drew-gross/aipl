@@ -44,8 +44,8 @@ fn span(self: ImportSource) -> Span {
 # What is said of a redundant import from `self`.
 fn message(self: ImportSource) -> str {
     match (self) {
-        Path(path, _) => `duplicate import from "{path}"; merge the names into the first \`import \{ .. } from "{path}";\` (or append #[allow] to this line to keep it)`,
-        Builtins(..) => """duplicate import from "builtins"; merge the names into the first `import { .. } from builtins;` (or append #[allow] to this line to keep it)""",
+        Path(path, _) => `duplicate import from "{path}"; merge the names into the first \`import \{ .. } from "{path}";\``,
+        Builtins(..) => """duplicate import from "builtins"; merge the names into the first `import { .. } from builtins;`""",
     }
 }
 
@@ -66,7 +66,7 @@ fn duplicates(src: str) -> LintHit[]!ParseFailure {
     let src = "import { map } from builtins;\nimport { len } from builtins;\nfn f() { }";
     assert(duplicate_import_source(aipl_parse_file(src)?.program)$span == [50..58]);
     assert(duplicate_import_source(aipl_parse_file(src)?.program)$message == [
-        """duplicate import from "builtins"; merge the names into the first `import { .. } from builtins;` (or append #[allow] to this line to keep it)""",
+        """duplicate import from "builtins"; merge the names into the first `import { .. } from builtins;`""",
     ]);
 
     // A path is told apart from `builtins` and from another path, and each
@@ -79,7 +79,7 @@ fn duplicates(src: str) -> LintHit[]!ParseFailure {
         import { d } from "./a.aipl";
     """)?;
     assert(paths$message == [
-        """duplicate import from "./a.aipl"; merge the names into the first `import { .. } from "./a.aipl";` (or append #[allow] to this line to keep it)""",
-        """duplicate import from "./a.aipl"; merge the names into the first `import { .. } from "./a.aipl";` (or append #[allow] to this line to keep it)""",
+        """duplicate import from "./a.aipl"; merge the names into the first `import { .. } from "./a.aipl";`""",
+        """duplicate import from "./a.aipl"; merge the names into the first `import { .. } from "./a.aipl";`""",
     ]);
 })

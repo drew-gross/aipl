@@ -33,7 +33,7 @@ pub(super) fn field_init_shorthand(e: &Expr, src: &str, hits: &mut Vec<Error>) {
         hits.push(Error::at(
             format!(
                 "field \"{n}\" is set to the identifier of the same name — use the \
-                 shorthand \"{n}\" (or append #[allow] to this line to keep it)"
+                 shorthand \"{n}\""
             ),
             init.value.span.clone(),
         ));
