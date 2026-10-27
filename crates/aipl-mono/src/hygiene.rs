@@ -15,12 +15,12 @@
 //!
 //! What it reports ([`Kind`]):
 //!
-//! - **Dangling** — a call or an identifier that names no binder in scope and no
-//!   function. A pass that renames a binder and one of its uses apart leaves this.
-//! - **Captured call** — a call of `n` where a local `n` is in scope too, and a
-//!   global function `n` exists. Source can write it (a closure called like a
-//!   function it shadows), but a pass that creates one has changed which one the
-//!   call means.
+//! - **Dangling** — an identifier that names no binder in scope and no function,
+//!   a call through a local ([`Callee::Local`]) whose binder is not in scope, or
+//!   a call of a global ([`Callee::User`]) that is not a function. A pass that
+//!   renames a binder and one of its uses apart leaves this. A call's target
+//!   says which kind of name it is, so a local can no more capture a global's
+//!   call than the reverse.
 //! - **Rebound synthetic** — a compiler-generated name (one with a `$`, which
 //!   users cannot write) bound twice in one function. Each is minted to be unique,
 //!   so a second binder is a counter or a derivation that reused a value.
@@ -43,7 +43,6 @@ use crate::passes::Optimizable;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Kind {
     Dangling,
-    CapturedCall,
     ReboundSynthetic,
     Shadows,
 }
@@ -52,7 +51,6 @@ impl fmt::Display for Kind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Kind::Dangling => "dangling",
-            Kind::CapturedCall => "captured-call",
             Kind::ReboundSynthetic => "rebound-synthetic",
             Kind::Shadows => "shadows",
         })
@@ -102,6 +100,17 @@ pub fn violations(program: &impl Optimizable) -> BTreeSet<Violation> {
     out
 }
 
+/// What a reference may resolve to.
+#[derive(Clone, Copy)]
+enum Target {
+    /// A call through a local: a binder in scope.
+    Local,
+    /// A call of a global: a function.
+    Global,
+    /// An identifier, which is a local or a function used as a value.
+    Either,
+}
+
 struct Walk<'a> {
     function: &'a str,
     globals: &'a HashSet<&'a str>,
@@ -139,26 +148,31 @@ impl Walk<'_> {
         self.scope.truncate(self.scope.len() - count);
     }
 
-    /// A use of `name`: a call when `call`, else a plain identifier.
-    fn reference(&mut self, name: &str, call: bool) {
+    /// A use of `name`, which `target` says is a local, a global, or a bare
+    /// identifier that is either.
+    fn reference(&mut self, name: &str, target: Target) {
         let local = self.scope.iter().any(|n| n == name);
         let global = self.globals.contains(name);
-        if call && local && global {
-            self.report(Kind::CapturedCall, name);
-        }
+        let resolves = match target {
+            Target::Local => local,
+            Target::Global => global,
+            Target::Either => local || global,
+        };
         // A case's constructor is spelled `Case@Variant`, and neither a binder
         // nor a function.
-        if !local && !global && !name.contains('@') {
+        if !resolves && !name.contains('@') {
             self.report(Kind::Dangling, name);
         }
     }
 
     fn expr(&mut self, e: &Expr) {
         match &e.kind {
-            ExprKind::Ident(n) => self.reference(n, false),
+            ExprKind::Ident(n) => self.reference(n, Target::Either),
             ExprKind::Call(callee, args, _) => {
-                if let Callee::User(n) = callee {
-                    self.reference(n, true);
+                match callee {
+                    Callee::Local(n) => self.reference(n, Target::Local),
+                    Callee::User(n) => self.reference(n, Target::Global),
+                    _ => {}
                 }
                 for a in args {
                     self.expr(a);
@@ -332,13 +346,29 @@ mod tests {
     }
 
     #[test]
-    fn a_call_under_a_binder_spelled_like_the_function_is_captured() {
+    fn a_call_of_a_global_is_not_captured_by_a_binder_of_its_spelling() {
         assert_eq!(
             found(vec![
                 function("reads", number()),
                 function("f", bind("reads", call("reads")))
             ]),
-            vec![says("f", "captured-call", "reads")]
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_call_through_a_local_needs_the_local_in_scope() {
+        let through = |name: &str| {
+            expr(ExprKind::Call(
+                Callee::Local(name.to_string()),
+                Vec::new(),
+                false,
+            ))
+        };
+        assert_eq!(found(vec![function("f", bind("g", through("g")))]), vec![]);
+        assert_eq!(
+            found(vec![function("g", number()), function("f", through("g"))]),
+            vec![says("f", "dangling", "g")]
         );
     }
 

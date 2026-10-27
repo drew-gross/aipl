@@ -255,6 +255,7 @@ case_tests! {
     cases_functions_owned_inplace = "cases/functions/owned_inplace",
     cases_functions_owned_inplace_bool = "cases/functions/owned_inplace_bool",
     cases_functions_owned_struct_chain = "cases/functions/owned_struct_chain",
+    cases_functions_param_spelled_like_called_function = "cases/functions/param_spelled_like_called_function",
     cases_functions_recursion_factorial_recursion = "cases/functions/recursion/factorial_recursion",
     cases_functions_recursion_factorial_recursion_large = "cases/functions/recursion/factorial_recursion_large",
     cases_functions_recursion_mutual_recursion = "cases/functions/recursion/mutual_recursion",

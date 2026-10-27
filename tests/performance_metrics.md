@@ -199,6 +199,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/functions/owned_inplace | 2 | 88 | 88 | 637 | 1344 | 4.00 | 66.97 | 1472 |
 | cases/functions/owned_inplace_bool | 2 | 34 | 34 | 573 | 1080 | 4.00 | 65.73 | 1472 |
 | cases/functions/owned_struct_chain | 15 | 1761 | 1761 | 29006 | 3716 | 13.00 | 80.80 | 1488 |
+| cases/functions/param_spelled_like_called_function | 1 | 18 | 18 | 55 | 516 | 4.00 | 114.45 | 1456 |
 | cases/functions/recursion/factorial_recursion | 0 | 0 | 0 | 111 | 320 | 1.00 | 63.59 | 1440 |
 | cases/functions/recursion/factorial_recursion_large | 0 | 0 | 0 | 136 | 232 | 2.00 | 63.10 | 1424 |
 | cases/functions/recursion/mutual_recursion | 0 | 0 | 0 | 822 | 572 | 2.00 | 63.94 | 1440 |

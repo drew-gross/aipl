@@ -3278,7 +3278,7 @@ impl Mono<'_> {
         }
         aipl_syntax::each_subexpr(body, &mut |e| {
             let name = match &e.kind {
-                ExprKind::Call(Callee::User(n), ..) | ExprKind::Ident(n) => n,
+                ExprKind::Call(Callee::Local(n), ..) | ExprKind::Ident(n) => n,
                 _ => return,
             };
             if self.cur_lenv.contains_key(name)
@@ -7990,7 +7990,7 @@ impl Mono<'_> {
                     let recv = it.next().expect("call through a field has a receiver");
                     let rest: Vec<Expr> = it.collect();
                     let field = node(ExprKind::Field(Box::new(recv), name.to_string()));
-                    let call = node(ExprKind::Call(Callee::User(tmp.clone()), rest, false));
+                    let call = node(ExprKind::Call(Callee::Local(tmp.clone()), rest, false));
                     (
                         node(ExprKind::Let(tmp, None, Box::new(field), Box::new(call))),
                         ret,
@@ -10820,7 +10820,7 @@ pub(crate) fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
         // knows, which no parameter can shadow.
         ExprKind::Call(name, args, m) => ExprKind::Call(
             match name {
-                Callee::User(n) => Callee::User(sub(n)),
+                Callee::Local(n) => Callee::Local(sub(n)),
                 known => known.clone(),
             },
             args.iter().map(|a| rename_params(a, map)).collect(),

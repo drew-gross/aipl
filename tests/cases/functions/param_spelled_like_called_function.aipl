@@ -1,0 +1,20 @@
+# A parameter may be spelled like a function that some other function calls. In
+# `inner`, `reads()` is the function; in `outer` there is a parameter `reads`
+# too, but `outer` never calls it. Inlining `inner` into `outer` puts the call to
+# the function where the parameter is in scope, and inlining `outer` into `main`
+# then renames the parameter — and must not touch the call, which is not a use of
+# the parameter however it is spelled.
+
+import { print, wrapping_add as + } from builtins;
+
+fn reads(self: i64) -> i64 { self + 1 }
+
+fn inner(self: i64) -> i64 { self.reads() }
+
+fn outer(self: i64, reads: i64) -> i64 { self.inner() + reads }
+
+fn main() !prints {
+    print(`{3.outer(10)}`);
+}
+--- stdout ---
+14

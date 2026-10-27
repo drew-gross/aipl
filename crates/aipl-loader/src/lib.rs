@@ -1749,6 +1749,23 @@ fn rewrite_expr(
                         .collect(),
                     false,
                 ),
+                // A call through a local holding a function value. Every global
+                // reaches here spelled differently from its source — mangled, or
+                // an imported builtin's canonical name — except the root file's
+                // own functions, which keep theirs. A local of that spelling is
+                // the one such a call means (the checker has always held it to
+                // being a function), so it is the local that is called, and it is
+                // recorded as one: no global can then be taken for it, nor it for
+                // a global.
+                None if locals.contains(name) && view.get(name).is_none_or(|g| g == name) => {
+                    ExprKind::Call(
+                        Callee::Local(name.clone()),
+                        args.iter()
+                            .map(|a| rewrite_expr(a, view, sc, locals))
+                            .collect(),
+                        *method_style,
+                    )
+                }
                 // A bare-imported operator builtin (`import { concat }` then
                 // `concat(a, b)`) needs nothing special: its canonical is a real
                 // `__builtin_*`, the same one the operator spelling resolves to,

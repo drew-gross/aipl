@@ -663,7 +663,8 @@ fn mark(
             mark(name, body, tail, mutating, alias_outlives);
         }
         ExprKind::Call(callee, args, _) => {
-            let user = matches!(callee, Callee::User(f) if !mutating.contains(f));
+            let user =
+                matches!(callee, Callee::User(f) | Callee::Local(f) if !mutating.contains(f));
             // `with` consumes its array (argument 0) to write into it.
             let takes_array = matches!(callee, Callee::With | Callee::WithOrSelf);
             // Arguments are evaluated left to right, and each is handed over

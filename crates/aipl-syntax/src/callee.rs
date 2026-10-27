@@ -5,7 +5,7 @@
 //! intrinsics a pass synthesizes — is its own arm of
 //! [`Callee`]; only a name that originates in source (a user function, one of
 //! its monomorphized instances, a variant constructor, a local holding a
-//! function value) is carried as text, in [`Callee::User`]. So a pass that
+//! function value) is carried as text, in [`Callee::User`] or [`Callee::Local`]. So a pass that
 //! wants to know "is this `len`?" matches `Callee::Len`, and one that adds a
 //! builtin arm without teaching every dispatch about it hears from the
 //! exhaustiveness checker rather than from a string that silently never
@@ -399,9 +399,17 @@ pub enum Callee {
     // ---- names from source ----
     /// A name that is not the compiler's to know: a user function (mangled
     /// `__m<N>__name` after loading, `name$..` once monomorphized), a variant
-    /// constructor (`Case@Variant`), a local holding a function value — or,
-    /// before the loader has resolved imports, any spelling at all.
+    /// constructor (`Case@Variant`), a struct field holding a function value
+    /// (`recv.f(rest)`, stored as `f(recv, rest)`) — or, before the loader has
+    /// resolved imports, any spelling at all.
     User(String),
+    /// A call through a local holding a function value: a parameter, a `let`, a
+    /// loop or lambda variable, a pattern's binder. The loader decides it, as it
+    /// is the one pass that knows which names are bound where, and it is why a
+    /// call's target never has to be guessed from its spelling: a `Local` is
+    /// renamed with the binder it names, and a [`Callee::User`] is a global that
+    /// no binder of the same spelling can capture.
+    Local(String),
 }
 
 impl Callee {
@@ -651,7 +659,7 @@ impl Callee {
             Callee::DictKeyAt => "__dict_key_at",
             Callee::DictValueAt => "__dict_value_at",
 
-            Callee::User(s) => s,
+            Callee::User(s) | Callee::Local(s) => s,
         }
     }
 
@@ -702,14 +710,23 @@ impl Callee {
     /// intrinsic): the set the loader's function tables register under that
     /// prefix and that no source identifier can name.
     pub fn is_builtin(&self) -> bool {
-        !matches!(self, Callee::User(_)) && self.name().starts_with("__builtin_")
+        !matches!(self, Callee::User(_) | Callee::Local(_)) && self.name().starts_with("__builtin_")
     }
 
     /// The text of a [`Callee::User`], or `None` for every arm the compiler
-    /// knows.
+    /// knows and for a [`Callee::Local`]: the name of something global.
     pub fn user(&self) -> Option<&str> {
         match self {
             Callee::User(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// The text of a callee that came from source — a [`Callee::User`] or a
+    /// [`Callee::Local`] — or `None` for every arm the compiler knows.
+    pub fn source_name(&self) -> Option<&str> {
+        match self {
+            Callee::User(s) | Callee::Local(s) => Some(s),
             _ => None,
         }
     }

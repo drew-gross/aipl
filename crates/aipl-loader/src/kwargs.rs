@@ -1240,7 +1240,7 @@ impl Expander {
                         _ => self.expand_expr(a, locals),
                     })
                     .collect::<Result<_, _>>()?;
-                if name.user().is_some_and(|n| locals.contains(n)) {
+                if matches!(name, Callee::Local(_)) {
                     // A call through a function-typed local: function types
                     // have no keyword parameters.
                     if let Some(kw) = args.iter().find(|a| matches!(a.kind, ExprKind::KwArg(..))) {
