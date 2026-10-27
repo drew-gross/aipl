@@ -452,12 +452,9 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
-  tuple to array function (simplify DictLit(pairs) in subexprs)
-  words() util for use in parse_command()
   __builtin_drop_* should be mutating methods
   zip
   int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html
-  map on a set is a bit of a weird operation, I feel like I should come up with a name for it (what if the pred isn't injective?)
   (T, U)[] -> (T[], U[]) function (unzip)
   generic sum function with int bound
   numeric < vs. lexicographic <. Also maybe a < for map/dict purposes that uses compiler-decided ordering?

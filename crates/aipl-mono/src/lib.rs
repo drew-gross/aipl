@@ -7491,6 +7491,17 @@ impl Mono<'_> {
                         return self.infer(&rewritten, env);
                     }
                 }
+                // `(a, b).to_array()` is `[a, b]`: a tuple whose elements share a
+                // type, as the array of them. The tuple is bound first unless it is
+                // written out, so that it is evaluated once.
+                if *callee == Callee::ToArray && args.len() == 1 {
+                    let (_, receiver) = self.infer(&args[0], env)?;
+                    if let Some(elems) = self.tuple_field_tys(&receiver) {
+                        let rewritten = tuple_to_array(&args[0], elems.len(), self.synth, &span);
+                        self.synth += 1;
+                        return self.infer(&rewritten, env);
+                    }
+                }
                 // `grid.try_set((row, column), value)` is
                 // `grid.grid_try_set(row, column, value)`: the same store as the
                 // two-index form, with the cell given as a pair.
@@ -12088,6 +12099,35 @@ impl MatchTree<'_, '_> {
         }
         out
     }
+}
+
+/// `tuple.to_array()` as the array literal of the tuple's `arity` elements. A
+/// tuple written out (`(a, b).to_array()`) is the literal of its elements;
+/// anything else is read once into a binding (numbered `k`) and its fields
+/// `_0`, `_1`, … are the elements.
+fn tuple_to_array(tuple: &Expr, arity: usize, k: usize, span: &Span) -> Expr {
+    if let ExprKind::TupleLit(elems) = &tuple.kind {
+        return Expr::new(ExprKind::ArrayLit(elems.clone()), span.clone());
+    }
+    let tmp = format!("__tuple_array${k}");
+    let fields = (0..arity)
+        .map(|i| {
+            let tuple = Expr::new(ExprKind::Ident(tmp.clone()), span.clone());
+            Expr::new(
+                ExprKind::Field(Box::new(tuple), format!("_{i}")),
+                span.clone(),
+            )
+        })
+        .collect();
+    Expr::new(
+        ExprKind::Let(
+            tmp,
+            None,
+            Box::new(tuple.clone()),
+            Box::new(Expr::new(ExprKind::ArrayLit(fields), span.clone())),
+        ),
+        span.clone(),
+    )
 }
 
 /// A case name without its `@Variant` qualification.

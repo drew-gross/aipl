@@ -5045,6 +5045,22 @@ impl Cx<'_> {
                     args[0].span.clone(),
                 ));
             }
+            // A tuple whose elements all have one type is a short array of that
+            // type, in the order written.
+            if let Some(elems) = self.tuple_elems(unrefined(&t)) {
+                let first = &elems[0];
+                if elems.iter().any(|e| e != first) {
+                    return Err(Error::at(
+                        format!(
+                            "\"to_array\": a tuple's elements must all have one type to make an \
+                             array, got {}",
+                            tyname(&t)
+                        ),
+                        args[0].span.clone(),
+                    ));
+                }
+                return Ok(Type::Array(Box::new(first.clone())));
+            }
         }
         // An operator resolved (in the loader) to its canonical `__builtin_*`
         // impl. Typed exactly as the operator is, because it *is* the operator:

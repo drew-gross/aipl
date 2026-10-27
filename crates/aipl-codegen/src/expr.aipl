@@ -11,6 +11,7 @@ import {
     logical_not as !,
     map,
     push,
+    to_array,
     value_or,
 } from builtins;
 import { Ctor, Pat, show_pat } from "./pat.aipl";
@@ -461,14 +462,7 @@ pub fn subexprs(self: Expr) -> Expr[] {
         | Lambda(_, x)
         | Shim(_, _, x) => [x],
         Construct(_, inits) => inits$value,
-        DictLit(pairs) => {
-            mut out: Expr[] = [];
-            for (let pair : pairs) {
-                set out.push(pair.0);
-                set out.push(pair.1);
-            }
-            out
-        },
+        DictLit(pairs) => pairs$to_array().join(),
         Seq(a, b)
         | Index(a, b)
         | Let(_, _, a, b)
