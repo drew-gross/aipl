@@ -1,0 +1,37 @@
+# `t.to_set()` on a tuple whose elements all have one type — the set of those
+# elements, deduplicated, in the order the use site asks for (as for an array's).
+# It is what turns a list of pairs into the set of everything in them.
+
+import { has, len, print, to_set, union_all } from builtins;
+
+fn pair_ends() -> #<{i64} { (7, 3).to_set() }
+
+fn main() !prints {
+    // Two, three and more elements; a repeat counts once.
+    print(`{(1, 2).to_set().len()} {(1, 1).to_set().len()} {(4, 5, 4).to_set().len()}`);
+
+    // Every element type a set takes: str, char, bool.
+    let names = ("pear", "fig").to_set();
+    print(`{names.has("fig")} {names.has("plum")}`);
+    let letters = ('a', 'b', 'a').to_set();
+    print(`{letters.len()} {letters.has('b')}`);
+    print(`{(true, true).to_set().len()}`);
+
+    // The set's order comes from context.
+    print(`{pair_ends()}`);
+    let widest: #>{i64} = (3, 9, 5).to_set();
+    print(`{widest}`);
+
+    // Mapped over pairs, then joined into one set.
+    let edges = [(1, 2), (2, 3), (3, 1), (3, 4)];
+    let nodes = edges$to_set().union_all();
+    print(`{nodes.len()} {nodes.has(4)}`);
+}
+--- stdout ---
+2 1 2
+true false
+2 true
+1
+{3, 7}
+{9, 5, 3}
+4 true

@@ -21,6 +21,7 @@ import {
     not_equal as !=,
     push,
     split,
+    to_set,
     union_all,
     value_or,
 } from builtins;
@@ -184,10 +185,7 @@ fn own_names(self: Expr) -> #{str} {
         // stays a node; every other operator use is a `Call` on its spelling.
         Neg(..) => #{"-"},
         // A shim's name and bindings all name functions.
-        Shim(effect, bindings, _) => #{
-            effect,
-            ..bindings.map(|binding| #{binding.0, binding.1}).union_all(),
-        },
+        Shim(effect, bindings, _) => #{effect, ..bindings$to_set().union_all()},
         Let(_, ty, _, _) | LetMut(_, ty, _, _) => ty.optional_ty_names(),
         Lambda(params, _) => params$ty$optional_ty_names().union_all(),
         Match(_, arms) => arms$pattern$ctor_names().union_all(),

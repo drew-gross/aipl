@@ -4983,6 +4983,35 @@ impl Cx<'_> {
                     args[0].span.clone(),
                 ));
             }
+            // A tuple whose elements all have one type is a short sequence of
+            // that type, and its set is the set of those elements.
+            if let Some(elems) = self.tuple_elems(unrefined(&t)) {
+                let first = &elems[0];
+                if elems.iter().any(|e| e != first) {
+                    return Err(Error::at(
+                        format!(
+                            "\"to_set\": a tuple's elements must all have one type to make a \
+                             set, got {}",
+                            tyname(&t)
+                        ),
+                        args[0].span.clone(),
+                    ));
+                }
+                if is_set_elem(first) || is_abstract_scalar_ty(first, &[]) || is_typevar(first) {
+                    return Ok(Type::Set(
+                        Box::new(first.clone()),
+                        aipl_syntax::ast::SetOrder::Context,
+                    ));
+                }
+                return Err(Error::at(
+                    format!(
+                        "\"to_set\": a set element must be an integer (i8..i64, u8..u64), bool, \
+                         char, or str, got {}",
+                        tyname(first)
+                    ),
+                    args[0].span.clone(),
+                ));
+            }
         }
         // `to_array` reads a set's elements *in order*, so only an ordered set
         // has one to give; the signature's `#{T}` would accept any.

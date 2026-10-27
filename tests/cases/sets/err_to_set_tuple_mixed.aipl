@@ -1,0 +1,13 @@
+# A tuple makes a set only when its elements all have one type.
+
+import { to_set } from builtins;
+
+fn main() {
+    let s = (1, "one").to_set();
+}
+--- errors ---
+error: "to_set": a tuple's elements must all have one type to make a set, got (i64, str)
+ --> ./tests/cases/sets/err_to_set_tuple_mixed.aipl:6:13
+  |
+6 |     let s = (1, "one").to_set();
+  |             ^^^^^^^^^^

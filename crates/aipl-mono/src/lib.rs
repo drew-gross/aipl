@@ -5484,6 +5484,9 @@ impl Mono<'_> {
     }
 
     fn call_return(&self, callee: &Callee, arg_tys: &[Type]) -> Type {
+        if let Some(t) = self.tuple_to_set_return(callee, arg_tys) {
+            return t;
+        }
         if let Some(t) = builtin_return(callee, arg_tys) {
             return t;
         }
@@ -6385,8 +6388,26 @@ impl Mono<'_> {
         self.concrete
             .get(name)
             .and_then(|f| f.return_ty.clone())
-            .or_else(|| builtin_return(&Callee::resolve(name.to_string()), arg_tys))
+            .or_else(|| {
+                let callee = Callee::resolve(name.to_string());
+                self.tuple_to_set_return(&callee, arg_tys)
+                    .or_else(|| builtin_return(&callee, arg_tys))
+            })
             .unwrap_or(Type::Unit)
+    }
+
+    /// `t.to_set()` on a tuple: the set of its elements, whose order the use site
+    /// decides like any `to_set`'s. The checker has refused a tuple whose elements
+    /// differ, so the first element's type is all of them.
+    fn tuple_to_set_return(&self, callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
+        if *callee != Callee::ToSet {
+            return None;
+        }
+        let elems = self.tuple_field_tys(arg_tys.first()?)?;
+        Some(Type::Set(
+            Box::new(elems.first()?.clone()),
+            aipl_syntax::ast::SetOrder::Context,
+        ))
     }
 
     /// Build the value expression for a field-path assignment (`set

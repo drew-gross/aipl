@@ -17338,6 +17338,77 @@ fn compile_call_expr_direct<M: Module>(
                 return Ok((base, ConcreteType::Set(Box::new(elem), order)));
             }
             let (arr_ptr, t) = compile_expr(module, builder, cx, scopes, receiver)?;
+            // A tuple whose elements share one type: its fields are the elements,
+            // read where they sit and inserted one by one.
+            if let ConcreteType::Named(tuple) = &t {
+                if tuple.starts_with("__tuple$") {
+                    let layout =
+                        structs
+                            .get(tuple)
+                            .and_then(TypeDef::as_struct)
+                            .ok_or_else(|| {
+                                Error::at(
+                                    format!(
+                                        "\"to_set\": tuple {:?} has no layout",
+                                        display_name(tuple)
+                                    ),
+                                    receiver.span.clone(),
+                                )
+                            })?;
+                    let mut fields = Vec::new();
+                    while let Some(field) = layout.field(&format!("_{}", fields.len())) {
+                        fields.push((field.offset, field.ty.clone()));
+                    }
+                    let elem = fields[0].1.clone();
+                    if fields.iter().any(|(_, ty)| *ty != elem) {
+                        return Err(Error::at(
+                            format!(
+                                "\"to_set\" requires a tuple of one type, got {}",
+                                type_name(&t)
+                            ),
+                            receiver.span.clone(),
+                        ));
+                    }
+                    // A `char` set is the bitfield: no allocation, a bit per field.
+                    if elem == ConcreteType::Primitive(Primitive::Char) {
+                        let out = charset_slot(builder);
+                        for (offset, ty) in &fields {
+                            let c = component(builder, arr_ptr, *offset, ty, structs);
+                            emit_charset_insert(builder, out, c);
+                        }
+                        return Ok((out, ConcreteType::Set(Box::new(elem), order)));
+                    }
+                    let esz = runtime_elem_size(&elem, structs);
+                    let esz_v = builder.ins().iconst(types::I64, esz);
+                    let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
+                    let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
+                    let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
+                    let ord = builder
+                        .ins()
+                        .iconst(types::I64, set_order_code(&elem, order));
+                    let set_ty = ConcreteType::Set(Box::new(elem.clone()), order);
+                    let cap = builder.ins().iconst(types::I64, fields.len() as i64);
+                    let set_v =
+                        new_seq_with_cap(builder, module, builtins, &set_ty, cap, drop_fn, esz_v);
+                    for (offset, ty) in &fields {
+                        let ev = component(builder, arr_ptr, *offset, ty, structs);
+                        let s = value_slot(builder, &elem, structs);
+                        let x_ptr = builder.ins().stack_addr(types::I64, s, 0);
+                        store_array_elem(builder, x_ptr, ev, &elem, structs);
+                        builtins.call_void(
+                            module,
+                            builder,
+                            "aipl_set_insert",
+                            &[set_v, x_ptr, drop_fn, retain_fn, esz_v, str_cmp, ord],
+                        );
+                    }
+                    scopes
+                        .last_mut()
+                        .expect("scope")
+                        .push(Tracked::new(set_v, &set_ty));
+                    return Ok((set_v, set_ty));
+                }
+            }
             // A `str` receiver gives a `#{char}` — a string is a sequence of
             // chars, and the bitfield is filled by streaming it, so nothing
             // reads its bytes as array elements.
