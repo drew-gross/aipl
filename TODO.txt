@@ -369,7 +369,7 @@ matrices:
   support retrieving a row/col
 
 types:
-  each variant arms should implicitly become a type, then collect_arms can work better
+  each variant arms should implicitly become a type, then collect_arms can work better, and unused_imports can use it better
   allow sets of more complex things (tuples, structs, variants)
   spans with signed bounds should work, so that we can e.g. (-1..2).cartesian_product(-1..2) in neighbours
   make without work for fields, then you can spread the original type into them
@@ -453,7 +453,6 @@ grammar:
 
 utilities:
   tuple to array function (simplify DictLit(pairs) in subexprs)
-  utility for turning SomeVariant[] into OneArm[], use in unused_imports()
   words() util for use in parse_command()
   __builtin_drop_* should be mutating methods
   zip
@@ -577,6 +576,7 @@ design:
   apis should express intent
 
 optimizations:
+  hoisting repeated code out of loops, lambdas, etc.
   exending a set with a function call that returns a set should fuse and not materialize an intermediate set
   Cache monomorphizations of the same lambda
   special case seed handling in reduce to avoid optional checks in the generated code. Maybe also fuse reduce().value_or()?. Though .value_or isn't always a valid seed e.g. .minimum().value_or(0) in dedent

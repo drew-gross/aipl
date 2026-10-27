@@ -43,6 +43,20 @@
         <p class="note">Not importable from another file.</p>
 
 
+        <section class="item" id="item-unused_in">
+          <h3>
+            <a class="anchor" href="#item-unused_in">unused_in</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn unused_in(__spat$2306: ImportDecl, used: #{str}) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>A hit for each name <code>decl</code> imports that is not in <code>used</code>.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-unused_message">
           <h3>
             <a class="anchor" href="#item-unused_message">unused_message</a>
@@ -90,7 +104,7 @@
             <a class="anchor" href="#item-referenced_names">referenced_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn referenced_names(__spat$3461: Program) -&#62; #{str}</code></pre>
+          <pre class="signature"><code>fn referenced_names(__spat$3613: Program) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>Every name the file mentions outside its own import lists: called and referenced idents, constructed structs, match constructors, operator spellings, and every name appearing in a type — signatures, struct fields, variant payloads, and inline <code>let</code>/lambda annotations.</p></div>
 

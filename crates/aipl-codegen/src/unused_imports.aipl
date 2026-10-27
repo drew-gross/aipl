@@ -11,12 +11,14 @@
 
 import {
     Span,
+    collect_arms,
     equal as ==,
+    filter,
     has,
+    join,
     logical_not as !,
     map,
     not_equal as !=,
-    push,
     split,
     to_set,
     union_all,
@@ -63,6 +65,7 @@ import {
     Const,
     Fn,
     Import,
+    ImportDecl,
     ImportName,
     ImportSource,
     Item,
@@ -97,17 +100,20 @@ import {
 # A hit for each name `program` imports and nothing in it references.
 pub fn unused_imports(program: Program) -> LintHit[] {
     let used = referenced_names(program);
-    mut hits: LintHit[] = [];
-    for (let item : program.items) {
-        if (let Import(decl) = item) {
-            for (let name : decl.names) {
-                if (!used.has(name.local())) {
-                    set hits.push(hit(unused_message(name.local()), name.hit_span(decl.source)));
-                };
-            }
-        };
-    }
-    hits
+    program.items
+        .collect_arms(Import)
+        .map(|item| match (item) {
+            Import(decl) => decl,
+        })
+        .map(|decl| unused_in(decl, used))
+        .join()
+}
+
+# A hit for each name `decl` imports that is not in `used`.
+fn unused_in(ImportDecl { names, source }, used: #{str}) -> LintHit[] {
+    names
+        .filter(|name| !used.has(name.local()))
+        .map(|name| hit(unused_message(name.local()), name.hit_span(source)))
 }
 
 # What is said of the import `name`.
