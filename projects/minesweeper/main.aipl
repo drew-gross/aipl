@@ -433,28 +433,27 @@ let QUIT_KEY: u8 = 113;
 # What a key press does: an arrow key moves the cursor, but not off the board;
 # `r` reveals the cell under it, `f` flags or unflags it, `q` quits, and any other
 # key does nothing.
-fn press(self: Session, key: Key) -> Turn {
-    let game = self.game;
-    let row = self.cursor.0;
-    let column = self.cursor.1;
+fn press(self: Session { game, cursor, mined }, key: Key) -> Turn {
+    let row = cursor.0;
+    let column = cursor.1;
     match (key) {
         Up => Continue(Session { ..self, cursor: (row.before(), column) }),
         Down => Continue(Session { ..self, cursor: (row.after(game.height()), column) }),
         Left => Continue(Session { ..self, cursor: (row, column.before()) }),
         Right => Continue(Session { ..self, cursor: (row, column.after(game.width())) }),
         Other(byte) => if (byte == REVEAL_KEY) {
-            if (!self.mined) {
+            if (!mined) {
                 // A flagged cell is not revealed, so it is not a first reveal either.
-                if (game[self.cursor] == some(Hidden(false))) {
+                if (game[cursor] == some(Hidden(false))) {
                     FirstReveal(self)
                 } else {
                     Continue(self)
                 }
             } else {
-                Continue(Session { ..self, game: game.reveal(self.cursor) })
+                Continue(Session { ..self, game: game.reveal(cursor) })
             }
         } else if (byte == FLAG_KEY) {
-            Continue(Session { ..self, game: game.toggle_flag(self.cursor) })
+            Continue(Session { ..self, game: game.toggle_flag(cursor) })
         } else if (byte == QUIT_KEY) {
             Quit
         } else {
