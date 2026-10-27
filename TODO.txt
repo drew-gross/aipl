@@ -102,6 +102,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  field_reads (and some other places in the linter) look like the for-if-push lint should be firing
   mentions_any looks like it should use collect_arms
   collect_arms should accept a type param, not a case as a value
   use SpanStr in ImportSource and other parts of linter

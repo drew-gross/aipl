@@ -239,6 +239,22 @@ pub fn optimize<P: Optimizable>(
         );
     }
 
+    // `AIPL_HYGIENE=report`: what each pass does to the meaning of names. The
+    // program's own violations on entry are the baseline, so a pass is shown only
+    // the ones it adds.
+    let hygiene = crate::hygiene::enabled();
+    let phase = std::any::type_name::<P>().rsplit("::").next().unwrap_or("");
+    let mut introduced = if hygiene {
+        crate::hygiene::violations(&program)
+    } else {
+        Default::default()
+    };
+    if hygiene {
+        for v in &introduced {
+            eprintln!("[hygiene] {phase} on entry: {v}");
+        }
+    }
+
     for round in 1..=rounds {
         let mut changed: HashSet<String> = HashSet::new();
         for pass in passes {
@@ -246,6 +262,13 @@ pub fn optimize<P: Optimizable>(
                 continue;
             }
             let next = (pass.rewrite)(&program, &scope);
+            if hygiene {
+                let now = crate::hygiene::violations(&next);
+                for v in now.difference(&introduced) {
+                    eprintln!("[hygiene] {phase} pass `{}` round {round}: {v}", pass.name);
+                }
+                introduced = now;
+            }
             // Checked per pass, because this is the only point at which the
             // culprit is still known: one pass later and the only evidence is
             // a program that compiles to the wrong representation.

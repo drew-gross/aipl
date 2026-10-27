@@ -77,6 +77,7 @@ mod shim_closures;
 /// The optimization pass manager: the pass list, and the loop that runs it
 /// until the passes stop finding anything. See the module docs for the
 /// worklist and what a pass may assume about being run twice.
+pub mod hygiene;
 pub mod passes;
 
 use aipl_syntax::subst_type_params;
