@@ -308,6 +308,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  support if (let [a, ..] = xs) syntax
   let some(x) = v else { return; } syntax, use everywhere that there is a one-arm+_ -> return match
   unary minus doesn't have a named operator
   explore simpler syntax than turbofish for type arguments
@@ -368,6 +369,7 @@ matrices:
   support retrieving a row/col
 
 types:
+  each variant arms should implicitly become a type, then collect_arms can work better
   allow sets of more complex things (tuples, structs, variants)
   spans with signed bounds should work, so that we can e.g. (-1..2).cartesian_product(-1..2) in neighbours
   make without work for fields, then you can spread the original type into them

@@ -1,0 +1,52 @@
+# `shapes.collect_arms(Circle)` is the elements that are a `Circle`, and it is
+# typed that way: an array of `Shape` *without* its other cases, so a `match` on an
+# element needs a `Circle` arm and no other, and the payload is there to read
+# without handling `Square` or `Dot` first. At run time they are the same
+# `Shape`s — the narrowing is the checker's, as for any `without`.
+#
+# The case is written as a constructor name because that is the one place it is
+# known; the result's type depends on it.
+
+import { collect_arms, len, print, to_str, wrapping_add_assign as += } from builtins;
+
+variant Shape = Circle(i64) | Square(i64) | Dot
+
+variant Solid = Shape without Dot
+
+variant Round = Solid without Square
+
+fn radius(self: Round) -> i64 {
+    match (self) {
+        Circle(r) => r,
+    }
+}
+
+// A `match` on a collected element has the one arm.
+fn total_radius(shapes: Shape[]) -> i64 {
+    mut sum = 0;
+    for (let c : shapes.collect_arms(Circle)) {
+        set sum += match (c) {
+            Circle(r) => r,
+        };
+    }
+    sum
+}
+
+// And the array goes where an array of the refined type is wanted.
+fn radii(shapes: Shape[]) -> i64[] { shapes.collect_arms(Circle)$radius() }
+
+fn main() !prints {
+    let shapes = [Circle(1), Square(2), Dot, Circle(3), Dot, Square(4)];
+    print(total_radius(shapes).to_str());
+    print(`{radii(shapes)}`);
+    print(`{shapes.collect_arms(Square)}`);
+    print(`{shapes.collect_arms(Dot).len()}`);
+    let none_of_them: Shape[] = [Dot];
+    print(`{none_of_them.collect_arms(Circle).len()}`);
+}
+--- stdout ---
+4
+[1, 3]
+[Square(2), Square(4)]
+2
+0

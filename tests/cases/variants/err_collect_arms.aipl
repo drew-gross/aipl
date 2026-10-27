@@ -1,0 +1,37 @@
+# What `collect_arms` types depends on the case written in its second argument,
+# so the result admits only that arm, and the argument has to be a constructor
+# name rather than a `Case<..>` held in a variable.
+
+import { collect_arms, print } from builtins;
+
+variant Shape = Circle(i64) | Square(i64) | Dot
+
+fn other_arm(shapes: Shape[]) -> i64 {
+    mut sum = 0;
+    for (let c : shapes.collect_arms(Circle)) {
+        set sum = match (c) {
+            Circle(r) => r,
+            Square(w) => w,
+        };
+    }
+    sum
+}
+
+fn held_case(shapes: Shape[]) {
+    let held: Case<Shape> = Dot;
+    print(`{shapes.collect_arms(held)}`);
+}
+
+fn main() {}
+--- errors ---
+error: Shape without Square without Dot has no constructor "Square"
+  --> ./tests/cases/variants/err_collect_arms.aipl:14:13
+   |
+14 |             Square(w) => w,
+   |             ^^^^^^^^^
+
+error: fn "print" has effect "!prints" but the calling function does not declare it
+  --> ./tests/cases/variants/err_collect_arms.aipl:22:5
+   |
+22 |     print(`{shapes.collect_arms(held)}`);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

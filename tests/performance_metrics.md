@@ -665,6 +665,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/variants/boxed_match_arm_payload | 23 | 1423 | 1071 | 1960 | 5820 | 12.00 | 81.32 | 1504 |
 | cases/variants/case_name | 3 | 66 | 66 | 783 | 8592 | 13.00 | 67.10 | 1440 |
 | cases/variants/case_type | 22 | 1359 | 1391 | 923 | 4812 | 18.00 | 69.89 | 1504 |
+| cases/variants/collect_arms | 11 | 511 | 511 | 2010 | 5160 | 12.00 | 160.50 | 1488 |
 | cases/variants/ctor_as_fn_value | 13 | 944 | 448 | 2227 | 5464 | 7.00 | 69.59 | 1488 |
 | cases/variants/fn_payload | 0 | 0 | 0 | 50 | 268 | 1.00 | 62.42 | 1424 |
 | cases/variants/fn_value_returns_boxed | 13 | 613 | 613 | 307 | 1204 | 6.00 | 63.56 | 1456 |
@@ -749,6 +750,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_all | 0 | 0 | 0 | 1265 | 2884 | 3.00 | 108.24 | 1456 |
 | crates/aipl-mono/src/builtin_any | 0 | 0 | 0 | 1043 | 2784 | 2.00 | 105.91 | 1456 |
 | crates/aipl-mono/src/builtin_cartesian_product | 10 | 680 | 1016 | 3339 | 6536 | 7.00 | 70.18 | 1520 |
+| crates/aipl-mono/src/builtin_collect_arms | 9 | 480 | 480 | 1701 | 2740 | 6.00 | 106.56 | 1488 |
 | crates/aipl-mono/src/builtin_count | 1 | 104 | 104 | 1717 | 2556 | 3.00 | 93.41 | 1440 |
 | crates/aipl-mono/src/builtin_count_if | 1 | 104 | 104 | 2196 | 4752 | 4.00 | 106.45 | 1472 |
 | crates/aipl-mono/src/builtin_count_if_is_at_least | 0 | 0 | 0 | 1664 | 2824 | 3.00 | 113.74 | 1456 |

@@ -274,6 +274,7 @@ const BUILTINS: &[Builtin] = &[
     Builtin::aipl(Callee::CountWhile, "builtin_count_while.aipl"),
     Builtin::aipl(Callee::CountIf, "builtin_count_if.aipl"),
     Builtin::aipl(Callee::FindIf, "builtin_find_if.aipl"),
+    Builtin::aipl(Callee::CollectArms, "builtin_collect_arms.aipl"),
     Builtin::aipl(Callee::MapFindIf, "builtin_map_find_if.aipl"),
     Builtin::aipl(Callee::MapJoin, "builtin_map_join.aipl"),
     Builtin::aipl(Callee::JoinIsNonempty, "builtin_join_is_nonempty.aipl"),

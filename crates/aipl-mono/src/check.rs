@@ -5675,6 +5675,16 @@ impl Cx<'_> {
             let ret = subst_vars(&return_ty, &map, &vars);
             let ptys: Vec<Type> = sig.params.iter().map(|p| p.ty.clone()).collect();
             let ret = aipl_syntax::inherit_set_order(ret, &ptys, &atys);
+            // `xs.collect_arms(Circle)`: the elements are all that one case, so the
+            // call is typed as such — and recorded on the node, since mono
+            // monomorphizes the builtin as `T[] -> T[]` and would lose it.
+            let ret = if *callee == Callee::CollectArms {
+                let refined = self.refine_collected_arms(ret, args)?;
+                self.lock_node(node, &refined);
+                refined
+            } else {
+                ret
+            };
             // A generic-struct/variant return (`fn wrap<T>(..) -> Box<T>`) came
             // back as a `Type::Generic`; once its arguments are concrete at the
             // call site, resolve it to the synthesized named instance so the rest
@@ -5686,6 +5696,48 @@ impl Cx<'_> {
                 self.resolve_generic_ty(&ret)
             }
         }
+    }
+
+    /// The type of `xs.collect_arms(Circle)`: an array of `xs`'s variant less
+    /// every case but the one named, so a `match` on an element needs that arm
+    /// alone and refuses any other. `ret` is the array type the builtin's
+    /// signature gives; the case is read off the constructor reference written as
+    /// the second argument, which is the only place it is known — a `Case<V>`
+    /// value held in a variable says which variant but not which case.
+    fn refine_collected_arms(&self, ret: Type, args: &[Expr]) -> Result<Type, Error> {
+        let Type::Array(elem) = &ret else {
+            return Ok(ret);
+        };
+        // Inside a generic body the variant is a type variable and has no cases
+        // to name.
+        let Some(cases) = self.cases_of(elem) else {
+            return Ok(ret);
+        };
+        let [_, arm] = args else {
+            return Ok(ret);
+        };
+        let Some((case, _)) = aipl_syntax::ctor_ref_case(arm) else {
+            return Err(Error::at(
+                "\"collect_arms\" needs the case written as a constructor name, as in \
+                 `shapes.collect_arms(Circle)` — a value of type `Case<..>` does not say \
+                 which case it holds until run time, so the result could not be typed by it",
+                arm.span.clone(),
+            ));
+        };
+        let case = case.split('@').next().unwrap_or(case);
+        if !cases.iter().any(|(c, _)| c == case) {
+            return Err(Error::at(
+                format!("{case:?} is not a case of {}", tyname(elem)),
+                arm.span.clone(),
+            ));
+        }
+        let refined = cases
+            .iter()
+            .filter(|(c, _)| c != case)
+            .fold((**elem).clone(), |acc, (c, _)| {
+                Type::Without(Box::new(acc), Exclusion::NamedCase(c.clone()))
+            });
+        Ok(Type::Array(Box::new(refined)))
     }
 
     /// Refuse an argument of type `aty` that a variadic parameter of `arity`
@@ -6598,7 +6650,12 @@ pub(crate) fn needs_lock(k: &ExprKind) -> bool {
         ExprKind::Call(n, _, _) => {
             matches!(
                 n,
-                Callee::Ok | Callee::Err | Callee::Some | Callee::ToSet | Callee::Narrow
+                Callee::Ok
+                    | Callee::Err
+                    | Callee::Some
+                    | Callee::ToSet
+                    | Callee::Narrow
+                    | Callee::CollectArms
             )
         }
         _ => false,

@@ -1,0 +1,42 @@
+# The AIPL implementation of the `collect_arms` builtin. The loader names this
+# function by the canonical name `__builtin_collect_arms` (see
+# `aipl_syntax::aipl_builtins`), so a user's `xs.collect_arms(Circle)` resolves
+# through the ordinary generic machinery — the in-file name `collect_arms` is only
+# for this file's own tests, which read exactly like user code.
+#
+# What the body returns is a `T[]`, but a call in a user's file is typed more
+# precisely than that: the checker reads the case off the constructor reference
+# passed as `arm` and types the result as an array of `T` *without every other
+# case* (see `refine_collected_arms` in `aipl-mono`). The elements are the same
+# values either way — the refinement costs nothing at run time — but a `match` on
+# one needs only the arm that was collected, and refuses any other.
+#
+# There is no lint steering callers here: the longhand,
+# `xs.filter(|x| x.case_of() == Circle)`, is a different program (its elements are
+# still any case of `T`), not a worse spelling of this one.
+
+import { case_of, equal as ==, filter, len } from builtins;
+
+# What the tests collect from.
+variant Shape = Circle(i64) | Square(i64) | Dot
+
+# The elements of `self` that are the case `arm`, in order. `arm` is a constructor
+# name, payload-carrying or not: `shapes.collect_arms(Circle)`. An array with none
+# of that case gives an empty one.
+#
+# See `filter` for keeping elements by an arbitrary predicate, and `case_of` for
+# reading which case a single value is.
+pub fn collect_arms<T: variant>(self: T[], arm: Case<T>) -> T[] {
+    self.filter(|x| x.case_of() == arm)
+}.test({
+    let shapes = [Circle(1), Square(2), Dot, Circle(3), Dot];
+    assert(shapes.collect_arms(Circle) == [Circle(1), Circle(3)]);
+    assert(shapes.collect_arms(Square) == [Square(2)]);
+    assert(shapes.collect_arms(Dot).len() == 2);
+    // The function-call form is the same call.
+    assert(collect_arms(shapes, Square) == [Square(2)]);
+    // Nothing of that case.
+    assert([Dot, Dot].collect_arms(Circle) == []);
+    let empty: Shape[] = [];
+    assert(empty.collect_arms(Dot) == []);
+})
