@@ -41,13 +41,10 @@ fn span(self: ImportSource) -> Span {
     }
 }
 
-# A backtick, which a template cannot hold.
-let TICK: str = "`";
-
 # What is said of a redundant import from `self`.
 fn message(self: ImportSource) -> str {
     match (self) {
-        Path(path, _) => `duplicate import from "{path}"; merge the names into the first {TICK}import \{ .. } from "{path}";{TICK} (or append #[allow] to this line to keep it)`,
+        Path(path, _) => `duplicate import from "{path}"; merge the names into the first \`import \{ .. } from "{path}";\` (or append #[allow] to this line to keep it)`,
         Builtins(..) => """duplicate import from "builtins"; merge the names into the first `import { .. } from builtins;` (or append #[allow] to this line to keep it)""",
     }
 }
