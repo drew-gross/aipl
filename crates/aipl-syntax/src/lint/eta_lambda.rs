@@ -24,7 +24,7 @@ impl Forwarding {
                 Item::Fn(f) if f.sig.params.first().is_some_and(|p| p.name == "self") => {
                     methods.insert(f.name.text.clone());
                 }
-                Item::Import(decl) if matches!(decl.source, ImportSource::Builtins { .. }) => {
+                Item::Import(decl) if matches!(decl.source, ImportSource::Builtins) => {
                     methods.extend(
                         decl.names
                             .iter()

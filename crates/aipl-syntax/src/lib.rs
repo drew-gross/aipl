@@ -468,6 +468,9 @@ pub mod ast {
     pub struct ImportDecl {
         pub names: Vec<ImportName>,
         pub source: ImportSource,
+        /// The source as written (`"./util.aipl"` or `builtins`), where a
+        /// diagnostic about the import as a whole points.
+        pub source_span: Span,
     }
 
     /// One name in an `import { .. }` list: the exported `name`, optionally bound
@@ -493,11 +496,11 @@ pub mod ast {
     pub enum ImportSource {
         /// `from "path"` — another AIPL source file, resolved relative to
         /// the importing file.
-        Path { path: String, span: Span },
+        Path(String),
         /// `from builtins` — the built-in namespace (`print`, `len`, …).
         /// Every builtin must be imported before use, exactly like a
         /// user item, so user idents never silently shadow them.
-        Builtins { span: Span },
+        Builtins,
     }
 
     /// A constraint on a declared type variable, restricting which concrete

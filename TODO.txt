@@ -102,7 +102,6 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
-  for duplicate_import_source, the span should live outside the ImportSource arms, so that ImportSource can be useful as a set key
   field_reads (and some other places in the linter) look like the for-if-push lint should be firing
   mentions_any looks like it should use collect_arms
   collect_arms should accept a type param, not a case as a value

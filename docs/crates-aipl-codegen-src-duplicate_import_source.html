@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-duplicate_import_source">duplicate_import_source</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn duplicate_import_source(__spat$674: Program) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn duplicate_import_source(__spat$664: Program) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each import of a source an earlier import already took names from, in the order the imports are written.</p></div>
 
@@ -41,34 +41,6 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
-
-
-        <section class="item" id="item-key">
-          <h3>
-            <a class="anchor" href="#item-key">key</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn key(self: ImportSource) -&#62; ImportSource</code></pre>
-
-          <div class="doc"><p>The source with its span cleared, so two imports of one compare equal: the spans differ between them.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-span">
-          <h3>
-            <a class="anchor" href="#item-span">span</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn span(self: ImportSource) -&#62; Span</code></pre>
-
-          <div class="doc"><p>The source as written, which is where the caret goes: it is on the import's one line however its names are laid out.</p></div>
-
-
-        </section>
-
 
 
         <section class="item" id="item-message">

@@ -273,6 +273,7 @@ fn import_decl(v: &FfiValue) -> R<ast::ImportDecl> {
     Ok(ast::ImportDecl {
         names: each(field(v, "names")?, import_name)?,
         source: import_source(field(v, "source")?)?,
+        source_span: span(field(v, "source_span")?)?,
     })
 }
 
@@ -287,13 +288,8 @@ fn import_name(v: &FfiValue) -> R<ast::ImportName> {
 fn import_source(v: &FfiValue) -> R<ast::ImportSource> {
     let (case, payload) = variant(v)?;
     Ok(match case {
-        "Path" => ast::ImportSource::Path {
-            path: text(at(payload, 0, case)?)?,
-            span: span(at(payload, 1, case)?)?,
-        },
-        "Builtins" => ast::ImportSource::Builtins {
-            span: span(at(payload, 0, case)?)?,
-        },
+        "Path" => ast::ImportSource::Path(text(at(payload, 0, case)?)?),
+        "Builtins" => ast::ImportSource::Builtins,
         other => return Err(unknown("ImportSource", other)),
     })
 }

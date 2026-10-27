@@ -331,12 +331,16 @@ impl Loader {
         let mut builtin_imports = Vec::new();
         for item in program.items {
             match item {
-                Item::Import(ImportDecl { names, source }) => match source {
-                    ImportSource::Path { path: from, span } => {
-                        let from = resolve(&from, span)?;
+                Item::Import(ImportDecl {
+                    names,
+                    source,
+                    source_span,
+                }) => match source {
+                    ImportSource::Path(from) => {
+                        let from = resolve(&from, source_span)?;
                         imports.push(ResolvedImport { names, from });
                     }
-                    ImportSource::Builtins { .. } => builtin_imports.extend(names),
+                    ImportSource::Builtins => builtin_imports.extend(names),
                 },
                 other => items.push(other),
             }

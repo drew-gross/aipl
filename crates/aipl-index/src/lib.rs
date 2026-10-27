@@ -568,8 +568,8 @@ fn imports(program: &Program) -> Vec<Import> {
     for item in &program.items {
         let Item::Import(decl) = item else { continue };
         let from = match &decl.source {
-            aipl_syntax::ast::ImportSource::Path { path, .. } => Some(path.clone()),
-            aipl_syntax::ast::ImportSource::Builtins { .. } => None,
+            aipl_syntax::ast::ImportSource::Path(path) => Some(path.clone()),
+            aipl_syntax::ast::ImportSource::Builtins => None,
         };
         for n in &decl.names {
             out.push(Import {

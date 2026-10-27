@@ -90,7 +90,7 @@
             <a class="anchor" href="#item-hit_span">hit_span</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn hit_span(self: ImportName, source: ImportSource) -&#62; Span</code></pre>
+          <pre class="signature"><code>fn hit_span(self: ImportName, source_span: Span) -&#62; Span</code></pre>
 
           <div class="doc"><p>Where an unused import's caret goes. The bare <code>-</code>/<code>&lt;</code>/<code>&gt;</code>/<code>||</code>/<code>!</code> operator tokens carry no span of their own, so the import statement is pointed at instead — an empty span would put the caret on the file's first line, nowhere near the import.</p></div>
 
@@ -104,7 +104,7 @@
             <a class="anchor" href="#item-referenced_names">referenced_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn referenced_names(__spat$3523: Program) -&#62; #{str}</code></pre>
+          <pre class="signature"><code>fn referenced_names(__spat$3429: Program) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>Every name the file mentions outside its own import lists: called and referenced idents, constructed structs, match constructors, operator spellings, and every name appearing in a type — signatures, struct fields, variant payloads, and inline <code>let</code>/lambda annotations.</p></div>
 

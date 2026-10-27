@@ -12,11 +12,11 @@ import { Named, NamedCase, Primitive, Ty, Without, show_ty } from "./ty.aipl";
 
 struct TypeParam { name: str, bound: Bound, default: Ty? }
 
-variant ImportSource = Path(path: str, span: Span) | Builtins(span: Span)
+variant ImportSource = Path(path: str) | Builtins
 
 struct ImportName { name: str, alias: str?, span: Span }
 
-struct ImportDecl { names: ImportName[], source: ImportSource }
+struct ImportDecl { names: ImportName[], source: ImportSource, source_span: Span }
 
 # One declared parameter. `ty` is the type the *body* sees, which is not always
 # the one written: a variadic `x: T*` / `x: T+` stores the sequence type, and a
@@ -146,7 +146,8 @@ pub fn show_item(self: Item) -> str {
 }.test({
     let d = ImportDecl {
         names: [ImportName { name: "a", alias: some("b"), span: 0..0 }],
-        source: Builtins(0..0),
+        source: Builtins,
+        source_span: 0..0,
     };
     assert(Import(d).show_item() == "import [a as b] from builtins");
     let no_params: TypeParam[] = [];
@@ -240,7 +241,7 @@ fn show_import_name(self: ImportName) -> str {
 
 fn show_import_source(self: ImportSource) -> str {
     match (self) {
-        Path(path, _) => `"{path}"`,
-        Builtins(..) => "builtins",
+        Path(path) => `"{path}"`,
+        Builtins => "builtins",
     }
 }

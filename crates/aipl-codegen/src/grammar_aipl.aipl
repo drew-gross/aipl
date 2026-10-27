@@ -3391,9 +3391,9 @@ fn lower_import_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let text = toks[i].value_or("");
     let span = spans[i].value_or(node.tok_span());
     if (text == "builtins") {
-        return ok(AImport(ImportDecl { names, source: Builtins(span) }));
+        return ok(AImport(ImportDecl { names, source: Builtins, source_span: span }));
     };
-    ok(AImport(ImportDecl { names, source: Path(str_lit_value(text), span) }))
+    ok(AImport(ImportDecl { names, source: Path(str_lit_value(text)), source_span: span }))
 }
 
 # What refusing a bare operator import says: the operator, and the aliased

@@ -126,7 +126,7 @@ pub(super) fn matching_compound(program: &Program) -> CompoundOps {
         let Item::Import(decl) = item else {
             continue;
         };
-        let from_builtins = matches!(decl.source, ImportSource::Builtins { .. });
+        let from_builtins = matches!(decl.source, ImportSource::Builtins);
         for n in &decl.names {
             let canonical = from_builtins
                 .then(|| crate::operator_builtin(&n.name))

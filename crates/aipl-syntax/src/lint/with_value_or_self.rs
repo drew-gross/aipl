@@ -19,7 +19,7 @@ pub(super) fn with_names(program: &Program) -> Option<WithNames> {
             let Item::Import(decl) = item else {
                 return None;
             };
-            if !matches!(decl.source, ImportSource::Builtins { .. }) {
+            if !matches!(decl.source, ImportSource::Builtins) {
                 return None;
             }
             decl.names

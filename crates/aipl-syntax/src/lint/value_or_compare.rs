@@ -25,7 +25,7 @@ pub(super) fn value_or_compare_names(program: &Program) -> ValueOrCompare {
         let Item::Import(decl) = item else {
             continue;
         };
-        if !matches!(decl.source, ImportSource::Builtins { .. }) {
+        if !matches!(decl.source, ImportSource::Builtins) {
             continue;
         }
         for n in &decl.names {

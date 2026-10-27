@@ -994,7 +994,7 @@ fn path_import_parses_as_path_source() {
         ["a", "b"]
     );
     match &imp.source {
-        ImportSource::Path { path, .. } => assert_eq!(path, "m"),
+        ImportSource::Path(path) => assert_eq!(path, "m"),
         other => panic!("expected path source, got {other:?}"),
     }
 }
@@ -1010,16 +1010,13 @@ fn builtins_import_parses_as_builtins_source() {
             .collect::<Vec<_>>(),
         ["len", "push"]
     );
-    assert!(matches!(imp.source, ImportSource::Builtins { .. }));
+    assert!(matches!(imp.source, ImportSource::Builtins));
 }
 
 #[test]
 fn builtins_import_allows_trailing_comma() {
     let p = parse("import { len, } from builtins; fn f() { 0 }").unwrap();
-    assert!(matches!(
-        import_at(&p, 0).source,
-        ImportSource::Builtins { .. }
-    ));
+    assert!(matches!(import_at(&p, 0).source, ImportSource::Builtins));
 }
 
 #[test]

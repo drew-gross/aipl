@@ -61,16 +61,13 @@ import {
 } from "./expr.aipl";
 import { ParseFailure, aipl_parse_file } from "./grammar_aipl.aipl";
 import {
-    Builtins,
     Const,
     Fn,
     Import,
     ImportDecl,
     ImportName,
-    ImportSource,
     Item,
     Param,
-    Path,
     Program,
     Refinement,
     Struct,
@@ -105,10 +102,10 @@ pub fn unused_imports(program: Program) -> LintHit[] {
 
 # A hit for each name `self` imports that is not in `used`.
 fn unused_in(self: Import(decl), used: #{str}) -> LintHit[] {
-    let ImportDecl { names, source } = decl;
+    let ImportDecl { names, source_span } = decl;
     names
         .filter(|name| !used.has(name.local()))
-        .map(|name| hit(unused_message(name.local()), name.hit_span(source)))
+        .map(|name| hit(unused_message(name.local()), name.hit_span(source_span)))
 }
 
 # What is said of the import `name`.
@@ -124,13 +121,11 @@ fn local(self: ImportName) -> str { self.alias.value_or(self.name) }
 # tokens carry no span of their own, so the import statement is pointed at
 # instead — an empty span would put the caret on the file's first line, nowhere
 # near the import.
-fn hit_span(self: ImportName, source: ImportSource) -> Span {
+fn hit_span(self: ImportName, source_span: Span) -> Span {
     if (self.span.start != self.span.end) {
         return self.span;
     };
-    match (source) {
-        Path(_, span) | Builtins(span) => span,
-    }
+    source_span
 }
 
 # Every name the file mentions outside its own import lists: called and

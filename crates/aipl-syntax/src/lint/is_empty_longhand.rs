@@ -31,7 +31,7 @@ pub(super) fn empty_names(program: &Program) -> EmptyNames {
         let Item::Import(decl) = item else {
             continue;
         };
-        if !matches!(decl.source, ImportSource::Builtins { .. }) {
+        if !matches!(decl.source, ImportSource::Builtins) {
             continue;
         }
         for n in &decl.names {

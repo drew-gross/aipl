@@ -4,24 +4,24 @@
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
 ; array-abi narrow
 ; set-abi wide
-; entry parse_test_section_header 622 str -> str?
-; entry strip_test_sections 668 str -> str
-; entry split_test_sections 667 str -> __tuple$str$str
-; entry source_loc 666 str __builtin_Span -> str
+; entry parse_test_section_header 620 str -> str?
+; entry strip_test_sections 666 str -> str
+; entry split_test_sections 665 str -> __tuple$str$str
+; entry source_loc 664 str __builtin_Span -> str
 ; entry caret_block 130 str __builtin_Span str -> str
-; entry fill_or_add_sections_file 238 str #{str:str} -> unit!Error
-; entry normalize_output 583 str -> str
-; entry int_fits 517 i64 str -> bool
-; entry is_operator_name 518 str -> bool
-; entry aipl_token_scopes 553 str -> __m19__ScopeSpan[]!__m19__LexError
-; entry find_files 239 str str -> str[]!Error
+; entry fill_or_add_sections_file 236 str #{str:str} -> unit!Error
+; entry normalize_output 581 str -> str
+; entry int_fits 515 i64 str -> bool
+; entry is_operator_name 516 str -> bool
+; entry aipl_token_scopes 551 str -> __m19__ScopeSpan[]!__m19__LexError
+; entry find_files 237 str str -> str[]!Error
 ; entry companion_files 132 str -> __m25__Companion[]!str
-; entry parse_spec 618 str -> __m26__Spec!str
-; entry parse_and_partial_load 616 str -> __m52__PartialLoad!__m27__ParseFailure
-; entry fn_role 248 str -> __m44__FnRole
-; entry test_fn_name 243 str -> str
-; entry performance_fn_name 244 str -> str
-; entry format_source 273 str u64 -> str!__m55__FmtError
+; entry parse_spec 616 str -> __m26__Spec!str
+; entry parse_and_partial_load 614 str -> __m52__PartialLoad!__m27__ParseFailure
+; entry fn_role 246 str -> __m44__FnRole
+; entry test_fn_name 241 str -> str
+; entry performance_fn_name 242 str -> str
+; entry format_source 271 str u64 -> str!__m55__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
 ; struct __m19__ScopeSpan 40 span@0:__builtin_Span scope@16:str
@@ -57,9 +57,9 @@
 ; struct __m36__VariantCase 96 name@0:__m19__SpanStr doc@40:str? payload@72:__m36__CaseParam[]
 ; struct __m36__CaseParam 96 name@0:str? ty@32:__m30__Ty default@40:__m31__Expr? implicit_some@56:bool doc@64:str?
 ; struct __m36__RefinementDecl 104 name@0:__m19__SpanStr doc@40:str? type_vars@72:__m36__TypeParam[] target@96:__m30__Ty
-; struct __m36__ImportDecl 72 names@0:__m36__ImportName[] source@24:__m36__ImportSource
+; struct __m36__ImportDecl 72 names@0:__m36__ImportName[] source@24:__m36__ImportSource source_span@56:__builtin_Span
 ; struct __m36__ImportName 72 name@0:str alias@24:str? span@56:__builtin_Span
-; variant __m36__ImportSource 48 Path(8:str,32:__builtin_Span) Builtins(8:__builtin_Span)
+; variant __m36__ImportSource 32 Path(8:str) Builtins
 ; struct __m36__ConstDecl 104 name@0:__m19__SpanStr is_pub@40:bool ty@48:__m30__Ty? value@64:__m31__Expr doc@72:str?
 ; struct __m47__LintHit 40 message@0:str span@24:__builtin_Span
 ; struct __m27__ParseFailure 24 errors@0:__m39__ParseError[]
@@ -368,4 +368,4 @@
 ; data 225 __tostr_lit_96 52427261636b6574
 
 ; __m57____test$all$is_nine
-; source-fingerprint 11051405682610129930
+; source-fingerprint 9856369380159300344
