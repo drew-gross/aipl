@@ -251,7 +251,7 @@ pub(super) fn build(whole: &Expr, blocked: &HashSet<String>) -> Option<Expr> {
     }
 
     // The fresh loop variable: the element as `recv` yields it, before `f`.
-    let elem = format!("$fuse{}_{}", crate::next_inline_id(), var);
+    let elem = format!("$fuse{}_{}", aipl_syntax::fresh_id(), var);
     let elem_ref = || Expr::new(ExprKind::Ident(elem.clone()), iterable.span.clone());
     // `let var = f($e); body` — or `let var = $e; body` with no mapping. The
     // binding is spanned as the call it replaces: that is what the user wrote.
@@ -304,7 +304,7 @@ fn build_windows(
     recv: &Expr,
     body: &Expr,
 ) -> Expr {
-    let id = crate::next_inline_id();
+    let id = aipl_syntax::fresh_id();
     let sp = || recv.span.clone();
     let name = |what: &str| format!("$fuse{id}_{what}");
     let ident = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), sp());
@@ -460,7 +460,7 @@ fn build_windows(
 /// as the call evaluates its arguments. The pairs reach `body` in the order the
 /// array holds them: every `$b` for the first `$a`, then for the next.
 fn build_product(whole: &Expr, var: &str, recv: &Expr, other: &Expr, body: &Expr) -> Expr {
-    let id = crate::next_inline_id();
+    let id = aipl_syntax::fresh_id();
     let sp = || recv.span.clone();
     let name = |what: &str| format!("$fuse{id}_{what}");
     let ident = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), sp());
@@ -512,7 +512,7 @@ pub(crate) fn apply(func: &Expr, arg: Expr) -> Option<Expr> {
                 return None;
             };
             let map = HashMap::from([(param.name.clone(), arg_name.clone())]);
-            Some(crate::rename_params(body, &map))
+            Some(aipl_syntax::rename_params(body, &map))
         }
         ExprKind::Ident(g) => Some(Expr::new(
             ExprKind::Call(Callee::resolve(g.clone()), vec![arg], false),

@@ -1826,7 +1826,15 @@ fn rewrite_expr(
                         span: arm.span.clone(),
                     }
                 })
-                .collect();
+                .collect::<Vec<MatchArm>>();
+            // `A | B => body` is one arm per alternative, each with a copy of the
+            // body, and a copy gets binders of its own.
+            let mut new_arms = new_arms;
+            for i in 1..new_arms.len() {
+                if new_arms[..i].iter().any(|a| a.body == new_arms[i].body) {
+                    new_arms[i].body = aipl_syntax::distinct_binders(&new_arms[i].body);
+                }
+            }
             ExprKind::Match(
                 Box::new(rewrite_expr(scrutinee, view, sc, locals)),
                 new_arms,

@@ -346,6 +346,10 @@ pub fn set_caret_block_hook(f: fn(&str, Span, &str) -> String) {
 pub mod aipl_builtins;
 pub mod builtin;
 pub mod callee;
+pub mod rename;
+pub use rename::{
+    distinct_binders, fresh_id, fresh_local, fresh_temp, rename_params, rename_scoped,
+};
 
 pub mod ast {
     pub use crate::callee::{Callee, SeqShape};

@@ -306,7 +306,7 @@ pub(super) fn build(whole: &Expr, blocked: &HashSet<String>) -> Option<Expr> {
         return None;
     }
 
-    let id = crate::next_inline_id();
+    let id = aipl_syntax::fresh_id();
     let (x, y) = (format!("$predicate{id}_x"), format!("$predicate{id}_y"));
     let ident = |name: &str| Expr::new(ExprKind::Ident(name.to_string()), whole.span.clone());
     // `let y = f(x); g(y)`.

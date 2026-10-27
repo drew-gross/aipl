@@ -87,7 +87,7 @@ fn lower_expr(e: &mut Expr) {
         let Some(step) = Callee::from_canonical(name).and_then(|c| c.reduction_step()) else {
             return;
         };
-        let param = format!("$reduce{}_xs", crate::next_inline_id());
+        let param = format!("$reduce{}_xs", aipl_syntax::fresh_id());
         let operand = Expr::new(ExprKind::Ident(param.clone()), e.span.clone());
         let call = Expr::new(
             ExprKind::Call(

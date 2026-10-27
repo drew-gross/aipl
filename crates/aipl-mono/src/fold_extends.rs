@@ -394,7 +394,7 @@ fn appends(v: &str, src: &Expr, arrays: &ArrayReceivers) -> Option<Expr> {
             if !seps.iter().all(|s| arrays.is_empty_sequence(s)) {
                 return None;
             }
-            let elem = format!("$ext{}_x", crate::next_inline_id());
+            let elem = format!("$ext{}_x", aipl_syntax::fresh_id());
             let piece = apply(f, Expr::new(ExprKind::Ident(elem.clone()), span()))?;
             let walk = Expr::new(
                 ExprKind::For(elem, None, Box::new(xs.clone()), Box::new(extend(&piece))),
@@ -419,7 +419,7 @@ fn appends(v: &str, src: &Expr, arrays: &ArrayReceivers) -> Option<Expr> {
             let [opt, f] = map_args.as_slice() else {
                 return None;
             };
-            let bound = format!("$ext{}_v", crate::next_inline_id());
+            let bound = format!("$ext{}_v", aipl_syntax::fresh_id());
             let piece = apply(f, Expr::new(ExprKind::Ident(bound.clone()), span()))?;
             Some(like(ExprKind::Match(
                 Box::new(opt.clone()),

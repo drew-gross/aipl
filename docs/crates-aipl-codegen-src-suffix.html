@@ -111,14 +111,14 @@
         <p class="note">Not importable from another file.</p>
 
 
-        <section class="item" id="item-MAPPED_ELEMENT">
+        <section class="item" id="item-mapped_element">
           <h3>
-            <a class="anchor" href="#item-MAPPED_ELEMENT">MAPPED_ELEMENT</a>
-            <span class="kind kind-const">let</span>
+            <a class="anchor" href="#item-mapped_element">mapped_element</a>
+            <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>let MAPPED_ELEMENT = &#34;__map$&#34;</code></pre>
+          <pre class="signature"><code>fn mapped_element(__spat$4610: Span) -&#62; str</code></pre>
 
-          <div class="doc"><p>What <code>recv$step</code> means: <code>recv.map(|e| step)</code>, where <code>step</code> is the postfix step written against the element <code>e</code>. The element's name has a <code>$</code> in it, so no source can spell it and an argument of the step can never mean it by accident — which also means a mapped step nested in another's arguments shadows harmlessly.</p></div>
+          <div class="doc"><p>What <code>recv$step</code> means: <code>recv.map(|e| step)</code>, where <code>step</code> is the postfix step written against the element <code>e</code>. The element's name has a <code>$</code> in it, so no source can spell it and an argument of the step can never mean it by accident. It carries the step's span, so no two steps of a function name their element alike.</p></div>
 
 
         </section>

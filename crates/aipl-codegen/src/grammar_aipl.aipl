@@ -4495,20 +4495,20 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     assert(expr_dump("a.b.c") == "a.b.c");
 
     // `$` maps a member over the receiver: a field, a tuple slot, or a call.
-    assert(expr_dump("v$f") == "v.__builtin_map(Lambda([__map$], __map$.f))");
-    assert(expr_dump("v$0") == "v.__builtin_map(Lambda([__map$], __map$._0))");
-    assert(expr_dump("v$f(1, w)") == "v.__builtin_map(Lambda([__map$], __map$.f(1, w)))");
+    assert(expr_dump("v$f") == "v.__builtin_map(Lambda([__map$0_3], __map$0_3.f))");
+    assert(expr_dump("v$0") == "v.__builtin_map(Lambda([__map$0_3], __map$0_3._0))");
+    assert(expr_dump("v$f(1, w)") == "v.__builtin_map(Lambda([__map$0_9], __map$0_9.f(1, w)))");
     assert(
         expr_dump(
             "v$f$g",
-        ) == "v.__builtin_map(Lambda([__map$], __map$.f)).__builtin_map(Lambda([__map$], __map$.g))",
+        ) == "v.__builtin_map(Lambda([__map$0_3], __map$0_3.f)).__builtin_map(Lambda([__map$0_5], __map$0_5.g))",
     );
     assert(
         expr_dump(
             "v$f(w$g)",
-        ) == "v.__builtin_map(Lambda([__map$], __map$.f(w.__builtin_map(Lambda([__map$], __map$.g)))))",
+        ) == "v.__builtin_map(Lambda([__map$0_8], __map$0_8.f(w.__builtin_map(Lambda([__map$4_7], __map$4_7.g)))))",
     );
-    assert(expr_dump("v$f.len()") == "v.__builtin_map(Lambda([__map$], __map$.f)).len()");
+    assert(expr_dump("v$f.len()") == "v.__builtin_map(Lambda([__map$0_3], __map$0_3.f)).len()");
     assert(expr_dump("v$-1") == "error: tuple index must be a non-negative integer");
 
     // A method call folds its receiver in as the first argument, so `xs.f(1)`

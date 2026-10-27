@@ -54,5 +54,5 @@ aipl_shim_get                2    external
 aipl_u64_len                 4    external
 aipl_write_u64               2    external
 main                         1        1956
+main$map1                    0         404
 main$map3                    0         404
-main$map5                    0         404

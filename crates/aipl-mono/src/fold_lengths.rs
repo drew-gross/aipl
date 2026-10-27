@@ -610,7 +610,7 @@ fn sum_of_parts(
     if !is_pure(f, blocked) {
         return None;
     }
-    let id = crate::next_inline_id();
+    let id = aipl_syntax::fresh_id();
     let span = || whole.span.clone();
     let (total, elem) = (format!("$len{id}_n"), format!("$len{id}_x"));
     let ident = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span());
@@ -681,7 +681,7 @@ fn optional_count(
         return None;
     }
     let span = || whole.span.clone();
-    let bound = format!("$len{}_v", crate::next_inline_id());
+    let bound = format!("$len{}_v", aipl_syntax::fresh_id());
     let some = MatchArm {
         pattern: Pattern::Ctor {
             name: "some".to_string(),

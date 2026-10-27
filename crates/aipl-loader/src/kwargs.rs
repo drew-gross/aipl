@@ -1129,22 +1129,36 @@ impl Expander {
                     None => {
                         let d = &defaults[i - npos];
                         let free = aipl_syntax::free_idents(d);
-                        params[..i].iter().rev().fold(d.clone(), |body, (n, ty)| {
-                            let Some(a) = arg_of.get(n.as_str()).filter(|_| free.contains(n))
-                            else {
-                                return body;
-                            };
-                            let bspan = body.span.clone();
-                            Expr::new(
-                                ExprKind::Let(
-                                    n.clone(),
-                                    ty.clone(),
-                                    Box::new(a.clone()),
-                                    Box::new(body),
-                                ),
-                                bspan,
-                            )
-                        })
+                        // Each earlier parameter the default reads is bound to a
+                        // name of its own, so neither the binding nor an argument
+                        // a later binding evaluates can meet a caller's variable
+                        // spelled like the parameter.
+                        let read: Vec<(&String, &Option<Type>, &Expr, String)> = params[..i]
+                            .iter()
+                            .filter_map(|(n, ty)| {
+                                let a = arg_of.get(n.as_str()).filter(|_| free.contains(n))?;
+                                Some((n, ty, a, aipl_syntax::fresh_local("kw", n)))
+                            })
+                            .collect();
+                        let renames = read
+                            .iter()
+                            .map(|(n, _, _, fresh)| ((*n).clone(), fresh.clone()))
+                            .collect();
+                        let body = aipl_syntax::rename_params(d, &renames);
+                        read.into_iter()
+                            .rev()
+                            .fold(body, |body, (_, ty, a, fresh)| {
+                                let bspan = body.span.clone();
+                                Expr::new(
+                                    ExprKind::Let(
+                                        fresh,
+                                        ty.clone(),
+                                        Box::new(a.clone()),
+                                        Box::new(body),
+                                    ),
+                                    bspan,
+                                )
+                            })
                     }
                 },
             };

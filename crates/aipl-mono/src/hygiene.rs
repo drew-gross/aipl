@@ -17,7 +17,8 @@
 //!
 //! - **Dangling** — an identifier that names no binder in scope and no function,
 //!   a call through a local ([`Callee::Local`]) whose binder is not in scope, or
-//!   a call of a global ([`Callee::User`]) that is not a function. A pass that
+//!   a call of a global ([`Callee::User`]) that is not a function (unless it is
+//!   written as a method, which may call a function held in a field). A pass that
 //!   renames a binder and one of its uses apart leaves this. A call's target
 //!   says which kind of name it is, so a local can no more capture a global's
 //!   call than the reverse.
@@ -71,10 +72,22 @@ impl fmt::Display for Violation {
     }
 }
 
-/// Whether the check is on, and how loudly: `AIPL_HYGIENE=report` prints what
-/// each pass introduced. Unset, it costs nothing.
+/// Whether the check is on: `AIPL_HYGIENE=report` prints what each pass
+/// introduced, and `AIPL_HYGIENE=strict` also panics on the first. Unset, it
+/// costs nothing.
 pub fn enabled() -> bool {
-    std::env::var("AIPL_HYGIENE").is_ok_and(|v| v == "report")
+    mode().is_some()
+}
+
+/// Whether a violation is a panic rather than a line on stderr.
+pub fn strict() -> bool {
+    mode().as_deref() == Some("strict")
+}
+
+fn mode() -> Option<String> {
+    std::env::var("AIPL_HYGIENE")
+        .ok()
+        .filter(|v| v == "report" || v == "strict")
 }
 
 /// Every violation in `program`.
@@ -152,7 +165,8 @@ impl Walk<'_> {
     /// identifier that is either.
     fn reference(&mut self, name: &str, target: Target) {
         let local = self.scope.iter().any(|n| n == name);
-        let global = self.globals.contains(name);
+        // A builtin is not an item of the program, and is always in reach.
+        let global = self.globals.contains(name) || name.starts_with("__builtin_");
         let resolves = match target {
             Target::Local => local,
             Target::Global => global,
@@ -168,10 +182,12 @@ impl Walk<'_> {
     fn expr(&mut self, e: &Expr) {
         match &e.kind {
             ExprKind::Ident(n) => self.reference(n, Target::Either),
-            ExprKind::Call(callee, args, _) => {
+            ExprKind::Call(callee, args, method_style) => {
                 match callee {
                     Callee::Local(n) => self.reference(n, Target::Local),
-                    Callee::User(n) => self.reference(n, Target::Global),
+                    // `s.f(x)` calls the function held in `s`'s field `f` when
+                    // `s` has one, and no global names it.
+                    Callee::User(n) if !*method_style => self.reference(n, Target::Global),
                     _ => {}
                 }
                 for a in args {
@@ -352,6 +368,30 @@ mod tests {
                 function("reads", number()),
                 function("f", bind("reads", call("reads")))
             ]),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_method_call_may_call_a_function_held_in_a_field() {
+        let method = |name: &str| {
+            expr(ExprKind::Call(
+                Callee::User(name.to_string()),
+                Vec::new(),
+                true,
+            ))
+        };
+        assert_eq!(found(vec![function("f", method("step"))]), vec![]);
+        assert_eq!(
+            found(vec![function("f", call("step"))]),
+            vec![says("f", "dangling", "step")]
+        );
+    }
+
+    #[test]
+    fn a_builtin_is_always_in_reach() {
+        assert_eq!(
+            found(vec![function("f", ident("__builtin_is_digit"))]),
             vec![]
         );
     }

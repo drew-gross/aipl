@@ -107,7 +107,7 @@ use aipl_syntax::ast::{Callee, Expr, ExprKind, FieldInit, MatchArm, Pattern, Typ
 
 use crate::sink::{can_defer, undeferrable_fns_post_mono};
 use crate::subst::{assigned_names, read_names, uses_of};
-use crate::{body_size, next_inline_id, ConcreteFn, MonoProgram};
+use crate::{body_size, ConcreteFn, MonoProgram};
 
 /// Eliminate every known-constructor pair in `program`. `max_duplicated` bounds
 /// how much arm text a pushed `match` may copy; `builtin_effects` is the effect
@@ -211,7 +211,7 @@ fn unwrap_equality(
     at: &Expr,
     limits: &Limits,
 ) -> Expr {
-    let id = next_inline_id();
+    let id = aipl_syntax::fresh_id();
     let rebuilt = |kind: ExprKind| Expr::rebuilt(kind, at);
     // Each payload as the arm reads it: itself when it may be deferred, else
     // the name it is bound to ahead of the match.
@@ -741,28 +741,44 @@ fn push_match(
                 payloads[0].clone()
             }
             // Binders are bound first to last, so the body sees them all; the
-            // payloads' own evaluation order is preserved the same way.
-            Pattern::Ctor { bindings, .. } => bindings.iter().zip(payloads).rev().fold(
-                arm.body.clone(),
-                |body, (binder, payload)| {
-                    if binder == "_" {
-                        evaluate(payload.clone(), body)
-                    } else {
-                        bind(binder.clone(), payload.clone(), body)
-                    }
-                },
-            ),
+            // payloads' own evaluation order is preserved the same way. The body
+            // is copied to every leaf, so each copy binds names of its own.
+            Pattern::Ctor { bindings, .. } => {
+                let renames = fresh_binders(bindings);
+                let body = aipl_syntax::rename_scoped(&arm.body, &renames, true);
+                bindings
+                    .iter()
+                    .zip(payloads)
+                    .rev()
+                    .fold(body, |body, (binder, payload)| match renames.get(binder) {
+                        Some(fresh) => bind(fresh.clone(), payload.clone(), body),
+                        None => evaluate(payload.clone(), body),
+                    })
+            }
             // A catch-all binder names the whole constructed value, which is
             // therefore still built.
-            Pattern::Bind(name) => bind(name.clone(), leaf.clone(), arm.body.clone()),
+            Pattern::Bind(name) => {
+                let renames = fresh_binders(std::slice::from_ref(name));
+                let body = aipl_syntax::rename_scoped(&arm.body, &renames, true);
+                bind(renames[name].clone(), leaf.clone(), body)
+            }
             _ => payloads
                 .iter()
                 .rev()
-                .fold(arm.body.clone(), |body, payload| {
+                .fold(crate::distinct_binders(&arm.body), |body, payload| {
                     evaluate((*payload).clone(), body)
                 }),
         }
     })
+}
+
+/// A new name for each of `binders` that binds something (`_` binds nothing).
+fn fresh_binders(binders: &[String]) -> std::collections::HashMap<String, String> {
+    binders
+        .iter()
+        .filter(|b| *b != "_")
+        .map(|b| (b.clone(), aipl_syntax::fresh_local("ceq", b)))
+        .collect()
 }
 
 /// Whether projecting `field` out of every struct `base` ends in is possible:
@@ -989,7 +1005,7 @@ mod tests {
         // The binder takes the annotation's payload type.
         assert!(
             matches!(&t.kind, ExprKind::Let(v, Some(Type::Primitive(_)), p, _)
-            if v == "v" && matches!(&p.kind, ExprKind::Ident(x) if x == "x"))
+            if v.ends_with("_v") && matches!(&p.kind, ExprKind::Ident(x) if x == "x"))
         );
         assert!(matches!(&f.kind, ExprKind::Ident(d) if d == "d"));
     }
@@ -1052,11 +1068,12 @@ mod tests {
         let ExprKind::Let(name, _, payload, body) = &t.kind else {
             panic!("expected `let x = a; ..`, got {t:?}");
         };
-        assert_eq!(name, "x");
+        // The arm's binder is renamed, since its body is copied to each leaf.
+        assert!(name.ends_with("_x"));
         assert!(matches!(&payload.kind, ExprKind::Ident(a) if a == "a"));
         assert!(matches!(&body.kind, ExprKind::Seq(first, rest)
             if matches!(&first.kind, ExprKind::Ident(b) if b == "b")
-                && matches!(&rest.kind, ExprKind::Ident(x) if x == "x")));
+                && matches!(&rest.kind, ExprKind::Ident(x) if x == name)));
         assert!(matches!(&f.kind, ExprKind::Ident(d) if d == "d"));
     }
 

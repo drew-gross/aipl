@@ -239,7 +239,7 @@ pub fn optimize<P: Optimizable>(
         );
     }
 
-    // `AIPL_HYGIENE=report`: what each pass does to the meaning of names. The
+    // `AIPL_HYGIENE=report|strict`: what each pass does to the meaning of names. The
     // program's own violations on entry are the baseline, so a pass is shown only
     // the ones it adds.
     let hygiene = crate::hygiene::enabled();
@@ -251,7 +251,13 @@ pub fn optimize<P: Optimizable>(
     };
     if hygiene {
         for v in &introduced {
+            // A binder spelled like one around it is the source shadowing on
+            // purpose; only a name the compiler made says a pass did it.
+            if v.kind == crate::hygiene::Kind::Shadows && !v.name.contains('$') {
+                continue;
+            }
             eprintln!("[hygiene] {phase} on entry: {v}");
+            assert!(!crate::hygiene::strict(), "hygiene: {phase} on entry: {v}");
         }
     }
 
@@ -266,6 +272,11 @@ pub fn optimize<P: Optimizable>(
                 let now = crate::hygiene::violations(&next);
                 for v in now.difference(&introduced) {
                     eprintln!("[hygiene] {phase} pass `{}` round {round}: {v}", pass.name);
+                    assert!(
+                        !crate::hygiene::strict(),
+                        "hygiene: {phase} pass `{}` round {round}: {v}",
+                        pass.name
+                    );
                 }
                 introduced = now;
             }

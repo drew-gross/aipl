@@ -3770,7 +3770,7 @@ impl Mono<'_> {
                 params: fm_params,
                 effects,
                 return_ty: Some(ret.clone()),
-                body: fm_body,
+                body: distinct_binders(&fm_body),
             },
         );
         // The in-place body consumes its array parameter, so emit the *owned*
@@ -4128,7 +4128,7 @@ impl Mono<'_> {
                 params: map_params,
                 effects,
                 return_ty: Some(ret.clone()),
-                body: map_body,
+                body: distinct_binders(&map_body),
             },
         );
         // The in-place body consumes its array parameter, so emit the *owned*
@@ -4605,7 +4605,7 @@ impl Mono<'_> {
                 params: zip_params,
                 effects,
                 return_ty: Some(ret.clone()),
-                body,
+                body: distinct_binders(&body),
             },
         );
         // The in-place bodies consume the fresh input(s), so emit the instance
@@ -4882,7 +4882,7 @@ impl Mono<'_> {
                 params: filter_params,
                 effects,
                 return_ty: Some(ret.clone()),
-                body: filter_body,
+                body: distinct_binders(&filter_body),
             },
         );
         // The in-place body consumes its array parameter, so emit the *owned*
@@ -5472,14 +5472,12 @@ impl Mono<'_> {
                 _ => Callee::ExtendOptional,
             });
         }
-        let k = self.synth;
-        self.synth += 1;
         let src = rargs.pop().expect("extend has a source argument");
         let span = src.span.clone();
         let char_ty = Type::Primitive(Primitive::Char);
         rargs.push(match shape {
             VShape::Elem => elem_variadic_seq(src, &char_ty, span),
-            _ => opt_variadic_seq(src, format!("$opt{k}"), &char_ty, span),
+            _ => opt_variadic_seq(src, aipl_syntax::fresh_temp("opt"), &char_ty, span),
         });
         Some(Callee::Extend)
     }
@@ -7034,10 +7032,8 @@ impl Mono<'_> {
                 // a dict's order is not promised, so `$i` is the compiler's and
                 // only the key is the program's.
                 if let Type::Dict(..) = aipl_syntax::unrefined(&it) {
-                    let k = self.synth;
-                    self.synth += 1;
-                    let dict = format!("__dict${k}");
-                    let counter = format!("__dict_i${k}");
+                    let dict = aipl_syntax::fresh_temp("dict");
+                    let counter = aipl_syntax::fresh_temp("dict_i");
                     let sp = || span.clone();
                     let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), sp());
                     let unit = || Expr::new(ExprKind::Unit, sp());
@@ -7133,9 +7129,7 @@ impl Mono<'_> {
                 // like one the program wrote. The inner loop is plain, so a range
                 // still reaches the counted-`while` lowering below.
                 if let Some(idx) = index {
-                    let k = self.synth;
-                    self.synth += 1;
-                    let counter = format!("__idx${k}");
+                    let counter = aipl_syntax::fresh_temp("idx");
                     let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
                     let unit = || Expr::new(ExprKind::Unit, span.clone());
                     let bump = Expr::new(
@@ -7180,10 +7174,8 @@ impl Mono<'_> {
                 // `var` is a fresh immutable binding per iteration, as a `for`
                 // variable is.
                 if matches!(&it, Type::Named(n) if n == "__builtin_Span") {
-                    let k = self.synth;
-                    self.synth += 1;
-                    let range = format!("__range${k}");
-                    let counter = format!("__range_i${k}");
+                    let range = aipl_syntax::fresh_temp("range");
+                    let counter = aipl_syntax::fresh_temp("range_i");
                     let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
                     let field = |f: &str| {
                         Expr::new(
@@ -7417,7 +7409,8 @@ impl Mono<'_> {
                                 bindings: vec!["_".to_string(); payload.len()],
                                 ignore_payload: false,
                             },
-                            body: re.clone(),
+                            // Each case gets a copy, so each copy's binders are its own.
+                            body: distinct_binders(&re),
                             span: else_b.span.clone(),
                         })
                         .collect()
@@ -7498,8 +7491,7 @@ impl Mono<'_> {
                 if *callee == Callee::ToArray && args.len() == 1 {
                     let (_, receiver) = self.infer(&args[0], env)?;
                     if let Some(elems) = self.tuple_field_tys(&receiver) {
-                        let rewritten = tuple_to_array(&args[0], elems.len(), self.synth, &span);
-                        self.synth += 1;
+                        let rewritten = tuple_to_array(&args[0], elems.len(), &span);
                         return self.infer(&rewritten, env);
                     }
                 }
@@ -7626,7 +7618,7 @@ impl Mono<'_> {
                 // mutate the copy, and yield it, leaving the original untouched.
                 // This covers both the free-call form `push(b, x)` and the method
                 // form `b.push(x)` in expression position. Desugar to
-                // `{ mut __mut_copy$k = b; set __mut_copy$k.foo(rest..); __mut_copy$k }`
+                // `{ mut $mut_copy<N> = b; set $mut_copy<N>.foo(rest..); $mut_copy<N> }`
                 // and re-infer: the inner call is the `set` writeback form, so it
                 // mutates the fresh copy in place (the copy is a fresh local, so
                 // the receiver `b` is never touched). The in-place `set b.foo(..)`
@@ -7638,15 +7630,13 @@ impl Mono<'_> {
                         // Fall through to the raw method-call inference (in-place
                         // writeback into the receiver's slot).
                     } else {
-                        let k = self.synth;
-                        self.synth += 1;
-                        let tmp = format!("__mut_copy${k}");
+                        let tmp = aipl_syntax::fresh_temp("mut_copy");
                         let recv = || Expr::new(ExprKind::Ident(tmp.clone()), span.clone());
                         let mut margs = Vec::with_capacity(args.len());
                         margs.push(recv());
                         margs.extend(args[1..].iter().cloned());
                         let method = node(ExprKind::Call(callee.clone(), margs, true));
-                        // `set __mut_copy$k.foo(rest..); __mut_copy$k`
+                        // `set $mut_copy<N>.foo(rest..); $mut_copy<N>`
                         let set = node(ExprKind::Assign(
                             Box::new(node(ExprKind::Ident(tmp.clone()))),
                             Box::new(method),
@@ -7983,9 +7973,7 @@ impl Mono<'_> {
                     let ret = self
                         .fn_field_ret(&atys[0], name)
                         .expect("fn field checked above");
-                    let k = self.synth;
-                    self.synth += 1;
-                    let tmp = format!("__fldcall${k}");
+                    let tmp = aipl_syntax::fresh_temp("fldcall");
                     let mut it = rargs.into_iter();
                     let recv = it.next().expect("call through a field has a receiver");
                     let rest: Vec<Expr> = it.collect();
@@ -8284,7 +8272,7 @@ fn grid_call(callee: Callee, receiver: &Expr, pair: &Expr, rest: &[Expr], span: 
     }
     let bound = match &pair.kind {
         ExprKind::Ident(name) => name.clone(),
-        _ => format!("$cell{}", span.start),
+        _ => aipl_syntax::fresh_temp("cell"),
     };
     let mut args = vec![receiver.clone(), slot(&bound, "_0"), slot(&bound, "_1")];
     args.extend(rest.iter().cloned());
@@ -10700,19 +10688,6 @@ struct InlineParam {
     mutable: bool,
 }
 
-/// The next id for a binding an inlined body introduces. Process-wide rather
-/// than per pass: four passes inline (single-use and small, before and after
-/// monomorphization), and a body one pass inlined is inlined again by a later
-/// one, so two counters that each start at zero can hand out the same
-/// `$inl<n>_self` twice in one function — the inner binding then shadows the
-/// outer, and a `self.span()` that meant the outer receiver reads the inner
-/// one. Ids only ever have to be unique within one program, so sharing the
-/// counter between concurrent compiles costs nothing but a few skipped numbers.
-pub(crate) fn next_inline_id() -> usize {
-    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-}
-
 /// Build the inlined expression for `Call(f, args)`: bind each (freshly renamed)
 /// parameter to its argument via a `let`, in order, wrapping `f`'s body. Renaming
 /// the parameters to `$inl<N>_<name>` is required for correctness — an argument
@@ -10730,12 +10705,12 @@ fn build_inlined(fparams: &[InlineParam], fbody: &Expr, args: &[Expr], span: Spa
     let fresh: Vec<String> = fparams
         .iter()
         .map(|p| {
-            let nm = format!("$inl{}_{}", next_inline_id(), p.name);
+            let nm = format!("$inl{}_{}", aipl_syntax::fresh_id(), p.name);
             map.insert(p.name.clone(), nm.clone());
             nm
         })
         .collect();
-    let mut expr = rename_scoped(fbody, &map, true);
+    let mut expr = aipl_syntax::rename_scoped(fbody, &map, true);
 
     // A mutating method is declared void and mutates its receiver; what a call
     // to it *produces* is that receiver, which is why its ABI return is the
@@ -10783,217 +10758,7 @@ fn build_inlined(fparams: &[InlineParam], fbody: &Expr, args: &[Expr], span: Spa
     expr
 }
 
-/// Rebuild `e` (a function body) substituting parameter references per `map`
-/// (original → fresh name), respecting shadowing: a `let`/`for`/`match`/lambda
-/// binder of a mapped name removes it from the map within that scope (there the
-/// name is the local, not the parameter). Body-internal binders are left as-is —
-/// only the substituted *parameter* references are renamed.
-pub(crate) fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
-    rename_scoped(e, map, false)
-}
-
-/// [`rename_params`], and with `fresh` also every binder the body introduces: each
-/// `let`, loop variable, pattern binder and lambda parameter becomes a new
-/// `$inl<N>_<name>`, so a body copied under a caller's variables can neither
-/// shadow one nor be shadowed, and two copies of one body share no binder.
-pub(crate) fn rename_scoped(e: &Expr, map: &HashMap<String, String>, fresh: bool) -> Expr {
-    let sub = |n: &String| map.get(n).cloned().unwrap_or_else(|| n.clone());
-    // The map inside a scope that binds `names`: they are the locals there, not
-    // the parameters, and under `fresh` each is known by a new name, returned
-    // alongside.
-    let scope = |names: &[String]| -> (HashMap<String, String>, HashMap<String, String>) {
-        let mut inner = map.clone();
-        let mut renamed = HashMap::new();
-        for n in names {
-            inner.remove(n);
-            if fresh && n != "_" {
-                // A shim's closure is found by its prefix, which a fresh name keeps.
-                let nm = match n.strip_prefix(aipl_syntax::SHIM_CLOSURE_PREFIX) {
-                    Some(rest) => format!(
-                        "{}$inl{}_{rest}",
-                        aipl_syntax::SHIM_CLOSURE_PREFIX,
-                        next_inline_id()
-                    ),
-                    None => format!("$inl{}_{}", next_inline_id(), n),
-                };
-                inner.insert(n.clone(), nm.clone());
-                renamed.insert(n.clone(), nm);
-            }
-        }
-        (inner, renamed)
-    };
-    let known_as = |renamed: &HashMap<String, String>, n: &String| {
-        renamed.get(n).cloned().unwrap_or_else(|| n.clone())
-    };
-    let kind = match &e.kind {
-        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
-        ExprKind::TypeArgs(x, tys) => {
-            ExprKind::TypeArgs(Box::new(rename_scoped(x, map, fresh)), tys.clone())
-        }
-        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
-        // A shim binds a function by name: a global, which renaming never touches,
-        // or a closure `let` the parser put just outside it, which it does.
-        ExprKind::Shim(effect, bindings, body) => ExprKind::Shim(
-            effect.clone(),
-            bindings
-                .iter()
-                .map(|(op, f)| (op.clone(), sub(f)))
-                .collect(),
-            Box::new(rename_scoped(body, map, fresh)),
-        ),
-        ExprKind::Ident(n) => ExprKind::Ident(sub(n)),
-        // Only a name can be a renamed parameter: a call through one is a
-        // `User` callee, and every other arm names a function the compiler
-        // knows, which no parameter can shadow.
-        ExprKind::Call(name, args, m) => ExprKind::Call(
-            match name {
-                Callee::Local(n) => Callee::Local(sub(n)),
-                known => known.clone(),
-            },
-            args.iter().map(|a| rename_scoped(a, map, fresh)).collect(),
-            *m,
-        ),
-        ExprKind::Num(_)
-        | ExprKind::Bool(_)
-        | ExprKind::Str(_)
-        | ExprKind::Char(_)
-        | ExprKind::None
-        | ExprKind::Unit => e.kind.clone(),
-        ExprKind::Neg(x) => ExprKind::Neg(Box::new(rename_scoped(x, map, fresh))),
-        ExprKind::Try(x) => ExprKind::Try(Box::new(rename_scoped(x, map, fresh))),
-        ExprKind::Return(x) => ExprKind::Return(Box::new(rename_scoped(x, map, fresh))),
-        ExprKind::Field(x, fld) => {
-            ExprKind::Field(Box::new(rename_scoped(x, map, fresh)), fld.clone())
-        }
-        ExprKind::Seq(a, b) => ExprKind::Seq(
-            Box::new(rename_scoped(a, map, fresh)),
-            Box::new(rename_scoped(b, map, fresh)),
-        ),
-        ExprKind::Index(a, b) => ExprKind::Index(
-            Box::new(rename_scoped(a, map, fresh)),
-            Box::new(rename_scoped(b, map, fresh)),
-        ),
-        ExprKind::While(a, b) => ExprKind::While(
-            Box::new(rename_scoped(a, map, fresh)),
-            Box::new(rename_scoped(b, map, fresh)),
-        ),
-        ExprKind::If(a, b, c) => ExprKind::If(
-            Box::new(rename_scoped(a, map, fresh)),
-            Box::new(rename_scoped(b, map, fresh)),
-            Box::new(rename_scoped(c, map, fresh)),
-        ),
-        ExprKind::Slice(a, b, c) => ExprKind::Slice(
-            Box::new(rename_scoped(a, map, fresh)),
-            Box::new(rename_scoped(b, map, fresh)),
-            c.as_ref().map(|c| Box::new(rename_scoped(c, map, fresh))),
-        ),
-        ExprKind::ArrayLit(xs) => {
-            ExprKind::ArrayLit(xs.iter().map(|x| rename_scoped(x, map, fresh)).collect())
-        }
-        ExprKind::SetLit(xs, o) => ExprKind::SetLit(
-            xs.iter().map(|x| rename_scoped(x, map, fresh)).collect(),
-            *o,
-        ),
-        ExprKind::TupleLit(xs) => {
-            ExprKind::TupleLit(xs.iter().map(|x| rename_scoped(x, map, fresh)).collect())
-        }
-        ExprKind::DictLit(pairs) => ExprKind::DictLit(
-            pairs
-                .iter()
-                .map(|(k, v)| (rename_scoped(k, map, fresh), rename_scoped(v, map, fresh)))
-                .collect(),
-        ),
-        ExprKind::Construct(name, inits) => ExprKind::Construct(
-            name.clone(),
-            inits
-                .iter()
-                .map(|i| FieldInit {
-                    name: i.name.clone(),
-                    value: rename_scoped(&i.value, map, fresh),
-                })
-                .collect(),
-        ),
-        // The LHS is a place expression — a bare ident, or a field chain rooted
-        // at one. It used to be left alone on the grounds that it is rooted at a
-        // `mut` local and parameters are immutable, but a mutating method's
-        // `mut self` *is* a parameter: its body is a run of `set self... `, and
-        // leaving those unrenamed would assign to a binding the inlined
-        // expression never introduced. Renaming it is right either way — a
-        // caller-side local is simply absent from the map.
-        ExprKind::Assign(lhs, a, b) => ExprKind::Assign(
-            Box::new(rename_scoped(lhs, map, fresh)),
-            Box::new(rename_scoped(a, map, fresh)),
-            Box::new(rename_scoped(b, map, fresh)),
-        ),
-        ExprKind::Let(n, ty, a, b) => {
-            let (inner, renamed) = scope(std::slice::from_ref(n));
-            ExprKind::Let(
-                known_as(&renamed, n),
-                ty.clone(),
-                Box::new(rename_scoped(a, map, fresh)),
-                Box::new(rename_scoped(b, &inner, fresh)),
-            )
-        }
-        ExprKind::LetMut(n, ty, a, b) => {
-            let (inner, renamed) = scope(std::slice::from_ref(n));
-            ExprKind::LetMut(
-                known_as(&renamed, n),
-                ty.clone(),
-                Box::new(rename_scoped(a, map, fresh)),
-                Box::new(rename_scoped(b, &inner, fresh)),
-            )
-        }
-        ExprKind::For(v, index, iter, b) => {
-            // Both binders shadow a parameter of the same name.
-            let (inner, renamed) = scope(&aipl_syntax::loop_binders(v, index));
-            ExprKind::For(
-                known_as(&renamed, v),
-                index.as_ref().map(|i| known_as(&renamed, i)),
-                Box::new(rename_scoped(iter, map, fresh)),
-                Box::new(rename_scoped(b, &inner, fresh)),
-            )
-        }
-        ExprKind::Match(s, arms) => ExprKind::Match(
-            Box::new(rename_scoped(s, map, fresh)),
-            arms.iter().map(|a| arm_scoped(a, &scope, fresh)).collect(),
-        ),
-        ExprKind::IfLet(arm, s, else_b) => ExprKind::IfLet(
-            Box::new(arm_scoped(arm, &scope, fresh)),
-            Box::new(rename_scoped(s, map, fresh)),
-            Box::new(rename_scoped(else_b, map, fresh)),
-        ),
-        ExprKind::Lambda(ps, b) => {
-            let names: Vec<String> = ps.iter().map(|p| p.name.clone()).collect();
-            let (inner, renamed) = scope(&names);
-            let ps = ps
-                .iter()
-                .map(|p| LambdaParam {
-                    name: known_as(&renamed, &p.name),
-                    ..p.clone()
-                })
-                .collect();
-            ExprKind::Lambda(ps, Box::new(rename_scoped(b, &inner, fresh)))
-        }
-    };
-    Expr::rebuilt(kind, e)
-}
-
-/// A match arm under [`rename_scoped`]: its pattern's binders open a scope over
-/// the body.
-fn arm_scoped(
-    arm: &MatchArm,
-    scope: &dyn Fn(&[String]) -> (HashMap<String, String>, HashMap<String, String>),
-    fresh: bool,
-) -> MatchArm {
-    let (inner, renamed) = scope(&arm.pattern.bindings());
-    MatchArm {
-        pattern: arm
-            .pattern
-            .rename_bindings(&mut |n| renamed.get(n).cloned().unwrap_or_else(|| n.to_string())),
-        body: rename_scoped(&arm.body, &inner, fresh),
-        span: arm.span.clone(),
-    }
-}
+pub(crate) use aipl_syntax::distinct_binders;
 
 // ---- Ownership analysis -----------------------------------------------------
 //
@@ -11866,9 +11631,7 @@ struct MatchTree<'m, 'a> {
 impl MatchTree<'_, '_> {
     /// A fresh temporary. `$` keeps it out of any user's namespace.
     fn fresh(&mut self) -> String {
-        let n = self.mono.synth;
-        self.mono.synth += 1;
-        format!("$mt{n}")
+        aipl_syntax::fresh_temp("mt")
     }
 
     fn ident(&self, var: &str) -> Expr {
@@ -12142,7 +11905,8 @@ impl MatchTree<'_, '_> {
 
     /// The arm `row` reaches: its body under the binders the row collected.
     fn leaf(&self, row: &TreeRow) -> Expr {
-        let mut out = self.bodies[row.arm].clone();
+        // An arm can be reached by several rows, each of which gets its own copy.
+        let mut out = distinct_binders(&self.bodies[row.arm]);
         for (name, var) in row.binds.iter().rev() {
             out = Expr::new(
                 ExprKind::Let(name.clone(), None, Box::new(self.ident(var)), Box::new(out)),
@@ -12155,13 +11919,13 @@ impl MatchTree<'_, '_> {
 
 /// `tuple.to_array()` as the array literal of the tuple's `arity` elements. A
 /// tuple written out (`(a, b).to_array()`) is the literal of its elements;
-/// anything else is read once into a binding (numbered `k`) and its fields
+/// anything else is read once into a temporary and its fields
 /// `_0`, `_1`, … are the elements.
-fn tuple_to_array(tuple: &Expr, arity: usize, k: usize, span: &Span) -> Expr {
+fn tuple_to_array(tuple: &Expr, arity: usize, span: &Span) -> Expr {
     if let ExprKind::TupleLit(elems) = &tuple.kind {
         return Expr::new(ExprKind::ArrayLit(elems.clone()), span.clone());
     }
-    let tmp = format!("__tuple_array${k}");
+    let tmp = aipl_syntax::fresh_temp("tuple_array");
     let fields = (0..arity)
         .map(|i| {
             let tuple = Expr::new(ExprKind::Ident(tmp.clone()), span.clone());
