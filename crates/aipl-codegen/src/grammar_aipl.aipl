@@ -66,7 +66,6 @@ import {
     find_if,
     first,
     greater_than as >,
-    greater_than_or_equal as >=,
     int_parse,
     is_empty,
     is_nonempty,
@@ -98,7 +97,6 @@ import {
     wrapping_add as +,
     wrapping_add_assign as +=,
     wrapping_decrement as --,
-    wrapping_increment as ++,
     wrapping_sub as -,
     zip_with,
 } from builtins;
@@ -1514,14 +1512,19 @@ fn lower_suffix(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // the operand's to find which side it sat on.
     // `.name::<A, B>(args)` has as many type children as it was given types, so
     // no slot pattern can name its shape; the `::` after the name does.
-    let texts = node.own_texts(src);
-    if (texts[0] == some("$")) {
-        return ok(ASuffix(map_step(src, node, kids, sp)?));
-    };
-    if (texts[2] == some("::")) {
-        let TypedCall { tys, args } = typed_call(kids, sp)?;
-        return ok(ASuffix(SufMethodTyped(texts[1].value_or(""), tys, args)));
-    };
+    match (node.own_texts(src)) {
+        ["$", ..] => ok(ASuffix(map_step(src, node, kids, sp)?)),
+        [_, name, "::", ..] => {
+            let TypedCall { tys, args } = typed_call(kids, sp)?;
+            ok(ASuffix(SufMethodTyped(name, tys, args)))
+        },
+        _ => suffix_by_shape(src, node, kids, sp),
+    }
+}
+
+# The suffix forms that carry no token of their own to tell them apart: `?`, a
+# field, `.name(args)` and the bracket forms, by the shape of the positions.
+fn suffix_by_shape(src: str, node: Parts, kids: Ast[], sp: Span) -> Ast!ParseError {
     match (node.slots()) {
         // `?`
         [Tok(_)] => ok(ASuffix(SufTry)),
@@ -1580,78 +1583,84 @@ fn field_name(name: str, span: Span) -> str!ParseError {
 fn lower_atom(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    if (toks.is_empty()) {
-        return ok(AExpr(kid_expr(kids, 0, sp)?));
-    };
     let tsp = node.tok_span();
-    let head = toks[0].value_or("");
-    if (head == "if") {
-        return ok(AExpr(lower_if(src, node, kids)?));
-    };
-    if (head == "match") {
-        return ok(AExpr(match_expr(kids, tsp, sp)?));
-    };
-    if (head == "shim") {
-        return ok(AExpr(shim_expr(src, node, kids, sp)?));
-    };
-    if (head == "true") {
-        return ok(AExpr(at(Bool(true), tsp)));
-    };
-    if (head == "false") {
-        return ok(AExpr(at(Bool(false), tsp)));
-    };
-    if (head == "none") {
-        return ok(AExpr(at(None, tsp)));
-    };
+    match (toks) {
+        [head, ..] => {
+            if (head == "if") {
+                return ok(AExpr(lower_if(src, node, kids)?));
+            };
+            if (head == "match") {
+                return ok(AExpr(match_expr(kids, tsp, sp)?));
+            };
+            if (head == "shim") {
+                return ok(AExpr(shim_expr(src, node, kids, sp)?));
+            };
+            if (head == "true") {
+                return ok(AExpr(at(Bool(true), tsp)));
+            };
+            if (head == "false") {
+                return ok(AExpr(at(Bool(false), tsp)));
+            };
+            if (head == "none") {
+                return ok(AExpr(at(None, tsp)));
+            };
 
-    // A grouping paren holds one expression; a tuple holds two or more, which
-    // is what the comma after the first bought.
-    if (head == "(") {
-        if (kids.len() == 1) {
-            return ok(AExpr(kid_expr(kids, 0, sp)?));
-        };
-        return ok(AExpr(at(TupleLit(kids.try_map(|k| as_expr(k, sp))?), tsp)));
-    };
-    // The array literal and the set literal are the places a `..` spread survives.
-    if (head == "[") {
-        return ok(AExpr(at(ArrayLit(as_exprs(kid(kids, 0, sp)?, sp)?), tsp)));
-    };
-    if (head == "#") {
-        let order = set_order(toks[1].value_or(""));
-        return ok(AExpr(brace_literal(as_entries(kid(kids, 0, sp)?, sp)?, order, tsp)?));
-    };
-    if (head == "|") {
-        return ok(AExpr(lambda_of(kids, tsp, sp)?));
-    };
-    if (head.starts_with('"') || head.starts_with('`')) {
-        return ok(AExpr(at(Str(str_lit_value(head)), tsp)));
-    };
-    if (head.starts_with('\'')) {
-        let c = char_lit_value(head).value_or_err(ParseError {
-            message: "a char literal holds exactly one character",
-            span: sp,
-        })?;
-        return ok(AExpr(at(Char(c), tsp)));
-    };
-    if (let some(n) = head.int_parse()) {
-        return ok(AExpr(at(Num(n), tsp)));
-    };
+            // A grouping paren holds one expression; a tuple holds two or more, which
+            // is what the comma after the first bought.
+            if (head == "(") {
+                if (kids.len() == 1) {
+                    return ok(AExpr(kid_expr(kids, 0, sp)?));
+                };
+                return ok(AExpr(at(TupleLit(kids.try_map(|k| as_expr(k, sp))?), tsp)));
+            };
+            // The array literal and the set literal are the places a `..` spread survives.
+            if (head == "[") {
+                return ok(AExpr(at(ArrayLit(as_exprs(kid(kids, 0, sp)?, sp)?), tsp)));
+            };
+            if (head == "#") {
+                let order = order_after_hash(toks);
+                return ok(AExpr(brace_literal(as_entries(kid(kids, 0, sp)?, sp)?, order, tsp)?));
+            };
+            if (head == "|") {
+                return ok(AExpr(lambda_of(kids, tsp, sp)?));
+            };
+            if (head.starts_with('"') || head.starts_with('`')) {
+                return ok(AExpr(at(Str(str_lit_value(head)), tsp)));
+            };
+            if (head.starts_with('\'')) {
+                let c = char_lit_value(head).value_or_err(ParseError {
+                    message: "a char literal holds exactly one character",
+                    span: sp,
+                })?;
+                return ok(AExpr(at(Char(c), tsp)));
+            };
+            if (let some(n) = head.int_parse()) {
+                return ok(AExpr(at(Num(n), tsp)));
+            };
 
-    // What is left opens with an identifier, and the token after it says which
-    // of the three name forms was written.
-    let second = toks[1].value_or("");
-    if (second == "::") {
-        let TypedCall { tys, args } = typed_call(kids, sp)?;
-        return ok(AExpr(at(TypeArgs(at(Call(head, args, false), tsp), tys), sp)));
-    };
-    if (second == "(") {
-        let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a call argument list")?;
-        return ok(AExpr(at(Call(head, args, false), tsp)));
-    };
-    if (second == "{") {
-        return ok(AExpr(at(Construct(head, kids.try_map(|k| as_field_init(k, sp))?), tsp)));
-    };
-    ok(AExpr(at(Ident(head), tsp)))
+            // What is left opens with an identifier, and the token after it says which
+            // of the three name forms was written.
+
+            // What is left opens with an identifier, and the token after it says which
+            // of the three name forms was written.
+            match (toks) {
+                [_, "::", ..] => {
+                    let TypedCall { tys, args } = typed_call(kids, sp)?;
+                    ok(AExpr(at(TypeArgs(at(Call(head, args, false), tsp), tys), sp)))
+                },
+                [_, "(", ..] => {
+                    let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a call argument list")?;
+                    ok(AExpr(at(Call(head, args, false), tsp)))
+                },
+                [_, "{", ..] => {
+                    ok(AExpr(at(Construct(head, kids.try_map(|k| as_field_init(k, sp))?), tsp)))
+                },
+                _ => ok(AExpr(at(Ident(head), tsp))),
+            }
+        },
+        // A rule that matched no token of its own is a single pass-through child.
+        _ => ok(AExpr(kid_expr(kids, 0, sp)?)),
+    }
 }
 
 # `match (e) { .. }` — every arm child is already a *list* of arms, since an
@@ -1668,16 +1677,15 @@ fn match_expr(kids: Ast[], tsp: Span, sp: Span) -> Expr!ParseError {
             set arms.extend(as_arms(k, sp)?);
         };
     }
-    let first = parts
-        .first()
-        .value_or_err(ParseError { message: "a match needs a scrutinee", span: sp })?;
-    let scrutinee = if (parts.len() == 1) {
-        first
-    } else {
-        let last = parts.last().value_or(first);
-        at(TupleLit(parts), join_spans(first.span, last.span))
-    };
-    ok(at(Match(scrutinee, arms), tsp))
+    match (parts) {
+        [only] => ok(at(Match(only, arms), tsp)),
+        [first, ..] => {
+            let last = parts.last().value_or(first);
+            let scrutinee = at(TupleLit(parts), join_spans(first.span, last.span));
+            ok(at(Match(scrutinee, arms), tsp))
+        },
+        _ => err(ParseError { message: "a match needs a scrutinee", span: sp }),
+    }
 }
 
 # Whether `kid` is an expression, as the first block of `shim <effect> { provider } { body }`
@@ -1692,30 +1700,54 @@ fn is_block_kid(kid: Ast?, sp: Span) -> bool {
 # `shim <effect> { op = f, .. } { body }`. Spanned over `shim <effect>` rather
 # than over the whole form: the body's span is empty when it ends in a `;`.
 fn shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
-    let toks = node.own_texts(src);
-    let spans = node.tokens;
     if (kids.len() == 2 && is_block_kid(kids[0], sp)) {
         return provider_block_shim_expr(src, node, kids, sp);
     };
-    if (toks[2] != some("{")) {
-        return provider_shim_expr(src, node, kids, sp);
-    };
-    let last = kids.len() - 1;
-    let body = kid_expr(kids, last, sp)?;
-    let named = kids[..last].try_map(|k| as_bind(k, sp))?;
-    let head = spans
-        .first()
-        .value_or_err(ParseError { message: "a shim matched no token", span: sp })?;
-    let at_head = join_spans(head, spans[1].value_or(head));
-    let binds = named.map(|b| (b.op, b.name));
-    mut wrapped = at(Shim(toks[1].value_or(""), binds, body), at_head);
-    // Each closure is a `let` around the shim, named by the binding that uses it.
-    for (let bind : named) {
-        if (let some(closure) = bind.closure) {
-            set wrapped = at(Let(bind.name, none, closure, wrapped), at_head);
-        };
+    match (node.own_texts(src)) {
+        [_, _, "{", ..] => {
+            let ShimHead { effect, span } = shim_head(src, node, sp)?;
+            let last = kids.len() - 1;
+            let body = kid_expr(kids, last, sp)?;
+            let named = kids[..last].try_map(|k| as_bind(k, sp))?;
+            let binds = named.map(|b| (b.op, b.name));
+            mut wrapped = at(Shim(effect, binds, body), span);
+            // Each closure is a `let` around the shim, named by the binding that uses it.
+            for (let bind : named) {
+                if (let some(closure) = bind.closure) {
+                    set wrapped = at(Let(bind.name, none, closure, wrapped), span);
+                };
+            }
+            ok(wrapped)
+        },
+        _ => provider_shim_expr(src, node, kids, sp),
     }
-    ok(wrapped)
+}
+
+# `shim <effect>`: the effect's name, and the span over both tokens, which is
+# where a diagnostic about the form points.
+struct ShimHead { effect: str, span: Span }
+
+fn shim_head(src: str, Parts { tokens }, sp: Span) -> ShimHead!ParseError {
+    match (tokens) {
+        [opener, effect, ..] => ok(ShimHead {
+            effect: src[effect],
+            span: join_spans(opener, effect),
+        }),
+        _ => err(ParseError { message: "a shim matched no token", span: sp }),
+    }
+}
+
+# The head of a shim that names a provider rather than listing bindings. Only
+# `random` has providers, so any other effect is refused here.
+fn provider_head(src: str, node: Parts, sp: Span) -> ShimHead!ParseError {
+    let ShimHead { effect, span } = shim_head(src, node, sp)?;
+    if (effect != "random") {
+        return err(ParseError {
+            message: `effect "!{effect}" has no providers; \`shim {effect}\` takes a list of bindings`,
+            span,
+        });
+    };
+    ok(ShimHead { effect, span })
 }
 
 # `shim <effect> <provider>(args) { body }`, lowered to the shim it stands for.
@@ -1734,36 +1766,28 @@ fn shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
 # reads is an ordinary `now_nanos` call: the enclosing function declares `!clock`
 # for it, and a `shim clock` around the whole thing makes the seed repeatable.
 fn provider_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
-    let toks = node.own_texts(src);
-    let spans = node.tokens;
-    let head = spans
-        .first()
-        .value_or_err(ParseError { message: "a shim matched no token", span: sp })?;
-    let at_head = join_spans(head, spans[1].value_or(head));
-    let effect = toks[1].value_or("");
-    let provider = toks[2].value_or("");
+    let span = provider_head(src, node, sp)?.span;
     let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a shim provider's arguments")?;
     let body = kid_expr(kids, 1, sp)?;
-    if (effect != "random") {
-        return err(ParseError {
-            message: `effect "!{effect}" has no providers; \`shim {effect}\` takes a list of bindings`,
-            span: at_head,
-        });
-    };
-    if (provider == "seeded_with_int" && args.len() == 1) {
-        return ok(random_shim(at(Call("__random_seed", args, false), at_head), body, at_head));
-    };
-    if (provider == "seeded_with_clock" && args.is_empty()) {
-        return ok(random_shim(
-            at(Call("__random_seed_from_clock", [], false), at_head),
-            body,
-            at_head,
-        ));
-    };
-    err(ParseError {
-        message: `\`shim random\` has providers \`seeded_with_int(seed)\` and \`seeded_with_clock()\`; \`{provider}\` with {args.len()} argument(s) is neither`,
-        span: at_head,
-    })
+    match (node.own_texts(src)) {
+        [_, _, provider, ..] => match ((provider, args.len())) {
+            ("seeded_with_int", 1) => ok(random_shim(
+                at(Call("__random_seed", args, false), span),
+                body,
+                span,
+            )),
+            ("seeded_with_clock", 0) => ok(random_shim(
+                at(Call("__random_seed_from_clock", [], false), span),
+                body,
+                span,
+            )),
+            _ => err(ParseError {
+                message: `\`shim random\` has providers \`seeded_with_int(seed)\` and \`seeded_with_clock()\`; \`{provider}\` with {args.len()} argument(s) is neither`,
+                span,
+            }),
+        },
+        _ => err(ParseError { message: "a shim provider matched no token", span }),
+    }
 }
 
 # `shim random { provider } { body }`: the first block is any expression of type
@@ -1776,19 +1800,7 @@ fn provider_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!Pars
 #              body
 #          }
 fn provider_block_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
-    let toks = node.own_texts(src);
-    let spans = node.tokens;
-    let head = spans
-        .first()
-        .value_or_err(ParseError { message: "a shim matched no token", span: sp })?;
-    let at_head = join_spans(head, spans[1].value_or(head));
-    let effect = toks[1].value_or("");
-    if (effect != "random") {
-        return err(ParseError {
-            message: `effect "!{effect}" has no providers; \`shim {effect}\` takes a list of bindings`,
-            span: at_head,
-        });
-    };
+    let at_head = provider_head(src, node, sp)?.span;
     let provider = kid_expr(kids, 0, sp)?;
     let body = kid_expr(kids, 1, sp)?;
     let arm = MatchArm {
@@ -1859,7 +1871,10 @@ fn lower_else_branch(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 fn lower_template(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let raw = toks.first().value_or("").starts_with("```");
+    let raw = match (toks) {
+        [open, ..] => open.starts_with("```"),
+        _ => false,
+    };
     let segs = template_segments(raw, template_slots(toks));
     let exprs = kids.try_map(|k| as_expr(k, sp))?;
     ok(AExpr(at(template_chain(segs, exprs, sp).kind, node.tok_span())))
@@ -2018,13 +2033,15 @@ fn lower_lambda(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // The *first* token, not the run of them: `|x|` matches two `|` tokens, and
     // their texts run together are indistinguishable from the one `||` token
     // the no-parameter form is.
-    if (node.own_texts(src)[0] == some("||")) {
-        let body = kid_expr(kids, 0, sp)?;
-        let span = body.span;
-        let no_params: LambdaParam[] = [];
-        return ok(AExpr(at(Lambda(no_params, body), span)));
-    };
-    ok(AExpr(lambda_of(kids, node.tok_span(), sp)?))
+    match (node.own_texts(src)) {
+        ["||", ..] => {
+            let body = kid_expr(kids, 0, sp)?;
+            let span = body.span;
+            let no_params: LambdaParam[] = [];
+            ok(AExpr(at(Lambda(no_params, body), span)))
+        },
+        _ => ok(AExpr(lambda_of(kids, node.tok_span(), sp)?)),
+    }
 }
 
 # `|a, b| body` — the parameters are every child but the last, which is the
@@ -2038,15 +2055,17 @@ fn lambda_of(kids: Ast[], span: Span, sp: Span) -> Expr!ParseError {
 
 fn lower_lambda_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let toks = node.own_texts(src);
-    let spans = node.tokens;
-    let name_span = spans.first().value_or(node.tok_span());
-    let name = toks[0].value_or("");
-    if (kids.is_empty()) {
-        return ok(ALambdaParam(LambdaParam { name, ty: none, span: name_span }));
-    };
-    let ty = as_ty(kid(kids, 0, sp)?, sp)?;
-    ok(ALambdaParam(LambdaParam { name, ty: some(ty), span: name_span }))
+    let name_span = node.first_tok(node.tok_span());
+    match (node.own_texts(src)) {
+        [name, ..] => {
+            if (kids.is_empty()) {
+                return ok(ALambdaParam(LambdaParam { name, ty: none, span: name_span }));
+            };
+            let ty = as_ty(kid(kids, 0, sp)?, sp)?;
+            ok(ALambdaParam(LambdaParam { name, ty: some(ty), span: name_span }))
+        },
+        _ => err(ParseError { message: "a lambda parameter matched no token", span: sp }),
+    }
 }
 
 # `field_init` — `name: value`, the shorthand `name`, or a `..base` spread. A
@@ -2104,15 +2123,17 @@ fn lower_entry(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 
 fn lower_shim_binding(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let op = node.own_texts(src)[0].value_or("");
     let value = kid_expr(kids, 0, sp)?;
-    match (value.kind) {
-        Ident(f) => ok(AShimBind(op, f)),
-        Lambda(..) => ok(AShimClosure(op, value)),
-        _ => err(ParseError {
-            message: `"{op}" is bound to a function's name or to a closure \`|args| body\``,
-            span: value.span,
-        }),
+    match (node.own_texts(src)) {
+        [op, ..] => match (value.kind) {
+            Ident(f) => ok(AShimBind(op, f)),
+            Lambda(..) => ok(AShimClosure(op, value)),
+            _ => err(ParseError {
+                message: `"{op}" is bound to a function's name or to a closure \`|args| body\``,
+                span: value.span,
+            }),
+        },
+        _ => err(ParseError { message: "a shim binding matched no token", span: sp }),
     }
 }
 
@@ -2125,7 +2146,7 @@ fn lower_shim_binding(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 
 fn lower_block(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let brace = node.tokens.first().value_or(node.tok_span());
+    let brace = node.first_tok(node.tok_span());
     let repaired = repair_block_value(kid_expr(kids, 0, sp)?, brace);
     ok(AExpr(Expr { ..repaired.0, value_span: repaired.1 }))
 }
@@ -2201,12 +2222,12 @@ fn lower_block_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // `block_tail` hands back what followed the `;`: nothing when the
     // expression was the block's value, and the rest of the block when it was a
     // statement.
-    match (as_exprs(kid(kids, 1, sp)?, sp)?.first()) {
-        some(rest) => {
+    match (as_exprs(kid(kids, 1, sp)?, sp)?) {
+        [rest, ..] => {
             let span = join_spans(value.span, rest.span);
             ok(AExpr(at(Seq(value, rest), span)))
         },
-        none => ok(AExpr(value)),
+        _ => ok(AExpr(value)),
     }
 }
 
@@ -2258,19 +2279,23 @@ struct FieldBinders { fields: str[], names: str[] }
 fn field_binders_of(toks: str[], first: u64) -> FieldBinders {
     mut fields: str[] = [];
     mut names: str[] = [];
-    mut i = first;
-    while (i < toks.len() && toks[i] != some("}")) {
-        let field = toks[i].value_or("");
-        set fields.push(field);
-        if (toks[i + 1] == some("as")) {
-            set names.push(toks[i + 2].value_or(field));
-            set i += 3;
-        } else {
-            set names.push(field);
-            set i++;
+    mut rest = toks[first..];
+    while (rest.first() != some("}") && rest.is_nonempty()) {
+        match (rest) {
+            [field, "as", name, ..] => {
+                set fields.push(field);
+                set names.push(name);
+                set rest = rest[3..];
+            },
+            [field, ..] => {
+                set fields.push(field);
+                set names.push(field);
+                set rest = rest[1..];
+            },
+            _ => {},
         };
-        if (toks[i] == some(",")) {
-            set i++;
+        if (rest.first() == some(",")) {
+            set rest = rest[1..];
         };
     }
     FieldBinders { fields, names }
@@ -2315,45 +2340,52 @@ fn lower_mut_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let spans = node.tokens;
-    let names = binder_names(toks);
+    let name_span = node.second_tok(node.tok_span());
+    match (toks) {
+        // `let (a, b) = e;` — a tuple pattern, spanned at its value like the struct
+        // form, since the names are not one run of text.
+        [_, "(", ..] => {
+            let names = binder_names(toks);
+            if (names.len() < 2) {
+                return err(ParseError {
+                    message: "a tuple pattern needs at least 2 names, e.g. let (a, b) = expr;",
+                    span: sp,
+                });
+            };
+            let value = kid_expr(kids, 0, sp)?;
+            let span = value.span;
+            ok(AStmt(SLetTuple(names, value, span)))
+        },
+        // `let T { x, y as py } = e;` — the struct name, then the braces.
+        [_, struct_name, "{", ..] => {
+            let value = kid_expr(kids, 0, sp)?;
+            let span = value.span;
+            let FieldBinders { fields, names } = field_binders_of(toks, 3);
+            if (mutable) {
+                return ok(AStmt(SMutStruct(struct_name, fields, names, value, span)));
+            };
+            ok(AStmt(SLetStruct(struct_name, fields, names, value, span)))
+        },
+        // `let x: T = e;` — the annotation is a child, so it comes before the value.
+        [_, name, ":", ..] => {
+            let ty = as_ty(kid(kids, 0, sp)?, sp)?;
+            let value = kid_expr(kids, 1, sp)?;
+            ok(AStmt(named_binding(mutable, name, name_span, some(ty), value)))
+        },
+        [_, name, ..] => {
+            let value = kid_expr(kids, 0, sp)?;
+            ok(AStmt(named_binding(mutable, name, name_span, none, value)))
+        },
+        _ => err(ParseError { message: "a binding matched no alternative", span: sp }),
+    }
+}
 
-    // `let (a, b) = e;` — a tuple pattern, spanned at its value like the struct
-    // form, since the names are not one run of text.
-    if (toks[1] == some("(")) {
-        if (names.len() < 2) {
-            return err(ParseError {
-                message: "a tuple pattern needs at least 2 names, e.g. let (a, b) = expr;",
-                span: sp,
-            });
-        };
-        let value = kid_expr(kids, 0, sp)?;
-        let span = value.span;
-        return ok(AStmt(SLetTuple(names, value, span)));
-    };
-    // `let T { x, y as py } = e;` — the struct name, then the braces.
-    if (toks[2] == some("{")) {
-        let value = kid_expr(kids, 0, sp)?;
-        let span = value.span;
-        let struct_name = toks[1].value_or("");
-        let FieldBinders { fields, names } = field_binders_of(toks, 3);
-        if (mutable) {
-            return ok(AStmt(SMutStruct(struct_name, fields, names, value, span)));
-        };
-        return ok(AStmt(SLetStruct(struct_name, fields, names, value, span)));
-    };
-    let name_span = spans[1].value_or(node.tok_span());
-    let name = toks[1].value_or("");
-
-    // `let x: T = e;` — the annotation is a child, so its presence is a child
-    // count rather than a token test; the `:` is what the grammar matched.
-    let annotated = toks[2] == some(":");
-    let ty = if (annotated) { some(as_ty(kid(kids, 0, sp)?, sp)?) } else { none };
-    let value = kid_expr(kids, if (annotated) { 1 } else { 0 }, sp)?;
+# `let name = e;` and `mut name = e;`, with the annotation when one was written.
+fn named_binding(mutable: bool, name: str, name_span: Span, ty: Ty?, value: Expr) -> Stmt {
     if (mutable) {
-        return ok(AStmt(SMut(name, name_span, ty, value)));
+        return SMut(name, name_span, ty, value);
     };
-    ok(AStmt(SLet(name, name_span, ty, value)))
+    SLet(name, name_span, ty, value)
 }
 
 # `assign_stmt` — eight alternatives on one target, told apart by the token
@@ -2369,7 +2401,7 @@ fn lower_assign_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let toks = node.own_texts(src);
     let spans = node.tokens;
     let name = toks[1].value_or("");
-    let name_span = spans[1].value_or(node.tok_span());
+    let name_span = node.second_tok(node.tok_span());
 
     // The target: `set` then names joined by `.`. `at` ends on the first token
     // that is neither, which is the form's own operator.
@@ -2512,42 +2544,38 @@ fn is_plain_index(Expr { kind }) -> bool {
 fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let spans = node.tokens;
     let names = binder_names(toks);
     let iterable = kid_expr(kids, 0, sp)?;
     let body = kid_expr(kids, 1, sp)?;
-    let indexed = toks[4] == some(",");
-    let index = if (indexed) { toks[3] } else { none };
-    let pattern: u64 = if (indexed) { 5 } else { 3 };
-    if (toks[pattern] == some("(")) {
-        let pattern_names = if (indexed) { names[1..] } else { names };
-        return ok(AStmt(for_tuple(pattern_names, index, iterable, body, sp)?));
-    };
 
-    // `for (let T { x, y as b } : xs)` — the struct name and then its braces.
-    if (toks[pattern + 1] == some("{")) {
-        let struct_name = toks[pattern].value_or("");
-        let FieldBinders { fields, names as bound } = field_binders_of(toks, pattern + 2);
-        return ok(AStmt(for_struct(struct_name, fields, bound, index, iterable, body)));
-    };
-
-    // `for (let i, x : xs)` — two names, the first of which is the index. Its
-    // span is what the whole statement is spanned from.
-    if (names.len() == 2) {
-        let name_span = spans[3].value_or(node.tok_span());
-        let span = join_spans(name_span, body.span);
-        return ok(AStmt(SFor(
-            names[1].value_or(""),
-            name_span,
-            some(names.first().value_or("")),
-            iterable,
-            body,
-            span,
-        )));
-    };
-    let name_span = spans[3].value_or(node.tok_span());
+    // The index, when one was written, is the name in front of the comma. Its span
+    // is what a plain loop is spanned from.
+    let name_span = node.tokens[3].value_or(node.tok_span());
     let span = join_spans(name_span, body.span);
-    ok(AStmt(SFor(names.first().value_or(""), name_span, none, iterable, body, span)))
+    match (toks) {
+        // `for (let i, (a, b) : xs)`
+        [_, _, _, index, ",", "(", ..] => {
+            ok(AStmt(for_tuple(names[1..], some(index), iterable, body, sp)?))
+        },
+        // `for (let (a, b) : xs)`
+        [_, _, _, "(", ..] => ok(AStmt(for_tuple(names, none, iterable, body, sp)?)),
+        // `for (let i, T { x, y as b } : xs)` — the struct name and then its braces.
+        [_, _, _, index, ",", struct_name, "{", ..] => {
+            let FieldBinders { fields, names as bound } = field_binders_of(toks, 7);
+            ok(AStmt(for_struct(struct_name, fields, bound, some(index), iterable, body)))
+        },
+        // `for (let T { x, y as b } : xs)`
+        [_, _, _, struct_name, "{", ..] => {
+            let FieldBinders { fields, names as bound } = field_binders_of(toks, 5);
+            ok(AStmt(for_struct(struct_name, fields, bound, none, iterable, body)))
+        },
+        // `for (let i, x : xs)` — two names, the first of which is the index.
+        [_, _, _, index, ",", name, ..] => {
+            ok(AStmt(SFor(name, name_span, some(index), iterable, body, span)))
+        },
+        [_, _, _, name, ..] => ok(AStmt(SFor(name, name_span, none, iterable, body, span))),
+        _ => err(ParseError { message: "a for loop matched no alternative", span: sp }),
+    }
 }
 
 # `for (let (a, b) : xs) { body }` is a plain loop over a temporary with the
@@ -2793,22 +2821,26 @@ fn lower_match_arm(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // the `[`, which is what tells it from the `|`-separated alternation and
     // from the single-pattern arm; the elements are ordinary patterns, so the
     // grammar reaches them through `pattern` like every other slot.
-    if (node.tokens.first().map(|t| src[t]) == some("[")) {
-        // A trailing `..` is not an element: it says the elements are only the
-        // first ones.
-        let rest = last > 0 && kids[last - 1].is_some_and(is_rest);
-        let written = if (rest) { kids[..last - 1] } else { kids[..last] };
-        let elems = written.try_map(|k| as_pat(k, sp))?;
-        let pattern = array_pattern(elems, subs, rest, tsp)?;
-        return ok(AArms([MatchArm { pattern, body, span: tsp }]));
-    };
-    let heads = same_bindings(kids[..last].try_map(|k| as_pat(k, sp))?, subs, tsp)?;
-    mut arms: MatchArm[] = [];
-    for (let i, pat : heads) {
-        let span = arm_span(pat, subs, i, tsp, heads.len() == 1);
-        set arms.push(MatchArm { pattern: pat, body, span });
+    match (node.own_texts(src)) {
+        ["[", ..] => {
+            // A trailing `..` is not an element: it says the elements are only the
+            // first ones.
+            let rest = last > 0 && kids[last - 1].is_some_and(is_rest);
+            let written = if (rest) { kids[..last - 1] } else { kids[..last] };
+            let elems = written.try_map(|k| as_pat(k, sp))?;
+            let pattern = array_pattern(elems, subs, rest, tsp)?;
+            ok(AArms([MatchArm { pattern, body, span: tsp }]))
+        },
+        _ => {
+            let heads = same_bindings(kids[..last].try_map(|k| as_pat(k, sp))?, subs, tsp)?;
+            mut arms: MatchArm[] = [];
+            for (let i, pat : heads) {
+                let span = arm_span(pat, subs, i, tsp, heads.len() == 1);
+                set arms.push(MatchArm { pattern: pat, body, span });
+            }
+            ok(AArms(arms))
+        },
     }
-    ok(AArms(arms))
 }
 
 # An array-destructuring arm's pattern: the simple `Array` when every element is
@@ -2890,18 +2922,22 @@ fn arm_span(pat: Pat, subs: Cst[], i: u64, tsp: Span, alone: bool) -> Span {
 # disagree are refused here rather than left to fail as an unbound name
 # somewhere in the body.
 fn same_bindings(heads: Pat[], subs: Cst[], tsp: Span) -> Pat[]!ParseError {
-    let first_pat = heads.first().value_or(PatWildcard);
-    let want = first_pat.pat_bindings();
-    for (let i, pat : heads) {
-        let got = pat.pat_bindings();
-        if (got != want) {
-            return err(ParseError {
-                message: `alternatives of one arm must bind the same names: {first_pat.pat_label()} binds {want.binder_list()}, but {pat.pat_label()} binds {got.binder_list()}`,
-                span: join_spans(sub_span(subs, 0, tsp), sub_span(subs, i, tsp)),
-            });
-        };
+    match (heads) {
+        [first_pat, ..] => {
+            let want = first_pat.pat_bindings();
+            for (let i, pat : heads) {
+                let got = pat.pat_bindings();
+                if (got != want) {
+                    return err(ParseError {
+                        message: `alternatives of one arm must bind the same names: {first_pat.pat_label()} binds {want.binder_list()}, but {pat.pat_label()} binds {got.binder_list()}`,
+                        span: join_spans(sub_span(subs, 0, tsp), sub_span(subs, i, tsp)),
+                    });
+                };
+            }
+            ok(heads)
+        },
+        _ => ok(heads),
     }
-    ok(heads)
 }
 
 // ---------- lowering: patterns ----------
@@ -2910,6 +2946,30 @@ fn same_bindings(heads: Pat[], subs: Cst[], tsp: Span) -> Pat[]!ParseError {
 // its spelling. `str_lit_value`/`char_lit_value` live beside the lexer rules
 // that decode the same bytes on the way in, because a `build` is handed the
 // source and a span and has to strip the delimiters for itself.
+
+# Whether a declaration's own tokens open with `pub`.
+fn starts_pub(toks: str[]) -> bool {
+    match (toks) {
+        ["pub", ..] => true,
+        _ => false,
+    }
+}
+
+# The span of a node's first own token, or `fallback` for a node that matched none.
+fn first_tok(self: Parts, fallback: Span) -> Span {
+    match (self.tokens) {
+        [first, ..] => first,
+        _ => fallback,
+    }
+}
+
+# The span of a node's second own token — the name after a declaration's keyword.
+fn second_tok(self: Parts, fallback: Span) -> Span {
+    match (self.tokens) {
+        [_, second, ..] => second,
+        _ => fallback,
+    }
+}
 
 fn as_pat(v: Ast, span: Span) -> Pat!ParseError {
     if (let APat(pat) = v) {
@@ -2928,10 +2988,10 @@ fn as_pat(v: Ast, span: Span) -> Pat!ParseError {
 # on the AST, so a qualified case and a bare one are the same shape from here on. Anything but a `.` in second
 # position means this pattern was not qualified.
 fn qualified_name(toks: str[], head: str) -> str {
-    if (toks[1] != some(".")) {
-        return head;
-    };
-    toks[2].map(|tail| `{head}.{tail}`).value_or(head)
+    match (toks) {
+        [_, ".", tail, ..] => `{head}.{tail}`,
+        _ => head,
+    }
 }
 
 # `ctor_payload` — `Ctor(p, q)` matches each slot against a pattern, `Ctor(..)`
@@ -2941,10 +3001,10 @@ fn qualified_name(toks: str[], head: str) -> str {
 fn lower_ctor_payload(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let no_slots: Pat[] = [];
-    if (node.own_texts(src).first() == some("..")) {
-        return ok(APayload(no_slots, true));
-    };
-    ok(APayload(kids.try_map(|k| as_pat(k, sp))?, false))
+    match (node.own_texts(src)) {
+        ["..", ..] => ok(APayload(no_slots, true)),
+        _ => ok(APayload(kids.try_map(|k| as_pat(k, sp))?, false)),
+    }
 }
 
 # `pattern` — the seven alternatives, told apart by the first token they matched.
@@ -2957,51 +3017,53 @@ fn lower_ctor_payload(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 fn lower_pattern(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let head = toks
-        .first()
-        .value_or_err(ParseError { message: "a pattern matched no token", span: sp })?;
-    if (head.starts_with('"')) {
-        return ok(APat(PatStr(str_lit_value(head))));
-    };
+    match (toks) {
+        [head, ..] => {
+            if (head.starts_with('"')) {
+                return ok(APat(PatStr(str_lit_value(head))));
+            };
 
-    // A backtick literal is a run of tokens — the delimiters and the text
-    // between them — so its value comes from the whole run's source rather than
-    // from the first token, which is only the opening delimiter.
-    if (head.starts_with('`')) {
-        return ok(APat(PatStr(str_lit_value(src[node.tok_span()]))));
-    };
-    if (head.starts_with('\'')) {
-        let c = char_lit_value(head).value_or_err(ParseError {
-            message: "a char pattern holds exactly one character",
-            span: sp,
-        })?;
-        return ok(APat(PatChar(c)));
-    };
-    // A tuple pattern: the parenthesized run of two or more patterns.
-    if (head == "..") {
-        return ok(ARest(sp));
-    };
-    if (head == "(") {
-        return ok(APat(PatTuple(kids.try_map(|k| as_pat(k, sp))?)));
-    };
-    if (let some(n) = head.int_parse()) {
-        return ok(APat(PatInt(n)));
-    };
-    let name = qualified_name(toks, head);
-    if (kids.is_empty()) {
-        if (name == "_") {
-            return ok(APat(PatWildcard));
-        };
-        return ok(APat(PatCtor(name)));
-    };
-    let payload = kid(kids, 0, sp)?;
-    if (let APayload(slots, ignore_payload) = payload) {
-        if (ignore_payload) {
-            return ok(APat(PatCtor(name, ignore_payload=true)));
-        };
-        return ok(APat(nested_or_ctor(name, slots)));
-    };
-    err(wrong_kind("a constructor payload", payload, sp))
+            // A backtick literal is a run of tokens — the delimiters and the text
+            // between them — so its value comes from the whole run's source rather than
+            // from the first token, which is only the opening delimiter.
+            if (head.starts_with('`')) {
+                return ok(APat(PatStr(str_lit_value(src[node.tok_span()]))));
+            };
+            if (head.starts_with('\'')) {
+                let c = char_lit_value(head).value_or_err(ParseError {
+                    message: "a char pattern holds exactly one character",
+                    span: sp,
+                })?;
+                return ok(APat(PatChar(c)));
+            };
+            // A tuple pattern: the parenthesized run of two or more patterns.
+            if (head == "..") {
+                return ok(ARest(sp));
+            };
+            if (head == "(") {
+                return ok(APat(PatTuple(kids.try_map(|k| as_pat(k, sp))?)));
+            };
+            if (let some(n) = head.int_parse()) {
+                return ok(APat(PatInt(n)));
+            };
+            let name = qualified_name(toks, head);
+            if (kids.is_empty()) {
+                if (name == "_") {
+                    return ok(APat(PatWildcard));
+                };
+                return ok(APat(PatCtor(name)));
+            };
+            let payload = kid(kids, 0, sp)?;
+            if (let APayload(slots, ignore_payload) = payload) {
+                if (ignore_payload) {
+                    return ok(APat(PatCtor(name, ignore_payload=true)));
+                };
+                return ok(APat(nested_or_ctor(name, slots)));
+            };
+            err(wrong_kind("a constructor payload", payload, sp))
+        },
+        _ => err(ParseError { message: "a pattern matched no token", span: sp }),
+    }
 }
 
 // ---------- lowering: items ----------
@@ -3127,12 +3189,11 @@ fn lower_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let decl_at = node.children.first()$child_span().value_or(sp);
     let DocSplit { detached, attached } = split_doc_lines(src, node.tokens, decl_at.start);
     let item = lower_decl(src, kid(kids, 0, sp)?, attached, sp)?;
-    match (detached.first(), detached.last()) {
-        (some(f), some(l)) => ok(ADetachedDoc(
-            module_doc_block(src, detached),
-            f.start..l.end,
-            item,
-        )),
+    match (detached) {
+        [first, ..] => {
+            let end = detached.last().value_or(first).end;
+            ok(ADetachedDoc(module_doc_block(src, detached), first.start..end, item))
+        },
         _ => ok(AItem(item)),
     }
 }
@@ -3233,9 +3294,8 @@ fn doc_block(lines: str[]) -> str? {
 # resolved and where the substitution that makes them matter happens.
 fn lower_const_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let toks = node.own_texts(src);
     let spans = node.tokens;
-    let is_pub = toks[0] == some("pub");
+    let is_pub = starts_pub(node.own_texts(src));
     let at_name: u64 = if (is_pub) { 2 } else { 1 };
     let annotated = kids.len() == 2;
     let ty = if (annotated) { some(as_ty(kid(kids, 0, sp)?, sp)?) } else { none };
@@ -3312,27 +3372,27 @@ fn missing_semicolon(next: str) -> str {
 # gets here: the grammar refuses it before lowering.
 fn lower_import_name(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let toks = node.own_texts(src);
-    let spans = node.tokens;
-    let name_span = spans.first().value_or(node.tok_span());
-    if (toks[1] == some("as")) {
-        let name = toks[0].value_or("");
-
-        // `a as b` spells the alias as a token; `a as +` as the `operator`
-        // production, which is a child.
-        if (toks.len() >= 3) {
-            let alias = toks[2].value_or("");
-            return ok(AImportName(ImportName { name, alias: some(alias), span: name_span }));
-        };
-        let alias = as_name(kid(kids, 0, sp)?, sp)?;
-        return ok(AImportName(ImportName { name, alias: some(alias), span: name_span }));
-    };
-    let name = toks[0].value_or("");
-    ok(AImportName(ImportName { name, alias: none, span: name_span }))
+    let name_span = node.first_tok(node.tok_span());
+    match (node.own_texts(src)) {
+        // `a as b` spells the alias as a token...
+        [name, "as", alias, ..] => {
+            ok(AImportName(ImportName { name, alias: some(alias), span: name_span }))
+        },
+        // ...and `a as +` as the `operator` production, which is a child.
+        [name, "as"] => {
+            let alias = as_name(kid(kids, 0, sp)?, sp)?;
+            ok(AImportName(ImportName { name, alias: some(alias), span: name_span }))
+        },
+        [name, ..] => ok(AImportName(ImportName { name, alias: none, span: name_span })),
+        _ => err(ParseError { message: "an import name matched no token", span: sp }),
+    }
 }
 
 fn lower_effect(src: str, node: Parts, kids: Ast[]) -> Ast {
-    AName(node.own_texts(src)[1].value_or(""))
+    match (node.own_texts(src)) {
+        [_, effect, ..] => AName(effect),
+        _ => AName(""),
+    }
 }
 
 fn lower_type_params(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
@@ -3344,28 +3404,27 @@ fn lower_type_params(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # `=` for any of them. A bare name takes the `any` bound, which almost every
 # generic uses.
 fn lower_type_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
-    let toks = node.own_texts(src);
-    let spans = node.tokens;
     let sp = node.span();
-    let name = toks[0].value_or("");
     // The default is the one child the rule has: a type.
-    mut default: Ty? = none;
-    if (let some(kid) = kids.first()) {
-        set default = some(as_ty(kid, sp)?);
+    let default: Ty? = match (kids) {
+        [written, ..] => some(as_ty(written, sp)?),
+        _ => none,
     };
-    // `name`, or `name = ty`: no bound was written.
-    if (toks.len() == 1 || toks[1] == some("=")) {
-        return ok(ATypeParam(TypeParam { name, bound: BoundAny, default }));
-    };
-    let bound_name = toks[2].value_or("");
-    if (bound_name == "variant") {
-        return ok(ATypeParam(TypeParam { name, bound: BoundVariant, default }));
-    };
-    let bound = bound_from_name(bound_name).value_or_err(ParseError {
-        message: `unknown type parameter bound "{bound_name}"; expected "any" or "ord"`,
-        span: spans[2].value_or(node.tok_span()),
-    })?;
-    ok(ATypeParam(TypeParam { name, bound, default }))
+    match (node.own_texts(src)) {
+        [name, ":", "variant", ..] => {
+            ok(ATypeParam(TypeParam { name, bound: BoundVariant, default }))
+        },
+        [name, ":", bound_name, ..] => {
+            let bound = bound_from_name(bound_name).value_or_err(ParseError {
+                message: `unknown type parameter bound "{bound_name}"; expected "any" or "ord"`,
+                span: node.tokens[2].value_or(node.tok_span()),
+            })?;
+            ok(ATypeParam(TypeParam { name, bound, default }))
+        },
+        // `name`, or `name = ty`: no bound was written.
+        [name, ..] => ok(ATypeParam(TypeParam { name, bound: BoundAny, default })),
+        _ => err(ParseError { message: "a type parameter matched no token", span: sp }),
+    }
 }
 
 # `param` — the seven shapes. The destructuring one is the only one that is not
@@ -3373,30 +3432,35 @@ fn lower_type_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # field list for the body to bind off it.
 fn lower_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let name_span = node.tokens.first().value_or(node.tok_span());
+    let name_span = node.first_tok(node.tok_span());
 
     // `Point { x, y }` — the destructuring form. It is the one alternative
     // holding a repetition, so its positions do not line up one per sub-rule
     // and it is recognised by its `{` rather than by its shape.
-    if (node.tokens[1].map(|t| src[t]) == some("{")) {
-        let toks = node.own_texts(src);
-        let scrutinee = Param {
-            name: `__spat${name_span.start}`,
-            ty: TyNamed(toks[0].value_or("")),
-            mutable: false,
-            arity: One,
-            default: none,
-            implicit_some: false,
-        };
-        let FieldBinders { fields, names } = field_binders_of(toks, 2);
-        return ok(AParam(ParsedParam { param: scrutinee, fields, names, span: name_span }));
-    };
+    let toks = node.own_texts(src);
+    match (toks) {
+        [struct_name, "{", ..] => {
+            let scrutinee = Param {
+                name: `__spat${name_span.start}`,
+                ty: TyNamed(struct_name),
+                mutable: false,
+                arity: One,
+                default: none,
+                implicit_some: false,
+            };
+            let FieldBinders { fields, names } = field_binders_of(toks, 2);
+            ok(AParam(ParsedParam { param: scrutinee, fields, names, span: name_span }))
+        },
+        _ => named_param_by_shape(src, node, kids, sp),
+    }
+}
 
-    // The six named shapes. Every sub-rule is one position, and *which*
-    // positions hold a lowered child is what tells them apart — `name: T*` puts
-    // its type third and `mut name: T` fourth, `name?: T = d` puts its type
-    // fourth where `name: T* = d` puts it third. So no arm counts tokens, hunts
-    // for a `*` or an `=`, or shifts an index past an optional `mut`.
+# The six named shapes. Every sub-rule is one position, and *which*
+# positions hold a lowered child is what tells them apart — `name: T*` puts
+# its type third and `mut name: T` fourth, `name?: T = d` puts its type
+# fourth where `name: T* = d` puts it third. So no arm counts tokens, hunts
+# for a `*` or an `=`, or shifts an index past an optional `mut`.
+fn named_param_by_shape(src: str, node: Parts, kids: Ast[], sp: Span) -> Ast!ParseError {
     match (node.slots()) {
         // `mut name: T` — leads with the keyword, and takes neither a default
         // nor a variadic marker.
@@ -3503,29 +3567,29 @@ fn lower_fn_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # spelled by the alternative that matched; the rest are ordinary `field_init`s.
 fn lower_construct_fields(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let toks = node.own_texts(src);
-    let spans = node.tokens;
-    let head = toks[0].value_or("");
-    let name_span = spans.first().value_or(node.tok_span());
-
-    // `{ ..base, rest.. }` — the spread rides as a nameless init holding an
-    // `Spread`, exactly as in a written struct literal, so the loader expands
-    // it with no knowledge that it came from the shorthand.
-    if (head == "..") {
-        let base = kid_expr(kids, 0, sp)?;
-        let span = base.span;
-        let first = FieldInit { name: "", value: at(Spread(base), span) };
-        return ok(AFieldInits([first, ..kids[1..].try_map(|k| as_field_init(k, sp))?]));
-    };
-
-    // `{ name, rest.. }` — a leading shorthand field, which is also how the
-    // trailing-comma form `{ x, }` spells a lone one.
-    if (toks[1] == some(",")) {
-        let first = FieldInit { name: head, value: at(Ident(head), name_span) };
-        return ok(AFieldInits([first, ..kids.try_map(|k| as_field_init(k, sp))?]));
-    };
-    let first = FieldInit { name: head, value: kid_expr(kids, 0, sp)? };
-    ok(AFieldInits([first, ..kids[1..].try_map(|k| as_field_init(k, sp))?]))
+    let name_span = node.first_tok(node.tok_span());
+    match (node.own_texts(src)) {
+        // `{ ..base, rest.. }` — the spread rides as a nameless init holding an
+        // `Spread`, exactly as in a written struct literal, so the loader expands
+        // it with no knowledge that it came from the shorthand.
+        ["..", ..] => {
+            let base = kid_expr(kids, 0, sp)?;
+            let span = base.span;
+            let first = FieldInit { name: "", value: at(Spread(base), span) };
+            ok(AFieldInits([first, ..kids[1..].try_map(|k| as_field_init(k, sp))?]))
+        },
+        // `{ name, rest.. }` — a leading shorthand field, which is also how the
+        // trailing-comma form `{ x, }` spells a lone one.
+        [head, ",", ..] => {
+            let first = FieldInit { name: head, value: at(Ident(head), name_span) };
+            ok(AFieldInits([first, ..kids.try_map(|k| as_field_init(k, sp))?]))
+        },
+        [head, ..] => {
+            let first = FieldInit { name: head, value: kid_expr(kids, 0, sp)? };
+            ok(AFieldInits([first, ..kids[1..].try_map(|k| as_field_init(k, sp))?]))
+        },
+        _ => err(ParseError { message: "a body shorthand matched no token", span: sp }),
+    }
 }
 
 # `fn_attr` — `.test({ .. })` or `.performance({ .. })`, the only two. The
@@ -3534,48 +3598,50 @@ fn lower_construct_fields(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError 
 # whole reason that alternative parses: so each can be refused *by name*.
 fn lower_fn_attr(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let toks = node.own_texts(src);
-    let spans = node.tokens;
-    let name = toks[1].value_or("");
-    let name_span = spans[1].value_or(node.tok_span());
-    if (kids.is_empty()) {
-        if (name == "doc") {
-            return err(ParseError {
-                message: """`.doc("..")` is no longer a function attribute — write the documentation as `# ..` lines above the declaration, which also documents structs and variants""",
-                span: name_span,
-            });
-        };
-        if (name == "test" || name == "performance") {
-            return err(ParseError {
-                message: `\`.{name}\` takes a \`\{ .. }\` block, not a string argument`,
-                span: name_span,
-            });
-        };
-        return err(ParseError { message: unknown_attr(name), span: name_span });
-    };
-    if (name != "test" && name != "performance") {
-        return err(ParseError { message: unknown_attr(name), span: name_span });
-    };
-    let TestBlock { fns, body } = as_test_block(kid(kids, 0, sp)?, sp)?;
+    match (node.own_texts(src)) {
+        [_, name, ..] => {
+            let name_span = node.second_tok(node.tok_span());
+            if (kids.is_empty()) {
+                if (name == "doc") {
+                    return err(ParseError {
+                        message: """`.doc("..")` is no longer a function attribute — write the documentation as `# ..` lines above the declaration, which also documents structs and variants""",
+                        span: name_span,
+                    });
+                };
+                if (name == "test" || name == "performance") {
+                    return err(ParseError {
+                        message: `\`.{name}\` takes a \`\{ .. }\` block, not a string argument`,
+                        span: name_span,
+                    });
+                };
+                return err(ParseError { message: unknown_attr(name), span: name_span });
+            };
+            if (name != "test" && name != "performance") {
+                return err(ParseError { message: unknown_attr(name), span: name_span });
+            };
+            let TestBlock { fns, body } = as_test_block(kid(kids, 0, sp)?, sp)?;
 
-    // Two helpers of one name would hoist to one name; refuse it here, where
-    // the names are still the ones written.
-    for (let i, f : fns) {
-        if (fns[..i].any(|g| g.name.text == f.name.text)) {
-            return err(ParseError {
-                message: `duplicate function "{f.name.text}" in this \`.{name}\` block`,
-                span: name_span,
-            });
-        };
+            // Two helpers of one name would hoist to one name; refuse it here, where
+            // the names are still the ones written.
+            for (let i, f : fns) {
+                if (fns[..i].any(|g| g.name.text == f.name.text)) {
+                    return err(ParseError {
+                        message: `duplicate function "{f.name.text}" in this \`.{name}\` block`,
+                        span: name_span,
+                    });
+                };
+            }
+            ok(AAttr(FnAttr { name, body: body.value_or(at(Unit, 0..0)), fns, span: name_span }))
+        },
+        _ => err(ParseError { message: "a function attribute matched no token", span: sp }),
     }
-    ok(AAttr(FnAttr { name, body: body.value_or(at(Unit, 0..0)), fns, span: name_span }))
 }
 
 # `test_block` — the braces around a `test_body`: the chain's value is located
 # the way `block` does it, and the functions ride along.
 fn lower_test_block(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let brace = node.tokens.first().value_or(node.tok_span());
+    let brace = node.first_tok(node.tok_span());
     let TestBlock { fns, body } = as_test_block(kid(kids, 0, sp)?, sp)?;
     let repaired = repair_block_value(body.value_or(at(Unit, 0..0)), brace);
     ok(ATestBlock(TestBlock { fns, body: some(Expr { ..repaired.0, value_span: repaired.1 }) }))
@@ -3654,7 +3720,7 @@ fn unknown_attr(name: str) -> str {
 fn lower_struct_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     ok(AStruct(StructDecl {
-        name: span_str(src, node.tokens[1].value_or(sp)),
+        name: span_str(src, node.second_tok(sp)),
         // The `item` production is what has the docs; this one is reached
         // through it, so the slot is filled in there.
         doc: none,
@@ -3731,7 +3797,7 @@ fn lower_variant_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         set after = at.end;
     }
     ok(AVariant(VariantDecl {
-        name: span_str(src, node.tokens[1].value_or(sp)),
+        name: span_str(src, node.second_tok(sp)),
         doc: none,
         type_vars: as_type_params(kid(kids, 0, sp)?, sp)?,
         cases,
@@ -3747,7 +3813,7 @@ fn lower_refinement_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let head = as_ty(kid(kids, 1, sp)?, sp)?;
     let x = as_exclusion(kid(kids, 2, sp)?, sp)?;
     ok(ARefinement(RefinementDecl {
-        name: span_str(src, node.tokens[1].value_or(sp)),
+        name: span_str(src, node.second_tok(sp)),
         doc: none,
         type_vars: as_type_params(kid(kids, 0, sp)?, sp)?,
         target: TyWithout(head, x),
@@ -3766,7 +3832,7 @@ fn doc_lines_between(src: str, Parts { tokens }, lo: u64, hi: u64) -> str[] {
 fn lower_variant_case(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     ok(AVariantCase(VariantCase {
-        name: span_str(src, node.tokens[0].value_or(sp)),
+        name: span_str(src, node.first_tok(sp)),
         doc: none,
         payload: kids.try_map(|k| as_case_param(k, sp))?,
     }))
@@ -3782,19 +3848,23 @@ fn lower_case_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let doc = doc_block(own.filter(|t| t.starts_with('#')));
     let toks = own.filter(|t| !t.starts_with('#'));
     let written = as_ty(kid(kids, 0, sp)?, sp)?;
-    if (toks.is_empty()) {
-        return ok(ACaseParam(CaseParam {
+    match (toks) {
+        // `name: T`, `name?: T`, and either with a default.
+        [name, ..] => {
+            let implicit_some = toks.contains("?");
+            let default = if (kids.len() == 2) { some(kid_expr(kids, 1, sp)?) } else { none };
+            let ty = if (implicit_some) { TyOptional(written) } else { written };
+            ok(ACaseParam(CaseParam { name: some(name), ty, default, implicit_some, doc }))
+        },
+        // A bare type.
+        _ => ok(ACaseParam(CaseParam {
             name: none,
             ty: written,
             default: none,
             implicit_some: false,
             doc,
-        }));
-    };
-    let implicit_some = toks[1] == some("?");
-    let default = if (kids.len() == 2) { some(kid_expr(kids, 1, sp)?) } else { none };
-    let ty = if (implicit_some) { TyOptional(written) } else { written };
-    ok(ACaseParam(CaseParam { name: some(toks[0].value_or("")), ty, default, implicit_some, doc }))
+        })),
+    }
 }
 
 # `function` — the one production whose children are told apart by what they
@@ -3803,8 +3873,7 @@ fn lower_case_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # list, and each is a different `Ast` case.
 fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let toks = node.own_texts(src);
-    let is_pub = toks[0] == some("pub");
+    let is_pub = starts_pub(node.own_texts(src));
     let at_name: u64 = if (is_pub) { 2 } else { 1 };
     let name = span_str(src, node.tokens[at_name].value_or(node.tok_span()));
     mut type_vars: TypeParam[] = [];
@@ -5607,6 +5676,13 @@ fn field_binders() -> Rule<AiplTok> {
 
 # The order a `#`-led bracket names, from the token after the `#`: `>` is
 # largest first, `<` smallest first, and the plain `{` promises none.
+fn order_after_hash(toks: str[]) -> SetOrder {
+    match (toks) {
+        [_, after, ..] => set_order(after),
+        _ => Unordered,
+    }
+}
+
 fn set_order(after_hash: str) -> SetOrder {
     match (after_hash) {
         ">" => Desc,
@@ -5735,10 +5811,10 @@ fn named_ty(name: str) -> Ty {
 # and what it excludes.
 fn lower_ty(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let head = as_ty(kid(kids, 0, sp)?, sp)?;
-    match (kids[1]) {
-        some(x) => ok(ATy(TyWithout(head, as_exclusion(x, sp)?))),
-        none => ok(ATy(head)),
+    match (kids) {
+        [head, x] => ok(ATy(TyWithout(as_ty(head, sp)?, as_exclusion(x, sp)?))),
+        [head] => ok(ATy(as_ty(head, sp)?)),
+        _ => err(ParseError { message: "a type matched no alternative", span: sp }),
     }
 }
 
@@ -5746,11 +5822,11 @@ fn lower_ty(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # first token tells them apart, since the name is the only form that starts with
 # one.
 fn lower_exclusion(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
-    let toks = node.own_texts(src);
-    if (toks[0] == some("[")) {
-        return ok(AExclusion(EmptyArray));
-    };
-    ok(AExclusion(NamedCase(toks[0].value_or(""))))
+    match (node.own_texts(src)) {
+        ["[", ..] => ok(AExclusion(EmptyArray)),
+        [name, ..] => ok(AExclusion(NamedCase(name))),
+        _ => err(ParseError { message: "an exclusion matched no token", span: node.span() }),
+    }
 }
 
 # `ty_head` — the eight alternatives, told apart by their left child's `Ast` case
@@ -5839,31 +5915,33 @@ fn lower_base_ty(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # has to know that one base name is special.
 fn lower_ty_core(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let head_tok = node.tokens
-        .first()
-        .value_or_err(ParseError { message: "a type core matched no token", span: sp })?;
-    let head = src[head_tok];
-    if (head == "#") {
-        let inner = as_ty(kid(kids, 0, sp)?, sp)?;
-        if (kids.len() == 2) {
-            return ok(ATy(TyDict(inner, as_ty(kid(kids, 1, sp)?, sp)?)));
-        };
-        return ok(ATy(TySet(inner, set_order(node.own_texts(src)[1].value_or("")))));
-    };
-    if (kids.is_empty()) {
-        return ok(ATy(named_ty(head)));
-    };
-    let args = kids.try_map(|k| as_ty(k, sp))?;
-    if (head == "Case") {
-        if (args.len() != 1) {
-            return err(ParseError {
-                message: `Case<V> takes one type argument, got {args.len()}`,
-                span: sp,
-            });
-        };
-        return ok(ATy(TyCase(as_ty(kid(kids, 0, sp)?, sp)?)));
-    };
-    ok(ATy(TyGeneric(head, args)))
+    match (node.tokens) {
+        [head_tok, ..] => {
+            let head = src[head_tok];
+            if (head == "#") {
+                let inner = as_ty(kid(kids, 0, sp)?, sp)?;
+                if (kids.len() == 2) {
+                    return ok(ATy(TyDict(inner, as_ty(kid(kids, 1, sp)?, sp)?)));
+                };
+                return ok(ATy(TySet(inner, order_after_hash(node.own_texts(src)))));
+            };
+            if (kids.is_empty()) {
+                return ok(ATy(named_ty(head)));
+            };
+            let args = kids.try_map(|k| as_ty(k, sp))?;
+            if (head == "Case") {
+                if (args.len() != 1) {
+                    return err(ParseError {
+                        message: `Case<V> takes one type argument, got {args.len()}`,
+                        span: sp,
+                    });
+                };
+                return ok(ATy(TyCase(as_ty(kid(kids, 0, sp)?, sp)?)));
+            };
+            ok(ATy(TyGeneric(head, args)))
+        },
+        _ => err(ParseError { message: "a type core matched no token", span: sp }),
+    }
 }
 
 # Test shorthand, so an assertion reads as the source it is about.

@@ -64,6 +64,20 @@
 
 
 
+        <section class="item" id="item-ShimHead">
+          <h3>
+            <a class="anchor" href="#item-ShimHead">ShimHead</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct ShimHead</code></pre>
+
+          <div class="doc"><p><code>shim &lt;effect&gt;</code>: the effect's name, and the span over both tokens, which is where a diagnostic about the form points.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-FieldBinders">
           <h3>
             <a class="anchor" href="#item-FieldBinders">FieldBinders</a>
@@ -659,6 +673,20 @@
 
 
 
+        <section class="item" id="item-suffix_by_shape">
+          <h3>
+            <a class="anchor" href="#item-suffix_by_shape">suffix_by_shape</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn suffix_by_shape(src: str, node: Parts, kids: Ast[], sp: Span) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p>The suffix forms that carry no token of their own to tell them apart: <code>?</code>, a field, <code>.name(args)</code> and the bracket forms, by the shape of the positions.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-map_step">
           <h3>
             <a class="anchor" href="#item-map_step">map_step</a>
@@ -737,6 +765,34 @@
           <pre class="signature"><code>fn shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -&#62; Expr!ParseError</code></pre>
 
           <div class="doc"><p><code>shim &lt;effect&gt; { op = f, .. } { body }</code>. Spanned over <code>shim &lt;effect&gt;</code> rather than over the whole form: the body's span is empty when it ends in a <code>;</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-shim_head">
+          <h3>
+            <a class="anchor" href="#item-shim_head">shim_head</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$67530: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-provider_head">
+          <h3>
+            <a class="anchor" href="#item-provider_head">provider_head</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn provider_head(src: str, node: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+
+          <div class="doc"><p>The head of a shim that names a provider rather than listing bindings. Only <code>random</code> has providers, so any other effect is refused here.</p></div>
 
 
         </section>
@@ -1256,6 +1312,20 @@ shim random seeded_with_clock() { body }
 
 
 
+        <section class="item" id="item-named_binding">
+          <h3>
+            <a class="anchor" href="#item-named_binding">named_binding</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn named_binding(mutable: bool, name: str, name_span: Span, ty: Ty?, value: Expr) -&#62; Stmt</code></pre>
+
+          <div class="doc"><p><code>let name = e;</code> and <code>mut name = e;</code>, with the annotation when one was written.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower_assign_stmt">
           <h3>
             <a class="anchor" href="#item-lower_assign_stmt">lower_assign_stmt</a>
@@ -1321,7 +1391,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$100033: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$101961: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -1606,6 +1676,48 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn same_bindings(heads: Pat[], subs: Cst[], tsp: Span) -&#62; Pat[]!ParseError</code></pre>
 
           <div class="doc"><p>Every alternative of one arm must bind the same names in the same order, so the shared body means the same thing whichever matched. Two cases whose payloads line up may therefore group by naming them alike; alternatives that disagree are refused here rather than left to fail as an unbound name somewhere in the body.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-starts_pub">
+          <h3>
+            <a class="anchor" href="#item-starts_pub">starts_pub</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn starts_pub(toks: str[]) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether a declaration's own tokens open with <code>pub</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-first_tok">
+          <h3>
+            <a class="anchor" href="#item-first_tok">first_tok</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn first_tok(self: Parts, fallback: Span) -&#62; Span</code></pre>
+
+          <div class="doc"><p>The span of a node's first own token, or <code>fallback</code> for a node that matched none.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-second_tok">
+          <h3>
+            <a class="anchor" href="#item-second_tok">second_tok</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn second_tok(self: Parts, fallback: Span) -&#62; Span</code></pre>
+
+          <div class="doc"><p>The span of a node's second own token — the name after a declaration's keyword.</p></div>
 
 
         </section>
@@ -2018,6 +2130,20 @@ if (let some(..) = target[__iset$N]) {
 
 
 
+        <section class="item" id="item-named_param_by_shape">
+          <h3>
+            <a class="anchor" href="#item-named_param_by_shape">named_param_by_shape</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn named_param_by_shape(src: str, node: Parts, kids: Ast[], sp: Span) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p>The six named shapes. Every sub-rule is one position, and <em>which</em> positions hold a lowered child is what tells them apart — <code>name: T*</code> puts its type third and <code>mut name: T</code> fourth, <code>name?: T = d</code> puts its type fourth where <code>name: T* = d</code> puts it third. So no arm counts tokens, hunts for a <code>*</code> or an <code>=</code>, or shifts an index past an optional <code>mut</code>.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-named_param">
           <h3>
             <a class="anchor" href="#item-named_param">named_param</a>
@@ -2261,7 +2387,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$151586: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$155359: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -2634,6 +2760,20 @@ if (let some(..) = target[__iset$N]) {
 
 
 
+        <section class="item" id="item-order_after_hash">
+          <h3>
+            <a class="anchor" href="#item-order_after_hash">order_after_hash</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn order_after_hash(toks: str[]) -&#62; SetOrder</code></pre>
+
+          <div class="doc"><p>The order a <code>#</code>-led bracket names, from the token after the <code>#</code>: <code>&gt;</code> is largest first, <code>&lt;</code> smallest first, and the plain <code>{</code> promises none.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-set_order">
           <h3>
             <a class="anchor" href="#item-set_order">set_order</a>
@@ -2641,7 +2781,7 @@ if (let some(..) = target[__iset$N]) {
           </h3>
           <pre class="signature"><code>fn set_order(after_hash: str) -&#62; SetOrder</code></pre>
 
-          <div class="doc"><p>The order a <code>#</code>-led bracket names, from the token after the <code>#</code>: <code>&gt;</code> is largest first, <code>&lt;</code> smallest first, and the plain <code>{</code> promises none.</p></div>
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>
