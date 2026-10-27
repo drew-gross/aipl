@@ -1367,11 +1367,12 @@ fn params_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
 }
 
 # One parameter: its leading comments, then either a name with its type and the
-# `mut` / `*` / `= default` markers, or the `Point { x, y }` destructuring form.
+# `mut` / `*` / `= default` markers, or one of the destructuring forms.
 #
-# The destructuring form names no parameter, so it has no `: T` after it — the
-# pattern names the struct instead, exactly as `let Point { x, y } = v;` does,
-# and it is laid out the same flat way that statement is.
+# `Point { x, y }` names no parameter, so it has no `: T` after it — the pattern
+# names the struct instead, exactly as `let Point { x, y } = v;` does, and it is
+# laid out the same flat way that statement is. `p: Point { x, y }` names one,
+# and its pattern follows the `:` laid out the same way.
 fn one_param(self: W) -> WDoc!FmtError {
     let l = self.lead();
     let m = if (l.w.peek_text() == "mut") {
@@ -1397,6 +1398,12 @@ fn one_param(self: W) -> WDoc!FmtError {
     let named = if (opt) { Text(`{n.text}?`) } else { Text(n.text) };
     let after = if (opt) { n.w.bump().w } else { n.w };
     let t = after.expect(":")?.w.ty()?;
+    if (t.w.peek_text() == "{") {
+        let ids = t.w.bump().w.field_binder_list();
+        let closed = ids.w.expect("}")?.w;
+        let pattern = Text(` \{ {ids.names.join(sep=", ")} }`);
+        return ok(WDoc { w: closed, doc: Concat([..m.docs, named, Text(": "), t.doc, pattern]) });
+    };
     let typed = [..m.docs, named, Text(": "), t.doc];
     // The variadic marker: `*` or `+`.
     let marker = t.w.peek_text();
@@ -3463,6 +3470,11 @@ fn walker_of(src: str) -> W!FmtError {
         walker_of("fn f ( Point { x  as  px , y } ) -> i64 { px }")?
             .fn_item()
             .rendered(100)? == "fn f(Point { x as px, y }) -> i64 { px }",
+    );
+    assert(
+        walker_of("fn f ( self : Span { start , end  as  e } , n : i64 ) -> i64 { e }")?
+            .fn_item()
+            .rendered(100)? == "fn f(self: Span { start, end as e }, n: i64) -> i64 { e }",
     );
     assert(walker_of("pub fn f ( ) { }")?.fn_item().rendered(100)? == "pub fn f() {}");
     assert(walker_of("fn f ( ) -> i64 { 1 }")?.fn_item().rendered(100)? == "fn f() -> i64 { 1 }");

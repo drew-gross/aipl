@@ -24,7 +24,8 @@ use crate::Error;
 /// off another value, a tuple):
 ///
 /// - **`self`.** Method-call syntax is defined by the receiver being named
-///   `self`, so a pattern there would change how the function is called.
+///   `self`, so its pattern is the named form `self: Span { start, end }`, not
+///   the `Span { start, end }` this lint's advice spells.
 /// - **A keyword parameter.** Its name *is* the call-site spelling (`f(sep =
 ///   ", ")`), so destructuring it would break every caller.
 /// - **`mut` and variadic parameters.** A `mut` receiver is written through

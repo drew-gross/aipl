@@ -577,6 +577,7 @@ case_tests! {
     cases_match_arms_wildcard_variant = "cases/match_arms/wildcard_variant",
     cases_methods_builtin_char_to_str_as_method = "cases/methods/builtin_char_to_str_as_method",
     cases_methods_builtin_print_as_method = "cases/methods/builtin_print_as_method",
+    cases_methods_destructured_self = "cases/methods/destructured_self",
     cases_methods_err_methods = "cases/methods/err_methods",
     cases_methods_method_call_basic = "cases/methods/method_call_basic",
     cases_methods_method_call_chains = "cases/methods/method_call_chains",

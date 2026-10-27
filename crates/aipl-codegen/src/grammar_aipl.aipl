@@ -518,12 +518,16 @@ fn items() -> Production<AiplTok, Ast>[] {
         Term(Name),
     ]);
 
-    // The five parameter shapes, longest first. `mut self: T` takes no default
+    // The parameter shapes, longest first. `mut self: T` takes no default
     // and no variadic marker. The variadic marker is `*` (zero or more) or `+`
     // (one or more).
     let variadic: Rule<AiplTok> = OneOf([Lit("*"), Lit("+")]);
     let param: Rule<AiplTok> = OneOf([
         Then([Lit("mut"), Term(Name), Lit(":"), Named("ty")]),
+        // `self: Span { start, end }` — a named parameter destructured as well.
+        // Ahead of `name: T`, which would otherwise take `self: Span` and leave
+        // the `{` unparsed.
+        Then([Term(Name), Lit(":"), Term(Name), field_binders()]),
         Then([Term(Name), Lit(":"), Named("ty"), variadic, Lit("="), Named("expr")]),
         // `k?: T = none` — a parameter that may be *omitted*, as against `k: T?`
         // whose type is optional. Ordered choice makes this an ordinary
@@ -3427,32 +3431,52 @@ fn lower_type_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     }
 }
 
-# `param` — the seven shapes. The destructuring one is the only one that is not
-# simply a parameter: it introduces a scrutinee the caller never named and a
-# field list for the body to bind off it.
+# `param` — the eight shapes. The two destructuring ones carry a field list for
+# the body to bind off the argument, and the unnamed one also introduces a
+# scrutinee the caller never named.
 fn lower_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let name_span = node.first_tok(node.tok_span());
 
-    // `Point { x, y }` — the destructuring form. It is the one alternative
-    // holding a repetition, so its positions do not line up one per sub-rule
-    // and it is recognised by its `{` rather than by its shape.
+    // `Point { x, y }` and `p: Point { x, y }` — the destructuring forms. They
+    // are the alternatives holding a repetition, so their positions do not line
+    // up one per sub-rule and they are recognised by their `{` rather than by
+    // their shape.
     let toks = node.own_texts(src);
     match (toks) {
-        [struct_name, "{", ..] => {
-            let scrutinee = Param {
-                name: `__spat${name_span.start}`,
-                ty: TyNamed(struct_name),
-                mutable: false,
-                arity: One,
-                default: none,
-                implicit_some: false,
-            };
-            let FieldBinders { fields, names } = field_binders_of(toks, 2);
-            ok(AParam(ParsedParam { param: scrutinee, fields, names, span: name_span }))
-        },
+        [struct_name, "{", ..] => ok(destructured_param(
+            `__spat${name_span.start}`,
+            struct_name,
+            field_binders_of(toks, 2),
+            name_span,
+        )),
+        [name, ":", struct_name, "{", ..] => ok(destructured_param(
+            name,
+            struct_name,
+            field_binders_of(toks, 4),
+            name_span,
+        )),
         _ => named_param_by_shape(src, node, kids, sp),
     }
+}
+
+# A parameter named `name`, of the struct `struct_name`, whose `fields` are bound
+# to `names` at the top of the body.
+fn destructured_param(
+    name: str,
+    struct_name: str,
+    FieldBinders { fields, names },
+    span: Span,
+) -> Ast {
+    let param = Param {
+        name,
+        ty: TyNamed(struct_name),
+        mutable: false,
+        arity: One,
+        default: none,
+        implicit_some: false,
+    };
+    AParam(ParsedParam { param, fields, names, span })
 }
 
 # The six named shapes. Every sub-rule is one position, and *which*
@@ -4881,6 +4905,14 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
         program_dump(
             "fn f(Point { x, y }) -> i64 { x }",
         ) == "fn f(__spat$5: Point) -> i64 = Let(x, __spat$5.x, Let(y, __spat$5.y, x))",
+    );
+
+    // `self: Span { start, end }` is the same, with the parameter named: the
+    // fields are bound off it and it stays readable whole.
+    assert(
+        program_dump(
+            "fn f(self: Span { start, end as e }) -> Span { self }",
+        ) == "fn f(self: Span) -> Span = Let(start, self.start, Let(e, self.end, self))",
     );
 
     // The `{ field: value }` body shorthand, which resolves against the return

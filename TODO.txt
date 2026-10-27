@@ -19,6 +19,9 @@ projects:
   minesweeper:
     do the RNG with a shuffle, not the current nonsense
     minesweeper probably doens't need the row/col numbers anymore. Maybe an ascii window though?
+    whats with Key? Why is up/down/left/right special cased?
+    before is just saturating sub. Maybe after can have a clamp_add?
+    press() should destructure self. Also we should have tuple destructuring
 
 argparser:
   make it
@@ -326,7 +329,7 @@ syntax:
   more match power: earlier matches in a multi-match can be used in later matches
   generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
   make a syntax for ignoring the rest of the args in a match (just take the ones you want)
-  allow destructuring self while having it still be self e.g. fn foo(self: Span { start, end }). Maybe do this for other args too for doc purposes?
+  Maybe do named arg destructuring for args other than self for doc purposes?
   limitation: a struct default must be a literal
   a lambda bound to a let is not a value (this would let test helpers move into the test, big cleanup)
     is_nine is a silly test helper

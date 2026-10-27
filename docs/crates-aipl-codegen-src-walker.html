@@ -1485,7 +1485,7 @@
           </h3>
           <pre class="signature"><code>fn one_param(self: W) -&#62; WDoc!FmtError</code></pre>
 
-          <div class="doc"><p>One parameter: its leading comments, then either a name with its type and the <code>mut</code> / <code>*</code> / <code>= default</code> markers, or the <code>Point { x, y }</code> destructuring form.</p><p>The destructuring form names no parameter, so it has no <code>: T</code> after it — the pattern names the struct instead, exactly as <code>let Point { x, y } = v;</code> does, and it is laid out the same flat way that statement is.</p></div>
+          <div class="doc"><p>One parameter: its leading comments, then either a name with its type and the <code>mut</code> / <code>*</code> / <code>= default</code> markers, or one of the destructuring forms.</p><p><code>Point { x, y }</code> names no parameter, so it has no <code>: T</code> after it — the pattern names the struct instead, exactly as <code>let Point { x, y } = v;</code> does, and it is laid out the same flat way that statement is. <code>p: Point { x, y }</code> names one, and its pattern follows the <code>:</code> laid out the same way.</p></div>
 
 
         </section>
@@ -1595,7 +1595,7 @@
             <a class="anchor" href="#item-range_has_stmt">range_has_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$59685: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$60057: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code> or a <code>fn</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 
