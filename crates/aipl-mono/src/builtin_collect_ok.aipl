@@ -1,0 +1,34 @@
+# The AIPL implementation of the `collect_ok` builtin. The loader names this
+# function by the canonical name `__builtin_collect_ok` (see
+# `aipl_syntax::aipl_builtins`), so a user's `xs.collect_ok()` resolves through
+# the ordinary generic machinery.
+#
+# It is the other half of a map whose function may decline: `xs$read()` is a
+# `T?[]`, one slot per element, and this keeps the answers. The elements stay in
+# order, and the result is no longer than the receiver. A loop that pushes only
+# when `if (let some(v) = f(x))` matches is this, written the long way.
+
+import { equal as ==, int_parse, push } from builtins;
+
+# The values inside the `some` elements of `self`, in order; the `none`s are dropped.
+pub fn collect_ok<T: any>(self: T?[]) -> T[] {
+    // This is the loop `push_loop_collect_ok` advises replacing.
+    mut out: T[] = []; #[allow]
+    for (let x : self) {
+        if (let some(v) = x) {
+            set out.push(v);
+        };
+    }
+    out
+}.test({
+    assert([some(1), none, some(3)].collect_ok() == [1, 3]);
+    // Every slot declines, or there are none to ask: nothing is kept.
+    let nothing: i64?[] = [none, none];
+    assert(nothing.collect_ok() == []);
+    let empty: i64?[] = [];
+    assert(empty.collect_ok() == []);
+    // Free-call form, and a heap element.
+    assert(collect_ok([some("a"), none, some("b")]) == ["a", "b"]);
+    // The usual partner: a map whose function may decline.
+    assert(["1", "x", "3"]$int_parse().collect_ok() == [1, 3]);
+})

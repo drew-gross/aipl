@@ -1,0 +1,31 @@
+# `#[allow]` keeps the loop — the escape hatch every lint carries. The marker goes
+# on the `mut out = [];` seed, which is where this lint points: `#[allow]` is
+# line-scoped, so a hit spanning the loop could never be squelched.
+
+import { collect_ok, int_parse, join, print, push, to_str } from builtins;
+
+fn parsed(words: str[]) -> i64[] {
+    mut out: i64[] = []; #[allow]
+    for (let word : words) {
+        if (let some(n) = word.int_parse()) {
+            set out.push(n);
+        };
+    }
+    out
+}
+
+// The rewrite the lint asks for, so the two spellings are checked side by side
+// and proven to agree.
+fn parsed_short(words: str[]) -> i64[] { words$int_parse().collect_ok() }
+
+fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }
+
+fn main() !prints {
+    print(show(parsed(["1", "x", "3"])));
+    print(show(parsed_short(["1", "x", "3"])));
+    print(show(parsed([])));
+    print(show(parsed_short([])));
+}
+--- stdout ---
+1,3
+1,3

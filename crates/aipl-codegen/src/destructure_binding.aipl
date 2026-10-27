@@ -51,6 +51,7 @@ import {
     all,
     any,
     collect_arms,
+    collect_ok,
     contains,
     count_if,
     equal as ==,
@@ -128,15 +129,7 @@ fn descendants(self: Expr) -> Expr[] { [self, ..self.subexprs()$descendants().jo
 
 # Every field `self` and the expressions under it read off a plain name, with a
 # read for each time it is read.
-fn field_reads(self: Expr) -> Read[] {
-    mut found: Read[] = [];
-    for (let node : self.descendants()) {
-        if (let some(r) = node.read()) {
-            set found.push(r);
-        };
-    }
-    found
-}
+fn field_reads(self: Expr) -> Read[] { self.descendants()$read().collect_ok() }
 
 # The field read `self` is, when it reads one off a plain name.
 fn read(self: Expr) -> Read? {

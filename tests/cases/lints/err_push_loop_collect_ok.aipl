@@ -1,0 +1,64 @@
+# `mut out = []; for (let x : xs) { if (let some(v) = f(x)) { set out.push(v); } }`
+# — an array seeded empty and filled by a loop that keeps the answers that exist.
+# `map` and `collect_ok` say that in one expression, and say it up front: the
+# reader learns what the array *is* without running a loop to find out that
+# nothing else happens to `out`.
+#
+# When what is pushed is more than the bound name, a `map` follows.
+
+import { int_parse, print, push, wrapping_mul as * } from builtins;
+
+// The answers kept as they are: a `map` of the question, then `collect_ok`.
+fn parsed(words: str[]) -> i64[] {
+    mut out: i64[] = [];
+    for (let word : words) {
+        if (let some(n) = word.int_parse()) {
+            set out.push(n);
+        };
+    }
+    out
+}
+
+// The answers changed on the way in.
+fn doubled(words: str[]) -> i64[] {
+    mut out: i64[] = [];
+    for (let word : words) {
+        if (let some(n) = word.int_parse()) {
+            set out.push(n * 2);
+        };
+    }
+    out
+}
+
+// The iterable already holds the optionals, so there is nothing to map first.
+fn present(slots: i64?[]) -> i64[] {
+    mut out: i64[] = [];
+    for (let slot : slots) {
+        if (let some(n) = slot) {
+            set out.push(n);
+        };
+    }
+    out
+}
+
+fn main() !prints {
+    print(`{parsed(["1", "x"])} {doubled(["2"])} {present([some(3), none])}`);
+}
+--- errors ---
+error: "out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = words.map(|word| ..).collect_ok();" and drop the loop, importing `map` and `collect_ok` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_push_loop_collect_ok.aipl:13:22
+   |
+13 |     mut out: i64[] = [];
+   |                      ^^
+
+error: "out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = words.map(|word| ..).collect_ok().map(|n| ..);" and drop the loop, importing `map` and `collect_ok` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_push_loop_collect_ok.aipl:24:22
+   |
+24 |     mut out: i64[] = [];
+   |                      ^^
+
+error: "out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = slots.collect_ok();" and drop the loop, importing `collect_ok` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_push_loop_collect_ok.aipl:35:22
+   |
+35 |     mut out: i64[] = [];
+   |                      ^^

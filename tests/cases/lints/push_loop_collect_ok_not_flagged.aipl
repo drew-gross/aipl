@@ -1,0 +1,81 @@
+# The shapes the collect-ok lint must leave alone. It rewrites exactly one shape —
+# a `mut acc = [];` whose very next statement is a loop doing nothing but an
+# else-less `if let some(v) = ..` around one push — so everything here compiles.
+
+import {
+    int_parse,
+    join,
+    len,
+    less_than as <,
+    print,
+    push,
+    to_str,
+    wrapping_add as +,
+} from builtins;
+
+fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }
+
+fn show_u(xs: u64[]) -> str { xs$to_str().join(sep=",") }
+
+// An `else` that does something: the pipeline has nowhere to put it.
+fn parsed_or_zero(words: str[]) -> i64[] {
+    mut out: i64[] = [];
+    for (let word : words) {
+        if (let some(n) = word.int_parse()) {
+            set out.push(n);
+        } else {
+            set out.push(0);
+        };
+    }
+    out
+}
+
+// The loop does something else as well.
+fn logged(words: str[]) !prints -> i64[] {
+    mut out: i64[] = [];
+    for (let word : words) {
+        print(word);
+        if (let some(n) = word.int_parse()) {
+            set out.push(n);
+        };
+    }
+    out
+}
+
+// The question reads the array being built, so it depends on how much the loop
+// has already done, which no `map` lambda can see.
+fn limited(words: str[]) -> i64[] {
+    mut out: i64[] = [];
+    for (let word : words) {
+        if (let some(n) = word.int_parse()) {
+            if (out.len() < 2) {
+                set out.push(n);
+            };
+        };
+    }
+    out
+}
+
+// An indexed loop: `map` has no index to pass.
+fn at_even(words: str[]) -> u64[] {
+    mut out: u64[] = [];
+    for (let i, word : words) {
+        if (let some(_) = word.int_parse()) {
+            set out.push(word.len() + i);
+        };
+    }
+    out
+}
+
+fn main() !prints {
+    print(show(parsed_or_zero(["1", "x"])));
+    print(show(logged(["2"])));
+    print(show(limited(["1", "2", "3"])));
+    print(show_u(at_even(["1", "2"])));
+}
+--- stdout ---
+1,0
+2
+2
+1,2
+1,2
