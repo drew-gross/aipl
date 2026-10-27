@@ -1,0 +1,17 @@
+# A struct is a set element, but it has no order, so an ordered set of one has
+# nothing to sort by.
+
+import { print } from builtins;
+
+struct Point { x: i64, y: i64 }
+
+fn main() !prints {
+    let s = #>{Point { x: 1, y: 2 }};
+    print(`{s}`);
+}
+--- errors ---
+error: set literal: an ordered set (`#>{..}` / `#<{..}`) sorts its elements, so its element must be an integer, char, or str, got Point
+ --> ./tests/cases/sets/err_ordered_struct_elem.aipl:9:13
+  |
+9 |     let s = #>{Point { x: 1, y: 2 }};
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^

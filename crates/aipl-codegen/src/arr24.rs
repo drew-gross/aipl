@@ -998,6 +998,19 @@ pub(crate) extern "C" fn aipl_set_contains(
     elem_size: i64,
     str_cmp: i64,
 ) -> i64 {
+    aipl_set_contains_by(s, x, elem_size, str_cmp, 0)
+}
+
+/// [`aipl_set_contains`] for a set of structs or variants, whose elements are
+/// compared by `eq_fn`: the address of a compiled `(element, element) -> 0/1`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_set_contains_by(
+    s: *const ArrValue,
+    x: *const u8,
+    elem_size: i64,
+    str_cmp: i64,
+    eq_fn: i64,
+) -> i64 {
     let s = unsafe { &*s };
     i64::from(super::array_ops::set_contains(
         s.block,
@@ -1005,6 +1018,7 @@ pub(crate) extern "C" fn aipl_set_contains(
         x,
         elem_size,
         str_cmp,
+        eq_fn,
     ))
 }
 
@@ -1020,6 +1034,22 @@ pub(crate) extern "C" fn aipl_set_insert(
     str_cmp: i64,
     order: i64,
 ) {
+    aipl_set_insert_by(slot, x, drop_fn, retain_fn, elem_size, str_cmp, order, 0)
+}
+
+/// [`aipl_set_insert`] for a set of structs or variants (see
+/// [`aipl_set_contains_by`]).
+#[no_mangle]
+pub(crate) extern "C" fn aipl_set_insert_by(
+    slot: *mut ArrValue,
+    x: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+    str_cmp: i64,
+    order: i64,
+    eq_fn: i64,
+) {
     unsafe {
         let v = *slot;
         let (set, len) = super::array_ops::set_insert(
@@ -1031,6 +1061,7 @@ pub(crate) extern "C" fn aipl_set_insert(
             elem_size,
             str_cmp,
             order,
+            eq_fn,
         );
         core::ptr::write(slot, ArrValue::whole_of(set, len));
     }
@@ -1050,6 +1081,26 @@ pub(crate) extern "C" fn aipl_set_union(
     order: i64,
     in_place: i64,
 ) {
+    aipl_set_union_by(
+        out, a, b, drop_fn, retain_fn, elem_size, str_cmp, order, 0, in_place,
+    )
+}
+
+/// [`aipl_set_union`] for a set of structs or variants (see
+/// [`aipl_set_contains_by`]).
+#[no_mangle]
+pub(crate) extern "C" fn aipl_set_union_by(
+    out: *mut ArrValue,
+    a: *const ArrValue,
+    b: *const ArrValue,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+    str_cmp: i64,
+    order: i64,
+    eq_fn: i64,
+    in_place: i64,
+) {
     unsafe {
         let (a, b) = (*a, *b);
         let (set, len) = if in_place != 0 {
@@ -1063,6 +1114,7 @@ pub(crate) extern "C" fn aipl_set_union(
                 elem_size,
                 str_cmp,
                 order,
+                eq_fn,
             )
         } else {
             super::array_ops::set_union(
@@ -1075,6 +1127,7 @@ pub(crate) extern "C" fn aipl_set_union(
                 elem_size,
                 str_cmp,
                 order,
+                eq_fn,
             )
         };
         // `b` is consumed; so is `a`, unless it was grown into the result.

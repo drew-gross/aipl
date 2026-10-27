@@ -2,15 +2,13 @@
 
 import { to_set } from builtins;
 
-struct Point { x: i64, y: i64 }
-
 fn main() {
-    let p = Point { x: 1, y: 2 };
-    let s = (p, p).to_set();
+    let xs = [1, 2];
+    let s = (xs, xs).to_set();
 }
 --- errors ---
-error: "to_set": a set element must be an integer (i8..i64, u8..u64), bool, char, or str, got Point
- --> ./tests/cases/sets/err_to_set_tuple_elem.aipl:9:13
+error: "to_set": a set element must be an integer (i8..i64, u8..u64), bool, char, str, struct or variant, got i64[]
+ --> ./tests/cases/sets/err_to_set_tuple_elem.aipl:7:13
   |
-9 |     let s = (p, p).to_set();
-  |             ^^^^^^
+7 |     let s = (xs, xs).to_set();
+  |             ^^^^^^^^

@@ -3874,8 +3874,10 @@ pub fn is_array_elem(t: &Type) -> bool {
 
 /// Valid set element types: the scalar value types — every integer width
 /// (`i8`..`i64`, `u8`..`u64`), `bool`, `char`, and `str`. Scalars compare by
-/// value; `str` compares by content (see the set runtime). Nested containers
-/// (arrays/sets/optionals/structs) are not yet supported as set elements.
+/// value; `str` compares by content (see the set runtime). A struct or variant
+/// is also a set element, but needs the declarations to recognise, so the checker
+/// and codegen ask for it themselves; nested containers (arrays/sets/optionals)
+/// are not set elements.
 ///
 /// Also the "storable scalar" test behind struct fields and variant payloads,
 /// which hold exactly these inline.

@@ -309,7 +309,8 @@ pub(crate) fn reserve(
 // ---------- Sets ----------
 //
 // A set reuses the array block verbatim; only construction differs: elements are
-// inserted deduplicated. Elements are i64/bool/char or `str`. Scalars compare by
+// inserted deduplicated. Elements are i64/bool/char, `str`, or a struct or variant,
+// which a compiled equality function (`eq_fn`) compares. Scalars compare by
 // value (a bit-compare for a packed `bool`) and need no element drop/retain;
 // `str` elements are compared by content, with the array's `str` drop/retain
 // helpers recorded so the block frees/retains its strings like a `str[]`.
@@ -317,19 +318,25 @@ pub(crate) fn reserve(
 /// Whether the set `a` of `len` elements already contains the element at `x`.
 /// `str_cmp != 0` compares `str` elements by content and carries their width (see
 /// `str_cmp_width`); otherwise a bit-packed `bool` set (`elem_size == 0`) compares
-/// unpacked bits and every other scalar set compares the 8-byte value.
+/// unpacked bits and every other scalar set compares the 8-byte value. A non-zero
+/// `eq_fn` is the address of a compiled `(element, element) -> 0/1` function that
+/// compares two elements in place (a struct or variant element), and takes over.
 pub(crate) fn set_contains(
     a: *const u8,
     len: usize,
     x: *const u8,
     elem_size: i64,
     str_cmp: i64,
+    eq_fn: i64,
 ) -> bool {
     if len == 0 {
         return false;
     }
     unsafe {
-        if str_cmp == super::str24::STR_SIZE as i64 {
+        if eq_fn != 0 {
+            let eq: extern "C" fn(i64, i64) -> i64 = core::mem::transmute(eq_fn as usize);
+            (0..len).any(|i| eq(elem_ptr(a, i, elem_size as usize) as i64, x as i64) != 0)
+        } else if str_cmp == super::str24::STR_SIZE as i64 {
             // Wide `str` elements: the element *is* the 24-byte value, so there
             // is no pointer to load — compare the values in place.
             let target = core::ptr::read(x as *const super::str24::Str);
@@ -441,9 +448,10 @@ pub(crate) fn set_insert(
     elem_size: i64,
     str_cmp: i64,
     order: i64,
+    eq_fn: i64,
 ) -> (*const u8, usize) {
     if order == SET_ORDER_NONE {
-        if set_contains(a, len, x, elem_size, str_cmp) {
+        if set_contains(a, len, x, elem_size, str_cmp, eq_fn) {
             return (a, len);
         }
         return (push_mut(a, len, x, drop_fn, retain_fn, elem_size), len + 1);
@@ -465,12 +473,25 @@ pub(crate) fn set_insert(
 /// then read back as a whole value. Only the bit-packed `bool` case has no address
 /// to give (its element is one bit), so that one is materialized into the scratch
 /// and its address returned.
-unsafe fn set_elem_ptr(src: *const u8, i: usize, elem_size: i64, scratch: &mut i64) -> *const u8 {
+unsafe fn set_elem_ptr(
+    src: *const u8,
+    i: usize,
+    elem_size: i64,
+    eq_fn: i64,
+    scratch: &mut i64,
+) -> *const u8 {
     if elem_size == ELEM_BITPACKED {
         *scratch = i64::from(unsafe { bit_of(src, i) });
         return scratch as *const i64 as *const u8;
     }
-    unsafe { elem_ptr(src, i, elem_size.max(8) as usize) }
+    // A struct or variant element is stored at its own width, which a word is not
+    // a lower bound on.
+    let stride = if eq_fn != 0 {
+        elem_size
+    } else {
+        elem_size.max(8)
+    };
+    unsafe { elem_ptr(src, i, stride as usize) }
 }
 
 /// `a.union(b)` (copy): a fresh set with every distinct element of `a` then `b`,
@@ -486,6 +507,7 @@ pub(crate) fn set_union(
     elem_size: i64,
     str_cmp: i64,
     order: i64,
+    eq_fn: i64,
 ) -> (*const u8, usize) {
     // Pre-size to the upper bound (|a| + |b|) so the insert loop never reallocs.
     let mut dest = super::aipl_array_with_cap((a_len + b_len) as i64, drop_fn, elem_size);
@@ -493,8 +515,10 @@ pub(crate) fn set_union(
     for (src, n) in [(a, a_len), (b, b_len)] {
         for i in 0..n {
             let mut scratch = 0i64;
-            let vp = unsafe { set_elem_ptr(src, i, elem_size, &mut scratch) };
-            (dest, len) = set_insert(dest, len, vp, drop_fn, retain_fn, elem_size, str_cmp, order);
+            let vp = unsafe { set_elem_ptr(src, i, elem_size, eq_fn, &mut scratch) };
+            (dest, len) = set_insert(
+                dest, len, vp, drop_fn, retain_fn, elem_size, str_cmp, order, eq_fn,
+            );
         }
     }
     (dest, len)
@@ -514,12 +538,15 @@ pub(crate) fn set_union_mut(
     elem_size: i64,
     str_cmp: i64,
     order: i64,
+    eq_fn: i64,
 ) -> (*const u8, usize) {
     let (mut a, mut len) = (a, a_len);
     for i in 0..b_len {
         let mut scratch = 0i64;
-        let vp = unsafe { set_elem_ptr(b, i, elem_size, &mut scratch) };
-        (a, len) = set_insert(a, len, vp, drop_fn, retain_fn, elem_size, str_cmp, order);
+        let vp = unsafe { set_elem_ptr(b, i, elem_size, eq_fn, &mut scratch) };
+        (a, len) = set_insert(
+            a, len, vp, drop_fn, retain_fn, elem_size, str_cmp, order, eq_fn,
+        );
     }
     (a, len)
 }

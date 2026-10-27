@@ -999,6 +999,22 @@ impl<'a> Cx<'a> {
     /// The cases of a variant-typed value: a concrete named variant, or an
     /// (abstract) generic-variant application `Emit<K>` (template cases with its
     /// type variables substituted). Lets a `match` on such a value resolve.
+    /// Whether `t` can be a set's element: a scalar or `str`, or a struct or
+    /// variant, whose elements are told apart by its structural `==`.
+    fn is_set_member(&self, t: &Type) -> bool {
+        is_set_elem(t)
+            || match t {
+                Type::Named(n) => {
+                    self.struct_fields(n).is_some() || self.variant_cases(n).is_some()
+                }
+                Type::Generic(base, _) => {
+                    self.generic_structs.contains_key(base)
+                        || self.generic_variants.contains_key(base)
+                }
+                _ => false,
+            }
+    }
+
     fn cases_of(&self, ty: &Type) -> Option<Vec<(String, Vec<Type>)>> {
         match ty {
             // `V without C` has the cases of `V` less `C`. This is what makes a
@@ -2455,11 +2471,11 @@ impl Cx<'_> {
             // parameter (pinned to one of those when monomorphized). No nested
             // containers, no struct/variant.
             Type::Set(inner, order) => {
-                if is_set_elem(inner) || is_abstract_scalar_ty(inner, type_params) {
+                if self.is_set_member(inner) || is_abstract_scalar_ty(inner, type_params) {
                     check_ordered_elem(inner, *order, type_params, ctx)
                 } else {
                     Err(Error::msg(format!(
-                        "{ctx}: a set element must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
+                        "{ctx}: a set element must be an integer (i8..i64, u8..u64), bool, char, str, struct or variant, got {}",
                         tyname(inner)
                     )))
                 }
@@ -4303,10 +4319,10 @@ impl Cx<'_> {
                     }
                 }
                 let elem_ty = elem_ty.unwrap_or(Type::NoneInner);
-                if !elems.is_empty() && !recovered_any && !is_set_elem(&elem_ty) {
+                if !elems.is_empty() && !recovered_any && !self.is_set_member(&elem_ty) {
                     return Err(Error::at(
                         format!(
-                            "set elements must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
+                            "set elements must be an integer (i8..i64, u8..u64), bool, char, str, struct or variant, got {}",
                             tyname(&elem_ty)
                         ),
                         span.clone(),
@@ -4983,7 +4999,10 @@ impl Cx<'_> {
                 ));
             }
             if let Type::Array(inner) = unrefined(&t) {
-                if is_set_elem(inner) || is_abstract_scalar_ty(inner, &[]) || is_typevar(inner) {
+                if self.is_set_member(inner)
+                    || is_abstract_scalar_ty(inner, &[])
+                    || is_typevar(inner)
+                {
                     return Ok(Type::Set(
                         inner.clone(),
                         aipl_syntax::ast::SetOrder::Context,
@@ -4992,7 +5011,7 @@ impl Cx<'_> {
                 return Err(Error::at(
                     format!(
                         "\"to_set\": a set element must be an integer (i8..i64, u8..u64), bool, \
-                         char, or str, got {}",
+                         char, str, struct or variant, got {}",
                         tyname(inner)
                     ),
                     args[0].span.clone(),
@@ -5012,7 +5031,10 @@ impl Cx<'_> {
                         args[0].span.clone(),
                     ));
                 }
-                if is_set_elem(first) || is_abstract_scalar_ty(first, &[]) || is_typevar(first) {
+                if self.is_set_member(first)
+                    || is_abstract_scalar_ty(first, &[])
+                    || is_typevar(first)
+                {
                     return Ok(Type::Set(
                         Box::new(first.clone()),
                         aipl_syntax::ast::SetOrder::Context,
@@ -5021,7 +5043,7 @@ impl Cx<'_> {
                 return Err(Error::at(
                     format!(
                         "\"to_set\": a set element must be an integer (i8..i64, u8..u64), bool, \
-                         char, or str, got {}",
+                         char, str, struct or variant, got {}",
                         tyname(first)
                     ),
                     args[0].span.clone(),

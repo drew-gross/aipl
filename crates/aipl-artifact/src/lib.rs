@@ -409,8 +409,11 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         }
         "aipl_arr_writable" => sig(5, false),
         "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" => sig(4, true),
+        "aipl_set_contains_by" => sig(5, true),
         "aipl_set_insert" => sig(7, false),
+        "aipl_set_insert_by" => sig(8, false),
         "aipl_set_union" => sig(9, false),
+        "aipl_set_union_by" => sig(10, false),
         "aipl_dict_insert" | "aipl_dict_remove" | "aipl_dict_set" => sig(6, false),
         "aipl_arr_join" => sig(8, false),
         "aipl_arr_settle" => sig(4, false),

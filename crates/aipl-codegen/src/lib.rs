@@ -3343,6 +3343,12 @@ fn new_jit_module(frame_pointers: bool) -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_set_contains", arr24::aipl_set_contains as *const u8);
     jit_builder.symbol("aipl_set_insert", arr24::aipl_set_insert as *const u8);
     jit_builder.symbol("aipl_set_union", arr24::aipl_set_union as *const u8);
+    jit_builder.symbol(
+        "aipl_set_contains_by",
+        arr24::aipl_set_contains_by as *const u8,
+    );
+    jit_builder.symbol("aipl_set_insert_by", arr24::aipl_set_insert_by as *const u8);
+    jit_builder.symbol("aipl_set_union_by", arr24::aipl_set_union_by as *const u8);
     jit_builder.symbol("aipl_dict_get", arr24::aipl_dict_get as *const u8);
     jit_builder.symbol(
         "aipl_dict_contains_key",
@@ -7084,8 +7090,11 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         }
         "aipl_arr_writable" => (5, Ret::None),
         "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" => (4, Ret::Word),
+        "aipl_set_contains_by" => (5, Ret::Word),
         "aipl_set_insert" => (7, Ret::None),
+        "aipl_set_insert_by" => (8, Ret::None),
         "aipl_set_union" => (9, Ret::None),
+        "aipl_set_union_by" => (10, Ret::None),
         "aipl_dict_insert" | "aipl_dict_remove" | "aipl_dict_set" => (6, Ret::None),
         "aipl_arr_join" => (8, Ret::None),
         // The parts and `join`'s three separators; the `str` comes back through
@@ -11243,12 +11252,14 @@ fn emit_eq_body<M: Module>(
                 let xptr = builder.ins().stack_addr(types::I64, xslot, 0);
                 store_array_elem(builder, xptr, el, elem, structs);
                 let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
-                let c = builtins.call(
-                    module,
-                    builder,
+                let eq_fn = set_eq_fn_addr(builder, module, cx, elem);
+                let (name, args) = set_call(
                     "aipl_set_contains",
-                    &[rv_value, xptr, esz, str_cmp],
+                    eq_fn,
+                    4,
+                    vec![rv_value, xptr, esz, str_cmp],
                 );
+                let c = builtins.call(module, builder, name, &args);
                 let cont = builder.create_block();
                 let missing = builder.create_block();
                 builder.ins().brif(c, cont, &[], missing, &[]);
@@ -12006,6 +12017,49 @@ fn array_drop_fn_addr<M: Module>(
         _ => None,
     };
     fn_addr_or_zero(builder, module, id)
+}
+
+/// Whether `elem` is a struct or variant, which a set holds by comparing whole
+/// values with the type's structural equality.
+fn is_composite_set_elem(elem: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
+    matches!(elem, ConcreteType::Named(n)
+        if structs.get(n).is_some_and(|d| d.as_struct().is_some() || d.as_variant().is_some()))
+}
+
+/// The address of the function a set of `elem` compares two elements with, or
+/// `None` when its elements are scalars or `str`, which the runtime compares
+/// itself.
+fn set_eq_fn_addr<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    cx: Cx,
+    elem: &ConcreteType,
+) -> Option<Value> {
+    is_composite_set_elem(elem, cx.structs).then(|| {
+        let id = eq_func(module, cx, elem);
+        fn_addr_or_zero(builder, module, Some(id))
+    })
+}
+
+/// A call to a set runtime entry, which for a set of structs or variants is the
+/// `_by` form taking the equality function at `eq_at` among its arguments.
+fn set_call(
+    name: &'static str,
+    eq: Option<Value>,
+    eq_at: usize,
+    mut args: Vec<Value>,
+) -> (&'static str, Vec<Value>) {
+    let Some(eq) = eq else {
+        return (name, args);
+    };
+    args.insert(eq_at, eq);
+    let by = match name {
+        "aipl_set_contains" => "aipl_set_contains_by",
+        "aipl_set_insert" => "aipl_set_insert_by",
+        "aipl_set_union" => "aipl_set_union_by",
+        other => unreachable!("{other} has no equality-function form"),
+    };
+    (by, args)
 }
 
 /// The element *retain*-fn pointer for element type `elem` (mirrors
@@ -17444,6 +17498,7 @@ fn compile_call_expr_direct<M: Module>(
                     let ord = builder
                         .ins()
                         .iconst(types::I64, set_order_code(&elem, order));
+                    let eq_fn = set_eq_fn_addr(builder, module, cx, &elem);
                     let set_ty = ConcreteType::Set(Box::new(elem.clone()), order);
                     let cap = builder.ins().iconst(types::I64, fields.len() as i64);
                     let set_v =
@@ -17453,12 +17508,13 @@ fn compile_call_expr_direct<M: Module>(
                         let s = value_slot(builder, &elem, structs);
                         let x_ptr = builder.ins().stack_addr(types::I64, s, 0);
                         store_array_elem(builder, x_ptr, ev, &elem, structs);
-                        builtins.call_void(
-                            module,
-                            builder,
+                        let (name, args) = set_call(
                             "aipl_set_insert",
-                            &[set_v, x_ptr, drop_fn, retain_fn, esz_v, str_cmp, ord],
+                            eq_fn,
+                            7,
+                            vec![set_v, x_ptr, drop_fn, retain_fn, esz_v, str_cmp, ord],
                         );
+                        builtins.call_void(module, builder, name, &args);
                     }
                     scopes
                         .last_mut()
@@ -17528,6 +17584,7 @@ fn compile_call_expr_direct<M: Module>(
             let ord = builder
                 .ins()
                 .iconst(types::I64, set_order_code(&elem, order));
+            let eq_fn = set_eq_fn_addr(builder, module, cx, &elem);
             // Past the `char[]` case, the source is an array value, which may be
             // a window; the walk below reads it through its view.
             let src = arr_view(builder, arr_ptr, &t, structs);
@@ -17555,12 +17612,13 @@ fn compile_call_expr_direct<M: Module>(
             let s = value_slot(builder, &elem, structs);
             let x_ptr = builder.ins().stack_addr(types::I64, s, 0);
             store_array_elem(builder, x_ptr, ev, &elem, structs);
-            builtins.call_void(
-                module,
-                builder,
+            let (name, args) = set_call(
                 "aipl_set_insert",
-                &[set_v, x_ptr, drop_fn, retain_fn, esz_v, str_cmp, ord],
+                eq_fn,
+                7,
+                vec![set_v, x_ptr, drop_fn, retain_fn, esz_v, str_cmp, ord],
             );
+            builtins.call_void(module, builder, name, &args);
             let i1 = builder.ins().iadd_imm_s(i, 1);
             builder.ins().stack_store(types::I64, i1, i_slot, 0);
             builder.ins().jump(head, &[]);
@@ -18034,12 +18092,14 @@ fn compile_call_expr_direct<M: Module>(
                     .ins()
                     .iconst(types::I64, runtime_elem_size(&elem, structs));
                 let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
-                let found = builtins.call(
-                    module,
-                    builder,
+                let eq_fn = set_eq_fn_addr(builder, module, cx, &elem);
+                let (name, args) = set_call(
                     "aipl_set_contains",
-                    &[set_ptr, x_ptr, esz, str_cmp],
+                    eq_fn,
+                    4,
+                    vec![set_ptr, x_ptr, esz, str_cmp],
                 );
+                let found = builtins.call(module, builder, name, &args);
                 (found, ConcreteType::Primitive(Primitive::Bool))
             }
         }
@@ -18089,6 +18149,7 @@ fn compile_call_expr_direct<M: Module>(
             let ord = builder
                 .ins()
                 .iconst(types::I64, set_order_code(elem, *order));
+            let eq_fn = set_eq_fn_addr(builder, module, cx, elem);
             // `aipl_set_union` consumes both operands, so `b` is retained to
             // balance its own track either way, and `a` unless it is a fresh
             // temporary whose reference goes to the union.
@@ -18124,14 +18185,15 @@ fn compile_call_expr_direct<M: Module>(
                 (a_ptr, 0)
             };
             let in_place = builder.ins().iconst(types::I64, in_place);
-            builtins.call_void(
-                module,
-                builder,
+            let (name, args) = set_call(
                 "aipl_set_union",
-                &[
+                eq_fn,
+                8,
+                vec![
                     res, a_v, b_ptr, drop_fn, retain_fn, esz, str_cmp, ord, in_place,
                 ],
             );
+            builtins.call_void(module, builder, name, &args);
             scopes
                 .last_mut()
                 .expect("scope")
@@ -21566,16 +21628,18 @@ fn compile_expr_inner<M: Module>(
                         let ord = builder
                             .ins()
                             .iconst(types::I64, set_order_code(elem, *order));
+                        let eq_fn = set_eq_fn_addr(builder, module, cx, elem);
                         let addr = builder.ins().stack_addr(types::I64, slot, 0);
                         let in_place = builder.ins().iconst(types::I64, 1);
-                        builtins.call_void(
-                            module,
-                            builder,
+                        let (name, args) = set_call(
                             "aipl_set_union",
-                            &[
+                            eq_fn,
+                            8,
+                            vec![
                                 addr, addr, b_ptr, drop_fn, retain_fn, esz, str_cmp, ord, in_place,
                             ],
                         );
+                        builtins.call_void(module, builder, name, &args);
                         // No new track — the binding's slot-track owns the result.
                         return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
                     }
@@ -22750,10 +22814,10 @@ fn compile_expr_inner<M: Module>(
                 let (v, t) = compile_expr(module, builder, cx, scopes, el)?;
                 match &elem_ty {
                     None => {
-                        if !is_set_elem(&t) {
+                        if !is_set_elem(&t) && !is_composite_set_elem(&t, structs) {
                             return Err(Error::at(
                                 format!(
-                                    "set elements must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
+                                    "set elements must be an integer (i8..i64, u8..u64), bool, char, str, struct or variant, got {}",
                                     type_name(&t)
                                 ),
                                 el.span.clone(),
@@ -22787,6 +22851,7 @@ fn compile_expr_inner<M: Module>(
             let ord = builder
                 .ins()
                 .iconst(types::I64, set_order_code(&elem, *order));
+            let eq_fn = set_eq_fn_addr(builder, module, cx, &elem);
             let cap = builder.ins().iconst(types::I64, elems.len() as i64);
             // The set under construction, as the value each insert updates.
             let set_ty = ConcreteType::Set(Box::new(elem.clone()), *order);
@@ -22798,12 +22863,13 @@ fn compile_expr_inner<M: Module>(
                 let s = value_slot(builder, &elem, structs);
                 let x_ptr = builder.ins().stack_addr(types::I64, s, 0);
                 store_array_elem(builder, x_ptr, v, &elem, structs);
-                builtins.call_void(
-                    module,
-                    builder,
+                let (name, args) = set_call(
                     "aipl_set_insert",
-                    &[ptr, x_ptr, drop_fn, retain_fn, esz_v, str_cmp, ord],
+                    eq_fn,
+                    7,
+                    vec![ptr, x_ptr, drop_fn, retain_fn, esz_v, str_cmp, ord],
                 );
+                builtins.call_void(module, builder, name, &args);
             }
             scopes
                 .last_mut()

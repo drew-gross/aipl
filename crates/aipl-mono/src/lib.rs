@@ -7229,7 +7229,7 @@ impl Mono<'_> {
                     return self.infer(&counted, env);
                 }
                 let elem = match it {
-                    Type::Array(inner) => *inner,
+                    Type::Array(inner) | Type::Set(inner, _) => *inner,
                     _ => Type::Primitive(Primitive::Char), // str iteration binds char
                 };
                 let mut env2 = env.clone();

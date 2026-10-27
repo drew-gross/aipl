@@ -1,0 +1,91 @@
+# A set of structs or variants: elements are told apart by the type's own `==`,
+# so two equal values are one element however they were built, and a payload that
+# differs makes a different one.
+
+import {
+    equal as ==,
+    has,
+    heap_str,
+    is_empty,
+    len,
+    logical_not as !,
+    print,
+    to_set,
+    union,
+} from builtins;
+
+struct Point { x: i64, y: i64 }
+
+struct Label { text: str, at: Point }
+
+variant Source = Path(path: str, at: Point) | Builtins(at: Point)
+
+fn corners() -> #{Point} {
+    #{Point { x: 0, y: 0 }, Point { x: 4, y: 0 }, Point { x: 0, y: 0 }, Point { x: 4, y: 4 }}
+}.test({
+    assert(corners().len() == 3);
+    assert(corners().has(Point { x: 4, y: 4 }));
+    assert(!corners().has(Point { x: 0, y: 4 }));
+    // Equality is order-independent.
+    assert(corners() == #{Point { x: 4, y: 4 }, Point { x: 0, y: 0 }, Point { x: 4, y: 0 }});
+})
+
+fn labels() -> #{Label} {
+    let key = heap_str("origin");
+    #{
+        Label { text: "origin", at: Point { x: 0, y: 0 } },
+        Label { text: key, at: Point { x: 0, y: 0 } },
+        Label { text: "origin", at: Point { x: 1, y: 0 } },
+    }
+}.test({
+    // A `str` field compares by content, so the heap copy is the same element.
+    assert(labels().len() == 2);
+})
+
+fn sources() -> #{Source} {
+    #{
+        Path("a", Point { x: 0, y: 0 }),
+        Builtins(Point { x: 0, y: 0 }),
+        Path("a", Point { x: 0, y: 0 }),
+    }
+}.test({
+    assert(sources().len() == 2);
+    assert(sources().has(Builtins(Point { x: 0, y: 0 })));
+    assert(!sources().has(Builtins(Point { x: 1, y: 0 })));
+    assert(!sources().has(Path("b", Point { x: 0, y: 0 })));
+})
+
+fn grown() -> #{Point} {
+    mut seen: #{Point} = #{};
+    set seen = seen.union(#{Point { x: 1, y: 1 }});
+    set seen = seen.union(#{Point { x: 1, y: 1 }, Point { x: 2, y: 2 }});
+    seen
+}.test({
+    assert(grown() == #{Point { x: 2, y: 2 }, Point { x: 1, y: 1 }});
+    assert(corners().union(grown()).len() == 5);
+})
+
+fn from_array(points: Point[]) -> #{Point} { points.to_set() }.test({
+    assert(
+        from_array([Point { x: 1, y: 1 }, Point { x: 1, y: 1 }, Point { x: 2, y: 1 }]).len() == 2,
+    );
+    assert(from_array([]).is_empty());
+})
+
+fn pair(p: Point) -> #{Point} { (p, p).to_set() }.test({
+    assert(pair(Point { x: 1, y: 2 }).len() == 1);
+})
+
+fn main() !prints {
+    for (let p : corners()) {
+        print(`{p.x},{p.y}`);
+    }
+    print(`{labels().len()} {sources().len()}`);
+    print(`{corners() == corners().union(corners())}`);
+}
+--- stdout ---
+0,0
+4,0
+4,4
+2 2
+true

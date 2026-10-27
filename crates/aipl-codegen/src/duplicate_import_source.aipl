@@ -11,7 +11,7 @@ import { LintHit, hit } from "./lint_hit.aipl";
 # A hit for each import of a source an earlier import already took names from,
 # in the order the imports are written.
 pub fn duplicate_import_source(Program { items }) -> LintHit[] {
-    mut seen: #{str} = #{};
+    mut seen: #{ImportSource} = #{};
     mut hits: LintHit[] = [];
     for (let Import(decl) : items.collect_arms(Import)) {
         let source = decl.source;
@@ -24,12 +24,12 @@ pub fn duplicate_import_source(Program { items }) -> LintHit[] {
     hits
 }
 
-# Which source an import names, so two imports of one compare equal: the spans
-# differ between them, and a path is not the `builtins` import.
-fn key(self: ImportSource) -> str {
+# The source with its span cleared, so two imports of one compare equal: the
+# spans differ between them.
+fn key(self: ImportSource) -> ImportSource {
     match (self) {
-        Path(path, _) => `path {path}`,
-        Builtins(..) => "builtins",
+        Path(path, _) => Path(path, 0..0),
+        Builtins(..) => Builtins(0..0),
     }
 }
 
