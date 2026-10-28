@@ -16,13 +16,16 @@ import {
     Span,
     contains,
     equal as ==,
+    extend,
     greater_than as >,
     len,
     logical_not as !,
     map,
+    push,
     range,
     right_fold,
     value_or,
+    wrapping_add as +,
     wrapping_decrement as --,
     zip_with,
 } from builtins;
@@ -36,6 +39,7 @@ import {
     For,
     ForPattern,
     Ident,
+    IfLet,
     Let,
     LetMut,
     LetPattern,
@@ -67,7 +71,19 @@ import {
     VariantCase,
     VariantDecl,
 } from "./item.aipl";
-import { Ctor as PatCtor } from "./pat.aipl";
+import {
+    Array,
+    ArrayNested,
+    ArrayRest,
+    Ctor,
+    Ctor as PatCtor,
+    Int,
+    Nested,
+    Pat,
+    Tuple,
+    Wildcard,
+    nested_or_ctor,
+} from "./pat.aipl";
 import { Named as TyNamed } from "./ty.aipl";
 
 # `self` with every destructuring form lowered, in every expression it holds.
@@ -111,7 +127,7 @@ fn desugared_function(self: Function) -> Function {
 
 # `self` and every expression under it, the destructuring forms lowered.
 pub fn desugared(self: Expr) -> Expr {
-    let inner = self.map_subexprs(desugared);
+    let inner = self.with_struct_patterns_lifted().map_subexprs(desugared);
     match (inner.kind) {
         LetPattern(pattern, value, body) => let_pattern(pattern, value, body),
         ForPattern(pattern, iterable, body, index) => for_pattern(pattern, iterable, body, index),
@@ -158,12 +174,120 @@ pub fn desugared(self: Expr) -> Expr {
             .show_expr() == "For([i], __fpat$0, xs, Let(a, __fpat$0._0, Let(b, __fpat$0._1, a)))",
     );
 
+    // A struct pattern inside another pattern becomes a binder, and the arm's body
+    // reads the fields off it.
+    let inside = MatchArm {
+        pattern: ArrayNested([Pat.Struct("P", ["x"], ["x"])]),
+        body: ident("x"),
+        span: 4..9,
+    };
+    assert(
+        expr(IfLet(inside, ident("v"), ident("z")))
+            .desugared()
+            .show_expr() == "IfLet([__npat$4_0] => Let(__spat$4_0: P, __npat$4_0, Let(x, __spat$4_0.x, x)), v, z)",
+    );
+
     // The forms are lowered wherever they sit.
     let nested = expr(Seq(tuple, ident("z")));
     assert(nested.desugared().show_expr().contains("__tpat$0"));
     assert(!nested.desugared().show_expr().contains("LetPattern"));
     assert(ident("x").desugared() == ident("x"));
 })
+
+# `self` with the struct patterns inside its arms' patterns replaced by binders
+# the arm's body reads the fields off.
+fn with_struct_patterns_lifted(self: Expr) -> Expr {
+    let kind = match (self.kind) {
+        Match(scrutinee, arms) => Match(scrutinee, arms$lifted_arm()),
+        IfLet(arm, scrutinee, otherwise) => IfLet(arm.lifted_arm(), scrutinee, otherwise),
+        _ => self.kind,
+    };
+    Expr { ..self, kind }
+}
+
+# A struct pattern nested in another pattern — `[Point { x, y }]` — always
+# matches, so it takes no more than a name does. The arm binds a temporary where
+# the struct pattern stood, and its body starts by reading the fields off it, the
+# way `let Point { x, y } = temporary;` would. Temporaries are named for where the
+# arm's pattern starts and the struct pattern's place in it.
+fn lifted_arm(self: MatchArm) -> MatchArm {
+    let Lifted { pattern, structs } = self.pattern.lifted(self.span.start, 0);
+    let span = self.span;
+    let body = structs.right_fold(
+        self.body,
+        |found: Found, rest: Expr| {
+            let Found { binder, struct_name, fields, names, temporary } = found;
+            destructure_struct(
+                struct_name,
+                fields,
+                names,
+                at(Ident(binder), span),
+                span,
+                rest,
+                false,
+                temporary,
+            )
+        },
+    );
+    MatchArm { ..self, pattern, body }
+}
+
+# A struct pattern taken out of a pattern: the binder that stands in for it, what
+# it destructures, and the name of the temporary its fields are read off.
+struct Found { binder: str, struct_name: str, fields: str[], names: str[], temporary: str }
+
+# A pattern with its struct patterns replaced, and what they were, in order.
+struct Lifted { pattern: Pat, structs: Found[] }
+
+# The same for a list of patterns.
+struct LiftedAll { patterns: Pat[], structs: Found[] }
+
+# `self` with each struct pattern in it replaced by a binder named for `tag` and
+# its place, counting from `taken` — the number already lifted from the patterns
+# before this one in the arm.
+fn lifted(self: Pat, tag: u64, taken: u64) -> Lifted {
+    match (self) {
+        Struct(struct_name, fields, names) => Lifted {
+            pattern: PatCtor(`__npat${tag}_{taken}`),
+            structs: [
+                Found {
+                    binder: `__npat${tag}_{taken}`,
+                    struct_name,
+                    fields,
+                    names,
+                    temporary: `__spat${tag}_{taken}`,
+                },
+            ],
+        },
+        Nested(name, args) => {
+            let LiftedAll { patterns, structs } = args.lifted_all(tag, taken);
+            Lifted { pattern: nested_or_ctor(name, patterns), structs }
+        },
+        Tuple(elements) => {
+            let LiftedAll { patterns, structs } = elements.lifted_all(tag, taken);
+            Lifted { pattern: Tuple(patterns), structs }
+        },
+        ArrayNested(elements) => {
+            let LiftedAll { patterns, structs } = elements.lifted_all(tag, taken);
+            Lifted { pattern: ArrayNested(patterns), structs }
+        },
+        Ctor(..) | Str(..) | Char(..) | Array(..) | ArrayRest(..) | Wildcard | Int(..) => Lifted {
+            pattern: self,
+            structs: [],
+        },
+    }
+}
+
+fn lifted_all(self: Pat[], tag: u64, taken: u64) -> LiftedAll {
+    mut patterns: Pat[] = [];
+    mut structs: Found[] = [];
+    for (let p : self) {
+        let Lifted { pattern, structs as found } = p.lifted(tag, taken + structs.len());
+        set patterns.push(pattern);
+        set structs.extend(found);
+    }
+    LiftedAll { patterns, structs }
+}
 
 # `let <pattern> = value; body`. The temporary is named for where the value
 # starts, and holds the value so it is evaluated once.
@@ -188,6 +312,7 @@ fn let_pattern(pattern: Destructure, value: Expr, body: Expr) -> Expr {
             span,
             body,
             mutable,
+            `__spat${span.start}`,
         ),
     }
 }
@@ -211,6 +336,7 @@ fn for_pattern(pattern: Destructure, iterable: Expr, body: Expr, index: str?) ->
             span,
             body,
             mutable,
+            `__spat${span.start}`,
         ),
     };
     at(For(tmp, iterable, inner, index=index), join_spans(span, inner.span))
@@ -291,8 +417,8 @@ fn destructure_struct(
     span: Span,
     acc: Expr,
     mutable: bool,
+    tmp: str,
 ) -> Expr {
-    let tmp = `__spat${span.start}`;
     let inner = bind_fields_mut(names, tmp, span, acc, fields, mutable);
     let outer_span = join_spans(span, inner.span);
     at(Let(tmp, some(TyNamed(struct_name)), value, inner), outer_span)

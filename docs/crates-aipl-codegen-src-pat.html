@@ -142,6 +142,13 @@
 
             </li>
 
+            <li id="item-Struct"><code>Struct(name: str, fields: str[], names: str[])</code>
+
+              <div class="doc"><p>A struct pattern, <code>T { a, b as c }</code>: the fields read and the name each is bound to, in step. It always matches, so it binds where a plain name would, and <code>desugar.aipl</code> replaces it with one — a temporary the arm's body takes the fields off. Nothing past that sees it.</p></div>
+
+
+            </li>
+
           </ul>
 
         </section>
@@ -261,6 +268,20 @@
           <pre class="signature"><code>fn binder_name(self: Pat) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_field_binder">
+          <h3>
+            <a class="anchor" href="#item-show_field_binder">show_field_binder</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_field_binder(field: str, name: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>A struct pattern's field as written: <code>x</code>, or <code>x as name</code> when it is bound under another name.</p></div>
 
 
         </section>

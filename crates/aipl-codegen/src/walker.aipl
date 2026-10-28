@@ -2615,6 +2615,12 @@ fn pattern(self: W) -> WDoc!FmtError {
     let n = self.bump();
     // A variant-qualified constructor pattern `V.A` / `V.A(ids)`.
     let q = if (n.w.peek_text() == ".") { n.w.qualified_case(n.text) } else { n };
+    // A struct pattern: the fields as `let T { .. } = e;` lays them out.
+    if (q.w.peek_text() == "{") {
+        let ids = q.w.bump().w.field_binder_list();
+        let closed = ids.w.expect("}")?.w;
+        return ok(WDoc { w: closed, doc: Text(`{q.text} \{ {ids.names.join(sep=", ")} }`) });
+    };
     if (q.w.peek_text() != "(") {
         return ok(WDoc { w: q.w, doc: Text(q.text) });
     };
@@ -2627,7 +2633,14 @@ fn pattern(self: W) -> WDoc!FmtError {
     let slots = opened.pattern_list(")", [])?;
     let closed = slots.w.expect(")")?.w;
     ok(WDoc { w: closed, doc: Concat([Text(q.text), flat_parens(slots.docs)]) })
-}
+}.test({
+    // A struct pattern lays out as `let T { .. } = e;` does, wherever it nests.
+    assert(
+        walker_of("[ P { x , y  as b } , n ] =")?
+            .pattern()
+            .rendered(100)? == "[P { x, y as b }, n]",
+    );
+})
 
 # `(a, b, c)` on one line, whatever the width: the parenthesized lists whose
 # grammar takes no trailing comma — a pattern's, a match head's — cannot be

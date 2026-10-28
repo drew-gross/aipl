@@ -325,6 +325,7 @@ import {
     Int as PatInt,
     Pat,
     Str as PatStr,
+    Struct as PatStruct,
     Tuple as PatTuple,
     Wildcard as PatWildcard,
     binder_list,
@@ -1304,6 +1305,8 @@ fn patterns() -> Production<AiplTok, Ast>[] {
             Maybe(nest("(", Named("ctor_payload"), ")", strict())),
         ]),
         Then([Term(Name), nest("(", Named("ctor_payload"), ")", strict())]),
+        // A struct pattern, which always matches: `T { a, b as c }`.
+        Then([Term(Name), field_binders()]),
         Term(Name),
         Lit("none"),
         Term(StrLit),
@@ -2905,7 +2908,7 @@ fn is_plain_elem(self: Pat) -> bool {
     match (self) {
         Ctor(name, bindings, ignore) => bindings.is_empty() && !ignore && name.is_binder_name(),
         Wildcard | Str(..) | Char(..) | Int(..) => true,
-        Array(..) | ArrayRest(..) | ArrayNested(..) | Tuple(..) | Nested(..) => false,
+        Array(..) | ArrayRest(..) | ArrayNested(..) | Tuple(..) | Nested(..) | Struct(..) => false,
     }
 }
 
@@ -2919,7 +2922,7 @@ fn plain_elem_expr(self: Pat, span: Span) -> Expr {
         Str(s) => at(Str(s), span),
         Char(c) => at(Char(c), span),
         Int(n) => at(Num(n), span),
-        Array(..) | ArrayRest(..) | ArrayNested(..) | Tuple(..) | Nested(..) => at(
+        Array(..) | ArrayRest(..) | ArrayNested(..) | Tuple(..) | Nested(..) | Struct(..) => at(
             Ident("_"),
             span,
         ),
@@ -3068,6 +3071,10 @@ fn lower_pattern(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             };
             if (let some(n) = head.int_parse()) {
                 return ok(APat(PatInt(n)));
+            };
+            if (toks[1] == some("{")) {
+                let FieldBinders { fields, names } = field_binders_of(toks, 2);
+                return ok(APat(PatStruct(head, fields, names)));
             };
             let name = qualified_name(toks, head);
             if (kids.is_empty()) {
@@ -4314,6 +4321,11 @@ pub fn lower_aipl_pattern(src: str) -> Pat!ParseError {
             err(e) => `error: {e.message}`,
         }
     }
+
+    // A struct pattern, anywhere a pattern goes.
+    assert(pat_dump("P { x, y as b }") == "P { x, y as b }");
+    assert(pat_dump("(P { x }, n)") == "(P { x }, n)");
+    assert(pat_dump("some(P { x })") == "some(P { x })");
 
     // The nullary forms, and the one identifier that is not a constructor.
     assert(pat_dump("none") == "none");

@@ -72,14 +72,11 @@ fn literal_name(self: Ty?) -> str? {
 # replacement isn't obvious: `{ x }` reads back as a block whose value is `x`, so the
 # trailing comma is load-bearing and the message spells it out.
 fn lone_shorthand(self: FieldInit[]) -> str? {
-    let [only] = self else {
+    let [FieldInit { name, value }] = self else {
         return none;
     };
-    let FieldInit { name, value } = only;
-    if (let Ident(read) = value.kind) {
-        if (read == name) {
-            return some(name);
-        };
+    if (value.kind == Ident(name)) {
+        return some(name);
     };
     none
 }

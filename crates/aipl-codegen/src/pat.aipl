@@ -13,6 +13,7 @@ import {
     logical_not as !,
     map,
     not_equal as !=,
+    zip_with,
 } from builtins;
 import { Expr, Ident, ident, num, show_exprs } from "./expr.aipl";
 
@@ -76,6 +77,11 @@ variant Pat =
     )
     # An integer literal pattern (`1 => ..`).
     | Int(i64)
+    # A struct pattern, `T { a, b as c }`: the fields read and the name each is
+    # bound to, in step. It always matches, so it binds where a plain name would,
+    # and `desugar.aipl` replaces it with one — a temporary the arm's body takes
+    # the fields off. Nothing past that sees it.
+    | Struct(name: str, fields: str[], names: str[])
 
 # Whether a bare name in a nested pattern slot is a binder rather than a case:
 # everything but `none` and a capitalised name. The one rule that needs no type,
@@ -144,9 +150,11 @@ pub fn show_pat(self: Pat) -> str {
         Tuple(ps) => `({show_pats(ps)})`,
         Nested(name, args) => `{name}({show_pats(args)})`,
         Int(n) => `{n}`,
+        Struct(name, fields, names) => `{name} \{ {zip_with(fields, names, show_field_binder).join(sep=", ")} }`,
     }
 }.test({
     assert(Wildcard.show_pat() == "_");
+    assert(Struct("P", ["x", "y"], ["x", "b"]).show_pat() == "P { x, y as b }");
     assert(Ctor("none").show_pat() == "none");
     assert(Ctor("some", bindings=["v"]).show_pat() == "some(v)");
     assert(Ctor("Pair", bindings=["a", "b"]).show_pat() == "Pair(a, b)");
@@ -159,6 +167,12 @@ pub fn show_pat(self: Pat) -> str {
     assert(Tuple([Int(1), Nested("some", [Int(1)])]).show_pat() == "(1, some(1))");
     assert(Nested("Pair", [Ctor("lo"), Wildcard]).show_pat() == "Pair(lo, _)");
 })
+
+# A struct pattern's field as written: `x`, or `x as name` when it is bound
+# under another name.
+fn show_field_binder(field: str, name: str) -> str {
+    if (field == name) { field } else { `{field} as {name}` }
+}
 
 # The elements of a pattern list, comma-separated.
 fn show_pats(self: Pat[]) -> str { self$show_pat().join(sep=", ") }
@@ -178,6 +192,7 @@ pub fn pat_bindings(self: Pat) -> str[] {
         // A nested slot binds where a bare binder name sits, at any depth.
         Tuple(ps) => ps$nested_bindings().join(),
         Nested(_, args) => args$nested_bindings().join(),
+        Struct(_, _, names) => names,
     }
 }.test({
     let none_bound: str[] = [];
@@ -191,6 +206,9 @@ pub fn pat_bindings(self: Pat) -> str[] {
     // Nested: every binder, depth first, left to right; a case name is not one.
     assert(Tuple([Ctor("lo"), Nested("some", [Ctor("hi")])]).pat_bindings() == ["lo", "hi"]);
     assert(Nested("Pair", [Ctor("Nil"), Int(1)]).pat_bindings() == none_bound);
+    // A struct pattern binds its names, wherever it sits.
+    assert(Struct("P", ["x", "y"], ["x", "b"]).pat_bindings() == ["x", "b"]);
+    assert(ArrayNested([Struct("P", ["x"], ["x"]), Ctor("n")]).pat_bindings() == ["x", "n"]);
 })
 
 # The binders of one nested slot: a bare binder name is itself, a case or a
@@ -237,6 +255,7 @@ pub fn pat_label(self: Pat) -> str {
         Wildcard => `"_"`,
         Tuple(..) => "a tuple pattern",
         Int(..) => "an integer pattern",
+        Struct(name, _, _) => `"{name}"`,
     }
 }.test({
     assert(Ctor("some", bindings=["v"]).pat_label() == `"some"`);

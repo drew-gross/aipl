@@ -235,6 +235,7 @@ fn ctor_names(self: Pat) -> #{str} {
     match (self) {
         Pat.Ctor(name, _, _) => path_names(name),
         Pat.Nested(name, args) => #{..path_names(name), ..args$ctor_names().union_all()},
+        Pat.Struct(name, _, _) => #{name},
         Pat.ArrayNested(patterns) | Pat.Tuple(patterns) => patterns$ctor_names().union_all(),
         Pat.Str(..)
         | Pat.Char(..)

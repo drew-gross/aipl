@@ -102,6 +102,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  function_hits in body type stutter can only ever return one, make it LintHint? instead of LintHint[]
   is_shorthand should disappear into is_case (with lint)
   retructure how the lints manage names. There should be shared infrastructure for managing names (i.e. if a builtin is being requested, and is already imported, request the already-imported name. If that name is taken, suggest something else. If a function being checked for is imported with an atypical name, the lint should fire anyway)
   unify destructure param and destructure binding

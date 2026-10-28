@@ -49,6 +49,48 @@
         </section>
 
 
+
+        <section class="item" id="item-Found">
+          <h3>
+            <a class="anchor" href="#item-Found">Found</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Found</code></pre>
+
+          <div class="doc"><p>A struct pattern taken out of a pattern: the binder that stands in for it, what it destructures, and the name of the temporary its fields are read off.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Lifted">
+          <h3>
+            <a class="anchor" href="#item-Lifted">Lifted</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Lifted</code></pre>
+
+          <div class="doc"><p>A pattern with its struct patterns replaced, and what they were, in order.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-LiftedAll">
+          <h3>
+            <a class="anchor" href="#item-LiftedAll">LiftedAll</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct LiftedAll</code></pre>
+
+          <div class="doc"><p>The same for a list of patterns.</p></div>
+
+
+        </section>
+
+
       </section>
 
 
@@ -93,6 +135,62 @@
           <pre class="signature"><code>fn desugared_function(self: Function) -&#62; Function</code></pre>
 
           <div class="doc"><p>A function whose destructured parameters are bound off their synthetic scrutinees at the top of the body — the shape <code>let Point { x, y } = v;</code> has, less the <code>let</code>, the value being bound already by being an argument. Folded from the right so the bindings come out in source order.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-with_struct_patterns_lifted">
+          <h3>
+            <a class="anchor" href="#item-with_struct_patterns_lifted">with_struct_patterns_lifted</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn with_struct_patterns_lifted(self: Expr) -&#62; Expr</code></pre>
+
+          <div class="doc"><p><code>self</code> with the struct patterns inside its arms' patterns replaced by binders the arm's body reads the fields off.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lifted_arm">
+          <h3>
+            <a class="anchor" href="#item-lifted_arm">lifted_arm</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lifted_arm(self: MatchArm) -&#62; MatchArm</code></pre>
+
+          <div class="doc"><p>A struct pattern nested in another pattern — <code>[Point { x, y }]</code> — always matches, so it takes no more than a name does. The arm binds a temporary where the struct pattern stood, and its body starts by reading the fields off it, the way <code>let Point { x, y } = temporary;</code> would. Temporaries are named for where the arm's pattern starts and the struct pattern's place in it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lifted">
+          <h3>
+            <a class="anchor" href="#item-lifted">lifted</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lifted(self: Pat, tag: u64, taken: u64) -&#62; Lifted</code></pre>
+
+          <div class="doc"><p><code>self</code> with each struct pattern in it replaced by a binder named for <code>tag</code> and its place, counting from <code>taken</code> — the number already lifted from the patterns before this one in the arm.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lifted_all">
+          <h3>
+            <a class="anchor" href="#item-lifted_all">lifted_all</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lifted_all(self: Pat[], tag: u64, taken: u64) -&#62; LiftedAll</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>
@@ -188,7 +286,7 @@
             <a class="anchor" href="#item-destructure_struct">destructure_struct</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn destructure_struct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span, acc: Expr, mutable: bool) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn destructure_struct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span, acc: Expr, mutable: bool, tmp: str) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>let T { a, b } = value; rest</code> and its <code>mut</code> twin, as nested bindings. The scrutinee stays an immutable <code>let</code> either way — it is read once per field and never written through — and carries the pattern's type as its annotation, which is what makes the type name mean something rather than decorate the line. The <code>__spat$</code> prefix is <code>aipl_syntax::DESTRUCTURE_BASE_PREFIX</code>, which is how the checker knows to report a mismatch as the destructuring it was.</p></div>
 

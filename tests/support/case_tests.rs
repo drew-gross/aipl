@@ -98,6 +98,7 @@ case_tests! {
     cases_bindings_let_let_binding_shadowing = "cases/bindings/let/let_binding_shadowing",
     cases_bindings_let_let_binding_str = "cases/bindings/let/let_binding_str",
     cases_bindings_let_let_else = "cases/bindings/let/let_else",
+    cases_bindings_let_nested_struct_pattern = "cases/bindings/let/nested_struct_pattern",
     cases_bindings_let_type_annotation = "cases/bindings/let/type_annotation",
     cases_bindings_mut_decr = "cases/bindings/mut/decr",
     cases_bindings_mut_decr_saturating = "cases/bindings/mut/decr_saturating",

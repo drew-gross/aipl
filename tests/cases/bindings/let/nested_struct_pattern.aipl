@@ -1,0 +1,71 @@
+# A struct pattern is a pattern like any other, so it nests: inside an array, a
+# tuple or a case's payload, in a `let ... else`, an `if let` and a `match` arm.
+# It always matches, so it binds its names wherever a plain name would.
+
+import { print, wrapping_add as +, wrapping_mul as * } from builtins;
+
+struct Point { x: i64, y: i64 }
+
+variant Shape = Dot(Point) | Segment(Point, Point) | Empty
+
+// A struct pattern as the element of an array pattern.
+fn only_x(points: Point[]) -> i64 {
+    let [Point { x, y }] = points else {
+        return -1;
+    };
+    x + y
+}
+
+// In a tuple, beside a name.
+fn offset(pair: (Point, i64)) -> i64 {
+    let (Point { x, y }, n) = pair else {
+        return 0;
+    };
+    x + y + n
+}
+
+// In a case's payload, with a rename.
+fn dot_y(s: Shape) -> i64 {
+    let Dot(Point { x, y as height }) = s else {
+        return 0;
+    };
+    x + height
+}
+
+// More than one in the same pattern.
+fn span_width(s: Shape) -> i64 {
+    match (s) {
+        Segment(Point { x as a, y as c }, Point { x as b, y as d }) => a + b + c + d,
+        Dot(Point { x, y }) => x + y,
+        Empty => 0,
+    }
+}
+
+// In an `if let`.
+fn tagged(pair: (Point, i64)) -> i64 { if (let (Point { x, y }, 1) = pair) { x + y } else { -1 } }
+
+// In an array arm of a `match`.
+fn lone(points: Point[]) -> i64 {
+    match (points) {
+        [Point { x, y }] => x * y,
+        _ => -1,
+    }
+}
+
+fn main() !prints {
+    print(`{only_x([Point { x: 4, y: 5 }])} {only_x([])}`);
+    print(`{offset((Point { x: 1, y: 2 }, 10))}`);
+    print(`{dot_y(Dot(Point { x: 1, y: 7 }))} {dot_y(Empty)}`);
+    print(
+        `{span_width(Segment(Point { x: 2, y: 0 }, Point { x: 9, y: 0 }))} {span_width(Dot(Point { x: 3, y: 0 }))}`,
+    );
+    print(`{tagged((Point { x: 3, y: 8 }, 1))} {tagged((Point { x: 3, y: 8 }, 2))}`);
+    print(`{lone([Point { x: 3, y: 4 }])} {lone([])}`);
+}
+--- stdout ---
+9 -1
+13
+8 0
+11 3
+11 -1
+12 -1
