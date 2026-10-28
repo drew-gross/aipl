@@ -1,0 +1,54 @@
+# The shapes the try-as-case lint must leave alone. It rewrites a two-arm `match`
+# that is the function's last act, whose first arm is a variant case and whose
+# second is `_ => none` — so everything here compiles.
+
+import { map, print, wrapping_add as + } from builtins;
+
+variant Shape = Circle(i64) | Rect(i64, i64) | Empty
+
+// Not the function's last act: a `?` would return from the function, where the
+// `match` only ended a statement.
+fn doubled(s: Shape) -> i64? {
+    let r = match (s) {
+        Circle(r) => some(r),
+        _ => none,
+    };
+    r
+}
+
+// The fallthrough is not `none`.
+fn radius_or_zero(s: Shape) -> i64? {
+    match (s) {
+        Circle(r) => some(r),
+        _ => some(0),
+    }
+}
+
+// More than one case is named.
+fn extent(s: Shape) -> i64? {
+    match (s) {
+        Circle(r) => some(r),
+        Rect(w, h) => some(w + h),
+        _ => none,
+    }
+}
+
+// Inside a lambda, where `?` would leave the lambda and not this function.
+fn radii(shapes: Shape[]) -> i64?[] {
+    shapes.map(|s| {
+        match (s) {
+            Circle(r) => some(r),
+            _ => none,
+        }
+    })
+}
+
+fn show(o: i64?) -> str { `{o}` }
+
+fn main() !prints {
+    print(`{show(doubled(Circle(1)))} {show(radius_or_zero(Empty))} {show(extent(Rect(1, 2)))}`);
+    print(`{radii([Circle(1), Empty])}`);
+}
+--- stdout ---
+some(1) some(0) some(3)
+[some(1), none]

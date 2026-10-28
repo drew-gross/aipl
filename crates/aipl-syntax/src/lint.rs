@@ -26,6 +26,7 @@ mod len_gt_zero;
 mod map_constant_repeat;
 mod map_find_if_some;
 mod match_case_as_case;
+mod match_case_try_as_case;
 mod match_is_some_and;
 mod match_map_err;
 mod match_map_ok;
@@ -67,6 +68,7 @@ use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
 use self::map_constant_repeat::{map_constant_repeat, repeat_names};
 use self::map_find_if_some::{find_map_names, map_find_if_some};
 use self::match_case_as_case::match_case_as_case;
+use self::match_case_try_as_case::{match_case_try_as_case, tail_matches};
 use self::match_is_some_and::match_is_some_and;
 use self::match_map_err::match_map_err;
 use self::match_map_ok::match_map_ok;
@@ -176,6 +178,15 @@ pub fn check(
     each_expr(program, &mut |e| {
         match_case_as_case(e, src, as_case.as_deref(), &mut hits)
     });
+    for item in &program.items {
+        if let Item::Fn(func) = item {
+            let mut tails = Vec::new();
+            tail_matches(&func.body, &mut tails);
+            for e in tails {
+                match_case_try_as_case(e, src, as_case.as_deref(), &mut hits);
+            }
+        }
+    }
     each_expr(program, &mut |e| match_map_err(e, &mut hits));
     each_expr(program, &mut |e| match_map_ok(e, &mut hits));
     each_expr(program, &mut |e| field_init_shorthand(e, src, &mut hits));

@@ -251,6 +251,7 @@ lsp:
   docs hover should work on Error, err, ok, etc.
 
 bugs:
+  Printing a call that constant-folds to none (for example print({f(0)}) with f returning None) fails with "to_str: rendering none is not yet supported"
   Gate bug: the_leak_gate_runs_for_a_case_with_no_sections re-runs examples_arrays and requires it to pass. When that case's baseline row is stale, the test fails without printing a handoff-fill: line. Handoff then stops before it reaches the step that would refresh the row. I got past it once by refreshing that single row with the scoped refresh_perfmon command. The fix would be either to have the test print the Fill it needs, or to have it ignore baseline movement.
   main should return u8 since that's what OSes use
   An inlined fn wrapped() -> u8[]? { some([200, 1]) } makes wrapped().value_or([]) fail in monomorphization with "conflicting types for T: i64[] vs u8[]". The build without my changes fails the same way.

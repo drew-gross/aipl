@@ -10,7 +10,7 @@ variant Shape = Circle(i64) | Rect(i64, i64) | Empty
 fn radius(s: Shape) -> i64? {
     match (s) {
         Circle(r) => some(r),
-        _ => none,
+        _ => none, #[allow]
     }
 }
 
@@ -35,7 +35,7 @@ fn circle_or_empty(s: Shape) -> Shape? {
 fn unit_circle(s: Shape) -> Shape? {
     match (s) {
         Circle(..) => some(Circle(1)),
-        _ => none,
+        _ => none, #[allow]
     }
 }
 

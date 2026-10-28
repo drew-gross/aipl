@@ -50,6 +50,7 @@
 import {
     all,
     any,
+    as_case,
     collect_arms,
     collect_ok,
     contains,
@@ -133,13 +134,9 @@ fn field_reads(self: Expr) -> Read[] { self.descendants()$read().collect_ok() }
 
 # The field read `self` is, when it reads one off a plain name.
 fn read(self: Expr) -> Read? {
-    match (self.kind) {
-        Field(base, field) => match (base.kind) {
-            Ident(name) => some(Read { field, base: name }),
-            _ => none,
-        },
-        _ => none,
-    }
+    let Field(base, field) = self.kind.as_case(Field)?;
+    let Ident(name) = base.kind.as_case(Ident)?;
+    some(Read { field, base: name })
 }
 
 # The hit for one `let`, or none: `reads` are every field read in its body.

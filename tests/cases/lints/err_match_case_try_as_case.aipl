@@ -1,0 +1,63 @@
+# `match (x) { K(a, b) => rest, _ => none }` as the last thing a function does —
+# a variant taken apart when it is one case and given up on otherwise.
+# `let K(a, b) = x.as_case(K)?;` says the early exit first and keeps the rest of
+# the function at one level, instead of inside an arm.
+
+import { print } from builtins;
+
+variant Shape = Circle(i64) | Rect(i64, i64) | Empty
+
+// The arm takes the payload apart.
+fn radius(s: Shape) -> i64? {
+    match (s) {
+        Circle(r) => some(r * 2),
+        _ => none,
+    }
+}
+
+// Nested: the inner `match` is also the function's last act.
+fn wide(s: Shape) -> i64? {
+    match (s) {
+        Rect(w, h) => match (Circle(w)) {
+            Circle(r) => some(r + h),
+            _ => none,
+        },
+        _ => none,
+    }
+}
+
+// A case with no payload to bind.
+fn only_empty(s: Shape, n: i64) -> i64? {
+    match (s) {
+        Empty => some(n),
+        _ => none,
+    }
+}
+
+fn main() !prints {
+    print(`{radius(Circle(1))} {wide(Rect(1, 2))} {only_empty(Empty, 3)}`);
+}
+--- errors ---
+error: this match gives up with none unless the value is Circle, and is the last thing the function does — write "let Circle(r) = s.as_case(Circle)?;" and continue with the arm's body, importing `as_case` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_case_try_as_case.aipl:14:9
+   |
+14 |         _ => none,
+   |         ^
+
+error: this match gives up with none unless the value is Rect, and is the last thing the function does — write "let Rect(w, h) = s.as_case(Rect)?;" and continue with the arm's body, importing `as_case` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_case_try_as_case.aipl:25:9
+   |
+25 |         _ => none,
+   |         ^
+
+error: this match gives up with none unless the value is Circle, and is the last thing the function does — write "let Circle(r) = <value>.as_case(Circle)?;" and continue with the arm's body, importing `as_case` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_case_try_as_case.aipl:23:13
+   |
+23 |             _ => none,
+   |             ^
+
+error: this match gives up with none unless the value is Empty, and is the last thing the function does — write "s.as_case(Empty)?;" and continue with the arm's body, importing `as_case` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_case_try_as_case.aipl:33:9
+   |
+33 |         _ => none,
+   |         ^
