@@ -44,12 +44,9 @@
 
             </li>
 
-            <li id="item-LetTuple"><code>LetTuple(names: str[], value: Expr, span: Span)</code>
+            <li id="item-LetDestructure"><code>LetDestructure(pattern: Destructure, value: Expr, span: Span)</code>
 
-
-            </li>
-
-            <li id="item-LetArm"><code>LetArm(case_name: str, names: str[], value: Expr, span: Span)</code>
+              <div class="doc"><p><code>let (a, b) = v;</code>, <code>let Case(a) = v;</code>, <code>let T { x } = v;</code> and the <code>mut</code> struct form: the pattern as written, kept for <code>desugar.aipl</code> to lower. <code>span</code> is the value's.</p></div>
 
 
             </li>
@@ -61,22 +58,19 @@
 
             </li>
 
-            <li id="item-LetStruct"><code>LetStruct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span)</code>
-
-
-            </li>
-
-            <li id="item-MutStruct"><code>MutStruct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span)</code>
-
-
-            </li>
-
             <li id="item-Assign"><code>Assign(lhs: Expr, value: Expr, span: Span)</code>
 
 
             </li>
 
             <li id="item-For"><code>For(name: str, name_span: Span, index: str?, iterable: Expr, body: Expr, span: Span)</code>
+
+
+            </li>
+
+            <li id="item-ForDestructure"><code>ForDestructure(pattern: Destructure, index: str?, iterable: Expr, body: Expr, span: Span)</code>
+
+              <div class="doc"><p>A loop that takes each element apart with a pattern, as written; <code>span</code> runs from the iterable through the body.</p></div>
 
 
             </li>
@@ -127,20 +121,6 @@
             </li>
 
           </ul>
-
-        </section>
-
-
-
-        <section class="item" id="item-ParsedParam">
-          <h3>
-            <a class="anchor" href="#item-ParsedParam">ParsedParam</a>
-            <span class="kind kind-struct">struct</span>
-          </h3>
-          <pre class="signature"><code>struct ParsedParam</code></pre>
-
-          <div class="doc"><p>A parameter as written, before the destructuring form is taken apart. <code>fields</code> is empty for every ordinary parameter and holds the pattern's field names for <code>Point { x, y }</code>, whose <code>Param</code> is the synthetic scrutinee the function's own lowering then binds those fields off. <code>names</code> is what each field is bound <em>as</em>, one per field: the field's own name, or the one written after <code>as</code> in <code>Point { x as px, y }</code>.</p><p><code>arm</code> is the case a <code>Circle(r)</code> pattern names, whose payload slots <code>names</code> binds in order and whose <code>fields</code> is empty; <code>none</code> for every other parameter.</p></div>
-
 
         </section>
 

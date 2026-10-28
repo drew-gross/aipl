@@ -10,9 +10,12 @@ import {
     join,
     logical_not as !,
     map,
+    max,
+    min,
     push,
     to_array,
     value_or,
+    zip_with,
 } from builtins;
 import { Ctor, Pat, show_pat } from "./pat.aipl";
 import { I64 } from "./prim.aipl";
@@ -122,6 +125,42 @@ variant ExprKind =
     # `f::<T, U>(args)`: the call, and the types written between the angles.
     # Last in the variant so an artifact built before it decodes as it always did.
     | TypeArgs(Expr, Ty[])
+    # `let T { x, y } = v; rest`, `let (a, b) = v; rest` and `let Case(a) = v; rest`:
+    # the pattern, what it takes apart, and the rest of the block. Written
+    # syntax, kept as it was written so the lints see it; `desugar.aipl` lowers it
+    # to the `let`s and `match`es that bind the names, and nothing downstream of
+    # it ever sees the node.
+    | LetPattern(pattern: Destructure, value: Expr, body: Expr)
+    # `for (let (a, b) : xs) { .. }` and its struct and case twins, with the
+    # optional index binder. Lowered by `desugar.aipl` like `LetPattern`.
+    | ForPattern(pattern: Destructure, iterable: Expr, body: Expr, index: str? = none)
+
+# What a `let`, a `for` or a parameter takes a value apart with, as written. A
+# tuple's slots are its positions, so only the names are kept; a case's payload
+# is bound in order; a struct names the fields it reads and what each is bound as,
+# and `mutable` is the `mut T { .. } = v` form.
+variant Destructure =
+    | ByTuple(names: str[])
+    | ByCase(case_name: str, names: str[])
+    | ByStruct(struct_name: str, fields: str[], names: str[], mutable: bool)
+
+# Two spans as the one that covers both — `aipl_syntax::join_spans`, mirrored.
+#
+# The rule that matters is the empty one: an *empty* span is the "no location"
+# placeholder a construct with no text of its own carries (an empty block body,
+# a synthesized node), and it must not take part in a join. Written naively as
+# `a.start..b.end` it drags every enclosing construct's end back to offset 0,
+# which is a span that ends before it starts — and a caret rendered from one is
+# nonsense. Contributing nothing is the honest answer.
+pub fn join_spans(a: Span, b: Span) -> Span {
+    if (a.start == a.end) {
+        return b;
+    };
+    if (b.start == b.end) {
+        return a;
+    };
+    min(a.start, b.start)..max(a.end, b.end)
+}
 
 # An expression as a one-line structural dump. Spans are left out: they are what
 # 5e has to settle and what would make every assertion unreadable in the
@@ -173,6 +212,11 @@ pub fn show_expr(self: Expr) -> str {
             `KwFwd({name}, {value.show_expr()})`
         } else {
             `Kw({name}, {value.show_expr()})`
+        },
+        LetPattern(pattern, value, body) => `LetPattern({pattern.show_destructure()}, {value.show_expr()}, {body.show_expr()})`,
+        ForPattern(pattern, iterable, body, index) => match (index) {
+            some(i) => `ForPattern([{i}], {pattern.show_destructure()}, {iterable.show_expr()}, {body.show_expr()})`,
+            none => `ForPattern({pattern.show_destructure()}, {iterable.show_expr()}, {body.show_expr()})`,
         },
     }
 }.test({
@@ -289,6 +333,29 @@ fn show_bind(self: (str, str)) -> str { `{self.0} = {self.1}` }
 // undefined fn "f"`) and not passed to `map` by name (`expected (Expr) -> _,
 // got (Expr) -> Expr`). Each carries the `#[allow]` the loop lint wants.
 # `f` applied to each of `xs`.
+# A destructuring pattern as one line, for the dump: `(a, b)`, `Case(a, b)`,
+# `T { x as a, y }` (and `mut T { .. }`). A field bound under its own name prints
+# bare.
+fn show_destructure(self: Destructure) -> str {
+    match (self) {
+        ByTuple(names) => `({names.join(sep=", ")})`,
+        ByCase(case_name, names) => `{case_name}({names.join(sep=", ")})`,
+        ByStruct(struct_name, fields, names, mutable) => {
+            let reads = zip_with(
+                fields,
+                names,
+                |field: str, name: str| if (field == name) { name } else { `{field} as {name}` },
+            );
+            `{if (mutable) { "mut " } else { "" }}{struct_name} \{ {reads.join(sep=", ")} }`
+        },
+    }
+}.test({
+    assert(ByTuple(["a", "b"]).show_destructure() == "(a, b)");
+    assert(ByCase("Pair", ["a", "_"]).show_destructure() == "Pair(a, _)");
+    assert(ByStruct("P", ["x", "y"], ["x", "b"], false).show_destructure() == "P { x, y as b }");
+    assert(ByStruct("P", ["x"], ["x"], true).show_destructure() == "mut P { x }");
+})
+
 fn each_mapped(xs: Expr[], f: (Expr) -> Expr) -> Expr[] {
     mut mapped: Expr[] = []; #[allow]
     for (let x : xs) {
@@ -373,6 +440,13 @@ pub fn map_subexprs(self: Expr, f: (Expr) -> Expr) -> Expr {
         TupleLit(elements) => TupleLit(each_mapped(elements, f)),
         KwArg(name, value, forwarded) => KwArg(name, f(value), forwarded),
         TypeArgs(x, types) => TypeArgs(f(x), types),
+        LetPattern(pattern, value, body) => LetPattern(pattern, f(value), f(body)),
+        ForPattern(pattern, iterable, body, index) => ForPattern(
+            pattern,
+            f(iterable),
+            f(body),
+            index=index,
+        ),
     };
     Expr { ..self, kind }
 }.test({
@@ -468,6 +542,8 @@ pub fn subexprs(self: Expr) -> Expr[] {
         | Let(_, _, a, b)
         | LetMut(_, _, a, b)
         | For(_, a, b, _)
+        | LetPattern(_, a, b)
+        | ForPattern(_, a, b, _)
         | While(a, b) => [a, b],
         Assign(a, b, c) | If(a, b, c) => [a, b, c],
         Match(scrutinee, arms) => [scrutinee, ..arms$body],

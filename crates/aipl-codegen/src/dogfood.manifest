@@ -4,24 +4,24 @@
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
 ; array-abi narrow
 ; set-abi wide
-; entry parse_test_section_header 624 str -> str?
-; entry strip_test_sections 670 str -> str
-; entry split_test_sections 669 str -> __tuple$str$str
-; entry source_loc 668 str __builtin_Span -> str
+; entry parse_test_section_header 637 str -> str?
+; entry strip_test_sections 683 str -> str
+; entry split_test_sections 682 str -> __tuple$str$str
+; entry source_loc 681 str __builtin_Span -> str
 ; entry caret_block 130 str __builtin_Span str -> str
-; entry fill_or_add_sections_file 236 str #{str:str} -> unit!Error
-; entry normalize_output 585 str -> str
-; entry int_fits 519 i64 str -> bool
-; entry is_operator_name 520 str -> bool
-; entry aipl_token_scopes 555 str -> __m19__ScopeSpan[]!__m19__LexError
-; entry find_files 237 str str -> str[]!Error
+; entry fill_or_add_sections_file 254 str #{str:str} -> unit!Error
+; entry normalize_output 598 str -> str
+; entry int_fits 532 i64 str -> bool
+; entry is_operator_name 533 str -> bool
+; entry aipl_token_scopes 568 str -> __m19__ScopeSpan[]!__m19__LexError
+; entry find_files 255 str str -> str[]!Error
 ; entry companion_files 132 str -> __m25__Companion[]!str
-; entry parse_spec 620 str -> __m26__Spec!str
-; entry parse_and_partial_load 618 str -> __m52__PartialLoad!__m27__ParseFailure
-; entry fn_role 246 str -> __m44__FnRole
-; entry test_fn_name 241 str -> str
-; entry performance_fn_name 242 str -> str
-; entry format_source 271 str u64 -> str!__m55__FmtError
+; entry parse_spec 633 str -> __m26__Spec!str
+; entry parse_and_partial_load 631 str -> __m53__PartialLoad!__m27__ParseFailure
+; entry fn_role 264 str -> __m44__FnRole
+; entry test_fn_name 259 str -> str
+; entry performance_fn_name 260 str -> str
+; entry format_source 289 str u64 -> str!__m56__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
 ; struct __m19__ScopeSpan 40 span@0:__builtin_Span scope@16:str
@@ -29,7 +29,7 @@
 ; struct __m25__Companion 48 path@0:str contents@24:str
 ; struct __m26__Spec 288 source@0:str extra_files@24:__m26__Entry[] expect_files@48:__m26__Entry[] stdout@72:str? stderr@104:str? exit_code@136:i64? errors@152:str? report@184:str? cli@216:str[] check@240:str? check_exit_code@272:i64?
 ; struct __m26__Entry 48 path@0:str contents@24:str
-; struct __m52__PartialLoad 104 program@0:__m36__Program allows@56:__builtin_Span[] lints@80:__m47__LintHit[]
+; struct __m53__PartialLoad 104 program@0:__m36__Program allows@56:__builtin_Span[] lints@80:__m48__LintHit[]
 ; struct __m36__Program 56 items@0:__m36__Item[] doc@24:str?
 ; variant __m36__Item 128 Fn(8:__m36__Function) Struct(8:__m36__StructDecl) Variant(8:__m36__VariantDecl) Refinement(8:__m36__RefinementDecl) Import(8:__m36__ImportDecl) Const(8:__m36__ConstDecl)
 ; struct __m36__Function 232 boxed name@0:__m19__SpanStr is_pub@40:bool sig@48:__m36__Signature body@136:__m31__Expr test_body@144:__m31__Expr? test_fns@160:__m36__Function[] performance@184:__m36__PerformanceBlock? doc@200:str?
@@ -41,15 +41,17 @@
 ; variant __m29__Prim 8 I8 I16 I32 I64 U8 U16 U32 U64 Bool Char Str
 ; variant __m30__SetOrder 8 Unordered Desc Asc
 ; variant __m30__Exclusion 32 EmptyArray NamedCase(8:str)
-; struct __m36__Param 72 name@0:str ty@24:__m30__Ty mutable@32:bool arity@40:__m36__Arity default@48:__m31__Expr? implicit_some@64:bool
+; struct __m36__Param 184 name@0:str ty@24:__m30__Ty mutable@32:bool arity@40:__m36__Arity default@48:__m31__Expr? implicit_some@64:bool pattern@72:__m36__ParamPattern?
 ; variant __m36__Arity 8 One ZeroOrMore OneOrMore
 ; struct __m31__Expr 40 boxed kind@0:__m31__ExprKind span@8:__builtin_Span value_span@24:__builtin_Span
-; variant __m31__ExprKind 80 boxed Num(8:i64) Bool(8:bool) Str(8:str) Char(8:char) Ident(8:str) Call(8:str,32:__m31__Expr[],56:bool) Neg(8:__m31__Expr) If(8:__m31__Expr,16:__m31__Expr,24:__m31__Expr) Construct(8:str,32:__m31__FieldInit[]) Field(8:__m31__Expr,16:str) Let(8:str,32:__m30__Ty?,48:__m31__Expr,56:__m31__Expr) LetMut(8:str,32:__m30__Ty?,48:__m31__Expr,56:__m31__Expr) Assign(8:__m31__Expr,16:__m31__Expr,24:__m31__Expr) For(8:str,32:__m31__Expr,40:__m31__Expr,48:str?) While(8:__m31__Expr,16:__m31__Expr) Shim(8:str,32:__tuple$str$str[],56:__m31__Expr) None Match(8:__m31__Expr,16:__m31__MatchArm[]) IfLet(8:__m31__MatchArm,16:__m31__Expr,24:__m31__Expr) ArrayLit(8:__m31__Expr[]) Spread(8:__m31__Expr) SetLit(8:__m31__Expr[],32:__m30__SetOrder) DictLit(8:__tuple$__m31__Expr$__m31__Expr[]) Index(8:__m31__Expr,16:__m31__Expr) Slice(8:__m31__Expr,16:__m31__Expr,24:__m31__Expr?) Try(8:__m31__Expr) Unit Seq(8:__m31__Expr,16:__m31__Expr) Return(8:__m31__Expr) Lambda(8:__m31__LambdaParam[],32:__m31__Expr) TupleLit(8:__m31__Expr[]) KwArg(8:str,32:__m31__Expr,40:bool) TypeArgs(8:__m31__Expr,16:__m30__Ty[])
+; variant __m31__ExprKind 144 boxed Num(8:i64) Bool(8:bool) Str(8:str) Char(8:char) Ident(8:str) Call(8:str,32:__m31__Expr[],56:bool) Neg(8:__m31__Expr) If(8:__m31__Expr,16:__m31__Expr,24:__m31__Expr) Construct(8:str,32:__m31__FieldInit[]) Field(8:__m31__Expr,16:str) Let(8:str,32:__m30__Ty?,48:__m31__Expr,56:__m31__Expr) LetMut(8:str,32:__m30__Ty?,48:__m31__Expr,56:__m31__Expr) Assign(8:__m31__Expr,16:__m31__Expr,24:__m31__Expr) For(8:str,32:__m31__Expr,40:__m31__Expr,48:str?) While(8:__m31__Expr,16:__m31__Expr) Shim(8:str,32:__tuple$str$str[],56:__m31__Expr) None Match(8:__m31__Expr,16:__m31__MatchArm[]) IfLet(8:__m31__MatchArm,16:__m31__Expr,24:__m31__Expr) ArrayLit(8:__m31__Expr[]) Spread(8:__m31__Expr) SetLit(8:__m31__Expr[],32:__m30__SetOrder) DictLit(8:__tuple$__m31__Expr$__m31__Expr[]) Index(8:__m31__Expr,16:__m31__Expr) Slice(8:__m31__Expr,16:__m31__Expr,24:__m31__Expr?) Try(8:__m31__Expr) Unit Seq(8:__m31__Expr,16:__m31__Expr) Return(8:__m31__Expr) Lambda(8:__m31__LambdaParam[],32:__m31__Expr) TupleLit(8:__m31__Expr[]) KwArg(8:str,32:__m31__Expr,40:bool) TypeArgs(8:__m31__Expr,16:__m30__Ty[]) LetPattern(8:__m31__Destructure,96:__m31__Expr,104:__m31__Expr) ForPattern(8:__m31__Destructure,96:__m31__Expr,104:__m31__Expr,112:str?)
 ; struct __m31__FieldInit 32 boxed name@0:str value@24:__m31__Expr
 ; struct __m31__MatchArm 32 boxed pattern@0:__m32__Pat body@8:__m31__Expr span@16:__builtin_Span
 ; variant __m32__Pat 64 boxed Ctor(8:str,32:str[],56:bool) Str(8:str) Char(8:char) Array(8:__m31__Expr[]) ArrayRest(8:__m31__Expr[]) ArrayNested(8:__m32__Pat[]) Wildcard Tuple(8:__m32__Pat[]) Nested(8:str,32:__m32__Pat[]) Int(8:i64)
 ; struct __tuple$__m31__Expr$__m31__Expr 16 boxed _0@0:__m31__Expr _1@8:__m31__Expr
 ; struct __m31__LambdaParam 56 name@0:str ty@24:__m30__Ty? span@40:__builtin_Span
+; variant __m31__Destructure 88 ByTuple(8:str[]) ByCase(8:str,32:str[]) ByStruct(8:str,32:str[],56:str[],80:bool)
+; struct __m36__ParamPattern 104 pattern@0:__m31__Destructure span@88:__builtin_Span
 ; struct __m36__PerformanceBlock 48 boxed body@0:__m31__Expr fns@8:__m36__Function[] span@32:__builtin_Span
 ; struct __m36__StructDecl 120 name@0:__m19__SpanStr doc@40:str? type_vars@72:__m36__TypeParam[] fields@96:__m36__FieldDecl[]
 ; struct __m36__FieldDecl 48 name@0:str ty@24:__m30__Ty default@32:__m31__Expr?
@@ -61,11 +63,11 @@
 ; struct __m36__ImportName 72 name@0:str alias@24:str? span@56:__builtin_Span
 ; variant __m36__ImportSource 32 Path(8:str) Builtins
 ; struct __m36__ConstDecl 104 name@0:__m19__SpanStr is_pub@40:bool ty@48:__m30__Ty? value@64:__m31__Expr doc@72:str?
-; struct __m47__LintHit 40 message@0:str span@24:__builtin_Span
+; struct __m48__LintHit 40 message@0:str span@24:__builtin_Span
 ; struct __m27__ParseFailure 24 errors@0:__m39__ParseError[]
 ; struct __m39__ParseError 40 message@0:str span@24:__builtin_Span
 ; variant __m44__FnRole 32 Plain TestBody TestHelper(8:str) Performance(8:str)
-; struct __m55__FmtError 40 message@0:str span@24:__builtin_Span
+; struct __m56__FmtError 40 message@0:str span@24:__builtin_Span
 ; import 0 aipl_arr_drop_str
 ; import 1 aipl_arr_drop_warr
 ; import 2 aipl_arr_elem_ptr
@@ -369,5 +371,5 @@
 ; data 226 __tostr_lit_95 4c427261636b6574
 ; data 227 __tostr_lit_96 52427261636b6574
 
-; __m57____test$all$is_nine
-; source-fingerprint 9299213916265414599
+; __m58____test$all$is_nine
+; source-fingerprint 16337656686189669330

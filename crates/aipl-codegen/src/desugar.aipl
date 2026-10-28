@@ -1,0 +1,325 @@
+# Lowering the destructuring forms, after the lints have read them.
+#
+# `let T { x, y } = v;`, `let (a, b) = v;`, `let Case(a) = v;`, the same in a
+# `for` header, and a pattern in a parameter are kept as written when a file is
+# parsed (`LetPattern`, `ForPattern`, `Param::pattern`). The lints that run next
+# see what the author wrote, not the temporaries the lowering would bind, so
+# none of them has to recognise a name the compiler made. This is the pass that
+# does the binding: each form becomes the `let`s and one-arm `match`es that bind
+# its names off a temporary, and nothing past it knows the surface form existed.
+#
+# Spans and the temporaries' names come from the value or iterable the pattern
+# takes apart, as they always have, so the tree this produces is the one the
+# parser used to produce directly.
+
+import {
+    Span,
+    contains,
+    equal as ==,
+    greater_than as >,
+    len,
+    logical_not as !,
+    map,
+    range,
+    right_fold,
+    value_or,
+    wrapping_decrement as --,
+    zip_with,
+} from builtins;
+import {
+    ByCase,
+    ByStruct,
+    ByTuple,
+    Destructure,
+    Expr,
+    Field,
+    For,
+    ForPattern,
+    Ident,
+    Let,
+    LetMut,
+    LetPattern,
+    Match,
+    MatchArm,
+    Seq,
+    at,
+    expr,
+    ident,
+    join_spans,
+    map_subexprs,
+    show_expr,
+} from "./expr.aipl";
+import {
+    CaseParam,
+    Const,
+    ConstDecl,
+    FieldDecl,
+    Fn,
+    Function,
+    Item,
+    Param,
+    ParamPattern,
+    Program,
+    Signature,
+    Struct,
+    StructDecl,
+    Variant,
+    VariantCase,
+    VariantDecl,
+} from "./item.aipl";
+import { Ctor as PatCtor } from "./pat.aipl";
+import { Named as TyNamed } from "./ty.aipl";
+
+# `self` with every destructuring form lowered, in every expression it holds.
+pub fn desugar(self: Program) -> Program { ..self, items: self.items$desugared_item() }
+
+fn desugared_item(self: Item) -> Item {
+    match (self) {
+        Fn(f) => Fn(f.desugared_function()),
+        Struct(s) => Struct(StructDecl {
+            ..s,
+            fields: s.fields.map(|f| FieldDecl { ..f, default: f.default$desugared() }),
+        }),
+        Variant(v) => Variant(VariantDecl { ..v, cases: v.cases$desugared_case() }),
+        Const(c) => Const(ConstDecl { ..c, value: c.value.desugared() }),
+        _ => self,
+    }
+}
+
+fn desugared_case(self: VariantCase) -> VariantCase {
+    ..self,
+    payload: self.payload.map(|slot| CaseParam { ..slot, default: slot.default$desugared() }),
+}
+
+# A function whose destructured parameters are bound off their synthetic
+# scrutinees at the top of the body — the shape `let Point { x, y } = v;` has,
+# less the `let`, the value being bound already by being an argument. Folded from
+# the right so the bindings come out in source order.
+fn desugared_function(self: Function) -> Function {
+    let plain = self.sig.params.map(|p| Param {
+        ..p,
+        default: p.default$desugared(),
+        pattern: none,
+    });
+    Function {
+        ..self,
+        sig: Signature { ..self.sig, params: plain },
+        body: self.sig.params.right_fold(self.body.desugared(), bind_one_param),
+        test_body: self.test_body$desugared(),
+    }
+}
+
+# `self` and every expression under it, the destructuring forms lowered.
+pub fn desugared(self: Expr) -> Expr {
+    let inner = self.map_subexprs(desugared);
+    match (inner.kind) {
+        LetPattern(pattern, value, body) => let_pattern(pattern, value, body),
+        ForPattern(pattern, iterable, body, index) => for_pattern(pattern, iterable, body, index),
+        _ => inner,
+    }
+}.test({
+    // A tuple pattern binds a slot at a time, off a temporary named for the value.
+    let tuple = expr(LetPattern(ByTuple(["a", "b"]), ident("v"), ident("a")));
+    assert(
+        tuple
+            .desugared()
+            .show_expr() == "Let(__tpat$0, v, Let(a, __tpat$0._0, Let(b, __tpat$0._1, a)))",
+    );
+
+    // A struct pattern annotates the temporary with the struct, which is what
+    // checks the pattern names the right one; `as` reads one field into another name.
+    let record = expr(LetPattern(
+        ByStruct("P", ["x", "y"], ["x", "b"], false),
+        ident("v"),
+        ident("b"),
+    ));
+    assert(
+        record
+            .desugared()
+            .show_expr() == "Let(__spat$0: P, v, Let(x, __spat$0.x, Let(b, __spat$0.y, b)))",
+    );
+    let mutable = expr(LetPattern(ByStruct("P", ["x"], ["x"], true), ident("v"), ident("x")));
+    assert(mutable.desugared().show_expr() == "Let(__spat$0: P, v, Mut(x, __spat$0.x, x))");
+
+    // A case pattern reads each name with a `match` of its own.
+    let arm = expr(LetPattern(ByCase("Pair", ["a", "b"]), ident("v"), ident("a")));
+    assert(
+        arm
+            .desugared()
+            .show_expr() == "Let(__cpat$0, v, Let(a, Match(__cpat$0, [Pair(a, _) => a]), Let(b, Match(__cpat$0, [Pair(_, b) => b]), a)))",
+    );
+
+    // A loop over a pattern is a loop over a temporary with the reads in front of
+    // the body; an index rides along.
+    let looped = expr(ForPattern(ByTuple(["a", "b"]), ident("xs"), ident("a"), index=some("i")));
+    assert(
+        looped
+            .desugared()
+            .show_expr() == "For([i], __fpat$0, xs, Let(a, __fpat$0._0, Let(b, __fpat$0._1, a)))",
+    );
+
+    // The forms are lowered wherever they sit.
+    let nested = expr(Seq(tuple, ident("z")));
+    assert(nested.desugared().show_expr().contains("__tpat$0"));
+    assert(!nested.desugared().show_expr().contains("LetPattern"));
+    assert(ident("x").desugared() == ident("x"));
+})
+
+# `let <pattern> = value; body`. The temporary is named for where the value
+# starts, and holds the value so it is evaluated once.
+fn let_pattern(pattern: Destructure, value: Expr, body: Expr) -> Expr {
+    let span = value.span;
+    match (pattern) {
+        ByTuple(names) => {
+            let tmp = `__tpat${span.start}`;
+            let inner = bind_fields(names, tmp, span, body, tuple_slot_names(names));
+            at(Let(tmp, none, value, inner), join_spans(span, inner.span))
+        },
+        ByCase(case_name, names) => {
+            let tmp = `__cpat${span.start}`;
+            let inner = bind_arm(case_name, names, tmp, span, body);
+            at(Let(tmp, none, value, inner), join_spans(span, inner.span))
+        },
+        ByStruct(struct_name, fields, names, mutable) => destructure_struct(
+            struct_name,
+            fields,
+            names,
+            value,
+            span,
+            body,
+            mutable,
+        ),
+    }
+}
+
+# `for (let <pattern> : iterable) { body }` is a plain loop over a temporary
+# whose fields (or slots, or payload) are read in front of the body, as the same
+# pattern in a `let` reads them — through the same helpers, so the pattern's type
+# is checked the same way. With an `index` it is the indexed loop over that
+# temporary: the counter and the pattern compose as each does alone.
+fn for_pattern(pattern: Destructure, iterable: Expr, body: Expr, index: str?) -> Expr {
+    let span = iterable.span;
+    let tmp = `__fpat${span.start}`;
+    let inner = match (pattern) {
+        ByTuple(names) => bind_fields(names, tmp, span, body, tuple_slot_names(names)),
+        ByCase(case_name, names) => bind_arm(case_name, names, tmp, span, body),
+        ByStruct(struct_name, fields, names, mutable) => destructure_struct(
+            struct_name,
+            fields,
+            names,
+            at(Ident(tmp), span),
+            span,
+            body,
+            mutable,
+        ),
+    };
+    at(For(tmp, iterable, inner, index=index), join_spans(span, inner.span))
+}
+
+# The field names a tuple pattern reads: `_0`, `_1`, ... one per binder, which is
+# how the AST spells a tuple's slots.
+fn tuple_slot_names(names: str[]) -> str[] { names.range().map(|i| `_{i}`) }
+
+# `let a = <tmp>.<field0>; let b = <tmp>.<field1>; rest`, innermost last — the
+# body of both destructuring forms, which differ only in the field names they
+# read and in whether the bindings are mutable.
+fn bind_fields(names: str[], tmp: str, span: Span, rest: Expr, fields: str[]) -> Expr {
+    bind_fields_mut(names, tmp, span, rest, fields, false)
+}
+
+fn bind_fields_mut(
+    names: str[],
+    tmp: str,
+    span: Span,
+    rest: Expr,
+    fields: str[],
+    mutable: bool,
+) -> Expr {
+    mut result = rest;
+    mut i = names.len();
+    while (i > 0) {
+        set i--;
+        let field = at(Field(at(Ident(tmp), span), fields[i].value_or("")), span);
+        let inner_span = join_spans(span, result.span);
+        let name = names[i].value_or("");
+        set result = if (mutable) {
+            at(LetMut(name, none, field, result), inner_span)
+        } else {
+            at(Let(name, none, field, result), inner_span)
+        };
+    }
+    result
+}
+
+# `let a = match (<tmp>) { Case(a, _) => a }; let b = match (<tmp>) { Case(_, b) => b };
+# rest`, innermost last — what `let Case(a, b) = value; rest` binds, one `match`
+# per name. The scrutinee is a value that can only be `Case`, which is what makes
+# each `match` exhaustive with the one arm; any other value is refused by that
+# check. A `match` for each name, rather than one around the rest of the block,
+# keeps `rest` out of an arm: a block that is an expression may not assign to a
+# binding from outside it.
+fn bind_arm(case_name: str, names: str[], tmp: str, span: Span, rest: Expr) -> Expr {
+    mut result = rest;
+    mut i = names.len();
+    while (i > 0) {
+        set i--;
+        let name = names[i].value_or("");
+        let slot = i;
+        let slots = names.range().map(|j| if (j == slot) { name } else { "_" });
+        let arm = MatchArm {
+            pattern: PatCtor(case_name, bindings=slots),
+            body: at(Ident(name), span),
+            span,
+        };
+        let read = at(Match(at(Ident(tmp), span), [arm]), span);
+        set result = at(Let(name, none, read, result), join_spans(span, result.span));
+    }
+    result
+}
+
+# `let T { a, b } = value; rest` and its `mut` twin, as nested bindings. The
+# scrutinee stays an immutable `let` either way — it is read once per field and
+# never written through — and carries the pattern's type as its annotation,
+# which is what makes the type name mean something rather than decorate the
+# line. The `__spat$` prefix is `aipl_syntax::DESTRUCTURE_BASE_PREFIX`, which is
+# how the checker knows to report a mismatch as the destructuring it was.
+fn destructure_struct(
+    struct_name: str,
+    fields: str[],
+    names: str[],
+    value: Expr,
+    span: Span,
+    acc: Expr,
+    mutable: bool,
+) -> Expr {
+    let tmp = `__spat${span.start}`;
+    let inner = bind_fields_mut(names, tmp, span, acc, fields, mutable);
+    let outer_span = join_spans(span, inner.span);
+    at(Let(tmp, some(TyNamed(struct_name)), value, inner), outer_span)
+}
+
+# A destructured parameter's bindings in front of `body`: the case's payload, or
+# the struct's fields, read off the parameter itself. Folded from the right by the
+# caller so they come out in source order.
+fn bind_one_param(p: Param, body: Expr) -> Expr {
+    let ParamPattern { pattern, span } = p.pattern.value_or(ParamPattern {
+        pattern: ByTuple([]),
+        span: 0..0,
+    });
+    match (pattern) {
+        ByCase(case_name, names) => bind_arm(case_name, names, p.name, span, body),
+        ByStruct(_, fields, names, _) => zip_with(
+            fields,
+            names,
+            |field: str, name: str| (field, name),
+        ).right_fold(
+            body,
+            |read: (str, str), result: Expr| {
+                let (field, name) = read;
+                let value = at(Field(at(Ident(p.name), span), field), span);
+                at(Let(name, none, value, result), join_spans(span, result.span))
+            },
+        ),
+        ByTuple(..) => body,
+    }
+}

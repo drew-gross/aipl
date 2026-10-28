@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">152 files, 1552 items.</p>
+      <p class="summary">153 files, 1568 items.</p>
 
       <ul class="files">
 
@@ -307,7 +307,7 @@
           <p class="file-summary">The <code>destructure_binding</code> lint: <code>let p = value; ... p.a ... p.b ...</code> where <strong>every</strong> mention of <code>p</code> is a field read. Say so with a pattern instead: <code>let T { a, b } = value;</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-destructure_binding.html#private">19 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-destructure_binding.html#private">21 private</a></span>
 
 
           <ul class="items">
@@ -324,6 +324,31 @@
 
             <li>
               <a href="crates-aipl-codegen-src-destructure_binding.html#item-destructure_binding"><code>destructure_binding</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-desugar.html">crates/aipl-codegen/src/desugar.aipl</a>
+
+          <p class="file-summary">Lowering the destructuring forms, after the lints have read them.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-desugar.html#private">11 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-desugar.html#item-desugar"><code>desugar</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-desugar.html#item-desugared"><code>desugared</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -457,7 +482,7 @@
           <p class="file-summary"><code>aipl_syntax::ast::Expr</code> and <code>ExprKind</code> as AIPL declares them, with the structural dump the lowering's tests assert against. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-expr.html#private">16 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-expr.html#private">17 private</a></span>
 
 
           <ul class="items">
@@ -485,6 +510,16 @@
             <li>
               <a href="crates-aipl-codegen-src-expr.html#item-ExprKind"><code>ExprKind</code></a>
               <span class="kind kind-variant">variant</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-expr.html#item-Destructure"><code>Destructure</code></a>
+              <span class="kind kind-variant">variant</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-expr.html#item-join_spans"><code>join_spans</code></a>
+              <span class="kind kind-fn">fn</span>
             </li>
 
             <li>
@@ -844,7 +879,7 @@
           <p class="file-summary">AIPL's own syntax, as a <code>Grammar</code> value — the third and largest consumer of the parser library, and the one the whole thing was built for. It is the only description of the language there is: every compile runs this grammar over <code>lex_aipl.aipl</code>'s token stream, the compiler's own sources included.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">200 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">192 private</a></span>
 
 
           <ul class="items">
@@ -920,6 +955,11 @@
             </li>
 
             <li>
+              <a href="crates-aipl-codegen-src-grammar_aipl.html#item-lower_aipl_block_surface"><code>lower_aipl_block_surface</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
               <a href="crates-aipl-codegen-src-grammar_aipl.html#item-lower_aipl_program"><code>lower_aipl_program</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
@@ -946,6 +986,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-grammar_aipl.html#item-aipl_parse_file"><code>aipl_parse_file</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-grammar_aipl.html#item-aipl_parse_surface_file"><code>aipl_parse_surface_file</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -1341,6 +1386,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-item.html#item-Param"><code>Param</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-item.html#item-ParamPattern"><code>ParamPattern</code></a>
               <span class="kind kind-struct">struct</span>
             </li>
 
@@ -1933,11 +1983,6 @@
             </li>
 
             <li>
-              <a href="crates-aipl-codegen-src-parsed.html#item-ParsedParam"><code>ParsedParam</code></a>
-              <span class="kind kind-struct">struct</span>
-            </li>
-
-            <li>
               <a href="crates-aipl-codegen-src-parsed.html#item-FnAttr"><code>FnAttr</code></a>
               <span class="kind kind-struct">struct</span>
             </li>
@@ -2361,7 +2406,7 @@
           <p class="file-summary">The <code>unused_imports</code> lint: an imported name nothing in the file references. Legal — an unused import changes no behavior — but it misstates what the file depends on and outlives whatever once used it; the better spelling is to drop the name.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-unused_imports.html#private">15 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-unused_imports.html#private">16 private</a></span>
 
 
           <ul class="items">

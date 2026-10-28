@@ -84,7 +84,6 @@ import {
     map,
     map_err,
     max,
-    min,
     not_equal as !=,
     push,
     range,
@@ -162,18 +161,24 @@ import {
     tok_span,
     token_span,
 } from "./cst.aipl";
+import { desugar, desugared } from "./desugar.aipl";
 import { Doc, print } from "./doc.aipl";
 import {
     ArrayLit,
     Assign,
     Bool,
+    ByCase,
+    ByStruct,
+    ByTuple,
     Call,
     Char,
     Construct,
+    Destructure,
     Expr,
     Field,
     FieldInit,
     For,
+    ForPattern,
     Ident,
     If,
     IfLet,
@@ -183,6 +188,7 @@ import {
     LambdaParam,
     Let,
     LetMut,
+    LetPattern,
     Match,
     MatchArm,
     Neg,
@@ -199,6 +205,7 @@ import {
     While,
     at,
     is_spread,
+    join_spans,
     show_expr,
 } from "./expr.aipl";
 import { find_trailing_whitespace } from "./find_trailing_whitespace.aipl";
@@ -245,6 +252,7 @@ import {
     One,
     OneOrMore,
     Param,
+    ParamPattern,
     Path,
     PerformanceBlock,
     Program,
@@ -296,15 +304,12 @@ import {
     Effect as SEffect,
     FnAttr,
     For as SFor,
+    ForDestructure as SForDestructure,
     Let as SLet,
-    LetArm as SLetArm,
+    LetDestructure as SLetDestructure,
     LetElse as SLetElse,
-    LetStruct as SLetStruct,
-    LetTuple as SLetTuple,
     Mut as SMut,
-    MutStruct as SMutStruct,
     ParsedBody,
-    ParsedParam,
     Return as SReturn,
     Stmt,
     TestBlock,
@@ -1354,24 +1359,6 @@ fn patterns() -> Production<AiplTok, Ast>[] {
 // `AEntry`) because neither is an expression on its own: a suffix has no
 // receiver yet, and an entry is not known to be a set element or a dict pair
 // until the whole body is in scope.
-
-# Two spans as the one that covers both — `aipl_syntax::join_spans`, mirrored.
-#
-# The rule that matters is the empty one: an *empty* span is the "no location"
-# placeholder a construct with no text of its own carries (an empty block body,
-# a synthesized node), and it must not take part in a join. Written naively as
-# `a.start..b.end` it drags every enclosing construct's end back to offset 0,
-# which is a span that ends before it starts — and a caret rendered from one is
-# nonsense. Contributing nothing is the honest answer.
-fn join_spans(a: Span, b: Span) -> Span {
-    if (a.start == a.end) {
-        return b;
-    };
-    if (b.start == b.end) {
-        return a;
-    };
-    min(a.start, b.start)..max(a.end, b.end)
-}
 
 # The span a lowered node takes: this node's *tokens*, with the trivia in front
 # of the first one left out. `span` reaches back over that trivia, which is what
@@ -2430,8 +2417,7 @@ fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!Parse
                 });
             };
             let value = kid_expr(kids, 0, sp)?;
-            let span = value.span;
-            ok(AStmt(SLetTuple(names, value, span)))
+            ok(AStmt(SLetDestructure(ByTuple(names), value, value.span)))
         },
         // `let Import(decl) = e;` — the case name, then its payload's binders.
         [_, case_name, "(", ..] => {
@@ -2440,18 +2426,15 @@ fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!Parse
                 let pattern = PatCtor(case_name, bindings=case_binders(toks[2..]));
                 return let_else(pattern, value, kid_expr(kids, 1, sp)?, sp);
             };
-            let span = value.span;
-            ok(AStmt(SLetArm(case_name, binder_names(toks[2..]), value, span)))
+            let pattern = ByCase(case_name, binder_names(toks[2..]));
+            ok(AStmt(SLetDestructure(pattern, value, value.span)))
         },
         // `let T { x, y as py } = e;` — the struct name, then the braces.
         [_, struct_name, "{", ..] => {
             let value = kid_expr(kids, 0, sp)?;
-            let span = value.span;
             let FieldBinders { fields, names } = field_binders_of(toks, 3);
-            if (mutable) {
-                return ok(AStmt(SMutStruct(struct_name, fields, names, value, span)));
-            };
-            ok(AStmt(SLetStruct(struct_name, fields, names, value, span)))
+            let pattern = ByStruct(struct_name, fields, names, mutable);
+            ok(AStmt(SLetDestructure(pattern, value, value.span)))
         },
         // `let x: T = e;` — the annotation is a child, so it comes before the value.
         [_, name, ":", ..] => {
@@ -2701,14 +2684,10 @@ fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     }
 }
 
-# `for (let (a, b) : xs) { body }` is a plain loop over a temporary with the
-# field reads prepended to the body:
-#
-#     for (let __fpat$N : xs) { let a = __fpat$N._0; let b = __fpat$N._1; body }
-#
-# With an `index` — `for (let i, (a, b) : xs)` — it is the indexed loop over
-# that same temporary, so the counter and the pattern compose exactly as each
-# does alone: `for_chain` binds `i` outside the field reads.
+# `for (let (a, b) : xs) { body }`, and its struct and case twins, with an optional
+# index in front: the pattern as written, for `desugar.aipl` to lower. A tuple
+# pattern needs two names or more, which is checked here, where the span of the
+# written pattern is at hand.
 fn for_tuple(names: str[], index: str?, iterable: Expr, body: Expr, sp: Span) -> Stmt!ParseError {
     if (names.len() < 2) {
         return err(ParseError {
@@ -2716,22 +2695,9 @@ fn for_tuple(names: str[], index: str?, iterable: Expr, body: Expr, sp: Span) ->
             span: sp,
         });
     };
-    let tmp_span = iterable.span;
-    let tmp = `__fpat${tmp_span.start}`;
-    let inner = bind_fields(names, tmp, tmp_span, body, tuple_slot_names(names));
-    let span = join_spans(tmp_span, inner.span);
-    ok(SFor(tmp, tmp_span, index, iterable, inner, span))
+    ok(for_destructure(ByTuple(names), index, iterable, body))
 }
 
-# `for (let T { a, b as c } : xs) { body }` is a plain loop over a temporary whose
-# fields are read in front of the body, as `let T { a, b as c } = value;` reads
-# them — and through the same desugaring, so the pattern's type is checked the
-# same way: the temporary is rebound under the struct's name before its fields
-# are taken, which is what rejects a pattern naming a different struct.
-#
-#     for (let __fpat$N : xs) { let __spat$N: T = __fpat$N; let a = __spat$N.a; body }
-#
-# With an `index` it is the indexed loop over that temporary, as `for_tuple`'s is.
 fn for_struct(
     struct_name: str,
     fields: str[],
@@ -2739,27 +2705,14 @@ fn for_struct(
     index: str?,
     iterable: Expr,
     body: Expr,
-) -> Stmt {
-    let tmp_span = iterable.span;
-    let tmp = `__fpat${tmp_span.start}`;
-    let element = at(Ident(tmp), tmp_span);
-    let inner = destructure_struct(struct_name, fields, names, element, tmp_span, body, false);
-    let span = join_spans(tmp_span, inner.span);
-    SFor(tmp, tmp_span, index, iterable, inner, span)
+) -> Stmt { for_destructure(ByStruct(struct_name, fields, names, false), index, iterable, body) }
+
+fn for_arm(case_name: str, names: str[], index: str?, iterable: Expr, body: Expr) -> Stmt {
+    for_destructure(ByCase(case_name, names), index, iterable, body)
 }
 
-# `for (let Import(decl) : xs) { body }` is a plain loop over a temporary whose
-# payload is bound in front of the body, as `let Import(decl) = value;` binds it:
-#
-#     for (let __fpat$N : xs) { let decl = match (__fpat$N) { Import(decl) => decl }; body }
-#
-# With an `index` it is the indexed loop over that temporary, as `for_struct`'s is.
-fn for_arm(case_name: str, names: str[], index: str?, iterable: Expr, body: Expr) -> Stmt {
-    let tmp_span = iterable.span;
-    let tmp = `__fpat${tmp_span.start}`;
-    let inner = bind_arm(case_name, names, tmp, tmp_span, body);
-    let span = join_spans(tmp_span, inner.span);
-    SFor(tmp, tmp_span, index, iterable, inner, span)
+fn for_destructure(pattern: Destructure, index: str?, iterable: Expr, body: Expr) -> Stmt {
+    SForDestructure(pattern, index, iterable, body, join_spans(iterable.span, body.span))
 }
 
 # `wrap_stmt` — one statement and the rest of the block, folded into the chain
@@ -2799,125 +2752,23 @@ fn wrap_stmt(stmt: Stmt, acc: Expr) -> Expr {
             for_span,
             acc,
         ),
-        SLetTuple(names, value, tup_span) => {
-            let tmp = `__tpat${tup_span.start}`;
-            let inner = bind_fields(names, tmp, tup_span, acc, tuple_slot_names(names));
-            let span = join_spans(tup_span, inner.span);
-            at(Let(tmp, none, value, inner), span)
-        },
+        SForDestructure(pattern, index, iterable, body, span) => seq(
+            at(ForPattern(pattern, iterable, body, index=index), span),
+            acc,
+            join_spans(iterable.span, acc.span),
+        ),
+        SLetDestructure(pattern, value, span) => at(
+            LetPattern(pattern, value, acc),
+            join_spans(span, acc.span),
+        ),
         SLetElse(pattern, value, otherwise, span) => {
             let arm = MatchArm { pattern, body: acc, span };
             at(IfLet(arm, value, otherwise), join_spans(span, acc.span))
         },
-        SLetArm(case_name, names, value, span) => {
-            let tmp = `__cpat${span.start}`;
-            let inner = bind_arm(case_name, names, tmp, span, acc);
-            at(Let(tmp, none, value, inner), join_spans(span, inner.span))
-        },
-        SLetStruct(struct_name, fields, names, value, span) => destructure_struct(
-            struct_name,
-            fields,
-            names,
-            value,
-            span,
-            acc,
-            false,
-        ),
-        SMutStruct(struct_name, fields, names, value, span) => destructure_struct(
-            struct_name,
-            fields,
-            names,
-            value,
-            span,
-            acc,
-            true,
-        ),
     }
 }
 
 fn seq(head: Expr, rest: Expr, span: Span) -> Expr { at(Seq(head, rest), span) }
-
-# The field names a tuple pattern reads: `_0`, `_1`, ... one per binder, which is
-# how the AST spells a tuple's slots.
-fn tuple_slot_names(names: str[]) -> str[] { names.range().map(|i| `_{i}`) }
-
-# `let a = <tmp>.<field0>; let b = <tmp>.<field1>; rest`, innermost last — the
-# body of both destructuring forms, which differ only in the field names they
-# read and in whether the bindings are mutable.
-fn bind_fields(names: str[], tmp: str, span: Span, rest: Expr, fields: str[]) -> Expr {
-    bind_fields_mut(names, tmp, span, rest, fields, false)
-}
-
-fn bind_fields_mut(
-    names: str[],
-    tmp: str,
-    span: Span,
-    rest: Expr,
-    fields: str[],
-    mutable: bool,
-) -> Expr {
-    mut result = rest;
-    mut i = names.len();
-    while (i > 0) {
-        set i--;
-        let field = at(Field(at(Ident(tmp), span), fields[i].value_or("")), span);
-        let inner_span = join_spans(span, result.span);
-        let name = names[i].value_or("");
-        set result = if (mutable) {
-            at(LetMut(name, none, field, result), inner_span)
-        } else {
-            at(Let(name, none, field, result), inner_span)
-        };
-    }
-    result
-}
-
-# `let a = match (<tmp>) { Case(a, _) => a }; let b = match (<tmp>) { Case(_, b) => b };
-# rest`, innermost last — what `let Case(a, b) = value; rest` binds, one `match`
-# per name. The scrutinee is a value that can only be `Case`, which is what makes
-# each `match` exhaustive with the one arm; any other value is refused by that
-# check. A `match` for each name, rather than one around the rest of the block,
-# keeps `rest` out of an arm: a block that is an expression may not assign to a
-# binding from outside it.
-fn bind_arm(case_name: str, names: str[], tmp: str, span: Span, rest: Expr) -> Expr {
-    mut result = rest;
-    mut i = names.len();
-    while (i > 0) {
-        set i--;
-        let name = names[i].value_or("");
-        let slot = i;
-        let slots = names.range().map(|j| if (j == slot) { name } else { "_" });
-        let arm = MatchArm {
-            pattern: PatCtor(case_name, bindings=slots),
-            body: at(Ident(name), span),
-            span,
-        };
-        let read = at(Match(at(Ident(tmp), span), [arm]), span);
-        set result = at(Let(name, none, read, result), join_spans(span, result.span));
-    }
-    result
-}
-
-# `let T { a, b } = value; rest` and its `mut` twin, as nested bindings. The
-# scrutinee stays an immutable `let` either way — it is read once per field and
-# never written through — and carries the pattern's type as its annotation,
-# which is what makes the type name mean something rather than decorate the
-# line. The `__spat$` prefix is `aipl_syntax::DESTRUCTURE_BASE_PREFIX`, which is
-# how the checker knows to report a mismatch as the destructuring it was.
-fn destructure_struct(
-    struct_name: str,
-    fields: str[],
-    names: str[],
-    value: Expr,
-    span: Span,
-    acc: Expr,
-    mutable: bool,
-) -> Expr {
-    let tmp = `__spat${span.start}`;
-    let inner = bind_fields_mut(names, tmp, span, acc, fields, mutable);
-    let outer_span = join_spans(span, inner.span);
-    at(Let(tmp, some(TyNamed(struct_name)), value, inner), outer_span)
-}
 
 # The `for` loop and the rest of the block. Both binders are carried on the node
 # — the element one and, for `for (let i, x : xs)`, the index one — and nothing
@@ -3651,8 +3502,10 @@ fn arm_param(name: str, case_name: str, names: str[], span: Span) -> Ast {
         default: none,
         implicit_some: false,
     };
-    let no_fields: str[] = [];
-    AParam(ParsedParam { param, fields: no_fields, names, arm: some(case_name), span })
+    AParam(Param {
+        ..param,
+        pattern: some(ParamPattern { pattern: ByCase(case_name, names), span }),
+    })
 }
 
 # A parameter named `name`, of the struct `struct_name`, whose `fields` are bound
@@ -3671,7 +3524,8 @@ fn destructured_param(
         default: none,
         implicit_some: false,
     };
-    AParam(ParsedParam { param, fields, names, arm: none, span })
+    let pattern = ByStruct(struct_name, fields, names, false);
+    AParam(Param { ..param, pattern: some(ParamPattern { pattern, span }) })
 }
 
 # The six named shapes. Every sub-rule is one position, and *which*
@@ -3742,14 +3596,7 @@ fn named_param(
         One => if (implicit_some) { TyOptional(written) } else { written },
     };
     let default = if (has_default) { some(kid_expr(kids, 1, sp)?) } else { none };
-    let no_fields: str[] = [];
-    ok(AParam(ParsedParam {
-        param: Param { name: name.slot_text(src), ty, mutable, arity, default, implicit_some },
-        fields: no_fields,
-        names: no_fields,
-        arm: none,
-        span: name.slot_span().value_or(sp),
-    }))
+    ok(AParam(Param { name: name.slot_text(src), ty, mutable, arity, default, implicit_some }))
 }
 
 # `x: T*` stores the sequence type: `str` when the element is `char` (an AIPL
@@ -4097,7 +3944,7 @@ fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let at_name: u64 = if (is_pub) { 2 } else { 1 };
     let name = span_str(src, node.tokens[at_name].value_or(node.tok_span()));
     mut type_vars: TypeParam[] = [];
-    mut params: ParsedParam[] = [];
+    mut params: Param[] = [];
     mut effects: str[] = [];
     mut return_ty: Ty? = none;
     mut body: ParsedBody = PBlock(at(Unit, sp));
@@ -4145,8 +3992,8 @@ fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     ok(AFunction(Function {
         name,
         is_pub,
-        sig: Signature { type_vars, params: params$param_of(), effects, return_ty },
-        body: bind_param_fields(params, resolved),
+        sig: Signature { type_vars, params, effects, return_ty },
+        body: resolved,
         test_body,
         test_fns,
         performance,
@@ -4154,31 +4001,6 @@ fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         // declaration, which `item` holds; this never sees them.
         doc: none,
     }))
-}
-
-fn param_of(self: ParsedParam) -> Param { self.param }
-
-# `Point { x, y }` in parameter position: the fields are bound off the synthetic
-# scrutinee at the top of the body — the shape `let Point { x, y } = v;`
-# produces, minus the `let`, the value being already bound by being an argument.
-# Both fold from the right so the bindings come out in source order.
-fn bind_param_fields(params: ParsedParam[], body: Expr) -> Expr {
-    params.right_fold(body, bind_one_param)
-}
-
-fn bind_one_param(p: ParsedParam, body: Expr) -> Expr {
-    if (let some(case_name) = p.arm) {
-        return bind_arm(case_name, p.names, p.param.name, p.span, body);
-    };
-    let reads = zip_with(p.fields, p.names, |field: str, name: str| (field, name));
-    reads.right_fold(
-        body,
-        |read: (str, str), result: Expr| {
-            let (field, name) = read;
-            let value = at(Field(at(Ident(p.param.name), p.span), field), p.span);
-            at(Let(name, none, value, result), join_spans(p.span, result.span))
-        },
-    )
 }
 
 // ---------- entry points ----------
@@ -4546,7 +4368,7 @@ pub fn lower_aipl_pattern(src: str) -> Pat!ParseError {
 # block holding a keyword statement — that slice is next, and a block that holds
 # one refuses rather than dropping it.
 pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
-    as_expr(parse(src, lex_lossless(src)?, aipl_grammar(), "expr")?, 0..src.len())
+    ok(as_expr(parse(src, lex_lossless(src)?, aipl_grammar(), "expr")?, 0..src.len())?.desugared())
 }.test({
     // Literals, and the identifier that is not one.
     assert(expr_dump("1") == "1");
@@ -4793,6 +4615,12 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
 # so what comes back is an ordinary expression and the assertions read as the
 # desugarings they are.
 pub fn lower_aipl_block(src: str) -> Expr!ParseError {
+    ok(lower_aipl_block_surface(src)?.desugared())
+}
+
+# `lower_aipl_block`, before the destructuring forms are lowered: the tree the
+# lints read.
+pub fn lower_aipl_block_surface(src: str) -> Expr!ParseError {
     as_expr(parse(src, lex_lossless(src)?, aipl_grammar(), "block")?, 0..src.len())
 }.test({
     // A lowered block as text, or the refusal that stopped it.
@@ -4904,6 +4732,29 @@ pub fn lower_aipl_block(src: str) -> Expr!ParseError {
         block_dump(
             "{ let Pair(a, b) = p; a }",
         ) == "Let(__cpat$19, p, Let(a, Match(__cpat$19, [Pair(a, _) => a]), Let(b, Match(__cpat$19, [Pair(_, b) => b]), a)))",
+    );
+
+    // A destructuring `let` or `for` is kept as written until it is lowered, which
+    // is what the lints read; `block_dump` above has the lowered form.
+    fn surface_dump(src: str) -> str {
+        match (lower_aipl_block_surface(src)) {
+            ok(e) => e.show_expr(),
+            err(e) => `error: {e.message}`,
+        }
+    }
+    assert(surface_dump("{ let (a, b) = t; a }") == "LetPattern((a, b), t, a)");
+    assert(surface_dump("{ let P { x, y as b } = p; b }") == "LetPattern(P { x, y as b }, p, b)");
+    assert(surface_dump("{ mut P { x } = p; x }") == "LetPattern(mut P { x }, p, x)");
+    assert(surface_dump("{ let Pair(a, b) = p; a }") == "LetPattern(Pair(a, b), p, a)");
+    assert(
+        surface_dump(
+            "{ for (let (a, b) : xs) { f(a); } 0 }",
+        ) == "Seq(ForPattern((a, b), xs, Seq(f(a), 0)), 0)",
+    );
+    assert(
+        surface_dump(
+            "{ for (let i, P { x } : xs) { f(x); } 0 }",
+        ) == "Seq(ForPattern([i], P { x }, xs, Seq(f(x), 0)), 0)",
     );
 
     // `let PATTERN = e else { .. };` binds the pattern's names in the rest of the
@@ -5043,7 +4894,12 @@ pub fn lower_aipl_block(src: str) -> Expr!ParseError {
 # concrete tree, lowers it and throws the tree away.
 pub fn lower_aipl_program(src: str) -> Program!ParseError {
     let text = aipl_source(src);
-    as_program(parse(text, lex_lossless(text)?, aipl_grammar(), "program")?, 0..text.len())
+    ok(
+        as_program(
+            parse(text, lex_lossless(text)?, aipl_grammar(), "program")?,
+            0..text.len(),
+        )?.desugar(),
+    )
 }.test({
     // A lowered program as text, one item per line, or the refusal that stopped it.
     fn program_dump(src: str) -> str {
@@ -5508,6 +5364,14 @@ let PREPARED_GRAMMAR: Prepared<AiplTok, Ast>!ParseError = prepare(aipl_grammar()
 # A tree that recovered from a missing token is a tree of broken input, and is
 # never lowered: the errors come back instead.
 pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
+    let ParsedFile { program, allows } = aipl_parse_surface_file(src)?;
+    ok(ParsedFile { program: program.desugar(), allows })
+}
+
+# `aipl_parse_file`, stopping before the destructuring forms are lowered: the
+# program as written, which is what the lints read. Everything else wants the
+# lowered one.
+pub fn aipl_parse_surface_file(src: str) -> ParsedFile!ParseFailure {
     let text = reject_trailing_whitespace(aipl_source(src)).map_err(failure)?;
     let lexed = lex_lossless(text).map_err(failure)?;
     let allows = allow_spans(lexed);

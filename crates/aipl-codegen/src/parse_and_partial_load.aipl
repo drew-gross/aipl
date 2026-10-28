@@ -13,12 +13,21 @@
 #   variables.
 # - `lint`: the lints that have been ported to AIPL. Their hits ride beside the
 #   program, for the Rust driver to squelch and report with its own.
+# - `desugar`: the destructuring forms are lowered. It comes after `lint` so the
+#   lints read what the author wrote, with no temporaries the parser would have
+#   bound; the lints still in Rust run on what this returns.
 #
 # The formatter parses with `aipl_parse_file` and not this, because it lays out
 # the program the author wrote, attributes and all.
 
 import { Span, contains, equal as ==, logical_not as ! } from builtins;
-import { ParseFailure, ParsedFile, aipl_parse_file } from "./grammar_aipl.aipl";
+import { desugar } from "./desugar.aipl";
+import {
+    ParseFailure,
+    ParsedFile,
+    aipl_parse_file,
+    aipl_parse_surface_file,
+} from "./grammar_aipl.aipl";
 import { hoist_test_fns } from "./hoist_test_fns.aipl";
 import { Fn, Item, Program, show_program } from "./item.aipl";
 import { lint } from "./lint.aipl";
@@ -32,9 +41,9 @@ struct PartialLoad { program: Program, allows: Span[], lints: LintHit[] }
 # `aipl_parse_file`, then the steps of loading that happen per file and need
 # nothing from any other.
 pub fn parse_and_partial_load(src: str) -> PartialLoad!ParseFailure {
-    let ParsedFile { program, allows } = aipl_parse_file(src)?;
+    let ParsedFile { program, allows } = aipl_parse_surface_file(src)?;
     let loaded = program.hoist_test_fns().promote_type_vars();
-    ok(PartialLoad { program: loaded, allows, lints: lint(loaded) })
+    ok(PartialLoad { program: loaded.desugar(), allows, lints: lint(loaded) })
 }.test({
     // A file with neither attribute and no type parameters is as it was parsed.
     let plain = parse_and_partial_load("fn f() { }")?;

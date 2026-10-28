@@ -55,7 +55,7 @@
             <a class="anchor" href="#item-destructure_binding">destructure_binding</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn destructure_binding(__spat$4286: Program) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn destructure_binding(__spat$4382: Program) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each immutable <code>let</code> in the program whose binding is only ever taken apart by field reads.</p></div>
 
@@ -141,6 +141,34 @@
 
 
 
+        <section class="item" id="item-pattern_reads">
+          <h3>
+            <a class="anchor" href="#item-pattern_reads">pattern_reads</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn pattern_reads(self: Expr) -&#62; Read[]</code></pre>
+
+          <div class="doc"><p>The reads a destructuring <code>let</code> or <code>for</code> makes of the value it takes apart: one per field its pattern names, off a base of its own. A binding that is taken apart by field reads to the same names is not a place for a second pattern, so these count as reads like any other.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-reads_off">
+          <h3>
+            <a class="anchor" href="#item-reads_off">reads_off</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn reads_off(self: Destructure, base: str) -&#62; Read[]</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
         <section class="item" id="item-read">
           <h3>
             <a class="anchor" href="#item-read">read</a>
@@ -177,20 +205,6 @@
           <pre class="signature"><code>fn message(name: str, fields: str, ty: str) -&#62; str</code></pre>
 
           <div class="doc"><p>What is said of the binding <code>name</code>, whose <code>fields</code> are the ones read.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-is_read_off_temporary">
-          <h3>
-            <a class="anchor" href="#item-is_read_off_temporary">is_read_off_temporary</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn is_read_off_temporary(self: Expr) -&#62; bool</code></pre>
-
-          <div class="doc"><p>Whether <code>self</code> is a read off one of the parser's own temporaries (<code>__spat$N</code>).</p></div>
 
 
         </section>
@@ -247,6 +261,20 @@
           <pre class="signature"><code>fn is_read_off(self: Expr, name: str) -&#62; bool</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-binders">
+          <h3>
+            <a class="anchor" href="#item-binders">binders</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn binders(self: Destructure) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The names a destructuring pattern binds, in order.</p></div>
 
 
         </section>

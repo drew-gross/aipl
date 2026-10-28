@@ -5,9 +5,17 @@
 # of the files the AST is declared across; see `ast.aipl`.
 
 import { Span, equal as ==, is_err_and, value_or_err } from builtins;
-import { Construct as ConstructExpr, Expr, FieldInit, at, num, show_expr } from "./expr.aipl";
+import {
+    Construct as ConstructExpr,
+    Destructure,
+    Expr,
+    FieldInit,
+    at,
+    num,
+    show_expr,
+} from "./expr.aipl";
 import { ParseError } from "./grammar.aipl";
-import { Function, Param } from "./item.aipl";
+import { Function } from "./item.aipl";
 import { Pat } from "./pat.aipl";
 import { Generic, Named, Ty, Unit, show_ty } from "./ty.aipl";
 
@@ -21,16 +29,19 @@ import { Generic, Named, Ty, Unit, show_ty } from "./ty.aipl";
 variant Stmt =
     | Let(name: str, name_span: Span, ty: Ty?, value: Expr)
     | Mut(name: str, name_span: Span, ty: Ty?, value: Expr)
-    | LetTuple(names: str[], value: Expr, span: Span)
-    | LetArm(case_name: str, names: str[], value: Expr, span: Span)
+    # `let (a, b) = v;`, `let Case(a) = v;`, `let T { x } = v;` and the `mut` struct
+    # form: the pattern as written, kept for `desugar.aipl` to lower. `span` is the
+    # value's.
+    | LetDestructure(pattern: Destructure, value: Expr, span: Span)
     # `let PATTERN = value else { .. };` — the rest of the block runs with the
     # pattern's names bound when `value` matches, and `otherwise` (which returns)
     # when it does not.
     | LetElse(pattern: Pat, value: Expr, otherwise: Expr, span: Span)
-    | LetStruct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span)
-    | MutStruct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span)
     | Assign(lhs: Expr, value: Expr, span: Span)
     | For(name: str, name_span: Span, index: str?, iterable: Expr, body: Expr, span: Span)
+    # A loop that takes each element apart with a pattern, as written; `span` runs
+    # from the iterable through the body.
+    | ForDestructure(pattern: Destructure, index: str?, iterable: Expr, body: Expr, span: Span)
     | While(cond: Expr, body: Expr, span: Span)
     | Return(value: Expr, span: Span)
     # A statement already built as one expression, run for its effect before the
@@ -41,17 +52,6 @@ variant Stmt =
 # the shorthand constructs. Parser-local: by the time a `Function` is built the
 # sugar is gone.
 variant ParsedBody = Block(Expr) | Construct(FieldInit[], Span)
-
-# A parameter as written, before the destructuring form is taken apart.
-# `fields` is empty for every ordinary parameter and holds the pattern's field
-# names for `Point { x, y }`, whose `Param` is the synthetic scrutinee the
-# function's own lowering then binds those fields off. `names` is what each field
-# is bound *as*, one per field: the field's own name, or the one written after
-# `as` in `Point { x as px, y }`.
-#
-# `arm` is the case a `Circle(r)` pattern names, whose payload slots `names` binds
-# in order and whose `fields` is empty; `none` for every other parameter.
-struct ParsedParam { param: Param, fields: str[], names: str[], arm: str?, span: Span }
 
 # One function attribute, `.test({ .. })` or `.performance({ .. })`: which one
 # (`name`), its block, the functions declared inside the block, and the span of

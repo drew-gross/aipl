@@ -44,6 +44,7 @@ import {
     ImportDecl,
     ImportName as ImportNameNode,
     Item as ItemNode,
+    Param as ParamNode,
     Program as ProgramNode,
     RefinementDecl,
     StructDecl,
@@ -51,13 +52,7 @@ import {
     VariantCase as VariantCaseNode,
     VariantDecl,
 } from "./item.aipl";
-import {
-    FnAttr,
-    ParsedBody,
-    ParsedParam,
-    Stmt as StmtNode,
-    TestBlock as TestBlockNode,
-} from "./parsed.aipl";
+import { FnAttr, ParsedBody, Stmt as StmtNode, TestBlock as TestBlockNode } from "./parsed.aipl";
 import { Pat as PatNode } from "./pat.aipl";
 import { Suffix as SuffixNode, Try } from "./suffix.aipl";
 import { Exclusion as ExclusionNode, Ty as TyNode, Unit } from "./ty.aipl";
@@ -110,7 +105,7 @@ variant Ast =
     | Function(FunctionNode)
     | TypeParams(TypeParamNode[])
     | TypeParam(TypeParamNode)
-    | Param(ParsedParam)
+    | Param(ParamNode)
     | Body(ParsedBody)
     | FieldInits(FieldInitNode[])
     | Attr(FnAttr)

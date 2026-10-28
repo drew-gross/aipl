@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/desugar.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/desugar.aipl</code></h1>
+
+      <div class="module-doc"><p>Lowering the destructuring forms, after the lints have read them.</p><p><code>let T { x, y } = v;</code>, <code>let (a, b) = v;</code>, <code>let Case(a) = v;</code>, the same in a <code>for</code> header, and a pattern in a parameter are kept as written when a file is parsed (<code>LetPattern</code>, <code>ForPattern</code>, <code>Param::pattern</code>). The lints that run next see what the author wrote, not the temporaries the lowering would bind, so none of them has to recognise a name the compiler made. This is the pass that does the binding: each form becomes the <code>let</code>s and one-arm <code>match</code>es that bind its names off a temporary, and nothing past it knows the surface form existed.</p><p>Spans and the temporaries' names come from the value or iterable the pattern takes apart, as they always have, so the tree this produces is the one the parser used to produce directly.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-desugar">
+          <h3>
+            <a class="anchor" href="#item-desugar">desugar</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn desugar(self: Program) -&#62; Program</code></pre>
+
+          <div class="doc"><p><code>self</code> with every destructuring form lowered, in every expression it holds.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-desugared">
+          <h3>
+            <a class="anchor" href="#item-desugared">desugared</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn desugared(self: Expr) -&#62; Expr</code></pre>
+
+          <div class="doc"><p><code>self</code> and every expression under it, the destructuring forms lowered.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-desugared_item">
+          <h3>
+            <a class="anchor" href="#item-desugared_item">desugared_item</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn desugared_item(self: Item) -&#62; Item</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-desugared_case">
+          <h3>
+            <a class="anchor" href="#item-desugared_case">desugared_case</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn desugared_case(self: VariantCase) -&#62; VariantCase</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-desugared_function">
+          <h3>
+            <a class="anchor" href="#item-desugared_function">desugared_function</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn desugared_function(self: Function) -&#62; Function</code></pre>
+
+          <div class="doc"><p>A function whose destructured parameters are bound off their synthetic scrutinees at the top of the body — the shape <code>let Point { x, y } = v;</code> has, less the <code>let</code>, the value being bound already by being an argument. Folded from the right so the bindings come out in source order.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-let_pattern">
+          <h3>
+            <a class="anchor" href="#item-let_pattern">let_pattern</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn let_pattern(pattern: Destructure, value: Expr, body: Expr) -&#62; Expr</code></pre>
+
+          <div class="doc"><p><code>let &lt;pattern&gt; = value; body</code>. The temporary is named for where the value starts, and holds the value so it is evaluated once.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-for_pattern">
+          <h3>
+            <a class="anchor" href="#item-for_pattern">for_pattern</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn for_pattern(pattern: Destructure, iterable: Expr, body: Expr, index: str?) -&#62; Expr</code></pre>
+
+          <div class="doc"><p><code>for (let &lt;pattern&gt; : iterable) { body }</code> is a plain loop over a temporary whose fields (or slots, or payload) are read in front of the body, as the same pattern in a <code>let</code> reads them — through the same helpers, so the pattern's type is checked the same way. With an <code>index</code> it is the indexed loop over that temporary: the counter and the pattern compose as each does alone.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-tuple_slot_names">
+          <h3>
+            <a class="anchor" href="#item-tuple_slot_names">tuple_slot_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn tuple_slot_names(names: str[]) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The field names a tuple pattern reads: <code>_0</code>, <code>_1</code>, ... one per binder, which is how the AST spells a tuple's slots.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-bind_fields">
+          <h3>
+            <a class="anchor" href="#item-bind_fields">bind_fields</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn bind_fields(names: str[], tmp: str, span: Span, rest: Expr, fields: str[]) -&#62; Expr</code></pre>
+
+          <div class="doc"><p><code>let a = &lt;tmp&gt;.&lt;field0&gt;; let b = &lt;tmp&gt;.&lt;field1&gt;; rest</code>, innermost last — the body of both destructuring forms, which differ only in the field names they read and in whether the bindings are mutable.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-bind_fields_mut">
+          <h3>
+            <a class="anchor" href="#item-bind_fields_mut">bind_fields_mut</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn bind_fields_mut(names: str[], tmp: str, span: Span, rest: Expr, fields: str[], mutable: bool) -&#62; Expr</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-bind_arm">
+          <h3>
+            <a class="anchor" href="#item-bind_arm">bind_arm</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn bind_arm(case_name: str, names: str[], tmp: str, span: Span, rest: Expr) -&#62; Expr</code></pre>
+
+          <div class="doc"><p><code>let a = match (&lt;tmp&gt;) { Case(a, _) =&gt; a }; let b = match (&lt;tmp&gt;) { Case(_, b) =&gt; b }; rest</code>, innermost last — what <code>let Case(a, b) = value; rest</code> binds, one <code>match</code> per name. The scrutinee is a value that can only be <code>Case</code>, which is what makes each <code>match</code> exhaustive with the one arm; any other value is refused by that check. A <code>match</code> for each name, rather than one around the rest of the block, keeps <code>rest</code> out of an arm: a block that is an expression may not assign to a binding from outside it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-destructure_struct">
+          <h3>
+            <a class="anchor" href="#item-destructure_struct">destructure_struct</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn destructure_struct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span, acc: Expr, mutable: bool) -&#62; Expr</code></pre>
+
+          <div class="doc"><p><code>let T { a, b } = value; rest</code> and its <code>mut</code> twin, as nested bindings. The scrutinee stays an immutable <code>let</code> either way — it is read once per field and never written through — and carries the pattern's type as its annotation, which is what makes the type name mean something rather than decorate the line. The <code>__spat$</code> prefix is <code>aipl_syntax::DESTRUCTURE_BASE_PREFIX</code>, which is how the checker knows to report a mismatch as the destructuring it was.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-bind_one_param">
+          <h3>
+            <a class="anchor" href="#item-bind_one_param">bind_one_param</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn bind_one_param(p: Param, body: Expr) -&#62; Expr</code></pre>
+
+          <div class="doc"><p>A destructured parameter's bindings in front of <code>body</code>: the case's payload, or the struct's fields, read off the parameter itself. Folded from the right by the caller so they come out in source order.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

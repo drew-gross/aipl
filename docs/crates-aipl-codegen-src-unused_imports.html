@@ -104,7 +104,7 @@
             <a class="anchor" href="#item-referenced_names">referenced_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn referenced_names(__spat$3429: Program) -&#62; #{str}</code></pre>
+          <pre class="signature"><code>fn referenced_names(__spat$3525: Program) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>Every name the file mentions outside its own import lists: called and referenced idents, constructed structs, match constructors, operator spellings, and every name appearing in a type — signatures, struct fields, variant payloads, and inline <code>let</code>/lambda annotations.</p></div>
 
@@ -177,6 +177,20 @@
           <pre class="signature"><code>fn own_names(self: Expr) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>The names <code>e</code> itself mentions, not those of its sub-expressions.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-destructure_names">
+          <h3>
+            <a class="anchor" href="#item-destructure_names">destructure_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn destructure_names(self: Destructure) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The type or case a destructuring pattern names: a tuple names none.</p></div>
 
 
         </section>

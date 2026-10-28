@@ -5,7 +5,7 @@
 
 import { Span, equal as ==, is_empty, join, map, value_or } from builtins;
 import { Bound, show_bound } from "./bound.aipl";
-import { Expr, FieldInit, show_expr } from "./expr.aipl";
+import { Destructure, Expr, FieldInit, show_expr } from "./expr.aipl";
 import { SpanStr, span_str } from "./lexer.aipl";
 import { I64 } from "./prim.aipl";
 import { Named, NamedCase, Primitive, Ty, Without, show_ty } from "./ty.aipl";
@@ -22,7 +22,23 @@ struct ImportDecl { names: ImportName[], source: ImportSource, source_span: Span
 # the one written: a variadic `x: T*` / `x: T+` stores the sequence type, and a
 # `k?: T` stores `T?` with `implicit_some` recording that the call site passes
 # a bare `T`.
-struct Param { name: str, ty: Ty, mutable: bool, arity: Arity, default: Expr?, implicit_some: bool }
+struct Param {
+    name: str,
+    ty: Ty,
+    mutable: bool,
+    arity: Arity,
+    default: Expr?,
+    implicit_some: bool,
+    // The pattern a destructured parameter (`fn f(Point { x, y })`) was written
+    // with. The parameter itself is a synthetic one of the pattern's type; the
+    // names are bound off it at the top of the body when `desugar.aipl` lowers it.
+    // Always `none` once that has run.
+    pattern: ParamPattern? = none,
+}
+
+# A parameter's destructuring pattern and where it was written, which is the span
+# the bindings it makes carry.
+struct ParamPattern { pattern: Destructure, span: Span }
 
 # How many arguments a parameter takes at a call site: one, or — for a
 # variadic — zero or more (`T*`) or one or more (`T+`). Mirrors

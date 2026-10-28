@@ -72,18 +72,24 @@ import {
     value_or,
 } from builtins;
 import {
+    ByCase,
+    ByStruct,
+    ByTuple,
     Construct,
+    Destructure,
     Expr,
     Field,
     For,
+    ForPattern,
     Ident,
     Lambda,
     Let,
     LetMut,
+    LetPattern,
     Match,
     subexprs,
 } from "./expr.aipl";
-import { ParseFailure, aipl_parse_file } from "./grammar_aipl.aipl";
+import { ParseFailure, aipl_parse_surface_file } from "./grammar_aipl.aipl";
 import { Fn, Function, Program } from "./item.aipl";
 import { LintHit, hit } from "./lint_hit.aipl";
 import { pat_bindings } from "./pat.aipl";
@@ -130,7 +136,28 @@ fn descendants(self: Expr) -> Expr[] { [self, ..self.subexprs()$descendants().jo
 
 # Every field `self` and the expressions under it read off a plain name, with a
 # read for each time it is read.
-fn field_reads(self: Expr) -> Read[] { self.descendants()$read().collect_ok() }
+fn field_reads(self: Expr) -> Read[] {
+    [..self.descendants()$read().collect_ok(), ..self.descendants()$pattern_reads().join()]
+}
+
+# The reads a destructuring `let` or `for` makes of the value it takes apart: one
+# per field its pattern names, off a base of its own. A binding that is taken
+# apart by field reads to the same names is not a place for a second pattern, so
+# these count as reads like any other.
+fn pattern_reads(self: Expr) -> Read[] {
+    match (self.kind) {
+        LetPattern(pattern, value, _) => pattern.reads_off(`$pattern{value.span.start}`),
+        ForPattern(pattern, iterable, _, _) => pattern.reads_off(`$pattern{iterable.span.start}`),
+        _ => [],
+    }
+}
+
+fn reads_off(self: Destructure, base: str) -> Read[] {
+    match (self) {
+        ByStruct(_, fields, _, _) => fields.map(|field| Read { field, base }),
+        ByTuple(..) | ByCase(..) => [],
+    }
+}
 
 # The field read `self` is, when it reads one off a plain name.
 fn read(self: Expr) -> Read? {
@@ -141,20 +168,13 @@ fn read(self: Expr) -> Read? {
 
 # The hit for one `let`, or none: `reads` are every field read in its body.
 fn binding_hit(self: Let(name, annotation, value, body), reads: Read[]) -> LintHit[] {
-    // The parser's own desugarings bind temporaries whose only use *is* a field
-    // read — a `let T { .. }` pattern lowers to exactly that, and so does a
-    // destructured parameter, so linting them would advise rewriting the
-    // rewrite, on a name the user never wrote and cannot put an `#[allow]` on.
-    if (name.starts_with("__")) {
+    // A name the parser made (`__iset1$6`, the `seed$provider` of a shim) was never
+    // written by the author, who cannot put an `#[allow]` on it. The destructuring
+    // forms are not among them: this reads the program before they are lowered.
+    if (name.contains("$")) {
         return [];
     };
 
-    // ...nor the field bindings such a desugaring introduces, whose value is a
-    // read off that temporary: advising a pattern *inside* a pattern is the lint
-    // chasing its own output.
-    if (value.is_read_off_temporary()) {
-        return [];
-    };
     let Uses { mentions, field_reads, fields, shadowed } = body.uses_of(name);
 
     // A rebinding of the same name inside the body splits the mentions between two
@@ -200,17 +220,6 @@ fn message(name: str, fields: str, ty: str) -> str {
     `only the fields of "{name}" are read — destructure the binding instead: "let {ty} \{ {fields} } = ..."`
 }
 
-# Whether `self` is a read off one of the parser's own temporaries (`__spat$N`).
-fn is_read_off_temporary(self: Expr) -> bool {
-    match (self.kind) {
-        Field(base, _) => match (base.kind) {
-            Ident(name) => name.starts_with("__"),
-            _ => false,
-        },
-        _ => false,
-    }
-}
-
 fn is_construct(self: Expr) -> bool {
     match (self.kind) {
         Construct(..) => true,
@@ -244,6 +253,13 @@ fn is_name(self: Expr, name: str) -> bool {
 
 fn is_read_off(self: Expr, name: str) -> bool { self.read().is_some_and(|r| r.base == name) }
 
+# The names a destructuring pattern binds, in order.
+fn binders(self: Destructure) -> str[] {
+    match (self) {
+        ByTuple(names) | ByCase(_, names) | ByStruct(_, _, names, _) => names,
+    }
+}
+
 # Whether `self` introduces a binding called `name`, in any of the positions that
 # can: the two `let` forms, a lambda parameter, a loop variable, and a match
 # arm's payload binders.
@@ -252,6 +268,9 @@ fn rebinds(self: Expr, name: str) -> bool {
         Let(n, _, _, _) | LetMut(n, _, _, _) => n == name,
         // Both of a loop's binders shadow, the element one and the index one.
         For(n, _, _, index) => n == name || index == some(name),
+        // A destructuring `let` or `for` binds each name its pattern lists.
+        LetPattern(pattern, _, _) => pattern.binders().contains(name),
+        ForPattern(pattern, _, _, index) => pattern.binders().contains(name) || index == some(name),
         Lambda(params, _) => params.any(|p| p.name == name),
         Match(_, arms) => arms.any(|arm| arm.pattern.pat_bindings().contains(name)),
         _ => false,
@@ -303,13 +322,22 @@ fn is_tuple_field(self: str) -> bool {
 }
 
 fn hits(src: str) -> str[]!ParseFailure {
-    ok(destructure_binding(aipl_parse_file(src)?.program)$message)
+    ok(destructure_binding(aipl_parse_surface_file(src)?.program)$message)
 }.test({
     // Only fields are read: take it apart in the pattern.
     assert(hits("fn f() -> i64 { let p = g(); p.a + p.b }")? == [message("p", "a, b", "<Type>")]);
 
     // An annotation names the struct for the advice.
     assert(hits("fn f() -> i64 { let p: P = g(); p.a }")? == [message("p", "a", "P")]);
+
+    // A pattern the author wrote is not a binding to advise about, whatever the
+    // parser binds for it underneath; neither is the rest of the block's reading
+    // of the names it made.
+    assert(hits("fn f() -> i64 { let P { a, b } = g(); a + b }")? == []);
+    assert(hits("fn f(t: (i64, i64)) -> i64 { let (a, b) = t; a + b }")? == []);
+    assert(hits("fn f() -> i64 { for (let P { a } : xs) { h(a); } 0 }")? == []);
+    // A name the pattern binds shadows an outer one, which splits its mentions.
+    assert(hits("fn f() -> i64 { let p = g(); let P { p } = h(); p.a }")? == []);
 
     // One bare mention keeps the value whole, so a pattern could not replace it.
     assert(hits("fn f() -> i64 { let p = g(); h(p); p.a }")? == []);

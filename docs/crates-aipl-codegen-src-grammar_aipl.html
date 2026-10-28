@@ -218,6 +218,20 @@
 
 
 
+        <section class="item" id="item-lower_aipl_block_surface">
+          <h3>
+            <a class="anchor" href="#item-lower_aipl_block_surface">lower_aipl_block_surface</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lower_aipl_block_surface(src: str) -&#62; Expr!ParseError</code></pre>
+
+          <div class="doc"><p><code>lower_aipl_block</code>, before the destructuring forms are lowered: the tree the lints read.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower_aipl_program">
           <h3>
             <a class="anchor" href="#item-lower_aipl_program">lower_aipl_program</a>
@@ -296,6 +310,20 @@
           <pre class="signature"><code>pub fn aipl_parse_file(src: str) -&#62; ParsedFile!ParseFailure</code></pre>
 
           <div class="doc"><p>The whole of <code>aipl_parser::parse_with_allows</code>, on this side: strip the expected-output sections, refuse trailing whitespace, lex losslessly, keep the <code>#[allow]</code> spans, parse and lower.</p><p>What it deliberately does <em>not</em> do is what follows a parse but is no part of one: <code>parse_and_partial_load</code> hoists test functions and promotes type variables, and the loader bakes the locations of <code>assert</code> and <code>trace</code>.</p><p>A tree that recovered from a missing token is a tree of broken input, and is never lowered: the errors come back instead.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-aipl_parse_surface_file">
+          <h3>
+            <a class="anchor" href="#item-aipl_parse_surface_file">aipl_parse_surface_file</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn aipl_parse_surface_file(src: str) -&#62; ParsedFile!ParseFailure</code></pre>
+
+          <div class="doc"><p><code>aipl_parse_file</code>, stopping before the destructuring forms are lowered: the program as written, which is what the lints read. Everything else wants the lowered one.</p></div>
 
 
         </section>
@@ -415,20 +443,6 @@
           <pre class="signature"><code>fn patterns() -&#62; Production&#60;AiplTok, Ast&#62;[]</code></pre>
 
           <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-join_spans">
-          <h3>
-            <a class="anchor" href="#item-join_spans">join_spans</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn join_spans(a: Span, b: Span) -&#62; Span</code></pre>
-
-          <div class="doc"><p>Two spans as the one that covers both — <code>aipl_syntax::join_spans</code>, mirrored.</p><p>The rule that matters is the empty one: an <em>empty</em> span is the &quot;no location&quot; placeholder a construct with no text of its own carries (an empty block body, a synthesized node), and it must not take part in a join. Written naively as <code>a.start..b.end</code> it drags every enclosing construct's end back to offset 0, which is a span that ends before it starts — and a caret rendered from one is nonsense. Contributing nothing is the honest answer.</p></div>
 
 
         </section>
@@ -776,7 +790,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$69105: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$68492: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1433,7 +1447,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$107023: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$106319: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -1463,8 +1477,7 @@ if (let some(..) = target[__iset$N]) {
           </h3>
           <pre class="signature"><code>fn for_tuple(names: str[], index: str?, iterable: Expr, body: Expr, sp: Span) -&#62; Stmt!ParseError</code></pre>
 
-          <div class="doc"><p><code>for (let (a, b) : xs) { body }</code> is a plain loop over a temporary with the field reads prepended to the body:</p><pre><code>for (let __fpat$N : xs) { let a = __fpat$N._0; let b = __fpat$N._1; body }
-</code></pre><p>With an <code>index</code> — <code>for (let i, (a, b) : xs)</code> — it is the indexed loop over that same temporary, so the counter and the pattern compose exactly as each does alone: <code>for_chain</code> binds <code>i</code> outside the field reads.</p></div>
+          <div class="doc"><p><code>for (let (a, b) : xs) { body }</code>, and its struct and case twins, with an optional index in front: the pattern as written, for <code>desugar.aipl</code> to lower. A tuple pattern needs two names or more, which is checked here, where the span of the written pattern is at hand.</p></div>
 
 
         </section>
@@ -1478,8 +1491,7 @@ if (let some(..) = target[__iset$N]) {
           </h3>
           <pre class="signature"><code>fn for_struct(struct_name: str, fields: str[], names: str[], index: str?, iterable: Expr, body: Expr) -&#62; Stmt</code></pre>
 
-          <div class="doc"><p><code>for (let T { a, b as c } : xs) { body }</code> is a plain loop over a temporary whose fields are read in front of the body, as <code>let T { a, b as c } = value;</code> reads them — and through the same desugaring, so the pattern's type is checked the same way: the temporary is rebound under the struct's name before its fields are taken, which is what rejects a pattern naming a different struct.</p><pre><code>for (let __fpat$N : xs) { let __spat$N: T = __fpat$N; let a = __spat$N.a; body }
-</code></pre><p>With an <code>index</code> it is the indexed loop over that temporary, as <code>for_tuple</code>'s is.</p></div>
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>
@@ -1493,8 +1505,21 @@ if (let some(..) = target[__iset$N]) {
           </h3>
           <pre class="signature"><code>fn for_arm(case_name: str, names: str[], index: str?, iterable: Expr, body: Expr) -&#62; Stmt</code></pre>
 
-          <div class="doc"><p><code>for (let Import(decl) : xs) { body }</code> is a plain loop over a temporary whose payload is bound in front of the body, as <code>let Import(decl) = value;</code> binds it:</p><pre><code>for (let __fpat$N : xs) { let decl = match (__fpat$N) { Import(decl) =&gt; decl }; body }
-</code></pre><p>With an <code>index</code> it is the indexed loop over that temporary, as <code>for_struct</code>'s is.</p></div>
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-for_destructure">
+          <h3>
+            <a class="anchor" href="#item-for_destructure">for_destructure</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn for_destructure(pattern: Destructure, index: str?, iterable: Expr, body: Expr) -&#62; Stmt</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>
@@ -1523,76 +1548,6 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn seq(head: Expr, rest: Expr, span: Span) -&#62; Expr</code></pre>
 
           <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-tuple_slot_names">
-          <h3>
-            <a class="anchor" href="#item-tuple_slot_names">tuple_slot_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn tuple_slot_names(names: str[]) -&#62; str[]</code></pre>
-
-          <div class="doc"><p>The field names a tuple pattern reads: <code>_0</code>, <code>_1</code>, ... one per binder, which is how the AST spells a tuple's slots.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-bind_fields">
-          <h3>
-            <a class="anchor" href="#item-bind_fields">bind_fields</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn bind_fields(names: str[], tmp: str, span: Span, rest: Expr, fields: str[]) -&#62; Expr</code></pre>
-
-          <div class="doc"><p><code>let a = &lt;tmp&gt;.&lt;field0&gt;; let b = &lt;tmp&gt;.&lt;field1&gt;; rest</code>, innermost last — the body of both destructuring forms, which differ only in the field names they read and in whether the bindings are mutable.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-bind_fields_mut">
-          <h3>
-            <a class="anchor" href="#item-bind_fields_mut">bind_fields_mut</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn bind_fields_mut(names: str[], tmp: str, span: Span, rest: Expr, fields: str[], mutable: bool) -&#62; Expr</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-bind_arm">
-          <h3>
-            <a class="anchor" href="#item-bind_arm">bind_arm</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn bind_arm(case_name: str, names: str[], tmp: str, span: Span, rest: Expr) -&#62; Expr</code></pre>
-
-          <div class="doc"><p><code>let a = match (&lt;tmp&gt;) { Case(a, _) =&gt; a }; let b = match (&lt;tmp&gt;) { Case(_, b) =&gt; b }; rest</code>, innermost last — what <code>let Case(a, b) = value; rest</code> binds, one <code>match</code> per name. The scrutinee is a value that can only be <code>Case</code>, which is what makes each <code>match</code> exhaustive with the one arm; any other value is refused by that check. A <code>match</code> for each name, rather than one around the rest of the block, keeps <code>rest</code> out of an arm: a block that is an expression may not assign to a binding from outside it.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-destructure_struct">
-          <h3>
-            <a class="anchor" href="#item-destructure_struct">destructure_struct</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn destructure_struct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span, acc: Expr, mutable: bool) -&#62; Expr</code></pre>
-
-          <div class="doc"><p><code>let T { a, b } = value; rest</code> and its <code>mut</code> twin, as nested bindings. The scrutinee stays an immutable <code>let</code> either way — it is read once per field and never written through — and carries the pattern's type as its annotation, which is what makes the type name mean something rather than decorate the line. The <code>__spat$</code> prefix is <code>aipl_syntax::DESTRUCTURE_BASE_PREFIX</code>, which is how the checker knows to report a mismatch as the destructuring it was.</p></div>
 
 
         </section>
@@ -2220,7 +2175,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-destructured_param">destructured_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$148420: FieldBinders, span: Span) -&#62; Ast</code></pre>
+          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$142403: FieldBinders, span: Span) -&#62; Ast</code></pre>
 
           <div class="doc"><p>A parameter named <code>name</code>, of the struct <code>struct_name</code>, whose <code>fields</code> are bound to <code>names</code> at the top of the body.</p></div>
 
@@ -2486,7 +2441,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$164488: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$158361: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -2531,48 +2486,6 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_function(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>function</code> — the one production whose children are told apart by what they lowered to rather than by position: a type parameter list, some parameters, some effects, a return type, a body and some attributes all arrive in one list, and each is a different <code>Ast</code> case.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-param_of">
-          <h3>
-            <a class="anchor" href="#item-param_of">param_of</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn param_of(self: ParsedParam) -&#62; Param</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-bind_param_fields">
-          <h3>
-            <a class="anchor" href="#item-bind_param_fields">bind_param_fields</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn bind_param_fields(params: ParsedParam[], body: Expr) -&#62; Expr</code></pre>
-
-          <div class="doc"><p><code>Point { x, y }</code> in parameter position: the fields are bound off the synthetic scrutinee at the top of the body — the shape <code>let Point { x, y } = v;</code> produces, minus the <code>let</code>, the value being already bound by being an argument. Both fold from the right so the bindings come out in source order.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-bind_one_param">
-          <h3>
-            <a class="anchor" href="#item-bind_one_param">bind_one_param</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn bind_one_param(p: ParsedParam, body: Expr) -&#62; Expr</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
 
 
         </section>

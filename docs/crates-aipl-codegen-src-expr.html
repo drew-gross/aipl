@@ -259,7 +259,68 @@
 
             </li>
 
+            <li id="item-LetPattern"><code>LetPattern(pattern: Destructure, value: Expr, body: Expr)</code>
+
+              <div class="doc"><p><code>let T { x, y } = v; rest</code>, <code>let (a, b) = v; rest</code> and <code>let Case(a) = v; rest</code>: the pattern, what it takes apart, and the rest of the block. Written syntax, kept as it was written so the lints see it; <code>desugar.aipl</code> lowers it to the <code>let</code>s and <code>match</code>es that bind the names, and nothing downstream of it ever sees the node.</p></div>
+
+
+            </li>
+
+            <li id="item-ForPattern"><code>ForPattern(pattern: Destructure, iterable: Expr, body: Expr, index: str? = none)</code>
+
+              <div class="doc"><p><code>for (let (a, b) : xs) { .. }</code> and its struct and case twins, with the optional index binder. Lowered by <code>desugar.aipl</code> like <code>LetPattern</code>.</p></div>
+
+
+            </li>
+
           </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-Destructure">
+          <h3>
+            <a class="anchor" href="#item-Destructure">Destructure</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Destructure</code></pre>
+
+          <div class="doc"><p>What a <code>let</code>, a <code>for</code> or a parameter takes a value apart with, as written. A tuple's slots are its positions, so only the names are kept; a case's payload is bound in order; a struct names the fields it reads and what each is bound as, and <code>mutable</code> is the <code>mut T { .. } = v</code> form.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-ByTuple"><code>ByTuple(names: str[])</code>
+
+
+            </li>
+
+            <li id="item-ByCase"><code>ByCase(case_name: str, names: str[])</code>
+
+
+            </li>
+
+            <li id="item-ByStruct"><code>ByStruct(struct_name: str, fields: str[], names: str[], mutable: bool)</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-join_spans">
+          <h3>
+            <a class="anchor" href="#item-join_spans">join_spans</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn join_spans(a: Span, b: Span) -&#62; Span</code></pre>
+
+          <div class="doc"><p>Two spans as the one that covers both — <code>aipl_syntax::join_spans</code>, mirrored.</p><p>The rule that matters is the empty one: an <em>empty</em> span is the &quot;no location&quot; placeholder a construct with no text of its own carries (an empty block body, a synthesized node), and it must not take part in a join. Written naively as <code>a.start..b.end</code> it drags every enclosing construct's end back to offset 0, which is a span that ends before it starts — and a caret rendered from one is nonsense. Contributing nothing is the honest answer.</p></div>
+
 
         </section>
 
@@ -566,6 +627,20 @@
 
 
 
+        <section class="item" id="item-show_destructure">
+          <h3>
+            <a class="anchor" href="#item-show_destructure">show_destructure</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_destructure(self: Destructure) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>f</code> applied to each of <code>xs</code>. A destructuring pattern as one line, for the dump: <code>(a, b)</code>, <code>Case(a, b)</code>, <code>T { x as a, y }</code> (and <code>mut T { .. }</code>). A field bound under its own name prints bare.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-each_mapped">
           <h3>
             <a class="anchor" href="#item-each_mapped">each_mapped</a>
@@ -573,7 +648,7 @@
           </h3>
           <pre class="signature"><code>fn each_mapped(xs: Expr[], f: (Expr) -&#62; Expr) -&#62; Expr[]</code></pre>
 
-          <div class="doc"><p><code>f</code> applied to each of <code>xs</code>.</p></div>
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>

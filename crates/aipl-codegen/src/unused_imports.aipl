@@ -28,13 +28,18 @@ import {
     ArrayLit,
     Assign,
     Bool,
+    ByCase,
+    ByStruct,
+    ByTuple,
     Call,
     Char,
     Construct,
+    Destructure,
     DictLit,
     Expr,
     Field,
     For,
+    ForPattern,
     Ident,
     If,
     IfLet,
@@ -43,6 +48,7 @@ import {
     Lambda,
     Let,
     LetMut,
+    LetPattern,
     Match,
     Neg,
     Num,
@@ -59,7 +65,7 @@ import {
     While,
     subexprs,
 } from "./expr.aipl";
-import { ParseFailure, aipl_parse_file } from "./grammar_aipl.aipl";
+import { ParseFailure, aipl_parse_surface_file } from "./grammar_aipl.aipl";
 import {
     Const,
     Fn,
@@ -185,6 +191,8 @@ fn own_names(self: Expr) -> #{str} {
         // `if (let P = e)` is one arm without the `match`; its pattern names a
         // constructor just as an arm's does.
         IfLet(arm, _, _) => arm.pattern.ctor_names(),
+        // A destructuring `let` or `for` names the struct or case it takes apart.
+        LetPattern(pattern, _, _) | ForPattern(pattern, _, _, _) => pattern.destructure_names(),
         Num(..)
         | Bool(..)
         | Str(..)
@@ -208,6 +216,15 @@ fn own_names(self: Expr) -> #{str} {
         | TupleLit(..)
         | KwArg(..)
         | TypeArgs(..) => #{},
+    }
+}
+
+# The type or case a destructuring pattern names: a tuple names none.
+fn destructure_names(self: Destructure) -> #{str} {
+    match (self) {
+        ByTuple(..) => #{},
+        ByCase(case_name, _) => path_names(case_name),
+        ByStruct(struct_name, _, _, _) => #{struct_name},
     }
 }
 
@@ -263,7 +280,7 @@ fn ty_names(self: Ty) -> #{str} {
 }
 
 fn dead_names(src: str) -> str[]!ParseFailure {
-    ok(unused_imports(aipl_parse_file(src)?.program)$message)
+    ok(unused_imports(aipl_parse_surface_file(src)?.program)$message)
 }.test({
     // Each unused name is reported, and a used one is not.
     assert(dead_names("""
@@ -273,7 +290,7 @@ fn dead_names(src: str) -> str[]!ParseFailure {
 
     // The caret goes under the name in the import list.
     let src = "import { map, filter } from builtins;\nfn f() { }";
-    assert(unused_imports(aipl_parse_file(src)?.program)$span == [9..12, 14..20]);
+    assert(unused_imports(aipl_parse_surface_file(src)?.program)$span == [9..12, 14..20]);
 
     // An alias is the local name: the operator is used, the exported name is not.
     assert(dead_names("""
