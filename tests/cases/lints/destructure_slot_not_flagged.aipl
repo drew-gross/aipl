@@ -1,0 +1,34 @@
+# Shapes the slot lint leaves alone. Each would need a pattern that could not stand
+# in for the name, or that the author already wrote.
+
+import { print, wrapping_add as + } from builtins;
+
+struct Pos { line: i64, col: i64 }
+
+variant Shape = Dot(Pos)
+
+fn show(Pos { line }) -> i64 { line }
+
+// The slot is passed on whole, so it is more than its fields.
+fn whole(Dot(pos)) -> i64 { show(pos) + pos.col }
+
+// A field's name is already spoken for in the body.
+fn spoken_for(Dot(pos), line: i64) -> i64 { pos.line + line }
+
+// The same field is read off two values, which the names of the values tell apart.
+fn shared(Dot(pos), other: Pos) -> i64 { pos.line + other.line }
+
+// The pattern already takes it apart.
+fn nested(Dot(Pos { line, col })) -> i64 { line + col }
+
+// A slot nothing reads from.
+fn unused(Dot(pos)) -> i64 { 1 }
+
+fn main() !prints {
+    let dot = Dot(Pos { line: 1, col: 2 });
+    print(
+        `{whole(dot) + spoken_for(dot, 1) + shared(dot, Pos { line: 1, col: 1 }) + nested(dot) + unused(dot)}`,
+    );
+}
+--- stdout ---
+11

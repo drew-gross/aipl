@@ -94,6 +94,42 @@ pub fn uses_of(self: Expr, name: str) -> Uses {
     assert(!uses("{ let q = 1; p.a }", "p")?.shadowed);
 })
 
+# The fields `self` reads off `name`, when every use of `name` in it is a field read
+# and nothing holds a pattern back: the name is not rebound, no field is also read
+# off another value, none is a tuple position, and no field's name is already
+# spoken for in `self`. `reads` are the field reads in scope of `name`, which is
+# what tells a field read off two values apart.
+pub fn sole_fields(self: Expr, name: str, reads: Read[]) -> str[]? {
+    let Uses { mentions, field_reads, fields, shadowed } = self.uses_of(name);
+    if (shadowed || field_reads == 0 || field_reads != mentions) {
+        return none;
+    };
+    if (fields.is_shared(reads, []) || fields.any(is_tuple_field)) {
+        return none;
+    };
+
+    // The name itself is exempt: it is the one going away, and every mention of it
+    // is the base of a read the pattern replaces.
+    if (self.mentions_any(fields, some(name))) {
+        return none;
+    };
+    some(fields)
+}.test({
+    fn sole(src: str, name: str) -> str[]?!ParseError {
+        let body = lower_aipl_block_surface(src)?;
+        ok(body.sole_fields(name, body.field_reads()))
+    }
+    assert(sole("{ f(p.a, p.b) }", "p")? == some(["a", "b"]));
+    // A bare mention keeps the value whole.
+    assert(sole("{ f(p, p.a) }", "p")? == none);
+    // A field spoken for, a tuple position, a rebinding, a field read off two values.
+    assert(sole("{ f(a, p.a) }", "p")? == none);
+    assert(sole("{ p._0 }", "p")? == none);
+    assert(sole("{ let p = 1; p.a }", "p")? == none);
+    assert(sole("{ f(p.a, q.a) }", "p")? == none);
+    assert(sole("{ 1 }", "p")? == none);
+})
+
 # Whether `self` is the bare name `name`.
 pub fn is_name(self: Expr, name: str) -> bool {
     match (self.kind) {

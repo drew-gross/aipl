@@ -1,0 +1,53 @@
+# A name a pattern binds whose every use is a field read: the pattern can take the
+# value apart itself, one level down. The slot's type is not written in the file, so
+# the advice leaves it as `<Type>`.
+
+import { wrapping_add as + } from builtins;
+
+struct Pos { line: i64, col: i64 }
+
+variant Shape = Dot(Pos)
+
+// A case parameter's payload.
+fn dot(Dot(pos)) -> i64 { pos.line + pos.col }
+
+// The same on a named parameter, beside another slot of the pattern.
+variant Pair = Both(Pos, i64)
+
+fn both(self: Both(pos, n)) -> i64 { pos.line + n }
+
+// A `let` over a case.
+fn opened(shape: Shape) -> i64 {
+    let Dot(pos) = shape;
+    pos.col
+}
+
+// A `let` over a tuple.
+fn paired(pair: (Pos, i64)) -> i64 {
+    let (pos, n) = pair;
+    pos.line + n
+}
+--- errors ---
+error: only the fields of "pos" are read — destructure it in the pattern instead: "Dot(<Type> { line, col })" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_destructure_slot.aipl:12:27
+   |
+12 | fn dot(Dot(pos)) -> i64 { pos.line + pos.col }
+   |                           ^^^^^^^^^^^^^^^^^^
+
+error: only the fields of "pos" are read — destructure it in the pattern instead: "Both(<Type> { line }, n)" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_destructure_slot.aipl:17:38
+   |
+17 | fn both(self: Both(pos, n)) -> i64 { pos.line + n }
+   |                                      ^^^^^^^^^^^^
+
+error: only the fields of "pos" are read — destructure it in the pattern instead: "Dot(<Type> { col })" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_destructure_slot.aipl:21:20
+   |
+21 |     let Dot(pos) = shape;
+   |                    ^^^^^
+
+error: only the fields of "pos" are read — destructure it in the pattern instead: "(<Type> { line }, n)" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_destructure_slot.aipl:27:20
+   |
+27 |     let (pos, n) = pair;
+   |                    ^^^^

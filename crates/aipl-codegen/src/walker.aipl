@@ -1391,11 +1391,11 @@ fn one_param(self: W) -> WDoc!FmtError {
         });
     };
     if (n.w.peek_text() == "(") {
-        let ids = n.w.bump().w.ident_list(")", []);
-        let closed = ids.w.expect(")")?.w;
+        let slots = n.w.bump().w.pattern_list(")", [])?;
+        let closed = slots.w.expect(")")?.w;
         return ok(WDoc {
             w: closed,
-            doc: Concat([..m.docs, Text(`{n.text}({ids.names.join(sep=", ")})`)]),
+            doc: Concat([..m.docs, Text(n.text), flat_parens(slots.docs)]),
         });
     };
 
@@ -1414,10 +1414,12 @@ fn one_param(self: W) -> WDoc!FmtError {
         return ok(WDoc { w: closed, doc: Concat([..m.docs, named, Text(": "), t.doc, pattern]) });
     };
     if (t.w.peek_text() == "(") {
-        let ids = t.w.bump().w.ident_list(")", []);
-        let closed = ids.w.expect(")")?.w;
-        let pattern = Text(`({ids.names.join(sep=", ")})`);
-        return ok(WDoc { w: closed, doc: Concat([..m.docs, named, Text(": "), t.doc, pattern]) });
+        let slots = t.w.bump().w.pattern_list(")", [])?;
+        let closed = slots.w.expect(")")?.w;
+        return ok(WDoc {
+            w: closed,
+            doc: Concat([..m.docs, named, Text(": "), t.doc, flat_parens(slots.docs)]),
+        });
     };
     let typed = [..m.docs, named, Text(": "), t.doc];
     // The variadic marker: `*` or `+`.

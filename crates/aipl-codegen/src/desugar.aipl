@@ -18,9 +18,12 @@ import {
     equal as ==,
     extend,
     greater_than as >,
+    is_empty,
     len,
+    logical_and as &&,
     logical_not as !,
     map,
+    not_equal as !=,
     push,
     range,
     right_fold,
@@ -31,6 +34,7 @@ import {
 } from builtins;
 import {
     ByCase,
+    ByPattern,
     ByStruct,
     ByTuple,
     Destructure,
@@ -82,7 +86,9 @@ import {
     Pat,
     Tuple,
     Wildcard,
+    is_binder_name,
     nested_or_ctor,
+    pat_bindings,
 } from "./pat.aipl";
 import { Named as TyNamed } from "./ty.aipl";
 
@@ -216,7 +222,7 @@ fn lifted_arm(self: MatchArm) -> MatchArm {
     let body = structs.right_fold(
         self.body,
         |found: Found, rest: Expr| {
-            let Found { binder, struct_name, fields, names, temporary } = found;
+            let Found { binder, struct_name, fields, names, temporary } = found.bound_only();
             destructure_struct(
                 struct_name,
                 fields,
@@ -230,6 +236,19 @@ fn lifted_arm(self: MatchArm) -> MatchArm {
         },
     );
     MatchArm { ..self, pattern, body }
+}
+
+# `self` with the fields bound to `_` dropped: they are not read.
+fn bound_only(self: Found) -> Found {
+    mut fields: str[] = [];
+    mut names: str[] = [];
+    for (let i, name : self.names) {
+        if (name != "_") {
+            set fields.push(self.fields[i].value_or(""));
+            set names.push(name);
+        };
+    }
+    Found { ..self, fields, names }
 }
 
 # A struct pattern taken out of a pattern: the binder that stands in for it, what
@@ -314,6 +333,11 @@ fn let_pattern(pattern: Destructure, value: Expr, body: Expr) -> Expr {
             mutable,
             `__spat${span.start}`,
         ),
+        ByPattern(pattern) => {
+            let tmp = `__cpat${span.start}`;
+            let inner = bind_pattern(pattern, tmp, span, body);
+            at(Let(tmp, none, value, inner), join_spans(span, inner.span))
+        },
     }
 }
 
@@ -338,6 +362,7 @@ fn for_pattern(pattern: Destructure, iterable: Expr, body: Expr, index: str?) ->
             mutable,
             `__spat${span.start}`,
         ),
+        ByPattern(pattern) => bind_pattern(pattern, tmp, span, body),
     };
     at(For(tmp, iterable, inner, index=index), join_spans(span, inner.span))
 }
@@ -385,22 +410,73 @@ fn bind_fields_mut(
 # keeps `rest` out of an arm: a block that is an expression may not assign to a
 # binding from outside it.
 fn bind_arm(case_name: str, names: str[], tmp: str, span: Span, rest: Expr) -> Expr {
+    bind_pattern(PatCtor(case_name, bindings=names), tmp, span, rest)
+}
+
+# The same for any pattern: a `match` of `pattern` per name it binds, with the
+# other names left unbound. Struct patterns inside it become binders and reads in
+# front of the arm's body, as in any other arm.
+fn bind_pattern(pattern: Pat, tmp: str, span: Span, rest: Expr) -> Expr {
+    let names = pattern.pat_bindings();
     mut result = rest;
     mut i = names.len();
     while (i > 0) {
         set i--;
         let name = names[i].value_or("");
-        let slot = i;
-        let slots = names.range().map(|j| if (j == slot) { name } else { "_" });
         let arm = MatchArm {
-            pattern: PatCtor(case_name, bindings=slots),
+            pattern: pattern.keeping(name),
             body: at(Ident(name), span),
             span,
-        };
+        }.lifted_arm();
         let read = at(Match(at(Ident(tmp), span), [arm]), span);
         set result = at(Let(name, none, read, result), join_spans(span, result.span));
     }
     result
+}
+
+# `self` with every name but `name` left unbound: `_` where a binder stood.
+fn keeping(self: Pat, name: str) -> Pat {
+    match (self) {
+        Ctor(case_name, bindings, ignore) => {
+            if (bindings.is_empty() && !ignore) {
+                // A bare name is a binder or a case, which the spelling tells apart.
+                return if (case_name.is_binder_name() && case_name != name) {
+                    Wildcard
+                } else {
+                    self
+                };
+            };
+            Ctor(
+                case_name,
+                bindings=bindings.map(|b| if (b == name) { b } else { "_" }),
+                ignore_payload=ignore,
+            )
+        },
+        Nested(case_name, args) => Nested(case_name, args$keeping(name)),
+        Tuple(elements) => Tuple(elements$keeping(name)),
+        ArrayNested(elements) => ArrayNested(elements$keeping(name)),
+        // A struct pattern with nothing left to bind reads no field, so it matches
+        // anything, as `_` does: the arm that keeps one of its names checks its type.
+        Struct(struct_name, fields, names) => {
+            if (!names.contains(name)) {
+                return Wildcard;
+            };
+            Pat.Struct(struct_name, fields, names.map(|n| if (n == name) { n } else { "_" }))
+        },
+        Array(elements) => Array(elements$keeping_ident(name)),
+        ArrayRest(elements) => ArrayRest(elements$keeping_ident(name)),
+        Str(..) | Char(..) | Wildcard | Int(..) => self,
+    }
+}
+
+# An array pattern's element, `_` unless it is the binder `name`.
+fn keeping_ident(self: Expr, name: str) -> Expr {
+    if (let Ident(bound) = self.kind) {
+        if (bound != name) {
+            return at(Ident("_"), self.span);
+        };
+    };
+    self
 }
 
 # `let T { a, b } = value; rest` and its `mut` twin, as nested bindings. The
@@ -446,6 +522,7 @@ fn bind_one_param(p: Param, body: Expr) -> Expr {
                 at(Let(name, none, value, result), join_spans(span, result.span))
             },
         ),
+        ByPattern(pattern) => bind_pattern(pattern, p.name, span, body),
         ByTuple(..) => body,
     }
 }

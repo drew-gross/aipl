@@ -19,7 +19,7 @@ import {
     value_or,
     zip_with,
 } from builtins;
-import { Ctor, Pat, show_pat } from "./pat.aipl";
+import { Ctor, Pat, pat_bindings, show_pat } from "./pat.aipl";
 import { I64 } from "./prim.aipl";
 import {
     Array,
@@ -145,6 +145,11 @@ variant Destructure =
     | ByTuple(names: str[])
     | ByCase(case_name: str, names: str[])
     | ByStruct(struct_name: str, fields: str[], names: str[], mutable: bool)
+    # A pattern with something nested in it, `Case(Point { x, y })` or
+    # `(Point { x }, n)`, which the forms above cannot spell. It is read the way a
+    # `match` arm is, so it is any pattern an arm takes; whether it can fail to
+    # match is for the type checker to say, as it is for `ByCase`.
+    | ByPattern(pattern: Pat)
 
 # Two spans as the one that covers both — `aipl_syntax::join_spans`, mirrored.
 #
@@ -350,8 +355,15 @@ fn show_destructure(self: Destructure) -> str {
             );
             `{if (mutable) { "mut " } else { "" }}{struct_name} \{ {reads.join(sep=", ")} }`
         },
+        ByPattern(pattern) => pattern.show_pat(),
     }
 }.test({
+    assert(
+        ByPattern(Pat.Tuple([
+            Pat.Struct("P", ["x"], ["x"]),
+            Ctor("n"),
+        ])).show_destructure() == "(P { x }, n)",
+    );
     assert(ByTuple(["a", "b"]).show_destructure() == "(a, b)");
     assert(ByCase("Pair", ["a", "_"]).show_destructure() == "Pair(a, _)");
     assert(ByStruct("P", ["x", "y"], ["x", "b"], false).show_destructure() == "P { x, y as b }");
@@ -682,7 +694,7 @@ fn pattern_reads(self: Expr) -> Read[] {
 pub fn reads_off(self: Destructure, base: str) -> Read[] {
     match (self) {
         ByStruct(_, fields, _, _) => fields.map(|field| Read { field, base }),
-        ByTuple(..) | ByCase(..) => [],
+        ByTuple(..) | ByCase(..) | ByPattern(..) => [],
     }
 }.test({
     assert(ByStruct("P", ["x", "y"], ["a", "b"], false).reads_off("v") == [
@@ -697,8 +709,10 @@ pub fn reads_off(self: Destructure, base: str) -> Read[] {
 pub fn binders(self: Destructure) -> str[] {
     match (self) {
         ByTuple(names) | ByCase(_, names) | ByStruct(_, _, names, _) => names,
+        ByPattern(pattern) => pattern.pat_bindings(),
     }
 }.test({
+    assert(ByPattern(Pat.Nested("some", [Pat.Struct("P", ["x"], ["b"])])).binders() == ["b"]);
     assert(ByTuple(["a", "b"]).binders() == ["a", "b"]);
     assert(ByCase("C", ["a"]).binders() == ["a"]);
     assert(ByStruct("P", ["x", "y"], ["x", "b"], false).binders() == ["x", "b"]);

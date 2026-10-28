@@ -34,7 +34,6 @@
 
 import {
     Span,
-    any,
     as_case,
     collect_arms,
     equal as ==,
@@ -48,9 +47,9 @@ import {
 } from builtins;
 import { ByStruct, Expr, LetPattern, Read, field_reads } from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
-import { Fn, One, Param, Program, pattern_reads } from "../item.aipl";
+import { Fn, Function, One, Param, Program, pattern_reads } from "../item.aipl";
 import { Named } from "../ty.aipl";
-import { Uses, is_name, is_shared, is_tuple_field, mentions_any, uses_of } from "./field_uses.aipl";
+import { Uses, is_name, sole_fields, uses_of } from "./field_uses.aipl";
 import { LintHit, hit } from "./lint_hit.aipl";
 
 # A hit for each parameter of the program that only its fields are read from.
@@ -61,9 +60,9 @@ pub fn destructure_param(Program { items }) -> LintHit[] {
 # The hits in a function's signature. The reads are those of the whole body, so
 # that a field read off two bases anywhere in it counts against each parameter it
 # belongs to; the destructured parameters make reads of their own.
-fn function_hits(self: Fn(function)) -> LintHit[] {
-    let reads = [..function.sig.params$pattern_reads().join(), ..function.body.field_reads()];
-    function.sig.params$param_hits(function.body, reads).join()
+fn function_hits(self: Fn(Function { sig, body })) -> LintHit[] {
+    let reads = [..sig.params$pattern_reads().join(), ..body.field_reads()];
+    sig.params$param_hits(body, reads).join()
 }
 
 # The hit for one parameter, or none.
@@ -74,26 +73,17 @@ fn param_hits(self: Param, body: Expr, reads: Read[]) -> LintHit[] {
     let Named(struct_name) = self.ty else {
         return [];
     };
-    let Uses { mentions, field_reads, fields, shadowed } = body.uses_of(self.name);
+    let Uses { mentions, field_reads, shadowed, fields as _ } = body.uses_of(self.name);
     if (!shadowed && field_reads == 0 && mentions == 1) {
         if (let some((value_span, opening)) = body.opening_destructure(self.name, struct_name)) {
             return [hit(opening_message(self.name, struct_name, opening), value_span)];
         };
     };
-    if (shadowed || field_reads == 0 || field_reads != mentions) {
-        return [];
-    };
 
     // There is no right-hand side to discount here the way a `let` has one: a
     // parameter is bound before the body runs, so every read in the function is one
     // the pattern's names would have to live alongside.
-    if (fields.is_shared(reads, []) || fields.any(is_tuple_field)) {
-        return [];
-    };
-
-    // The parameter's own name is exempt, as the binding's is: it is the name going
-    // away, and every mention of it is the base of a read the pattern replaces.
-    if (body.mentions_any(fields, some(self.name))) {
+    let some(fields) = body.sole_fields(self.name, reads) else {
         return [];
     };
 

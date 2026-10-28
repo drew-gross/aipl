@@ -790,7 +790,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$68632: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$69288: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1447,7 +1447,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$106459: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$107231: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -2161,9 +2161,37 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-arm_param">arm_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn arm_param(name: str, case_name: str, names: str[], span: Span) -&#62; Ast</code></pre>
+          <pre class="signature"><code>fn arm_param(name: str, case_name: str, pattern: Pat, span: Span) -&#62; Ast</code></pre>
 
           <div class="doc"><p>A parameter named <code>name</code>, of the type <code>case_name</code> — the case of its variant and no other — whose payload is bound to <code>names</code> at the top of the body.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-case_pattern">
+          <h3>
+            <a class="anchor" href="#item-case_pattern">case_pattern</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn case_pattern(case_name: str, payload: Ast, span: Span) -&#62; Pat!ParseError</code></pre>
+
+          <div class="doc"><p>The pattern <code>case_name(..slots..)</code> writes: its <code>payload</code> child holds the slots, or says they are ignored.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-destructure">
+          <h3>
+            <a class="anchor" href="#item-destructure">destructure</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn destructure(self: Pat) -&#62; Destructure</code></pre>
+
+          <div class="doc"><p>A pattern as the binding it makes: a case whose slots are all plain names is the <code>ByCase</code> form, and anything else is taken as the pattern it is.</p></div>
 
 
         </section>
@@ -2175,7 +2203,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-destructured_param">destructured_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$142769: FieldBinders, span: Span) -&#62; Ast</code></pre>
+          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$144428: FieldBinders, span: Span) -&#62; Ast</code></pre>
 
           <div class="doc"><p>A parameter named <code>name</code>, of the struct <code>struct_name</code>, whose <code>fields</code> are bound to <code>names</code> at the top of the body.</p></div>
 
@@ -2441,7 +2469,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$158727: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$160386: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -2772,6 +2800,20 @@ if (let some(..) = target[__iset$N]) {
 
 
 
+        <section class="item" id="item-case_payload">
+          <h3>
+            <a class="anchor" href="#item-case_payload">case_payload</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn case_payload() -&#62; Rule&#60;AiplTok&#62;</code></pre>
+
+          <div class="doc"><p>The braces of a struct pattern: the fields it reads, each optionally bound under another name — <code>Point { x, y as py }</code>. The field leads and the name it is bound as follows <code>as</code>, so the pattern reads like the import that renames (<code>wrapping_add as +</code>) and a reader can tell which side is the struct's. <code>(a, b)</code> after a case's name: one binder per payload slot, <code>_</code> for a slot not wanted. Only a <code>let</code>, a <code>for</code> and a parameter take one, and only over a value that can be nothing but that case.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-arm_binders">
           <h3>
             <a class="anchor" href="#item-arm_binders">arm_binders</a>
@@ -2779,7 +2821,7 @@ if (let some(..) = target[__iset$N]) {
           </h3>
           <pre class="signature"><code>fn arm_binders() -&#62; Rule&#60;AiplTok&#62;</code></pre>
 
-          <div class="doc"><p>The braces of a struct pattern: the fields it reads, each optionally bound under another name — <code>Point { x, y as py }</code>. The field leads and the name it is bound as follows <code>as</code>, so the pattern reads like the import that renames (<code>wrapping_add as +</code>) and a reader can tell which side is the struct's. <code>(a, b)</code> after a case's name: one binder per payload slot, <code>_</code> for a slot not wanted. Only a <code>let</code>, a <code>for</code> and a parameter take one, and only over a value that can be nothing but that case.</p></div>
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>

@@ -105,7 +105,7 @@ misc cleanup:
   function_hits in body type stutter can only ever return one, make it LintHint? instead of LintHint[]
   is_shorthand should disappear into is_case (with lint)
   retructure how the lints manage names. There should be shared infrastructure for managing names (i.e. if a builtin is being requested, and is already imported, request the already-imported name. If that name is taken, suggest something else. If a function being checked for is imported with an atypical name, the lint should fire anyway)
-  unify destructure param and destructure binding
+  unify destructure param, destructure binding, and destructure slot
   request nested destructuring e.g function_hits(self: Fn(function)) can be function_hits(self: Fn(Function { body, sig, ...}))
   in Stmt move the span out of the variant
   is_name should be self.kind == Ident(name)
@@ -114,6 +114,7 @@ misc cleanup:
   collect_arms should accept a type param, not a case as a value
   use SpanStr in ImportSource and other parts of linter
   renames:
+    sig -> signature
     tok -> token
     subexprs -> subexpressions
     ty -> type

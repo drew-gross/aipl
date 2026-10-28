@@ -1714,6 +1714,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./lint/field_uses.aipl",
     "./lint/destructure_binding.aipl",
     "./lint/destructure_param.aipl",
+    "./lint/destructure_slot.aipl",
     "./lint/fn_body_type_stutter.aipl",
     "./lint/lint.aipl",
     "./parse_and_partial_load.aipl",

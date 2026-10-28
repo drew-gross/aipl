@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/destructure_slot.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/destructure_slot.aipl</code></h1>
+
+      <div class="module-doc"><p>The <code>destructure_slot</code> lint: a name a pattern binds — the payload of a case, a position of a tuple — whose every use is a field read. The pattern can take that value apart itself, one level down:</p><pre><code>fn f(self: Fn(function)) { function.sig .. function.body }
+fn f(self: Fn(Function { sig, body })) { sig .. body }
+</code></pre><p>The same argument <code>destructure_param</code> and <code>destructure_binding</code> make about a parameter and a <code>let</code>, one pattern further in. It applies to a pattern of either of them: a parameter's case pattern, and a <code>let</code> over a case or a tuple.</p><p>The slot's type is not written anywhere in the file, so the advice leaves it as a placeholder, as <code>destructure_binding</code> does for a <code>let</code> with no annotation.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-destructure_slot">
+          <h3>
+            <a class="anchor" href="#item-destructure_slot">destructure_slot</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn destructure_slot(__spat$1373: Program) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>A hit for each slot of a pattern in the program that is only read by field.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Slot">
+          <h3>
+            <a class="anchor" href="#item-Slot">Slot</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Slot</code></pre>
+
+          <div class="doc"><p>A name a pattern binds, and the fields its uses read.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-function_hits">
+          <h3>
+            <a class="anchor" href="#item-function_hits">function_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn function_hits(self: Fn) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hits in a function: its parameters' patterns, and the <code>let</code>s in its body. The reads are those of the whole body and of the parameters' own patterns, so a field read off two values anywhere counts against each slot it belongs to.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-param_hits">
+          <h3>
+            <a class="anchor" href="#item-param_hits">param_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn param_hits(self: Param, body: Expr, reads: Read[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hits in one parameter's case pattern. The body's span starts at the <code>{</code> that opens it, a single line that survives the formatter and the closest one to the signature that a parameter can be blamed on.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-let_hits">
+          <h3>
+            <a class="anchor" href="#item-let_hits">let_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn let_hits(self: Expr, reads: Read[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hits in a <code>let</code> over a case or a tuple, at its value.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slots_read_by_field">
+          <h3>
+            <a class="anchor" href="#item-slots_read_by_field">slots_read_by_field</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn slots_read_by_field(self: str[], body: Expr, reads: Read[]) -&#62; Slot[]</code></pre>
+
+          <div class="doc"><p>The names of <code>self</code> that <code>body</code> only reads by field. The parser's own temporaries are not the author's to rewrite, and <code>_</code> binds nothing.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-message">
+          <h3>
+            <a class="anchor" href="#item-message">message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn message(__spat$3796: Slot, rewritten: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>What is said of <code>slot</code>, whose pattern would read <code>rewritten</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-struct_slot">
+          <h3>
+            <a class="anchor" href="#item-struct_slot">struct_slot</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn struct_slot(self: Slot) -&#62; str</code></pre>
+
+          <div class="doc"><p>The slot as a struct pattern, which names a type the file does not.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-case_pattern">
+          <h3>
+            <a class="anchor" href="#item-case_pattern">case_pattern</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn case_pattern(case_name: str, names: str[], slot: Slot) -&#62; str</code></pre>
+
+          <div class="doc"><p>A case pattern over <code>names</code>, with <code>slot</code> taken apart in place.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-tuple_pattern">
+          <h3>
+            <a class="anchor" href="#item-tuple_pattern">tuple_pattern</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn tuple_pattern(names: str[], slot: Slot) -&#62; str</code></pre>
+
+          <div class="doc"><p>A tuple pattern over <code>names</code>, with <code>slot</code> taken apart in place.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-hits">
+          <h3>
+            <a class="anchor" href="#item-hits">hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn hits(src: str) -&#62; str[]!ParseFailure</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

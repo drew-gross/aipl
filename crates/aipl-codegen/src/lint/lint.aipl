@@ -9,6 +9,7 @@ import { equal as == } from builtins;
 import { Program } from "../item.aipl";
 import { destructure_binding } from "./destructure_binding.aipl";
 import { destructure_param } from "./destructure_param.aipl";
+import { destructure_slot } from "./destructure_slot.aipl";
 import { duplicate_import_source } from "./duplicate_import_source.aipl";
 import { fn_body_type_stutter } from "./fn_body_type_stutter.aipl";
 import { LintHit } from "./lint_hit.aipl";
@@ -21,6 +22,7 @@ pub fn lint(program: Program) -> LintHit[] {
         ..duplicate_import_source(program),
         ..destructure_binding(program),
         ..destructure_param(program),
+        ..destructure_slot(program),
         ..fn_body_type_stutter(program),
     ]
 }.test({

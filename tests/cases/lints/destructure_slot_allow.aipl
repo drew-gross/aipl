@@ -1,0 +1,34 @@
+# The marker squelches it, on the line the hit is reported at: the start of the body
+# for a parameter, the value for a `let`. The rewrite the lint advises sits beside
+# it, so both spellings run and are proven to agree.
+
+import { equal as ==, print, wrapping_add as + } from builtins;
+
+struct Pos { line: i64, col: i64 }
+
+variant Shape = Dot(Pos)
+
+fn squelched(Dot(pos)) -> i64 {
+    pos.line + pos.col #[allow]
+}
+
+fn rewritten(Dot(Pos { line, col })) -> i64 { line + col }
+
+fn squelched_let(shape: Shape) -> i64 {
+    let Dot(pos) = shape; #[allow]
+    pos.line + pos.col
+}
+
+fn rewritten_let(shape: Shape) -> i64 {
+    let Dot(Pos { line, col }) = shape;
+    line + col
+}
+
+fn main() !prints {
+    let dot = Dot(Pos { line: 2, col: 3 });
+    print(`{squelched(dot) == rewritten(dot)}`);
+    print(`{squelched_let(dot) == rewritten_let(dot)}`);
+}
+--- stdout ---
+true
+true

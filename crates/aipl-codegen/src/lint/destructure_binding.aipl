@@ -59,7 +59,7 @@ import {
 } from builtins;
 import { Construct, Expr, Let, Read, descendants, field_reads } from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
-import { Fn, Program, pattern_reads } from "../item.aipl";
+import { Fn, Function, Program, pattern_reads } from "../item.aipl";
 import { Named } from "../ty.aipl";
 import { Uses, is_shared, is_tuple_field, mentions_any, uses_of } from "./field_uses.aipl";
 import { LintHit, hit } from "./lint_hit.aipl";
@@ -73,9 +73,9 @@ pub fn destructure_binding(Program { items }) -> LintHit[] {
 # The hits in a function's body and in its `.test` block. The body's reads
 # include those of the function's destructured parameters, which take their
 # fields apart at the top of it; the `.test` block is outside them.
-fn function_hits(self: Fn(function)) -> LintHit[] {
-    let parameters = function.sig.params$pattern_reads().join();
-    [..function.body.body_hits(parameters), ..function.test_body$body_hits([]).value_or([])]
+fn function_hits(self: Fn(Function { sig, body, test_body })) -> LintHit[] {
+    let parameters = sig.params$pattern_reads().join();
+    [..body.body_hits(parameters), ..test_body$body_hits([]).value_or([])]
 }
 
 # The hits in one body. Every read is those of the whole body, so that a field read

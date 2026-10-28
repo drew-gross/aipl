@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">156 files, 1591 items.</p>
+      <p class="summary">157 files, 1611 items.</p>
 
       <ul class="files">
 
@@ -307,7 +307,7 @@
           <p class="file-summary">Lowering the destructuring forms, after the lints have read them.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-desugar.html#private">15 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-desugar.html#private">19 private</a></span>
 
 
           <ul class="items">
@@ -874,7 +874,7 @@
           <p class="file-summary">AIPL's own syntax, as a <code>Grammar</code> value — the third and largest consumer of the parser library, and the one the whole thing was built for. It is the only description of the language there is: every compile runs this grammar over <code>lex_aipl.aipl</code>'s token stream, the compiler's own sources included.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">193 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">196 private</a></span>
 
 
           <ul class="items">
@@ -1761,6 +1761,31 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-destructure_slot.html">crates/aipl-codegen/src/lint/destructure_slot.aipl</a>
+
+          <p class="file-summary">The <code>destructure_slot</code> lint: a name a pattern binds — the payload of a case, a position of a tuple — whose every use is a field read. The pattern can take that value apart itself, one level down:</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_slot.html#private">9 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-destructure_slot.html#item-destructure_slot"><code>destructure_slot</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-destructure_slot.html#item-Slot"><code>Slot</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-codegen-src-lint-duplicate_import_source.html">crates/aipl-codegen/src/lint/duplicate_import_source.aipl</a>
 
           <p class="file-summary">The <code>duplicate_import_source</code> lint: the same source imported on more than one line. Legal, but a reader wants everything a file takes from <code>builtins</code>, or from one path, in a single <code>import { .. }</code>; the better spelling merges the names into the first.</p>
@@ -1798,6 +1823,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-field_uses.html#item-uses_of"><code>uses_of</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-field_uses.html#item-sole_fields"><code>sole_fields</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

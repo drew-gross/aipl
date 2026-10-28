@@ -169,6 +169,20 @@
 
 
 
+        <section class="item" id="item-bound_only">
+          <h3>
+            <a class="anchor" href="#item-bound_only">bound_only</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn bound_only(self: Found) -&#62; Found</code></pre>
+
+          <div class="doc"><p><code>self</code> with the fields bound to <code>_</code> dropped: they are not read.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lifted">
           <h3>
             <a class="anchor" href="#item-lifted">lifted</a>
@@ -275,6 +289,48 @@
           <pre class="signature"><code>fn bind_arm(case_name: str, names: str[], tmp: str, span: Span, rest: Expr) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>let a = match (&lt;tmp&gt;) { Case(a, _) =&gt; a }; let b = match (&lt;tmp&gt;) { Case(_, b) =&gt; b }; rest</code>, innermost last — what <code>let Case(a, b) = value; rest</code> binds, one <code>match</code> per name. The scrutinee is a value that can only be <code>Case</code>, which is what makes each <code>match</code> exhaustive with the one arm; any other value is refused by that check. A <code>match</code> for each name, rather than one around the rest of the block, keeps <code>rest</code> out of an arm: a block that is an expression may not assign to a binding from outside it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-bind_pattern">
+          <h3>
+            <a class="anchor" href="#item-bind_pattern">bind_pattern</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn bind_pattern(pattern: Pat, tmp: str, span: Span, rest: Expr) -&#62; Expr</code></pre>
+
+          <div class="doc"><p>The same for any pattern: a <code>match</code> of <code>pattern</code> per name it binds, with the other names left unbound. Struct patterns inside it become binders and reads in front of the arm's body, as in any other arm.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-keeping">
+          <h3>
+            <a class="anchor" href="#item-keeping">keeping</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn keeping(self: Pat, name: str) -&#62; Pat</code></pre>
+
+          <div class="doc"><p><code>self</code> with every name but <code>name</code> left unbound: <code>_</code> where a binder stood.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-keeping_ident">
+          <h3>
+            <a class="anchor" href="#item-keeping_ident">keeping_ident</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn keeping_ident(self: Expr, name: str) -&#62; Expr</code></pre>
+
+          <div class="doc"><p>An array pattern's element, <code>_</code> unless it is the binder <code>name</code>.</p></div>
 
 
         </section>

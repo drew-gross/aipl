@@ -29,6 +29,7 @@ import {
     Assign,
     Bool,
     ByCase,
+    ByPattern,
     ByStruct,
     ByTuple,
     Call,
@@ -163,8 +164,13 @@ fn item_names(self: Item) -> #{str} {
     }
 }
 
-# The names a parameter mentions: its type, and its default.
-fn param_names(self: Param) -> #{str} { field_names(self.ty, self.default) }
+# The names a parameter mentions: its type, its default, and what its pattern names.
+fn param_names(self: Param) -> #{str} {
+    #{
+        ..field_names(self.ty, self.default),
+        ..self.pattern$pattern$destructure_names().value_or(#{}),
+    }
+}
 
 # The names a declared type and an optional default expression mention.
 fn field_names(ty: Ty, default: Expr?) -> #{str} {
@@ -225,6 +231,7 @@ fn destructure_names(self: Destructure) -> #{str} {
         ByTuple(..) => #{},
         ByCase(case_name, _) => path_names(case_name),
         ByStruct(struct_name, _, _, _) => #{struct_name},
+        ByPattern(pattern) => pattern.ctor_names(),
     }
 }
 

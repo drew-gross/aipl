@@ -50,6 +50,20 @@
 
 
 
+        <section class="item" id="item-sole_fields">
+          <h3>
+            <a class="anchor" href="#item-sole_fields">sole_fields</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn sole_fields(self: Expr, name: str, reads: Read[]) -&#62; str[]?</code></pre>
+
+          <div class="doc"><p>The fields <code>self</code> reads off <code>name</code>, when every use of <code>name</code> in it is a field read and nothing holds a pattern back: the name is not rebound, no field is also read off another value, none is a tuple position, and no field's name is already spoken for in <code>self</code>. <code>reads</code> are the field reads in scope of <code>name</code>, which is what tells a field read off two values apart.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-is_name">
           <h3>
             <a class="anchor" href="#item-is_name">is_name</a>

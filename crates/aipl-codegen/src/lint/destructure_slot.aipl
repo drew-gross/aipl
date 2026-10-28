@@ -1,0 +1,150 @@
+# The `destructure_slot` lint: a name a pattern binds — the payload of a case, a
+# position of a tuple — whose every use is a field read. The pattern can take that
+# value apart itself, one level down:
+#
+#     fn f(self: Fn(function)) { function.sig .. function.body }
+#     fn f(self: Fn(Function { sig, body })) { sig .. body }
+#
+# The same argument `destructure_param` and `destructure_binding` make about a
+# parameter and a `let`, one pattern further in. It applies to a pattern of either
+# of them: a parameter's case pattern, and a `let` over a case or a tuple.
+#
+# The slot's type is not written anywhere in the file, so the advice leaves it as a
+# placeholder, as `destructure_binding` does for a `let` with no annotation.
+
+import {
+    collect_arms,
+    contains,
+    equal as ==,
+    join,
+    logical_and as &&,
+    logical_not as !,
+    map,
+    not_equal as !=,
+    push,
+} from builtins;
+import { ByCase, ByTuple, Expr, LetPattern, Read, descendants, field_reads } from "../expr.aipl";
+import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
+import { Fn, Function, Param, ParamPattern, Program, pattern_reads } from "../item.aipl";
+import { sole_fields } from "./field_uses.aipl";
+import { LintHit, hit } from "./lint_hit.aipl";
+
+# A hit for each slot of a pattern in the program that is only read by field.
+pub fn destructure_slot(Program { items }) -> LintHit[] {
+    items.collect_arms(Fn)$function_hits().join()
+}
+
+# The hits in a function: its parameters' patterns, and the `let`s in its body. The
+# reads are those of the whole body and of the parameters' own patterns, so a field
+# read off two values anywhere counts against each slot it belongs to.
+fn function_hits(self: Fn(Function { sig, body })) -> LintHit[] {
+    let reads = [..sig.params$pattern_reads().join(), ..body.field_reads()];
+    [..sig.params$param_hits(body, reads).join(), ..body.descendants()$let_hits(reads).join()]
+}
+
+# The hits in one parameter's case pattern. The body's span starts at the `{` that
+# opens it, a single line that survives the formatter and the closest one to the
+# signature that a parameter can be blamed on.
+fn param_hits(self: Param, body: Expr, reads: Read[]) -> LintHit[] {
+    let some(ParamPattern { pattern, span as _ }) = self.pattern else {
+        return [];
+    };
+    let ByCase(case_name, names) = pattern else {
+        return [];
+    };
+    names
+        .slots_read_by_field(body, reads)
+        .map(|slot| hit(message(slot, case_pattern(case_name, names, slot)), body.span))
+}
+
+# The hits in a `let` over a case or a tuple, at its value.
+fn let_hits(self: Expr, reads: Read[]) -> LintHit[] {
+    let LetPattern(pattern, value, body) = self.kind else {
+        return [];
+    };
+    match (pattern) {
+        ByCase(case_name, names) => names
+            .slots_read_by_field(body, reads)
+            .map(|slot| hit(message(slot, case_pattern(case_name, names, slot)), value.span)),
+        ByTuple(names) => names
+            .slots_read_by_field(body, reads)
+            .map(|slot| hit(message(slot, tuple_pattern(names, slot)), value.span)),
+        _ => [],
+    }
+}
+
+# A name a pattern binds, and the fields its uses read.
+struct Slot { name: str, fields: str[] }
+
+# The names of `self` that `body` only reads by field. The parser's own
+# temporaries are not the author's to rewrite, and `_` binds nothing.
+fn slots_read_by_field(self: str[], body: Expr, reads: Read[]) -> Slot[] {
+    mut found: Slot[] = [];
+    for (let name : self) {
+        if (name != "_" && !name.contains("$")) {
+            if (let some(fields) = body.sole_fields(name, reads)) {
+                set found.push(Slot { name, fields });
+            };
+        };
+    }
+    found
+}
+
+# What is said of `slot`, whose pattern would read `rewritten`.
+fn message(Slot { name }, rewritten: str) -> str {
+    `only the fields of "{name}" are read — destructure it in the pattern instead: "{rewritten}"`
+}
+
+# The slot as a struct pattern, which names a type the file does not.
+fn struct_slot(self: Slot { fields }) -> str { `<Type> \{ {fields.join(sep=", ")} }` }
+
+# A case pattern over `names`, with `slot` taken apart in place.
+fn case_pattern(case_name: str, names: str[], slot: Slot) -> str {
+    `{case_name}({names.map(|n| if (n == slot.name) { slot.struct_slot() } else { n }).join(sep=", ")})`
+}
+
+# A tuple pattern over `names`, with `slot` taken apart in place.
+fn tuple_pattern(names: str[], slot: Slot) -> str {
+    `({names.map(|n| if (n == slot.name) { slot.struct_slot() } else { n }).join(sep=", ")})`
+}
+
+fn hits(src: str) -> str[]!ParseFailure {
+    ok(destructure_slot(aipl_parse_surface_file(src)?.program)$message)
+}.test({
+    let function = Slot { name: "function", fields: ["sig", "body"] };
+
+    // A parameter's case payload that is only read by field.
+    assert(hits("fn f(self: Fn(function), n: i64) -> i64 { function.sig + function.body }")? == [
+        message(function, "Fn(<Type> { sig, body })"),
+    ]);
+    assert(hits("fn f(Fn(function)) -> i64 { function.sig + function.body }")? == [
+        message(function, "Fn(<Type> { sig, body })"),
+    ]);
+
+    // Beside other slots, which stay as they were.
+    assert(hits("fn f(Pair(a, function)) -> i64 { a + function.sig + function.body }")? == [
+        message(function, "Pair(a, <Type> { sig, body })"),
+    ]);
+
+    // A `let` over a case or a tuple.
+    assert(hits("fn f(v: V) -> i64 { let Fn(function) = v; function.sig + function.body }")? == [
+        message(function, "Fn(<Type> { sig, body })"),
+    ]);
+    assert(hits(
+        "fn f(t: (P, i64)) -> i64 { let (function, n) = t; function.sig + function.body + n }",
+    )? == [message(function, "(<Type> { sig, body }, n)")]);
+
+    // The slot is used whole, or read off a tuple position, or not at all.
+    assert(hits("fn f(Fn(function)) -> i64 { g(function); function.sig }")? == []);
+    assert(hits("fn f(Fn(function)) -> i64 { function._0 }")? == []);
+    assert(hits("fn f(Fn(function)) -> i64 { 1 }")? == []);
+
+    // The name a field would bind is spoken for, or the field is read off two values.
+    assert(hits("fn f(Fn(function), sig: i64) -> i64 { function.sig + sig }")? == []);
+    assert(hits("fn f(Fn(function), other: P) -> i64 { function.sig + other.sig }")? == []);
+
+    // A pattern that is already nested, a struct parameter, and a plain named parameter
+    // are the other lints' business.
+    assert(hits("fn f(Fn(P { sig })) -> i64 { sig }")? == []);
+    assert(hits("fn f(p: P) -> i64 { p.sig }")? == []);
+})
