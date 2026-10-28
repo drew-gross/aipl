@@ -1711,7 +1711,9 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./lint_hit.aipl",
     "./unused_imports.aipl",
     "./duplicate_import_source.aipl",
+    "./field_uses.aipl",
     "./destructure_binding.aipl",
+    "./destructure_param.aipl",
     "./lint.aipl",
     "./parse_and_partial_load.aipl",
     // The formatter: `format_source` is the whole pipeline, and its walker

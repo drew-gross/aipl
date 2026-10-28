@@ -14,7 +14,6 @@
 mod arm_block_value;
 mod char_set_literal;
 mod compound_assign;
-mod destructure_param;
 mod eta_lambda;
 mod extend_longhand;
 mod field_init_shorthand;
@@ -52,12 +51,11 @@ mod with_value_or_self;
 
 use crate::ast::{Expr, ExprKind, Function, ImportSource, Item, Program};
 use crate::{each_expr, each_subexpr, Error, Span};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use self::arm_block_value::arm_block_value;
 use self::char_set_literal::char_set_literal;
 use self::compound_assign::{compound_assign, matching_compound};
-use self::destructure_param::destructure_param;
 use self::eta_lambda::{eta_lambda, Forwarding};
 use self::extend_longhand::{extend_longhand, extend_names};
 use self::field_init_shorthand::field_init_shorthand;
@@ -294,10 +292,9 @@ pub fn check(
         });
     }
     // The lints ported to AIPL ran with the parse: `unused_imports`,
-    // `duplicate_import_source` and `destructure_binding`, so far. Their place in
-    // the order among the lints still written in Rust is kept.
+    // `duplicate_import_source`, `destructure_binding` and `destructure_param`, so
+    // far. Their place in the order among the lints still written in Rust is kept.
     hits.extend(ported);
-    destructure_param(program, &mut hits);
     fn_body_type_stutter(program, src, &mut hits);
     hits.retain(|e| match &e.span {
         Some(sp) => {
@@ -448,8 +445,8 @@ fn root_name(e: &Expr) -> Option<&str> {
     }
 }
 
-/// Whether `e` mentions `name` as a bare identifier anywhere. The singular of
-/// [`mentions_any`], and asked by every lint whose rewrite drops a binding or
+/// Whether `e` mentions `name` as a bare identifier anywhere. Asked by every lint
+/// whose rewrite drops a binding or
 /// splits one statement into several — either way the question is whether some
 /// sub-expression still refers to it.
 fn mentions(e: &Expr, name: &str) -> bool {
@@ -547,134 +544,6 @@ fn quote<'a>(e: &Expr, src: &'a str, placeholder: &'a str) -> &'a str {
         text
     } else {
         placeholder
-    }
-}
-
-// ---------- what `destructure_param` asks ----------
-//
-// `destructure_param` asks whether a parameter can become a pattern: whether
-// every use of it is a field read, and whether the names the pattern would bind
-// are free. `destructure_binding`, in `destructure_binding.aipl`, asks the same
-// of a `let`; the two answer it with the same rules.
-
-/// Every `base.field` read in `e`, counted per `(field, base)` pair.
-///
-/// Counted rather than collected because [`shared_fields`] subtracts one
-/// subtree's reads from another's.
-fn field_reads(e: &Expr) -> HashMap<(String, String), usize> {
-    let mut out: HashMap<(String, String), usize> = HashMap::new();
-    each_subexpr(e, &mut |x| {
-        if let ExprKind::Field(base, f) = &x.kind {
-            if let ExprKind::Ident(b) = &base.kind {
-                *out.entry((f.clone(), b.clone())).or_default() += 1;
-            }
-        }
-    });
-    out
-}
-
-/// Field names read off more than one base, discounting the reads inside
-/// `exclude` when there is one — a `let`'s own right-hand side, which runs
-/// before the pattern binds anything.
-fn shared_fields(
-    all: &HashMap<(String, String), usize>,
-    exclude: Option<&Expr>,
-) -> HashSet<String> {
-    let inside = exclude.map(field_reads).unwrap_or_default();
-    let mut bases: HashMap<&str, HashSet<&str>> = HashMap::new();
-    for ((field, base), n) in all {
-        if *n
-            > inside
-                .get(&(field.clone(), base.clone()))
-                .copied()
-                .unwrap_or(0)
-        {
-            bases.entry(field).or_default().insert(base);
-        }
-    }
-    bases
-        .into_iter()
-        .filter(|(_, b)| b.len() > 1)
-        .map(|(f, _)| f.to_string())
-        .collect()
-}
-
-/// How `name` is used inside `body`.
-///
-/// `mentions == field_reads` is the whole question both lints turn on: it says
-/// the value itself is never used, only its parts, which is exactly when a
-/// pattern can replace it.
-struct Uses {
-    mentions: usize,
-    field_reads: usize,
-    /// The distinct fields read, in first-read order — the order the advised
-    /// pattern lists them in.
-    fields: Vec<String>,
-    /// Whether something inside `body` rebinds `name`, which splits the
-    /// mentions between two values this walk cannot tell apart.
-    shadowed: bool,
-}
-
-fn uses_of(body: &Expr, name: &str) -> Uses {
-    let mut u = Uses {
-        mentions: 0,
-        field_reads: 0,
-        fields: Vec::new(),
-        shadowed: false,
-    };
-    each_subexpr(body, &mut |x| {
-        match &x.kind {
-            ExprKind::Ident(n) if n == name => u.mentions += 1,
-            ExprKind::Field(base, f) if matches!(&base.kind, ExprKind::Ident(n) if n == name) => {
-                u.field_reads += 1;
-                if !u.fields.iter().any(|k| k == f) {
-                    u.fields.push(f.clone());
-                }
-            }
-            _ => {}
-        }
-        u.shadowed |= rebinds(x, name);
-    });
-    u
-}
-
-/// Whether `e` mentions any of `names` as a bare identifier, ignoring `skip`.
-fn mentions_any(e: &Expr, names: &[String], skip: Option<&str>) -> bool {
-    let mut found = false;
-    each_subexpr(e, &mut |x| {
-        if let ExprKind::Ident(n) = &x.kind {
-            found |= Some(n.as_str()) != skip && names.iter().any(|f| f == n);
-        }
-    });
-    found
-}
-
-/// Whether any of `fields` is a tuple position (`t._0`).
-///
-/// No struct pattern can take a tuple apart — there is no type name to write —
-/// and `let (a, b) = t;` has to name every position, where this sees only the
-/// ones that were read. So tuples are left alone rather than advised into a
-/// pattern that would not compile.
-fn has_tuple_field(fields: &[String]) -> bool {
-    fields.iter().any(|f| {
-        f.strip_prefix('_')
-            .is_some_and(|d| !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()))
-    })
-}
-
-/// Whether `e` introduces a binding called `name`, in any of the positions that
-/// can: the two `let` forms, a lambda parameter, a loop variable, and a match
-/// arm's payload binders.
-fn rebinds(e: &Expr, name: &str) -> bool {
-    match &e.kind {
-        ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) => n == name,
-        // Both of a loop's binders shadow, the element one and the index one.
-        ExprKind::For(n, index, _, _) => n == name || index.as_deref() == Some(name),
-        ExprKind::Lambda(params, _) => params.iter().any(|p| p.name == name),
-        ExprKind::Match(_, arms) => arms
-            .iter()
-            .any(|a| a.pattern.bindings().iter().any(|b| b == name)),
-        _ => false,
     }
 }
 

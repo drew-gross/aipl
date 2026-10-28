@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">153 files, 1568 items.</p>
+      <p class="summary">155 files, 1575 items.</p>
 
       <ul class="files">
 
@@ -307,23 +307,33 @@
           <p class="file-summary">The <code>destructure_binding</code> lint: <code>let p = value; ... p.a ... p.b ...</code> where <strong>every</strong> mention of <code>p</code> is a field read. Say so with a pattern instead: <code>let T { a, b } = value;</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-destructure_binding.html#private">21 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-destructure_binding.html#private">6 private</a></span>
 
 
           <ul class="items">
 
             <li>
-              <a href="crates-aipl-codegen-src-destructure_binding.html#item-Read"><code>Read</code></a>
-              <span class="kind kind-struct">struct</span>
-            </li>
-
-            <li>
-              <a href="crates-aipl-codegen-src-destructure_binding.html#item-Uses"><code>Uses</code></a>
-              <span class="kind kind-struct">struct</span>
-            </li>
-
-            <li>
               <a href="crates-aipl-codegen-src-destructure_binding.html#item-destructure_binding"><code>destructure_binding</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-destructure_param.html">crates/aipl-codegen/src/destructure_param.aipl</a>
+
+          <p class="file-summary">The <code>destructure_param</code> lint: <code>fn f(p: Point) { .. p.x .. p.y .. }</code> where <strong>every</strong> mention of <code>p</code> is a field read — destructure the parameter instead: <code>fn f(Point { x, y })</code>.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-destructure_param.html#private">6 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-destructure_param.html#item-destructure_param"><code>destructure_param</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -482,7 +492,7 @@
           <p class="file-summary"><code>aipl_syntax::ast::Expr</code> and <code>ExprKind</code> as AIPL declares them, with the structural dump the lowering's tests assert against. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-expr.html#private">17 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-expr.html#private">18 private</a></span>
 
 
           <ul class="items">
@@ -574,6 +584,81 @@
 
             <li>
               <a href="crates-aipl-codegen-src-expr.html#item-promoted_annotations"><code>promoted_annotations</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-expr.html#item-Read"><code>Read</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-expr.html#item-descendants"><code>descendants</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-expr.html#item-read"><code>read</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-expr.html#item-field_reads"><code>field_reads</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-expr.html#item-reads_off"><code>reads_off</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-expr.html#item-binders"><code>binders</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-field_uses.html">crates/aipl-codegen/src/field_uses.aipl</a>
+
+          <p class="file-summary">How a name is used inside an expression, for the lints that turn a binding into a pattern.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-field_uses.html#private">3 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-field_uses.html#item-Uses"><code>Uses</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-field_uses.html#item-uses_of"><code>uses_of</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-field_uses.html#item-is_name"><code>is_name</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-field_uses.html#item-mentions_any"><code>mentions_any</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-field_uses.html#item-is_shared"><code>is_shared</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-field_uses.html#item-is_tuple_field"><code>is_tuple_field</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -1392,6 +1477,11 @@
             <li>
               <a href="crates-aipl-codegen-src-item.html#item-ParamPattern"><code>ParamPattern</code></a>
               <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-item.html#item-pattern_reads"><code>pattern_reads</code></a>
+              <span class="kind kind-fn">fn</span>
             </li>
 
             <li>

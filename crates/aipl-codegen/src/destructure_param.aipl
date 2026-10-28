@@ -1,0 +1,170 @@
+# The `destructure_param` lint: `fn f(p: Point) { .. p.x .. p.y .. }` where
+# **every** mention of `p` is a field read — destructure the parameter instead:
+# `fn f(Point { x, y })`.
+#
+# The same argument `destructure_binding` makes about a `let`, one step earlier. A
+# parameter that is only ever taken apart is a pattern written the long way, and
+# the signature is where a reader looks first: `fn f(Point { x, y })` says what
+# the function needs, where `fn f(p: Point)` says only that it needs a `Point` and
+# leaves the body to be scanned for how much of it.
+#
+# The parameter's type is right there in the signature, so unlike the binding lint
+# this one can name the struct in its advice rather than leaving a placeholder.
+#
+# A parameter whose only use is a `let T { a, b } = p;` that opens the body is the
+# same pattern written one step late, and is flagged too: the pattern moves into
+# the signature unchanged.
+#
+# **What is left alone**, beyond everything `field_uses` already excludes (a bare
+# mention, a name the pattern would collide with, a field read off another value,
+# a tuple):
+#
+# - **`self`.** Method-call syntax is defined by the receiver being named `self`,
+#   so its pattern is the named form `self: Span { start, end }`, not the
+#   `Span { start, end }` this lint's advice spells.
+# - **A parameter already destructured**, whose pattern the author wrote.
+# - **A keyword parameter.** Its name *is* the call-site spelling (`f(sep = ", ")`),
+#   so destructuring it would break every caller.
+# - **`mut` and variadic parameters.** A `mut` receiver is written through rather
+#   than read, and a variadic parameter's type is a sequence.
+# - **Anything but a plain named type.** A generic instance is a template until
+#   monomorphization and a parameter has no value to infer arguments from, so
+#   `Box { v }` has nothing to bind; arrays, optionals and primitives have no
+#   fields to name.
+
+import {
+    Span,
+    any,
+    as_case,
+    collect_arms,
+    equal as ==,
+    is_nonempty,
+    is_some,
+    join,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    not_equal as !=,
+} from builtins;
+import { ByStruct, Expr, LetPattern, Read, field_reads } from "./expr.aipl";
+import { Uses, is_name, is_shared, is_tuple_field, mentions_any, uses_of } from "./field_uses.aipl";
+import { ParseFailure, aipl_parse_surface_file } from "./grammar_aipl.aipl";
+import { Fn, One, Param, Program, pattern_reads } from "./item.aipl";
+import { LintHit, hit } from "./lint_hit.aipl";
+import { Named } from "./ty.aipl";
+
+# A hit for each parameter of the program that only its fields are read from.
+pub fn destructure_param(Program { items }) -> LintHit[] {
+    items.collect_arms(Fn)$function_hits().join()
+}
+
+# The hits in a function's signature. The reads are those of the whole body, so
+# that a field read off two bases anywhere in it counts against each parameter it
+# belongs to; the destructured parameters make reads of their own.
+fn function_hits(self: Fn(function)) -> LintHit[] {
+    let reads = [..function.sig.params$pattern_reads().join(), ..function.body.field_reads()];
+    function.sig.params$param_hits(function.body, reads).join()
+}
+
+# The hit for one parameter, or none.
+fn param_hits(self: Param, body: Expr, reads: Read[]) -> LintHit[] {
+    if (self.name == "self" || self.mutable || self.arity != One || self.default.is_some() || self.pattern.is_some()) {
+        return [];
+    };
+    let Named(struct_name) = self.ty else {
+        return [];
+    };
+    let Uses { mentions, field_reads, fields, shadowed } = body.uses_of(self.name);
+    if (!shadowed && field_reads == 0 && mentions == 1) {
+        if (let some((value_span, opening)) = body.opening_destructure(self.name, struct_name)) {
+            return [hit(opening_message(self.name, struct_name, opening), value_span)];
+        };
+    };
+    if (shadowed || field_reads == 0 || field_reads != mentions) {
+        return [];
+    };
+
+    // There is no right-hand side to discount here the way a `let` has one: a
+    // parameter is bound before the body runs, so every read in the function is one
+    // the pattern's names would have to live alongside.
+    if (fields.is_shared(reads, []) || fields.any(is_tuple_field)) {
+        return [];
+    };
+
+    // The parameter's own name is exempt, as the binding's is: it is the name going
+    // away, and every mention of it is the base of a read the pattern replaces.
+    if (body.mentions_any(fields, some(self.name))) {
+        return [];
+    };
+
+    // The body's span starts at the `{` that opens it, which is a single line that
+    // survives the formatter — and the closest line to the signature that a
+    // parameter can be blamed on, `Param` carrying no span of its own.
+    [hit(message(self.name, struct_name, fields), body.span)]
+}
+
+# What is said of a parameter `name` whose `fields` are the ones read.
+fn message(name: str, struct_name: str, fields: str[]) -> str {
+    `only the fields of parameter "{name}" are read — destructure it instead: "{struct_name} \{ {fields.join(sep=", ")} }" in place of "{name}: {struct_name}"`
+}
+
+# What is said of a parameter `name` that a `let` right under the signature takes
+# apart.
+fn opening_message(name: str, struct_name: str, fields: str[]) -> str {
+    `parameter "{name}" is only taken apart by a destructuring \`let\` — destructure it in the signature instead: "{struct_name} \{ {fields.join(sep=", ")} }" in place of "{name}: {struct_name}"`
+}
+
+# The span of the value and the field names of a `let T { a, b } = <param>;` that
+# opens `self`, when it binds each field to a name of its own spelling and names
+# the parameter's type. A field bound under another name (`T { a as x }`) is not
+# recognised: the signature's pattern would have to spell the rename too.
+fn opening_destructure(self: Expr, param: str, struct_name: str) -> (Span, str[])? {
+    let LetPattern(pattern, value, _) = self.kind.as_case(LetPattern)?;
+    let ByStruct(named, fields, names, mutable) = pattern.as_case(ByStruct)?;
+    if (named == struct_name && !mutable && fields == names && fields.is_nonempty() && value.is_name(
+        param,
+    )) {
+        return some((value.span, fields));
+    };
+    none
+}
+
+fn hits(src: str) -> str[]!ParseFailure {
+    ok(destructure_param(aipl_parse_surface_file(src)?.program)$message)
+}.test({
+    // Only fields are read: take the parameter apart in the signature.
+    assert(hits("fn f(p: Point) -> i64 { p.x + p.y }")? == [message("p", "Point", ["x", "y"])]);
+
+    // One bare mention keeps the value whole.
+    assert(hits("fn f(p: Point) -> i64 { g(p); p.x }")? == []);
+
+    // The name is spoken for: a field's name would shadow one in scope.
+    assert(hits("fn f(p: Point, x: i64) -> i64 { p.x + x }")? == []);
+
+    // A field read off two values is told apart by the names of the values.
+    assert(hits("fn f(p: Point, q: Point) -> i64 { p.x + q.x }")? == []);
+
+    // A tuple cannot be taken apart by a struct pattern.
+    assert(hits("fn f(p: Point) -> i64 { p._0 }")? == []);
+
+    // `self`, a keyword parameter, `mut` and variadic parameters, and anything but
+    // a plain named type are left alone.
+    assert(hits("fn f(self: Point) -> i64 { self.x }")? == []);
+    assert(hits("fn f(p: Point = g()) -> i64 { p.x }")? == []);
+    assert(hits("fn f(mut p: Point) -> i64 { p.x }")? == []);
+    assert(hits("fn f(p: Point*) -> i64 { p.x }")? == []);
+    assert(hits("fn f(p: Point[]) -> i64 { p.x }")? == []);
+
+    // A parameter the author already destructured is not advised about.
+    assert(hits("fn f(Point { x, y }) -> i64 { x + y }")? == []);
+
+    // A `let` that opens the body and takes the parameter apart is the same
+    // pattern written one step late.
+    assert(hits("fn f(p: Point) -> i64 { let Point { x, y } = p; x + y }")? == [
+        opening_message("p", "Point", ["x", "y"]),
+    ]);
+    // ...unless it renames, names another type, or is `mut`.
+    assert(hits("fn f(p: Point) -> i64 { let Point { x as a } = p; a }")? == []);
+    assert(hits("fn f(p: Point) -> i64 { let Other { x } = p; x }")? == []);
+    assert(hits("fn f(p: Point) -> i64 { mut Point { x } = p; x }")? == []);
+})

@@ -4,6 +4,8 @@
 
 import {
     Span,
+    as_case,
+    collect_ok,
     equal as ==,
     first,
     is_empty,
@@ -615,4 +617,89 @@ pub fn promoted_annotations(self: Expr, vars: str[]) -> Expr {
     );
     // A name that is not declared is left alone.
     assert(annotated.promoted_annotations(["U"]).show_expr() == annotated.show_expr());
+})
+
+# A field read off a plain name: `base.field`.
+struct Read { field: str, base: str }
+
+# `self` and every expression under it, outermost first.
+pub fn descendants(self: Expr) -> Expr[] { [self, ..self.subexprs()$descendants().join()] }.test({
+    assert(ident("x").descendants() == [ident("x")]);
+    let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false));
+    assert(call.descendants()$show_expr() == ["f(a, Neg(b))", "a", "Neg(b)", "b"]);
+})
+
+# The field read `self` is, when it reads one off a plain name.
+pub fn read(self: Expr) -> Read? {
+    let Field(base, field) = self.kind.as_case(Field)?;
+    let Ident(name) = base.kind.as_case(Ident)?;
+    some(Read { field, base: name })
+}.test({
+    assert(expr(Field(ident("p"), "x")).read() == some(Read { field: "x", base: "p" }));
+    // Only a plain name has fields read off it here.
+    assert(expr(Field(expr(Field(ident("p"), "q")), "x")).read() == none);
+    assert(ident("p").read() == none);
+})
+
+# Every field `self` and the expressions under it read off a plain name, with a
+# read for each time it is read — the reads a destructuring pattern makes
+# included, since taking a field apart is reading it.
+pub fn field_reads(self: Expr) -> Read[] {
+    [..self.descendants()$read().collect_ok(), ..self.descendants()$pattern_reads().join()]
+}.test({
+    let reads = expr(Seq(
+        expr(Field(ident("p"), "a")),
+        expr(Seq(expr(Field(ident("p"), "a")), expr(Field(ident("q"), "b")))),
+    ));
+    assert(reads.field_reads() == [
+        Read { field: "a", base: "p" },
+        Read { field: "a", base: "p" },
+        Read { field: "b", base: "q" },
+    ]);
+    // A struct pattern reads its fields off the value it takes apart.
+    let pattern = expr(LetPattern(
+        ByStruct("P", ["x", "y"], ["x", "b"], false),
+        ident("v"),
+        ident("x"),
+    ));
+    assert(pattern.field_reads()$field == ["x", "y"]);
+    assert(ident("x").field_reads() == []);
+})
+
+# The reads a destructuring `let` or `for` makes of the value it takes apart: one
+# per field its pattern names, off a base of its own. A binding that is taken
+# apart by field reads to the same names is not a place for a second pattern, so
+# these count as reads like any other.
+fn pattern_reads(self: Expr) -> Read[] {
+    match (self.kind) {
+        LetPattern(pattern, value, _) => pattern.reads_off(`$pattern{value.span.start}`),
+        ForPattern(pattern, iterable, _, _) => pattern.reads_off(`$pattern{iterable.span.start}`),
+        _ => [],
+    }
+}
+
+# The fields `self` reads off `base`: a struct pattern's, none for the others.
+pub fn reads_off(self: Destructure, base: str) -> Read[] {
+    match (self) {
+        ByStruct(_, fields, _, _) => fields.map(|field| Read { field, base }),
+        ByTuple(..) | ByCase(..) => [],
+    }
+}.test({
+    assert(ByStruct("P", ["x", "y"], ["a", "b"], false).reads_off("v") == [
+        Read { field: "x", base: "v" },
+        Read { field: "y", base: "v" },
+    ]);
+    assert(ByTuple(["a", "b"]).reads_off("v") == []);
+    assert(ByCase("C", ["a"]).reads_off("v") == []);
+})
+
+# The names a destructuring pattern binds, in order.
+pub fn binders(self: Destructure) -> str[] {
+    match (self) {
+        ByTuple(names) | ByCase(_, names) | ByStruct(_, _, names, _) => names,
+    }
+}.test({
+    assert(ByTuple(["a", "b"]).binders() == ["a", "b"]);
+    assert(ByCase("C", ["a"]).binders() == ["a"]);
+    assert(ByStruct("P", ["x", "y"], ["x", "b"], false).binders() == ["x", "b"]);
 })

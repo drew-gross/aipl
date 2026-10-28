@@ -479,6 +479,90 @@
         </section>
 
 
+
+        <section class="item" id="item-Read">
+          <h3>
+            <a class="anchor" href="#item-Read">Read</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Read</code></pre>
+
+          <div class="doc"><p>A field read off a plain name: <code>base.field</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-descendants">
+          <h3>
+            <a class="anchor" href="#item-descendants">descendants</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn descendants(self: Expr) -&#62; Expr[]</code></pre>
+
+          <div class="doc"><p><code>self</code> and every expression under it, outermost first.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-read">
+          <h3>
+            <a class="anchor" href="#item-read">read</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn read(self: Expr) -&#62; Read?</code></pre>
+
+          <div class="doc"><p>The field read <code>self</code> is, when it reads one off a plain name.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-field_reads">
+          <h3>
+            <a class="anchor" href="#item-field_reads">field_reads</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn field_reads(self: Expr) -&#62; Read[]</code></pre>
+
+          <div class="doc"><p>Every field <code>self</code> and the expressions under it read off a plain name, with a read for each time it is read — the reads a destructuring pattern makes included, since taking a field apart is reading it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-reads_off">
+          <h3>
+            <a class="anchor" href="#item-reads_off">reads_off</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn reads_off(self: Destructure, base: str) -&#62; Read[]</code></pre>
+
+          <div class="doc"><p>The fields <code>self</code> reads off <code>base</code>: a struct pattern's, none for the others.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-binders">
+          <h3>
+            <a class="anchor" href="#item-binders">binders</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn binders(self: Destructure) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The names a destructuring pattern binds, in order.</p></div>
+
+
+        </section>
+
+
       </section>
 
 
@@ -719,6 +803,20 @@
           <pre class="signature"><code>fn wrap(e: Expr) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>Neg(e)</code>: the node <code>map_subexprs</code>'s tests map with, easy to see in a dump.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-pattern_reads">
+          <h3>
+            <a class="anchor" href="#item-pattern_reads">pattern_reads</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn pattern_reads(self: Expr) -&#62; Read[]</code></pre>
+
+          <div class="doc"><p>The reads a destructuring <code>let</code> or <code>for</code> makes of the value it takes apart: one per field its pattern names, off a base of its own. A binding that is taken apart by field reads to the same names is not a place for a second pattern, so these count as reads like any other.</p></div>
 
 
         </section>

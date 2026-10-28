@@ -1,0 +1,190 @@
+# How a name is used inside an expression, for the lints that turn a binding into
+# a pattern.
+#
+# `destructure_binding` asks it of a `let` and `destructure_param` of a parameter,
+# and both put the same question: is every use of the name a field read, and are
+# the names a pattern would bind free? What they share lives here; each lint
+# keeps what only it asks.
+
+import {
+    all,
+    any,
+    contains,
+    count_if,
+    equal as ==,
+    filter,
+    greater_than as >,
+    is_digit,
+    is_some_and,
+    len,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    not_equal as !=,
+    push,
+    starts_with,
+} from builtins;
+import {
+    Expr,
+    ForPattern,
+    Ident,
+    Lambda,
+    Let,
+    LetMut,
+    LetPattern,
+    Match,
+    Read,
+    binders,
+    descendants,
+    field_reads,
+    read,
+} from "./expr.aipl";
+import { ParseError } from "./grammar.aipl";
+import { lower_aipl_block_surface } from "./grammar_aipl.aipl";
+import { pat_bindings } from "./pat.aipl";
+
+# How a name is used inside an expression. `mentions == field_reads` is the whole
+# question: it says the value itself is never used, only its parts, which is
+# exactly when a pattern can replace it.
+struct Uses {
+    mentions: u64,
+    field_reads: u64,
+    // The distinct fields read, in first-read order — the order the advised
+    // pattern lists them in.
+    fields: str[],
+    // Whether something inside the expression rebinds the name, which splits the
+    // mentions between two values this walk cannot tell apart.
+    shadowed: bool,
+}
+
+# How `name` is used inside `self`.
+pub fn uses_of(self: Expr, name: str) -> Uses {
+    let nodes = self.descendants();
+    mut fields: str[] = [];
+    for (let read : self.field_reads().filter(|r| r.base == name)) {
+        if (!fields.contains(read.field)) {
+            set fields.push(read.field);
+        };
+    }
+    Uses {
+        mentions: nodes.count_if(|node| node.is_name(name)),
+        field_reads: nodes.count_if(|node| node.is_read_off(name)),
+        fields,
+        shadowed: nodes.any(|node| node.rebinds(name)),
+    }
+}.test({
+    fn uses(src: str, name: str) -> Uses!ParseError {
+        ok(lower_aipl_block_surface(src)?.uses_of(name))
+    }
+    let both = uses("{ f(p.a, p.b, p.a) }", "p")?;
+    assert(both.mentions == 3);
+    assert(both.field_reads == 3);
+    assert(both.fields == ["a", "b"]);
+    assert(!both.shadowed);
+
+    // A bare mention is a use that is not a field read.
+    let whole = uses("{ f(p, p.a) }", "p")?;
+    assert(whole.mentions == 2);
+    assert(whole.field_reads == 1);
+
+    // Anything that binds the name again splits the mentions between two values.
+    assert(uses("{ let p = 1; p.a }", "p")?.shadowed);
+    assert(uses("{ g(|p| p.a) }", "p")?.shadowed);
+    assert(uses("{ let P { p } = v; p.a }", "p")?.shadowed);
+    assert(!uses("{ let q = 1; p.a }", "p")?.shadowed);
+})
+
+# Whether `self` is the bare name `name`.
+pub fn is_name(self: Expr, name: str) -> bool {
+    match (self.kind) {
+        Ident(n) => n == name,
+        _ => false,
+    }
+}
+
+fn is_read_off(self: Expr, name: str) -> bool { self.read().is_some_and(|r| r.base == name) }
+
+# Whether `self` introduces a binding called `name`, in any of the positions that
+# can: the two `let` forms, a lambda parameter, a loop variable, a destructuring
+# pattern's binders, and a match arm's payload binders.
+fn rebinds(self: Expr, name: str) -> bool {
+    match (self.kind) {
+        Let(n, _, _, _) | LetMut(n, _, _, _) => n == name,
+        // Both of a loop's binders shadow, the element one and the index one.
+        For(n, _, _, index) => n == name || index == some(name),
+        LetPattern(pattern, _, _) => pattern.binders().contains(name),
+        ForPattern(pattern, _, _, index) => pattern.binders().contains(name) || index == some(name),
+        Lambda(params, _) => params.any(|p| p.name == name),
+        Match(_, arms) => arms.any(|arm| arm.pattern.pat_bindings().contains(name)),
+        _ => false,
+    }
+}
+
+# Whether `self` mentions any of `names` as a bare identifier, ignoring `skip`.
+pub fn mentions_any(self: Expr, names: str[], skip: str?) -> bool {
+    self
+        .descendants()
+        .any(|node| match (node.kind) {
+            Ident(n) => some(n) != skip && names.contains(n),
+            _ => false,
+        })
+}.test({
+    fn mentions(src: str, names: str[], skip: str?) -> bool!ParseError {
+        ok(lower_aipl_block_surface(src)?.mentions_any(names, skip))
+    }
+    assert(mentions("{ f(a) }", ["a"], none)?);
+    assert(!mentions("{ f(b) }", ["a"], none)?);
+    // The skipped name is the one going away.
+    assert(!mentions("{ f(a) }", ["a"], some("a"))?);
+    assert(mentions("{ f(a, c) }", ["a", "c"], some("a"))?);
+})
+
+# Whether one of `self` is read off more than one base, discounting the reads in
+# `inside` — a `let`'s own right-hand side, whose reads run before the pattern
+# binds anything. A pair read as often inside as anywhere has no read outside it,
+# so it counts for nothing.
+pub fn is_shared(self: str[], everywhere: Read[], inside: Read[]) -> bool {
+    self.any(|field| bases_outside(field, everywhere, inside).len() > 1)
+}.test({
+    let reads = [
+        Read { field: "a", base: "p" },
+        Read { field: "a", base: "q" },
+        Read { field: "b", base: "p" },
+    ];
+    assert(["a"].is_shared(reads, []));
+    assert(!["b"].is_shared(reads, []));
+    assert(["b", "a"].is_shared(reads, []));
+    // The reads inside the value do not count against the binding.
+    assert(!["a"].is_shared(reads, [Read { field: "a", base: "q" }]));
+})
+
+# The distinct bases `field` is read off, counting only those read somewhere
+# other than `inside`.
+fn bases_outside(field: str, everywhere: Read[], inside: Read[]) -> str[] {
+    let mine = everywhere.filter(|r| r.field == field);
+    let local = inside.filter(|r| r.field == field);
+    mut bases: str[] = [];
+    for (let read : mine) {
+        let counted = mine.count_if(|r| r.base == read.base);
+        if (!bases.contains(read.base) && counted > local.count_if(|r| r.base == read.base)) {
+            set bases.push(read.base);
+        };
+    }
+    bases
+}
+
+# Whether `self` is a tuple position (`t._0`).
+#
+# No struct pattern can take a tuple apart — there is no type name to write — and
+# `let (a, b) = t;` has to name every position, where the lints see only the ones
+# that were read. So tuples are left alone rather than advised into a pattern
+# that would not compile.
+pub fn is_tuple_field(self: str) -> bool {
+    self.len() > 1 && self.starts_with("_") && self[1..].all(is_digit)
+}.test({
+    assert("_0".is_tuple_field());
+    assert("_12".is_tuple_field());
+    assert(!"_".is_tuple_field());
+    assert(!"_a".is_tuple_field());
+    assert(!"a0".is_tuple_field());
+})

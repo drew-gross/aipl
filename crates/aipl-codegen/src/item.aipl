@@ -5,7 +5,7 @@
 
 import { Span, equal as ==, is_empty, join, map, value_or } from builtins;
 import { Bound, show_bound } from "./bound.aipl";
-import { Destructure, Expr, FieldInit, show_expr } from "./expr.aipl";
+import { ByStruct, Destructure, Expr, FieldInit, Read, reads_off, show_expr } from "./expr.aipl";
 import { SpanStr, span_str } from "./lexer.aipl";
 import { I64 } from "./prim.aipl";
 import { Named, NamedCase, Primitive, Ty, Without, show_ty } from "./ty.aipl";
@@ -39,6 +39,25 @@ struct Param {
 # A parameter's destructuring pattern and where it was written, which is the span
 # the bindings it makes carry.
 struct ParamPattern { pattern: Destructure, span: Span }
+
+# The fields a destructured parameter reads off itself, none for an ordinary one.
+pub fn pattern_reads(self: Param) -> Read[] {
+    self.pattern$pattern$reads_off(self.name).value_or([])
+}.test({
+    let plain = Param {
+        name: "p",
+        ty: Named("P"),
+        mutable: false,
+        arity: One,
+        default: none,
+        implicit_some: false,
+    };
+    assert(plain.pattern_reads() == []);
+    let pattern = ParamPattern { pattern: ByStruct("P", ["x"], ["x"], false), span: 0..0 };
+    assert(Param { ..plain, pattern: some(pattern) }.pattern_reads() == [
+        Read { field: "x", base: "p" },
+    ]);
+})
 
 # How many arguments a parameter takes at a call site: one, or — for a
 # variadic — zero or more (`T*`) or one or more (`T+`). Mirrors
