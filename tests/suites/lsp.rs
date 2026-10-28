@@ -89,6 +89,28 @@ fn request(server: &mut Server, method: &str, params: Value) -> Value {
     message["result"].clone()
 }
 
+/// Send a request that is expected to fail, and return the reason it gave.
+fn request_error(server: &mut Server, method: &str, params: Value) -> String {
+    let reaction = server.handle(&json!({
+        "jsonrpc": "2.0", "id": 1, "method": method, "params": params,
+    }));
+    let message = reaction
+        .message
+        .unwrap_or_else(|| panic!("{method} left the request unanswered"));
+    message["error"]["message"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{method} did not fail: {message}"))
+        .to_string()
+}
+
+/// Run the check the diagnostics worker would, which is what gives a document
+/// names the server can answer about.
+fn analysed(server: &mut Server, workspace: &Workspace, name: &str) {
+    server
+        .diagnostics(&workspace.uri(name))
+        .expect("a document to check");
+}
+
 fn notify(server: &mut Server, method: &str, params: Value) -> Reaction {
     server.handle(&json!({ "jsonrpc": "2.0", "method": method, "params": params }))
 }
@@ -153,77 +175,6 @@ fn an_identifier_still_lexes_as_variable_other() {
     );
 }
 
-#[test]
-fn jumps_to_a_definition_in_another_file() {
-    let workspace = Workspace::new("cross-file", &[("main.aipl", ROOT), ("util.aipl", UTIL)]);
-    let mut server = opened(&workspace, "main.aipl");
-
-    let location = definition_at(
-        &mut server,
-        &workspace.uri("main.aipl"),
-        cursor_on(ROOT, "add(2, 3)"),
-    );
-    assert_eq!(location["uri"], json!(workspace.uri("util.aipl")));
-    // The name itself, not the whole declaration: `add` on the `pub fn` line.
-    assert_eq!(location["range"]["start"], cursor_on(UTIL, "add(a: i64"));
-}
-
-#[test]
-fn jumps_to_a_definition_in_the_same_file() {
-    let source = "import { wrapping_mul as * } from builtins;\n\
-                  \n\
-                  fn square(n: i64) -> i64 {\n\
-                  \u{20}   n * n\n\
-                  }\n\
-                  \n\
-                  fn main() {\n\
-                  \u{20}   mut x = square(7);\n\
-                  }\n";
-    let workspace = Workspace::new("same-file", &[("main.aipl", source)]);
-    let mut server = opened(&workspace, "main.aipl");
-
-    let location = definition_at(
-        &mut server,
-        &workspace.uri("main.aipl"),
-        cursor_on(source, "square(7)"),
-    );
-    assert_eq!(location["uri"], json!(workspace.uri("main.aipl")));
-    assert_eq!(location["range"]["start"], cursor_on(source, "square(n:"));
-}
-
-/// Nothing resolves a local binding, a keyword, or a type name — and saying so
-/// is the point. A server that guessed would send the cursor somewhere wrong,
-/// which is worse than leaving it where it is.
-#[test]
-fn declines_what_it_cannot_resolve() {
-    let workspace = Workspace::new("unresolved", &[("main.aipl", ROOT), ("util.aipl", UTIL)]);
-    let mut server = opened(&workspace, "main.aipl");
-    let uri = workspace.uri("main.aipl");
-    assert_eq!(
-        definition_at(&mut server, &uri, cursor_on(ROOT, "total = add(2")),
-        Value::Null,
-        "a local binding has no declaration to jump to"
-    );
-    assert_eq!(
-        definition_at(&mut server, &uri, json!({ "line": 2, "character": 0 })),
-        Value::Null,
-        "neither does a keyword"
-    );
-}
-
-/// A server for a client that opened the workspace folder and then `name` in it,
-/// so files it has not opened are the server's to find.
-fn opened_in_folder(workspace: &Workspace, name: &str) -> Server {
-    let mut server = opened(workspace, name);
-    let folder = fs::canonicalize(&workspace.dir).expect("resolve workspace");
-    request(
-        &mut server,
-        "initialize",
-        json!({ "workspaceFolders": [{ "uri": format!("file://{}", folder.display()), "name": "w" }] }),
-    );
-    server
-}
-
 /// The references request, as `(uri, line, character)` triples in the order
 /// the server gave them.
 fn references_at(
@@ -265,138 +216,204 @@ fn triple(uri: &str, at: Value) -> (String, u64, u64) {
     )
 }
 
-#[test]
-fn finds_every_use_across_files_that_were_never_opened() {
-    let workspace = Workspace::new("references", &[("main.aipl", ROOT), ("util.aipl", UTIL)]);
-    // Only `main.aipl` is open: `util.aipl` is found by walking the folder.
-    let mut server = opened_in_folder(&workspace, "main.aipl");
-    let (main, util) = (workspace.uri("main.aipl"), workspace.uri("util.aipl"));
+/// Two structs that share a field name, and a function that shares it too.
+const SHARED_NAME: &str = "import { wrapping_add as + } from builtins;\n\
+                           \n\
+                           struct Pair { name: i64, other: i64 }\n\
+                           \n\
+                           struct Tag { name: i64 }\n\
+                           \n\
+                           fn name(self: Pair) -> i64 { self.other }\n\
+                           \n\
+                           fn read(pair: Pair, tag: Tag) -> i64 { pair.name + tag.name }\n\
+                           \n\
+                           fn call() -> i64 { read(Pair { name: 1, other: 2 }, Tag { name: 3 }) }\n\
+                           \n\
+                           fn built(n: i64) -> Pair { name: n, other: n }\n\
+                           \n\
+                           fn both(pair: Pair) -> i64 { name(pair) + pair.name() }\n\
+                           \n\
+                           fn mapped(pairs: Pair[]) -> i64[] { pairs$name }\n";
 
-    let uses = vec![
-        triple(&main, cursor_on(ROOT, "add }")),
-        triple(&main, cursor_on(ROOT, "add(2, 3)")),
-        triple(&main, cursor_on(ROOT, "add(total, 1)")),
-    ];
-    let declaration = triple(&util, cursor_on(UTIL, "add(a: i64"));
-
-    let mut everything = uses.clone();
-    everything.push(declaration);
-    assert_eq!(
-        references_at(&mut server, &main, cursor_on(ROOT, "add(2, 3)"), true),
-        everything
-    );
-    assert_eq!(
-        references_at(&mut server, &main, cursor_on(ROOT, "add(2, 3)"), false),
-        uses,
-        "includeDeclaration: false leaves out the declaration only"
-    );
+/// The position `past` characters after the start of `snippet`.
+fn past_start(text: &str, snippet: &str, past: u64) -> Value {
+    let mut at = cursor_on(text, snippet);
+    at["character"] = json!(at["character"].as_u64().expect("character") + past);
+    at
 }
 
-#[test]
-fn asking_from_the_declaration_finds_the_same_uses() {
-    let workspace = Workspace::new(
-        "references-from-declaration",
-        &[("main.aipl", ROOT), ("util.aipl", UTIL)],
-    );
-    let mut server = opened_in_folder(&workspace, "util.aipl");
-    let (main, util) = (workspace.uri("main.aipl"), workspace.uri("util.aipl"));
-    assert_eq!(
-        references_at(&mut server, &util, cursor_on(UTIL, "add(a: i64"), true),
-        vec![
-            triple(&main, cursor_on(ROOT, "add }")),
-            triple(&main, cursor_on(ROOT, "add(2, 3)")),
-            triple(&main, cursor_on(ROOT, "add(total, 1)")),
-            triple(&util, cursor_on(UTIL, "add(a: i64")),
-        ]
-    );
+/// `SHARED_NAME` open and checked.
+fn shared_name(tag: &str) -> (Workspace, Server) {
+    let workspace = Workspace::new(tag, &[("main.aipl", SHARED_NAME)]);
+    let mut server = opened(&workspace, "main.aipl");
+    analysed(&mut server, &workspace, "main.aipl");
+    (workspace, server)
 }
 
-/// What makes a name the same name is the declaration it resolves to, not its
-/// spelling: an unrelated file's `add` is not a use, and an alias is.
-#[test]
-fn a_use_is_what_resolves_to_the_declaration() {
-    let aliased = "import { add as plus } from \"./util.aipl\";\n\
-                   \n\
-                   fn main() {\n\
-                   \u{20}   mut total = plus(1, 2);\n\
-                   }\n";
-    let unrelated = "pub fn add(a: i64) -> i64 { a }\n\
-                     \n\
-                     fn main() {\n\
-                     \u{20}   mut total = add(1);\n\
-                     }\n";
-    let workspace = Workspace::new(
-        "references-resolution",
-        &[
-            ("aliased.aipl", aliased),
-            ("unrelated.aipl", unrelated),
-            ("util.aipl", UTIL),
-        ],
-    );
-    let mut server = opened_in_folder(&workspace, "util.aipl");
-    let (alias, util) = (workspace.uri("aliased.aipl"), workspace.uri("util.aipl"));
-    assert_eq!(
-        references_at(&mut server, &util, cursor_on(UTIL, "add(a: i64"), true),
-        vec![
-            triple(&alias, cursor_on(aliased, "add as")),
-            triple(&alias, cursor_on(aliased, "plus }")),
-            triple(&alias, cursor_on(aliased, "plus(1, 2)")),
-            triple(&util, cursor_on(UTIL, "add(a: i64")),
-        ]
-    );
-}
-
-#[test]
-fn finds_every_use_of_a_builtin() {
-    let first = "import { wrapping_add as + } from builtins;\n\
-                 \n\
-                 fn one() -> i64 { 1 + 1 }\n";
-    let second = "import { wrapping_add as + } from builtins;\n\
-                  \n\
-                  fn two() -> i64 { 2 + 2 }\n";
-    let workspace = Workspace::new(
-        "references-builtin",
-        &[("first.aipl", first), ("second.aipl", second)],
-    );
-    let mut server = opened_in_folder(&workspace, "first.aipl");
-    assert_eq!(
-        references_at(
-            &mut server,
-            &workspace.uri("first.aipl"),
-            cursor_on(first, "wrapping_add"),
-            true
-        ),
-        vec![
-            triple(
-                &workspace.uri("first.aipl"),
-                cursor_on(first, "wrapping_add")
-            ),
-            triple(
-                &workspace.uri("second.aipl"),
-                cursor_on(second, "wrapping_add")
-            ),
-        ]
-    );
-}
-
-#[test]
-fn declines_references_to_what_it_cannot_resolve() {
-    let workspace = Workspace::new(
-        "references-none",
-        &[("main.aipl", ROOT), ("util.aipl", UTIL)],
-    );
-    let mut server = opened_in_folder(&workspace, "main.aipl");
+/// Where the declaration `definition` jumps to starts, as `(line, character)`.
+fn jumps_to(server: &mut Server, workspace: &Workspace, at: &str, past: u64) -> Value {
     let uri = workspace.uri("main.aipl");
-    let found = request(
+    let location = definition_at(server, &uri, past_start(SHARED_NAME, at, past));
+    assert_eq!(location["uri"], json!(uri));
+    location["range"]["start"].clone()
+}
+
+/// The name after `.` or `$` is a field of the type read from, so it goes to
+/// that type's field — never to `fn name`, and never to another struct's field
+/// of the same name.
+#[test]
+fn a_field_goes_to_the_field_of_the_type_it_is_read_from() {
+    let (workspace, mut server) = shared_name("a_field_goes_to_the_fiel");
+    let pair_name = cursor_on(SHARED_NAME, "name: i64, other");
+    let tag_name = cursor_on(SHARED_NAME, "name: i64 }\n\nfn name");
+    assert_eq!(
+        jumps_to(&mut server, &workspace, "name + tag", 0),
+        pair_name
+    );
+    assert_eq!(
+        jumps_to(&mut server, &workspace, "name }\n\nfn call", 0),
+        tag_name
+    );
+    // `pairs$name` maps the field over the array.
+    assert_eq!(jumps_to(&mut server, &workspace, "$name", 1), pair_name);
+}
+
+#[test]
+fn a_call_goes_to_the_function_not_to_a_field_of_the_same_name() {
+    let (workspace, mut server) = shared_name("a_call_goes_to_the_funct");
+    let function = cursor_on(SHARED_NAME, "name(self");
+    assert_eq!(
+        jumps_to(&mut server, &workspace, "name(pair) +", 0),
+        function
+    );
+    assert_eq!(jumps_to(&mut server, &workspace, "name() }", 0), function);
+}
+
+#[test]
+fn a_field_in_a_struct_literal_goes_to_the_field_of_that_struct() {
+    let (workspace, mut server) = shared_name("a_field_in_a_struct_lite");
+    assert_eq!(
+        jumps_to(&mut server, &workspace, "name: 1,", 0),
+        cursor_on(SHARED_NAME, "name: i64, other")
+    );
+    assert_eq!(
+        jumps_to(&mut server, &workspace, "name: 3 }", 0),
+        cursor_on(SHARED_NAME, "name: i64 }\n\nfn name")
+    );
+    assert_eq!(
+        jumps_to(&mut server, &workspace, "name: n,", 0),
+        cursor_on(SHARED_NAME, "name: i64, other"),
+        "in the body shorthand too"
+    );
+}
+
+/// Every place `Pair`'s field is used — read, mapped, and written in a
+/// literal — and not `Tag`'s field or the function that share its spelling.
+#[test]
+fn the_references_of_a_field_are_that_fields_uses() {
+    let (workspace, mut server) = shared_name("the_references_of_a_fiel");
+    let uri = workspace.uri("main.aipl");
+    let at = |snippet: &str| triple(&uri, cursor_on(SHARED_NAME, snippet));
+    let uses = vec![
+        at("name + tag"),
+        at("name: 1,"),
+        at("name: n,"),
+        triple(&uri, past_start(SHARED_NAME, "$name", 1)),
+    ];
+    let declaration = at("name: i64, other");
+
+    // Asked from a use, and asked from the declaration, it is the same list.
+    for from in ["name + tag", "name: i64, other"] {
+        let mut everything = vec![declaration.clone()];
+        everything.extend(uses.clone());
+        assert_eq!(
+            references_at(&mut server, &uri, cursor_on(SHARED_NAME, from), true),
+            everything,
+            "from {from:?}"
+        );
+        assert_eq!(
+            references_at(&mut server, &uri, cursor_on(SHARED_NAME, from), false),
+            uses,
+            "includeDeclaration: false leaves out the declaration only"
+        );
+    }
+}
+
+#[test]
+fn the_references_of_a_function_are_its_calls() {
+    let (workspace, mut server) = shared_name("the_references_of_a_func");
+    let uri = workspace.uri("main.aipl");
+    let at = |snippet: &str| triple(&uri, cursor_on(SHARED_NAME, snippet));
+    assert_eq!(
+        references_at(&mut server, &uri, cursor_on(SHARED_NAME, "name(self"), true),
+        vec![at("name(self"), at("name(pair) +"), at("name() }")]
+    );
+}
+
+/// Until the compiler has finished with the current text there is nothing it
+/// can say, and the request fails with that reason: an empty answer would read
+/// as "nothing refers to this".
+#[test]
+fn a_request_before_the_check_has_finished_says_so() {
+    let workspace = Workspace::new("not-yet", &[("main.aipl", SHARED_NAME)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let params =
+        json!({ "textDocument": { "uri": uri }, "position": cursor_on(SHARED_NAME, "name + tag") });
+    assert!(
+        request_error(&mut server, "textDocument/definition", params.clone())
+            .starts_with("still analysing")
+    );
+
+    analysed(&mut server, &workspace, "main.aipl");
+    let edited = format!("{SHARED_NAME}\n");
+    change(&mut server, &uri, 2, &edited);
+    assert!(
+        request_error(&mut server, "textDocument/definition", params)
+            .starts_with("still analysing"),
+        "an edit makes the last check out of date"
+    );
+}
+
+#[test]
+fn a_document_that_does_not_compile_says_so() {
+    let broken = format!("{SHARED_NAME}\nfn bad() -> i64 {{ missing }}\n");
+    let workspace = Workspace::new("broken", &[("main.aipl", &broken)]);
+    let mut server = opened(&workspace, "main.aipl");
+    analysed(&mut server, &workspace, "main.aipl");
+    let reason = request_error(
         &mut server,
-        "textDocument/references",
+        "textDocument/definition",
         json!({
-            "textDocument": { "uri": uri },
-            "position": cursor_on(ROOT, "total = add(2"),
-            "context": { "includeDeclaration": true },
+            "textDocument": { "uri": workspace.uri("main.aipl") },
+            "position": cursor_on(&broken, "name + tag"),
         }),
     );
-    assert_eq!(found, Value::Null, "a local binding has no declaration");
+    assert!(reason.contains("does not compile"), "{reason}");
+}
+
+/// A name the compiler resolves nothing for is an error, not an empty result:
+/// the cursor is on something, and the server cannot say what.
+#[test]
+fn a_name_the_compiler_did_not_resolve_is_an_error_but_whitespace_is_not() {
+    let (workspace, mut server) = shared_name("a_name_the_compiler_did_");
+    let uri = workspace.uri("main.aipl");
+    let params = |position: Value| json!({ "textDocument": { "uri": uri }, "position": position });
+    let reason = request_error(
+        &mut server,
+        "textDocument/definition",
+        params(cursor_on(SHARED_NAME, "n: i64) -> Pair")),
+    );
+    assert!(reason.contains("does not cover `n`"), "{reason}");
+    assert_eq!(
+        request(
+            &mut server,
+            "textDocument/definition",
+            params(json!({ "line": 1, "character": 0 }))
+        ),
+        Value::Null,
+        "a blank line is not a name"
+    );
 }
 
 #[test]
@@ -438,38 +455,6 @@ fn hover_at(server: &mut Server, uri: &str, position: Value) -> Value {
         "textDocument/hover",
         json!({ "textDocument": { "uri": uri }, "position": position }),
     )
-}
-
-/// An AIPL-implemented builtin is a file like any other, so go-to-definition
-/// lands in it, on the name its `pub fn` declares.
-#[test]
-fn jumps_to_the_source_of_an_aipl_implemented_builtin() {
-    let workspace = Workspace::new("builtin-definition", &[("main.aipl", USES_BUILTINS)]);
-    let mut server = opened(&workspace, "main.aipl");
-    let uri = workspace.uri("main.aipl");
-
-    let location = definition_at(&mut server, &uri, cursor_on(USES_BUILTINS, "first()"));
-    let target = location["uri"].as_str().expect("a location");
-    assert!(target.ends_with("/builtin_first.aipl"), "{target}");
-    let source = fs::read_to_string(target.strip_prefix("file://").expect("a file URI")).unwrap();
-    assert_eq!(
-        location["range"]["start"],
-        cursor_on(&source, "first<T: any>"),
-        "the name in `pub fn first`"
-    );
-}
-
-/// A builtin the compiler expands has no source to go to, and says so rather
-/// than landing somewhere unrelated.
-#[test]
-fn a_builtin_the_compiler_expands_has_no_definition() {
-    let workspace = Workspace::new("builtin-no-definition", &[("main.aipl", USES_BUILTINS)]);
-    let mut server = opened(&workspace, "main.aipl");
-    let uri = workspace.uri("main.aipl");
-    assert_eq!(
-        definition_at(&mut server, &uri, cursor_on(USES_BUILTINS, "len()")),
-        Value::Null
-    );
 }
 
 #[test]
@@ -573,59 +558,6 @@ fn the_outline_survives_an_edit_that_does_not_parse() {
         ["first", "second", "third"],
         "and a text that parses again replaces it"
     );
-}
-
-/// The name under the cursor is read from the text as it is now, and what it
-/// resolves to from the last text that parsed — so a definition one line above
-/// the break still answers.
-#[test]
-fn a_definition_still_resolves_while_the_buffer_does_not_parse() {
-    let workspace = Workspace::new(
-        "definition-broken",
-        &[("main.aipl", ROOT), ("util.aipl", UTIL)],
-    );
-    let mut server = opened(&workspace, "main.aipl");
-    let uri = workspace.uri("main.aipl");
-    let target = definition_at(&mut server, &uri, cursor_on(ROOT, "add(2, 3)"));
-    assert_eq!(target["uri"], json!(workspace.uri("util.aipl")));
-
-    let broken = format!("{ROOT}\nfn unfinished(");
-    change(&mut server, &uri, 2, &broken);
-    assert_eq!(
-        definition_at(&mut server, &uri, cursor_on(&broken, "add(2, 3)")),
-        target
-    );
-}
-
-/// An answer is remembered per text, so every way the text can change has to
-/// show up in the next one.
-#[test]
-fn an_edit_to_either_file_changes_the_next_answer() {
-    let workspace = Workspace::new(
-        "definition-reindexed",
-        &[("main.aipl", ROOT), ("util.aipl", UTIL)],
-    );
-    let mut server = opened(&workspace, "main.aipl");
-    let uri = workspace.uri("main.aipl");
-    let before = definition_at(&mut server, &uri, cursor_on(ROOT, "add(2, 3)"));
-    assert_eq!(
-        before["range"]["start"],
-        cursor_on(UTIL, "add(a: i64"),
-        "the declaration in util.aipl"
-    );
-
-    // The imported file changes on disk, shifting the declaration down.
-    let shifted = format!("# One more line.\n{UTIL}");
-    fs::write(workspace.path("util.aipl"), &shifted).expect("write util");
-    let after = definition_at(&mut server, &uri, cursor_on(ROOT, "add(2, 3)"));
-    assert_eq!(after["range"]["start"], cursor_on(&shifted, "add(a: i64"));
-
-    // The importing buffer changes: its own declaration now wins.
-    let own = format!("fn add(a: i64) -> i64 {{ a }}\n{ROOT}");
-    change(&mut server, &uri, 2, &own);
-    let local = definition_at(&mut server, &uri, cursor_on(&own, "add(2, 3)"));
-    assert_eq!(local["uri"], json!(uri));
-    assert_eq!(local["range"]["start"], cursor_on(&own, "add(a: i64"));
 }
 
 #[test]
@@ -737,7 +669,7 @@ fn diagnostics_report_a_type_error_where_it_is() {
                   \u{20}   print(nope);\n\
                   }\n";
     let workspace = Workspace::new("diagnostics", &[("main.aipl", source)]);
-    let server = opened(&workspace, "main.aipl");
+    let mut server = opened(&workspace, "main.aipl");
     let uri = workspace.uri("main.aipl");
 
     let published = server.diagnostics(&uri).expect("diagnostics");
@@ -811,7 +743,7 @@ fn diagnostics_name_the_imported_file_an_error_came_from() {
         "imported-error",
         &[("main.aipl", ROOT), ("util.aipl", broken_util)],
     );
-    let server = opened(&workspace, "main.aipl");
+    let mut server = opened(&workspace, "main.aipl");
 
     let published = server
         .diagnostics(&workspace.uri("main.aipl"))
@@ -941,7 +873,7 @@ fn the_cli_serves_the_protocol_over_a_pipe() {
         json!({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {
             "textDocument": {"uri": uri, "languageId": "aipl", "version": 1, "text": ROOT},
         }}),
-        json!({"jsonrpc": "2.0", "id": 2, "method": "textDocument/definition", "params": {
+        json!({"jsonrpc": "2.0", "id": 2, "method": "textDocument/hover", "params": {
             "textDocument": {"uri": uri}, "position": cursor_on(ROOT, "add(2, 3)"),
         }}),
         json!({"jsonrpc": "2.0", "id": 3, "method": "shutdown", "params": null}),
@@ -987,9 +919,10 @@ fn the_cli_serves_the_protocol_over_a_pipe() {
     ] {
         assert_eq!(capabilities[provider], json!(true), "{provider} announced");
     }
-    assert_eq!(
-        replies.get("2").expect("a definition result")["uri"],
-        json!(workspace.uri("util.aipl")),
+    assert!(
+        replies.get("2").expect("a hover result")["contents"]["value"]
+            .as_str()
+            .is_some_and(|hover| hover.contains("from `util.aipl`")),
         "and it answered across the import"
     );
 }

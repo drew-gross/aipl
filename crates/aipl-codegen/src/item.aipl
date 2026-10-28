@@ -110,7 +110,7 @@ struct Function {
 # attribute name, which is where a diagnostic about the attribute points.
 struct PerformanceBlock { body: Expr, fns: Function[], span: Span }
 
-struct FieldDecl { name: str, ty: Ty, default: Expr? }
+struct FieldDecl { name: SpanStr, ty: Ty, default: Expr? }
 
 struct StructDecl { name: SpanStr, doc: str?, type_vars: TypeParam[], fields: FieldDecl[] }
 
@@ -195,7 +195,13 @@ pub fn show_item(self: Item) -> str {
         name: span_str("struct P { x: i64 }", 7..8),
         doc: none,
         type_vars: no_params,
-        fields: [FieldDecl { name: "x", ty: Primitive(I64), default: none }],
+        fields: [
+            FieldDecl {
+                name: span_str("struct P { x: i64 }", 11..12),
+                ty: Primitive(I64),
+                default: none,
+            },
+        ],
     };
     assert(Struct(s).show_item() == "struct P(x: i64)");
     let r = RefinementDecl {
@@ -249,7 +255,7 @@ fn show_param(self: Param) -> str {
 fn show_default(self: Expr?) -> str { self.map(|e| ` = {e.show_expr()}`).value_or("") }
 
 fn show_field_decl(self: FieldDecl) -> str {
-    `{self.name}: {self.ty.show_ty()}{show_default(self.default)}`
+    `{self.name.text}: {self.ty.show_ty()}{show_default(self.default)}`
 }
 
 fn show_case(self: VariantCase) -> str {

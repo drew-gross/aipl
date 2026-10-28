@@ -885,6 +885,7 @@ impl Loader {
                 *slot = aipl_syntax::ast::FileSource {
                     label: diagnostic_label(path, self.project_root.as_deref()),
                     source: file.source.clone(),
+                    path: path.to_string_lossy().into_owned(),
                 };
             }
         }
@@ -1992,6 +1993,7 @@ fn rewrite_expr(
         // Carried over with `span`: the parser recorded it, and rewriting a
         // name or qualifying a path moves no text.
         value_span: e.value_span.clone(),
+        name_span: e.name_span.clone(),
     }
 }
 

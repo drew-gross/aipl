@@ -51,6 +51,7 @@
 
 mod analysis;
 pub mod jsonrpc;
+mod navigation;
 pub mod server;
 pub mod text;
 mod workspace;
@@ -180,11 +181,12 @@ fn publish_diagnostics(pending: Receiver<String>, server: &Mutex<Server>, output
             };
             // A panic in the frontend costs this document's diagnostics, not
             // the worker: the next edit gets another try.
-            let Ok(message) =
-                std::panic::catch_unwind(AssertUnwindSafe(|| server::diagnostics(&snapshot)))
+            let Ok(analysis) =
+                std::panic::catch_unwind(AssertUnwindSafe(|| server::analyse(&snapshot)))
             else {
                 continue;
             };
+            let message = lock(server).record(analysis);
             if send(output, &message).is_err() {
                 // The client is gone. Nothing left to publish to.
                 return;

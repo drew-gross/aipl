@@ -226,8 +226,14 @@ fn struct_decl(v: &FfiValue) -> R<ast::StructDecl> {
 }
 
 fn field_decl(v: &FfiValue) -> R<ast::FieldDecl> {
+    let name = field(v, "name")?;
     Ok(ast::FieldDecl {
-        name: text(field(v, "name")?)?,
+        // A `SpanStr` in the AIPL declaration; an artifact built before it was
+        // one marshals the bare name, which decodes as a name with no position.
+        name: match name {
+            FfiValue::Struct(_) => span_str(name)?,
+            _ => ast::SpanStr::synthetic(text(name)?),
+        },
         ty: ty(field(v, "ty")?)?,
         default: maybe(field(v, "default")?, expr)?,
     })
@@ -394,7 +400,14 @@ fn lambda_param(v: &FfiValue) -> R<ast::LambdaParam> {
 
 fn field_init(v: &FfiValue) -> R<ast::FieldInit> {
     Ok(ast::FieldInit {
-        name: text(field(v, "name")?)?,
+        name: ast::SpanStr {
+            text: text(field(v, "name")?)?,
+            // The AIPL struct's last slot; an older artifact has none.
+            span: match v_field(v, "name_span") {
+                Some(name_span) => span(name_span)?,
+                None => 0..0,
+            },
+        },
         value: expr(field(v, "value")?)?,
     })
 }
@@ -406,10 +419,23 @@ fn expr(v: &FfiValue) -> R<ast::Expr> {
     // that does not exist, and the only one a struct field can hold. A recorded
     // value span is never empty, so the two spellings say the same thing.
     let value_span = span(field(v, "value_span")?)?;
-    Ok(if value_span.is_empty() {
+    let built = if value_span.is_empty() {
         built
     } else {
         built.with_value_span(value_span)
+    };
+    // `name_span` is the AIPL struct's last slot, so an artifact built before it
+    // existed marshals an `Expr` without one and decodes as a node with no name.
+    Ok(match v_field(v, "name_span") {
+        Some(name_span) => {
+            let name_span = span(name_span)?;
+            if name_span.is_empty() {
+                built
+            } else {
+                built.with_name_span(name_span)
+            }
+        }
+        None => built,
     })
 }
 
@@ -504,6 +530,18 @@ fn expr_pair(v: &FfiValue) -> R<(ast::Expr, ast::Expr)> {
 }
 
 // ---------- the shape helpers ----------
+
+/// A struct's field when it has one — for a slot an older artifact does not
+/// marshal yet. Every other read is `field`, which refuses a missing one.
+fn v_field<'a>(v: &'a FfiValue, name: &str) -> Option<&'a FfiValue> {
+    let FfiValue::Struct(fields) = v else {
+        return None;
+    };
+    fields
+        .iter()
+        .find(|(n, _)| n == name)
+        .map(|(_, value)| value)
+}
 
 fn field<'a>(v: &'a FfiValue, name: &str) -> R<&'a FfiValue> {
     let FfiValue::Struct(fields) = v else {

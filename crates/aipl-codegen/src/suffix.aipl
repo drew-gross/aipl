@@ -1,7 +1,7 @@
 # One postfix step of AIPL's syntax tree and what applying it to a receiver
 # means. One of the files the AST is declared across; see `ast.aipl`.
 
-import { Span, equal as == } from builtins;
+import { Span, equal as ==, value_or } from builtins;
 import {
     Call,
     Construct,
@@ -16,9 +16,11 @@ import {
     TypeArgs,
     at,
     ident,
+    named_at,
     num,
     show_expr,
 } from "./expr.aipl";
+import { SpanStr } from "./lexer.aipl";
 import { Ty, Unit as UnitTy } from "./ty.aipl";
 
 # One postfix step, before it has a receiver to apply to. `postfix` is an atom
@@ -29,26 +31,26 @@ import { Ty, Unit as UnitTy } from "./ty.aipl";
 # AST spells it and why nothing downstream has to know tuples have a second
 # syntax for their fields.
 variant Suffix =
-    | Field(str)
-    | Method(name: str, args: Expr[])
-    | MethodTyped(name: str, tys: Ty[], args: Expr[])
+    | Field(SpanStr)
+    | Method(name: SpanStr, args: Expr[])
+    | MethodTyped(name: SpanStr, tys: Ty[], args: Expr[])
     | Index(Expr)
     | Index2(Expr, Expr)
     | SliceFrom(Expr)
     | SliceTo(Expr)
     | Try
-    | MapField(str)
-    | MapMethod(name: str, args: Expr[])
+    | MapField(SpanStr)
+    | MapMethod(name: SpanStr, args: Expr[])
 
 # One postfix step, given the receiver it applies to. A method call folds the
 # receiver in as `args[0]` and flags the method form, so `recv.f(a)` is stored
 # exactly as the free call `f(recv, a)`.
 pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     match (suf) {
-        Field(name) => at(FieldExpr(recv, name), span),
-        Method(name, args) => at(Call(name, [recv, ..args], true), span),
+        Field(name) => at(FieldExpr(recv, name.text), span).named_at(name.span),
+        Method(name, args) => at(Call(name.text, [recv, ..args], true), span).named_at(name.span),
         MethodTyped(name, tys, args) => at(
-            TypeArgs(at(Call(name, [recv, ..args], true), span), tys),
+            TypeArgs(at(Call(name.text, [recv, ..args], true), span).named_at(name.span), tys),
             span,
         ),
         Index(index) => index_or_slice(recv, index, span),
@@ -61,23 +63,25 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
         Try => at(TryExpr(recv), span),
         MapField(name) => mapped(
             recv,
-            at(FieldExpr(ident(mapped_element(span)), name), span),
+            at(FieldExpr(ident(mapped_element(span)), name.text), span).named_at(name.span),
             span,
         ),
         MapMethod(name, args) => mapped(
             recv,
-            at(Call(name, [ident(mapped_element(span)), ..args], true), span),
+            at(Call(name.text, [ident(mapped_element(span)), ..args], true), span).named_at(
+                name.span,
+            ),
             span,
         ),
     }
 }.test({
     let p = ident("p");
-    assert(apply_suffix(p, Field("x"), 0..0).show_expr() == "p.x");
-    assert(apply_suffix(p, Method("f", [num(1)]), 0..0).show_expr() == "p.f(1)");
+    assert(apply_suffix(p, Field(spelled("x")), 0..0).show_expr() == "p.x");
+    assert(apply_suffix(p, Method(spelled("f"), [num(1)]), 0..0).show_expr() == "p.f(1)");
     assert(
         apply_suffix(
             p,
-            MethodTyped("f", [UnitTy], [num(1)]),
+            MethodTyped(spelled("f"), [UnitTy], [num(1)]),
             0..0,
         ).show_expr() == "TypeArgs(p.f(1), [()])",
     );
@@ -94,17 +98,30 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     assert(
         apply_suffix(
             p,
-            MapField("x"),
+            MapField(spelled("x")),
             0..0,
         ).show_expr() == "p.__builtin_map(Lambda([__map$0_0], __map$0_0.x))",
     );
     assert(
         apply_suffix(
             p,
-            MapMethod("f", [num(1)]),
+            MapMethod(spelled("f"), [num(1)]),
             0..0,
         ).show_expr() == "p.__builtin_map(Lambda([__map$0_0], __map$0_0.f(1)))",
     );
+
+    // The name's own span rides on the node it names: the field in `p.x` and in
+    // `p$x`'s element, the callee in `p.f(1)`.
+    let at_5 = SpanStr { text: "x", span: 5..6 };
+    assert(apply_suffix(p, Field(at_5), 0..6).name_span == 5..6);
+    assert(apply_suffix(p, Method(at_5, []), 0..8).name_span == 5..6);
+    match (apply_suffix(p, MapField(at_5), 0..6).kind) {
+        Call(_, args, _) => match (args[1].value_or(p).kind) {
+            Lambda(_, step) => assert(step.name_span == 5..6),
+            _ => assert(false),
+        },
+        _ => assert(false),
+    };
     // A range literal written as an index is the closed slice form.
     let range = at(
         Construct(
@@ -115,6 +132,9 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     );
     assert(apply_suffix(p, Index(range), 0..0).show_expr() == "Slice(p, 1, 2)");
 })
+
+# A name as it would be written at no particular place — the tests' spelling.
+fn spelled(text: str) -> SpanStr { text, span: 0..0 }
 
 # What `recv$step` means: `recv.map(|e| step)`, where `step` is the postfix step
 # written against the element `e`. The element's name has a `$` in it, so no

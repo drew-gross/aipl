@@ -24,7 +24,7 @@ pub(super) fn field_init_shorthand(e: &Expr, src: &str, hits: &mut Vec<Error>) {
         let ExprKind::Ident(n) = &init.value.kind else {
             continue;
         };
-        if n != &init.name {
+        if n.as_str() != init.name.as_str() {
             continue;
         }
         if !src[..init.value.span.start].trim_end().ends_with(':') {

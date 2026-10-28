@@ -720,9 +720,23 @@
             <a class="anchor" href="#item-field_name">field_name</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn field_name(name: str, span: Span) -&#62; str!ParseError</code></pre>
+          <pre class="signature"><code>fn field_name(name: SpanStr, span: Span) -&#62; SpanStr!ParseError</code></pre>
 
           <div class="doc"><p><code>.name</code> names a field and <code>.0</code> a tuple slot, which the AST spells as the field <code>_0</code> — so the two syntaxes become one here and nothing downstream knows tuples have a second way to name their fields. A negative index is refused here rather than in the lexer: the <code>Int</code> matcher claims the sign, so <code>p.-1</code> does lex.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slot_name">
+          <h3>
+            <a class="anchor" href="#item-slot_name">slot_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn slot_name(self: Slot, src: str, fallback: Span) -&#62; SpanStr</code></pre>
+
+          <div class="doc"><p>The name a slot holds, with where it was written; <code>fallback</code> when the slot is a child position, which has no token of its own.</p></div>
 
 
         </section>
@@ -790,7 +804,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$69288: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$69787: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1447,7 +1461,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$107231: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$107874: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -2203,7 +2217,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-destructured_param">destructured_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$144428: FieldBinders, span: Span) -&#62; Ast</code></pre>
+          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$145131: FieldBinders, span: Span) -&#62; Ast</code></pre>
 
           <div class="doc"><p>A parameter named <code>name</code>, of the struct <code>struct_name</code>, whose <code>fields</code> are bound to <code>names</code> at the top of the body.</p></div>
 
@@ -2469,7 +2483,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$160386: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$161200: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

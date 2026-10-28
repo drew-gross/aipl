@@ -2,7 +2,7 @@
 
 use aipl::ast::{
     Arity, BinOp, Bound, Callee, Expr, ExprKind, FieldDecl, FieldInit, ImportSource, Item,
-    MatchArm, Param, Primitive, Program, StructDecl, Type, TypeParam,
+    MatchArm, Param, Primitive, Program, SpanStr, StructDecl, Type, TypeParam,
 };
 /// Parse, first installing the (idempotent) parser hooks the dogfooded
 /// section-header / raw-string helpers require — there's no native fallback.
@@ -297,12 +297,12 @@ fn struct_with_fields() {
         s.fields,
         vec![
             FieldDecl {
-                name: "x".into(),
+                name: SpanStr::synthetic("x"),
                 ty: i64_ty(),
                 default: None,
             },
             FieldDecl {
-                name: "y".into(),
+                name: SpanStr::synthetic("y"),
                 ty: i64_ty(),
                 default: None,
             },
@@ -331,11 +331,11 @@ fn struct_construction_parses() {
             "Point",
             vec![
                 FieldInit {
-                    name: "x".into(),
+                    name: SpanStr::synthetic("x"),
                     value: num(1)
                 },
                 FieldInit {
-                    name: "y".into(),
+                    name: SpanStr::synthetic("y"),
                     value: num(2)
                 },
             ]
@@ -377,11 +377,11 @@ fn construct_field_value_can_be_expr() {
             "Point",
             vec![
                 FieldInit {
-                    name: "x".into(),
+                    name: SpanStr::synthetic("x"),
                     value: binop(ident("x"), BinOp::Add, num(1)),
                 },
                 FieldInit {
-                    name: "y".into(),
+                    name: SpanStr::synthetic("y"),
                     value: neg(ident("x")),
                 },
             ]

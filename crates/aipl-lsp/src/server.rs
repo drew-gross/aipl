@@ -7,8 +7,8 @@
 //!
 //! | request | answered by |
 //! |---|---|
-//! | `textDocument/definition` | [`aipl_index::Index::definition_of`], and [`aipl_index::builtin`] for a builtin written in AIPL |
-//! | `textDocument/references` | `Analyses::mentions`: each identifier that resolves to the same declaration, in the open documents and the workspace's `.aipl` files |
+//! | `textDocument/definition` | the name resolutions the type checker recorded for the document ([`crate::navigation`]) |
+//! | `textDocument/references` | the same resolutions, from every open document's analysis |
 //! | `textDocument/hover` | [`aipl_index::Symbol`]'s `detail` and `doc`, for a builtin from [`aipl_index::builtin`] |
 //! | `textDocument/documentSymbol` | [`aipl_index::FileIndex::outline`] |
 //! | `textDocument/formatting` | [`aipl_fmt::format_source`] |
@@ -25,9 +25,10 @@ use aipl_index::SymbolKind;
 use aipl_syntax::{DebugOptions, Error};
 use serde_json::{json, Value};
 
-use crate::analysis::{Analyses, Declaration};
+use crate::analysis::Analyses;
+use crate::navigation::{Navigation, Site, Under};
 use crate::text::{path_to_uri, uri_to_path, LineIndex};
-use crate::workspace::{aipl_files, mentions_word};
+use crate::workspace::mentions_word;
 
 /// One open document, as the editor last told us it reads.
 struct Document {
@@ -40,6 +41,42 @@ struct Document {
     /// document so a client can drop a batch that an edit has already
     /// invalidated.
     version: Option<i64>,
+}
+
+/// What the type checker made of one document, for the text it was given.
+pub(crate) enum Typed {
+    /// The document compiled; [`Navigation`] holds what its names resolve to.
+    Ready {
+        text: String,
+        navigation: Navigation,
+    },
+    /// It did not, and this is the first thing the compiler said about it.
+    Broken { text: String, message: String },
+}
+
+impl Typed {
+    /// The text this was computed from.
+    fn text(&self) -> &str {
+        match self {
+            Typed::Ready { text, .. } | Typed::Broken { text, .. } => text,
+        }
+    }
+}
+
+fn still_analysing() -> String {
+    "still analysing: the compiler has not finished checking the current text of this \
+     document"
+        .to_string()
+}
+
+/// A declaration site as an LSP `Location`, with its range taken against the
+/// source the navigation was built from.
+fn location(navigation: &Navigation, site: &Site) -> Value {
+    let source = navigation.source(&site.file).unwrap_or_default();
+    json!({
+        "uri": path_to_uri(&site.file),
+        "range": LineIndex::new(source).range(&site.span),
+    })
 }
 
 /// What handling one message asks the transport to do. Returned rather than
@@ -63,10 +100,10 @@ pub struct Server {
     /// What has been worked out about files, so a request about text it has seen
     /// does not do that work again.
     analyses: Analyses,
-    /// The folders the client has open, which a search for uses looks through
-    /// besides the documents it has open. Empty until `initialize`, and for a
-    /// client that opened a file on its own.
-    roots: Vec<PathBuf>,
+    /// What the type checker made of each open document, by URI — see
+    /// [`Typed`]. Written by [`Server::record`] when the diagnostics worker
+    /// finishes a check.
+    typed: HashMap<String, Typed>,
 }
 
 impl Server {
@@ -86,10 +123,7 @@ impl Server {
         let id = message.get("id").cloned();
         let params = &message["params"];
         match method {
-            "initialize" => {
-                self.roots = workspace_roots(params);
-                reply(id, initialize_result())
-            }
+            "initialize" => reply(id, initialize_result()),
             "shutdown" => reply(id, Value::Null),
             "exit" => Reaction {
                 exit: true,
@@ -112,6 +146,7 @@ impl Server {
             "textDocument/didClose" => {
                 let uri = uri_of(&params["textDocument"]);
                 self.documents.remove(&uri);
+                self.typed.remove(&uri);
                 // Diagnostics belong to the server until it says otherwise, so
                 // a closed document's have to be withdrawn explicitly or the
                 // editor keeps showing them.
@@ -120,8 +155,8 @@ impl Server {
                     ..Reaction::default()
                 }
             }
-            "textDocument/definition" => reply(id, self.definition(params)),
-            "textDocument/references" => reply(id, self.references(params)),
+            "textDocument/definition" => answer(id, self.definition(params)),
+            "textDocument/references" => answer(id, self.references(params)),
             "textDocument/hover" => reply(id, self.hover(params)),
             "textDocument/documentSymbol" => reply(id, self.document_symbols(params)),
             "textDocument/formatting" => reply(id, self.formatting(params)),
@@ -160,8 +195,17 @@ impl Server {
     /// Snapshot a document and check it in one step — what a caller with
     /// nothing else to do wants, and what the tests use. The transport splits
     /// the two instead; see [`Server::snapshot`].
-    pub fn diagnostics(&self, uri: &str) -> Option<Value> {
-        Some(diagnostics(&self.snapshot(uri)?))
+    pub fn diagnostics(&mut self, uri: &str) -> Option<Value> {
+        let analysis = analyse(&self.snapshot(uri)?);
+        Some(self.record(analysis))
+    }
+
+    /// Keep what a check found out about a document, and hand back the
+    /// diagnostics message to publish. The check itself ran without the server;
+    /// this is the one step that needs it.
+    pub(crate) fn record(&mut self, analysis: Analysis) -> Value {
+        self.typed.insert(analysis.uri, analysis.typed);
+        analysis.message
     }
 
     fn open(&mut self, document: &Value) {
@@ -193,114 +237,149 @@ impl Server {
         document.version = params["textDocument"]["version"].as_i64();
     }
 
-    fn definition(&mut self, params: &Value) -> Value {
+    /// What the compiler resolved the name under the cursor to, with the
+    /// document and position the request named — or the reason the compiler
+    /// has no answer, which is an error rather than an empty result so that "the
+    /// server is still working" and "this does not compile" are never mistaken
+    /// for "nothing refers to this". See [`crate::navigation`].
+    fn under(&self, params: &Value) -> Result<(Under, PathBuf, String, usize), String> {
         let Some((path, text, offset)) = locate(&self.documents, params) else {
-            return Value::Null;
+            return Err(
+                "this document has no file on disk, so its imports cannot be \
+                        resolved — save it first"
+                    .to_string(),
+            );
         };
-        let Some((name, _)) = self.analyses.identifier_at(path, text, offset) else {
-            return Value::Null;
-        };
-        let read = |imported: &Path| source_in(&self.documents, imported);
-        let Some(found) = self.analyses.resolve(path, text, &name, offset, &read) else {
-            return Value::Null;
-        };
-        // A builtin the compiler expands itself is described but not written
-        // anywhere, so there is nowhere to jump.
-        let Some((target, source)) = found.file else {
-            return Value::Null;
-        };
-        json!({
-            // The index keys an imported file by the path the import spells
-            // (`../lib/util.aipl`), which is the right key and the wrong URI:
-            // resolved is what an editor compares against the buffer it
-            // already has open.
-            "uri": path_to_uri(&resolved(&target)),
-            "range": LineIndex::new(&source).range(&found.symbol.name_span),
-        })
+        let navigation = self.current_navigation(&uri_of(&params["textDocument"]), text)?;
+        Ok((
+            navigation.under(path, offset),
+            path.to_path_buf(),
+            text.to_string(),
+            offset,
+        ))
+    }
+
+    /// The navigation of the document at `uri`, if it was built from exactly
+    /// `text`.
+    fn current_navigation(&self, uri: &str, text: &str) -> Result<&Navigation, String> {
+        match self.typed.get(uri) {
+            None => Err(still_analysing()),
+            Some(typed) if typed.text() != text => Err(still_analysing()),
+            Some(Typed::Broken { message, .. }) => Err(format!(
+                "this document does not compile, so what its names refer to is unknown: {message}"
+            )),
+            Some(Typed::Ready { navigation, .. }) => Ok(navigation),
+        }
+    }
+
+    /// The answer for a cursor the compiler resolved nothing at: nothing to
+    /// say if it is not on a name, and an error if it is, because a name the
+    /// compiler did not resolve is a name this server cannot honestly send
+    /// anywhere.
+    fn nothing_resolved(
+        &mut self,
+        path: &Path,
+        text: &str,
+        offset: usize,
+    ) -> Result<Value, String> {
+        match self.analyses.identifier_at(path, text, offset) {
+            Some((name, _)) => Err(format!(
+                "the compiler's name resolution does not cover `{name}` here (imports, \
+                 parameters, patterns and types are not tracked yet)"
+            )),
+            None => Ok(Value::Null),
+        }
+    }
+
+    fn definition(&mut self, params: &Value) -> Result<Value, String> {
+        let (under, path, text, offset) = self.under(params)?;
+        match under {
+            Under::Declared(site) => {
+                let navigation =
+                    self.current_navigation(&uri_of(&params["textDocument"]), &text)?;
+                Ok(location(navigation, &site))
+            }
+            Under::Native(name) => Err(format!(
+                "`{name}` is a builtin the compiler expands itself; it has no source to show"
+            )),
+            Under::Nothing => self.nothing_resolved(&path, &text, offset),
+        }
     }
 
     /// Every place the name under the cursor is used.
     ///
-    /// A use is an identifier that [`Analyses::resolve`] takes to the same
-    /// declaration the cursor's does — so a same-named function in a file that
-    /// does not import this one is not a use, and an alias is. That is the whole
-    /// of the resolution, and so also its limit: a local binding or a field that
-    /// shares a declaration's name is indistinguishable from a use of it, which
-    /// is the same gap go-to-definition has.
+    /// A use is a name the type checker resolved to the same declaration the
+    /// cursor's name resolves to, so a field is never confused with a function
+    /// that shares its spelling, and two structs with a field of the same name
+    /// are told apart by the type the field is read off.
     ///
-    /// Looks in the open documents, the file that declares the name, and every
-    /// `.aipl` file under the client's workspace folders. A file that does not
-    /// spell the name at all is not parsed.
-    fn references(&mut self, params: &Value) -> Value {
-        let Some((path, text, offset)) = locate(&self.documents, params) else {
-            return Value::Null;
-        };
-        let Some((name, _)) = self.analyses.identifier_at(path, text, offset) else {
-            return Value::Null;
-        };
-        let read = |imported: &Path| source_in(&self.documents, imported);
-        let Some(found) = self.analyses.resolve(path, text, &name, offset, &read) else {
-            return Value::Null;
-        };
-        let Some(target) = found.declaration() else {
-            return Value::Null;
+    /// Looks through the analysis of every open document, which covers the files
+    /// each one imports. A document whose analysis is missing, out of date or a
+    /// compile error is an error here when it mentions the name, because its
+    /// uses cannot be listed and a list without them would read as complete.
+    fn references(&mut self, params: &Value) -> Result<Value, String> {
+        let (under, path, text, offset) = self.under(params)?;
+        let declaration = match under {
+            Under::Declared(site) => site,
+            Under::Native(name) => {
+                return Err(format!(
+                    "`{name}` is a builtin the compiler expands itself; its uses are not tracked"
+                ))
+            }
+            Under::Nothing => return self.nothing_resolved(&path, &text, offset),
         };
         let include_declaration = params["context"]["includeDeclaration"]
             .as_bool()
             .unwrap_or(true);
+        let uri = uri_of(&params["textDocument"]);
+        let here = self.current_navigation(&uri, &text)?;
+        let name = here
+            .source(&declaration.file)
+            .and_then(|source| source.get(declaration.span.clone()))
+            .unwrap_or_default()
+            .to_string();
 
-        // An open document keeps the spelling of its path, which is the key its
-        // analysis is remembered under; the others are found by walking.
-        let mut seen: HashSet<PathBuf> = HashSet::new();
-        let mut candidates: Vec<PathBuf> = Vec::new();
-        let declaring = match &target {
-            Declaration::Written { file, .. } => Some(file.clone()),
-            Declaration::Builtin(_) => None,
+        let mut locations: Vec<(PathBuf, usize, Value)> = Vec::new();
+        let mut seen: HashSet<(PathBuf, usize, usize)> = HashSet::new();
+        let mut add = |navigation: &Navigation, site: &Site| {
+            if seen.insert((site.file.clone(), site.span.start, site.span.end)) {
+                locations.push((
+                    site.file.clone(),
+                    site.span.start,
+                    location(navigation, site),
+                ));
+            }
         };
-        let open = self.documents.values().filter_map(|d| d.path.clone());
-        let walked = self.roots.iter().flat_map(|root| aipl_files(root));
-        for candidate in open.chain(declaring).chain(walked) {
-            if seen.insert(resolved(&candidate)) {
-                candidates.push(candidate);
-            }
+        if include_declaration {
+            add(here, &declaration);
         }
-
-        let mut locations: Vec<(String, Value)> = Vec::new();
-        for candidate in candidates {
-            let Some(source) = source_in(&self.documents, &candidate) else {
-                continue;
-            };
-            if !mentions_word(&source, &found.symbol.name) {
-                continue;
-            }
-            let uri = path_to_uri(&resolved(&candidate));
-            let lines = LineIndex::new(&source);
-            let spans =
-                self.analyses
-                    .mentions(&candidate, &source, &target, &found.symbol.name, &read);
-            for span in spans {
-                let is_declaration = matches!(
-                    &target,
-                    Declaration::Written { file, name_span }
-                        if *file == resolved(&candidate) && *name_span == span
-                );
-                if include_declaration || !is_declaration {
-                    locations.push((
-                        uri.clone(),
-                        json!({ "uri": uri, "range": lines.range(&span) }),
-                    ));
+        for (other_uri, document) in &self.documents {
+            match self.typed.get(other_uri) {
+                Some(Typed::Ready { text, navigation }) if *text == document.text => {
+                    for site in navigation.uses_of(&declaration) {
+                        add(navigation, &site);
+                    }
+                }
+                _ if !mentions_word(&document.text, &name) => {}
+                Some(Typed::Broken { text, message }) if *text == document.text => {
+                    return Err(format!(
+                        "cannot list every use of `{name}`: {other_uri} does not compile ({message})"
+                    ))
+                }
+                _ => {
+                    return Err(format!(
+                        "cannot list every use of `{name}`: {other_uri} is still being analysed"
+                    ))
                 }
             }
         }
-        // Documents come out of a hash map, so order by file; the sort is stable,
-        // which keeps each file's uses in source order.
-        locations.sort_by(|a, b| a.0.cmp(&b.0));
-        Value::Array(
+        locations.sort_by(|a, b| (&a.0, a.1).cmp(&(&b.0, b.1)));
+        Ok(Value::Array(
             locations
                 .into_iter()
-                .map(|(_, location)| location)
+                .map(|(_, _, location)| location)
                 .collect(),
-        )
+        ))
     }
 
     fn hover(&mut self, params: &Value) -> Value {
@@ -409,19 +488,6 @@ impl Server {
     }
 }
 
-/// The folders a client opened, from `initialize`: its workspace folders, or
-/// the single root an older client sends instead.
-fn workspace_roots(params: &Value) -> Vec<PathBuf> {
-    let folders: Vec<&str> = match params["workspaceFolders"].as_array() {
-        Some(folders) => folders
-            .iter()
-            .filter_map(|folder| folder["uri"].as_str())
-            .collect(),
-        None => params["rootUri"].as_str().into_iter().collect(),
-    };
-    folders.into_iter().filter_map(uri_to_path).collect()
-}
-
 /// The document a request names, and the byte offset of its `position`.
 fn locate<'a>(
     documents: &'a HashMap<String, Document>,
@@ -484,6 +550,7 @@ fn same_file(a: &Path, b: &Path) -> bool {
     }
 }
 
+const REQUEST_FAILED: i64 = -32803;
 /// JSON-RPC's code for a method the server does not implement.
 const METHOD_NOT_FOUND: i64 = -32601;
 
@@ -530,6 +597,28 @@ fn reply(id: Option<Value>, result: Value) -> Reaction {
     }
 }
 
+/// A reply that is the result, or a failed request carrying the reason. The
+/// client shows the reason, which is how "still analysing" and "does not
+/// compile" reach a person as themselves rather than as an empty answer.
+fn answer(id: Option<Value>, result: Result<Value, String>) -> Reaction {
+    match result {
+        Ok(result) => reply(id, result),
+        Err(message) => {
+            let Some(id) = id else {
+                return Reaction::default();
+            };
+            Reaction {
+                message: Some(json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "error": { "code": REQUEST_FAILED, "message": message },
+                })),
+                ..Reaction::default()
+            }
+        }
+    }
+}
+
 fn recheck(uri: String) -> Reaction {
     Reaction {
         recheck: Some(uri),
@@ -562,22 +651,55 @@ pub struct Snapshot {
     version: Option<i64>,
 }
 
+/// What checking one snapshot produced: the diagnostics to publish, and what the
+/// checker made of the text for [`Server::record`] to keep.
+pub(crate) struct Analysis {
+    uri: String,
+    message: Value,
+    typed: Typed,
+}
+
 /// The `textDocument/publishDiagnostics` notification for a snapshot:
 /// everything the loader and the type checker report against it.
 ///
 /// Takes no `&Server`, so the caller can let go of the server first. That
 /// matters: the frontend over a few thousand lines of AIPL takes seconds, and
 /// go-to-definition has to keep answering while it does.
-pub fn diagnostics(snapshot: &Snapshot) -> Value {
+pub(crate) fn analyse(snapshot: &Snapshot) -> Analysis {
     let lines = LineIndex::new(&snapshot.text);
-    let found = match check(&snapshot.path, &snapshot.text) {
-        Ok(()) => Vec::new(),
-        Err(errors) => errors
-            .iter()
-            .map(|error| diagnostic(&lines, error))
-            .collect(),
+    let (found, typed) = match check(&snapshot.path, &snapshot.text) {
+        Ok(navigation) => (
+            Vec::new(),
+            Typed::Ready {
+                text: snapshot.text.clone(),
+                navigation,
+            },
+        ),
+        Err(errors) => (
+            errors
+                .iter()
+                .map(|error| diagnostic(&lines, error))
+                .collect(),
+            Typed::Broken {
+                text: snapshot.text.clone(),
+                message: errors
+                    .first()
+                    .map(|error| error.message.clone())
+                    .unwrap_or_default(),
+            },
+        ),
     };
-    publish_diagnostics(&snapshot.uri, snapshot.version, found)
+    Analysis {
+        uri: snapshot.uri.clone(),
+        message: publish_diagnostics(&snapshot.uri, snapshot.version, found),
+        typed,
+    }
+}
+
+/// [`analyse`], keeping only the diagnostics to publish: what a caller with no
+/// server to record into wants.
+pub fn diagnostics(snapshot: &Snapshot) -> Value {
+    analyse(snapshot).message
 }
 
 /// Load the document and type-check it, collecting every finding.
@@ -588,11 +710,11 @@ pub fn diagnostics(snapshot: &Snapshot) -> Value {
 /// after the checker — monomorphization, optimization, Cranelift — none of
 /// which reports anything an editor can point at, and all of which costs more
 /// than the rest put together.
-fn check(path: &Path, text: &str) -> Result<(), Vec<Error>> {
+fn check(path: &Path, text: &str) -> Result<Navigation, Vec<Error>> {
     let debug = DebugOptions::new(false);
     let program = aipl_loader::load_program_overlay(path, text, debug)?;
-    aipl_codegen::frontend(&program)?;
-    Ok(())
+    let frontend = aipl_codegen::frontend(&program)?;
+    Ok(Navigation::new(&frontend, path, text))
 }
 
 /// One compiler [`Error`] as an LSP diagnostic.

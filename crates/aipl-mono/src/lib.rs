@@ -28,7 +28,7 @@ use std::{
 
 mod check;
 mod patterns;
-pub use check::{check, set_mangle};
+pub use check::{check, check_resolved, set_mangle};
 
 mod fold;
 pub use fold::{fold_constants, fold_matches_post_mono};
@@ -753,7 +753,7 @@ fn lt_ty(
                     order.push(name.clone());
                     let fs: Vec<FieldDecl> = (0..lowered.len())
                         .map(|i| FieldDecl {
-                            name: format!("_{i}"),
+                            name: aipl_syntax::SpanStr::synthetic(format!("_{i}")),
                             ty: Type::TypeVar(tuple_var_name(i)),
                             default: None,
                         })
@@ -769,7 +769,7 @@ fn lt_ty(
                     .iter()
                     .enumerate()
                     .map(|(i, ty)| FieldDecl {
-                        name: format!("_{i}"),
+                        name: aipl_syntax::SpanStr::synthetic(format!("_{i}")),
                         ty: ty.clone(),
                         default: None,
                     })
@@ -1580,7 +1580,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                     s.name.text.clone(),
                     s.fields
                         .iter()
-                        .map(|f| (f.name.clone(), f.ty.clone(), f.default.clone()))
+                        .map(|f| (f.name.text.clone(), f.ty.clone(), f.default.clone()))
                         .collect(),
                 );
                 passthrough.push(item.clone());
@@ -1918,7 +1918,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
             fields: fields
                 .into_iter()
                 .map(|(fname, ty, _)| aipl_syntax::ast::FieldDecl {
-                    name: fname,
+                    name: aipl_syntax::SpanStr::synthetic(fname),
                     ty,
                     default: None,
                 })
@@ -1983,7 +1983,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                     .fields
                     .iter()
                     .map(|f| ConcreteFieldDecl {
-                        name: f.name.clone(),
+                        name: f.name.text.clone(),
                         ty: settled(&f.ty, &format!("struct {:?} field {:?}", s.name, f.name)),
                     })
                     .collect(),
@@ -5875,7 +5875,7 @@ impl Mono<'_> {
             let mut fields = Vec::with_capacity(tmpl.fields.len());
             for fd in &tmpl.fields {
                 let ty = self.resolve_generic_ty(&subst_type_params(&fd.ty, &map))?;
-                fields.push((fd.name.clone(), ty, fd.default.clone()));
+                fields.push((fd.name.text.clone(), ty, fd.default.clone()));
             }
             self.syn_structs.insert(name.clone(), fields);
         } else if let Some(tmpl) = self.generic_variants.get(base).cloned() {
@@ -6465,7 +6465,7 @@ impl Mono<'_> {
                     read
                 };
                 Ok(FieldInit {
-                    name: fname.clone(),
+                    name: aipl_syntax::SpanStr::synthetic(fname.clone()),
                     value,
                 })
             })
@@ -6678,7 +6678,7 @@ impl Mono<'_> {
                     .into_iter()
                     .enumerate()
                     .map(|(i, v)| aipl_syntax::ast::FieldInit {
-                        name: format!("_{i}"),
+                        name: aipl_syntax::SpanStr::synthetic(format!("_{i}")),
                         value: v,
                     })
                     .collect();
@@ -7451,7 +7451,7 @@ impl Mono<'_> {
                     };
                     let (rv, _) = self.infer(&src, env)?;
                     rfields.push(aipl_syntax::ast::FieldInit {
-                        name: fname.clone(),
+                        name: aipl_syntax::SpanStr::synthetic(fname.clone()),
                         value: rv,
                     });
                 }
@@ -8968,6 +8968,7 @@ fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
         // Carried over with `span`: substituting a type variable in an
         // annotation moves no text.
         value_span: e.value_span.clone(),
+        name_span: e.name_span.clone(),
     }
 }
 

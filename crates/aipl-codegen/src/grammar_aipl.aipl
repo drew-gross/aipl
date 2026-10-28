@@ -207,6 +207,7 @@ import {
     at,
     is_spread,
     join_spans,
+    named_at,
     show_expr,
 } from "./expr.aipl";
 import { find_trailing_whitespace } from "./find_trailing_whitespace.aipl";
@@ -286,7 +287,7 @@ import {
     str_lit_value,
     template_segments,
 } from "./lex_aipl.aipl";
-import { LexResult, keep_skipped, lex, span_str } from "./lexer.aipl";
+import { LexResult, SpanStr, keep_skipped, lex, span_str } from "./lexer.aipl";
 import { operator_named_forms } from "./operator_named_forms.aipl";
 import {
     Prepared,
@@ -1565,9 +1566,9 @@ fn lower_suffix(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // no slot pattern can name its shape; the `::` after the name does.
     match (node.own_texts(src)) {
         ["$", ..] => ok(ASuffix(map_step(src, node, kids, sp)?)),
-        [_, name, "::", ..] => {
+        [_, _, "::", ..] => {
             let TypedCall { tys, args } = typed_call(kids, sp)?;
-            ok(ASuffix(SufMethodTyped(name, tys, args)))
+            ok(ASuffix(SufMethodTyped(span_str(src, node.second_tok(sp)), tys, args)))
         },
         _ => suffix_by_shape(src, node, kids, sp),
     }
@@ -1580,7 +1581,7 @@ fn suffix_by_shape(src: str, node: Parts, kids: Ast[], sp: Span) -> Ast!ParseErr
         // `?`
         [Tok(_)] => ok(ASuffix(SufTry)),
         // `.name`, and `.0` — a tuple slot, which `field_name` spells `_0`.
-        [Tok(_), name] => ok(ASuffix(SufField(field_name(name.slot_text(src), sp)?))),
+        [Tok(_), name] => ok(ASuffix(SufField(field_name(slot_name(name, src, sp), sp)?))),
         // `[row, column]`
         [Tok(_), Sub(_), Tok(_), Sub(_), Tok(_)] => ok(ASuffix(SufIndex2(
             kid_expr(kids, 0, sp)?,
@@ -1589,7 +1590,7 @@ fn suffix_by_shape(src: str, node: Parts, kids: Ast[], sp: Span) -> Ast!ParseErr
         // `.name(args)`
         [Tok(_), name, Tok(_), Sub(_), Tok(_)] => {
             let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a method call")?;
-            ok(ASuffix(SufMethod(name.slot_text(src), args)))
+            ok(ASuffix(SufMethod(slot_name(name, src, sp), args)))
         },
         // `[i]`
         [Tok(_), Sub(_), Tok(_)] => ok(ASuffix(SufIndex(kid_expr(kids, 0, sp)?))),
@@ -1605,10 +1606,10 @@ fn suffix_by_shape(src: str, node: Parts, kids: Ast[], sp: Span) -> Ast!ParseErr
 # receiver. The shapes are the `.` forms', so the slots say which one matched.
 fn map_step(src: str, node: Parts, kids: Ast[], sp: Span) -> Suffix!ParseError {
     match (node.slots()) {
-        [Tok(_), name] => ok(SufMapField(field_name(name.slot_text(src), sp)?)),
+        [Tok(_), name] => ok(SufMapField(field_name(slot_name(name, src, sp), sp)?)),
         [Tok(_), name, Tok(_), Sub(_), Tok(_)] => {
             let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a mapped call")?;
-            ok(SufMapMethod(name.slot_text(src), args))
+            ok(SufMapMethod(slot_name(name, src, sp), args))
         },
         _ => err(ParseError { message: "a mapped step matched no alternative", span: sp }),
     }
@@ -1618,14 +1619,20 @@ fn map_step(src: str, node: Parts, kids: Ast[], sp: Span) -> Suffix!ParseError {
 # `_0` — so the two syntaxes become one here and nothing downstream knows tuples
 # have a second way to name their fields. A negative index is refused here rather
 # than in the lexer: the `Int` matcher claims the sign, so `p.-1` does lex.
-fn field_name(name: str, span: Span) -> str!ParseError {
-    if (name.starts_with('-')) {
+fn field_name(name: SpanStr, span: Span) -> SpanStr!ParseError {
+    if (name.text.starts_with('-')) {
         return err(ParseError { message: "tuple index must be a non-negative integer", span });
     };
-    match (name.int_parse()) {
-        some(..) => ok(`_{name}`),
+    match (name.text.int_parse()) {
+        some(..) => ok(SpanStr { ..name, text: `_{name.text}` }),
         none => ok(name),
     }
+}
+
+# The name a slot holds, with where it was written; `fallback` when the slot is a
+# child position, which has no token of its own.
+fn slot_name(self: Slot, src: str, fallback: Span) -> SpanStr {
+    span_str(src, self.slot_span().value_or(fallback))
 }
 
 # `atom` — the twenty alternatives, dispatched on the first token each matched.
@@ -1697,16 +1704,19 @@ fn lower_atom(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             match (toks) {
                 [_, "::", ..] => {
                     let TypedCall { tys, args } = typed_call(kids, sp)?;
-                    ok(AExpr(at(TypeArgs(at(Call(head, args, false), tsp), tys), sp)))
+                    ok(AExpr(at(TypeArgs(at(Call(head, args, false), tsp).named_at(tsp), tys), sp)))
                 },
                 [_, "(", ..] => {
                     let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a call argument list")?;
-                    ok(AExpr(at(Call(head, args, false), tsp)))
+                    ok(AExpr(at(Call(head, args, false), tsp).named_at(tsp)))
                 },
                 [_, "{", ..] => {
-                    ok(AExpr(at(Construct(head, kids.try_map(|k| as_field_init(k, sp))?), tsp)))
+                    ok(AExpr(at(
+                        Construct(head, kids.try_map(|k| as_field_init(k, sp))?),
+                        tsp,
+                    ).named_at(tsp)))
                 },
-                _ => ok(AExpr(at(Ident(head), tsp))),
+                _ => ok(AExpr(at(Ident(head), tsp).named_at(tsp))),
             }
         },
         // A rule that matched no token of its own is a single pass-through child.
@@ -2136,12 +2146,17 @@ fn lower_field_init(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         [n, _, v] => ok(AFieldInit(FieldInit {
             name: n.slot_text(src),
             value: slot_expr(v, kids, sp)?,
+            name_span: n.slot_span().value_or(sp),
         })),
         // `x` is `x: x`, spanned at the field name.
         [n] => {
             let name = n.slot_text(src);
             let span = n.slot_span().value_or(node.tok_span());
-            ok(AFieldInit(FieldInit { name, value: at(Ident(name), span) }))
+            ok(AFieldInit(FieldInit {
+                name,
+                value: at(Ident(name), span).named_at(span),
+                name_span: span,
+            }))
         },
         _ => err(ParseError { message: "a field initialiser matched no alternative", span: sp }),
     }
@@ -2748,11 +2763,11 @@ fn wrap_stmt(stmt: Stmt, acc: Expr) -> Expr {
     match (stmt) {
         SLet(name, name_span, ty, value) => {
             let span = join_spans(name_span, acc.span);
-            at(Let(name, ty, value, acc), span)
+            at(Let(name, ty, value, acc), span).named_at(name_span)
         },
         SMut(name, name_span, ty, value) => {
             let span = join_spans(name_span, acc.span);
-            at(LetMut(name, ty, value, acc), span)
+            at(LetMut(name, ty, value, acc), span).named_at(name_span)
         },
         // The statement's own span, not the usual join with the rest of the
         // block: an error against this node (an immutable target, an unknown
@@ -2813,7 +2828,7 @@ fn for_chain(
     acc: Expr,
 ) -> Expr {
     let span = join_spans(name_span, acc.span);
-    seq(at(For(name, iterable, body, index=index), for_span), acc, span)
+    seq(at(For(name, iterable, body, index=index), for_span).named_at(name_span), acc, span)
 }
 
 # `while (cond) { body }`. No keyword or paren token carries a span of its own,
@@ -3698,11 +3713,15 @@ fn lower_construct_fields(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError 
         // `{ name, rest.. }` — a leading shorthand field, which is also how the
         // trailing-comma form `{ x, }` spells a lone one.
         [head, ",", ..] => {
-            let first = FieldInit { name: head, value: at(Ident(head), name_span) };
+            let first = FieldInit {
+                name: head,
+                value: at(Ident(head), name_span).named_at(name_span),
+                name_span,
+            };
             ok(AFieldInits([first, ..kids.try_map(|k| as_field_init(k, sp))?]))
         },
         [head, ..] => {
-            let first = FieldInit { name: head, value: kid_expr(kids, 0, sp)? };
+            let first = FieldInit { name: head, value: kid_expr(kids, 0, sp)?, name_span };
             ok(AFieldInits([first, ..kids[1..].try_map(|k| as_field_init(k, sp))?]))
         },
         _ => err(ParseError { message: "a body shorthand matched no token", span: sp }),
@@ -3855,12 +3874,12 @@ fn lower_field_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // sideways, and an arm per alternative is the rule read back.
     match (node.slots()) {
         [n, _, t, _, d] => ok(AFieldDecl(FieldDecl {
-            name: n.slot_text(src),
+            name: n.slot_name(src, sp),
             ty: as_ty(slot_kid(t, kids, sp)?, sp)?,
             default: some(slot_expr(d, kids, sp)?),
         })),
         [n, _, t] => ok(AFieldDecl(FieldDecl {
-            name: n.slot_text(src),
+            name: n.slot_name(src, sp),
             ty: as_ty(slot_kid(t, kids, sp)?, sp)?,
             default: none,
         })),

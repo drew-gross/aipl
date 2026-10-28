@@ -54,13 +54,23 @@ import {
 # the two spellings mean the same thing either way, since a recorded value span
 # is never empty: the repair that fills it in runs first.
 #
+# `name_span` is where the node's *name* is written: the field in `p.x`/`p$x`, the
+# callee in `f(a)`/`p.f(a)`, the identifier of an `Ident` or `Construct`, the
+# binder of a `Let`. The node's own span covers the whole construct, which cannot
+# say where inside it the name sits; a language server needs exactly that. Like
+# `value_span` it is a plain `Span`, with the empty one meaning "none" (a
+# synthesized node has no name written anywhere).
+#
 # The `ty` field `Expr` carries in Rust is absent — nothing the parser sets it.
-struct Expr { kind: ExprKind, span: Span, value_span: Span }
+struct Expr { kind: ExprKind, span: Span, value_span: Span, name_span: Span }
 
 # One field of a struct literal. A `..base` spread rides as an init with an
 # empty name whose *value* is the `Spread` — the value is what identifies it,
 # exactly as an array-literal spread is identified by being a spread element.
-struct FieldInit { name: str, value: Expr }
+#
+# `name_span` is where the field name is written in `T { name: v }` or the
+# shorthand `T { name }`; empty for a spread and for a synthesized init.
+struct FieldInit { name: str, value: Expr, name_span: Span = 0..0 }
 
 # One parameter of a lambda. `ty` is the annotation from `|x: i64| ..`, absent
 # for the bare `|x| ..` form.
@@ -283,10 +293,17 @@ pub fn show_expr(self: Expr) -> str {
 # An `Expr` at an empty span — the shorthand this file's own tests are written
 # with, and the one every synthesized node uses (a template's `Str` segments,
 # An expression node at a span — the constructor every lowering uses.
-pub fn at(kind: ExprKind, span: Span) -> Expr { kind, span, value_span: 0..0 }
+pub fn at(kind: ExprKind, span: Span) -> Expr { kind, span, value_span: 0..0, name_span: 0..0 }
 
 # an else-less `if`'s unit branch, an open slice's `0`).
-pub fn expr(kind: ExprKind) -> Expr { kind, span: 0..0, value_span: 0..0 }
+pub fn expr(kind: ExprKind) -> Expr { kind, span: 0..0, value_span: 0..0, name_span: 0..0 }
+
+# `self` with the span of its name recorded — see `Expr`.
+pub fn named_at(self: Expr, name_span: Span) -> Expr { ..self, name_span }.test({
+    assert(at(Ident("x"), 4..9).named_at(4..5).name_span == 4..5);
+    assert(at(Ident("x"), 4..9).named_at(4..5).span == 4..9);
+    assert(expr(Num(1)).name_span == 0..0);
+})
 
 # The two synthesized leaves that come up most.
 pub fn num(v: i64) -> Expr { expr(Num(v)) }

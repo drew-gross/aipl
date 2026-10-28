@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>struct Expr</code></pre>
 
-          <div class="doc"><p>block) where its <em>value</em> is.</p><p>The span is this node's <em>token</em> span: every token the node was built from, closing bracket and unary operator included. A span kept for diagnostics alone can be narrower than that — it only has to point somewhere useful — but a formatter needs the extent, so this one records it.</p><p><code>value_span</code> is a block's tail position: <code>fn f() -&gt; str { let a = 1; a }</code> returns the <code>a</code>, but the body's span starts at the <code>let</code>, so a return-type error would underline the binding. It is recorded while the block is being built, where the tail is in hand, rather than re-walked at every diagnostic.</p><p>Rust spells it <code>Option&lt;Box&lt;Span&gt;&gt;</code>; here it is a plain <code>Span</code> with the <em>empty</em> one meaning &quot;none&quot;, which is the convention already in force for a location that does not exist (see <code>join_spans</code>). A struct field could not be an optional struct when this was written, so there was no choice; it can be one now, and the two spellings mean the same thing either way, since a recorded value span is never empty: the repair that fills it in runs first.</p><p>The <code>ty</code> field <code>Expr</code> carries in Rust is absent — nothing the parser sets it.</p></div>
+          <div class="doc"><p>block) where its <em>value</em> is.</p><p>The span is this node's <em>token</em> span: every token the node was built from, closing bracket and unary operator included. A span kept for diagnostics alone can be narrower than that — it only has to point somewhere useful — but a formatter needs the extent, so this one records it.</p><p><code>value_span</code> is a block's tail position: <code>fn f() -&gt; str { let a = 1; a }</code> returns the <code>a</code>, but the body's span starts at the <code>let</code>, so a return-type error would underline the binding. It is recorded while the block is being built, where the tail is in hand, rather than re-walked at every diagnostic.</p><p>Rust spells it <code>Option&lt;Box&lt;Span&gt;&gt;</code>; here it is a plain <code>Span</code> with the <em>empty</em> one meaning &quot;none&quot;, which is the convention already in force for a location that does not exist (see <code>join_spans</code>). A struct field could not be an optional struct when this was written, so there was no choice; it can be one now, and the two spellings mean the same thing either way, since a recorded value span is never empty: the repair that fills it in runs first.</p><p><code>name_span</code> is where the node's <em>name</em> is written: the field in <code>p.x</code>/<code>p$x</code>, the callee in <code>f(a)</code>/<code>p.f(a)</code>, the identifier of an <code>Ident</code> or <code>Construct</code>, the binder of a <code>Let</code>. The node's own span covers the whole construct, which cannot say where inside it the name sits; a language server needs exactly that. Like <code>value_span</code> it is a plain <code>Span</code>, with the empty one meaning &quot;none&quot; (a synthesized node has no name written anywhere).</p><p>The <code>ty</code> field <code>Expr</code> carries in Rust is absent — nothing the parser sets it.</p></div>
 
 
         </section>
@@ -43,7 +43,7 @@
           </h3>
           <pre class="signature"><code>struct FieldInit</code></pre>
 
-          <div class="doc"><p>One field of a struct literal. A <code>..base</code> spread rides as an init with an empty name whose <em>value</em> is the <code>Spread</code> — the value is what identifies it, exactly as an array-literal spread is identified by being a spread element.</p></div>
+          <div class="doc"><p>One field of a struct literal. A <code>..base</code> spread rides as an init with an empty name whose <em>value</em> is the <code>Spread</code> — the value is what identifies it, exactly as an array-literal spread is identified by being a spread element.</p><p><code>name_span</code> is where the field name is written in <code>T { name: v }</code> or the shorthand <code>T { name }</code>; empty for a spread and for a synthesized init.</p></div>
 
 
         </section>
@@ -369,6 +369,20 @@
           <pre class="signature"><code>pub fn expr(kind: ExprKind) -&#62; Expr</code></pre>
 
           <div class="doc"><p>an else-less <code>if</code>'s unit branch, an open slice's <code>0</code>).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-named_at">
+          <h3>
+            <a class="anchor" href="#item-named_at">named_at</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn named_at(self: Expr, name_span: Span) -&#62; Expr</code></pre>
+
+          <div class="doc"><p><code>self</code> with the span of its name recorded — see <code>Expr</code>.</p></div>
 
 
         </section>

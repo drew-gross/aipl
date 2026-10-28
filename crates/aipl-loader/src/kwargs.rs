@@ -39,7 +39,7 @@ use std::collections::{HashMap, HashSet};
 
 use aipl_syntax::ast::{
     Arity, Callee, Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Param,
-    Program, SetOrder, Signature, Type, VariantCase, VariantDecl,
+    Program, SetOrder, Signature, SpanStr, Type, VariantCase, VariantDecl,
 };
 use aipl_syntax::{Error, Span};
 
@@ -84,7 +84,7 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
             Item::Struct(s) => Some((
                 s.name.text.clone(),
                 (
-                    s.fields.iter().map(|f| f.name.clone()).collect(),
+                    s.fields.iter().map(|f| f.name.text.clone()).collect(),
                     s.is_generic(),
                 ),
             )),
@@ -601,10 +601,10 @@ impl Expander {
         // the diagnostic for a typo'd field name is the usual one.
         let mut out: Vec<FieldInit> = Vec::with_capacity(field_names.len());
         for fname in &field_names {
-            match given.iter().find(|fi| &fi.name == fname) {
+            match given.iter().find(|fi| fi.name.as_str() == fname.as_str()) {
                 Some(fi) => out.push(fi.clone()),
                 None => out.push(FieldInit {
-                    name: fname.clone(),
+                    name: SpanStr::synthetic(fname.clone()),
                     value: Expr::new(
                         ExprKind::Field(Box::new(base_ref.clone()), fname.clone()),
                         sspan.clone(),
@@ -613,7 +613,7 @@ impl Expander {
             }
         }
         for fi in given {
-            if !field_names.contains(&fi.name) {
+            if !field_names.contains(&fi.name.text) {
                 out.push(fi.clone());
             }
         }

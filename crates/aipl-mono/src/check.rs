@@ -27,6 +27,7 @@ use aipl_syntax::ast::{
     Arity, BinOp, Callee, Exclusion, Expr, ExprKind, FieldInit, Function, Item, LambdaParam,
     MatchArm, Pattern, Primitive, Program, Signature, StructDecl, Type, VariantDecl,
 };
+use aipl_syntax::resolution::{Resolution, Target};
 use aipl_syntax::KNOWN_EFFECTS;
 use aipl_syntax::{
     binop_spelling, is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr,
@@ -362,6 +363,10 @@ struct Cx<'a> {
     /// [`Cx::check_ty`] (which needs both) and blamed on the right function.
     /// Single slots for the same reason as `current_ret`: functions never nest.
     current_fn: std::cell::RefCell<String>,
+    /// What each written name resolved to, for [`aipl_syntax::resolution`]. Filled
+    /// as the checker makes the decisions it needs to type a program, so a
+    /// language server's answer is the checker's.
+    resolutions: std::cell::RefCell<Vec<Resolution>>,
     current_type_params: std::cell::RefCell<Vec<String>>,
     /// The type an expression is being checked *against*, when something more
     /// local than the function's return type says so — currently an annotated
@@ -964,6 +969,40 @@ impl<'a> Cx<'a> {
         }
     }
 
+    /// Note that the name written at `named` — if the parser recorded where —
+    /// refers to `target`, within the function being checked.
+    fn resolved(&self, named: &Option<Box<Span>>, target: Target) {
+        if let Some(at) = named {
+            self.resolved_at(at, target);
+        }
+    }
+
+    /// [`Cx::resolved`] for a name whose span is held bare; an empty one is the
+    /// "written nowhere" placeholder and records nothing.
+    fn resolved_at(&self, at: &Span, target: Target) {
+        if at.start < at.end {
+            self.resolutions.borrow_mut().push(Resolution {
+                in_fn: self.current_fn.borrow().clone(),
+                at: at.clone(),
+                target,
+            });
+        }
+    }
+
+    /// The item that declares the struct `ty` names: the struct itself, or the
+    /// generic template an instance was made from. `None` for a type that is no
+    /// struct.
+    fn declaring_struct(&self, ty: &Type) -> Option<String> {
+        match ty {
+            Type::Named(n) => Some(match self.instance_args(n) {
+                Some((base, _)) => base,
+                None => n.clone(),
+            }),
+            Type::Generic(base, _) => Some(base.clone()),
+            _ => None,
+        }
+    }
+
     fn has_variant(&self, name: &str) -> bool {
         self.variants.contains_key(name) || self.syn_variants.borrow().contains_key(name)
     }
@@ -984,7 +1023,7 @@ impl<'a> Cx<'a> {
                         .iter()
                         .map(|fd| {
                             (
-                                fd.name.clone(),
+                                fd.name.text.clone(),
                                 crate::subst_type_params(&fd.ty, &map),
                                 fd.default.is_some(),
                             )
@@ -1280,7 +1319,7 @@ impl<'a> Cx<'a> {
             let mut fields = Vec::with_capacity(tmpl.fields.len());
             for fd in &tmpl.fields {
                 let ty = self.resolve_generic_ty(&crate::subst_type_params(&fd.ty, &map))?;
-                fields.push((fd.name.clone(), ty, fd.default.is_some()));
+                fields.push((fd.name.text.clone(), ty, fd.default.is_some()));
             }
             self.add_syn_struct(name.clone(), fields);
         } else if let Some(tmpl) = self.generic_variants.get(base) {
@@ -1348,11 +1387,11 @@ impl<'a> Cx<'a> {
                 self.check_expr(&fi.value, env, effects)?
             };
             self.bind_field(&fd.ty, &vt, &vars, &mut map);
-            provided.insert(fi.name.clone(), (vt, fi.value.span.clone()));
+            provided.insert(fi.name.text.clone(), (vt, fi.value.span.clone()));
         }
         // Every field without a default must be provided.
         for fd in &tmpl.fields {
-            let given = provided.contains_key(&fd.name)
+            let given = provided.contains_key(&fd.name.text)
                 || waiting_lambdas.iter().any(|fi| fi.name == fd.name);
             if fd.default.is_none() && !given {
                 return Err(Error::at(
@@ -1413,7 +1452,7 @@ impl<'a> Cx<'a> {
                 };
                 let target = crate::subst_type_params(&fd.ty, &subst);
                 let vt = self.check_value_lambda(&fi.value, params, body, Some(&target), env)?;
-                provided.insert(fi.name.clone(), (vt, fi.value.span.clone()));
+                provided.insert(fi.name.text.clone(), (vt, fi.value.span.clone()));
             }
         }
         // Inside a generic function the arguments may be abstract (`Box { value:
@@ -1430,7 +1469,7 @@ impl<'a> Cx<'a> {
                 .iter()
                 .find(|(n, _, _)| *n == fi.name)
                 .expect("field validated above");
-            let (vt, vspan) = &provided[&fi.name];
+            let (vt, vspan) = &provided[&fi.name.text];
             if aipl_syntax::int_widens(vt, expected) {
                 continue;
             }
@@ -1702,6 +1741,12 @@ fn defaults_only_on_functions(kind: &str, name: &aipl_syntax::SpanStr) -> Error 
 /// change what it means. Recording the answer here, while the context is still
 /// visible, is what makes those moves safe.
 pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
+    check_resolved(program).map(|(checked, _)| checked)
+}
+
+/// [`check`], also returning what every written name resolved to — see
+/// [`aipl_syntax::resolution`].
+pub fn check_resolved(program: &Program) -> Result<(Program, Vec<Resolution>), Vec<Error>> {
     // struct name → [(field_name, field_type, has_default)]
     let mut structs: HashMap<String, Vec<(String, Type, bool)>> = HashMap::new();
     let mut variants: HashMap<String, Vec<(String, Vec<Type>)>> = HashMap::new();
@@ -1732,7 +1777,7 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
                     s.name.text.clone(),
                     s.fields
                         .iter()
-                        .map(|f| (f.name.clone(), f.ty.clone(), f.default.is_some()))
+                        .map(|f| (f.name.text.clone(), f.ty.clone(), f.default.is_some()))
                         .collect(),
                 );
             }
@@ -1798,6 +1843,7 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
         sigs: &sigs,
         current_ret: std::cell::RefCell::new(Type::Unit),
         current_fn: std::cell::RefCell::new(String::new()),
+        resolutions: std::cell::RefCell::new(Vec::new()),
         current_type_params: std::cell::RefCell::new(Vec::new()),
         current_expected: std::cell::RefCell::new(None),
         locks: std::cell::RefCell::new(HashMap::new()),
@@ -1972,7 +2018,7 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
             }
         }
     }
-    Ok(out)
+    Ok((out, aipl_syntax::resolution::settled(cx.resolutions.take())))
 }
 
 /// Tag `e` with the file the function named `name` came from, so the renderer
@@ -4481,7 +4527,7 @@ impl Cx<'_> {
                         obj.span.clone(),
                     )
                 })?;
-                fields
+                let field_ty = fields
                     .iter()
                     .find(|(n, _, _)| n == fname)
                     .map(|(_, t, _)| t.clone())
@@ -4490,11 +4536,33 @@ impl Cx<'_> {
                             format!("struct {} has no field {fname:?}", tyname(&ot)),
                             span.clone(),
                         )
-                    })?
+                    })?;
+                if let Some(owner) = self.declaring_struct(&ot) {
+                    self.resolved(
+                        &expr.name_span,
+                        Target::Field {
+                            owner,
+                            field: fname.clone(),
+                        },
+                    );
+                }
+                field_ty
             }
             ExprKind::Construct(name, inits) => {
                 // A construction of a generic struct template (`Box { value: 5 }`)
                 // infers its type arguments from the field values.
+                self.resolved(&expr.name_span, Target::Struct(name.clone()));
+                for fi in inits {
+                    if !fi.name.is_empty() {
+                        self.resolved_at(
+                            &fi.name.span,
+                            Target::Field {
+                                owner: name.clone(),
+                                field: fi.name.text.clone(),
+                            },
+                        );
+                    }
+                }
                 if self.generic_structs.contains_key(name) {
                     return self.infer_generic_construct(name, inits, env, effects, span.clone());
                 }
@@ -4674,7 +4742,15 @@ impl Cx<'_> {
                         }
                     }
                 }
-                self.check_call(name, args, env, effects, span.clone(), node_id(expr))?
+                self.check_call(
+                    name,
+                    args,
+                    env,
+                    effects,
+                    span.clone(),
+                    node_id(expr),
+                    &expr.name_span,
+                )?
             }
         })
     }
@@ -4883,6 +4959,8 @@ impl Cx<'_> {
         span: Span,
         // Identity of the call expression, for `Cx::lock_node`.
         node: usize,
+        // Where the callee's name is written, if the parser said.
+        named: &Option<Box<Span>>,
     ) -> Result<Type, Error> {
         // The canonical name is what the signature and constructor tables are
         // keyed by; the arms below are the callees the compiler types by hand.
@@ -5353,6 +5431,15 @@ impl Cx<'_> {
             if !args.is_empty() {
                 if let Ok(Type::Named(sn)) = self.check_expr(&args[0], env, effects) {
                     if let Some((ptys, ret)) = self.struct_fn_field(&sn, name) {
+                        if let Some(owner) = self.declaring_struct(&Type::Named(sn.clone())) {
+                            self.resolved(
+                                named,
+                                Target::Field {
+                                    owner,
+                                    field: name.to_string(),
+                                },
+                            );
+                        }
                         let cargs = &args[1..];
                         if ptys.len() != cargs.len() {
                             return Err(Error::at(
@@ -5391,6 +5478,7 @@ impl Cx<'_> {
             }
             return Err(Error::at(msg, span.clone()));
         };
+        self.resolved(named, Target::Function(name.to_string()));
         if sig.params.len() != args.len() {
             return Err(Error::at(
                 format!(

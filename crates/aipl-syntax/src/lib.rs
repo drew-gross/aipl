@@ -110,6 +110,24 @@ impl PartialEq<str> for SpanStr {
     }
 }
 
+impl PartialEq<String> for SpanStr {
+    fn eq(&self, other: &String) -> bool {
+        self.text == *other
+    }
+}
+
+impl PartialEq<SpanStr> for String {
+    fn eq(&self, other: &SpanStr) -> bool {
+        *self == other.text
+    }
+}
+
+impl PartialEq<&String> for SpanStr {
+    fn eq(&self, other: &&String) -> bool {
+        self.text == **other
+    }
+}
+
 impl PartialEq<&str> for SpanStr {
     fn eq(&self, other: &&str) -> bool {
         self.text == *other
@@ -347,6 +365,7 @@ pub mod aipl_builtins;
 pub mod builtin;
 pub mod callee;
 pub mod rename;
+pub mod resolution;
 pub use rename::{
     distinct_binders, fresh_id, fresh_local, fresh_temp, rename_params, rename_scoped,
 };
@@ -366,6 +385,9 @@ pub mod ast {
     pub struct FileSource {
         pub label: String,
         pub source: String,
+        /// The file's own path, as the loader read it — what `label` abbreviates
+        /// for a person. Empty for a source that has no file.
+        pub path: String,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -745,7 +767,7 @@ pub mod ast {
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct FieldDecl {
-        pub name: String,
+        pub name: SpanStr,
         pub ty: Type,
         pub default: Option<Expr>,
     }
@@ -1408,7 +1430,10 @@ pub mod ast {
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct FieldInit {
-        pub name: String,
+        /// The field's name and where it is written in `T { name: v }` or the
+        /// shorthand `T { name }`; empty for a spread, and spanless for a
+        /// synthesized init.
+        pub name: SpanStr,
         pub value: Expr,
     }
 
@@ -1455,6 +1480,15 @@ pub mod ast {
         /// `Expr` is recursed over deeply enough during compilation that
         /// widening every one of them costs real stack.
         pub value_span: Option<Box<Span>>,
+        /// Where this node's *name* is written: the field in `p.x`, the callee
+        /// in `f(a)` and `p.f(a)`, the identifier of an `Ident` or a
+        /// `Construct`, a binder. `span` covers the whole construct and cannot
+        /// say where inside it the name sits, which is what a language server
+        /// needs to map a cursor to a declaration.
+        ///
+        /// `None` on a synthesized node, which has no name written anywhere.
+        /// Boxed for the same reason as [`Expr::ty`].
+        pub name_span: Option<Box<Span>>,
     }
 
     impl Expr {
@@ -1464,7 +1498,15 @@ pub mod ast {
                 span,
                 ty: None,
                 value_span: None,
+                name_span: None,
             }
+        }
+
+        /// The same expression with the span of its name recorded — see
+        /// [`Expr::name_span`].
+        pub fn with_name_span(mut self, span: Span) -> Self {
+            self.name_span = Some(Box::new(span));
+            self
         }
 
         /// The span to report a diagnostic about this expression's *value*
@@ -1493,6 +1535,7 @@ pub mod ast {
                 span: like.span.clone(),
                 ty: like.ty.clone(),
                 value_span: like.value_span.clone(),
+                name_span: like.name_span.clone(),
             }
         }
 

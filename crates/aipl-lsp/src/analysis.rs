@@ -33,8 +33,6 @@ use std::path::{Path, PathBuf};
 use aipl_index::{FileIndex, Index, Symbol};
 use aipl_syntax::Span;
 
-use crate::server::resolved;
-
 /// The lexer scope every identifier token carries — the rule in
 /// `lex_aipl.aipl` that matches a name. Turning a cursor position into a name
 /// is a lexical question, so it is asked of the lexer rather than re-derived
@@ -50,31 +48,6 @@ pub(crate) struct Resolved {
     pub file: Option<(PathBuf, String)>,
     /// Whether it is a builtin rather than something a program declares.
     pub builtin: bool,
-}
-
-/// What a name stands for, whichever way a file spells it: the same value for
-/// `add` where it is declared, for `add` where it is imported, and for `plus`
-/// where it is imported `as plus`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Declaration {
-    /// A declaration in a file: the file, resolved, and the span of its name.
-    Written { file: PathBuf, name_span: Span },
-    /// A builtin, by the name an import list spells it.
-    Builtin(String),
-}
-
-impl Resolved {
-    /// What this name stands for, for comparing it with another resolution.
-    pub fn declaration(&self) -> Option<Declaration> {
-        if self.builtin {
-            return Some(Declaration::Builtin(self.symbol.name.clone()));
-        }
-        let (file, _) = self.file.as_ref()?;
-        Some(Declaration::Written {
-            file: resolved(file),
-            name_span: self.symbol.name_span.clone(),
-        })
-    }
 }
 
 /// The remembered work on one file.
@@ -163,48 +136,6 @@ impl Analyses {
             entry.lexed = Some((text.to_string(), spans));
         }
         entry.lexed.as_ref()?.1.as_deref()
-    }
-
-    /// The spans in `text` (the file at `path`) of every identifier that stands
-    /// for `target`, which `name` is the declared name of.
-    ///
-    /// A file spells `target` by `name`, or by the alias an import gives it, so
-    /// only identifiers spelled one of those are resolved — and each is resolved
-    /// as [`Analyses::resolve`] resolves a cursor on it, because a spelling that
-    /// reaches a different declaration (another file's `add`) is not a mention.
-    pub fn mentions(
-        &mut self,
-        path: &Path,
-        text: &str,
-        target: &Declaration,
-        name: &str,
-        read: &dyn Fn(&Path) -> Option<String>,
-    ) -> Vec<Span> {
-        let Some((file, _)) = self.file(path, text) else {
-            return Vec::new();
-        };
-        let mut spellings = vec![name.to_string()];
-        spellings.extend(
-            file.imports
-                .iter()
-                .filter(|import| import.name == name)
-                .map(|import| import.local.clone()),
-        );
-        let Some(spans) = self.identifiers(path, text).map(<[Span]>::to_vec) else {
-            return Vec::new();
-        };
-        let mut found = Vec::new();
-        for span in spans {
-            let spelled = &text[span.clone()];
-            if !spellings.iter().any(|spelling| spelling == spelled) {
-                continue;
-            }
-            let resolved = self.resolve(path, text, spelled, span.start, read);
-            if resolved.and_then(|r| r.declaration()).as_ref() == Some(target) {
-                found.push(span);
-            }
-        }
-        found
     }
 
     /// Where `name` is declared, as the file at `path` (whose text is `text`)

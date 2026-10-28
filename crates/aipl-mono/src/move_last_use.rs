@@ -898,7 +898,7 @@ mod tests {
             .into_iter()
             .enumerate()
             .map(|(i, value)| aipl_syntax::ast::FieldInit {
-                name: format!("f{i}"),
+                name: aipl_syntax::SpanStr::synthetic(format!("f{i}")),
                 value,
             })
             .collect();

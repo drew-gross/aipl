@@ -886,7 +886,7 @@ mod tests {
             fields
                 .iter()
                 .map(|(n, v)| FieldInit {
-                    name: (*n).to_string(),
+                    name: aipl_syntax::SpanStr::synthetic((*n).to_string()),
                     value: v.clone(),
                 })
                 .collect(),

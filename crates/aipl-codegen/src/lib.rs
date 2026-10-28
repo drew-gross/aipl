@@ -2590,6 +2590,9 @@ pub struct Frontend {
     /// the optimizer asks for (`aipl_mono::effectful_fns`) must be computed
     /// over the builtins too.
     pub check_program: Program,
+    /// What the checker decided each written name refers to — see
+    /// [`aipl_syntax::resolution`]. Names are those of `check_program`.
+    pub resolutions: Vec<aipl_syntax::resolution::Resolution>,
 }
 
 /// Everything from a loaded [`Program`] up to and including the type check:
@@ -2683,7 +2686,7 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
     // expressions stamped in (`Expr::ty`) — a bare `none`, an empty `[]`, a
     // generic constructor. Everything downstream runs on *that*, because the
     // passes below move expressions away from the context those types came from.
-    let checked = aipl_mono::check(&check_program)?;
+    let (checked, resolutions) = aipl_mono::check_resolved(&check_program)?;
     // `check_program` is the synthesized builtin decls followed by the real
     // program; take back the second half, now stamped. `check` neither reorders
     // nor adds items, so the tail lines up by construction.
@@ -2699,6 +2702,7 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
     Ok(Frontend {
         program,
         check_program,
+        resolutions,
     })
 }
 
@@ -2724,6 +2728,7 @@ fn compile_program<M: Module>(
     let Frontend {
         program: checked,
         check_program,
+        resolutions: _,
     } = frontend(program)?;
     // Everything a deferral decision is made against: the functions that have
     // effects or can abort. Computed once from `check_program`, which is where

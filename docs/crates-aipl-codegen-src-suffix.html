@@ -34,17 +34,17 @@
 
           <ul class="cases">
 
-            <li id="item-Field"><code>Field(str)</code>
+            <li id="item-Field"><code>Field(SpanStr)</code>
 
 
             </li>
 
-            <li id="item-Method"><code>Method(name: str, args: Expr[])</code>
+            <li id="item-Method"><code>Method(name: SpanStr, args: Expr[])</code>
 
 
             </li>
 
-            <li id="item-MethodTyped"><code>MethodTyped(name: str, tys: Ty[], args: Expr[])</code>
+            <li id="item-MethodTyped"><code>MethodTyped(name: SpanStr, tys: Ty[], args: Expr[])</code>
 
 
             </li>
@@ -74,12 +74,12 @@
 
             </li>
 
-            <li id="item-MapField"><code>MapField(str)</code>
+            <li id="item-MapField"><code>MapField(SpanStr)</code>
 
 
             </li>
 
-            <li id="item-MapMethod"><code>MapMethod(name: str, args: Expr[])</code>
+            <li id="item-MapMethod"><code>MapMethod(name: SpanStr, args: Expr[])</code>
 
 
             </li>
@@ -111,12 +111,26 @@
         <p class="note">Not importable from another file.</p>
 
 
+        <section class="item" id="item-spelled">
+          <h3>
+            <a class="anchor" href="#item-spelled">spelled</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn spelled(text: str) -&#62; SpanStr</code></pre>
+
+          <div class="doc"><p>A name as it would be written at no particular place — the tests' spelling.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-mapped_element">
           <h3>
             <a class="anchor" href="#item-mapped_element">mapped_element</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn mapped_element(__spat$4610: Span) -&#62; str</code></pre>
+          <pre class="signature"><code>fn mapped_element(__spat$5608: Span) -&#62; str</code></pre>
 
           <div class="doc"><p>What <code>recv$step</code> means: <code>recv.map(|e| step)</code>, where <code>step</code> is the postfix step written against the element <code>e</code>. The element's name has a <code>$</code> in it, so no source can spell it and an argument of the step can never mean it by accident. It carries the step's span, so no two steps of a function name their element alike.</p></div>
 

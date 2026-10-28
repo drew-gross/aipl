@@ -825,7 +825,6 @@ expression matcher:
 
 vscode:
   go to definition and go to references should work for local variables
-  find all references is finding local variables with the same name that aren't actually references
   have the server able to run tests and show how many are passing (probably needs to have tests auto-shim first)
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 
