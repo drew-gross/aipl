@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">157 files, 1614 items.</p>
+      <p class="summary">157 files, 1610 items.</p>
 
       <ul class="files">
 
@@ -1731,7 +1731,7 @@
           <p class="file-summary">The <code>destructure_binding</code> lint: <code>let p = value; ... p.a ... p.b ...</code> where <strong>every</strong> mention of <code>p</code> is a field read. Say so with a pattern instead: <code>let T { a, b } = value;</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_binding.html#private">6 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_binding.html#private">5 private</a></span>
 
 
           <ul class="items">
@@ -1751,7 +1751,7 @@
           <p class="file-summary">The <code>destructure_param</code> lint: <code>fn f(p: Point) { .. p.x .. p.y .. }</code> where <strong>every</strong> mention of <code>p</code> is a field read — destructure the parameter instead: <code>fn f(Point { x, y })</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_param.html#private">6 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_param.html#private">5 private</a></span>
 
 
           <ul class="items">
@@ -1771,7 +1771,7 @@
           <p class="file-summary">The <code>destructure_slot</code> lint: a name a pattern binds — the payload of a case, a position of a tuple — whose every use is a field read. The pattern can take that value apart itself, one level down:</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_slot.html#private">9 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_slot.html#private">8 private</a></span>
 
 
           <ul class="items">
@@ -1796,7 +1796,7 @@
           <p class="file-summary">The <code>duplicate_import_source</code> lint: the same source imported on more than one line. Legal, but a reader wants everything a file takes from <code>builtins</code>, or from one path, in a single <code>import { .. }</code>; the better spelling merges the names into the first.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-duplicate_import_source.html#private">2 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-duplicate_import_source.html#private">1 private</a></span>
 
 
           <ul class="items">
@@ -1866,7 +1866,7 @@
           <p class="file-summary">The <code>fn_body_type_stutter</code> lint: <code>fn f() -&gt; T { T { .. } }</code> — a function whose whole body is a literal of its own declared return type, naming that type twice. The body-shorthand spelling drops the repetition: <code>fn f() -&gt; T { .. }</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-fn_body_type_stutter.html#private">5 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-fn_body_type_stutter.html#private">4 private</a></span>
 
 
           <ul class="items">
@@ -1917,6 +1917,16 @@
               <span class="kind kind-fn">fn</span>
             </li>
 
+            <li>
+              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-lint_hits"><code>lint_hits</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-lint_messages"><code>lint_messages</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
           </ul>
 
         </li>
@@ -1927,7 +1937,7 @@
           <p class="file-summary">The <code>unused_imports</code> lint: an imported name nothing in the file references. Legal — an unused import changes no behavior — but it misstates what the file depends on and outlives whatever once used it; the better spelling is to drop the name.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-unused_imports.html#private">16 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-unused_imports.html#private">15 private</a></span>
 
 
           <ul class="items">

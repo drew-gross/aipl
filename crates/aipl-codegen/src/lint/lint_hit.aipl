@@ -3,10 +3,33 @@
 # `#[allow]` squelching as the lints still written in Rust.
 
 import { Span, equal as == } from builtins;
+import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
+import { Program } from "../item.aipl";
 
 struct LintHit { message: str, span: Span }
 
 # A hit at `span`.
 pub fn hit(message: str, span: Span) -> LintHit { message, span }.test({
     assert(hit("m", 3..5) == LintHit { message: "m", span: 3..5 });
+})
+
+# What `lint` reports for the program `src` parses to. The one way the lints'
+# `.test` blocks run a lint over source text: pass the lint function itself.
+pub fn lint_hits(src: str, lint: (Program) -> LintHit[]) -> LintHit[]!ParseFailure {
+    ok(lint(aipl_parse_surface_file(src)?.program))
+}.test({
+    assert(lint_hits("fn f() { }", |program: Program| { [hit("found", 0..1)] })? == [
+        hit("found", 0..1),
+    ]);
+    match (lint_hits("fn (", |program: Program| { [hit("found", 0..1)] })) {
+        ok(..) => assert(false),
+        err(..) => assert(true),
+    };
+})
+
+# [`lint_hits`], keeping only the messages.
+pub fn lint_messages(src: str, lint: (Program) -> LintHit[]) -> str[]!ParseFailure {
+    ok(lint_hits(src, lint)?$message)
+}.test({
+    assert(lint_messages("fn f() { }", |program: Program| { [hit("found", 0..1)] })? == ["found"]);
 })

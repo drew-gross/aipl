@@ -104,7 +104,7 @@
             <a class="anchor" href="#item-referenced_names">referenced_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn referenced_names(__spat$3545: Program) -&#62; #{str}</code></pre>
+          <pre class="signature"><code>fn referenced_names(__spat$5739: Program) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>Every name the file mentions outside its own import lists: called and referenced idents, constructed structs, match constructors, operator spellings, and every name appearing in a type — signatures, struct fields, variant payloads, and inline <code>let</code>/lambda annotations.</p></div>
 
@@ -247,20 +247,6 @@
           <pre class="signature"><code>fn ty_names(self: Ty) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>Every name <code>self</code> mentions, so an import used only in a type position still counts as used. Variants are spelled out rather than wildcarded so a new <code>Ty</code> forces a decision here.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-dead_names">
-          <h3>
-            <a class="anchor" href="#item-dead_names">dead_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn dead_names(src: str) -&#62; str[]!ParseFailure</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
 
 
         </section>

@@ -4,9 +4,8 @@
 # into the first.
 
 import { collect_arms, equal as ==, has, push } from builtins;
-import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import { Import, ImportDecl, ImportSource, Program } from "../item.aipl";
-import { LintHit, hit } from "./lint_hit.aipl";
+import { LintHit, hit, lint_hits } from "./lint_hit.aipl";
 
 # A hit for each import of a source an earlier import already took names from,
 # in the order the imports are written.
@@ -21,7 +20,44 @@ pub fn duplicate_import_source(Program { items }) -> LintHit[] {
         set seen = #{..seen, source};
     }
     hits
-}
+}.test({
+    // One import of each source is fine, however many names it takes.
+    assert(
+        lint_hits(
+            """
+                import { map, filter } from builtins;
+                import { a } from "./a.aipl";
+                import { b } from "./b.aipl";
+            """,
+            duplicate_import_source,
+        )? == [],
+    );
+
+    // The second `builtins` import is the redundant one, and the caret goes under
+    // its source.
+    let src = "import { map } from builtins;\nimport { len } from builtins;\nfn f() { }";
+    assert(lint_hits(src, duplicate_import_source)?$span == [50..58]);
+    assert(lint_hits(src, duplicate_import_source)?$message == [
+        """duplicate import from "builtins"; merge the names into the first `import { .. } from builtins;`""",
+    ]);
+
+    // A path is told apart from `builtins` and from another path, and each
+    // redundant import is reported, not just the first.
+    let paths = lint_hits(
+        """
+            import { a } from "./a.aipl";
+            import { map } from builtins;
+            import { b } from "./a.aipl";
+            import { c } from "./c.aipl";
+            import { d } from "./a.aipl";
+        """,
+        duplicate_import_source,
+    )?;
+    assert(paths$message == [
+        """duplicate import from "./a.aipl"; merge the names into the first `import { .. } from "./a.aipl";`""",
+        """duplicate import from "./a.aipl"; merge the names into the first `import { .. } from "./a.aipl";`""",
+    ]);
+})
 
 # What is said of a redundant import from `self`.
 fn message(self: ImportSource) -> str {
@@ -30,38 +66,3 @@ fn message(self: ImportSource) -> str {
         Builtins => """duplicate import from "builtins"; merge the names into the first `import { .. } from builtins;`""",
     }
 }
-
-fn duplicates(src: str) -> LintHit[]!ParseFailure {
-    ok(duplicate_import_source(aipl_parse_surface_file(src)?.program))
-}.test({
-    // One import of each source is fine, however many names it takes.
-    assert(
-        duplicates("""
-            import { map, filter } from builtins;
-            import { a } from "./a.aipl";
-            import { b } from "./b.aipl";
-        """)? == [],
-    );
-
-    // The second `builtins` import is the redundant one, and the caret goes under
-    // its source.
-    let src = "import { map } from builtins;\nimport { len } from builtins;\nfn f() { }";
-    assert(duplicate_import_source(aipl_parse_surface_file(src)?.program)$span == [50..58]);
-    assert(duplicate_import_source(aipl_parse_surface_file(src)?.program)$message == [
-        """duplicate import from "builtins"; merge the names into the first `import { .. } from builtins;`""",
-    ]);
-
-    // A path is told apart from `builtins` and from another path, and each
-    // redundant import is reported, not just the first.
-    let paths = duplicates("""
-        import { a } from "./a.aipl";
-        import { map } from builtins;
-        import { b } from "./a.aipl";
-        import { c } from "./c.aipl";
-        import { d } from "./a.aipl";
-    """)?;
-    assert(paths$message == [
-        """duplicate import from "./a.aipl"; merge the names into the first `import { .. } from "./a.aipl";`""",
-        """duplicate import from "./a.aipl"; merge the names into the first `import { .. } from "./a.aipl";`""",
-    ]);
-})

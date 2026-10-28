@@ -49,6 +49,34 @@
         </section>
 
 
+
+        <section class="item" id="item-lint_hits">
+          <h3>
+            <a class="anchor" href="#item-lint_hits">lint_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_hits(src: str, lint: (Program) -&#62; LintHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>What <code>lint</code> reports for the program <code>src</code> parses to. The one way the lints' <code>.test</code> blocks run a lint over source text: pass the lint function itself.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lint_messages">
+          <h3>
+            <a class="anchor" href="#item-lint_messages">lint_messages</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_messages(src: str, lint: (Program) -&#62; LintHit[]) -&#62; str[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>[<code>lint_hits</code>], keeping only the messages.</p></div>
+
+
+        </section>
+
+
       </section>
 
 

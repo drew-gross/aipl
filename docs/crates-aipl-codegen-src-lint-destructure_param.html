@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-destructure_param">destructure_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn destructure_param(__spat$2632: Program) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn destructure_param(__spat$2569: Program) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each parameter of the program that only its fields are read from.</p></div>
 
@@ -107,20 +107,6 @@
           <pre class="signature"><code>fn opening_destructure(self: Expr, param: str, struct_name: str) -&#62; (Span, str[])?</code></pre>
 
           <div class="doc"><p>The span of the value and the field names of a <code>let T { a, b } = &lt;param&gt;;</code> that opens <code>self</code>, when it binds each field to a name of its own spelling and names the parameter's type. A field bound under another name (<code>T { a as x }</code>) is not recognised: the signature's pattern would have to spell the rename too.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-hits">
-          <h3>
-            <a class="anchor" href="#item-hits">hits</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn hits(src: str) -&#62; str[]!ParseFailure</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
 
 
         </section>
