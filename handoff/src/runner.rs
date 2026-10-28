@@ -297,12 +297,6 @@ Re-run this gate — don't hand-drive the sequence it was about to do.",
         }
     }
 
-    /// Point the "(full output: ..)" line at something other than a step log —
-    /// used by the startup checks, which have no step output of their own.
-    pub fn set_saved(&mut self, path: PathBuf) {
-        self.saved = Some(path);
-    }
-
     /// Abort with a step name and (optionally) the salient excerpt.
     pub fn fail(&self, label: &str, detail: &str) -> ! {
         eprintln!("\n{RED}{BOLD}HANDOFF FAILED at: {label}{OFF}");

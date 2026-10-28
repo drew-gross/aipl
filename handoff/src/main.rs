@@ -9,7 +9,7 @@
 //! # Order & why
 //!
 //! 0. Startup. Clears nextest listing processes orphaned by an interrupted run,
-//!    refuses to start over a staged IR artifact left by one, and reports the
+//!    removes a staged IR artifact left by one, and reports the
 //!    process chain the gate runs under — warning when it does not start from an
 //!    application, since the suite links and runs two binaries per case and
 //!    macOS assesses each new one serially unless the chain starts from a
@@ -417,6 +417,30 @@ fn tail(out: &str, n: usize) -> String {
     lines[lines.len().saturating_sub(n)..].join("\n")
 }
 
+/// Remove the staged IR file and every sibling built from it (`<staged>.*`: the
+/// compiled library and its lock). Returns how many files went.
+fn clear_staged(staged: &std::path::Path) -> usize {
+    let dir = staged.parent().expect("the staged file has a directory");
+    let name = staged
+        .file_name()
+        .expect("the staged file has a name")
+        .to_string_lossy()
+        .into_owned();
+    let mut removed = 0;
+    for entry in std::fs::read_dir(dir)
+        .expect("the staged file's directory is readable")
+        .flatten()
+    {
+        let file = entry.file_name().to_string_lossy().into_owned();
+        if (file == name || file.starts_with(&format!("{name}.")))
+            && std::fs::remove_file(entry.path()).is_ok()
+        {
+            removed += 1;
+        }
+    }
+    removed
+}
+
 fn handoff() -> ! {
     let repo = repo_root();
     std::env::set_current_dir(&repo).expect("repo root is a directory");
@@ -456,24 +480,15 @@ fn handoff() -> ! {
         }
     }
 
-    // A leftover staged artifact means a previous IR workflow was interrupted; a
-    // plain suite run fails on `no_staged_ir_pending` until it's resolved. Don't
-    // guess.
+    // A leftover staged artifact means a previous IR workflow was interrupted, and
+    // a plain suite run fails on `no_staged_ir_pending` while it exists. It is a
+    // candidate built from sources that may since have changed, and this gate
+    // regenerates one from the current sources whenever the IR is stale, so
+    // nothing in it is worth keeping: remove it, and the library built from it.
     if staged.exists() {
-        r.set_saved(staged.clone());
-        r.fail(
-            "startup",
-            &format!(
-                "A staged IR artifact already exists:
-    {}
-Resolve the interrupted workflow first — promote it
-    cargo nextest run --run-ignored only -E 'test(=dogfood_ir::promote_staged_ir)'
-or discard it, with the library built from it
-    rm -f '{}' '{}'.*",
-                staged.display(),
-                staged.display(),
-                staged.display(),
-            ),
+        let removed = clear_staged(&staged);
+        eprintln!(
+            "{DIM}(removed a staged IR artifact left by an interrupted workflow: {removed} file(s)){OFF}"
         );
     }
 
@@ -1375,5 +1390,28 @@ case_tests! {
     fn tail_is_bounded_by_the_input() {
         assert_eq!(tail("a\nb\nc", 2), "b\nc");
         assert_eq!(tail("a", 40), "a");
+    }
+
+    #[test]
+    fn clearing_the_staged_ir_takes_its_library_and_lock_and_nothing_else() {
+        let dir = std::env::temp_dir().join(format!("handoff-staged-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        for name in [
+            "dogfood.clif.staged",
+            "dogfood.clif.staged.3-100.dylib",
+            "dogfood.clif.staged.lock",
+            "dogfood.manifest",
+            "dogfood.o",
+        ] {
+            std::fs::write(dir.join(name), "x").unwrap();
+        }
+        assert_eq!(super::clear_staged(&dir.join("dogfood.clif.staged")), 3);
+        let mut left: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        left.sort();
+        assert_eq!(left, ["dogfood.manifest", "dogfood.o"]);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
