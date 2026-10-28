@@ -2,7 +2,7 @@
 # side rebuilds each as an `aipl_syntax::Error` and runs it through the same
 # `#[allow]` squelching as the lints still written in Rust.
 
-import { Span, equal as == } from builtins;
+import { Span, equal as ==, is_err_and, is_nonempty } from builtins;
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import { Program } from "../item.aipl";
 
@@ -21,10 +21,9 @@ pub fn lint_hits(src: str, lint: (Program) -> LintHit[]) -> LintHit[]!ParseFailu
     assert(lint_hits("fn f() { }", |program: Program| { [hit("found", 0..1)] })? == [
         hit("found", 0..1),
     ]);
-    match (lint_hits("fn (", |program: Program| { [hit("found", 0..1)] })) {
-        ok(..) => assert(false),
-        err(..) => assert(true),
-    };
+    assert(lint_hits("fn (", |program: Program| { [] }).is_err_and(
+        |failure| failure.errors.is_nonempty(),
+    ));
 })
 
 # [`lint_hits`], keeping only the messages.
