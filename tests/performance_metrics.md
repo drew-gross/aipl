@@ -741,13 +741,14 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/lint/destructure_param | 27739 | 3516799 | 675192 | 17534015 | 4855504 | 4299.00 | 8900.32 | 6592 |
 | crates/aipl-codegen/src/lint/duplicate_import_source | 17904 | 2453320 | 679376 | 6471890 | 4809144 | 2390.00 | 8352.31 | 5344 |
 | crates/aipl-codegen/src/lint/field_uses | 34913 | 7865890 | 501640 | 13969425 | 5151392 | 3685.00 | 9135.01 | 5424 |
-| crates/aipl-codegen/src/lint/lint | 4 | 208 | 208 | 1350 | 109192 | 6.00 | 4205.85 | 1536 |
+| crates/aipl-codegen/src/lint/fn_body_type_stutter | 23909 | 3116185 | 677280 | 13342865 | 4832832 | 3725.00 | 8761.05 | 6464 |
+| crates/aipl-codegen/src/lint/lint | 5 | 280 | 280 | 1629 | 131752 | 6.00 | 4270.58 | 1552 |
 | crates/aipl-codegen/src/lint/lint_hit | 0 | 0 | 0 | 146 | 656 | 2.00 | 69.28 | 1456 |
 | crates/aipl-codegen/src/lint/unused_imports | 23882 | 3032189 | 696178 | 14556242 | 4847972 | 3680.00 | 9010.07 | 7280 |
 | crates/aipl-codegen/src/normalize_output | 16 | 880 | 143 | 2750 | 1968 | 5.00 | 64.27 | 1440 |
 | crates/aipl-codegen/src/operator_named_forms | 16 | 1040 | 1040 | 3256 | 8316 | 7.00 | 66.69 | 1472 |
 | crates/aipl-codegen/src/parse | 7617 | 828674 | 144080 | 3744050 | 650156 | 937.00 | 3749.21 | 2832 |
-| crates/aipl-codegen/src/parse_and_partial_load | 22710 | 2929469 | 707010 | 11653797 | 5132848 | 3347.00 | 12296.80 | 7232 |
+| crates/aipl-codegen/src/parse_and_partial_load | 22722 | 2931485 | 707010 | 11658472 | 5155760 | 3249.00 | 12324.47 | 7312 |
 | crates/aipl-codegen/src/parse_spec | 147 | 4236 | 2155 | 75000 | 108664 | 39.00 | 268.43 | 1568 |
 | crates/aipl-codegen/src/parse_test_section_header | 0 | 0 | 0 | 1296 | 3232 | 4.00 | 64.92 | 1472 |
 | crates/aipl-codegen/src/parsed | 40 | 3237 | 2777 | 2259 | 54012 | 10.00 | 793.66 | 1552 |

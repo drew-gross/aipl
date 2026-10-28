@@ -17,7 +17,6 @@ mod compound_assign;
 mod eta_lambda;
 mod extend_longhand;
 mod field_init_shorthand;
-mod fn_body_type_stutter;
 mod interp_literal;
 mod interp_to_str;
 mod is_empty_longhand;
@@ -49,7 +48,7 @@ mod union_loop_union_all;
 mod value_or_compare;
 mod with_value_or_self;
 
-use crate::ast::{Expr, ExprKind, Function, ImportSource, Item, Program};
+use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
 use crate::{each_expr, each_subexpr, Error, Span};
 use std::collections::HashSet;
 
@@ -59,7 +58,6 @@ use self::compound_assign::{compound_assign, matching_compound};
 use self::eta_lambda::{eta_lambda, Forwarding};
 use self::extend_longhand::{extend_longhand, extend_names};
 use self::field_init_shorthand::field_init_shorthand;
-use self::fn_body_type_stutter::fn_body_type_stutter;
 use self::interp_literal::interp_literal;
 use self::interp_to_str::{interp_to_str, to_str_name};
 use self::is_empty_longhand::{empty_names, is_empty_longhand};
@@ -292,10 +290,9 @@ pub fn check(
         });
     }
     // The lints ported to AIPL ran with the parse: `unused_imports`,
-    // `duplicate_import_source`, `destructure_binding` and `destructure_param`, so
-    // far. Their place in the order among the lints still written in Rust is kept.
+    // `duplicate_import_source`, `destructure_binding`, `destructure_param` and
+    // `fn_body_type_stutter`, so far.
     hits.extend(ported);
-    fn_body_type_stutter(program, src, &mut hits);
     hits.retain(|e| match &e.span {
         Some(sp) => {
             let line = line_of(src, sp.start);
@@ -545,26 +542,4 @@ fn quote<'a>(e: &Expr, src: &'a str, placeholder: &'a str) -> &'a str {
     } else {
         placeholder
     }
-}
-
-/// `function`'s body without the bindings its destructuring parameters lower to:
-/// a synthetic `__spat$` parameter, and at the head of the body one `let` per
-/// field reading it. What remains is the body the user wrote. A destructuring
-/// `let` in the body binds a temporary of its own rather than a parameter, so it
-/// is not looked through.
-fn through_parameter_patterns(function: &Function) -> &Expr {
-    let mut current = &function.body;
-    while let ExprKind::Let(_, None, read, rest) = &current.kind {
-        let ExprKind::Field(base, _) = &read.kind else {
-            break;
-        };
-        let reads_pattern_parameter = matches!(&base.kind, ExprKind::Ident(b)
-            if b.starts_with(crate::DESTRUCTURE_BASE_PREFIX)
-                && function.sig.params.iter().any(|p| p.name == *b));
-        if !reads_pattern_parameter {
-            break;
-        }
-        current = rest;
-    }
-    current
 }

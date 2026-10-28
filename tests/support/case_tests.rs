@@ -1015,6 +1015,7 @@ case_tests! {
     crates_aipl_codegen_src_lint_destructure_param = "crates/aipl-codegen/src/lint/destructure_param",
     crates_aipl_codegen_src_lint_duplicate_import_source = "crates/aipl-codegen/src/lint/duplicate_import_source",
     crates_aipl_codegen_src_lint_field_uses = "crates/aipl-codegen/src/lint/field_uses",
+    crates_aipl_codegen_src_lint_fn_body_type_stutter = "crates/aipl-codegen/src/lint/fn_body_type_stutter",
     crates_aipl_codegen_src_lint_lint = "crates/aipl-codegen/src/lint/lint",
     crates_aipl_codegen_src_lint_lint_hit = "crates/aipl-codegen/src/lint/lint_hit",
     crates_aipl_codegen_src_lint_unused_imports = "crates/aipl-codegen/src/lint/unused_imports",

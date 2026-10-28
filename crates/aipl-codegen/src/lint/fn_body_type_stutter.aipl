@@ -1,0 +1,140 @@
+# The `fn_body_type_stutter` lint: `fn f() -> T { T { .. } }` — a function whose
+# whole body is a literal of its own declared return type, naming that type twice.
+# The body-shorthand spelling drops the repetition: `fn f() -> T { .. }`.
+#
+# Both spellings parse to the same `Construct`, so which one was written is
+# recovered from the source: the long form's span starts at the type name, the
+# shorthand's at the first field name. Requiring a `{` after that name is what
+# keeps a field that happens to share the type's name from reading as the long form.
+#
+# Only a body that is *exactly* the literal qualifies: a block with any statement in
+# it parses to a `Let`/`Seq` wrapping the literal, and the shorthand replaces the
+# whole body, so those are left alone. A destructured parameter is no statement
+# either, which the surface tree this runs on makes true without looking through
+# anything.
+
+import {
+    collect_arms,
+    ends_with,
+    equal as ==,
+    is_empty,
+    join,
+    len,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+    starts_with,
+    starts_with_at,
+    trim_while,
+    value_or,
+    wrapping_add as +,
+} from builtins;
+import { Construct, Expr, FieldInit } from "../expr.aipl";
+import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
+import { Fn, Program } from "../item.aipl";
+import { trim_end_while } from "../trim_end_while.aipl";
+import { Generic, Named, Ty } from "../ty.aipl";
+import { LintHit, hit } from "./lint_hit.aipl";
+
+# A hit for each function of the program whose body is a literal of its return type.
+pub fn fn_body_type_stutter(Program { items }, src: str) -> LintHit[] {
+    items.collect_arms(Fn)$function_hits(src).join()
+}
+
+# The hit for one function, or none.
+fn function_hits(self: Fn(function), src: str) -> LintHit[] {
+    // The name the return type offers the literal: a generic return contributes its
+    // base, since `Pair<i64>` is built as `Pair { .. }`.
+    let some(ret) = function.sig.return_ty.literal_name() else {
+        return [];
+    };
+    let Expr { kind, span, value_span as _ } = function.body;
+    let Construct(name, inits) = kind else {
+        return [];
+    };
+
+    // A construct the parser synthesized from other syntax (a range is
+    // `__builtin_Span { .. }`) is not a literal anyone wrote, and its name can't be
+    // spelled, so it has no shorter form.
+    if (name != ret || name.starts_with("__builtin_") || inits.is_empty()) {
+        return [];
+    };
+
+    // `{}` has no shorthand (it would read as an empty block), and the long form is
+    // the one whose span starts at the type name and has a `{` after it.
+    let start = span.start;
+    if (!src.starts_with_at(name, start) || !src[start + name.len()..]
+        .trim_while(is_blank)
+        .starts_with("{")) {
+        return [];
+    };
+    [hit(message(function.name.text, name, inits.lone_shorthand(src)), span)]
+}
+
+# The type name a return type offers a literal, if it offers one.
+fn literal_name(self: Ty?) -> str? {
+    match (self) {
+        some(Named(name)) => some(name),
+        some(Generic(base, _)) => some(base),
+        _ => none,
+    }
+}
+
+fn is_blank(c: char) -> bool { c == ' ' || c == '\n' || c == '\t' || c == '\r' }
+
+# The name of the field when it is the lone *shorthand* one, the case whose
+# replacement isn't obvious: `{ x }` reads back as a block whose value is `x`, so the
+# trailing comma is load-bearing and the message spells it out.
+fn lone_shorthand(self: FieldInit[], src: str) -> str? {
+    let [only] = self else {
+        return none;
+    };
+    let FieldInit { name, value } = only;
+    if (src[..value.span.start].trim_end_while(is_blank).ends_with(":")) {
+        return none;
+    };
+    some(name)
+}
+
+# What is said of function `name` whose body is a `type_name` literal.
+fn message(name: str, type_name: str, lone: str?) -> str {
+    let advice = lone
+        .map(
+            |field| `write the field directly as the body, "\{ {field}, }" — the trailing comma is what keeps it a struct literal rather than a block`,
+        )
+        .value_or("write the fields directly as the body");
+    `fn "{name}" returns "{type_name}" and its body is a "{type_name}" literal, naming the type twice — {advice}`
+}
+
+fn hits(src: str) -> LintHit[]!ParseFailure {
+    ok(fn_body_type_stutter(aipl_parse_surface_file(src)?.program, src))
+}.test({
+    let long = "fn f(x: i64) -> P { P { x: x + 1, y: 0 } }";
+    let found = hits(long)?;
+    assert(found$message == [message("f", "P", none)]);
+    assert(found$span == [20..40]);
+
+    // A lone shorthand field spells out the trailing comma.
+    assert(hits("fn f(x: i64) -> P { P { x } }")?$message == [message("f", "P", some("x"))]);
+    assert(hits("fn f(x: i64) -> P { P { x: x + 1 } }")?$message == [message("f", "P", none)]);
+
+    // A generic return is built under its base name.
+    assert(hits("fn f(x: i64) -> Pair<i64> { Pair { a: x, b: x } }")?$message == [
+        message("f", "Pair", none),
+    ]);
+
+    // The shorthand body, a literal of another type, a statement before the literal,
+    // an empty literal and a field named like the type are all left alone.
+    assert(hits("fn f(x: i64) -> P { x, y: 0 }")? == []);
+    assert(hits("fn f(x: i64) -> P { Q { x } }")? == []);
+    assert(hits("fn f(x: i64) -> P { let y = x; P { x, y } }")? == []);
+    assert(hits("fn f() -> P { P {} }")? == []);
+    assert(hits("fn f(P: i64) -> Q { P, y: 0 }")? == []);
+
+    // A destructured parameter is not a statement.
+    assert(hits("fn f(P { x }) -> P { P { x: x + 1 } }")?$message == [message("f", "P", none)]);
+
+    // A range is a synthesized literal.
+    assert(hits("fn f(a: i64) -> Span { a..a }")? == []);
+})

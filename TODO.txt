@@ -419,6 +419,7 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 formatter:
+  allow let bind = foo() else { return fallback; } all on one line
   some way to allow really long string literals to wrap
   the formatter should decide whether to output a trailing comma based on the grammer definition
   wrap comments
@@ -426,12 +427,6 @@ formatter:
   formatter gets list separater directly off the Many,
   Why the formatter isn't already a thin wrapper
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
-  if a list contains a single template string, it should put the ( and the opening """ on the same line e.g.
-    foo("""
-      this
-      is
-      valid
-    """)
 
 sets:
   add insert method
@@ -495,6 +490,7 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  lint should happen after name resolution so it doesn't have to check startswith("__builtin_") to know if something is a builtin
   map->$ lint should apply through self function that aren't being used as self
   lint to use my_opt$foo().value_or(fallback) rather than in if/else
   assert(fn() == ok(val)) should be assert(fn()? == val)
@@ -801,6 +797,7 @@ check:
   can for sure recover from format errors
 
 tests:
+  allow top-level test({}) to kill the stupid fn main() {}.test() pattern (also lint against that pattern - tests on empty main or other empty function)
   make a better way to test non-aipl-implemented builtins
   make tests unable to write files, using shimming
   make tests leverage better parallelism and caching by using more files

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/fn_body_type_stutter.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/fn_body_type_stutter.aipl</code></h1>
+
+      <div class="module-doc"><p>The <code>fn_body_type_stutter</code> lint: <code>fn f() -&gt; T { T { .. } }</code> — a function whose whole body is a literal of its own declared return type, naming that type twice. The body-shorthand spelling drops the repetition: <code>fn f() -&gt; T { .. }</code>.</p><p>Both spellings parse to the same <code>Construct</code>, so which one was written is recovered from the source: the long form's span starts at the type name, the shorthand's at the first field name. Requiring a <code>{</code> after that name is what keeps a field that happens to share the type's name from reading as the long form.</p><p>Only a body that is <em>exactly</em> the literal qualifies: a block with any statement in it parses to a <code>Let</code>/<code>Seq</code> wrapping the literal, and the shorthand replaces the whole body, so those are left alone. A destructured parameter is no statement either, which the surface tree this runs on makes true without looking through anything.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-fn_body_type_stutter">
+          <h3>
+            <a class="anchor" href="#item-fn_body_type_stutter">fn_body_type_stutter</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn fn_body_type_stutter(__spat$1626: Program, src: str) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>A hit for each function of the program whose body is a literal of its return type.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-function_hits">
+          <h3>
+            <a class="anchor" href="#item-function_hits">function_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn function_hits(self: Fn, src: str) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hit for one function, or none.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-literal_name">
+          <h3>
+            <a class="anchor" href="#item-literal_name">literal_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn literal_name(self: Ty?) -&#62; str?</code></pre>
+
+          <div class="doc"><p>The type name a return type offers a literal, if it offers one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_blank">
+          <h3>
+            <a class="anchor" href="#item-is_blank">is_blank</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_blank(c: char) -&#62; bool</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lone_shorthand">
+          <h3>
+            <a class="anchor" href="#item-lone_shorthand">lone_shorthand</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lone_shorthand(self: FieldInit[], src: str) -&#62; str?</code></pre>
+
+          <div class="doc"><p>The name of the field when it is the lone <em>shorthand</em> one, the case whose replacement isn't obvious: <code>{ x }</code> reads back as a block whose value is <code>x</code>, so the trailing comma is load-bearing and the message spells it out.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-message">
+          <h3>
+            <a class="anchor" href="#item-message">message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn message(name: str, type_name: str, lone: str?) -&#62; str</code></pre>
+
+          <div class="doc"><p>What is said of function <code>name</code> whose body is a <code>type_name</code> literal.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-hits">
+          <h3>
+            <a class="anchor" href="#item-hits">hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn hits(src: str) -&#62; LintHit[]!ParseFailure</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

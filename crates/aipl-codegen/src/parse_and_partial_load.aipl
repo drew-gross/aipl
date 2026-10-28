@@ -43,7 +43,7 @@ struct PartialLoad { program: Program, allows: Span[], lints: LintHit[] }
 pub fn parse_and_partial_load(src: str) -> PartialLoad!ParseFailure {
     let ParsedFile { program, allows } = aipl_parse_surface_file(src)?;
     let loaded = program.hoist_test_fns().promote_type_vars();
-    ok(PartialLoad { program: loaded.desugar(), allows, lints: lint(loaded) })
+    ok(PartialLoad { program: loaded.desugar(), allows, lints: lint(loaded, src) })
 }.test({
     // A file with neither attribute and no type parameters is as it was parsed.
     let plain = parse_and_partial_load("fn f() { }")?;

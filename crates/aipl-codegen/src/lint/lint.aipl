@@ -10,18 +10,20 @@ import { Program } from "../item.aipl";
 import { destructure_binding } from "./destructure_binding.aipl";
 import { destructure_param } from "./destructure_param.aipl";
 import { duplicate_import_source } from "./duplicate_import_source.aipl";
+import { fn_body_type_stutter } from "./fn_body_type_stutter.aipl";
 import { LintHit } from "./lint_hit.aipl";
 import { unused_imports } from "./unused_imports.aipl";
 
 # Every hit the ported lints find in `program`.
-pub fn lint(program: Program) -> LintHit[] {
+pub fn lint(program: Program, src: str) -> LintHit[] {
     [
         ..unused_imports(program),
         ..duplicate_import_source(program),
         ..destructure_binding(program),
         ..destructure_param(program),
+        ..fn_body_type_stutter(program, src),
     ]
 }.test({
     let program = Program { items: [], doc: none };
-    assert(lint(program) == []);
+    assert(lint(program, "") == []);
 })
