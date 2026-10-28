@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/lint/fn_body_type_stutter.aipl</code></h1>
 
-      <div class="module-doc"><p>The <code>fn_body_type_stutter</code> lint: <code>fn f() -&gt; T { T { .. } }</code> — a function whose whole body is a literal of its own declared return type, naming that type twice. The body-shorthand spelling drops the repetition: <code>fn f() -&gt; T { .. }</code>.</p><p>Both spellings parse to the same <code>Construct</code>, so which one was written is recovered from the source: the long form's span starts at the type name, the shorthand's at the first field name. Requiring a <code>{</code> after that name is what keeps a field that happens to share the type's name from reading as the long form.</p><p>Only a body that is <em>exactly</em> the literal qualifies: a block with any statement in it parses to a <code>Let</code>/<code>Seq</code> wrapping the literal, and the shorthand replaces the whole body, so those are left alone. A destructured parameter is no statement either, which the surface tree this runs on makes true without looking through anything.</p></div>
+      <div class="module-doc"><p>The <code>fn_body_type_stutter</code> lint: <code>fn f() -&gt; T { T { .. } }</code> — a function whose whole body is a literal of its own declared return type, naming that type twice. The body-shorthand spelling drops the repetition: <code>fn f() -&gt; T { .. }</code>.</p><p>Both spellings parse to the same <code>Construct</code>, so <code>Function.shorthand_body</code> records which one was written.</p><p>Only a body that is <em>exactly</em> the literal qualifies: a block with any statement in it parses to a <code>Let</code>/<code>Seq</code> wrapping the literal, and the shorthand replaces the whole body, so those are left alone. A destructured parameter is no statement either, which the surface tree this runs on makes true without looking through anything.</p></div>
 
 
 
@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-fn_body_type_stutter">fn_body_type_stutter</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn fn_body_type_stutter(__spat$1626: Program, src: str) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn fn_body_type_stutter(__spat$1262: Program) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each function of the program whose body is a literal of its return type.</p></div>
 
@@ -48,7 +48,7 @@
             <a class="anchor" href="#item-function_hits">function_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn function_hits(self: Fn, src: str) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn function_hits(self: Fn) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The hit for one function, or none.</p></div>
 
@@ -71,26 +71,12 @@
 
 
 
-        <section class="item" id="item-is_blank">
-          <h3>
-            <a class="anchor" href="#item-is_blank">is_blank</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn is_blank(c: char) -&#62; bool</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
         <section class="item" id="item-lone_shorthand">
           <h3>
             <a class="anchor" href="#item-lone_shorthand">lone_shorthand</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lone_shorthand(self: FieldInit[], src: str) -&#62; str?</code></pre>
+          <pre class="signature"><code>fn lone_shorthand(self: FieldInit[]) -&#62; str?</code></pre>
 
           <div class="doc"><p>The name of the field when it is the lone <em>shorthand</em> one, the case whose replacement isn't obvious: <code>{ x }</code> reads back as a block whose value is <code>x</code>, so the trailing comma is load-bearing and the message spells it out.</p></div>
 

@@ -2,10 +2,8 @@
 # whole body is a literal of its own declared return type, naming that type twice.
 # The body-shorthand spelling drops the repetition: `fn f() -> T { .. }`.
 #
-# Both spellings parse to the same `Construct`, so which one was written is
-# recovered from the source: the long form's span starts at the type name, the
-# shorthand's at the first field name. Requiring a `{` after that name is what
-# keeps a field that happens to share the type's name from reading as the long form.
+# Both spellings parse to the same `Construct`, so `Function.shorthand_body` records
+# which one was written.
 #
 # Only a body that is *exactly* the literal qualifies: a block with any statement in
 # it parses to a `Let`/`Seq` wrapping the literal, and the shorthand replaces the
@@ -15,35 +13,32 @@
 
 import {
     collect_arms,
-    ends_with,
     equal as ==,
     is_empty,
     join,
-    len,
-    logical_not as !,
     logical_or as ||,
     map,
     not_equal as !=,
     starts_with,
-    starts_with_at,
-    trim_while,
     value_or,
-    wrapping_add as +,
 } from builtins;
-import { Construct, Expr, FieldInit } from "../expr.aipl";
+import { Construct, Expr, FieldInit, Ident } from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import { Fn, Program } from "../item.aipl";
-import { trim_end_while } from "../trim_end_while.aipl";
 import { Generic, Named, Ty } from "../ty.aipl";
 import { LintHit, hit } from "./lint_hit.aipl";
 
 # A hit for each function of the program whose body is a literal of its return type.
-pub fn fn_body_type_stutter(Program { items }, src: str) -> LintHit[] {
-    items.collect_arms(Fn)$function_hits(src).join()
+pub fn fn_body_type_stutter(Program { items }) -> LintHit[] {
+    items.collect_arms(Fn)$function_hits().join()
 }
 
 # The hit for one function, or none.
-fn function_hits(self: Fn(function), src: str) -> LintHit[] {
+fn function_hits(self: Fn(function)) -> LintHit[] {
+    if (function.shorthand_body) {
+        return [];
+    };
+
     // The name the return type offers the literal: a generic return contributes its
     // base, since `Pair<i64>` is built as `Pair { .. }`.
     let some(ret) = function.sig.return_ty.literal_name() else {
@@ -56,20 +51,12 @@ fn function_hits(self: Fn(function), src: str) -> LintHit[] {
 
     // A construct the parser synthesized from other syntax (a range is
     // `__builtin_Span { .. }`) is not a literal anyone wrote, and its name can't be
-    // spelled, so it has no shorter form.
+    // spelled, so it has no shorter form. `{}` has no shorthand either (it would
+    // read as an empty block).
     if (name != ret || name.starts_with("__builtin_") || inits.is_empty()) {
         return [];
     };
-
-    // `{}` has no shorthand (it would read as an empty block), and the long form is
-    // the one whose span starts at the type name and has a `{` after it.
-    let start = span.start;
-    if (!src.starts_with_at(name, start) || !src[start + name.len()..]
-        .trim_while(is_blank)
-        .starts_with("{")) {
-        return [];
-    };
-    [hit(message(function.name.text, name, inits.lone_shorthand(src)), span)]
+    [hit(message(function.name.text, name, inits.lone_shorthand()), span)]
 }
 
 # The type name a return type offers a literal, if it offers one.
@@ -81,20 +68,20 @@ fn literal_name(self: Ty?) -> str? {
     }
 }
 
-fn is_blank(c: char) -> bool { c == ' ' || c == '\n' || c == '\t' || c == '\r' }
-
 # The name of the field when it is the lone *shorthand* one, the case whose
 # replacement isn't obvious: `{ x }` reads back as a block whose value is `x`, so the
 # trailing comma is load-bearing and the message spells it out.
-fn lone_shorthand(self: FieldInit[], src: str) -> str? {
+fn lone_shorthand(self: FieldInit[]) -> str? {
     let [only] = self else {
         return none;
     };
     let FieldInit { name, value } = only;
-    if (src[..value.span.start].trim_end_while(is_blank).ends_with(":")) {
-        return none;
+    if (let Ident(read) = value.kind) {
+        if (read == name) {
+            return some(name);
+        };
     };
-    some(name)
+    none
 }
 
 # What is said of function `name` whose body is a `type_name` literal.
@@ -108,10 +95,9 @@ fn message(name: str, type_name: str, lone: str?) -> str {
 }
 
 fn hits(src: str) -> LintHit[]!ParseFailure {
-    ok(fn_body_type_stutter(aipl_parse_surface_file(src)?.program, src))
+    ok(fn_body_type_stutter(aipl_parse_surface_file(src)?.program))
 }.test({
-    let long = "fn f(x: i64) -> P { P { x: x + 1, y: 0 } }";
-    let found = hits(long)?;
+    let found = hits("fn f(x: i64) -> P { P { x: x + 1, y: 0 } }")?;
     assert(found$message == [message("f", "P", none)]);
     assert(found$span == [20..40]);
 

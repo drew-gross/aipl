@@ -102,6 +102,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  is_shorthand should disappear into is_case (with lint)
   retructure how the lints manage names. There should be shared infrastructure for managing names (i.e. if a builtin is being requested, and is already imported, request the already-imported name. If that name is taken, suggest something else. If a function being checked for is imported with an atypical name, the lint should fire anyway)
   unify destructure param and destructure binding
   request nested destructuring e.g function_hits(self: Fn(function)) can be function_hits(self: Fn(Function { body, sig, ...}))
@@ -435,7 +436,7 @@ sets:
   bug: #{} does not flex through a generic parameter.
   Dicts and sets can't be optional cores or dict elements, so #{} can't flex there either.
   There's no dict-insert or dict-union builtin, so a dict can't be grown — which also means the empty-block representation can't be observed to differ.
-  An unannotated let x = #{}; still settles on a set, since there's no context to decide from. (maybe require the annotation?)
+  An unannotated let x = #{}; still settles on a set, since there's no context to decide from. (maybe require the annotation? maybe flex?)
   support conversion to other containers
   support other types
 
@@ -461,6 +462,7 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  make a "static_ok" method that evaluates a top-level function at compile time and fails the compile if err, then users don't have to check for err
   is_case_and: variant matches case and predicate
   set add operation
   __builtin_drop_* should be mutating methods
@@ -490,6 +492,7 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  the lints seem to have an odd pattern where the main tests for the lint are on a wrapper, often called "hits". I think the tests for a function should be on the function. If the tests need a helper define it in the test.
   lint should happen after name resolution so it doesn't have to check startswith("__builtin_") to know if something is a builtin
   map->$ lint should apply through self function that aren't being used as self
   lint to use my_opt$foo().value_or(fallback) rather than in if/else
@@ -819,6 +822,7 @@ expression matcher:
   use it for operation fusion
 
 vscode:
+  go to definition and go to references should work for local variables
   find all references is finding local variables with the same name that aren't actually references
   have the server able to run tests and show how many are passing (probably needs to have tests auto-shim first)
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
