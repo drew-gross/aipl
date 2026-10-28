@@ -64,6 +64,7 @@ import {
     extend,
     filter,
     find_if,
+    find_index,
     first,
     greater_than as >,
     int_parse,
@@ -297,6 +298,7 @@ import {
     For as SFor,
     Let as SLet,
     LetArm as SLetArm,
+    LetElse as SLetElse,
     LetStruct as SLetStruct,
     LetTuple as SLetTuple,
     Mut as SMut,
@@ -853,7 +855,14 @@ fn statements() -> Production<AiplTok, Ast>[] {
         Term(Name),
     ]);
     let let_stmt: Rule<AiplTok> = OneOf([
-        Then([Lit("let"), bind_target, Lit("="), Named("expr"), Expect(Lit(";"))]),
+        Then([
+            Lit("let"),
+            bind_target,
+            Lit("="),
+            Named("expr"),
+            Maybe(Then([Lit("else"), Named("block")])),
+            Expect(Lit(";")),
+        ]),
         Then([
             Lit("let"),
             Term(Name),
@@ -861,6 +870,28 @@ fn statements() -> Production<AiplTok, Ast>[] {
             Named("ty"),
             Lit("="),
             Named("expr"),
+            Expect(Lit(";")),
+        ]),
+        // An array pattern, as a `match` arm writes one.
+        Then([
+            Lit("let"),
+            Many(Named("pattern"), sep=Lit(","), nested_in=brackets(), style=loose()),
+            Lit("="),
+            Named("expr"),
+            Lit("else"),
+            Named("block"),
+            Expect(Lit(";")),
+        ]),
+        // Any other pattern a `match` arm takes, for the forms the `bind_target`
+        // above does not: `let (some(a), b) = e else { .. };`. Reached only when
+        // that alternative failed on the pattern, before any expression was read.
+        Then([
+            Lit("let"),
+            Named("pattern"),
+            Lit("="),
+            Named("expr"),
+            Lit("else"),
+            Named("block"),
             Expect(Lit(";")),
         ]),
     ]);
@@ -2277,6 +2308,13 @@ fn lower_block_tail(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # by its fields for `let T { x, y }`.
 fn binder_names(toks: str[]) -> str[] { toks.filter(|w| !binder_punct().contains(w)) }
 
+# The names between a case pattern's parentheses, ending at the `)` — the tokens
+# after it (a `let`'s `=`, `else`) are not binders.
+fn case_binders(toks: str[]) -> str[] {
+    let close = toks.find_index(|t| t == ")").value_or(toks.len());
+    binder_names(toks[..close])
+}
+
 # The fields a struct pattern reads and the names it binds them as, in order —
 # read off the tokens of its braces, which start at `first`. `x` binds `x` and
 # `x as px` binds `px`; either way the field is the one written first.
@@ -2351,7 +2389,36 @@ fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!Parse
     let sp = node.span();
     let toks = node.own_texts(src);
     let name_span = node.second_tok(node.tok_span());
+    let has_else = toks.contains("else");
+    let refutable = match (toks) {
+        [_, "=", ..] => true,
+        [_, "[", ..] => true,
+        [_, _, "(", ..] => true,
+        _ => false,
+    };
+    if (has_else && !refutable) {
+        return err(ParseError {
+            message: "`else` follows a pattern that can fail to match, like `Some(x)`; a name, a tuple or a struct pattern always matches",
+            span: node.tok_span(),
+        });
+    };
     match (toks) {
+        // `let [a, b] = e else { .. };` — an array pattern, its elements children
+        // ahead of the value and the block.
+        [_, "[", ..] => {
+            let last = kids.len() - 2;
+            let rest = last > 0 && kids[last - 1].is_some_and(is_rest);
+            let written = if (rest) { kids[..last - 1] } else { kids[..last] };
+            let elems = written.try_map(|k| as_pat(k, sp))?;
+            let pattern = array_pattern(elems, node.children, rest, node.tok_span())?;
+            let_else(pattern, kid_expr(kids, last, sp)?, kid_expr(kids, last + 1, sp)?, sp)
+        },
+        // `let PATTERN = e else { .. };` — a pattern the binding forms below do not
+        // take, so it is a child of its own.
+        [_, "=", ..] => {
+            let pattern = as_pat(kid(kids, 0, sp)?, sp)?;
+            let_else(pattern, kid_expr(kids, 1, sp)?, kid_expr(kids, 2, sp)?, sp)
+        },
         // `let (a, b) = e;` — a tuple pattern, spanned at its value like the struct
         // form, since the names are not one run of text.
         [_, "(", ..] => {
@@ -2369,6 +2436,10 @@ fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!Parse
         // `let Import(decl) = e;` — the case name, then its payload's binders.
         [_, case_name, "(", ..] => {
             let value = kid_expr(kids, 0, sp)?;
+            if (has_else) {
+                let pattern = PatCtor(case_name, bindings=case_binders(toks[2..]));
+                return let_else(pattern, value, kid_expr(kids, 1, sp)?, sp);
+            };
             let span = value.span;
             ok(AStmt(SLetArm(case_name, binder_names(toks[2..]), value, span)))
         },
@@ -2393,6 +2464,34 @@ fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!Parse
             ok(AStmt(named_binding(mutable, name, name_span, none, value)))
         },
         _ => err(ParseError { message: "a binding matched no alternative", span: sp }),
+    }
+}
+
+# `let PATTERN = value else { .. };`. The block is what runs when the pattern does
+# not match, and the rest of the block cannot be reached from it, so it has to
+# leave the function: otherwise the binding the pattern makes would be missing
+# below it.
+fn let_else(pattern: Pat, value: Expr, otherwise: Expr, sp: Span) -> Ast!ParseError {
+    if (!otherwise.diverges()) {
+        return err(ParseError {
+            message: "the `else` of a `let .. else` has to leave the function, as in `else { return none; }`",
+            span: otherwise.span,
+        });
+    };
+    ok(AStmt(SLetElse(pattern, value, otherwise, join_spans(sp, value.span))))
+}
+
+# Whether running `self` always ends in a `return`: it is one, or a sequence one of
+# whose steps is, or a branching form each of whose branches is.
+fn diverges(self: Expr) -> bool {
+    match (self.kind) {
+        Return(..) => true,
+        Seq(first, rest) => first.diverges() || rest.diverges(),
+        Let(_, _, _, rest) | LetMut(_, _, _, rest) | Assign(_, _, rest) => rest.diverges(),
+        If(_, then, otherwise) => then.diverges() && otherwise.diverges(),
+        IfLet(arm, _, otherwise) => arm.body.diverges() && otherwise.diverges(),
+        Match(_, arms) => arms.is_nonempty() && arms.all(|a| a.body.diverges()),
+        _ => false,
     }
 }
 
@@ -2705,6 +2804,10 @@ fn wrap_stmt(stmt: Stmt, acc: Expr) -> Expr {
             let inner = bind_fields(names, tmp, tup_span, acc, tuple_slot_names(names));
             let span = join_spans(tup_span, inner.span);
             at(Let(tmp, none, value, inner), span)
+        },
+        SLetElse(pattern, value, otherwise, span) => {
+            let arm = MatchArm { pattern, body: acc, span };
+            at(IfLet(arm, value, otherwise), join_spans(span, acc.span))
         },
         SLetArm(case_name, names, value, span) => {
             let tmp = `__cpat${span.start}`;
@@ -4801,6 +4904,58 @@ pub fn lower_aipl_block(src: str) -> Expr!ParseError {
         block_dump(
             "{ let Pair(a, b) = p; a }",
         ) == "Let(__cpat$19, p, Let(a, Match(__cpat$19, [Pair(a, _) => a]), Let(b, Match(__cpat$19, [Pair(_, b) => b]), a)))",
+    );
+
+    // `let PATTERN = e else { .. };` binds the pattern's names in the rest of the
+    // block, and runs its block when the pattern does not match — so the rest is
+    // the arm of an `if let`, and the block its `else`.
+    assert(
+        block_dump(
+            "{ let some(v) = o else { return none; }; v }",
+        ) == "IfLet(some(v) => v, o, Seq(Return(none), ()))",
+    );
+    assert(
+        block_dump(
+            "{ let Pair(a, b) = p else { return 0; }; a }",
+        ) == "IfLet(Pair(a, b) => a, p, Seq(Return(0), ()))",
+    );
+    // Any pattern a `match` arm takes: an array, a nested constructor, a literal.
+    assert(
+        block_dump(
+            "{ let [a, ..] = xs else { return 0; }; a }",
+        ) == "IfLet([a, ..] => a, xs, Seq(Return(0), ()))",
+    );
+    assert(
+        block_dump(
+            "{ let (some(a), b) = t else { return 0; }; a }",
+        ) == "IfLet((some(a), b) => a, t, Seq(Return(0), ()))",
+    );
+    assert(
+        block_dump("{ let 5 = n else { return 0; }; 1 }") == "IfLet(5 => 1, n, Seq(Return(0), ()))",
+    );
+    // The block returns on every path through it.
+    assert(
+        block_dump(
+            "{ let some(v) = o else { if (c) { return 1; } else { return 2; } }; v }",
+        ) == "IfLet(some(v) => v, o, If(c, Seq(Return(1), ()), Seq(Return(2), ())))",
+    );
+
+    // A block that can fall out would leave the names unbound below it, and a
+    // pattern that cannot fail has no use for one.
+    assert(
+        block_dump(
+            "{ let some(v) = o else { 1 }; v }",
+        ) == "error: the `else` of a `let .. else` has to leave the function, as in `else { return none; }`",
+    );
+    assert(
+        block_dump(
+            "{ let (a, b) = t else { return 0; }; a }",
+        ) == "error: `else` follows a pattern that can fail to match, like `Some(x)`; a name, a tuple or a struct pattern always matches",
+    );
+    assert(
+        block_dump(
+            "{ let x = 1 else { return 0; }; x }",
+        ) == "error: `else` follows a pattern that can fail to match, like `Some(x)`; a name, a tuple or a struct pattern always matches",
     );
 
     // A field is bound under another name with `as`: the field is the one read

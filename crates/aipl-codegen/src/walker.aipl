@@ -1621,9 +1621,14 @@ fn statement(self: W) -> WDoc!FmtError {
 }
 
 # `let x = e;`, `let x: T = e;`, `let (a, b) = e;`, `let Name { a, b } = e;`, or
-# `let Case(a, b) = e;`.
+# `let Case(a, b) = e;` — the last two with a pattern that can fail also taking
+# `else { .. }` after the value.
 fn let_stmt(self: W) -> WDoc!FmtError {
     let kw = self.bump().w;
+    if (kw.general_pattern_ahead()) {
+        let pat = kw.pattern()?;
+        return pat.w.expect("=")?.w.let_tail(Concat([Text("let "), pat.doc, Text(" = ")]));
+    };
     if (kw.peek_text() == "(") {
         let ids = kw.bump().w.ident_list(")", []);
         let v = ids.w.expect(")")?.w.expect("=")?.w.expr()?;
@@ -1639,23 +1644,80 @@ fn let_stmt(self: W) -> WDoc!FmtError {
     };
     if (n.w.peek_text() == "(") {
         let ids = n.w.bump().w.ident_list(")", []);
-        let v = ids.w.expect(")")?.w.expect("=")?.w.expr()?;
-        let done = v.w.expect(";")?.w;
-        return ok(
-            WDoc {
-                w: done,
-                doc: Concat([
-                    Text(`let {n.text}({ids.names.join(sep=", ")}) = `),
-                    v.doc,
-                    Text(";"),
-                ]),
-            },
-        );
+        return ids.w
+            .expect(")")?.w
+            .expect("=")?.w
+            .let_tail(Text(`let {n.text}({ids.names.join(sep=", ")}) = `));
     };
     let a = n.w.binding_ann()?;
     let v = a.w.expect("=")?.w.expr()?;
     let done = v.w.expect(";")?.w;
     ok(WDoc { w: done, doc: Concat([Text(`let {n.text}`), a.doc, Text(" = "), v.doc, Text(";")]) })
+}
+
+# The value of a `let` and what ends it: the `;`, or the `else { .. }` block of a
+# pattern that can fail and then the `;`. `head` is everything written before the
+# value.
+fn let_tail(self: W, head: Doc) -> WDoc!FmtError {
+    let v = self.expr()?;
+    if (v.w.peek_text() != "else") {
+        let done = v.w.expect(";")?.w;
+        return ok(WDoc { w: done, doc: Concat([head, v.doc, Text(";")]) });
+    };
+    let handler = v.w.bump().w.block_layout()?;
+    let done = handler.w.expect(";")?.w;
+    ok(WDoc { w: done, doc: Concat([head, v.doc, Text(" else "), handler.doc, Text(";")]) })
+}.test({
+    // A pattern that can fail takes an `else` block, one statement per line.
+    assert(
+        walker_of("let  some ( v )  =  o  else  {  return  none ;  } ;")?
+            .let_stmt()
+            .rendered(100)? == "let some(v) = o else {\n    return none;\n};\n",
+    );
+    // A pattern the plain forms cannot lay out goes through `pattern`.
+    assert(
+        walker_of("let  [ a , .. ]  =  xs  else  {  return  0 ;  } ;")?
+            .let_stmt()
+            .rendered(100)? == "let [a, ..] = xs else {\n    return 0;\n};\n",
+    );
+    assert(
+        walker_of("let ( some ( a ) , b )  =  t  else  {  return  0 ;  } ;")?
+            .let_stmt()
+            .rendered(100)? == "let (some(a), b) = t else {\n    return 0;\n};\n",
+    );
+    // Without an `else` the statement is the plain one.
+    assert(walker_of("let  some ( v )  =  o ;")?.let_stmt().rendered(100)? == "let some(v) = o;");
+})
+
+# Whether the pattern at the cursor is one `let_stmt`'s own forms cannot lay out:
+# a literal or array pattern, or a case or tuple pattern with anything but plain
+# names inside its parentheses. Those go through `pattern`, as a `match` arm's do.
+fn general_pattern_ahead(self: W) -> bool {
+    if (self.peek_is(StrTok) || self.peek_is(CharTok) || self.peek_is(Num)) {
+        return true;
+    };
+    if (self.peek_text() == "[") {
+        return true;
+    };
+    let open: u64 = if (self.peek_text() == "(") { 0 } else { 1 };
+    if (self.peek_text_n(open) != "(") {
+        return false;
+    };
+    mut n: u64 = open + 1;
+    while (n < self.toks.len()) {
+        let t = self.peek_text_n(n);
+        if (t == ")") {
+            return false;
+        };
+        if (t == "(" || t == "[" || t == "{" || self.peek_is_n(n, StrTok)) {
+            return true;
+        };
+        if (self.peek_is_n(n, CharTok) || self.peek_is_n(n, Num)) {
+            return true;
+        };
+        set n++;
+    }
+    false
 }
 
 # `mut x = e;`, `mut x: T = e;`, or `mut Name { a, b } = e;`.

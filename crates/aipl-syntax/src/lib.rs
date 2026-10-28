@@ -4736,6 +4736,25 @@ pub fn assigned_names(e: &ast::Expr) -> Vec<String> {
     names
 }
 
+/// Whether evaluating `e` always leaves the function: it is a `return`, or a
+/// sequence one of whose steps is, or a branching form every branch of which is.
+/// Decided from the shape alone — `?` can leave but may not, so it does not count.
+///
+/// A branch that diverges has no value to give the form around it, which is why
+/// an `if` or `if let` is typed by its other branch alone.
+pub fn diverges(e: &ast::Expr) -> bool {
+    use ast::ExprKind as K;
+    match &e.kind {
+        K::Return(_) => true,
+        K::Seq(first, rest) => diverges(first) || diverges(rest),
+        K::Let(_, _, _, rest) | K::LetMut(_, _, _, rest) | K::Assign(_, _, rest) => diverges(rest),
+        K::If(_, then, otherwise) => diverges(then) && diverges(otherwise),
+        K::IfLet(arm, _, otherwise) => diverges(&arm.body) && diverges(otherwise),
+        K::Match(_, arms) => !arms.is_empty() && arms.iter().all(|a| diverges(&a.body)),
+        _ => false,
+    }
+}
+
 pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
     use ast::ExprKind as K;
     f(e);

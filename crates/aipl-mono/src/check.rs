@@ -3942,7 +3942,9 @@ impl Cx<'_> {
                 // takes the other's type (`if (b) { u8_val } else { 9 }`).
                 let tt = self.flex_int(t, &tt, &et)?;
                 let et = self.flex_int(e, &et, &tt)?;
-                if coerce(&tt, &et).is_err() && coerce(&et, &tt).is_err() {
+                // A branch that always returns has no value to agree with.
+                let leaves = aipl_syntax::diverges(t) || aipl_syntax::diverges(e);
+                if !leaves && coerce(&tt, &et).is_err() && coerce(&et, &tt).is_err() {
                     return Err(Error::at(
                         format!(
                             "if branches have mismatched types: {} vs {}",
@@ -3960,7 +3962,13 @@ impl Cx<'_> {
                     no_outer_assign(t, &declared, ValueForm::If)?;
                     no_outer_assign(e, &declared, ValueForm::If)?;
                 }
-                merge(tt, et)
+                if aipl_syntax::diverges(t) {
+                    et
+                } else if aipl_syntax::diverges(e) {
+                    tt
+                } else {
+                    merge(tt, et)
+                }
             }
             ExprKind::Seq(first, rest) => {
                 // A mutating method call in statement position discards its
@@ -4617,7 +4625,9 @@ impl Cx<'_> {
                 let et = self.check_expr_at(else_b, env, effects, pos)?;
                 let tt = self.flex_int(&arm.body, &tt, &et)?;
                 let et = self.flex_int(else_b, &et, &tt)?;
-                if coerce(&tt, &et).is_err() && coerce(&et, &tt).is_err() {
+                // A branch that always returns has no value to agree with.
+                let leaves = aipl_syntax::diverges(&arm.body) || aipl_syntax::diverges(else_b);
+                if !leaves && coerce(&tt, &et).is_err() && coerce(&et, &tt).is_err() {
                     return Err(Error::at(
                         format!(
                             "if-let branches have mismatched types: {} vs {}",
@@ -4632,7 +4642,13 @@ impl Cx<'_> {
                     no_outer_assign(&arm.body, &declared, ValueForm::If)?;
                     no_outer_assign(else_b, &HashSet::new(), ValueForm::If)?;
                 }
-                merge(tt, et)
+                if aipl_syntax::diverges(&arm.body) {
+                    et
+                } else if aipl_syntax::diverges(else_b) {
+                    tt
+                } else {
+                    merge(tt, et)
+                }
             }
             ExprKind::Call(name, args, method_style) => {
                 // For a method call the receiver is `args[0]`, and two rules

@@ -21042,6 +21042,15 @@ fn compile_expr_inner<M: Module>(
             // type (`if (b) { u8_val } else { 9 }`), matching the checker.
             let then_ty = flex_int_ty(then_e, &then_ty, &else_ty);
             let else_ty = flex_int_ty(else_e, &else_ty, &then_ty);
+            // A branch that always returns has no value to agree with: the
+            // `if` is the other branch's type.
+            let (then_ty, else_ty) = if aipl_syntax::diverges(then_e) {
+                (else_ty.clone(), else_ty)
+            } else if aipl_syntax::diverges(else_e) {
+                (then_ty.clone(), then_ty)
+            } else {
+                (then_ty, else_ty)
+            };
             let merged_ty = merge_types(&then_ty, &else_ty).ok_or_else(|| {
                 Error::at(
                     format!(
@@ -22528,31 +22537,36 @@ fn compile_expr_inner<M: Module>(
                 // arm in either order. The emitted value is the same 64-bit
                 // constant either way — only its static type moves — so retyping
                 // after the fact is sound.
-                merged_ty = Some(match merged_ty.take() {
-                    None => {
-                        merged_body = Some(&arm.body);
-                        at
-                    }
-                    Some(prev) => {
-                        let at = flex_int_ty(&arm.body, &at, &prev);
-                        let prev = match merged_body {
-                            Some(b) => flex_int_ty(b, &prev, &at),
-                            None => prev,
-                        };
-                        let m = merge_types(&prev, &at).ok_or_else(|| {
-                            Error::at(
-                                format!(
-                                    "match arms have mismatched types: {} vs {}",
-                                    type_name(&prev),
-                                    type_name(&at),
-                                ),
-                                span.clone(),
-                            )
-                        })?;
-                        merged_body = Some(&arm.body);
-                        m
-                    }
-                });
+                // An arm that always returns has no value to agree with.
+                merged_ty = if aipl_syntax::diverges(&arm.body) {
+                    merged_ty.take()
+                } else {
+                    Some(match merged_ty.take() {
+                        None => {
+                            merged_body = Some(&arm.body);
+                            at
+                        }
+                        Some(prev) => {
+                            let at = flex_int_ty(&arm.body, &at, &prev);
+                            let prev = match merged_body {
+                                Some(b) => flex_int_ty(b, &prev, &at),
+                                None => prev,
+                            };
+                            let m = merge_types(&prev, &at).ok_or_else(|| {
+                                Error::at(
+                                    format!(
+                                        "match arms have mismatched types: {} vs {}",
+                                        type_name(&prev),
+                                        type_name(&at),
+                                    ),
+                                    span.clone(),
+                                )
+                            })?;
+                            merged_body = Some(&arm.body);
+                            m
+                        }
+                    })
+                };
             }
 
             builder.switch_to_block(merge);

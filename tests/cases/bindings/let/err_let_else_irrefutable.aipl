@@ -1,0 +1,21 @@
+# `else` goes after a pattern that can fail. A name, a tuple or a struct pattern
+# always matches, so its `else` could never run.
+
+import { print } from builtins;
+
+fn first(t: (i64, i64)) -> i64 {
+    let (a, b) = t else {
+        return 0;
+    };
+    a
+}
+
+fn main() !prints {
+    print(`{first((1, 2))}`);
+}
+--- errors ---
+error: `else` follows a pattern that can fail to match, like `Some(x)`; a name, a tuple or a struct pattern always matches
+ --> ./tests/cases/bindings/let/err_let_else_irrefutable.aipl:7:5
+  |
+7 |     let (a, b) = t else {
+  |     ^^^^^^^^^^^^^^^^^^^^^

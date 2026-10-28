@@ -1,0 +1,92 @@
+# `let PATTERN = value else { .. };` binds the pattern's names for the rest of the
+# block when `value` matches, and runs its block when it does not. The block has
+# to return, so the names are bound everywhere below the statement — which is what
+# lets the success path stay at one level instead of nesting inside an arm.
+#
+# The pattern is anything a `match` arm takes.
+
+import { print, wrapping_add as + } from builtins;
+
+variant Shape = Circle(i64) | Rect(i64, i64) | Empty
+
+// An optional.
+fn doubled(o: i64?) -> i64 {
+    let some(n) = o else {
+        return -1;
+    };
+    n + n
+}
+
+// A variant case, taking its payload apart.
+fn area(s: Shape) -> i64 {
+    let Rect(w, h) = s else {
+        return 0;
+    };
+    w + h
+}
+
+// A nested pattern, and a heap value flowing through.
+fn label(pair: (str?, i64)) -> str {
+    let (some(text), n) = pair else {
+        return "nothing";
+    };
+    `{text}{n}`
+}
+
+// An array pattern.
+fn second(xs: i64[]) -> i64 {
+    let [_, b, ..] = xs else {
+        return 0;
+    };
+    b
+}
+
+// A literal pattern.
+fn only_zero(n: i64) -> str {
+    let 0 = n else {
+        return "nonzero";
+    };
+    "zero"
+}
+
+// Several in a row, each leaving at its own point.
+fn both(a: i64?, b: i64?) -> i64 {
+    let some(x) = a else {
+        return 1;
+    };
+    let some(y) = b else {
+        return 2;
+    };
+    x + y
+}
+
+// The block may branch, as long as every path returns.
+fn picky(o: i64?, flag: bool) -> i64 {
+    let some(n) = o else {
+        if (flag) {
+            return 10;
+        } else {
+            return 20;
+        };
+    };
+    n
+}
+
+fn main() !prints {
+    print(`{doubled(some(4))} {doubled(none)}`);
+    print(`{area(Rect(2, 3))} {area(Empty)}`);
+    let missing: str? = none;
+    print(`{label((some("n"), 5))} {label((missing, 1))}`);
+    print(`{second([1, 2, 3])} {second([1])}`);
+    print(`{only_zero(0)} {only_zero(7)}`);
+    print(`{both(some(1), some(2))} {both(none, some(2))} {both(some(1), none)}`);
+    print(`{picky(some(5), true)} {picky(none, true)} {picky(none, false)}`);
+}
+--- stdout ---
+8 -1
+5 0
+n5 nothing
+2 0
+zero nonzero
+3 1 2
+5 10 20

@@ -1625,7 +1625,35 @@
           </h3>
           <pre class="signature"><code>fn let_stmt(self: W) -&#62; WDoc!FmtError</code></pre>
 
-          <div class="doc"><p><code>let x = e;</code>, <code>let x: T = e;</code>, <code>let (a, b) = e;</code>, <code>let Name { a, b } = e;</code>, or <code>let Case(a, b) = e;</code>.</p></div>
+          <div class="doc"><p><code>let x = e;</code>, <code>let x: T = e;</code>, <code>let (a, b) = e;</code>, <code>let Name { a, b } = e;</code>, or <code>let Case(a, b) = e;</code> — the last two with a pattern that can fail also taking <code>else { .. }</code> after the value.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-let_tail">
+          <h3>
+            <a class="anchor" href="#item-let_tail">let_tail</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn let_tail(self: W, head: Doc) -&#62; WDoc!FmtError</code></pre>
+
+          <div class="doc"><p>The value of a <code>let</code> and what ends it: the <code>;</code>, or the <code>else { .. }</code> block of a pattern that can fail and then the <code>;</code>. <code>head</code> is everything written before the value.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-general_pattern_ahead">
+          <h3>
+            <a class="anchor" href="#item-general_pattern_ahead">general_pattern_ahead</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn general_pattern_ahead(self: W) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether the pattern at the cursor is one <code>let_stmt</code>'s own forms cannot lay out: a literal or array pattern, or a case or tuple pattern with anything but plain names inside its parentheses. Those go through <code>pattern</code>, as a <code>match</code> arm's do.</p></div>
 
 
         </section>

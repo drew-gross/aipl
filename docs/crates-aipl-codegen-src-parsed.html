@@ -54,6 +54,13 @@
 
             </li>
 
+            <li id="item-LetElse"><code>LetElse(pattern: Pat, value: Expr, otherwise: Expr, span: Span)</code>
+
+              <div class="doc"><p><code>let PATTERN = value else { .. };</code> — the rest of the block runs with the pattern's names bound when <code>value</code> matches, and <code>otherwise</code> (which returns) when it does not.</p></div>
+
+
+            </li>
+
             <li id="item-LetStruct"><code>LetStruct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span)</code>
 
 

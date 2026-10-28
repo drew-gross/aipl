@@ -776,7 +776,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$68149: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$69105: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1228,6 +1228,20 @@ shim random seeded_with_clock() { body }
 
 
 
+        <section class="item" id="item-case_binders">
+          <h3>
+            <a class="anchor" href="#item-case_binders">case_binders</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn case_binders(toks: str[]) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The names between a case pattern's parentheses, ending at the <code>)</code> — the tokens after it (a <code>let</code>'s <code>=</code>, <code>else</code>) are not binders.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-field_binders_of">
           <h3>
             <a class="anchor" href="#item-field_binders_of">field_binders_of</a>
@@ -1306,6 +1320,34 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-let_else">
+          <h3>
+            <a class="anchor" href="#item-let_else">let_else</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn let_else(pattern: Pat, value: Expr, otherwise: Expr, sp: Span) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>let PATTERN = value else { .. };</code>. The block is what runs when the pattern does not match, and the rest of the block cannot be reached from it, so it has to leave the function: otherwise the binding the pattern makes would be missing below it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-diverges">
+          <h3>
+            <a class="anchor" href="#item-diverges">diverges</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn diverges(self: Expr) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether running <code>self</code> always ends in a <code>return</code>: it is one, or a sequence one of whose steps is, or a branching form each of whose branches is.</p></div>
 
 
         </section>
@@ -1391,7 +1433,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$102912: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$107023: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -2178,7 +2220,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-destructured_param">destructured_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$144109: FieldBinders, span: Span) -&#62; Ast</code></pre>
+          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$148420: FieldBinders, span: Span) -&#62; Ast</code></pre>
 
           <div class="doc"><p>A parameter named <code>name</code>, of the struct <code>struct_name</code>, whose <code>fields</code> are bound to <code>names</code> at the top of the body.</p></div>
 
@@ -2444,7 +2486,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$160177: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$164488: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

@@ -1,0 +1,21 @@
+# The block of a `let .. else` has to leave the function: when it can fall out, the
+# names the pattern binds would be missing in the code below it.
+
+import { print } from builtins;
+
+fn pick(o: i64?) -> i64 {
+    let some(n) = o else {
+        print("nothing");
+    };
+    n
+}
+
+fn main() !prints {
+    print(`{pick(none)}`);
+}
+--- errors ---
+error: the `else` of a `let .. else` has to leave the function, as in `else { return none; }`
+ --> ./tests/cases/bindings/let/err_let_else_falls_through.aipl:8:9
+  |
+8 |         print("nothing");
+  |         ^^^^^^^^^^^^^^^^
