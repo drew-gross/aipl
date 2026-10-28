@@ -23,6 +23,7 @@ mod interp_literal;
 mod interp_to_str;
 mod is_empty_longhand;
 mod len_gt_zero;
+mod let_else_as_case;
 mod map_constant_repeat;
 mod map_find_if_some;
 mod match_case_as_case;
@@ -65,6 +66,7 @@ use self::interp_literal::interp_literal;
 use self::interp_to_str::{interp_to_str, to_str_name};
 use self::is_empty_longhand::{empty_names, is_empty_longhand};
 use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
+use self::let_else_as_case::let_else_as_case;
 use self::map_constant_repeat::{map_constant_repeat, repeat_names};
 use self::map_find_if_some::{find_map_names, map_find_if_some};
 use self::match_case_as_case::match_case_as_case;
@@ -184,6 +186,7 @@ pub fn check(
             tail_matches(&func.body, &mut tails);
             for e in tails {
                 match_case_try_as_case(e, src, as_case.as_deref(), &mut hits);
+                let_else_as_case(e, src, as_case.as_deref(), &mut hits);
             }
         }
     }

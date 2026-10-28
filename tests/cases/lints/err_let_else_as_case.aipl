@@ -1,0 +1,56 @@
+# `let K(a, b) = x else { return none; };` — a variant taken apart, giving up with
+# `none` when it is another case. `let K(a, b) = x.as_case(K)?;` says the same
+# without the block.
+
+import { print } from builtins;
+
+variant Shape = Circle(i64) | Rect(i64, i64) | Empty
+
+// A payload the `let` takes apart.
+fn radius(s: Shape) -> i64? {
+    let Circle(r) = s else {
+        return none;
+    };
+    some(r * 2)
+}
+
+// Written as an `if let`, which is the same tree.
+fn width(s: Shape) -> i64? {
+    if (let Rect(w, h) = s) {
+        some(w + h)
+    } else {
+        return none;
+    }
+}
+
+// A case with no payload to bind has no pattern for a `let`, so it is asked of
+// the value alone.
+fn only_empty(s: Shape, n: i64) -> i64? {
+    if (let Empty = s) {
+        some(n)
+    } else {
+        return none;
+    }
+}
+
+fn main() !prints {
+    print(`{radius(Circle(1))} {width(Rect(1, 2))} {only_empty(Empty, 3)}`);
+}
+--- errors ---
+error: this `else` only gives up with none — write "let Circle(r) = s.as_case(Circle)?;" and drop the block, importing `as_case` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_let_else_as_case.aipl:12:16
+   |
+12 |         return none;
+   |                ^^^^
+
+error: this `else` only gives up with none — write "let Rect(w, h) = s.as_case(Rect)?;" and drop the block, importing `as_case` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_let_else_as_case.aipl:22:16
+   |
+22 |         return none;
+   |                ^^^^
+
+error: this `else` only gives up with none — write "s.as_case(Empty)?;" and drop the block, importing `as_case` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_let_else_as_case.aipl:32:16
+   |
+32 |         return none;
+   |                ^^^^

@@ -1,0 +1,30 @@
+# `#[allow]` keeps the `else`. The marker goes on the `return none;` line, which is
+# where this lint points.
+
+import { as_case, print } from builtins;
+
+variant Shape = Circle(i64) | Empty
+
+fn radius(s: Shape) -> i64? {
+    let Circle(r) = s else {
+        return none; #[allow]
+    };
+    some(r)
+}
+
+// The rewrite the lint asks for, so the two spellings are checked side by side
+// and proven to agree.
+fn radius_short(s: Shape) -> i64? {
+    let Circle(r) = s.as_case(Circle)?;
+    some(r)
+}
+
+fn show(o: i64?) -> str { `{o}` }
+
+fn main() !prints {
+    print(`{show(radius(Circle(1)))} {show(radius_short(Circle(1)))}`);
+    print(`{show(radius(Empty))} {show(radius_short(Empty))}`);
+}
+--- stdout ---
+some(1) some(1)
+none none

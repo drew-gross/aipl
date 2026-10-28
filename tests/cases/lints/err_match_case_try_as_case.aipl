@@ -38,19 +38,19 @@ fn main() !prints {
     print(`{radius(Circle(1))} {wide(Rect(1, 2))} {only_empty(Empty, 3)}`);
 }
 --- errors ---
-error: this match gives up with none unless the value is Circle, and is the last thing the function does — write "let Circle(r) = s else { return none; };" and continue with the arm's body (or append #[allow] to this line to keep it)
+error: this match gives up with none unless the value is Circle, and is the last thing the function does — write "let Circle(r) = s.as_case(Circle)?;" and continue with the arm's body, importing `as_case` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_case_try_as_case.aipl:14:9
    |
 14 |         _ => none,
    |         ^
 
-error: this match gives up with none unless the value is Rect, and is the last thing the function does — write "let Rect(w, h) = s else { return none; };" and continue with the arm's body (or append #[allow] to this line to keep it)
+error: this match gives up with none unless the value is Rect, and is the last thing the function does — write "let Rect(w, h) = s.as_case(Rect)?;" and continue with the arm's body, importing `as_case` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_case_try_as_case.aipl:25:9
    |
 25 |         _ => none,
    |         ^
 
-error: this match gives up with none unless the value is Circle, and is the last thing the function does — write "let Circle(r) = <value> else { return none; };" and continue with the arm's body (or append #[allow] to this line to keep it)
+error: this match gives up with none unless the value is Circle, and is the last thing the function does — write "let Circle(r) = <value>.as_case(Circle)?;" and continue with the arm's body, importing `as_case` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_case_try_as_case.aipl:23:13
    |
 23 |             _ => none,

@@ -1,0 +1,61 @@
+# The shapes the let-else-as-case lint must leave alone. It rewrites a variant
+# case's pattern whose `else` is exactly `return none;`, at the function's tail —
+# so everything here compiles.
+
+import { print, wrapping_add as + } from builtins;
+
+variant Shape = Circle(i64) | Rect(i64, i64) | Empty
+
+// The block returns something other than `none`.
+fn radius(s: Shape) -> i64 {
+    let Circle(r) = s else {
+        return 0;
+    };
+    r
+}
+
+// The block does something before it returns.
+fn logged(s: Shape) !prints -> i64? {
+    let Circle(r) = s else {
+        print("not a circle");
+        return none;
+    };
+    some(r)
+}
+
+// An optional's `some` has no `as_case`, and neither has an array pattern.
+fn double(o: i64?) -> i64? {
+    let some(n) = o else {
+        return none;
+    };
+    some(n + n)
+}
+
+fn second(xs: i64[]) -> i64? {
+    let [_, b, ..] = xs else {
+        return none;
+    };
+    some(b)
+}
+
+// Not the function's last act: the `?` would leave the function where the `if let`
+// only chose a value for a binding.
+fn width(s: Shape) -> i64? {
+    let w = if (let Rect(a, b) = s) {
+        a + b
+    } else {
+        return none;
+    };
+    some(w)
+}
+
+fn show(o: i64?) -> str { `{o}` }
+
+fn main() !prints {
+    print(`{radius(Circle(2))} {show(logged(Empty))} {show(double(some(2)))}`);
+    print(`{show(second([1, 2]))} {show(width(Rect(1, 2)))}`);
+}
+--- stdout ---
+not a circle
+2 none some(4)
+some(2) some(3)

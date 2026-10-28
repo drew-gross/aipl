@@ -3,10 +3,11 @@ use crate::Error;
 
 use super::spans_its_text;
 
-/// The `match` expressions whose value *is* the function's value: the tail of the
-/// body, through the statements that lead to it, the branches of an `if`, and the
-/// arms of another `match`. A `?` written in place of such a `match` returns from
-/// the function with the same answer the `match` would have produced.
+/// The `match` and `if let` expressions whose value *is* the function's value: the
+/// tail of the body, through the statements that lead to it, the branches of an
+/// `if`, and the arms of another `match`. A `?` written in place of such an
+/// expression returns from the function with the same answer it would have
+/// produced.
 pub(super) fn tail_matches<'a>(e: &'a Expr, out: &mut Vec<&'a Expr>) {
     match &e.kind {
         ExprKind::Let(_, _, _, rest)
@@ -18,6 +19,7 @@ pub(super) fn tail_matches<'a>(e: &'a Expr, out: &mut Vec<&'a Expr>) {
             tail_matches(otherwise, out);
         }
         ExprKind::IfLet(arm, _, otherwise) => {
+            out.push(e);
             tail_matches(&arm.body, out);
             tail_matches(otherwise, out);
         }
@@ -40,10 +42,9 @@ pub(super) fn tail_matches<'a>(e: &'a Expr, out: &mut Vec<&'a Expr>) {
 ///
 /// — as the last thing a function does: a variant value taken apart when it is
 /// one case, and given up on with `none` otherwise. That is
-/// `let Field(base, field) = x else { return none; };` followed by `rest`, which
-/// says the early exit first and leaves the rest of the function at one level
-/// instead of inside an arm. (A case with no payload to bind has no pattern of
-/// its own for that, so the advice is `x.as_case(Empty)?;`.)
+/// `let Field(base, field) = x.as_case(Field)?;` followed by `rest`, which says
+/// the early exit first and leaves the rest of the function at one level instead
+/// of inside an arm.
 ///
 /// It has to be the function's *tail* (see [`tail_matches`]): the `?` returns
 /// `none` from the function, which is only the `match`'s own answer when the
@@ -93,25 +94,17 @@ pub(super) fn match_case_try_as_case(
     } else {
         "<value>".to_string()
     };
-    // A payload the arm names is taken apart by a `let .. else`. A case with none
-    // to bind (or one the arm ignores) has no pattern of its own — a bare name
-    // would be a binding — so it is asked of the value instead.
-    let (statement, import) = if bindings.is_empty() || *ignore_payload {
-        match as_case {
-            Some(local) => (format!("{receiver}.{local}({case})?;"), String::new()),
-            None => (
-                format!("{receiver}.as_case({case})?;"),
-                ", importing `as_case` from builtins".to_string(),
-            ),
-        }
+    let (method, import) = match as_case {
+        Some(local) => (local, String::new()),
+        None => ("as_case", ", importing `as_case` from builtins".to_string()),
+    };
+    // A payload the arm names is taken apart by the `let`; one it does not name
+    // (`K(..)`, or a case with none) has nothing to bind.
+    let call = format!("{receiver}.{method}({case})?");
+    let statement = if bindings.is_empty() || *ignore_payload {
+        format!("{call};")
     } else {
-        (
-            format!(
-                "let {case}({}) = {receiver} else {{ return none; }};",
-                bindings.join(", ")
-            ),
-            String::new(),
-        )
+        format!("let {case}({}) = {call};", bindings.join(", "))
     };
     hits.push(Error::at(
         format!(
