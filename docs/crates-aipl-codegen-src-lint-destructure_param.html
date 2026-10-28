@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/destructure_param.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/destructure_param.aipl</code></h1>
+
+      <div class="module-doc"><p>The <code>destructure_param</code> lint: <code>fn f(p: Point) { .. p.x .. p.y .. }</code> where <strong>every</strong> mention of <code>p</code> is a field read — destructure the parameter instead: <code>fn f(Point { x, y })</code>.</p><p>The same argument <code>destructure_binding</code> makes about a <code>let</code>, one step earlier. A parameter that is only ever taken apart is a pattern written the long way, and the signature is where a reader looks first: <code>fn f(Point { x, y })</code> says what the function needs, where <code>fn f(p: Point)</code> says only that it needs a <code>Point</code> and leaves the body to be scanned for how much of it.</p><p>The parameter's type is right there in the signature, so unlike the binding lint this one can name the struct in its advice rather than leaving a placeholder.</p><p>A parameter whose only use is a <code>let T { a, b } = p;</code> that opens the body is the same pattern written one step late, and is flagged too: the pattern moves into the signature unchanged.</p><p><strong>What is left alone</strong>, beyond everything <code>field_uses</code> already excludes (a bare mention, a name the pattern would collide with, a field read off another value, a tuple):</p><ul><li><strong><code>self</code>.</strong> Method-call syntax is defined by the receiver being named <code>self</code>,</li></ul><p>so its pattern is the named form <code>self: Span { start, end }</code>, not the <code>Span { start, end }</code> this lint's advice spells.</p><ul><li><strong>A parameter already destructured</strong>, whose pattern the author wrote.</li><li><strong>A keyword parameter.</strong> Its name <em>is</em> the call-site spelling (<code>f(sep = &quot;, &quot;)</code>),</li></ul><p>so destructuring it would break every caller.</p><ul><li><strong><code>mut</code> and variadic parameters.</strong> A <code>mut</code> receiver is written through rather</li></ul><p>than read, and a variadic parameter's type is a sequence.</p><ul><li><strong>Anything but a plain named type.</strong> A generic instance is a template until</li></ul><p>monomorphization and a parameter has no value to infer arguments from, so <code>Box { v }</code> has nothing to bind; arrays, optionals and primitives have no fields to name.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-destructure_param">
+          <h3>
+            <a class="anchor" href="#item-destructure_param">destructure_param</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn destructure_param(__spat$2659: Program) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>A hit for each parameter of the program that only its fields are read from.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-function_hits">
+          <h3>
+            <a class="anchor" href="#item-function_hits">function_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn function_hits(self: Fn) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hits in a function's signature. The reads are those of the whole body, so that a field read off two bases anywhere in it counts against each parameter it belongs to; the destructured parameters make reads of their own.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-param_hits">
+          <h3>
+            <a class="anchor" href="#item-param_hits">param_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn param_hits(self: Param, body: Expr, reads: Read[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hit for one parameter, or none.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-message">
+          <h3>
+            <a class="anchor" href="#item-message">message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn message(name: str, struct_name: str, fields: str[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>What is said of a parameter <code>name</code> whose <code>fields</code> are the ones read.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-opening_message">
+          <h3>
+            <a class="anchor" href="#item-opening_message">opening_message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn opening_message(name: str, struct_name: str, fields: str[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>What is said of a parameter <code>name</code> that a <code>let</code> right under the signature takes apart.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-opening_destructure">
+          <h3>
+            <a class="anchor" href="#item-opening_destructure">opening_destructure</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn opening_destructure(self: Expr, param: str, struct_name: str) -&#62; (Span, str[])?</code></pre>
+
+          <div class="doc"><p>The span of the value and the field names of a <code>let T { a, b } = &lt;param&gt;;</code> that opens <code>self</code>, when it binds each field to a name of its own spelling and names the parameter's type. A field bound under another name (<code>T { a as x }</code>) is not recognised: the signature's pattern would have to spell the rename too.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-hits">
+          <h3>
+            <a class="anchor" href="#item-hits">hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn hits(src: str) -&#62; str[]!ParseFailure</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

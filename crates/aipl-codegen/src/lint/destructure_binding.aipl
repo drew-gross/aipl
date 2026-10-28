@@ -57,12 +57,12 @@ import {
     not_equal as !=,
     value_or,
 } from builtins;
-import { Construct, Expr, Let, Read, descendants, field_reads } from "./expr.aipl";
+import { Construct, Expr, Let, Read, descendants, field_reads } from "../expr.aipl";
+import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
+import { Fn, Program, pattern_reads } from "../item.aipl";
+import { Named } from "../ty.aipl";
 import { Uses, is_shared, is_tuple_field, mentions_any, uses_of } from "./field_uses.aipl";
-import { ParseFailure, aipl_parse_surface_file } from "./grammar_aipl.aipl";
-import { Fn, Program, pattern_reads } from "./item.aipl";
 import { LintHit, hit } from "./lint_hit.aipl";
-import { Named } from "./ty.aipl";
 
 # A hit for each immutable `let` in the program whose binding is only ever taken
 # apart by field reads.

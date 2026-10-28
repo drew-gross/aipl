@@ -38,10 +38,10 @@ import {
     descendants,
     field_reads,
     read,
-} from "./expr.aipl";
-import { ParseError } from "./grammar.aipl";
-import { lower_aipl_block_surface } from "./grammar_aipl.aipl";
-import { pat_bindings } from "./pat.aipl";
+} from "../expr.aipl";
+import { ParseError } from "../grammar.aipl";
+import { lower_aipl_block_surface } from "../grammar_aipl.aipl";
+import { pat_bindings } from "../pat.aipl";
 
 # How a name is used inside an expression. `mentions == field_reads` is the whole
 # question: it says the value itself is never used, only its parts, which is

@@ -479,8 +479,9 @@ impl Loader {
             ))
             .into());
         }
-        let (items, imports, builtin_imports) =
-            self.prepare(program, &key, src, |from, _| Ok(PathBuf::from(from)))?;
+        let (items, imports, builtin_imports) = self.prepare(program, &key, src, |from, _| {
+            Ok(virtual_import_path(&key, from))
+        })?;
         if self.insert_file(&key, src, items, imports, builtin_imports) {
             return Err(Error::msg(format!(
                 "duplicate source {:?} in compile_sources",
@@ -2118,4 +2119,28 @@ mod tests {
         // A non-digit inside what should be the index.
         assert_eq!(unmangled_name("__m3a__x"), "__m3a__x");
     }
+}
+
+/// The virtual file an import `from` written in `importer` names: `from`
+/// resolved against the importer's directory, with `.` and `..` folded out, so
+/// `../expr.aipl` in `./lint/lint.aipl` is `./expr.aipl`.
+fn virtual_import_path(importer: &std::path::Path, from: &str) -> PathBuf {
+    use std::path::Component;
+    let mut parts: Vec<std::ffi::OsString> = Vec::new();
+    let dir = importer.parent().unwrap_or(std::path::Path::new("."));
+    for component in dir
+        .components()
+        .chain(std::path::Path::new(from).components())
+    {
+        match component {
+            Component::Normal(part) => parts.push(part.to_owned()),
+            Component::ParentDir => {
+                parts.pop();
+            }
+            _ => {}
+        }
+    }
+    let mut path = PathBuf::from(".");
+    path.extend(parts);
+    path
 }

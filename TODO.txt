@@ -102,6 +102,9 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  retructure how the lints manage names. There should be shared infrastructure for managing names (i.e. if a builtin is being requested, and is already imported, request the already-imported name. If that name is taken, suggest something else. If a function being checked for is imported with an atypical name, the lint should fire anyway)
+  unify destructure param and destructure binding
+  request nested destructuring e.g function_hits(self: Fn(function)) can be function_hits(self: Fn(Function { body, sig, ...}))
   in Stmt move the span out of the variant
   is_name should be self.kind == Ident(name)
   descendants should have a descendants_of_kind variant that return T[] where T is a specific kind of expression.
@@ -319,6 +322,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  .... in an array or set literal should double-unwrap-spread
   support if (let [a, ..] = xs) syntax
   let some(x) = v else { return; } syntax, use everywhere that there is a one-arm+_ -> return match
   unary minus doesn't have a named operator

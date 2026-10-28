@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/unused_imports.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/unused_imports.aipl</code></h1>
+
+      <div class="module-doc"><p>The <code>unused_imports</code> lint: an imported name nothing in the file references. Legal — an unused import changes no behavior — but it misstates what the file depends on and outlives whatever once used it; the better spelling is to drop the name.</p><p>&quot;Referenced&quot; is deliberately syntactic and <em>generous</em>: any expression, pattern, operator, or type position mentioning the local name counts, including one a local definition or type parameter shadows. That is the safe direction — a lint is a hard error here, so a missed dead import costs one stale line, while a false hit costs a build that cannot be made to pass except by <code>#[allow]</code>.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-unused_imports">
+          <h3>
+            <a class="anchor" href="#item-unused_imports">unused_imports</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn unused_imports(program: Program) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>A hit for each name <code>program</code> imports and nothing in it references.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-unused_in">
+          <h3>
+            <a class="anchor" href="#item-unused_in">unused_in</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn unused_in(self: Import, used: #{str}) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>A hit for each name <code>self</code> imports that is not in <code>used</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-unused_message">
+          <h3>
+            <a class="anchor" href="#item-unused_message">unused_message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn unused_message(name: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>What is said of the import <code>name</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-local">
+          <h3>
+            <a class="anchor" href="#item-local">local</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn local(self: ImportName) -&#62; str</code></pre>
+
+          <div class="doc"><p>The name an import binds in the importing file: the alias if given, else the exported name.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-hit_span">
+          <h3>
+            <a class="anchor" href="#item-hit_span">hit_span</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn hit_span(self: ImportName, source_span: Span) -&#62; Span</code></pre>
+
+          <div class="doc"><p>Where an unused import's caret goes. The bare <code>-</code>/<code>&lt;</code>/<code>&gt;</code>/<code>||</code>/<code>!</code> operator tokens carry no span of their own, so the import statement is pointed at instead — an empty span would put the caret on the file's first line, nowhere near the import.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-referenced_names">
+          <h3>
+            <a class="anchor" href="#item-referenced_names">referenced_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn referenced_names(__spat$3530: Program) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>Every name the file mentions outside its own import lists: called and referenced idents, constructed structs, match constructors, operator spellings, and every name appearing in a type — signatures, struct fields, variant payloads, and inline <code>let</code>/lambda annotations.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-item_names">
+          <h3>
+            <a class="anchor" href="#item-item_names">item_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn item_names(self: Item) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The names an item mentions: the type positions that belong to it rather than to any expression, and the expressions it holds.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-param_names">
+          <h3>
+            <a class="anchor" href="#item-param_names">param_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn param_names(self: Param) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The names a parameter mentions: its type, and its default.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-field_names">
+          <h3>
+            <a class="anchor" href="#item-field_names">field_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn field_names(ty: Ty, default: Expr?) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The names a declared type and an optional default expression mention.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-names_in">
+          <h3>
+            <a class="anchor" href="#item-names_in">names_in</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn names_in(self: Expr) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The names <code>self</code> and every expression under it mention.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-own_names">
+          <h3>
+            <a class="anchor" href="#item-own_names">own_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn own_names(self: Expr) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The names <code>e</code> itself mentions, not those of its sub-expressions.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-destructure_names">
+          <h3>
+            <a class="anchor" href="#item-destructure_names">destructure_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn destructure_names(self: Destructure) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The type or case a destructuring pattern names: a tuple names none.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ctor_names">
+          <h3>
+            <a class="anchor" href="#item-ctor_names">ctor_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn ctor_names(self: Pat) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The constructors a pattern names, at any depth. A <code>V.A</code> path names the variant as well as the case. Written with the variant's name because <code>Str</code> and <code>Char</code> are also expression cases here.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-path_names">
+          <h3>
+            <a class="anchor" href="#item-path_names">path_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn path_names(name: str) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The names a constructor written <code>name</code> mentions: the name, and the variant too when it is qualified.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-optional_ty_names">
+          <h3>
+            <a class="anchor" href="#item-optional_ty_names">optional_ty_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn optional_ty_names(self: Ty?) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The names an annotation mentions, none when it was not written.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ty_names">
+          <h3>
+            <a class="anchor" href="#item-ty_names">ty_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn ty_names(self: Ty) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>Every name <code>self</code> mentions, so an import used only in a type position still counts as used. Variants are spelled out rather than wildcarded so a new <code>Ty</code> forces a decision here.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-dead_names">
+          <h3>
+            <a class="anchor" href="#item-dead_names">dead_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn dead_names(src: str) -&#62; str[]!ParseFailure</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

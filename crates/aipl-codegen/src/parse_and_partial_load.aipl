@@ -30,8 +30,8 @@ import {
 } from "./grammar_aipl.aipl";
 import { hoist_test_fns } from "./hoist_test_fns.aipl";
 import { Fn, Item, Program, show_program } from "./item.aipl";
-import { lint } from "./lint.aipl";
-import { LintHit } from "./lint_hit.aipl";
+import { lint } from "./lint/lint.aipl";
+import { LintHit } from "./lint/lint_hit.aipl";
 import { promote_type_vars } from "./promote_type_vars.aipl";
 
 # A file as far as the loader has been ported: the program, the spans of its

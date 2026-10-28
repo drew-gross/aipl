@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/destructure_binding.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/destructure_binding.aipl</code></h1>
+
+      <div class="module-doc"><p>The <code>destructure_binding</code> lint: <code>let p = value; ... p.a ... p.b ...</code> where <strong>every</strong> mention of <code>p</code> is a field read. Say so with a pattern instead: <code>let T { a, b } = value;</code>.</p><p>The binding then names what it actually holds. A reader of <code>let P { line, col } = pos_of(i);</code> knows the two fields are the whole story; with <code>let p = pos_of(i);</code> they have to scan the rest of the block to find out whether <code>p</code> is also passed somewhere, compared, or returned.</p><p>One bare mention is enough to stay quiet, because a pattern cannot reproduce it — the value itself is gone, only its fields survive. That covers the obvious escapes (<code>f(p)</code>, <code>p == q</code>, a trailing <code>p</code>) without special-casing any of them.</p><p>Only an immutable <code>let</code> is flagged. A <code>mut</code> binding is a different question — whether it should be <code>mut</code> at all — and answering it here would advise a rewrite that changes more than the spelling.</p><p><strong>A pattern binds one name per field, so it is only available when each of those names would mean one thing in the function.</strong> Two conditions take the lint out, and between them they are most of what it would otherwise flag:</p><ul><li><strong>The name is already spoken for.</strong> <code>let b = w.bump();</code> reading <code>b.text</code> and</li></ul><p><code>b.w</code> cannot become <code>let Bump { text, w } = w.bump();</code> where a <code>w</code> is in scope: the new binding shadows it and every later mention of the old one silently changes meaning.</p><p>The binding's <em>own</em> name does not count, even when a field shares it (<code>let segs = ..</code> reading <code>segs.segs</code>). That binding is the one going away, and every mention of it is the base of a field read the pattern replaces — so there is provably nothing left for the new name to shadow.</p><ul><li><strong>The field is read off more than one value.</strong> Three <code>let</code>s binding the same</li></ul><p>struct in one block are told apart by their <em>names</em> (<code>plain.cleaned</code>, <code>empty.cleaned</code>); destructuring them all binds <code>cleaned</code> three times, shadowing in sequence, and the distinction the names carried is gone. So a field read off two different bases anywhere in the function disqualifies every binding it belongs to — which is why the reads are those of the whole function rather than of the binding's own body.</p><p>Reads inside the binding's <strong>own value</strong> are the exception, and they are not a rarity: threading a cursor writes <code>let segs = head.w.next()?</code> and then reads <code>segs.w</code>, so <code>w</code> has two bases and neither is ambiguous. The value is evaluated before the pattern binds anything, so no name the pattern introduces can be confused with a read in it.</p><p>The lint runs before type checking, so it cannot know the type of a call's result: the advice names the struct only where an annotation already does.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-destructure_binding">
+          <h3>
+            <a class="anchor" href="#item-destructure_binding">destructure_binding</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn destructure_binding(__spat$3445: Program) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>A hit for each immutable <code>let</code> in the program whose binding is only ever taken apart by field reads.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-function_hits">
+          <h3>
+            <a class="anchor" href="#item-function_hits">function_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn function_hits(self: Fn) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hits in a function's body and in its <code>.test</code> block. The body's reads include those of the function's destructured parameters, which take their fields apart at the top of it; the <code>.test</code> block is outside them.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-body_hits">
+          <h3>
+            <a class="anchor" href="#item-body_hits">body_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn body_hits(self: Expr, outside: Read[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hits in one body. Every read is those of the whole body, so that a field read off two bases anywhere in it counts against each binding it belongs to; <code>outside</code> are reads made beside it that count the same way.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-binding_hit">
+          <h3>
+            <a class="anchor" href="#item-binding_hit">binding_hit</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn binding_hit(self: Let, reads: Read[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hit for one <code>let</code>, or none: <code>reads</code> are every field read in its body.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-message">
+          <h3>
+            <a class="anchor" href="#item-message">message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn message(name: str, fields: str, ty: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>What is said of the binding <code>name</code>, whose <code>fields</code> are the ones read.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_construct">
+          <h3>
+            <a class="anchor" href="#item-is_construct">is_construct</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_construct(self: Expr) -&#62; bool</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-hits">
+          <h3>
+            <a class="anchor" href="#item-hits">hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn hits(src: str) -&#62; str[]!ParseFailure</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

@@ -302,46 +302,6 @@
         </li>
 
         <li>
-          <a class="file" href="crates-aipl-codegen-src-destructure_binding.html">crates/aipl-codegen/src/destructure_binding.aipl</a>
-
-          <p class="file-summary">The <code>destructure_binding</code> lint: <code>let p = value; ... p.a ... p.b ...</code> where <strong>every</strong> mention of <code>p</code> is a field read. Say so with a pattern instead: <code>let T { a, b } = value;</code>.</p>
-
-
-          <span class="private-count"><a href="crates-aipl-codegen-src-destructure_binding.html#private">6 private</a></span>
-
-
-          <ul class="items">
-
-            <li>
-              <a href="crates-aipl-codegen-src-destructure_binding.html#item-destructure_binding"><code>destructure_binding</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-          </ul>
-
-        </li>
-
-        <li>
-          <a class="file" href="crates-aipl-codegen-src-destructure_param.html">crates/aipl-codegen/src/destructure_param.aipl</a>
-
-          <p class="file-summary">The <code>destructure_param</code> lint: <code>fn f(p: Point) { .. p.x .. p.y .. }</code> where <strong>every</strong> mention of <code>p</code> is a field read — destructure the parameter instead: <code>fn f(Point { x, y })</code>.</p>
-
-
-          <span class="private-count"><a href="crates-aipl-codegen-src-destructure_param.html#private">6 private</a></span>
-
-
-          <ul class="items">
-
-            <li>
-              <a href="crates-aipl-codegen-src-destructure_param.html#item-destructure_param"><code>destructure_param</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-          </ul>
-
-        </li>
-
-        <li>
           <a class="file" href="crates-aipl-codegen-src-desugar.html">crates/aipl-codegen/src/desugar.aipl</a>
 
           <p class="file-summary">Lowering the destructuring forms, after the lints have read them.</p>
@@ -394,26 +354,6 @@
 
             <li>
               <a href="crates-aipl-codegen-src-doc.html#item-print"><code>print</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-          </ul>
-
-        </li>
-
-        <li>
-          <a class="file" href="crates-aipl-codegen-src-duplicate_import_source.html">crates/aipl-codegen/src/duplicate_import_source.aipl</a>
-
-          <p class="file-summary">The <code>duplicate_import_source</code> lint: the same source imported on more than one line. Legal, but a reader wants everything a file takes from <code>builtins</code>, or from one path, in a single <code>import { .. }</code>; the better spelling merges the names into the first.</p>
-
-
-          <span class="private-count"><a href="crates-aipl-codegen-src-duplicate_import_source.html#private">2 private</a></span>
-
-
-          <ul class="items">
-
-            <li>
-              <a href="crates-aipl-codegen-src-duplicate_import_source.html#item-duplicate_import_source"><code>duplicate_import_source</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -614,51 +554,6 @@
 
             <li>
               <a href="crates-aipl-codegen-src-expr.html#item-binders"><code>binders</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-          </ul>
-
-        </li>
-
-        <li>
-          <a class="file" href="crates-aipl-codegen-src-field_uses.html">crates/aipl-codegen/src/field_uses.aipl</a>
-
-          <p class="file-summary">How a name is used inside an expression, for the lints that turn a binding into a pattern.</p>
-
-
-          <span class="private-count"><a href="crates-aipl-codegen-src-field_uses.html#private">3 private</a></span>
-
-
-          <ul class="items">
-
-            <li>
-              <a href="crates-aipl-codegen-src-field_uses.html#item-Uses"><code>Uses</code></a>
-              <span class="kind kind-struct">struct</span>
-            </li>
-
-            <li>
-              <a href="crates-aipl-codegen-src-field_uses.html#item-uses_of"><code>uses_of</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-            <li>
-              <a href="crates-aipl-codegen-src-field_uses.html#item-is_name"><code>is_name</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-            <li>
-              <a href="crates-aipl-codegen-src-field_uses.html#item-mentions_any"><code>mentions_any</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-            <li>
-              <a href="crates-aipl-codegen-src-field_uses.html#item-is_shared"><code>is_shared</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-            <li>
-              <a href="crates-aipl-codegen-src-field_uses.html#item-is_tuple_field"><code>is_tuple_field</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -1811,16 +1706,18 @@
         </li>
 
         <li>
-          <a class="file" href="crates-aipl-codegen-src-lint.html">crates/aipl-codegen/src/lint.aipl</a>
+          <a class="file" href="crates-aipl-codegen-src-lint-destructure_binding.html">crates/aipl-codegen/src/lint/destructure_binding.aipl</a>
 
-          <p class="file-summary">The lints that have moved to AIPL, run over a parsed file.</p>
+          <p class="file-summary">The <code>destructure_binding</code> lint: <code>let p = value; ... p.a ... p.b ...</code> where <strong>every</strong> mention of <code>p</code> is a field read. Say so with a pattern instead: <code>let T { a, b } = value;</code>.</p>
 
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_binding.html#private">6 private</a></span>
 
 
           <ul class="items">
 
             <li>
-              <a href="crates-aipl-codegen-src-lint.html#item-lint"><code>lint</code></a>
+              <a href="crates-aipl-codegen-src-lint-destructure_binding.html#item-destructure_binding"><code>destructure_binding</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -1829,7 +1726,110 @@
         </li>
 
         <li>
-          <a class="file" href="crates-aipl-codegen-src-lint_hit.html">crates/aipl-codegen/src/lint_hit.aipl</a>
+          <a class="file" href="crates-aipl-codegen-src-lint-destructure_param.html">crates/aipl-codegen/src/lint/destructure_param.aipl</a>
+
+          <p class="file-summary">The <code>destructure_param</code> lint: <code>fn f(p: Point) { .. p.x .. p.y .. }</code> where <strong>every</strong> mention of <code>p</code> is a field read — destructure the parameter instead: <code>fn f(Point { x, y })</code>.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_param.html#private">6 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-destructure_param.html#item-destructure_param"><code>destructure_param</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-duplicate_import_source.html">crates/aipl-codegen/src/lint/duplicate_import_source.aipl</a>
+
+          <p class="file-summary">The <code>duplicate_import_source</code> lint: the same source imported on more than one line. Legal, but a reader wants everything a file takes from <code>builtins</code>, or from one path, in a single <code>import { .. }</code>; the better spelling merges the names into the first.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-duplicate_import_source.html#private">2 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-duplicate_import_source.html#item-duplicate_import_source"><code>duplicate_import_source</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-field_uses.html">crates/aipl-codegen/src/lint/field_uses.aipl</a>
+
+          <p class="file-summary">How a name is used inside an expression, for the lints that turn a binding into a pattern.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-field_uses.html#private">3 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-field_uses.html#item-Uses"><code>Uses</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-field_uses.html#item-uses_of"><code>uses_of</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-field_uses.html#item-is_name"><code>is_name</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-field_uses.html#item-mentions_any"><code>mentions_any</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-field_uses.html#item-is_shared"><code>is_shared</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-field_uses.html#item-is_tuple_field"><code>is_tuple_field</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-lint.html">crates/aipl-codegen/src/lint/lint.aipl</a>
+
+          <p class="file-summary">The lints that have moved to AIPL, run over a parsed file.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-lint.html#item-lint"><code>lint</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-lint_hit.html">crates/aipl-codegen/src/lint/lint_hit.aipl</a>
 
           <p class="file-summary">What a lint reports: the message, and the span the caret goes under. The Rust side rebuilds each as an <code>aipl_syntax::Error</code> and runs it through the same <code>#[allow]</code> squelching as the lints still written in Rust.</p>
 
@@ -1838,12 +1838,32 @@
           <ul class="items">
 
             <li>
-              <a href="crates-aipl-codegen-src-lint_hit.html#item-LintHit"><code>LintHit</code></a>
+              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-LintHit"><code>LintHit</code></a>
               <span class="kind kind-struct">struct</span>
             </li>
 
             <li>
-              <a href="crates-aipl-codegen-src-lint_hit.html#item-hit"><code>hit</code></a>
+              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-hit"><code>hit</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-unused_imports.html">crates/aipl-codegen/src/lint/unused_imports.aipl</a>
+
+          <p class="file-summary">The <code>unused_imports</code> lint: an imported name nothing in the file references. Legal — an unused import changes no behavior — but it misstates what the file depends on and outlives whatever once used it; the better spelling is to drop the name.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-unused_imports.html#private">16 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-unused_imports.html#item-unused_imports"><code>unused_imports</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -2483,26 +2503,6 @@
 
             <li>
               <a href="crates-aipl-codegen-src-unescape.html#item-unescape_braces"><code>unescape_braces</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-          </ul>
-
-        </li>
-
-        <li>
-          <a class="file" href="crates-aipl-codegen-src-unused_imports.html">crates/aipl-codegen/src/unused_imports.aipl</a>
-
-          <p class="file-summary">The <code>unused_imports</code> lint: an imported name nothing in the file references. Legal — an unused import changes no behavior — but it misstates what the file depends on and outlives whatever once used it; the better spelling is to drop the name.</p>
-
-
-          <span class="private-count"><a href="crates-aipl-codegen-src-unused_imports.html#private">16 private</a></span>
-
-
-          <ul class="items">
-
-            <li>
-              <a href="crates-aipl-codegen-src-unused_imports.html#item-unused_imports"><code>unused_imports</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

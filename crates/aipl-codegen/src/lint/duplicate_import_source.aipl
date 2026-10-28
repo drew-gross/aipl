@@ -4,8 +4,8 @@
 # into the first.
 
 import { collect_arms, equal as ==, has, push } from builtins;
-import { ParseFailure, aipl_parse_surface_file } from "./grammar_aipl.aipl";
-import { Import, ImportDecl, ImportSource, Program } from "./item.aipl";
+import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
+import { Import, ImportDecl, ImportSource, Program } from "../item.aipl";
 import { LintHit, hit } from "./lint_hit.aipl";
 
 # A hit for each import of a source an earlier import already took names from,

@@ -1708,13 +1708,13 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./promote_type_vars.aipl",
     "./desugar.aipl",
     // The lints that have moved to AIPL, run by `parse_and_partial_load`.
-    "./lint_hit.aipl",
-    "./unused_imports.aipl",
-    "./duplicate_import_source.aipl",
-    "./field_uses.aipl",
-    "./destructure_binding.aipl",
-    "./destructure_param.aipl",
-    "./lint.aipl",
+    "./lint/lint_hit.aipl",
+    "./lint/unused_imports.aipl",
+    "./lint/duplicate_import_source.aipl",
+    "./lint/field_uses.aipl",
+    "./lint/destructure_binding.aipl",
+    "./lint/destructure_param.aipl",
+    "./lint/lint.aipl",
     "./parse_and_partial_load.aipl",
     // The formatter: `format_source` is the whole pipeline, and its walker
     // parses with the same `aipl_parse_file` every compile calls — which is why

@@ -46,12 +46,12 @@ import {
     logical_or as ||,
     not_equal as !=,
 } from builtins;
-import { ByStruct, Expr, LetPattern, Read, field_reads } from "./expr.aipl";
+import { ByStruct, Expr, LetPattern, Read, field_reads } from "../expr.aipl";
+import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
+import { Fn, One, Param, Program, pattern_reads } from "../item.aipl";
+import { Named } from "../ty.aipl";
 import { Uses, is_name, is_shared, is_tuple_field, mentions_any, uses_of } from "./field_uses.aipl";
-import { ParseFailure, aipl_parse_surface_file } from "./grammar_aipl.aipl";
-import { Fn, One, Param, Program, pattern_reads } from "./item.aipl";
 import { LintHit, hit } from "./lint_hit.aipl";
-import { Named } from "./ty.aipl";
 
 # A hit for each parameter of the program that only its fields are read from.
 pub fn destructure_param(Program { items }) -> LintHit[] {

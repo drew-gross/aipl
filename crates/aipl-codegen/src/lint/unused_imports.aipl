@@ -64,8 +64,8 @@ import {
     TypeArgs,
     While,
     subexprs,
-} from "./expr.aipl";
-import { ParseFailure, aipl_parse_surface_file } from "./grammar_aipl.aipl";
+} from "../expr.aipl";
+import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import {
     Const,
     Fn,
@@ -78,9 +78,8 @@ import {
     Refinement,
     Struct,
     Variant,
-} from "./item.aipl";
-import { LintHit, hit } from "./lint_hit.aipl";
-import { Pat } from "./pat.aipl";
+} from "../item.aipl";
+import { Pat } from "../pat.aipl";
 import {
     Any,
     Array as TyArray,
@@ -98,7 +97,8 @@ import {
     TypeVar,
     Unit as TyUnit,
     Without,
-} from "./ty.aipl";
+} from "../ty.aipl";
+import { LintHit, hit } from "./lint_hit.aipl";
 
 # A hit for each name `program` imports and nothing in it references.
 pub fn unused_imports(program: Program) -> LintHit[] {
@@ -302,7 +302,7 @@ fn dead_names(src: str) -> str[]!ParseFailure {
     // annotation and a nested type.
     assert(dead_names("""
         import { Span } from builtins;
-        import { A, B, C, D, E } from "./other.aipl";
+        import { A, B, C, D, E } from "../other.aipl";
         struct S { a: A[] }
         variant V = X(B?)
         fn f(s: S) -> (C, Span) { let d: D = g(); s }
@@ -310,7 +310,7 @@ fn dead_names(src: str) -> str[]!ParseFailure {
 
     // A match arm's constructor, qualified or not, and a pattern in `if let`.
     assert(dead_names("""
-        import { Q, R, some } from "./other.aipl";
+        import { Q, R, some } from "../other.aipl";
         fn f(x: i64) -> i64 {
             if (let some(v) = x) { v } else { match (x) { Q.Z => 1, _ => 2 } }
         }
@@ -318,13 +318,13 @@ fn dead_names(src: str) -> str[]!ParseFailure {
 
     // A constructor inside another pattern counts, however deep.
     assert(dead_names("""
-        import { A, B, C, D } from "./other.aipl";
+        import { A, B, C, D } from "../other.aipl";
         fn f(x: i64) -> i64 { match (x) { A(B(_), C(_)) => 1, _ => 2 } }
     """)? == [unused_message("D")]);
 
     // A shim names the functions it binds, and a struct literal the struct.
     assert(dead_names("""
-        import { P, hook, other } from "./other.aipl";
+        import { P, hook, other } from "../other.aipl";
         fn f() { shim prints { print = hook } { P { x: 1 } }; }
     """)? == [unused_message("other")]);
 })
