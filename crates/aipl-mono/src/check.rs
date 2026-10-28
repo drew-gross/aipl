@@ -320,11 +320,19 @@ fn no_outer_assign(body: &Expr, declared: &HashSet<String>, form: ValueForm) -> 
     }
 }
 
+/// A written span, or `None` for the empty placeholder a synthesized name has.
+fn written(span: &Span) -> Option<Span> {
+    (span.start < span.end).then(|| span.clone())
+}
+
 /// A bound name's type and whether it's reassignable (`let mut` / `mut self`).
 #[derive(Clone)]
 struct Binding {
     ty: Type,
     mutable: bool,
+    /// Where the name that introduced this binding is written, when the parser
+    /// recorded it. A use of the name resolves to it.
+    binder: Option<Span>,
 }
 
 type Env = HashMap<String, Binding>;
@@ -1957,6 +1965,7 @@ pub fn check_resolved(program: &Program) -> Result<(Program, Vec<Resolution>), V
                             Binding {
                                 ty: slot.ty.clone(),
                                 mutable: false,
+                                binder: None,
                             },
                         );
                     }
@@ -2365,6 +2374,7 @@ impl Cx<'_> {
                 Binding {
                     ty: pty,
                     mutable: false,
+                    binder: written(&p.name_span.0),
                 },
             );
         }
@@ -2382,6 +2392,7 @@ impl Cx<'_> {
                 Binding {
                     ty: subst_typevars(&p.ty, &type_var_names),
                     mutable: p.mutable,
+                    binder: written(&p.name_span.0),
                 },
             );
         }
@@ -3777,6 +3788,7 @@ impl Cx<'_> {
                     Binding {
                         ty: ty.clone(),
                         mutable: false,
+                        binder: written(&p.span),
                     },
                 );
             }
@@ -3904,6 +3916,9 @@ impl Cx<'_> {
                 // be a nullary variant constructor (e.g. `Empty`), or a
                 // function used as a value (`let f = inc;`).
                 if let Some(b) = env.get(name) {
+                    if let Some(binder) = &b.binder {
+                        self.resolved(&expr.name_span, Target::Local(binder.clone()));
+                    }
                     b.ty.clone()
                 } else if let Some(vn) = self.ctors.get(name) {
                     let bare = name.split('@').next().unwrap_or(name);
@@ -3924,6 +3939,7 @@ impl Cx<'_> {
                         node_id(expr),
                     )?
                 } else if let Some(sig) = self.sigs.get(name.as_str()) {
+                    self.resolved(&expr.name_span, Target::Function(name.clone()));
                     // A named function as a first-class value: its type is the
                     // corresponding `Type::Fn`. A runtime function value is a
                     // bare code address, so v1 restricts it to functions that
@@ -4143,6 +4159,7 @@ impl Cx<'_> {
                     Binding {
                         ty: bt,
                         mutable: false,
+                        binder: expr.name_span.as_deref().cloned(),
                     },
                 );
                 self.check_expr_at(body, &env2, effects, pos)?
@@ -4155,6 +4172,7 @@ impl Cx<'_> {
                     Binding {
                         ty: bt,
                         mutable: true,
+                        binder: expr.name_span.as_deref().cloned(),
                     },
                 );
                 self.check_expr_at(body, &env2, effects, pos)?
@@ -4169,6 +4187,13 @@ impl Cx<'_> {
                 let binding = env.get(name).ok_or_else(|| {
                     Error::at(format!("set: undeclared variable {name:?}"), span.clone())
                 })?;
+                if let Some(binder) = &binding.binder {
+                    let mut root = lhs;
+                    while let ExprKind::Field(obj, _) = &root.kind {
+                        root = obj;
+                    }
+                    self.resolved(&root.name_span, Target::Local(binder.clone()));
+                }
                 if !binding.mutable {
                     return Err(Error::at(
                         format!(
@@ -4260,6 +4285,7 @@ impl Cx<'_> {
                     Binding {
                         ty: elem,
                         mutable: false,
+                        binder: expr.name_span.as_deref().cloned(),
                     },
                 );
                 // The index binder of `for (let i, x : xs)`. A dict is indexed
@@ -4276,6 +4302,7 @@ impl Cx<'_> {
                         Binding {
                             ty: ity,
                             mutable: false,
+                            binder: None,
                         },
                     );
                 }
@@ -4645,7 +4672,14 @@ impl Cx<'_> {
                     };
                     let mut env2 = env.clone();
                     for (name, ty) in binders {
-                        env2.insert(name, Binding { ty, mutable: false });
+                        env2.insert(
+                            name,
+                            Binding {
+                                ty,
+                                mutable: false,
+                                binder: None,
+                            },
+                        );
                     }
                     let t = self.check_expr_at(&arm.body, &env2, effects, pos)?;
                     merged = Some(match merged {
@@ -4687,7 +4721,14 @@ impl Cx<'_> {
                 };
                 let mut env2 = env.clone();
                 for (name, ty) in binders {
-                    env2.insert(name, Binding { ty, mutable: false });
+                    env2.insert(
+                        name,
+                        Binding {
+                            ty,
+                            mutable: false,
+                            binder: None,
+                        },
+                    );
                 }
                 let tt = self.check_expr_at(&arm.body, &env2, effects, pos)?;
                 let et = self.check_expr_at(else_b, env, effects, pos)?;
@@ -4915,6 +4956,7 @@ impl Cx<'_> {
                 Binding {
                     ty: ty.clone(),
                     mutable: false,
+                    binder: written(&p.span),
                 },
             );
             ptys.push(ty);
@@ -5381,6 +5423,9 @@ impl Cx<'_> {
         // type carries no effects; a lambda's effects are charged to the site
         // that supplies it (see `check_lambda`).
         if let Some(b) = env.get(name) {
+            if let Some(binder) = &b.binder {
+                self.resolved(named, Target::Local(binder.clone()));
+            }
             let Type::Fn(ptys, ret) = &b.ty else {
                 return Err(Error::at(
                     format!("{name:?} is not a function and cannot be called"),
@@ -6058,6 +6103,7 @@ impl Cx<'_> {
                 Binding {
                     ty: pty.clone(),
                     mutable: false,
+                    binder: written(&p.span),
                 },
             );
         }

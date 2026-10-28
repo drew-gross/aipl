@@ -319,6 +319,7 @@ fn case_params(c: &VariantCase) -> Vec<Param> {
         .iter()
         .enumerate()
         .map(|(i, slot)| Param {
+            name_span: Default::default(),
             name: slot
                 .name
                 .clone()

@@ -293,6 +293,7 @@ fn ctor_wrapper_fn(w: &CtorWrapper, ctor: &str) -> Function {
         .iter()
         .enumerate()
         .map(|(i, ty)| Param {
+            name_span: Default::default(),
             name: format!("__ctor{i}"),
             ty: ty.clone(),
             mutable: false,
@@ -1816,6 +1817,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                             (_, _, t) => t,
                         };
                         Param {
+                            name_span: p.name_span.clone(),
                             name: p.name.clone(),
                             ty,
                             mutable: p.mutable,
@@ -2223,6 +2225,7 @@ fn make_concrete(sig: &Signature, type_args: &[Type]) -> (Vec<Param>, Option<Typ
         .params
         .iter()
         .map(|p| Param {
+            name_span: p.name_span.clone(),
             name: p.name.clone(),
             ty: subst_vars(&p.ty, &map),
             mutable: p.mutable,
@@ -2895,6 +2898,7 @@ impl Mono<'_> {
                         // callee's own list.
                         let cap = format!("$cap{}", new_params.len());
                         new_params.push(Param {
+                            name_span: Default::default(),
                             name: cap.clone(),
                             ty: ct.clone(),
                             mutable: false,
@@ -3156,6 +3160,7 @@ impl Mono<'_> {
             // named instance (`Emit$Tok`) so codegen sees an ordinary type.
             let ty = self.resolve_generic_ty(&ty)?;
             params.push(Param {
+                name_span: p.name_span.clone(),
                 name: p.name.clone(),
                 ty,
                 mutable: p.mutable,
@@ -3352,6 +3357,7 @@ impl Mono<'_> {
             .iter()
             .zip(ptys)
             .map(|(lp, pty)| Param {
+                name_span: aipl_syntax::ast::NameSpan(lp.span.clone()),
                 name: lp.name.clone(),
                 ty: pty.clone(),
                 mutable: false,
@@ -3362,6 +3368,7 @@ impl Mono<'_> {
             .collect();
         for (cn, ct) in captures {
             params.push(Param {
+                name_span: Default::default(),
                 name: cn.clone(),
                 ty: ct.clone(),
                 mutable: false,
@@ -3421,6 +3428,7 @@ impl Mono<'_> {
             // `filter_map` threads two capture lists into the same one.
             let cap = format!("$cap{}", params.len());
             params.push(Param {
+                name_span: Default::default(),
                 name: cap.clone(),
                 ty: ct.clone(),
                 mutable: false,
@@ -3579,6 +3587,7 @@ impl Mono<'_> {
 
         // The loop function: `(xs: T[], pred captures.., map captures..) -> U[]`.
         let mut fm_params = vec![Param {
+            name_span: Default::default(),
             name: "$arr".to_string(),
             ty: Type::Array(Box::new(elem.clone())),
             mutable: false,
@@ -3935,6 +3944,7 @@ impl Mono<'_> {
         // The mapping function: `(xs: T[], captures..) -> U[]` — or, over an
         // optional, `(opt: T?, captures..) -> U?`.
         let mut map_params = vec![Param {
+            name_span: Default::default(),
             name: "$arr".to_string(),
             ty: arr_ty.clone(),
             mutable: false,
@@ -4279,6 +4289,7 @@ impl Mono<'_> {
         // The synthesized function: `($a: T[], $b: U[], captures..) -> R[]`.
         let mut zip_params = vec![
             Param {
+                name_span: Default::default(),
                 name: "$a".to_string(),
                 ty: Type::Array(Box::new(elem_a.clone())),
                 mutable: false,
@@ -4287,6 +4298,7 @@ impl Mono<'_> {
                 implicit_some: false,
             },
             Param {
+                name_span: Default::default(),
                 name: "$b".to_string(),
                 ty: Type::Array(Box::new(elem_b.clone())),
                 mutable: false,
@@ -4300,6 +4312,7 @@ impl Mono<'_> {
         for (cn, ct) in &captures {
             let cap = format!("$cap{}", zip_params.len());
             zip_params.push(Param {
+                name_span: Default::default(),
                 name: cap.clone(),
                 ty: ct.clone(),
                 mutable: false,
@@ -4708,6 +4721,7 @@ impl Mono<'_> {
 
         // The filter function: `(xs: T[], captures..) -> T[]`.
         let mut filter_params = vec![Param {
+            name_span: Default::default(),
             name: "$arr".to_string(),
             ty: Type::Array(Box::new(elem.clone())),
             mutable: false,
@@ -8652,6 +8666,7 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
     for p in &f.sig.params {
         let ty = normalize_param_ty(&p.ty, &mut var_names, &mut counter, &f.name)?;
         params.push(Param {
+            name_span: p.name_span.clone(),
             name: p.name.clone(),
             ty,
             mutable: p.mutable,

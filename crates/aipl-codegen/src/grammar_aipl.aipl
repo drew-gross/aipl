@@ -2240,19 +2240,19 @@ fn repair_block_value(e: Expr, brace: Span) -> (Expr, Span) {
     match (e.kind) {
         Seq(head, tail) => {
             let inner = repair_block_value(tail, brace);
-            (at(Seq(head, inner.0), e.span), inner.1)
+            (Expr { ..e, kind: Seq(head, inner.0) }, inner.1)
         },
         Let(name, ty, value, body) => {
             let inner = repair_block_value(body, brace);
-            (at(Let(name, ty, value, inner.0), e.span), inner.1)
+            (Expr { ..e, kind: Let(name, ty, value, inner.0) }, inner.1)
         },
         LetMut(name, ty, value, body) => {
             let inner = repair_block_value(body, brace);
-            (at(LetMut(name, ty, value, inner.0), e.span), inner.1)
+            (Expr { ..e, kind: LetMut(name, ty, value, inner.0) }, inner.1)
         },
         Assign(lhs, value, body) => {
             let inner = repair_block_value(body, brace);
-            (at(Assign(lhs, value, inner.0), e.span), inner.1)
+            (Expr { ..e, kind: Assign(lhs, value, inner.0) }, inner.1)
         },
         // Everything else is the block's tail, so the walk stops here.
         _ => block_tail(e, brace),
@@ -2264,7 +2264,7 @@ fn repair_block_value(e: Expr, brace: Span) -> (Expr, Span) {
 # from matched no text — and the block's `{` is the honest location for it.
 # Anything else already knows where it is.
 fn block_tail(e: Expr, brace: Span) -> (Expr, Span) {
-    if (e.span.start == e.span.end) { (at(e.kind, brace), brace) } else { (e, e.span) }
+    if (e.span.start == e.span.end) { (Expr { ..e, span: brace }, brace) } else { (e, e.span) }
 }
 
 # `block_body` — a statement and the rest of the block, an expression and
@@ -3661,7 +3661,15 @@ fn named_param(
         One => if (implicit_some) { TyOptional(written) } else { written },
     };
     let default = if (has_default) { some(kid_expr(kids, 1, sp)?) } else { none };
-    ok(AParam(Param { name: name.slot_text(src), ty, mutable, arity, default, implicit_some }))
+    ok(AParam(Param {
+        name: name.slot_text(src),
+        ty,
+        mutable,
+        arity,
+        default,
+        implicit_some,
+        name_span: name.slot_span().value_or(sp),
+    }))
 }
 
 # `x: T*` stores the sequence type: `str` when the element is `char` (an AIPL

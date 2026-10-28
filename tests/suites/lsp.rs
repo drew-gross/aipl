@@ -353,6 +353,89 @@ fn the_references_of_a_function_are_its_calls() {
 /// Until the compiler has finished with the current text there is nothing it
 /// can say, and the request fails with that reason: an empty answer would read
 /// as "nothing refers to this".
+/// A `.test` block is checked as a function of its own, and its names are
+/// resolved like any other's.
+#[test]
+fn a_field_read_in_a_test_block_goes_to_the_field() {
+    let source = "import { equal as == } from builtins;\n\
+                  \n\
+                  struct Pair { name: i64 }\n\
+                  \n\
+                  fn name(self: Pair) -> i64 { self.name }\n\
+                  \n\
+                  fn make() -> Pair { name: 1 }.test({\n\
+                  \u{20}   let pairs = [make()];\n\
+                  \u{20}   assert(pairs$name == [1]);\n\
+                  })\n";
+    let workspace = Workspace::new("test-block", &[("main.aipl", source)]);
+    let mut server = opened(&workspace, "main.aipl");
+    analysed(&mut server, &workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let mut at = cursor_on(source, "$name ==");
+    at["character"] = json!(at["character"].as_u64().expect("character") + 1);
+    let location = definition_at(&mut server, &uri, at);
+    assert_eq!(location["range"]["start"], cursor_on(source, "name: i64 }"));
+}
+
+/// A local name goes to the binding that introduced it, whichever kind it is,
+/// and a shadowing one goes to the shadow.
+#[test]
+fn a_local_goes_to_its_binding() {
+    let source = "import { map, wrapping_add as + } from builtins;\n\
+                  \n\
+                  fn sum(first: i64, xs: i64[]) -> i64[] {\n\
+                  \u{20}   mut total = first;\n\
+                  \u{20}   for (let x : xs) {\n\
+                  \u{20}       set total = x;\n\
+                  \u{20}   }\n\
+                  \u{20}   let doubled = total + total;\n\
+                  \u{20}   let shadow = doubled;\n\
+                  \u{20}   let shadow = shadow + 1;\n\
+                  \u{20}   xs.map(|y| y + shadow + first)\n\
+                  }\n";
+    let workspace = Workspace::new("locals", &[("main.aipl", source)]);
+    let mut server = opened(&workspace, "main.aipl");
+    analysed(&mut server, &workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let goes = |server: &mut Server, from: &str, to: &str| {
+        let location = definition_at(server, &uri, cursor_on(source, from));
+        assert_eq!(
+            location["range"]["start"],
+            cursor_on(source, to),
+            "from {from:?}"
+        );
+    };
+    goes(&mut server, "first;", "first: i64");
+    goes(&mut server, "total = first", "total = first;\n\u{20}   for");
+    goes(&mut server, "x;", "x : xs");
+    goes(&mut server, "xs) {", "xs: i64[]");
+    goes(
+        &mut server,
+        "total + total;\n\u{20}   let shadow = d",
+        "total = first;\n\u{20}   for",
+    );
+    goes(&mut server, "shadow + 1", "shadow = doubled");
+    goes(&mut server, "y + shadow", "y| y + shadow");
+}
+
+/// A name in an import list goes to the declaration it imports.
+#[test]
+fn an_import_goes_to_what_it_imports() {
+    let workspace = Workspace::new(
+        "import-definition",
+        &[("main.aipl", ROOT), ("util.aipl", UTIL)],
+    );
+    let mut server = opened(&workspace, "main.aipl");
+    analysed(&mut server, &workspace, "main.aipl");
+    let location = definition_at(
+        &mut server,
+        &workspace.uri("main.aipl"),
+        cursor_on(ROOT, "add }"),
+    );
+    assert_eq!(location["uri"], json!(workspace.uri("util.aipl")));
+    assert_eq!(location["range"]["start"], cursor_on(UTIL, "add(a: i64"));
+}
+
 #[test]
 fn a_request_before_the_check_has_finished_says_so() {
     let workspace = Workspace::new("not-yet", &[("main.aipl", SHARED_NAME)]);
@@ -402,9 +485,9 @@ fn a_name_the_compiler_did_not_resolve_is_an_error_but_whitespace_is_not() {
     let reason = request_error(
         &mut server,
         "textDocument/definition",
-        params(cursor_on(SHARED_NAME, "n: i64) -> Pair")),
+        params(cursor_on(SHARED_NAME, "Pair) -> i64 { name(pair)")),
     );
-    assert!(reason.contains("does not cover `n`"), "{reason}");
+    assert!(reason.contains("does not cover `Pair`"), "{reason}");
     assert_eq!(
         request(
             &mut server,

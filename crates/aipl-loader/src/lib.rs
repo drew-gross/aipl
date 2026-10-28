@@ -626,6 +626,7 @@ impl Loader {
         // exists, and that imports don't collide with locals or other
         // imports.
         let mut full_views: HashMap<&PathBuf, HashMap<String, String>> = local_views.clone();
+        let mut import_sites: HashMap<PathBuf, Vec<aipl_syntax::ast::ImportSite>> = HashMap::new();
         for (path, file) in &self.files {
             // Need a mutable ref to this file's view; do the lookups first
             // to satisfy the borrow checker.
@@ -673,6 +674,7 @@ impl Loader {
             // A collision with a local item points at `local_spans` instead.
             let mut import_spans: HashMap<String, Span> = HashMap::new();
             for (local, span, mangled) in resolved {
+                let mangled_for_site = mangled.clone();
                 if view.insert(local.clone(), mangled).is_some() {
                     return Err(self.attribute(
                         path,
@@ -687,6 +689,13 @@ impl Loader {
                         ),
                     ));
                 }
+                import_sites
+                    .entry(path.clone())
+                    .or_default()
+                    .push(aipl_syntax::ast::ImportSite {
+                        span: span.clone(),
+                        target: mangled_for_site.clone(),
+                    });
                 import_spans.insert(local, span);
             }
 
@@ -775,6 +784,13 @@ impl Loader {
                         Error::at(format!("\"{}\" is not a builtin", n.name), n.span.clone()),
                     ));
                 };
+                import_sites
+                    .entry(path.clone())
+                    .or_default()
+                    .push(aipl_syntax::ast::ImportSite {
+                        span: n.span.clone(),
+                        target: canonical.clone(),
+                    });
                 if view.insert(local.to_string(), canonical).is_some() {
                     return Err(self.attribute(
                         path,
@@ -886,6 +902,7 @@ impl Loader {
                     label: diagnostic_label(path, self.project_root.as_deref()),
                     source: file.source.clone(),
                     path: path.to_string_lossy().into_owned(),
+                    imports: import_sites.get(path).cloned().unwrap_or_default(),
                 };
             }
         }
@@ -1430,6 +1447,7 @@ fn rewrite_item(
                     let mut params = Vec::with_capacity(f.sig.params.len());
                     for p in &f.sig.params {
                         params.push(Param {
+                            name_span: p.name_span.clone(),
                             name: p.name.clone(),
                             ty: rewrite_type(&p.ty, view, &f.sig.type_vars),
                             mutable: p.mutable,

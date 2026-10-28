@@ -152,6 +152,7 @@ impl Mono<'_> {
                 .iter()
                 .zip(&ptys)
                 .map(|(p, ty)| Param {
+                    name_span: aipl_syntax::ast::NameSpan(p.span.clone()),
                     name: p.name.clone(),
                     ty: ty.clone(),
                     mutable: false,

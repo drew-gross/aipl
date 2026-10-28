@@ -388,6 +388,19 @@ pub mod ast {
         /// The file's own path, as the loader read it — what `label` abbreviates
         /// for a person. Empty for a source that has no file.
         pub path: String,
+        /// Each name in the file's `import { .. }` lists, with the global name the
+        /// loader bound it to.
+        pub imports: Vec<ImportSite>,
+    }
+
+    /// One name written in an import list, and what the loader resolved it to.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct ImportSite {
+        /// Where the name is written in the import list.
+        pub span: Span,
+        /// The global name it was bound to: a mangled item of another file, or a
+        /// builtin's canonical `__builtin_*` form.
+        pub target: String,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -876,9 +889,25 @@ pub mod ast {
         }
     }
 
+    /// Where a name is written. Compares equal to every other, like
+    /// [`SpanStr`]'s span and [`Expr::span`]: a position says where, not what, and
+    /// tests compare the shape of parsed programs.
+    #[derive(Debug, Clone, Default)]
+    pub struct NameSpan(pub Span);
+
+    impl PartialEq for NameSpan {
+        fn eq(&self, _: &NameSpan) -> bool {
+            true
+        }
+    }
+
+    impl Eq for NameSpan {}
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct Param {
         pub name: String,
+        /// Where the parameter's name is written; empty for one a pass made up.
+        pub name_span: NameSpan,
         pub ty: Type,
         /// `true` for a `mut self` receiver: the function mutates this
         /// parameter (only valid on the first parameter, named `self`). Such a
@@ -3595,6 +3624,7 @@ pub fn with_reduction_signatures(mut items: Vec<ast::Item>) -> Vec<ast::Item> {
             sig: ast::Signature {
                 type_vars: decl.sig.type_vars.clone(),
                 params: vec![ast::Param {
+                    name_span: Default::default(),
                     name: "self".to_string(),
                     ty: ast::Type::Array(Box::new(element.clone())),
                     mutable: false,

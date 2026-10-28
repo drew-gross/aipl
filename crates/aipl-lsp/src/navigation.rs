@@ -73,8 +73,8 @@ impl Navigation {
     /// source names while every other file's are mangled with the file's index,
     /// which is how a name is traced back to a file (see
     /// [`aipl_syntax::mangled_file_index`]).
-    pub fn new(frontend: &Frontend, root: &std::path::Path, root_text: &str) -> Navigation {
-        let program = &frontend.program;
+    pub fn new(frontends: &[&Frontend], root: &std::path::Path, root_text: &str) -> Navigation {
+        let program = &frontends[0].program;
         let root = resolved(root);
         let mut sources: HashMap<PathBuf, String> = program
             .sources
@@ -109,8 +109,9 @@ impl Navigation {
         let mut structs: HashMap<&str, Site> = HashMap::new();
         let mut fields: HashMap<(&str, &str), Site> = HashMap::new();
         let mut declarations: Vec<Site> = Vec::new();
-        for item in &program.items {
+        for item in frontends.iter().flat_map(|f| &f.program.items) {
             match item {
+                Item::Fn(f) if f.name.starts_with("__test") => {}
                 Item::Fn(f) => {
                     if let Some(file) = file_of(&f.name).filter(|_| written(&f.name.span)) {
                         let site = Site {
@@ -147,7 +148,30 @@ impl Navigation {
         }
 
         let mut uses: Vec<(Site, Found)> = Vec::new();
-        for resolution in &frontend.resolutions {
+        // The names in each file's import lists, which the loader bound.
+        for source in program.sources.iter().filter(|s| !s.path.is_empty()) {
+            let file = resolved(Path::new(&source.path));
+            for import in &source.imports {
+                let found = match import.target.strip_prefix("__builtin_") {
+                    Some(builtin) => builtin_found(builtin, &mut sources),
+                    None => functions
+                        .get(import.target.as_str())
+                        .or_else(|| structs.get(import.target.as_str()))
+                        .cloned()
+                        .map(Found::Declared),
+                };
+                if let Some(found) = found {
+                    uses.push((
+                        Site {
+                            file: file.clone(),
+                            span: import.span.clone(),
+                        },
+                        found,
+                    ));
+                }
+            }
+        }
+        for resolution in frontends.iter().flat_map(|f| &f.resolutions) {
             let Some(file) = file_of(&resolution.in_fn) else {
                 continue;
             };
@@ -161,10 +185,14 @@ impl Navigation {
                     Some(builtin) => builtin_found(builtin, &mut sources),
                     None => functions.get(name.as_str()).cloned().map(Found::Declared),
                 },
-                Target::Local(span) => Some(Found::Declared(Site {
-                    file: file.clone(),
-                    span: span.clone(),
-                })),
+                Target::Local(span) => {
+                    let site = Site {
+                        file: file.clone(),
+                        span: span.clone(),
+                    };
+                    declarations.push(site.clone());
+                    Some(Found::Declared(site))
+                }
             };
             if let Some(found) = found {
                 uses.push((
@@ -176,6 +204,20 @@ impl Navigation {
                 ));
             }
         }
+        // The program and its test program share every non-test function, so
+        // the same finding can arrive twice.
+        uses.sort_by(|a, b| {
+            (&a.0.file, a.0.span.start, a.0.span.end).cmp(&(
+                &b.0.file,
+                b.0.span.start,
+                b.0.span.end,
+            ))
+        });
+        uses.dedup();
+        declarations.sort_by(|a, b| {
+            (&a.file, a.span.start, a.span.end).cmp(&(&b.file, b.span.start, b.span.end))
+        });
+        declarations.dedup();
         Navigation {
             uses,
             declarations,

@@ -117,6 +117,7 @@ fn function_with_one_param() {
     assert_eq!(
         f.sig.params,
         vec![Param {
+            name_span: Default::default(),
             name: "x".into(),
             ty: i64_ty(),
             mutable: false,

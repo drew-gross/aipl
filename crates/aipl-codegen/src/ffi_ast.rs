@@ -168,6 +168,11 @@ fn function(v: &FfiValue) -> R<ast::Function> {
 
 fn param(v: &FfiValue) -> R<ast::Param> {
     Ok(ast::Param {
+        // The AIPL struct's last slot; an older artifact has none.
+        name_span: ast::NameSpan(match v_field(v, "name_span") {
+            Some(name_span) => span(name_span)?,
+            None => 0..0,
+        }),
         name: text(field(v, "name")?)?,
         ty: ty(field(v, "ty")?)?,
         mutable: flag(field(v, "mutable")?)?,

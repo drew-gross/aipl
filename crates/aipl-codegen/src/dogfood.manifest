@@ -41,7 +41,7 @@
 ; variant __m29__Prim 8 I8 I16 I32 I64 U8 U16 U32 U64 Bool Char Str
 ; variant __m30__SetOrder 8 Unordered Desc Asc
 ; variant __m30__Exclusion 32 EmptyArray NamedCase(8:str)
-; struct __m36__Param 104 name@0:str ty@24:__m30__Ty mutable@32:bool arity@40:__m36__Arity default@48:__m31__Expr? implicit_some@64:bool pattern@72:__m36__ParamPattern?
+; struct __m36__Param 120 name@0:str ty@24:__m30__Ty mutable@32:bool arity@40:__m36__Arity default@48:__m31__Expr? implicit_some@64:bool pattern@72:__m36__ParamPattern? name_span@104:__builtin_Span
 ; variant __m36__Arity 8 One ZeroOrMore OneOrMore
 ; struct __m31__Expr 56 boxed kind@0:__m31__ExprKind span@8:__builtin_Span value_span@24:__builtin_Span name_span@40:__builtin_Span
 ; variant __m31__ExprKind 80 boxed Num(8:i64) Bool(8:bool) Str(8:str) Char(8:char) Ident(8:str) Call(8:str,32:__m31__Expr[],56:bool) Neg(8:__m31__Expr) If(8:__m31__Expr,16:__m31__Expr,24:__m31__Expr) Construct(8:str,32:__m31__FieldInit[]) Field(8:__m31__Expr,16:str) Let(8:str,32:__m30__Ty?,48:__m31__Expr,56:__m31__Expr) LetMut(8:str,32:__m30__Ty?,48:__m31__Expr,56:__m31__Expr) Assign(8:__m31__Expr,16:__m31__Expr,24:__m31__Expr) For(8:str,32:__m31__Expr,40:__m31__Expr,48:str?) While(8:__m31__Expr,16:__m31__Expr) Shim(8:str,32:__tuple$str$str[],56:__m31__Expr) None Match(8:__m31__Expr,16:__m31__MatchArm[]) IfLet(8:__m31__MatchArm,16:__m31__Expr,24:__m31__Expr) ArrayLit(8:__m31__Expr[]) Spread(8:__m31__Expr) SetLit(8:__m31__Expr[],32:__m30__SetOrder) DictLit(8:__tuple$__m31__Expr$__m31__Expr[]) Index(8:__m31__Expr,16:__m31__Expr) Slice(8:__m31__Expr,16:__m31__Expr,24:__m31__Expr?) Try(8:__m31__Expr) Unit Seq(8:__m31__Expr,16:__m31__Expr) Return(8:__m31__Expr) Lambda(8:__m31__LambdaParam[],32:__m31__Expr) TupleLit(8:__m31__Expr[]) KwArg(8:str,32:__m31__Expr,40:bool) TypeArgs(8:__m31__Expr,16:__m30__Ty[]) LetPattern(8:__m31__Destructure,16:__m31__Expr,24:__m31__Expr) ForPattern(8:__m31__Destructure,16:__m31__Expr,24:__m31__Expr,32:str?)
@@ -380,4 +380,4 @@
 ; data 235 __tostr_lit_96 52427261636b6574
 
 ; __m62____test$all$is_nine
-; source-fingerprint 13678748628769264691
+; source-fingerprint 10335755302671861369

@@ -714,7 +714,11 @@ fn check(path: &Path, text: &str) -> Result<Navigation, Vec<Error>> {
     let debug = DebugOptions::new(false);
     let program = aipl_loader::load_program_overlay(path, text, debug)?;
     let frontend = aipl_codegen::frontend(&program)?;
-    Ok(Navigation::new(&frontend, path, text))
+    // The `.test` blocks are checked as functions of their own when tests run, and
+    // are names the author writes like any other, so they are part of what the
+    // compiler resolves here.
+    let tests = aipl_codegen::frontend(&aipl_codegen::build_test_program(&program))?;
+    Ok(Navigation::new(&[&frontend, &tests], path, text))
 }
 
 /// One compiler [`Error`] as an LSP diagnostic.

@@ -34,6 +34,8 @@ struct Param {
     // names are bound off it at the top of the body when `desugar.aipl` lowers it.
     // Always `none` once that has run.
     pattern: ParamPattern? = none,
+    // Where the parameter's name is written; empty for one a pass made up.
+    name_span: Span = 0..0,
 }
 
 # A parameter's destructuring pattern and where it was written, which is the span

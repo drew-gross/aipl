@@ -243,6 +243,7 @@ fn mint(f: &Function, variant: &str) -> Option<Function> {
         return None;
     }
     let receiver = Param {
+        name_span: Default::default(),
         name: RECEIVER.to_string(),
         ty: f.sig.return_ty.clone()?,
         mutable: true,
