@@ -1,0 +1,13 @@
+// A tuple pattern has at least two names, as it does in a `let`.
+
+import { map } from builtins;
+
+fn main() {
+    let xs = [(1, 2)].map(|(a)| a);
+}
+--- errors ---
+error: a tuple pattern needs at least 2 names, e.g. |(a, b)| expr
+ --> ./tests/cases/bindings/lambda/err_tuple_needs_two_names.aipl:6:28
+  |
+6 |     let xs = [(1, 2)].map(|(a)| a);
+  |                            ^^^

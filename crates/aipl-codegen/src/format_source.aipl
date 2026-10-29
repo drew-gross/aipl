@@ -86,6 +86,12 @@ pub fn format_source(src: str, width: u64) -> str!FmtError {
     ));
     assert(format_source("", 100) == ok("\n"));
 
+    // A lambda parameter may take its argument apart, as a function's may.
+    assert(format_source(
+        "fn f() { xs.map( |P  { x , y  as b }, ( a , b ), W( c ) , d : i64| a ) ; }",
+        100,
+    ) == ok("fn f() {\n    xs.map(|P { x, y as b }, (a, b), W(c), d: i64| a);\n}\n"));
+
     // A malformed program fails with the *parser's* message, not the walker's.
     assert(
         match (format_source("fn f( {", 100)) {

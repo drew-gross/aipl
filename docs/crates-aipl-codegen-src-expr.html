@@ -57,7 +57,7 @@
           </h3>
           <pre class="signature"><code>struct LambdaParam</code></pre>
 
-          <div class="doc"><p>One parameter of a lambda. <code>ty</code> is the annotation from <code>|x: i64| ..</code>, absent for the bare <code>|x| ..</code> form.</p></div>
+          <div class="doc"><p>One parameter of a lambda. <code>ty</code> is the annotation from <code>|x: i64| ..</code>, absent for the bare <code>|x| ..</code> form.</p><p><code>pattern</code> is the destructuring a parameter was written as (<code>|Point { x, y }| ..</code>, <code>|(a, b)| ..</code>): the parameter itself is a synthetic one named <code>name</code>, and the names are bound off it at the top of the body when <code>desugar.aipl</code> lowers it. Always <code>none</code> once that has run.</p></div>
 
 
         </section>

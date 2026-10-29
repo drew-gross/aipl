@@ -74,7 +74,12 @@ struct FieldInit { name: str, value: Expr, name_span: Span = 0..0 }
 
 # One parameter of a lambda. `ty` is the annotation from `|x: i64| ..`, absent
 # for the bare `|x| ..` form.
-struct LambdaParam { name: str, ty: Ty?, span: Span }
+#
+# `pattern` is the destructuring a parameter was written as (`|Point { x, y }| ..`,
+# `|(a, b)| ..`): the parameter itself is a synthetic one named `name`, and the
+# names are bound off it at the top of the body when `desugar.aipl` lowers it. Always
+# `none` once that has run.
+struct LambdaParam { name: str, ty: Ty?, span: Span, pattern: Destructure? = none }
 
 # One arm of a `match`, and the `then` half of an `if let`. Its span is the
 # *pattern's*, so a diagnostic points at what selected the arm rather than at

@@ -90,6 +90,8 @@ case_tests! {
     cases_arrays_with_in_place = "cases/arrays/with_in_place",
     cases_bindings_err_bindings = "cases/bindings/err_bindings",
     cases_bindings_err_unknown_type_in_annotation = "cases/bindings/err_unknown_type_in_annotation",
+    cases_bindings_lambda_destructure_params = "cases/bindings/lambda/destructure_params",
+    cases_bindings_lambda_err_tuple_needs_two_names = "cases/bindings/lambda/err_tuple_needs_two_names",
     cases_bindings_let_err_let_else_falls_through = "cases/bindings/let/err_let_else_falls_through",
     cases_bindings_let_err_let_else_irrefutable = "cases/bindings/let/err_let_else_irrefutable",
     cases_bindings_let_let_binding_basic = "cases/bindings/let/let_binding_basic",

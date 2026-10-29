@@ -236,7 +236,10 @@ fn own_names(self: Expr) -> #{str} {
         // A shim's name and bindings all name functions.
         Shim(effect, bindings, _) => #{effect, ..bindings$to_set().union_all()},
         Let(_, ty, _, _) | LetMut(_, ty, _, _) => ty.optional_ty_names(),
-        Lambda(params, _) => params$ty$optional_ty_names().union_all(),
+        Lambda(params, _) => {
+            let taken_apart = params.map(|p| p.pattern$destructure_names().value_or(#{})); #[allow]
+            #{..params$ty$optional_ty_names().union_all(), ..taken_apart.union_all()}
+        },
         Match(_, arms) => arms$pattern$ctor_names().union_all(),
         // `if (let P = e)` is one arm without the `match`; its pattern names a
         // constructor just as an arm's does.

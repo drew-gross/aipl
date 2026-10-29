@@ -804,7 +804,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$69816: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$70206: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1096,6 +1096,20 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn lambda_of(kids: Ast[], span: Span, sp: Span) -&#62; Expr!ParseError</code></pre>
 
           <div class="doc"><p><code>|a, b| body</code> — the parameters are every child but the last, which is the body. Shared with the value-position lambda in <code>atom</code>, which is the same shape with a block for a body.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lambda_param_of">
+          <h3>
+            <a class="anchor" href="#item-lambda_param_of">lambda_param_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lambda_param_of(param: Ast) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p>A function parameter that takes its argument apart, as the lambda parameter that does the same.</p></div>
 
 
         </section>
@@ -1461,7 +1475,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$107943: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$109931: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -2217,7 +2231,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-destructured_param">destructured_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$145200: FieldBinders, span: Span) -&#62; Ast</code></pre>
+          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$147188: FieldBinders, span: Span) -&#62; Ast</code></pre>
 
           <div class="doc"><p>A parameter named <code>name</code>, of the struct <code>struct_name</code>, whose <code>fields</code> are bound to <code>names</code> at the top of the body.</p></div>
 
@@ -2483,7 +2497,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$161372: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$163360: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

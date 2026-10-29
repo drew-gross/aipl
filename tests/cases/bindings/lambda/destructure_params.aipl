@@ -1,0 +1,34 @@
+# A lambda parameter may take its argument apart in place of naming it, with the
+# same patterns a function's parameter or a `let` takes: a struct, a case, a tuple.
+# The names are bound at the top of the body, so they read like any other.
+
+import { collect_arms, map, print, wrapping_add as +, zip_with } from builtins;
+
+struct Point { x: i64, y: i64 }
+
+variant Shape = Dot(Point) | Square(i64)
+
+fn main() !prints {
+    let points = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];
+
+    // A struct, with a rename.
+    print(`{points.map(|Point { x, y as height }| x + height)}`);
+
+    // A tuple, beside a plain name.
+    let pairs = [(1, 10), (2, 20)];
+    print(`{pairs.map(|(a, b)| a + b)}`);
+
+    // A case, from an array narrowed to that one case; and patterns nest.
+    let shapes = [Square(5), Dot(Point { x: 7, y: 8 }), Square(6)];
+    print(`{shapes.collect_arms(Square).map(|Square(side)| side + 1)}`);
+    print(`{shapes.collect_arms(Dot).map(|Dot(Point { x, y })| x + y)}`);
+
+    // Beside a typed parameter, in a two-parameter lambda.
+    print(`{zip_with(points, [10, 20], |Point { x, y }, n: i64| x + y + n)}`);
+}
+--- stdout ---
+[3, 7]
+[11, 22]
+[6, 7]
+[15]
+[13, 27]

@@ -2743,16 +2743,36 @@ fn lambda_params(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
     while (w.more_before("|")) {
-        let n = w.bump();
-        let p = if (n.w.peek_text() == ":") {
-            n.w.lambda_param_ty(n.text)?
-        } else {
-            WDoc { w: n.w, doc: Text(n.text) }
-        };
+        let p = w.lambda_param()?;
         set acc.push(p.doc);
         set w = if (p.w.peek_text() == ",") { p.w.bump().w } else { p.w };
     }
     ok(WDocs { w, docs: acc })
+}
+
+# One lambda parameter: a name, `name: T`, or one that takes its argument apart —
+# `Point { x, y }`, `Wrap(inner)` or `(a, b)`.
+fn lambda_param(self: W) -> WDoc!FmtError {
+    let n = self.bump();
+    if (n.text == "(") {
+        let slots = n.w.pattern_list(")", [])?;
+        let closed = slots.w.expect(")")?.w;
+        return ok(WDoc { w: closed, doc: flat_parens(slots.docs) });
+    };
+    if (n.w.peek_text() == "{") {
+        let ids = n.w.bump().w.field_binder_list();
+        let closed = ids.w.expect("}")?.w;
+        return ok(WDoc { w: closed, doc: Text(`{n.text} \{ {ids.names.join(sep=", ")} }`) });
+    };
+    if (n.w.peek_text() == "(") {
+        let slots = n.w.bump().w.pattern_list(")", [])?;
+        let closed = slots.w.expect(")")?.w;
+        return ok(WDoc { w: closed, doc: Concat([Text(n.text), flat_parens(slots.docs)]) });
+    };
+    if (n.w.peek_text() == ":") {
+        return n.w.lambda_param_ty(n.text);
+    };
+    ok(WDoc { w: n.w, doc: Text(n.text) })
 }
 
 fn lambda_param_ty(self: W, name: str) -> WDoc!FmtError {

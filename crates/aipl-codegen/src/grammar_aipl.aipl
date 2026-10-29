@@ -1256,7 +1256,16 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Then([Lit("||"), Named("block")]),
         Then([Lit("||"), Named("expr")]),
     ]);
-    let lambda_param: Rule<AiplTok> = Then([Term(Name), Maybe(Then([Lit(":"), Named("ty")]))]);
+
+    // `Point { x, y }`, `Wrap(inner)` and `(a, b)` take the argument apart in place
+    // of naming it, as a function parameter does and a tuple `let` does. Ahead of
+    // the plain name, which would take the first token and leave the rest unparsed.
+    let lambda_param: Rule<AiplTok> = OneOf([
+        Then([Term(Name), field_binders()]),
+        Then([Term(Name), case_payload()]),
+        arm_binders(),
+        Then([Term(Name), Maybe(Then([Lit(":"), Named("ty")]))]),
+    ]);
 
     let field_init: Rule<AiplTok> = OneOf([
         Then([Lit(".."), Named("expr")]),
@@ -2116,10 +2125,55 @@ fn lambda_of(kids: Ast[], span: Span, sp: Span) -> Expr!ParseError {
     ok(at(Lambda(kids[..last].try_map(|k| as_lambda_param(k, sp))?, body), span))
 }
 
+# A function parameter that takes its argument apart, as the lambda parameter that
+# does the same.
+fn lambda_param_of(param: Ast) -> Ast!ParseError {
+    let AParam(p) = param else {
+        return err(wrong_kind("a destructured parameter", param, 0..0));
+    };
+    ok(ALambdaParam(LambdaParam {
+        name: p.name,
+        ty: some(p.ty),
+        span: p.name_span,
+        pattern: p.pattern$pattern,
+    }))
+}
+
 fn lower_lambda_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let name_span = node.first_tok(node.tok_span());
-    match (node.own_texts(src)) {
+    let toks = node.own_texts(src);
+    match (toks) {
+        // `Point { x, y }` and `Wrap(inner)` — the same parameter a function would
+        // write, handed over as a lambda's.
+        [struct_name, "{", ..] => lambda_param_of(destructured_param(
+            `__spat${name_span.start}`,
+            struct_name,
+            field_binders_of(toks, 2),
+            name_span,
+        )),
+        [case_name, "(", ..] => lambda_param_of(arm_param(
+            `__cpat${name_span.start}`,
+            case_name,
+            case_pattern(case_name, kid(kids, 0, sp)?, sp)?,
+            name_span,
+        )),
+        // `(a, b)` — a tuple, whose type is whatever the lambda is handed.
+        ["(", ..] => {
+            let names = binder_names(toks);
+            if (names.len() < 2) {
+                return err(ParseError {
+                    message: "a tuple pattern needs at least 2 names, e.g. |(a, b)| expr",
+                    span: sp,
+                });
+            };
+            ok(ALambdaParam(LambdaParam {
+                name: `__tpat${name_span.start}`,
+                ty: none,
+                span: name_span,
+                pattern: some(ByTuple(names)),
+            }))
+        },
         [name, ..] => {
             if (kids.is_empty()) {
                 return ok(ALambdaParam(LambdaParam { name, ty: none, span: name_span }));
@@ -4592,6 +4646,25 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     assert(expr_dump("if (a) { }") == "If(a, (), ())");
     assert(expr_dump("if (a) { 1 } else if (b) { 2 } else { 3 }") == "If(a, 1, If(b, 2, 3))");
     assert(expr_dump("if (let some(v) = o) { v } else { 0 }") == "IfLet(some(v) => v, o, 0)");
+
+    // A lambda parameter takes its argument apart as a function's does: a struct is
+    // a typed parameter read field by field, a tuple is read by slot, a case by a
+    // `match` per name.
+    assert(
+        expr_dump(
+            "xs.map(|P { x, y as b }| b)",
+        ) == "xs.map(Lambda([__spat$8: P], Let(x, __spat$8.x, Let(b, __spat$8.y, b))))",
+    );
+    assert(
+        expr_dump(
+            "xs.map(|(a, b)| a)",
+        ) == "xs.map(Lambda([__tpat$8], Let(a, __tpat$8._0, Let(b, __tpat$8._1, a))))",
+    );
+    assert(
+        expr_dump(
+            "xs.map(|W(c), d: i64| c)",
+        ) == "xs.map(Lambda([__cpat$8: W, d: i64], Let(c, Match(__cpat$8, [W(c) => c]), c)))",
+    );
     assert(expr_dump("if (let some(v) = o) { v }") == "IfLet(some(v) => v, o, ())");
 
     // A block is a right-nested `Seq`, and an `expr;` is what puts one there.

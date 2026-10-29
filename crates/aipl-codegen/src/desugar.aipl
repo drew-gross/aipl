@@ -44,6 +44,8 @@ import {
     ForPattern,
     Ident,
     IfLet,
+    Lambda,
+    LambdaParam,
     Let,
     LetMut,
     LetPattern,
@@ -137,6 +139,20 @@ pub fn desugared(self: Expr) -> Expr {
     match (inner.kind) {
         LetPattern(pattern, value, body) => let_pattern(pattern, value, body),
         ForPattern(pattern, iterable, body, index) => for_pattern(pattern, iterable, body, index),
+        // A lambda's destructured parameters are bound off the parameter itself, in
+        // front of its body, as a function's are.
+        Lambda(params, body) => Expr {
+            ..inner,
+            kind: Lambda(
+                params.map(|p| LambdaParam { ..p, pattern: none }),
+                params.right_fold(
+                    body,
+                    |p: LambdaParam, result: Expr| p.pattern
+                        .map(|pattern| bind_param_pattern(p.name, pattern, p.span, result))
+                        .value_or(result),
+                ),
+            ),
+        },
         _ => inner,
     }
 }.test({
@@ -508,21 +524,26 @@ fn bind_one_param(p: Param, body: Expr) -> Expr {
         pattern: ByTuple([]),
         span: 0..0,
     });
+    bind_param_pattern(p.name, pattern, span, body)
+}
+
+# The bindings `pattern` makes, read off the parameter called `parameter`, in front of
+# `body`. The parameter's own type is what the checker holds the pattern to.
+fn bind_param_pattern(parameter: str, pattern: Destructure, span: Span, body: Expr) -> Expr {
     match (pattern) {
-        ByCase(case_name, names) => bind_arm(case_name, names, p.name, span, body),
+        ByCase(case_name, names) => bind_arm(case_name, names, parameter, span, body),
         ByStruct(_, fields, names, _) => zip_with(
             fields,
             names,
             |field: str, name: str| (field, name),
         ).right_fold(
             body,
-            |read: (str, str), result: Expr| {
-                let (field, name) = read;
-                let value = at(Field(at(Ident(p.name), span), field), span);
+            |(field, name), result: Expr| {
+                let value = at(Field(at(Ident(parameter), span), field), span);
                 at(Let(name, none, value, result), join_spans(span, result.span))
             },
         ),
-        ByPattern(pattern) => bind_pattern(pattern, p.name, span, body),
-        ByTuple(..) => body,
+        ByPattern(pattern) => bind_pattern(pattern, parameter, span, body),
+        ByTuple(names) => bind_fields(names, parameter, span, body, tuple_slot_names(names)),
     }
 }
