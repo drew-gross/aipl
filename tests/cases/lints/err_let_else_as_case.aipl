@@ -8,9 +8,7 @@ variant Shape = Circle(i64) | Rect(i64, i64) | Empty
 
 // A payload the `let` takes apart.
 fn radius(s: Shape) -> i64? {
-    let Circle(r) = s else {
-        return none;
-    };
+    let Circle(r) = s else { return none; };
     some(r * 2)
 }
 
@@ -38,19 +36,19 @@ fn main() !prints {
 }
 --- errors ---
 error: this `else` only gives up with none — write "let Circle(r) = s.as_case(Circle)?;" and drop the block, importing `as_case` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_let_else_as_case.aipl:12:16
+  --> ./tests/cases/lints/err_let_else_as_case.aipl:11:37
    |
-12 |         return none;
-   |                ^^^^
+11 |     let Circle(r) = s else { return none; };
+   |                                     ^^^^
 
 error: this `else` only gives up with none — write "let Rect(w, h) = s.as_case(Rect)?;" and drop the block, importing `as_case` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_let_else_as_case.aipl:22:16
+  --> ./tests/cases/lints/err_let_else_as_case.aipl:20:16
    |
-22 |         return none;
+20 |         return none;
    |                ^^^^
 
 error: this `else` only gives up with none — write "s.as_case(Empty)?;" and drop the block, importing `as_case` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_let_else_as_case.aipl:32:16
+  --> ./tests/cases/lints/err_let_else_as_case.aipl:30:16
    |
-32 |         return none;
+30 |         return none;
    |                ^^^^

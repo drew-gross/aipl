@@ -10,25 +10,19 @@ variant Shape = Dot(Point) | Segment(Point, Point) | Empty
 
 // A struct pattern as the element of an array pattern.
 fn only_x(points: Point[]) -> i64 {
-    let [Point { x, y }] = points else {
-        return -1;
-    };
+    let [Point { x, y }] = points else { return -1; };
     x + y
 }
 
 // In a tuple, beside a name.
 fn offset(pair: (Point, i64)) -> i64 {
-    let (Point { x, y }, n) = pair else {
-        return 0;
-    };
+    let (Point { x, y }, n) = pair else { return 0; };
     x + y + n
 }
 
 // In a case's payload, with a rename.
 fn dot_y(s: Shape) -> i64 {
-    let Dot(Point { x, y as height }) = s else {
-        return 0;
-    };
+    let Dot(Point { x, y as height }) = s else { return 0; };
     x + height
 }
 

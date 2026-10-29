@@ -130,9 +130,7 @@ fn param_hits(self: Param, body: Expr, reads: Read[]) -> LintHit[] {
     if (self.name == "self" || self.mutable || self.arity != One || self.default.is_some() || self.pattern.is_some()) {
         return [];
     };
-    let Named(struct_name) = self.ty else {
-        return [];
-    };
+    let Named(struct_name) = self.ty else { return []; };
     let Uses { mentions, field_reads, shadowed, fields as _ } = body.uses_of(self.name);
     if (!shadowed && field_reads == 0 && mentions == 1) {
         if (let some((value_span, opening)) = body.opening_destructure(self.name, struct_name)) {
@@ -143,9 +141,7 @@ fn param_hits(self: Param, body: Expr, reads: Read[]) -> LintHit[] {
     // There is no right-hand side to discount here the way a `let` has one: a
     // parameter is bound before the body runs, so every read in the function is one
     // the pattern's names would have to live alongside.
-    let some(fields) = body.sole_fields(self.name, reads) else {
-        return [];
-    };
+    let some(fields) = body.sole_fields(self.name, reads) else { return []; };
 
     // The body's span starts at the `{` that opens it, which is a single line that
     // survives the formatter — and the closest line to the signature that a

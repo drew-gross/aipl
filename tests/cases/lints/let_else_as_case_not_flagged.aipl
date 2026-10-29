@@ -8,9 +8,7 @@ variant Shape = Circle(i64) | Rect(i64, i64) | Empty
 
 // The block returns something other than `none`.
 fn radius(s: Shape) -> i64 {
-    let Circle(r) = s else {
-        return 0;
-    };
+    let Circle(r) = s else { return 0; };
     r
 }
 
@@ -25,16 +23,12 @@ fn logged(s: Shape) !prints -> i64? {
 
 // An optional's `some` has no `as_case`, and neither has an array pattern.
 fn double(o: i64?) -> i64? {
-    let some(n) = o else {
-        return none;
-    };
+    let some(n) = o else { return none; };
     some(n + n)
 }
 
 fn second(xs: i64[]) -> i64? {
-    let [_, b, ..] = xs else {
-        return none;
-    };
+    let [_, b, ..] = xs else { return none; };
     some(b)
 }
 

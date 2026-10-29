@@ -1562,6 +1562,20 @@
 
 
 
+        <section class="item" id="item-block_laid_out">
+          <h3>
+            <a class="anchor" href="#item-block_laid_out">block_laid_out</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn block_laid_out(self: W, fit_statements: bool) -&#62; WDoc!FmtError</code></pre>
+
+          <div class="doc"><p><code>block_layout</code>, with <code>fit_statements</code> letting a block of statements stay on one line when it fits: <code>{ return none; }</code>. A second statement, or a comment, puts a line break between entries, which breaks the enclosing group whatever the width.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-block_entries">
           <h3>
             <a class="anchor" href="#item-block_entries">block_entries</a>
@@ -1595,7 +1609,7 @@
             <a class="anchor" href="#item-range_has_stmt">range_has_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$60724: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$61088: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code> or a <code>fn</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 

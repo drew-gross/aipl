@@ -102,12 +102,8 @@ pub fn destructure_slot(Function { sig, body }) -> LintHit[] {
 # opens it, a single line that survives the formatter and the closest one to the
 # signature that a parameter can be blamed on.
 fn param_hits(self: Param, body: Expr, reads: Read[]) -> LintHit[] {
-    let some(ParamPattern { pattern, span as _ }) = self.pattern else {
-        return [];
-    };
-    let ByCase(case_name, names) = pattern else {
-        return [];
-    };
+    let some(ParamPattern { pattern, span as _ }) = self.pattern else { return []; };
+    let ByCase(case_name, names) = pattern else { return []; };
     names
         .slots_read_by_field(body, reads)
         .map(|slot| hit(message(slot, case_pattern(case_name, names, slot)), body.span))
@@ -115,9 +111,7 @@ fn param_hits(self: Param, body: Expr, reads: Read[]) -> LintHit[] {
 
 # The hits in a `let` over a case or a tuple, at its value.
 fn let_hits(self: Expr, reads: Read[]) -> LintHit[] {
-    let LetPattern(pattern, value, body) = self.kind else {
-        return [];
-    };
+    let LetPattern(pattern, value, body) = self.kind else { return []; };
     match (pattern) {
         ByCase(case_name, names) => names
             .slots_read_by_field(body, reads)

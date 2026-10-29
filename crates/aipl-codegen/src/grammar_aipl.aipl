@@ -2129,9 +2129,7 @@ fn lambda_of(kids: Ast[], span: Span, sp: Span) -> Expr!ParseError {
 # A function parameter that takes its argument apart, as the lambda parameter that
 # does the same.
 fn lambda_param_of(param: Ast) -> Ast!ParseError {
-    let AParam(p) = param else {
-        return err(wrong_kind("a destructured parameter", param, 0..0));
-    };
+    let AParam(p) = param else { return err(wrong_kind("a destructured parameter", param, 0..0)); };
     ok(ALambdaParam(LambdaParam {
         name: p.name,
         ty: some(p.ty),

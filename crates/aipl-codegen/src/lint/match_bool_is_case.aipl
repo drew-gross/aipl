@@ -120,9 +120,7 @@ fn match_hit(self: Match(scrutinee, arms), method: str?) -> LintHit[] {
     )) else {
         return [];
     };
-    let Ctor(case, _, _) = pattern else {
-        return [];
-    };
+    let Ctor(case, _, _) = pattern else { return []; };
     if (case.is_binder_name() || ["some", "none", "ok", "err"].contains(case)) {
         return [];
     };

@@ -47,12 +47,8 @@ fn message(receiver: str, end: str) -> str {
 
 # The hit for one slice, or none.
 fn from_zero_hit(self: Slice(receiver, start, end)) -> LintHit[] {
-    let some(lower) = start else {
-        return [];
-    };
-    let some(bound) = end else {
-        return [];
-    };
+    let some(lower) = start else { return []; };
+    let some(bound) = end else { return []; };
     if (lower.is_zero() && !bound.is_len_of(receiver)) {
         [hit(message(receiver.source, bound.source), lower.span)]
     } else {

@@ -33,13 +33,9 @@ pub fn fn_body_type_stutter(Function { name as function, shorthand_body, sig, bo
 
     // The name the return type offers the literal: a generic return contributes its
     // base, since `Pair<i64>` is built as `Pair { .. }`.
-    let some(ret) = sig.return_ty.literal_name() else {
-        return [];
-    };
+    let some(ret) = sig.return_ty.literal_name() else { return []; };
     let Expr { kind, span, value_span as _, name_span as _ } = body;
-    let Construct(name, inits) = kind else {
-        return [];
-    };
+    let Construct(name, inits) = kind else { return []; };
 
     // A construct the parser synthesized from other syntax (a range is
     // `__builtin_Span { .. }`) is not a literal anyone wrote, and its name can't be
@@ -108,9 +104,7 @@ fn literal_name(self: Ty?) -> str? {
 # replacement isn't obvious: `{ x }` reads back as a block whose value is `x`, so the
 # trailing comma is load-bearing and the message spells it out.
 fn lone_shorthand(self: FieldInit[]) -> str? {
-    let [FieldInit { name, value, name_span as _ }] = self else {
-        return none;
-    };
+    let [FieldInit { name, value, name_span as _ }] = self else { return none; };
     if (value.kind == Ident(name)) {
         return some(name);
     };

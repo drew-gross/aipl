@@ -1496,7 +1496,12 @@ fn block(self: W) -> WDoc!FmtError {
 # one statement per line otherwise. *Not* wrapped in a group, so a caller can
 # place several blocks under one shared group (an `if`/`else` breaks both
 # branches together) — `block` is the grouped form.
-fn block_layout(self: W) -> WDoc!FmtError {
+fn block_layout(self: W) -> WDoc!FmtError { self.block_laid_out(false) }
+
+# `block_layout`, with `fit_statements` letting a block of statements stay on one
+# line when it fits: `{ return none; }`. A second statement, or a comment, puts a
+# line break between entries, which breaks the enclosing group whatever the width.
+fn block_laid_out(self: W, fit_statements: bool) -> WDoc!FmtError {
     let opened = self.expect("{")?.w;
     let body_start = opened.pos;
     let WEntries { w, entries } = opened.block_entries([], opened.last_end)?;
@@ -1510,7 +1515,7 @@ fn block_layout(self: W) -> WDoc!FmtError {
     if (entries.is_empty()) {
         return ok(WDoc { w: closed, doc: Text("{}") });
     };
-    let edge = if (has_stmt) { HardLine } else { Line };
+    let edge = if (has_stmt && !fit_statements) { HardLine } else { Line };
     ok(WDoc {
         w: closed,
         doc: Concat([Text("{"), Indent(Concat([edge, ..entries])), edge, Text("}")]),
@@ -1666,26 +1671,38 @@ fn let_tail(self: W, head: Doc) -> WDoc!FmtError {
         let done = v.w.expect(";")?.w;
         return ok(WDoc { w: done, doc: Concat([head, v.doc, Text(";")]) });
     };
-    let handler = v.w.bump().w.block_layout()?;
+    let handler = v.w.bump().w.block_laid_out(true)?;
     let done = handler.w.expect(";")?.w;
-    ok(WDoc { w: done, doc: Concat([head, v.doc, Text(" else "), handler.doc, Text(";")]) })
+    ok(WDoc { w: done, doc: group(Concat([head, v.doc, Text(" else "), handler.doc, Text(";")])) })
 }.test({
-    // A pattern that can fail takes an `else` block, one statement per line.
+    // A pattern that can fail takes an `else` block, which stays on the line when
+    // it fits and a lone statement is all it holds.
     assert(
         walker_of("let  some ( v )  =  o  else  {  return  none ;  } ;")?
             .let_stmt()
-            .rendered(100)? == "let some(v) = o else {\n    return none;\n};\n",
+            .rendered(100)? == "let some(v) = o else { return none; };",
     );
     // A pattern the plain forms cannot lay out goes through `pattern`.
     assert(
         walker_of("let  [ a , .. ]  =  xs  else  {  return  0 ;  } ;")?
             .let_stmt()
-            .rendered(100)? == "let [a, ..] = xs else {\n    return 0;\n};\n",
+            .rendered(100)? == "let [a, ..] = xs else { return 0; };",
     );
     assert(
         walker_of("let ( some ( a ) , b )  =  t  else  {  return  0 ;  } ;")?
             .let_stmt()
-            .rendered(100)? == "let (some(a), b) = t else {\n    return 0;\n};\n",
+            .rendered(100)? == "let (some(a), b) = t else { return 0; };",
+    );
+    // Two statements, or a line too long, break the block one statement per line.
+    assert(
+        walker_of("let some ( v ) = o else { print ( 1 ) ; return none ; } ;")?
+            .let_stmt()
+            .rendered(100)? == "let some(v) = o else {\n    print(1);\n    return none;\n};\n",
+    );
+    assert(
+        walker_of("let some ( v ) = o else { return none ; } ;")?
+            .let_stmt()
+            .rendered(20)? == "let some(v) = o else {\n    return none;\n};\n",
     );
     // Without an `else` the statement is the plain one.
     assert(walker_of("let  some ( v )  =  o ;")?.let_stmt().rendered(100)? == "let some(v) = o;");

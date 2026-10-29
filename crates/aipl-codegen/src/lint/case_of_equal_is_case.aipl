@@ -69,9 +69,7 @@ fn comparison_hit(
     self: Expr { kind, span, value_span as _, name_span as _ },
     method: str?,
 ) -> LintHit[] {
-    let Call("==", operands, _) = kind else {
-        return [];
-    };
+    let Call("==", operands, _) = kind else { return []; };
     if (operands.count_if(|operand| match (operand.kind) {
         Call("case_of", arguments, _) => arguments.len() == 1,
         _ => false,
