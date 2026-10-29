@@ -1,0 +1,25 @@
+# The marker squelches it, on the `true` arm. The rewrite the lint advises sits
+# beside it, so both spellings run and are proven to agree.
+
+import { is_case, print } from builtins;
+
+variant Shape = Circle(i64) | Square(i64) | Dot
+
+fn squelched(shape: Shape) -> bool {
+    match (shape) {
+        Circle(..) => true, #[allow]
+        _ => false,
+    }
+}
+
+fn rewritten(shape: Shape) -> bool { shape.is_case(Circle) }
+
+fn main() !prints {
+    for (let shape : [Circle(1), Square(2), Dot]) {
+        print(`{squelched(shape)} {rewritten(shape)}`);
+    }
+}
+--- stdout ---
+true true
+false false
+false false

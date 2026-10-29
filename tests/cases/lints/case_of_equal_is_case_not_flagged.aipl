@@ -1,0 +1,18 @@
+# Comparisons that involve `case_of()` and are not asking whether a value is a
+# case, each with the reason it is left alone.
+
+import { case_of, equal as ==, print } from builtins;
+
+variant Shape = Circle(i64) | Square(i64) | Dot
+
+// Two values' cases against each other is `same_case`, which `is_case` cannot say.
+fn same_kind(a: Shape, b: Shape) -> bool { a.case_of() == b.case_of() }
+
+// Cases held in variables compare without a `case_of()` call at all.
+fn same_held(a: Case<Shape>, b: Case<Shape>) -> bool { a == b }
+
+fn main() !prints {
+    print(`{same_kind(Circle(1), Circle(2))} {same_held(Circle, Dot)}`);
+}
+--- stdout ---
+true false

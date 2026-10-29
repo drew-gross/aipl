@@ -1,0 +1,43 @@
+# Matches that look like the shape and are not, each with the reason it is left alone.
+
+import { greater_than as >, print } from builtins;
+
+variant Shape = Circle(i64) | Square(i64) | Dot
+
+// Two cases answer `true`: `is_case` asks about one.
+fn round_or_square(shape: Shape) -> bool {
+    match (shape) {
+        Circle(..) | Square(..) => true,
+        Dot => false,
+    }
+}
+
+// The case answering `true` is the catch-all: the question is "is it not a Dot".
+fn not_dot(shape: Shape) -> bool {
+    match (shape) {
+        Dot => false,
+        _ => true,
+    }
+}
+
+// An arm that is not a literal does work of its own.
+fn is_big(shape: Shape) -> bool {
+    match (shape) {
+        Circle(r) => r > 10,
+        _ => false,
+    }
+}
+
+// An optional is not a variant case, and has `is_some`.
+fn has(value: i64?) -> bool {
+    match (value) {
+        some(..) => true,
+        none => false,
+    }
+}
+
+fn main() !prints {
+    print(`{round_or_square(Dot)} {not_dot(Dot)} {is_big(Circle(11))} {has(some(1))}`);
+}
+--- stdout ---
+false false true true

@@ -61,7 +61,7 @@ fn combined(a: Solid, b: Round) -> i64 {
 // A wildcard stands for what is left once the excluded case is gone.
 fn is_circle(s: Solid) -> bool {
     match (s) {
-        Circle(..) => true,
+        Circle(..) => true, #[allow]
         Square(..) => false,
     }
 }

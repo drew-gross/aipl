@@ -102,6 +102,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  duplicate_import_source lint looks like it could use a source->count index maybe? Could enable better fixits.
   function_hits in body type stutter can only ever return one, make it LintHint? instead of LintHint[]
   is_shorthand should disappear into is_case (with lint)
   retructure how the lints manage names. There should be shared infrastructure for managing names (i.e. if a builtin is being requested, and is already imported, request the already-imported name. If that name is taken, suggest something else. If a function being checked for is imported with an atypical name, the lint should fire anyway)
@@ -824,6 +825,7 @@ expression matcher:
   use it for operation fusion
 
 vscode:
+  PBlock on body in lower_function gives Message: the compiler's name resolution does not cover `PBlock` here (imports, parameters, patterns and types are not tracked yet)
   refresh on code edit (with watcher? check for edits when command received? possily go-to-* should block rather than error while parsing? Maybe need partial update?)
   go to definition and go to references should work for local variables
   make go-to-references deprioritize references in test (separate heading, needs vscode support)

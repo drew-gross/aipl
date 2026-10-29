@@ -68,6 +68,7 @@ import {
     first,
     greater_than as >,
     int_parse,
+    is_case,
     is_empty,
     is_nonempty,
     is_some,
@@ -4072,7 +4073,7 @@ fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         is_pub,
         sig: Signature { type_vars, params, effects, return_ty },
         body: resolved,
-        shorthand_body: body.is_shorthand(),
+        shorthand_body: body.is_case(PConstruct),
         test_body,
         test_fns,
         performance,
@@ -4080,15 +4081,6 @@ fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         // declaration, which `item` holds; this never sees them.
         doc: none,
     }))
-}
-
-# Whether the body was written as the `{ field: value }` shorthand, which resolves
-# to the same literal as the long form.
-fn is_shorthand(self: ParsedBody) -> bool {
-    match (self) {
-        PConstruct(..) => true,
-        PBlock(..) => false,
-    }
 }
 
 // ---------- entry points ----------

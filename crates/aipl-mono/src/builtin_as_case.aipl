@@ -15,7 +15,7 @@
 # The shorthand for `match (x) { Circle(..) => some(x), _ => none }`, which the
 # `match_case_as_case` lint asks for.
 
-import { case_of, equal as ==, not_equal as != } from builtins;
+import { equal as ==, is_case, not_equal as != } from builtins;
 
 # What the tests convert.
 variant Shape = Circle(i64) | Square(i64) | Dot
@@ -26,7 +26,7 @@ variant Shape = Circle(i64) | Square(i64) | Dot
 # See `collect_arms` for keeping the elements of an array that are one case, and
 # `case_of` for reading which case a single value is.
 pub fn as_case<T: variant>(self: T, arm: Case<T>) -> T? {
-    if (self.case_of() == arm) { some(self) } else { none }
+    if (self.is_case(arm)) { some(self) } else { none }
 }.test({
     assert(Circle(1).as_case(Circle) == some(Circle(1)));
     assert(Square(2).as_case(Circle) == none);

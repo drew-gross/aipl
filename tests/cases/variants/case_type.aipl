@@ -8,11 +8,9 @@
 # constructor function otherwise (`ctor_as_fn_value.aipl`). The expected type is
 # what tells the two apart, which is why `kinds` below still maps constructors.
 
-import { case_name, case_of, equal as ==, is_some_and, len, map, print } from builtins;
+import { case_name, equal as ==, is_case, is_some_and, len, map, print } from builtins;
 
 variant Tok = Str(str) | Num(i64) | End
-
-fn is_kind(t: Tok, k: Case<Tok>) -> bool { t.case_of() == k }
 
 fn describe(k: Case<Tok>) -> str { k.case_name() }
 
@@ -22,8 +20,8 @@ fn main() !prints {
 
     // Comparing a value against a case reads the tag and nothing else, so the
     // payload never has to be produced or matched.
-    print(`{is_kind(Str("hello"), Str)} {is_kind(Str("hello"), Num)}`);
-    print(`{is_kind(End, End)} {is_kind(Num(7), Num)}`);
+    print(`{Str("hello").is_case(Str)} {Str("hello").is_case(Num)}`);
+    print(`{End.is_case(End)} {Num(7).is_case(Num)}`);
 
     // Cases compare with each other. The annotation is what asks for one: with
     // no expected type a bare `Str` is still the constructor function, so this
@@ -34,7 +32,7 @@ fn main() !prints {
     // The other reading is untouched: here `Str` is still the constructor
     // function, because a `(str) -> Tok` is what `map` wants.
     let built = ["a", "b"].map(Str);
-    print(`{built.len()} {built[0].is_some_and(|t| is_kind(t, Str))}`);
+    print(`{built.len()} {built[0].is_some_and(|t| t.is_case(Str))}`);
 }
 --- stdout ---
 Str Num End

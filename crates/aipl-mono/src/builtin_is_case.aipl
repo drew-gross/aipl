@@ -1,0 +1,32 @@
+# The AIPL implementation of the `is_case` builtin. The loader names this
+# function by the canonical name `__builtin_is_case` (see
+# `aipl_syntax::aipl_builtins`), so a user's `shape.is_case(Circle)` resolves
+# through the ordinary generic machinery — the in-file name `is_case` is only for
+# this file's own tests, which read exactly like user code.
+#
+# The shorthand for `match (shape) { Circle(..) => true, _ => false }`, which the
+# `match_bool_is_case` lint asks for.
+
+import { case_of, equal as ==, logical_not as ! } from builtins;
+
+# What the tests ask about.
+variant Shape = Circle(i64) | Square(i64) | Dot
+
+# Whether `self` is the case `arm`, whatever its payload. `arm` is a constructor
+# name, payload-carrying or not: `shape.is_case(Circle)`.
+#
+# See `as_case` for the value itself when it is that case, and `case_of` for
+# reading which case a single value is.
+pub fn is_case<T: variant>(self: T, arm: Case<T>) -> bool {
+    // The comparison `case_of_equal_is_case` advises against is what `is_case` is.
+    self.case_of() == arm #[allow]
+}.test({
+    assert(Circle(1).is_case(Circle));
+    assert(!Square(2).is_case(Circle));
+    assert(Dot.is_case(Dot));
+    assert(!Dot.is_case(Circle));
+    // The function-call form is the same call.
+    assert(is_case(Square(2), Square));
+    // The payload decides nothing: only which case it is.
+    assert(Circle(1).is_case(Circle) == Circle(2).is_case(Circle));
+})

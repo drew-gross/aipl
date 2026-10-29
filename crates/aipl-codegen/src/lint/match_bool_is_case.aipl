@@ -1,0 +1,147 @@
+# The `match_bool_is_case` lint:
+#
+#     match (shape) {
+#         Circle(..) => true,
+#         Square(..) => false,
+#     }
+#
+# — a variant value turned into whether it is one case. That is
+# `shape.is_case(Circle)`, which says so without the other arms and stays right
+# when the variant gains a case.
+#
+# The shape is exact: every arm's body is a `true` or `false` literal, exactly one
+# of them is `true`, and its pattern is a variant case's constructor. `some`,
+# `none`, `ok` and `err` are optionals and results rather than cases of a variant
+# the program declares, and a bare lowercase name binds rather than naming a case,
+# so neither is advised. A second `true` arm (`A | B => true`) is two cases, which
+# `is_case` does not ask about.
+#
+# The hit points at the `true` arm, a short line the formatter keeps in place.
+
+import {
+    all,
+    collect_arms,
+    contains,
+    equal as ==,
+    filter,
+    is_case,
+    is_some,
+    join,
+    logical_not as !,
+    logical_or as ||,
+    value_or,
+} from builtins;
+import { Bool, Expr, Match, MatchArm, descendants } from "../expr.aipl";
+import { Fn, Function, Program } from "../item.aipl";
+import { Ctor, is_binder_name } from "../pat.aipl";
+import { LintHit, hit, imported_as, lint_messages } from "./lint_hit.aipl";
+
+# A hit for each `match` in the program that only asks which case a value is.
+pub fn match_bool_is_case(Program { items }) -> LintHit[] {
+    let method = items.imported_as("is_case");
+    items.collect_arms(Fn)$function_hits(method).join()
+}.test({
+    // One case is `true`, the rest `false`.
+    assert(lint_messages(
+        "fn f(s: Shape) -> bool { match (s) { Circle(..) => true, Square(..) => false } }",
+        match_bool_is_case,
+    )? == [message("Circle", none)]);
+
+    // A catch-all `false` does as well, and the payload may be bound.
+    assert(lint_messages(
+        "fn f(s: Shape) -> bool { match (s) { Circle(r) => true, _ => false } }",
+        match_bool_is_case,
+    )? == [message("Circle", none)]);
+
+    // A nullary case.
+    assert(lint_messages(
+        "fn f(s: Shape) -> bool { match (s) { Dot => true, _ => false } }",
+        match_bool_is_case,
+    )? == [message("Dot", none)]);
+
+    // The name the file imports it under is the advice's.
+    assert(lint_messages(
+        "import { is_case as isa } from builtins;\nfn f(s: Shape) -> bool { match (s) { Dot => true, _ => false } }",
+        match_bool_is_case,
+    )? == [message("Dot", some("isa"))]);
+
+    // A `.test` block is held to it too.
+    assert(lint_messages(
+        "fn f() { }.test({ assert(match (s) { Dot => true, _ => false }); })",
+        match_bool_is_case,
+    )? == [message("Dot", none)]);
+
+    // Two cases answering `true`, an arm that is not a bool, `false` for the case
+    // named (the opposite question), an optional and a result are left alone.
+    assert(
+        lint_messages(
+            "fn f(s: Shape) -> bool { match (s) { A | B => true, _ => false } }",
+            match_bool_is_case,
+        )? == [],
+    );
+    assert(
+        lint_messages(
+            "fn f(s: Shape) -> bool { match (s) { A(..) => true, B(r) => r, _ => false } }",
+            match_bool_is_case,
+        )? == [],
+    );
+    assert(
+        lint_messages(
+            "fn f(s: Shape) -> bool { match (s) { A(..) => false, _ => true } }",
+            match_bool_is_case,
+        )? == [],
+    );
+    assert(
+        lint_messages(
+            "fn f(s: i64?) -> bool { match (s) { some(..) => true, none => false } }",
+            match_bool_is_case,
+        )? == [],
+    );
+    assert(
+        lint_messages(
+            "fn f(s: i64!str) -> bool { match (s) { ok(..) => true, err(..) => false } }",
+            match_bool_is_case,
+        )? == [],
+    );
+    assert(
+        lint_messages(
+            "fn f(n: i64) -> bool { match (n) { other => true, _ => false } }",
+            match_bool_is_case,
+        )? == [],
+    );
+})
+
+# The hits in a function's body and in its `.test` block.
+fn function_hits(self: Fn(Function { body, test_body }), method: str?) -> LintHit[] {
+    [..body.body_hits(method), ..test_body$body_hits(method).value_or([])]
+}
+
+fn body_hits(self: Expr, method: str?) -> LintHit[] {
+    self.descendants()$kind.collect_arms(Match)$match_hit(method).join()
+}
+
+# The hit for one `match`, or none.
+fn match_hit(self: Match(scrutinee, arms), method: str?) -> LintHit[] {
+    if (!arms.all(|arm| arm.body.kind.is_case(Bool))) {
+        return [];
+    };
+    let [MatchArm { pattern, span, body as _ }] = arms.filter(|arm| arm.body.kind == Bool(
+        true,
+    )) else {
+        return [];
+    };
+    let Ctor(case, _, _) = pattern else {
+        return [];
+    };
+    if (case.is_binder_name() || ["some", "none", "ok", "err"].contains(case)) {
+        return [];
+    };
+    [hit(message(case, method), span)]
+}
+
+# What is said of a match that only asks whether a value is `case`.
+fn message(case: str, method: str?) -> str {
+    let name = method.value_or("is_case");
+    let hint = if (method.is_some()) { "" } else { ", importing `is_case` from builtins" };
+    `this match only asks whether the value is {case} — write "<value>.{name}({case})" and drop the match{hint}`
+}

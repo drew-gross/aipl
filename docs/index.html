@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">157 files, 1611 items.</p>
+      <p class="summary">160 files, 1628 items.</p>
 
       <ul class="files">
 
@@ -879,7 +879,7 @@
           <p class="file-summary">AIPL's own syntax, as a <code>Grammar</code> value — the third and largest consumer of the parser library, and the one the whole thing was built for. It is the only description of the language there is: every compile runs this grammar over <code>lex_aipl.aipl</code>'s token stream, the compiler's own sources included.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">198 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">197 private</a></span>
 
 
           <ul class="items">
@@ -1726,12 +1726,32 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-case_of_equal_is_case.html">crates/aipl-codegen/src/lint/case_of_equal_is_case.aipl</a>
+
+          <p class="file-summary">The <code>case_of_equal_is_case</code> lint: <code>shape.case_of() == Circle</code> — reading which case a value is only to compare it with one. That is <code>shape.is_case(Circle)</code>, which asks the same question without the detour through a <code>Case</code>.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-case_of_equal_is_case.html#private">5 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-case_of_equal_is_case.html#item-case_of_equal_is_case"><code>case_of_equal_is_case</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-codegen-src-lint-destructure_binding.html">crates/aipl-codegen/src/lint/destructure_binding.aipl</a>
 
           <p class="file-summary">The <code>destructure_binding</code> lint: <code>let p = value; ... p.a ... p.b ...</code> where <strong>every</strong> mention of <code>p</code> is a field read. Say so with a pattern instead: <code>let T { a, b } = value;</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_binding.html#private">5 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_binding.html#private">4 private</a></span>
 
 
           <ul class="items">
@@ -1904,6 +1924,8 @@
           <p class="file-summary">What a lint reports: the message, and the span the caret goes under. The Rust side rebuilds each as an <code>aipl_syntax::Error</code> and runs it through the same <code>#[allow]</code> squelching as the lints still written in Rust.</p>
 
 
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-lint_hit.html#private">2 private</a></span>
+
 
           <ul class="items">
 
@@ -1924,6 +1946,31 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-lint_messages"><code>lint_messages</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-imported_as"><code>imported_as</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-match_bool_is_case.html">crates/aipl-codegen/src/lint/match_bool_is_case.aipl</a>
+
+          <p class="file-summary">The <code>match_bool_is_case</code> lint:</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-match_bool_is_case.html#private">4 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-match_bool_is_case.html#item-match_bool_is_case"><code>match_bool_is_case</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -3482,6 +3529,29 @@
 
             <li>
               <a href="crates-aipl-mono-src-builtin_is_all_whitespace.html#item-is_all_whitespace"><code>is_all_whitespace</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_is_case.html">crates/aipl-mono/src/builtin_is_case.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>is_case</code> builtin. The loader names this function by the canonical name <code>__builtin_is_case</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>shape.is_case(Circle)</code> resolves through the ordinary generic machinery — the in-file name <code>is_case</code> is only for this file's own tests, which read exactly like user code.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_is_case.html#item-Shape"><code>Shape</code></a>
+              <span class="kind kind-variant">variant</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_is_case.html#item-is_case"><code>is_case</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

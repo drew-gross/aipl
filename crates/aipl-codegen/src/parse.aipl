@@ -53,6 +53,7 @@ import {
     find_if,
     find_index,
     first,
+    is_case,
     is_empty,
     is_nonempty,
     is_some,
@@ -488,7 +489,7 @@ fn matched_text<K: variant>(toks: Token<K>[]) -> str {
 # payload, so naming a kind needs no value of that kind.
 fn match_term<K: variant, A: any>(p: Parser<K, A>, k: Case<K>, pos: u64, far: Far) -> Step {
     match (p.toks[pos]) {
-        some(t) => if (t.kind.case_of() == k) {
+        some(t) => if (t.kind.is_case(k)) {
             Step { hit: true, pos: pos + 1, kids: leaf_at(p, pos), far }
         } else {
             miss(far, pos, k.case_name())

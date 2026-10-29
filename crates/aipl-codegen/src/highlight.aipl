@@ -553,7 +553,7 @@ fn run_len(items: Item[]) -> u64 {
 # a new matcher shape has to answer this before it compiles.
 fn self_referential(m: Matcher) -> bool {
     match (m) {
-        Nested(..) => true,
+        Nested(..) => true, #[allow]
         CharRun(..)
         | OneChar(..)
         | Exact(..)

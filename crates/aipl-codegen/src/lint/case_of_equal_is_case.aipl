@@ -1,0 +1,96 @@
+# The `case_of_equal_is_case` lint: `shape.case_of() == Circle` — reading which
+# case a value is only to compare it with one. That is `shape.is_case(Circle)`,
+# which asks the same question without the detour through a `Case`.
+#
+# Exactly one side is a `case_of()` call. Two of them, `a.case_of() == b.case_of()`,
+# compare the cases of two values, which is `same_case(a, b)` and not `is_case`.
+#
+# The hit points at the `==`, a short line the formatter keeps in place.
+
+import { collect_arms, count_if, equal as ==, is_some, join, len, value_or } from builtins;
+import { Call, Expr, descendants } from "../expr.aipl";
+import { Fn, Function, Program } from "../item.aipl";
+import { LintHit, hit, imported_as, lint_messages } from "./lint_hit.aipl";
+
+# A hit for each comparison of a value's case with something.
+pub fn case_of_equal_is_case(Program { items }) -> LintHit[] {
+    let method = items.imported_as("is_case");
+    items.collect_arms(Fn)$function_hits(method).join()
+}.test({
+    assert(lint_messages(
+        "fn f(s: Shape) -> bool { s.case_of() == Circle }",
+        case_of_equal_is_case,
+    )? == [message(none)]);
+
+    // The call form, the case on the left, and the `.test` block.
+    assert(lint_messages(
+        "fn f(s: Shape) -> bool { case_of(s) == Circle }",
+        case_of_equal_is_case,
+    )? == [message(none)]);
+    assert(lint_messages(
+        "fn f(s: Shape) -> bool { Circle == s.case_of() }",
+        case_of_equal_is_case,
+    )? == [message(none)]);
+    assert(lint_messages(
+        "fn f() { }.test({ assert(s.case_of() == Dot); })",
+        case_of_equal_is_case,
+    )? == [message(none)]);
+
+    // The name the file imports it under is the advice's.
+    assert(lint_messages(
+        "import { is_case as isa } from builtins;\nfn f(s: Shape) -> bool { s.case_of() == Dot }",
+        case_of_equal_is_case,
+    )? == [message(some("isa"))]);
+
+    // Two `case_of`s compare two values' cases, which `is_case` cannot say.
+    assert(
+        lint_messages(
+            "fn f(a: Shape, b: Shape) -> bool { a.case_of() == b.case_of() }",
+            case_of_equal_is_case,
+        )? == [],
+    );
+
+    // Neither side reads a case, or the comparison is another one.
+    assert(lint_messages("fn f(a: i64, b: i64) -> bool { a == b }", case_of_equal_is_case)? == []);
+    assert(
+        lint_messages(
+            "fn f(s: Shape) -> bool { s.case_of() != Circle }",
+            case_of_equal_is_case,
+        )? == [],
+    );
+})
+
+# The hits in a function's body and in its `.test` block.
+fn function_hits(self: Fn(Function { body, test_body }), method: str?) -> LintHit[] {
+    [..body.body_hits(method), ..test_body$body_hits(method).value_or([])]
+}
+
+fn body_hits(self: Expr, method: str?) -> LintHit[] {
+    self.descendants()$comparison_hit(method).join()
+}
+
+# The hit for one expression, or none: it is `==` with a `case_of()` on one side.
+fn comparison_hit(
+    self: Expr { kind, span, value_span as _, name_span as _ },
+    method: str?,
+) -> LintHit[] {
+    let Call("==", operands, _) = kind else {
+        return [];
+    };
+    if (operands.count_if(is_case_of) == 1) { [hit(message(method), span)] } else { [] }
+}
+
+# Whether an expression is a call of `case_of` on one value.
+fn is_case_of(self: Expr) -> bool {
+    match (self.kind) {
+        Call("case_of", arguments, _) => arguments.len() == 1,
+        _ => false,
+    }
+}
+
+# What is said of a comparison that only asks which case a value is.
+fn message(method: str?) -> str {
+    let name = method.value_or("is_case");
+    let hint = if (method.is_some()) { "" } else { ", importing `is_case` from builtins" };
+    `this compares a value's case — write "<value>.{name}(<case>)" instead of reading it with "case_of()"{hint}`
+}

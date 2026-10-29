@@ -77,8 +77,56 @@
         </section>
 
 
+
+        <section class="item" id="item-imported_as">
+          <h3>
+            <a class="anchor" href="#item-imported_as">imported_as</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn imported_as(self: Item[], name: str) -&#62; str?</code></pre>
+
+          <div class="doc"><p>The name a file's <code>items</code> import builtin <code>name</code> under, if it does: the spelling a lint's advice should use. <code>none</code> when the file does not import it, which is when the advice has to say so.</p></div>
+
+
+        </section>
+
+
       </section>
 
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-builtin_locals">
+          <h3>
+            <a class="anchor" href="#item-builtin_locals">builtin_locals</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn builtin_locals(self: Import, name: str) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>What an import brings under <code>name</code>, when it is from builtins.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-local">
+          <h3>
+            <a class="anchor" href="#item-local">local</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn local(self: ImportName) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+      </section>
 
 
     </main>

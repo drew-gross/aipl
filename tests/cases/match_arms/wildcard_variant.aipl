@@ -24,7 +24,7 @@ fn size(s: Shape) -> i64 {
 
 fn is_point(s: Shape) -> bool {
     match (s) {
-        Point => true,
+        Point => true, #[allow]
         _ => false,
     }
 }

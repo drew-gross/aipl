@@ -52,6 +52,7 @@ import {
     collect_arms,
     contains,
     equal as ==,
+    is_case,
     join,
     logical_or as ||,
     not_equal as !=,
@@ -210,7 +211,7 @@ fn binding_hit(self: Let(name, annotation, value, body), reads: Read[]) -> LintH
     // Taking apart a value built on the same line is not an improvement: the
     // pattern restates the type name that literal just wrote and re-lists the
     // fields it just set.
-    if (value.is_construct()) {
+    if (value.kind.is_case(Construct)) {
         return [];
     };
     // The struct is named only where the source already names it — an annotation.
@@ -224,11 +225,4 @@ fn binding_hit(self: Let(name, annotation, value, body), reads: Read[]) -> LintH
 # What is said of the binding `name`, whose `fields` are the ones read.
 fn message(name: str, fields: str, ty: str) -> str {
     `only the fields of "{name}" are read — destructure the binding instead: "let {ty} \{ {fields} } = ..."`
-}
-
-fn is_construct(self: Expr) -> bool {
-    match (self.kind) {
-        Construct(..) => true,
-        _ => false,
-    }
 }

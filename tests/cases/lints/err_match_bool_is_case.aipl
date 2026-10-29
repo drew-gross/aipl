@@ -1,0 +1,48 @@
+# A `match` whose arms are all `true` or `false`, with exactly one `true` and that
+# arm a variant case: the whole thing asks which case the value is, which
+# `is_case` says directly.
+
+variant Shape = Circle(i64) | Square(i64) | Dot
+
+// The other cases spelled out.
+fn is_circle(shape: Shape) -> bool {
+    match (shape) {
+        Circle(..) => true,
+        Square(..) => false,
+        Dot => false,
+    }
+}
+
+// A catch-all `false`, with the payload bound and ignored.
+fn is_square(shape: Shape) -> bool {
+    match (shape) {
+        Square(side) => true,
+        _ => false,
+    }
+}
+
+// A nullary case, and the `false` arm first.
+fn is_dot(shape: Shape) -> bool {
+    match (shape) {
+        Circle(..) | Square(..) => false,
+        Dot => true,
+    }
+}
+--- errors ---
+error: this match only asks whether the value is Circle — write "<value>.is_case(Circle)" and drop the match, importing `is_case` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_bool_is_case.aipl:10:9
+   |
+10 |         Circle(..) => true,
+   |         ^^^^^^^^^^
+
+error: this match only asks whether the value is Square — write "<value>.is_case(Square)" and drop the match, importing `is_case` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_bool_is_case.aipl:19:9
+   |
+19 |         Square(side) => true,
+   |         ^^^^^^^^^^^^
+
+error: this match only asks whether the value is Dot — write "<value>.is_case(Dot)" and drop the match, importing `is_case` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_bool_is_case.aipl:28:9
+   |
+28 |         Dot => true,
+   |         ^^^

@@ -1,0 +1,23 @@
+# Reading which case a value is, only to compare it with one: `is_case` asks the
+# same question without the `case_of()` call.
+
+import { case_of, equal as == } from builtins;
+
+variant Shape = Circle(i64) | Square(i64) | Dot
+
+fn is_circle(shape: Shape) -> bool { shape.case_of() == Circle }
+
+// The case on the left, and the call form.
+fn is_dot(shape: Shape) -> bool { Dot == case_of(shape) }
+--- errors ---
+error: this compares a value's case — write "<value>.is_case(<case>)" instead of reading it with "case_of()", importing `is_case` from builtins (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_case_of_equal_is_case.aipl:8:38
+  |
+8 | fn is_circle(shape: Shape) -> bool { shape.case_of() == Circle }
+  |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: this compares a value's case — write "<value>.is_case(<case>)" instead of reading it with "case_of()", importing `is_case` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_case_of_equal_is_case.aipl:11:35
+   |
+11 | fn is_dot(shape: Shape) -> bool { Dot == case_of(shape) }
+   |                                   ^^^^^^^^^^^^^^^^^^^^^

@@ -2,9 +2,19 @@
 # side rebuilds each as an `aipl_syntax::Error` and runs it through the same
 # `#[allow]` squelching as the lints still written in Rust.
 
-import { Span, equal as ==, is_err_and, is_nonempty } from builtins;
+import {
+    Span,
+    collect_arms,
+    equal as ==,
+    filter,
+    first,
+    is_err_and,
+    is_nonempty,
+    join,
+    value_or,
+} from builtins;
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
-import { Program } from "../item.aipl";
+import { Import, ImportDecl, ImportName, Item, Program } from "../item.aipl";
 
 struct LintHit { message: str, span: Span }
 
@@ -32,3 +42,31 @@ pub fn lint_messages(src: str, lint: (Program) -> LintHit[]) -> str[]!ParseFailu
 }.test({
     assert(lint_messages("fn f() { }", |program: Program| { [hit("found", 0..1)] })? == ["found"]);
 })
+
+# The name a file's `items` import builtin `name` under, if it does: the spelling a
+# lint's advice should use. `none` when the file does not import it, which is when
+# the advice has to say so.
+pub fn imported_as(self: Item[], name: str) -> str? {
+    self.collect_arms(Import)$builtin_locals(name).join().first()
+}.test({
+    let program = aipl_parse_surface_file(
+        "import { is_case as case_is, len } from builtins;",
+    )?.program.items;
+    assert(program.imported_as("is_case") == some("case_is"));
+    assert(program.imported_as("len") == some("len"));
+    assert(program.imported_as("map") == none);
+    let from_a_file = aipl_parse_surface_file(
+        """import { is_case } from "./a.aipl";""",
+    )?.program.items;
+    assert(from_a_file.imported_as("is_case") == none);
+})
+
+# What an import brings under `name`, when it is from builtins.
+fn builtin_locals(self: Import(ImportDecl { names, source }), name: str) -> str[] {
+    match (source) {
+        Builtins => names.filter(|n| n.name == name)$local(),
+        Path(..) => [],
+    }
+}
+
+fn local(self: ImportName) -> str { self.alias.value_or(self.name) }
