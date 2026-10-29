@@ -846,8 +846,14 @@ extern "C" fn aipl_rec_dec_strong(p: *const u8) {
     }
 }
 
+/// Null here too: a boxed field of the value's own recursion group is a weak
+/// reference, and `take_field` leaves it null when its owner is dropped after
+/// the field was moved out.
 #[no_mangle]
 extern "C" fn aipl_rec_dec_weak(p: *const u8) {
+    if p.is_null() {
+        return;
+    }
     let b = rec_block(p);
     unsafe {
         *b.add(REC_WEAK_WORD) -= 1;
@@ -1707,6 +1713,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./hoist_test_fns.aipl",
     "./promote_type_vars.aipl",
     "./desugar.aipl",
+    "./source_text.aipl",
     // The lints that have moved to AIPL, run by `parse_and_partial_load`.
     "./lint/lint_hit.aipl",
     "./lint/unused_imports.aipl",
@@ -8683,6 +8690,39 @@ fn take_field<M: Module>(
             .ins()
             .store(MemFlagsData::trusted(), null, obj_ptr, offset as i32);
         Ok(v)
+    }
+}
+
+/// Whether the field `fty` of the boxed struct `owner` is an internal reference —
+/// the owner and the field's value being in one recursion group, so the owner holds
+/// the field's value by a *weak* count (see `emit_rc_w`).
+fn field_is_weak(structs: &HashMap<String, TypeDef>, owner: &str, fty: &ConcreteType) -> bool {
+    let ConcreteType::Named(field) = fty else {
+        return false;
+    };
+    match (structs.get(owner), structs.get(field)) {
+        (Some(o), Some(f)) => o.boxed() && f.boxed() && o.scc() == f.scc(),
+        _ => false,
+    }
+}
+
+/// What a value just [`take_field`]n from `owner` needs to be an ordinary owned
+/// reference: a field of the owner's own recursion group was held by the owner's
+/// weak count, and the taker will release it as a strong one, so the reference
+/// is converted — the strong count taken first, so the block cannot die between
+/// the two.
+fn own_taken_field(
+    module: &mut impl Module,
+    builder: &mut FunctionBuilder,
+    builtins: &Builtins,
+    structs: &HashMap<String, TypeDef>,
+    owner: &str,
+    fty: &ConcreteType,
+    taken: Value,
+) {
+    if field_is_weak(structs, owner, fty) {
+        builtins.call_void(module, builder, "aipl_rec_inc_strong", &[taken]);
+        builtins.call_void(module, builder, "aipl_rec_dec_weak", &[taken]);
     }
 }
 
@@ -18729,6 +18769,11 @@ fn compile_call_expr_direct<M: Module>(
                                 && (is_str_shaped(&fty) || mut_binding_owns_slot_ref(&fty, structs))
                             {
                                 let v = take_field(module, builder, cx, obj_ptr, foff, &fty)?;
+                                if let ConcreteType::Named(owner_name) = &obj_ty {
+                                    own_taken_field(
+                                        module, builder, builtins, structs, owner_name, &fty, v,
+                                    );
+                                }
                                 scopes
                                     .last_mut()
                                     .expect("scope")
@@ -20949,6 +20994,7 @@ fn compile_expr_inner<M: Module>(
                 && (is_str_shaped(&fty) || mut_binding_owns_slot_ref(&fty, structs))
             {
                 let v = take_field(module, builder, cx, obj_ptr, foff, &fty)?;
+                own_taken_field(module, builder, builtins, structs, struct_name, &fty, v);
                 scopes
                     .last_mut()
                     .expect("scope")

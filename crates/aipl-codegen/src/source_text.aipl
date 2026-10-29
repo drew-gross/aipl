@@ -1,0 +1,100 @@
+# Filling in each expression's `source`: the text its span covers.
+#
+# A lint that advises a rewrite wants to quote the code it saw (`s[3..]`, not
+# `<receiver>[<start>..]`), and it is given a program, not the file. So the parser
+# records the text on the node, once, here — the only place that holds both.
+#
+# A slice of a large source shares its buffer rather than copying it, so every node
+# carrying its text costs a pointer and a length, however long the text is.
+
+import { collect_arms, equal as ==, map } from builtins;
+import { Call, Expr, Ident, at, map_subexprs, subexprs } from "./expr.aipl";
+import {
+    CaseParam,
+    Const,
+    ConstDecl,
+    FieldDecl,
+    Fn,
+    Function,
+    Item,
+    Param,
+    PerformanceBlock,
+    Program,
+    Signature,
+    Struct,
+    StructDecl,
+    Variant,
+    VariantCase,
+    VariantDecl,
+} from "./item.aipl";
+import { SpanStr } from "./lexer.aipl";
+
+# `self` with `source` set, in every expression it holds, to the text of `text`
+# that the expression's span covers.
+pub fn with_source_text(self: Program, text: str) -> Program {
+    ..self,
+    items: self.items$sourced_item(text),
+}.test({
+    // Each expression holds what was written for it, children included.
+    let text = "fn f() { g(a) }";
+    let call = at(Call("g", [at(Ident("a"), 11..12)], false), 9..13);
+    assert(call.sourced(text).source == "g(a)");
+    assert(call.sourced(text).subexprs()$source == ["a"]);
+
+    // An item's function body is one of them.
+    let function = Function {
+        name: SpanStr { text: "f", span: 3..4 },
+        is_pub: false,
+        sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
+        body: call,
+        test_body: none,
+        doc: none,
+    };
+    let program = Program { items: [Fn(function)], doc: none };
+    fn body_source(self: Fn(Function { body })) -> str { body.source }
+    assert(program.with_source_text(text).items.collect_arms(Fn)$body_source() == ["g(a)"]);
+})
+
+fn sourced_item(self: Item, text: str) -> Item {
+    match (self) {
+        Fn(f) => Fn(f.sourced_function(text)),
+        Struct(s) => Struct(StructDecl {
+            ..s,
+            fields: s.fields.map(|f| FieldDecl { ..f, default: f.default$sourced(text) }),
+        }),
+        Variant(v) => Variant(VariantDecl { ..v, cases: v.cases$sourced_case(text) }),
+        Const(c) => Const(ConstDecl { ..c, value: c.value.sourced(text) }),
+        Refinement(..) | Import(..) => self,
+    }
+}
+
+fn sourced_case(self: VariantCase, text: str) -> VariantCase {
+    ..self,
+    payload: self.payload.map(|slot| CaseParam { ..slot, default: slot.default$sourced(text) }),
+}
+
+# A function, with its `.test` block and `.performance` block and the helpers
+# declared in either.
+fn sourced_function(self: Function, text: str) -> Function {
+    ..self,
+    sig: Signature {
+        ..self.sig,
+        params: self.sig.params.map(|p| Param { ..p, default: p.default$sourced(text) }),
+    },
+    body: self.body.sourced(text),
+    test_body: self.test_body$sourced(text),
+    test_fns: self.test_fns$sourced_function(text),
+    performance: self.performance.map(|block| PerformanceBlock {
+        ..block,
+        body: block.body.sourced(text),
+        fns: block.fns$sourced_function(text),
+    }),
+}
+
+# `self` and every expression under it.
+fn sourced(self: Expr, text: str) -> Expr {
+    Expr {
+        ..self,
+        source: text[self.span.start..self.span.end],
+    }.map_subexprs(|child| child.sourced(text))
+}

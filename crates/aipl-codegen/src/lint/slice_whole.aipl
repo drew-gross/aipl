@@ -35,13 +35,18 @@ pub fn slice_whole(Function { body }) -> LintHit[] {
 }.test({
     // The three spellings, each pointing at a bound.
     assert(lint_function_hits("fn f(s: str) -> str { s[0..] }", slice_whole)? == [
-        hit(MESSAGE, 24..25),
+        hit(message("s"), 24..25),
     ]);
     assert(lint_function_hits("fn f(s: str) -> str { s[..s.len()] }", slice_whole)? == [
-        hit(MESSAGE, 26..33),
+        hit(message("s"), 26..33),
     ]);
     assert(lint_function_hits("fn f(s: str) -> str { s[0..s.len()] }", slice_whole)? == [
-        hit(MESSAGE, 24..25),
+        hit(message("s"), 24..25),
+    ]);
+
+    // The receiver is quoted as written, a call's arguments and all.
+    assert(lint_function_messages("fn f(x: str) -> str { g(x)[0..] }", slice_whole)? == [
+        message("g(x)"),
     ]);
 
     // A start worth keeping, an end that is not the length, or a different
@@ -55,12 +60,12 @@ pub fn slice_whole(Function { body }) -> LintHit[] {
 
     // The `.test` block is held to it too.
     assert(lint_function_messages("fn f() { }.test({ assert(s[0..] == s); })", slice_whole)? == [
-        MESSAGE,
+        message("s"),
     ]);
 })
 
-# What is said of a slice that covers all of its receiver.
-let MESSAGE = "slice covers the whole receiver — use the receiver itself";
+# What is said of a slice of `receiver` that covers all of it.
+fn message(receiver: str) -> str { `slice covers the whole receiver — use "{receiver}" itself` }
 
 # The hit for one slice, or none.
 fn whole_hit(self: Slice(receiver, start, end)) -> LintHit[] {
@@ -70,5 +75,5 @@ fn whole_hit(self: Slice(receiver, start, end)) -> LintHit[] {
         return [];
     };
     let at = if (start.is_elided()) { end$span.value_or(start.span) } else { start.span };
-    [hit(MESSAGE, at)]
+    [hit(message(receiver.source), at)]
 }

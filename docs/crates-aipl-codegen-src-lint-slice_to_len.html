@@ -43,14 +43,14 @@
         <p class="note">Not importable from another file.</p>
 
 
-        <section class="item" id="item-MESSAGE">
+        <section class="item" id="item-message">
           <h3>
-            <a class="anchor" href="#item-MESSAGE">MESSAGE</a>
-            <span class="kind kind-const">let</span>
+            <a class="anchor" href="#item-message">message</a>
+            <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>let MESSAGE = `slice end is the receiver&#39;s whole length — use the open-ended &#34;&#60;receiver&#62;[&#60;start&#62;..]&#34;`</code></pre>
+          <pre class="signature"><code>fn message(receiver: str, start: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>What is said of a slice whose end is its receiver's length.</p></div>
+          <div class="doc"><p>What is said of a slice <code>receiver[start..receiver.len()]</code>.</p></div>
 
 
         </section>

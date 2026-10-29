@@ -19,7 +19,12 @@ pub fn slice_to_len(Function { body }) -> LintHit[] {
     body.descendants()$kind.collect_arms(Slice)$to_len_hit().join()
 }.test({
     assert(lint_function_hits("fn f(s: str) -> str { s[3..s.len()] }", slice_to_len)? == [
-        hit(MESSAGE, 27..34),
+        hit(message("s", "3"), 27..34),
+    ]);
+
+    // A bound that is itself a computation is quoted whole.
+    assert(lint_function_messages("fn f(s: str) -> str { s[n + 1..s.len()] }", slice_to_len)? == [
+        message("s", "n + 1"),
     ]);
 
     // The whole receiver is `slice_whole`'s; an open end, another end, and another
@@ -36,8 +41,10 @@ pub fn slice_to_len(Function { body }) -> LintHit[] {
     );
 })
 
-# What is said of a slice whose end is its receiver's length.
-let MESSAGE = `slice end is the receiver's whole length — use the open-ended "<receiver>[<start>..]"`;
+# What is said of a slice `receiver[start..receiver.len()]`.
+fn message(receiver: str, start: str) -> str {
+    `slice end is the receiver's whole length — use the open-ended "{receiver}[{start}..]"`
+}
 
 # The hit for one slice, or none.
 fn to_len_hit(self: Slice(receiver, start, end)) -> LintHit[] {
@@ -47,5 +54,5 @@ fn to_len_hit(self: Slice(receiver, start, end)) -> LintHit[] {
     if (!bound.is_len_of(receiver) || start.is_zero()) {
         return [];
     };
-    [hit(MESSAGE, bound.span)]
+    [hit(message(receiver.source, start.source), bound.span)]
 }

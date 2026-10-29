@@ -1863,6 +1863,11 @@ pub extern "C" fn aipl_rec_dec_strong(p: *const u8) {
 #[no_mangle]
 pub extern "C" fn aipl_rec_dec_weak(p: *const u8) {
     count_builtin!(builtin_calls::AIPL_REC_DEC_WEAK);
+    // Null as in `aipl_rec_dec_strong`: a taken field of the value's own recursion
+    // group is a weak reference. Mirrors the JIT runtime.
+    if p.is_null() {
+        return;
+    }
     let b = rec_block(p);
     unsafe {
         *b.add(REC_WEAK_WORD) -= 1;

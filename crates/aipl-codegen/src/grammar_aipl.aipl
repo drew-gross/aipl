@@ -340,6 +340,7 @@ import {
     show_pat,
 } from "./pat.aipl";
 import { Char as CharPrim, Str as StrPrim, prim_from_name } from "./prim.aipl";
+import { with_source_text } from "./source_text.aipl";
 import { strip_test_sections } from "./strip_test_sections.aipl";
 import {
     Field as SufField,
@@ -5572,7 +5573,7 @@ pub fn aipl_parse_surface_file(src: str) -> ParsedFile!ParseFailure {
         span: 0..0,
     }))?;
     let ast = lower(text, tree, GRAMMAR).map_err(failure)?;
-    let program = as_program(ast, 0..text.len()).map_err(failure)?;
+    let program = as_program(ast, 0..text.len()).map_err(failure)?.with_source_text(text);
     ok(ParsedFile { program, allows, type_uses: tree.type_leaves(prod_names(GRAMMAR), false) })
 }.test({
     let ParsedFile { program, allows, type_uses } = aipl_parse_file("fn f() { g(); } #[allow]\n")?;

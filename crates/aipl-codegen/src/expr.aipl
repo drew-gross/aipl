@@ -61,8 +61,13 @@ import {
 # `value_span` it is a plain `Span`, with the empty one meaning "none" (a
 # synthesized node has no name written anywhere).
 #
+# `source` is the text `span` covers, so a lint can quote what the author wrote
+# without being handed the file. It is the empty string on a node the parser
+# synthesized, and on every node until `with_source_text` has filled it in. Rust
+# has no such field: it is read only by the lints, which run on the AIPL side.
+#
 # The `ty` field `Expr` carries in Rust is absent — nothing the parser sets it.
-struct Expr { kind: ExprKind, span: Span, value_span: Span, name_span: Span }
+struct Expr { kind: ExprKind, span: Span, value_span: Span, name_span: Span, source: str }
 
 # One field of a struct literal. A `..base` spread rides as an init with an
 # empty name whose *value* is the `Spread` — the value is what identifies it,
@@ -298,10 +303,22 @@ pub fn show_expr(self: Expr) -> str {
 # An `Expr` at an empty span — the shorthand this file's own tests are written
 # with, and the one every synthesized node uses (a template's `Str` segments,
 # An expression node at a span — the constructor every lowering uses.
-pub fn at(kind: ExprKind, span: Span) -> Expr { kind, span, value_span: 0..0, name_span: 0..0 }
+pub fn at(kind: ExprKind, span: Span) -> Expr {
+    kind,
+    span,
+    value_span: 0..0,
+    name_span: 0..0,
+    source: "",
+}
 
 # an else-less `if`'s unit branch, an open slice's `0`).
-pub fn expr(kind: ExprKind) -> Expr { kind, span: 0..0, value_span: 0..0, name_span: 0..0 }
+pub fn expr(kind: ExprKind) -> Expr {
+    kind,
+    span: 0..0,
+    value_span: 0..0,
+    name_span: 0..0,
+    source: "",
+}
 
 # `self` with the span of its name recorded — see `Expr`.
 pub fn named_at(self: Expr, name_span: Span) -> Expr { ..self, name_span }.test({

@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/lint/slice_from_zero.aipl</code></h1>
 
-      <div class="module-doc"><p>The <code>slice_from_zero</code> lint: <code>x[0..y]</code> — a start bound of a written <code>0</code> is what the open-ended <code>x[..y]</code> already means. The mirror of <code>slice_to_len</code>, and it leans on the same distinction: an <em>omitted</em> start is a zero with an empty span, so requiring a non-empty span is what separates a written <code>0</code> from an elided one.</p><p>Only flagged when there is an end bound. <code>x[0..]</code> is left alone here on purpose: <code>x[..]</code> is not a form, so there would be nothing to recommend (<code>slice_whole</code> reports it, since a zero start makes it the whole receiver). Nor is <code>x[0..x.len()]</code>, which is the whole receiver in one step rather than the two this lint's <code>x[..x.len()]</code> would start.</p><p>The advice does not quote the end bound back: a call-shaped span (<code>s.len()</code>) stops before its parens, so splicing the source text would give advice like <code>s[..s.len]</code>. The hit points at the <code>0</code>.</p></div>
+      <div class="module-doc"><p>The <code>slice_from_zero</code> lint: <code>x[0..y]</code> — a start bound of a written <code>0</code> is what the open-ended <code>x[..y]</code> already means. The mirror of <code>slice_to_len</code>, and it leans on the same distinction: an <em>omitted</em> start is a zero with an empty span, so requiring a non-empty span is what separates a written <code>0</code> from an elided one.</p><p>Only flagged when there is an end bound. <code>x[0..]</code> is left alone here on purpose: <code>x[..]</code> is not a form, so there would be nothing to recommend (<code>slice_whole</code> reports it, since a zero start makes it the whole receiver). Nor is <code>x[0..x.len()]</code>, which is the whole receiver in one step rather than the two this lint's <code>x[..x.len()]</code> would start.</p><p>The hit points at the <code>0</code>.</p></div>
 
 
 
@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-slice_from_zero">slice_from_zero</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn slice_from_zero(__spat$1358: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn slice_from_zero(__spat$1187: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each slice in the program that starts with a written <code>0</code> and ends short of the length.</p></div>
 
@@ -43,14 +43,14 @@
         <p class="note">Not importable from another file.</p>
 
 
-        <section class="item" id="item-MESSAGE">
+        <section class="item" id="item-message">
           <h3>
-            <a class="anchor" href="#item-MESSAGE">MESSAGE</a>
-            <span class="kind kind-const">let</span>
+            <a class="anchor" href="#item-message">message</a>
+            <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>let MESSAGE = `slice starts at 0 — drop it for the open-ended &#34;&#60;receiver&#62;[..&#60;end&#62;]&#34;`</code></pre>
+          <pre class="signature"><code>fn message(receiver: str, end: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>What is said of a slice that starts with a written <code>0</code>.</p></div>
+          <div class="doc"><p>What is said of a slice <code>receiver[0..end]</code>.</p></div>
 
 
         </section>

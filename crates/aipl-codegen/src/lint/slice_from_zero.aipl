@@ -9,8 +9,6 @@
 # which is the whole receiver in one step rather than the two this lint's
 # `x[..x.len()]` would start.
 #
-# The advice does not quote the end bound back: a call-shaped span (`s.len()`) stops
-# before its parens, so splicing the source text would give advice like `s[..s.len]`.
 # The hit points at the `0`.
 
 import { collect_arms, equal as ==, join, logical_and as &&, logical_not as ! } from builtins;
@@ -25,8 +23,14 @@ pub fn slice_from_zero(Function { body }) -> LintHit[] {
     body.descendants()$kind.collect_arms(Slice)$from_zero_hit().join()
 }.test({
     assert(lint_function_hits("fn f(s: str) -> str { s[0..2] }", slice_from_zero)? == [
-        hit(MESSAGE, 24..25),
+        hit(message("s", "2"), 24..25),
     ]);
+
+    // A call-shaped end is quoted whole, parentheses included.
+    assert(lint_function_messages(
+        "fn f(s: str, t: str) -> str { s[0..t.len()] }",
+        slice_from_zero,
+    )? == [message("s", "t.len()")]);
 
     // An elided start, a start worth keeping, an open end, and the whole receiver
     // are not this.
@@ -36,8 +40,10 @@ pub fn slice_from_zero(Function { body }) -> LintHit[] {
     assert(lint_function_messages("fn f(s: str) -> str { s[0..s.len()] }", slice_from_zero)? == []);
 })
 
-# What is said of a slice that starts with a written `0`.
-let MESSAGE = `slice starts at 0 — drop it for the open-ended "<receiver>[..<end>]"`;
+# What is said of a slice `receiver[0..end]`.
+fn message(receiver: str, end: str) -> str {
+    `slice starts at 0 — drop it for the open-ended "{receiver}[..{end}]"`
+}
 
 # The hit for one slice, or none.
 fn from_zero_hit(self: Slice(receiver, start, end)) -> LintHit[] {
@@ -45,7 +51,7 @@ fn from_zero_hit(self: Slice(receiver, start, end)) -> LintHit[] {
         return [];
     };
     if (start.is_zero() && !start.is_elided() && !bound.is_len_of(receiver)) {
-        [hit(MESSAGE, start.span)]
+        [hit(message(receiver.source, bound.source), start.span)]
     } else {
         []
     }

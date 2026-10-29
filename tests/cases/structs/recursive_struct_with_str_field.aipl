@@ -1,0 +1,32 @@
+# A struct that is part of a recursive group *and* owns a `str` of its own. Dropping
+# one whose boxed field was moved out (the `match` takes `kind` off an owned
+# `Node`) leaves that weak reference null, and the release has to pass over it — a
+# struct whose only heap field is the boxed one is released whole and never gets
+# there, which is why the `str` matters.
+
+import { equal as ==, print } from builtins;
+
+struct Node { kind: Kind, label: str }
+
+variant Kind = Leaf(str) | Pair(Node, Node)
+
+fn leaf(name: str) -> Node { kind: Leaf(name), label: "" }
+
+fn show(self: Node) -> str {
+    match (self.kind) {
+        Leaf(name) => name,
+        Pair(left, right) => `({left.show()} {right.show()})`,
+    }
+}
+
+fn main() !prints {
+    print(leaf("x").show());
+    print(leaf("y").show());
+    print(Node { kind: Pair(leaf("a"), leaf("b")), label: "pair" }.show());
+}.test({
+    assert(leaf("z").show() == "z");
+})
+--- stdout ---
+x
+y
+(a b)
