@@ -98,6 +98,7 @@ import {
     wrapping_add as +,
     wrapping_add_assign as +=,
     wrapping_decrement as --,
+    wrapping_increment as ++,
     wrapping_sub as -,
     zip_with,
 } from builtins;
@@ -5579,6 +5580,11 @@ pub fn aipl_parse_surface_file(src: str) -> ParsedFile!ParseFailure {
 
     // The tokens written inside a type annotation, and only those.
     assert(aipl_parse_file("fn f(x: Pair) -> Q { }")?.type_uses == [8..12, 17..18]);
+
+    // The names a pattern puts in front of its slots, in a parameter or a `let`:
+    // the case and the struct, and not the names the slots bind.
+    assert(aipl_parse_file("fn f(self: Fn(Function { body })) { }")?.type_uses == [11..13, 14..22]);
+    assert(aipl_parse_file("fn f(p: Q) { let Point { x } = p; }")?.type_uses == [8..9, 17..22]);
     assert(program.show_program() == "fn f() = Seq(g(), ())");
 
     // Every named parameter shape, lowered. The six are six distinct runs of
@@ -5706,16 +5712,21 @@ fn allow_spans(lexed: LexResult<AiplTok>) -> Span[] {
     lexed.trivia.filter(|t| t.kind == AllowMarker)$text$span
 }
 
-# Every token written inside a type annotation, in source order: the names a
-# language server resolves to declarations. A token is in a type when some `ty`
-# node holds it, at any depth, so `Pair<i64>[]` yields `Pair`, `<`, `i64`, `>` and
-# the brackets; the loader keeps the ones that name something.
+# Every token written inside a type annotation, in source order, and every name
+# a pattern puts in front of its slots: the names a language server resolves to
+# declarations. A token is in a type when some `ty` node holds it, at any depth,
+# so `Pair<i64>[]` yields `Pair`, `<`, `i64`, `>` and the brackets. The loader
+# keeps the ones that name something.
 fn type_leaves(self: Cst, names: str[], inside: bool) -> Span[] {
     match (self) {
         Leaf(span) => if (inside) { [span] } else { [] },
         Tree(production, kids) => {
-            let in_type = inside || names[production] == some("ty");
-            kids$type_leaves(names, in_type).join()
+            let name = names[production].value_or("");
+            let in_type = inside || name == "ty";
+            [
+                ..if (PATTERN_PRODUCTIONS.contains(name)) { kids.constructor_names() } else { [] },
+                ..kids$type_leaves(names, in_type).join(),
+            ]
         },
         Group(_, opening, between, closing) => [
             ..opening$type_leaves(names, inside).join(),
@@ -5724,6 +5735,42 @@ fn type_leaves(self: Cst, names: str[], inside: bool) -> Span[] {
         ],
         Trivia(..) | Missing(..) => [],
     }
+}
+
+# The productions that hold a pattern's own tokens: a parameter, a pattern, a
+# binding statement (`let Point { x } = p;`) and a lambda parameter.
+let PATTERN_PRODUCTIONS: str[] = [
+    "param",
+    "pattern",
+    "let_stmt",
+    "mut_stmt",
+    "for_stmt",
+    "lambda_param",
+];
+
+# The names among `kids` that open a payload: `Fn` in `Fn(Function { body })` and
+# `Function` in `Function { body }`, a name directly followed by a bracketed group.
+# Trivia between the two does not separate them.
+fn constructor_names(self: Cst[]) -> Span[] {
+    let real = self.filter(|kid| match (kid) {
+        Trivia(..) => false,
+        _ => true,
+    });
+    mut found: Span[] = [];
+    mut i: u64 = 0;
+    while (i + 1 < real.len()) {
+        match (real[i]) {
+            some(Leaf(span)) => match (real[i + 1]) {
+                some(Group(..)) => {
+                    set found.push(span);
+                },
+                _ => {},
+            },
+            _ => {},
+        };
+        set i++;
+    }
+    found
 }
 
 # Why `src` does not parse, or `none` when it does — the FFI entry the

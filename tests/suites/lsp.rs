@@ -508,6 +508,42 @@ fn a_type_name_goes_to_its_declaration() {
     goes(&mut server, "Pair? =", "Pair {");
 }
 
+/// A struct named in a destructuring pattern goes to its declaration, whether the
+/// pattern is a parameter, nested inside a case's payload, or a `let`.
+#[test]
+fn a_struct_in_a_pattern_goes_to_its_declaration() {
+    let source = "struct Function { body: i64 }\n\
+                  \n\
+                  variant Item = Fn(Function) | Other(i64)\n\
+                  \n\
+                  fn body_of(self: Fn(Function { body })) -> i64 { body }\n\
+                  \n\
+                  fn direct(Function { body }) -> i64 { body }\n\
+                  \n\
+                  fn make() -> Function { body: 1 }\n\
+                  \n\
+                  fn read() -> i64 {\n\
+                  \u{20}   let Function { body } = make();\n\
+                  \u{20}   body\n\
+                  }\n";
+    let workspace = Workspace::new("pattern-structs", &[("main.aipl", source)]);
+    let mut server = opened(&workspace, "main.aipl");
+    analysed(&mut server, &workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    for from in [
+        "Function { body })) ->",
+        "Function { body }) ->",
+        "Function { body } = make",
+    ] {
+        let location = definition_at(&mut server, &uri, cursor_on(source, from));
+        assert_eq!(
+            location["range"]["start"],
+            cursor_on(source, "Function { body: i64 }"),
+            "from {from:?}"
+        );
+    }
+}
+
 /// A name the compiler resolves nothing for is an error, not an empty result:
 /// the cursor is on something, and the server cannot say what.
 #[test]

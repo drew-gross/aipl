@@ -804,7 +804,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$70261: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$70291: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1475,7 +1475,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$109974: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$110004: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -2231,7 +2231,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-destructured_param">destructured_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$147231: FieldBinders, span: Span) -&#62; Ast</code></pre>
+          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$147261: FieldBinders, span: Span) -&#62; Ast</code></pre>
 
           <div class="doc"><p>A parameter named <code>name</code>, of the struct <code>struct_name</code>, whose <code>fields</code> are bound to <code>names</code> at the top of the body.</p></div>
 
@@ -2497,7 +2497,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$163403: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$163433: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -2667,7 +2667,42 @@ if (let some(..) = target[__iset$N]) {
           </h3>
           <pre class="signature"><code>fn type_leaves(self: Cst, names: str[], inside: bool) -&#62; Span[]</code></pre>
 
-          <div class="doc"><p>Every token written inside a type annotation, in source order: the names a language server resolves to declarations. A token is in a type when some <code>ty</code> node holds it, at any depth, so <code>Pair&lt;i64&gt;[]</code> yields <code>Pair</code>, <code>&lt;</code>, <code>i64</code>, <code>&gt;</code> and the brackets; the loader keeps the ones that name something.</p></div>
+          <div class="doc"><p>Every token written inside a type annotation, in source order, and every name a pattern puts in front of its slots: the names a language server resolves to declarations. A token is in a type when some <code>ty</code> node holds it, at any depth, so <code>Pair&lt;i64&gt;[]</code> yields <code>Pair</code>, <code>&lt;</code>, <code>i64</code>, <code>&gt;</code> and the brackets. The loader keeps the ones that name something.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-PATTERN_PRODUCTIONS">
+          <h3>
+            <a class="anchor" href="#item-PATTERN_PRODUCTIONS">PATTERN_PRODUCTIONS</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let PATTERN_PRODUCTIONS: str[] = [
+    &#34;param&#34;,
+    &#34;pattern&#34;,
+    &#34;let_stmt&#34;,
+    &#34;mut_stmt&#34;,
+    &#34;for_stmt&#34;,
+    &#34;lambda_param&#34;,
+]</code></pre>
+
+          <div class="doc"><p>The productions that hold a pattern's own tokens: a parameter, a pattern, a binding statement (<code>let Point { x } = p;</code>) and a lambda parameter.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-constructor_names">
+          <h3>
+            <a class="anchor" href="#item-constructor_names">constructor_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn constructor_names(self: Cst[]) -&#62; Span[]</code></pre>
+
+          <div class="doc"><p>The names among <code>kids</code> that open a payload: <code>Fn</code> in <code>Fn(Function { body })</code> and <code>Function</code> in <code>Function { body }</code>, a name directly followed by a bracketed group. Trivia between the two does not separate them.</p></div>
 
 
         </section>
