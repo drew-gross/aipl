@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>struct Expr</code></pre>
 
-          <div class="doc"><p>block) where its <em>value</em> is.</p><p>The span is this node's <em>token</em> span: every token the node was built from, closing bracket and unary operator included. A span kept for diagnostics alone can be narrower than that — it only has to point somewhere useful — but a formatter needs the extent, so this one records it.</p><p><code>value_span</code> is a block's tail position: <code>fn f() -&gt; str { let a = 1; a }</code> returns the <code>a</code>, but the body's span starts at the <code>let</code>, so a return-type error would underline the binding. It is recorded while the block is being built, where the tail is in hand, rather than re-walked at every diagnostic.</p><p>Rust spells it <code>Option&lt;Box&lt;Span&gt;&gt;</code>; here it is a plain <code>Span</code> with the <em>empty</em> one meaning &quot;none&quot;, which is the convention already in force for a location that does not exist (see <code>join_spans</code>). A struct field could not be an optional struct when this was written, so there was no choice; it can be one now, and the two spellings mean the same thing either way, since a recorded value span is never empty: the repair that fills it in runs first.</p><p><code>name_span</code> is where the node's <em>name</em> is written: the field in <code>p.x</code>/<code>p$x</code>, the callee in <code>f(a)</code>/<code>p.f(a)</code>, the identifier of an <code>Ident</code> or <code>Construct</code>, the binder of a <code>Let</code>. The node's own span covers the whole construct, which cannot say where inside it the name sits; a language server needs exactly that. Like <code>value_span</code> it is a plain <code>Span</code>, with the empty one meaning &quot;none&quot; (a synthesized node has no name written anywhere).</p><p><code>source</code> is the text <code>span</code> covers, so a lint can quote what the author wrote without being handed the file. It is the empty string on a node the parser synthesized, and on every node until <code>with_source_text</code> has filled it in. Rust has no such field: it is read only by the lints, which run on the AIPL side.</p><p>The <code>ty</code> field <code>Expr</code> carries in Rust is absent — nothing the parser sets it.</p></div>
+          <div class="doc"><p>block) where its <em>value</em> is.</p><p>The span is this node's <em>token</em> span: every token the node was built from, closing bracket and unary operator included. A span kept for diagnostics alone can be narrower than that — it only has to point somewhere useful — but a formatter needs the extent, so this one records it.</p><p><code>value_span</code> is a block's tail position: <code>fn f() -&gt; str { let a = 1; a }</code> returns the <code>a</code>, but the body's span starts at the <code>let</code>, so a return-type error would underline the binding. It is recorded while the block is being built, where the tail is in hand, rather than re-walked at every diagnostic.</p><p>Rust spells it <code>Option&lt;Box&lt;Span&gt;&gt;</code>; here it is a plain <code>Span</code> with the <em>empty</em> one meaning &quot;none&quot;, which is the convention already in force for a location that does not exist (see <code>join_spans</code>). A struct field could not be an optional struct when this was written, so there was no choice; it can be one now, and the two spellings mean the same thing either way, since a recorded value span is never empty: the repair that fills it in runs first.</p><p><code>name_span</code> is where the node's <em>name</em> is written: the field in <code>p.x</code>/<code>p$x</code>, the callee in <code>f(a)</code>/<code>p.f(a)</code>, the identifier of an <code>Ident</code> or <code>Construct</code>, the binder of a <code>Let</code>. The node's own span covers the whole construct, which cannot say where inside it the name sits; a language server needs exactly that. Like <code>value_span</code> it is a plain <code>Span</code>, with the empty one meaning &quot;none&quot; (a synthesized node has no name written anywhere).</p><p><code>source</code> is the text <code>span</code> covers, so a lint can quote what the author wrote without being handed the file. It is the empty string on a node the parser synthesized, and on every node until <code>with_source_text</code> has filled it in. Rust has no such field: it is read only by the lints, which run on the AIPL side.</p><p><code>written</code> is where a destructuring <code>let</code> or <code>for</code> writes the names in its pattern (<code>LetPattern</code> and <code>ForPattern</code> only), kept for <code>desugar.aipl</code>, which turns them into bindings that carry the places.</p><p>The <code>ty</code> field <code>Expr</code> carries in Rust is absent — nothing the parser sets it.</p></div>
 
 
         </section>
@@ -64,6 +64,90 @@
 
 
 
+        <section class="item" id="item-WrittenName">
+          <h3>
+            <a class="anchor" href="#item-WrittenName">WrittenName</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct WrittenName</code></pre>
+
+          <div class="doc"><p>One name as it is written in a pattern, and where.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-WrittenStruct">
+          <h3>
+            <a class="anchor" href="#item-WrittenStruct">WrittenStruct</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct WrittenStruct</code></pre>
+
+          <div class="doc"><p>The fields a struct pattern <code>T { a, b as c }</code> reads, in order, and the names it binds them as — <code>a</code> and <code>a</code> for a field bound under its own name.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-WrittenNames">
+          <h3>
+            <a class="anchor" href="#item-WrittenNames">WrittenNames</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct WrittenNames</code></pre>
+
+          <div class="doc"><p>The names a pattern spells and where, so a language server can point at them. <code>Pat</code> keeps names as text, which is all the compiler needs; this is the part of the source it drops.</p><p><code>cases</code> are the constructors the pattern names, <code>binders</code> the names it binds (outside any struct pattern), and <code>structs</code> one entry per struct pattern, in source order.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-span_named">
+          <h3>
+            <a class="anchor" href="#item-span_named">span_named</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn span_named(self: WrittenName[], text: str) -&#62; Span</code></pre>
+
+          <div class="doc"><p>Where <code>self</code> writes <code>text</code>, or the empty span for a name that is not written.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-binder_span">
+          <h3>
+            <a class="anchor" href="#item-binder_span">binder_span</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn binder_span(self: WrittenNames, text: str) -&#62; Span</code></pre>
+
+          <div class="doc"><p>Where a pattern writes the binder <code>text</code>, whether directly or in one of its struct patterns; the empty span if it does not.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-struct_written">
+          <h3>
+            <a class="anchor" href="#item-struct_written">struct_written</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn struct_written(self: WrittenNames, i: u64) -&#62; WrittenStruct</code></pre>
+
+          <div class="doc"><p>The <code>i</code>th struct pattern's part of <code>self</code>: nothing written if there is none.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-MatchArm">
           <h3>
             <a class="anchor" href="#item-MatchArm">MatchArm</a>
@@ -71,7 +155,21 @@
           </h3>
           <pre class="signature"><code>struct MatchArm</code></pre>
 
-          <div class="doc"><p>One arm of a <code>match</code>, and the <code>then</code> half of an <code>if let</code>. Its span is the <em>pattern's</em>, so a diagnostic points at what selected the arm rather than at everything it does.</p></div>
+          <div class="doc"><p>One arm of a <code>match</code>, and the <code>then</code> half of an <code>if let</code>. Its span is the <em>pattern's</em>, so a diagnostic points at what selected the arm rather than at everything it does. <code>written</code> is where the pattern's names are written.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-names_written">
+          <h3>
+            <a class="anchor" href="#item-names_written">names_written</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn names_written(self: MatchArm) -&#62; WrittenNames</code></pre>
+
+          <div class="doc"><p>Where <code>self</code>'s pattern writes its names; nothing for an arm a pass made up.</p></div>
 
 
         </section>

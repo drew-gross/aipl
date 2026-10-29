@@ -161,6 +161,7 @@ import {
     span,
     text,
     tok_span,
+    token_leaves,
     token_span,
 } from "./cst.aipl";
 import { desugar, desugared } from "./desugar.aipl";
@@ -206,6 +207,7 @@ import {
     TypeArgs,
     Unit,
     While,
+    WrittenNames,
     at,
     is_spread,
     join_spans,
@@ -382,6 +384,7 @@ import {
     Without as TyWithout,
     show_ty,
 } from "./ty.aipl";
+import { written_names } from "./written_names.aipl";
 
 // ---------- the grammar ----------
 
@@ -1717,17 +1720,23 @@ fn lower_atom(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             match (toks) {
                 [_, "::", ..] => {
                     let TypedCall { tys, args } = typed_call(kids, sp)?;
-                    ok(AExpr(at(TypeArgs(at(Call(head, args, false), tsp).named_at(tsp), tys), sp)))
+                    ok(AExpr(at(
+                        TypeArgs(
+                            at(Call(head, args, false), tsp).named_at(node.first_tok(tsp)),
+                            tys,
+                        ),
+                        sp,
+                    )))
                 },
                 [_, "(", ..] => {
                     let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a call argument list")?;
-                    ok(AExpr(at(Call(head, args, false), tsp).named_at(tsp)))
+                    ok(AExpr(at(Call(head, args, false), tsp).named_at(node.first_tok(tsp))))
                 },
                 [_, "{", ..] => {
                     ok(AExpr(at(
                         Construct(head, kids.try_map(|k| as_field_init(k, sp))?),
                         tsp,
-                    ).named_at(tsp)))
+                    ).named_at(node.first_tok(tsp))))
                 },
                 _ => ok(AExpr(at(Ident(head), tsp).named_at(tsp))),
             }
@@ -1911,6 +1920,7 @@ fn lower_if(src: str, node: Parts, kids: Ast[]) -> Expr!ParseError {
             pattern: as_pat(kid(kids, 0, sp)?, sp)?,
             body: kid_expr(kids, 2, sp)?,
             span: sub_span(subs, 0, tsp),
+            written: some(sub_written(subs, 0, src, true)),
         };
         return ok(at(IfLet(arm, kid_expr(kids, 1, sp)?, else_or_unit(kids, 3, tsp, sp)?), tsp));
     };
@@ -2080,7 +2090,7 @@ fn kw_arg(
         .slot_span()
         .value_or_err(ParseError { message: "a keyword argument has no name", span: sp })?;
     let span = join_spans(name_span, v.span);
-    ok(AExpr(at(KwArg(name.slot_text(src), v, implicit_some), span)))
+    ok(AExpr(at(KwArg(name.slot_text(src), v, implicit_some), span).named_at(name_span)))
 }
 
 # `op_value` — an operator passed as a value (`apply(2, 3, +)`) is a binary
@@ -2129,13 +2139,14 @@ fn lambda_of(kids: Ast[], span: Span, sp: Span) -> Expr!ParseError {
 
 # A function parameter that takes its argument apart, as the lambda parameter that
 # does the same.
-fn lambda_param_of(param: Ast) -> Ast!ParseError {
+fn lambda_param_of(param: Ast, written: WrittenNames) -> Ast!ParseError {
     let AParam(p) = param else { return err(wrong_kind("a destructured parameter", param, 0..0)); };
     ok(ALambdaParam(LambdaParam {
         name: p.name,
         ty: some(p.ty),
         span: p.name_span,
         pattern: p.pattern$pattern,
+        written: some(written),
     }))
 }
 
@@ -2143,21 +2154,30 @@ fn lower_lambda_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let name_span = node.first_tok(node.tok_span());
     let toks = node.own_texts(src);
+    let written = written_in(node, src, 0, "", false);
     match (toks) {
         // `Point { x, y }` and `Wrap(inner)` — the same parameter a function would
         // write, handed over as a lambda's.
-        [struct_name, "{", ..] => lambda_param_of(destructured_param(
-            `__spat${name_span.start}`,
-            struct_name,
-            field_binders_of(toks, 2),
-            name_span,
-        )),
-        [case_name, "(", ..] => lambda_param_of(arm_param(
-            `__cpat${name_span.start}`,
-            case_name,
-            case_pattern(case_name, kid(kids, 0, sp)?, sp)?,
-            name_span,
-        )),
+        [struct_name, "{", ..] => lambda_param_of(
+            destructured_param(
+                `__spat${name_span.start}`,
+                struct_name,
+                field_binders_of(toks, 2),
+                name_span,
+                written,
+            ),
+            written,
+        ),
+        [case_name, "(", ..] => lambda_param_of(
+            arm_param(
+                `__cpat${name_span.start}`,
+                case_name,
+                case_pattern(case_name, kid(kids, 0, sp)?, sp)?,
+                name_span,
+                written,
+            ),
+            written,
+        ),
         // `(a, b)` — a tuple, whose type is whatever the lambda is handed.
         ["(", ..] => {
             let names = binder_names(toks);
@@ -2172,6 +2192,7 @@ fn lower_lambda_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
                 ty: none,
                 span: name_span,
                 pattern: some(ByTuple(names)),
+                written: some(written),
             }))
         },
         [name, ..] => {
@@ -2471,6 +2492,8 @@ fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!Parse
     let toks = node.own_texts(src);
     let name_span = node.second_tok(node.tok_span());
     let has_else = toks.contains("else");
+    // Where the pattern writes its names, for the forms that are patterns.
+    let spelled = written_in(node, src, 1, "=", false);
     let refutable = match (toks) {
         [_, "=", ..] => true,
         [_, "[", ..] => true,
@@ -2492,17 +2515,23 @@ fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!Parse
             let written = if (rest) { kids[..last - 1] } else { kids[..last] };
             let elems = written.try_map(|k| as_pat(k, sp))?;
             let pattern = array_pattern(elems, node.children, rest, node.tok_span())?;
-            let_else(pattern, kid_expr(kids, last, sp)?, kid_expr(kids, last + 1, sp)?, sp)
+            let_else(pattern, kid_expr(kids, last, sp)?, kid_expr(kids, last + 1, sp)?, sp, spelled)
         },
         // `let PATTERN = e else { .. };` — a pattern the binding forms below do not
         // take, so it is a child of its own.
         [_, "=", ..] => {
             let pattern = as_pat(kid(kids, 0, sp)?, sp)?;
             if (has_else) {
-                return let_else(pattern, kid_expr(kids, 1, sp)?, kid_expr(kids, 2, sp)?, sp);
+                return let_else(
+                    pattern,
+                    kid_expr(kids, 1, sp)?,
+                    kid_expr(kids, 2, sp)?,
+                    sp,
+                    spelled,
+                );
             };
             let value = kid_expr(kids, 1, sp)?;
-            ok(AStmt(SLetDestructure(ByPattern(pattern), value, value.span)))
+            ok(AStmt(SLetDestructure(ByPattern(pattern), value, value.span, spelled)))
         },
         // `let (a, b) = e;` — a tuple pattern, spanned at its value like the struct
         // form, since the names are not one run of text.
@@ -2515,23 +2544,23 @@ fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!Parse
                 });
             };
             let value = kid_expr(kids, 0, sp)?;
-            ok(AStmt(SLetDestructure(ByTuple(names), value, value.span)))
+            ok(AStmt(SLetDestructure(ByTuple(names), value, value.span, spelled)))
         },
         // `let Import(decl) = e;` — the case name, then its payload's binders.
         [_, case_name, "(", ..] => {
             let pattern = case_pattern(case_name, kid(kids, 0, sp)?, sp)?;
             let value = kid_expr(kids, 1, sp)?;
             if (has_else) {
-                return let_else(pattern, value, kid_expr(kids, 2, sp)?, sp);
+                return let_else(pattern, value, kid_expr(kids, 2, sp)?, sp, spelled);
             };
-            ok(AStmt(SLetDestructure(pattern.destructure(), value, value.span)))
+            ok(AStmt(SLetDestructure(pattern.destructure(), value, value.span, spelled)))
         },
         // `let T { x, y as py } = e;` — the struct name, then the braces.
         [_, struct_name, "{", ..] => {
             let value = kid_expr(kids, 0, sp)?;
             let FieldBinders { fields, names } = field_binders_of(toks, 3);
             let pattern = ByStruct(struct_name, fields, names, mutable);
-            ok(AStmt(SLetDestructure(pattern, value, value.span)))
+            ok(AStmt(SLetDestructure(pattern, value, value.span, spelled)))
         },
         // `let x: T = e;` — the annotation is a child, so it comes before the value.
         [_, name, ":", ..] => {
@@ -2551,14 +2580,20 @@ fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!Parse
 # not match, and the rest of the block cannot be reached from it, so it has to
 # leave the function: otherwise the binding the pattern makes would be missing
 # below it.
-fn let_else(pattern: Pat, value: Expr, otherwise: Expr, sp: Span) -> Ast!ParseError {
+fn let_else(
+    pattern: Pat,
+    value: Expr,
+    otherwise: Expr,
+    sp: Span,
+    written: WrittenNames,
+) -> Ast!ParseError {
     if (!otherwise.diverges()) {
         return err(ParseError {
             message: "the `else` of a `let .. else` has to leave the function, as in `else { return none; }`",
             span: otherwise.span,
         });
     };
-    ok(AStmt(SLetElse(pattern, value, otherwise, join_spans(sp, value.span))))
+    ok(AStmt(SLetElse(pattern, value, otherwise, join_spans(sp, value.span), written)))
 }
 
 # Whether running `self` always ends in a `return`: it is one, or a sequence one of
@@ -2742,6 +2777,7 @@ fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let names = binder_names(toks);
     let iterable = kid_expr(kids, 0, sp)?;
     let body = kid_expr(kids, 1, sp)?;
+    let written = written_in(node, src, 3, ":", false);
 
     // The index, when one was written, is the name in front of the comma. Its span
     // is what a plain loop is spanned from.
@@ -2750,27 +2786,34 @@ fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     match (toks) {
         // `for (let i, (a, b) : xs)`
         [_, _, _, index, ",", "(", ..] => {
-            ok(AStmt(for_tuple(names[1..], some(index), iterable, body, sp)?))
+            ok(AStmt(for_tuple(names[1..], some(index), iterable, body, sp, written)?))
         },
         // `for (let (a, b) : xs)`
-        [_, _, _, "(", ..] => ok(AStmt(for_tuple(names, none, iterable, body, sp)?)),
+        [_, _, _, "(", ..] => ok(AStmt(for_tuple(names, none, iterable, body, sp, written)?)),
         // `for (let i, Import(decl) : xs)` — the case name and then its binders.
         [_, _, _, index, ",", case_name, "(", ..] => {
-            ok(AStmt(for_arm(case_name, binder_names(toks[6..]), some(index), iterable, body)))
+            ok(AStmt(for_arm(
+                case_name,
+                binder_names(toks[6..]),
+                some(index),
+                iterable,
+                body,
+                written,
+            )))
         },
         // `for (let Import(decl) : xs)`
         [_, _, _, case_name, "(", ..] => {
-            ok(AStmt(for_arm(case_name, binder_names(toks[4..]), none, iterable, body)))
+            ok(AStmt(for_arm(case_name, binder_names(toks[4..]), none, iterable, body, written)))
         },
         // `for (let i, T { x, y as b } : xs)` — the struct name and then its braces.
         [_, _, _, index, ",", struct_name, "{", ..] => {
             let FieldBinders { fields, names as bound } = field_binders_of(toks, 7);
-            ok(AStmt(for_struct(struct_name, fields, bound, some(index), iterable, body)))
+            ok(AStmt(for_struct(struct_name, fields, bound, some(index), iterable, body, written)))
         },
         // `for (let T { x, y as b } : xs)`
         [_, _, _, struct_name, "{", ..] => {
             let FieldBinders { fields, names as bound } = field_binders_of(toks, 5);
-            ok(AStmt(for_struct(struct_name, fields, bound, none, iterable, body)))
+            ok(AStmt(for_struct(struct_name, fields, bound, none, iterable, body, written)))
         },
         // `for (let i, x : xs)` — two names, the first of which is the index.
         [_, _, _, index, ",", name, ..] => {
@@ -2785,14 +2828,21 @@ fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # index in front: the pattern as written, for `desugar.aipl` to lower. A tuple
 # pattern needs two names or more, which is checked here, where the span of the
 # written pattern is at hand.
-fn for_tuple(names: str[], index: str?, iterable: Expr, body: Expr, sp: Span) -> Stmt!ParseError {
+fn for_tuple(
+    names: str[],
+    index: str?,
+    iterable: Expr,
+    body: Expr,
+    sp: Span,
+    written: WrittenNames,
+) -> Stmt!ParseError {
     if (names.len() < 2) {
         return err(ParseError {
             message: "a tuple pattern needs at least 2 names, e.g. for (let (a, b) : expr) { ... }",
             span: sp,
         });
     };
-    ok(for_destructure(ByTuple(names), index, iterable, body))
+    ok(for_destructure(ByTuple(names), index, iterable, body, written))
 }
 
 fn for_struct(
@@ -2802,14 +2852,28 @@ fn for_struct(
     index: str?,
     iterable: Expr,
     body: Expr,
-) -> Stmt { for_destructure(ByStruct(struct_name, fields, names, false), index, iterable, body) }
-
-fn for_arm(case_name: str, names: str[], index: str?, iterable: Expr, body: Expr) -> Stmt {
-    for_destructure(ByCase(case_name, names), index, iterable, body)
+    written: WrittenNames,
+) -> Stmt {
+    for_destructure(ByStruct(struct_name, fields, names, false), index, iterable, body, written)
 }
 
-fn for_destructure(pattern: Destructure, index: str?, iterable: Expr, body: Expr) -> Stmt {
-    SForDestructure(pattern, index, iterable, body, join_spans(iterable.span, body.span))
+fn for_arm(
+    case_name: str,
+    names: str[],
+    index: str?,
+    iterable: Expr,
+    body: Expr,
+    written: WrittenNames,
+) -> Stmt { for_destructure(ByCase(case_name, names), index, iterable, body, written) }
+
+fn for_destructure(
+    pattern: Destructure,
+    index: str?,
+    iterable: Expr,
+    body: Expr,
+    written: WrittenNames,
+) -> Stmt {
+    SForDestructure(pattern, index, iterable, body, join_spans(iterable.span, body.span), written)
 }
 
 # `wrap_stmt` — one statement and the rest of the block, folded into the chain
@@ -2849,17 +2913,20 @@ fn wrap_stmt(stmt: Stmt, acc: Expr) -> Expr {
             for_span,
             acc,
         ),
-        SForDestructure(pattern, index, iterable, body, span) => seq(
-            at(ForPattern(pattern, iterable, body, index=index), span),
+        SForDestructure(pattern, index, iterable, body, span, written) => seq(
+            Expr {
+                ..at(ForPattern(pattern, iterable, body, index=index), span),
+                written: some(written),
+            },
             acc,
             join_spans(iterable.span, acc.span),
         ),
-        SLetDestructure(pattern, value, span) => at(
-            LetPattern(pattern, value, acc),
-            join_spans(span, acc.span),
-        ),
-        SLetElse(pattern, value, otherwise, span) => {
-            let arm = MatchArm { pattern, body: acc, span };
+        SLetDestructure(pattern, value, span, written) => Expr {
+            ..at(LetPattern(pattern, value, acc), join_spans(span, acc.span)),
+            written: some(written),
+        },
+        SLetElse(pattern, value, otherwise, span, written) => {
+            let arm = MatchArm { pattern, body: acc, span, written: some(written) };
             at(IfLet(arm, value, otherwise), join_spans(span, acc.span))
         },
     }
@@ -2949,14 +3016,16 @@ fn lower_match_arm(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             let written = if (rest) { kids[..last - 1] } else { kids[..last] };
             let elems = written.try_map(|k| as_pat(k, sp))?;
             let pattern = array_pattern(elems, subs, rest, tsp)?;
-            ok(AArms([MatchArm { pattern, body, span: tsp }]))
+            let written = written_in(node, src, 0, "=>", true);
+            ok(AArms([MatchArm { pattern, body, span: tsp, written: some(written) }]))
         },
         _ => {
             let heads = same_bindings(kids[..last].try_map(|k| as_pat(k, sp))?, subs, tsp)?;
             mut arms: MatchArm[] = [];
             for (let i, pat : heads) {
                 let span = arm_span(pat, subs, i, tsp, heads.len() == 1);
-                set arms.push(MatchArm { pattern: pat, body, span });
+                let written = some(sub_written(subs, i, src, true));
+                set arms.push(MatchArm { pattern: pat, body, span, written });
             }
             ok(AArms(arms))
         },
@@ -3089,6 +3158,35 @@ fn second_tok(self: Parts, fallback: Span) -> Span {
         [_, second, ..] => second,
         _ => fallback,
     }
+}
+
+# The names written in the tokens of `node` after its first `skip` and before the
+# first `stop` (which may be empty: no stop), with `bare_is_case` as `written_names`
+# takes it.
+fn written_in(Parts { cst }, src: str, skip: u64, stop: str, bare_is_case: bool) -> WrittenNames {
+    written_names(cst.token_leaves().tokens_between(src, skip, stop), src, bare_is_case)
+}
+
+# The names written in the pattern child `i` of `subs`.
+fn sub_written(subs: Cst[], i: u64, src: str, bare_is_case: bool) -> WrittenNames {
+    written_names(subs[i].map(token_leaves).value_or([]), src, bare_is_case)
+}
+
+# `self`, less the first `skip` tokens and everything from the first one spelled `stop`.
+fn tokens_between(self: Span[], src: str, skip: u64, stop: str) -> Span[] {
+    mut kept: Span[] = [];
+    mut i = skip;
+    mut open = true;
+    while (open && i < self.len()) {
+        let at = self[i].value_or(0..0);
+        if (src[at] == stop) {
+            set open = false;
+        } else {
+            set kept.push(at);
+        };
+        set i++;
+    }
+    kept
 }
 
 fn as_pat(v: Ast, span: Span) -> Pat!ParseError {
@@ -3529,6 +3627,7 @@ fn lower_type_params(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # generic uses.
 fn lower_type_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
+    let name_span = node.first_tok(node.tok_span());
     // The default is the one child the rule has: a type.
     let default: Ty? = match (kids) {
         [written, ..] => some(as_ty(written, sp)?),
@@ -3536,17 +3635,17 @@ fn lower_type_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     };
     match (node.own_texts(src)) {
         [name, ":", "variant", ..] => {
-            ok(ATypeParam(TypeParam { name, bound: BoundVariant, default }))
+            ok(ATypeParam(TypeParam { name, bound: BoundVariant, default, name_span }))
         },
         [name, ":", bound_name, ..] => {
             let bound = bound_from_name(bound_name).value_or_err(ParseError {
                 message: `unknown type parameter bound "{bound_name}"; expected "any" or "ord"`,
                 span: node.tokens[2].value_or(node.tok_span()),
             })?;
-            ok(ATypeParam(TypeParam { name, bound, default }))
+            ok(ATypeParam(TypeParam { name, bound, default, name_span }))
         },
         // `name`, or `name = ty`: no bound was written.
-        [name, ..] => ok(ATypeParam(TypeParam { name, bound: BoundAny, default })),
+        [name, ..] => ok(ATypeParam(TypeParam { name, bound: BoundAny, default, name_span })),
         _ => err(ParseError { message: "a type parameter matched no token", span: sp }),
     }
 }
@@ -3563,30 +3662,36 @@ fn lower_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // up one per sub-rule and they are recognised by their `{` rather than by
     // their shape.
     let toks = node.own_texts(src);
+    let bare = written_in(node, src, 0, "", false);
+    let named = written_in(node, src, 2, "", false);
     match (toks) {
         [struct_name, "{", ..] => ok(destructured_param(
             `__spat${name_span.start}`,
             struct_name,
             field_binders_of(toks, 2),
             name_span,
+            bare,
         )),
         [name, ":", struct_name, "{", ..] => ok(destructured_param(
             name,
             struct_name,
             field_binders_of(toks, 4),
             name_span,
+            named,
         )),
         [case_name, "(", ..] => ok(arm_param(
             `__cpat${name_span.start}`,
             case_name,
             case_pattern(case_name, kid(kids, 0, sp)?, sp)?,
             name_span,
+            bare,
         )),
         [name, ":", case_name, "(", ..] => ok(arm_param(
             name,
             case_name,
             case_pattern(case_name, kid(kids, 0, sp)?, sp)?,
             name_span,
+            named,
         )),
         _ => named_param_by_shape(src, node, kids, sp),
     }
@@ -3594,7 +3699,7 @@ fn lower_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 
 # A parameter named `name`, of the type `case_name` — the case of its variant and
 # no other — whose payload is bound to `names` at the top of the body.
-fn arm_param(name: str, case_name: str, pattern: Pat, span: Span) -> Ast {
+fn arm_param(name: str, case_name: str, pattern: Pat, span: Span, written: WrittenNames) -> Ast {
     let param = Param {
         name,
         ty: TyNamed(case_name),
@@ -3603,7 +3708,14 @@ fn arm_param(name: str, case_name: str, pattern: Pat, span: Span) -> Ast {
         default: none,
         implicit_some: false,
     };
-    AParam(Param { ..param, pattern: some(ParamPattern { pattern: pattern.destructure(), span }) })
+    AParam(Param {
+        ..param,
+        pattern: some(ParamPattern {
+            pattern: pattern.destructure(),
+            span,
+            written: some(written),
+        }),
+    })
 }
 
 # The pattern `case_name(..slots..)` writes: its `payload` child holds the slots, or
@@ -3636,6 +3748,7 @@ fn destructured_param(
     struct_name: str,
     FieldBinders { fields, names },
     span: Span,
+    written: WrittenNames,
 ) -> Ast {
     let param = Param {
         name,
@@ -3646,7 +3759,7 @@ fn destructured_param(
         implicit_some: false,
     };
     let pattern = ByStruct(struct_name, fields, names, false);
-    AParam(Param { ..param, pattern: some(ParamPattern { pattern, span }) })
+    AParam(Param { ..param, pattern: some(ParamPattern { pattern, span, written: some(written) }) })
 }
 
 # The six named shapes. Every sub-rule is one position, and *which*

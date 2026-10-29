@@ -443,6 +443,7 @@ fn appends(v: &str, src: &Expr, arrays: &ArrayReceivers) -> Option<Expr> {
             scrutinee.clone(),
             arms.iter()
                 .map(|a| MatchArm {
+                    written: a.written.clone(),
                     pattern: a.pattern.clone(),
                     body: extend(&a.body),
                     span: a.span.clone(),
@@ -451,6 +452,7 @@ fn appends(v: &str, src: &Expr, arrays: &ArrayReceivers) -> Option<Expr> {
         ))),
         ExprKind::IfLet(matched, scrutinee, els) => Some(like(ExprKind::IfLet(
             Box::new(MatchArm {
+                written: Default::default(),
                 pattern: matched.pattern.clone(),
                 body: extend(&matched.body),
                 span: matched.span.clone(),
@@ -483,6 +485,7 @@ fn appends(v: &str, src: &Expr, arrays: &ArrayReceivers) -> Option<Expr> {
 /// One `some(..)`/`none`-shaped arm.
 fn arm(name: &str, bindings: Vec<String>, body: Expr, span: aipl_syntax::Span) -> MatchArm {
     MatchArm {
+        written: Default::default(),
         pattern: Pattern::Ctor {
             name: name.to_string(),
             bindings,

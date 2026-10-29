@@ -9,7 +9,8 @@
 
 use std::collections::HashMap;
 
-use crate::ast::{Callee, Expr, ExprKind, FieldInit, LambdaParam, MatchArm};
+use crate::ast::{Callee, Expr, ExprKind, FieldInit, LambdaParam, MatchArm, WrittenNames};
+use crate::SpanStr;
 
 /// A number no earlier call has returned. Process-wide rather than per pass or
 /// per function: four passes inline, and a body one pass copied is copied again
@@ -250,5 +251,22 @@ fn arm_scoped(
             .rename_bindings(&mut |n| renamed.get(n).cloned().unwrap_or_else(|| n.to_string())),
         body: rename_scoped(&arm.body, &inner, fresh),
         span: arm.span.clone(),
+        written: WrittenNames {
+            cases: arm.written.cases.clone(),
+            binders: arm
+                .written
+                .binders
+                .iter()
+                .map(|b| {
+                    SpanStr::new(
+                        renamed
+                            .get(&b.text)
+                            .cloned()
+                            .unwrap_or_else(|| b.text.clone()),
+                        b.span.clone(),
+                    )
+                })
+                .collect(),
+        },
     }
 }

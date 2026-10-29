@@ -24,6 +24,10 @@ pub enum Target {
     Struct(String),
     /// A function (or builtin), by its global name.
     Function(String),
+    /// A case of a variant, written as a constructor or in a pattern: the
+    /// declaring variant item (the template, for a generic one) and the bare
+    /// case name.
+    Case { variant: String, case: String },
     /// A local binding (`let`, `mut`, `for`), by the span of the name that
     /// introduced it in the same function.
     Local(Span),

@@ -10,6 +10,7 @@ import {
     Destructure,
     Expr,
     FieldInit,
+    WrittenNames,
     at,
     num,
     show_expr,
@@ -30,18 +31,25 @@ variant Stmt =
     | Let(name: str, name_span: Span, ty: Ty?, value: Expr)
     | Mut(name: str, name_span: Span, ty: Ty?, value: Expr)
     # `let (a, b) = v;`, `let Case(a) = v;`, `let T { x } = v;` and the `mut` struct
-    # form: the pattern as written, kept for `desugar.aipl` to lower. `span` is the
-    # value's.
-    | LetDestructure(pattern: Destructure, value: Expr, span: Span)
+    # form: the pattern as written, kept for `desugar.aipl` to lower, and where its
+    # names are written. `span` is the value's.
+    | LetDestructure(pattern: Destructure, value: Expr, span: Span, written: WrittenNames)
     # `let PATTERN = value else { .. };` — the rest of the block runs with the
     # pattern's names bound when `value` matches, and `otherwise` (which returns)
     # when it does not.
-    | LetElse(pattern: Pat, value: Expr, otherwise: Expr, span: Span)
+    | LetElse(pattern: Pat, value: Expr, otherwise: Expr, span: Span, written: WrittenNames)
     | Assign(lhs: Expr, value: Expr, span: Span)
     | For(name: str, name_span: Span, index: str?, iterable: Expr, body: Expr, span: Span)
     # A loop that takes each element apart with a pattern, as written; `span` runs
     # from the iterable through the body.
-    | ForDestructure(pattern: Destructure, index: str?, iterable: Expr, body: Expr, span: Span)
+    | ForDestructure(
+        pattern: Destructure,
+        index: str?,
+        iterable: Expr,
+        body: Expr,
+        span: Span,
+        written: WrittenNames
+    )
     | While(cond: Expr, body: Expr, span: Span)
     | Return(value: Expr, span: Span)
     # A statement already built as one expression, run for its effect before the

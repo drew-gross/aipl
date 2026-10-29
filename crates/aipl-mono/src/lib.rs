@@ -700,6 +700,7 @@ pub(crate) fn tuple_template_vars(name: &str) -> Vec<TypeParam> {
             name: tuple_var_name(i),
             bound: aipl_syntax::ast::Bound::Any,
             default: None,
+            name_span: Default::default(),
         })
         .collect()
 }
@@ -942,6 +943,7 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
             Box::new(lt_expr(s, fm, ord)),
             arms.iter()
                 .map(|arm| MatchArm {
+                    written: arm.written.clone(),
                     pattern: arm.pattern.clone(),
                     body: lt_expr(&arm.body, fm, ord),
                     span: arm.span.clone(),
@@ -950,6 +952,7 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
         ),
         ExprKind::IfLet(arm, s, else_b) => ExprKind::IfLet(
             Box::new(MatchArm {
+                written: arm.written.clone(),
                 pattern: arm.pattern.clone(),
                 body: lt_expr(&arm.body, fm, ord),
                 span: arm.span.clone(),
@@ -1369,6 +1372,7 @@ impl GenericLowerer {
                 arms.iter()
                     .map(|arm| {
                         Ok(MatchArm {
+                            written: arm.written.clone(),
                             pattern: arm.pattern.clone(),
                             body: self.lower_expr(&arm.body)?,
                             span: arm.span.clone(),
@@ -1378,6 +1382,7 @@ impl GenericLowerer {
             ),
             K::IfLet(arm, s, else_b) => K::IfLet(
                 Box::new(MatchArm {
+                    written: arm.written.clone(),
                     pattern: arm.pattern.clone(),
                     body: self.lower_expr(&arm.body)?,
                     span: arm.span.clone(),
@@ -2139,6 +2144,7 @@ fn opt_variadic_seq(scrut: Expr, binder: String, elem: &Type, span: Span) -> Exp
             Box::new(scrut),
             vec![
                 MatchArm {
+                    written: Default::default(),
                     pattern: Pattern::Ctor {
                         name: "some".into(),
                         bindings: vec![binder],
@@ -2148,6 +2154,7 @@ fn opt_variadic_seq(scrut: Expr, binder: String, elem: &Type, span: Span) -> Exp
                     span: span.clone(),
                 },
                 MatchArm {
+                    written: Default::default(),
                     pattern: Pattern::Ctor {
                         name: "none".into(),
                         bindings: Vec::new(),
@@ -3967,6 +3974,7 @@ impl Mono<'_> {
             // Over an optional: `match ($arr) { some($e) => some(f($e, caps..)),
             // none => none }`.
             let some_arm = MatchArm {
+                written: Default::default(),
                 pattern: Pattern::Ctor {
                     name: "some".to_string(),
                     bindings: vec!["$e".to_string()],
@@ -3979,6 +3987,7 @@ impl Mono<'_> {
                 span: span.clone(),
             };
             let none_arm = MatchArm {
+                written: Default::default(),
                 pattern: Pattern::Ctor {
                     name: "none".to_string(),
                     bindings: Vec::new(),
@@ -4413,6 +4422,7 @@ impl Mono<'_> {
                     Box::new(index),
                     vec![
                         MatchArm {
+                            written: Default::default(),
                             pattern: Pattern::Ctor {
                                 name: "some".to_string(),
                                 bindings: vec![other_el.to_string()],
@@ -4422,6 +4432,7 @@ impl Mono<'_> {
                             span: span.clone(),
                         },
                         MatchArm {
+                            written: Default::default(),
                             pattern: Pattern::Ctor {
                                 name: "none".to_string(),
                                 bindings: Vec::new(),
@@ -4551,6 +4562,7 @@ impl Mono<'_> {
                     Box::new(index),
                     vec![
                         MatchArm {
+                            written: Default::default(),
                             pattern: Pattern::Ctor {
                                 name: "some".to_string(),
                                 bindings: vec!["$v".to_string()],
@@ -4560,6 +4572,7 @@ impl Mono<'_> {
                             span: span.clone(),
                         },
                         MatchArm {
+                            written: Default::default(),
                             pattern: Pattern::Ctor {
                                 name: "none".to_string(),
                                 bindings: Vec::new(),
@@ -7285,6 +7298,7 @@ impl Mono<'_> {
                 let arms = vec![
                     (**arm).clone(),
                     MatchArm {
+                        written: Default::default(),
                         pattern: Pattern::Wildcard,
                         body: (**else_b).clone(),
                         span: else_b.span.clone(),
@@ -7332,6 +7346,7 @@ impl Mono<'_> {
                     }
                     let (rb, t) = self.infer(&arm.body, &env2)?;
                     rarms.push(MatchArm {
+                        written: arm.written.clone(),
                         pattern,
                         body: rb,
                         span: arm.span.clone(),
@@ -7392,6 +7407,7 @@ impl Mono<'_> {
                 }
                 let (rb, tt) = self.infer(&arm.body, &env2)?;
                 let given_arm = MatchArm {
+                    written: arm.written.clone(),
                     pattern,
                     body: rb,
                     span: arm.span.clone(),
@@ -7401,6 +7417,7 @@ impl Mono<'_> {
                     || matches!(&st, Type::Array(_) | Type::Primitive(Primitive::Char))
                 {
                     vec![MatchArm {
+                        written: Default::default(),
                         pattern: Pattern::Wildcard,
                         body: re,
                         span: else_b.span.clone(),
@@ -7418,6 +7435,7 @@ impl Mono<'_> {
                     self.other_cases(&st, &given)
                         .into_iter()
                         .map(|(case, payload)| MatchArm {
+                            written: Default::default(),
                             pattern: Pattern::Ctor {
                                 name: case,
                                 bindings: vec!["_".to_string(); payload.len()],
@@ -8716,6 +8734,7 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
                 name,
                 bound,
                 default,
+                name_span: Default::default(),
             }
         })
         .collect();
@@ -8938,6 +8957,7 @@ fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
             r(scrut),
             arms.iter()
                 .map(|a| MatchArm {
+                    written: a.written.clone(),
                     pattern: a.pattern.clone(),
                     body: *r(&a.body),
                     span: a.span.clone(),
@@ -8946,6 +8966,7 @@ fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
         ),
         K::IfLet(arm, scrut, else_b) => K::IfLet(
             Box::new(MatchArm {
+                written: arm.written.clone(),
                 pattern: arm.pattern.clone(),
                 body: *r(&arm.body),
                 span: arm.span.clone(),
@@ -10674,6 +10695,7 @@ fn replace_call(
             Box::new(rc(s, replaced)),
             arms.iter()
                 .map(|a| MatchArm {
+                    written: a.written.clone(),
                     pattern: a.pattern.clone(),
                     body: rc(&a.body, replaced),
                     span: a.span.clone(),
@@ -10682,6 +10704,7 @@ fn replace_call(
         ),
         ExprKind::IfLet(arm, s, else_b) => ExprKind::IfLet(
             Box::new(MatchArm {
+                written: arm.written.clone(),
                 pattern: arm.pattern.clone(),
                 body: rc(&arm.body, replaced),
                 span: arm.span.clone(),
@@ -11785,6 +11808,7 @@ impl MatchTree<'_, '_> {
                     let new_cols = splice_cols(cols, col, &sub_cols);
                     let body = self.compile(spec, &new_cols)?;
                     arms.push(MatchArm {
+                        written: Default::default(),
                         pattern: Pattern::Ctor {
                             name: case,
                             bindings: sub_cols.iter().map(|(v, _)| v.clone()).collect(),
@@ -11885,6 +11909,7 @@ impl MatchTree<'_, '_> {
                     let new_cols = splice_cols(cols, col, &sub_cols);
                     let body = self.compile(spec, &new_cols)?;
                     arms.push(MatchArm {
+                        written: Default::default(),
                         pattern: Pattern::Array(
                             sub_cols.iter().map(|(v, _)| self.ident(v)).collect(),
                         ),
@@ -11908,6 +11933,7 @@ impl MatchTree<'_, '_> {
                     self.compile(default, &rest_cols)?
                 };
                 arms.push(MatchArm {
+                    written: Default::default(),
                     pattern: Pattern::Wildcard,
                     body,
                     span: self.span.clone(),

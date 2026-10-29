@@ -408,6 +408,7 @@ fn build_windows(
     let peeled = Expr::new(
         ExprKind::IfLet(
             Box::new(MatchArm {
+                written: Default::default(),
                 pattern: Pattern::Ctor {
                     name: "some".to_string(),
                     bindings: vec![first],

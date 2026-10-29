@@ -908,16 +908,22 @@ impl Loader {
                     path: path.to_string_lossy().into_owned(),
                     imports: import_sites.get(path).cloned().unwrap_or_default(),
                     type_uses: type_sites(file, &full_views[path]),
+                    type_var_uses: type_var_sites(file),
+                    keyword_uses: Vec::new(),
                 };
             }
         }
-        kwargs::expand_keyword_args(&Program {
-            items: merged,
-            sources,
-            // A merged program is several files; no one file's `# ..` header
-            // documents it, so it carries none.
-            doc: None,
-        })
+        let root_index = self.files.get(root).map_or(0, |file| file.index);
+        kwargs::expand_keyword_args(
+            &Program {
+                items: merged,
+                sources,
+                // A merged program is several files; no one file's `# ..` header
+                // documents it, so it carries none.
+                doc: None,
+            },
+            root_index,
+        )
     }
 }
 
@@ -1850,6 +1856,7 @@ fn rewrite_expr(
                         arm_locals.insert(b.clone());
                     }
                     MatchArm {
+                        written: arm.written.clone(),
                         pattern: resolve_pattern(&arm.pattern, view, sc),
                         body: rewrite_expr(&arm.body, view, sc, &arm_locals),
                         span: arm.span.clone(),
@@ -1878,6 +1885,7 @@ fn rewrite_expr(
                 then_locals.insert(b.clone());
             }
             let new_arm = MatchArm {
+                written: arm.written.clone(),
                 pattern: resolve_pattern(&arm.pattern, view, sc),
                 body: rewrite_expr(&arm.body, view, sc, &then_locals),
                 span: arm.span.clone(),
@@ -2024,6 +2032,30 @@ fn rewrite_expr(
 /// the file's `view` resolves them. A name a declaration of the file takes as a
 /// type parameter is left out: which of the two a use means depends on the
 /// function it sits in, and a wrong answer is worse than none.
+/// The names written in `file`'s type annotations that are declared type
+/// parameters. Which item's parameter each one means is for the reader to say
+/// from where it sits.
+fn type_var_sites(file: &LoadedFile) -> Vec<Span> {
+    let mut type_vars: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    for item in &file.items {
+        match item {
+            Item::Fn(f) => type_vars.extend(f.sig.type_vars.iter().map(|t| t.name.as_str())),
+            Item::Struct(s) => type_vars.extend(s.type_vars.iter().map(|t| t.name.as_str())),
+            Item::Variant(v) => type_vars.extend(v.type_vars.iter().map(|t| t.name.as_str())),
+            _ => {}
+        }
+    }
+    file.type_uses
+        .iter()
+        .filter(|span| {
+            file.source
+                .get((*span).clone())
+                .is_some_and(|n| type_vars.contains(n))
+        })
+        .cloned()
+        .collect()
+}
+
 fn type_sites(
     file: &LoadedFile,
     view: &HashMap<String, String>,

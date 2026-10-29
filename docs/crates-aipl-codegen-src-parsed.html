@@ -44,14 +44,14 @@
 
             </li>
 
-            <li id="item-LetDestructure"><code>LetDestructure(pattern: Destructure, value: Expr, span: Span)</code>
+            <li id="item-LetDestructure"><code>LetDestructure(pattern: Destructure, value: Expr, span: Span, written: WrittenNames)</code>
 
-              <div class="doc"><p><code>let (a, b) = v;</code>, <code>let Case(a) = v;</code>, <code>let T { x } = v;</code> and the <code>mut</code> struct form: the pattern as written, kept for <code>desugar.aipl</code> to lower. <code>span</code> is the value's.</p></div>
+              <div class="doc"><p><code>let (a, b) = v;</code>, <code>let Case(a) = v;</code>, <code>let T { x } = v;</code> and the <code>mut</code> struct form: the pattern as written, kept for <code>desugar.aipl</code> to lower, and where its names are written. <code>span</code> is the value's.</p></div>
 
 
             </li>
 
-            <li id="item-LetElse"><code>LetElse(pattern: Pat, value: Expr, otherwise: Expr, span: Span)</code>
+            <li id="item-LetElse"><code>LetElse(pattern: Pat, value: Expr, otherwise: Expr, span: Span, written: WrittenNames)</code>
 
               <div class="doc"><p><code>let PATTERN = value else { .. };</code> — the rest of the block runs with the pattern's names bound when <code>value</code> matches, and <code>otherwise</code> (which returns) when it does not.</p></div>
 
@@ -68,7 +68,7 @@
 
             </li>
 
-            <li id="item-ForDestructure"><code>ForDestructure(pattern: Destructure, index: str?, iterable: Expr, body: Expr, span: Span)</code>
+            <li id="item-ForDestructure"><code>ForDestructure(pattern: Destructure, index: str?, iterable: Expr, body: Expr, span: Span, written: WrittenNames)</code>
 
               <div class="doc"><p>A loop that takes each element apart with a pattern, as written; <code>span</code> runs from the iterable through the body.</p></div>
 

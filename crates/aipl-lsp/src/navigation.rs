@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use aipl_codegen::Frontend;
-use aipl_syntax::ast::Item;
+use aipl_syntax::ast::{Item, TypeParam};
 use aipl_syntax::resolution::Target;
 use aipl_syntax::{mangled_file_index, Span};
 
@@ -106,14 +106,26 @@ impl Navigation {
         };
 
         let mut functions: HashMap<&str, Site> = HashMap::new();
+        let mut parameters: HashMap<(&str, &str), Site> = HashMap::new();
         let mut structs: HashMap<&str, Site> = HashMap::new();
         let mut variants: HashMap<&str, Site> = HashMap::new();
         let mut fields: HashMap<(&str, &str), Site> = HashMap::new();
+        let mut cases: HashMap<(&str, &str), Site> = HashMap::new();
         let mut declarations: Vec<Site> = Vec::new();
+        // The items that declare type parameters, with where each starts in its
+        // file: an item runs from its name to the next item's, so a type
+        // parameter written in an annotation belongs to the item it sits in.
+        let mut item_starts: HashMap<PathBuf, Vec<(usize, Vec<&TypeParam>)>> = HashMap::new();
         for item in frontends.iter().flat_map(|f| &f.program.items) {
             match item {
                 Item::Fn(f) if f.name.starts_with("__test") => {}
                 Item::Fn(f) => {
+                    if let Some(file) = file_of(&f.name).filter(|_| written(&f.name.span)) {
+                        item_starts
+                            .entry(file)
+                            .or_default()
+                            .push((f.name.span.start, f.sig.type_vars.iter().collect()));
+                    }
                     if let Some(file) = file_of(&f.name).filter(|_| written(&f.name.span)) {
                         let site = Site {
                             file,
@@ -122,11 +134,29 @@ impl Navigation {
                         functions.insert(&f.name, site.clone());
                         declarations.push(site);
                     }
+                    // A parameter is a place to jump to whether or not the body
+                    // reads it: a keyword parameter may only be supplied by a call.
+                    if let Some(file) = file_of(&f.name) {
+                        for param in f.sig.params.iter().filter(|p| written(&p.name_span.0)) {
+                            let site = Site {
+                                file: file.clone(),
+                                span: param.name_span.0.clone(),
+                            };
+                            parameters.insert((&f.name, &param.name), site.clone());
+                            declarations.push(site);
+                        }
+                    }
                 }
                 Item::Struct(s) => {
                     let Some(file) = file_of(&s.name) else {
                         continue;
                     };
+                    if written(&s.name.span) {
+                        item_starts
+                            .entry(file.clone())
+                            .or_default()
+                            .push((s.name.span.start, s.type_vars.iter().collect()));
+                    }
                     if written(&s.name.span) {
                         let site = Site {
                             file: file.clone(),
@@ -146,6 +176,12 @@ impl Navigation {
                 }
                 Item::Variant(v) => {
                     if let Some(file) = file_of(&v.name).filter(|_| written(&v.name.span)) {
+                        item_starts
+                            .entry(file)
+                            .or_default()
+                            .push((v.name.span.start, v.type_vars.iter().collect()));
+                    }
+                    if let Some(file) = file_of(&v.name).filter(|_| written(&v.name.span)) {
                         let site = Site {
                             file,
                             span: v.name.span.clone(),
@@ -153,8 +189,33 @@ impl Navigation {
                         variants.insert(&v.name, site.clone());
                         declarations.push(site);
                     }
+                    if let Some(file) = file_of(&v.name) {
+                        for case in v.cases.iter().filter(|c| written(&c.name.span)) {
+                            let site = Site {
+                                file: file.clone(),
+                                span: case.name.span.clone(),
+                            };
+                            cases.insert((&v.name, &case.name), site.clone());
+                            declarations.push(site);
+                        }
+                    }
                 }
                 _ => {}
+            }
+        }
+
+        for owners in item_starts.values_mut() {
+            owners.sort_by_key(|(start, _)| *start);
+            owners.dedup_by_key(|(start, _)| *start);
+        }
+        for (file, owners) in &item_starts {
+            for (_, type_vars) in owners {
+                for type_var in type_vars.iter().filter(|t| written(&t.name_span.0)) {
+                    declarations.push(Site {
+                        file: file.clone(),
+                        span: type_var.name_span.0.clone(),
+                    });
+                }
             }
         }
 
@@ -175,6 +236,47 @@ impl Navigation {
                             span: written.span.clone(),
                         },
                         Found::Declared(site),
+                    ));
+                }
+            }
+            // A type parameter written in an annotation is the one the item
+            // holding it declares: the item that starts last before it.
+            let owners = item_starts.get(&file).map(Vec::as_slice).unwrap_or(&[]);
+            for at in &source.type_var_uses {
+                let Some(name) = source.source.get(at.clone()) else {
+                    continue;
+                };
+                let Some((_, type_vars)) =
+                    owners.iter().rev().find(|(start, _)| *start <= at.start)
+                else {
+                    continue;
+                };
+                if let Some(declared) = type_vars.iter().find(|t| t.name == name) {
+                    if written(&declared.name_span.0) {
+                        uses.push((
+                            Site {
+                                file: file.clone(),
+                                span: at.clone(),
+                            },
+                            Found::Declared(Site {
+                                file: file.clone(),
+                                span: declared.name_span.0.clone(),
+                            }),
+                        ));
+                    }
+                }
+            }
+            // A keyword argument's name is the parameter it was passed for.
+            for keyword in &source.keyword_uses {
+                if let Some(site) =
+                    parameters.get(&(keyword.callee.as_str(), keyword.param.as_str()))
+                {
+                    uses.push((
+                        Site {
+                            file: file.clone(),
+                            span: keyword.span.clone(),
+                        },
+                        Found::Declared(site.clone()),
                     ));
                 }
             }
@@ -209,6 +311,10 @@ impl Navigation {
                     .cloned()
                     .map(Found::Declared),
                 Target::Struct(name) => structs.get(name.as_str()).cloned().map(Found::Declared),
+                Target::Case { variant, case } => cases
+                    .get(&(variant.as_str(), case.as_str()))
+                    .cloned()
+                    .map(Found::Declared),
                 Target::Function(name) => match name.strip_prefix("__builtin_") {
                     Some(builtin) => builtin_found(builtin, &mut sources),
                     None => functions.get(name.as_str()).cloned().map(Found::Declared),

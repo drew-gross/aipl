@@ -390,6 +390,7 @@ matrices:
   support more than 2 dimensions
 
 types:
+  Optionally call a function that accepts one arm of a variant, if what you have is the whole variant
   function_hits shouldn't need to exist - need some better way of expanding single-arm variants
   allow sets of more complex things (tuples, structs, variants)
   spans with signed bounds should work, so that we can e.g. (-1..2).cartesian_product(-1..2) in neighbours

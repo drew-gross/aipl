@@ -804,7 +804,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$70291: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$70583: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1107,7 +1107,7 @@ shim random seeded_with_clock() { body }
             <a class="anchor" href="#item-lambda_param_of">lambda_param_of</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lambda_param_of(param: Ast) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lambda_param_of(param: Ast, written: WrittenNames) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p>A function parameter that takes its argument apart, as the lambda parameter that does the same.</p></div>
 
@@ -1373,7 +1373,7 @@ shim random seeded_with_clock() { body }
             <a class="anchor" href="#item-let_else">let_else</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn let_else(pattern: Pat, value: Expr, otherwise: Expr, sp: Span) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn let_else(pattern: Pat, value: Expr, otherwise: Expr, sp: Span, written: WrittenNames) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>let PATTERN = value else { .. };</code>. The block is what runs when the pattern does not match, and the rest of the block cannot be reached from it, so it has to leave the function: otherwise the binding the pattern makes would be missing below it.</p></div>
 
@@ -1475,7 +1475,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$110004: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$111073: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -1503,7 +1503,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-for_tuple">for_tuple</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn for_tuple(names: str[], index: str?, iterable: Expr, body: Expr, sp: Span) -&#62; Stmt!ParseError</code></pre>
+          <pre class="signature"><code>fn for_tuple(names: str[], index: str?, iterable: Expr, body: Expr, sp: Span, written: WrittenNames) -&#62; Stmt!ParseError</code></pre>
 
           <div class="doc"><p><code>for (let (a, b) : xs) { body }</code>, and its struct and case twins, with an optional index in front: the pattern as written, for <code>desugar.aipl</code> to lower. A tuple pattern needs two names or more, which is checked here, where the span of the written pattern is at hand.</p></div>
 
@@ -1517,7 +1517,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-for_struct">for_struct</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn for_struct(struct_name: str, fields: str[], names: str[], index: str?, iterable: Expr, body: Expr) -&#62; Stmt</code></pre>
+          <pre class="signature"><code>fn for_struct(struct_name: str, fields: str[], names: str[], index: str?, iterable: Expr, body: Expr, written: WrittenNames) -&#62; Stmt</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1531,7 +1531,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-for_arm">for_arm</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn for_arm(case_name: str, names: str[], index: str?, iterable: Expr, body: Expr) -&#62; Stmt</code></pre>
+          <pre class="signature"><code>fn for_arm(case_name: str, names: str[], index: str?, iterable: Expr, body: Expr, written: WrittenNames) -&#62; Stmt</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1545,7 +1545,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-for_destructure">for_destructure</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn for_destructure(pattern: Destructure, index: str?, iterable: Expr, body: Expr) -&#62; Stmt</code></pre>
+          <pre class="signature"><code>fn for_destructure(pattern: Destructure, index: str?, iterable: Expr, body: Expr, written: WrittenNames) -&#62; Stmt</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1772,6 +1772,48 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn second_tok(self: Parts, fallback: Span) -&#62; Span</code></pre>
 
           <div class="doc"><p>The span of a node's second own token — the name after a declaration's keyword.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-written_in">
+          <h3>
+            <a class="anchor" href="#item-written_in">written_in</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn written_in(__spat$127380: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
+
+          <div class="doc"><p>The names written in the tokens of <code>node</code> after its first <code>skip</code> and before the first <code>stop</code> (which may be empty: no stop), with <code>bare_is_case</code> as <code>written_names</code> takes it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-sub_written">
+          <h3>
+            <a class="anchor" href="#item-sub_written">sub_written</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn sub_written(subs: Cst[], i: u64, src: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
+
+          <div class="doc"><p>The names written in the pattern child <code>i</code> of <code>subs</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-tokens_between">
+          <h3>
+            <a class="anchor" href="#item-tokens_between">tokens_between</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn tokens_between(self: Span[], src: str, skip: u64, stop: str) -&#62; Span[]</code></pre>
+
+          <div class="doc"><p><code>self</code>, less the first <code>skip</code> tokens and everything from the first one spelled <code>stop</code>.</p></div>
 
 
         </section>
@@ -2189,7 +2231,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-arm_param">arm_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn arm_param(name: str, case_name: str, pattern: Pat, span: Span) -&#62; Ast</code></pre>
+          <pre class="signature"><code>fn arm_param(name: str, case_name: str, pattern: Pat, span: Span, written: WrittenNames) -&#62; Ast</code></pre>
 
           <div class="doc"><p>A parameter named <code>name</code>, of the type <code>case_name</code> — the case of its variant and no other — whose payload is bound to <code>names</code> at the top of the body.</p></div>
 
@@ -2231,7 +2273,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-destructured_param">destructured_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$147261: FieldBinders, span: Span) -&#62; Ast</code></pre>
+          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$150522: FieldBinders, span: Span, written: WrittenNames) -&#62; Ast</code></pre>
 
           <div class="doc"><p>A parameter named <code>name</code>, of the struct <code>struct_name</code>, whose <code>fields</code> are bound to <code>names</code> at the top of the body.</p></div>
 
@@ -2497,7 +2539,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$163433: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$166745: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

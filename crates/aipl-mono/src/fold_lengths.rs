@@ -527,6 +527,7 @@ fn index_of(whole: &Expr, e: &Expr, index: &Expr, blocked: &HashSet<String>) -> 
             scrutinee.clone(),
             arms.iter()
                 .map(|a| MatchArm {
+                    written: a.written.clone(),
                     pattern: a.pattern.clone(),
                     body: at(&a.body),
                     span: a.span.clone(),
@@ -535,6 +536,7 @@ fn index_of(whole: &Expr, e: &Expr, index: &Expr, blocked: &HashSet<String>) -> 
         ))),
         ExprKind::IfLet(arm, scrutinee, els) => Some(like(ExprKind::IfLet(
             Box::new(MatchArm {
+                written: arm.written.clone(),
                 pattern: arm.pattern.clone(),
                 body: at(&arm.body),
                 span: arm.span.clone(),
@@ -564,6 +566,7 @@ fn none_for_empty(whole: &Expr, e: &Expr, elems: &[Expr]) -> Option<Expr> {
 /// `arm` with its body measured rather than produced.
 fn measured_arm(arm: &MatchArm, measure: &dyn Fn(&Expr) -> Expr) -> MatchArm {
     MatchArm {
+        written: arm.written.clone(),
         pattern: arm.pattern.clone(),
         body: measure(&arm.body),
         span: arm.span.clone(),
@@ -683,6 +686,7 @@ fn optional_count(
     let span = || whole.span.clone();
     let bound = format!("$len{}_v", aipl_syntax::fresh_id());
     let some = MatchArm {
+        written: Default::default(),
         pattern: Pattern::Ctor {
             name: "some".to_string(),
             bindings: vec![bound.clone()],
@@ -699,6 +703,7 @@ fn optional_count(
         span: span(),
     };
     let none = MatchArm {
+        written: Default::default(),
         pattern: Pattern::Ctor {
             name: "none".to_string(),
             bindings: Vec::new(),

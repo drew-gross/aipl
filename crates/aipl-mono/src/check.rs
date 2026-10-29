@@ -375,6 +375,10 @@ struct Cx<'a> {
     /// as the checker makes the decisions it needs to type a program, so a
     /// language server's answer is the checker's.
     resolutions: std::cell::RefCell<Vec<Resolution>>,
+    /// Where the pattern being typed writes its names, and how many times each
+    /// case has been named so far. A pattern is typed before its arm's body, and
+    /// one arm at a time, so a single slot is enough.
+    pattern_names: std::cell::RefCell<(aipl_syntax::ast::WrittenNames, HashMap<String, usize>)>,
     current_type_params: std::cell::RefCell<Vec<String>>,
     /// The type an expression is being checked *against*, when something more
     /// local than the function's return type says so — currently an annotated
@@ -994,6 +998,42 @@ impl<'a> Cx<'a> {
                 at: at.clone(),
                 target,
             });
+        }
+    }
+
+    /// Start typing the pattern of `arm`: its names are the ones to resolve.
+    fn begin_pattern(&self, arm: &MatchArm) {
+        *self.pattern_names.borrow_mut() = (arm.written.clone(), HashMap::new());
+    }
+
+    /// Note that the pattern being typed names case `bare` of `ty`, at the next
+    /// place the pattern writes that case.
+    fn note_case(&self, ty: &Type, bare: &str) {
+        if self.cases_of(ty).is_none() || !matches!(ty, Type::Named(_) | Type::Generic(..)) {
+            return;
+        }
+        let Some(variant) = self.declaring_struct(ty) else {
+            return;
+        };
+        let mut names = self.pattern_names.borrow_mut();
+        let (written, seen) = &mut *names;
+        let nth = seen.entry(bare.to_string()).or_insert(0);
+        let at = written
+            .cases
+            .iter()
+            .filter(|c| c.text == bare)
+            .nth(*nth)
+            .map(|c| c.span.clone());
+        *nth += 1;
+        drop(names);
+        if let Some(at) = at {
+            self.resolved_at(
+                &at,
+                Target::Case {
+                    variant,
+                    case: bare.to_string(),
+                },
+            );
         }
     }
 
@@ -1852,6 +1892,7 @@ pub fn check_resolved(program: &Program) -> Result<(Program, Vec<Resolution>), V
         current_ret: std::cell::RefCell::new(Type::Unit),
         current_fn: std::cell::RefCell::new(String::new()),
         resolutions: std::cell::RefCell::new(Vec::new()),
+        pattern_names: std::cell::RefCell::new(Default::default()),
         current_type_params: std::cell::RefCell::new(Vec::new()),
         current_expected: std::cell::RefCell::new(None),
         locks: std::cell::RefCell::new(HashMap::new()),
@@ -3017,6 +3058,7 @@ impl Cx<'_> {
         // A pattern constructor may be variant-qualified (`Case@Variant`); the
         // scrutinee's type fixes the variant, so resolve against the bare case.
         let bare: &str = name.split('@').next().unwrap_or(name);
+        self.note_case(st, bare);
         let payload: Vec<Type> = match st {
             Type::Optional(inner) => match bare {
                 "some" => vec![(**inner).clone()],
@@ -3373,6 +3415,7 @@ impl Cx<'_> {
     /// `ty` does offer.
     fn pattern_case_payload(&self, ty: &Type, name: &str, span: &Span) -> Result<Vec<Type>, Error> {
         let bare: &str = name.split('@').next().unwrap_or(name);
+        self.note_case(ty, bare);
         match ty {
             Type::Optional(inner) => match bare {
                 "some" => Ok(vec![(**inner).clone()]),
@@ -3923,12 +3966,26 @@ impl Cx<'_> {
                 } else if let Some(vn) = self.ctors.get(name) {
                     let bare = name.split('@').next().unwrap_or(name);
                     self.expect_nullary_ctor(bare, vn, span.clone())?;
+                    self.resolved(
+                        &expr.name_span,
+                        Target::Case {
+                            variant: vn.clone(),
+                            case: bare.to_string(),
+                        },
+                    );
                     Type::Named(vn.clone())
                 } else if self.generic_ctors.contains_key(name) {
                     // A nullary constructor of a generic variant (`Nothing`):
                     // its instance can't be inferred from a (missing) payload, so
                     // it's resolved from the expected type.
                     let base = &self.generic_ctors[name];
+                    self.resolved(
+                        &expr.name_span,
+                        Target::Case {
+                            variant: base.clone(),
+                            case: name.split('@').next().unwrap_or(name).to_string(),
+                        },
+                    );
                     self.infer_generic_variant_ctor(
                         base,
                         name,
@@ -4660,6 +4717,7 @@ impl Cx<'_> {
                 let mut rows: Vec<patterns::Row> = Vec::new();
                 let mut merged: Option<(Type, &Expr)> = None;
                 for arm in arms {
+                    self.begin_pattern(arm);
                     let binders: Vec<(String, Type)> = if nested {
                         let (pat, binders) =
                             self.bind_nested(&arm.pattern, &st, arm.span.clone())?;
@@ -4672,12 +4730,13 @@ impl Cx<'_> {
                     };
                     let mut env2 = env.clone();
                     for (name, ty) in binders {
+                        let binder = arm.written.binder(&name);
                         env2.insert(
                             name,
                             Binding {
                                 ty,
                                 mutable: false,
-                                binder: None,
+                                binder,
                             },
                         );
                     }
@@ -4712,6 +4771,7 @@ impl Cx<'_> {
             // pattern's names, `ELSE` binds nothing.
             ExprKind::IfLet(arm, scrut, else_b) => {
                 let st = self.check_scrutinee(scrut, std::slice::from_ref(arm), env, effects)?;
+                self.begin_pattern(arm);
                 let binders: Vec<(String, Type)> = if arm.pattern.is_nested() {
                     self.bind_nested(&arm.pattern, &st, arm.span.clone())?.1
                 } else {
@@ -4721,12 +4781,13 @@ impl Cx<'_> {
                 };
                 let mut env2 = env.clone();
                 for (name, ty) in binders {
+                    let binder = arm.written.binder(&name);
                     env2.insert(
                         name,
                         Binding {
                             ty,
                             mutable: false,
-                            binder: None,
+                            binder,
                         },
                     );
                 }
@@ -5016,6 +5077,13 @@ impl Cx<'_> {
                 // the case's payload is keyed by the bare case name.
                 let bare = name.split('@').next().unwrap_or(name);
                 let payload = self.case_payload(vn, bare).unwrap_or(&[]).to_vec();
+                self.resolved(
+                    named,
+                    Target::Case {
+                        variant: vn.clone(),
+                        case: bare.to_string(),
+                    },
+                );
                 if args.len() != payload.len() {
                     return Err(Error::at(
                         format!(
@@ -5045,6 +5113,13 @@ impl Cx<'_> {
             // A constructor of a generic variant template: resolve to a concrete
             // instance by inferring the type arguments.
             if let Some(base) = self.generic_ctors.get(name) {
+                self.resolved(
+                    named,
+                    Target::Case {
+                        variant: base.clone(),
+                        case: name.split('@').next().unwrap_or(name).to_string(),
+                    },
+                );
                 return self.infer_generic_variant_ctor(base, name, args, env, effects, span, node);
             }
         }

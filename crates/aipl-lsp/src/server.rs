@@ -284,8 +284,9 @@ impl Server {
     ) -> Result<Value, String> {
         match self.analyses.identifier_at(path, text, offset) {
             Some((name, _)) => Err(format!(
-                "the compiler's name resolution does not cover `{name}` here (imports, \
-                 parameters, patterns and types are not tracked yet)"
+                "the compiler's name resolution does not cover `{name}` here: it is not a \
+                 name that stands for a declaration written in a file (a primitive type, \
+                 a keyword and the wildcard are not)"
             )),
             None => Ok(Value::Null),
         }

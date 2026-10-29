@@ -30,7 +30,6 @@ import {
     value_or,
     wrapping_add as +,
     wrapping_decrement as --,
-    zip_with,
 } from builtins;
 import {
     ByCase,
@@ -52,12 +51,18 @@ import {
     Match,
     MatchArm,
     Seq,
+    WrittenName,
+    WrittenNames,
+    WrittenStruct,
     at,
+    binder_span,
     expr,
     ident,
     join_spans,
     map_subexprs,
+    named_at,
     show_expr,
+    struct_written,
 } from "./expr.aipl";
 import {
     CaseParam,
@@ -137,8 +142,19 @@ fn desugared_function(self: Function) -> Function {
 pub fn desugared(self: Expr) -> Expr {
     let inner = self.with_struct_patterns_lifted().map_subexprs(desugared);
     match (inner.kind) {
-        LetPattern(pattern, value, body) => let_pattern(pattern, value, body),
-        ForPattern(pattern, iterable, body, index) => for_pattern(pattern, iterable, body, index),
+        LetPattern(pattern, value, body) => let_pattern(
+            pattern,
+            value,
+            body,
+            inner.written.value_or(WrittenNames {}),
+        ),
+        ForPattern(pattern, iterable, body, index) => for_pattern(
+            pattern,
+            iterable,
+            body,
+            index,
+            inner.written.value_or(WrittenNames {}),
+        ),
         // A lambda's destructured parameters are bound off the parameter itself, in
         // front of its body, as a function's are.
         Lambda(params, body) => Expr {
@@ -148,7 +164,13 @@ pub fn desugared(self: Expr) -> Expr {
                 params.right_fold(
                     body,
                     |p: LambdaParam, result: Expr| p.pattern
-                        .map(|pattern| bind_param_pattern(p.name, pattern, p.span, result))
+                        .map(|pattern| bind_param_pattern(
+                            p.name,
+                            pattern,
+                            p.span,
+                            result,
+                            p.written.value_or(WrittenNames {}),
+                        ))
                         .value_or(result),
                 ),
             ),
@@ -233,12 +255,13 @@ fn with_struct_patterns_lifted(self: Expr) -> Expr {
 # way `let Point { x, y } = temporary;` would. Temporaries are named for where the
 # arm's pattern starts and the struct pattern's place in it.
 fn lifted_arm(self: MatchArm) -> MatchArm {
-    let Lifted { pattern, structs } = self.pattern.lifted(self.span.start, 0);
+    let written = self.written.value_or(WrittenNames {});
+    let Lifted { pattern, structs } = self.pattern.lifted(self.span.start, 0, written);
     let span = self.span;
     let body = structs.right_fold(
         self.body,
         |found: Found, rest: Expr| {
-            let Found { binder, struct_name, fields, names, temporary } = found.bound_only();
+            let Found { binder, struct_name, fields, names, temporary, spelled } = found.bound_only();
             destructure_struct(
                 struct_name,
                 fields,
@@ -248,6 +271,7 @@ fn lifted_arm(self: MatchArm) -> MatchArm {
                 rest,
                 false,
                 temporary,
+                spelled,
             )
         },
     );
@@ -258,18 +282,37 @@ fn lifted_arm(self: MatchArm) -> MatchArm {
 fn bound_only(self: Found) -> Found {
     mut fields: str[] = [];
     mut names: str[] = [];
+    mut field_places: WrittenName[] = [];
+    mut binder_places: WrittenName[] = [];
     for (let i, name : self.names) {
         if (name != "_") {
             set fields.push(self.fields[i].value_or(""));
             set names.push(name);
+            set field_places.push(self.spelled.fields[i].value_or(NOWHERE));
+            set binder_places.push(self.spelled.binders[i].value_or(NOWHERE));
         };
     }
-    Found { ..self, fields, names }
+    Found {
+        ..self,
+        fields,
+        names,
+        spelled: WrittenStruct { fields: field_places, binders: binder_places },
+    }
 }
+
+# A name that is written nowhere.
+let NOWHERE: WrittenName = WrittenName { text: "", span: 0..0 };
 
 # A struct pattern taken out of a pattern: the binder that stands in for it, what
 # it destructures, and the name of the temporary its fields are read off.
-struct Found { binder: str, struct_name: str, fields: str[], names: str[], temporary: str }
+struct Found {
+    binder: str,
+    struct_name: str,
+    fields: str[],
+    names: str[],
+    temporary: str,
+    spelled: WrittenStruct,
+}
 
 # A pattern with its struct patterns replaced, and what they were, in order.
 struct Lifted { pattern: Pat, structs: Found[] }
@@ -280,7 +323,7 @@ struct LiftedAll { patterns: Pat[], structs: Found[] }
 # `self` with each struct pattern in it replaced by a binder named for `tag` and
 # its place, counting from `taken` — the number already lifted from the patterns
 # before this one in the arm.
-fn lifted(self: Pat, tag: u64, taken: u64) -> Lifted {
+fn lifted(self: Pat, tag: u64, taken: u64, written: WrittenNames) -> Lifted {
     match (self) {
         Struct(struct_name, fields, names) => Lifted {
             pattern: PatCtor(`__npat${tag}_{taken}`),
@@ -291,19 +334,20 @@ fn lifted(self: Pat, tag: u64, taken: u64) -> Lifted {
                     fields,
                     names,
                     temporary: `__spat${tag}_{taken}`,
+                    spelled: written.struct_written(taken),
                 },
             ],
         },
         Nested(name, args) => {
-            let LiftedAll { patterns, structs } = args.lifted_all(tag, taken);
+            let LiftedAll { patterns, structs } = args.lifted_all(tag, taken, written);
             Lifted { pattern: nested_or_ctor(name, patterns), structs }
         },
         Tuple(elements) => {
-            let LiftedAll { patterns, structs } = elements.lifted_all(tag, taken);
+            let LiftedAll { patterns, structs } = elements.lifted_all(tag, taken, written);
             Lifted { pattern: Tuple(patterns), structs }
         },
         ArrayNested(elements) => {
-            let LiftedAll { patterns, structs } = elements.lifted_all(tag, taken);
+            let LiftedAll { patterns, structs } = elements.lifted_all(tag, taken, written);
             Lifted { pattern: ArrayNested(patterns), structs }
         },
         Ctor(..) | Str(..) | Char(..) | Array(..) | ArrayRest(..) | Wildcard | Int(..) => Lifted {
@@ -313,11 +357,11 @@ fn lifted(self: Pat, tag: u64, taken: u64) -> Lifted {
     }
 }
 
-fn lifted_all(self: Pat[], tag: u64, taken: u64) -> LiftedAll {
+fn lifted_all(self: Pat[], tag: u64, taken: u64, written: WrittenNames) -> LiftedAll {
     mut patterns: Pat[] = [];
     mut structs: Found[] = [];
     for (let p : self) {
-        let Lifted { pattern, structs as found } = p.lifted(tag, taken + structs.len());
+        let Lifted { pattern, structs as found } = p.lifted(tag, taken + structs.len(), written);
         set patterns.push(pattern);
         set structs.extend(found);
     }
@@ -326,17 +370,17 @@ fn lifted_all(self: Pat[], tag: u64, taken: u64) -> LiftedAll {
 
 # `let <pattern> = value; body`. The temporary is named for where the value
 # starts, and holds the value so it is evaluated once.
-fn let_pattern(pattern: Destructure, value: Expr, body: Expr) -> Expr {
+fn let_pattern(pattern: Destructure, value: Expr, body: Expr, written: WrittenNames) -> Expr {
     let span = value.span;
     match (pattern) {
         ByTuple(names) => {
             let tmp = `__tpat${span.start}`;
-            let inner = bind_fields(names, tmp, span, body, tuple_slot_names(names));
+            let inner = bind_fields(names, tmp, span, body, tuple_slot_names(names), written);
             at(Let(tmp, none, value, inner), join_spans(span, inner.span))
         },
         ByCase(case_name, names) => {
             let tmp = `__cpat${span.start}`;
-            let inner = bind_arm(case_name, names, tmp, span, body);
+            let inner = bind_arm(case_name, names, tmp, span, body, written);
             at(Let(tmp, none, value, inner), join_spans(span, inner.span))
         },
         ByStruct(struct_name, fields, names, mutable) => destructure_struct(
@@ -348,10 +392,11 @@ fn let_pattern(pattern: Destructure, value: Expr, body: Expr) -> Expr {
             body,
             mutable,
             `__spat${span.start}`,
+            written.struct_written(0),
         ),
         ByPattern(pattern) => {
             let tmp = `__cpat${span.start}`;
-            let inner = bind_pattern(pattern, tmp, span, body);
+            let inner = bind_pattern(pattern, tmp, span, body, written);
             at(Let(tmp, none, value, inner), join_spans(span, inner.span))
         },
     }
@@ -362,12 +407,18 @@ fn let_pattern(pattern: Destructure, value: Expr, body: Expr) -> Expr {
 # pattern in a `let` reads them — through the same helpers, so the pattern's type
 # is checked the same way. With an `index` it is the indexed loop over that
 # temporary: the counter and the pattern compose as each does alone.
-fn for_pattern(pattern: Destructure, iterable: Expr, body: Expr, index: str?) -> Expr {
+fn for_pattern(
+    pattern: Destructure,
+    iterable: Expr,
+    body: Expr,
+    index: str?,
+    written: WrittenNames,
+) -> Expr {
     let span = iterable.span;
     let tmp = `__fpat${span.start}`;
     let inner = match (pattern) {
-        ByTuple(names) => bind_fields(names, tmp, span, body, tuple_slot_names(names)),
-        ByCase(case_name, names) => bind_arm(case_name, names, tmp, span, body),
+        ByTuple(names) => bind_fields(names, tmp, span, body, tuple_slot_names(names), written),
+        ByCase(case_name, names) => bind_arm(case_name, names, tmp, span, body, written),
         ByStruct(struct_name, fields, names, mutable) => destructure_struct(
             struct_name,
             fields,
@@ -377,8 +428,9 @@ fn for_pattern(pattern: Destructure, iterable: Expr, body: Expr, index: str?) ->
             body,
             mutable,
             `__spat${span.start}`,
+            written.struct_written(0),
         ),
-        ByPattern(pattern) => bind_pattern(pattern, tmp, span, body),
+        ByPattern(pattern) => bind_pattern(pattern, tmp, span, body, written),
     };
     at(For(tmp, iterable, inner, index=index), join_spans(span, inner.span))
 }
@@ -390,8 +442,19 @@ fn tuple_slot_names(names: str[]) -> str[] { names.range().map(|i| `_{i}`) }
 # `let a = <tmp>.<field0>; let b = <tmp>.<field1>; rest`, innermost last — the
 # body of both destructuring forms, which differ only in the field names they
 # read and in whether the bindings are mutable.
-fn bind_fields(names: str[], tmp: str, span: Span, rest: Expr, fields: str[]) -> Expr {
-    bind_fields_mut(names, tmp, span, rest, fields, false)
+fn bind_fields(
+    names: str[],
+    tmp: str,
+    span: Span,
+    rest: Expr,
+    fields: str[],
+    written: WrittenNames,
+) -> Expr {
+    let spelled = WrittenStruct {
+        fields: [],
+        binders: names.map(|name| WrittenName { text: name, span: written.binder_span(name) }),
+    };
+    bind_fields_mut(names, tmp, span, rest, fields, false, spelled)
 }
 
 fn bind_fields_mut(
@@ -401,18 +464,23 @@ fn bind_fields_mut(
     rest: Expr,
     fields: str[],
     mutable: bool,
+    spelled: WrittenStruct,
 ) -> Expr {
     mut result = rest;
     mut i = names.len();
     while (i > 0) {
         set i--;
-        let field = at(Field(at(Ident(tmp), span), fields[i].value_or("")), span);
+        let field_at = spelled.fields[i]$span.value_or(0..0);
+        let binder_at = spelled.binders[i]$span.value_or(0..0);
+        let field = at(Field(at(Ident(tmp), span), fields[i].value_or("")), span).named_at(
+            field_at,
+        );
         let inner_span = join_spans(span, result.span);
         let name = names[i].value_or("");
         set result = if (mutable) {
-            at(LetMut(name, none, field, result), inner_span)
+            at(LetMut(name, none, field, result), inner_span).named_at(binder_at)
         } else {
-            at(Let(name, none, field, result), inner_span)
+            at(Let(name, none, field, result), inner_span).named_at(binder_at)
         };
     }
     result
@@ -425,14 +493,19 @@ fn bind_fields_mut(
 # check. A `match` for each name, rather than one around the rest of the block,
 # keeps `rest` out of an arm: a block that is an expression may not assign to a
 # binding from outside it.
-fn bind_arm(case_name: str, names: str[], tmp: str, span: Span, rest: Expr) -> Expr {
-    bind_pattern(PatCtor(case_name, bindings=names), tmp, span, rest)
-}
+fn bind_arm(
+    case_name: str,
+    names: str[],
+    tmp: str,
+    span: Span,
+    rest: Expr,
+    written: WrittenNames,
+) -> Expr { bind_pattern(PatCtor(case_name, bindings=names), tmp, span, rest, written) }
 
 # The same for any pattern: a `match` of `pattern` per name it binds, with the
 # other names left unbound. Struct patterns inside it become binders and reads in
 # front of the arm's body, as in any other arm.
-fn bind_pattern(pattern: Pat, tmp: str, span: Span, rest: Expr) -> Expr {
+fn bind_pattern(pattern: Pat, tmp: str, span: Span, rest: Expr, written: WrittenNames) -> Expr {
     let names = pattern.pat_bindings();
     mut result = rest;
     mut i = names.len();
@@ -443,9 +516,13 @@ fn bind_pattern(pattern: Pat, tmp: str, span: Span, rest: Expr) -> Expr {
             pattern: pattern.keeping(name),
             body: at(Ident(name), span),
             span,
+            written: some(written),
         }.lifted_arm();
         let read = at(Match(at(Ident(tmp), span), [arm]), span);
-        set result = at(Let(name, none, read, result), join_spans(span, result.span));
+        set result = at(
+            Let(name, none, read, result),
+            join_spans(span, result.span),
+        ).named_at(written.binder_span(name));
     }
     result
 }
@@ -510,8 +587,9 @@ fn destructure_struct(
     acc: Expr,
     mutable: bool,
     tmp: str,
+    spelled: WrittenStruct,
 ) -> Expr {
-    let inner = bind_fields_mut(names, tmp, span, acc, fields, mutable);
+    let inner = bind_fields_mut(names, tmp, span, acc, fields, mutable, spelled);
     let outer_span = join_spans(span, inner.span);
     at(Let(tmp, some(TyNamed(struct_name)), value, inner), outer_span)
 }
@@ -520,30 +598,41 @@ fn destructure_struct(
 # the struct's fields, read off the parameter itself. Folded from the right by the
 # caller so they come out in source order.
 fn bind_one_param(p: Param, body: Expr) -> Expr {
-    let ParamPattern { pattern, span } = p.pattern.value_or(ParamPattern {
+    let ParamPattern { pattern, span, written } = p.pattern.value_or(ParamPattern {
         pattern: ByTuple([]),
         span: 0..0,
     });
-    bind_param_pattern(p.name, pattern, span, body)
+    bind_param_pattern(p.name, pattern, span, body, written.value_or(WrittenNames {}))
 }
 
 # The bindings `pattern` makes, read off the parameter called `parameter`, in front of
 # `body`. The parameter's own type is what the checker holds the pattern to.
-fn bind_param_pattern(parameter: str, pattern: Destructure, span: Span, body: Expr) -> Expr {
+fn bind_param_pattern(
+    parameter: str,
+    pattern: Destructure,
+    span: Span,
+    body: Expr,
+    written: WrittenNames,
+) -> Expr {
     match (pattern) {
-        ByCase(case_name, names) => bind_arm(case_name, names, parameter, span, body),
-        ByStruct(_, fields, names, _) => zip_with(
-            fields,
+        ByCase(case_name, names) => bind_arm(case_name, names, parameter, span, body, written),
+        ByStruct(_, fields, names, _) => bind_fields_mut(
             names,
-            |field: str, name: str| (field, name),
-        ).right_fold(
+            parameter,
+            span,
             body,
-            |(field, name), result: Expr| {
-                let value = at(Field(at(Ident(parameter), span), field), span);
-                at(Let(name, none, value, result), join_spans(span, result.span))
-            },
+            fields,
+            false,
+            written.struct_written(0),
         ),
-        ByPattern(pattern) => bind_pattern(pattern, parameter, span, body),
-        ByTuple(names) => bind_fields(names, parameter, span, body, tuple_slot_names(names)),
+        ByPattern(pattern) => bind_pattern(pattern, parameter, span, body, written),
+        ByTuple(names) => bind_fields(
+            names,
+            parameter,
+            span,
+            body,
+            tuple_slot_names(names),
+            written,
+        ),
     }
 }

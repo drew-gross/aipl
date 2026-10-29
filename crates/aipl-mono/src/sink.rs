@@ -444,6 +444,7 @@ mod tests {
 
     fn arm(name: &str, bindings: &[&str], body: Expr) -> MatchArm {
         MatchArm {
+            written: Default::default(),
             pattern: Pattern::Ctor {
                 name: name.into(),
                 bindings: bindings.iter().map(|b| (*b).to_string()).collect(),

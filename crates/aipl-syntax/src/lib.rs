@@ -394,6 +394,23 @@ pub mod ast {
         /// Each name written in a type annotation that the loader resolved to a
         /// declaration: where it is written, and the global name it means.
         pub type_uses: Vec<ImportSite>,
+        /// Each name written in a type annotation that is a declared type
+        /// parameter (`T` in `fn f<T>(x: T)`). Which declaration it means is
+        /// the parameter list of the item that holds it.
+        pub type_var_uses: Vec<Span>,
+        /// Each keyword argument written in the file (`f(k = v)`): the calls are
+        /// positional once the loader has expanded them, so this is what says
+        /// where the name was and which parameter it meant.
+        pub keyword_uses: Vec<KeywordUse>,
+    }
+
+    /// One keyword argument's name, written at `span` in a call of `callee`
+    /// (a function's global name), for its parameter `param`.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct KeywordUse {
+        pub span: Span,
+        pub callee: String,
+        pub param: String,
     }
 
     /// One name written in an import list, and what the loader resolved it to.
@@ -627,6 +644,9 @@ pub mod ast {
         /// The type the parameter takes when a call leaves nothing to infer it from,
         /// written `<T: any = i64>`. Only a function's parameter has one.
         pub default: Option<Type>,
+        /// Where the parameter's name is written in the `<..>` list; empty for
+        /// one a pass made up.
+        pub name_span: NameSpan,
     }
 
     /// A function's shape apart from its body and source-only concerns (name,
@@ -2226,6 +2246,44 @@ pub mod ast {
         pub pattern: Pattern,
         pub body: Expr,
         pub span: Span,
+        /// Where the pattern's names are written. Empty for an arm a pass made up.
+        pub written: WrittenNames,
+    }
+
+    /// The constructors a pattern names and the names it binds, each with the
+    /// place it is written. A pattern keeps only the text of its names; this is
+    /// the part of the source that does not survive that. Compares equal to every
+    /// other, as a [`NameSpan`] does: positions say where, not what.
+    #[derive(Debug, Clone, Default)]
+    pub struct WrittenNames {
+        pub cases: Vec<SpanStr>,
+        pub binders: Vec<SpanStr>,
+    }
+
+    impl PartialEq for WrittenNames {
+        fn eq(&self, _: &WrittenNames) -> bool {
+            true
+        }
+    }
+
+    impl Eq for WrittenNames {}
+
+    impl WrittenNames {
+        /// Where the pattern writes the binder `name`.
+        pub fn binder(&self, name: &str) -> Option<Span> {
+            self.binders
+                .iter()
+                .find(|written| written.text == name)
+                .map(|written| written.span.clone())
+        }
+
+        /// Where the pattern writes the case `name`.
+        pub fn case(&self, name: &str) -> Option<Span> {
+            self.cases
+                .iter()
+                .find(|written| written.text == name)
+                .map(|written| written.span.clone())
+        }
     }
 }
 

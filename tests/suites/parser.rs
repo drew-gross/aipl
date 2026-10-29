@@ -866,6 +866,7 @@ fn generic_type_params_parse() {
     assert_eq!(
         f.sig.type_vars,
         vec![TypeParam {
+            name_span: Default::default(),
             name: "T".to_string(),
             bound: Bound::Any,
             default: None
@@ -913,6 +914,7 @@ fn ord_bound_parses() {
     assert_eq!(
         fn_item(&p, 0).sig.type_vars,
         vec![TypeParam {
+            name_span: Default::default(),
             name: "T".to_string(),
             bound: Bound::Ord,
             default: None
@@ -927,11 +929,13 @@ fn type_param_defaults_parse() {
         fn_item(&p, 0).sig.type_vars,
         vec![
             TypeParam {
+                name_span: Default::default(),
                 name: "T".to_string(),
                 bound: Bound::Any,
                 default: Some(Type::Primitive(Primitive::I64))
             },
             TypeParam {
+                name_span: Default::default(),
                 name: "U".to_string(),
                 bound: Bound::Any,
                 default: Some(Type::Primitive(Primitive::Str))
@@ -953,11 +957,13 @@ fn multiple_type_params_parse() {
         fn_item(&p, 0).sig.type_vars,
         vec![
             TypeParam {
+                name_span: Default::default(),
                 name: "T".to_string(),
                 bound: Bound::Any,
                 default: None
             },
             TypeParam {
+                name_span: Default::default(),
                 name: "U".to_string(),
                 bound: Bound::Any,
                 default: None

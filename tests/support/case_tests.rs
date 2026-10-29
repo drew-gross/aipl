@@ -1064,6 +1064,7 @@ case_tests! {
     crates_aipl_codegen_src_ty = "crates/aipl-codegen/src/ty",
     crates_aipl_codegen_src_unescape = "crates/aipl-codegen/src/unescape",
     crates_aipl_codegen_src_walker = "crates/aipl-codegen/src/walker",
+    crates_aipl_codegen_src_written_names = "crates/aipl-codegen/src/written_names",
     crates_aipl_mono_src_builtin_all = "crates/aipl-mono/src/builtin_all",
     crates_aipl_mono_src_builtin_any = "crates/aipl-mono/src/builtin_any",
     crates_aipl_mono_src_builtin_as_case = "crates/aipl-mono/src/builtin_as_case",

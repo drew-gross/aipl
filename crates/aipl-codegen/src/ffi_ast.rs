@@ -192,6 +192,11 @@ fn type_param(v: &FfiValue) -> R<ast::TypeParam> {
         name: text(field(v, "name")?)?,
         bound: bound(field(v, "bound")?)?,
         default: maybe(field(v, "default")?, ty)?,
+        // The AIPL struct's last slot; an older artifact has none.
+        name_span: ast::NameSpan(match v_field(v, "name_span") {
+            Some(name_span) => span(name_span)?,
+            None => 0..0,
+        }),
     })
 }
 
@@ -397,6 +402,28 @@ fn match_arm(v: &FfiValue) -> R<ast::MatchArm> {
         pattern: pattern(field(v, "pattern")?)?.normalized(true),
         body: expr(field(v, "body")?)?,
         span: span(field(v, "span")?)?,
+        // The AIPL struct's last slot; an older artifact has none.
+        written: match v_field(v, "written") {
+            Some(written) => maybe(written, written_names)?.unwrap_or_default(),
+            None => Default::default(),
+        },
+    })
+}
+
+/// Where a pattern writes its names. The AIPL side also lists each struct
+/// pattern's fields; those are bound to `let`s before anything here sees them.
+fn written_names(v: &FfiValue) -> R<ast::WrittenNames> {
+    let names = |v: &FfiValue| -> R<Vec<aipl_syntax::SpanStr>> {
+        each(v, |name| {
+            Ok(aipl_syntax::SpanStr::new(
+                text(field(name, "text")?)?,
+                span(field(name, "span")?)?,
+            ))
+        })
+    };
+    Ok(ast::WrittenNames {
+        cases: names(field(v, "cases")?)?,
+        binders: names(field(v, "binders")?)?,
     })
 }
 

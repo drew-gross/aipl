@@ -49,7 +49,7 @@ use aipl_syntax::{Error, Span};
 /// positional parameter following a keyword parameter, keyword arguments to a
 /// function without that keyword parameter, duplicate/positional-after-keyword
 /// arguments, or a function with keyword parameters used as a value.
-pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
+pub(crate) fn expand_keyword_args(program: &Program, root_index: u32) -> Result<Program, Error> {
     // Builtins with keyword parameters (currently just `execute_program`'s
     // `args`) participate too: their calls are already rewritten to canonical
     // `__builtin_*` names by this point, and the info comes straight from the
@@ -100,6 +100,8 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
         struct_fields,
         struct_spreads: 0,
         kw_tmps: 0,
+        current_fn: String::new(),
+        keyword_uses: Vec::new(),
     };
 
     let items = program
@@ -127,6 +129,7 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
             let Item::Fn(f) = item else {
                 return Ok(item.clone());
             };
+            cx.current_fn = f.name.text.clone();
             // Parameters are the body's locals: a function-typed parameter
             // named like a global function must not have that global's
             // keyword machinery applied to calls through it.
@@ -160,11 +163,23 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
             }))
         })
         .collect::<Result<_, _>>()?;
+    // Expansion rewrites bodies only; the file map and the file's own
+    // documentation are unchanged — but for the places keyword arguments were
+    // written, which are gone from the tree once they are positional.
+    let mut sources = program.sources.clone();
+    for (in_fn, span, callee, param) in cx.keyword_uses {
+        let index = aipl_syntax::mangled_file_index(&in_fn).unwrap_or(root_index);
+        if let Some(source) = sources.get_mut(index as usize) {
+            source.keyword_uses.push(aipl_syntax::ast::KeywordUse {
+                span,
+                callee,
+                param,
+            });
+        }
+    }
     Ok(Program {
         items,
-        // Expansion rewrites bodies only; the file map and the file's own
-        // documentation are unchanged.
-        sources: program.sources.clone(),
+        sources,
         doc: program.doc.clone(),
     })
 }
@@ -354,6 +369,11 @@ fn builtin_kw_infos() -> Result<HashMap<String, FnKwInfo>, Error> {
 }
 
 struct Expander {
+    /// The function whose body is being expanded, and the keyword arguments
+    /// written in the program so far: in which function, where the name is
+    /// written, which function it was passed to and for which parameter.
+    current_fn: String,
+    keyword_uses: Vec<(String, Span, String, String)>,
     fns: HashMap<String, FnKwInfo>,
     /// Memoized *expanded* default expressions per function (in keyword
     /// parameter order) — a default may itself call functions with keyword
@@ -918,10 +938,12 @@ impl Expander {
         // Split the positional prefix from the keyword tail, rejecting a
         // positional argument after a keyword one.
         let mut positional: Vec<Expr> = Vec::new();
-        let mut by_kw: Vec<(String, Expr, Span, bool)> = Vec::new();
+        let mut by_kw: Vec<(String, Expr, Span, bool, Option<Span>)> = Vec::new();
         for arg in args {
             match arg.kind {
-                ExprKind::KwArg(k, v, fwd) => by_kw.push((k, *v, arg.span, fwd)),
+                ExprKind::KwArg(k, v, fwd) => {
+                    by_kw.push((k, *v, arg.span, fwd, arg.name_span.map(|written| *written)))
+                }
                 _ if by_kw.is_empty() => positional.push(arg),
                 _ => {
                     return Err(Error::at(
@@ -938,7 +960,7 @@ impl Expander {
         let info = match self.info(callee)? {
             Some(info) if !info.kw.is_empty() => info,
             found => {
-                if let Some((k, _, kspan, _)) = by_kw.first() {
+                if let Some((k, _, kspan, _, _)) = by_kw.first() {
                     // A known function whose parameter `k` exists but is
                     // positional gets the more specific message.
                     if found.is_some_and(|info| info.positional.iter().any(|p| p == k)) {
@@ -986,7 +1008,11 @@ impl Expander {
         // Match each keyword argument to a keyword parameter by name.
         let kw_names: Vec<&str> = info.kw.iter().map(|(k, _)| k.as_str()).collect();
         let mut supplied: Vec<Option<Expr>> = vec![None; kw_names.len()];
-        for (k, v, kspan, fwd) in by_kw {
+        let mut written_names: Vec<(Span, String)> = Vec::new();
+        for (k, v, kspan, fwd, written) in by_kw {
+            if let Some(written) = written.filter(|_| kw_names.contains(&k.as_str())) {
+                written_names.push((written, k.clone()));
+            }
             let Some(i) = kw_names.iter().position(|n| *n == k) else {
                 // Naming a *positional* parameter gets its own message: only a
                 // keyword parameter may be supplied by keyword.
@@ -1071,6 +1097,10 @@ impl Expander {
         }
 
         let params = info.params.clone();
+        for (written, param) in written_names {
+            self.keyword_uses
+                .push((self.current_fn.clone(), written, name.to_string(), param));
+        }
         let defaults = self.expanded_defaults(name)?;
         Ok(self.fill_defaults(&params, positional, supplied, defaults, span))
     }
@@ -1247,9 +1277,9 @@ impl Expander {
                     .map(|a| match &a.kind {
                         ExprKind::KwArg(k, v, fwd) => {
                             let v = self.expand_expr(v, locals)?;
-                            Ok(Expr::new(
+                            Ok(Expr::rebuilt(
                                 ExprKind::KwArg(k.clone(), Box::new(v), *fwd),
-                                a.span.clone(),
+                                a,
                             ))
                         }
                         _ => self.expand_expr(a, locals),
@@ -1327,6 +1357,7 @@ impl Expander {
                             arm_locals.insert(b.clone());
                         }
                         Ok(MatchArm {
+                            written: arm.written.clone(),
                             pattern: arm.pattern.clone(),
                             body: self.expand_expr(&arm.body, &arm_locals)?,
                             span: arm.span.clone(),
@@ -1343,6 +1374,7 @@ impl Expander {
                     then_locals.insert(b.clone());
                 }
                 let new_arm = MatchArm {
+                    written: arm.written.clone(),
                     pattern: arm.pattern.clone(),
                     body: self.expand_expr(&arm.body, &then_locals)?,
                     span: arm.span.clone(),

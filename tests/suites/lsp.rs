@@ -545,7 +545,8 @@ fn a_struct_in_a_pattern_goes_to_its_declaration() {
 }
 
 /// A name the compiler resolves nothing for is an error, not an empty result:
-/// the cursor is on something, and the server cannot say what.
+/// the cursor is on something, and the server cannot say what. A primitive type
+/// is one: it is declared nowhere.
 #[test]
 fn a_name_the_compiler_did_not_resolve_is_an_error_but_whitespace_is_not() {
     let source = "variant Shape = Circle(i64) | Square(i64)\n\
@@ -564,9 +565,9 @@ fn a_name_the_compiler_did_not_resolve_is_an_error_but_whitespace_is_not() {
     let reason = request_error(
         &mut server,
         "textDocument/definition",
-        params(cursor_on(source, "Circle(r)")),
+        params(cursor_on(source, "i64 {")),
     );
-    assert!(reason.contains("does not cover `Circle`"), "{reason}");
+    assert!(reason.contains("does not cover `i64`"), "{reason}");
     assert_eq!(
         request(
             &mut server,
@@ -1139,4 +1140,104 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack
         .windows(needle.len())
         .position(|window| window == needle)
+}
+
+/// The names a pattern writes go where the compiler sends them: the case it
+/// names to the case's declaration, a binder to its uses, and a struct pattern's
+/// field to the field it reads.
+#[test]
+fn the_names_in_a_pattern_go_where_the_compiler_sends_them() {
+    let source = "import { wrapping_add as +, map } from builtins;\n\
+                  \n\
+                  struct Point { east: i64, north: i64 }\n\
+                  \n\
+                  variant Shape = Circle(i64) | Square(Point) | Blob\n\
+                  \n\
+                  fn area(shape: Shape) -> i64 {\n\
+                  \u{20}   match (shape) {\n\
+                  \u{20}       Circle(radius) => radius + 1,\n\
+                  \u{20}       Square(Point { east, north }) => east + north,\n\
+                  \u{20}       Blob => 0,\n\
+                  \u{20}   }\n\
+                  }\n\
+                  \n\
+                  fn make() -> Shape { Circle(3) }\n\
+                  \n\
+                  fn total(Point { east, north }) -> i64 { east + north }\n\
+                  \n\
+                  fn pair(slots: (i64, i64)) -> i64 {\n\
+                  \u{20}   let (left, right) = slots;\n\
+                  \u{20}   left + right\n\
+                  }\n\
+                  \n\
+                  fn lambda(points: Point[]) -> i64[] {\n\
+                  \u{20}   points.map(|Point { east, north }| east + north)\n\
+                  }\n";
+    let workspace = Workspace::new("pattern-names", &[("main.aipl", source)]);
+    let mut server = opened(&workspace, "main.aipl");
+    analysed(&mut server, &workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let goes = |server: &mut Server, from: &str, to: &str| {
+        let location = definition_at(server, &uri, cursor_on(source, from));
+        assert_eq!(
+            location["range"]["start"],
+            cursor_on(source, to),
+            "from {from:?}"
+        );
+    };
+    // A case goes to its declaration from a pattern and from a constructor call.
+    goes(&mut server, "Circle(radius)", "Circle(i64)");
+    goes(&mut server, "Circle(3)", "Circle(i64)");
+    goes(&mut server, "Square(Point { east", "Square(Point)");
+    goes(&mut server, "Blob =>", "Blob\n");
+    // A binder a pattern writes is what its uses go to.
+    goes(&mut server, "radius + 1", "radius) =>");
+    // A struct pattern's field goes to the field; its uses go to the binder.
+    goes(&mut server, "east, north }) =>", "east: i64");
+    goes(&mut server, "east + north,", "east, north }) =>");
+    // A destructured parameter, a tuple `let` and a lambda parameter are the same.
+    goes(&mut server, "east + north }", "east, north }) -> i64");
+    goes(&mut server, "left + right", "left, right) = slots");
+    goes(&mut server, "east + north)", "east, north }| east");
+}
+
+/// A keyword argument's name goes to the parameter it was passed for, though the
+/// loader has made the call positional by the time anything is checked.
+#[test]
+fn a_keyword_argument_goes_to_its_parameter() {
+    let source = "import { wrapping_add as + } from builtins;\n\
+                  \n\
+                  fn shifted(start: i64, shift: i64 = 1) -> i64 { start + shift }\n\
+                  \n\
+                  fn caller() -> i64 { shifted(2, shift=3) }\n";
+    let workspace = Workspace::new("keyword-arguments", &[("main.aipl", source)]);
+    let mut server = opened(&workspace, "main.aipl");
+    analysed(&mut server, &workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let location = definition_at(&mut server, &uri, cursor_on(source, "shift=3"));
+    assert_eq!(location["range"]["start"], cursor_on(source, "shift: i64"));
+}
+
+/// A type parameter goes to the list that declares it, from every place its item
+/// writes it.
+#[test]
+fn a_type_parameter_goes_to_its_declaration() {
+    let source = "struct Holder<Item> { held: Item }\n\
+                  \n\
+                  fn unwrap<Value>(holder: Holder<Value>) -> Value { holder.held }\n";
+    let workspace = Workspace::new("type-parameters", &[("main.aipl", source)]);
+    let mut server = opened(&workspace, "main.aipl");
+    analysed(&mut server, &workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let goes = |server: &mut Server, from: &str, to: &str| {
+        let location = definition_at(server, &uri, cursor_on(source, from));
+        assert_eq!(
+            location["range"]["start"],
+            cursor_on(source, to),
+            "from {from:?}"
+        );
+    };
+    goes(&mut server, "Item }", "Item>");
+    goes(&mut server, "Value>)", "Value>(");
+    goes(&mut server, "Value {", "Value>(");
 }

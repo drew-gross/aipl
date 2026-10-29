@@ -1,0 +1,161 @@
+# Where the names in a pattern are written.
+#
+# A pattern is kept as text (`Pat`), which is all the compiler needs, so the places
+# its names stand in the source are read off the pattern's tokens as the parser
+# lowers it. A language server needs them: the case a pattern names, the names it
+# binds and the fields a struct pattern reads are each something to jump to or from.
+
+import {
+    Span,
+    contains,
+    equal as ==,
+    greater_than as >,
+    greater_than_or_equal as >=,
+    is_some_and,
+    len,
+    less_than as <,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    push,
+    split,
+    value_or,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+    wrapping_decrement as --,
+    wrapping_increment as ++,
+    wrapping_sub as -,
+} from builtins;
+import { WrittenName, WrittenNames, WrittenStruct } from "./expr.aipl";
+import { is_binder_name } from "./pat.aipl";
+
+# The names `tokens` spell, in a pattern written in `src`. `tokens` are the
+# pattern's token spans, nothing before or after it.
+#
+# A name followed by `(` or written after a `.` is a case, and one followed by `{`
+# opens a struct pattern, whose own name is a type. Any other name is a binder
+# unless it spells a case (`none`, or capitalised) — and `bare_is_case` says the
+# pattern's top level is a case position: at the head of a `match` arm a bare name
+# is a nullary case, where in a `let` it binds.
+pub fn written_names(tokens: Span[], src: str, bare_is_case: bool) -> WrittenNames {
+    mut cases: WrittenName[] = [];
+    mut binders: WrittenName[] = [];
+    mut structs: WrittenStruct[] = [];
+    mut depth: u64 = 0;
+    mut i: u64 = 0;
+    while (i < tokens.len()) {
+        let at = tokens[i].value_or(0..0);
+        let text = src[at];
+        let next = token_text(tokens, src, i + 1);
+        if (text == "(" || text == "[") {
+            set depth++;
+        } else if (text == ")" || text == "]") {
+            if (depth > 0) {
+                set depth--;
+            };
+        } else if (text.starts_name()) {
+            if (token_text(tokens, src, i - 1) == ".") {
+                set cases.push(WrittenName { text, span: at });
+            } else if (next == "{") {
+                let StructScan { written, end } = struct_fields(tokens, src, i + 2);
+                set structs.push(written);
+                set i = end;
+            } else if (next == "(") {
+                set cases.push(WrittenName { text, span: at });
+            } else if (next == "." || text == "_") {} else if ((depth == 0 && bare_is_case) || !text.is_binder_name()) {
+                set cases.push(WrittenName { text, span: at });
+            } else {
+                set binders.push(WrittenName { text, span: at });
+            };
+        };
+        set i++;
+    }
+    WrittenNames { cases, binders, structs }
+}.test({
+    // The tokens of `src`, which is written with a space between each.
+    fn words(src: str) -> Span[] {
+        mut spans: Span[] = [];
+        mut start: u64 = 0;
+        for (let word : src.split(" ")) {
+            set spans.push(start..start + word.len());
+            set start = start + word.len() + 1;
+        }
+        spans
+    }
+    fn texts(self: WrittenName[]) -> str[] { self$text }
+
+    // An arm's top level is a case position, and a nested bare lowercase name binds.
+    let arm = "Pair ( a , Nil )";
+    let found = written_names(words(arm), arm, true);
+    assert(found.cases.texts() == ["Pair", "Nil"]);
+    assert(found.binders.texts() == ["a"]);
+    let bare = "Blob";
+    assert(written_names(words(bare), bare, true).cases.texts() == ["Blob"]);
+
+    // A `let` binds a bare name at its top level.
+    let tuple = "( a , b )";
+    assert(written_names(words(tuple), tuple, false).binders.texts() == ["a", "b"]);
+
+    // A qualified case is its last name; the variant before the dot is not one.
+    let qualified = "Shape . Circle ( r )";
+    let q = written_names(words(qualified), qualified, true);
+    assert(q.cases.texts() == ["Circle"]);
+    assert(q.binders.texts() == ["r"]);
+
+    // A struct pattern's fields and the names they bind, apart from the arm's own.
+    let record = "Square ( Point { x , y as w } , n )";
+    let r = written_names(words(record), record, true);
+    assert(r.cases.texts() == ["Square"]);
+    assert(r.binders.texts() == ["n"]);
+    assert(r.structs.len() == 1);
+    assert(
+        r.structs[0].value_or(WrittenStruct { fields: [], binders: [] }).fields.texts() == [
+            "x",
+            "y",
+        ],
+    );
+    assert(
+        r.structs[0].value_or(WrittenStruct { fields: [], binders: [] }).binders.texts() == [
+            "x",
+            "w",
+        ],
+    );
+})
+
+# What follows a struct pattern's `{`: the fields it reads and the names it binds
+# them as, and the index of the `}` that closes it.
+struct StructScan { written: WrittenStruct, end: u64 }
+
+fn struct_fields(tokens: Span[], src: str, start: u64) -> StructScan {
+    mut fields: WrittenName[] = [];
+    mut binders: WrittenName[] = [];
+    mut i = start - 1;
+    mut open = true;
+    while (open) {
+        set i++;
+        let at = tokens[i].value_or(0..0);
+        let text = src[at];
+        if (text == "}" || i >= tokens.len()) {
+            set open = false;
+        } else if (text.starts_name()) {
+            set fields.push(WrittenName { text, span: at });
+            if (token_text(tokens, src, i + 1) == "as") {
+                set i += 2;
+                let name_at = tokens[i].value_or(0..0);
+                set binders.push(WrittenName { text: src[name_at], span: name_at });
+            } else {
+                set binders.push(WrittenName { text, span: at });
+            };
+        };
+    }
+    StructScan { written: WrittenStruct { fields, binders }, end: i }
+}
+
+# The text of token `i`, or the empty string past either end.
+fn token_text(tokens: Span[], src: str, i: u64) -> str { tokens[i].map(|at| src[at]).value_or("") }
+
+# Whether `self` begins like a name: a letter or an underscore.
+fn starts_name(self: str) -> bool {
+    self[0].is_some_and(|c| "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contains(c))
+}

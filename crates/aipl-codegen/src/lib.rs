@@ -1714,6 +1714,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./promote_type_vars.aipl",
     "./desugar.aipl",
     "./source_text.aipl",
+    "./written_names.aipl",
     // The lints that have moved to AIPL, run by `parse_and_partial_load`.
     "./lint/lint_hit.aipl",
     "./lint/unused_imports.aipl",

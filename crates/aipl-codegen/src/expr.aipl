@@ -7,6 +7,7 @@ import {
     as_case,
     collect_ok,
     equal as ==,
+    find_if,
     first,
     is_empty,
     join,
@@ -14,12 +15,13 @@ import {
     map,
     max,
     min,
+    not_equal as !=,
     push,
     to_array,
     value_or,
     zip_with,
 } from builtins;
-import { Ctor, Pat, pat_bindings, show_pat } from "./pat.aipl";
+import { Ctor, Pat, Wildcard, pat_bindings, show_pat } from "./pat.aipl";
 import { I64 } from "./prim.aipl";
 import {
     Array,
@@ -66,8 +68,19 @@ import {
 # synthesized, and on every node until `with_source_text` has filled it in. Rust
 # has no such field: it is read only by the lints, which run on the AIPL side.
 #
+# `written` is where a destructuring `let` or `for` writes the names in its
+# pattern (`LetPattern` and `ForPattern` only), kept for `desugar.aipl`, which turns
+# them into bindings that carry the places.
+#
 # The `ty` field `Expr` carries in Rust is absent — nothing the parser sets it.
-struct Expr { kind: ExprKind, span: Span, value_span: Span, name_span: Span, source: str }
+struct Expr {
+    kind: ExprKind,
+    span: Span,
+    value_span: Span,
+    name_span: Span,
+    source: str,
+    written: WrittenNames? = none,
+}
 
 # One field of a struct literal. A `..base` spread rides as an init with an
 # empty name whose *value* is the `Spread` — the value is what identifies it,
@@ -84,12 +97,92 @@ struct FieldInit { name: str, value: Expr, name_span: Span = 0..0 }
 # `|(a, b)| ..`): the parameter itself is a synthetic one named `name`, and the
 # names are bound off it at the top of the body when `desugar.aipl` lowers it. Always
 # `none` once that has run.
-struct LambdaParam { name: str, ty: Ty?, span: Span, pattern: Destructure? = none }
+struct LambdaParam {
+    name: str,
+    ty: Ty?,
+    span: Span,
+    pattern: Destructure? = none,
+    written: WrittenNames? = none,
+}
+
+# One name as it is written in a pattern, and where.
+struct WrittenName { text: str, span: Span }
+
+# The fields a struct pattern `T { a, b as c }` reads, in order, and the names it
+# binds them as — `a` and `a` for a field bound under its own name.
+struct WrittenStruct { fields: WrittenName[], binders: WrittenName[] }
+
+# The names a pattern spells and where, so a language server can point at them.
+# `Pat` keeps names as text, which is all the compiler needs; this is the part of
+# the source it drops.
+#
+# `cases` are the constructors the pattern names, `binders` the names it binds
+# (outside any struct pattern), and `structs` one entry per struct pattern, in
+# source order.
+struct WrittenNames {
+    cases: WrittenName[] = [],
+    binders: WrittenName[] = [],
+    structs: WrittenStruct[] = [],
+}
+
+# Where `self` writes `text`, or the empty span for a name that is not written.
+pub fn span_named(self: WrittenName[], text: str) -> Span {
+    self.find_if(|name| name.text == text)$span.value_or(0..0)
+}.test({
+    let names = [WrittenName { text: "a", span: 1..2 }, WrittenName { text: "b", span: 4..5 }];
+    assert(names.span_named("b") == 4..5);
+    assert(names.span_named("c") == 0..0);
+})
+
+# Where a pattern writes the binder `text`, whether directly or in one of its
+# struct patterns; the empty span if it does not.
+pub fn binder_span(self: WrittenNames, text: str) -> Span {
+    let found = self.binders.span_named(text);
+    if (found != 0..0) {
+        return found;
+    };
+    self.structs$binders.join().span_named(text)
+}.test({
+    let direct = WrittenName { text: "a", span: 1..2 };
+    let inner = WrittenName { text: "x", span: 6..7 };
+    let names = WrittenNames {
+        cases: [],
+        binders: [direct],
+        structs: [WrittenStruct { fields: [inner], binders: [inner] }],
+    };
+    assert(names.binder_span("a") == 1..2);
+    assert(names.binder_span("x") == 6..7);
+    assert(names.binder_span("y") == 0..0);
+})
+
+# The `i`th struct pattern's part of `self`: nothing written if there is none.
+pub fn struct_written(self: WrittenNames, i: u64) -> WrittenStruct {
+    self.structs[i].value_or(WrittenStruct { fields: [], binders: [] })
+}.test({
+    let written = WrittenStruct { fields: [WrittenName { text: "f", span: 2..3 }], binders: [] };
+    let names = WrittenNames { cases: [], binders: [], structs: [written] };
+    assert(names.struct_written(0) == written);
+    assert(names.struct_written(1).fields == []);
+})
 
 # One arm of a `match`, and the `then` half of an `if let`. Its span is the
 # *pattern's*, so a diagnostic points at what selected the arm rather than at
-# everything it does.
-struct MatchArm { pattern: Pat, body: Expr, span: Span }
+# everything it does. `written` is where the pattern's names are written.
+struct MatchArm { pattern: Pat, body: Expr, span: Span, written: WrittenNames? = none }
+
+# Where `self`'s pattern writes its names; nothing for an arm a pass made up.
+pub fn names_written(self: MatchArm) -> WrittenNames {
+    self.written.value_or(WrittenNames { cases: [], binders: [], structs: [] })
+}.test({
+    let arm = MatchArm { pattern: Wildcard, body: ident("x"), span: 0..0 };
+    assert(arm.names_written().cases == []);
+    let named = WrittenNames {
+        cases: [WrittenName { text: "A", span: 1..2 }],
+        binders: [],
+        structs: [],
+    };
+    assert(MatchArm { ..arm, written: some(named) }.names_written() == named);
+})
 
 # `aipl_syntax::ast::ExprKind`, all 32 cases.
 #

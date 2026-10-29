@@ -227,6 +227,7 @@ fn fold_expr(e: &Expr, env: &HashMap<String, ExprKind>) -> Expr {
             f(scrut),
             arms.iter()
                 .map(|arm| MatchArm {
+                    written: arm.written.clone(),
                     pattern: arm.pattern.clone(),
                     body: fold_expr(&arm.body, env),
                     span: arm.span.clone(),
@@ -235,6 +236,7 @@ fn fold_expr(e: &Expr, env: &HashMap<String, ExprKind>) -> Expr {
         ),
         ExprKind::IfLet(arm, scrut, else_b) => ExprKind::IfLet(
             Box::new(MatchArm {
+                written: arm.written.clone(),
                 pattern: arm.pattern.clone(),
                 body: fold_expr(&arm.body, env),
                 span: arm.span.clone(),

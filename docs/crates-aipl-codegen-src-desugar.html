@@ -183,12 +183,26 @@
 
 
 
+        <section class="item" id="item-NOWHERE">
+          <h3>
+            <a class="anchor" href="#item-NOWHERE">NOWHERE</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let NOWHERE: WrittenName = WrittenName { text: &#34;&#34;, span: 0..0 }</code></pre>
+
+          <div class="doc"><p>A name that is written nowhere.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lifted">
           <h3>
             <a class="anchor" href="#item-lifted">lifted</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lifted(self: Pat, tag: u64, taken: u64) -&#62; Lifted</code></pre>
+          <pre class="signature"><code>fn lifted(self: Pat, tag: u64, taken: u64, written: WrittenNames) -&#62; Lifted</code></pre>
 
           <div class="doc"><p><code>self</code> with each struct pattern in it replaced by a binder named for <code>tag</code> and its place, counting from <code>taken</code> — the number already lifted from the patterns before this one in the arm.</p></div>
 
@@ -202,7 +216,7 @@
             <a class="anchor" href="#item-lifted_all">lifted_all</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lifted_all(self: Pat[], tag: u64, taken: u64) -&#62; LiftedAll</code></pre>
+          <pre class="signature"><code>fn lifted_all(self: Pat[], tag: u64, taken: u64, written: WrittenNames) -&#62; LiftedAll</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -216,7 +230,7 @@
             <a class="anchor" href="#item-let_pattern">let_pattern</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn let_pattern(pattern: Destructure, value: Expr, body: Expr) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn let_pattern(pattern: Destructure, value: Expr, body: Expr, written: WrittenNames) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>let &lt;pattern&gt; = value; body</code>. The temporary is named for where the value starts, and holds the value so it is evaluated once.</p></div>
 
@@ -230,7 +244,7 @@
             <a class="anchor" href="#item-for_pattern">for_pattern</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn for_pattern(pattern: Destructure, iterable: Expr, body: Expr, index: str?) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn for_pattern(pattern: Destructure, iterable: Expr, body: Expr, index: str?, written: WrittenNames) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>for (let &lt;pattern&gt; : iterable) { body }</code> is a plain loop over a temporary whose fields (or slots, or payload) are read in front of the body, as the same pattern in a <code>let</code> reads them — through the same helpers, so the pattern's type is checked the same way. With an <code>index</code> it is the indexed loop over that temporary: the counter and the pattern compose as each does alone.</p></div>
 
@@ -258,7 +272,7 @@
             <a class="anchor" href="#item-bind_fields">bind_fields</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn bind_fields(names: str[], tmp: str, span: Span, rest: Expr, fields: str[]) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn bind_fields(names: str[], tmp: str, span: Span, rest: Expr, fields: str[], written: WrittenNames) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>let a = &lt;tmp&gt;.&lt;field0&gt;; let b = &lt;tmp&gt;.&lt;field1&gt;; rest</code>, innermost last — the body of both destructuring forms, which differ only in the field names they read and in whether the bindings are mutable.</p></div>
 
@@ -272,7 +286,7 @@
             <a class="anchor" href="#item-bind_fields_mut">bind_fields_mut</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn bind_fields_mut(names: str[], tmp: str, span: Span, rest: Expr, fields: str[], mutable: bool) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn bind_fields_mut(names: str[], tmp: str, span: Span, rest: Expr, fields: str[], mutable: bool, spelled: WrittenStruct) -&#62; Expr</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -286,7 +300,7 @@
             <a class="anchor" href="#item-bind_arm">bind_arm</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn bind_arm(case_name: str, names: str[], tmp: str, span: Span, rest: Expr) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn bind_arm(case_name: str, names: str[], tmp: str, span: Span, rest: Expr, written: WrittenNames) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>let a = match (&lt;tmp&gt;) { Case(a, _) =&gt; a }; let b = match (&lt;tmp&gt;) { Case(_, b) =&gt; b }; rest</code>, innermost last — what <code>let Case(a, b) = value; rest</code> binds, one <code>match</code> per name. The scrutinee is a value that can only be <code>Case</code>, which is what makes each <code>match</code> exhaustive with the one arm; any other value is refused by that check. A <code>match</code> for each name, rather than one around the rest of the block, keeps <code>rest</code> out of an arm: a block that is an expression may not assign to a binding from outside it.</p></div>
 
@@ -300,7 +314,7 @@
             <a class="anchor" href="#item-bind_pattern">bind_pattern</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn bind_pattern(pattern: Pat, tmp: str, span: Span, rest: Expr) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn bind_pattern(pattern: Pat, tmp: str, span: Span, rest: Expr, written: WrittenNames) -&#62; Expr</code></pre>
 
           <div class="doc"><p>The same for any pattern: a <code>match</code> of <code>pattern</code> per name it binds, with the other names left unbound. Struct patterns inside it become binders and reads in front of the arm's body, as in any other arm.</p></div>
 
@@ -342,7 +356,7 @@
             <a class="anchor" href="#item-destructure_struct">destructure_struct</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn destructure_struct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span, acc: Expr, mutable: bool, tmp: str) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn destructure_struct(struct_name: str, fields: str[], names: str[], value: Expr, span: Span, acc: Expr, mutable: bool, tmp: str, spelled: WrittenStruct) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>let T { a, b } = value; rest</code> and its <code>mut</code> twin, as nested bindings. The scrutinee stays an immutable <code>let</code> either way — it is read once per field and never written through — and carries the pattern's type as its annotation, which is what makes the type name mean something rather than decorate the line. The <code>__spat$</code> prefix is <code>aipl_syntax::DESTRUCTURE_BASE_PREFIX</code>, which is how the checker knows to report a mismatch as the destructuring it was.</p></div>
 
@@ -370,7 +384,7 @@
             <a class="anchor" href="#item-bind_param_pattern">bind_param_pattern</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn bind_param_pattern(parameter: str, pattern: Destructure, span: Span, body: Expr) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn bind_param_pattern(parameter: str, pattern: Destructure, span: Span, body: Expr, written: WrittenNames) -&#62; Expr</code></pre>
 
           <div class="doc"><p>The bindings <code>pattern</code> makes, read off the parameter called <code>parameter</code>, in front of <code>body</code>. The parameter's own type is what the checker holds the pattern to.</p></div>
 

@@ -5,12 +5,22 @@
 
 import { Span, equal as ==, is_empty, join, map, value_or } from builtins;
 import { Bound, show_bound } from "./bound.aipl";
-import { ByStruct, Destructure, Expr, FieldInit, Read, reads_off, show_expr } from "./expr.aipl";
+import {
+    ByStruct,
+    Destructure,
+    Expr,
+    FieldInit,
+    Read,
+    WrittenNames,
+    reads_off,
+    show_expr,
+} from "./expr.aipl";
 import { SpanStr, span_str } from "./lexer.aipl";
 import { I64 } from "./prim.aipl";
 import { Named, NamedCase, Primitive, Ty, Without, show_ty } from "./ty.aipl";
 
-struct TypeParam { name: str, bound: Bound, default: Ty? }
+# `name_span` is where the parameter's name is written in the `<..>` list.
+struct TypeParam { name: str, bound: Bound, default: Ty?, name_span: Span = 0..0 }
 
 variant ImportSource = Path(path: str) | Builtins
 
@@ -48,7 +58,7 @@ struct Param {
 
 # A parameter's destructuring pattern and where it was written, which is the span
 # the bindings it makes carry.
-struct ParamPattern { pattern: Destructure, span: Span }
+struct ParamPattern { pattern: Destructure, span: Span, written: WrittenNames? = none }
 
 # The fields a destructured parameter reads off itself, none for an ordinary one.
 pub fn pattern_reads(self: Param) -> Read[] {

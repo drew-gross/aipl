@@ -388,6 +388,7 @@ fn counted_value(e: &Expr, shape: Counted) -> Option<Expr> {
     let sub = |x: &Expr| counted_value(x, shape);
     let arm = |a: &MatchArm| {
         Some(MatchArm {
+            written: a.written.clone(),
             pattern: a.pattern.clone(),
             body: counted_value(&a.body, shape)?,
             span: a.span.clone(),
