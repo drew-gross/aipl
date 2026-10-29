@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">160 files, 1620 items.</p>
+      <p class="summary">160 files, 1617 items.</p>
 
       <ul class="files">
 
@@ -1736,7 +1736,7 @@
           <p class="file-summary">The <code>case_of_equal_is_case</code> lint: <code>shape.case_of() == Circle</code> — reading which case a value is only to compare it with one. That is <code>shape.is_case(Circle)</code>, which asks the same question without the detour through a <code>Case</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-case_of_equal_is_case.html#private">4 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-case_of_equal_is_case.html#private">2 private</a></span>
 
 
           <ul class="items">
@@ -1756,7 +1756,7 @@
           <p class="file-summary">The <code>destructure_binding</code> lint: <code>let p = value; ... p.a ... p.b ...</code> where <strong>every</strong> mention of <code>p</code> is a field read. Say so with a pattern instead: <code>let T { a, b } = value;</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_binding.html#private">4 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_binding.html#private">2 private</a></span>
 
 
           <ul class="items">
@@ -1776,7 +1776,7 @@
           <p class="file-summary">The <code>destructure_param</code> lint: <code>fn f(p: Point) { .. p.x .. p.y .. }</code> where <strong>every</strong> mention of <code>p</code> is a field read — destructure the parameter instead: <code>fn f(Point { x, y })</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_param.html#private">5 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_param.html#private">4 private</a></span>
 
 
           <ul class="items">
@@ -1796,7 +1796,7 @@
           <p class="file-summary">The <code>destructure_slot</code> lint: a name a pattern binds — the payload of a case, a position of a tuple — whose every use is a field read. The pattern can take that value apart itself, one level down:</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_slot.html#private">7 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_slot.html#private">6 private</a></span>
 
 
           <ul class="items">
@@ -1891,7 +1891,7 @@
           <p class="file-summary">The <code>fn_body_type_stutter</code> lint: <code>fn f() -&gt; T { T { .. } }</code> — a function whose whole body is a literal of its own declared return type, naming that type twice. The body-shorthand spelling drops the repetition: <code>fn f() -&gt; T { .. }</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-fn_body_type_stutter.html#private">4 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-fn_body_type_stutter.html#private">3 private</a></span>
 
 
           <ul class="items">
@@ -1929,7 +1929,7 @@
           <p class="file-summary">What a lint reports: the message, and the span the caret goes under. The Rust side rebuilds each as an <code>aipl_syntax::Error</code> and runs it through the same <code>#[allow]</code> squelching as the lints still written in Rust.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-lint_hit.html#private">1 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-lint_hit.html#private">4 private</a></span>
 
 
           <ul class="items">
@@ -1959,6 +1959,21 @@
               <span class="kind kind-fn">fn</span>
             </li>
 
+            <li>
+              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-on_functions"><code>on_functions</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-lint_function_hits"><code>lint_function_hits</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-lint_function_messages"><code>lint_function_messages</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
           </ul>
 
         </li>
@@ -1969,7 +1984,7 @@
           <p class="file-summary">The <code>match_bool_is_case</code> lint:</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-match_bool_is_case.html#private">4 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-match_bool_is_case.html#private">2 private</a></span>
 
 
           <ul class="items">

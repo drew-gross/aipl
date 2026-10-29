@@ -91,6 +91,48 @@
         </section>
 
 
+
+        <section class="item" id="item-on_functions">
+          <h3>
+            <a class="anchor" href="#item-on_functions">on_functions</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn on_functions(self: Program, lint: (Function) -&#62; LintHit[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>Lints come in two kinds. A <em>program</em> lint is a function of the whole <code>Program</code> (<code>unused_imports</code>, which compares the imports with every name the file mentions). A <em>function</em> lint is a function of one <code>Function</code>, and [<code>on_functions</code>] is what runs it over a program, so no function lint decides for itself which bodies to look at.</p><p>Every body that is code to check is a function here: each function, the <code>.test</code> block it carries, the <code>.performance</code> block it carries, and the helpers declared in a <code>.test</code> block. A block is checked as a function of its own when tests run, so it is handed over as one — no parameters, no return type, the block as its body.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lint_function_hits">
+          <h3>
+            <a class="anchor" href="#item-lint_function_hits">lint_function_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_function_hits(src: str, lint: (Function) -&#62; LintHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>What the function lint <code>lint</code> reports for the program <code>src</code> parses to.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lint_function_messages">
+          <h3>
+            <a class="anchor" href="#item-lint_function_messages">lint_function_messages</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_function_messages(src: str, lint: (Function) -&#62; LintHit[]) -&#62; str[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>[<code>lint_function_hits</code>], keeping only the messages.</p></div>
+
+
+        </section>
+
+
       </section>
 
 
@@ -107,6 +149,48 @@
           <pre class="signature"><code>fn builtin_locals(self: Import, name: str) -&#62; str[]</code></pre>
 
           <div class="doc"><p>What an import brings under <code>name</code>, when it is from builtins.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-declared">
+          <h3>
+            <a class="anchor" href="#item-declared">declared</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn declared(self: Fn) -&#62; Function</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-bodies">
+          <h3>
+            <a class="anchor" href="#item-bodies">bodies</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn bodies(self: Function) -&#62; Function[]</code></pre>
+
+          <div class="doc"><p><code>self</code>, and a function standing for each other body it holds.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-standing_in">
+          <h3>
+            <a class="anchor" href="#item-standing_in">standing_in</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn standing_in(self: Function, body: Expr) -&#62; Function</code></pre>
+
+          <div class="doc"><p><code>self</code>, with <code>body</code> as its whole body: what a block is when it is checked.</p></div>
 
 
         </section>

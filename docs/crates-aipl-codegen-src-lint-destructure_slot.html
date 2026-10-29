@@ -29,7 +29,7 @@ fn f(self: Fn(Function { sig, body })) { sig .. body }
             <a class="anchor" href="#item-destructure_slot">destructure_slot</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn destructure_slot(__spat$1310: Program) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn destructure_slot(__spat$1288: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each slot of a pattern in the program that is only read by field.</p></div>
 
@@ -57,20 +57,6 @@ fn f(self: Fn(Function { sig, body })) { sig .. body }
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
-
-
-        <section class="item" id="item-function_hits">
-          <h3>
-            <a class="anchor" href="#item-function_hits">function_hits</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn function_hits(self: Fn) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The hits in a function: its parameters' patterns, and the <code>let</code>s in its body. The reads are those of the whole body and of the parameters' own patterns, so a field read off two values anywhere counts against each slot it belongs to.</p></div>
-
-
-        </section>
-
 
 
         <section class="item" id="item-param_hits">
@@ -120,7 +106,7 @@ fn f(self: Fn(Function { sig, body })) { sig .. body }
             <a class="anchor" href="#item-message">message</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn message(__spat$6313: Slot, rewritten: str) -&#62; str</code></pre>
+          <pre class="signature"><code>fn message(__spat$6326: Slot, rewritten: str) -&#62; str</code></pre>
 
           <div class="doc"><p>What is said of <code>slot</code>, whose pattern would read <code>rewritten</code>.</p></div>
 

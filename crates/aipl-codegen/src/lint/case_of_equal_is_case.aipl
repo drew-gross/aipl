@@ -7,67 +7,62 @@
 #
 # The hit points at the `==`, a short line the formatter keeps in place.
 
-import { collect_arms, count_if, equal as ==, is_some, join, len, value_or } from builtins;
+import { count_if, equal as ==, is_some, join, len, value_or } from builtins;
 import { Call, Expr, descendants } from "../expr.aipl";
-import { Fn, Function, Program } from "../item.aipl";
-import { LintHit, hit, imported_as, lint_messages } from "./lint_hit.aipl";
+import { Function } from "../item.aipl";
+import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
 
 # A hit for each comparison of a value's case with something.
-pub fn case_of_equal_is_case(Program { items }) -> LintHit[] {
-    let method = items.imported_as("is_case");
-    items.collect_arms(Fn)$function_hits(method).join()
+pub fn case_of_equal_is_case(Function { body }, method: str?) -> LintHit[] {
+    body.descendants()$comparison_hit(method).join()
 }.test({
-    assert(lint_messages(
+    assert(lint_function_messages(
         "fn f(s: Shape) -> bool { s.case_of() == Circle }",
-        case_of_equal_is_case,
+        |function| case_of_equal_is_case(function, none),
     )? == [message(none)]);
 
     // The call form, the case on the left, and the `.test` block.
-    assert(lint_messages(
+    assert(lint_function_messages(
         "fn f(s: Shape) -> bool { case_of(s) == Circle }",
-        case_of_equal_is_case,
+        |function| case_of_equal_is_case(function, none),
     )? == [message(none)]);
-    assert(lint_messages(
+    assert(lint_function_messages(
         "fn f(s: Shape) -> bool { Circle == s.case_of() }",
-        case_of_equal_is_case,
+        |function| case_of_equal_is_case(function, none),
     )? == [message(none)]);
-    assert(lint_messages(
+    assert(lint_function_messages(
         "fn f() { }.test({ assert(s.case_of() == Dot); })",
-        case_of_equal_is_case,
+        |function| case_of_equal_is_case(function, none),
     )? == [message(none)]);
 
     // The name the file imports it under is the advice's.
-    assert(lint_messages(
-        "import { is_case as isa } from builtins;\nfn f(s: Shape) -> bool { s.case_of() == Dot }",
-        case_of_equal_is_case,
+    assert(lint_function_messages(
+        "fn f(s: Shape) -> bool { s.case_of() == Dot }",
+        |function| case_of_equal_is_case(function, some("isa")),
     )? == [message(some("isa"))]);
 
     // Two `case_of`s compare two values' cases, which `is_case` cannot say.
     assert(
-        lint_messages(
+        lint_function_messages(
             "fn f(a: Shape, b: Shape) -> bool { a.case_of() == b.case_of() }",
-            case_of_equal_is_case,
+            |function| case_of_equal_is_case(function, none),
         )? == [],
     );
 
     // Neither side reads a case, or the comparison is another one.
-    assert(lint_messages("fn f(a: i64, b: i64) -> bool { a == b }", case_of_equal_is_case)? == []);
     assert(
-        lint_messages(
+        lint_function_messages(
+            "fn f(a: i64, b: i64) -> bool { a == b }",
+            |function| case_of_equal_is_case(function, none),
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
             "fn f(s: Shape) -> bool { s.case_of() != Circle }",
-            case_of_equal_is_case,
+            |function| case_of_equal_is_case(function, none),
         )? == [],
     );
 })
-
-# The hits in a function's body and in its `.test` block.
-fn function_hits(self: Fn(Function { body, test_body }), method: str?) -> LintHit[] {
-    [..body.body_hits(method), ..test_body$body_hits(method).value_or([])]
-}
-
-fn body_hits(self: Expr, method: str?) -> LintHit[] {
-    self.descendants()$comparison_hit(method).join()
-}
 
 # The hit for one expression, or none: it is `==` with a `case_of()` on one side.
 fn comparison_hit(

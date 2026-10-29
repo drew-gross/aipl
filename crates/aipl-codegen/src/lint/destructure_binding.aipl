@@ -56,122 +56,141 @@ import {
     join,
     logical_or as ||,
     not_equal as !=,
-    value_or,
 } from builtins;
-import { Construct, Expr, Let, Read, descendants, field_reads } from "../expr.aipl";
-import { Fn, Function, Program, pattern_reads } from "../item.aipl";
+import { Construct, Let, Read, descendants, field_reads } from "../expr.aipl";
+import { Function, pattern_reads } from "../item.aipl";
 import { Named } from "../ty.aipl";
 import { Uses, is_shared, is_tuple_field, mentions_any, uses_of } from "./field_uses.aipl";
-import { LintHit, hit, lint_messages } from "./lint_hit.aipl";
+import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
 
 # A hit for each immutable `let` in the program whose binding is only ever taken
 # apart by field reads.
-pub fn destructure_binding(Program { items }) -> LintHit[] {
-    items.collect_arms(Fn)$function_hits().join()
+pub fn destructure_binding(Function { sig, body }) -> LintHit[] {
+    // Every read is those of the whole body, so that a field read off two bases
+    // anywhere in it counts against each binding it belongs to; the function's
+    // destructured parameters take their fields apart at the top of it, and their
+    // reads count the same way.
+    let reads = [..sig.params$pattern_reads().join(), ..body.field_reads()];
+    body.descendants()$kind.collect_arms(Let)$binding_hit(reads).join()
 }.test({
     // Only fields are read: take it apart in the pattern.
-    assert(lint_messages("fn f() -> i64 { let p = g(); p.a + p.b }", destructure_binding)? == [
-        message("p", "a, b", "<Type>"),
-    ]);
+    assert(lint_function_messages(
+        "fn f() -> i64 { let p = g(); p.a + p.b }",
+        destructure_binding,
+    )? == [message("p", "a, b", "<Type>")]);
 
     // An annotation names the struct for the advice.
-    assert(lint_messages("fn f() -> i64 { let p: P = g(); p.a }", destructure_binding)? == [
-        message("p", "a", "P"),
-    ]);
+    assert(lint_function_messages(
+        "fn f() -> i64 { let p: P = g(); p.a }",
+        destructure_binding,
+    )? == [message("p", "a", "P")]);
 
     // A pattern the author wrote is not a binding to advise about, whatever the
     // parser binds for it underneath; neither is the rest of the block's reading
     // of the names it made.
     assert(
-        lint_messages("fn f() -> i64 { let P { a, b } = g(); a + b }", destructure_binding)? == [],
+        lint_function_messages(
+            "fn f() -> i64 { let P { a, b } = g(); a + b }",
+            destructure_binding,
+        )? == [],
     );
     assert(
-        lint_messages(
+        lint_function_messages(
             "fn f(t: (i64, i64)) -> i64 { let (a, b) = t; a + b }",
             destructure_binding,
         )? == [],
     );
     assert(
-        lint_messages(
+        lint_function_messages(
             "fn f() -> i64 { for (let P { a } : xs) { h(a); } 0 }",
             destructure_binding,
         )? == [],
     );
     // A name the pattern binds shadows an outer one, which splits its mentions.
     assert(
-        lint_messages(
+        lint_function_messages(
             "fn f() -> i64 { let p = g(); let P { p } = h(); p.a }",
             destructure_binding,
         )? == [],
     );
 
     // One bare mention keeps the value whole, so a pattern could not replace it.
-    assert(lint_messages("fn f() -> i64 { let p = g(); h(p); p.a }", destructure_binding)? == []);
+    assert(
+        lint_function_messages(
+            "fn f() -> i64 { let p = g(); h(p); p.a }",
+            destructure_binding,
+        )? == [],
+    );
 
     // The name is spoken for: the field's name would shadow one in scope.
     assert(
-        lint_messages("fn f(a: i64) -> i64 { let p = g(); p.a + a }", destructure_binding)? == [],
+        lint_function_messages(
+            "fn f(a: i64) -> i64 { let p = g(); p.a + a }",
+            destructure_binding,
+        )? == [],
     );
 
     // A field read off two values is told apart by the names of the values...
     assert(
-        lint_messages(
+        lint_function_messages(
             "fn f() -> i64 { let p = g(); let q = g(); p.a + q.a }",
             destructure_binding,
         )? == [],
     );
 
     // ...but a read inside the binding's own value runs before the pattern binds.
-    assert(lint_messages("fn f() -> i64 { let p = h(q.a); p.a }", destructure_binding)? == [
-        message("p", "a", "<Type>"),
-    ]);
+    assert(lint_function_messages(
+        "fn f() -> i64 { let p = h(q.a); p.a }",
+        destructure_binding,
+    )? == [message("p", "a", "<Type>")]);
 
     // A rebinding of the name splits its mentions between two values.
     assert(
-        lint_messages("fn f() -> i64 { let p = g(); h(|p| p); p.a }", destructure_binding)? == [],
+        lint_function_messages(
+            "fn f() -> i64 { let p = g(); h(|p| p); p.a }",
+            destructure_binding,
+        )? == [],
     );
 
     // ...and a later `let` of the same name is judged on its own.
-    assert(lint_messages(
+    assert(lint_function_messages(
         "fn f() -> i64 { let p = g(); let p = h(); p.a }",
         destructure_binding,
     )? == [message("p", "a", "<Type>")]);
 
     // A tuple cannot be taken apart by a struct pattern.
-    assert(lint_messages("fn f() -> i64 { let p = g(); p._0 }", destructure_binding)? == []);
+    assert(
+        lint_function_messages("fn f() -> i64 { let p = g(); p._0 }", destructure_binding)? == [],
+    );
 
     // The parser's own temporaries are not the user's to rewrite.
-    assert(lint_messages("fn f(P { a }) -> i64 { a }", destructure_binding)? == []);
-    assert(lint_messages("fn f() -> i64 { let P { a } = g(); a }", destructure_binding)? == []);
+    assert(lint_function_messages("fn f(P { a }) -> i64 { a }", destructure_binding)? == []);
+    assert(
+        lint_function_messages(
+            "fn f() -> i64 { let P { a } = g(); a }",
+            destructure_binding,
+        )? == [],
+    );
 
     // A value built on the same line is not taken apart.
-    assert(lint_messages("fn f() -> i64 { let p = P { a: 1 }; p.a }", destructure_binding)? == []);
+    assert(
+        lint_function_messages(
+            "fn f() -> i64 { let p = P { a: 1 }; p.a }",
+            destructure_binding,
+        )? == [],
+    );
 
     // A `mut` binding is a different question.
-    assert(lint_messages("fn f() -> i64 { mut p = g(); p.a }", destructure_binding)? == []);
+    assert(
+        lint_function_messages("fn f() -> i64 { mut p = g(); p.a }", destructure_binding)? == [],
+    );
 
     // The `.test` block is held to it too.
-    assert(lint_messages(
+    assert(lint_function_messages(
         "fn f() { }.test({ let p = g(); assert(p.a == 1); })",
         destructure_binding,
     )? == [message("p", "a", "<Type>")]);
 })
-
-# The hits in a function's body and in its `.test` block. The body's reads
-# include those of the function's destructured parameters, which take their
-# fields apart at the top of it; the `.test` block is outside them.
-fn function_hits(self: Fn(Function { sig, body, test_body })) -> LintHit[] {
-    let parameters = sig.params$pattern_reads().join();
-    [..body.body_hits(parameters), ..test_body$body_hits([]).value_or([])]
-}
-
-# The hits in one body. Every read is those of the whole body, so that a field read
-# off two bases anywhere in it counts against each binding it belongs to; `outside`
-# are reads made beside it that count the same way.
-fn body_hits(self: Expr, outside: Read[]) -> LintHit[] {
-    let reads = [..outside, ..self.field_reads()];
-    self.descendants()$kind.collect_arms(Let)$binding_hit(reads).join()
-}
 
 # The hit for one `let`, or none: `reads` are every field read in its body.
 fn binding_hit(self: Let(name, annotation, value, body), reads: Read[]) -> LintHit[] {

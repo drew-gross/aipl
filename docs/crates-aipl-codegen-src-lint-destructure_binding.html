@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-destructure_binding">destructure_binding</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn destructure_binding(__spat$3405: Program) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn destructure_binding(__spat$3381: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each immutable <code>let</code> in the program whose binding is only ever taken apart by field reads.</p></div>
 
@@ -41,34 +41,6 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
-
-
-        <section class="item" id="item-function_hits">
-          <h3>
-            <a class="anchor" href="#item-function_hits">function_hits</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn function_hits(self: Fn) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The hits in a function's body and in its <code>.test</code> block. The body's reads include those of the function's destructured parameters, which take their fields apart at the top of it; the <code>.test</code> block is outside them.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-body_hits">
-          <h3>
-            <a class="anchor" href="#item-body_hits">body_hits</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn body_hits(self: Expr, outside: Read[]) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The hits in one body. Every read is those of the whole body, so that a field read off two bases anywhere in it counts against each binding it belongs to; <code>outside</code> are reads made beside it that count the same way.</p></div>
-
-
-        </section>
-
 
 
         <section class="item" id="item-binding_hit">

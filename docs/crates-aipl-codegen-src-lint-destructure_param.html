@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-destructure_param">destructure_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn destructure_param(__spat$2569: Program) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn destructure_param(__spat$2547: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each parameter of the program that only its fields are read from.</p></div>
 
@@ -41,20 +41,6 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
-
-
-        <section class="item" id="item-function_hits">
-          <h3>
-            <a class="anchor" href="#item-function_hits">function_hits</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn function_hits(self: Fn) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The hits in a function's signature. The reads are those of the whole body, so that a field read off two bases anywhere in it counts against each parameter it belongs to; the destructured parameters make reads of their own.</p></div>
-
-
-        </section>
-
 
 
         <section class="item" id="item-param_hits">

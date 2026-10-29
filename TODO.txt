@@ -94,7 +94,7 @@ value_or for structs:
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 highlighter:
-  range collapsing in charachter classes
+  range collapsing in character classes
   fold regions and bracket pair coloring
 
 benchmark:
@@ -102,6 +102,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  find a way to make lints work without awkwardly threading the method through to every message() call
   duplicate_import_source lint looks like it could use a source->count index maybe? Could enable better fixits.
   function_hits in body type stutter can only ever return one, make it LintHint? instead of LintHint[]
   is_shorthand should disappear into is_case (with lint)
@@ -326,10 +327,10 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  destructuring in lambda args
   .. should maybe work on optionals too? Or anything that can be $'ed?
   .... in an array or set literal should double-unwrap-spread
   support if (let [a, ..] = xs) syntax
-  let some(x) = v else { return; } syntax, use everywhere that there is a one-arm+_ -> return match
   unary minus doesn't have a named operator
   explore simpler syntax than turbofish for type arguments
   wildcard syntax in turbofish that means "infer this one"
@@ -496,6 +497,8 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  make on_function lints work on expressions used to compute top-level consts
+  convert reject_trailing_whitespace to a lint
   if a param is only used in one place, and it's the RHS of a destructuring, just destructure in the param (even if it's aleady a destructuring, nested destructuring should work)
   the lints seem to have an odd pattern where the main tests for the lint are on a wrapper, often called "hits". I think the tests for a function should be on the function. If the tests need a helper define it in the test.
   lint should happen after name resolution so it doesn't have to check startswith("__builtin_") to know if something is a builtin
@@ -827,6 +830,7 @@ expression matcher:
   use it for operation fusion
 
 vscode:
+  go to definition should work for destructurings (types and fields)
   lint should work on _some_ documents that fail to compile e.g. if it has unused imports, or fails lint
   PBlock on body in lower_function gives Message: the compiler's name resolution does not cover `PBlock` here (imports, parameters, patterns and types are not tracked yet)
   refresh on code edit (with watcher? check for edits when command received? possily go-to-* should block rather than error while parsing? Maybe need partial update?)

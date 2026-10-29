@@ -6,14 +6,19 @@ import {
     Span,
     collect_arms,
     equal as ==,
+    extend,
     filter,
     first,
     is_err_and,
     is_nonempty,
     join,
+    len,
+    map,
+    value_or,
 } from builtins;
+import { Expr } from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
-import { Import, ImportDecl, Item, Program, local } from "../item.aipl";
+import { Fn, Function, Import, ImportDecl, Item, Program, Signature, local } from "../item.aipl";
 
 struct LintHit { message: str, span: Span }
 
@@ -66,4 +71,79 @@ fn builtin_locals(self: Import(ImportDecl { names, source }), name: str) -> str[
         Builtins => names.filter(|n| n.name == name)$local(),
         Path(..) => [],
     }
+}
+
+# Lints come in two kinds. A *program* lint is a function of the whole `Program`
+# (`unused_imports`, which compares the imports with every name the file
+# mentions). A *function* lint is a function of one `Function`, and [`on_functions`]
+# is what runs it over a program, so no function lint decides for itself which
+# bodies to look at.
+#
+# Every body that is code to check is a function here: each function, the `.test`
+# block it carries, the `.performance` block it carries, and the helpers declared
+# in a `.test` block. A block is checked as a function of its own when tests run, so
+# it is handed over as one — no parameters, no return type, the block as its body.
+pub fn on_functions(self: Program { items }, lint: (Function) -> LintHit[]) -> LintHit[] {
+    mut hits: LintHit[] = [];
+    for (let function : items.collect_arms(Fn)$declared()$bodies().join()) {
+        set hits.extend(lint(function));
+    }
+    hits
+}.test({
+    // Each function, once.
+    assert(lint_function_messages(
+        "fn f() { } fn g() { }",
+        |function| { [hit(function.name.text, 0..1)] },
+    )? == ["f", "g"]);
+
+    // A `.test` block, a `.performance` block and the helpers declared in a block
+    // are each another body of the function that carries them.
+    assert(lint_function_messages(
+        "fn f() { }.test({ g(); })",
+        |function| { [hit(function.name.text, 0..1)] },
+    )? == ["f", "f"]);
+    assert(lint_function_messages(
+        "fn f() { }.performance({ g(); })",
+        |function| { [hit(function.name.text, 0..1)] },
+    )? == ["f", "f"]);
+    assert(lint_function_messages(
+        "fn f() { }.test({ fn h() { } h(); })",
+        |function| { [hit(function.name.text, 0..1)] },
+    )? == ["f", "f", "h"]);
+
+    // A block has no parameters of its own.
+    assert(lint_function_messages(
+        "fn f(x: i64) { }.test({ g(); })",
+        |function| { [hit(`{function.sig.params.len()}`, 0..1)] },
+    )? == ["1", "0"]);
+})
+
+fn declared(self: Fn(function)) -> Function { function }
+
+# `self`, and a function standing for each other body it holds.
+fn bodies(self: Function) -> Function[] {
+    let test = self.test_body.map(|body| [self.standing_in(body)]).value_or([]);
+    let performance = self.performance.map(|block| [self.standing_in(block.body)]).value_or([]);
+    [self, ..test, ..performance, ..self.test_fns]
+}
+
+# `self`, with `body` as its whole body: what a block is when it is checked.
+fn standing_in(self: Function, body: Expr) -> Function {
+    ..self,
+    sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
+    body,
+    shorthand_body: false,
+    test_body: none,
+    test_fns: [],
+    performance: none,
+}
+
+# What the function lint `lint` reports for the program `src` parses to.
+pub fn lint_function_hits(src: str, lint: (Function) -> LintHit[]) -> LintHit[]!ParseFailure {
+    lint_hits(src, |program: Program| { program.on_functions(lint) })
+}
+
+# [`lint_function_hits`], keeping only the messages.
+pub fn lint_function_messages(src: str, lint: (Function) -> LintHit[]) -> str[]!ParseFailure {
+    ok(lint_function_hits(src, lint)?$message)
 }

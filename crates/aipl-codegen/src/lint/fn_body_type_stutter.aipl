@@ -12,10 +12,8 @@
 # anything.
 
 import {
-    collect_arms,
     equal as ==,
     is_empty,
-    join,
     logical_or as ||,
     map,
     not_equal as !=,
@@ -23,61 +21,22 @@ import {
     value_or,
 } from builtins;
 import { Construct, Expr, FieldInit, Ident } from "../expr.aipl";
-import { Fn, Program } from "../item.aipl";
+import { Function } from "../item.aipl";
 import { Generic, Named, Ty } from "../ty.aipl";
-import { LintHit, hit, lint_hits } from "./lint_hit.aipl";
+import { LintHit, hit, lint_function_hits } from "./lint_hit.aipl";
 
-# A hit for each function of the program whose body is a literal of its return type.
-pub fn fn_body_type_stutter(Program { items }) -> LintHit[] {
-    items.collect_arms(Fn)$function_hits().join()
-}.test({
-    let found = lint_hits("fn f(x: i64) -> P { P { x: x + 1, y: 0 } }", fn_body_type_stutter)?;
-    assert(found$message == [message("f", "P", none)]);
-    assert(found$span == [20..40]);
-
-    // A lone shorthand field spells out the trailing comma.
-    assert(lint_hits("fn f(x: i64) -> P { P { x } }", fn_body_type_stutter)?$message == [
-        message("f", "P", some("x")),
-    ]);
-    assert(lint_hits("fn f(x: i64) -> P { P { x: x + 1 } }", fn_body_type_stutter)?$message == [
-        message("f", "P", none),
-    ]);
-
-    // A generic return is built under its base name.
-    assert(lint_hits(
-        "fn f(x: i64) -> Pair<i64> { Pair { a: x, b: x } }",
-        fn_body_type_stutter,
-    )?$message == [message("f", "Pair", none)]);
-
-    // The shorthand body, a literal of another type, a statement before the literal,
-    // an empty literal and a field named like the type are all left alone.
-    assert(lint_hits("fn f(x: i64) -> P { x, y: 0 }", fn_body_type_stutter)? == []);
-    assert(lint_hits("fn f(x: i64) -> P { Q { x } }", fn_body_type_stutter)? == []);
-    assert(lint_hits("fn f(x: i64) -> P { let y = x; P { x, y } }", fn_body_type_stutter)? == []);
-    assert(lint_hits("fn f() -> P { P {} }", fn_body_type_stutter)? == []);
-    assert(lint_hits("fn f(P: i64) -> Q { P, y: 0 }", fn_body_type_stutter)? == []);
-
-    // A destructured parameter is not a statement.
-    assert(lint_hits("fn f(P { x }) -> P { P { x: x + 1 } }", fn_body_type_stutter)?$message == [
-        message("f", "P", none),
-    ]);
-
-    // A range is a synthesized literal.
-    assert(lint_hits("fn f(a: i64) -> Span { a..a }", fn_body_type_stutter)? == []);
-})
-
-# The hit for one function, or none.
-fn function_hits(self: Fn(function)) -> LintHit[] {
-    if (function.shorthand_body) {
+# The hit for a function whose body is a literal of its return type, or none.
+pub fn fn_body_type_stutter(Function { name as function, shorthand_body, sig, body }) -> LintHit[] {
+    if (shorthand_body) {
         return [];
     };
 
     // The name the return type offers the literal: a generic return contributes its
     // base, since `Pair<i64>` is built as `Pair { .. }`.
-    let some(ret) = function.sig.return_ty.literal_name() else {
+    let some(ret) = sig.return_ty.literal_name() else {
         return [];
     };
-    let Expr { kind, span, value_span as _, name_span as _ } = function.body;
+    let Expr { kind, span, value_span as _, name_span as _ } = body;
     let Construct(name, inits) = kind else {
         return [];
     };
@@ -89,8 +48,52 @@ fn function_hits(self: Fn(function)) -> LintHit[] {
     if (name != ret || name.starts_with("__builtin_") || inits.is_empty()) {
         return [];
     };
-    [hit(message(function.name.text, name, inits.lone_shorthand()), span)]
-}
+    [hit(message(function.text, name, inits.lone_shorthand()), span)]
+}.test({
+    let found = lint_function_hits(
+        "fn f(x: i64) -> P { P { x: x + 1, y: 0 } }",
+        fn_body_type_stutter,
+    )?;
+    assert(found$message == [message("f", "P", none)]);
+    assert(found$span == [20..40]);
+
+    // A lone shorthand field spells out the trailing comma.
+    assert(lint_function_hits("fn f(x: i64) -> P { P { x } }", fn_body_type_stutter)?$message == [
+        message("f", "P", some("x")),
+    ]);
+    assert(lint_function_hits(
+        "fn f(x: i64) -> P { P { x: x + 1 } }",
+        fn_body_type_stutter,
+    )?$message == [message("f", "P", none)]);
+
+    // A generic return is built under its base name.
+    assert(lint_function_hits(
+        "fn f(x: i64) -> Pair<i64> { Pair { a: x, b: x } }",
+        fn_body_type_stutter,
+    )?$message == [message("f", "Pair", none)]);
+
+    // The shorthand body, a literal of another type, a statement before the literal,
+    // an empty literal and a field named like the type are all left alone.
+    assert(lint_function_hits("fn f(x: i64) -> P { x, y: 0 }", fn_body_type_stutter)? == []);
+    assert(lint_function_hits("fn f(x: i64) -> P { Q { x } }", fn_body_type_stutter)? == []);
+    assert(
+        lint_function_hits(
+            "fn f(x: i64) -> P { let y = x; P { x, y } }",
+            fn_body_type_stutter,
+        )? == [],
+    );
+    assert(lint_function_hits("fn f() -> P { P {} }", fn_body_type_stutter)? == []);
+    assert(lint_function_hits("fn f(P: i64) -> Q { P, y: 0 }", fn_body_type_stutter)? == []);
+
+    // A destructured parameter is not a statement.
+    assert(lint_function_hits(
+        "fn f(P { x }) -> P { P { x: x + 1 } }",
+        fn_body_type_stutter,
+    )?$message == [message("f", "P", none)]);
+
+    // A range is a synthesized literal.
+    assert(lint_function_hits("fn f(a: i64) -> Span { a..a }", fn_body_type_stutter)? == []);
+})
 
 # The type name a return type offers a literal, if it offers one.
 fn literal_name(self: Ty?) -> str? {

@@ -13,7 +13,6 @@
 # placeholder, as `destructure_binding` does for a `let` with no annotation.
 
 import {
-    collect_arms,
     contains,
     equal as ==,
     join,
@@ -24,61 +23,70 @@ import {
     push,
 } from builtins;
 import { ByCase, ByTuple, Expr, LetPattern, Read, descendants, field_reads } from "../expr.aipl";
-import { Fn, Function, Param, ParamPattern, Program, pattern_reads } from "../item.aipl";
+import { Function, Param, ParamPattern, pattern_reads } from "../item.aipl";
 import { sole_fields } from "./field_uses.aipl";
-import { LintHit, hit, lint_messages } from "./lint_hit.aipl";
+import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
 
 # A hit for each slot of a pattern in the program that is only read by field.
-pub fn destructure_slot(Program { items }) -> LintHit[] {
-    items.collect_arms(Fn)$function_hits().join()
+pub fn destructure_slot(Function { sig, body }) -> LintHit[] {
+    // The parameters' patterns, and the `lets` in the body. The reads are those of
+    // the whole body and of the parameters' own patterns, so a field read off two
+    // values anywhere counts against each slot it belongs to.
+    let reads = [..sig.params$pattern_reads().join(), ..body.field_reads()];
+    [..sig.params$param_hits(body, reads).join(), ..body.descendants()$let_hits(reads).join()]
 }.test({
     let function = Slot { name: "function", fields: ["sig", "body"] };
 
     // A parameter's case payload that is only read by field.
-    assert(lint_messages(
+    assert(lint_function_messages(
         "fn f(self: Fn(function), n: i64) -> i64 { function.sig + function.body }",
         destructure_slot,
     )? == [message(function, "Fn(<Type> { sig, body })")]);
-    assert(lint_messages(
+    assert(lint_function_messages(
         "fn f(Fn(function)) -> i64 { function.sig + function.body }",
         destructure_slot,
     )? == [message(function, "Fn(<Type> { sig, body })")]);
 
     // Beside other slots, which stay as they were.
-    assert(lint_messages(
+    assert(lint_function_messages(
         "fn f(Pair(a, function)) -> i64 { a + function.sig + function.body }",
         destructure_slot,
     )? == [message(function, "Pair(a, <Type> { sig, body })")]);
 
     // A `let` over a case or a tuple.
-    assert(lint_messages(
+    assert(lint_function_messages(
         "fn f(v: V) -> i64 { let Fn(function) = v; function.sig + function.body }",
         destructure_slot,
     )? == [message(function, "Fn(<Type> { sig, body })")]);
-    assert(lint_messages(
+    assert(lint_function_messages(
         "fn f(t: (P, i64)) -> i64 { let (function, n) = t; function.sig + function.body + n }",
         destructure_slot,
     )? == [message(function, "(<Type> { sig, body }, n)")]);
 
     // The slot is used whole, or read off a tuple position, or not at all.
     assert(
-        lint_messages(
+        lint_function_messages(
             "fn f(Fn(function)) -> i64 { g(function); function.sig }",
             destructure_slot,
         )? == [],
     );
-    assert(lint_messages("fn f(Fn(function)) -> i64 { function._0 }", destructure_slot)? == []);
-    assert(lint_messages("fn f(Fn(function)) -> i64 { 1 }", destructure_slot)? == []);
+    assert(
+        lint_function_messages(
+            "fn f(Fn(function)) -> i64 { function._0 }",
+            destructure_slot,
+        )? == [],
+    );
+    assert(lint_function_messages("fn f(Fn(function)) -> i64 { 1 }", destructure_slot)? == []);
 
     // The name a field would bind is spoken for, or the field is read off two values.
     assert(
-        lint_messages(
+        lint_function_messages(
             "fn f(Fn(function), sig: i64) -> i64 { function.sig + sig }",
             destructure_slot,
         )? == [],
     );
     assert(
-        lint_messages(
+        lint_function_messages(
             "fn f(Fn(function), other: P) -> i64 { function.sig + other.sig }",
             destructure_slot,
         )? == [],
@@ -86,17 +94,9 @@ pub fn destructure_slot(Program { items }) -> LintHit[] {
 
     // A pattern that is already nested, a struct parameter, and a plain named parameter
     // are the other lints' business.
-    assert(lint_messages("fn f(Fn(P { sig })) -> i64 { sig }", destructure_slot)? == []);
-    assert(lint_messages("fn f(p: P) -> i64 { p.sig }", destructure_slot)? == []);
+    assert(lint_function_messages("fn f(Fn(P { sig })) -> i64 { sig }", destructure_slot)? == []);
+    assert(lint_function_messages("fn f(p: P) -> i64 { p.sig }", destructure_slot)? == []);
 })
-
-# The hits in a function: its parameters' patterns, and the `let`s in its body. The
-# reads are those of the whole body and of the parameters' own patterns, so a field
-# read off two values anywhere counts against each slot it belongs to.
-fn function_hits(self: Fn(Function { sig, body })) -> LintHit[] {
-    let reads = [..sig.params$pattern_reads().join(), ..body.field_reads()];
-    [..sig.params$param_hits(body, reads).join(), ..body.descendants()$let_hits(reads).join()]
-}
 
 # The hits in one parameter's case pattern. The body's span starts at the `{` that
 # opens it, a single line that survives the formatter and the closest one to the
