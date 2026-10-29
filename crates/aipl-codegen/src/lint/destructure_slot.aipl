@@ -124,7 +124,11 @@ fn let_hits(self: Expr, reads: Read[]) -> LintHit[] {
             .map(|slot| hit(message(slot, case_pattern(case_name, names, slot)), value.span)),
         ByTuple(names) => names
             .slots_read_by_field(body, reads)
-            .map(|slot| hit(message(slot, tuple_pattern(names, slot)), value.span)),
+            .map(|slot| {
+                // The tuple pattern over `names`, with `slot` taken apart in place.
+                let spelled = names.map(|n| if (n == slot.name) { slot.struct_slot() } else { n });
+                hit(message(slot, `({spelled.join(sep=", ")})`), value.span)
+            }),
         _ => [],
     }
 }
@@ -157,9 +161,4 @@ fn struct_slot(self: Slot { fields }) -> str { `<Type> \{ {fields.join(sep=", ")
 # A case pattern over `names`, with `slot` taken apart in place.
 fn case_pattern(case_name: str, names: str[], slot: Slot) -> str {
     `{case_name}({names.map(|n| if (n == slot.name) { slot.struct_slot() } else { n }).join(sep=", ")})`
-}
-
-# A tuple pattern over `names`, with `slot` taken apart in place.
-fn tuple_pattern(names: str[], slot: Slot) -> str {
-    `({names.map(|n| if (n == slot.name) { slot.struct_slot() } else { n }).join(sep=", ")})`
 }

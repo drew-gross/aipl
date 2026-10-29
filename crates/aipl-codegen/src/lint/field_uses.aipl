@@ -68,7 +68,7 @@ pub fn uses_of(self: Expr, name: str) -> Uses {
     }
     Uses {
         mentions: nodes.count_if(|node| node.is_name(name)),
-        field_reads: nodes.count_if(|node| node.is_read_off(name)),
+        field_reads: nodes.count_if(|node| node.read().is_some_and(|r| r.base == name)),
         fields,
         shadowed: nodes.any(|node| node.rebinds(name)),
     }
@@ -137,8 +137,6 @@ pub fn is_name(self: Expr, name: str) -> bool {
         _ => false,
     }
 }
-
-fn is_read_off(self: Expr, name: str) -> bool { self.read().is_some_and(|r| r.base == name) }
 
 # Whether `self` introduces a binding called `name`, in any of the positions that
 # can: the two `let` forms, a lambda parameter, a loop variable, a destructuring

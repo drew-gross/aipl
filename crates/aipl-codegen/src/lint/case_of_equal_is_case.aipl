@@ -77,14 +77,13 @@ fn comparison_hit(
     let Call("==", operands, _) = kind else {
         return [];
     };
-    if (operands.count_if(is_case_of) == 1) { [hit(message(method), span)] } else { [] }
-}
-
-# Whether an expression is a call of `case_of` on one value.
-fn is_case_of(self: Expr) -> bool {
-    match (self.kind) {
+    if (operands.count_if(|operand| match (operand.kind) {
         Call("case_of", arguments, _) => arguments.len() == 1,
         _ => false,
+    }) == 1) {
+        [hit(message(method), span)]
+    } else {
+        []
     }
 }
 

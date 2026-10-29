@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-unused_imports">unused_imports</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn unused_imports(program: Program) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn unused_imports(__spat$1933: Program) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each name <code>program</code> imports and nothing in it references.</p></div>
 
@@ -65,48 +65,6 @@
           <pre class="signature"><code>fn unused_message(name: str) -&#62; str</code></pre>
 
           <div class="doc"><p>What is said of the import <code>name</code>.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-referenced_names">
-          <h3>
-            <a class="anchor" href="#item-referenced_names">referenced_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn referenced_names(__spat$5344: Program) -&#62; #{str}</code></pre>
-
-          <div class="doc"><p>Every name the file mentions outside its own import lists: called and referenced idents, constructed structs, match constructors, operator spellings, and every name appearing in a type — signatures, struct fields, variant payloads, and inline <code>let</code>/lambda annotations.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-item_names">
-          <h3>
-            <a class="anchor" href="#item-item_names">item_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn item_names(self: Item) -&#62; #{str}</code></pre>
-
-          <div class="doc"><p>The names an item mentions: the type positions that belong to it rather than to any expression, and the expressions it holds.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-param_names">
-          <h3>
-            <a class="anchor" href="#item-param_names">param_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn param_names(self: Param) -&#62; #{str}</code></pre>
-
-          <div class="doc"><p>The names a parameter mentions: its type, its default, and what its pattern names.</p></div>
 
 
         </section>
