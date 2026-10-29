@@ -10,7 +10,6 @@
 # false hit costs a build that cannot be made to pass except by `#[allow]`.
 
 import {
-    Span,
     collect_arms,
     equal as ==,
     filter,
@@ -18,7 +17,6 @@ import {
     join,
     logical_not as !,
     map,
-    not_equal as !=,
     split,
     to_set,
     union_all,
@@ -71,7 +69,6 @@ import {
     Fn,
     Import,
     ImportDecl,
-    ImportName,
     Item,
     Param,
     Program,
@@ -118,6 +115,12 @@ pub fn unused_imports(program: Program) -> LintHit[] {
     // The caret goes under the name in the import list.
     let src = "import { map, filter } from builtins;\nfn f() { }";
     assert(lint_hits(src, unused_imports)?$span == [9..12, 14..20]);
+
+    // An operator alias is pointed at by the exported name written before it.
+    assert(lint_hits(
+        "import { less_than as < } from builtins;\nfn f() { }",
+        unused_imports,
+    )?$span == [9..18]);
 
     // An alias is the local name: the operator is used, the exported name is not.
     assert(lint_messages(
@@ -173,26 +176,15 @@ pub fn unused_imports(program: Program) -> LintHit[] {
 
 # A hit for each name `self` imports that is not in `used`.
 fn unused_in(self: Import(decl), used: #{str}) -> LintHit[] {
-    let ImportDecl { names, source_span } = decl;
+    let ImportDecl { names, source as _, source_span as _ } = decl;
     names
         .filter(|name| !used.has(name.local()))
-        .map(|name| hit(unused_message(name.local()), name.hit_span(source_span)))
+        .map(|name| hit(unused_message(name.local()), name.span))
 }
 
 # What is said of the import `name`.
 fn unused_message(name: str) -> str {
     `unused import "{name}": nothing in this file references it; drop it from the import list`
-}
-
-# Where an unused import's caret goes. The bare `-`/`<`/`>`/`||`/`!` operator
-# tokens carry no span of their own, so the import statement is pointed at
-# instead — an empty span would put the caret on the file's first line, nowhere
-# near the import.
-fn hit_span(self: ImportName, source_span: Span) -> Span {
-    if (self.span.start != self.span.end) {
-        return self.span;
-    };
-    source_span
 }
 
 # Every name the file mentions outside its own import lists: called and
