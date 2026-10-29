@@ -1,0 +1,69 @@
+# Runs the compiler's own passes over source files, to be profiled:
+#
+#     profiling/flamegraph.sh            # the default stage over the compiler's sources
+#     profiling/flamegraph.sh format     # one stage; see below
+#
+# `aipl run --flamegraph` samples where this `main` spends its CPU time, so what
+# the graph shows is the compiler's code — the lexer, the parser, the loader's
+# per-file passes and the formatter, all of which are AIPL — running over source.
+# The passes written in Rust (the loader's flattening, the type checker, code
+# generation) are not in it.
+#
+# The arguments are a stage and the files to run it over. The stages, each the
+# whole of what it names:
+#
+# - `lex`: `lex_aipl`, the tokens.
+# - `parse`: `aipl_parse_file`, the program a file parses to.
+# - `load`: `parse_and_partial_load`, the parse plus the passes the loader runs
+#   on each file: test-function hoisting, type-variable promotion, the lints that
+#   are written in AIPL, and the destructuring lowering.
+# - `format`: `format_source`, the formatter, at the width the corpus uses.
+
+import { count_if, first, len, map, print, read_file_to_string } from builtins;
+import { format_source } from "../crates/aipl-codegen/src/format_source.aipl";
+import { aipl_parse_file } from "../crates/aipl-codegen/src/grammar_aipl.aipl";
+import { lex_aipl } from "../crates/aipl-codegen/src/lex_aipl.aipl";
+import { parse_and_partial_load } from "../crates/aipl-codegen/src/parse_and_partial_load.aipl";
+
+# The width the formatter lays the corpus out at.
+let FORMAT_WIDTH: u64 = 100;
+
+# Whether `stage` succeeds on `source`. The answer is what keeps the work from
+# being discarded as unused, and a file that fails is noticed in the total.
+fn run_stage(stage: str, source: str) -> bool {
+    match (stage) {
+        "lex" => match (lex_aipl(source)) {
+            ok(..) => true,
+            err(..) => false,
+        },
+        "parse" => match (aipl_parse_file(source)) {
+            ok(..) => true,
+            err(..) => false,
+        },
+        "load" => match (parse_and_partial_load(source)) {
+            ok(..) => true,
+            err(..) => false,
+        },
+        "format" => match (format_source(source, FORMAT_WIDTH)) {
+            ok(..) => true,
+            err(..) => false,
+        },
+        _ => false,
+    }
+}
+
+fn main(args: str[]) !prints !read_files {
+    match (args.first()) {
+        some(stage) => {
+            let files = args[1..];
+            // A file that cannot be read is an empty source, which the total counts.
+            let sources = files.map(|path| match (read_file_to_string(path)) {
+                ok(text) => text,
+                err(..) => "",
+            });
+            let succeeded = sources.count_if(|source| run_stage(stage, source));
+            print(`{stage}: {succeeded} of {files.len()} files`);
+        },
+        none => print("usage: main <lex|parse|load|format> <file.aipl>..."),
+    };
+}

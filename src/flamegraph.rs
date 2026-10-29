@@ -5,6 +5,11 @@
 //! a frame's position means nothing and its width means everything. The x axis
 //! is not time passing.
 //!
+//! A frame that appears again above itself is drawn once: the stack is cut back
+//! to its first appearance, so recursion (direct, or through other functions)
+//! does not pile up as a tower of identical boxes. The box says how many times
+//! it was re-entered, at the most, in any stack through it.
+//!
 //! The SVG is self-contained and interactive, as `flamegraph.pl`'s is: hovering
 //! a frame names it and its sample count, clicking one zooms the graph to it,
 //! and Search (or Ctrl-F) highlights the frames whose name matches a regular
@@ -37,6 +42,8 @@ const MIN_WIDTH: f64 = 0.1;
 #[derive(Default)]
 struct Node {
     samples: u64,
+    /// The most times any one stack through this frame re-entered it.
+    reentered: u64,
     children: BTreeMap<Frame, Node>,
 }
 
@@ -44,6 +51,8 @@ struct Node {
 struct Placed {
     frame: Frame,
     depth: usize,
+    /// See [`Node::reentered`].
+    reentered: u64,
     /// The samples to its left on its row.
     offset: u64,
     samples: u64,
@@ -55,9 +64,10 @@ pub fn svg(profile: &Profile, title: &str, subtitle: &str) -> String {
     for (stack, &count) in &profile.stacks {
         root.samples += count;
         let mut node = &mut root;
-        for frame in stack {
-            node = node.children.entry(frame.clone()).or_default();
+        for (frame, reentered) in collapse_recursion(stack) {
+            node = node.children.entry(frame).or_default();
             node.samples += count;
+            node.reentered = node.reentered.max(reentered);
         }
     }
     let all = Frame {
@@ -121,20 +131,44 @@ text {{ font-family: Verdana, sans-serif; font-size: {FONT_SIZE}px; fill: rgb(0,
         let fill = color(&b.frame);
         let samples = if b.samples == 1 { "sample" } else { "samples" };
         let percent = 100.0 * b.samples as f64 / total as f64;
+        let (note, detail) = match b.reentered {
+            0 => (String::new(), String::new()),
+            n => (
+                format!(" (recursion x{n})"),
+                format!(", re-entered up to {n} times"),
+            ),
+        };
         let _ = writeln!(
             out,
-            r#"<g data-x="{offset}" data-w="{count}"><title>{name} ({count} {samples}, {percent:.2}%)</title><rect x="{x:.2}" y="{y}" width="{width:.2}" height="{h}" fill="{fill}" data-fill="{fill}" rx="2" ry="2"/><text x="{tx:.2}" y="{ty}">{label}</text></g>"#,
+            r#"<g data-x="{offset}" data-w="{count}" data-note="{note}"><title>{name} ({count} {samples}, {percent:.2}%{detail})</title><rect x="{x:.2}" y="{y}" width="{width:.2}" height="{h}" fill="{fill}" data-fill="{fill}" rx="2" ry="2"/><text x="{tx:.2}" y="{ty}">{label}</text></g>"#,
             offset = b.offset,
             count = b.samples,
             name = escape(&b.frame.name),
             h = FRAME_HEIGHT - 1.0,
             tx = x + 3.0,
             ty = y + FRAME_HEIGHT / 2.0 + 3.5,
-            label = escape(&label(&b.frame.name, width)),
+            label = escape(&label(&format!("{}{note}", b.frame.name), width)),
         );
     }
     out.push_str("</g>\n</svg>\n");
     out
+}
+
+/// `stack` with every cycle cut out: a frame already on the stack drops the
+/// frames above its first appearance, and is charged one re-entry. Each frame
+/// comes with the number of times it was re-entered.
+fn collapse_recursion(stack: &[Frame]) -> Vec<(Frame, u64)> {
+    let mut path: Vec<(Frame, u64)> = Vec::new();
+    for frame in stack {
+        match path.iter().position(|(seen, _)| seen == frame) {
+            Some(at) => {
+                path.truncate(at + 1);
+                path[at].1 += 1;
+            }
+            None => path.push((frame.clone(), 0)),
+        }
+    }
+    path
 }
 
 /// Push a box for `node` and, depth first, for everything above it.
@@ -142,6 +176,7 @@ fn lay_out(frame: &Frame, node: &Node, depth: usize, offset: u64, boxes: &mut Ve
     boxes.push(Placed {
         frame: frame.clone(),
         depth,
+        reentered: node.reentered,
         offset,
         samples: node.samples,
     });
@@ -269,7 +304,7 @@ window.addEventListener("keydown", function(e) {
 });
 function update_text(g) {
     var rect = g.querySelector("rect"), text = g.querySelector("text");
-    var room = +rect.getAttribute("width") - 3, name = name_of(g);
+    var room = +rect.getAttribute("width") - 3, name = name_of(g) + g.getAttribute("data-note");
     text.setAttribute("x", +rect.getAttribute("x") + 3);
     if (room < 3 * FONT_SIZE * FONT_WIDTH) { text.textContent = ""; return; }
     text.textContent = name;
@@ -406,6 +441,40 @@ mod tests {
                 "build (1 sample, 20.00%) x=10.00 width=236.00",
                 "malloc (1 sample, 20.00%) x=10.00 width=236.00",
                 "work (3 samples, 60.00%) x=246.00 width=708.00",
+            ]
+        );
+    }
+
+    #[test]
+    fn recursion_is_drawn_once_with_its_depth() {
+        let (main, parse, rule) = (
+            frame("main", FrameKind::Aipl),
+            frame("parse", FrameKind::Aipl),
+            frame("rule", FrameKind::Aipl),
+        );
+        let profile = Profile {
+            stacks: BTreeMap::from([(
+                vec![
+                    main.clone(),
+                    rule.clone(),
+                    parse.clone(),
+                    rule.clone(),
+                    parse.clone(),
+                    rule.clone(),
+                    frame("memcpy", FrameKind::System),
+                ],
+                4,
+            )]),
+            hz: 997,
+            lost: 0,
+        };
+        assert_eq!(
+            boxes(&svg(&profile, "Flame Graph", "")),
+            [
+                "all (4 samples, 100.00%) x=10.00 width=1180.00",
+                "main (4 samples, 100.00%) x=10.00 width=1180.00",
+                "rule (4 samples, 100.00%, re-entered up to 2 times) x=10.00 width=1180.00",
+                "memcpy (4 samples, 100.00%) x=10.00 width=1180.00",
             ]
         );
     }
