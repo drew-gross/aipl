@@ -28,37 +28,37 @@ fn main() !prints {
     print(s[4..s.len()]);
 }
 --- errors ---
-error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
+error: slice covers the whole receiver — use the receiver itself (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_slices.aipl:17:13
    |
 17 |     print(s[0..]);
    |             ^
 
-error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
+error: slice covers the whole receiver — use the receiver itself (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_slices.aipl:18:15
    |
 18 |     print(s[..s.len()]);
    |               ^^^^^^^
 
-error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
+error: slice covers the whole receiver — use the receiver itself (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_slices.aipl:19:13
    |
 19 |     print(s[0..s.len()]);
    |             ^
 
-error: slice end is the receiver's whole length — use the open-ended "s[3..]" (or append #[allow] to this line to keep it)
+error: slice end is the receiver's whole length — use the open-ended "<receiver>[<start>..]" (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_slices.aipl:11:16
    |
 11 |     print(s[3..s.len()]);
    |                ^^^^^^^
 
-error: slice end is the receiver's whole length — use the open-ended "s[4..]" (or append #[allow] to this line to keep it)
+error: slice end is the receiver's whole length — use the open-ended "<receiver>[<start>..]" (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_slices.aipl:28:16
    |
 28 |     print(s[4..s.len()]);
    |                ^^^^^^^
 
-error: slice starts at 0 — drop it for the open-ended "s[..end]" (or append #[allow] to this line to keep it)
+error: slice starts at 0 — drop it for the open-ended "<receiver>[..<end>]" (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_slices.aipl:23:13
    |
 23 |     print(s[0..2]);

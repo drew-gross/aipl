@@ -15,6 +15,9 @@ import { duplicate_import_source } from "./duplicate_import_source.aipl";
 import { fn_body_type_stutter } from "./fn_body_type_stutter.aipl";
 import { LintHit, imported_as, on_functions } from "./lint_hit.aipl";
 import { match_bool_is_case } from "./match_bool_is_case.aipl";
+import { slice_from_zero } from "./slice_from_zero.aipl";
+import { slice_to_len } from "./slice_to_len.aipl";
+import { slice_whole } from "./slice_whole.aipl";
 import { unused_imports } from "./unused_imports.aipl";
 
 # Every hit the ported lints find in `program`.
@@ -32,6 +35,9 @@ pub fn lint(program: Program) -> LintHit[] {
         ..program.on_functions(fn_body_type_stutter),
         ..program.on_functions(|function| match_bool_is_case(function, is_case)),
         ..program.on_functions(|function| case_of_equal_is_case(function, is_case)),
+        ..program.on_functions(slice_whole),
+        ..program.on_functions(slice_to_len),
+        ..program.on_functions(slice_from_zero),
     ]
 }.test({
     let program = Program { items: [], doc: none };

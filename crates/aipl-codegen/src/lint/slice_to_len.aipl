@@ -1,0 +1,51 @@
+# The `slice_to_len` lint: `x[y..x.len()]` — the end bound is the receiver's own
+# length, which is what the open-ended `x[y..]` already means. Purely syntactic:
+# the receiver and the `len` argument must be the same expression, so aliases or
+# computed receivers that merely happen to be equal at runtime are not flagged.
+#
+# A zero start makes this the *whole* receiver, which `slice_whole` reports, and its
+# advice (`x`) is better than the `x[0..]` this one would give.
+#
+# The hit points at the end bound.
+
+import { collect_arms, equal as ==, join, logical_not as !, logical_or as || } from builtins;
+import { Slice, descendants } from "../expr.aipl";
+import { Function } from "../item.aipl";
+import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
+import { is_len_of, is_zero } from "./slice_bounds.aipl";
+
+# A hit for each slice in the program whose end is its receiver's length.
+pub fn slice_to_len(Function { body }) -> LintHit[] {
+    body.descendants()$kind.collect_arms(Slice)$to_len_hit().join()
+}.test({
+    assert(lint_function_hits("fn f(s: str) -> str { s[3..s.len()] }", slice_to_len)? == [
+        hit(MESSAGE, 27..34),
+    ]);
+
+    // The whole receiver is `slice_whole`'s; an open end, another end, and another
+    // receiver's length are not this.
+    assert(lint_function_messages("fn f(s: str) -> str { s[0..s.len()] }", slice_to_len)? == []);
+    assert(lint_function_messages("fn f(s: str) -> str { s[..s.len()] }", slice_to_len)? == []);
+    assert(lint_function_messages("fn f(s: str) -> str { s[3..] }", slice_to_len)? == []);
+    assert(lint_function_messages("fn f(s: str) -> str { s[3..5] }", slice_to_len)? == []);
+    assert(
+        lint_function_messages(
+            "fn f(s: str, t: str) -> str { s[3..t.len()] }",
+            slice_to_len,
+        )? == [],
+    );
+})
+
+# What is said of a slice whose end is its receiver's length.
+let MESSAGE = `slice end is the receiver's whole length — use the open-ended "<receiver>[<start>..]"`;
+
+# The hit for one slice, or none.
+fn to_len_hit(self: Slice(receiver, start, end)) -> LintHit[] {
+    let some(bound) = end else {
+        return [];
+    };
+    if (!bound.is_len_of(receiver) || start.is_zero()) {
+        return [];
+    };
+    [hit(MESSAGE, bound.span)]
+}

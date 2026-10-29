@@ -1,0 +1,52 @@
+# The `slice_from_zero` lint: `x[0..y]` — a start bound of a written `0` is what the
+# open-ended `x[..y]` already means. The mirror of `slice_to_len`, and it leans on
+# the same distinction: an *omitted* start is a zero with an empty span, so requiring
+# a non-empty span is what separates a written `0` from an elided one.
+#
+# Only flagged when there is an end bound. `x[0..]` is left alone here on purpose:
+# `x[..]` is not a form, so there would be nothing to recommend (`slice_whole`
+# reports it, since a zero start makes it the whole receiver). Nor is `x[0..x.len()]`,
+# which is the whole receiver in one step rather than the two this lint's
+# `x[..x.len()]` would start.
+#
+# The advice does not quote the end bound back: a call-shaped span (`s.len()`) stops
+# before its parens, so splicing the source text would give advice like `s[..s.len]`.
+# The hit points at the `0`.
+
+import { collect_arms, equal as ==, join, logical_and as &&, logical_not as ! } from builtins;
+import { Slice, descendants } from "../expr.aipl";
+import { Function } from "../item.aipl";
+import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
+import { is_elided, is_len_of, is_zero } from "./slice_bounds.aipl";
+
+# A hit for each slice in the program that starts with a written `0` and ends short
+# of the length.
+pub fn slice_from_zero(Function { body }) -> LintHit[] {
+    body.descendants()$kind.collect_arms(Slice)$from_zero_hit().join()
+}.test({
+    assert(lint_function_hits("fn f(s: str) -> str { s[0..2] }", slice_from_zero)? == [
+        hit(MESSAGE, 24..25),
+    ]);
+
+    // An elided start, a start worth keeping, an open end, and the whole receiver
+    // are not this.
+    assert(lint_function_messages("fn f(s: str) -> str { s[..2] }", slice_from_zero)? == []);
+    assert(lint_function_messages("fn f(s: str) -> str { s[1..2] }", slice_from_zero)? == []);
+    assert(lint_function_messages("fn f(s: str) -> str { s[0..] }", slice_from_zero)? == []);
+    assert(lint_function_messages("fn f(s: str) -> str { s[0..s.len()] }", slice_from_zero)? == []);
+})
+
+# What is said of a slice that starts with a written `0`.
+let MESSAGE = `slice starts at 0 — drop it for the open-ended "<receiver>[..<end>]"`;
+
+# The hit for one slice, or none.
+fn from_zero_hit(self: Slice(receiver, start, end)) -> LintHit[] {
+    let some(bound) = end else {
+        return [];
+    };
+    if (start.is_zero() && !start.is_elided() && !bound.is_len_of(receiver)) {
+        [hit(MESSAGE, start.span)]
+    } else {
+        []
+    }
+}

@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">160 files, 1620 items.</p>
+      <p class="summary">164 files, 1632 items.</p>
 
       <ul class="files">
 
@@ -1991,6 +1991,94 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-match_bool_is_case.html#item-match_bool_is_case"><code>match_bool_is_case</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-slice_bounds.html">crates/aipl-codegen/src/lint/slice_bounds.aipl</a>
+
+          <p class="file-summary">What the three slice lints (<code>slice_whole</code>, <code>slice_to_len</code>, <code>slice_from_zero</code>) share: how to read a slice's bounds. They divide the range forms between them, so they must agree on what &quot;runs to the end&quot; and &quot;starts at zero&quot; mean.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-slice_bounds.html#item-is_len_of"><code>is_len_of</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-slice_bounds.html#item-is_zero"><code>is_zero</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-slice_bounds.html#item-is_elided"><code>is_elided</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-slice_from_zero.html">crates/aipl-codegen/src/lint/slice_from_zero.aipl</a>
+
+          <p class="file-summary">The <code>slice_from_zero</code> lint: <code>x[0..y]</code> — a start bound of a written <code>0</code> is what the open-ended <code>x[..y]</code> already means. The mirror of <code>slice_to_len</code>, and it leans on the same distinction: an <em>omitted</em> start is a zero with an empty span, so requiring a non-empty span is what separates a written <code>0</code> from an elided one.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-slice_from_zero.html#private">2 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-slice_from_zero.html#item-slice_from_zero"><code>slice_from_zero</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-slice_to_len.html">crates/aipl-codegen/src/lint/slice_to_len.aipl</a>
+
+          <p class="file-summary">The <code>slice_to_len</code> lint: <code>x[y..x.len()]</code> — the end bound is the receiver's own length, which is what the open-ended <code>x[y..]</code> already means. Purely syntactic: the receiver and the <code>len</code> argument must be the same expression, so aliases or computed receivers that merely happen to be equal at runtime are not flagged.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-slice_to_len.html#private">2 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-slice_to_len.html#item-slice_to_len"><code>slice_to_len</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-slice_whole.html">crates/aipl-codegen/src/lint/slice_whole.aipl</a>
+
+          <p class="file-summary">The <code>slice_whole</code> lint: <code>x[0..]</code>, <code>x[..x.len()]</code> and <code>x[0..x.len()]</code> — a slice whose range covers the receiver end to end, which is what <code>x</code> already is. The slice is not free: an array slice allocates a fresh block and copies every element, so this is a redundant copy as well as a redundant spelling. Dropping it is safe because arrays have value semantics — mutating an aliased binding copies first, so <code>y = x</code> cannot be surprised by a later <code>set x[..]</code>.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-slice_whole.html#private">2 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-slice_whole.html#item-slice_whole"><code>slice_whole</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

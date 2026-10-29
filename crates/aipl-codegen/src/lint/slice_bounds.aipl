@@ -1,0 +1,36 @@
+# What the three slice lints (`slice_whole`, `slice_to_len`, `slice_from_zero`) share:
+# how to read a slice's bounds. They divide the range forms between them, so they
+# must agree on what "runs to the end" and "starts at zero" mean.
+
+import { equal as ==, logical_not as ! } from builtins;
+import { Call, Expr, Num, expr, ident, num, show_expr } from "../expr.aipl";
+
+# Whether `self` is `len(receiver)`: the receiver's own length, however it was
+# spelled (`x.len()` is the free call `len(x)`). Spans are ignored, so the two must
+# be the same expression, not merely equal when run.
+pub fn is_len_of(self: Expr, receiver: Expr) -> bool {
+    match (self.kind) {
+        Call("len", arguments, _) => arguments$show_expr() == [receiver.show_expr()],
+        _ => false,
+    }
+}.test({
+    let xs = ident("xs");
+    assert(expr(Call("len", [xs], true)).is_len_of(xs));
+    assert(!expr(Call("len", [xs], true)).is_len_of(ident("ys")));
+    assert(!expr(Call("size", [xs], true)).is_len_of(xs));
+    assert(!expr(Call("len", [xs, xs], false)).is_len_of(xs));
+    assert(!xs.is_len_of(xs));
+})
+
+# Whether `self` is the number `0`, written or not.
+pub fn is_zero(self: Expr) -> bool { self.kind == Num(0) }.test({
+    assert(num(0).is_zero());
+    assert(!num(1).is_zero());
+})
+
+# Whether `self` was left unwritten: the parser fills an omitted start bound with a
+# zero that has an empty span, which is what tells `x[..y]` from `x[0..y]`.
+pub fn is_elided(self: Expr) -> bool { self.span.start == self.span.end }.test({
+    assert(num(0).is_elided());
+    assert(!Expr { ..num(0), span: 3..4 }.is_elided());
+})

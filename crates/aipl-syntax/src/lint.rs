@@ -40,9 +40,6 @@ mod return_loop_find_if;
 mod return_loop_find_index;
 mod set_spread_field;
 mod set_spread_push;
-mod slice_from_zero;
-mod slice_to_len;
-mod slice_whole;
 mod step_by_one;
 mod union_loop_union_all;
 mod value_or_compare;
@@ -81,9 +78,6 @@ use self::return_loop_find_if::{find_if_name, return_loop_find_if};
 use self::return_loop_find_index::{find_index_name, return_loop_find_index};
 use self::set_spread_field::set_spread_field;
 use self::set_spread_push::{append_names, set_spread_push};
-use self::slice_from_zero::slice_from_zero;
-use self::slice_to_len::slice_to_len;
-use self::slice_whole::slice_whole;
 use self::step_by_one::{matching_steps, step_by_one};
 use self::union_loop_union_all::{union_loop_union_all, union_names};
 use self::value_or_compare::{value_or_compare, value_or_compare_names};
@@ -109,14 +103,6 @@ pub fn check(
     // reported below.
     let mut squelched: HashSet<usize> = HashSet::new();
     let mut hits: Vec<Error> = Vec::new();
-    // The three slice lints partition the range forms rather than overlap:
-    // a whole-receiver range belongs to `slice_whole` and the other two bow
-    // out of it explicitly, so `x[0..x.len()]` yields one hit advising `x`
-    // instead of a chain of rewrites through `x[0..]` or `x[..x.len()]`.
-    // Order between them therefore carries no meaning.
-    each_expr(program, &mut |e| slice_whole(e, src, &mut hits));
-    each_expr(program, &mut |e| slice_to_len(e, src, &mut hits));
-    each_expr(program, &mut |e| slice_from_zero(e, src, &mut hits));
     // `xs.map(|x| x.name)` is `xs$name`, `xs.map(f)` is `xs$f()`, and a lambda that
     // only forwards its arguments to a call is that function.
     let map = imported_as(program, "map");
@@ -461,22 +447,11 @@ fn line_of(src: &str, pos: usize) -> usize {
     src[..pos.min(src.len())].matches('\n').count()
 }
 
-/// True when `end` is exactly `len(obj)` — the receiver's own whole length,
-/// however it was spelled (`x.len()` is stored as the free call `len(x)`).
-/// Shared by the three slice lints, which divide the range forms between
-/// them and so must agree on what "runs to the end" means.
-fn end_is_receiver_len(end: &Expr, obj: &Expr) -> bool {
-    let ExprKind::Call(name, args, _) = &end.kind else {
-        return false;
-    };
-    name == "len" && args.len() == 1 && args[0] == *obj
-}
-
 /// The synthetic value the parser ends a statement-only block with: `()` for an
 /// ordinary block, and an i64 `0` — the loop expression's own result — for a
 /// loop body, which may not end in a value of its own at all. The loop's zero is
 /// told from a written one by its empty span, the same way
-/// [`slice_from_zero`](slice_from_zero()) tells an elided slice bound from a
+/// `slice_from_zero` (in AIPL) tells an elided slice bound from a
 /// typed one.
 fn is_block_tail(e: &Expr) -> bool {
     match &e.kind {

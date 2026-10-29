@@ -1,0 +1,74 @@
+# The `slice_whole` lint: `x[0..]`, `x[..x.len()]` and `x[0..x.len()]` — a slice
+# whose range covers the receiver end to end, which is what `x` already is. The
+# slice is not free: an array slice allocates a fresh block and copies every
+# element, so this is a redundant copy as well as a redundant spelling. Dropping it
+# is safe because arrays have value semantics — mutating an aliased binding copies
+# first, so `y = x` cannot be surprised by a later `set x[..]`.
+#
+# This is the whole-range corner of the three slice lints, and it takes priority
+# over both: `slice_to_len` would advise `x[0..]` and `slice_from_zero`
+# `x[..x.len()]`, each of which is still this shape and would need a second round
+# trip. Both bow out when this one applies, so a full-range slice produces exactly
+# one hit whichever way it was written.
+#
+# A start of `0` counts however it was written. The hit points at a bound rather
+# than the whole slice, because `#[allow]` is line-scoped and a receiver may span
+# lines while a bound sits inside the brackets: the written `0`, or when the start
+# was left out (`x[..x.len()]`), the end bound, which must be there in that form.
+
+import {
+    collect_arms,
+    equal as ==,
+    join,
+    logical_not as !,
+    logical_or as ||,
+    value_or,
+} from builtins;
+import { Slice, descendants } from "../expr.aipl";
+import { Function } from "../item.aipl";
+import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
+import { is_elided, is_len_of, is_zero } from "./slice_bounds.aipl";
+
+# A hit for each slice in the program that covers its whole receiver.
+pub fn slice_whole(Function { body }) -> LintHit[] {
+    body.descendants()$kind.collect_arms(Slice)$whole_hit().join()
+}.test({
+    // The three spellings, each pointing at a bound.
+    assert(lint_function_hits("fn f(s: str) -> str { s[0..] }", slice_whole)? == [
+        hit(MESSAGE, 24..25),
+    ]);
+    assert(lint_function_hits("fn f(s: str) -> str { s[..s.len()] }", slice_whole)? == [
+        hit(MESSAGE, 26..33),
+    ]);
+    assert(lint_function_hits("fn f(s: str) -> str { s[0..s.len()] }", slice_whole)? == [
+        hit(MESSAGE, 24..25),
+    ]);
+
+    // A start worth keeping, an end that is not the length, or a different
+    // receiver's length is not the whole receiver.
+    assert(lint_function_messages("fn f(s: str) -> str { s[1..] }", slice_whole)? == []);
+    assert(lint_function_messages("fn f(s: str) -> str { s[0..2] }", slice_whole)? == []);
+    assert(lint_function_messages("fn f(s: str) -> str { s[..2] }", slice_whole)? == []);
+    assert(
+        lint_function_messages("fn f(s: str, t: str) -> str { s[0..t.len()] }", slice_whole)? == [],
+    );
+
+    // The `.test` block is held to it too.
+    assert(lint_function_messages("fn f() { }.test({ assert(s[0..] == s); })", slice_whole)? == [
+        MESSAGE,
+    ]);
+})
+
+# What is said of a slice that covers all of its receiver.
+let MESSAGE = "slice covers the whole receiver — use the receiver itself";
+
+# The hit for one slice, or none.
+fn whole_hit(self: Slice(receiver, start, end)) -> LintHit[] {
+    // An absent end already runs to the length; a present one has to say so.
+    let reaches_end = end$is_len_of(receiver).value_or(true);
+    if (!start.is_zero() || !reaches_end) {
+        return [];
+    };
+    let at = if (start.is_elided()) { end$span.value_or(start.span) } else { start.span };
+    [hit(MESSAGE, at)]
+}

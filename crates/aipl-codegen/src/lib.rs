@@ -1718,6 +1718,10 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./lint/fn_body_type_stutter.aipl",
     "./lint/match_bool_is_case.aipl",
     "./lint/case_of_equal_is_case.aipl",
+    "./lint/slice_bounds.aipl",
+    "./lint/slice_whole.aipl",
+    "./lint/slice_to_len.aipl",
+    "./lint/slice_from_zero.aipl",
     "./lint/lint.aipl",
     "./parse_and_partial_load.aipl",
     // The formatter: `format_source` is the whole pipeline, and its walker
