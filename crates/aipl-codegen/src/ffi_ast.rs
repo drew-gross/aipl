@@ -77,6 +77,11 @@ fn parsed_file(v: &FfiValue) -> R<aipl_parser::Parsed> {
         program: program(field(v, "program")?)?,
         allows: each(field(v, "allows")?, span)?,
         lints: each(field(v, "lints")?, |hit| Ok(parse_error(hit)))?,
+        // Not marshaled by an artifact built before it existed.
+        type_uses: match v_field(v, "type_uses") {
+            Some(uses) => each(uses, span)?,
+            None => Vec::new(),
+        },
     })
 }
 

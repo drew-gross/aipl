@@ -475,19 +475,62 @@ fn a_document_that_does_not_compile_says_so() {
     assert!(reason.contains("does not compile"), "{reason}");
 }
 
+/// A type name goes to the struct or variant it names, wherever an annotation
+/// is written.
+#[test]
+fn a_type_name_goes_to_its_declaration() {
+    let source = "struct Pair { name: i64 }\n\
+                  \n\
+                  variant Shape = Circle(i64) | Square(i64)\n\
+                  \n\
+                  fn make(pair: Pair, shapes: Shape[]) -> Pair? { none }\n\
+                  \n\
+                  fn local() -> Shape? {\n\
+                  \u{20}   let held: Pair? = none;\n\
+                  \u{20}   none\n\
+                  }\n";
+    let workspace = Workspace::new("type-names", &[("main.aipl", source)]);
+    let mut server = opened(&workspace, "main.aipl");
+    analysed(&mut server, &workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let goes = |server: &mut Server, from: &str, to: &str| {
+        let location = definition_at(server, &uri, cursor_on(source, from));
+        assert_eq!(
+            location["range"]["start"],
+            cursor_on(source, to),
+            "from {from:?}"
+        );
+    };
+    goes(&mut server, "Pair, shapes", "Pair {");
+    goes(&mut server, "Shape[]", "Shape =");
+    goes(&mut server, "Pair? {", "Pair {");
+    goes(&mut server, "Shape? {", "Shape =");
+    goes(&mut server, "Pair? =", "Pair {");
+}
+
 /// A name the compiler resolves nothing for is an error, not an empty result:
 /// the cursor is on something, and the server cannot say what.
 #[test]
 fn a_name_the_compiler_did_not_resolve_is_an_error_but_whitespace_is_not() {
-    let (workspace, mut server) = shared_name("a_name_the_compiler_did_");
+    let source = "variant Shape = Circle(i64) | Square(i64)\n\
+                  \n\
+                  fn size(shape: Shape) -> i64 {\n\
+                  \u{20}   match (shape) {\n\
+                  \u{20}       Circle(r) => r,\n\
+                  \u{20}       Square(s) => s,\n\
+                  \u{20}   }\n\
+                  }\n";
+    let workspace = Workspace::new("unresolved-name", &[("main.aipl", source)]);
+    let mut server = opened(&workspace, "main.aipl");
+    analysed(&mut server, &workspace, "main.aipl");
     let uri = workspace.uri("main.aipl");
     let params = |position: Value| json!({ "textDocument": { "uri": uri }, "position": position });
     let reason = request_error(
         &mut server,
         "textDocument/definition",
-        params(cursor_on(SHARED_NAME, "Pair) -> i64 { name(pair)")),
+        params(cursor_on(source, "Circle(r)")),
     );
-    assert!(reason.contains("does not cover `Pair`"), "{reason}");
+    assert!(reason.contains("does not cover `Circle`"), "{reason}");
     assert_eq!(
         request(
             &mut server,

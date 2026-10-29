@@ -4,20 +4,20 @@
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
 ; array-abi narrow
 ; set-abi wide
-; entry parse_test_section_header 692 str -> str?
-; entry strip_test_sections 739 str -> str
-; entry split_test_sections 738 str -> __tuple$str$str
-; entry source_loc 737 str __builtin_Span -> str
+; entry parse_test_section_header 693 str -> str?
+; entry strip_test_sections 740 str -> str
+; entry split_test_sections 739 str -> __tuple$str$str
+; entry source_loc 738 str __builtin_Span -> str
 ; entry caret_block 130 str __builtin_Span str -> str
 ; entry fill_or_add_sections_file 247 str #{str:str} -> unit!Error
-; entry normalize_output 653 str -> str
-; entry int_fits 530 i64 str -> bool
-; entry is_operator_name 531 str -> bool
-; entry aipl_token_scopes 567 str -> __m19__ScopeSpan[]!__m19__LexError
+; entry normalize_output 654 str -> str
+; entry int_fits 531 i64 str -> bool
+; entry is_operator_name 532 str -> bool
+; entry aipl_token_scopes 568 str -> __m19__ScopeSpan[]!__m19__LexError
 ; entry find_files 248 str str -> str[]!Error
 ; entry companion_files 132 str -> __m25__Companion[]!str
-; entry parse_spec 688 str -> __m26__Spec!str
-; entry parse_and_partial_load 686 str -> __m57__PartialLoad!__m27__ParseFailure
+; entry parse_spec 689 str -> __m26__Spec!str
+; entry parse_and_partial_load 687 str -> __m57__PartialLoad!__m27__ParseFailure
 ; entry fn_role 257 str -> __m44__FnRole
 ; entry test_fn_name 252 str -> str
 ; entry performance_fn_name 253 str -> str
@@ -29,7 +29,7 @@
 ; struct __m25__Companion 48 path@0:str contents@24:str
 ; struct __m26__Spec 288 source@0:str extra_files@24:__m26__Entry[] expect_files@48:__m26__Entry[] stdout@72:str? stderr@104:str? exit_code@136:i64? errors@152:str? report@184:str? cli@216:str[] check@240:str? check_exit_code@272:i64?
 ; struct __m26__Entry 48 path@0:str contents@24:str
-; struct __m57__PartialLoad 104 program@0:__m36__Program allows@56:__builtin_Span[] lints@80:__m48__LintHit[]
+; struct __m57__PartialLoad 128 program@0:__m36__Program allows@56:__builtin_Span[] lints@80:__m48__LintHit[] type_uses@104:__builtin_Span[]
 ; struct __m36__Program 56 items@0:__m36__Item[] doc@24:str?
 ; variant __m36__Item 128 Fn(8:__m36__Function) Struct(8:__m36__StructDecl) Variant(8:__m36__VariantDecl) Refinement(8:__m36__RefinementDecl) Import(8:__m36__ImportDecl) Const(8:__m36__ConstDecl)
 ; struct __m36__Function 240 boxed name@0:__m19__SpanStr is_pub@40:bool sig@48:__m36__Signature body@136:__m31__Expr shorthand_body@144:bool test_body@152:__m31__Expr? test_fns@168:__m36__Function[] performance@192:__m36__PerformanceBlock? doc@208:str?
@@ -380,4 +380,4 @@
 ; data 235 __tostr_lit_96 52427261636b6574
 
 ; __m62____test$all$is_nine
-; source-fingerprint 18267516449208068758
+; source-fingerprint 8057869904399635056

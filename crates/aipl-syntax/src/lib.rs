@@ -391,6 +391,9 @@ pub mod ast {
         /// Each name in the file's `import { .. }` lists, with the global name the
         /// loader bound it to.
         pub imports: Vec<ImportSite>,
+        /// Each name written in a type annotation that the loader resolved to a
+        /// declaration: where it is written, and the global name it means.
+        pub type_uses: Vec<ImportSite>,
     }
 
     /// One name written in an import list, and what the loader resolved it to.

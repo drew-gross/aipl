@@ -107,6 +107,7 @@ impl Navigation {
 
         let mut functions: HashMap<&str, Site> = HashMap::new();
         let mut structs: HashMap<&str, Site> = HashMap::new();
+        let mut variants: HashMap<&str, Site> = HashMap::new();
         let mut fields: HashMap<(&str, &str), Site> = HashMap::new();
         let mut declarations: Vec<Site> = Vec::new();
         for item in frontends.iter().flat_map(|f| &f.program.items) {
@@ -143,6 +144,16 @@ impl Navigation {
                         declarations.push(site);
                     }
                 }
+                Item::Variant(v) => {
+                    if let Some(file) = file_of(&v.name).filter(|_| written(&v.name.span)) {
+                        let site = Site {
+                            file,
+                            span: v.name.span.clone(),
+                        };
+                        variants.insert(&v.name, site.clone());
+                        declarations.push(site);
+                    }
+                }
                 _ => {}
             }
         }
@@ -151,12 +162,29 @@ impl Navigation {
         // The names in each file's import lists, which the loader bound.
         for source in program.sources.iter().filter(|s| !s.path.is_empty()) {
             let file = resolved(Path::new(&source.path));
+            // Names written in type annotations: a type, never a function.
+            for written in &source.type_uses {
+                let declared = structs
+                    .get(written.target.as_str())
+                    .or_else(|| variants.get(written.target.as_str()))
+                    .cloned();
+                if let Some(site) = declared {
+                    uses.push((
+                        Site {
+                            file: file.clone(),
+                            span: written.span.clone(),
+                        },
+                        Found::Declared(site),
+                    ));
+                }
+            }
             for import in &source.imports {
                 let found = match import.target.strip_prefix("__builtin_") {
                     Some(builtin) => builtin_found(builtin, &mut sources),
                     None => functions
                         .get(import.target.as_str())
                         .or_else(|| structs.get(import.target.as_str()))
+                        .or_else(|| variants.get(import.target.as_str()))
                         .cloned()
                         .map(Found::Declared),
                 };

@@ -228,6 +228,9 @@ pub struct Parsed {
     pub program: Program,
     pub allows: Vec<Span>,
     pub lints: Vec<Error>,
+    /// Every token written inside a type annotation, in source order. A language
+    /// server resolves the ones that name a declaration.
+    pub type_uses: Vec<Span>,
 }
 
 /// Install the parser. The compiler points this at the dogfooded

@@ -235,6 +235,8 @@ struct LoadedFile {
     /// The AIPL-implemented builtins the file calls without importing them: the
     /// ones its syntax is written as, such as `v[row, column]`'s `grid_get`.
     syntax_builtins: Vec<Callee>,
+    /// Every token written inside a type annotation, from the parser.
+    type_uses: Vec<Span>,
 }
 
 struct ResolvedImport {
@@ -270,7 +272,7 @@ impl Loader {
         // Keep the original Error (including span) so `render()` can show
         // the caret pointing into the imported file's source. The path
         // tied to that source is implicit from the source line itself.
-        let program = self.parse_and_lint(src)?;
+        let (program, type_uses) = self.parse_and_lint(src)?;
         let (items, imports, builtin_imports) =
             self.prepare(program, path, src, |from, span| {
                 let parent = path.parent().unwrap_or_else(|| Path::new("."));
@@ -292,7 +294,7 @@ impl Loader {
         // Reserve the slot *before* recursing so cycles short-circuit at
         // `files.contains_key` above.
         let import_paths: Vec<PathBuf> = imports.iter().map(|i| i.from.clone()).collect();
-        self.insert_file(path, src, items, imports, builtin_imports);
+        self.insert_file(path, src, items, imports, builtin_imports, type_uses);
         for from in import_paths {
             self.load(&from)?;
         }
@@ -303,10 +305,10 @@ impl Loader {
     /// `#[allow]` squelching) is in hand. Before the `trace` rewrite in
     /// [`Loader::prepare`], so a lint sees what the author wrote rather than the
     /// block it desugars to.
-    fn parse_and_lint(&self, src: &str) -> Result<Program, Vec<Error>> {
+    fn parse_and_lint(&self, src: &str) -> Result<(Program, Vec<Span>), Vec<Error>> {
         let parsed = parse_with_allows(src)?;
         aipl_syntax::lint::check(&parsed.program, src, &parsed.allows, parsed.lints)?;
-        Ok(parsed.program)
+        Ok((parsed.program, parsed.type_uses))
     }
 
     /// Check `program`, bake its reserved calls, and split its items into the
@@ -357,6 +359,7 @@ impl Loader {
         items: Vec<Item>,
         imports: Vec<ResolvedImport>,
         builtin_imports: Vec<ImportName>,
+        type_uses: Vec<Span>,
     ) -> bool {
         let index = self.next_index;
         self.next_index += 1;
@@ -371,6 +374,7 @@ impl Loader {
                     items,
                     imports,
                     builtin_imports,
+                    type_uses,
                 },
             )
             .is_some()
@@ -464,7 +468,7 @@ impl Loader {
     }
 
     fn register_virtual_inner(&mut self, key: PathBuf, src: &str) -> Result<(), Vec<Error>> {
-        let program = self.parse_and_lint(src)?;
+        let (program, type_uses) = self.parse_and_lint(src)?;
         // A caller-supplied name, so a wrong one is a caller error to report,
         // not an invariant to assert: `load_program_sources` returns a `Result`
         // precisely so a host learns what to fix.
@@ -482,7 +486,7 @@ impl Loader {
         let (items, imports, builtin_imports) = self.prepare(program, &key, src, |from, _| {
             Ok(virtual_import_path(&key, from))
         })?;
-        if self.insert_file(&key, src, items, imports, builtin_imports) {
+        if self.insert_file(&key, src, items, imports, builtin_imports, type_uses) {
             return Err(Error::msg(format!(
                 "duplicate source {:?} in compile_sources",
                 file_label(&key)
@@ -903,6 +907,7 @@ impl Loader {
                     source: file.source.clone(),
                     path: path.to_string_lossy().into_owned(),
                     imports: import_sites.get(path).cloned().unwrap_or_default(),
+                    type_uses: type_sites(file, &full_views[path]),
                 };
             }
         }
@@ -2013,6 +2018,40 @@ fn rewrite_expr(
         value_span: e.value_span.clone(),
         name_span: e.name_span.clone(),
     }
+}
+
+/// The names written in `file`'s type annotations that mean a declaration, as
+/// the file's `view` resolves them. A name a declaration of the file takes as a
+/// type parameter is left out: which of the two a use means depends on the
+/// function it sits in, and a wrong answer is worse than none.
+fn type_sites(
+    file: &LoadedFile,
+    view: &HashMap<String, String>,
+) -> Vec<aipl_syntax::ast::ImportSite> {
+    let mut type_vars: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    for item in &file.items {
+        match item {
+            Item::Fn(f) => type_vars.extend(f.sig.type_vars.iter().map(|t| t.name.as_str())),
+            Item::Struct(s) => type_vars.extend(s.type_vars.iter().map(|t| t.name.as_str())),
+            Item::Variant(v) => type_vars.extend(v.type_vars.iter().map(|t| t.name.as_str())),
+            _ => {}
+        }
+    }
+    file.type_uses
+        .iter()
+        .filter_map(|span| {
+            let name = file.source.get(span.clone())?;
+            if !name.starts_with(|c: char| c.is_alphabetic() || c == '_')
+                || type_vars.contains(name)
+            {
+                return None;
+            }
+            Some(aipl_syntax::ast::ImportSite {
+                span: span.clone(),
+                target: view.get(name)?.clone(),
+            })
+        })
+        .collect()
 }
 
 /// Tag every error with the source its spans index, so the renderer points the

@@ -238,6 +238,7 @@ import {
     Then,
     Tight,
     TryMk,
+    prod_names,
 } from "./grammar.aipl";
 import {
     Builtins,
@@ -5447,7 +5448,7 @@ pub fn aipl_program(src: str) -> Program!ParseError { lower_aipl_program(src) }.
 # production ever sees one, and the loader's lint pass still needs them to drop
 # a hit squelched on the same line. They ride out on the return value rather
 # than through a sink the caller has to arm first.
-struct ParsedFile { program: Program, allows: Span[] }
+struct ParsedFile { program: Program, allows: Span[], type_uses: Span[] = [] }
 
 # Why a source file has no program: every syntax error in it, in source order — the
 # ones the grammar recovered from (a missing `;` after a statement, say; see
@@ -5483,8 +5484,8 @@ let PREPARED_GRAMMAR: Prepared<AiplTok, Ast>!ParseError = prepare(aipl_grammar()
 # A tree that recovered from a missing token is a tree of broken input, and is
 # never lowered: the errors come back instead.
 pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
-    let ParsedFile { program, allows } = aipl_parse_surface_file(src)?;
-    ok(ParsedFile { program: program.desugar(), allows })
+    let ParsedFile { program, allows, type_uses } = aipl_parse_surface_file(src)?;
+    ok(ParsedFile { program: program.desugar(), allows, type_uses })
 }
 
 # `aipl_parse_file`, stopping before the destructuring forms are lowered: the
@@ -5507,9 +5508,13 @@ pub fn aipl_parse_surface_file(src: str) -> ParsedFile!ParseFailure {
     }))?;
     let ast = lower(text, tree, GRAMMAR).map_err(failure)?;
     let program = as_program(ast, 0..text.len()).map_err(failure)?;
-    ok(ParsedFile { program, allows })
+    ok(ParsedFile { program, allows, type_uses: tree.type_leaves(prod_names(GRAMMAR), false) })
 }.test({
-    let ParsedFile { program, allows } = aipl_parse_file("fn f() { g(); } #[allow]\n")?;
+    let ParsedFile { program, allows, type_uses } = aipl_parse_file("fn f() { g(); } #[allow]\n")?;
+    assert(type_uses == []);
+
+    // The tokens written inside a type annotation, and only those.
+    assert(aipl_parse_file("fn f(x: Pair) -> Q { }")?.type_uses == [8..12, 17..18]);
     assert(program.show_program() == "fn f() = Seq(g(), ())");
 
     // Every named parameter shape, lowered. The six are six distinct runs of
@@ -5635,6 +5640,26 @@ fn reject_trailing_whitespace(src: str) -> str!ParseError {
 # trivia under a kind of their own, so this is a filter rather than a re-scan.
 fn allow_spans(lexed: LexResult<AiplTok>) -> Span[] {
     lexed.trivia.filter(|t| t.kind == AllowMarker)$text$span
+}
+
+# Every token written inside a type annotation, in source order: the names a
+# language server resolves to declarations. A token is in a type when some `ty`
+# node holds it, at any depth, so `Pair<i64>[]` yields `Pair`, `<`, `i64`, `>` and
+# the brackets; the loader keeps the ones that name something.
+fn type_leaves(self: Cst, names: str[], inside: bool) -> Span[] {
+    match (self) {
+        Leaf(span) => if (inside) { [span] } else { [] },
+        Tree(production, kids) => {
+            let in_type = inside || names[production] == some("ty");
+            kids$type_leaves(names, in_type).join()
+        },
+        Group(_, opening, between, closing) => [
+            ..opening$type_leaves(names, inside).join(),
+            ..between$type_leaves(names, inside).join(),
+            ..closing$type_leaves(names, inside).join(),
+        ],
+        Trivia(..) | Missing(..) => [],
+    }
 }
 
 # Why `src` does not parse, or `none` when it does — the FFI entry the
