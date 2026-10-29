@@ -27,7 +27,7 @@ import {
 import { Slice, descendants } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
-import { is_elided, is_len_of, is_zero } from "./slice_bounds.aipl";
+import { is_len_of, is_zero } from "./slice_bounds.aipl";
 
 # A hit for each slice in the program that covers its whole receiver.
 pub fn slice_whole(Function { body }) -> LintHit[] {
@@ -71,9 +71,12 @@ fn message(receiver: str) -> str { `slice covers the whole receiver — use "{re
 fn whole_hit(self: Slice(receiver, start, end)) -> LintHit[] {
     // An absent end already runs to the length; a present one has to say so.
     let reaches_end = end$is_len_of(receiver).value_or(true);
-    if (!start.is_zero() || !reaches_end) {
+    let starts_at_edge = start$is_zero().value_or(true);
+    if (!starts_at_edge || !reaches_end) {
         return [];
     };
-    let at = if (start.is_elided()) { end$span.value_or(start.span) } else { start.span };
-    [hit(message(receiver.source), at)]
+
+    // The bound to point at: the `0` when it is written, else the end that says
+    // the length (`receiver[..]` is not a form, so one of the two is there).
+    [hit(message(receiver.source), start.value_or(end.value_or(receiver)).span)]
 }

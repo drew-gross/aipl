@@ -22,15 +22,8 @@ pub fn is_len_of(self: Expr, receiver: Expr) -> bool {
     assert(!xs.is_len_of(xs));
 })
 
-# Whether `self` is the number `0`, written or not.
+# Whether `self` is the number `0`.
 pub fn is_zero(self: Expr) -> bool { self.kind == Num(0) }.test({
     assert(num(0).is_zero());
     assert(!num(1).is_zero());
-})
-
-# Whether `self` was left unwritten: the parser fills an omitted start bound with a
-# zero that has an empty span, which is what tells `x[..y]` from `x[0..y]`.
-pub fn is_elided(self: Expr) -> bool { self.span.start == self.span.end }.test({
-    assert(num(0).is_elided());
-    assert(!Expr { ..num(0), span: 3..4 }.is_elided());
 })

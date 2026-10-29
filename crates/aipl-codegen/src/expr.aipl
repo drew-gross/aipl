@@ -136,7 +136,12 @@ variant ExprKind =
     | SetLit(Expr[], SetOrder)
     | DictLit((Expr, Expr)[])
     | Index(Expr, Expr)
-    | Slice(Expr, Expr, Expr?)
+    # `receiver[start..end]`, with either bound left out: `receiver[start..]` has
+    # no `end`, `receiver[..end]` has no `start`, and each is `none` rather than a
+    # stand-in value, so a bound that is present is one the author wrote. A missing
+    # bound means the receiver's own edge — the start clamps to the beginning, the
+    # end to the length — and `receiver[..]` is not a form.
+    | Slice(receiver: Expr, start: Expr?, end: Expr?)
     | Try(Expr)
     | Unit
     | Seq(Expr, Expr)
@@ -227,7 +232,7 @@ pub fn show_expr(self: Expr) -> str {
         SetLit(es, o) => `Set([{show_exprs(es)}]{o.show_order()})`,
         DictLit(ps) => `Dict([{ps$show_dict_entry().join(sep=", ")}])`,
         Index(a, i) => `Index({a.show_expr()}, {i.show_expr()})`,
-        Slice(a, lo, hi) => `Slice({a.show_expr()}, {lo.show_expr()}, {show_opt_expr(hi)})`,
+        Slice(a, lo, hi) => `Slice({a.show_expr()}, {show_opt_expr(lo)}, {show_opt_expr(hi)})`,
         Try(e) => `Try({e.show_expr()})`,
         Unit => "()",
         Seq(a, b) => `Seq({a.show_expr()}, {b.show_expr()})`,
@@ -267,8 +272,9 @@ pub fn show_expr(self: Expr) -> str {
     assert(expr(SetLit([three], Unordered)).show_expr() == "Set([3])");
     assert(expr(SetLit([three], Desc)).show_expr() == "Set([3], Desc)");
     assert(expr(DictLit([(three, ident("v"))])).show_expr() == "Dict([3: v])");
-    assert(expr(Slice(ident("s"), three, none)).show_expr() == "Slice(s, 3, )");
-    assert(expr(Slice(ident("s"), three, some(three))).show_expr() == "Slice(s, 3, 3)");
+    assert(expr(Slice(ident("s"), some(three), none)).show_expr() == "Slice(s, 3, )");
+    assert(expr(Slice(ident("s"), none, some(three))).show_expr() == "Slice(s, , 3)");
+    assert(expr(Slice(ident("s"), some(three), some(three))).show_expr() == "Slice(s, 3, 3)");
 
     // The annotation is written where the source writes it, and vanishes when
     // there is none.
@@ -485,7 +491,7 @@ pub fn map_subexprs(self: Expr, f: (Expr) -> Expr) -> Expr {
         SetLit(elements, order) => SetLit(each_mapped(elements, f), order),
         DictLit(pairs) => DictLit(pairs_mapped(pairs, f)),
         Index(obj, index) => Index(f(obj), f(index)),
-        Slice(obj, start, end) => Slice(f(obj), f(start), optional_mapped(end, f)),
+        Slice(obj, start, end) => Slice(f(obj), optional_mapped(start, f), optional_mapped(end, f)),
         Try(x) => Try(f(x)),
         Seq(first, rest) => Seq(f(first), f(rest)),
         Return(x) => Return(f(x)),
@@ -525,19 +531,27 @@ pub fn map_subexprs(self: Expr, f: (Expr) -> Expr) -> Expr {
         ))),
     );
     // An optional child is mapped when present and left absent otherwise.
-    let open = expr(Slice(ident("s"), num(1), none));
+    let open = expr(Slice(ident("s"), some(num(1)), none));
     assert(
         open.map_subexprs(wrap).show_expr() == show_expr(expr(Slice(
             wrap(ident("s")),
-            wrap(num(1)),
+            some(wrap(num(1))),
             none,
         ))),
     );
-    let closed = expr(Slice(ident("s"), num(1), some(num(2))));
+    let closed = expr(Slice(ident("s"), some(num(1)), some(num(2))));
     assert(
         closed.map_subexprs(wrap).show_expr() == show_expr(expr(Slice(
             wrap(ident("s")),
-            wrap(num(1)),
+            some(wrap(num(1))),
+            some(wrap(num(2))),
+        ))),
+    );
+    let unbounded_start = expr(Slice(ident("s"), none, some(num(2))));
+    assert(
+        unbounded_start.map_subexprs(wrap).show_expr() == show_expr(expr(Slice(
+            wrap(ident("s")),
+            none,
             some(wrap(num(2))),
         ))),
     );
@@ -601,7 +615,11 @@ pub fn subexprs(self: Expr) -> Expr[] {
         Assign(a, b, c) | If(a, b, c) => [a, b, c],
         Match(scrutinee, arms) => [scrutinee, ..arms$body],
         IfLet(arm, scrutinee, else_branch) => [scrutinee, arm.body, else_branch],
-        Slice(a, b, end) => end.map(|c| [a, b, c]).value_or([a, b]),
+        Slice(receiver, start, end) => [
+            receiver,
+            ..start.map(|bound| [bound]).value_or([]),
+            ..end.map(|bound| [bound]).value_or([]),
+        ],
     }
 }.test({
     assert(ident("x").subexprs() == []);
@@ -616,8 +634,9 @@ pub fn subexprs(self: Expr) -> Expr[] {
     ));
     assert(arms.subexprs() == [ident("s"), ident("v")]);
     assert(expr(DictLit([(ident("k"), ident("v"))])).subexprs() == [ident("k"), ident("v")]);
-    assert(expr(Slice(ident("s"), num(1), none)).subexprs() == [ident("s"), num(1)]);
-    assert(expr(Slice(ident("s"), num(1), some(num(2)))).subexprs() == [
+    assert(expr(Slice(ident("s"), some(num(1)), none)).subexprs() == [ident("s"), num(1)]);
+    assert(expr(Slice(ident("s"), none, some(num(2)))).subexprs() == [ident("s"), num(2)]);
+    assert(expr(Slice(ident("s"), some(num(1)), some(num(2)))).subexprs() == [
         ident("s"),
         num(1),
         num(2),

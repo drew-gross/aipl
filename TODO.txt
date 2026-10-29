@@ -102,7 +102,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
-  start_bounds.aipl's is_elided shouldn't be necessary, slice's start/end should be ?
+  source text should be propagated by the parser, not rebuilt later in source_text.aipl
   find a way to make lints work without awkwardly threading the method through to every message() call
   duplicate_import_source lint looks like it could use a source->count index maybe? Could enable better fixits.
   function_hits in body type stutter can only ever return one, make it LintHint? instead of LintHint[]

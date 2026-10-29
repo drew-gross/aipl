@@ -56,10 +56,8 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
         Index(index) => index_or_slice(recv, index, span),
         // `recv[row, column]` reads one cell of a grid; the builtin answers `none` off the grid.
         Index2(row, column) => at(Call("__builtin_grid_get", [recv, row, column], false), span),
-        SliceFrom(lo) => at(Slice(recv, lo, none), span),
-        // `recv[..end]` is `recv[0..end]`: the start clamps to `[0, len]`
-        // regardless, so a synthetic `0` is the whole difference.
-        SliceTo(hi) => at(Slice(recv, num(0), some(hi)), span),
+        SliceFrom(lo) => at(Slice(recv, some(lo), none), span),
+        SliceTo(hi) => at(Slice(recv, none, some(hi)), span),
         Try => at(TryExpr(recv), span),
         MapField(name) => mapped(
             recv,
@@ -90,7 +88,7 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
         apply_suffix(p, Index2(num(1), num(2)), 0..0).show_expr() == "__builtin_grid_get(p, 1, 2)",
     );
     assert(apply_suffix(p, SliceFrom(num(1)), 0..0).show_expr() == "Slice(p, 1, )");
-    assert(apply_suffix(p, SliceTo(num(2)), 0..0).show_expr() == "Slice(p, 0, 2)");
+    assert(apply_suffix(p, SliceTo(num(2)), 0..0).show_expr() == "Slice(p, , 2)");
     assert(apply_suffix(p, Try, 0..0).show_expr() == "Try(p)");
 
     // `$` maps the step over the receiver: `p$x` is `p.map(|x| x.x)`, with the
@@ -153,7 +151,7 @@ fn mapped(recv: Expr, step: Expr, span: Span) -> Expr {
 # result) stays an index and takes the `Span`-index sugar path instead.
 fn index_or_slice(recv: Expr, index: Expr, span: Span) -> Expr {
     match (index.range_bounds()) {
-        some(b) => at(Slice(recv, b.0, some(b.1)), span),
+        some(b) => at(Slice(recv, some(b.0), some(b.1)), span),
         none => at(IndexExpr(recv, index), span),
     }
 }

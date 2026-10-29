@@ -4549,7 +4549,7 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     // ...except written *as* an index, where it folds straight into a slice.
     assert(expr_dump("s[1..2]") == "Slice(s, 1, 2)");
     assert(expr_dump("s[1..]") == "Slice(s, 1, )");
-    assert(expr_dump("s[..2]") == "Slice(s, 0, 2)");
+    assert(expr_dump("s[..2]") == "Slice(s, , 2)");
     assert(expr_dump("s[i]") == "Index(s, i)");
 
     // Postfix chains, left to right. A tuple slot is the field `_0`.
@@ -5603,7 +5603,7 @@ pub fn aipl_parse_surface_file(src: str) -> ParsedFile!ParseFailure {
             "fn h(g: i64[,]) { g[1, 2]; }",
         )?.program.show_program() == "fn h(g: Generic(__builtin_Grid, i64)) = Seq(__builtin_grid_get(g, 1, 2), ())",
     );
-    let want_suffixes = "fn h(v: i64) = Seq(v.a, Seq(v._0, Seq(v.m(1), Seq(Index(v, 2), Seq(Slice(v, 0, 3), Seq(Slice(v, 4, ), Seq(Try(v), ())))))))";
+    let want_suffixes = "fn h(v: i64) = Seq(v.a, Seq(v._0, Seq(v.m(1), Seq(Index(v, 2), Seq(Slice(v, , 3), Seq(Slice(v, 4, ), Seq(Try(v), ())))))))";
     assert(suffixes.program.show_program() == want_suffixes);
 
     // The seventh shape, the destructuring one, which holds a repetition and so

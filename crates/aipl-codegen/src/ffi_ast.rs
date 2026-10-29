@@ -514,7 +514,7 @@ fn expr_kind(v: &FfiValue) -> R<ast::ExprKind> {
         "Index" => K::Index(sub(0)?, sub(1)?),
         "Slice" => K::Slice(
             sub(0)?,
-            sub(1)?,
+            slice_start(at(payload, 1, case)?)?,
             maybe(at(payload, 2, case)?, expr)?.map(Box::new),
         ),
         "Try" => K::Try(sub(0)?),
@@ -527,6 +527,15 @@ fn expr_kind(v: &FfiValue) -> R<ast::ExprKind> {
         "TypeArgs" => K::TypeArgs(sub(0)?, each(at(payload, 1, case)?, ty)?),
         other => return Err(unknown("ExprKind", other)),
     })
+}
+
+/// A slice's start bound. The Rust AST always has one, so an omitted start
+/// (`s[..end]`) is the number `0` with an empty span.
+fn slice_start(v: &FfiValue) -> R<Box<ast::Expr>> {
+    Ok(Box::new(match maybe(v, expr)? {
+        Some(start) => start,
+        None => ast::Expr::new(ast::ExprKind::Num(0), 0..0),
+    }))
 }
 
 /// A `(str, str)` tuple — a shim's `operation = function` binding.

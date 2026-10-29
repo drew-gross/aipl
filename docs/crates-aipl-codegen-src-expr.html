@@ -212,7 +212,9 @@
 
             </li>
 
-            <li id="item-Slice"><code>Slice(Expr, Expr, Expr?)</code>
+            <li id="item-Slice"><code>Slice(receiver: Expr, start: Expr?, end: Expr?)</code>
+
+              <div class="doc"><p><code>receiver[start..end]</code>, with either bound left out: <code>receiver[start..]</code> has no <code>end</code>, <code>receiver[..end]</code> has no <code>start</code>, and each is <code>none</code> rather than a stand-in value, so a bound that is present is one the author wrote. A missing bound means the receiver's own edge — the start clamps to the beginning, the end to the length — and <code>receiver[..]</code> is not a form.</p></div>
 
 
             </li>

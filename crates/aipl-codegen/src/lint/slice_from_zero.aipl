@@ -15,7 +15,7 @@ import { collect_arms, equal as ==, join, logical_and as &&, logical_not as ! } 
 import { Slice, descendants } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
-import { is_elided, is_len_of, is_zero } from "./slice_bounds.aipl";
+import { is_len_of, is_zero } from "./slice_bounds.aipl";
 
 # A hit for each slice in the program that starts with a written `0` and ends short
 # of the length.
@@ -47,11 +47,14 @@ fn message(receiver: str, end: str) -> str {
 
 # The hit for one slice, or none.
 fn from_zero_hit(self: Slice(receiver, start, end)) -> LintHit[] {
+    let some(lower) = start else {
+        return [];
+    };
     let some(bound) = end else {
         return [];
     };
-    if (start.is_zero() && !start.is_elided() && !bound.is_len_of(receiver)) {
-        [hit(message(receiver.source, bound.source), start.span)]
+    if (lower.is_zero() && !bound.is_len_of(receiver)) {
+        [hit(message(receiver.source, bound.source), lower.span)]
     } else {
         []
     }
