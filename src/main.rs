@@ -83,7 +83,7 @@ fn cli() -> ExitCode {
 fn usage(prog: &str) -> String {
     format!(
         "usage:
-  {prog} run   [--flamegraph <out.svg>] [-- args...]  compile and JIT-execute `main` from ./main.aipl, exiting with its result
+  {prog} run   [--flamegraph <out.svg> [--inverted]] [-- args...]  compile and JIT-execute `main` from ./main.aipl, exiting with its result
   {prog} ir    <file.aipl>                  print cranelift IR for a source file
   {prog} doc   <file.aipl>                  print the file's and each declaration's `# ..` docs
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
@@ -147,7 +147,9 @@ spends its CPU time (at 997 Hz, by walking the stack) and writes it as an
 interactive flame graph: one box per function, stacked caller below callee, each
 as wide as its share of the samples. Click a box to zoom to it; Search highlights
 the functions matching a regular expression. Green is the program's own code,
-yellow the AIPL runtime, red the system libraries under it. Only on arm64 macOS.
+yellow the AIPL runtime, red the system libraries under it. `--inverted` draws the
+leaves at the bottom and their callers above, so a function's width is the time
+spent in it however many places call it. Only on arm64 macOS.
 `build` requires `clang` on PATH (used as linker driver).
 
 pass `--debug` to any command to trace each compiler pass (loader,
@@ -178,6 +180,7 @@ fn run_cmd(args: &[String]) -> Result<ExitCode, String> {
     let (args, dbg) = take_debug_flag(args);
     // `run`'s own options come first; everything after `--` is for `main`.
     let mut flamegraph = None;
+    let mut inverted = false;
     let mut rest = &args[..];
     let trailing = loop {
         match rest {
@@ -185,6 +188,10 @@ fn run_cmd(args: &[String]) -> Result<ExitCode, String> {
             [sep, after @ ..] if sep == "--" => break after,
             [flag, path, after @ ..] if flag == "--flamegraph" => {
                 flamegraph = Some(PathBuf::from(path));
+                rest = after;
+            }
+            [flag, after @ ..] if flag == "--inverted" => {
+                inverted = true;
                 rest = after;
             }
             [other, ..] => {
@@ -198,6 +205,9 @@ fn run_cmd(args: &[String]) -> Result<ExitCode, String> {
     let (file, fn_name) = (RUN_FILE, "main");
 
     let program = loader::load_program(Path::new(file), dbg).map_err(|e| render_err(file, e))?;
+    if inverted && flamegraph.is_none() {
+        return Err("`--inverted` draws a flame graph; add `--flamegraph <out.svg>`".to_string());
+    }
     let comp = match flamegraph {
         Some(_) => Compilation::new_profiled(&program, dbg),
         None => Compilation::new(&program, dbg),
@@ -237,7 +247,7 @@ fn run_cmd(args: &[String]) -> Result<ExitCode, String> {
                 profile.samples(),
                 profile.hz
             );
-            let svg = aipl::flamegraph::svg(&profile, "Flame Graph", &subtitle);
+            let svg = aipl::flamegraph::svg(&profile, "Flame Graph", &subtitle, inverted);
             std::fs::write(path, svg)
                 .map_err(|e| format!("could not write {}: {e}", path.display()))?;
             result

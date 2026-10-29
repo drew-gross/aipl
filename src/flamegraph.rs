@@ -10,6 +10,11 @@
 //! does not pile up as a tower of identical boxes. The box says how many times
 //! it was re-entered, at the most, in any stack through it.
 //!
+//! Drawn *inverted*, every stack is read from its leaf instead: the bottom row
+//! is the functions the CPU was in, and each box above one is a caller of it,
+//! so a function's width is the time spent in it itself, however many places
+//! called it. That is the view for finding what is worth making faster.
+//!
 //! The SVG is self-contained and interactive, as `flamegraph.pl`'s is: hovering
 //! a frame names it and its sample count, clicking one zooms the graph to it,
 //! and Search (or Ctrl-F) highlights the frames whose name matches a regular
@@ -58,13 +63,18 @@ struct Placed {
     samples: u64,
 }
 
-/// Render `profile` as an SVG flame graph headed by `title` and `subtitle`.
-pub fn svg(profile: &Profile, title: &str, subtitle: &str) -> String {
+/// Render `profile` as an SVG flame graph headed by `title` and `subtitle`,
+/// with the leaves at the bottom when `inverted`.
+pub fn svg(profile: &Profile, title: &str, subtitle: &str, inverted: bool) -> String {
     let mut root = Node::default();
     for (stack, &count) in &profile.stacks {
         root.samples += count;
         let mut node = &mut root;
-        for (frame, reentered) in collapse_recursion(stack) {
+        let mut collapsed = collapse_recursion(stack);
+        if inverted {
+            collapsed.reverse();
+        }
+        for (frame, reentered) in collapsed {
             node = node.children.entry(frame).or_default();
             node.samples += count;
             node.reentered = node.reentered.max(reentered);
@@ -434,7 +444,7 @@ mod tests {
             lost: 0,
         };
         assert_eq!(
-            boxes(&svg(&profile, "Flame Graph", "")),
+            boxes(&svg(&profile, "Flame Graph", "", false)),
             [
                 "all (5 samples, 100.00%) x=10.00 width=1180.00",
                 "main (5 samples, 100.00%) x=10.00 width=1180.00",
@@ -469,12 +479,41 @@ mod tests {
             lost: 0,
         };
         assert_eq!(
-            boxes(&svg(&profile, "Flame Graph", "")),
+            boxes(&svg(&profile, "Flame Graph", "", false)),
             [
                 "all (4 samples, 100.00%) x=10.00 width=1180.00",
                 "main (4 samples, 100.00%) x=10.00 width=1180.00",
                 "rule (4 samples, 100.00%, re-entered up to 2 times) x=10.00 width=1180.00",
                 "memcpy (4 samples, 100.00%) x=10.00 width=1180.00",
+            ]
+        );
+    }
+
+    #[test]
+    fn an_inverted_graph_starts_from_the_leaf_and_merges_callers() {
+        let (main, a, b, leaf) = (
+            frame("main", FrameKind::Aipl),
+            frame("a", FrameKind::Aipl),
+            frame("b", FrameKind::Aipl),
+            frame("push", FrameKind::Runtime),
+        );
+        let profile = Profile {
+            stacks: BTreeMap::from([
+                (vec![main.clone(), a, leaf.clone()], 2),
+                (vec![main.clone(), b, leaf], 1),
+            ]),
+            hz: 997,
+            lost: 0,
+        };
+        assert_eq!(
+            boxes(&svg(&profile, "Flame Graph", "", true)),
+            [
+                "all (3 samples, 100.00%) x=10.00 width=1180.00",
+                "push (3 samples, 100.00%) x=10.00 width=1180.00",
+                "a (2 samples, 66.67%) x=10.00 width=786.67",
+                "main (2 samples, 66.67%) x=10.00 width=786.67",
+                "b (1 sample, 33.33%) x=796.67 width=393.33",
+                "main (1 sample, 33.33%) x=796.67 width=393.33",
             ]
         );
     }

@@ -1,18 +1,27 @@
 #!/bin/bash
 # A flame graph of the compiler's own passes running over its own sources.
 #
-#     profiling/flamegraph.sh [stage] [file.aipl ...]
+#     profiling/flamegraph.sh [--inverted] [stage] [file.aipl ...]
 #
 # `stage` is one of lex, parse, load or format (see `main.aipl`), `load` when
 # omitted. With no files it runs over every source of the dogfooded compiler,
 # `crates/aipl-codegen/src` and its `lint` folder. The graph is written to
-# `target/profiling/<stage>.svg`; open it in a browser.
+# `target/profiling/<stage>.svg`; open it in a browser. `--inverted` puts the
+# leaf functions at the bottom with their callers above them, which shows what
+# is worth making faster; that graph is `<stage>-inverted.svg`.
 #
 # What it shows is the AIPL half of the compiler. The passes written in Rust —
 # flattening imports, the type checker, code generation — are not in it.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
+inverted=()
+suffix=""
+if [ "${1:-}" = "--inverted" ]; then
+    inverted=(--inverted)
+    suffix="-inverted"
+    shift
+fi
 stage="${1:-load}"
 [ $# -gt 0 ] && shift
 
@@ -27,9 +36,9 @@ fi
 
 cargo build -q --manifest-path "$root/Cargo.toml"
 mkdir -p "$root/target/profiling"
-out="$root/target/profiling/$stage.svg"
+out="$root/target/profiling/$stage$suffix.svg"
 
 # `aipl run` runs the `main.aipl` of its working directory.
 cd "$root/profiling"
-"$root/target/debug/aipl" run --flamegraph "$out" -- "$stage" "${files[@]}"
+"$root/target/debug/aipl" run --flamegraph "$out" ${inverted[@]+"${inverted[@]}"} -- "$stage" "${files[@]}"
 echo "flame graph: $out"
