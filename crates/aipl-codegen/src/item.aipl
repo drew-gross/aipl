@@ -16,6 +16,14 @@ variant ImportSource = Path(path: str) | Builtins
 
 struct ImportName { name: str, alias: str?, span: Span }
 
+# The name an import binds in the importing file: the alias if given, else the
+# exported name.
+pub fn local(self: ImportName) -> str { self.alias.value_or(self.name) }.test({
+    let plain = ImportName { name: "map", alias: none, span: 0..3 };
+    assert(plain.local() == "map");
+    assert(ImportName { ..plain, alias: some("each") }.local() == "each");
+})
+
 struct ImportDecl { names: ImportName[], source: ImportSource, source_span: Span }
 
 # One declared parameter. `ty` is the type the *body* sees, which is not always

@@ -739,7 +739,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/indent | 36 | 1886 | 393 | 5204 | 3856 | 8.00 | 154.42 | 1472 |
 | crates/aipl-codegen/src/int_fits | 0 | 0 | 0 | 2177 | 3520 | 4.00 | 67.95 | 1456 |
 | crates/aipl-codegen/src/is_operator_name | 0 | 0 | 0 | 4605 | 42580 | 9.00 | 109.02 | 1488 |
-| crates/aipl-codegen/src/item | 33 | 2642 | 1740 | 3304 | 90200 | 13.00 | 740.09 | 1568 |
+| crates/aipl-codegen/src/item | 33 | 2642 | 1740 | 3594 | 91564 | 13.00 | 802.19 | 1600 |
 | crates/aipl-codegen/src/lex_aipl | 220 | 516976 | 414957 | 2041707 | 217640 | 339.00 | 617.32 | 2304 |
 | crates/aipl-codegen/src/lexer | 178 | 40680 | 44256 | 602785 | 540840 | 157.00 | 1172.69 | 2224 |
 | crates/aipl-codegen/src/line_at | 0 | 0 | 0 | 3536 | 2044 | 2.00 | 64.81 | 1440 |

@@ -326,6 +326,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  .. should maybe work on optionals too? Or anything that can be $'ed?
   .... in an array or set literal should double-unwrap-spread
   support if (let [a, ..] = xs) syntax
   let some(x) = v else { return; } syntax, use everywhere that there is a one-arm+_ -> return match
@@ -825,6 +826,7 @@ expression matcher:
   use it for operation fusion
 
 vscode:
+  lint should work on _some_ documents that fail to compile e.g. if it has unused imports, or fails lint
   PBlock on body in lower_function gives Message: the compiler's name resolution does not cover `PBlock` here (imports, parameters, patterns and types are not tracked yet)
   refresh on code edit (with watcher? check for edits when command received? possily go-to-* should block rather than error while parsing? Maybe need partial update?)
   go to definition and go to references should work for local variables

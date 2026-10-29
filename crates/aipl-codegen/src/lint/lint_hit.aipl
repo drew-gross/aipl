@@ -11,10 +11,9 @@ import {
     is_err_and,
     is_nonempty,
     join,
-    value_or,
 } from builtins;
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
-import { Import, ImportDecl, ImportName, Item, Program } from "../item.aipl";
+import { Import, ImportDecl, Item, Program, local } from "../item.aipl";
 
 struct LintHit { message: str, span: Span }
 
@@ -68,5 +67,3 @@ fn builtin_locals(self: Import(ImportDecl { names, source }), name: str) -> str[
         Path(..) => [],
     }
 }
-
-fn local(self: ImportName) -> str { self.alias.value_or(self.name) }

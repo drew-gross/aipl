@@ -78,6 +78,7 @@ import {
     Refinement,
     Struct,
     Variant,
+    local,
 } from "../item.aipl";
 import { Pat } from "../pat.aipl";
 import {
@@ -182,10 +183,6 @@ fn unused_in(self: Import(decl), used: #{str}) -> LintHit[] {
 fn unused_message(name: str) -> str {
     `unused import "{name}": nothing in this file references it; drop it from the import list`
 }
-
-# The name an import binds in the importing file: the alias if given, else the
-# exported name.
-fn local(self: ImportName) -> str { self.alias.value_or(self.name) }
 
 # Where an unused import's caret goes. The bare `-`/`<`/`>`/`||`/`!` operator
 # tokens carry no span of their own, so the import statement is pointed at
