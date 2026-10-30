@@ -7654,39 +7654,38 @@ impl Mono<'_> {
                 // A direct call through a function-typed binding: `f(x)` where
                 // `f` is a lambda parameter of this (specialized) function.
                 // Rewrite to call the synthesized function, forwarding captures.
-                // (Free-call form only — a method name is never a lambda binding.)
-                if !method_style {
-                    if let Some(lb) = self.cur_lenv.get(name).cloned() {
-                        let mut rargs = Vec::with_capacity(args.len() + lb.captures.len());
-                        let mut atys = Vec::with_capacity(args.len());
-                        for a in args {
-                            let (ra, t) = self.infer(a, env)?;
-                            rargs.push(ra);
-                            atys.push(t);
-                        }
-                        // The bound function may be a synthesized lambda (concrete),
-                        // a named user function, or a builtin — `ref_return` covers
-                        // all three. (Captures aren't part of the builtin's args.)
-                        let ret = self.ref_return(&lb.fn_name, &atys);
-                        rargs.extend(lb.captures);
-                        return Ok((
-                            node(ExprKind::Call(Callee::resolve(lb.fn_name), rargs, false)),
-                            ret,
-                        ));
+                // The method form `x.f()` is the same call, as the checker reads it:
+                // a binding in scope is the callee before any function of that name.
+                if let Some(lb) = self.cur_lenv.get(name).cloned() {
+                    let mut rargs = Vec::with_capacity(args.len() + lb.captures.len());
+                    let mut atys = Vec::with_capacity(args.len());
+                    for a in args {
+                        let (ra, t) = self.infer(a, env)?;
+                        rargs.push(ra);
+                        atys.push(t);
                     }
-                    // A call through a *runtime function value* held in a local
-                    // (`let f = inc; f(5)`): the callee isn't known here (unlike
-                    // the `cur_lenv` HOF case, which resolves to a concrete
-                    // function), so it stays an indirect call — codegen loads the
-                    // binding's address and `call_indirect`s through it. Detected
-                    // by the callee being an in-scope binding of `Type::Fn`.
-                    if let Some(Type::Fn(_, ret)) = env.get(name).cloned() {
-                        let rargs = args
-                            .iter()
-                            .map(|a| self.infer(a, env).map(|(ra, _)| ra))
-                            .collect::<Result<Vec<_>, _>>()?;
-                        return Ok((node(ExprKind::Call(callee.clone(), rargs, false)), *ret));
-                    }
+                    // The bound function may be a synthesized lambda (concrete),
+                    // a named user function, or a builtin — `ref_return` covers
+                    // all three. (Captures aren't part of the builtin's args.)
+                    let ret = self.ref_return(&lb.fn_name, &atys);
+                    rargs.extend(lb.captures);
+                    return Ok((
+                        node(ExprKind::Call(Callee::resolve(lb.fn_name), rargs, false)),
+                        ret,
+                    ));
+                }
+                // A call through a *runtime function value* held in a local
+                // (`let f = inc; f(5)`): the callee isn't known here (unlike
+                // the `cur_lenv` HOF case, which resolves to a concrete
+                // function), so it stays an indirect call — codegen loads the
+                // binding's address and `call_indirect`s through it. Detected
+                // by the callee being an in-scope binding of `Type::Fn`.
+                if let Some(Type::Fn(_, ret)) = env.get(name).cloned() {
+                    let rargs = args
+                        .iter()
+                        .map(|a| self.infer(a, env).map(|(ra, _)| ra))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    return Ok((node(ExprKind::Call(callee.clone(), rargs, false)), *ret));
                 }
                 // A mutating call used as a *value* (not the RHS of an in-place
                 // `set recv.f(args)`) is copy-and-modify: copy the receiver,

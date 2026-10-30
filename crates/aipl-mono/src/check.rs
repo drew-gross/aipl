@@ -4874,7 +4874,13 @@ impl Cx<'_> {
                     // does — that's enforced by the `Assign` check ("cannot assign
                     // to immutable binding"), which fires on the target directly.
                     // A user function called as a method must declare a `self` receiver.
-                    if let Some(s) = self.sigs.get(name.name()) {
+                    // A binding in scope of that name is the callee instead (`x.f()`
+                    // calls a function-typed parameter `f`), whatever functions share it.
+                    if let Some(s) = self
+                        .sigs
+                        .get(name.name())
+                        .filter(|_| !env.contains_key(name.name()))
+                    {
                         if !s.is_method() {
                             return Err(Error::at(
                                 format!(

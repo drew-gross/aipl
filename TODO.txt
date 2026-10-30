@@ -102,6 +102,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  vec$foo() when foo is a predicate argument should probably only work if there is some indicator that the predicate is a self function
   Shape (only Circle) error would read better as Shape.Circle
   run type inference before fusion, to fix this problem:
     // The lambda only forwards to `lint`, but `map(lint).join()` fuses into `map_join`,

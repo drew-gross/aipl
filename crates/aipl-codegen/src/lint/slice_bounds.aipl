@@ -2,7 +2,7 @@
 # how to read a slice's bounds. They divide the range forms between them, so they
 # must agree on what "runs to the end" and "starts at zero" mean.
 
-import { collect_arms, equal as ==, is_some, join, logical_not as !, map } from builtins;
+import { collect_arms, equal as ==, is_some, join, logical_not as ! } from builtins;
 import { Call, Expr, Num, Slice, descendants, expr, ident, num, show_expr } from "../expr.aipl";
 import { LintHit, hit } from "./lint_hit.aipl";
 
@@ -31,7 +31,7 @@ pub fn is_zero(self: Expr) -> bool { self.kind == Num(0) }.test({
 
 # What `lint` reports for each slice in `self` and under it.
 pub fn on_slices(self: Expr, lint: (Slice) -> LintHit[]) -> LintHit[] {
-    self.descendants()$kind.collect_arms(Slice).map(lint).join()
+    self.descendants()$kind.collect_arms(Slice)$lint().join()
 }.test({
     let xs = ident("xs");
     let slice = expr(Slice(xs, some(num(1)), none));
