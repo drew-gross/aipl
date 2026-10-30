@@ -240,12 +240,17 @@ fn run_cmd(args: &[String]) -> Result<ExitCode, String> {
     let result = match &flamegraph {
         None => call()?,
         Some(path) => {
+            let started = std::time::Instant::now();
             let (result, profile) = aipl::profile::sample(&comp.code_symbols(), call)?;
+            let wall = started.elapsed();
             let result = result?;
+            // Samples are of CPU time, so a run that waits (on a process, a
+            // file, a lock) shows far fewer samples than its wall time implies.
             let subtitle = format!(
-                "{RUN_FILE}: {} samples of CPU time at {} Hz",
+                "{RUN_FILE}: {} samples of CPU time at {} Hz, over {:.2}s of wall time",
                 profile.samples(),
-                profile.hz
+                profile.hz,
+                wall.as_secs_f64()
             );
             let svg = aipl::flamegraph::svg(&profile, "Flame Graph", &subtitle, inverted);
             std::fs::write(path, svg)
