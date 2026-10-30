@@ -1,0 +1,98 @@
+# The `interp_to_str` lint: `` `..{to_str(x)}..` `` — a `to_str` inside a template
+# interpolation. The interpolation *is* `to_str`: a template lowers each `{e}` to
+# `__template_interp(e)`, which renders `e` exactly as `to_str` does (a `str` as its
+# text, a `char` as its character, anything else by its type), so the call converts
+# a value to the string the interpolation was about to make of it anyway. `{x}`
+# says the same thing.
+#
+# Only the file's builtins `to_str` counts, by whatever local name it goes by, and
+# only as the interpolation's whole expression: `{to_str(x) +++ y}` is not this
+# shape, and a `to_str` of the file's own would be some other function.
+#
+# The hit points at the `to_str` call.
+
+import { equal as ==, join, map, not_equal as != } from builtins;
+import { Call, Expr, Field, Ident } from "../expr.aipl";
+import { Program } from "../item.aipl";
+import { interpolated_values } from "./interpolation.aipl";
+import { LintHit, hit, imported_as, lint_messages, on_functions } from "./lint_hit.aipl";
+
+# A hit for each `to_str` call that is the whole of an interpolation.
+pub fn interp_to_str(program: Program) -> LintHit[] {
+    let some(to_str) = program.items.imported_as("to_str") else { return []; };
+    program.on_functions(
+        |function| function.body
+            .interpolated_values()
+            .map(|value| {
+                let Call(callee, arguments, _) = value.kind else { return []; };
+                let [argument] = arguments else { return []; };
+                if (callee != to_str) {
+                    return [];
+                };
+
+                // The argument is spliced into the advice only where its span is its text:
+                // a call's span stops before its closing paren.
+                let advice = if (argument.is_path()) {
+                    `write "\{{argument.source}}"`
+                } else {
+                    "interpolate the value itself"
+                };
+                [hit(message(to_str, advice), value.span)]
+            })
+            .join(),
+    )
+}.test({
+    // The function and the method spelling are the same call.
+    assert(lint_messages(
+        "import { to_str } from builtins; fn f(n: i64) -> str { `n = {to_str(n)} ({n.to_str()})` }",
+        interp_to_str,
+    )? == [message("to_str", "write \"{n}\""), message("to_str", "write \"{n}\"")]);
+
+    // The name the file imports it under is the one quoted.
+    assert(lint_messages(
+        "import { to_str as show } from builtins; fn f(n: i64) -> str { `{show(n)}` }",
+        interp_to_str,
+    )? == [message("show", "write \"{n}\"")]);
+
+    // A field path is quoted whole; anything else is not.
+    assert(lint_messages(
+        "import { to_str } from builtins; fn f(p: P) -> str { `{to_str(p.x)}` }",
+        interp_to_str,
+    )? == [message("to_str", "write \"{p.x}\"")]);
+    assert(lint_messages(
+        "import { to_str } from builtins; fn f(n: i64) -> str { `{to_str(g(n))}` }",
+        interp_to_str,
+    )? == [message("to_str", "interpolate the value itself")]);
+
+    // Not the shape: outside a template, one operand of the interpolated expression,
+    // a function of the file's own, and a file that does not import the builtin.
+    assert(
+        lint_messages(
+            "import { to_str } from builtins; fn f(n: i64) -> str { to_str(n) }",
+            interp_to_str,
+        )? == [],
+    );
+    assert(
+        lint_messages(
+            """import { concat as +++, to_str } from builtins; fn f(n: i64) -> str { `{to_str(n) +++ "!"}` }""",
+            interp_to_str,
+        )? == [],
+    );
+    assert(lint_messages("fn f(n: i64) -> str { `{to_str(n)}` }", interp_to_str)? == []);
+})
+
+# Whether `self` is a name or a field path off one, the forms whose span runs from
+# their first character to their last.
+fn is_path(self: Expr) -> bool {
+    match (self.kind) {
+        Ident(..) => true,
+        Field(receiver, _) => receiver.is_path(),
+        _ => false,
+    }
+}
+
+# What is said of an interpolated `to_str` that the file spells `to_str`, with
+# `advice` for the fix.
+fn message(to_str: str, advice: str) -> str {
+    `"{to_str}" inside an interpolation is redundant — the interpolation already renders its value, so {advice}`
+}

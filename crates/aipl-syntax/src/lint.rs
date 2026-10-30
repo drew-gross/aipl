@@ -17,8 +17,6 @@ mod compound_assign;
 mod eta_lambda;
 mod extend_longhand;
 mod field_init_shorthand;
-mod interp_literal;
-mod interp_to_str;
 mod is_empty_longhand;
 mod len_gt_zero;
 mod let_else_as_case;
@@ -52,8 +50,6 @@ use self::compound_assign::{compound_assign, matching_compound};
 use self::eta_lambda::{eta_lambda, Forwarding};
 use self::extend_longhand::{extend_longhand, extend_names};
 use self::field_init_shorthand::field_init_shorthand;
-use self::interp_literal::interp_literal;
-use self::interp_to_str::{interp_to_str, to_str_name};
 use self::is_empty_longhand::{empty_names, is_empty_longhand};
 use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
 use self::let_else_as_case::let_else_as_case;
@@ -105,13 +101,6 @@ pub fn check(
     each_expr(program, &mut |e| {
         eta_lambda(e, src, &forwarding, &mut advised, &mut hits)
     });
-    // A `to_str` inside a template interpolation, which already renders its
-    // value the same way. Only where the file's `to_str` is the builtin.
-    if let Some(to_str) = to_str_name(program) {
-        each_expr(program, &mut |e| interp_to_str(e, src, &to_str, &mut hits));
-    }
-    // A string or char literal as an interpolation, which is just its text.
-    each_expr(program, &mut |e| interp_literal(e, src, &mut hits));
     // A char set spelled out element by element, which a string says better.
     // Fires whether or not the file imported `to_set` — the name is only for
     // the advice, which says to import it when it is missing.

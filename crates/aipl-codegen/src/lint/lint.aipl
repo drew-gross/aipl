@@ -13,6 +13,8 @@ import { destructure_param } from "./destructure_param.aipl";
 import { destructure_slot } from "./destructure_slot.aipl";
 import { duplicate_import_source } from "./duplicate_import_source.aipl";
 import { fn_body_type_stutter } from "./fn_body_type_stutter.aipl";
+import { interp_literal } from "./interp_literal.aipl";
+import { interp_to_str } from "./interp_to_str.aipl";
 import { LintHit, on_functions, on_functions_filled } from "./lint_hit.aipl";
 import { match_bool_is_case } from "./match_bool_is_case.aipl";
 import { match_is_some_and } from "./match_is_some_and.aipl";
@@ -40,6 +42,8 @@ pub fn lint(program: Program) -> LintHit[] {
         ..program.on_functions_filled(match_is_some_and),
         ..program.on_functions_filled(match_value_or),
         ..program.on_functions_filled(match_map_value_or),
+        ..interp_to_str(program),
+        ..program.on_functions(interp_literal),
         ..program.on_functions(slice_whole),
         ..program.on_functions(slice_to_len),
         ..program.on_functions(slice_from_zero),

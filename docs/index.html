@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">171 files, 1682 items.</p>
+      <p class="summary">174 files, 1688 items.</p>
 
       <ul class="files">
 
@@ -1956,6 +1956,64 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-fn_body_type_stutter.html#item-fn_body_type_stutter"><code>fn_body_type_stutter</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-interp_literal.html">crates/aipl-codegen/src/lint/interp_literal.aipl</a>
+
+          <p class="file-summary">The <code>interp_literal</code> lint: <code>`a: {'a'}`</code> / <code>`aa: {&quot;aa&quot;}`</code> — a string or char literal as the whole of a template interpolation. The interpolation renders the literal as its text, which is exactly what the surrounding template would have said had the text been written in place: <code>`a: a`</code>. The braces, the quotes and the render are all spent on nothing.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-interp_literal.html#private">1 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-interp_literal.html#item-interp_literal"><code>interp_literal</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-interp_to_str.html">crates/aipl-codegen/src/lint/interp_to_str.aipl</a>
+
+          <p class="file-summary">The <code>interp_to_str</code> lint: <code>`..{to_str(x)}..`</code> — a <code>to_str</code> inside a template interpolation. The interpolation <em>is</em> <code>to_str</code>: a template lowers each <code>{e}</code> to <code>__template_interp(e)</code>, which renders <code>e</code> exactly as <code>to_str</code> does (a <code>str</code> as its text, a <code>char</code> as its character, anything else by its type), so the call converts a value to the string the interpolation was about to make of it anyway. <code>{x}</code> says the same thing.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-interp_to_str.html#private">2 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-interp_to_str.html#item-interp_to_str"><code>interp_to_str</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-interpolation.html">crates/aipl-codegen/src/lint/interpolation.aipl</a>
+
+          <p class="file-summary">What the two interpolation lints (<code>interp_to_str</code>, <code>interp_literal</code>) share: finding the value each <code>{..}</code> of a template renders.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-interpolation.html#item-interpolated_values"><code>interpolated_values</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

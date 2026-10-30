@@ -1,0 +1,71 @@
+# The `interp_literal` lint: `` `a: {'a'}` `` / `` `aa: {"aa"}` `` — a string or char
+# literal as the whole of a template interpolation. The interpolation renders the
+# literal as its text, which is exactly what the surrounding template would have
+# said had the text been written in place: `` `a: a` ``. The braces, the quotes and
+# the render are all spent on nothing.
+#
+# Only a literal standing alone is this shape — `{"a" +++ s}` computes something —
+# and only the escaping forms of it: a `"""` literal is raw, and its contents may
+# need escapes a template would decode (`\{`, a backtick), so it is a way of getting
+# verbatim text into a template rather than a detour.
+#
+# The hit points at the literal.
+
+import {
+    equal as ==,
+    is_case,
+    join,
+    logical_and as &&,
+    logical_not as !,
+    map,
+    starts_with,
+} from builtins;
+import { Char, Str } from "../expr.aipl";
+import { Function } from "../item.aipl";
+import { interpolated_values } from "./interpolation.aipl";
+import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
+
+# A hit for each string or char literal interpolated into a template.
+pub fn interp_literal(Function { body }) -> LintHit[] {
+    body
+        .interpolated_values()
+        .map(|value| {
+            // The tree does not record which form a string literal was written in; its
+            // first characters do.
+            let raw = value.source.starts_with(`"""`);
+            let what = if (value.kind.is_case(Char)) {
+                "char"
+            } else if (value.kind.is_case(Str) && !raw) {
+                "string"
+            } else {
+                return [];
+            };
+            [hit(message(what), value.span)]
+        })
+        .join()
+}.test({
+    assert(lint_function_messages("fn f() -> str { `a: {'a'}` }", interp_literal)? == [
+        message("char"),
+    ]);
+    assert(lint_function_messages("""fn f() -> str { `a: {"aa"}` }""", interp_literal)? == [
+        message("string"),
+    ]);
+
+    // A literal that is only part of the interpolation computes something, a
+    // `"""` literal is raw text a template cannot say, and a name is not a literal.
+    assert(
+        lint_function_messages("""fn f(s: str) -> str { `{"a" +++ s}` }""", interp_literal)? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f() -> str { `{\"\"\"back\\slash\"\"\"}` }",
+            interp_literal,
+        )? == [],
+    );
+    assert(lint_function_messages("fn f(c: char) -> str { `{c}` }", interp_literal)? == []);
+})
+
+# What is said of a `what` literal in an interpolation.
+fn message(what: str) -> str {
+    `a {what} literal interpolated into a template is just its text — write it into the template directly`
+}

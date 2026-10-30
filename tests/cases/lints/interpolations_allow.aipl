@@ -1,0 +1,17 @@
+# `#[allow]` keeps either interpolation lint's spelling, and the shorter spelling
+# prints the same.
+
+import { print, to_str } from builtins;
+
+fn main() !prints {
+    let n = 7;
+    print(`n = {to_str(n)}`); #[allow]
+    print(`n = {n}`);
+    print(`a: {'a'}`); #[allow]
+    print(`a: a`);
+}
+--- stdout ---
+n = 7
+n = 7
+a: a
+a: a

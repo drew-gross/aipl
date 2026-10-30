@@ -1,0 +1,29 @@
+# What the two interpolation lints (`interp_to_str`, `interp_literal`) share: finding
+# the value each `{..}` of a template renders.
+
+import { equal as ==, join, map } from builtins;
+import { Call, Expr, collect_expr_cases } from "../expr.aipl";
+import { hit, lint_function_messages } from "./lint_hit.aipl";
+
+# The expression inside each template interpolation in `self` and under it,
+# outermost first. A template lowers each `{e}` to `__template_interp(e)`, which
+# renders `e` as text, so these are the `e`s.
+pub fn interpolated_values(self: Expr) -> Expr[] {
+    self
+        .collect_expr_cases(Call)
+        .map(|Call(name, arguments, _)| {
+            if (name == "__template_interp") { arguments } else { [] }
+        })
+        .join()
+}.test({
+    assert(lint_function_messages(
+        "fn f(n: i64) -> str { `a{n}b{n + 1}` }",
+        |function| function.body.interpolated_values()$source.map(|text| hit(text, 0..0)),
+    )? == ["n", "n + 1"]);
+    assert(
+        lint_function_messages(
+            "fn f(n: i64) -> str { n.to_str() }",
+            |function| function.body.interpolated_values()$source.map(|text| hit(text, 0..0)),
+        )? == [],
+    );
+})

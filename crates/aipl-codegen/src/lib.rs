@@ -1735,6 +1735,9 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./lint/slice_whole.aipl",
     "./lint/slice_to_len.aipl",
     "./lint/slice_from_zero.aipl",
+    "./lint/interpolation.aipl",
+    "./lint/interp_literal.aipl",
+    "./lint/interp_to_str.aipl",
     "./lint/lint.aipl",
     "./parse_and_partial_load.aipl",
     // The formatter: `format_source` is the whole pipeline, and its walker

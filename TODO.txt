@@ -102,6 +102,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  code_bodies and on_functions don't need to exist now that we have collect_case_arms (or we can make something similar, maybe?)
   self.descendants()$kind.filter(|kind| kind.is_case(arm)) stutters
   vec$foo() when foo is a predicate argument should probably only work if there is some indicator that the predicate is a self function
   Shape (only Circle) error would read better as Shape.Circle
@@ -508,6 +509,7 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  interpolation.aipl lint should operate on pre-lowering AST so it can access interpolation nodes directly rather than have to check __template_interp
   have the parser propagate original names so that lint can access them, and do accurate linting even when builtins are imported with an unusual name
   ingest all files in project so go to refs can be comprehensive
   make on_function lints work on expressions used to compute top-level consts
