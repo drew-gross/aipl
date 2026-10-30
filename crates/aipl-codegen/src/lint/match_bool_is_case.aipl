@@ -19,99 +19,103 @@
 # The hit points at the `true` arm, a short line the formatter keeps in place.
 
 import {
+    Span,
     all,
     collect_arms,
     contains,
     equal as ==,
     filter,
     is_case,
-    is_some,
     join,
     logical_not as !,
     logical_or as ||,
-    value_or,
 } from builtins;
 import { Bool, Match, MatchArm, descendants } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { Ctor, is_binder_name } from "../pat.aipl";
-import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
+import {
+    UnfilledHit,
+    filled_with,
+    lint_function_unfilled_messages,
+    unfilled,
+} from "./lint_hit.aipl";
 
 # A hit for each `match` in the program that only asks which case a value is.
-pub fn match_bool_is_case(Function { body }, method: str?) -> LintHit[] {
-    body.descendants()$kind.collect_arms(Match)$match_hit(method).join()
+pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
+    body.descendants()$kind.collect_arms(Match)$match_hit().join()
 }.test({
     // One case is `true`, the rest `false`.
-    assert(lint_function_messages(
+    assert(lint_function_unfilled_messages(
         "fn f(s: Shape) -> bool { match (s) { Circle(..) => true, Square(..) => false } }",
-        |function| match_bool_is_case(function, none),
+        match_bool_is_case,
     )? == [message("Circle", none)]);
 
     // A catch-all `false` does as well, and the payload may be bound.
-    assert(lint_function_messages(
+    assert(lint_function_unfilled_messages(
         "fn f(s: Shape) -> bool { match (s) { Circle(r) => true, _ => false } }",
-        |function| match_bool_is_case(function, none),
+        match_bool_is_case,
     )? == [message("Circle", none)]);
 
     // A nullary case.
-    assert(lint_function_messages(
+    assert(lint_function_unfilled_messages(
         "fn f(s: Shape) -> bool { match (s) { Dot => true, _ => false } }",
-        |function| match_bool_is_case(function, none),
+        match_bool_is_case,
     )? == [message("Dot", none)]);
 
     // The name the file imports it under is the advice's.
-    assert(lint_function_messages(
-        "fn f(s: Shape) -> bool { match (s) { Dot => true, _ => false } }",
-        |function| match_bool_is_case(function, some("isa")),
+    assert(lint_function_unfilled_messages(
+        "import { is_case as isa } from builtins; fn f(s: Shape) -> bool { match (s) { Dot => true, _ => false } }",
+        match_bool_is_case,
     )? == [message("Dot", some("isa"))]);
 
     // A `.test` block is held to it too.
-    assert(lint_function_messages(
+    assert(lint_function_unfilled_messages(
         "fn f() { }.test({ assert(match (s) { Dot => true, _ => false }); })",
-        |function| match_bool_is_case(function, none),
+        match_bool_is_case,
     )? == [message("Dot", none)]);
 
     // Two cases answering `true`, an arm that is not a bool, `false` for the case
     // named (the opposite question), an optional and a result are left alone.
     assert(
-        lint_function_messages(
+        lint_function_unfilled_messages(
             "fn f(s: Shape) -> bool { match (s) { A | B => true, _ => false } }",
-            |function| match_bool_is_case(function, none),
+            match_bool_is_case,
         )? == [],
     );
     assert(
-        lint_function_messages(
+        lint_function_unfilled_messages(
             "fn f(s: Shape) -> bool { match (s) { A(..) => true, B(r) => r, _ => false } }",
-            |function| match_bool_is_case(function, none),
+            match_bool_is_case,
         )? == [],
     );
     assert(
-        lint_function_messages(
+        lint_function_unfilled_messages(
             "fn f(s: Shape) -> bool { match (s) { A(..) => false, _ => true } }",
-            |function| match_bool_is_case(function, none),
+            match_bool_is_case,
         )? == [],
     );
     assert(
-        lint_function_messages(
+        lint_function_unfilled_messages(
             "fn f(s: i64?) -> bool { match (s) { some(..) => true, none => false } }",
-            |function| match_bool_is_case(function, none),
+            match_bool_is_case,
         )? == [],
     );
     assert(
-        lint_function_messages(
+        lint_function_unfilled_messages(
             "fn f(s: i64!str) -> bool { match (s) { ok(..) => true, err(..) => false } }",
-            |function| match_bool_is_case(function, none),
+            match_bool_is_case,
         )? == [],
     );
     assert(
-        lint_function_messages(
+        lint_function_unfilled_messages(
             "fn f(n: i64) -> bool { match (n) { other => true, _ => false } }",
-            |function| match_bool_is_case(function, none),
+            match_bool_is_case,
         )? == [],
     );
 })
 
 # The hit for one `match`, or none.
-fn match_hit(self: Match(scrutinee, arms), method: str?) -> LintHit[] {
+fn match_hit(self: Match(scrutinee, arms)) -> UnfilledHit[] {
     if (!arms.all(|arm| arm.body.kind.is_case(Bool))) {
         return [];
     };
@@ -124,12 +128,19 @@ fn match_hit(self: Match(scrutinee, arms), method: str?) -> LintHit[] {
     if (case.is_binder_name() || ["some", "none", "ok", "err"].contains(case)) {
         return [];
     };
-    [hit(message(case, method), span)]
+    [advice(case, span)]
 }
 
-# What is said of a match that only asks whether a value is `case`.
-fn message(case: str, method: str?) -> str {
-    let name = method.value_or("is_case");
-    let hint = if (method.is_some()) { "" } else { ", importing `is_case` from builtins" };
-    `this match only asks whether the value is {case} — write "<value>.{name}({case})" and drop the match{hint}`
+# What is said of a match that only asks whether a value is `case`, with the name
+# of `is_case` left for the caller to fill in.
+fn advice(case: str, span: Span) -> UnfilledHit {
+    unfilled(
+        "is_case",
+        `this match only asks whether the value is {case} — write "<value>.`,
+        `({case})" and drop the match`,
+        span,
+    )
 }
+
+# The message `advice` comes to for a file that spells `is_case` as `spelled`.
+fn message(case: str, spelled: str?) -> str { advice(case, 0..0).filled_with(spelled).message }

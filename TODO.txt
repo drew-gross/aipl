@@ -102,6 +102,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  stop making functions that just pass their arguments directly to a constructor. Don't need a function for that, and it just hides which arguments become which fields.
   source text should be propagated by the parser, not rebuilt later in source_text.aipl
   find a way to make lints work without awkwardly threading the method through to every message() call
   duplicate_import_source lint looks like it could use a source->count index maybe? Could enable better fixits.
@@ -499,7 +500,7 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
-  have the parser propagate original names so that lint can access them
+  have the parser propagate original names so that lint can access them, and do accurate linting even when builtins are imported with an unusual name
   ingest all files in project so go to refs can be comprehensive
   make on_function lints work on expressions used to compute top-level consts
   convert reject_trailing_whitespace to a lint

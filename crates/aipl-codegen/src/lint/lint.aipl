@@ -13,7 +13,7 @@ import { destructure_param } from "./destructure_param.aipl";
 import { destructure_slot } from "./destructure_slot.aipl";
 import { duplicate_import_source } from "./duplicate_import_source.aipl";
 import { fn_body_type_stutter } from "./fn_body_type_stutter.aipl";
-import { LintHit, imported_as, on_functions } from "./lint_hit.aipl";
+import { LintHit, filled, on_functions, on_functions_unfilled } from "./lint_hit.aipl";
 import { match_bool_is_case } from "./match_bool_is_case.aipl";
 import { slice_from_zero } from "./slice_from_zero.aipl";
 import { slice_to_len } from "./slice_to_len.aipl";
@@ -25,7 +25,6 @@ import { unused_imports } from "./unused_imports.aipl";
 # A lint is either a function of the whole program or of one function, and
 # `on_functions` is what runs the second kind over every body that is code.
 pub fn lint(program: Program) -> LintHit[] {
-    let is_case = program.items.imported_as("is_case");
     [
         ..unused_imports(program),
         ..duplicate_import_source(program),
@@ -33,8 +32,8 @@ pub fn lint(program: Program) -> LintHit[] {
         ..program.on_functions(destructure_param),
         ..program.on_functions(destructure_slot),
         ..program.on_functions(fn_body_type_stutter),
-        ..program.on_functions(|function| match_bool_is_case(function, is_case)),
-        ..program.on_functions(|function| case_of_equal_is_case(function, is_case)),
+        ..program.on_functions_unfilled(match_bool_is_case).filled(program.items),
+        ..program.on_functions_unfilled(case_of_equal_is_case).filled(program.items),
         ..program.on_functions(slice_whole),
         ..program.on_functions(slice_to_len),
         ..program.on_functions(slice_from_zero),

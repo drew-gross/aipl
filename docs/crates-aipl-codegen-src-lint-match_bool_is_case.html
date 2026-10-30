@@ -31,7 +31,7 @@
             <a class="anchor" href="#item-match_bool_is_case">match_bool_is_case</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn match_bool_is_case(__spat$1359: Function, method: str?) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn match_bool_is_case(__spat$1390: Function) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>A hit for each <code>match</code> in the program that only asks which case a value is.</p></div>
 
@@ -52,9 +52,23 @@
             <a class="anchor" href="#item-match_hit">match_hit</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_hit(self: Match, method: str?) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn match_hit(self: Match) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>The hit for one <code>match</code>, or none.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-advice">
+          <h3>
+            <a class="anchor" href="#item-advice">advice</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn advice(case: str, span: Span) -&#62; UnfilledHit</code></pre>
+
+          <div class="doc"><p>What is said of a match that only asks whether a value is <code>case</code>, with the name of <code>is_case</code> left for the caller to fill in.</p></div>
 
 
         </section>
@@ -66,9 +80,9 @@
             <a class="anchor" href="#item-message">message</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn message(case: str, method: str?) -&#62; str</code></pre>
+          <pre class="signature"><code>fn message(case: str, spelled: str?) -&#62; str</code></pre>
 
-          <div class="doc"><p>What is said of a match that only asks whether a value is <code>case</code>.</p></div>
+          <div class="doc"><p>The message <code>advice</code> comes to for a file that spells <code>is_case</code> as <code>spelled</code>.</p></div>
 
 
         </section>

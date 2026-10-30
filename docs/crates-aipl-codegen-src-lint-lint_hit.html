@@ -50,6 +50,62 @@
 
 
 
+        <section class="item" id="item-UnfilledHit">
+          <h3>
+            <a class="anchor" href="#item-UnfilledHit">UnfilledHit</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct UnfilledHit</code></pre>
+
+          <div class="doc"><p>A hit whose message names a builtin the way the file that was linted spells it. A lint cannot say how: it reads one function, and the spelling is in the import list, so it reports the message in three parts — what comes before the builtin's name, what comes after it — and the caller fills the name in. A file that does not import the builtin is told to, which the lint need not know either.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-unfilled">
+          <h3>
+            <a class="anchor" href="#item-unfilled">unfilled</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn unfilled(builtin: str, before: str, after: str, span: Span) -&#62; UnfilledHit</code></pre>
+
+          <div class="doc"><p>An unfilled hit at <code>span</code> for a message <code>before</code> + the builtin's name + <code>after</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-filled_with">
+          <h3>
+            <a class="anchor" href="#item-filled_with">filled_with</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn filled_with(self: UnfilledHit, spelled: str?) -&#62; LintHit</code></pre>
+
+          <div class="doc"><p><code>self</code> as the hit it is for a file that spells the builtin <code>spelled</code>, or does not import it (<code>none</code>).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-filled">
+          <h3>
+            <a class="anchor" href="#item-filled">filled</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn filled(self: UnfilledHit[], items: Item[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p><code>self</code> filled in for the file whose items are <code>items</code>.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lint_hits">
           <h3>
             <a class="anchor" href="#item-lint_hits">lint_hits</a>
@@ -106,6 +162,20 @@
 
 
 
+        <section class="item" id="item-on_functions_unfilled">
+          <h3>
+            <a class="anchor" href="#item-on_functions_unfilled">on_functions_unfilled</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn on_functions_unfilled(self: Program, lint: (Function) -&#62; UnfilledHit[]) -&#62; UnfilledHit[]</code></pre>
+
+          <div class="doc"><p>[<code>on_functions</code>] for a lint whose hits are [<code>UnfilledHit</code>]s.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lint_function_hits">
           <h3>
             <a class="anchor" href="#item-lint_function_hits">lint_function_hits</a>
@@ -133,6 +203,20 @@
         </section>
 
 
+
+        <section class="item" id="item-lint_function_unfilled_messages">
+          <h3>
+            <a class="anchor" href="#item-lint_function_unfilled_messages">lint_function_unfilled_messages</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_function_unfilled_messages(src: str, lint: (Function) -&#62; UnfilledHit[]) -&#62; str[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>What the function lint <code>lint</code> reports for the program <code>src</code> parses to, filled in for the imports <code>src</code> has.</p></div>
+
+
+        </section>
+
+
       </section>
 
 
@@ -149,6 +233,20 @@
           <pre class="signature"><code>fn builtin_locals(self: Import, name: str) -&#62; str[]</code></pre>
 
           <div class="doc"><p>What an import brings under <code>name</code>, when it is from builtins.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-code_bodies">
+          <h3>
+            <a class="anchor" href="#item-code_bodies">code_bodies</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn code_bodies(self: Program) -&#62; Function[]</code></pre>
+
+          <div class="doc"><p>Every body of the program that is code to check, each as a function.</p></div>
 
 
         </section>
