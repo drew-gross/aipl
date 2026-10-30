@@ -71,7 +71,7 @@ fn gather<K: variant>(r: Rule<K>) -> i64[] {
 # The same row where the optional is empty, so the `none` arm is what runs and
 # `f` is never called.
 fn gather_two<K: variant>(rs: Rule<K>[]) -> i64[] {
-    mut v: i64[] = [];
+    mut v: i64[] = []; #[allow]
     for (let r : rs) {
         set v.extend(styles(r));
     }

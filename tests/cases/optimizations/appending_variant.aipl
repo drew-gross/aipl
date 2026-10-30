@@ -57,7 +57,7 @@ fn deep(n: i64) -> Rule {
 
 # The `link` shape: one accumulator, fed a producer's result per iteration.
 fn gather(rs: Rule[]) -> u64 {
-    mut groups: i64[] = [];
+    mut groups: i64[] = []; #[allow]
     for (let r : rs) {
         set groups.extend(styles(r));
     }

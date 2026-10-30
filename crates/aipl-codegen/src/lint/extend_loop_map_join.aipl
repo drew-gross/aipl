@@ -1,0 +1,93 @@
+# The `extend_loop_map_join` lint:
+#
+#     mut out = [];
+#     for (let x : xs) {
+#         set out.extend(f(x));
+#     }
+#
+# — an array seeded empty and filled by a loop that does nothing but extend it with
+# something derived from each element. That is `xs.map(|x| f(x)).join()`: one
+# expression that says the array *is* the pieces joined, rather than statements the
+# reader has to run in their head. It is `push_loop_pipeline`'s twin, for a loop that
+# adds an array per element rather than one element, and recognises the shape the same
+# way (see `accumulation.aipl`); a guard around the extension is a `filter` first.
+#
+# The one thing this cannot check is what each extension is: `extend` also takes an
+# optional, which adds its payload if there is one, and `join` does not. A loop that
+# extends with optionals is the lint's blind spot, and `#[allow]` is the answer there.
+# Nor can it check that `xs` is an array, for the reasons `push_loop_pipeline` gives.
+#
+# The hit points at the seed.
+
+import { equal as ==, extend, join, map } from builtins;
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Function, Program } from "../item.aipl";
+import { accumulations, element_stages, is_advisable, pipeline_hit } from "./accumulation.aipl";
+import { LintHit, imported_as, lint_messages, on_functions_filled } from "./lint_hit.aipl";
+
+# A hit for each array the program seeds empty and fills with a loop of `extend`s.
+pub fn extend_loop_map_join(program: Program) -> LintHit[] {
+    let some(extend) = program.items.imported_as("extend") else { return []; };
+    program.on_functions_filled(|Function { body }| {
+        body
+            .accumulations(extend)
+            .map(|loop| {
+                if (loop.is_advisable()) {
+                    [loop.pipeline_hit([..loop.element_stages(), ("join", "()")])]
+                } else {
+                    []
+                }
+            })
+            .join()
+    })
+}.test({
+    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_messages(
+            `import \{ {imports} } from builtins; fn f(xs: i64[][]) -> i64[] \{ {body} }`,
+            extend_loop_map_join,
+        )
+    }
+    let all = "extend, map, filter, join";
+
+    // Mapped, mapped under a guard, and joined as they are.
+    assert(messages(all, "mut out = []; for (let x : xs) { set out.extend(g(x)); } out")? == [
+        `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.map(|x| ..).join();" and drop the loop`,
+    ]);
+    assert(messages(
+        all,
+        "mut out = []; for (let x : xs) { if (c(x)) { set out.extend(g(x)); }; } out",
+    )? == [
+        `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.filter(|x| ..).map(|x| ..).join();" and drop the loop`,
+    ]);
+    assert(messages(all, "mut out = []; for (let x : xs) { set out.extend(x); } out")? == [
+        `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.join();" and drop the loop`,
+    ]);
+
+    // Imports the file lacks are named, and an alias is followed.
+    assert(messages("extend", "mut out = []; for (let x : xs) { set out.extend(g(x)); } out")? == [
+        ```"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.map(|x| ..).join();" and drop the loop, importing `map`, `join` from builtins```,
+    ]);
+    assert(messages(
+        "extend, map as each, join",
+        "mut out = []; for (let x : xs) { set out.extend(g(x)); } out",
+    )? == [
+        `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.each(|x| ..).join();" and drop the loop`,
+    ]);
+
+    // A range has no `filter`, a `push` loop is `push_loop_pipeline`'s, and an `extend` the
+    // file never imported is some other function.
+    assert(
+        messages(
+            all,
+            "mut out = []; for (let x : 0..3) { if (c(x)) { set out.extend(g(x)); }; } out",
+        )? == [],
+    );
+    assert(messages("push, map", "mut out = []; for (let x : xs) { set out.push(x); } out")? == []);
+    assert(
+        messages(
+            "map, join",
+            "mut out = []; for (let x : xs) { set out.extend(g(x)); } out",
+        )? == [],
+    );
+})

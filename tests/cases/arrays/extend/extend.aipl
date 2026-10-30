@@ -71,7 +71,7 @@ fn main() !prints {
     print(to_str(nest));
 
     // Growing repeatedly in a loop — the shape this builtin exists to replace.
-    mut loops = [];
+    mut loops = []; #[allow]
     for (let i : [1, 2, 3]) {
         set loops.extend([i, i]);
     }

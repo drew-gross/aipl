@@ -82,7 +82,7 @@ fn main() !prints {
     print(squares(3).len().to_str());
 }
 --- errors ---
-error: "out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.filter(|x| ..).map(|x| ..);" and drop the loop, importing `filter` and `map` from builtins (or append #[allow] to this line to keep it)
+error: "out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.filter(|x| ..).map(|x| ..);" and drop the loop, importing `filter`, `map` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_push_loop_pipeline.aipl:13:22
    |
 13 |     mut out: i64[] = [];

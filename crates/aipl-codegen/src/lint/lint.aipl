@@ -12,6 +12,7 @@ import { destructure_binding } from "./destructure_binding.aipl";
 import { destructure_param } from "./destructure_param.aipl";
 import { destructure_slot } from "./destructure_slot.aipl";
 import { duplicate_import_source } from "./duplicate_import_source.aipl";
+import { extend_loop_map_join } from "./extend_loop_map_join.aipl";
 import { fn_body_type_stutter } from "./fn_body_type_stutter.aipl";
 import { interp_literal } from "./interp_literal.aipl";
 import { interp_to_str } from "./interp_to_str.aipl";
@@ -20,6 +21,7 @@ import { match_bool_is_case } from "./match_bool_is_case.aipl";
 import { match_is_some_and } from "./match_is_some_and.aipl";
 import { match_map_value_or } from "./match_map_value_or.aipl";
 import { match_value_or } from "./match_value_or.aipl";
+import { push_loop_pipeline } from "./push_loop_pipeline.aipl";
 import { slice_from_zero } from "./slice_from_zero.aipl";
 import { slice_to_len } from "./slice_to_len.aipl";
 import { slice_whole } from "./slice_whole.aipl";
@@ -42,6 +44,8 @@ pub fn lint(program: Program) -> LintHit[] {
         ..program.on_functions_filled(match_is_some_and),
         ..program.on_functions_filled(match_value_or),
         ..program.on_functions_filled(match_map_value_or),
+        ..push_loop_pipeline(program),
+        ..extend_loop_map_join(program),
         ..interp_to_str(program),
         ..program.on_functions(interp_literal),
         ..program.on_functions(slice_whole),

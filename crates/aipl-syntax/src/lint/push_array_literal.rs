@@ -47,7 +47,7 @@ fn seed_parts(seed: &Expr, src: &str) -> Vec<String> {
 /// literal has no binding for it to refer to. And this file's `push` must be
 /// the builtin, so a *user* function of that name is not mistaken for it.
 ///
-/// Unlike [`push_loop_pipeline`](super::push_loop_pipeline()) there is no
+/// Unlike `push_loop_pipeline` (in AIPL) there is no
 /// blind spot about the receiver's type: `push` is declared
 /// `fn __builtin_push<T: any>(mut self: T[], x: T)`, so an `out` that is
 /// pushed to is an array, and `[..out]` always type-checks.

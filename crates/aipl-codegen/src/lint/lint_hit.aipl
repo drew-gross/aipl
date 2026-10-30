@@ -6,7 +6,6 @@ import {
     Span,
     collect_arms,
     equal as ==,
-    extend,
     filter,
     first,
     is_err_and,
@@ -19,7 +18,7 @@ import {
     map_join,
     value_or,
 } from builtins;
-import { Expr } from "../expr.aipl";
+import { Call, Expr, Field, Ident, expr, ident } from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import { Fn, Function, Import, ImportDecl, Item, Program, Signature, local } from "../item.aipl";
 
@@ -113,6 +112,25 @@ pub fn lint_messages(src: str, lint: (Program) -> LintHit[]) -> str[]!ParseFailu
     assert(lint_messages("fn f() { }", |program: Program| { [hit("found", 0..1)] })? == ["found"]);
 })
 
+# Whether `self`'s span covers exactly the text that spells it, so the source can be
+# spliced back into advice. Only a name and a field path off one qualify: their spans
+# run from the first character to the last. Most other forms do not — a call's span
+# stops before its closing paren, so `f(x)` splices back as `f(x`, which doesn't
+# parse — and the ones that might are left out rather than each having to be
+# re-checked whenever a span moves.
+pub fn spans_its_text(self: Expr) -> bool {
+    match (self.kind) {
+        Ident(..) => true,
+        Field(receiver, _) => receiver.spans_its_text(),
+        _ => false,
+    }
+}.test({
+    assert(ident("x").spans_its_text());
+    assert(expr(Field(ident("p"), "x")).spans_its_text());
+    assert(!expr(Call("f", [ident("x")], false)).spans_its_text());
+    assert(!expr(Field(expr(Call("f", [], false)), "x")).spans_its_text());
+})
+
 # The name a file's `items` import builtin `name` under, if it does: the spelling a
 # lint's advice should use. `none` when the file does not import it, which is when
 # the advice has to say so.
@@ -150,11 +168,7 @@ fn builtin_locals(self: Import(ImportDecl { names, source }), name: str) -> str[
 # in a `.test` block. A block is checked as a function of its own when tests run, so
 # it is handed over as one — no parameters, no return type, the block as its body.
 pub fn on_functions(self: Program, lint: (Function) -> LintHit[]) -> LintHit[] {
-    mut hits: LintHit[] = [];
-    for (let function : self.code_bodies()) {
-        set hits.extend(lint(function));
-    }
-    hits
+    self.code_bodies()$lint().join()
 }.test({
     // Each function, once.
     assert(lint_function_messages(
@@ -186,11 +200,7 @@ pub fn on_functions(self: Program, lint: (Function) -> LintHit[]) -> LintHit[] {
 
 # [`on_functions`] for a lint whose hits are [`UnfilledHit`]s.
 pub fn on_functions_unfilled(self: Program, lint: (Function) -> UnfilledHit[]) -> UnfilledHit[] {
-    mut hits: UnfilledHit[] = [];
-    for (let function : self.code_bodies()) {
-        set hits.extend(lint(function));
-    }
-    hits
+    self.code_bodies()$lint().join()
 }
 
 # [`on_functions_unfilled`], each hit filled in for the program's own imports.

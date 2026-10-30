@@ -148,6 +148,20 @@
 
 
 
+        <section class="item" id="item-spans_its_text">
+          <h3>
+            <a class="anchor" href="#item-spans_its_text">spans_its_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn spans_its_text(self: Expr) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code>'s span covers exactly the text that spells it, so the source can be spliced back into advice. Only a name and a field path off one qualify: their spans run from the first character to the last. Most other forms do not — a call's span stops before its closing paren, so <code>f(x)</code> splices back as <code>f(x</code>, which doesn't parse — and the ones that might are left out rather than each having to be re-checked whenever a span moves.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-imported_as">
           <h3>
             <a class="anchor" href="#item-imported_as">imported_as</a>

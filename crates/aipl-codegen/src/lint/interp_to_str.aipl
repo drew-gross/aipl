@@ -12,10 +12,17 @@
 # The hit points at the `to_str` call.
 
 import { equal as ==, join, map, not_equal as != } from builtins;
-import { Call, Expr, Field, Ident } from "../expr.aipl";
+import { Call } from "../expr.aipl";
 import { Program } from "../item.aipl";
 import { interpolated_values } from "./interpolation.aipl";
-import { LintHit, hit, imported_as, lint_messages, on_functions } from "./lint_hit.aipl";
+import {
+    LintHit,
+    hit,
+    imported_as,
+    lint_messages,
+    on_functions,
+    spans_its_text,
+} from "./lint_hit.aipl";
 
 # A hit for each `to_str` call that is the whole of an interpolation.
 pub fn interp_to_str(program: Program) -> LintHit[] {
@@ -32,7 +39,7 @@ pub fn interp_to_str(program: Program) -> LintHit[] {
 
                 // The argument is spliced into the advice only where its span is its text:
                 // a call's span stops before its closing paren.
-                let advice = if (argument.is_path()) {
+                let advice = if (argument.spans_its_text()) {
                     `write "\{{argument.source}}"`
                 } else {
                     "interpolate the value itself"
@@ -80,16 +87,6 @@ pub fn interp_to_str(program: Program) -> LintHit[] {
     );
     assert(lint_messages("fn f(n: i64) -> str { `{to_str(n)}` }", interp_to_str)? == []);
 })
-
-# Whether `self` is a name or a field path off one, the forms whose span runs from
-# their first character to their last.
-fn is_path(self: Expr) -> bool {
-    match (self.kind) {
-        Ident(..) => true,
-        Field(receiver, _) => receiver.is_path(),
-        _ => false,
-    }
-}
 
 # What is said of an interpolated `to_str` that the file spells `to_str`, with
 # `advice` for the fix.

@@ -8,7 +8,7 @@ use super::{imported_as, liftable, lone_stmt, spans_its_text};
 /// precondition — a file that never imported it cannot be writing a set union,
 /// and some other `union` is not this lint's business — while `map` and
 /// `union_all` only decide whether the advice has to name an import too, the way
-/// [`push_loop_pipeline`](super::push_loop_pipeline()) does.
+/// `push_loop_pipeline` (in AIPL) does.
 pub(super) struct UnionNames {
     union: Option<String>,
     map: Option<String>,
@@ -65,7 +65,7 @@ fn unioned_operand<'a>(value: &'a Expr, acc: &str, union: &str) -> Option<&'a Ex
 /// When the loop unions something *derived* from the element rather than the
 /// element itself, that derivation is the `map` the pipeline needs first:
 /// `set out = out.union(f(s));` is `xs.map(|s| f(s)).union_all()`. This is the
-/// same two-stage advice [`push_loop_pipeline`](super::push_loop_pipeline())
+/// same two-stage advice `push_loop_pipeline` (in AIPL)
 /// gives, and it bows out in the same places — the unioned expression may not
 /// mention `out` (a fold reading its own accumulator is not a `map`) and may not
 /// propagate with `?` (see [`lambda_safe`](super::lambda_safe())).

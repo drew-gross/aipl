@@ -1,0 +1,59 @@
+# `mut out = []; for (let x : xs) { set out.extend(..); }` — an array seeded empty and
+# filled by a loop that does nothing else. `map` and `join` say that in one
+# expression: the array *is* the pieces joined, with nothing else happening to
+# `out`. The twin of `push_loop_pipeline`, for a loop that adds an array per element.
+
+import { extend, not_equal as !=, print, to_str } from builtins;
+
+// A transformed piece per element: a `map` then a `join`.
+fn pairs(xs: i64[]) -> i64[] {
+    mut out: i64[] = [];
+    for (let x : xs) {
+        set out.extend([x, x]);
+    }
+    out
+}
+
+// Under a guard, a `filter` first.
+fn pairs_of_positives(xs: i64[]) -> i64[] {
+    mut out: i64[] = [];
+    for (let x : xs) {
+        if (0 != x) {
+            set out.extend([x, x]);
+        };
+    }
+    out
+}
+
+// The elements are themselves arrays, added unchanged: just a `join`.
+fn flattened(xs: i64[][]) -> i64[] {
+    mut out: i64[] = [];
+    for (let x : xs) {
+        set out.extend(x);
+    }
+    out
+}
+
+fn main() !prints {
+    print(to_str(pairs([1, 2])));
+    print(to_str(pairs_of_positives([0, 3])));
+    print(to_str(flattened([[1], [2]])));
+}
+--- errors ---
+error: "out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.map(|x| ..).join();" and drop the loop, importing `map`, `join` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_extend_loop_map_join.aipl:10:22
+   |
+10 |     mut out: i64[] = [];
+   |                      ^^
+
+error: "out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.filter(|x| ..).map(|x| ..).join();" and drop the loop, importing `filter`, `map`, `join` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_extend_loop_map_join.aipl:19:22
+   |
+19 |     mut out: i64[] = [];
+   |                      ^^
+
+error: "out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.join();" and drop the loop, importing `join` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_extend_loop_map_join.aipl:30:22
+   |
+30 |     mut out: i64[] = [];
+   |                      ^^

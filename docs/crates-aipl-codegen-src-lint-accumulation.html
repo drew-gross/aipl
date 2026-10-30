@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/accumulation.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/accumulation.aipl</code></h1>
+
+      <div class="module-doc"><p>What the two loop-accumulation lints (<code>push_loop_pipeline</code>, <code>extend_loop_map_join</code>) share: recognising an array that is seeded empty and then filled by the loop that follows it and nothing else, and phrasing the pipeline that loop is.</p><pre><code>mut out = [];
+for (let x : xs) {
+    if (keep(x)) {
+        set out.push(f(x));
+    };
+}
+</code></pre><p>The shape has to be <em>exactly</em> this, because anything else in the loop is something the pipeline would drop: the loop body is one statement (the add, or an else-less <code>if</code> around one add), the guard and the added value may not mention <code>out</code>, and may not use <code>?</code>, which would return from the lambda they move into instead of the function. What comes <em>after</em> the loop is unconstrained — a later <code>set out.push(..)</code> is fine, since the rewrite leaves <code>out</code> a <code>mut</code> binding that simply starts out filled.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-Accumulation">
+          <h3>
+            <a class="anchor" href="#item-Accumulation">Accumulation</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Accumulation</code></pre>
+
+          <div class="doc"><p>An array <code>name</code> seeded empty at <code>seed</code> and filled by a loop over <code>iterable</code>, which binds each element as <code>variable</code>, and for each one (that passes <code>guard</code>, if there is one) adds <code>added</code> to it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-accumulations">
+          <h3>
+            <a class="anchor" href="#item-accumulations">accumulations</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn accumulations(self: Expr, adder: str) -&#62; Accumulation[]</code></pre>
+
+          <div class="doc"><p>Every [<code>Accumulation</code>] in <code>self</code> and under it whose loop fills the array with <code>adder</code> — the local name of the builtin that adds to it (<code>push</code>, <code>extend</code>), so an aliased import is followed and a <em>user</em> function that happens to share the name is not.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-receiver">
+          <h3>
+            <a class="anchor" href="#item-receiver">receiver</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn receiver(self: Accumulation) -&#62; str</code></pre>
+
+          <div class="doc"><p>What the pipeline that <code>self</code>'s loop is would iterate, as advice quotes it: what was written where its span covers its text, and a placeholder where it does not (a call's span stops before its closing paren).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_range">
+          <h3>
+            <a class="anchor" href="#item-is_range">is_range</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn is_range(self: Accumulation) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether the loop walks a range (<code>a..b</code>, a <code>Span</code> construction), which is not an array: only <code>map</code> takes one, so a guard has no <code>filter</code> to become and an element added unchanged is the range as an array, which has no spelling to advise.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-maps">
+          <h3>
+            <a class="anchor" href="#item-maps">maps</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn maps(self: Accumulation) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether the loop adds something derived from its element, rather than the element itself, which a pipeline just leaves out.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_advisable">
+          <h3>
+            <a class="anchor" href="#item-is_advisable">is_advisable</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn is_advisable(self: Accumulation) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether a pipeline over the loop's iterable can be advised. A range is not an array and only <code>map</code> takes one, so a guard has no <code>filter</code> to become, and an element added unchanged is the range as an array, which has no spelling.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-element_stages">
+          <h3>
+            <a class="anchor" href="#item-element_stages">element_stages</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn element_stages(self: Accumulation) -&#62; (str, str)[]</code></pre>
+
+          <div class="doc"><p>The stages of the pipeline that select and derive the loop's elements: a <code>filter</code> for the guard, if there is one, then a <code>map</code> for what is added, if that is not the element itself. Each is a builtin and the arguments it is written with.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lead">
+          <h3>
+            <a class="anchor" href="#item-lead">lead</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lead(self: Accumulation) -&#62; str</code></pre>
+
+          <div class="doc"><p>The text before the pipeline in a hit for <code>self</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-pipeline_hit">
+          <h3>
+            <a class="anchor" href="#item-pipeline_hit">pipeline_hit</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn pipeline_hit(self: Accumulation, stages: (str, str)[]) -&#62; UnfilledHit</code></pre>
+
+          <div class="doc"><p>The hit for a loop that is the pipeline of <code>stages</code> over its iterable, assigned to the array: each stage a builtin and the arguments it is written with. It points at the seed, not the loop: <code>#[allow]</code> is line-scoped, so a hit spanning the loop could never be squelched (the marker would have to go on the <code>for (..) {</code> header, and the formatter relocates one written there onto a line of its own, where it squelches nothing). <code>mut out = [];</code> always occupies one line, and is where the shape starts.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-block_accumulations">
+          <h3>
+            <a class="anchor" href="#item-block_accumulations">block_accumulations</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn block_accumulations(src: str, adder: str) -&#62; str[]!ParseError</code></pre>
+
+          <div class="doc"><p>The name of each [<code>accumulations</code>] the block <code>src</code> holds.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-accumulation">
+          <h3>
+            <a class="anchor" href="#item-accumulation">accumulation</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn accumulation(self: LetMut, adder: str) -&#62; Accumulation?</code></pre>
+
+          <div class="doc"><p><code>self</code> as an [<code>Accumulation</code>], when it is one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lone_statement">
+          <h3>
+            <a class="anchor" href="#item-lone_statement">lone_statement</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lone_statement(self: Expr) -&#62; Expr?</code></pre>
+
+          <div class="doc"><p>The one statement a block consists of, or <code>none</code> when it holds anything else — no statements, or more than one. A block is a right-nested chain, and which node carries the rest of it depends on the statement: an expression statement is a <code>Seq</code> whose second operand is the remainder, while an assignment holds its own. Only those two forms are recognized, and each is &quot;lone&quot; exactly when what follows it is the block's tail.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_block_tail">
+          <h3>
+            <a class="anchor" href="#item-is_block_tail">is_block_tail</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_block_tail(self: Expr) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> is what the parser ends a statement-only block with: <code>()</code> for an ordinary block, and an <code>0</code> with no location of its own — the loop expression's result — for a loop body, which may not end in a value of its own at all. The loop's zero is told from a written one by its empty span, the way <code>slice_from_zero</code> tells an elided slice bound from a typed one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-added_to">
+          <h3>
+            <a class="anchor" href="#item-added_to">added_to</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn added_to(self: Expr, acc: str, adder: str) -&#62; Expr?</code></pre>
+
+          <div class="doc"><p>The value <code>adder</code> adds, when <code>self</code> is <code>set acc.adder(value);</code> — <code>acc = adder(acc, value)</code> — and nothing else.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_liftable">
+          <h3>
+            <a class="anchor" href="#item-is_liftable">is_liftable</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_liftable(self: Expr, acc: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> can move into a lambda in a rewritten pipeline: a <code>?</code> returns from the function it is written in, so moved into a lambda it would return from the lambda instead, and the rewrite no longer has <code>acc</code>, the array being filled.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

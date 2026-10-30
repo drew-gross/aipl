@@ -1,0 +1,313 @@
+# What the two loop-accumulation lints (`push_loop_pipeline`, `extend_loop_map_join`)
+# share: recognising an array that is seeded empty and then filled by the loop that
+# follows it and nothing else, and phrasing the pipeline that loop is.
+#
+#     mut out = [];
+#     for (let x : xs) {
+#         if (keep(x)) {
+#             set out.push(f(x));
+#         };
+#     }
+#
+# The shape has to be *exactly* this, because anything else in the loop is something
+# the pipeline would drop: the loop body is one statement (the add, or an else-less
+# `if` around one add), the guard and the added value may not mention `out`, and may
+# not use `?`, which would return from the lambda they move into instead of the
+# function. What comes *after* the loop is unconstrained — a later `set out.push(..)`
+# is fine, since the rewrite leaves `out` a `mut` binding that simply starts out filled.
+
+import {
+    as_case,
+    drop_last,
+    equal as ==,
+    is_empty,
+    is_nonempty,
+    is_some,
+    join,
+    last,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+    value_or,
+    zip_with,
+} from builtins;
+import {
+    ArrayLit,
+    Assign,
+    Call,
+    Construct,
+    Expr,
+    For,
+    Ident,
+    If,
+    LetMut,
+    Num,
+    Seq,
+    Try,
+    Unit,
+    collect_expr_cases,
+} from "../expr.aipl";
+import { ParseError } from "../grammar.aipl";
+import { lower_aipl_block_surface } from "../grammar_aipl.aipl";
+import { mentions_any } from "./field_uses.aipl";
+import { Named, UnfilledHit, spans_its_text } from "./lint_hit.aipl";
+
+# An array `name` seeded empty at `seed` and filled by a loop over `iterable`, which
+# binds each element as `variable`, and for each one (that passes `guard`, if there
+# is one) adds `added` to it.
+struct Accumulation {
+    name: str,
+    seed: Expr,
+    variable: str,
+    iterable: Expr,
+    guard: Expr?,
+    added: Expr,
+}
+
+# Every [`Accumulation`] in `self` and under it whose loop fills the array with
+# `adder` — the local name of the builtin that adds to it (`push`, `extend`), so an
+# aliased import is followed and a *user* function that happens to share the name
+# is not.
+pub fn accumulations(self: Expr, adder: str) -> Accumulation[] {
+    self.collect_expr_cases(LetMut)$accumulation(adder)$map(|found| [found])$value_or([]).join()
+}.test({
+    assert(block_accumulations(
+        "{ mut out = []; for (let x : xs) { set out.push(f(x)); } out }",
+        "push",
+    )? == ["out"]);
+    // Later ones are found too, in order.
+    assert(block_accumulations(
+        "{ mut a = []; for (let x : xs) { set a.push(x); } mut b = []; for (let y : a) { set b.push(y); } b }",
+        "push",
+    )? == ["a", "b"]);
+    // The adder is the file's: a different name is another function.
+    assert(
+        block_accumulations(
+            "{ mut out = []; for (let x : xs) { set out.push(x); } out }",
+            "add",
+        )? == [],
+    );
+})
+
+# The name of each [`accumulations`] the block `src` holds.
+fn block_accumulations(src: str, adder: str) -> str[]!ParseError {
+    ok(lower_aipl_block_surface(src)?.accumulations(adder)$name)
+}
+
+# `self` as an [`Accumulation`], when it is one.
+fn accumulation(self: LetMut(name, _, seed, body), adder: str) -> Accumulation? {
+    // `mut acc = [];` — the seed. An annotation is allowed (and usual: it is often
+    // what gives the empty literal its element type) but says nothing about the
+    // iterable, so it is not inspected.
+    let ArrayLit(seeded) = seed.kind.as_case(ArrayLit)?;
+    if (seeded.is_nonempty()) {
+        return none;
+    };
+
+    // The very next statement must be the loop: a statement between the two could
+    // read `acc` while it is still empty, which the rewrite would reorder.
+    let Seq(first, _) = body.kind.as_case(Seq)?;
+
+    // An *indexed* loop is not this shape: `map` and `filter` pass each element and
+    // have no index to pass with it, so the rewrite would silently drop whatever the
+    // body did with it.
+    // `as_case(For)` would say this, but `For` has a keyword parameter, which keeps it
+    // from being passed as a function value.
+    let For(variable, iterable, loop_body, index) = first.kind else { return none; }; #[allow]
+    if (index.is_some()) {
+        return none;
+    };
+
+    // An else-less `if` around the add is the filter; anything else in the body (an
+    // `else`, a second statement) is work the pipeline has nowhere to put.
+    mut statement = loop_body.lone_statement()?;
+    mut guard: Expr? = none;
+    if (let If(condition, then, otherwise) = statement.kind) {
+        if (otherwise.kind != Unit) {
+            return none;
+        };
+        set guard = some(condition);
+        set statement = then.lone_statement()?;
+    };
+    let added = statement.added_to(name, adder)?;
+    if (!added.is_liftable(name) || !guard$is_liftable(name).value_or(true)) {
+        return none;
+    };
+    some(Accumulation { name, seed, variable, iterable, guard, added })
+}.test({
+    assert(block_accumulations(
+        "{ mut out: i64[] = []; for (let x : xs) { if (x > 0) { set out.push(x); }; } out }",
+        "push",
+    )? == ["out"]);
+
+    // Not the shape: a seed with elements, a statement between seed and loop, an
+    // indexed loop, a second statement or an `else` in the body, and an added value
+    // that reads the array or propagates with `?`.
+    assert(
+        block_accumulations(
+            "{ mut out = [1]; for (let x : xs) { set out.push(x); } out }",
+            "push",
+        )? == [],
+    );
+    assert(
+        block_accumulations(
+            "{ mut out = []; g(); for (let x : xs) { set out.push(x); } out }",
+            "push",
+        )? == [],
+    );
+    assert(
+        block_accumulations(
+            "{ mut out = []; for (let i, x : xs) { set out.push(x); } out }",
+            "push",
+        )? == [],
+    );
+    assert(
+        block_accumulations(
+            "{ mut out = []; for (let x : xs) { g(x); set out.push(x); } out }",
+            "push",
+        )? == [],
+    );
+    assert(
+        block_accumulations(
+            "{ mut out = []; for (let x : xs) { if (c) { set out.push(x); } else { g(x); }; } out }",
+            "push",
+        )? == [],
+    );
+    assert(
+        block_accumulations(
+            "{ mut out = []; for (let x : xs) { set out.push(out.len()); } out }",
+            "push",
+        )? == [],
+    );
+    assert(
+        block_accumulations(
+            "{ mut out = []; for (let x : xs) { set out.push(g(x)?); } out }",
+            "push",
+        )? == [],
+    );
+})
+
+# The one statement a block consists of, or `none` when it holds anything else — no
+# statements, or more than one. A block is a right-nested chain, and which node
+# carries the rest of it depends on the statement: an expression statement is a
+# `Seq` whose second operand is the remainder, while an assignment holds its own.
+# Only those two forms are recognized, and each is "lone" exactly when what follows
+# it is the block's tail.
+fn lone_statement(self: Expr) -> Expr? {
+    match (self.kind) {
+        Seq(statement, rest) => if (rest.is_block_tail()) { some(statement) } else { none },
+        Assign(_, _, rest) => if (rest.is_block_tail()) { some(self) } else { none },
+        _ => none,
+    }
+}
+
+# Whether `self` is what the parser ends a statement-only block with: `()` for an
+# ordinary block, and an `0` with no location of its own — the loop expression's
+# result — for a loop body, which may not end in a value of its own at all. The
+# loop's zero is told from a written one by its empty span, the way `slice_from_zero`
+# tells an elided slice bound from a typed one.
+fn is_block_tail(self: Expr) -> bool {
+    match (self.kind) {
+        Unit => true,
+        Num(0) => self.span.start == self.span.end,
+        _ => false,
+    }
+}
+
+# The value `adder` adds, when `self` is `set acc.adder(value);` — `acc = adder(acc,
+# value)` — and nothing else.
+fn added_to(self: Expr, acc: str, adder: str) -> Expr? {
+    let Assign(target, value, _) = self.kind.as_case(Assign)?;
+    let Call(callee, arguments, _) = value.kind.as_case(Call)?;
+    let [receiver, added] = arguments else { return none; };
+    if (target.kind != Ident(acc) || callee != adder || receiver.kind != Ident(acc)) {
+        return none;
+    };
+    some(added)
+}
+
+# Whether `self` can move into a lambda in a rewritten pipeline: a `?` returns from
+# the function it is written in, so moved into a lambda it would return from the
+# lambda instead, and the rewrite no longer has `acc`, the array being filled.
+fn is_liftable(self: Expr, acc: str) -> bool {
+    self.collect_expr_cases(Try).is_empty() && !self.mentions_any([acc], none)
+}
+
+# What the pipeline that `self`'s loop is would iterate, as advice quotes it: what was
+# written where its span covers its text, and a placeholder where it does not (a
+# call's span stops before its closing paren).
+pub fn receiver(self: Accumulation) -> str {
+    if (self.iterable.spans_its_text()) {
+        self.iterable.source
+    } else if (self.is_range()) {
+        "(<range>)"
+    } else {
+        "<iterable>"
+    }
+}
+
+# Whether the loop walks a range (`a..b`, a `Span` construction), which is not an
+# array: only `map` takes one, so a guard has no `filter` to become and an element
+# added unchanged is the range as an array, which has no spelling to advise.
+pub fn is_range(self: Accumulation) -> bool {
+    match (self.iterable.kind) {
+        Construct("__builtin_Span", _) => true,
+        _ => false,
+    }
+}
+
+# Whether the loop adds something derived from its element, rather than the element
+# itself, which a pipeline just leaves out.
+pub fn maps(self: Accumulation) -> bool { self.added.kind != Ident(self.variable) }
+
+# Whether a pipeline over the loop's iterable can be advised. A range is not an
+# array and only `map` takes one, so a guard has no `filter` to become, and an element
+# added unchanged is the range as an array, which has no spelling.
+pub fn is_advisable(self: Accumulation) -> bool {
+    !self.is_range() || (!self.guard.is_some() && self.maps())
+}
+
+# The stages of the pipeline that select and derive the loop's elements: a `filter`
+# for the guard, if there is one, then a `map` for what is added, if that is not the
+# element itself. Each is a builtin and the arguments it is written with.
+pub fn element_stages(self: Accumulation) -> (str, str)[] {
+    let lambda = `(|{self.variable}| ..)`;
+    let filter: (str, str)[] = if (self.guard.is_some()) { [("filter", lambda)] } else { [] };
+    let map: (str, str)[] = if (self.maps()) { [("map", lambda)] } else { [] };
+    [..filter, ..map]
+}
+
+# The text before the pipeline in a hit for `self`.
+pub fn lead(self: Accumulation) -> str {
+    `"{self.name}" is seeded empty and filled by this loop and nothing else — `
+}
+
+# The hit for a loop that is the pipeline of `stages` over its iterable, assigned to
+# the array: each stage a builtin and the arguments it is written with. It points at
+# the seed, not the loop: `#[allow]` is line-scoped, so a hit spanning the loop could
+# never be squelched (the marker would have to go on the `for (..) {` header, and the
+# formatter relocates one written there onto a line of its own, where it squelches
+# nothing). `mut out = [];` always occupies one line, and is where the shape starts.
+pub fn pipeline_hit(self: Accumulation, stages: (str, str)[]) -> UnfilledHit {
+    // No stage at all: the loop copies the iterable one element at a time.
+    if (stages.is_empty()) {
+        return UnfilledHit {
+            named: [],
+            tail: `{self.lead()}it is "{self.receiver()}" already — assign that and drop the loop`,
+            span: self.seed.span,
+        };
+    };
+    let opening = `{self.lead()}write "mut {self.name} = {self.receiver()}.`;
+    let separators = stages.drop_last()$1.map(|arguments| `{arguments}.`);
+    UnfilledHit {
+        named: zip_with(
+            [opening, ..separators],
+            stages,
+            |text: str, stage: (str, str)| Named { text, builtin: stage.0 },
+        ),
+        tail: `{stages.last()$1.value_or("")};" and drop the loop`,
+        span: self.seed.span,
+    }
+}

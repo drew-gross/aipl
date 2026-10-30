@@ -1,0 +1,29 @@
+# `#[allow]` keeps the loop — the escape hatch every lint carries. It is the answer for
+# what this lint cannot check: `extend` also takes an optional, adding its payload if
+# there is one, and `join` does not.
+#
+# The marker goes on the `mut out = [];` seed, which is where this lint points: it is a
+# short statement that always occupies one line, so it keeps a trailing marker through
+# the formatter.
+
+import { extend, join, map, print, to_str } from builtins;
+
+fn pairs(xs: i64[]) -> i64[] {
+    mut out: i64[] = []; #[allow]
+    for (let x : xs) {
+        set out.extend([x, x]);
+    }
+    out
+}
+
+// The rewrite the lint asks for, so the two spellings are checked side by side and
+// proven to agree.
+fn pairs_short(xs: i64[]) -> i64[] { xs.map(|x| [x, x]).join() }
+
+fn main() !prints {
+    print(to_str(pairs([1, 2])));
+    print(to_str(pairs_short([1, 2])));
+}
+--- stdout ---
+[1, 1, 2, 2]
+[1, 1, 2, 2]

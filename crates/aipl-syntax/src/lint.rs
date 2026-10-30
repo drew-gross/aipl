@@ -29,7 +29,6 @@ mod match_map_ok;
 mod match_value_or_err;
 mod push_array_literal;
 mod push_loop_collect_ok;
-mod push_loop_pipeline;
 mod return_loop_any_all;
 mod return_loop_find_if;
 mod return_loop_find_index;
@@ -62,7 +61,6 @@ use self::match_map_ok::match_map_ok;
 use self::match_value_or_err::match_value_or_err;
 use self::push_array_literal::push_array_literal;
 use self::push_loop_collect_ok::{collect_ok_names, push_loop_collect_ok};
-use self::push_loop_pipeline::{pipeline_names, push_loop_pipeline};
 use self::return_loop_any_all::{any_all_names, return_loop_any_all};
 use self::return_loop_find_if::{find_if_name, return_loop_find_if};
 use self::return_loop_find_index::{find_index_name, return_loop_find_index};
@@ -162,13 +160,7 @@ pub fn check(
     each_expr(program, &mut |e| {
         set_spread_push(e, src, &appends, &mut hits)
     });
-    // Only where this file's `push` is the builtin — see `pipeline_names`,
-    // which also reports what `map`/`filter` are called here.
-    let pipeline = pipeline_names(program);
-    each_expr(program, &mut |e| {
-        push_loop_pipeline(e, src, &pipeline, &mut hits)
-    });
-    // The optional-guard sibling of the pipeline lint: an `if let some(..)` where
+    // The optional-guard sibling of the `push` loop lint (in AIPL): an `if let some(..)` where
     // that one reads a boolean `if`.
     let collect_ok = collect_ok_names(program);
     each_expr(program, &mut |e| {

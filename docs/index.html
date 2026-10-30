@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">174 files, 1688 items.</p>
+      <p class="summary">177 files, 1705 items.</p>
 
       <ul class="files">
 
@@ -1771,6 +1771,66 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-accumulation.html">crates/aipl-codegen/src/lint/accumulation.aipl</a>
+
+          <p class="file-summary">What the two loop-accumulation lints (<code>push_loop_pipeline</code>, <code>extend_loop_map_join</code>) share: recognising an array that is seeded empty and then filled by the loop that follows it and nothing else, and phrasing the pipeline that loop is.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-accumulation.html#private">6 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-accumulation.html#item-Accumulation"><code>Accumulation</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-accumulation.html#item-accumulations"><code>accumulations</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-accumulation.html#item-receiver"><code>receiver</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-accumulation.html#item-is_range"><code>is_range</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-accumulation.html#item-maps"><code>maps</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-accumulation.html#item-is_advisable"><code>is_advisable</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-accumulation.html#item-element_stages"><code>element_stages</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-accumulation.html#item-lead"><code>lead</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-accumulation.html#item-pipeline_hit"><code>pipeline_hit</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-codegen-src-lint-case_of_equal_is_case.html">crates/aipl-codegen/src/lint/case_of_equal_is_case.aipl</a>
 
           <p class="file-summary">The <code>case_of_equal_is_case</code> lint: <code>shape.case_of() == Circle</code> — reading which case a value is only to compare it with one. That is <code>shape.is_case(Circle)</code>, which asks the same question without the detour through a <code>Case</code>.</p>
@@ -1894,6 +1954,24 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-extend_loop_map_join.html">crates/aipl-codegen/src/lint/extend_loop_map_join.aipl</a>
+
+          <p class="file-summary">The <code>extend_loop_map_join</code> lint:</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-extend_loop_map_join.html#item-extend_loop_map_join"><code>extend_loop_map_join</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-codegen-src-lint-field_uses.html">crates/aipl-codegen/src/lint/field_uses.aipl</a>
 
           <p class="file-summary">How a name is used inside an expression, for the lints that turn a binding into a pattern.</p>
@@ -1989,7 +2067,7 @@
           <p class="file-summary">The <code>interp_to_str</code> lint: <code>`..{to_str(x)}..`</code> — a <code>to_str</code> inside a template interpolation. The interpolation <em>is</em> <code>to_str</code>: a template lowers each <code>{e}</code> to <code>__template_interp(e)</code>, which renders <code>e</code> exactly as <code>to_str</code> does (a <code>str</code> as its text, a <code>char</code> as its character, anything else by its type), so the call converts a value to the string the interpolation was about to make of it anyway. <code>{x}</code> says the same thing.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-interp_to_str.html#private">2 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-interp_to_str.html#private">1 private</a></span>
 
 
           <ul class="items">
@@ -2092,6 +2170,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-lint_messages"><code>lint_messages</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-spans_its_text"><code>spans_its_text</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -2252,6 +2335,24 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-option_match.html#item-default_text"><code>default_text</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-push_loop_pipeline.html">crates/aipl-codegen/src/lint/push_loop_pipeline.aipl</a>
+
+          <p class="file-summary">The <code>push_loop_pipeline</code> lint:</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-push_loop_pipeline.html#item-push_loop_pipeline"><code>push_loop_pipeline</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

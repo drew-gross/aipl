@@ -32,7 +32,8 @@ DRY is critical here. Before writing a helper, search for it:
 - `lint/lint_hit.aipl` — `hit`, `UnfilledHit`, `imported_as`, `on_functions`,
   `on_functions_unfilled`, the `lint_*` test drivers.
 - `lint/field_uses.aipl`, `lint/slice_bounds.aipl`, `lint/option_match.aipl`,
-  `lint/constant_default.aipl` — shared shape recognizers.
+  `lint/constant_default.aipl`, `lint/accumulation.aipl` (the seeded-empty-then-filled-by-a-loop
+  shape and its pipeline advice), `lint/interpolation.aipl` — shared shape recognizers.
 - The builtins and `crates/aipl-codegen/src/*.aipl` (expr walkers, `source`
   quoting, spans). `body.collect_expr_cases(Slice)` is every `Slice` under `body`,
   typed as that case alone, so a lambda can destructure it directly.

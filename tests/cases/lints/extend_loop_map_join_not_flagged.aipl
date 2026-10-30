@@ -1,0 +1,70 @@
+# The shapes the extend-loop lint must leave alone. It rewrites exactly one shape — a
+# `mut acc = [];` whose very next statement is a loop doing nothing but extending it,
+# optionally behind an else-less `if` — so everything here compiles.
+
+import { extend, not_equal as !=, print, to_str } from builtins;
+
+// The loop does something else as well. A pipeline has nowhere to put it.
+fn logged(xs: i64[]) !prints -> i64[] {
+    mut out: i64[] = [];
+    for (let x : xs) {
+        print(to_str(x));
+        set out.extend([x]);
+    }
+    out
+}
+
+// A seed with elements is not an empty array to be filled.
+fn seeded(xs: i64[]) -> i64[] {
+    mut out: i64[] = [0];
+    for (let x : xs) {
+        set out.extend([x]);
+    }
+    out
+}
+
+// An `else` branch is work the pipeline has nowhere to put.
+fn either(xs: i64[]) -> i64[] {
+    mut out: i64[] = [];
+    for (let x : xs) {
+        if (0 != x) {
+            set out.extend([x]);
+        } else {
+            set out.extend([]);
+        };
+    }
+    out
+}
+
+// What is added reads the array itself, which the pipeline no longer has.
+fn doubling(xs: i64[]) -> i64[] {
+    mut out: i64[] = [1];
+    for (let x : xs) {
+        set out.extend(out);
+    }
+    out
+}
+
+// An indexed loop uses its index, which `map` has no way to pass.
+fn indexed(xs: u64[]) -> u64[] {
+    mut out: u64[] = [];
+    for (let i, x : xs) {
+        set out.extend([i, x]);
+    }
+    out
+}
+
+fn main() !prints {
+    print(to_str(logged([1])));
+    print(to_str(seeded([1])));
+    print(to_str(either([0, 1])));
+    print(to_str(doubling([1])));
+    print(to_str(indexed([5])));
+}
+--- stdout ---
+1
+[1]
+[0, 1]
+[1]
+[1, 1]
+[0, 5]
