@@ -477,6 +477,7 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  turn map into a real function that can be inlined, rather than a synthetic one, so that map/join fusion can be both normal and after mono
   make a "static_ok" method that evaluates a top-level function at compile time and fails the compile if err, then users don't have to check for err
   is_case_and: variant matches case and predicate
   set add operation

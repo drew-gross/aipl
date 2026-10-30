@@ -31,9 +31,7 @@ pub fn is_zero(self: Expr) -> bool { self.kind == Num(0) }.test({
 
 # What `lint` reports for each slice in `self` and under it.
 pub fn on_slices(self: Expr, lint: (Slice) -> LintHit[]) -> LintHit[] {
-    // The lambda only forwards to `lint`, but `map(lint).join()` fuses into `map_join`,
-    // whose result type cannot be inferred from a function-typed parameter.
-    self.descendants()$kind.collect_arms(Slice).map(|slice| lint(slice)).join() #[allow]
+    self.descendants()$kind.collect_arms(Slice).map(lint).join()
 }.test({
     let xs = ident("xs");
     let slice = expr(Slice(xs, some(num(1)), none));

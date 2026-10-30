@@ -2959,8 +2959,8 @@ impl Mono<'_> {
         ))
     }
 
-    /// The result type of a function-typed *argument* — a lambda literal or a
-    /// named function reference — called with `arg_tys`. Used to pin a type
+    /// The result type of a function-typed *argument* — a lambda literal, a
+    /// named function reference or a function-typed parameter — called with `arg_tys`. Used to pin a type
     /// variable that appears only as such a parameter's result (see
     /// [`Self::specialize_generic_call`]).
     ///
@@ -2985,6 +2985,12 @@ impl Mono<'_> {
                 self.try_errs.truncate(mark);
                 Ok(Some(ty))
             }
+            // A function-typed parameter of the function being processed, which is
+            // what `expand_map` accepts as `xs.map(f)`: it returns what the
+            // function it is bound to returns for that element.
+            ExprKind::Ident(g) if self.cur_lenv.contains_key(g) && arg_tys.len() == 1 => Ok(self
+                .lenv_fn_value(g, &arg_tys[0], env)
+                .map(|(_, _, ret)| ret)),
             ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
                 Ok(Some(self.fn_value(g, arg_tys, &arg.span)?.1))
             }
@@ -3036,6 +3042,7 @@ impl Mono<'_> {
         &mut self,
         gname: &str,
         args: &[Expr],
+        pinned: Option<&Type>,
         env: &Env,
         span: Span,
     ) -> Result<(Expr, Type), Error> {
@@ -3115,6 +3122,10 @@ impl Mono<'_> {
             .filter(|n| !map.contains_key(n))
             .collect();
         if !unpinned.is_empty() {
+            let unpinned: Vec<String> = unpinned
+                .into_iter()
+                .filter(|n| !map.contains_key(n))
+                .collect();
             for (param, arg) in sig.params.iter().zip(args) {
                 let Type::Fn(ptys, ret) = &param.ty else {
                     continue;
@@ -3127,6 +3138,28 @@ impl Mono<'_> {
                     self.bind_generic_or(ret, &rty, &var_set, &mut map, gname, span.clone())?;
                     if is_str_repr(&rty) {
                         str_pinned.extend(str_var_of(ret));
+                    }
+                }
+            }
+            // What neither the arguments nor the function-typed arguments pinned is read off
+            // the type the checker recorded for the call. After them, because they know
+            // more: a `str` result says `char` for `U[]`, where a lambda's `str` pieces
+            // make the result a joined string.
+            if let Some(pinned) = pinned {
+                let mut from_result = HashMap::new();
+                if self
+                    .bind_generic_or(
+                        &sig.return_type(),
+                        pinned,
+                        &var_set,
+                        &mut from_result,
+                        gname,
+                        span.clone(),
+                    )
+                    .is_ok()
+                {
+                    for (var, ty) in from_result {
+                        map.entry(var).or_insert(ty);
                     }
                 }
             }
@@ -6551,9 +6584,19 @@ impl Mono<'_> {
         // `infer_generic_variant_ctor` to have its instance instantiated and its
         // arguments bound. Supplying the context it lost is enough, and leaves
         // one code path instead of two that must agree.
+        //
+        // Except for a call the checker recorded only so that its type variables can
+        // be read off the result (`specialize_generic_call`): its arguments decide
+        // its type, and as an expected type the record would pin a representation
+        // (a joined `str`) the arguments leave open.
+        let result_only = matches!(&expr.kind, ExprKind::Call(callee, ..)
+        if self.generics.get(callee.name()).is_some_and(|g| {
+            check::has_function_result_var(&g.sig) && !check::has_return_only_var(&g.sig)
+        }));
         let prev_expected = expr
             .ty
             .clone()
+            .filter(|_| !result_only)
             .map(|t| std::mem::replace(&mut self.cur_expected, Some(*t)));
         // A constructor reference the checker resolved to a case: lower it to the
         // tag, which is all a `Case<V>` is at runtime. The variant travels in the
@@ -7713,7 +7756,13 @@ impl Mono<'_> {
                 // the lambdas — the union of generic monomorphization and lambda
                 // lifting.
                 if self.generics.contains_key(name) && !self.mutating.contains(name) && has_fn_arg {
-                    return self.specialize_generic_call(name, args, env, span.clone());
+                    return self.specialize_generic_call(
+                        name,
+                        args,
+                        expr.ty.as_deref(),
+                        env,
+                        span.clone(),
+                    );
                 }
                 let mut rargs = Vec::with_capacity(args.len());
                 let mut atys = Vec::with_capacity(args.len());

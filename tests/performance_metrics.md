@@ -443,6 +443,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/optimizations/fold_extends_value_or | 30 | 1445 | 1384 | 6475 | 9452 | 22.00 | 175.54 | 1488 |
 | cases/optimizations/fold_lengths | 23 | 1202 | 1202 | 1501 | 4540 | 16.00 | 121.35 | 1488 |
 | cases/optimizations/fold_match | 11 | 620 | 620 | 300 | 1952 | 9.00 | 63.74 | 1456 |
+| cases/optimizations/fusion_function_parameter | 10 | 312 | 306 | 3163 | 7800 | 13.00 | 223.98 | 1504 |
 | cases/optimizations/fusion_named_effects | 8 | 378 | 145 | 529 | 1864 | 9.00 | 110.00 | 1456 |
 | cases/optimizations/fusion_swapped_operators | 28 | 1520 | 1520 | 2174 | 4420 | 18.00 | 138.55 | 1456 |
 | cases/optimizations/index_map_fusion | 19 | 991 | 991 | 1906 | 8016 | 22.00 | 96.89 | 1472 |

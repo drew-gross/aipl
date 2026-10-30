@@ -643,6 +643,7 @@ case_tests! {
     cases_optimizations_fold_extends_value_or = "cases/optimizations/fold_extends_value_or",
     cases_optimizations_fold_lengths = "cases/optimizations/fold_lengths",
     cases_optimizations_fold_match = "cases/optimizations/fold_match",
+    cases_optimizations_fusion_function_parameter = "cases/optimizations/fusion_function_parameter",
     cases_optimizations_fusion_named_effects = "cases/optimizations/fusion_named_effects",
     cases_optimizations_fusion_swapped_operators = "cases/optimizations/fusion_swapped_operators",
     cases_optimizations_index_map_fusion = "cases/optimizations/index_map_fusion",

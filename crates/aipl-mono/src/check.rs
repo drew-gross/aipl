@@ -727,7 +727,11 @@ impl<'a> Cx<'a> {
                 // Asked of the signature, not of `return_pinned`: a position
                 // locks its expression before the expression is checked, so the
                 // call is not recorded there yet.
-                if has_return_only_var(sig) {
+                //
+                // Not only a return-only variable: one that only a function-typed
+                // argument's result mentions is as unpinned by the arguments, and
+                // the position's type is the one thing that says what it is.
+                if has_return_only_var(sig) || has_function_result_var(sig) {
                     self.lock_node(node_id(e), ty);
                 }
                 if !sig.is_generic() || sig.params.len() != args.len() {
@@ -2137,9 +2141,24 @@ fn narrow_target_errors(e: &Expr, locks: &HashMap<usize, Option<Type>>) -> Vec<E
     out
 }
 
+/// Whether `sig` has a function-typed parameter whose result mentions a type
+/// variable. A call's arguments may leave such a variable unpinned: a lambda has no
+/// type until its parameters are known, and a function-typed parameter of the
+/// caller is not a lambda at all.
+pub(crate) fn has_function_result_var(sig: &Signature) -> bool {
+    sig.is_generic()
+        && sig.param_types().iter().any(|p| match p {
+            Type::Fn(_, ret) => sig
+                .type_vars
+                .iter()
+                .any(|tp| super::ty_mentions(ret, &tp.name)),
+            _ => false,
+        })
+}
+
 /// Whether `sig` has a type variable that its return type mentions and no
 /// parameter does — one a call's arguments cannot pin.
-fn has_return_only_var(sig: &Signature) -> bool {
+pub(crate) fn has_return_only_var(sig: &Signature) -> bool {
     let return_ty = sig.return_type();
     let params = sig.param_types();
     sig.type_vars.iter().any(|tp| {
@@ -3941,7 +3960,7 @@ impl Cx<'_> {
         pos: Pos,
     ) -> Result<Type, Error> {
         let span = expr.span.clone();
-        Ok(match &expr.kind {
+        let ty = match &expr.kind {
             ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
             ExprKind::TypeArgs(call, tys) => self.check_type_args(call, tys, env, effects)?,
             ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
@@ -4854,7 +4873,25 @@ impl Cx<'_> {
                     &expr.name_span,
                 )?
             }
-        })
+        };
+        // The type of a call whose callee's type variables its arguments may not
+        // pin (see [`has_function_result_var`]) is recorded wherever it is fully
+        // known. A pass that rewrites the call (a fusion) carries it onto the call
+        // it builds, and monomorphization binds the callee's variables from it when
+        // the arguments cannot, so the rewrite needs no inference path of its own.
+        // Other calls are left alone: their types are read off their arguments, and
+        // a recorded one would pin a representation (`+++` concatenating strings) or
+        // an integer width (`int_parse`) that the context decides.
+        if let ExprKind::Call(callee, ..) = &expr.kind {
+            if self
+                .sigs
+                .get(callee.name())
+                .is_some_and(has_function_result_var)
+            {
+                self.lock_node(node_id(expr), &ty);
+            }
+        }
+        Ok(ty)
     }
 
     /// Enforce that a `match` is *either* a statement or an expression, never

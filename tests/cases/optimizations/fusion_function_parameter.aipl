@@ -1,0 +1,51 @@
+import {
+    equal as ==,
+    find_if,
+    join,
+    len,
+    map,
+    print,
+    reduce,
+    split,
+    to_dict,
+    wrapping_add as +,
+} from builtins;
+
+fn flatten_with(xs: i64[], f: (i64) -> i64[]) -> i64[] { xs.map(f).join() }
+
+fn dict_with(xs: i64[], f: (i64) -> (i64, i64)) -> #{i64: i64} { xs.map(f).to_dict() }
+
+fn find_with(xs: i64[], f: (i64) -> i64, p: (i64) -> bool) -> i64? { xs.map(f).find_if(p) }
+
+fn reduce_with(xs: i64[], f: (i64) -> i64) -> i64? { xs.map(f).reduce(|a, b| a + b) }
+
+fn split_with(s: str, f: (str) -> u64) -> u64[] { s.split(",").map(f) }
+
+// The same chain in a generic function, where the result type names `T`.
+fn flatten_generic<T: any>(xs: T[], f: (T) -> T[]) -> T[] { xs.map(f).join() }
+
+fn pair(n: i64) -> i64[] { [n, n] }
+
+fn keyed(n: i64) -> (i64, i64) { (n, n + 1) }
+
+fn bump(n: i64) -> i64 { n + 1 }
+
+fn is_three(n: i64) -> bool { n == 3 }
+
+fn width(s: str) -> u64 { s.len() }
+
+fn main() !prints {
+    print(`{flatten_with([1, 2], pair)}`);
+    print(`{flatten_generic([1, 2], pair)}`);
+    print(`{dict_with([1, 2], keyed)}`);
+    print(`{find_with([1, 2], bump, is_three)}`);
+    print(`{reduce_with([1, 2], bump)}`);
+    print(`{split_with("a,bb", width)}`);
+}
+--- stdout ---
+[1, 1, 2, 2]
+[1, 1, 2, 2]
+{1: 2, 2: 3}
+some(3)
+some(5)
+[1, 2]
