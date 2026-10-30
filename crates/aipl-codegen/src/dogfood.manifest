@@ -4,24 +4,24 @@
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
 ; array-abi narrow
 ; set-abi wide
-; entry parse_test_section_header 735 str -> str?
-; entry strip_test_sections 790 str -> str
-; entry split_test_sections 789 str -> __tuple$str$str
-; entry source_loc 780 str __builtin_Span -> str
+; entry parse_test_section_header 736 str -> str?
+; entry strip_test_sections 791 str -> str
+; entry split_test_sections 790 str -> __tuple$str$str
+; entry source_loc 781 str __builtin_Span -> str
 ; entry caret_block 131 str __builtin_Span str -> str
-; entry fill_or_add_sections_file 253 str #{str:str} -> unit!Error
-; entry normalize_output 696 str -> str
-; entry int_fits 541 i64 str -> bool
-; entry is_operator_name 542 str -> bool
-; entry aipl_token_scopes 579 str -> __m19__ScopeSpan[]!__m19__LexError
-; entry find_files 254 str str -> str[]!Error
+; entry fill_or_add_sections_file 254 str #{str:str} -> unit!Error
+; entry normalize_output 697 str -> str
+; entry int_fits 542 i64 str -> bool
+; entry is_operator_name 543 str -> bool
+; entry aipl_token_scopes 580 str -> __m19__ScopeSpan[]!__m19__LexError
+; entry find_files 255 str str -> str[]!Error
 ; entry companion_files 133 str -> __m25__Companion[]!str
-; entry parse_spec 731 str -> __m26__Spec!str
-; entry parse_and_partial_load 729 str -> __m70__PartialLoad!__m27__ParseFailure
-; entry fn_role 263 str -> __m44__FnRole
-; entry test_fn_name 258 str -> str
-; entry performance_fn_name 259 str -> str
-; entry format_source 288 str u64 -> str!__m73__FmtError
+; entry parse_spec 732 str -> __m26__Spec!str
+; entry parse_and_partial_load 730 str -> __m70__PartialLoad!__m27__ParseFailure
+; entry fn_role 264 str -> __m44__FnRole
+; entry test_fn_name 259 str -> str
+; entry performance_fn_name 260 str -> str
+; entry format_source 289 str u64 -> str!__m73__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
 ; struct __m19__ScopeSpan 40 span@0:__builtin_Span scope@16:str
@@ -399,4 +399,4 @@
 ; data 250 __tostr_lit_96 52427261636b6574
 
 ; __m75____test$all$is_nine
-; source-fingerprint 435107524753092155
+; source-fingerprint 12007879883877056202

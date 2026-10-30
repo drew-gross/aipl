@@ -7,10 +7,13 @@ import {
     as_case,
     collect_ok,
     equal as ==,
+    filter,
     find_if,
     first,
+    is_case,
     is_empty,
     join,
+    len,
     logical_not as !,
     map,
     max,
@@ -790,6 +793,19 @@ pub fn descendants(self: Expr) -> Expr[] { [self, ..self.subexprs()$descendants(
     assert(ident("x").descendants() == [ident("x")]);
     let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false));
     assert(call.descendants()$show_expr() == ["f(a, Neg(b))", "a", "Neg(b)", "b"]);
+})
+
+# The kind of `self` and of every expression under it that is the case `arm`,
+# outermost first. Written with the case as a constructor name, as `collect_arms`
+# is, the result is typed as that case alone: `body.collect_expr_cases(Slice)` is
+# a list of `Slice`s.
+pub fn collect_expr_cases(self: Expr, arm: Case<ExprKind>) -> ExprKind[] {
+    self.descendants()$kind.filter(|kind| kind.is_case(arm))
+}.test({
+    let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false));
+    assert(call.collect_expr_cases(Ident) == [Ident("a"), Ident("b")]);
+    assert(call.collect_expr_cases(Neg).len() == 1);
+    assert(call.collect_expr_cases(Num) == []);
 })
 
 # The field read `self` is, when it reads one off a plain name.

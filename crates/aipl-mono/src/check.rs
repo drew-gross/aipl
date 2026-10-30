@@ -5734,7 +5734,17 @@ impl Cx<'_> {
                     )?);
                 }
             }
-            return Ok(self.return_ty_of(name, &atys));
+            // A function taking a `Case<V>` and returning an array (or optional) of `V`
+            // is a `collect_arms` of its own: the case written at the call types
+            // the result as that case alone.
+            let ret = self.return_ty_of(name, &atys);
+            return match params
+                .iter()
+                .position(|p| matches!(&p.ty, Type::Case(v) if is_collection_of(&ret, v)))
+            {
+                Some(i) => self.refine_collected_arms(ret, &args[i], name),
+                None => Ok(ret),
+            };
         }
 
         // Generic signature: infer the named type variables from the non-function
@@ -6007,7 +6017,10 @@ impl Cx<'_> {
             // call is typed as such — and recorded on the node, since mono
             // monomorphizes the builtin as `T[] -> T[]` and would lose it.
             let ret = if matches!(callee, Callee::CollectArms | Callee::AsCase) {
-                let refined = self.refine_collected_arms(ret, args, callee.name())?;
+                let [_, arm] = args else {
+                    return Ok(ret);
+                };
+                let refined = self.refine_collected_arms(ret, arm, callee.name())?;
                 self.lock_node(node, &refined);
                 refined
             } else {
@@ -6029,16 +6042,11 @@ impl Cx<'_> {
     /// The type of `xs.collect_arms(Circle)` or `x.as_case(Circle)`: the array (or
     /// optional) of `x`'s variant less every case but the one named, so a `match`
     /// on the value needs that arm alone and refuses any other. `ret` is the type
-    /// the builtin's signature gives; the case is read off the constructor
-    /// reference written as the second argument, which is the only place it is
+    /// the callee's signature gives; the case is read off the constructor
+    /// reference written as `arm`, the call's `Case<..>` argument, which is the only place it is
     /// known — a `Case<V>` value held in a variable says which variant but not
     /// which case. `builtin` names the call in a diagnostic.
-    fn refine_collected_arms(
-        &self,
-        ret: Type,
-        args: &[Expr],
-        builtin: &str,
-    ) -> Result<Type, Error> {
+    fn refine_collected_arms(&self, ret: Type, arm: &Expr, builtin: &str) -> Result<Type, Error> {
         let (elem, wrap): (&Type, fn(Type) -> Type) = match &ret {
             Type::Array(elem) => (elem, |t| Type::Array(Box::new(t))),
             Type::Optional(elem) => (elem, |t| Type::Optional(Box::new(t))),
@@ -6047,9 +6055,6 @@ impl Cx<'_> {
         // Inside a generic body the variant is a type variable and has no cases
         // to name.
         let Some(cases) = self.cases_of(elem) else {
-            return Ok(ret);
-        };
-        let [_, arm] = args else {
             return Ok(ret);
         };
         let Some((case, _)) = aipl_syntax::ctor_ref_case(arm) else {
@@ -7246,6 +7251,11 @@ fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
 /// parameter". Recurses so a sentinel nested in a function/array/optional type
 /// is rendered too (e.g. an inferred `(i64) -> _` from a partly-resolved
 /// generic, where `type_name` renders the unresolved part as `_`).
+/// Whether `ty` is an array or an optional of `elem`.
+fn is_collection_of(ty: &Type, elem: &Type) -> bool {
+    matches!(ty, Type::Array(e) | Type::Optional(e) if **e == *elem)
+}
+
 fn tyname(t: &Type) -> String {
     match t {
         // The sentinel carries its variable's name (see `typevar_ty`); name it in

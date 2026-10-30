@@ -629,6 +629,20 @@
 
 
 
+        <section class="item" id="item-collect_expr_cases">
+          <h3>
+            <a class="anchor" href="#item-collect_expr_cases">collect_expr_cases</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn collect_expr_cases(self: Expr, arm: Case&#60;ExprKind&#62;) -&#62; ExprKind[]</code></pre>
+
+          <div class="doc"><p>The kind of <code>self</code> and of every expression under it that is the case <code>arm</code>, outermost first. Written with the case as a constructor name, as <code>collect_arms</code> is, the result is typed as that case alone: <code>body.collect_expr_cases(Slice)</code> is a list of <code>Slice</code>s.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-read">
           <h3>
             <a class="anchor" href="#item-read">read</a>

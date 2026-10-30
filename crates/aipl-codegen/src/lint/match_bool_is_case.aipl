@@ -21,7 +21,6 @@
 import {
     Span,
     all,
-    collect_arms,
     contains,
     equal as ==,
     filter,
@@ -31,7 +30,7 @@ import {
     logical_or as ||,
     map,
 } from builtins;
-import { Bool, Match, MatchArm, descendants } from "../expr.aipl";
+import { Bool, Match, MatchArm, collect_expr_cases } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { Ctor, is_binder_name } from "../pat.aipl";
 import {
@@ -44,8 +43,7 @@ import {
 # A hit for each `match` in the program that only asks which case a value is.
 pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
     body
-        .descendants()$kind
-        .collect_arms(Match)
+        .collect_expr_cases(Match)
         .map(|Match(scrutinee, arms)| {
             if (!arms.all(|arm| arm.body.kind.is_case(Bool))) {
                 return [];

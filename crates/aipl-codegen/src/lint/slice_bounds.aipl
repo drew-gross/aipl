@@ -2,9 +2,8 @@
 # how to read a slice's bounds. They divide the range forms between them, so they
 # must agree on what "runs to the end" and "starts at zero" mean.
 
-import { collect_arms, equal as ==, is_some, join, logical_not as ! } from builtins;
-import { Call, Expr, Num, Slice, descendants, expr, ident, num, show_expr } from "../expr.aipl";
-import { LintHit, hit } from "./lint_hit.aipl";
+import { equal as ==, logical_not as ! } from builtins;
+import { Call, Expr, Num, expr, ident, num, show_expr } from "../expr.aipl";
 
 # Whether `self` is `len(receiver)`: the receiver's own length, however it was
 # spelled (`x.len()` is the free call `len(x)`). Spans are ignored, so the two must
@@ -27,16 +26,4 @@ pub fn is_len_of(self: Expr, receiver: Expr) -> bool {
 pub fn is_zero(self: Expr) -> bool { self.kind == Num(0) }.test({
     assert(num(0).is_zero());
     assert(!num(1).is_zero());
-})
-
-# What `lint` reports for each slice in `self` and under it.
-pub fn on_slices(self: Expr, lint: (Slice) -> LintHit[]) -> LintHit[] {
-    self.descendants()$kind.collect_arms(Slice)$lint().join()
-}.test({
-    let xs = ident("xs");
-    let slice = expr(Slice(xs, some(num(1)), none));
-    assert(slice.on_slices(|Slice(receiver, start, end)| {
-        [hit(`{start.is_some()} {end.is_some()}`, 0..1)]
-    }) == [hit("true false", 0..1)]);
-    assert(xs.on_slices(|Slice(receiver, start, end)| { [hit("x", 0..1)] }) == []);
 })

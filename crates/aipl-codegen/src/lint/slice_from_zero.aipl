@@ -11,23 +11,26 @@
 #
 # The hit points at the `0`.
 
-import { equal as ==, logical_and as &&, logical_not as ! } from builtins;
-import { Slice } from "../expr.aipl";
+import { equal as ==, join, logical_and as &&, logical_not as !, map } from builtins;
+import { Slice, collect_expr_cases } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
-import { is_len_of, is_zero, on_slices } from "./slice_bounds.aipl";
+import { is_len_of, is_zero } from "./slice_bounds.aipl";
 
 # A hit for each slice in the program that starts with a written `0` and ends short
 # of the length.
 pub fn slice_from_zero(Function { body }) -> LintHit[] {
-    body.on_slices(|slice| {
-        let Slice(receiver, some(lower), some(bound)) = slice else { return []; };
-        if (lower.is_zero() && !bound.is_len_of(receiver)) {
-            [hit(message(receiver.source, bound.source), lower.span)]
-        } else {
-            []
-        }
-    })
+    body
+        .collect_expr_cases(Slice)
+        .map(|slice| {
+            let Slice(receiver, some(lower), some(bound)) = slice else { return []; };
+            if (lower.is_zero() && !bound.is_len_of(receiver)) {
+                [hit(message(receiver.source, bound.source), lower.span)]
+            } else {
+                []
+            }
+        })
+        .join()
 }.test({
     assert(lint_function_hits("fn f(s: str) -> str { s[0..2] }", slice_from_zero)? == [
         hit(message("s", "2"), 24..25),

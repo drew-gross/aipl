@@ -49,7 +49,6 @@
 
 import {
     any,
-    collect_arms,
     contains,
     equal as ==,
     is_case,
@@ -58,7 +57,7 @@ import {
     map,
     not_equal as !=,
 } from builtins;
-import { Construct, Let, descendants, field_reads } from "../expr.aipl";
+import { Construct, Let, collect_expr_cases, field_reads } from "../expr.aipl";
 import { Function, pattern_reads } from "../item.aipl";
 import { Named } from "../ty.aipl";
 import { Uses, is_shared, is_tuple_field, mentions_any, uses_of } from "./field_uses.aipl";
@@ -73,8 +72,7 @@ pub fn destructure_binding(Function { sig, body }) -> LintHit[] {
     // reads count the same way.
     let reads = [..sig.params$pattern_reads().join(), ..body.field_reads()];
     body
-        .descendants()$kind
-        .collect_arms(Let)
+        .collect_expr_cases(Let)
         .map(|Let(name, annotation, value, inner)| {
             // A name the parser made (`__iset1$6`, the `seed$provider` of a shim) was never
             // written by the author, who cannot put an `#[allow]` on it. The destructuring

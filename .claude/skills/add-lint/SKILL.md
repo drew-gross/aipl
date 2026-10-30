@@ -34,7 +34,8 @@ DRY is critical here. Before writing a helper, search for it:
 - `lint/field_uses.aipl`, `lint/slice_bounds.aipl`, `lint/option_match.aipl`,
   `lint/constant_default.aipl` — shared shape recognizers.
 - The builtins and `crates/aipl-codegen/src/*.aipl` (expr walkers, `source`
-  quoting, spans).
+  quoting, spans). `body.collect_expr_cases(Slice)` is every `Slice` under `body`,
+  typed as that case alone, so a lambda can destructure it directly.
 
 If it exists in a library, use it. **If the thing you need already exists as a
 private helper inside another lint's file, move it into a library file (or a

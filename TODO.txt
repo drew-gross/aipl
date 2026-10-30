@@ -102,13 +102,10 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
-  generalize on_slices to on_case and accept a case template arg
+  self.descendants()$kind.filter(|kind| kind.is_case(arm)) stutters
   vec$foo() when foo is a predicate argument should probably only work if there is some indicator that the predicate is a self function
   Shape (only Circle) error would read better as Shape.Circle
-  run type inference before fusion, to fix this problem:
-    // The lambda only forwards to `lint`, but `map(lint).join()` fuses into `map_join`,
-    // whose result type cannot be inferred from a function-typed parameter.
-    self.descendants()$kind.collect_arms(Slice).map(|slice| lint(slice)).join() #[allow]
+  merge the slice from/to lints
   name.contains("$") is used in destructure_binding, it should be run at a stage where that isn't a possibility. But also there should be a bool on identifiers to flag if they are synthetic or not, checking for $ is jank.
   stop making functions that just pass their arguments directly to a constructor. Don't need a function for that, and it just hides which arguments become which fields.
   source text should be propagated by the parser, not rebuilt later in source_text.aipl
