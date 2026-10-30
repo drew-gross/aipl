@@ -1,0 +1,16 @@
+# A field read off a variant names the cases the value can be, not the ones it
+# cannot, and the caret lands on the `$r` that read it.
+
+import { collect_arms } from builtins;
+
+variant Shape = Circle(r: i64) | Square(s: i64) | Dot
+
+fn radii(shapes: Shape[]) -> i64[] { shapes.collect_arms(Circle)$r }
+
+fn main() {}
+--- errors ---
+error: field access on non-struct value of type Shape (only Circle)
+ --> ./tests/cases/structs/err_field_of_refined_variant.aipl:8:66
+  |
+8 | fn radii(shapes: Shape[]) -> i64[] { shapes.collect_arms(Circle)$r }
+  |                                                                  ^

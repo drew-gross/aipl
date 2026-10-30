@@ -1106,6 +1106,26 @@ impl<'a> Cx<'a> {
             }
     }
 
+    /// `tyname`, except that a refined variant (`V without A without B ..`) is
+    /// named by the cases it still has — `V (only Slice)` — rather than by the
+    /// ones it has lost, which for a wide variant is a list of everything else.
+    fn refined_tyname(&self, ty: &Type) -> String {
+        if !matches!(ty, Type::Without(_, Exclusion::NamedCase(_))) {
+            return tyname(ty);
+        }
+        let mut base = ty;
+        while let Type::Without(inner, _) = base {
+            base = inner;
+        }
+        match self.cases_of(ty) {
+            Some(cases) if !cases.is_empty() => {
+                let names: Vec<&str> = cases.iter().map(|(c, _)| c.as_str()).collect();
+                format!("{} (only {})", tyname(base), names.join(" or "))
+            }
+            _ => tyname(ty),
+        }
+    }
+
     fn cases_of(&self, ty: &Type) -> Option<Vec<(String, Vec<Type>)>> {
         match ty {
             // `V without C` has the cases of `V` less `C`. This is what makes a
@@ -4626,7 +4646,10 @@ impl Cx<'_> {
                 }
                 let fields = self.fields_of(&ot).ok_or_else(|| {
                     Error::at(
-                        format!("field access on non-struct value of type {}", tyname(&ot)),
+                        format!(
+                            "field access on non-struct value of type {}",
+                            self.refined_tyname(&ot)
+                        ),
                         obj.span.clone(),
                     )
                 })?;

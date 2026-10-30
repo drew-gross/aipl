@@ -8,6 +8,7 @@ import {
     Expr,
     Field as FieldExpr,
     FieldInit,
+    Ident,
     Index as IndexExpr,
     Lambda,
     LambdaParam,
@@ -61,14 +62,17 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
         Try => at(TryExpr(recv), span),
         MapField(name) => mapped(
             recv,
-            at(FieldExpr(ident(mapped_element(span)), name.text), span).named_at(name.span),
+            at(FieldExpr(at(Ident(mapped_element(span)), name.span), name.text), span).named_at(
+                name.span,
+            ),
             span,
         ),
         MapMethod(name, args) => mapped(
             recv,
-            at(Call(name.text, [ident(mapped_element(span)), ..args], true), span).named_at(
-                name.span,
-            ),
+            at(
+                Call(name.text, [at(Ident(mapped_element(span)), name.span), ..args], true),
+                span,
+            ).named_at(name.span),
             span,
         ),
     }
@@ -116,6 +120,19 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     match (apply_suffix(p, MapField(at_5), 0..6).kind) {
         Call(_, args, _) => match (args[1].value_or(p).kind) {
             Lambda(_, step) => assert(step.name_span == 5..6),
+            _ => assert(false),
+        },
+        _ => assert(false),
+    };
+
+    // The element a step reads sits where the step's name is written, so an error
+    // about it points at the name.
+    match (apply_suffix(p, MapField(at_5), 0..6).kind) {
+        Call(_, args, _) => match (args[1].value_or(p).kind) {
+            Lambda(_, step) => match (step.kind) {
+                FieldExpr(element, _) => assert(element.span == 5..6),
+                _ => assert(false),
+            },
             _ => assert(false),
         },
         _ => assert(false),
