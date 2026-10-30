@@ -1,0 +1,128 @@
+# What the lints on a `match` over an optional share: recognising the two-arm
+# `some(v) => .., none => ..` shape, and quoting its receiver back in the advice.
+
+import {
+    collect_arms,
+    collect_ok,
+    contains,
+    equal as ==,
+    find_if,
+    is_nonempty,
+    len,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+} from builtins;
+import { Call, Expr, Field, Ident, Index, Match, Slice, descendants, ident } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { is_operator_name } from "../is_operator_name.aipl";
+import { Ctor, Pat } from "../pat.aipl";
+import { hit, lint_function_messages } from "./lint_hit.aipl";
+
+# A `match` of exactly a `some(binder)` arm and a `none` arm, in either order: the
+# value matched, the name the payload is bound to, and the two arms' bodies.
+struct OptionMatch { scrutinee: Expr, binder: str, some_body: Expr, none_body: Expr }
+
+# `self` as an [`OptionMatch`], when it is one. `some` binds exactly its payload and
+# `none` binds nothing; a catch-all, a third arm, `some(..)` or a payload-less `some`
+# make it something else.
+pub fn option_match(self: Match(scrutinee, arms)) -> OptionMatch? {
+    if (arms.len() != 2) {
+        return none;
+    };
+    let some_arm = arms.find_if(|arm| arm.pattern.names_case("some"))?;
+    let none_arm = arms.find_if(|arm| arm.pattern.names_case("none"))?;
+    let bindings = some_arm.pattern.payload_binders()?;
+    let none_bindings = none_arm.pattern.payload_binders()?;
+    let [binder] = bindings else { return none; };
+    if (none_bindings.is_nonempty()) {
+        return none;
+    };
+    some(OptionMatch { scrutinee, binder, some_body: some_arm.body, none_body: none_arm.body })
+}.test({
+    // The binder and the receiver of each `match` that is one, whichever arm is first.
+    fn shapes(src: str) -> str[]!ParseFailure {
+        lint_function_messages(
+            src,
+            |function| function.body
+                .option_matches()
+                .map(|m| hit(`{m.binder} {m.scrutinee.receiver_text()}`, 0..0)),
+        )
+    }
+    assert(shapes("fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => 0 } }")? == ["v o"]);
+    assert(shapes("fn f(o: i64?) -> i64 { match (o) { none => 0, some(v) => v } }")? == ["v o"]);
+
+    // Not the shape: a catch-all, an ignored payload, a third arm.
+    assert(shapes("fn f(o: i64?) -> i64 { match (o) { some(v) => v, _ => 0 } }")? == []);
+    assert(shapes("fn f(o: i64?) -> i64 { match (o) { some(..) => 1, none => 0 } }")? == []);
+    assert(shapes("fn f(o: i64!str) -> i64 { match (o) { ok(v) => v, err(e) => 0 } }")? == []);
+
+    // The receiver is quoted as written when a method can follow it as it stands.
+    assert(shapes("fn f(p: P) -> i64 { match (p.x) { some(v) => v, none => 0 } }")? == ["v p.x"]);
+    assert(shapes("fn f(p: P) -> i64 { match (g(p)) { some(v) => v, none => 0 } }")? == ["v g(p)"]);
+    assert(shapes("fn f(p: P) -> i64 { match (xs[1]) { some(v) => v, none => 0 } }")? == [
+        "v xs[1]",
+    ]);
+
+    // An operator's operand would take the method instead.
+    assert(shapes("fn f(a: i64?) -> i64 { match (a || b) { some(v) => v, none => 0 } }")? == [
+        "v <value>",
+    ]);
+})
+
+# Every `match` in `self` and under it that is an [`OptionMatch`], outermost first.
+pub fn option_matches(self: Expr) -> OptionMatch[] {
+    self.descendants()$kind.collect_arms(Match)$option_match().collect_ok()
+}.test({
+    // Nested ones are found, outer first.
+    assert(lint_function_messages(
+        "fn f(a: i64?, b: i64?) -> i64 { match (a) { some(x) => match (b) { some(y) => y, none => 1 }, none => 0 } }",
+        |function| function.body.option_matches()$binder.map(|name| hit(name, 0..0)),
+    )? == ["x", "y"]);
+})
+
+# The names a constructor pattern binds, when `self` is one.
+fn payload_binders(self: Pat) -> str[]? {
+    match (self) {
+        Ctor(_, bindings, _) => some(bindings),
+        // `as_case(Ctor)` would say this, but `Ctor` has keyword parameters, which
+        // keeps it from being passed as a function value.
+        _ => none, #[allow]
+    }
+}
+
+# Whether `self` is a constructor pattern for the case `want`.
+fn names_case(self: Pat, want: str) -> bool {
+    match (self) {
+        Ctor(name, _, _) => name == want,
+        _ => false,
+    }
+}
+
+# The text to put in front of a `.method(..)` in advice for the value `self`: what
+# was written, when it can take a method as written (a name, a field, an index, a
+# slice or an ordinary call) and `<value>` when splicing it would change its meaning
+# (`a + b` would bind the method to `b`).
+pub fn receiver_text(self: Expr) -> str {
+    if (self.source != "" && self.takes_a_method()) { self.source } else { "<value>" }
+}
+
+# The text of a default expression to quote in advice: what was written, or `..`
+# when it is not there or runs over more than one line.
+pub fn default_text(self: Expr) -> str {
+    if (self.source == "" || self.source.contains("\n")) { ".." } else { self.source }
+}.test({
+    assert(ident("0").default_text() == "..");
+    assert(Expr { ..ident("zero"), source: "zero" }.default_text() == "zero");
+    assert(Expr { ..ident("p"), source: "P {\n x: 0 }" }.default_text() == "..");
+})
+
+fn takes_a_method(self: Expr) -> bool {
+    match (self.kind) {
+        Ident(..) | Field(..) | Index(..) | Slice(..) => true,
+        Call(name, _, _) => !name.is_operator_name(),
+        _ => false,
+    }
+}

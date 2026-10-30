@@ -67,8 +67,8 @@ fn sinkable(e: &Expr, pure_fn: bool) -> bool {
 /// struct error interpolating a runtime string: both spellings allocate the
 /// same, to the byte.
 ///
-/// This is where the rule differs from [`match_value_or`](super::match_value_or()),
-/// whose `constant_value` guard predates that reasoning. The lint stays quiet
+/// This is where the rule differs from `match_value_or` (an AIPL lint),
+/// whose `is_constant_default` guard predates that reasoning. The lint stays quiet
 /// only for an error the sinker genuinely cannot defer — one that aborts, writes,
 /// or may not terminate, or that sits in an effect-declaring function where its
 /// effects cannot be told apart.

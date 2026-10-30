@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">166 files, 1664 items.</p>
+      <p class="summary">171 files, 1683 items.</p>
 
       <ul class="files">
 
@@ -1786,6 +1786,24 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-constant_default.html">crates/aipl-codegen/src/lint/constant_default.aipl</a>
+
+          <p class="file-summary">Whether an expression is built purely from constants, and so costs the same computed eagerly as computed lazily.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-constant_default.html#item-is_constant_default"><code>is_constant_default</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-codegen-src-lint-destructure_binding.html">crates/aipl-codegen/src/lint/destructure_binding.aipl</a>
 
           <p class="file-summary">The <code>destructure_binding</code> lint: <code>let p = value; ... p.a ... p.b ...</code> where <strong>every</strong> mention of <code>p</code> is a field read. Say so with a pattern instead: <code>let T { a, b } = value;</code>.</p>
@@ -2056,6 +2074,106 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-match_bool_is_case.html#item-match_bool_is_case"><code>match_bool_is_case</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-match_is_some_and.html">crates/aipl-codegen/src/lint/match_is_some_and.aipl</a>
+
+          <p class="file-summary">The <code>match_is_some_and</code> lint:</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-match_is_some_and.html#private">2 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-match_is_some_and.html#item-match_is_some_and"><code>match_is_some_and</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-match_map_value_or.html">crates/aipl-codegen/src/lint/match_map_value_or.aipl</a>
+
+          <p class="file-summary">The <code>match_map_value_or</code> lint:</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-match_map_value_or.html#private">3 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-match_map_value_or.html#item-match_map_value_or"><code>match_map_value_or</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-match_value_or.html">crates/aipl-codegen/src/lint/match_value_or.aipl</a>
+
+          <p class="file-summary">The <code>match_value_or</code> lint:</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-match_value_or.html#private">2 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-match_value_or.html#item-match_value_or"><code>match_value_or</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-option_match.html">crates/aipl-codegen/src/lint/option_match.aipl</a>
+
+          <p class="file-summary">What the lints on a <code>match</code> over an optional share: recognising the two-arm <code>some(v) =&gt; .., none =&gt; ..</code> shape, and quoting its receiver back in the advice.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-option_match.html#private">3 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-option_match.html#item-OptionMatch"><code>OptionMatch</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-option_match.html#item-option_match"><code>option_match</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-option_match.html#item-option_matches"><code>option_matches</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-option_match.html#item-receiver_text"><code>receiver_text</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-option_match.html#item-default_text"><code>default_text</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

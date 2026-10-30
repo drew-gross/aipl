@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/option_match.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/option_match.aipl</code></h1>
+
+      <div class="module-doc"><p>What the lints on a <code>match</code> over an optional share: recognising the two-arm <code>some(v) =&gt; .., none =&gt; ..</code> shape, and quoting its receiver back in the advice.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-OptionMatch">
+          <h3>
+            <a class="anchor" href="#item-OptionMatch">OptionMatch</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct OptionMatch</code></pre>
+
+          <div class="doc"><p>A <code>match</code> of exactly a <code>some(binder)</code> arm and a <code>none</code> arm, in either order: the value matched, the name the payload is bound to, and the two arms' bodies.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-option_match">
+          <h3>
+            <a class="anchor" href="#item-option_match">option_match</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn option_match(self: Match) -&#62; OptionMatch?</code></pre>
+
+          <div class="doc"><p><code>self</code> as an [<code>OptionMatch</code>], when it is one. <code>some</code> binds exactly its payload and <code>none</code> binds nothing; a catch-all, a third arm, <code>some(..)</code> or a payload-less <code>some</code> make it something else.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-option_matches">
+          <h3>
+            <a class="anchor" href="#item-option_matches">option_matches</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn option_matches(self: Expr) -&#62; OptionMatch[]</code></pre>
+
+          <div class="doc"><p>Every <code>match</code> in <code>self</code> and under it that is an [<code>OptionMatch</code>], outermost first.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-receiver_text">
+          <h3>
+            <a class="anchor" href="#item-receiver_text">receiver_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn receiver_text(self: Expr) -&#62; str</code></pre>
+
+          <div class="doc"><p>The text to put in front of a <code>.method(..)</code> in advice for the value <code>self</code>: what was written, when it can take a method as written (a name, a field, an index, a slice or an ordinary call) and <code>&lt;value&gt;</code> when splicing it would change its meaning (<code>a + b</code> would bind the method to <code>b</code>).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-default_text">
+          <h3>
+            <a class="anchor" href="#item-default_text">default_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn default_text(self: Expr) -&#62; str</code></pre>
+
+          <div class="doc"><p>The text of a default expression to quote in advice: what was written, or <code>..</code> when it is not there or runs over more than one line.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-payload_binders">
+          <h3>
+            <a class="anchor" href="#item-payload_binders">payload_binders</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn payload_binders(self: Pat) -&#62; str[]?</code></pre>
+
+          <div class="doc"><p>The names a constructor pattern binds, when <code>self</code> is one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-names_case">
+          <h3>
+            <a class="anchor" href="#item-names_case">names_case</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn names_case(self: Pat, want: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> is a constructor pattern for the case <code>want</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-takes_a_method">
+          <h3>
+            <a class="anchor" href="#item-takes_a_method">takes_a_method</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn takes_a_method(self: Expr) -&#62; bool</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

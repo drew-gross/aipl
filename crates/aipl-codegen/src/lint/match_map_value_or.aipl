@@ -1,0 +1,150 @@
+# The `match_map_value_or` lint:
+#
+#     match (o) { some(v) => f(v), none => d }
+#
+# — an optional's payload transformed on the way out, with a fallback for the empty
+# case. That is a `map` and a `value_or`: `o.map(|v| f(v)).value_or(d)`, which says
+# what happens to the value and what stands in for it as two named steps rather than
+# one `match` naming both cases.
+#
+# When the `some` arm wraps its result in `some(..)` and the `none` arm is `none` —
+# `some(v) => some(f(v)), none => none` — the `match` is a `map` and nothing else,
+# and the advice says just that.
+#
+# The `some` arm must do something with the payload: the identity arm `some(v) => v`
+# is `match_value_or`'s shape, and a `bool` answered with `none => false` is
+# `match_is_some_and`'s, so neither is taken up here. The default is held to the same
+# bar `match_value_or` holds its own to (`is_constant_default`): `value_or`'s default
+# is an argument, evaluated either way, so only a default that costs nothing to
+# evaluate eagerly is advised. A `none => ()` arm is a `match` run for effect, not a
+# value with a fallback; a `some` arm that never reads its binding asks only whether
+# the optional is empty; and a `some` arm yielding an optional of its own over a
+# `none => none` is a bind, which `map` would nest rather than flatten — all three
+# are left alone.
+#
+# The hit points at the `none` arm's default. `#[allow]` is line-scoped, and the
+# default is the one part of the shape that is reliably a single line — the `some`
+# arm's body is whatever the mapping is, and may run to several.
+
+import { equal as ==, join, len, logical_not as !, logical_or as || } from builtins;
+import { Bool, Call, Ident, None, Unit } from "../expr.aipl";
+import { Function } from "../item.aipl";
+import { is_constant_default } from "./constant_default.aipl";
+import { mentions_any } from "./field_uses.aipl";
+import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
+import { OptionMatch, default_text, option_matches, receiver_text } from "./option_match.aipl";
+
+# A hit for each `match` in the program that maps an optional's payload and falls
+# back to a default.
+pub fn match_map_value_or(Function { body }) -> LintHit[] {
+    body.option_matches()$map_value_or_hit().join()
+}.test({
+    // A mapping with a default points at the default, in either arm order.
+    assert(lint_function_hits(
+        "fn f(o: i64?) -> i64 { match (o) { some(v) => g(v), none => 0 } }",
+        match_map_value_or,
+    )? == [hit(with_default("o", "v", "0"), 60..61)]);
+    assert(lint_function_messages(
+        "fn f(o: i64?) -> i64 { match (o) { none => 0, some(v) => g(v) } }",
+        match_map_value_or,
+    )? == [with_default("o", "v", "0")]);
+
+    // A struct default is quoted as written.
+    assert(lint_function_messages(
+        "fn f(o: i64?) -> P { match (o) { some(v) => g(v), none => P { x: 0, y: 1 } } }",
+        match_map_value_or,
+    )? == [with_default("o", "v", "P { x: 0, y: 1 }")]);
+
+    // `some(..)` over `none` is a `map` and nothing else.
+    assert(lint_function_messages(
+        "fn f(o: i64?) -> i64? { match (o) { some(v) => some(g(v)), none => none } }",
+        match_map_value_or,
+    )? == [kept_none("o", "v")]);
+
+    // An optional-yielding `some` arm over `none` is a bind, not a map.
+    assert(
+        lint_function_messages(
+            "fn f(o: i64?) -> i64? { match (o) { some(v) => g(v), none => none } }",
+            match_map_value_or,
+        )? == [],
+    );
+
+    // The identity arm, `none => false`, `none => ()`, a binding never read, a default
+    // that does work and a catch-all are other lints' shapes or left alone.
+    assert(
+        lint_function_messages(
+            "fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => 0 } }",
+            match_map_value_or,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(o: i64?) -> bool { match (o) { some(v) => g(v), none => false } }",
+            match_map_value_or,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(o: i64?) { match (o) { some(v) => g(v), none => {} } }",
+            match_map_value_or,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(o: i64?) -> i64 { match (o) { some(v) => 1, none => 0 } }",
+            match_map_value_or,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(o: i64?) -> i64 { match (o) { some(v) => g(v), none => h() } }",
+            match_map_value_or,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(o: i64?) -> i64 { match (o) { some(v) => g(v), _ => 0 } }",
+            match_map_value_or,
+        )? == [],
+    );
+})
+
+# The hit for one `match`, or none.
+fn map_value_or_hit(self: OptionMatch { scrutinee, binder, some_body, none_body }) -> LintHit[] {
+    // The identity arm is `value_or`'s shape, `none => false` is `is_some_and`'s and a
+    // unit `none` arm is a statement `match`. A `some` arm that never reads its binding
+    // maps nothing: that is an `is_some` question, and no `map` improves on it.
+    let identity = if (let Ident(payload) = some_body.kind) { payload == binder } else { false };
+    if (identity || none_body.kind == Bool(false) || none_body.kind == Unit) {
+        return [];
+    };
+    if (!some_body.mentions_any([binder], none)) {
+        return [];
+    };
+    let receiver = scrutinee.receiver_text();
+
+    // `some(v) => some(..), none => none`: a `map` with nothing to default. Any other
+    // `some` arm over `none` yields an optional of its own, a bind that `map` would nest.
+    if (none_body.kind == None) {
+        let wraps = if (let Call("some", wrapped, _) = some_body.kind) {
+            wrapped.len() == 1
+        } else {
+            false
+        };
+        return if (wraps) { [hit(kept_none(receiver, binder), none_body.span)] } else { [] };
+    };
+    if (!none_body.is_constant_default()) {
+        return [];
+    };
+    [hit(with_default(receiver, binder, none_body.default_text()), none_body.span)]
+}
+
+# What is said of a `match` that maps the payload and keeps `none`.
+fn kept_none(receiver: str, binder: str) -> str {
+    `this \`match\` maps the optional's payload and keeps \`none\` — write "{receiver}.map(|{binder}| ..)" with the value the \`some\` arm wraps`
+}
+
+# What is said of a `match` that maps the payload or falls back to `default`.
+fn with_default(receiver: str, binder: str, default: str) -> str {
+    `this \`match\` transforms the optional's payload or falls back to a default — write "{receiver}.map(|{binder}| ..).value_or({default})" with the \`some\` arm's body as the mapping`
+}

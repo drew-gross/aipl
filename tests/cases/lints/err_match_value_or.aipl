@@ -30,9 +30,8 @@ struct Pt { x: i64, y: i64 }
 // It is AIPL-implemented now and generic over every payload, so the rewrite the
 // lint advises is one that compiles.
 //
-// The message names the default rather than quoting it: a construction's span
-// stops at its last token, before the closing brace, so quoting it would print
-// advice that doesn't parse.
+// The message quotes the default as written, its closing brace included. A
+// default that runs over several lines is quoted as `..` instead.
 fn or_origin(o: Pt?) -> Pt {
     match (o) {
         some(v) => v,
@@ -71,14 +70,14 @@ error: this `match` hands back the optional's payload or a default — write "o.
 21 |         some(v) => v,
    |                    ^
 
-error: this `match` hands back the optional's payload or a default — write it as "o.value_or(..)" with that arm's value as the default (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or.aipl:38:20
+error: this `match` hands back the optional's payload or a default — write "o.value_or(Pt { x: 0, y: 0 })" instead (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_value_or.aipl:37:20
    |
-38 |         some(v) => v,
+37 |         some(v) => v,
    |                    ^
 
-error: this `match` hands back the optional's payload or a default — write it as "o.value_or(..)" with that arm's value as the default (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or.aipl:50:20
+error: this `match` hands back the optional's payload or a default — write "o.value_or(100 / 4)" instead (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_value_or.aipl:49:20
    |
-50 |         some(v) => v,
+49 |         some(v) => v,
    |                    ^

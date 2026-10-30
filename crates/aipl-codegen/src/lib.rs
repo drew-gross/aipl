@@ -1718,6 +1718,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     // The lints that have moved to AIPL, run by `parse_and_partial_load`.
     "./lint/lint_hit.aipl",
     "./lint/unused_imports.aipl",
+    "./lint/constant_default.aipl",
     "./lint/duplicate_import_source.aipl",
     "./lint/field_uses.aipl",
     "./lint/destructure_binding.aipl",
@@ -1725,6 +1726,10 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./lint/destructure_slot.aipl",
     "./lint/fn_body_type_stutter.aipl",
     "./lint/match_bool_is_case.aipl",
+    "./lint/option_match.aipl",
+    "./lint/match_value_or.aipl",
+    "./lint/match_map_value_or.aipl",
+    "./lint/match_is_some_and.aipl",
     "./lint/case_of_equal_is_case.aipl",
     "./lint/slice_bounds.aipl",
     "./lint/slice_whole.aipl",
@@ -8692,6 +8697,75 @@ fn take_field<M: Module>(
             .store(MemFlagsData::trusted(), null, obj_ptr, offset as i32);
         Ok(v)
     }
+}
+
+/// A field's reference as an owned one, taken out of the struct at `obj_ptr` when
+/// the struct is the only holder of it and retained otherwise.
+///
+/// Moving a field out leaves it empty in the struct, which is right for a struct
+/// this code alone refers to and wrong for one something else still does: a boxed
+/// struct is shared by reference, so a value a call handed back (an element
+/// `find_if` found in an array) can be read through two names, and emptying it
+/// from one would empty the other. A boxed struct is therefore taken from only
+/// when its strong count is 1 — the count is read inline from the block's
+/// header, as the runtime does — and borrowed from, with the retain a plain read
+/// takes, when it is not. Any other struct is held by value and taken as before.
+fn take_or_retain_field<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    builtins: &Builtins,
+    obj_ptr: Value,
+    offset: u32,
+    fty: &ConcreteType,
+    owner: &str,
+) -> Result<Value, Error> {
+    let structs = cx.structs;
+    if !structs.get(owner).is_some_and(TypeDef::boxed) {
+        let v = take_field(module, builder, cx, obj_ptr, offset, fty)?;
+        own_taken_field(module, builder, builtins, structs, owner, fty, v);
+        return Ok(v);
+    }
+    let strong = builder.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        obj_ptr,
+        -(REC_HEADER_SIZE as i32),
+    );
+    let one = builder.ins().iconst(types::I64, 1);
+    let unique = builder.ins().icmp(IntCC::Equal, strong, one);
+    let take_block = builder.create_block();
+    let borrow_block = builder.create_block();
+    let merge = builder.create_block();
+    builder.append_block_param(merge, types::I64);
+    builder
+        .ins()
+        .brif(unique, take_block, &[], borrow_block, &[]);
+
+    builder.switch_to_block(take_block);
+    builder.seal_block(take_block);
+    let taken = take_field(module, builder, cx, obj_ptr, offset, fty)?;
+    own_taken_field(module, builder, builtins, structs, owner, fty, taken);
+    builder.ins().jump(merge, &[BlockArg::Value(taken)]);
+
+    // The same read, snapshot and retain a field of a borrowed struct gets.
+    builder.switch_to_block(borrow_block);
+    builder.seal_block(borrow_block);
+    let field = component(builder, obj_ptr, offset, fty, structs);
+    let borrowed = if is_composite(fty, structs) {
+        let snapshot = value_slot(builder, fty, structs);
+        let copy = builder.ins().stack_addr(types::I64, snapshot, 0);
+        copy_composite(builder, copy, field, fty, structs);
+        copy
+    } else {
+        field
+    };
+    emit_retain(builder, module, builtins, structs, borrowed, fty);
+    builder.ins().jump(merge, &[BlockArg::Value(borrowed)]);
+
+    builder.switch_to_block(merge);
+    builder.seal_block(merge);
+    Ok(builder.block_params(merge)[0])
 }
 
 /// Whether the field `fty` of the boxed struct `owner` is an internal reference —
@@ -18769,12 +18843,13 @@ fn compile_call_expr_direct<M: Module>(
                             if needs_drop(&fty, structs)
                                 && (is_str_shaped(&fty) || mut_binding_owns_slot_ref(&fty, structs))
                             {
-                                let v = take_field(module, builder, cx, obj_ptr, foff, &fty)?;
-                                if let ConcreteType::Named(owner_name) = &obj_ty {
-                                    own_taken_field(
-                                        module, builder, builtins, structs, owner_name, &fty, v,
-                                    );
-                                }
+                                let v = match &obj_ty {
+                                    ConcreteType::Named(owner_name) => take_or_retain_field(
+                                        module, builder, cx, builtins, obj_ptr, foff, &fty,
+                                        owner_name,
+                                    )?,
+                                    _ => take_field(module, builder, cx, obj_ptr, foff, &fty)?,
+                                };
                                 scopes
                                     .last_mut()
                                     .expect("scope")
@@ -20994,8 +21069,16 @@ fn compile_expr_inner<M: Module>(
                 && needs_drop(&fty, structs)
                 && (is_str_shaped(&fty) || mut_binding_owns_slot_ref(&fty, structs))
             {
-                let v = take_field(module, builder, cx, obj_ptr, foff, &fty)?;
-                own_taken_field(module, builder, builtins, structs, struct_name, &fty, v);
+                let v = take_or_retain_field(
+                    module,
+                    builder,
+                    cx,
+                    builtins,
+                    obj_ptr,
+                    foff,
+                    &fty,
+                    struct_name,
+                )?;
                 scopes
                     .last_mut()
                     .expect("scope")

@@ -1,0 +1,24 @@
+# A field read once off a struct a call handed back is a move out of it only when
+# nothing else holds the struct. `find_if` hands back the array's own element, so
+# the binding and the array share it, and emptying its `label` would empty the
+# array's copy too.
+
+import { equal as ==, find_if, print, value_or } from builtins;
+
+variant Kind = Leaf(str) | Pair(Node, Node)
+
+struct Node { kind: Kind, label: str }
+
+fn first_labelled(nodes: Node[]) -> str? {
+    let found = nodes.find_if(|node| node.label == "x")?; #[allow]
+    some(found.label)
+}
+
+fn main() !prints {
+    let nodes = [Node { kind: Leaf("a"), label: "x" }];
+    print(first_labelled(nodes).value_or("none"));
+    print(nodes[0]$label.value_or("none"));
+}
+--- stdout ---
+x
+x

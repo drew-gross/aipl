@@ -21,8 +21,7 @@ fn none_first(o: i64?) -> i64 {
 
 struct Pt { x: i64, y: i64 }
 
-// An inline struct default is flagged too; the message names it rather than
-// quoting it, since a construction's span stops before its closing brace.
+// An inline struct default is flagged too; the message quotes it as written.
 fn shifted_or_origin(o: i64?) -> Pt {
     match (o) {
         some(v) => Pt { x: v, y: v },
@@ -56,14 +55,14 @@ error: this `match` transforms the optional's payload or falls back to a default
 17 |         none => 0,
    |                 ^
 
-error: this `match` transforms the optional's payload or falls back to a default — write it as "o.map(|v| ..).value_or(..)" with the `some` arm's body as the mapping and the `none` arm's value as the default (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_map_value_or.aipl:29:17
+error: this `match` transforms the optional's payload or falls back to a default — write "o.map(|v| ..).value_or(Pt { x: 0, y: 0 })" with the `some` arm's body as the mapping (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_map_value_or.aipl:28:17
    |
-29 |         none => Pt { x: 0, y: 0 },
+28 |         none => Pt { x: 0, y: 0 },
    |                 ^^^^^^^^^^^^^^^^^
 
 error: this `match` maps the optional's payload and keeps `none` — write "o.map(|v| ..)" with the value the `some` arm wraps (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_map_value_or.aipl:38:17
+  --> ./tests/cases/lints/err_match_map_value_or.aipl:37:17
    |
-38 |         none => none,
+37 |         none => none,
    |                 ^^^^

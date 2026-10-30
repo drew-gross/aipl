@@ -26,11 +26,8 @@ mod map_constant_repeat;
 mod map_find_if_some;
 mod match_case_as_case;
 mod match_case_try_as_case;
-mod match_is_some_and;
 mod match_map_err;
 mod match_map_ok;
-mod match_map_value_or;
-mod match_value_or;
 mod match_value_or_err;
 mod push_array_literal;
 mod push_loop_collect_ok;
@@ -64,11 +61,8 @@ use self::map_constant_repeat::{map_constant_repeat, repeat_names};
 use self::map_find_if_some::{find_map_names, map_find_if_some};
 use self::match_case_as_case::match_case_as_case;
 use self::match_case_try_as_case::{match_case_try_as_case, tail_matches};
-use self::match_is_some_and::match_is_some_and;
 use self::match_map_err::match_map_err;
 use self::match_map_ok::match_map_ok;
-use self::match_map_value_or::match_map_value_or;
-use self::match_value_or::match_value_or;
 use self::match_value_or_err::match_value_or_err;
 use self::push_array_literal::push_array_literal;
 use self::push_loop_collect_ok::{collect_ok_names, push_loop_collect_ok};
@@ -134,11 +128,8 @@ pub fn check(
     each_expr(program, &mut |e| {
         map_constant_repeat(e, src, &repeat, &mut hits)
     });
-    each_expr(program, &mut |e| match_is_some_and(e, &mut hits));
     // A match arm whose block is only its value — braces around nothing.
     each_expr(program, &mut |e| arm_block_value(e, src, &mut hits));
-    each_expr(program, &mut |e| match_value_or(e, src, &mut hits));
-    each_expr(program, &mut |e| match_map_value_or(e, src, &mut hits));
     // Not `each_expr`: this lint needs to know whether the *enclosing* function
     // declares any effects. AIPL requires a caller to declare at least the
     // effects of everything it calls, so "declares none" is a sound local proof

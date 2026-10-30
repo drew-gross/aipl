@@ -9,7 +9,7 @@ use crate::Error;
 /// `map_err` and not a `match` that transforms both sides. Arm order doesn't
 /// matter.
 ///
-/// Unlike [`match_value_or`](super::match_value_or()), there is no eager/lazy question to guard
+/// Unlike `match_value_or` (an AIPL lint), there is no eager/lazy question to guard
 /// against and so no restriction on what the `err` arm builds: `map_err`
 /// takes a *function*, which runs on the error path exactly when the arm
 /// did. The one shape left alone is `err(e) => err(e)` — a `match` that
