@@ -40,20 +40,3 @@ pub fn on_slices(self: Expr, lint: (Slice) -> LintHit[]) -> LintHit[] {
     }) == [hit("true false", 0..1)]);
     assert(xs.on_slices(|Slice(receiver, start, end)| { [hit("x", 0..1)] }) == []);
 })
-
-# [`on_slices`] for the slices that have both bounds.
-pub fn on_bounded_slices(self: Expr, lint: (Expr, Expr, Expr) -> LintHit[]) -> LintHit[] {
-    self.on_slices(|Slice(receiver, start, end)| {
-        let some(lower) = start else { return []; };
-        let some(upper) = end else { return []; };
-        lint(receiver, lower, upper)
-    })
-}.test({
-    let xs = ident("xs");
-    let closed = expr(Slice(xs, some(num(1)), some(num(2))));
-    let open = expr(Slice(xs, some(num(1)), none));
-    assert(closed.on_bounded_slices(|receiver, lower, upper| { [hit("both", 0..1)] }) == [
-        hit("both", 0..1),
-    ]);
-    assert(open.on_bounded_slices(|receiver, lower, upper| { [hit("both", 0..1)] }) == []);
-})

@@ -102,6 +102,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  generalize on_slices to on_case and accept a case template arg
   vec$foo() when foo is a predicate argument should probably only work if there is some indicator that the predicate is a self function
   Shape (only Circle) error would read better as Shape.Circle
   run type inference before fusion, to fix this problem:
@@ -109,7 +110,6 @@ misc cleanup:
     // whose result type cannot be inferred from a function-typed parameter.
     self.descendants()$kind.collect_arms(Slice).map(|slice| lint(slice)).join() #[allow]
   name.contains("$") is used in destructure_binding, it should be run at a stage where that isn't a possibility. But also there should be a bool on identifiers to flag if they are synthetic or not, checking for $ is jank.
-  I think I actually don't like on_bounded_slices because it makes the user more complicated. A let Slice(receiver, Some(lower), Some(upper)) = thing else { ... } is pleasant.
   stop making functions that just pass their arguments directly to a constructor. Don't need a function for that, and it just hides which arguments become which fields.
   source text should be propagated by the parser, not rebuilt later in source_text.aipl
   find a way to make lints work without awkwardly threading the method through to every message() call
@@ -400,6 +400,7 @@ matrices:
   support more than 2 dimensions
 
 types:
+  refutable function call syntax i.e. fn foo(arg: some(x)) that you can call with an optional and if it's not some, it gives you none back (or something like that)
   Optionally call a function that accepts one arm of a variant, if what you have is the whole variant
   function_hits shouldn't need to exist - need some better way of expanding single-arm variants
   allow sets of more complex things (tuples, structs, variants)
