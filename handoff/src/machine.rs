@@ -257,6 +257,17 @@ fn starts_from_an_application(chain: &[Link]) -> bool {
         .is_some_and(|root| root.path.contains(".app/Contents/MacOS/"))
 }
 
+/// Whether the person running the gate has said to run it under a chain that
+/// [`chain_warning`] complains about: `HANDOFF_ALLOW_SLOW_LAUNCHES` set to anything
+/// but empty or `0`.
+pub fn slow_launches_allowed() -> bool {
+    allowed(std::env::var("HANDOFF_ALLOW_SLOW_LAUNCHES").ok().as_deref())
+}
+
+fn allowed(value: Option<&str>) -> bool {
+    value.is_some_and(|v| !v.is_empty() && v != "0")
+}
+
 /// What to tell the person running the gate about the chain it runs under —
 /// `None` when it starts from an application.
 pub fn chain_warning(chain: &[Link]) -> Option<String> {
@@ -304,6 +315,14 @@ mod tests {
             link("/Users/d/Library/Application Support/iTerm2/iTermServer-3.4.23"),
             link("/Applications/iTerm.app/Contents/MacOS/iTerm2"),
         ]
+    }
+
+    #[test]
+    fn slow_launches_are_allowed_only_when_asked_for() {
+        assert!(!allowed(None));
+        assert!(!allowed(Some("")));
+        assert!(!allowed(Some("0")));
+        assert!(allowed(Some("1")));
     }
 
     #[test]

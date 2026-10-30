@@ -147,7 +147,9 @@ usage: cargo handoff
 
 Runs the pre-handoff gate: format, test, regenerate what a run proved stale, and
 confirm green. Takes no arguments; `HANDOFF_STEP_TIMEOUT` and `HANDOFF_VERBOSE`
-tune it (see the module docs).";
+tune it (see the module docs). On macOS it refuses to run from a process tree that
+does not start from an application, which roughly doubles its time; set
+`HANDOFF_ALLOW_SLOW_LAUNCHES=1` to run anyway.";
 
 /// Target selection for every whole-suite step.
 ///
@@ -466,12 +468,22 @@ fn handoff() -> ! {
     // The process chain this gate runs under. Every case links and runs two
     // binaries, and macOS assesses a new binary one at a time unless the chain
     // starts from an application exempted under Developer Tools (the terminal
-    // you added). A chain that does not slows the gate without making it wrong,
-    // so it is reported and the run goes on.
+    // you added). A chain that does not makes the gate several times slower
+    // without making it wrong; the gate is the biggest part of a task's time, so
+    // it refuses rather than quietly doubling it, unless told to go on.
     if cfg!(target_os = "macos") {
         if let Some(chain) = machine::ancestry(std::process::id()) {
             match machine::chain_warning(&chain) {
-                Some(warning) => eprintln!("{BOLD}! slow launches{OFF}\n  {warning}\n"),
+                Some(warning) if machine::slow_launches_allowed() => {
+                    eprintln!("{BOLD}! slow launches{OFF}\n  {warning}\n");
+                }
+                Some(warning) => {
+                    eprintln!(
+                        "{BOLD}handoff: refusing to run: slow launches{OFF}\n  {warning}\n\n  \
+                         Set HANDOFF_ALLOW_SLOW_LAUNCHES=1 to run it here anyway."
+                    );
+                    std::process::exit(2);
+                }
                 None => eprintln!(
                     "{DIM}(running under {}){OFF}",
                     machine::render_chain(&chain)
