@@ -14,7 +14,9 @@ import {
     is_some,
     join,
     len,
+    logical_not as !,
     map,
+    map_join,
     value_or,
 } from builtins;
 import { Expr } from "../expr.aipl";
@@ -28,45 +30,62 @@ pub fn hit(message: str, span: Span) -> LintHit { message, span }.test({
     assert(hit("m", 3..5) == LintHit { message: "m", span: 3..5 });
 })
 
-# A hit whose message names a builtin the way the file that was linted spells it.
+# A hit whose message names builtins the way the file that was linted spells them.
 # A lint cannot say how: it reads one function, and the spelling is in the import
-# list, so it reports the message in three parts — what comes before the builtin's
-# name, what comes after it — and the caller fills the name in. A file that does not
-# import the builtin is told to, which the lint need not know either.
-struct UnfilledHit { builtin: str, before: str, after: str, span: Span }
+# list, so it reports the message in parts — each stretch of text followed by the
+# name of a builtin, then a closing stretch — and the caller fills the names in. A
+# file that does not import a builtin is told to, which the lint need not know either.
+struct UnfilledHit { named: Named[], tail: str, span: Span }
+
+# Some text and the builtin whose name follows it in the message.
+struct Named { text: str, builtin: str }
 
 # An unfilled hit at `span` for a message `before` + the builtin's name + `after`.
 pub fn unfilled(builtin: str, before: str, after: str, span: Span) -> UnfilledHit {
-    builtin,
-    before,
-    after,
+    named: [Named { text: before, builtin }],
+    tail: after,
     span,
 }.test({
     assert(unfilled("len", "use ", "()", 1..2).span == 1..2);
 })
 
-# `self` as the hit it is for a file that spells the builtin `spelled`, or does not
-# import it (`none`).
-pub fn filled_with(self: UnfilledHit, spelled: str?) -> LintHit {
-    let name = spelled.value_or(self.builtin);
-    let hint = if (spelled.is_some()) {
-        ""
+# `self` as the hit it is for a file that spells builtin `name` as `spelled(name)`,
+# or does not import it (`none`).
+pub fn filled_with(self: UnfilledHit, spelled: (str) -> str?) -> LintHit {
+    let text = self.named.map_join(
+        |part| `{part.text}{spelled(part.builtin).value_or(part.builtin)}`,
+    );
+    let missing = self.named$builtin.filter(|builtin| !spelled(builtin).is_some());
+    let hint = if (missing.is_nonempty()) {
+        `, importing {missing.map(|builtin| `\`{builtin}\``).join(sep=", ")} from builtins`
     } else {
-        `, importing \`{self.builtin}\` from builtins`
+        ""
     };
-    hit(`{self.before}{name}{self.after}{hint}`, self.span)
+    hit(`{text}{self.tail}{hint}`, self.span)
 }.test({
     let advice = unfilled("is_case", "write ", "(x)", 4..5);
-    assert(advice.filled_with(none) == hit(
+    assert(advice.filled_with(|name| none) == hit(
         "write is_case(x), importing `is_case` from builtins",
         4..5,
     ));
-    assert(advice.filled_with(some("isa")) == hit("write isa(x)", 4..5));
+    assert(advice.filled_with(|name| some("isa")) == hit("write isa(x)", 4..5));
+    let pair = UnfilledHit {
+        named: [Named { text: "a ", builtin: "map" }, Named { text: " b ", builtin: "value_or" }],
+        tail: " c",
+        span: 1..2,
+    };
+    assert(
+        pair.filled_with(|name| if (name == "map") {
+            some("m")
+        } else {
+            none
+        }).message == "a m b value_or c, importing `value_or` from builtins",
+    );
 })
 
 # `self` filled in for the file whose items are `items`.
 pub fn filled(self: UnfilledHit[], items: Item[]) -> LintHit[] {
-    self.map(|unfilled_hit| unfilled_hit.filled_with(items.imported_as(unfilled_hit.builtin)))
+    self$filled_with(|name| items.imported_as(name))
 }.test({
     let items = aipl_parse_surface_file("import { is_case as isa } from builtins;")?.program.items;
     assert([unfilled("is_case", "write ", "(x)", 0..1), unfilled("len", "use ", "", 1..2)].filled(
@@ -174,6 +193,11 @@ pub fn on_functions_unfilled(self: Program, lint: (Function) -> UnfilledHit[]) -
     hits
 }
 
+# [`on_functions_unfilled`], each hit filled in for the program's own imports.
+pub fn on_functions_filled(self: Program, lint: (Function) -> UnfilledHit[]) -> LintHit[] {
+    self.on_functions_unfilled(lint).filled(self.items)
+}
+
 # Every body of the program that is code to check, each as a function.
 fn code_bodies(self: Program { items }) -> Function[] {
     items.collect_arms(Fn)$declared()$bodies().join()
@@ -211,10 +235,16 @@ pub fn lint_function_messages(src: str, lint: (Function) -> LintHit[]) -> str[]!
 
 # What the function lint `lint` reports for the program `src` parses to, filled in
 # for the imports `src` has.
+pub fn lint_function_unfilled_hits(
+    src: str,
+    lint: (Function) -> UnfilledHit[],
+) -> LintHit[]!ParseFailure {
+    let program = aipl_parse_surface_file(src)?.program;
+    ok(program.on_functions_filled(lint))
+}
+
+# [`lint_function_unfilled_hits`], keeping only the messages.
 pub fn lint_function_unfilled_messages(
     src: str,
     lint: (Function) -> UnfilledHit[],
-) -> str[]!ParseFailure {
-    let program = aipl_parse_surface_file(src)?.program;
-    ok(program.on_functions_unfilled(lint).filled(program.items)$message)
-}
+) -> str[]!ParseFailure { ok(lint_function_unfilled_hits(src, lint)?$message) }

@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-case_of_equal_is_case">case_of_equal_is_case</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn case_of_equal_is_case(__spat$848: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>pub fn case_of_equal_is_case(__spat$847: Function) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>A hit for each comparison of a value's case with something.</p></div>
 
@@ -43,20 +43,6 @@
         <p class="note">Not importable from another file.</p>
 
 
-        <section class="item" id="item-comparison_hit">
-          <h3>
-            <a class="anchor" href="#item-comparison_hit">comparison_hit</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn comparison_hit(self: Expr) -&#62; UnfilledHit[]</code></pre>
-
-          <div class="doc"><p>The hit for one expression, or none: it is <code>==</code> with a <code>case_of()</code> on one side.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-advice">
           <h3>
             <a class="anchor" href="#item-advice">advice</a>
@@ -64,7 +50,7 @@
           </h3>
           <pre class="signature"><code>fn advice(span: Span) -&#62; UnfilledHit</code></pre>
 
-          <div class="doc"><p>What is said of a comparison that only asks which case a value is, with the name of <code>is_case</code> left for the caller to fill in.</p></div>
+          <div class="doc"><p>The hit for one expression, or none: it is <code>==</code> with a <code>case_of()</code> on one side. What is said of a comparison that only asks which case a value is, with the name of <code>is_case</code> left for the caller to fill in.</p></div>
 
 
         </section>

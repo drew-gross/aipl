@@ -57,7 +57,21 @@
           </h3>
           <pre class="signature"><code>struct UnfilledHit</code></pre>
 
-          <div class="doc"><p>A hit whose message names a builtin the way the file that was linted spells it. A lint cannot say how: it reads one function, and the spelling is in the import list, so it reports the message in three parts — what comes before the builtin's name, what comes after it — and the caller fills the name in. A file that does not import the builtin is told to, which the lint need not know either.</p></div>
+          <div class="doc"><p>A hit whose message names builtins the way the file that was linted spells them. A lint cannot say how: it reads one function, and the spelling is in the import list, so it reports the message in parts — each stretch of text followed by the name of a builtin, then a closing stretch — and the caller fills the names in. A file that does not import a builtin is told to, which the lint need not know either.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Named">
+          <h3>
+            <a class="anchor" href="#item-Named">Named</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Named</code></pre>
+
+          <div class="doc"><p>Some text and the builtin whose name follows it in the message.</p></div>
 
 
         </section>
@@ -83,9 +97,9 @@
             <a class="anchor" href="#item-filled_with">filled_with</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn filled_with(self: UnfilledHit, spelled: str?) -&#62; LintHit</code></pre>
+          <pre class="signature"><code>pub fn filled_with(self: UnfilledHit, spelled: (str) -&#62; str?) -&#62; LintHit</code></pre>
 
-          <div class="doc"><p><code>self</code> as the hit it is for a file that spells the builtin <code>spelled</code>, or does not import it (<code>none</code>).</p></div>
+          <div class="doc"><p><code>self</code> as the hit it is for a file that spells builtin <code>name</code> as <code>spelled(name)</code>, or does not import it (<code>none</code>).</p></div>
 
 
         </section>
@@ -176,6 +190,20 @@
 
 
 
+        <section class="item" id="item-on_functions_filled">
+          <h3>
+            <a class="anchor" href="#item-on_functions_filled">on_functions_filled</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn on_functions_filled(self: Program, lint: (Function) -&#62; UnfilledHit[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>[<code>on_functions_unfilled</code>], each hit filled in for the program's own imports.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lint_function_hits">
           <h3>
             <a class="anchor" href="#item-lint_function_hits">lint_function_hits</a>
@@ -204,6 +232,20 @@
 
 
 
+        <section class="item" id="item-lint_function_unfilled_hits">
+          <h3>
+            <a class="anchor" href="#item-lint_function_unfilled_hits">lint_function_unfilled_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_function_unfilled_hits(src: str, lint: (Function) -&#62; UnfilledHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>What the function lint <code>lint</code> reports for the program <code>src</code> parses to, filled in for the imports <code>src</code> has.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lint_function_unfilled_messages">
           <h3>
             <a class="anchor" href="#item-lint_function_unfilled_messages">lint_function_unfilled_messages</a>
@@ -211,7 +253,7 @@
           </h3>
           <pre class="signature"><code>pub fn lint_function_unfilled_messages(src: str, lint: (Function) -&#62; UnfilledHit[]) -&#62; str[]!ParseFailure</code></pre>
 
-          <div class="doc"><p>What the function lint <code>lint</code> reports for the program <code>src</code> parses to, filled in for the imports <code>src</code> has.</p></div>
+          <div class="doc"><p>[<code>lint_function_unfilled_hits</code>], keeping only the messages.</p></div>
 
 
         </section>

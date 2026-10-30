@@ -1771,7 +1771,7 @@
           <p class="file-summary">The <code>case_of_equal_is_case</code> lint: <code>shape.case_of() == Circle</code> — reading which case a value is only to compare it with one. That is <code>shape.is_case(Circle)</code>, which asks the same question without the detour through a <code>Case</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-case_of_equal_is_case.html#private">3 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-case_of_equal_is_case.html#private">2 private</a></span>
 
 
           <ul class="items">
@@ -1809,7 +1809,7 @@
           <p class="file-summary">The <code>destructure_binding</code> lint: <code>let p = value; ... p.a ... p.b ...</code> where <strong>every</strong> mention of <code>p</code> is a field read. Say so with a pattern instead: <code>let T { a, b } = value;</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_binding.html#private">2 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-destructure_binding.html#private">1 private</a></span>
 
 
           <ul class="items">
@@ -2003,6 +2003,11 @@
             </li>
 
             <li>
+              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-Named"><code>Named</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
               <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-unfilled"><code>unfilled</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
@@ -2043,12 +2048,22 @@
             </li>
 
             <li>
+              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-on_functions_filled"><code>on_functions_filled</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
               <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-lint_function_hits"><code>lint_function_hits</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
             <li>
               <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-lint_function_messages"><code>lint_function_messages</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-lint_function_unfilled_hits"><code>lint_function_unfilled_hits</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -2067,7 +2082,7 @@
           <p class="file-summary">The <code>match_bool_is_case</code> lint:</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-match_bool_is_case.html#private">3 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-match_bool_is_case.html#private">2 private</a></span>
 
 
           <ul class="items">
@@ -2107,7 +2122,7 @@
           <p class="file-summary">The <code>match_map_value_or</code> lint:</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-match_map_value_or.html#private">3 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-match_map_value_or.html#private">4 private</a></span>
 
 
           <ul class="items">
@@ -2200,6 +2215,16 @@
               <span class="kind kind-fn">fn</span>
             </li>
 
+            <li>
+              <a href="crates-aipl-codegen-src-lint-slice_bounds.html#item-on_slices"><code>on_slices</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-slice_bounds.html#item-on_bounded_slices"><code>on_bounded_slices</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
           </ul>
 
         </li>
@@ -2210,7 +2235,7 @@
           <p class="file-summary">The <code>slice_from_zero</code> lint: <code>x[0..y]</code> — a start bound of a written <code>0</code> is what the open-ended <code>x[..y]</code> already means. The mirror of <code>slice_to_len</code>, and it leans on the same distinction: an <em>omitted</em> start is a zero with an empty span, so requiring a non-empty span is what separates a written <code>0</code> from an elided one.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-slice_from_zero.html#private">2 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-slice_from_zero.html#private">1 private</a></span>
 
 
           <ul class="items">
@@ -2230,7 +2255,7 @@
           <p class="file-summary">The <code>slice_to_len</code> lint: <code>x[y..x.len()]</code> — the end bound is the receiver's own length, which is what the open-ended <code>x[y..]</code> already means. Purely syntactic: the receiver and the <code>len</code> argument must be the same expression, so aliases or computed receivers that merely happen to be equal at runtime are not flagged.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-slice_to_len.html#private">2 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-slice_to_len.html#private">1 private</a></span>
 
 
           <ul class="items">
@@ -2250,7 +2275,7 @@
           <p class="file-summary">The <code>slice_whole</code> lint: <code>x[0..]</code>, <code>x[..x.len()]</code> and <code>x[0..x.len()]</code> — a slice whose range covers the receiver end to end, which is what <code>x</code> already is. The slice is not free: an array slice allocates a fresh block and copies every element, so this is a redundant copy as well as a redundant spelling. Dropping it is safe because arrays have value semantics — mutating an aliased binding copies first, so <code>y = x</code> cannot be surprised by a later <code>set x[..]</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-slice_whole.html#private">2 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-slice_whole.html#private">1 private</a></span>
 
 
           <ul class="items">

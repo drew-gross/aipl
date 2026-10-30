@@ -7,8 +7,8 @@
 #
 # The hit points at the `==`, a short line the formatter keeps in place.
 
-import { Span, count_if, equal as ==, join, len } from builtins;
-import { Call, Expr, descendants } from "../expr.aipl";
+import { Span, count_if, equal as ==, join, len, map } from builtins;
+import { Call, descendants } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import {
     UnfilledHit,
@@ -19,7 +19,20 @@ import {
 
 # A hit for each comparison of a value's case with something.
 pub fn case_of_equal_is_case(Function { body }) -> UnfilledHit[] {
-    body.descendants()$comparison_hit().join()
+    body
+        .descendants()
+        .map(|comparison| {
+            let Call("==", operands, _) = comparison.kind else { return []; };
+            if (operands.count_if(|operand| match (operand.kind) {
+                Call("case_of", arguments, _) => arguments.len() == 1,
+                _ => false,
+            }) == 1) {
+                [advice(comparison.span)]
+            } else {
+                []
+            }
+        })
+        .join()
 }.test({
     assert(lint_function_unfilled_messages(
         "fn f(s: Shape) -> bool { s.case_of() == Circle }",
@@ -70,18 +83,6 @@ pub fn case_of_equal_is_case(Function { body }) -> UnfilledHit[] {
 })
 
 # The hit for one expression, or none: it is `==` with a `case_of()` on one side.
-fn comparison_hit(self: Expr { kind, span, value_span as _, name_span as _ }) -> UnfilledHit[] {
-    let Call("==", operands, _) = kind else { return []; };
-    if (operands.count_if(|operand| match (operand.kind) {
-        Call("case_of", arguments, _) => arguments.len() == 1,
-        _ => false,
-    }) == 1) {
-        [advice(span)]
-    } else {
-        []
-    }
-}
-
 # What is said of a comparison that only asks which case a value is, with the name of
 # `is_case` left for the caller to fill in.
 fn advice(span: Span) -> UnfilledHit {
@@ -94,4 +95,4 @@ fn advice(span: Span) -> UnfilledHit {
 }
 
 # The message `advice` comes to for a file that spells `is_case` as `spelled`.
-fn message(spelled: str?) -> str { advice(0..0).filled_with(spelled).message }
+fn message(spelled: str?) -> str { advice(0..0).filled_with(|name| spelled).message }

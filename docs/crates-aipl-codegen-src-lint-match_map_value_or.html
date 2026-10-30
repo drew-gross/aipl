@@ -28,7 +28,7 @@
             <a class="anchor" href="#item-match_map_value_or">match_map_value_or</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn match_map_value_or(__spat$2201: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn match_map_value_or(__spat$2293: Function) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>A hit for each <code>match</code> in the program that maps an optional's payload and falls back to a default.</p></div>
 
@@ -44,28 +44,14 @@
         <p class="note">Not importable from another file.</p>
 
 
-        <section class="item" id="item-map_value_or_hit">
-          <h3>
-            <a class="anchor" href="#item-map_value_or_hit">map_value_or_hit</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn map_value_or_hit(self: OptionMatch) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The hit for one <code>match</code>, or none.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-kept_none">
           <h3>
             <a class="anchor" href="#item-kept_none">kept_none</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn kept_none(receiver: str, binder: str) -&#62; str</code></pre>
+          <pre class="signature"><code>fn kept_none(receiver: str, binder: str, span: Span) -&#62; UnfilledHit</code></pre>
 
-          <div class="doc"><p>What is said of a <code>match</code> that maps the payload and keeps <code>none</code>.</p></div>
+          <div class="doc"><p>What is said of a <code>match</code> that maps the payload and keeps <code>none</code>, pointing at <code>span</code>.</p></div>
 
 
         </section>
@@ -77,9 +63,37 @@
             <a class="anchor" href="#item-with_default">with_default</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn with_default(receiver: str, binder: str, default: str) -&#62; str</code></pre>
+          <pre class="signature"><code>fn with_default(receiver: str, binder: str, default: str, span: Span) -&#62; UnfilledHit</code></pre>
 
-          <div class="doc"><p>What is said of a <code>match</code> that maps the payload or falls back to <code>default</code>.</p></div>
+          <div class="doc"><p>What is said of a <code>match</code> that maps the payload or falls back to <code>default</code>, pointing at <code>span</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-message_kept_none">
+          <h3>
+            <a class="anchor" href="#item-message_kept_none">message_kept_none</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn message_kept_none(receiver: str, binder: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>The messages for a file that does not import <code>map</code> or <code>value_or</code>, as the tests' sources do not.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-message_with_default">
+          <h3>
+            <a class="anchor" href="#item-message_with_default">message_with_default</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn message_with_default(receiver: str, binder: str, default: str) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>

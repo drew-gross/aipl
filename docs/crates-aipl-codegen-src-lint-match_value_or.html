@@ -28,7 +28,7 @@
             <a class="anchor" href="#item-match_value_or">match_value_or</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn match_value_or(__spat$1518: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn match_value_or(__spat$1628: Function) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>A hit for each <code>match</code> in the program that only unwraps an optional or defaults.</p></div>
 
@@ -44,14 +44,14 @@
         <p class="note">Not importable from another file.</p>
 
 
-        <section class="item" id="item-value_or_hit">
+        <section class="item" id="item-advice">
           <h3>
-            <a class="anchor" href="#item-value_or_hit">value_or_hit</a>
+            <a class="anchor" href="#item-advice">advice</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn value_or_hit(self: OptionMatch) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn advice(receiver: str, default: str, span: Span) -&#62; UnfilledHit</code></pre>
 
-          <div class="doc"><p>The hit for one <code>match</code>, or none.</p></div>
+          <div class="doc"><p>What is said of a <code>match</code> that unwraps the optional <code>receiver</code> or gives <code>default</code>, pointing at <code>span</code>.</p></div>
 
 
         </section>
@@ -65,7 +65,7 @@
           </h3>
           <pre class="signature"><code>fn message(receiver: str, default: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>What is said of a <code>match</code> that unwraps the optional <code>receiver</code> or gives <code>default</code>.</p></div>
+          <div class="doc"><p>The message for a file that does not import <code>value_or</code>, as the tests' sources do not.</p></div>
 
 
         </section>

@@ -13,7 +13,7 @@ import { destructure_param } from "./destructure_param.aipl";
 import { destructure_slot } from "./destructure_slot.aipl";
 import { duplicate_import_source } from "./duplicate_import_source.aipl";
 import { fn_body_type_stutter } from "./fn_body_type_stutter.aipl";
-import { LintHit, filled, on_functions, on_functions_unfilled } from "./lint_hit.aipl";
+import { LintHit, on_functions, on_functions_filled } from "./lint_hit.aipl";
 import { match_bool_is_case } from "./match_bool_is_case.aipl";
 import { match_is_some_and } from "./match_is_some_and.aipl";
 import { match_map_value_or } from "./match_map_value_or.aipl";
@@ -35,11 +35,11 @@ pub fn lint(program: Program) -> LintHit[] {
         ..program.on_functions(destructure_param),
         ..program.on_functions(destructure_slot),
         ..program.on_functions(fn_body_type_stutter),
-        ..program.on_functions_unfilled(match_bool_is_case).filled(program.items),
-        ..program.on_functions_unfilled(case_of_equal_is_case).filled(program.items),
-        ..program.on_functions(match_is_some_and),
-        ..program.on_functions(match_value_or),
-        ..program.on_functions(match_map_value_or),
+        ..program.on_functions_filled(match_bool_is_case),
+        ..program.on_functions_filled(case_of_equal_is_case),
+        ..program.on_functions_filled(match_is_some_and),
+        ..program.on_functions_filled(match_value_or),
+        ..program.on_functions_filled(match_map_value_or),
         ..program.on_functions(slice_whole),
         ..program.on_functions(slice_to_len),
         ..program.on_functions(slice_from_zero),

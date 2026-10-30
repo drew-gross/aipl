@@ -53,6 +53,14 @@ which fills in the file's spelling and adds the ", importing `X` from builtins"
 hint when it is not imported. Register the lint in `lint.aipl` in its
 unfilled form.
 
+This covers **every builtin the message names, not only the one being
+introduced**: advice such as `write "x.value_or(d)"` or `"x.is_some_and(|v| ..)"`
+spells a builtin in a string, and so does one that names two (`.map(..).value_or(..)`).
+`match_value_or`, `match_is_some_and` and `match_map_value_or` hard-coded their
+names this way and had to be fixed. Before finishing, read every message string
+you wrote and ask whether it contains a builtin's name; if it does, that name is a
+segment the caller fills in.
+
 ## 3. No single-call-site functions without a good reason
 
 Do not split a body into a helper that has exactly one caller; inline it. A

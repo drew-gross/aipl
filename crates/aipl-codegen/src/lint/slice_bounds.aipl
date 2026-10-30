@@ -2,8 +2,9 @@
 # how to read a slice's bounds. They divide the range forms between them, so they
 # must agree on what "runs to the end" and "starts at zero" mean.
 
-import { equal as ==, logical_not as ! } from builtins;
-import { Call, Expr, Num, expr, ident, num, show_expr } from "../expr.aipl";
+import { collect_arms, equal as ==, extend, is_some, logical_not as ! } from builtins;
+import { Call, Expr, Num, Slice, descendants, expr, ident, num, show_expr } from "../expr.aipl";
+import { LintHit, hit } from "./lint_hit.aipl";
 
 # Whether `self` is `len(receiver)`: the receiver's own length, however it was
 # spelled (`x.len()` is the free call `len(x)`). Spans are ignored, so the two must
@@ -26,4 +27,40 @@ pub fn is_len_of(self: Expr, receiver: Expr) -> bool {
 pub fn is_zero(self: Expr) -> bool { self.kind == Num(0) }.test({
     assert(num(0).is_zero());
     assert(!num(1).is_zero());
+})
+
+# What `lint` reports for each slice in `self` and under it, given its receiver and
+# its two bounds, either of which may be left out.
+pub fn on_slices(self: Expr, lint: (Expr, Expr?, Expr?) -> LintHit[]) -> LintHit[] {
+    mut hits: LintHit[] = [];
+    for (let Slice(receiver, start, end) : self.descendants()$kind.collect_arms(Slice)) {
+        set hits.extend(lint(receiver, start, end));
+    }
+    hits
+}.test({
+    let xs = ident("xs");
+    let slice = expr(Slice(xs, some(num(1)), none));
+    assert(slice.on_slices(
+        |receiver, start, end| { [hit(`{start.is_some()} {end.is_some()}`, 0..1)] },
+    ) == [hit("true false", 0..1)]);
+    assert(xs.on_slices(|receiver, start, end| { [hit("x", 0..1)] }) == []);
+})
+
+# [`on_slices`] for the slices that have both bounds.
+pub fn on_bounded_slices(self: Expr, lint: (Expr, Expr, Expr) -> LintHit[]) -> LintHit[] {
+    self.on_slices(
+        |receiver, start, end| {
+            let some(lower) = start else { return []; };
+            let some(upper) = end else { return []; };
+            lint(receiver, lower, upper)
+        },
+    )
+}.test({
+    let xs = ident("xs");
+    let closed = expr(Slice(xs, some(num(1)), some(num(2))));
+    let open = expr(Slice(xs, some(num(1)), none));
+    assert(closed.on_bounded_slices(|receiver, lower, upper| { [hit("both", 0..1)] }) == [
+        hit("both", 0..1),
+    ]);
+    assert(open.on_bounded_slices(|receiver, lower, upper| { [hit("both", 0..1)] }) == []);
 })

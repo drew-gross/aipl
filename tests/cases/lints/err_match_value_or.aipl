@@ -58,25 +58,25 @@ fn main() !prints {
     print(or_divided(none).to_str());
 }
 --- errors ---
-error: this `match` hands back the optional's payload or a default — write "o.value_or(0)" instead (or append #[allow] to this line to keep it)
+error: this `match` hands back the optional's payload or a default — write "o.value_or(0)" instead, importing `value_or` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_value_or.aipl:13:20
    |
 13 |         some(v) => v,
    |                    ^
 
-error: this `match` hands back the optional's payload or a default — write "o.value_or(0)" instead (or append #[allow] to this line to keep it)
+error: this `match` hands back the optional's payload or a default — write "o.value_or(0)" instead, importing `value_or` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_value_or.aipl:21:20
    |
 21 |         some(v) => v,
    |                    ^
 
-error: this `match` hands back the optional's payload or a default — write "o.value_or(Pt { x: 0, y: 0 })" instead (or append #[allow] to this line to keep it)
+error: this `match` hands back the optional's payload or a default — write "o.value_or(Pt { x: 0, y: 0 })" instead, importing `value_or` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_value_or.aipl:37:20
    |
 37 |         some(v) => v,
    |                    ^
 
-error: this `match` hands back the optional's payload or a default — write "o.value_or(100 / 4)" instead (or append #[allow] to this line to keep it)
+error: this `match` hands back the optional's payload or a default — write "o.value_or(100 / 4)" instead, importing `value_or` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_value_or.aipl:49:20
    |
 49 |         some(v) => v,

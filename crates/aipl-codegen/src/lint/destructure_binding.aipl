@@ -55,9 +55,10 @@ import {
     is_case,
     join,
     logical_or as ||,
+    map,
     not_equal as !=,
 } from builtins;
-import { Construct, Let, Read, descendants, field_reads } from "../expr.aipl";
+import { Construct, Let, descendants, field_reads } from "../expr.aipl";
 import { Function, pattern_reads } from "../item.aipl";
 import { Named } from "../ty.aipl";
 import { Uses, is_shared, is_tuple_field, mentions_any, uses_of } from "./field_uses.aipl";
@@ -71,7 +72,57 @@ pub fn destructure_binding(Function { sig, body }) -> LintHit[] {
     // destructured parameters take their fields apart at the top of it, and their
     // reads count the same way.
     let reads = [..sig.params$pattern_reads().join(), ..body.field_reads()];
-    body.descendants()$kind.collect_arms(Let)$binding_hit(reads).join()
+    body
+        .descendants()$kind
+        .collect_arms(Let)
+        .map(|Let(name, annotation, value, inner)| {
+            // A name the parser made (`__iset1$6`, the `seed$provider` of a shim) was never
+            // written by the author, who cannot put an `#[allow]` on it. The destructuring
+            // forms are not among them: this reads the program before they are lowered.
+            if (name.contains("$")) {
+                return [];
+            };
+
+            let Uses { mentions, field_reads, fields, shadowed } = inner.uses_of(name);
+
+            // A rebinding of the same name inside the inner splits the mentions between two
+            // different values, and this walk cannot tell which is which. Rather than
+            // track scopes for a case that is rare and confusing to read anyway, say
+            // nothing.
+            if (shadowed || field_reads == 0 || field_reads != mentions) {
+                return [];
+            };
+
+            // Is one of these field names also read off some *other* value that is still
+            // around once the pattern binds it? Then the bare name would mean two things
+            // and the binding names are what tell them apart today.
+            if (fields.is_shared(reads, value.field_reads()) || fields.any(is_tuple_field)) {
+                return [];
+            };
+
+            // The binding's own name is exempt in the inner — it is the name going away,
+            // and every mention of it there is the base of a read the pattern replaces.
+            // In the *value* nothing is exempt: that is evaluated before the pattern
+            // binds, so a name it mentions is an outer one the pattern would shadow for
+            // the rest of the block.
+            if (inner.mentions_any(fields, some(name)) || value.mentions_any(fields, none)) {
+                return [];
+            };
+
+            // Taking apart a value built on the same line is not an improvement: the
+            // pattern restates the type name that literal just wrote and re-lists the
+            // fields it just set.
+            if (value.kind.is_case(Construct)) {
+                return [];
+            };
+            // The struct is named only where the source already names it — an annotation.
+            let ty = match (annotation) {
+                some(Named(struct_name)) => struct_name,
+                _ => "<Type>",
+            };
+            [hit(message(name, fields.join(sep=", "), ty), value.span)]
+        })
+        .join()
 }.test({
     // Only fields are read: take it apart in the pattern.
     assert(lint_function_messages(
@@ -191,55 +242,6 @@ pub fn destructure_binding(Function { sig, body }) -> LintHit[] {
         destructure_binding,
     )? == [message("p", "a", "<Type>")]);
 })
-
-# The hit for one `let`, or none: `reads` are every field read in its body.
-fn binding_hit(self: Let(name, annotation, value, body), reads: Read[]) -> LintHit[] {
-    // A name the parser made (`__iset1$6`, the `seed$provider` of a shim) was never
-    // written by the author, who cannot put an `#[allow]` on it. The destructuring
-    // forms are not among them: this reads the program before they are lowered.
-    if (name.contains("$")) {
-        return [];
-    };
-
-    let Uses { mentions, field_reads, fields, shadowed } = body.uses_of(name);
-
-    // A rebinding of the same name inside the body splits the mentions between two
-    // different values, and this walk cannot tell which is which. Rather than
-    // track scopes for a case that is rare and confusing to read anyway, say
-    // nothing.
-    if (shadowed || field_reads == 0 || field_reads != mentions) {
-        return [];
-    };
-
-    // Is one of these field names also read off some *other* value that is still
-    // around once the pattern binds it? Then the bare name would mean two things
-    // and the binding names are what tell them apart today.
-    if (fields.is_shared(reads, value.field_reads()) || fields.any(is_tuple_field)) {
-        return [];
-    };
-
-    // The binding's own name is exempt in the body — it is the name going away,
-    // and every mention of it there is the base of a read the pattern replaces.
-    // In the *value* nothing is exempt: that is evaluated before the pattern
-    // binds, so a name it mentions is an outer one the pattern would shadow for
-    // the rest of the block.
-    if (body.mentions_any(fields, some(name)) || value.mentions_any(fields, none)) {
-        return [];
-    };
-
-    // Taking apart a value built on the same line is not an improvement: the
-    // pattern restates the type name that literal just wrote and re-lists the
-    // fields it just set.
-    if (value.kind.is_case(Construct)) {
-        return [];
-    };
-    // The struct is named only where the source already names it — an annotation.
-    let ty = match (annotation) {
-        some(Named(struct_name)) => struct_name,
-        _ => "<Type>",
-    };
-    [hit(message(name, fields.join(sep=", "), ty), value.span)]
-}
 
 # What is said of the binding `name`, whose `fields` are the ones read.
 fn message(name: str, fields: str, ty: str) -> str {

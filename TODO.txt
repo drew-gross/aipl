@@ -102,6 +102,9 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  name.contains("$") is used in destructure_binding, it should be run at a stage where that isn't a possibility. But also there should be a bool on identifiers to flag if they are synthetic or not, checking for $ is jank.
+  on_slices should pass the Slice to it's predicate rather than unpacking the args, and also should be a functional chain (<for_rhs>$lint.join())
+  I think I actually don't like on_bounded_slices because it makes the user more complicated. A let Slice(receiver, Some(lower), Some(upper)) = thing else { ... } is pleasant.
   stop making functions that just pass their arguments directly to a constructor. Don't need a function for that, and it just hides which arguments become which fields.
   source text should be propagated by the parser, not rebuilt later in source_text.aipl
   find a way to make lints work without awkwardly threading the method through to every message() call
@@ -837,6 +840,7 @@ expression matcher:
   use it for operation fusion
 
 vscode:
+  autocomplete
   go to definition should work for destructurings (types and fields)
   lint should work on _some_ documents that fail to compile e.g. if it has unused imports, or fails lint
   PBlock on body in lower_function gives Message: the compiler's name resolution does not cover `PBlock` here (imports, parameters, patterns and types are not tracked yet)

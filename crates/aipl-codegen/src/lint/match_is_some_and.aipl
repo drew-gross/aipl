@@ -22,35 +22,50 @@
 # moves a marker written there onto its own line. The literal is always one line,
 # and it is the part that makes the shape recognizable.
 
-import { equal as ==, join, logical_or as ||, not_equal as != } from builtins;
+import { Span, equal as ==, join, logical_or as ||, map, not_equal as != } from builtins;
 import { Bool } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
+import {
+    UnfilledHit,
+    filled_with,
+    hit,
+    lint_function_unfilled_hits,
+    lint_function_unfilled_messages,
+    unfilled,
+} from "./lint_hit.aipl";
 import { OptionMatch, option_matches, receiver_text } from "./option_match.aipl";
 
 # A hit for each `match` in the program that only asks whether an optional holds a
 # value its arm accepts.
-pub fn match_is_some_and(Function { body }) -> LintHit[] {
-    body.option_matches()$is_some_and_hit().join()
+pub fn match_is_some_and(Function { body }) -> UnfilledHit[] {
+    body
+        .option_matches()
+        .map(|OptionMatch { scrutinee, binder, some_body, none_body }| {
+            if (none_body.kind != Bool(false) || some_body.kind == Bool(true)) {
+                return [];
+            };
+            [advice(scrutinee.receiver_text(), binder, none_body.span)]
+        })
+        .join()
 }.test({
     // The `none => false` arm is what is pointed at, in either arm order.
-    assert(lint_function_hits(
+    assert(lint_function_unfilled_hits(
         "fn f(o: i64?) -> bool { match (o) { some(v) => v > 1, none => false } }",
         match_is_some_and,
     )? == [hit(message("o", "v"), 62..67)]);
-    assert(lint_function_messages(
+    assert(lint_function_unfilled_messages(
         "fn f(o: i64?) -> bool { match (o) { none => false, some(v) => v > 1 } }",
         match_is_some_and,
     )? == [message("o", "v")]);
 
     // A receiver that cannot take a method as written is not quoted.
-    assert(lint_function_messages(
+    assert(lint_function_unfilled_messages(
         "fn f(a: i64?, b: i64?) -> bool { match (a || b) { some(v) => v > 1, none => false } }",
         match_is_some_and,
     )? == [message("<value>", "v")]);
 
     // The `.test` block is held to it too.
-    assert(lint_function_messages(
+    assert(lint_function_unfilled_messages(
         "fn f() { }.test({ assert(match (o) { some(v) => v > 1, none => false }); })",
         match_is_some_and,
     )? == [message("o", "v")]);
@@ -58,35 +73,37 @@ pub fn match_is_some_and(Function { body }) -> LintHit[] {
     // A `none` arm that is not `false`, a `some` arm that is `true`, and a catch-all
     // are left alone.
     assert(
-        lint_function_messages(
+        lint_function_unfilled_messages(
             "fn f(o: i64?) -> bool { match (o) { some(v) => v > 1, none => flag } }",
             match_is_some_and,
         )? == [],
     );
     assert(
-        lint_function_messages(
+        lint_function_unfilled_messages(
             "fn f(o: i64?) -> bool { match (o) { some(v) => true, none => false } }",
             match_is_some_and,
         )? == [],
     );
     assert(
-        lint_function_messages(
+        lint_function_unfilled_messages(
             "fn f(o: i64?) -> bool { match (o) { some(v) => v > 1, _ => false } }",
             match_is_some_and,
         )? == [],
     );
 })
 
-# The hit for one `match`, or none.
-fn is_some_and_hit(self: OptionMatch { scrutinee, binder, some_body, none_body }) -> LintHit[] {
-    if (none_body.kind != Bool(false) || some_body.kind == Bool(true)) {
-        return [];
-    };
-    [hit(message(scrutinee.receiver_text(), binder), none_body.span)]
+# What is said of a `match` that only asks whether the optional `receiver` holds a
+# value its arm accepts, pointing at `span`.
+fn advice(receiver: str, binder: str, span: Span) -> UnfilledHit {
+    unfilled(
+        "is_some_and",
+        `this \`match\` only asks whether the optional holds a value the arm accepts — write "{receiver}.`,
+        `(|{binder}| ..)" instead`,
+        span,
+    )
 }
 
-# What is said of a `match` that only asks whether the optional `receiver` holds a
-# value its arm accepts.
+# The message for a file that does not import `is_some_and`, as the tests' sources do not.
 fn message(receiver: str, binder: str) -> str {
-    `this \`match\` only asks whether the optional holds a value the arm accepts — write "{receiver}.is_some_and(|{binder}| ..)" instead`
+    advice(receiver, binder, 0..0).filled_with(|name| none).message
 }

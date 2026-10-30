@@ -20,80 +20,106 @@
 # one line, and it is the arm that identifies the shape, since a default alone is
 # something `value_or` has too.
 
-import { equal as ==, join, logical_not as !, logical_or as ||, not_equal as != } from builtins;
+import {
+    Span,
+    equal as ==,
+    join,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+} from builtins;
 import { Ident } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { is_constant_default } from "./constant_default.aipl";
-import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
+import {
+    UnfilledHit,
+    filled_with,
+    hit,
+    lint_function_unfilled_hits,
+    lint_function_unfilled_messages,
+    unfilled,
+} from "./lint_hit.aipl";
 import { OptionMatch, default_text, option_matches, receiver_text } from "./option_match.aipl";
 
 # A hit for each `match` in the program that only unwraps an optional or defaults.
-pub fn match_value_or(Function { body }) -> LintHit[] {
-    body.option_matches()$value_or_hit().join()
+pub fn match_value_or(Function { body }) -> UnfilledHit[] {
+    body
+        .option_matches()
+        .map(|OptionMatch { scrutinee, binder, some_body, none_body }| {
+            let Ident(payload) = some_body.kind else { return []; };
+            if (payload != binder || !none_body.is_constant_default()) {
+                return [];
+            };
+            [advice(scrutinee.receiver_text(), none_body.default_text(), some_body.span)]
+        })
+        .join()
 }.test({
     // The identity arm is what is pointed at, in either arm order.
-    assert(lint_function_hits(
+    assert(lint_function_unfilled_hits(
         "fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => 0 } }",
         match_value_or,
     )? == [hit(message("o", "0"), 46..47)]);
-    assert(lint_function_messages(
+    assert(lint_function_unfilled_messages(
         "fn f(o: i64?) -> i64 { match (o) { none => 0, some(v) => v } }",
         match_value_or,
     )? == [message("o", "0")]);
 
     // The default is quoted as written, a struct literal and arithmetic included.
-    assert(lint_function_messages(
+    assert(lint_function_unfilled_messages(
         "fn f(o: P?) -> P { match (o) { some(v) => v, none => P { x: 0, y: 1 } } }",
         match_value_or,
     )? == [message("o", "P { x: 0, y: 1 }")]);
-    assert(lint_function_messages(
+    assert(lint_function_unfilled_messages(
         "fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => 100 / 4 } }",
         match_value_or,
     )? == [message("o", "100 / 4")]);
 
     // A receiver that cannot take a method as written is not quoted.
-    assert(lint_function_messages(
+    assert(lint_function_unfilled_messages(
         "fn f(a: i64?, b: i64?) -> i64 { match (a || b) { some(v) => v, none => 0 } }",
         match_value_or,
     )? == [message("<value>", "0")]);
 
     // The `.test` block is held to it too.
-    assert(lint_function_messages(
+    assert(lint_function_unfilled_messages(
         "fn f() { }.test({ assert(match (o) { some(v) => v, none => 0 } == 0); })",
         match_value_or,
     )? == [message("o", "0")]);
 
     // A mapping, a default that does work and a catch-all are left alone.
     assert(
-        lint_function_messages(
+        lint_function_unfilled_messages(
             "fn f(o: i64?) -> i64 { match (o) { some(v) => g(v), none => 0 } }",
             match_value_or,
         )? == [],
     );
     assert(
-        lint_function_messages(
+        lint_function_unfilled_messages(
             "fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => g() } }",
             match_value_or,
         )? == [],
     );
     assert(
-        lint_function_messages(
+        lint_function_unfilled_messages(
             "fn f(o: i64?) -> i64 { match (o) { some(v) => v, _ => 0 } }",
             match_value_or,
         )? == [],
     );
 })
 
-# The hit for one `match`, or none.
-fn value_or_hit(self: OptionMatch { scrutinee, binder, some_body, none_body }) -> LintHit[] {
-    let Ident(payload) = some_body.kind else { return []; };
-    if (payload != binder || !none_body.is_constant_default()) {
-        return [];
-    };
-    [hit(message(scrutinee.receiver_text(), none_body.default_text()), some_body.span)]
+# What is said of a `match` that unwraps the optional `receiver` or gives `default`,
+# pointing at `span`.
+fn advice(receiver: str, default: str, span: Span) -> UnfilledHit {
+    unfilled(
+        "value_or",
+        `this \`match\` hands back the optional's payload or a default — write "{receiver}.`,
+        `({default})" instead`,
+        span,
+    )
 }
 
-# What is said of a `match` that unwraps the optional `receiver` or gives `default`.
+# The message for a file that does not import `value_or`, as the tests' sources do not.
 fn message(receiver: str, default: str) -> str {
-    `this \`match\` hands back the optional's payload or a default — write "{receiver}.value_or({default})" instead`
+    advice(receiver, default, 0..0).filled_with(|name| none).message
 }

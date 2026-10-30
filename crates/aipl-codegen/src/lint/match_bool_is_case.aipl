@@ -29,6 +29,7 @@ import {
     join,
     logical_not as !,
     logical_or as ||,
+    map,
 } from builtins;
 import { Bool, Match, MatchArm, descendants } from "../expr.aipl";
 import { Function } from "../item.aipl";
@@ -42,7 +43,25 @@ import {
 
 # A hit for each `match` in the program that only asks which case a value is.
 pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
-    body.descendants()$kind.collect_arms(Match)$match_hit().join()
+    body
+        .descendants()$kind
+        .collect_arms(Match)
+        .map(|Match(scrutinee, arms)| {
+            if (!arms.all(|arm| arm.body.kind.is_case(Bool))) {
+                return [];
+            };
+            let [MatchArm { pattern, span, body as _ }] = arms.filter(|arm| arm.body.kind == Bool(
+                true,
+            )) else {
+                return [];
+            };
+            let Ctor(case, _, _) = pattern else { return []; };
+            if (case.is_binder_name() || ["some", "none", "ok", "err"].contains(case)) {
+                return [];
+            };
+            [advice(case, span)]
+        })
+        .join()
 }.test({
     // One case is `true`, the rest `false`.
     assert(lint_function_unfilled_messages(
@@ -114,23 +133,6 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
     );
 })
 
-# The hit for one `match`, or none.
-fn match_hit(self: Match(scrutinee, arms)) -> UnfilledHit[] {
-    if (!arms.all(|arm| arm.body.kind.is_case(Bool))) {
-        return [];
-    };
-    let [MatchArm { pattern, span, body as _ }] = arms.filter(|arm| arm.body.kind == Bool(
-        true,
-    )) else {
-        return [];
-    };
-    let Ctor(case, _, _) = pattern else { return []; };
-    if (case.is_binder_name() || ["some", "none", "ok", "err"].contains(case)) {
-        return [];
-    };
-    [advice(case, span)]
-}
-
 # What is said of a match that only asks whether a value is `case`, with the name
 # of `is_case` left for the caller to fill in.
 fn advice(case: str, span: Span) -> UnfilledHit {
@@ -143,4 +145,6 @@ fn advice(case: str, span: Span) -> UnfilledHit {
 }
 
 # The message `advice` comes to for a file that spells `is_case` as `spelled`.
-fn message(case: str, spelled: str?) -> str { advice(case, 0..0).filled_with(spelled).message }
+fn message(case: str, spelled: str?) -> str {
+    advice(case, 0..0).filled_with(|name| spelled).message
+}

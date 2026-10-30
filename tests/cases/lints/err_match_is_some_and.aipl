@@ -28,13 +28,13 @@ fn main() !prints {
     print(none_first(some(5)).to_str());
 }
 --- errors ---
-error: this `match` only asks whether the optional holds a value the arm accepts — write "o.is_some_and(|v| ..)" instead (or append #[allow] to this line to keep it)
+error: this `match` only asks whether the optional holds a value the arm accepts — write "o.is_some_and(|v| ..)" instead, importing `is_some_and` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_is_some_and.aipl:15:17
    |
 15 |         none => false,
    |                 ^^^^^
 
-error: this `match` only asks whether the optional holds a value the arm accepts — write "o.is_some_and(|v| ..)" instead (or append #[allow] to this line to keep it)
+error: this `match` only asks whether the optional holds a value the arm accepts — write "o.is_some_and(|v| ..)" instead, importing `is_some_and` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_is_some_and.aipl:21:17
    |
 21 |         none => false,

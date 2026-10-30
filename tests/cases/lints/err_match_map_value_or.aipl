@@ -43,25 +43,25 @@ fn main() !prints {
     print(`{shifted_or_origin(some(2)).x} {plus_one(some(3))}`);
 }
 --- errors ---
-error: this `match` transforms the optional's payload or falls back to a default — write "o.map(|v| ..).value_or(0)" with the `some` arm's body as the mapping (or append #[allow] to this line to keep it)
+error: this `match` transforms the optional's payload or falls back to a default — write "o.map(|v| ..).value_or(0)" with the `some` arm's body as the mapping, importing `map`, `value_or` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_map_value_or.aipl:11:17
    |
 11 |         none => 0,
    |                 ^
 
-error: this `match` transforms the optional's payload or falls back to a default — write "o.map(|v| ..).value_or(0)" with the `some` arm's body as the mapping (or append #[allow] to this line to keep it)
+error: this `match` transforms the optional's payload or falls back to a default — write "o.map(|v| ..).value_or(0)" with the `some` arm's body as the mapping, importing `map`, `value_or` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_map_value_or.aipl:17:17
    |
 17 |         none => 0,
    |                 ^
 
-error: this `match` transforms the optional's payload or falls back to a default — write "o.map(|v| ..).value_or(Pt { x: 0, y: 0 })" with the `some` arm's body as the mapping (or append #[allow] to this line to keep it)
+error: this `match` transforms the optional's payload or falls back to a default — write "o.map(|v| ..).value_or(Pt { x: 0, y: 0 })" with the `some` arm's body as the mapping, importing `map`, `value_or` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_map_value_or.aipl:28:17
    |
 28 |         none => Pt { x: 0, y: 0 },
    |                 ^^^^^^^^^^^^^^^^^
 
-error: this `match` maps the optional's payload and keeps `none` — write "o.map(|v| ..)" with the value the `some` arm wraps (or append #[allow] to this line to keep it)
+error: this `match` maps the optional's payload and keeps `none` — write "o.map(|v| ..)" with the value the `some` arm wraps, importing `map` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_map_value_or.aipl:37:17
    |
 37 |         none => none,

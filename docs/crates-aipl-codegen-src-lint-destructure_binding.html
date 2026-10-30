@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-destructure_binding">destructure_binding</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn destructure_binding(__spat$3381: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn destructure_binding(__spat$3384: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each immutable <code>let</code> in the program whose binding is only ever taken apart by field reads.</p></div>
 
@@ -41,20 +41,6 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
-
-
-        <section class="item" id="item-binding_hit">
-          <h3>
-            <a class="anchor" href="#item-binding_hit">binding_hit</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn binding_hit(self: Let, reads: Read[]) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The hit for one <code>let</code>, or none: <code>reads</code> are every field read in its body.</p></div>
-
-
-        </section>
-
 
 
         <section class="item" id="item-message">
