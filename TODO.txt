@@ -102,8 +102,11 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  run type inference before fusion, to fix this problem:
+    // The lambda only forwards to `lint`, but `map(lint).join()` fuses into `map_join`,
+    // whose result type cannot be inferred from a function-typed parameter.
+    self.descendants()$kind.collect_arms(Slice).map(|slice| lint(slice)).join() #[allow]
   name.contains("$") is used in destructure_binding, it should be run at a stage where that isn't a possibility. But also there should be a bool on identifiers to flag if they are synthetic or not, checking for $ is jank.
-  on_slices should pass the Slice to it's predicate rather than unpacking the args, and also should be a functional chain (<for_rhs>$lint.join())
   I think I actually don't like on_bounded_slices because it makes the user more complicated. A let Slice(receiver, Some(lower), Some(upper)) = thing else { ... } is pleasant.
   stop making functions that just pass their arguments directly to a constructor. Don't need a function for that, and it just hides which arguments become which fields.
   source text should be propagated by the parser, not rebuilt later in source_text.aipl
@@ -332,6 +335,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  make HOFs able to treat their predicates as self methods.
   destructuring structs should be allowed to ignore fields
   .. should maybe work on optionals too? Or anything that can be $'ed?
   .... in an array or set literal should double-unwrap-spread
@@ -915,6 +919,7 @@ the arg contract being different for builtins caused problems for retain elision
 
 formatting:
   some way of wrapping really long string literals and template literals
+  if (cond) { return; } should be able to format on one line as long as the block is a single statement.
 
 docs:
   make go to def and doc-on-hover work for operators

@@ -17,26 +17,25 @@
 # was left out (`x[..x.len()]`), the end bound, which must be there in that form.
 
 import { equal as ==, logical_not as !, logical_or as ||, value_or } from builtins;
+import { Slice } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
 import { is_len_of, is_zero, on_slices } from "./slice_bounds.aipl";
 
 # A hit for each slice in the program that covers its whole receiver.
 pub fn slice_whole(Function { body }) -> LintHit[] {
-    body.on_slices(
-        |receiver, start, end| {
-            // An absent end already runs to the length; a present one has to say so.
-            let reaches_end = end$is_len_of(receiver).value_or(true);
-            let starts_at_edge = start$is_zero().value_or(true);
-            if (!starts_at_edge || !reaches_end) {
-                return [];
-            };
+    body.on_slices(|Slice(receiver, start, end)| {
+        // An absent end already runs to the length; a present one has to say so.
+        let reaches_end = end$is_len_of(receiver).value_or(true);
+        let starts_at_edge = start$is_zero().value_or(true);
+        if (!starts_at_edge || !reaches_end) {
+            return [];
+        };
 
-            // The bound to point at: the `0` when it is written, else the end that says
-            // the length (`receiver[..]` is not a form, so one of the two is there).
-            [hit(message(receiver.source), start.value_or(end.value_or(receiver)).span)]
-        },
-    )
+        // The bound to point at: the `0` when it is written, else the end that says
+        // the length (`receiver[..]` is not a form, so one of the two is there).
+        [hit(message(receiver.source), start.value_or(end.value_or(receiver)).span)]
+    })
 }.test({
     // The three spellings, each pointing at a bound.
     assert(lint_function_hits("fn f(s: str) -> str { s[0..] }", slice_whole)? == [

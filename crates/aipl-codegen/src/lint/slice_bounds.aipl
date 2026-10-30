@@ -2,7 +2,7 @@
 # how to read a slice's bounds. They divide the range forms between them, so they
 # must agree on what "runs to the end" and "starts at zero" mean.
 
-import { collect_arms, equal as ==, extend, is_some, logical_not as ! } from builtins;
+import { collect_arms, equal as ==, is_some, join, logical_not as !, map } from builtins;
 import { Call, Expr, Num, Slice, descendants, expr, ident, num, show_expr } from "../expr.aipl";
 import { LintHit, hit } from "./lint_hit.aipl";
 
@@ -29,32 +29,27 @@ pub fn is_zero(self: Expr) -> bool { self.kind == Num(0) }.test({
     assert(!num(1).is_zero());
 })
 
-# What `lint` reports for each slice in `self` and under it, given its receiver and
-# its two bounds, either of which may be left out.
-pub fn on_slices(self: Expr, lint: (Expr, Expr?, Expr?) -> LintHit[]) -> LintHit[] {
-    mut hits: LintHit[] = [];
-    for (let Slice(receiver, start, end) : self.descendants()$kind.collect_arms(Slice)) {
-        set hits.extend(lint(receiver, start, end));
-    }
-    hits
+# What `lint` reports for each slice in `self` and under it.
+pub fn on_slices(self: Expr, lint: (Slice) -> LintHit[]) -> LintHit[] {
+    // The lambda only forwards to `lint`, but `map(lint).join()` fuses into `map_join`,
+    // whose result type cannot be inferred from a function-typed parameter.
+    self.descendants()$kind.collect_arms(Slice).map(|slice| lint(slice)).join() #[allow]
 }.test({
     let xs = ident("xs");
     let slice = expr(Slice(xs, some(num(1)), none));
-    assert(slice.on_slices(
-        |receiver, start, end| { [hit(`{start.is_some()} {end.is_some()}`, 0..1)] },
-    ) == [hit("true false", 0..1)]);
-    assert(xs.on_slices(|receiver, start, end| { [hit("x", 0..1)] }) == []);
+    assert(slice.on_slices(|Slice(receiver, start, end)| {
+        [hit(`{start.is_some()} {end.is_some()}`, 0..1)]
+    }) == [hit("true false", 0..1)]);
+    assert(xs.on_slices(|Slice(receiver, start, end)| { [hit("x", 0..1)] }) == []);
 })
 
 # [`on_slices`] for the slices that have both bounds.
 pub fn on_bounded_slices(self: Expr, lint: (Expr, Expr, Expr) -> LintHit[]) -> LintHit[] {
-    self.on_slices(
-        |receiver, start, end| {
-            let some(lower) = start else { return []; };
-            let some(upper) = end else { return []; };
-            lint(receiver, lower, upper)
-        },
-    )
+    self.on_slices(|Slice(receiver, start, end)| {
+        let some(lower) = start else { return []; };
+        let some(upper) = end else { return []; };
+        lint(receiver, lower, upper)
+    })
 }.test({
     let xs = ident("xs");
     let closed = expr(Slice(xs, some(num(1)), some(num(2))));
