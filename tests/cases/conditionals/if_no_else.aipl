@@ -17,6 +17,12 @@ fn sign(n: i64) -> i64 {
     // An `else` after a nested `if` binds to that inner `if`, not the else-less
     // outer one (dangling-else resolves to the nearest `if`).
     mut s = 0;
-    if (1 < 2) { if (3 < 4) { set s = 1; } else { set s = 2; }; };
+    if (1 < 2) {
+        if (3 < 4) {
+            set s = 1;
+        } else {
+            set s = 2;
+        };
+    };
     assert(s == 1);
 })

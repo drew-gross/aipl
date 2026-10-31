@@ -92,23 +92,22 @@ pub fn format_source(src: str, width: u64) -> str!FmtError {
         100,
     ) == ok("fn f() {\n    xs.map(|P { x, y as b }, (a, b), W(c), d: i64| a);\n}\n"));
 
-    // A branch of one statement stays on the line when the chain fits, `else` and
-    // `else if` branches included; a second statement, or a line too long, breaks
-    // every branch of the chain.
+    // A lone `if` keeps a block of one statement on the line when it fits; a second
+    // statement, or a line too long, breaks it. Any `else` breaks every branch.
     assert(format_source("fn f() { if ( c ) { return 0 ; } ; }", 100) == ok(
         "fn f() {\n    if (c) { return 0; };\n}\n",
-    ));
-    assert(format_source(
-        "fn f() { if (c) { set x = 1; } else if (d) { set x = 2; } else { set x = 3; } ; }",
-        100,
-    ) == ok(
-        "fn f() {\n    if (c) { set x = 1; } else if (d) { set x = 2; } else { set x = 3; };\n}\n",
     ));
     assert(format_source("fn f() { if (c) { g(); return 0; } ; }", 100) == ok(
         "fn f() {\n    if (c) {\n        g();\n        return 0;\n    };\n}\n",
     ));
-    assert(format_source("fn f() { if (c) { return 0; } else { g(); return 1; } ; }", 100) == ok(
-        "fn f() {\n    if (c) {\n        return 0;\n    } else {\n        g();\n        return 1;\n    };\n}\n",
+    assert(format_source("fn f() { if (c) { return 0; } else { return 1; } ; }", 100) == ok(
+        "fn f() {\n    if (c) {\n        return 0;\n    } else {\n        return 1;\n    };\n}\n",
+    ));
+    assert(format_source(
+        "fn f() { if (c) { set x = 1; } else if (d) { set x = 2; } ; }",
+        100,
+    ) == ok(
+        "fn f() {\n    if (c) {\n        set x = 1;\n    } else if (d) {\n        set x = 2;\n    };\n}\n",
     ));
 
     // A malformed program fails with the *parser's* message, not the walker's.

@@ -16,7 +16,11 @@ fn counted(xs: i64[], lo: i64) -> bool {
 // An `else` branch — same reason.
 fn with_else(xs: i64[], lo: i64) !prints -> bool {
     for (let x : xs) {
-        if (x > lo) { return true; } else { print("looked"); };
+        if (x > lo) {
+            return true;
+        } else {
+            print("looked");
+        };
     }
     false
 }

@@ -21,7 +21,11 @@ fn show_u(xs: u64[]) -> str { xs$to_str().join(sep=",") }
 fn parsed_or_zero(words: str[]) -> i64[] {
     mut out: i64[] = [];
     for (let word : words) {
-        if (let some(n) = word.int_parse()) { set out.push(n); } else { set out.push(0); };
+        if (let some(n) = word.int_parse()) {
+            set out.push(n);
+        } else {
+            set out.push(0);
+        };
     }
     out
 }

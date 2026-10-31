@@ -246,7 +246,11 @@ fn flood(mut self: Mark[,], frontier: (u64, u64)[]) {
 fn reveal(mut self: Mark[,], cell: (u64, u64)) {
     match (self[cell]) {
         some(Hidden(mine)) => {
-            if (mine) { set self[cell] = Revealed(true) else {}; } else { set self.flood([cell]); };
+            if (mine) {
+                set self[cell] = Revealed(true) else {};
+            } else {
+                set self.flood([cell]);
+            };
         },
         some(Flagged(..)) | some(Revealed(..)) | none => {},
     };

@@ -14,13 +14,21 @@ fn radius(s: Shape) -> i64? {
 
 // Written as an `if let`, which is the same tree.
 fn width(s: Shape) -> i64? {
-    if (let Rect(w, h) = s) { some(w + h) } else { return none; }
+    if (let Rect(w, h) = s) {
+        some(w + h)
+    } else {
+        return none;
+    }
 }
 
 // A case with no payload to bind has no pattern for a `let`, so it is asked of
 // the value alone.
 fn only_empty(s: Shape, n: i64) -> i64? {
-    if (let Empty = s) { some(n) } else { return none; }
+    if (let Empty = s) {
+        some(n)
+    } else {
+        return none;
+    }
 }
 
 fn main() !prints {
@@ -34,13 +42,13 @@ error: this `else` only gives up with none — write "let Circle(r) = s.as_case(
    |                                     ^^^^
 
 error: this `else` only gives up with none — write "let Rect(w, h) = s.as_case(Rect)?;" and drop the block, importing `as_case` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_let_else_as_case.aipl:17:59
+  --> ./tests/cases/lints/err_let_else_as_case.aipl:20:16
    |
-17 |     if (let Rect(w, h) = s) { some(w + h) } else { return none; }
-   |                                                           ^^^^
+20 |         return none;
+   |                ^^^^
 
 error: this `else` only gives up with none — write "s.as_case(Empty)?;" and drop the block, importing `as_case` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_let_else_as_case.aipl:23:50
+  --> ./tests/cases/lints/err_let_else_as_case.aipl:30:16
    |
-23 |     if (let Empty = s) { some(n) } else { return none; }
-   |                                                  ^^^^
+30 |         return none;
+   |                ^^^^

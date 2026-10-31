@@ -922,7 +922,11 @@ fn label_sets<K: variant, A: any>(prods: Production<K, A>[], firsts: First<K>[])
     while (going) {
         let prev = labels;
         let next = prods.map(|pr| rule_labels(pr.rule, prods, firsts, prev));
-        if (next == prev) { set going = false; } else { set labels = next; };
+        if (next == prev) {
+            set going = false;
+        } else {
+            set labels = next;
+        };
     }
     labels
 }

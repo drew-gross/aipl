@@ -47,7 +47,11 @@ fn first_big(xs: i64[], lo: i64) -> i64? {
 // first one and is not a search at all.
 fn head_sign(xs: i64[]) -> u64? {
     for (let i, x : xs) {
-        if (0 < x) { return some(i); } else { return some(0); };
+        if (0 < x) {
+            return some(i);
+        } else {
+            return some(0);
+        };
     }
     none
 }

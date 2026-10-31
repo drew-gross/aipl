@@ -509,6 +509,7 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  empty else block should disappear, empty if block should invert the condition
   loop pipeline lints should work when initial array is not empty
   loop pipeline lints should suggest exactly what to put in the loop
   the for loop pipelines should be generalized to look at any instance of the let binding being only used as an argument to a function or an if (to change to map or filter)

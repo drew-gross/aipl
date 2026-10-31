@@ -488,7 +488,11 @@ fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseEr
         // to sit in.
         let prev = sets;
         let next = g.prods.try_map(|p| rule_first(p.rule, prev))?;
-        if (next == prev) { set going = false; } else { set sets = next; };
+        if (next == prev) {
+            set going = false;
+        } else {
+            set sets = next;
+        };
     }
     ok(sets)
 }

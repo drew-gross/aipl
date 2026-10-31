@@ -17,7 +17,11 @@ fn label(n: u64) -> str { `value {n} padded out well past the inline-string limi
 fn size(flag: bool, n: u64) -> u64 {
     mut out: u64 = 0;
     let big = label(n);
-    if (flag) { set out = big.len(); } else { set out = 1; };
+    if (flag) {
+        set out = big.len();
+    } else {
+        set out = 1;
+    };
     out + 1
 }.performance({
     assert(measure("arm not taken", false, |f| size(f, 1)).allocations == 0);

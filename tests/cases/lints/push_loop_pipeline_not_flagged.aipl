@@ -41,7 +41,11 @@ fn logged(xs: i64[]) !prints -> i64[] {
 fn signs(xs: i64[]) -> i64[] {
     mut out: i64[] = [];
     for (let x : xs) {
-        if (0 < x) { set out.push(1); } else { set out.push(0); };
+        if (0 < x) {
+            set out.push(1);
+        } else {
+            set out.push(0);
+        };
     }
     out
 }

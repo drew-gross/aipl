@@ -27,7 +27,11 @@ fn seeded(xs: i64[]) -> i64[] {
 fn either(xs: i64[]) -> i64[] {
     mut out: i64[] = [];
     for (let x : xs) {
-        if (0 != x) { set out.extend([x]); } else { set out.extend([]); };
+        if (0 != x) {
+            set out.extend([x]);
+        } else {
+            set out.extend([]);
+        };
     }
     out
 }

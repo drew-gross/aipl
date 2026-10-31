@@ -1008,7 +1008,11 @@ fn variant_body(cases: VCase[]) -> Doc[] {
     for (let i, c : cases) {
         if (0 < i) { set out.push(Line); };
         set out.push(c.lead);
-        if (0 < i) { set out.push(Text("| ")); } else { set out.push(IfBroken("| ")); };
+        if (0 < i) {
+            set out.push(Text("| "));
+        } else {
+            set out.push(IfBroken("| "));
+        };
         set out.push(c.body);
     }
     out
@@ -2294,19 +2298,20 @@ fn struct_field_value(self: W, lead: Doc, fname: str) -> WDoc!FmtError {
 # line or every block is broken. `if_chain` lays the chain out ungrouped so a
 # nested `else if` joins the enclosing chain's group rather than opening one of
 # its own — a fitting tail used to stay inline after broken heads, which read
-# as two different constructs.
+# as two different constructs. `fit_statements` lets a block of one statement stay on
+# the line; it is off for an `else if`, whose chain has an `else` already.
 fn if_expr(self: W) -> WDoc!FmtError {
-    let WDoc { w, doc } = self.if_chain()?;
+    let WDoc { w, doc } = self.if_chain(true)?;
     ok(WDoc { w, doc: group(doc) })
 }
 
-fn if_chain(self: W) -> WDoc!FmtError {
+fn if_chain(self: W, fit_statements: bool) -> WDoc!FmtError {
     let opened = self.expect("if")?.w.expect("(")?.w;
 
     // `if (let PATTERN = EXPR) { .. }` — the `let` lookahead (never a valid
     // `expr` lead) is what the grammar itself picks the production on, so the
     // formatter branches the same way, right after `if (`. `else if (let ..)`
-    // reaches this same branch through the recursive `if_chain()` call below, so
+    // reaches this same branch through the recursive `if_chain(false)` call below, so
     // an if/else-if-let ladder needs nothing extra.
     let lead = if (opened.peek_text() == "let") {
         let clause = opened.bump().w.if_let_clause()?;
@@ -2317,19 +2322,22 @@ fn if_chain(self: W) -> WDoc!FmtError {
         WDoc { w: closed, doc: Concat([Text("if ("), cond.doc, Text(") ")]) }
     };
 
-    // The branches share the chain's group (via the ungrouped `block_laid_out`,
-    // and the ungrouped recursion for an `else if`), so they break *together*. A
-    // branch of one statement stays on the line when the chain fits: `if (c) { return 0; }`.
-    let then_b = lead.w.block_laid_out(true)?;
-    let head = [lead.doc, then_b.doc];
-    if (then_b.w.peek_text() != "else") { return ok(WDoc { w: then_b.w, doc: Concat(head) }); };
+    // The branches share the chain's group (via the ungrouped `block_layout`, and
+    // the ungrouped recursion for an `else if`), so they break *together*. A lone
+    // `if` with no `else` keeps a block of one statement on the line when it fits:
+    // `if (c) { return 0; }`. Any `else` makes every block of the chain multi-line.
+    let fitted = lead.w.block_laid_out(fit_statements)?;
+    if (fitted.w.peek_text() != "else") {
+        return ok(WDoc { w: fitted.w, doc: Concat([lead.doc, fitted.doc]) });
+    };
+    let then_b = lead.w.block_layout()?;
     let stepped = then_b.w.bump().w;
     let tail = if (stepped.peek_text() == "if") {
-        stepped.if_chain()?
+        stepped.if_chain(false)?
     } else {
-        stepped.block_laid_out(true)?
+        stepped.block_layout()?
     };
-    ok(WDoc { w: tail.w, doc: Concat([..head, Text(" else "), tail.doc]) })
+    ok(WDoc { w: tail.w, doc: Concat([lead.doc, then_b.doc, Text(" else "), tail.doc]) })
 }
 
 # `PATTERN = EXPR)` — entered just past `if (let`; consumes the closing `)`

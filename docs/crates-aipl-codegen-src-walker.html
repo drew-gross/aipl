@@ -1609,7 +1609,7 @@
             <a class="anchor" href="#item-range_has_stmt">range_has_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$60744: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$60784: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code> or a <code>fn</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 
@@ -2227,7 +2227,7 @@
           </h3>
           <pre class="signature"><code>fn if_expr(self: W) -&#62; WDoc!FmtError</code></pre>
 
-          <div class="doc"><p>An <code>if</code>/<code>else if</code>/<code>else</code> chain is one group: either every branch is on one line or every block is broken. <code>if_chain</code> lays the chain out ungrouped so a nested <code>else if</code> joins the enclosing chain's group rather than opening one of its own — a fitting tail used to stay inline after broken heads, which read as two different constructs.</p></div>
+          <div class="doc"><p>An <code>if</code>/<code>else if</code>/<code>else</code> chain is one group: either every branch is on one line or every block is broken. <code>if_chain</code> lays the chain out ungrouped so a nested <code>else if</code> joins the enclosing chain's group rather than opening one of its own — a fitting tail used to stay inline after broken heads, which read as two different constructs. <code>fit_statements</code> lets a block of one statement stay on the line; it is off for an <code>else if</code>, whose chain has an <code>else</code> already.</p></div>
 
 
         </section>
@@ -2239,7 +2239,7 @@
             <a class="anchor" href="#item-if_chain">if_chain</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn if_chain(self: W) -&#62; WDoc!FmtError</code></pre>
+          <pre class="signature"><code>fn if_chain(self: W, fit_statements: bool) -&#62; WDoc!FmtError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

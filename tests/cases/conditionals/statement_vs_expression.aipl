@@ -32,7 +32,11 @@ fn main() !prints {
     mut ticks = 0;
     mut last = "";
     for (let c : "aba") {
-        if (c == 'a') { set ticks++; } else { set last = "b"; };
+        if (c == 'a') {
+            set ticks++;
+        } else {
+            set last = "b";
+        };
     }
     print(ticks.to_str());
     print(last);

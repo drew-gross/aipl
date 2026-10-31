@@ -1712,7 +1712,11 @@ fn match_expr(kids: Ast[], tsp: Span, sp: Span) -> Expr!ParseError {
     mut parts: Expr[] = [];
     mut arms: MatchArm[] = [];
     for (let k : kids) {
-        if (let AExpr(e) = k) { set parts.push(e); } else { set arms.extend(as_arms(k, sp)?); };
+        if (let AExpr(e) = k) {
+            set parts.push(e);
+        } else {
+            set arms.extend(as_arms(k, sp)?);
+        };
     }
     match (parts) {
         [only] => ok(at(Match(only, arms), tsp)),
@@ -3111,7 +3115,11 @@ fn tokens_between(self: Span[], src: str, skip: u64, stop: str) -> Span[] {
     mut open = true;
     while (open && i < self.len()) {
         let at = self[i].value_or(0..0);
-        if (src[at] == stop) { set open = false; } else { set kept.push(at); };
+        if (src[at] == stop) {
+            set open = false;
+        } else {
+            set kept.push(at);
+        };
         set i++;
     }
     kept
@@ -6303,7 +6311,11 @@ fn lower_base_ty(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
                 set in_grid = true;
             },
             "]" => {
-                if (in_grid) { set in_grid = false; } else { set ty = TyArray(ty); };
+                if (in_grid) {
+                    set in_grid = false;
+                } else {
+                    set ty = TyArray(ty);
+                };
             },
             _ => {},
         };

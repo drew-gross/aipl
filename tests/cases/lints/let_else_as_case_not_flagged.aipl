@@ -35,7 +35,11 @@ fn second(xs: i64[]) -> i64? {
 // Not the function's last act: the `?` would leave the function where the `if let`
 // only chose a value for a binding.
 fn width(s: Shape) -> i64? {
-    let w = if (let Rect(a, b) = s) { a + b } else { return none; };
+    let w = if (let Rect(a, b) = s) {
+        a + b
+    } else {
+        return none;
+    };
     some(w)
 }
 

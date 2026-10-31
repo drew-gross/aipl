@@ -43,7 +43,11 @@ fn graded(x: i64) -> str {
 // dropped with the branch it was in.
 fn floored(x: i64) -> i64 {
     mut y = 0;
-    if (x > 0) { set y = x + 1; } else { return 0; };
+    if (x > 0) {
+        set y = x + 1;
+    } else {
+        return 0;
+    };
     y + 100
 }
 
