@@ -5,9 +5,7 @@
 import { equal as ==, extend, less_than_or_equal as <=, print, to_str } from builtins;
 
 fn clamp_low(x: i64) -> i64 {
-    if (x <= 0) {
-        return 0;
-    };
+    if (x <= 0) { return 0; };
     x
 }
 
@@ -18,9 +16,7 @@ fn first_index_reaching(xs: i64[], limit: i64) -> str {
     mut log = "";
     for (let i, x : xs) {
         set log.extend("s");
-        if (limit <= x) {
-            return to_str(i);
-        };
+        if (limit <= x) { return to_str(i); };
     }
     log
 }

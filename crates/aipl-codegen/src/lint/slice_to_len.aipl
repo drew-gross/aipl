@@ -20,9 +20,7 @@ pub fn slice_to_len(Function { body }) -> LintHit[] {
         .collect_expr_cases(Slice)
         .map(|slice| {
             let Slice(receiver, some(lower), some(bound)) = slice else { return []; };
-            if (!bound.is_len_of(receiver) || lower.is_zero()) {
-                return [];
-            };
+            if (!bound.is_len_of(receiver) || lower.is_zero()) { return []; };
             [hit(message(receiver.source, lower.source), bound.span)]
         })
         .join()

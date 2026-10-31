@@ -41,11 +41,7 @@ fn logged(xs: i64[]) !prints -> i64[] {
 fn signs(xs: i64[]) -> i64[] {
     mut out: i64[] = [];
     for (let x : xs) {
-        if (0 < x) {
-            set out.push(1);
-        } else {
-            set out.push(0);
-        };
+        if (0 < x) { set out.push(1); } else { set out.push(0); };
     }
     out
 }
@@ -56,9 +52,7 @@ fn signs(xs: i64[]) -> i64[] {
 fn first_two(xs: i64[]) -> i64[] {
     mut out: i64[] = [];
     for (let x : xs) {
-        if (out.len() < 2) {
-            set out.push(x);
-        };
+        if (out.len() < 2) { set out.push(x); };
     }
     out
 }
@@ -136,9 +130,7 @@ fn counted(n: i64) -> i64[] {
 fn even_below(n: u64) -> u64[] {
     mut out: u64[] = [];
     for (let i : 0..n) {
-        if (i % 2 == 0) {
-            set out.push(i);
-        };
+        if (i % 2 == 0) { set out.push(i); };
     }
     out
 }

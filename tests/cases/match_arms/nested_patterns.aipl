@@ -83,9 +83,7 @@ fn main() !prints {
     print(`{span_of(some(Span { start: 1, end: 2 }), some(Span { start: 5, end: 9 }))}`);
     print(`{span_of(some(Span { start: 1, end: 2 }), none)}`);
     // `if let` takes a nested pattern too.
-    if (let (1, some(x)) = (1, some(9))) {
-        print(`x={x}`);
-    };
+    if (let (1, some(x)) = (1, some(9))) { print(`x={x}`); };
 }
 --- stdout ---
 |?

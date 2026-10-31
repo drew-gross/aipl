@@ -29,9 +29,7 @@ fn need_short(o: i64?) -> i64!str { o.value_or_err("missing") }
 fn need_returning(o: i64?) -> i64!str {
     match (o) {
         some(v) => {
-            if (v == 0) {
-                return err("zero");
-            };
+            if (v == 0) { return err("zero"); };
         },
         none => {
             return err("missing"); #[allow]
@@ -48,12 +46,8 @@ fn unwrap(r: i64!str) -> i64 {
 }
 
 fn main() !prints {
-    if (unwrap(need(some(5))) == unwrap(need_short(some(5)))) {
-        print("agree on some");
-    };
-    if (unwrap(need(none)) == unwrap(need_short(none))) {
-        print("agree on none");
-    };
+    if (unwrap(need(some(5))) == unwrap(need_short(some(5)))) { print("agree on some"); };
+    if (unwrap(need(none)) == unwrap(need_short(none))) { print("agree on none"); };
     if (unwrap(need_returning(some(0))) == -1 && unwrap(need_returning(some(2))) == 1) {
         print("returning form kept");
     };

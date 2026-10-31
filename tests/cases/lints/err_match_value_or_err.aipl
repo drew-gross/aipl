@@ -85,15 +85,9 @@ fn unwrap(r: i64!str) -> i64 {
 }
 
 fn main() !prints {
-    if (unwrap(need(some(5))) == 5) {
-        print("ok");
-    };
-    if (unwrap(none_first(none)) == -1) {
-        print("err");
-    };
-    if (unwrap(need_computed(some(9), "r")) == 9) {
-        print("computed");
-    };
+    if (unwrap(need(some(5))) == 5) { print("ok"); };
+    if (unwrap(none_first(none)) == -1) { print("err"); };
+    if (unwrap(need_computed(some(9), "r")) == 9) { print("computed"); };
 }
 --- errors ---
 error: this `match` turns an optional into a result — write "o.value_or_err("missing")" instead (or append #[allow] to this line to keep it)

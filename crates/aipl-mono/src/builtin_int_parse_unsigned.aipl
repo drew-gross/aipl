@@ -24,9 +24,7 @@ import {
 # nothing else — no sign, not even `-0`. `none` when the input is empty, holds
 # any other character, or exceeds `u64::MAX` (18446744073709551615).
 pub fn int_parse_unsigned(self: str) -> u64? {
-    if (self.is_empty()) {
-        return none;
-    };
+    if (self.is_empty()) { return none; };
 
     // `u64::MAX / 10`: an accumulator past it overflows on the next digit, and
     // one equal to it overflows on any digit past `u64::MAX`'s last, 5.

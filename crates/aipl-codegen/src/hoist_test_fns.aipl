@@ -62,9 +62,7 @@ fn performance_function(self: Function, PerformanceBlock { body, fns, span }) ->
 # `self` followed by the functions declared in its `.test` block, renamed. A
 # function with no helpers is itself.
 fn hoisted(self: Function) -> Function[] {
-    if (self.test_fns.is_empty()) {
-        return [self];
-    };
+    if (self.test_fns.is_empty()) { return [self]; };
     let renames = self.test_fns
         .map(|h| (h.name.text, test_helper_name(self.name.text, h.name.text)))
         .to_dict();

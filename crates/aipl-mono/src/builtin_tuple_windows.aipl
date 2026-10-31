@@ -27,9 +27,7 @@ pub fn tuple_windows<T: any>(self: T[]) -> (T, T)[] {
     mut out = [];
     mut prev: T? = none;
     for (let x : self) {
-        if (let some(p) = prev) {
-            set out.push((p, x));
-        };
+        if (let some(p) = prev) { set out.push((p, x)); };
         set prev = some(x);
     }
     out

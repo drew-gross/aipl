@@ -148,9 +148,7 @@ pub fn parse_spec(src: str) -> Spec!str {
 # Fold one finished section into the spec. `name` is `""` for the preamble.
 fn finalize(spec: Spec, name: str, buf: str) -> Spec!str {
     let body = buf.trim_end_while(|c| c == '\n' || c == '\r');
-    if (name == "") {
-        return ok(Spec { ..spec, source: body });
-    };
+    if (name == "") { return ok(Spec { ..spec, source: body }); };
 
     // Checked before the literal names because these carry a path after the
     // prefix; `expect file:` first, though the two prefixes can't both match.

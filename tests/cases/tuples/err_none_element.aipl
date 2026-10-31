@@ -13,9 +13,7 @@ fn main() !prints {
     mut prev = none;
     mut pairs = [];
     for (let x : [1, 2, 3]) {
-        if (let some(p) = prev) {
-            set pairs.push((p, x));
-        };
+        if (let some(p) = prev) { set pairs.push((p, x)); };
         set prev = some(x);
     }
     print(`{pairs}`);

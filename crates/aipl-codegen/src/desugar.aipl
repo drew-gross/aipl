@@ -551,9 +551,7 @@ fn keeping(self: Pat, name: str) -> Pat {
         // A struct pattern with nothing left to bind reads no field, so it matches
         // anything, as `_` does: the arm that keeps one of its names checks its type.
         Struct(struct_name, fields, names) => {
-            if (!names.contains(name)) {
-                return Wildcard;
-            };
+            if (!names.contains(name)) { return Wildcard; };
             Pat.Struct(struct_name, fields, names.map(|n| if (n == name) { n } else { "_" }))
         },
         Array(elements) => Array(elements$keeping_ident(name)),
@@ -564,11 +562,7 @@ fn keeping(self: Pat, name: str) -> Pat {
 
 # An array pattern's element, `_` unless it is the binder `name`.
 fn keeping_ident(self: Expr, name: str) -> Expr {
-    if (let Ident(bound) = self.kind) {
-        if (bound != name) {
-            return at(Ident("_"), self.span);
-        };
-    };
+    if (let Ident(bound) = self.kind) { if (bound != name) { return at(Ident("_"), self.span); }; };
     self
 }
 

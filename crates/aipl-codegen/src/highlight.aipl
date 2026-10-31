@@ -600,9 +600,7 @@ pub fn word_pat(words: str[], scope: str) -> Pat {
 # layout is fixed and deterministic rather than minified.
 pub fn tm_json(Tm { note, name, scope_name, file_types, top, repo }) -> str {
     mut fields = [fld("$schema", json_str(SCHEMA()))];
-    if (note.is_nonempty()) {
-        set fields.push(fld("comment", json_str(note)));
-    };
+    if (note.is_nonempty()) { set fields.push(fld("comment", json_str(note))); };
     set fields.extend([
         fld("name", json_str(name)),
         fld("scopeName", json_str(scope_name)),
@@ -652,26 +650,20 @@ fn pat_json(p: Pat) -> str {
         Include(name) => `\{ "include": "#{name}" \}`,
         Match(re, scope) => {
             mut fields = [fld("match", json_str(re))];
-            if (scope.is_nonempty()) {
-                set fields.push(fld("name", json_str(scope)));
-            };
+            if (scope.is_nonempty()) { set fields.push(fld("name", json_str(scope))); };
             obj_of(fields)
         },
         Caps(re, scopes) => obj_of([fld("match", json_str(re)), caps_fld("captures", scopes, 1)]),
         Region(begin, end, inner, scope, begin_scope, content_scope) => {
             mut fields = [fld("begin", json_str(begin)), fld("end", json_str(end))];
-            if (scope.is_nonempty()) {
-                set fields.push(fld("name", json_str(scope)));
-            };
+            if (scope.is_nonempty()) { set fields.push(fld("name", json_str(scope))); };
             if (begin_scope.is_nonempty()) {
                 set fields.push(caps_fld("beginCaptures", [begin_scope], 0));
             };
             if (content_scope.is_nonempty()) {
                 set fields.push(fld("contentName", json_str(content_scope)));
             };
-            if (inner.is_nonempty()) {
-                set fields.push(arr_fld("patterns", inner.map(pat_json)));
-            };
+            if (inner.is_nonempty()) { set fields.push(arr_fld("patterns", inner.map(pat_json))); };
             obj_of(fields)
         },
     }
@@ -688,17 +680,13 @@ fn fld(key: str, value: str) -> str { `{json_str(key)}: {value}` }
 # `"key": [ .. ]`, one item per line. Items arrive rendered at column 0 and are
 # indented here, which is what keeps every renderer below indentation-free.
 fn arr_fld(key: str, items: str[]) -> str {
-    if (items.is_empty()) {
-        return `{json_str(key)}: []`;
-    };
+    if (items.is_empty()) { return `{json_str(key)}: []`; };
     let body = items$indent(2).join(sep=",\n");
     `{json_str(key)}: [\n{body}\n]`
 }
 
 fn obj_fld(key: str, entries: str[]) -> str {
-    if (entries.is_empty()) {
-        return `{json_str(key)}: \{\}`;
-    };
+    if (entries.is_empty()) { return `{json_str(key)}: \{\}`; };
     let body = entries$indent(2).join(sep=",\n");
     `{json_str(key)}: \{\n{body}\n\}`
 }

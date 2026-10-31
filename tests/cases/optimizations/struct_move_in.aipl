@@ -26,9 +26,7 @@ fn merge(self: First, other: First) -> First {
 fn fold(parts: First[]) -> First {
     mut acc: First = First { nullable: true };
     for (let sub : parts) {
-        if (acc.nullable) {
-            set acc = First { ..acc.merge(sub), nullable: sub.nullable };
-        };
+        if (acc.nullable) { set acc = First { ..acc.merge(sub), nullable: sub.nullable }; };
     }
     acc
 }

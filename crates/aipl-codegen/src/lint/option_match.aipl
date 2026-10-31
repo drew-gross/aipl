@@ -38,17 +38,13 @@ struct OptionMatch { scrutinee: Expr, binder: str, some_body: Expr, none_body: E
 # `none` binds nothing; a catch-all, a third arm, `some(..)` or a payload-less `some`
 # make it something else.
 pub fn option_match(self: Match(scrutinee, arms)) -> OptionMatch? {
-    if (arms.len() != 2) {
-        return none;
-    };
+    if (arms.len() != 2) { return none; };
     let some_arm = arms.find_if(|arm| arm.pattern.names_case("some"))?;
     let none_arm = arms.find_if(|arm| arm.pattern.names_case("none"))?;
     let bindings = some_arm.pattern.payload_binders()?;
     let none_bindings = none_arm.pattern.payload_binders()?;
     let [binder] = bindings else { return none; };
-    if (none_bindings.is_nonempty()) {
-        return none;
-    };
+    if (none_bindings.is_nonempty()) { return none; };
     some(OptionMatch { scrutinee, binder, some_body: some_arm.body, none_body: none_arm.body })
 }.test({
     // The binder and the receiver of each `match` that is one, whichever arm is first.

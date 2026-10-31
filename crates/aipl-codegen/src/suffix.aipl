@@ -176,9 +176,7 @@ fn index_or_slice(recv: Expr, index: Expr, span: Span) -> Expr {
 # The two ends of `self`, if it is the `Span` construct a range desugars to.
 fn range_bounds(self: Expr) -> (Expr, Expr)? {
     if (let Construct(name, inits) = self.kind) {
-        if (name == "__builtin_Span") {
-            return two_values(inits);
-        };
+        if (name == "__builtin_Span") { return two_values(inits); };
     };
     none
 }

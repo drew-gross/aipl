@@ -48,9 +48,7 @@ pub fn match_value_or(Function { body }) -> UnfilledHit[] {
         .option_matches()
         .map(|OptionMatch { scrutinee, binder, some_body, none_body }| {
             let Ident(payload) = some_body.kind else { return []; };
-            if (payload != binder || !none_body.is_constant_default()) {
-                return [];
-            };
+            if (payload != binder || !none_body.is_constant_default()) { return []; };
             [advice(scrutinee.receiver_text(), none_body.default_text(), some_body.span)]
         })
         .join()

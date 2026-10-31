@@ -12,9 +12,7 @@ import { int_parse, print, push, wrapping_mul as * } from builtins;
 fn parsed(words: str[]) -> i64[] {
     mut out: i64[] = [];
     for (let word : words) {
-        if (let some(n) = word.int_parse()) {
-            set out.push(n);
-        };
+        if (let some(n) = word.int_parse()) { set out.push(n); };
     }
     out
 }
@@ -23,9 +21,7 @@ fn parsed(words: str[]) -> i64[] {
 fn doubled(words: str[]) -> i64[] {
     mut out: i64[] = [];
     for (let word : words) {
-        if (let some(n) = word.int_parse()) {
-            set out.push(n * 2);
-        };
+        if (let some(n) = word.int_parse()) { set out.push(n * 2); };
     }
     out
 }
@@ -34,9 +30,7 @@ fn doubled(words: str[]) -> i64[] {
 fn present(slots: i64?[]) -> i64[] {
     mut out: i64[] = [];
     for (let slot : slots) {
-        if (let some(n) = slot) {
-            set out.push(n);
-        };
+        if (let some(n) = slot) { set out.push(n); };
     }
     out
 }
@@ -52,13 +46,13 @@ error: "out" is seeded empty and filled by this loop with the answers that exist
    |                      ^^
 
 error: "out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = words.map(|word| ..).collect_ok().map(|n| ..);" and drop the loop, importing `map` and `collect_ok` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_push_loop_collect_ok.aipl:24:22
+  --> ./tests/cases/lints/err_push_loop_collect_ok.aipl:22:22
    |
-24 |     mut out: i64[] = [];
+22 |     mut out: i64[] = [];
    |                      ^^
 
 error: "out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = slots.collect_ok();" and drop the loop, importing `collect_ok` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_push_loop_collect_ok.aipl:35:22
+  --> ./tests/cases/lints/err_push_loop_collect_ok.aipl:31:22
    |
-35 |     mut out: i64[] = [];
+31 |     mut out: i64[] = [];
    |                      ^^

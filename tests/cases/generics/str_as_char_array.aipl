@@ -8,9 +8,7 @@ import { equal as ==, wrapping_increment as ++ } from builtins;
 fn count_eq<T: any>(self: T[], target: T) -> i64 {
     mut n = 0;
     for (let x : self) {
-        if (x == target) {
-            set n++;
-        };
+        if (x == target) { set n++; };
     }
     n
 }.test({

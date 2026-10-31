@@ -27,9 +27,7 @@ import { LintHit, hit, lint_function_hits } from "./lint_hit.aipl";
 
 # The hit for a function whose body is a literal of its return type, or none.
 pub fn fn_body_type_stutter(Function { name as function, shorthand_body, sig, body }) -> LintHit[] {
-    if (shorthand_body) {
-        return [];
-    };
+    if (shorthand_body) { return []; };
 
     // The name the return type offers the literal: a generic return contributes its
     // base, since `Pair<i64>` is built as `Pair { .. }`.
@@ -41,9 +39,7 @@ pub fn fn_body_type_stutter(Function { name as function, shorthand_body, sig, bo
     // `__builtin_Span { .. }`) is not a literal anyone wrote, and its name can't be
     // spelled, so it has no shorter form. `{}` has no shorthand either (it would
     // read as an empty block).
-    if (name != ret || name.starts_with("__builtin_") || inits.is_empty()) {
-        return [];
-    };
+    if (name != ret || name.starts_with("__builtin_") || inits.is_empty()) { return []; };
     [hit(message(function.text, name, inits.lone_shorthand()), span)]
 }.test({
     let found = lint_function_hits(
@@ -105,9 +101,7 @@ fn literal_name(self: Ty?) -> str? {
 # trailing comma is load-bearing and the message spells it out.
 fn lone_shorthand(self: FieldInit[]) -> str? {
     let [FieldInit { name, value, name_span as _ }] = self else { return none; };
-    if (value.kind == Ident(name)) {
-        return some(name);
-    };
+    if (value.kind == Ident(name)) { return some(name); };
     none
 }
 

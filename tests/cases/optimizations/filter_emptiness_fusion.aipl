@@ -51,9 +51,7 @@ fn main() !prints {
     let empty: i64[] = [];
     for (let xs : [empty, [1], [7], [1, 2, 3], [9, 1, 8, 2], [3, 4, 5, 6, 7]]) {
         print(fast(xs));
-        if (fast(xs) != slow(xs)) {
-            print("MISMATCH");
-        };
+        if (fast(xs) != slow(xs)) { print("MISMATCH"); };
     }
 }
 --- stdout ---

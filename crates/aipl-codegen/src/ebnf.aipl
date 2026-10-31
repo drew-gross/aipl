@@ -232,9 +232,7 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
         Named(n) => n,
         NamedIdx(i) => names[i].value_or("?"),
         Then(rs) => {
-            if (rs.is_empty()) {
-                return "(* empty *)";
-            };
+            if (rs.is_empty()) { return "(* empty *)"; };
             let body = rs.map(|x| render_rule(x, names, Seq)).join(sep=" ");
             match (ctx) {
                 Alt | Seq => body,
@@ -242,9 +240,7 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
             }
         },
         OneOf(rs) => {
-            if (rs.is_empty()) {
-                return "(* never *)";
-            };
+            if (rs.is_empty()) { return "(* never *)"; };
             let body = rs.map(|x| render_rule(x, names, Seq)).join(sep=" | ");
             match (ctx) {
                 Alt => body,
@@ -395,9 +391,7 @@ fn first_precs<K: variant>(rs: Rule<K>[]) -> Prec[] {
 # operators, with a right-associative level marked. Empty when there is nothing
 # to say.
 fn prec_note(precs: Prec[]) -> str {
-    if (precs.is_empty()) {
-        return "";
-    };
+    if (precs.is_empty()) { return ""; };
     let levels = powers_desc(precs).to_array().map(|pw| level_text(precs, pw)).join(sep=" > ");
     `(* precedence: {levels} *)`
 }
@@ -494,11 +488,7 @@ fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseEr
         // to sit in.
         let prev = sets;
         let next = g.prods.try_map(|p| rule_first(p.rule, prev))?;
-        if (next == prev) {
-            set going = false;
-        } else {
-            set sets = next;
-        };
+        if (next == prev) { set going = false; } else { set sets = next; };
     }
     ok(sets)
 }
@@ -670,12 +660,8 @@ pub fn show_first<K: variant>(self: First<K>) -> str {
     let kinds = self.kinds$case_name().join(sep=" ");
     let texts = self.texts.map(|t| `"{t}"`).join(sep=" ");
     let syms = [kinds, texts].filter(is_nonempty).join(sep=" ");
-    if (!self.nullable) {
-        return syms;
-    };
-    if (syms.is_empty()) {
-        return "<empty>";
-    };
+    if (!self.nullable) { return syms; };
+    if (syms.is_empty()) { return "<empty>"; };
     `{syms} <empty>`
 }.test({
     let num: Case<Tok> = Num;

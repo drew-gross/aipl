@@ -83,9 +83,7 @@ fn sum_as_u8(a: i64, b: i64) -> u8? {
 })
 
 fn returned(n: i64) -> i16? {
-    if (n != 0) {
-        return n.narrow();
-    };
+    if (n != 0) { return n.narrow(); };
     none
 }.test({
     assert(returned(0) == none);

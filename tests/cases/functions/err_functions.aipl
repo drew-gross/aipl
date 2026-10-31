@@ -30,9 +30,7 @@ fn variadic_wrong_type() {
 
 // An early `return` of the wrong type for the declared return.
 fn return_type_mismatch(b: bool) -> i64 {
-    if (b) {
-        return "nope";
-    };
+    if (b) { return "nope"; };
     0
 }
 
@@ -98,67 +96,67 @@ error: fn "sum" arg 1: variadic parameter expects i64[], i64, or i64?, got bool
    |                   ^^^^
 
 error: return value is str, but the function returns i64
-  --> ./tests/cases/functions/err_functions.aipl:34:16
+  --> ./tests/cases/functions/err_functions.aipl:33:21
    |
-34 |         return "nope";
-   |                ^^^^^^
+33 |     if (b) { return "nope"; };
+   |                     ^^^^^^
 
 error: fn "return_bool_for_i64": body returns bool, but the declared return type is i64
-  --> ./tests/cases/functions/err_functions.aipl:42:35
+  --> ./tests/cases/functions/err_functions.aipl:40:35
    |
-42 | fn return_bool_for_i64() -> i64 { true }
+40 | fn return_bool_for_i64() -> i64 { true }
    |                                   ^^^^
 
 error: fn "return_i64_for_str": body returns i64, but the declared return type is str
-  --> ./tests/cases/functions/err_functions.aipl:44:34
+  --> ./tests/cases/functions/err_functions.aipl:42:34
    |
-44 | fn return_i64_for_str() -> str { 5 }
+42 | fn return_i64_for_str() -> str { 5 }
    |                                  ^
 
 error: fn "return_str_for_i64": body returns str, but the declared return type is i64
-  --> ./tests/cases/functions/err_functions.aipl:46:34
+  --> ./tests/cases/functions/err_functions.aipl:44:34
    |
-46 | fn return_str_for_i64() -> i64 { "five" }
+44 | fn return_str_for_i64() -> i64 { "five" }
    |                                  ^^^^^^
 
 error: fn "return_void_for_i64": body returns (), but the declared return type is i64
-  --> ./tests/cases/functions/err_functions.aipl:48:33
+  --> ./tests/cases/functions/err_functions.aipl:46:33
    |
-48 | fn return_void_for_i64() -> i64 {}
+46 | fn return_void_for_i64() -> i64 {}
    |                                 ^
 
 error: fn "return_bare_for_optional": body returns i64, but the declared return type is i64?
-  --> ./tests/cases/functions/err_functions.aipl:50:41
+  --> ./tests/cases/functions/err_functions.aipl:48:41
    |
-50 | fn return_bare_for_optional() -> i64? { 5 }
+48 | fn return_bare_for_optional() -> i64? { 5 }
    |                                         ^
 
 error: a lambda used as a value cannot capture local "n" (function values are non-capturing)
-  --> ./tests/cases/functions/err_functions.aipl:56:13
+  --> ./tests/cases/functions/err_functions.aipl:54:13
    |
-56 |     let f = |x: i64| { x + n };
+54 |     let f = |x: i64| { x + n };
    |             ^^^^^^^^^^^^^^^^^^
 
 error: lambda parameter "x" used as a value must be typed, e.g. `|x: i64| ...`
-  --> ./tests/cases/functions/err_functions.aipl:61:14
+  --> ./tests/cases/functions/err_functions.aipl:59:14
    |
-61 |     let f = |x| { x + 1 };
+59 |     let f = |x| { x + 1 };
    |              ^
 
 error: cannot bind "_" to a value of type ()
-  --> ./tests/cases/functions/err_functions.aipl:67:13
+  --> ./tests/cases/functions/err_functions.aipl:65:13
    |
-67 |     let _ = print("hi");
+65 |     let _ = print("hi");
    |             ^^^^^^^^^^^
 
 error: arithmetic operand: expected i64, got ()
-  --> ./tests/cases/functions/err_functions.aipl:71:42
+  --> ./tests/cases/functions/err_functions.aipl:69:42
    |
-71 | fn unit_used_as_value() !prints -> i64 { print("hi") + 1 }
+69 | fn unit_used_as_value() !prints -> i64 { print("hi") + 1 }
    |                                          ^^^^^^^^^^^
 
 error: fn "main": body returns i64, but the declared return type is ()
-  --> ./tests/cases/functions/err_functions.aipl:74:13
+  --> ./tests/cases/functions/err_functions.aipl:72:13
    |
-74 | fn main() { 5 }
+72 | fn main() { 5 }
    |             ^

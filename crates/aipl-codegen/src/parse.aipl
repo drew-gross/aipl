@@ -237,15 +237,9 @@ struct Parser<K: variant, A: any> {
 # equally deep joins the expected set (deduped); shallower is discarded. An
 # empty label is a *transparent* production and records nothing.
 fn far_miss(far: Far, pos: u64, label: str) -> Far {
-    if (label.is_empty() || pos < far.pos) {
-        return far;
-    };
-    if (far.pos < pos) {
-        return Far { pos, expected: [label], recorded: far.recorded };
-    };
-    if (far.expected.contains(label)) {
-        return far;
-    };
+    if (label.is_empty() || pos < far.pos) { return far; };
+    if (far.pos < pos) { return Far { pos, expected: [label], recorded: far.recorded }; };
+    if (far.expected.contains(label)) { return far; };
 
     // A deeper position starts fresh, so its `unclosed` resets with it; an
     // equally deep one keeps whatever bracket was already blamed there.
@@ -264,17 +258,11 @@ fn far_miss(far: Far, pos: u64, label: str) -> Far {
 # prefix of it.
 fn far_join(a: Far, b: Far) -> Far {
     let recorded = b.recorded;
-    if (a.pos < b.pos) {
-        return Far { ..b, recorded };
-    };
-    if (b.pos < a.pos) {
-        return Far { ..a, recorded };
-    };
+    if (a.pos < b.pos) { return Far { ..b, recorded }; };
+    if (b.pos < a.pos) { return Far { ..a, recorded }; };
     mut expected = a.expected;
     for (let label : b.expected) {
-        if (!expected.contains(label)) {
-            set expected.push(label);
-        };
+        if (!expected.contains(label)) { set expected.push(label); };
     }
     far_unclosed(Far { ..a, expected, recorded }, b.unclosed)
 }
@@ -296,9 +284,7 @@ fn far_join(a: Far, b: Far) -> Far {
 # the edit the reader has to make first, even when an outer bracket is hanging
 # too.
 fn far_unclosed(far: Far, open: Span[]) -> Far {
-    if (far.unclosed.is_nonempty()) {
-        return far;
-    };
+    if (far.unclosed.is_nonempty()) { return far; };
     Far { ..far, unclosed: open }
 }
 
@@ -475,9 +461,7 @@ fn matched_text<K: variant>(toks: Token<K>[]) -> str {
     mut out = "";
     mut prev_end: u64 = 0;
     for (let i, t : toks) {
-        if (i != 0 && prev_end < t.text.span.start) {
-            set out.extend(" ");
-        };
+        if (i != 0 && prev_end < t.text.span.start) { set out.extend(" "); };
         set out.extend(t.text.text);
         set prev_end = t.text.span.end;
     }
@@ -522,14 +506,10 @@ fn match_then<K: variant, A: any>(
     for (let sub : rs) {
         // A refusal here is about what the sequence matched so far, and the
         // error says so by spanning it — and by handing it to the message.
-        if (let Refuse(what) = sub) {
-            return err(refused(refusal(p, what, pos, cp), f));
-        };
+        if (let Refuse(what) = sub) { return err(refused(refusal(p, what, pos, cp), f)); };
         let st = match_rule(p, sub, cp, cur, f)?;
         set f = st.far;
-        if (!st.hit) {
-            return ok(no(f, pos));
-        };
+        if (!st.hit) { return ok(no(f, pos)); };
         set cp = st.pos;
         set acc.extend(st.kids);
     }
@@ -550,9 +530,7 @@ fn match_one_of<K: variant, A: any>(
     for (let sub : rs) {
         let st = match_rule(p, sub, pos, cur, f)?;
         set f = st.far;
-        if (st.hit) {
-            return ok(st);
-        };
+        if (st.hit) { return ok(st); };
     }
     ok(no(f, pos))
 }
@@ -634,13 +612,9 @@ fn match_group<K: variant, A: any>(
     far: Far,
 ) -> Step!Abort {
     let so = match_rule(p, brackets.0, pos, cur, far)?;
-    if (!so.hit) {
-        return ok(no(so.far, pos));
-    };
+    if (!so.hit) { return ok(no(so.far, pos)); };
     let sb = match_reps(p, sub, min, max, sep, trailing_sep, leading_sep, so.pos, cur, so.far)?;
-    if (!sb.hit) {
-        return ok(no(sb.far, pos));
-    };
+    if (!sb.hit) { return ok(no(sb.far, pos)); };
     let sc = match_rule(p, brackets.1, sb.pos, cur, sb.far)?;
     if (!sc.hit) {
         // Only when the close was wanted past the last token. Anywhere else
@@ -675,9 +649,7 @@ fn match_reps<K: variant, A: any>(
     // desugars to, and by far the commonest repetition in a real grammar. The
     // loop below would run one trip and one more to discover the bound, so this
     // takes the rule directly.
-    if (min == 1 && max == some(1) && !sep.is_some()) {
-        return match_rule(p, sub, pos, cur, far);
-    };
+    if (min == 1 && max == some(1) && !sep.is_some()) { return match_rule(p, sub, pos, cur, far); };
     mut cp = pos;
     mut acc: Cst[] = [];
     mut f = far;
@@ -758,9 +730,7 @@ fn match_reps<K: variant, A: any>(
             };
         };
     }
-    if (n < min) {
-        return ok(no(f, pos));
-    };
+    if (n < min) { return ok(no(f, pos)); };
     ok(Step { hit: true, pos: cp, kids: acc, far: f })
 }
 
@@ -806,9 +776,7 @@ fn match_maybe<K: variant, A: any>(
     far: Far,
 ) -> Step!Abort {
     let st = match_rule(p, sub, pos, cur, far)?;
-    if (st.hit) {
-        return ok(st);
-    };
+    if (st.hit) { return ok(st); };
     ok(Step { hit: true, pos, kids: [], far: st.far })
 }
 
@@ -844,9 +812,7 @@ fn match_expect<K: variant, A: any>(
 ) -> Step!Abort {
     let st = match_rule(p, sub, pos, cur, Far { pos, expected: [], recorded: far.recorded })?;
     let joined = far_join(far, st.far);
-    if (st.hit) {
-        return ok(Step { ..st, far: joined });
-    };
+    if (st.hit) { return ok(Step { ..st, far: joined }); };
     let wanted = st.far;
     let slip = Slip { pos: wanted.pos, expected: wanted.expected, unclosed: wanted.unclosed };
     let missing = Missing(slip.pos, slip.expected, slip.unclosed);
@@ -889,16 +855,10 @@ fn match_prod<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, far: Far) -
     // driver recurses, so pruning here removes whole subtrees rather than single
     // token compares — and it costs a table lookup and a membership test, with
     // no rule walked and nothing allocated.
-    if (!can_reach(p, i, pos)) {
-        return ok(pruned(p, i, pos, expect_as, far));
-    };
+    if (!can_reach(p, i, pos)) { return ok(pruned(p, i, pos, expect_as, far)); };
     let st = match_rule(p, rule, pos, i, far)?;
-    if (st.hit) {
-        return ok(Step { ..st, kids: [Tree(i, st.kids)] });
-    };
-    if (pos < st.far.pos || expect_as.is_empty()) {
-        return ok(no(st.far, pos));
-    };
+    if (st.hit) { return ok(Step { ..st, kids: [Tree(i, st.kids)] }); };
+    if (pos < st.far.pos || expect_as.is_empty()) { return ok(no(st.far, pos)); };
 
     // The label replaces what the production expected, not what was recorded:
     // those are not expectations, and they are not the production's to drop.
@@ -933,9 +893,7 @@ fn can_reach<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64) -> bool {
 # difference and it is confined to the expected-set of an error reported at this
 # exact position; see `label_sets` in `ebnf.aipl` for the exact version.
 fn pruned<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, expect_as: str, far: Far) -> Step {
-    if (expect_as.is_nonempty()) {
-        return no(far_miss(far, pos, expect_as), pos);
-    };
+    if (expect_as.is_nonempty()) { return no(far_miss(far, pos, expect_as), pos); };
     no(p.labels[i].value_or(#{}).left_fold(far, |f: Far, l: str| far_miss(f, pos, l)), pos)
 }
 
@@ -964,11 +922,7 @@ fn label_sets<K: variant, A: any>(prods: Production<K, A>[], firsts: First<K>[])
     while (going) {
         let prev = labels;
         let next = prods.map(|pr| rule_labels(pr.rule, prods, firsts, prev));
-        if (next == prev) {
-            set going = false;
-        } else {
-            set labels = next;
-        };
+        if (next == prev) { set going = false; } else { set labels = next; };
     }
     labels
 }
@@ -1031,9 +985,7 @@ fn seq_labels<K: variant, A: any>(
     mut out: #{str} = #{};
     for (let sub : rs) {
         set out = out.union(rule_labels(sub, prods, firsts, labels));
-        if (!rule_nullable(sub, firsts)) {
-            return out;
-        };
+        if (!rule_nullable(sub, firsts)) { return out; };
     }
     out
 }
@@ -1068,9 +1020,7 @@ fn rule_nullable<K: variant>(r: Rule<K>, firsts: First<K>[]) -> bool {
 # first. The empty string never matches — that is what `tok_text` returns past
 # the end of the tokens, so running out of input simply ends the climb.
 fn find_prec(precs: Prec[], text: str, min_power: u64) -> Prec? {
-    if (text.is_empty()) {
-        return none;
-    };
+    if (text.is_empty()) { return none; };
     precs.find_if(|pr| min_power <= pr.power && pr.ops.contains(text))
 }
 
@@ -1105,9 +1055,7 @@ fn climb<K: variant, A: any>(
     far: Far,
 ) -> Step!Abort {
     let head = match_rule(p, atom, pos, cur, far)?;
-    if (!head.hit) {
-        return ok(head);
-    };
+    if (!head.hit) { return ok(head); };
     mut kids = head.kids;
     mut cp = head.pos;
     mut f = head.far;
@@ -1366,9 +1314,7 @@ fn finished<K: variant, A: any>(
 
     // Nothing was recorded, so there is nothing to look for: the common case, and
     // the reason a parse that meets no `Expect` pays nothing for the walk.
-    if (far.recorded.is_empty()) {
-        return ok(Recovered { cst: some(tree), errors: [] });
-    };
+    if (far.recorded.is_empty()) { return ok(Recovered { cst: some(tree), errors: [] }); };
     ok(Recovered {
         cst: some(tree),
         errors: recovered_errors(p, src, missing_slips(tree), none, false),
@@ -1382,9 +1328,7 @@ fn stopped<K: variant, A: any>(
     src: str,
     Abort { error, recorded, input },
 ) -> Recovered!ParseError {
-    if (!input) {
-        return err(error);
-    };
+    if (!input) { return err(error); };
     ok(Recovered { cst: none, errors: recovered_errors(p, src, recorded, some(error), true) })
 }
 
@@ -1433,12 +1377,8 @@ fn recovered_errors<K: variant, A: any>(
     }
     if (let some(e) = last) {
         let clash = out.any(|prior| prior.span == e.span);
-        if (clash && last_wins) {
-            set out = out.filter(|prior| prior.span != e.span);
-        };
-        if (!clash || last_wins) {
-            set out.push(e);
-        };
+        if (clash && last_wins) { set out = out.filter(|prior| prior.span != e.span); };
+        if (!clash || last_wins) { set out.push(e); };
     };
     out
 }
@@ -2281,9 +2221,7 @@ variant Node = Atom(str) | List(Node[])
 # The lowering every fixture production uses: a node with no interior children
 # is a leaf carrying its text, anything else a branch carrying its children.
 fn build_node(src: str, Parts { cst }, kids: Node[]) -> Node {
-    if (kids.is_nonempty()) {
-        return List(kids);
-    };
+    if (kids.is_nonempty()) { return List(kids); };
     Atom(cst.text(src))
 }
 

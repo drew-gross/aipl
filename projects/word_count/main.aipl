@@ -41,9 +41,7 @@ pub fn word_count(self: str) -> u64 {
         if (c.is_whitespace()) {
             set inside = false;
         } else {
-            if (!inside) {
-                set words++;
-            };
+            if (!inside) { set words++; };
             set inside = true;
         };
     }
@@ -116,15 +114,9 @@ fn add(a: Counts, b: Counts) -> Counts {
 # spaces.
 fn row(c: Counts, columns: Columns, label: str) -> str {
     mut cells: str[] = [];
-    if (columns.lines) {
-        set cells.push(`{c.lines}`);
-    };
-    if (columns.words) {
-        set cells.push(`{c.words}`);
-    };
-    if (columns.bytes) {
-        set cells.push(`{c.bytes}`);
-    };
+    if (columns.lines) { set cells.push(`{c.lines}`); };
+    if (columns.words) { set cells.push(`{c.words}`); };
+    if (columns.bytes) { set cells.push(`{c.bytes}`); };
     set cells.push(label);
     cells.join(sep=" ")
 }.test({
@@ -212,9 +204,7 @@ fn count_files(paths: str[], columns: Columns) !prints !read_files -> i64 {
             },
         };
     }
-    if (paths.len() > 1) {
-        print(row(total, columns, "total"));
-    };
+    if (paths.len() > 1) { print(row(total, columns, "total")); };
     status
 }
 

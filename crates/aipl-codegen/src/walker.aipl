@@ -439,15 +439,11 @@ fn shape(self: ListStyle) -> ListShape {
 # this only describes both layouts.
 fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
     let ListShape { open, close, spaced, trailing } = style.shape();
-    if (items.is_empty()) {
-        return Text(`{open}{close}`);
-    };
+    if (items.is_empty()) { return Text(`{open}{close}`); };
     let edge = if (spaced) { Line } else { SoftLine };
     let inner = [edge, ..items.intersperse(Concat([Text(","), Line]))];
     mut parts = [Text(open), Indent(Concat(inner))];
-    if (trailing) {
-        set parts.push(IfBroken(","));
-    };
+    if (trailing) { set parts.push(IfBroken(",")); };
     set parts.push(edge);
     set parts.push(Text(close));
     group(Concat(parts))
@@ -580,9 +576,7 @@ fn without_trailing_break(self: Doc) -> Doc {
 
 fn drop_trailing_break(self: Doc[]) -> Doc[] {
     let n = self.len();
-    if (n == 0) {
-        return self;
-    };
+    if (n == 0) { return self; };
     if (self[n - 1].value_or(Concat([])).is_line_break()) { self[..n - 1] } else { self }
 }
 
@@ -600,9 +594,7 @@ fn is_line_break(self: Doc) -> bool {
 # it just pushed (AIPL has no `last_mut`).
 fn with_last(self: Doc[], d: Doc) -> Doc[] {
     let n = self.len();
-    if (n == 0) {
-        return self.push(d);
-    };
+    if (n == 0) { return self.push(d); };
     self[..n - 1].push(d)
 }
 
@@ -661,9 +653,7 @@ fn import_source_precedes(a: str, b: str) -> bool {
 # `without ..` clause.
 fn ty(self: W) -> WDoc!FmtError {
     let head = self.ty_head()?;
-    if (head.w.peek_text() != "without") {
-        return ok(head);
-    };
+    if (head.w.peek_text() != "without") { return ok(head); };
     let x = head.w.bump().w.exclusion()?;
     ok(WDoc { w: x.w, doc: Concat([head.doc, Text(" without "), x.doc]) })
 }
@@ -674,9 +664,7 @@ fn ty_head(self: W) -> WDoc!FmtError {
         let inner = self.bump().w.base_ty()?;
         return ok(WDoc { w: inner.w, doc: Concat([Text("!"), inner.doc]) });
     };
-    if (self.peek_text() == "(") {
-        return self.paren_ty();
-    };
+    if (self.peek_text() == "(") { return self.paren_ty(); };
     let base = self.base_ty()?;
     if (base.w.peek_text() == "!") {
         let e = base.w.bump().w.base_ty()?;
@@ -779,9 +767,7 @@ fn dict_value_ty(self: W) -> WDocs!FmtError {
 # are unambiguously the argument brackets.
 fn named_ty(self: W) -> WDoc!FmtError {
     let n = self.bump();
-    if (n.w.peek_text() != "<") {
-        return ok(WDoc { w: n.w, doc: Text(n.text) });
-    };
+    if (n.w.peek_text() != "<") { return ok(WDoc { w: n.w, doc: Text(n.text) }); };
     let args = n.w.bump().w.ty_list(">", [])?;
     let closed = args.w.expect(">")?.w;
     ok(WDoc { w: closed, doc: Concat([Text(n.text), comma_list_docs(args.docs, Angles)]) })
@@ -829,9 +815,7 @@ fn array_suffixes(self: W, acc0: Doc[]) -> WDocs {
 # empty text, so this collapses the two.) A bound is optional — bare `T` prints
 # as-is, `T: ord` keeps its bound. Shared by `fn`, `struct` and `variant`.
 fn type_params(self: W) -> WDoc!FmtError {
-    if (self.peek_text() != "<") {
-        return ok(WDoc { w: self, doc: Text("") });
-    };
+    if (self.peek_text() != "<") { return ok(WDoc { w: self, doc: Text("") }); };
     let WDocs { w, docs } = self.bump().w.type_param_list([])?;
     let closed = w.expect(">")?.w;
     ok(WDoc { w: closed, doc: comma_list_docs(docs, Angles) })
@@ -883,9 +867,7 @@ fn variant_item(self: W) -> WDoc!FmtError {
     let n = self.expect("variant")?.w.bump();
     let tps = n.w.type_params()?;
     let eq = tps.w.expect("=")?.w;
-    if (eq.refinement_follows()) {
-        return eq.refinement_item(n.text, tps.doc);
-    };
+    if (eq.refinement_follows()) { return eq.refinement_item(n.text, tps.doc); };
     let cs = eq.variant_cases([])?;
     ok(WDoc {
         w: cs.w,
@@ -1024,15 +1006,9 @@ fn case_params(self: W, acc0: Doc[]) -> WDocs!FmtError {
 fn variant_body(cases: VCase[]) -> Doc[] {
     mut out = [];
     for (let i, c : cases) {
-        if (0 < i) {
-            set out.push(Line);
-        };
+        if (0 < i) { set out.push(Line); };
         set out.push(c.lead);
-        if (0 < i) {
-            set out.push(Text("| "));
-        } else {
-            set out.push(IfBroken("| "));
-        };
+        if (0 < i) { set out.push(Text("| ")); } else { set out.push(IfBroken("| ")); };
         set out.push(c.body);
     }
     out
@@ -1063,9 +1039,7 @@ fn program(self: W) -> WDoc!FmtError {
     mut out = [h.doc, m.doc, ..sorted_imports(imports).intersperse(HardLine)];
     let had_imports = imports.is_nonempty();
     for (let i, d : items) {
-        if (0 < i || had_imports) {
-            set out.push(BlankLine);
-        };
+        if (0 < i || had_imports) { set out.push(BlankLine); };
         set out.push(d);
     }
     ok(WDoc { w, doc: Concat(out) })
@@ -1084,9 +1058,7 @@ fn module_doc_lines(self: W) -> u64 {
     mut n: u64 = 0;
     mut taken: u64 = 0;
     while (self.peek_is_n(n, DocTok)) {
-        if (self.blank_line_after_n(n)) {
-            set taken = n + 1;
-        };
+        if (self.blank_line_after_n(n)) { set taken = n + 1; };
         set n++;
     }
     taken
@@ -1188,18 +1160,10 @@ fn item(self: W) -> WDoc!FmtError {
     // `pub` leads a function or a constant, so which one it is takes the token
     // after it.
     let kind = if (t == "pub") { self.peek_text_n(1) } else { t };
-    if (kind == "let") {
-        return self.const_item();
-    };
-    if (t == "pub" || t == "fn") {
-        return self.fn_item();
-    };
-    if (t == "struct") {
-        return self.struct_item();
-    };
-    if (t == "variant") {
-        return self.variant_item();
-    };
+    if (kind == "let") { return self.const_item(); };
+    if (t == "pub" || t == "fn") { return self.fn_item(); };
+    if (t == "struct") { return self.struct_item(); };
+    if (t == "variant") { return self.variant_item(); };
     err(self.err_here(`formatter: expected an item (fn/struct/variant/let/import), found "{t}"`))
 }
 
@@ -1268,20 +1232,14 @@ fn fn_item(self: W) -> WDoc!FmtError {
 # may be named `str`, which the formatter classifies as a builtin type rather
 # than an identifier.
 fn fn_body(self: W) -> WDoc!FmtError {
-    if (self.peek_text() != "{") {
-        return self.block();
-    };
+    if (self.peek_text() != "{") { return self.block(); };
 
     // `{ ..base, field: value }` — the spread form. Settled by the token right
     // after the `{`, not the one after that: `..` cannot begin a statement, so
     // there is nothing for it to be confused with.
-    if (self.peek_text_n(1) == "..") {
-        return self.bump().w.construct_body();
-    };
+    if (self.peek_text_n(1) == "..") { return self.bump().w.construct_body(); };
     let after = self.peek_text_n(2);
-    if (after == ":" || after == ",") {
-        return self.bump().w.construct_body();
-    };
+    if (after == ":" || after == ",") { return self.bump().w.construct_body(); };
     self.block()
 }
 
@@ -1512,9 +1470,7 @@ fn block_laid_out(self: W, fit_statements: bool) -> WDoc!FmtError {
     // single-expression body may stay flat.
     let has_stmt = w.range_has_stmt(body_start..w.pos);
     let closed = w.expect("}")?.w;
-    if (entries.is_empty()) {
-        return ok(WDoc { w: closed, doc: Text("{}") });
-    };
+    if (entries.is_empty()) { return ok(WDoc { w: closed, doc: Text("{}") }); };
     let edge = if (has_stmt && !fit_statements) { HardLine } else { Line };
     ok(WDoc {
         w: closed,
@@ -1548,9 +1504,7 @@ fn block_entries(self: W, entries0: Doc[], prev_end0: u64) -> WEntries!FmtError 
         if (w.peek_text() == "}") {
             // Drop the line break `lead` left dangling before `}` — the closing
             // edge supplies it.
-            if (had_lead) {
-                set entries = entries.trim_last_break();
-            };
+            if (had_lead) { set entries = entries.trim_last_break(); };
             set open = false;
         } else {
             let start = w.next_start();
@@ -1571,9 +1525,7 @@ fn block_entries(self: W, entries0: Doc[], prev_end0: u64) -> WEntries!FmtError 
 
 fn trim_last_break(self: Doc[]) -> Doc[] {
     let n = self.len();
-    if (n == 0) {
-        return self;
-    };
+    if (n == 0) { return self; };
     self.with_last(self[n - 1].value_or(Concat([])).without_trailing_break())
 }
 
@@ -1584,9 +1536,7 @@ fn range_has_stmt(self: W, Span { start, end }) -> bool {
     mut i = start;
     while (i < end) {
         let t = self.tok_text(i);
-        if (t == ";" || t == "fn") {
-            return true;
-        };
+        if (t == ";" || t == "fn") { return true; };
         set i++;
     }
     false
@@ -1595,30 +1545,18 @@ fn range_has_stmt(self: W, Span { start, end }) -> bool {
 # One statement (consuming its `;`) or the block's trailing expression.
 fn statement(self: W) -> WDoc!FmtError {
     let t = self.peek_text();
-    if (t == "let") {
-        return self.let_stmt();
-    };
-    if (t == "mut") {
-        return self.mut_stmt();
-    };
-    if (t == "set") {
-        return self.set_stmt();
-    };
+    if (t == "let") { return self.let_stmt(); };
+    if (t == "mut") { return self.mut_stmt(); };
+    if (t == "set") { return self.set_stmt(); };
     if (t == "return") {
         let v = self.bump().w.expr()?;
         let done = v.w.expect(";")?.w;
         return ok(WDoc { w: done, doc: Concat([Text("return "), v.doc, Text(";")]) });
     };
-    if (t == "for") {
-        return self.for_stmt();
-    };
-    if (t == "while") {
-        return self.while_stmt();
-    };
+    if (t == "for") { return self.for_stmt(); };
+    if (t == "while") { return self.while_stmt(); };
     // A function declared inside a `.test` block: an item, laid out as one.
-    if (t == "fn" || t == "pub") {
-        return self.fn_item();
-    };
+    if (t == "fn" || t == "pub") { return self.fn_item(); };
     let e = self.expr()?;
     if (e.w.peek_text() != ";") {
         // The block's trailing (value) expression.
@@ -1646,9 +1584,7 @@ fn let_stmt(self: W) -> WDoc!FmtError {
         });
     };
     let n = kw.bump();
-    if (n.w.peek_text() == "{") {
-        return n.w.struct_pattern("let", n.text);
-    };
+    if (n.w.peek_text() == "{") { return n.w.struct_pattern("let", n.text); };
     if (n.w.peek_text() == "(") {
         let ids = n.w.bump().w.ident_list(")", []);
         return ids.w
@@ -1712,28 +1648,16 @@ fn let_tail(self: W, head: Doc) -> WDoc!FmtError {
 # a literal or array pattern, or a case or tuple pattern with anything but plain
 # names inside its parentheses. Those go through `pattern`, as a `match` arm's do.
 fn general_pattern_ahead(self: W) -> bool {
-    if (self.peek_is(StrTok) || self.peek_is(CharTok) || self.peek_is(Num)) {
-        return true;
-    };
-    if (self.peek_text() == "[") {
-        return true;
-    };
+    if (self.peek_is(StrTok) || self.peek_is(CharTok) || self.peek_is(Num)) { return true; };
+    if (self.peek_text() == "[") { return true; };
     let open: u64 = if (self.peek_text() == "(") { 0 } else { 1 };
-    if (self.peek_text_n(open) != "(") {
-        return false;
-    };
+    if (self.peek_text_n(open) != "(") { return false; };
     mut n: u64 = open + 1;
     while (n < self.toks.len()) {
         let t = self.peek_text_n(n);
-        if (t == ")") {
-            return false;
-        };
-        if (t == "(" || t == "[" || t == "{" || self.peek_is_n(n, StrTok)) {
-            return true;
-        };
-        if (self.peek_is_n(n, CharTok) || self.peek_is_n(n, Num)) {
-            return true;
-        };
+        if (t == ")") { return false; };
+        if (t == "(" || t == "[" || t == "{" || self.peek_is_n(n, StrTok)) { return true; };
+        if (self.peek_is_n(n, CharTok) || self.peek_is_n(n, Num)) { return true; };
         set n++;
     }
     false
@@ -1742,9 +1666,7 @@ fn general_pattern_ahead(self: W) -> bool {
 # `mut x = e;`, `mut x: T = e;`, or `mut Name { a, b } = e;`.
 fn mut_stmt(self: W) -> WDoc!FmtError {
     let n = self.bump().w.bump();
-    if (n.w.peek_text() == "{") {
-        return n.w.struct_pattern("mut", n.text);
-    };
+    if (n.w.peek_text() == "{") { return n.w.struct_pattern("mut", n.text); };
     let a = n.w.binding_ann()?;
     let v = a.w.expect("=")?.w.expr()?;
     let done = v.w.expect(";")?.w;
@@ -1787,9 +1709,7 @@ fn struct_pattern(self: W, kw: str, name: str) -> WDoc!FmtError {
 # absent). Positioned after the name and before the `=`, so both callers can
 # splice it in unconditionally.
 fn binding_ann(self: W) -> WDoc!FmtError {
-    if (self.peek_text() != ":") {
-        return ok(WDoc { w: self, doc: Text("") });
-    };
+    if (self.peek_text() != ":") { return ok(WDoc { w: self, doc: Text("") }); };
     let WDoc { w, doc } = self.bump().w.ty()?;
     ok(WDoc { w, doc: Concat([Text(": "), doc]) })
 }.test({
@@ -1912,17 +1832,13 @@ fn for_stmt(self: W) -> WDoc!FmtError {
 # `Case(a, b)`, or a struct pattern `T { a, b as c }` — the name followed by its
 # parentheses or braces.
 fn binder_item(self: W) -> WStr {
-    if (self.peek_text() == "(") {
-        return self.tuple_binder();
-    };
+    if (self.peek_text() == "(") { return self.tuple_binder(); };
     let n = self.bump();
     if (n.w.peek_text() == "(") {
         let tuple = n.w.tuple_binder();
         return WStr { w: tuple.w, text: `{n.text}{tuple.text}` };
     };
-    if (n.w.peek_text() != "{") {
-        return WStr { w: n.w, text: n.text };
-    };
+    if (n.w.peek_text() != "{") { return WStr { w: n.w, text: n.text }; };
     let ids = n.w.bump().w.field_binder_list();
     let text = `{n.text} \{ {ids.names.join(sep=", ")} }`;
 
@@ -2081,9 +1997,7 @@ fn unary(self: W) -> WDoc!FmtError {
 fn postfix(self: W) -> WDoc!FmtError {
     let head = self.atom()?;
     let WSegs { w, segs } = head.w.postfix_segs([])?;
-    if (segs.is_empty()) {
-        return ok(WDoc { w, doc: head.doc });
-    };
+    if (segs.is_empty()) { return ok(WDoc { w, doc: head.doc }); };
 
     // A "member chain" (2+ method calls) becomes one group that, when it can't
     // fit, breaks before every call segment — the receiver ends up alone on the
@@ -2149,9 +2063,7 @@ fn dot_seg(self: W) -> WSeg!FmtError {
 # there is not. It glues to the name on its left and lays its types out as any
 # angle list.
 fn turbofish_if_any(self: W) -> WDoc!FmtError {
-    if (self.peek_text() != "::") {
-        return ok(WDoc { w: self, doc: Concat([]) });
-    };
+    if (self.peek_text() != "::") { return ok(WDoc { w: self, doc: Concat([]) }); };
     let WDocs { w, docs } = self.bump().w.expect("<")?.w.ty_list(">", [])?;
     let closed = w.expect(">")?.w;
     ok(WDoc { w: closed, doc: Concat([Text("::"), comma_list_docs(docs, Angles)]) })
@@ -2182,13 +2094,9 @@ fn index_or_from(self: W) -> WDocs!FmtError {
         let column = a.w.bump().w.expr()?;
         return ok(WDocs { w: column.w, docs: [a.doc, Text(", "), column.doc] });
     };
-    if (a.w.peek_text() != "..") {
-        return ok(WDocs { w: a.w, docs: [a.doc] });
-    };
+    if (a.w.peek_text() != "..") { return ok(WDocs { w: a.w, docs: [a.doc] }); };
     let dots = a.w.bump().w;
-    if (dots.peek_text() == "]") {
-        return ok(WDocs { w: dots, docs: [a.doc, Text("..")] });
-    };
+    if (dots.peek_text() == "]") { return ok(WDocs { w: dots, docs: [a.doc, Text("..")] }); };
     let b = dots.expr()?;
     ok(WDocs { w: b.w, docs: [a.doc, Text(".."), b.doc] })
 }
@@ -2204,41 +2112,23 @@ fn chain_docs(segs: Seg[]) -> Doc[] {
 fn atom(self: W) -> WDoc!FmtError {
     // Kind-dispatched forms first: a template literal is copied verbatim, and a
     // string / number / char / constant is its own text.
-    if (self.peek_is(TemplateOpenTok)) {
-        return self.template_verbatim();
-    };
-    if (self.peek_is(StrTok)) {
-        return ok(self.bump().str_atom());
-    };
+    if (self.peek_is(TemplateOpenTok)) { return self.template_verbatim(); };
+    if (self.peek_is(StrTok)) { return ok(self.bump().str_atom()); };
     if (self.peek_is(Num) || self.peek_is(CharTok) || self.peek_is(Constant)) {
         let WStr { w, text } = self.bump();
         return ok(WDoc { w, doc: Text(text) });
     };
     let t = self.peek_text();
-    if (t == "if") {
-        return self.if_expr();
-    };
-    if (t == "match") {
-        return self.match_expr();
-    };
-    if (t == "shim") {
-        return self.shim_expr();
-    };
+    if (t == "if") { return self.if_expr(); };
+    if (t == "match") { return self.match_expr(); };
+    if (t == "shim") { return self.shim_expr(); };
 
     // A lambda used as a value (`let f = |x: i64| { .. }`). Only the single-`|`
     // form reaches expression position; `||` there would be a binary operator.
-    if (t == "|") {
-        return self.lambda();
-    };
-    if (t == "(") {
-        return self.paren_atom();
-    };
-    if (t == "[") {
-        return self.array_atom();
-    };
-    if (t == "#") {
-        return self.set_or_dict_atom();
-    };
+    if (t == "|") { return self.lambda(); };
+    if (t == "(") { return self.paren_atom(); };
+    if (t == "[") { return self.array_atom(); };
+    if (t == "#") { return self.set_or_dict_atom(); };
     self.name_atom()
 }
 
@@ -2278,9 +2168,7 @@ fn tuple_rest(self: W, acc0: Doc[]) -> WDocs!FmtError {
 
         // A trailing comma before `)` ends the tuple rather than starting an
         // element.
-        if (stepped.peek_text() == ")") {
-            return ok(WDocs { w: stepped, docs: acc });
-        };
+        if (stepped.peek_text() == ")") { return ok(WDocs { w: stepped, docs: acc }); };
         let e = stepped.expr()?;
         set acc.push(e.doc);
         set w = e.w;
@@ -2354,18 +2242,14 @@ fn name_atom(self: W) -> WDoc!FmtError {
             doc: Concat([Text(n.text), typed.doc, call_arg_list(args.docs, hug)]),
         });
     };
-    if (n.w.peek_text() == "{") {
-        return n.w.bump().w.struct_atom(n.text);
-    };
+    if (n.w.peek_text() == "{") { return n.w.bump().w.struct_atom(n.text); };
     ok(WDoc { w: n.w, doc: Text(n.text) })
 }
 
 fn struct_atom(self: W, name: str) -> WDoc!FmtError {
     let WDocs { w, docs } = self.struct_inits([])?;
     let closed = w.expect("}")?.w;
-    if (docs.is_empty()) {
-        return ok(WDoc { w: closed, doc: Text(`{name} \{}`) });
-    };
+    if (docs.is_empty()) { return ok(WDoc { w: closed, doc: Text(`{name} \{}`) }); };
     ok(WDoc { w: closed, doc: Concat([Text(`{name} `), comma_list_docs(docs, SpacedBraces)]) })
 }
 
@@ -2433,18 +2317,17 @@ fn if_chain(self: W) -> WDoc!FmtError {
         WDoc { w: closed, doc: Concat([Text("if ("), cond.doc, Text(") ")]) }
     };
 
-    // The branches share the chain's group (via the ungrouped `block_layout`,
-    // and the ungrouped recursion for an `else if`), so they break *together*.
-    let then_b = lead.w.block_layout()?;
+    // The branches share the chain's group (via the ungrouped `block_laid_out`,
+    // and the ungrouped recursion for an `else if`), so they break *together*. A
+    // branch of one statement stays on the line when the chain fits: `if (c) { return 0; }`.
+    let then_b = lead.w.block_laid_out(true)?;
     let head = [lead.doc, then_b.doc];
-    if (then_b.w.peek_text() != "else") {
-        return ok(WDoc { w: then_b.w, doc: Concat(head) });
-    };
+    if (then_b.w.peek_text() != "else") { return ok(WDoc { w: then_b.w, doc: Concat(head) }); };
     let stepped = then_b.w.bump().w;
     let tail = if (stepped.peek_text() == "if") {
         stepped.if_chain()?
     } else {
-        stepped.block_layout()?
+        stepped.block_laid_out(true)?
     };
     ok(WDoc { w: tail.w, doc: Concat([..head, Text(" else "), tail.doc]) })
 }
@@ -2472,9 +2355,7 @@ fn match_expr(self: W) -> WDoc!FmtError {
     // The head never breaks at its parentheses: `match (` .. `) {` is one line,
     // as the single-scrutinee form always was.
     let head = Concat([Text("match "), flat_parens(scrut.docs), Text(" ")]);
-    if (arms.docs.is_empty()) {
-        return ok(WDoc { w: closed, doc: Concat([head, Text("{}")]) });
-    };
+    if (arms.docs.is_empty()) { return ok(WDoc { w: closed, doc: Concat([head, Text("{}")]) }); };
 
     // A `match` always lays out one arm per line (hard breaks), never collapsing
     // onto a single line even when it would fit — and those hard breaks force any
@@ -2587,9 +2468,7 @@ fn pattern_alts(self: W, first: Doc) -> WDoc!FmtError {
 
     // A lone pattern is not an alternation — hand back the doc untouched rather
     // than wrapping every ordinary arm in a group that can never break.
-    if (parts.len() == 1) {
-        return ok(WDoc { w, doc: first });
-    };
+    if (parts.len() == 1) { return ok(WDoc { w, doc: first }); };
     ok(WDoc { w, doc: Group(false, Concat(parts)) })
 }
 
@@ -2597,17 +2476,13 @@ fn pattern(self: W) -> WDoc!FmtError {
     // A literal pattern — a string (`"lit" => ..`, str scrutinee), a char
     // (`'c' => ..`, char scrutinee) or an integer — lays out as its source,
     // with a string re-delimited exactly as it would be in expression position.
-    if (self.peek_is(StrTok)) {
-        return ok(self.bump().str_atom());
-    };
+    if (self.peek_is(StrTok)) { return ok(self.bump().str_atom()); };
 
     // A string written with backticks is a template run of three tokens, and a
     // pattern can hold no other kind of template — it matches a value, and an
     // interpolation computes one. `template_verbatim` respells it through
     // `requote`, exactly as `str_atom` does for the quoted spelling.
-    if (self.peek_is(TemplateOpenTok)) {
-        return self.template_verbatim();
-    };
+    if (self.peek_is(TemplateOpenTok)) { return self.template_verbatim(); };
     if (self.peek_is(CharTok) || self.peek_is(Num)) {
         let b = self.bump();
         return ok(WDoc { w: b.w, doc: Text(b.text) });
@@ -2640,9 +2515,7 @@ fn pattern(self: W) -> WDoc!FmtError {
         let closed = ids.w.expect("}")?.w;
         return ok(WDoc { w: closed, doc: Text(`{q.text} \{ {ids.names.join(sep=", ")} }`) });
     };
-    if (q.w.peek_text() != "(") {
-        return ok(WDoc { w: q.w, doc: Text(q.text) });
-    };
+    if (q.w.peek_text() != "(") { return ok(WDoc { w: q.w, doc: Text(q.text) }); };
     // The payload: `..`, or a list of patterns — each of which may nest.
     let opened = q.w.bump().w;
     if (opened.peek_text() == "..") {
@@ -2726,9 +2599,7 @@ fn call_arg(self: W) -> WDoc!FmtError {
         let v = n.w.bump().w.expr()?;
         return ok(WDoc { w: v.w, doc: Concat([Text(`{n.text}=`), v.doc]) });
     };
-    if (self.peek_text() == "|" || self.peek_text() == "||") {
-        return self.lambda();
-    };
+    if (self.peek_text() == "|" || self.peek_text() == "||") { return self.lambda(); };
 
     // A bare operator passed as a value: an operator token immediately followed
     // by `,` or a closing bracket.
@@ -2786,9 +2657,7 @@ fn lambda_param(self: W) -> WDoc!FmtError {
         let closed = slots.w.expect(")")?.w;
         return ok(WDoc { w: closed, doc: Concat([Text(n.text), flat_parens(slots.docs)]) });
     };
-    if (n.w.peek_text() == ":") {
-        return n.w.lambda_param_ty(n.text);
-    };
+    if (n.w.peek_text() == ":") { return n.w.lambda_param_ty(n.text); };
     ok(WDoc { w: n.w, doc: Text(n.text) })
 }
 
@@ -2836,9 +2705,7 @@ fn template_scan(self: W, start: u64, depth0: u64) -> WDoc!FmtError {
         let text = self.src[span];
         if (kind == TemplateOpenTok) {
             set depth++;
-            if (depth == 1) {
-                set piece_start = span.end;
-            };
+            if (depth == 1) { set piece_start = span.end; };
         } else if (kind == TplCloseTok) {
             if (depth <= 1) {
                 set segs.push(self.src[piece_start..span.start]);
@@ -2936,9 +2803,7 @@ fn skip_comments_before(self: W, end: u64) -> W {
 fn hugs_sole_arg(self: W) -> bool {
     // Declines when a comment sits before the argument: it needs its own line,
     // above the whole call.
-    if (self.comment_before_cursor()) {
-        return false;
-    };
+    if (self.comment_before_cursor()) { return false; };
 
     // The argument's last token: the one before the call's `)`, past a trailing
     // comma from source already broken. An empty call has none.
@@ -2985,9 +2850,7 @@ fn chain_in(self: W, first: u64, last: u64) -> bool {
 # nothing to hug, and a call ending in one takes the ordinary broken list.
 fn is_construct_end(self: W, i: u64) -> bool {
     let t = self.tok_text(i);
-    if (t != ")" && t != "]" && t != "}") {
-        return false;
-    };
+    if (t != ")" && t != "]" && t != "}") { return false; };
     self.hug_open(i).is_some_and(|open| open + 1 < i)
 }
 
@@ -3038,9 +2901,7 @@ fn template_head(self: W, i: u64) -> u64 {
             set depth++;
         } else if (self.toks[j].is_some_and(|t| t.kind == TemplateOpenTok)) {
             set depth--;
-            if (depth == 0) {
-                return j;
-            };
+            if (depth == 0) { return j; };
         };
         set j--;
     }
@@ -3059,9 +2920,7 @@ fn hug_close(self: W, start: u64) -> u64? {
             set depth++;
         } else {
             if (t == ")" || t == "]" || t == "}") {
-                if (depth <= 1) {
-                    return some(i);
-                };
+                if (depth <= 1) { return some(i); };
                 set depth--;
             };
         };
@@ -3081,9 +2940,7 @@ fn hug_open(self: W, end: u64) -> u64? {
             set depth++;
         } else {
             if (t == "(" || t == "[" || t == "{" || t == "#{") {
-                if (depth <= 1) {
-                    return some(i);
-                };
+                if (depth <= 1) { return some(i); };
                 set depth--;
             };
         };

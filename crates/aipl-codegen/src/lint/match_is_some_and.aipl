@@ -41,9 +41,7 @@ pub fn match_is_some_and(Function { body }) -> UnfilledHit[] {
     body
         .option_matches()
         .map(|OptionMatch { scrutinee, binder, some_body, none_body }| {
-            if (none_body.kind != Bool(false) || some_body.kind == Bool(true)) {
-                return [];
-            };
+            if (none_body.kind != Bool(false) || some_body.kind == Bool(true)) { return []; };
             [advice(scrutinee.receiver_text(), binder, none_body.span)]
         })
         .join()

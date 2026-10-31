@@ -269,9 +269,7 @@ pub fn str_lit_value(text: str) -> str {
         // `finalize` and emit take.
         return process_raw_string(text[3..text.len() - 3]).unescape_braces();
     };
-    if (text.starts_with(`"""`)) {
-        return process_raw_string(text[3..text.len() - 3]);
-    };
+    if (text.starts_with(`"""`)) { return process_raw_string(text[3..text.len() - 3]); };
     text[1..text.len() - 1].unescape()
 }.test({
     // A `"..."` literal: escapes decoded, nothing else.

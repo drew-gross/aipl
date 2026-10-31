@@ -308,12 +308,8 @@ fn breaks_after(src: str, at: u64) -> bool {
     mut i = at;
     while (i < src.len()) {
         let c = src[i..i + 1];
-        if (c == "\n") {
-            return true;
-        };
-        if (c != " " && c != "\t" && c != "\r") {
-            return false;
-        };
+        if (c == "\n") { return true; };
+        if (c != " " && c != "\t" && c != "\r") { return false; };
         set i++;
     }
     true
@@ -365,9 +361,7 @@ fn leading(self: Piece) -> str {
 # first; there is no better answer for a comment with nothing to attach to.
 fn item_key(ps: Piece[]) -> str {
     for (let p : ps) {
-        if (p.starts_item()) {
-            return p.leading();
-        };
+        if (p.starts_item()) { return p.leading(); };
     }
     ""
 }.test({
@@ -411,29 +405,21 @@ fn inline_doc(ps: Piece[], space: (str, str) -> bool) -> Doc {
     for (let p : ps) {
         match (p) {
             Tok(t) => {
-                if (gap_wanted(prev, t, space)) {
-                    set out.push(Text(" "));
-                };
+                if (gap_wanted(prev, t, space)) { set out.push(Text(" ")); };
                 set out.push(Text(t));
                 set prev = t;
             },
             Node(d, f, l) => {
-                if (gap_wanted(prev, f, space)) {
-                    set out.push(Text(" "));
-                };
+                if (gap_wanted(prev, f, space)) { set out.push(Text(" ")); };
                 set out.push(d);
-                if (l != "") {
-                    set prev = l;
-                };
+                if (l != "") { set prev = l; };
             },
             // A comment takes a space in front of it whatever the rule says — it
             // is prose, not punctuation — and then either ends the line or is
             // followed by one space. Either way what comes next starts fresh, so
             // the rule is never asked across a comment.
             Note(t, brk) => {
-                if (prev != "") {
-                    set out.push(Text(" "));
-                };
+                if (prev != "") { set out.push(Text(" ")); };
                 set out.push(Text(t));
                 set out.push(if (brk) { HardLine } else { Text(" ") });
                 set prev = "";
@@ -515,15 +501,11 @@ fn wrapped(
     // A pair that is only a pair — a block's braces — is laid out like any other
     // run of children. The group still told the *parser* where the brackets are,
     // which is the half of a group that has nothing to do with layout.
-    if (!st.wraps) {
-        return inline_doc([..open, ..mid, ..close], space);
-    };
+    if (!st.wraps) { return inline_doc([..open, ..mid, ..close], space); };
     let od = inline_doc(open, space);
     let cd = inline_doc(close, space);
     let items = list_items(mid, st, space);
-    if (items.is_empty()) {
-        return Concat([od, cd]);
-    };
+    if (items.is_empty()) { return Concat([od, cd]); };
 
     // A style that reads as words takes a space inside its brackets while flat
     // (`{ a, b }`); the rest hug their contents (`(a, b)`).
@@ -533,9 +515,7 @@ fn wrapped(
 
     // A separator after the last item, written only once the list breaks. A
     // juxtaposed list has no separator to write.
-    if (st.trailing && st.sep != "") {
-        set parts.push(IfBroken(st.sep));
-    };
+    if (st.trailing && st.sep != "") { set parts.push(IfBroken(st.sep)); };
     set parts.push(edge);
     set parts.push(cd);
     group(Concat(parts))
@@ -648,12 +628,8 @@ fn list_items(mid: Piece[], ListStyle { sep, sorted }, space: (str, str) -> bool
             set cur.push(p);
         };
     }
-    if (cur.is_nonempty()) {
-        set items.push(item_of(cur, space));
-    };
-    if (sorted) {
-        set items = items.sort_by(|a, b| a.key < b.key);
-    };
+    if (cur.is_nonempty()) { set items.push(item_of(cur, space)); };
+    if (sorted) { set items = items.sort_by(|a, b| a.key < b.key); };
     items$doc
 }.test({
     fn texts(ds: Doc[]) -> str[] { ds$at(80) }

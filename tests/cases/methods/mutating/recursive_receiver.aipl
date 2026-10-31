@@ -153,9 +153,7 @@ fn spell(mut self: str, n: i64) {
 # one that aborted. Nothing here mutates, so only the handing back and forth is
 # under test.
 fn unchanged(mut self: str, n: i64) {
-    if (n > 0) {
-        set self.unchanged(n - 1);
-    };
+    if (n > 0) { set self.unchanged(n - 1); };
 }.test({
     mut s = "xy";
     set s.unchanged(3);

@@ -48,13 +48,7 @@ fn both(a: i64?, b: i64?) -> i64 {
 
 // The block may branch, as long as every path returns.
 fn picky(o: i64?, flag: bool) -> i64 {
-    let some(n) = o else {
-        if (flag) {
-            return 10;
-        } else {
-            return 20;
-        };
-    };
+    let some(n) = o else { if (flag) { return 10; } else { return 20; }; };
     n
 }
 

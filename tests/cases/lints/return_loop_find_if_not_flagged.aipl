@@ -20,9 +20,7 @@ import {
 // rather than mis-advised.
 fn first_big_doubled(xs: i64[], lo: i64) -> i64? {
     for (let x : xs) {
-        if (lo < x) {
-            return some(x * 2);
-        };
+        if (lo < x) { return some(x * 2); };
     }
     none
 }
@@ -31,11 +29,7 @@ fn first_big_doubled(xs: i64[], lo: i64) -> i64? {
 // first one and is not a search at all.
 fn head_sign(xs: i64[]) -> i64? {
     for (let x : xs) {
-        if (0 < x) {
-            return some(1);
-        } else {
-            return some(0);
-        };
+        if (0 < x) { return some(1); } else { return some(0); };
     }
     none
 }
@@ -44,9 +38,7 @@ fn head_sign(xs: i64[]) -> i64? {
 // the not-found answer — `find_if` would drop what the fall-through does.
 fn first_big_or_first(xs: i64[], lo: i64) -> i64? {
     for (let x : xs) {
-        if (lo < x) {
-            return some(x);
-        };
+        if (lo < x) { return some(x); };
     }
     xs[0]
 }
@@ -80,9 +72,7 @@ fn has_big(xs: i64[], lo: i64) -> bool {
 // testing — `find_if` hands back the element it matched.
 fn lo_if_any_big(xs: i64[], lo: i64) -> i64? {
     for (let x : xs) {
-        if (lo < x) {
-            return some(lo);
-        };
+        if (lo < x) { return some(lo); };
     }
     none
 }
@@ -92,9 +82,7 @@ fn lo_if_any_big(xs: i64[], lo: i64) -> i64? {
 fn first_multiple(n: i64, of: i64) -> i64? {
     mut i = 0;
     while (i < n) {
-        if (i == of) {
-            return some(i);
-        };
+        if (i == of) { return some(i); };
         set i++;
     }
     none
@@ -106,9 +94,7 @@ fn first_multiple(n: i64, of: i64) -> i64? {
 // reads it is not, and the desugared shape is what keeps both quiet.
 fn first_big_after(xs: i64[], lo: i64, skip: u64) -> i64? {
     for (let i, x : xs) {
-        if (skip < i + 1 && lo < x) {
-            return some(x);
-        };
+        if (skip < i + 1 && lo < x) { return some(x); };
     }
     none
 }

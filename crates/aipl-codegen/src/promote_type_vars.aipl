@@ -72,9 +72,7 @@ fn promote_item(self: Item) -> Item {
 
 fn promoted_function(self: Function) -> Function {
     let vars = self.sig.type_vars$name;
-    if (vars.is_empty()) {
-        return self;
-    };
+    if (vars.is_empty()) { return self; };
     Function {
         ..self,
         sig: Signature {
@@ -89,9 +87,7 @@ fn promoted_function(self: Function) -> Function {
 
 fn promoted_struct(self: StructDecl) -> StructDecl {
     let vars = self.type_vars$name;
-    if (vars.is_empty()) {
-        return self;
-    };
+    if (vars.is_empty()) { return self; };
     StructDecl {
         ..self,
         fields: self.fields.map(|f| FieldDecl {
@@ -104,9 +100,7 @@ fn promoted_struct(self: StructDecl) -> StructDecl {
 
 fn promoted_variant(self: VariantDecl) -> VariantDecl {
     let vars = self.type_vars$name;
-    if (vars.is_empty()) {
-        return self;
-    };
+    if (vars.is_empty()) { return self; };
     VariantDecl { ..self, cases: self.cases$promoted_case(vars) }
 }
 

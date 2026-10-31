@@ -13,9 +13,7 @@ import { equal as ==, less_than as <, print, to_str, wrapping_mul as * } from bu
 // The `none` as the block's tail.
 fn index_of_big(xs: i64[], lo: i64) -> u64? {
     for (let i, x : xs) {
-        if (lo < x) {
-            return some(i);
-        };
+        if (lo < x) { return some(i); };
     }
     none
 }
@@ -24,9 +22,7 @@ fn index_of_big(xs: i64[], lo: i64) -> u64? {
 // apart either — so it is flagged the same way.
 fn index_of_go(names: str[]) -> u64? {
     for (let i, n : names) {
-        if (n == "go") {
-            return some(i);
-        };
+        if (n == "go") { return some(i); };
     }
     return none;
 }
@@ -37,9 +33,7 @@ fn evens(n: i64) -> i64[] { [n, n * 2] }
 // before its parens — so the message leaves a placeholder where it would go.
 fn index_of_even_over(n: i64, lo: i64) -> u64? {
     for (let i, x : evens(n)) {
-        if (lo < x) {
-            return some(i);
-        };
+        if (lo < x) { return some(i); };
     }
     none
 }
@@ -51,19 +45,19 @@ fn main() !prints {
 }
 --- errors ---
 error: this loop returns the position of the first element passing a test, and "none" otherwise — write "return xs.find_index(|x| ..);" and drop the loop, importing `find_index` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_return_loop_find_index.aipl:17:20
+  --> ./tests/cases/lints/err_return_loop_find_index.aipl:16:30
    |
-17 |             return some(i);
-   |                    ^^^^^^^
+16 |         if (lo < x) { return some(i); };
+   |                              ^^^^^^^
 
 error: this loop returns the position of the first element passing a test, and "none" otherwise — write "return names.find_index(|n| ..);" and drop the loop, importing `find_index` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_return_loop_find_index.aipl:28:20
+  --> ./tests/cases/lints/err_return_loop_find_index.aipl:25:33
    |
-28 |             return some(i);
-   |                    ^^^^^^^
+25 |         if (n == "go") { return some(i); };
+   |                                 ^^^^^^^
 
 error: this loop returns the position of the first element passing a test, and "none" otherwise — write "return <iterable>.find_index(|x| ..);" and drop the loop, importing `find_index` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_return_loop_find_index.aipl:41:20
+  --> ./tests/cases/lints/err_return_loop_find_index.aipl:36:30
    |
-41 |             return some(i);
-   |                    ^^^^^^^
+36 |         if (lo < x) { return some(i); };
+   |                              ^^^^^^^

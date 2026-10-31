@@ -19,9 +19,7 @@ import {
 // cannot express, and mis-advising it would silently change what is searched.
 fn later_big(xs: i64[], lo: i64) -> u64? {
     for (let i, x : xs) {
-        if (0 < i && lo < x) {
-            return some(i);
-        };
+        if (0 < i && lo < x) { return some(i); };
     }
     none
 }
@@ -30,9 +28,7 @@ fn later_big(xs: i64[], lo: i64) -> u64? {
 // step, which is two things the one-line advice doesn't spell.
 fn one_past_big(xs: i64[], lo: i64) -> u64? {
     for (let i, x : xs) {
-        if (lo < x) {
-            return some(i + 1);
-        };
+        if (lo < x) { return some(i + 1); };
     }
     none
 }
@@ -42,9 +38,7 @@ fn one_past_big(xs: i64[], lo: i64) -> u64? {
 // never both, so the two lints never fire on the same loop.
 fn first_big(xs: i64[], lo: i64) -> i64? {
     for (let i, x : xs) {
-        if (lo < x) {
-            return some(x);
-        };
+        if (lo < x) { return some(x); };
     }
     none
 }
@@ -53,11 +47,7 @@ fn first_big(xs: i64[], lo: i64) -> i64? {
 // first one and is not a search at all.
 fn head_sign(xs: i64[]) -> u64? {
     for (let i, x : xs) {
-        if (0 < x) {
-            return some(i);
-        } else {
-            return some(0);
-        };
+        if (0 < x) { return some(i); } else { return some(0); };
     }
     none
 }
@@ -66,9 +56,7 @@ fn head_sign(xs: i64[]) -> u64? {
 fn noisy(xs: i64[], lo: i64) !prints -> u64? {
     for (let i, x : xs) {
         print(x.to_str());
-        if (lo < x) {
-            return some(i);
-        };
+        if (lo < x) { return some(i); };
     }
     none
 }
@@ -77,9 +65,7 @@ fn noisy(xs: i64[], lo: i64) !prints -> u64? {
 // so the loop is not simply a search.
 fn index_or_len(xs: i64[], lo: i64) -> u64? {
     for (let i, x : xs) {
-        if (lo < x) {
-            return some(i);
-        };
+        if (lo < x) { return some(i); };
     }
     some(xs.len())
 }
@@ -89,9 +75,7 @@ fn index_or_len(xs: i64[], lo: i64) -> u64? {
 fn count_to_big(xs: i64[], lo: i64) -> u64? {
     mut n: u64 = 0;
     for (let x : xs) {
-        if (lo < x) {
-            return some(n);
-        };
+        if (lo < x) { return some(n); };
         set n++;
     }
     none

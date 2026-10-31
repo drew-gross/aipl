@@ -133,9 +133,7 @@ fn main() !prints {
     // A named function; the body prints.
     mut n = 0;
     for (let y : xs.map(triple)) {
-        if (n < 3) {
-            print(y.to_str());
-        };
+        if (n < 3) { print(y.to_str()); };
         set n++;
     }
 

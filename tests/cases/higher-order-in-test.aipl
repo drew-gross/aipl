@@ -15,9 +15,7 @@ fn filter_evens(arr: i64[], pred: (i64) -> bool) -> i64[] {
     // regression is about.
     mut result = []; #[allow]
     for (let item : arr) {
-        if (pred(item)) {
-            set result.push(item);
-        };
+        if (pred(item)) { set result.push(item); };
     }
     result
 }.test({

@@ -21,16 +21,12 @@ import {
 # `xs.count(x) < n` (and the mirrored `n > xs.count(x)`) into this. Also
 # callable directly.
 pub fn count_is_less_than<T: any>(self: T[], x: T, limit: u64) -> bool {
-    if (limit == 0) {
-        return false;
-    };
+    if (limit == 0) { return false; };
     mut n: u64 = 0;
     for (let e : self) {
         if (e == x) {
             set n++;
-            if (n >= limit) {
-                return false;
-            };
+            if (n >= limit) { return false; };
         };
     }
     true

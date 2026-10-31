@@ -14,9 +14,7 @@ import {
 } from builtins;
 
 fn safe_add(a: i64, b: i64, allow_neg: bool) -> i64!str {
-    if (!allow_neg && (a < 0 || b < 0)) {
-        return err("negative");
-    };
+    if (!allow_neg && (a < 0 || b < 0)) { return err("negative"); };
     ok(a + b)
 }
 

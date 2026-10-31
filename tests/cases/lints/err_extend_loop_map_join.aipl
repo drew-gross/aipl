@@ -18,9 +18,7 @@ fn pairs(xs: i64[]) -> i64[] {
 fn pairs_of_positives(xs: i64[]) -> i64[] {
     mut out: i64[] = [];
     for (let x : xs) {
-        if (0 != x) {
-            set out.extend([x, x]);
-        };
+        if (0 != x) { set out.extend([x, x]); };
     }
     out
 }
@@ -53,7 +51,7 @@ error: "out" is seeded empty and filled by this loop and nothing else — write 
    |                      ^^
 
 error: "out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.join();" and drop the loop, importing `join` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_extend_loop_map_join.aipl:30:22
+  --> ./tests/cases/lints/err_extend_loop_map_join.aipl:28:22
    |
-30 |     mut out: i64[] = [];
+28 |     mut out: i64[] = [];
    |                      ^^

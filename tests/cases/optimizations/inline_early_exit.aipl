@@ -26,21 +26,15 @@ import {
 // Called from one place, so `inline_single_use` takes it — and `clamped` is
 // gone from the `functions:` block below, guard clause and all.
 fn clamped(x: i64) -> i64 {
-    if (x > 10) {
-        return 10;
-    };
+    if (x > 10) { return 10; };
     x * 2
 }
 
 // Two guards in a row, so the continuation moves twice. Called from three
 // places, which exercises both exits and the fall-through.
 fn graded(x: i64) -> str {
-    if (x < 0) {
-        return "negative";
-    };
-    if (x == 0) {
-        return "zero";
-    };
+    if (x < 0) { return "negative"; };
+    if (x == 0) { return "zero"; };
     "positive"
 }
 
@@ -49,11 +43,7 @@ fn graded(x: i64) -> str {
 // dropped with the branch it was in.
 fn floored(x: i64) -> i64 {
     mut y = 0;
-    if (x > 0) {
-        set y = x + 1;
-    } else {
-        return 0;
-    };
+    if (x > 0) { set y = x + 1; } else { return 0; };
     y + 100
 }
 
@@ -63,9 +53,7 @@ fn floored(x: i64) -> i64 {
 // still refused by the inliner, and still has to work.
 fn first_over(xs: i64[], limit: i64) -> i64 {
     for (let x : xs) {
-        if (x > limit) {
-            return x;
-        };
+        if (x > limit) { return x; };
     }
     0
 }

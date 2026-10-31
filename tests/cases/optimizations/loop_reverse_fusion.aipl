@@ -44,9 +44,7 @@ fn last_three(xs: i64[]) -> str {
     mut out = "";
     mut seen = 0;
     for (let x : xs.reverse()) {
-        if (seen < 3) {
-            set out.extend(`{x} `);
-        };
+        if (seen < 3) { set out.extend(`{x} `); };
         set seen++;
     }
     out

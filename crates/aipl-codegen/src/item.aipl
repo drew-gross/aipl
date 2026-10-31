@@ -256,9 +256,7 @@ fn show_doc(self: str?) -> str { self.map(|d| `doc({d}) `).value_or("") }
 fn show_const_ty(self: Ty?) -> str { self.map(|t| `: {show_ty(t)}`).value_or("") }
 
 fn show_type_params(self: TypeParam[]) -> str {
-    if (self.is_empty()) {
-        return "";
-    };
+    if (self.is_empty()) { return ""; };
     `<{self$show_type_param().join(sep=", ")}>`
 }
 
@@ -280,9 +278,7 @@ fn show_field_decl(self: FieldDecl) -> str {
 
 fn show_case(self: VariantCase) -> str {
     let head = `{show_doc(self.doc)}{self.name.text}`;
-    if (self.payload.is_empty()) {
-        return head;
-    };
+    if (self.payload.is_empty()) { return head; };
     `{head}({self.payload$show_case_param().join(sep=", ")})`
 }
 
@@ -295,9 +291,7 @@ fn show_case_param(self: CaseParam) -> str {
 }
 
 fn opt_marker(self: bool) -> str {
-    if (self) {
-        return "?";
-    };
+    if (self) { return "?"; };
     ""
 }
 

@@ -25,9 +25,7 @@ fn main() !prints {
     // Chars of a str.
     mut doubled = 0;
     for (let (c, d) : "aabcc".tuple_windows()) {
-        if (c == d) {
-            set doubled++;
-        };
+        if (c == d) { set doubled++; };
     }
     print(doubled.to_str());
 }

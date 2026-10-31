@@ -34,9 +34,7 @@ fn step(w: Walk, line: str) -> Walk {
     // A validated section name is never empty, so `""` doubles as "not a
     // header" and can never match a pending fill.
     let header = parse_test_section_header(line).value_or("");
-    if (w.skipping && header == "") {
-        return w;
-    };
+    if (w.skipping && header == "") { return w; };
     let kept = `{w.out}{line}\n`;
     w.pending
         .get(header)
@@ -53,9 +51,7 @@ fn step(w: Walk, line: str) -> Walk {
 # Append a fresh `--- section ---` block for every fill the file carried no
 # header for, after dropping the trailing newlines the walk copied over.
 fn append_missing(out: str, pending: #{str: str}) -> str {
-    if (pending.is_empty()) {
-        return out;
-    };
+    if (pending.is_empty()) { return out; };
     mut acc = out.trim_end_while(|c| c == '\n' || c == '\r');
     for (let section, body : pending) {
         set acc.extend(`\n--- {section} ---\n{body}`);
@@ -84,9 +80,7 @@ pub fn fill_or_add_sections(contents: str, fills: #{str: str}) -> str {
             set line_start = i + 1;
         };
     }
-    if (line_start < contents.len()) {
-        set w = step(w, contents[line_start..]);
-    };
+    if (line_start < contents.len()) { set w = step(w, contents[line_start..]); };
     append_missing(w.out, w.pending)
 }.test({
     // Fixtures below embed real `--- name ---` marker lines inside `"""` raw

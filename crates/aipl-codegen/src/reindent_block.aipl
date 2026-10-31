@@ -42,17 +42,13 @@ pub fn reindent_block(self: str, base: u64) -> str {
     let ls = self.lines();
     let n = ls.len();
     // A single-line atom (no interior newline) has nothing to re-lay-out.
-    if (n < 2) {
-        return self;
-    };
+    if (n < 2) { return self; };
 
     // Only a semantically-inert blank closing line — leading whitespace then a
     // bare triple-quote / triple-backtick delimiter — is touched; anything else
     // (a content-bearing final line) leaves the atom byte-for-byte.
     let closing = ls.last().value_or("").trim();
-    if (closing != `"""` && closing != "```") {
-        return self;
-    };
+    if (closing != `"""` && closing != "```") { return self; };
 
     let opening = ls.first().value_or("");
 

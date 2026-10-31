@@ -30,9 +30,7 @@ import {
 pub fn map_find_if<T: any, U: any>(self: T[], f: (T) -> U, pred: (U) -> bool) -> U? {
     for (let x : self) {
         let y = f(x);
-        if (pred(y)) {
-            return some(y);
-        };
+        if (pred(y)) { return some(y); };
     }
     none
 }.test({

@@ -27,9 +27,7 @@ fn tail_after_let() -> u8 {
 
 // ...and so does one returned early from a branch.
 fn early_return(b: bool) -> u8 {
-    if (b) {
-        return 250;
-    };
+    if (b) { return 250; };
     1
 }
 

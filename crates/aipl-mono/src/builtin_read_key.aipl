@@ -43,15 +43,11 @@ pub fn read_key() !read_stdin_raw -> Key? {
     match (read_byte()) {
         none => none,
         some(first) => {
-            if (first != ESCAPE) {
-                return some(Other(first));
-            };
+            if (first != ESCAPE) { return some(Other(first)); };
             match (read_byte()) {
                 none => some(Other(first)),
                 some(second) => {
-                    if (second != BRACKET) {
-                        return some(Other(second));
-                    };
+                    if (second != BRACKET) { return some(Other(second)); };
                     match (read_byte()) {
                         none => some(Other(second)),
                         some(last) => some(arrow_ending(last)),

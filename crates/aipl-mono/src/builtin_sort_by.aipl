@@ -55,11 +55,7 @@ pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
                 some(y) => less(x, y),
                 none => true, #[allow]
             };
-            if (step) {
-                set placed = true;
-            } else {
-                set k++;
-            };
+            if (step) { set placed = true; } else { set k++; };
         }
         set out = [..out[..k], x, ..out[k..]];
     }

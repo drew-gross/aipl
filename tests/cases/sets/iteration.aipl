@@ -44,11 +44,7 @@ fn char_strs(s: #{char}) -> str[] {
 fn bool_score(s: #{bool}) -> i64 {
     mut n = 0;
     for (let b : s) {
-        if (b) {
-            set n++;
-        } else {
-            set n += 10;
-        };
+        if (b) { set n++; } else { set n += 10; };
     }
     n
 }

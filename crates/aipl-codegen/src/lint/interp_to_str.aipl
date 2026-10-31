@@ -33,9 +33,7 @@ pub fn interp_to_str(program: Program) -> LintHit[] {
             .map(|value| {
                 let Call(callee, arguments, _) = value.kind else { return []; };
                 let [argument] = arguments else { return []; };
-                if (callee != to_str) {
-                    return [];
-                };
+                if (callee != to_str) { return []; };
 
                 // The argument is spliced into the advice only where its span is its text:
                 // a call's span stops before its closing paren.

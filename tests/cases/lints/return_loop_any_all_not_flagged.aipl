@@ -8,9 +8,7 @@ fn counted(xs: i64[], lo: i64) -> bool {
     mut seen = 0;
     for (let x : xs) {
         set seen++;
-        if (x > lo) {
-            return true;
-        };
+        if (x > lo) { return true; };
     }
     seen > 99
 }
@@ -18,11 +16,7 @@ fn counted(xs: i64[], lo: i64) -> bool {
 // An `else` branch — same reason.
 fn with_else(xs: i64[], lo: i64) !prints -> bool {
     for (let x : xs) {
-        if (x > lo) {
-            return true;
-        } else {
-            print("looked");
-        };
+        if (x > lo) { return true; } else { print("looked"); };
     }
     false
 }
@@ -31,9 +25,7 @@ fn with_else(xs: i64[], lo: i64) !prints -> bool {
 // exits answer the same thing and the loop is a constant, not an `any`.
 fn always_true(xs: i64[], lo: i64) -> bool {
     for (let x : xs) {
-        if (x > lo) {
-            return true;
-        };
+        if (x > lo) { return true; };
     }
     true
 }
@@ -41,9 +33,7 @@ fn always_true(xs: i64[], lo: i64) -> bool {
 // The fall-through does work, so it is not an answer at all.
 fn falls_through_to_work(xs: i64[], lo: i64) !prints -> bool {
     for (let x : xs) {
-        if (x > lo) {
-            return true;
-        };
+        if (x > lo) { return true; };
     }
     print("none matched");
     false
@@ -67,9 +57,7 @@ fn first_big(xs: i64[], lo: i64) -> i64? {
 // which is not something a diagnostic should attempt, so this is left alone.
 fn none_zero(xs: i64[]) -> bool {
     for (let x : xs) {
-        if (x == 0) {
-            return false;
-        };
+        if (x == 0) { return false; };
     }
     true
 }
@@ -77,9 +65,7 @@ fn none_zero(xs: i64[]) -> bool {
 // A condition that propagates with `?` cannot move into a lambda unchanged.
 fn any_big_checked(xs: i64[], lo: i64) -> bool!Error {
     for (let x : xs) {
-        if (checked(x)? > lo) {
-            return ok(true);
-        };
+        if (checked(x)? > lo) { return ok(true); };
     }
     ok(false)
 }

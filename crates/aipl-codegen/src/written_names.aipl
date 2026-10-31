@@ -51,9 +51,7 @@ pub fn written_names(tokens: Span[], src: str, bare_is_case: bool) -> WrittenNam
         if (text == "(" || text == "[") {
             set depth++;
         } else if (text == ")" || text == "]") {
-            if (depth > 0) {
-                set depth--;
-            };
+            if (depth > 0) { set depth--; };
         } else if (text.starts_name()) {
             if (token_text(tokens, src, i - 1) == ".") {
                 set cases.push(WrittenName { text, span: at });

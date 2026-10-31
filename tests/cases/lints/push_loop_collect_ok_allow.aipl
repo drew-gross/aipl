@@ -7,9 +7,7 @@ import { collect_ok, int_parse, join, print, push, to_str } from builtins;
 fn parsed(words: str[]) -> i64[] {
     mut out: i64[] = []; #[allow]
     for (let word : words) {
-        if (let some(n) = word.int_parse()) {
-            set out.push(n);
-        };
+        if (let some(n) = word.int_parse()) { set out.push(n); };
     }
     out
 }

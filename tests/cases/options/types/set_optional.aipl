@@ -27,11 +27,7 @@ fn main() {}.test({
     assert(pick(true) == some(#{3, 2, 1}));
     assert(pick(false) == none);
     assert(pick(true).is_some());
-    if (let some(s) = pick(true)) {
-        assert(s.union(#{4}).len() == 4);
-    } else {
-        assert(false);
-    };
+    if (let some(s) = pick(true)) { assert(s.union(#{4}).len() == 4); } else { assert(false); };
 
     // The order of an ordered set survives.
     assert(ordered().value_or(#>{}).to_array() == [9, 7, 5]);

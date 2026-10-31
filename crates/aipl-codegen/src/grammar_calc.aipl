@@ -129,9 +129,7 @@ fn lower_unary(src: str, node: Parts, kids: Calc[]) -> Calc!ParseError {
             message: "a unary expression has no operand",
             span: node.span(),
         })?;
-    if (node.own_token_text(src).is_nonempty()) {
-        return ok(Neg(inner));
-    };
+    if (node.own_token_text(src).is_nonempty()) { return ok(Neg(inner)); };
     ok(inner)
 }
 
@@ -408,9 +406,7 @@ pub fn eval_calc(self: Calc) -> i64 {
 # Integer exponentiation by repeated multiplication. A negative exponent has no
 # integer value, so it yields 0 rather than failing — see `eval_calc`'s doc.
 fn pow(base: i64, exp: i64) -> i64 {
-    if (exp < 0) {
-        return 0;
-    };
+    if (exp < 0) { return 0; };
     mut acc: i64 = 1;
     mut i: i64 = 0;
     while (i < exp) {

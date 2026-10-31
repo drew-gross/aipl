@@ -141,9 +141,7 @@ pub fn span_named(self: WrittenName[], text: str) -> Span {
 # struct patterns; the empty span if it does not.
 pub fn binder_span(self: WrittenNames, text: str) -> Span {
     let found = self.binders.span_named(text);
-    if (found != 0..0) {
-        return found;
-    };
+    if (found != 0..0) { return found; };
     self.structs$binders.join().span_named(text)
 }.test({
     let direct = WrittenName { text: "a", span: 1..2 };
@@ -281,12 +279,8 @@ variant Destructure =
 # which is a span that ends before it starts — and a caret rendered from one is
 # nonsense. Contributing nothing is the honest answer.
 pub fn join_spans(a: Span, b: Span) -> Span {
-    if (a.start == a.end) {
-        return b;
-    };
-    if (b.start == b.end) {
-        return a;
-    };
+    if (a.start == a.end) { return b; };
+    if (b.start == b.end) { return a; };
     min(a.start, b.start)..max(a.end, b.end)
 }
 
@@ -442,9 +436,7 @@ fn show_arms(self: MatchArm[]) -> str { self$show_arm().join(sep=", ") }
 # A call, in the spelling its `method_style` flag says was written: the receiver
 # is `args[0]` for a method call and an ordinary argument for a free one.
 fn show_call(name: str, args: Expr[], method_style: bool) -> str {
-    if (!method_style) {
-        return `{name}({show_exprs(args)})`;
-    };
+    if (!method_style) { return `{name}({show_exprs(args)})`; };
     match (args.first()) {
         some(recv) => `{recv.show_expr()}.{name}({show_exprs(args[1..])})`,
         none => `{name}({show_exprs(args)})`,
@@ -462,9 +454,7 @@ fn show_ann(self: Ty?) -> str { self.map(|t| `: {t.show_ty()}`).value_or("") }
 fn show_lambda_param(self: LambdaParam) -> str { `{self.name}{show_ann(self.ty)}` }
 
 fn show_field_init(self: FieldInit) -> str {
-    if (self.name.is_empty()) {
-        return self.value.show_expr();
-    };
+    if (self.name.is_empty()) { return self.value.show_expr(); };
     `{self.name}: {self.value.show_expr()}`
 }
 

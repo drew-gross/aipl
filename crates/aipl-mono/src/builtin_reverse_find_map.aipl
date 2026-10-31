@@ -18,9 +18,7 @@ import { equal as ==, greater_than as >, reverse, to_digit, wrapping_mul as * } 
 # A `str` receiver iterates its chars.
 pub fn reverse_find_map<T: any, U: any>(self: T[], f: (T) -> U?) -> U? {
     for (let x : self.reverse()) {
-        if (let some(y) = f(x)) {
-            return some(y);
-        };
+        if (let some(y) = f(x)) { return some(y); };
     }
     none
 }.test({

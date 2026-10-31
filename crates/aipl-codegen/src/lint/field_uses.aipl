@@ -62,9 +62,7 @@ pub fn uses_of(self: Expr, name: str) -> Uses {
     let nodes = self.descendants();
     mut fields: str[] = [];
     for (let read : self.field_reads().filter(|r| r.base == name)) {
-        if (!fields.contains(read.field)) {
-            set fields.push(read.field);
-        };
+        if (!fields.contains(read.field)) { set fields.push(read.field); };
     }
     Uses {
         mentions: nodes.count_if(|node| node.is_name(name)),
@@ -101,18 +99,12 @@ pub fn uses_of(self: Expr, name: str) -> Uses {
 # what tells a field read off two values apart.
 pub fn sole_fields(self: Expr, name: str, reads: Read[]) -> str[]? {
     let Uses { mentions, field_reads, fields, shadowed } = self.uses_of(name);
-    if (shadowed || field_reads == 0 || field_reads != mentions) {
-        return none;
-    };
-    if (fields.is_shared(reads, []) || fields.any(is_tuple_field)) {
-        return none;
-    };
+    if (shadowed || field_reads == 0 || field_reads != mentions) { return none; };
+    if (fields.is_shared(reads, []) || fields.any(is_tuple_field)) { return none; };
 
     // The name itself is exempt: it is the one going away, and every mention of it
     // is the base of a read the pattern replaces.
-    if (self.mentions_any(fields, some(name))) {
-        return none;
-    };
+    if (self.mentions_any(fields, some(name))) { return none; };
     some(fields)
 }.test({
     fn sole(src: str, name: str) -> str[]?!ParseError {

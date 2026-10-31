@@ -57,9 +57,7 @@ fn last_only(xs: i64[]) -> List {
 // The same reassignment one scope down, in an `if` body rather than a loop.
 fn conditional() -> List {
     mut acc = Cons(1, Nil);
-    if (1 == 1) {
-        set acc = Cons(7, acc);
-    };
+    if (1 == 1) { set acc = Cons(7, acc); };
     acc
 }
 

@@ -20,9 +20,7 @@ import { equal as ==, len, less_than as <, push } from builtins;
 pub fn intersperse<T: any>(self: T[], sep: T) -> T[] {
     mut out = [];
     for (let i, x : self) {
-        if (0 < i) {
-            set out.push(sep);
-        };
+        if (0 < i) { set out.push(sep); };
         set out.push(x);
     }
     out

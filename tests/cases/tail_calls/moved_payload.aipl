@@ -26,9 +26,7 @@ import {
 variant Calc = Num(i64) | Bin(str, Calc, Calc)
 
 fn pow(base: i64, exp: i64) -> i64 {
-    if (exp < 0) {
-        return 0;
-    };
+    if (exp < 0) { return 0; };
     mut acc: i64 = 1;
     mut i: i64 = 0;
     while (i < exp) {

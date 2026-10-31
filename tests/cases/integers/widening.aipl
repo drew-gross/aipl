@@ -21,9 +21,7 @@ fn takes_i64(n: i64) -> i64 { n }
 fn returns_i64(n: u8) -> i64 { n }
 
 fn early_i32(n: i16) -> i32 {
-    if (n == 0) {
-        return n;
-    };
+    if (n == 0) { return n; };
     n + 1
 }
 

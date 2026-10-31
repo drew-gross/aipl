@@ -102,9 +102,7 @@ fn accumulation(self: LetMut(name, _, seed, body), adder: str) -> Accumulation? 
     // what gives the empty literal its element type) but says nothing about the
     // iterable, so it is not inspected.
     let ArrayLit(seeded) = seed.kind.as_case(ArrayLit)?;
-    if (seeded.is_nonempty()) {
-        return none;
-    };
+    if (seeded.is_nonempty()) { return none; };
 
     // The very next statement must be the loop: a statement between the two could
     // read `acc` while it is still empty, which the rewrite would reorder.
@@ -116,25 +114,19 @@ fn accumulation(self: LetMut(name, _, seed, body), adder: str) -> Accumulation? 
     // `as_case(For)` would say this, but `For` has a keyword parameter, which keeps it
     // from being passed as a function value.
     let For(variable, iterable, loop_body, index) = first.kind else { return none; }; #[allow]
-    if (index.is_some()) {
-        return none;
-    };
+    if (index.is_some()) { return none; };
 
     // An else-less `if` around the add is the filter; anything else in the body (an
     // `else`, a second statement) is work the pipeline has nowhere to put.
     mut statement = loop_body.lone_statement()?;
     mut guard: Expr? = none;
     if (let If(condition, then, otherwise) = statement.kind) {
-        if (otherwise.kind != Unit) {
-            return none;
-        };
+        if (otherwise.kind != Unit) { return none; };
         set guard = some(condition);
         set statement = then.lone_statement()?;
     };
     let added = statement.added_to(name, adder)?;
-    if (!added.is_liftable(name) || !guard$is_liftable(name).value_or(true)) {
-        return none;
-    };
+    if (!added.is_liftable(name) || !guard$is_liftable(name).value_or(true)) { return none; };
     some(Accumulation { name, seed, variable, iterable, guard, added })
 }.test({
     assert(block_accumulations(

@@ -46,9 +46,7 @@ pub fn find_trailing_whitespace(src: str) -> Span? {
             // End of a line: return its trailing run if any. Returning on the first
             // match is the parser's "report the first" rule.
             let s = line_end_span(prev, prev2, i, ws_start, line_start);
-            if (is_some(s)) {
-                return s;
-            };
+            if (is_some(s)) { return s; };
             set line_start = i + 1;
         } else {
             // Extend the current whitespace run, or start a new one. A non-ws byte

@@ -27,9 +27,7 @@ import {
 pub fn count_if<T: any>(self: T[], pred: (T) -> bool) -> u64 {
     mut n: u64 = 0;
     for (let x : self) {
-        if (pred(x)) {
-            set n++;
-        };
+        if (pred(x)) { set n++; };
     }
     n
 }.test({

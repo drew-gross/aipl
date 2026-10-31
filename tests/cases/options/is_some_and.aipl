@@ -6,19 +6,11 @@
 import { equal as ==, is_some_and, less_than_or_equal as <=, logical_not as ! } from builtins;
 
 fn main() -> i64 {
-    if (!some(7).is_some_and(|x| x == 7)) {
-        return 1;
-    };
-    if (some(7).is_some_and(|x| x == 8)) {
-        return 2;
-    };
-    if (""[0].is_some_and(|c| c == 'a')) {
-        return 3;
-    }; // none -> false
+    if (!some(7).is_some_and(|x| x == 7)) { return 1; };
+    if (some(7).is_some_and(|x| x == 8)) { return 2; };
+    if (""[0].is_some_and(|c| c == 'a')) { return 3; }; // none -> false
     let cap = 5;
-    if (!some(3).is_some_and(|x| x <= cap)) {
-        return 4;
-    }; // captured bound
+    if (!some(3).is_some_and(|x| x <= cap)) { return 4; }; // captured bound
     0
 }
 --- stdout ---

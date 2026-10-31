@@ -15,9 +15,7 @@ pub fn collect_ok<T: any>(self: T?[]) -> T[] {
     // This is the loop `push_loop_collect_ok` advises replacing.
     mut out: T[] = []; #[allow]
     for (let x : self) {
-        if (let some(v) = x) {
-            set out.push(v);
-        };
+        if (let some(v) = x) { set out.push(v); };
     }
     out
 }.test({

@@ -25,9 +25,7 @@ pub fn count_if_is_at_most<T: any>(self: T[], pred: (T) -> bool, limit: u64) -> 
     for (let x : self) {
         if (pred(x)) {
             set n++;
-            if (n > limit) {
-                return false;
-            };
+            if (n > limit) { return false; };
         };
     }
     true

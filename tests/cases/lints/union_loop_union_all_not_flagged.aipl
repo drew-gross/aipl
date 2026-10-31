@@ -40,9 +40,7 @@ fn upto_three(xs: #{i64}[]) -> #{i64} {
     mut out: #{i64} = #{};
     for (let s : xs) {
         set out = out.union(s);
-        if (out.len() > 3) {
-            return out;
-        };
+        if (out.len() > 3) { return out; };
     }
     out
 }
@@ -54,9 +52,7 @@ fn upto_three(xs: #{i64}[]) -> #{i64} {
 fn nonempty_only(xs: #{i64}[]) -> #{i64} {
     mut out: #{i64} = #{};
     for (let s : xs) {
-        if (s.is_nonempty()) {
-            set out = out.union(s);
-        };
+        if (s.is_nonempty()) { set out = out.union(s); };
     }
     out
 }

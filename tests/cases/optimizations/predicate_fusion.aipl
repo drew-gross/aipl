@@ -114,13 +114,9 @@ fn main() !prints {
     for (let xs : arrays) {
         print(fast(xs));
         print(slow(xs));
-        if (fast_search(xs) != slow_search(xs)) {
-            print("SEARCH MISMATCH");
-        };
+        if (fast_search(xs) != slow_search(xs)) { print("SEARCH MISMATCH"); };
         print(fast_search(xs));
-        if (fast(xs) != slow(xs)) {
-            print("MISMATCH");
-        };
+        if (fast(xs) != slow(xs)) { print("MISMATCH"); };
     }
     print(`{filter_twice([1, 6, 7, 8, 12, 5])}`);
 

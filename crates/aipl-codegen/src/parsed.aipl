@@ -109,12 +109,8 @@ fn construct_ty_name(name: str, return_ty: Ty?, span: Span) -> str!ParseError {
         message: `fn "{name}": a \`\{ field: value, .. }\` body needs a struct return type to name, but this function declares no return type; add \`-> Struct\`, or give the literal its type`,
         span,
     })?;
-    if (let Named(n) = declared) {
-        return ok(n);
-    };
-    if (let Generic(base, _) = declared) {
-        return ok(base);
-    };
+    if (let Named(n) = declared) { return ok(n); };
+    if (let Generic(base, _) = declared) { return ok(base); };
     err(ParseError {
         message: `fn "{name}": a \`\{ field: value, .. }\` body needs a struct return type to name, but this function returns {declared.show_ty()}; give the literal its type, or return a struct`,
         span,

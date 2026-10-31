@@ -19,9 +19,7 @@ import { equal as ==, wrapping_increment as ++ } from builtins;
 pub fn count<T: any>(self: T[], x: T) -> u64 {
     mut n: u64 = 0;
     for (let e : self) {
-        if (e == x) {
-            set n++;
-        };
+        if (e == x) { set n++; };
     }
     n
 }.test({

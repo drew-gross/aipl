@@ -19,9 +19,7 @@ pub fn count_if_is_greater_than<T: any>(self: T[], pred: (T) -> bool, limit: u64
     for (let x : self) {
         if (pred(x)) {
             set n++;
-            if (n > limit) {
-                return true;
-            };
+            if (n > limit) { return true; };
         };
     }
     false

@@ -14,9 +14,7 @@ pub fn duplicate_import_source(Program { items }) -> LintHit[] {
     mut hits: LintHit[] = [];
     for (let Import(decl) : items.collect_arms(Import)) {
         let ImportDecl { source, source_span } = decl;
-        if (seen.has(source)) {
-            set hits.push(hit(source.message(), source_span));
-        };
+        if (seen.has(source)) { set hits.push(hit(source.message(), source_span)); };
         set seen = #{..seen, source};
     }
     hits

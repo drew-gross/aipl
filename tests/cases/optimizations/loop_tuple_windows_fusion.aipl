@@ -55,9 +55,7 @@ fn many() -> i64[] {
 fn rises(xs: i64[]) -> i64 {
     mut n = 0;
     for (let (a, b) : xs.tuple_windows()) {
-        if (a < b) {
-            set n++;
-        };
+        if (a < b) { set n++; };
     }
     n
 }
@@ -65,9 +63,7 @@ fn rises(xs: i64[]) -> i64 {
 // An early return out of the fused loop.
 fn first_drop(xs: i64[]) -> i64? {
     for (let (a, b) : xs.tuple_windows()) {
-        if (b < a) {
-            return some(a);
-        };
+        if (b < a) { return some(a); };
     }
     none
 }
@@ -76,9 +72,7 @@ fn first_drop(xs: i64[]) -> i64? {
 fn doubled_at(s: str) -> str {
     mut at = "";
     for (let i, w : s.tuple_windows()) {
-        if (w.0 == w.1) {
-            set at.extend(`{w.0}{i}`);
-        };
+        if (w.0 == w.1) { set at.extend(`{w.0}{i}`); };
     }
     at
 }

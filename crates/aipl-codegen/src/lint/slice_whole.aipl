@@ -30,9 +30,7 @@ pub fn slice_whole(Function { body }) -> LintHit[] {
             // An absent end already runs to the length; a present one has to say so.
             let reaches_end = end$is_len_of(receiver).value_or(true);
             let starts_at_edge = start$is_zero().value_or(true);
-            if (!starts_at_edge || !reaches_end) {
-                return [];
-            };
+            if (!starts_at_edge || !reaches_end) { return []; };
 
             // The bound to point at: the `0` when it is written, else the end that says
             // the length (`receiver[..]` is not a form, so one of the two is there).

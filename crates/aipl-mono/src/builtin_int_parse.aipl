@@ -33,9 +33,7 @@ import {
 pub fn int_parse(self: str) -> i64? {
     let neg = self.starts_with('-');
     let body = if (neg) { self.drop_first() } else { self };
-    if (body.is_empty()) {
-        return none;
-    };
+    if (body.is_empty()) { return none; };
     // Trim leading zeros so the remaining count is *significant* digits.
     let digits = body.trim_while(|c| c == '0');
 
@@ -45,9 +43,7 @@ pub fn int_parse(self: str) -> i64? {
     // more than once and land back on a plausible value — e.g. the 20-digit
     // "18446744073709551616" wraps to exactly 0 — which the `v > 0` check
     // would miss).
-    if (digits.len() > 19) {
-        return none;
-    };
+    if (digits.len() > 19) { return none; };
 
     // Accumulate *negative* so every magnitude fits: i64::MIN has no positive
     // counterpart, so building -v digit-by-digit covers the full range and the
@@ -61,9 +57,7 @@ pub fn int_parse(self: str) -> i64? {
     // which ends the fold there; the outer `?` then returns `none` from
     // `int_parse` itself.
     let v = digits.opt_fold(0, |acc, c| some(acc * 10 - c.to_digit()?))?;
-    if (v > 0) {
-        return none;
-    };
+    if (v > 0) { return none; };
 
     // The one non-wrapping overflow: `v` reached exactly i64::MIN, whose
     // negation (-i64::MIN) has no i64 representation (e.g. "9223372036854775808").

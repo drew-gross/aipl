@@ -10,39 +10,21 @@
 import { equal as ==, int_parse, logical_not as !, wrapping_sub as - } from builtins;
 
 fn main() -> i64 {
-    if (!("123".int_parse() == some(123))) {
-        return 1;
-    };
-    if (!("-45".int_parse() == some(0 - 45))) {
-        return 2;
-    };
-    if (!("007".int_parse() == some(7))) {
-        return 3;
-    }; // leading zeros are fine
-    if (!("".int_parse() == none)) {
-        return 4;
-    };
-    if (!("-".int_parse() == none)) {
-        return 5;
-    }; // a sign needs a digit
-    if (!("12a3".int_parse() == none)) {
-        return 6;
-    }; // no trailing garbage
-    if (!("+5".int_parse() == none)) {
-        return 7;
-    }; // no plus sign
+    if (!("123".int_parse() == some(123))) { return 1; };
+    if (!("-45".int_parse() == some(0 - 45))) { return 2; };
+    if (!("007".int_parse() == some(7))) { return 3; }; // leading zeros are fine
+    if (!("".int_parse() == none)) { return 4; };
+    if (!("-".int_parse() == none)) { return 5; }; // a sign needs a digit
+    if (!("12a3".int_parse() == none)) { return 6; }; // no trailing garbage
+    if (!("+5".int_parse() == none)) { return 7; }; // no plus sign
     if (!("9223372036854775807".int_parse() == some(9223372036854775807))) {
         return 8;
     }; // i64::MAX
-    if (!("9223372036854775808".int_parse() == none)) {
-        return 9;
-    }; // one past MAX
+    if (!("9223372036854775808".int_parse() == none)) { return 9; }; // one past MAX
     if (!("-9223372036854775808".int_parse() == some(0 - 9223372036854775807 - 1))) {
         return 10;
     }; // i64::MIN
-    if (!("-9223372036854775809".int_parse() == none)) {
-        return 11;
-    }; // one past MIN
+    if (!("-9223372036854775809".int_parse() == none)) { return 11; }; // one past MIN
     0
 }
 --- stdout ---

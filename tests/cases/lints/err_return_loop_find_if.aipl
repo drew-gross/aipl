@@ -9,9 +9,7 @@ import { equal as ==, less_than as <, print, to_str, wrapping_mul as * } from bu
 // The `none` as the block's tail.
 fn first_big(xs: i64[], lo: i64) -> i64? {
     for (let x : xs) {
-        if (lo < x) {
-            return some(x);
-        };
+        if (lo < x) { return some(x); };
     }
     none
 }
@@ -20,9 +18,7 @@ fn first_big(xs: i64[], lo: i64) -> i64? {
 // apart either — so it is flagged the same way.
 fn first_go(names: str[]) -> str? {
     for (let n : names) {
-        if (n == "go") {
-            return some(n);
-        };
+        if (n == "go") { return some(n); };
     }
     return none;
 }
@@ -33,9 +29,7 @@ fn evens(n: i64) -> i64[] { [n, n * 2] }
 // before its parens — so the message leaves a placeholder where it would go.
 fn first_even_over(n: i64, lo: i64) -> i64? {
     for (let x : evens(n)) {
-        if (lo < x) {
-            return some(x);
-        };
+        if (lo < x) { return some(x); };
     }
     none
 }
@@ -47,19 +41,19 @@ fn main() !prints {
 }
 --- errors ---
 error: this loop returns the first element passing a test, and "none" otherwise — write "return xs.find_if(|x| ..);" and drop the loop, importing `find_if` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_return_loop_find_if.aipl:13:20
+  --> ./tests/cases/lints/err_return_loop_find_if.aipl:12:30
    |
-13 |             return some(x);
-   |                    ^^^^^^^
+12 |         if (lo < x) { return some(x); };
+   |                              ^^^^^^^
 
 error: this loop returns the first element passing a test, and "none" otherwise — write "return names.find_if(|n| ..);" and drop the loop, importing `find_if` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_return_loop_find_if.aipl:24:20
+  --> ./tests/cases/lints/err_return_loop_find_if.aipl:21:33
    |
-24 |             return some(n);
-   |                    ^^^^^^^
+21 |         if (n == "go") { return some(n); };
+   |                                 ^^^^^^^
 
 error: this loop returns the first element passing a test, and "none" otherwise — write "return <iterable>.find_if(|x| ..);" and drop the loop, importing `find_if` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_return_loop_find_if.aipl:37:20
+  --> ./tests/cases/lints/err_return_loop_find_if.aipl:32:30
    |
-37 |             return some(x);
-   |                    ^^^^^^^
+32 |         if (lo < x) { return some(x); };
+   |                              ^^^^^^^

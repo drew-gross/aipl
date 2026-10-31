@@ -102,6 +102,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  better name for OptionMatch
   code_bodies and on_functions don't need to exist now that we have collect_case_arms (or we can make something similar, maybe?)
   self.descendants()$kind.filter(|kind| kind.is_case(arm)) stutters
   vec$foo() when foo is a predicate argument should probably only work if there is some indicator that the predicate is a self function
@@ -436,7 +437,6 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 formatter:
-  allow let bind = foo() else { return fallback; } all on one line
   some way to allow really long string literals to wrap
   the formatter should decide whether to output a trailing comma based on the grammer definition
   wrap comments

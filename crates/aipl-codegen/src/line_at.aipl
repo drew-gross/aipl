@@ -21,18 +21,12 @@ pub fn line_at(source: str, offset: u64) -> LineAt {
     mut found = false;
     for (let i, c : source) {
         if (c == '\n') {
-            if (found) {
-                return LineAt { line, span: line_start..i };
-            };
-            if (i >= offset) {
-                return LineAt { line, span: line_start..i };
-            };
+            if (found) { return LineAt { line, span: line_start..i }; };
+            if (i >= offset) { return LineAt { line, span: line_start..i }; };
             set line++;
             set line_start = i + 1;
         };
-        if (i >= offset) {
-            set found = true;
-        };
+        if (i >= offset) { set found = true; };
     }
     LineAt { line, span: line_start..source.len() }
 }.test({

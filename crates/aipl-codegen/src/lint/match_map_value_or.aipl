@@ -56,12 +56,8 @@ pub fn match_map_value_or(Function { body }) -> UnfilledHit[] {
             } else {
                 false
             };
-            if (identity || none_body.kind == Bool(false) || none_body.kind == Unit) {
-                return [];
-            };
-            if (!some_body.mentions_any([binder], none)) {
-                return [];
-            };
+            if (identity || none_body.kind == Bool(false) || none_body.kind == Unit) { return []; };
+            if (!some_body.mentions_any([binder], none)) { return []; };
             let receiver = scrutinee.receiver_text();
 
             // `some(v) => some(..), none => none`: a `map` with nothing to default. Any other
@@ -74,9 +70,7 @@ pub fn match_map_value_or(Function { body }) -> UnfilledHit[] {
                 };
                 return if (wraps) { [kept_none(receiver, binder, none_body.span)] } else { [] };
             };
-            if (!none_body.is_constant_default()) {
-                return [];
-            };
+            if (!none_body.is_constant_default()) { return []; };
             [with_default(receiver, binder, none_body.default_text(), none_body.span)]
         })
         .join()

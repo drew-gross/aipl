@@ -7,9 +7,7 @@ import { equal as ==, logical_not as !, wrapping_add as + } from builtins;
 pub fn trim_end_while(self: str, pred: (char) -> bool) -> str {
     mut k: u64 = 0; // end of the last non-matching run
     for (let i, c : self) {
-        if (!pred(c)) {
-            set k = i + 1;
-        };
+        if (!pred(c)) { set k = i + 1; };
     }
     self[..k]
 }.test({

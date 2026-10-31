@@ -56,9 +56,7 @@ fn widths(s: str, sep: str) -> str {
 fn first_blank(s: str) -> i64 {
     mut at = 0;
     for (let line : s.lines()) {
-        if (line == "") {
-            return at;
-        };
+        if (line == "") { return at; };
         set at++;
     }
     -1

@@ -45,9 +45,7 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
     body
         .collect_expr_cases(Match)
         .map(|Match(scrutinee, arms)| {
-            if (!arms.all(|arm| arm.body.kind.is_case(Bool))) {
-                return [];
-            };
+            if (!arms.all(|arm| arm.body.kind.is_case(Bool))) { return []; };
             let [MatchArm { pattern, span, body as _ }] = arms.filter(|arm| arm.body.kind == Bool(
                 true,
             )) else {

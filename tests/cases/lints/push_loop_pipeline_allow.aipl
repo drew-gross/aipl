@@ -24,9 +24,7 @@ import {
 fn scaled_above(xs: i64[], lo: i64) -> i64[] {
     mut out: i64[] = []; #[allow]
     for (let x : xs) {
-        if (lo <= x) {
-            set out.push(x * 2);
-        };
+        if (lo <= x) { set out.push(x * 2); };
     }
     out
 }

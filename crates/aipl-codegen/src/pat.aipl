@@ -101,9 +101,7 @@ pub fn is_binder_name(self: str) -> bool {
 # sub-pattern arrives as a nullary `Ctor` (the parser cannot tell a binder from
 # a case by shape alone), which is what the binder test reads.
 pub fn nested_or_ctor(name: str, args: Pat[]) -> Pat {
-    if (args.all(is_plain_binder)) {
-        return Ctor(name, bindings=args$binder_name());
-    };
+    if (args.all(is_plain_binder)) { return Ctor(name, bindings=args$binder_name()); };
     Nested(name, args)
 }.test({
     let plain: Pat[] = [Ctor("a"), Ctor("b")];
@@ -124,9 +122,7 @@ fn is_plain_binder(self: Pat) -> bool {
 }
 
 fn binder_name(self: Pat) -> str {
-    if (let Ctor(name, _, _) = self) {
-        return name;
-    };
+    if (let Ctor(name, _, _) = self) { return name; };
     ""
 }
 
@@ -228,16 +224,12 @@ fn nested_bindings(self: Pat) -> str[] {
 fn no_names() -> str[] { [] }
 
 fn is_ident(self: Expr) -> bool {
-    if (let Ident(..) = self.kind) {
-        return true;
-    };
+    if (let Ident(..) = self.kind) { return true; };
     false
 }
 
 fn ident_name(self: Expr) -> str {
-    if (let Ident(name) = self.kind) {
-        return name;
-    };
+    if (let Ident(name) = self.kind) { return name; };
     ""
 }
 
@@ -269,9 +261,7 @@ pub fn pat_label(self: Pat) -> str {
 # The binder list as the same diagnostic writes it: each name quoted, or the
 # word "nothing" when there are none.
 pub fn binder_list(self: str[]) -> str {
-    if (self.is_empty()) {
-        return "nothing";
-    };
+    if (self.is_empty()) { return "nothing"; };
     self.map(|x| `"{x}"`).join(sep=", ")
 }.test({
     let none_bound: str[] = [];

@@ -20,9 +20,7 @@ import { equal as ==, greater_than as >, to_digit, wrapping_mul as * } from buil
 # for a predicate on the mapped values.
 pub fn find_map<T: any, U: any>(self: T[], f: (T) -> U?) -> U? {
     for (let x : self) {
-        if (let some(y) = f(x)) {
-            return some(y);
-        };
+        if (let some(y) = f(x)) { return some(y); };
     }
     none
 }.test({

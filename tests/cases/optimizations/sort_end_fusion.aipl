@@ -31,9 +31,7 @@ fn main() !prints {
     let empty: i64[] = [];
     for (let xs : [empty, [4], [2, 2], [5, 3, 9, 1, 7, 1, 8], [-3, 0, -3, 6]]) {
         print(fast(xs));
-        if (fast(xs) != slow(xs)) {
-            print("MISMATCH");
-        };
+        if (fast(xs) != slow(xs)) { print("MISMATCH"); };
     }
     // Strings and chars order too.
     print(`{["pear", "apple", "fig"].sort().first()} {"hello".sort().last()}`);

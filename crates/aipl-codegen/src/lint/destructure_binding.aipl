@@ -77,9 +77,7 @@ pub fn destructure_binding(Function { sig, body }) -> LintHit[] {
             // A name the parser made (`__iset1$6`, the `seed$provider` of a shim) was never
             // written by the author, who cannot put an `#[allow]` on it. The destructuring
             // forms are not among them: this reads the program before they are lowered.
-            if (name.contains("$")) {
-                return [];
-            };
+            if (name.contains("$")) { return []; };
 
             let Uses { mentions, field_reads, fields, shadowed } = inner.uses_of(name);
 
@@ -87,9 +85,7 @@ pub fn destructure_binding(Function { sig, body }) -> LintHit[] {
             // different values, and this walk cannot tell which is which. Rather than
             // track scopes for a case that is rare and confusing to read anyway, say
             // nothing.
-            if (shadowed || field_reads == 0 || field_reads != mentions) {
-                return [];
-            };
+            if (shadowed || field_reads == 0 || field_reads != mentions) { return []; };
 
             // Is one of these field names also read off some *other* value that is still
             // around once the pattern binds it? Then the bare name would mean two things
@@ -110,9 +106,7 @@ pub fn destructure_binding(Function { sig, body }) -> LintHit[] {
             // Taking apart a value built on the same line is not an improvement: the
             // pattern restates the type name that literal just wrote and re-lists the
             // fields it just set.
-            if (value.kind.is_case(Construct)) {
-                return [];
-            };
+            if (value.kind.is_case(Construct)) { return []; };
             // The struct is named only where the source already names it — an annotation.
             let ty = match (annotation) {
                 some(Named(struct_name)) => struct_name,

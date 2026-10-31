@@ -32,9 +32,7 @@ struct ResultMatch {
 # `self` as a [`ResultMatch`], when it is one. Each side binds exactly its payload; a
 # catch-all, a third arm, `ok(..)` or a payload-less `ok` make it something else.
 pub fn result_match(self: Match(scrutinee, arms)) -> ResultMatch? {
-    if (arms.len() != 2) {
-        return none;
-    };
+    if (arms.len() != 2) { return none; };
     let ok_arm = arms.find_if(|arm| arm.pattern.names_case("ok"))?;
     let err_arm = arms.find_if(|arm| arm.pattern.names_case("err"))?;
     let [ok_binder] = ok_arm.pattern.payload_binders()? else { return none; };

@@ -23,9 +23,7 @@ fn main() !prints {
 fn count_eq(s: str, sep: str, target: str) -> i64 {
     mut n = 0;
     for (let p : split(s, sep)) {
-        if (p == target) {
-            set n++;
-        } else {};
+        if (p == target) { set n++; } else {};
     }
     n
 }.test({

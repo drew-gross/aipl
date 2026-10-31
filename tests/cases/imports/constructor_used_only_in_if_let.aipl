@@ -6,9 +6,7 @@ import { print } from builtins;
 import { Circle, Shape } from "./shapes.aipl";
 
 fn radius(s: Shape) -> i64 {
-    if (let Circle(r) = s) {
-        return r;
-    };
+    if (let Circle(r) = s) { return r; };
     0
 }
 

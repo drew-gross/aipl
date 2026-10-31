@@ -58,9 +58,7 @@ fn main() !prints {
     let bounds: u64[] = [0, 1, 2, 3, 5];
     for (let xs : [empty, [1], [2], [2, 1, 2], [2, 2, 2, 1, 2]]) {
         for (let k : bounds) {
-            if (fused(xs, k) != plain(xs, k)) {
-                print(`MISMATCH {xs} {k}`);
-            };
+            if (fused(xs, k) != plain(xs, k)) { print(`MISMATCH {xs} {k}`); };
         }
     }
     print((many().count_if(is_two) < 3).to_str());

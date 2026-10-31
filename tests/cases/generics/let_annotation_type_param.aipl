@@ -45,9 +45,7 @@ fn first_or<T: any>(xs: T[], fallback: T) -> T {
 fn filtered<T: any>(xs: T[], keep: (T) -> bool) -> T[] {
     mut out: T[] = []; #[allow]
     for (let x : xs) {
-        if (keep(x)) {
-            set out.push(x);
-        };
+        if (keep(x)) { set out.push(x); };
     }
     out
 }.test({

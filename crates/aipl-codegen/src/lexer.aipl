@@ -460,9 +460,7 @@ fn keyword_len(self: str, spelling: str, boundary: #{char}) -> u64 {
 # the source is a hard error (`at` is the token's absolute start, so error spans
 # land in the real source).
 fn delimited_len(self: str, at: u64, delims: #{char}, escapes: #{char}, msg: str) -> u64!LexError {
-    if (!self.first().is_some_and(|c| delims.has(c))) {
-        return ok(0);
-    };
+    if (!self.first().is_some_and(|c| delims.has(c))) { return ok(0); };
     let d = self.first().value_or(' '); // in bounds: the guard above saw a char
 
     // The opener is passed over the way an escaped char is: neither is content
@@ -513,17 +511,13 @@ fn unterminated_msg(msg: str) -> str {
 # escapes — contents are verbatim. A token still open at the end of the source
 # is a hard error (`at` places the span in the real source).
 fn between_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexError {
-    if (!self.starts_with(open)) {
-        return ok(0);
-    };
+    if (!self.starts_with(open)) { return ok(0); };
 
     // Scan for the close from just past the open, so an `open`/`close` that
     // share text (e.g. `"""`/`"""`) can't self-close on the opener.
     mut i = open.len();
     while (i < self.len()) {
-        if (self[i..].starts_with(close)) {
-            return ok(i + close.len());
-        };
+        if (self[i..].starts_with(close)) { return ok(i + close.len()); };
         set i++;
     }
     err(LexError { message: unterminated_msg(msg), span: at..at + self.len() })
@@ -545,9 +539,7 @@ fn up_to_any_len(
 ) -> u64!LexError {
     mut i: u64 = 0;
     while (i < self.len()) {
-        if (stops.any(|stop| self[i..].starts_with(stop))) {
-            return ok(i);
-        };
+        if (stops.any(|stop| self[i..].starts_with(stop))) { return ok(i); };
         let c = self[i].value_or(' '); // in bounds: the loop condition holds
         let escaped = self[i + 1];
         if (c == '\\' && escapes.is_nonempty() && escaped.is_some_and(|e| escapes.has(e))) {
@@ -578,9 +570,7 @@ fn up_to_any_len(
 # anything. No escapes — contents are verbatim. Still open (depth > 0) at the
 # end of the source is a hard error (`at` places the span in the real source).
 fn nested_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexError {
-    if (!self.starts_with(open)) {
-        return ok(0);
-    };
+    if (!self.starts_with(open)) { return ok(0); };
     mut depth: u64 = 1;
 
     // Where the scan resumes: a delimiter is matched at its first byte, and the
@@ -593,9 +583,7 @@ fn nested_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexErr
                 set next = i + open.len();
             } else if (self.starts_with_at(close, i)) {
                 set depth--;
-                if (depth == 0) {
-                    return ok(i + close.len());
-                };
+                if (depth == 0) { return ok(i + close.len()); };
                 set next = i + close.len();
             };
         };
@@ -618,9 +606,7 @@ fn to_eol_len(self: str, marker: str) -> u64 {
 # *not* blocked — an empty comment line is a comment.
 fn to_eol_unless_len(self: str, marker: str, blocked: #{char}) -> u64 {
     let len = self.to_eol_len(marker);
-    if (len == 0) {
-        return 0;
-    };
+    if (len == 0) { return 0; };
     if (self[marker.len()..].first().is_some_and(|c| blocked.has(c))) { 0 } else { len }
 }
 
@@ -647,9 +633,7 @@ fn number_end(self: str, int_end: u64) -> u64 {
 # digit run is 0 (no match) — it belongs to the int rule.
 fn float_len(self: str) -> u64 {
     let int_end = self.count_while(is_digit);
-    if (int_end == 0) {
-        return 0;
-    };
+    if (int_end == 0) { return 0; };
     let end = self.number_end(int_end);
     if (int_end < end) { end } else { 0 }
 }
@@ -753,9 +737,7 @@ struct StepResult<K> {
 fn step_result<K>(r: TokenRule<K>, src: str, at: u64, n: u64) -> StepResult<K>!LexError {
     // A decline transitions nothing: the rule did not match, so the mode stack
     // is no more its business than the token stream is.
-    if (n == 0) {
-        return ok(StepResult { end: at });
-    };
+    if (n == 0) { return ok(StepResult { end: at }); };
     let moved = StepResult {
         trivia: r.trivia,
         end: at + n,
@@ -764,9 +746,7 @@ fn step_result<K>(r: TokenRule<K>, src: str, at: u64, n: u64) -> StepResult<K>!L
         unterminated: r.unterminated,
         scope: r.scope,
     };
-    if (r.skip) {
-        return ok(moved);
-    };
+    if (r.skip) { return ok(moved); };
     let text = span_str(src, at..at + n);
     let kind = apply_emit(r.emit, text.span, token_content(r.matcher, text.text))?;
     ok(StepResult { ..moved, token: some(Token { kind, text }) })
@@ -837,9 +817,7 @@ fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[], mode: i64) -> StepResul
             let n = r.matcher.step_len(src, at, r.unterminated)?;
             step_result(r, src, at, n)?
         };
-        if (at < res.end) {
-            return ok(res);
-        };
+        if (at < res.end) { return ok(res); };
     }
     ok(StepResult { end: at })
 }
@@ -979,9 +957,7 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
             // Trivia is no part of a kind stream: a parser driven by kinds alone
             // never sees a comment.
             Kinds => {
-                if (!step.trivia) {
-                    set kinds.extend(step.token$kind);
-                };
+                if (!step.trivia) { set kinds.extend(step.token$kind); };
             },
             Scopes => {
                 set scopes.extend(step.scope_span());

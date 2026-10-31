@@ -18,9 +18,7 @@ import {
 # markers to delimit sections; the compiler treats any such marker as a hard
 # cutoff (see `strip_test_sections`).
 pub fn parse_test_section_header(line: str) -> str? {
-    if (!line.starts_with("---")) {
-        return none;
-    };
+    if (!line.starts_with("---")) { return none; };
     let trimmed = line.trim();
     if (trimmed.ends_with("---") && trimmed.len() >= 6) {
         let inner = trimmed[3..trimmed.len() - 3].trim();
