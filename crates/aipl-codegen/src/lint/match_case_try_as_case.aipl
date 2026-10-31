@@ -1,0 +1,111 @@
+# The `match_case_try_as_case` lint:
+#
+#     match (x) {
+#         Field(base, field) => rest,
+#         _ => none,
+#     }
+#
+# — as the last thing a function does: a variant value taken apart when it is one
+# case, and given up on with `none` otherwise. That is
+# `let Field(base, field) = x.as_case(Field)?;` followed by `rest`, which says the early
+# exit first and leaves the rest of the function at one level instead of inside an arm.
+#
+# It has to be the function's *tail* (see `tail_matches`): the `?` returns `none` from
+# the function, which is only the `match`'s own answer when the `match` is what the
+# function returns. The first arm must be a variant case's constructor pattern and the
+# second the catch-all giving `none`. A first arm that returns the matched value itself,
+# `K(..) => some(x)`, is `match_case_as_case`'s, whose answer is shorter still.
+#
+# The hit points at the `_ => none` arm, a short line the formatter keeps in place, so
+# `#[allow]` squelches it.
+
+import { equal as ==, join, logical_not as !, map } from builtins;
+import { Call, Match, show_expr } from "../expr.aipl";
+import { Function } from "../item.aipl";
+import { case_pattern, is_give_up, statement_head, tail_matches } from "./case_match.aipl";
+import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
+import { receiver_text } from "./option_match.aipl";
+
+# A hit for each `match` that ends the function and gives up with `none` unless a value
+# is one case.
+pub fn match_case_try_as_case(Function { body }) -> UnfilledHit[] {
+    body
+        .tail_matches()
+        .map(
+            |tail| {
+                let Match(scrutinee, arms) = tail.kind else { return []; };
+                let [case_arm, other_arm] = arms else { return []; };
+                let some(pattern) = case_arm.pattern.case_pattern() else { return []; };
+                if (!other_arm.is_give_up()) { return []; };
+                // `K(..) => some(x)` of the matched value is `match_case_as_case`'s.
+                if (let Call("some", wrapped, _) = case_arm.body.kind) {
+                    if (wrapped$show_expr() == [scrutinee.show_expr()]) { return []; };
+                };
+                [
+                    unfilled(
+                        "as_case",
+                        `this match gives up with none unless the value is {pattern.case}, and is the last thing the function does — write "{pattern.statement_head()}{scrutinee.receiver_text()}.`,
+                        `({pattern.case})?;" and continue with the arm's body`,
+                        other_arm.span,
+                    ),
+                ]
+            },
+        )
+        .join()
+}.test({
+    // The value taken apart, with the payload it names bound by the `let`.
+    assert(lint_function_unfilled_messages(
+        "fn f(x: Expr) -> i64? { match (x) { Field(base, field) => some(base), _ => none } }",
+        match_case_try_as_case,
+    )? == [message("let Field(base, field) = ", "x", "Field")]);
+
+    // A payload the arm does not name has nothing to bind, and a match that follows
+    // statements is still the tail.
+    assert(lint_function_unfilled_messages(
+        "fn f(x: Expr) -> i64? { g(); match (x) { Field(..) => some(1), _ => none } }",
+        match_case_try_as_case,
+    )? == [message("", "x", "Field")]);
+    assert(lint_function_unfilled_messages(
+        "fn f(x: Expr) -> i64? { match (x) { Empty => some(1), _ => none } }",
+        match_case_try_as_case,
+    )? == [message("", "x", "Empty")]);
+
+    // Through an `if`'s branch and another `match`'s arm.
+    assert(lint_function_unfilled_messages(
+        "fn f(x: Expr, c: bool) -> i64? { if (c) { match (x) { Field(b, f) => some(b), _ => none } } else { none } }",
+        match_case_try_as_case,
+    )? == [message("let Field(b, f) = ", "x", "Field")]);
+
+    // Not the shape: it is not the function's tail, the first arm hands the value back
+    // (`match_case_as_case`'s), the fallback is something else, an optional's own cases.
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(x: Expr) -> i64? { let y = match (x) { Field(b, f) => some(b), _ => none }; y }",
+            match_case_try_as_case,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(x: Expr) -> Expr? { match (x) { Field(..) => some(x), _ => none } }",
+            match_case_try_as_case,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(x: Expr) -> i64? { match (x) { Field(b, f) => some(b), _ => some(0) } }",
+            match_case_try_as_case,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(o: i64?) -> i64? { match (o) { some(v) => some(v), _ => none } }",
+            match_case_try_as_case,
+        )? == [],
+    );
+})
+
+# What is said of a tail `match` over `receiver` on `case`, whose statement begins
+# `head`, for a file that does not import `as_case`, as the tests' sources do not.
+fn message(head: str, receiver: str, case: str) -> str {
+    `this match gives up with none unless the value is {case}, and is the last thing the function does — write "{head}{receiver}.as_case({case})?;" and continue with the arm's body, importing \`as_case\` from builtins`
+}

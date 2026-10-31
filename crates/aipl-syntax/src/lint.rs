@@ -19,11 +19,8 @@ mod extend_longhand;
 mod field_init_shorthand;
 mod is_empty_longhand;
 mod len_gt_zero;
-mod let_else_as_case;
 mod map_constant_repeat;
 mod map_find_if_some;
-mod match_case_as_case;
-mod match_case_try_as_case;
 mod match_value_or_err;
 mod push_array_literal;
 mod push_loop_collect_ok;
@@ -49,11 +46,8 @@ use self::extend_longhand::{extend_longhand, extend_names};
 use self::field_init_shorthand::field_init_shorthand;
 use self::is_empty_longhand::{empty_names, is_empty_longhand};
 use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
-use self::let_else_as_case::let_else_as_case;
 use self::map_constant_repeat::{map_constant_repeat, repeat_names};
 use self::map_find_if_some::{find_map_names, map_find_if_some};
-use self::match_case_as_case::match_case_as_case;
-use self::match_case_try_as_case::{match_case_try_as_case, tail_matches};
 use self::match_value_or_err::match_value_or_err;
 use self::push_array_literal::push_array_literal;
 use self::push_loop_collect_ok::{collect_ok_names, push_loop_collect_ok};
@@ -129,20 +123,6 @@ pub fn check(
             });
             if let Some(tb) = &func.test_body {
                 crate::each_subexpr(tb, &mut |e| match_value_or_err(e, src, false, &mut hits));
-            }
-        }
-    }
-    let as_case = imported_as(program, "as_case");
-    each_expr(program, &mut |e| {
-        match_case_as_case(e, src, as_case.as_deref(), &mut hits)
-    });
-    for item in &program.items {
-        if let Item::Fn(func) = item {
-            let mut tails = Vec::new();
-            tail_matches(&func.body, &mut tails);
-            for e in tails {
-                match_case_try_as_case(e, src, as_case.as_deref(), &mut hits);
-                let_else_as_case(e, src, as_case.as_deref(), &mut hits);
             }
         }
     }

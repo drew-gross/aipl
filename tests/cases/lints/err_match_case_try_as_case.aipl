@@ -50,7 +50,7 @@ error: this match gives up with none unless the value is Rect, and is the last t
 25 |         _ => none,
    |         ^
 
-error: this match gives up with none unless the value is Circle, and is the last thing the function does — write "let Circle(r) = <value>.as_case(Circle)?;" and continue with the arm's body, importing `as_case` from builtins (or append #[allow] to this line to keep it)
+error: this match gives up with none unless the value is Circle, and is the last thing the function does — write "let Circle(r) = Circle(w).as_case(Circle)?;" and continue with the arm's body, importing `as_case` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_case_try_as_case.aipl:23:13
    |
 23 |             _ => none,

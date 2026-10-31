@@ -1,0 +1,113 @@
+# The `let_else_as_case` lint:
+#
+#     let Field(base, field) = x else {
+#         return none;
+#     };
+#
+# — a variant value taken apart, with `none` as the answer when it is another case. That
+# is `let Field(base, field) = x.as_case(Field)?;`, which says the same without the
+# block. (A hand-written `if (let K(..) = x) { rest } else { return none; }` lowers to
+# the same tree and is the same program.)
+#
+# It has to be the function's *tail* (see `tail_matches`), where the `?` and the block's
+# `return` both leave the function with the same answer, and the `else` has to be
+# exactly `return none;`: a block that does anything first, or returns something else,
+# is a different program. Only a variant case's constructor pattern is advised — an
+# optional's `some(v)` has no `as_case`, and an array or tuple pattern is not a case.
+#
+# A case with no payload to bind has no pattern of its own to write in a `let` (a bare
+# name would be a binding), so it is asked of the value alone: `x.as_case(Empty)?;`.
+#
+# The hit points at the `return none;` line, a short statement the formatter keeps in
+# place, so `#[allow]` squelches it.
+
+import { equal as ==, join, logical_or as ||, map, not_equal as != } from builtins;
+import { IfLet, None, Return, Seq, Unit } from "../expr.aipl";
+import { Function } from "../item.aipl";
+import { case_pattern, statement_head, tail_matches } from "./case_match.aipl";
+import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
+import { receiver_text } from "./option_match.aipl";
+
+# A hit for each `let .. else { return none; }` that ends the function and takes a
+# variant value apart.
+pub fn let_else_as_case(Function { body }) -> UnfilledHit[] {
+    body
+        .tail_matches()
+        .map(
+            |tail| {
+                let IfLet(arm, scrutinee, otherwise) = tail.kind else { return []; };
+                let some(pattern) = arm.pattern.case_pattern() else { return []; };
+                // `return none;` and nothing else: the statement, then the block's unit tail.
+                let Seq(leave, rest) = otherwise.kind else { return []; };
+                let Return(value) = leave.kind else { return []; };
+                if (rest.kind != Unit || value.kind != None) { return []; };
+                [
+                    unfilled(
+                        "as_case",
+                        `this \`else\` only gives up with none — write "{pattern.statement_head()}{scrutinee.receiver_text()}.`,
+                        `({pattern.case})?;" and drop the block`,
+                        leave.span,
+                    ),
+                ]
+            },
+        )
+        .join()
+}.test({
+    // The value taken apart, with the payload bound by the `let`, and the hit on the
+    // `return`.
+    assert(lint_function_unfilled_messages(
+        "fn f(x: Expr) -> i64? { let Field(base, field) = x else { return none; }; some(base) }",
+        let_else_as_case,
+    )? == [message("let Field(base, field) = ", "x", "Field")]);
+
+    // A case with no payload is asked of the value alone.
+    assert(lint_function_unfilled_messages(
+        "fn f(x: Expr) -> i64? { let Empty(..) = x else { return none; }; some(1) }",
+        let_else_as_case,
+    )? == [message("", "x", "Empty")]);
+
+    // A hand-written `if (let ..)` is the same tree.
+    assert(lint_function_unfilled_messages(
+        "fn f(x: Expr) -> i64? { if (let Field(b, f) = x) { some(b) } else { return none; } }",
+        let_else_as_case,
+    )? == [message("let Field(b, f) = ", "x", "Field")]);
+
+    // Not the shape: another answer, work before it, an optional's `some`, an array
+    // pattern, and a `let` that is not the function's tail.
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(x: Expr) -> i64? { let Field(b, f) = x else { return some(0); }; some(b) }",
+            let_else_as_case,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(x: Expr) -> i64? { let Field(b, f) = x else { g(); return none; }; some(b) }",
+            let_else_as_case,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(o: i64?) -> i64? { let some(n) = o else { return none; }; some(n) }",
+            let_else_as_case,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(xs: i64[]) -> i64? { let [a, ..] = xs else { return none; }; some(a) }",
+            let_else_as_case,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(x: Expr) -> i64? { let w = if (let Field(b, f) = x) { b } else { return none; }; some(w) }",
+            let_else_as_case,
+        )? == [],
+    );
+})
+
+# What is said of a tail `let .. else` over `receiver` on `case`, whose statement begins
+# `head`, for a file that does not import `as_case`, as the tests' sources do not.
+fn message(head: str, receiver: str, case: str) -> str {
+    `this \`else\` only gives up with none — write "{head}{receiver}.as_case({case})?;" and drop the block, importing \`as_case\` from builtins`
+}

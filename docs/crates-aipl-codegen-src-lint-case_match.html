@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/case_match.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/case_match.aipl</code></h1>
+
+      <div class="module-doc"><p>What the three <code>as_case</code> lints on a <code>match</code> or <code>let .. else</code> share: recognising a variant case's pattern, the arm that gives up with <code>none</code>, the places where a <code>?</code> would leave the function with the answer the construct had, and the statement that advice spells.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-CasePattern">
+          <h3>
+            <a class="anchor" href="#item-CasePattern">CasePattern</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct CasePattern</code></pre>
+
+          <div class="doc"><p>A constructor pattern for a case of a variant the program declares: its name, and the names it binds (none for <code>K(..)</code> or a case with no payload).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-case_pattern">
+          <h3>
+            <a class="anchor" href="#item-case_pattern">case_pattern</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn case_pattern(self: Pat) -&#62; CasePattern?</code></pre>
+
+          <div class="doc"><p><code>self</code> as a [<code>CasePattern</code>], when it is one. <code>some</code>, <code>none</code>, <code>ok</code> and <code>err</code> are optionals and results rather than cases of a declared variant, and a bare lowercase name binds rather than naming a case. A slot written <code>_</code> makes the pattern a <code>Nested</code> one rather than a <code>Ctor</code>, but it still only takes the payload apart by position, as <code>as_case</code> and a <code>let</code> do; a slot over a real sub-pattern does not.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_give_up">
+          <h3>
+            <a class="anchor" href="#item-is_give_up">is_give_up</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn is_give_up(self: MatchArm) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> is the catch-all arm that gives <code>none</code>: <code>_ =&gt; none</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-tail_matches">
+          <h3>
+            <a class="anchor" href="#item-tail_matches">tail_matches</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn tail_matches(self: Expr) -&#62; Expr[]</code></pre>
+
+          <div class="doc"><p>The <code>match</code> and <code>if let</code> expressions in <code>self</code> whose value <em>is</em> <code>self</code>'s: the tail of a body, through the statements that lead to it, the branches of an <code>if</code>, and the arms of another <code>match</code>. A <code>?</code> written in place of such an expression returns from the function with the same answer it would have produced.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-statement_head">
+          <h3>
+            <a class="anchor" href="#item-statement_head">statement_head</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn statement_head(self: CasePattern) -&#62; str</code></pre>
+
+          <div class="doc"><p>The statement that takes a case apart, as far as it precedes the receiver and as far as it follows the case: <code>let Circle(r) = </code> and <code>?;</code>, or nothing before the receiver when the pattern binds nothing. The advice quotes the receiver and <code>.as_case(Circle)</code> between them.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-declared_case">
+          <h3>
+            <a class="anchor" href="#item-declared_case">declared_case</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn declared_case(self: str, bindings: str[]) -&#62; CasePattern?</code></pre>
+
+          <div class="doc"><p><code>self</code> with the names it binds, when it names a case of a declared variant.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-binder_slot">
+          <h3>
+            <a class="anchor" href="#item-binder_slot">binder_slot</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn binder_slot(self: Pat) -&#62; str?</code></pre>
+
+          <div class="doc"><p>The name <code>self</code> binds when it fills one slot of a constructor pattern: a plain name, or <code>_</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-tails">
+          <h3>
+            <a class="anchor" href="#item-tails">tails</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn tails(src: str) -&#62; str[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>The kind of each [<code>tail_matches</code>] of the function <code>src</code>.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

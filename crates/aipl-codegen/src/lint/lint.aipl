@@ -16,8 +16,11 @@ import { extend_loop_map_join } from "./extend_loop_map_join.aipl";
 import { fn_body_type_stutter } from "./fn_body_type_stutter.aipl";
 import { interp_literal } from "./interp_literal.aipl";
 import { interp_to_str } from "./interp_to_str.aipl";
+import { let_else_as_case } from "./let_else_as_case.aipl";
 import { LintHit, on_functions, on_functions_filled } from "./lint_hit.aipl";
 import { match_bool_is_case } from "./match_bool_is_case.aipl";
+import { match_case_as_case } from "./match_case_as_case.aipl";
+import { match_case_try_as_case } from "./match_case_try_as_case.aipl";
 import { match_is_some_and } from "./match_is_some_and.aipl";
 import { match_map_err } from "./match_map_err.aipl";
 import { match_map_ok } from "./match_map_ok.aipl";
@@ -48,6 +51,9 @@ pub fn lint(program: Program) -> LintHit[] {
         ..program.on_functions_filled(match_map_value_or),
         ..program.on_functions_filled(match_map_err),
         ..program.on_functions_filled(match_map_ok),
+        ..program.on_functions_filled(match_case_as_case),
+        ..program.on_functions_filled(match_case_try_as_case),
+        ..program.on_functions_filled(let_else_as_case),
         ..push_loop_pipeline(program),
         ..extend_loop_map_join(program),
         ..interp_to_str(program),

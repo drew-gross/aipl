@@ -1,0 +1,178 @@
+# What the three `as_case` lints on a `match` or `let .. else` share: recognising a
+# variant case's pattern, the arm that gives up with `none`, the places where a `?`
+# would leave the function with the answer the construct had, and the statement that
+# advice spells.
+
+import {
+    all,
+    as_case,
+    contains,
+    equal as ==,
+    is_case,
+    is_empty,
+    is_some,
+    join,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    value_or,
+} from builtins;
+import {
+    Assign,
+    Expr,
+    If,
+    IfLet,
+    Let,
+    LetMut,
+    LetPattern,
+    Match,
+    MatchArm,
+    None,
+    Seq,
+} from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Ctor, Int, Nested, Pat, Wildcard, is_binder_name } from "../pat.aipl";
+import { hit, lint_function_messages } from "./lint_hit.aipl";
+
+# A constructor pattern for a case of a variant the program declares: its name, and
+# the names it binds (none for `K(..)` or a case with no payload).
+struct CasePattern { case: str, bindings: str[] }
+
+# `self` as a [`CasePattern`], when it is one. `some`, `none`, `ok` and `err` are
+# optionals and results rather than cases of a declared variant, and a bare lowercase
+# name binds rather than naming a case. A slot written `_` makes the pattern a
+# `Nested` one rather than a `Ctor`, but it still only takes the payload apart by
+# position, as `as_case` and a `let` do; a slot over a real sub-pattern does not.
+pub fn case_pattern(self: Pat) -> CasePattern? {
+    if (let Ctor(case, bindings, ignore_payload) = self) {
+        return case.declared_case(if (ignore_payload) { [] } else { bindings });
+    };
+    let Nested(case, slots) = self.as_case(Nested)?;
+    let bindings = slots$binder_slot();
+    if (!bindings.all(is_some)) { return none; };
+    case.declared_case(bindings$value_or("_"))
+}.test({
+    assert(Ctor("Circle", bindings=["r"]).case_pattern() == some(CasePattern {
+        case: "Circle",
+        bindings: ["r"],
+    }));
+    assert(Ctor("Circle", ignore_payload=true).case_pattern() == some(CasePattern {
+        case: "Circle",
+        bindings: [],
+    }));
+    assert(Ctor("Empty").case_pattern() == some(CasePattern { case: "Empty", bindings: [] }));
+    assert(Ctor("some", bindings=["v"]).case_pattern() == none);
+    assert(Ctor("ok", bindings=["v"]).case_pattern() == none);
+    assert(Ctor("v").case_pattern() == none);
+    assert(Wildcard.case_pattern() == none);
+
+    // A slot that ignores its payload is still a pattern by position.
+    assert(Nested("Pair", [Wildcard, Ctor("b")]).case_pattern() == some(CasePattern {
+        case: "Pair",
+        bindings: ["_", "b"],
+    }));
+    // A slot over a literal or a case is a real sub-pattern.
+    assert(Nested("Pair", [Int(1), Ctor("b")]).case_pattern() == none);
+    assert(Nested("Pair", [Ctor("Nil"), Ctor("b")]).case_pattern() == none);
+    assert(Nested("some", [Wildcard]).case_pattern() == none);
+})
+
+# `self` with the names it binds, when it names a case of a declared variant.
+fn declared_case(self: str, bindings: str[]) -> CasePattern? {
+    if (self.is_binder_name() || ["some", "none", "ok", "err"].contains(self)) { return none; };
+    some(CasePattern { case: self, bindings })
+}
+
+# The name `self` binds when it fills one slot of a constructor pattern: a plain name,
+# or `_`.
+fn binder_slot(self: Pat) -> str? {
+    match (self) {
+        Wildcard => some("_"),
+        Ctor(name, bindings, ignore_payload) => if (bindings.is_empty() && !ignore_payload && name.is_binder_name()) {
+            some(name)
+        } else {
+            none
+        },
+        _ => none,
+    }
+}
+
+# Whether `self` is the catch-all arm that gives `none`: `_ => none`.
+pub fn is_give_up(self: MatchArm) -> bool {
+    match (self.pattern) {
+        Wildcard => self.body.kind == None,
+        _ => false,
+    }
+}
+
+# The `match` and `if let` expressions in `self` whose value *is* `self`'s: the tail of
+# a body, through the statements that lead to it, the branches of an `if`, and the arms
+# of another `match`. A `?` written in place of such an expression returns from the
+# function with the same answer it would have produced.
+pub fn tail_matches(self: Expr) -> Expr[] {
+    match (self.kind) {
+        Let(_, _, _, rest)
+        | LetMut(_, _, _, rest)
+        | LetPattern(_, _, rest)
+        | Seq(_, rest)
+        | Assign(_, _, rest) => rest.tail_matches(),
+        If(_, then, otherwise) => [..then.tail_matches(), ..otherwise.tail_matches()],
+        IfLet(arm, _, otherwise) => [self, ..arm.body.tail_matches(), ..otherwise.tail_matches()],
+        Match(_, arms) => [self, ..arms$body$tail_matches().join()],
+        _ => [],
+    }
+}.test({
+    // The `match` that ends the body is one; an inner one is not, since its value is
+    // only a binding's.
+    assert(tails("fn f(s: S) { match (s) { A(..) => 1, _ => 2 } }")? == ["Match"]);
+    assert(tails("fn f(s: S) { let x = match (s) { A(..) => 1, _ => 2 }; x }")? == []);
+    assert(tails("fn f(s: S) { g(); match (s) { A(..) => 1, _ => 2 } }")? == ["Match"]);
+
+    // Through an `if`'s branches and another `match`'s arms.
+    assert(tails(
+        "fn f(s: S, c: bool) { if (c) { match (s) { A(..) => 1, _ => 2 } } else { 3 } }",
+    )? == ["Match"]);
+    assert(tails(
+        "fn f(s: S) { match (s) { A(..) => match (s) { B(..) => 1, _ => 2 }, _ => 3 } }",
+    )? == ["Match", "Match"]);
+    assert(tails("fn f(s: S) { let A(x) = s else { return none; }; x }")? == ["IfLet"]);
+
+    // Through a `let` that takes a value apart.
+    assert(tails("fn f(s: S, t: T) { let (a, b) = t; match (s) { A(..) => 1, _ => 2 } }")? == [
+        "Match",
+    ]);
+
+    // Through a `let` that takes a value apart.
+    assert(tails("fn f(s: S, t: T) { let (a, b) = t; match (s) { A(..) => 1, _ => 2 } }")? == [
+        "Match",
+    ]);
+})
+
+# The kind of each [`tail_matches`] of the function `src`.
+fn tails(src: str) -> str[]!ParseFailure {
+    lint_function_messages(
+        src,
+        |function| function.body
+            .tail_matches()
+            .map(|e| hit(if (e.kind.is_case(Match)) { "Match" } else { "IfLet" }, 0..0)),
+    )
+}
+
+# The statement that takes a case apart, as far as it precedes the receiver and as far
+# as it follows the case: `let Circle(r) = ` and `?;`, or nothing before the receiver
+# when the pattern binds nothing. The advice quotes the receiver and `.as_case(Circle)`
+# between them.
+pub fn statement_head(self: CasePattern) -> str {
+    if (self.bindings.is_empty()) {
+        ""
+    } else {
+        `let {self.case}({self.bindings.join(sep=", ")}) = `
+    }
+}.test({
+    assert(CasePattern { case: "Circle", bindings: ["r"] }.statement_head() == "let Circle(r) = ");
+    assert(
+        CasePattern { case: "Rect", bindings: ["w", "h"] }.statement_head() == "let Rect(w, h) = ",
+    );
+    assert(CasePattern { case: "Empty", bindings: [] }.statement_head() == "");
+})

@@ -102,6 +102,8 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  make reserved_names_not_bound into a lint (and also make the assert and trace work a bit more like builtin functions for most purposes so that they can be shadowed. It should fail at lint but work if squelched)
+  make should work for perf block and top level text. Unify the "collect all the functions" logic in baking and linting.
   better name for OptionMatch
   code_bodies and on_functions don't need to exist now that we have collect_case_arms (or we can make something similar, maybe?)
   self.descendants()$kind.filter(|kind| kind.is_case(arm)) stutters
@@ -509,6 +511,7 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  maybe do all filling at the end? Seems potentially faster (except that filling only happend on lint hits which a rare)
   empty else block should disappear, empty if block should invert the condition
   loop pipeline lints should work when initial array is not empty
   loop pipeline lints should suggest exactly what to put in the loop

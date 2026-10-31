@@ -1,0 +1,110 @@
+# The `match_case_as_case` lint:
+#
+#     match (shape) {
+#         Circle(..) => some(shape),
+#         _ => none,
+#     }
+#
+# — a variant value handed back when it is one case and `none` otherwise. That is
+# `shape.as_case(Circle)`, which says so without the second arm, and whose result is
+# typed as the one case it holds.
+#
+# The shape is exact: two arms, the first a variant case's constructor pattern whose
+# body is `some(x)` of the very value matched, and the second the catch-all giving
+# `none`. What the first arm binds is no matter, since the body does not read it. An
+# arm that returns anything but the scrutinee — a payload, a rebuilt value — is a
+# different program, and `as_case` is not its spelling.
+#
+# The hit points at the `_ => none` arm, a short line the formatter keeps in place, so
+# `#[allow]` squelches it.
+
+import {
+    equal as ==,
+    join,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+} from builtins;
+import { Call, Match, collect_expr_cases, show_expr } from "../expr.aipl";
+import { Function } from "../item.aipl";
+import { case_pattern, is_give_up } from "./case_match.aipl";
+import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
+import { receiver_text } from "./option_match.aipl";
+
+# A hit for each `match` in the function that only asks whether a value is one case.
+pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
+    body
+        .collect_expr_cases(Match)
+        .map(
+            |Match(scrutinee, arms)| {
+                let [case_arm, other_arm] = arms else { return []; };
+                let some(pattern) = case_arm.pattern.case_pattern() else { return []; };
+                let Call("some", wrapped, _) = case_arm.body.kind else { return []; };
+                if (!other_arm.is_give_up() || wrapped$show_expr() != [scrutinee.show_expr()]) {
+                    return [];
+                };
+                [
+                    unfilled(
+                        "as_case",
+                        `this match only asks whether the value is {pattern.case} — write "{scrutinee.receiver_text()}.`,
+                        `({pattern.case})" and drop the match`,
+                        other_arm.span,
+                    ),
+                ]
+            },
+        )
+        .join()
+}.test({
+    // The case, handed back as the value matched, and the hit on the catch-all.
+    assert(lint_function_unfilled_messages(
+        "fn f(s: Shape) -> Shape? { match (s) { Circle(..) => some(s), _ => none } }",
+        match_case_as_case,
+    )? == [message("s", "Circle")]);
+
+    // A payload the arm binds but does not read is no matter, and a call quotes as
+    // written.
+    assert(lint_function_unfilled_messages(
+        "fn f(s: Shape) -> Shape? { match (g(s)) { Circle(r) => some(g(s)), _ => none } }",
+        match_case_as_case,
+    )? == [message("g(s)", "Circle")]);
+
+    // Not the shape: another value handed back, a payload, a different fallback, an
+    // optional's own cases, a third arm.
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(s: Shape) -> Shape? { match (s) { Circle(..) => some(t), _ => none } }",
+            match_case_as_case,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(s: Shape) -> i64? { match (s) { Circle(r) => some(r), _ => none } }",
+            match_case_as_case,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(s: Shape) -> Shape? { match (s) { Circle(..) => some(s), _ => some(s) } }",
+            match_case_as_case,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(o: i64??) -> i64?? { match (o) { some(..) => some(o), _ => none } }",
+            match_case_as_case,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(s: Shape) -> Shape? { match (s) { Circle(..) => some(s), Dot => some(s), _ => none } }",
+            match_case_as_case,
+        )? == [],
+    );
+})
+
+# What is said of a match over `receiver` that only asks whether it is `case`, for a
+# file that does not import `as_case`, as the tests' sources do not.
+fn message(receiver: str, case: str) -> str {
+    `this match only asks whether the value is {case} — write "{receiver}.as_case({case})" and drop the match, importing \`as_case\` from builtins`
+}
