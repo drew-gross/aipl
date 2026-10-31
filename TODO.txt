@@ -828,6 +828,7 @@ check:
   can for sure recover from format errors
 
 tests:
+  test operation fusion by re-rendering the fused code back to aipl and asserting on that. The measure() assertions (especially the doesn't-fire assertions) are fragile.
   allow top-level test({}) to kill the stupid fn main() {}.test() pattern (also lint against that pattern - tests on empty main or other empty function)
   make a better way to test non-aipl-implemented builtins
   make tests unable to write files, using shimming

@@ -250,16 +250,17 @@ struct CheckPlan<'a> {
 /// Whether `aipl check` has to run for this case, and what its one run is
 /// compared against.
 ///
-/// `None` is the testless majority of the corpus, which pays nothing. Otherwise
-/// the run happens because the source carries `.test` blocks, or because a
-/// section pins something about `check` — a case may pin a report with no tests
-/// of its own (a compile failure's report, say), which is why the sections count
-/// on their own.
+/// `None` is the block-less majority of the corpus, which pays nothing. Otherwise
+/// the run happens because the source carries `.test` or `.performance` blocks —
+/// `check` is the only thing that runs either, so a case whose claims live in a
+/// `.performance` block is held to them only by this run — or because a section
+/// pins something about `check`: a case may pin a report with no tests of its own
+/// (a compile failure's report, say), which is why the sections count on their own.
 fn check_plan(spec: &Spec) -> Option<CheckPlan<'_>> {
     let report = spec.check.as_deref();
     let exit_code = spec.check_exit_code;
     let pinned = report.is_some() || exit_code.is_some();
-    if !pinned && !spec.source.contains(".test") {
+    if !pinned && !spec.source.contains(".test") && !spec.source.contains(".performance") {
         return None;
     }
     Some(CheckPlan {
@@ -1971,11 +1972,16 @@ fn check_runs_at_most_once_whichever_sections_are_used() {
         check_plan(&spec).map(|p| (p.report.map(str::to_string), p.exit_code, p.require_success))
     };
 
-    // Neither section and no `.test` blocks: nothing to ask `check`, so it never
+    // Neither section and no `.test` or `.performance` blocks: nothing to ask `check`, so it never
     // runs — which is what keeps the testless majority of the corpus free.
     for src in ["fn main() {}\n", "fn main() {}\n--- stdout ---\nhi\n"] {
         assert!(plan(src).is_none(), "should not run check: {src:?}");
     }
+
+    // A `.performance` block is run by `check` and by nothing else, so a file with
+    // only that block still needs the run: its claims are otherwise never held.
+    let performance = "fn f() -> i64 { 1 }.performance({ assert(true); })\nfn main() {}\n";
+    assert_eq!(plan(performance), Some((None, None, true)));
 
     // Every other combination is exactly one run. Two of the three reasons to run
     // are the sections themselves, so a case may pin `check` with no tests of its

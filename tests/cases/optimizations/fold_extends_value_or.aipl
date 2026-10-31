@@ -26,8 +26,8 @@
 #
 # What the fold saves is the array between `f` and the receiver. The `.performance`
 # block on `appended` measures it: the same row costs what the `match` it is
-# rewritten to costs, one allocation (the receiver growing), where a version that
-# has to keep the optional's result builds a second.
+# rewritten to costs. `f` returns three elements because two fit in an inline array,
+# which allocates nothing, and there would be no array to save.
 #
 # Each case prints the receiver's whole *contents* rather than its length: a
 # mis-accounted reference reads back as a plausible-looking array, and a count
@@ -99,7 +99,7 @@ fn loud(n: i64) !prints -> i64[] {
 // The mapping the measured functions use. `pair` is `plain`'s alone, and stays
 // so: a second caller would stop it being inlined there, and move the case's own
 // code for no reason that has to do with the fold.
-fn twin(n: i64) -> i64[] { [n, n + 1] }
+fn twin(n: i64) -> i64[] { [n, n + 1, n + 2] }
 
 // A receiver with room to spare, built outside the measured window.
 fn roomy() -> i64[] {
@@ -121,14 +121,15 @@ fn appended(v: i64[], o: i64?) -> i64[] {
     // What the fold rewrites it to, written out.
     let folded = measure("folded", roomy(), |v| appended(v, some(3)));
     let by_hand = measure("by hand", roomy(), |v| matched(v, some(3)));
-    assert(folded.allocations == 1);
+    assert(folded.allocations == 2);
     assert(folded.allocations == by_hand.allocations);
     assert(folded.bytes_allocated == by_hand.bytes_allocated);
 
     // The optional's result is read twice, so it cannot be appended where it is
     // produced: it exists, and so does an array for it.
     let kept = measure("kept", roomy(), |v| keeping(v, some(3)));
-    assert(kept.allocations == 2);
+    assert(kept.allocations == 1);
+    assert(kept.bytes_allocated == 40);
 
     // `none` builds nothing and calls nothing.
     let nothing = measure("none", roomy(), |v| appended(v, none));
