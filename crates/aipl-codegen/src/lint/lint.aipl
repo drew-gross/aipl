@@ -19,6 +19,8 @@ import { interp_to_str } from "./interp_to_str.aipl";
 import { LintHit, on_functions, on_functions_filled } from "./lint_hit.aipl";
 import { match_bool_is_case } from "./match_bool_is_case.aipl";
 import { match_is_some_and } from "./match_is_some_and.aipl";
+import { match_map_err } from "./match_map_err.aipl";
+import { match_map_ok } from "./match_map_ok.aipl";
 import { match_map_value_or } from "./match_map_value_or.aipl";
 import { match_value_or } from "./match_value_or.aipl";
 import { push_loop_pipeline } from "./push_loop_pipeline.aipl";
@@ -44,6 +46,8 @@ pub fn lint(program: Program) -> LintHit[] {
         ..program.on_functions_filled(match_is_some_and),
         ..program.on_functions_filled(match_value_or),
         ..program.on_functions_filled(match_map_value_or),
+        ..program.on_functions_filled(match_map_err),
+        ..program.on_functions_filled(match_map_ok),
         ..push_loop_pipeline(program),
         ..extend_loop_map_join(program),
         ..interp_to_str(program),

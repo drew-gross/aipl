@@ -1,0 +1,113 @@
+# The `match_map_ok` lint:
+#
+#     match (r) { ok(v) => ok(g), err(e) => err(e) }
+#
+# — a result whose value side is rebuilt and whose error passes straight through. That
+# is exactly `r.map_ok(|v| g)`, and the mirror of `match_map_err`.
+#
+# The `err` arm handing its own binding back to `err` is what makes this a `map_ok`; the
+# `ok` arm must do something, since `ok(v) => ok(v)` alongside it is a `match` that
+# rebuilds its scrutinee unchanged. Neither lint fires on that no-op: advising
+# `map_ok(|v| v)` would be a longer way to write the same nothing. Arm order does not
+# matter.
+#
+# As with `map_err` there is no eager/lazy question — `map_ok` takes a function, which
+# runs on the value path exactly when the arm did — and so no restriction on what the
+# `ok` arm builds.
+#
+# The hit points at the `err(e) => err(e)` arm's body, not the whole `match`: `#[allow]`
+# is line-scoped, so a hit spanning the multi-line `match` could never be squelched.
+# That pass-through is always one line — the `ok` arm's replacement need not be — and
+# it is the arm that identifies the shape.
+
+import { equal as ==, filter, logical_and as &&, map } from builtins;
+import { Function } from "../item.aipl";
+import {
+    UnfilledHit,
+    hit,
+    lint_function_unfilled_hits,
+    lint_function_unfilled_messages,
+    unfilled,
+} from "./lint_hit.aipl";
+import { receiver_text } from "./option_match.aipl";
+import { passes_through, rebuilds, result_matches } from "./result_match.aipl";
+
+# A hit for each `match` in the function that rebuilds a result's value side and passes
+# its error through.
+pub fn match_map_ok(Function { body }) -> UnfilledHit[] {
+    body
+        .result_matches()
+        .filter(
+            |m| m.err_body.passes_through("err", m.err_binder) && m.ok_body.rebuilds(
+                "ok",
+                m.ok_binder,
+            ),
+        )
+        .map(|m| unfilled(
+            "map_ok",
+            `this \`match\` rewrites the result's value side and passes its error through — write "{m.scrutinee.receiver_text()}.`,
+            `(|{m.ok_binder}| ..)" instead`,
+            m.err_body.span,
+        ))
+}.test({
+    // The value side is rebuilt, in either arm order; the hit is the pass-through arm.
+    assert(lint_function_unfilled_hits(
+        "fn f(r: i64!str) -> i64!str { match (r) { ok(v) => ok(g(v)), err(e) => err(e) } }",
+        match_map_ok,
+    )? == [hit(message("r", "v"), 71..77)]);
+    assert(lint_function_unfilled_messages(
+        "fn f(r: i64!str) -> i64!str { match (r) { err(e) => err(e), ok(v) => ok(v + 1) } }",
+        match_map_ok,
+    )? == [message("r", "v")]);
+
+    // A call as the scrutinee is quoted when a method can follow it, and a placeholder
+    // stands in when it cannot.
+    assert(lint_function_unfilled_messages(
+        "fn f(s: str) -> i64!str { match (parse(s)) { ok(v) => ok(g(v)), err(e) => err(e) } }",
+        match_map_ok,
+    )? == [message("parse(s)", "v")]);
+    assert(lint_function_unfilled_messages(
+        "fn f(a: i64!str) -> i64!str { match (a || b) { ok(v) => ok(g(v)), err(e) => err(e) } }",
+        match_map_ok,
+    )? == [message("<value>", "v")]);
+
+    // Not the shape: the error side is rebuilt too, the error is dropped, the value is
+    // handed back unchanged (the whole `match` is a no-op), the `ok` arm leaves the
+    // result world, or an arm is a catch-all.
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(r: i64!str) -> i64!P { match (r) { ok(v) => ok(g(v)), err(e) => err(h(e)) } }",
+            match_map_ok,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            """fn f(r: i64!str) -> i64!str { match (r) { ok(v) => ok(g(v)), err(e) => err("x") } }""",
+            match_map_ok,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(r: i64!str) -> i64!str { match (r) { ok(v) => ok(v), err(e) => err(e) } }",
+            match_map_ok,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(r: i64!str) -> i64 { match (r) { ok(v) => v, err(e) => err(e) } }",
+            match_map_ok,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(r: i64!str) -> i64!str { match (r) { _ => ok(g()), err(e) => err(e) } }",
+            match_map_ok,
+        )? == [],
+    );
+})
+
+# What is said of a `match` over `receiver` whose value is bound as `binder`, for a file
+# that does not import `map_ok`, as the tests' sources do not.
+fn message(receiver: str, binder: str) -> str {
+    `this \`match\` rewrites the result's value side and passes its error through — write "{receiver}.map_ok(|{binder}| ..)" instead, importing \`map_ok\` from builtins`
+}

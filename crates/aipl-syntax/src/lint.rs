@@ -24,8 +24,6 @@ mod map_constant_repeat;
 mod map_find_if_some;
 mod match_case_as_case;
 mod match_case_try_as_case;
-mod match_map_err;
-mod match_map_ok;
 mod match_value_or_err;
 mod push_array_literal;
 mod push_loop_collect_ok;
@@ -56,8 +54,6 @@ use self::map_constant_repeat::{map_constant_repeat, repeat_names};
 use self::map_find_if_some::{find_map_names, map_find_if_some};
 use self::match_case_as_case::match_case_as_case;
 use self::match_case_try_as_case::{match_case_try_as_case, tail_matches};
-use self::match_map_err::match_map_err;
-use self::match_map_ok::match_map_ok;
 use self::match_value_or_err::match_value_or_err;
 use self::push_array_literal::push_array_literal;
 use self::push_loop_collect_ok::{collect_ok_names, push_loop_collect_ok};
@@ -150,8 +146,6 @@ pub fn check(
             }
         }
     }
-    each_expr(program, &mut |e| match_map_err(e, &mut hits));
-    each_expr(program, &mut |e| match_map_ok(e, &mut hits));
     each_expr(program, &mut |e| field_init_shorthand(e, src, &mut hits));
     each_expr(program, &mut |e| set_spread_field(e, src, &mut hits));
     // The array sibling of the above, and disjoint from it by the kind of

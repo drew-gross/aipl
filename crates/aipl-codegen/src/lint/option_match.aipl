@@ -93,7 +93,7 @@ pub fn option_matches(self: Expr) -> OptionMatch[] {
 })
 
 # The names a constructor pattern binds, when `self` is one.
-fn payload_binders(self: Pat) -> str[]? {
+pub fn payload_binders(self: Pat) -> str[]? {
     match (self) {
         Ctor(_, bindings, _) => some(bindings),
         // `as_case(Ctor)` would say this, but `Ctor` has keyword parameters, which
@@ -103,7 +103,7 @@ fn payload_binders(self: Pat) -> str[]? {
 }
 
 # Whether `self` is a constructor pattern for the case `want`.
-fn names_case(self: Pat, want: str) -> bool {
+pub fn names_case(self: Pat, want: str) -> bool {
     match (self) {
         Ctor(name, _, _) => name == want,
         _ => false,

@@ -1,0 +1,113 @@
+# What the lints on a `match` over a result share: recognising the two-arm
+# `ok(v) => .., err(e) => ..` shape, and telling an arm that hands its binding
+# straight back from one that rebuilds it.
+
+import {
+    as_case,
+    collect_ok,
+    equal as ==,
+    find_if,
+    first,
+    is_some_and,
+    len,
+    map,
+    not_equal as !=,
+    value_or,
+} from builtins;
+import { Call, Expr, Ident, Match, collect_expr_cases } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { hit, lint_function_messages } from "./lint_hit.aipl";
+import { names_case, payload_binders } from "./option_match.aipl";
+
+# A `match` of exactly an `ok(ok_binder)` arm and an `err(err_binder)` arm, in either
+# order: the value matched, and each arm's binder and body.
+struct ResultMatch {
+    scrutinee: Expr,
+    ok_binder: str,
+    ok_body: Expr,
+    err_binder: str,
+    err_body: Expr,
+}
+
+# `self` as a [`ResultMatch`], when it is one. Each side binds exactly its payload; a
+# catch-all, a third arm, `ok(..)` or a payload-less `ok` make it something else.
+pub fn result_match(self: Match(scrutinee, arms)) -> ResultMatch? {
+    if (arms.len() != 2) {
+        return none;
+    };
+    let ok_arm = arms.find_if(|arm| arm.pattern.names_case("ok"))?;
+    let err_arm = arms.find_if(|arm| arm.pattern.names_case("err"))?;
+    let [ok_binder] = ok_arm.pattern.payload_binders()? else { return none; };
+    let [err_binder] = err_arm.pattern.payload_binders()? else { return none; };
+    some(ResultMatch {
+        scrutinee,
+        ok_binder,
+        ok_body: ok_arm.body,
+        err_binder,
+        err_body: err_arm.body,
+    })
+}.test({
+    fn shapes(src: str) -> str[]!ParseFailure {
+        lint_function_messages(
+            src,
+            |function| function.body
+                .result_matches()
+                .map(|m| hit(`{m.ok_binder} {m.err_binder}`, 0..0)),
+        )
+    }
+    assert(shapes("fn f(r: i64!str) -> i64 { match (r) { ok(v) => v, err(e) => 0 } }")? == ["v e"]);
+    assert(shapes("fn f(r: i64!str) -> i64 { match (r) { err(e) => 0, ok(v) => v } }")? == ["v e"]);
+
+    // Not the shape: a catch-all, an ignored payload, an optional.
+    assert(shapes("fn f(r: i64!str) -> i64 { match (r) { ok(v) => v, _ => 0 } }")? == []);
+    assert(shapes("fn f(r: i64!str) -> i64 { match (r) { ok(..) => 1, err(e) => 0 } }")? == []);
+    assert(shapes("fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => 0 } }")? == []);
+})
+
+# Every `match` in `self` and under it that is a [`ResultMatch`], outermost first.
+pub fn result_matches(self: Expr) -> ResultMatch[] {
+    self.collect_expr_cases(Match)$result_match().collect_ok()
+}
+
+# Whether `self` is `constructor(binder)`: the arm hands its own binding straight back to
+# the constructor it came from.
+pub fn passes_through(self: Expr, constructor: str, binder: str) -> bool {
+    self.wraps_with(constructor).is_some_and(|wrapped| wrapped.kind == Ident(binder))
+}.test({
+    assert(ok_arm_flags("ok(v)")? == "true false");
+    assert(ok_arm_flags("ok(v + 1)")? == "false true");
+
+    // A different constructor, one with other than a single argument and a bare value
+    // are neither.
+    assert(ok_arm_flags("err(v)")? == "false false");
+    assert(ok_arm_flags("ok(v, v)")? == "false false");
+    assert(ok_arm_flags("v")? == "false false");
+})
+
+# Whether `self` is `constructor(..)` of something other than `binder`: the arm builds
+# a new value for the side it came from.
+pub fn rebuilds(self: Expr, constructor: str, binder: str) -> bool {
+    self.wraps_with(constructor).is_some_and(|wrapped| wrapped.kind != Ident(binder))
+}
+
+# The one argument of `self`, when it is a call to `constructor`.
+fn wraps_with(self: Expr, constructor: str) -> Expr? {
+    let Call(name, arguments, _) = self.kind.as_case(Call)?;
+    let [wrapped] = arguments else { return none; };
+    if (name == constructor) { some(wrapped) } else { none }
+}
+
+# What [`passes_through`] and [`rebuilds`] say of the `ok` arm's body `body`, in a
+# `match` over a result.
+fn ok_arm_flags(body: str) -> str!ParseFailure {
+    let flags = lint_function_messages(
+        `fn f(r: i64!str) -> i64!str \{ match (r) \{ ok(v) => {body}, err(e) => err(e) } }`,
+        |function| function.body
+            .result_matches()
+            .map(|m| hit(
+                `{m.ok_body.passes_through("ok", m.ok_binder)} {m.ok_body.rebuilds("ok", m.ok_binder)}`,
+                0..0,
+            )),
+    )?;
+    ok(flags.first().value_or(""))
+}

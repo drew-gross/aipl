@@ -64,6 +64,34 @@
 
 
 
+        <section class="item" id="item-payload_binders">
+          <h3>
+            <a class="anchor" href="#item-payload_binders">payload_binders</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn payload_binders(self: Pat) -&#62; str[]?</code></pre>
+
+          <div class="doc"><p>The names a constructor pattern binds, when <code>self</code> is one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-names_case">
+          <h3>
+            <a class="anchor" href="#item-names_case">names_case</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn names_case(self: Pat, want: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> is a constructor pattern for the case <code>want</code>.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-receiver_text">
           <h3>
             <a class="anchor" href="#item-receiver_text">receiver_text</a>
@@ -97,34 +125,6 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
-
-
-        <section class="item" id="item-payload_binders">
-          <h3>
-            <a class="anchor" href="#item-payload_binders">payload_binders</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn payload_binders(self: Pat) -&#62; str[]?</code></pre>
-
-          <div class="doc"><p>The names a constructor pattern binds, when <code>self</code> is one.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-names_case">
-          <h3>
-            <a class="anchor" href="#item-names_case">names_case</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn names_case(self: Pat, want: str) -&#62; bool</code></pre>
-
-          <div class="doc"><p>Whether <code>self</code> is a constructor pattern for the case <code>want</code>.</p></div>
-
-
-        </section>
-
 
 
         <section class="item" id="item-takes_a_method">
