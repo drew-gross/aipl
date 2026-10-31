@@ -1056,6 +1056,7 @@ case_tests! {
     crates_aipl_codegen_src_lint_match_map_ok = "crates/aipl-codegen/src/lint/match_map_ok",
     crates_aipl_codegen_src_lint_match_map_value_or = "crates/aipl-codegen/src/lint/match_map_value_or",
     crates_aipl_codegen_src_lint_match_value_or = "crates/aipl-codegen/src/lint/match_value_or",
+    crates_aipl_codegen_src_lint_match_value_or_err = "crates/aipl-codegen/src/lint/match_value_or_err",
     crates_aipl_codegen_src_lint_option_match = "crates/aipl-codegen/src/lint/option_match",
     crates_aipl_codegen_src_lint_push_loop_pipeline = "crates/aipl-codegen/src/lint/push_loop_pipeline",
     crates_aipl_codegen_src_lint_result_match = "crates/aipl-codegen/src/lint/result_match",

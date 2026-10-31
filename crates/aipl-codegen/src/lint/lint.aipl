@@ -26,6 +26,7 @@ import { match_map_err } from "./match_map_err.aipl";
 import { match_map_ok } from "./match_map_ok.aipl";
 import { match_map_value_or } from "./match_map_value_or.aipl";
 import { match_value_or } from "./match_value_or.aipl";
+import { match_value_or_err } from "./match_value_or_err.aipl";
 import { push_loop_pipeline } from "./push_loop_pipeline.aipl";
 import { slice_from_zero } from "./slice_from_zero.aipl";
 import { slice_to_len } from "./slice_to_len.aipl";
@@ -48,6 +49,7 @@ pub fn lint(program: Program) -> LintHit[] {
         ..program.on_functions_filled(case_of_equal_is_case),
         ..program.on_functions_filled(match_is_some_and),
         ..program.on_functions_filled(match_value_or),
+        ..program.on_functions_filled(match_value_or_err),
         ..program.on_functions_filled(match_map_value_or),
         ..program.on_functions_filled(match_map_err),
         ..program.on_functions_filled(match_map_ok),

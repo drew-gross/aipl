@@ -1728,6 +1728,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./lint/match_bool_is_case.aipl",
     "./lint/option_match.aipl",
     "./lint/match_value_or.aipl",
+    "./lint/match_value_or_err.aipl",
     "./lint/match_map_value_or.aipl",
     "./lint/result_match.aipl",
     "./lint/match_map_err.aipl",

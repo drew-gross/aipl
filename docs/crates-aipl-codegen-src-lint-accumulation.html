@@ -56,6 +56,20 @@ for (let x : xs) {
 
 
 
+        <section class="item" id="item-lone_statement">
+          <h3>
+            <a class="anchor" href="#item-lone_statement">lone_statement</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lone_statement(self: Expr) -&#62; Expr?</code></pre>
+
+          <div class="doc"><p>The one statement a block consists of, or <code>none</code> when it holds anything else — no statements, or more than one. A block is a right-nested chain, and which node carries the rest of it depends on the statement: an expression statement is a <code>Seq</code> whose second operand is the remainder, while an assignment holds its own. Only those two forms are recognized, and each is &quot;lone&quot; exactly when what follows it is the block's tail.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-receiver">
           <h3>
             <a class="anchor" href="#item-receiver">receiver</a>
@@ -183,20 +197,6 @@ for (let x : xs) {
           <pre class="signature"><code>fn accumulation(self: LetMut, adder: str) -&#62; Accumulation?</code></pre>
 
           <div class="doc"><p><code>self</code> as an [<code>Accumulation</code>], when it is one.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lone_statement">
-          <h3>
-            <a class="anchor" href="#item-lone_statement">lone_statement</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn lone_statement(self: Expr) -&#62; Expr?</code></pre>
-
-          <div class="doc"><p>The one statement a block consists of, or <code>none</code> when it holds anything else — no statements, or more than one. A block is a right-nested chain, and which node carries the rest of it depends on the statement: an expression statement is a <code>Seq</code> whose second operand is the remainder, while an assignment holds its own. Only those two forms are recognized, and each is &quot;lone&quot; exactly when what follows it is the block's tail.</p></div>
 
 
         </section>

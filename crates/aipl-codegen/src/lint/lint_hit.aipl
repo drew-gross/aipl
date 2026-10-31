@@ -222,10 +222,12 @@ fn bodies(self: Function) -> Function[] {
     [self, ..test, ..performance, ..self.test_fns]
 }
 
-# `self`, with `body` as its whole body: what a block is when it is checked.
+# `self`, with `body` as its whole body: what a block is when it is checked. A block
+# runs with every effect allowed, which no function can declare, so it stands in as
+# one declaring `*`.
 fn standing_in(self: Function, body: Expr) -> Function {
     ..self,
-    sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
+    sig: Signature { type_vars: [], params: [], effects: ["*"], return_ty: none },
     body,
     shorthand_body: false,
     test_body: none,

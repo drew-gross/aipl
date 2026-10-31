@@ -187,7 +187,7 @@ fn accumulation(self: LetMut(name, _, seed, body), adder: str) -> Accumulation? 
 # `Seq` whose second operand is the remainder, while an assignment holds its own.
 # Only those two forms are recognized, and each is "lone" exactly when what follows
 # it is the block's tail.
-fn lone_statement(self: Expr) -> Expr? {
+pub fn lone_statement(self: Expr) -> Expr? {
     match (self.kind) {
         Seq(statement, rest) => if (rest.is_block_tail()) { some(statement) } else { none },
         Assign(_, _, rest) => if (rest.is_block_tail()) { some(self) } else { none },

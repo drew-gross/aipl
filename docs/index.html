@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">184 files, 1730 items.</p>
+      <p class="summary">185 files, 1732 items.</p>
 
       <ul class="files">
 
@@ -1776,7 +1776,7 @@
           <p class="file-summary">What the two loop-accumulation lints (<code>push_loop_pipeline</code>, <code>extend_loop_map_join</code>) share: recognising an array that is seeded empty and then filled by the loop that follows it and nothing else, and phrasing the pipeline that loop is.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-accumulation.html#private">6 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-accumulation.html#private">5 private</a></span>
 
 
           <ul class="items">
@@ -1788,6 +1788,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-accumulation.html#item-accumulations"><code>accumulations</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-accumulation.html#item-lone_statement"><code>lone_statement</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -2443,6 +2448,26 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-match_value_or_err.html">crates/aipl-codegen/src/lint/match_value_or_err.aipl</a>
+
+          <p class="file-summary">The <code>match_value_or_err</code> lint:</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-match_value_or_err.html#private">1 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-match_value_or_err.html#item-match_value_or_err"><code>match_value_or_err</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-codegen-src-lint-option_match.html">crates/aipl-codegen/src/lint/option_match.aipl</a>
 
           <p class="file-summary">What the lints on a <code>match</code> over an optional share: recognising the two-arm <code>some(v) =&gt; .., none =&gt; ..</code> shape, and quoting its receiver back in the advice.</p>
@@ -2516,7 +2541,7 @@
           <p class="file-summary">What the lints on a <code>match</code> over a result share: recognising the two-arm <code>ok(v) =&gt; .., err(e) =&gt; ..</code> shape, and telling an arm that hands its binding straight back from one that rebuilds it.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-result_match.html#private">2 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-result_match.html#private">1 private</a></span>
 
 
           <ul class="items">
@@ -2543,6 +2568,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-result_match.html#item-rebuilds"><code>rebuilds</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-result_match.html#item-wraps_with"><code>wraps_with</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

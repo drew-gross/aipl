@@ -90,37 +90,37 @@ fn main() !prints {
     if (unwrap(need_computed(some(9), "r")) == 9) { print("computed"); };
 }
 --- errors ---
-error: this `match` turns an optional into a result — write "o.value_or_err("missing")" instead (or append #[allow] to this line to keep it)
+error: this `match` turns an optional into a result — write "o.value_or_err("missing")" instead, importing `value_or_err` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_value_or_err.aipl:14:17
    |
 14 |         none => err("missing"),
    |                 ^^^^^^^^^^^^^^
 
-error: this `match` turns an optional into a result — write "o.value_or_err("missing")" instead (or append #[allow] to this line to keep it)
+error: this `match` turns an optional into a result — write "o.value_or_err("missing")" instead, importing `value_or_err` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_value_or_err.aipl:20:17
    |
 20 |         none => err("missing"),
    |                 ^^^^^^^^^^^^^^
 
-error: this `match` turns an optional into a result — write "o.value_or_err("integer literal overflows i64")?" and use the payload directly — `?` does the early return this arm is doing by hand (or append #[allow] to this line to keep it)
+error: this `match` turns an optional into a result — write "o.value_or_err("integer literal overflows i64")?" and use the payload directly — `?` does the early return this arm is doing by hand, importing `value_or_err` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_value_or_err.aipl:34:17
    |
 34 |         none => err("integer literal overflows i64"),
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: this `match` turns an optional into a result — write "let v = o.value_or_err("missing")?;" and continue with the `some` arm's body — `?` does the early return this arm is doing by hand (or append #[allow] to this line to keep it)
+error: this `match` turns an optional into a result — write "let v = o.value_or_err("missing")?;" and continue with the `some` arm's body — `?` does the early return this arm is doing by hand, importing `value_or_err` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_value_or_err.aipl:48:20
    |
 48 |             return err("missing");
    |                    ^^^^^^^^^^^^^^
 
-error: this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error (or append #[allow] to this line to keep it)
+error: this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error, importing `value_or_err` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_value_or_err.aipl:66:17
    |
 66 |         none => err(describe(tag)),
    |                 ^^^^^^^^^^^^^^^^^^
 
-error: this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error (or append #[allow] to this line to keep it)
+error: this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error, importing `value_or_err` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_value_or_err.aipl:76:17
    |
 76 |         none => err(Fault { code: 7 }),

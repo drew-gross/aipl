@@ -21,7 +21,6 @@ mod is_empty_longhand;
 mod len_gt_zero;
 mod map_constant_repeat;
 mod map_find_if_some;
-mod match_value_or_err;
 mod push_array_literal;
 mod push_loop_collect_ok;
 mod return_loop_any_all;
@@ -48,7 +47,6 @@ use self::is_empty_longhand::{empty_names, is_empty_longhand};
 use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
 use self::map_constant_repeat::{map_constant_repeat, repeat_names};
 use self::map_find_if_some::{find_map_names, map_find_if_some};
-use self::match_value_or_err::match_value_or_err;
 use self::push_array_literal::push_array_literal;
 use self::push_loop_collect_ok::{collect_ok_names, push_loop_collect_ok};
 use self::return_loop_any_all::{any_all_names, return_loop_any_all};
@@ -107,25 +105,6 @@ pub fn check(
     });
     // A match arm whose block is only its value — braces around nothing.
     each_expr(program, &mut |e| arm_block_value(e, src, &mut hits));
-    // Not `each_expr`: this lint needs to know whether the *enclosing* function
-    // declares any effects. AIPL requires a caller to declare at least the
-    // effects of everything it calls, so "declares none" is a sound local proof
-    // that the `none` arm's error is effect-free — which is what decides whether
-    // the optimizer may sink it. A `.test` body runs with every effect allowed,
-    // so it counts as effectful. Expressions outside a function body (a struct
-    // field or keyword-parameter default) have no enclosing signature to ask and
-    // are simply not visited.
-    for item in &program.items {
-        if let Item::Fn(func) = item {
-            let pure = func.sig.effects.is_empty();
-            crate::each_subexpr(&func.body, &mut |e| {
-                match_value_or_err(e, src, pure, &mut hits)
-            });
-            if let Some(tb) = &func.test_body {
-                crate::each_subexpr(tb, &mut |e| match_value_or_err(e, src, false, &mut hits));
-            }
-        }
-    }
     each_expr(program, &mut |e| field_init_shorthand(e, src, &mut hits));
     each_expr(program, &mut |e| set_spread_field(e, src, &mut hits));
     // The array sibling of the above, and disjoint from it by the kind of

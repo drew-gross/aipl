@@ -1,0 +1,266 @@
+# The `match_value_or_err` lint:
+#
+#     match (o) { some(v) => ok(v), none => err(e) }
+#
+# — an optional turned into a result by naming both cases. That is exactly
+# `o.value_or_err(e)`.
+#
+# The `none` arm building an `err` is what identifies the shape: it is the bridge from
+# the optional world to the result world, and `value_or_err` is the name of that
+# bridge. Arm order does not matter.
+#
+# The `some` arm is *not* constrained to the identity `ok(v)`, because the rewrite does
+# not need it to be. `some(v) => ok(f(v))` is `ok(f(o.value_or_err(e)?))` — the same
+# `value_or_err`, with `?` doing the early return the `none` arm was doing by hand. The
+# advice says which of the two it is, since the second reads quite differently from the
+# first.
+#
+# The `none` arm may also *leave* with the error — a block holding nothing but
+# `return err(e);` — which is the statement form of the same bridge: the `match` runs
+# for effect, the `some` arm's block is the rest of the function, and the `return` stands
+# in for the `?`. That one rewrites to `let v = o.value_or_err(e)?;` followed by the
+# `some` arm's body, with `v` the arm's binder, and the advice spells it that way.
+#
+# A *computed* error is fine, and that is the point of `is_sinkable`. Written out,
+# `value_or_err`'s error is an ordinary call argument and so looks eager — but the
+# optimizer inlines the builtin and sinks the argument into the `none` branch, so it is
+# built exactly when the `match` built it. Measured on a struct error interpolating a
+# runtime string: both spellings allocate the same, to the byte. This is where the rule
+# differs from `match_value_or`, whose `is_constant_default` guard predates that
+# reasoning.
+#
+# The hit points at the `none => err(..)` arm's body, not the whole `match`: `#[allow]`
+# is line-scoped, so a hit spanning the multi-line `match` could never be squelched.
+# This arm is the one that identifies the shape — the `some` arm varies — and its `err`
+# call always starts on the arm's own line. For the block form that line is the
+# `return`'s: a marker after the arm's `{` would not survive formatting.
+
+import {
+    any,
+    equal as ==,
+    is_nonempty,
+    is_some,
+    join,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    value_or,
+} from builtins;
+import {
+    Assign,
+    Call,
+    Char,
+    Expr,
+    Ident,
+    Num,
+    Return,
+    Str,
+    Try,
+    While,
+    descendants,
+} from "../expr.aipl";
+import { Function } from "../item.aipl";
+import { lone_statement } from "./accumulation.aipl";
+import {
+    UnfilledHit,
+    hit,
+    lint_function_unfilled_hits,
+    lint_function_unfilled_messages,
+    unfilled,
+} from "./lint_hit.aipl";
+import { option_matches, receiver_text } from "./option_match.aipl";
+import { passes_through, wraps_with } from "./result_match.aipl";
+
+# A hit for each `match` in the function that turns an optional into a result.
+pub fn match_value_or_err(Function { body, sig }) -> UnfilledHit[] {
+    body
+        .option_matches()
+        .map(
+            |m| {
+                // The `none` arm builds an `err` from one value, as its value or as what it
+                // returns; anything else is a `match` that does something this rule has no
+                // rewrite for.
+                mut error: Expr? = m.none_body.wraps_with("err");
+                mut leaves: Expr? = none;
+                if (!error.is_some()) {
+                    if (let some(statement) = m.none_body.lone_statement()) {
+                        if (let Return(value) = statement.kind) {
+                            set error = value.wraps_with("err");
+                            set leaves = some(statement);
+                        };
+                    };
+                };
+                let some(built) = error else { return []; };
+
+                // Whether the optimizer sinks the error into the `none` branch rather than
+                // evaluating it where it was written. This is the lint's local stand-in for
+                // `aipl_mono::sink::can_defer`, which runs after monomorphization over a call
+                // graph where a lint runs per file, and the two must agree on what is
+                // deferrable: the whole justification for the advice is that the sinker undoes
+                // its eagerness. The structural half is the same — nothing that leaves the
+                // function from where it sits, writes a binding, may not terminate, or aborts
+                // (`assert`). Arithmetic is absent because none of it aborts. The effect half
+                // is where AIPL's discipline does the work: a caller declares at least the
+                // effects of everything it calls, so a function that declares none cannot
+                // reach an effectful call at all. In an effect-declaring function the lint
+                // stays quiet, since it cannot tell which calls carry the effect.
+                let stays = built
+                    .descendants()
+                    .any(|e| match (e.kind) {
+                        Try(..) | Return(..) | Assign(..) | For(..) | While(..) => true,
+                        Call("assert", _, _) => true,
+                        _ => false,
+                    });
+                if (stays || sig.effects.is_nonempty()) { return []; };
+
+                // A single token splices back verbatim, escapes and quotes included, while
+                // anything wider has a span that stops at its last token — before a
+                // construction's closing brace — so quoting it would print advice that
+                // doesn't parse. The advice names the error instead.
+                let quoted = match (built.kind) {
+                    Num(..) | Bool(..) | Str(..) | Char(..) | Ident(..) => built.source,
+                    _ => "",
+                };
+                let named = quoted == "";
+                let argument = if (named) { ".." } else { quoted };
+                let with_error = if (named) { " with that arm's error" } else { "" };
+                let by_hand = "— `?` does the early return this arm is doing by hand";
+                let after = if (leaves.is_some()) {
+                    `({argument})?;"{with_error} and continue with the \`some\` arm's body {by_hand}`
+                } else if (m.some_body.passes_through("ok", m.binder)) {
+                    `({argument})"{if (named) { with_error } else { " instead" }}`
+                } else {
+                    `({argument})?"{if (named) { `{with_error},` } else { "" }} and use the payload directly {by_hand}`
+                };
+                let opening = if (leaves.is_some()) { `let {m.binder} = ` } else { "" };
+                [
+                    unfilled(
+                        "value_or_err",
+                        `this \`match\` turns an optional into a result — {if (named) { "write it as " } else { "write " }}"{opening}{m.scrutinee.receiver_text()}.`,
+                        after,
+                        leaves.value_or(m.none_body).span,
+                    ),
+                ]
+            },
+        )
+        .join()
+}.test({
+    // The identity `some` arm rewrites to a bare call, in either arm order, with the
+    // error quoted when it is a single token and the hit on the `err` call.
+    assert(lint_function_unfilled_hits(
+        """fn f(o: i64?) -> i64!str { match (o) { some(v) => ok(v), none => err("m") } }""",
+        match_value_or_err,
+    )? == [hit(message(`write "o.value_or_err("m")" instead`), 65..73)]);
+    assert(lint_function_unfilled_messages(
+        """fn f(o: i64?) -> i64!str { match (o) { none => err("m"), some(v) => ok(v) } }""",
+        match_value_or_err,
+    )? == [message(`write "o.value_or_err("m")" instead`)]);
+
+    // An error that is not a single token is named rather than quoted.
+    assert(lint_function_unfilled_messages(
+        "fn f(o: i64?) -> i64!P { match (o) { some(v) => ok(v), none => err(P { code: 7 }) } }",
+        match_value_or_err,
+    )? == [message(`write it as "o.value_or_err(..)" with that arm's error`)]);
+    assert(lint_function_unfilled_messages(
+        "fn f(o: i64?, t: str) -> i64!str { match (o) { some(v) => ok(v), none => err(g(t)) } }",
+        match_value_or_err,
+    )? == [message(`write it as "o.value_or_err(..)" with that arm's error`)]);
+
+    // A `some` arm that does more than hand the payload back needs the `?`.
+    assert(lint_function_unfilled_messages(
+        """fn f(o: i64?) -> T!str { match (o) { some(v) => ok(Tok(v)), none => err("m") } }""",
+        match_value_or_err,
+    )? == [
+        message(
+            """write "o.value_or_err("m")?" and use the payload directly — `?` does the early return this arm is doing by hand""",
+        ),
+    ]);
+    assert(lint_function_unfilled_messages(
+        "fn f(o: i64?) -> T!P { match (o) { some(v) => ok(Tok(v)), none => err(P { code: 7 }) } }",
+        match_value_or_err,
+    )? == [
+        message(
+            """write it as "o.value_or_err(..)?" with that arm's error, and use the payload directly — `?` does the early return this arm is doing by hand""",
+        ),
+    ]);
+
+    // The `none` arm may leave with the error instead: the statement form, where the
+    // hit is the `return`'s call.
+    assert(lint_function_unfilled_messages(
+        """fn f(o: i64?) -> i64!str { match (o) { some(v) => { g(v); }, none => { return err("m"); } }; ok(1) }""",
+        match_value_or_err,
+    )? == [
+        message(
+            """write "let v = o.value_or_err("m")?;" and continue with the `some` arm's body — `?` does the early return this arm is doing by hand""",
+        ),
+    ]);
+    assert(lint_function_unfilled_messages(
+        "fn f(o: i64?) -> i64!P { match (o) { some(v) => { g(v); }, none => { return err(P { code: 7 }); } }; ok(1) }",
+        match_value_or_err,
+    )? == [
+        message(
+            """write it as "let v = o.value_or_err(..)?;" with that arm's error and continue with the `some` arm's body — `?` does the early return this arm is doing by hand""",
+        ),
+    ]);
+
+    // A call that is not a name or field cannot take the method as written.
+    assert(lint_function_unfilled_messages(
+        """fn f(a: i64?, b: i64?) -> i64!str { match (a || b) { some(v) => ok(v), none => err("m") } }""",
+        match_value_or_err,
+    )? == [message(`write "<value>.value_or_err("m")" instead`)]);
+
+    // Not the shape: the `none` arm builds something else, or does more than return the
+    // error, or the `some` arm is the one that errs.
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(o: i64?) -> i64!str { match (o) { some(v) => ok(v), none => ok(0) } }",
+            match_value_or_err,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            """fn f(o: i64?) -> i64!str { match (o) { some(v) => { g(v); }, none => { g(); return err("m"); } }; ok(1) }""",
+            match_value_or_err,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            """fn f(o: i64?) -> i64!str { match (o) { some(v) => ok(v), _ => err("m") } }""",
+            match_value_or_err,
+        )? == [],
+    );
+
+    // An error the optimizer cannot sink stays where it is: one that leaves the
+    // function, aborts or loops, and any error in a function that declares an effect or
+    // in a `.test` block, where the effects cannot be told apart.
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(o: i64?) -> i64!str { match (o) { some(v) => ok(v), none => err(g()?) } }",
+            match_value_or_err,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(o: i64?) -> i64!str { match (o) { some(v) => ok(v), none => err(assert(false)) } }",
+            match_value_or_err,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(o: i64?) !prints -> i64!str { match (o) { some(v) => ok(v), none => err(g()) } }",
+            match_value_or_err,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f() { }.test({ match (o) { some(v) => ok(v), none => err(g()) }; })",
+            match_value_or_err,
+        )? == [],
+    );
+})
+
+# What is said of an optional turned into a result with the given `advice`, for a file
+# that does not import `value_or_err`, as the tests' sources do not.
+fn message(advice: str) -> str {
+    `this \`match\` turns an optional into a result — {advice}, importing \`value_or_err\` from builtins`
+}

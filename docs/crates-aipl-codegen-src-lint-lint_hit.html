@@ -344,7 +344,7 @@
           </h3>
           <pre class="signature"><code>fn standing_in(self: Function, body: Expr) -&#62; Function</code></pre>
 
-          <div class="doc"><p><code>self</code>, with <code>body</code> as its whole body: what a block is when it is checked.</p></div>
+          <div class="doc"><p><code>self</code>, with <code>body</code> as its whole body: what a block is when it is checked. A block runs with every effect allowed, which no function can declare, so it stands in as one declaring <code>*</code>.</p></div>
 
 
         </section>
