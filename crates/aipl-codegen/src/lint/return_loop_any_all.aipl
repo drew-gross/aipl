@@ -36,9 +36,9 @@
 # always occupies one line, and it is the line that makes this a fold to a single answer.
 
 import {
+    collect_ok,
     equal as ==,
     is_some,
-    join,
     len,
     logical_not as !,
     logical_or as ||,
@@ -68,8 +68,8 @@ pub fn return_loop_any_all(program: Program) -> LintHit[] {
                 // An *indexed* loop is not this shape: `any`/`all` pass each element and have
                 // no index to pass with it, so the rewrite would silently drop whatever the
                 // body did with it.
-                if (found.index.is_some() || !found.condition.is_lambda_safe()) { return []; };
-                let Bool(returned) = found.returned.kind else { return []; };
+                if (found.index.is_some() || !found.condition.is_lambda_safe()) { return none; };
+                let Bool(returned) = found.returned.kind else { return none; };
 
                 // What the loop falls through to: a bare `true`/`false` as the block's tail,
                 // or an explicit `return true;`. Anything else, and the fall-through does
@@ -83,17 +83,17 @@ pub fn return_loop_any_all(program: Program) -> LintHit[] {
                     },
                     _ => none,
                 };
-                let some(fell_through) = answer else { return []; };
+                let some(fell_through) = answer else { return none; };
 
                 // The two literals must disagree: `return true` above a `true` tail answers
                 // the same thing either way and folds to a constant, not to `any`.
-                if (returned == fell_through) { return []; };
+                if (returned == fell_through) { return none; };
 
                 // `return true` / `false` is `any` of the condition as written; `return
                 // false` / `true` is `all` of it with the negation lifted off.
                 if (!returned) {
-                    let Call("!", operands, _) = found.condition.kind else { return []; };
-                    if (!negation || operands.len() != 1) { return []; };
+                    let Call("!", operands, _) = found.condition.kind else { return none; };
+                    if (!negation || operands.len() != 1) { return none; };
                 };
                 let what = if (returned) {
                     "whether any element passes a test"
@@ -104,16 +104,14 @@ pub fn return_loop_any_all(program: Program) -> LintHit[] {
                 // The `all` rewrite takes the condition with its `!` removed, which is the one
                 // part of the advice a reader could get backwards, so it is said.
                 let note = if (returned) { "" } else { ` (the condition with its "!" removed)` };
-                [
-                    unfilled(
-                        if (returned) { "any" } else { "all" },
-                        `this loop reports {what} — write "return {found.iterable.iterable_text()}.`,
-                        `(|{found.variable}| ..);"{note} and drop the loop`,
-                        found.statement.span,
-                    ),
-                ]
+                some(unfilled(
+                    if (returned) { "any" } else { "all" },
+                    `this loop reports {what} — write "return {found.iterable.iterable_text()}.`,
+                    `(|{found.variable}| ..);"{note} and drop the loop`,
+                    found.statement.span,
+                ))
             })
-            .join()
+            .collect_ok()
     })
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.

@@ -18,7 +18,7 @@ import { fn_body_type_stutter } from "./fn_body_type_stutter.aipl";
 import { interp_literal } from "./interp_literal.aipl";
 import { interp_to_str } from "./interp_to_str.aipl";
 import { let_else_as_case } from "./let_else_as_case.aipl";
-import { LintHit, on_functions, on_functions_filled } from "./lint_hit.aipl";
+import { LintHit, on_functions, on_functions_filled, on_functions_once } from "./lint_hit.aipl";
 import { map_constant_repeat } from "./map_constant_repeat.aipl";
 import { map_find_if_some } from "./map_find_if_some.aipl";
 import { match_bool_is_case } from "./match_bool_is_case.aipl";
@@ -54,7 +54,7 @@ pub fn lint(program: Program) -> LintHit[] {
         ..program.on_functions(destructure_binding),
         ..program.on_functions(destructure_param),
         ..program.on_functions(destructure_slot),
-        ..program.on_functions(fn_body_type_stutter),
+        ..program.on_functions_once(fn_body_type_stutter),
         ..program.on_functions_filled(match_bool_is_case),
         ..program.on_functions_filled(case_of_equal_is_case),
         ..program.on_functions_filled(match_is_some_and),

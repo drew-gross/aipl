@@ -339,6 +339,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  lets make it allowed to ignore fields when destructuring, so that let Expr { kind, span, value_span as _, name_span as _ } = body; can just be let Expr { kind, span } = body;.
   make HOFs able to treat their predicates as self methods.
   destructuring structs should be allowed to ignore fields
   .. should maybe work on optionals too? Or anything that can be $'ed?
@@ -512,6 +513,8 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  let some(x) = e else { return none; } should just be let x = e?;
+  lint against unused variables and unused field destructuring items (even with as _, I don't think we need to adopt the "_ is intentionally unused" pattern)
   extend with a 1-char str literal should be push with a char literal
   go through the lint (and fusion) conditions and comment all of them
   merged-lint/fusion technique that works as a lint when a structure shows up in source and as a fusion when it shows up after inlining
@@ -614,6 +617,7 @@ nonempty lists:
 abi:
 
 design:
+  The type of a function should always reflect what it actually does, a function that always return 0 or 1 items should return T?, even if T[] would be more convenient in some way.
   determinism is mandatory, it should be impossible to write non-deterministic code in single threaded AIPL (given same host state i.e. if effects have deterministic shims. Also, threading isn't implemented but will obviously have to change this. somehow.)
   backwards compatibility is less important the age of AI: you can get claude to migrade all your code (note: changes that cause code that used to compile to stop is fine, change that silently change behaviour of existing code is still 100% banned)
   representation is not introspectable
@@ -697,6 +701,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    collect_ok fusions
     make consecutive set operations fuse when all adding to the same set (e.g. union chains)
     extend(xs.map(f))
     make a way for the same code to work as a lint when written directly and as a fusion when it shows up after inlining

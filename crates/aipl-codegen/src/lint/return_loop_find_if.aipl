@@ -32,7 +32,7 @@
 # own, where it squelches nothing). `return some(x);` is a short statement that always
 # occupies one line, and it is the line that makes this a search for the first match.
 
-import { equal as ==, is_some, join, logical_not as !, logical_or as ||, map } from builtins;
+import { collect_ok, equal as ==, is_some, logical_not as !, logical_or as ||, map } from builtins;
 import { Function } from "../item.aipl";
 import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
 import { answers_none, is_lambda_safe, iterable_text, search_loops } from "./loop_shape.aipl";
@@ -50,18 +50,16 @@ pub fn return_loop_find_if(Function { body }) -> UnfilledHit[] {
                 "some",
                 found.variable,
             ) || !found.condition.is_lambda_safe()) {
-                return [];
+                return none;
             };
-            [
-                unfilled(
-                    "find_if",
-                    `this loop returns the first element passing a test, and "none" otherwise — write "return {found.iterable.iterable_text()}.`,
-                    `(|{found.variable}| ..);" and drop the loop`,
-                    found.statement.span,
-                ),
-            ]
+            some(unfilled(
+                "find_if",
+                `this loop returns the first element passing a test, and "none" otherwise — write "return {found.iterable.iterable_text()}.`,
+                `(|{found.variable}| ..);" and drop the loop`,
+                found.statement.span,
+            ))
         })
-        .join()
+        .collect_ok()
 }.test({
     // The `return` is what the advice points at, with the loop dropped and `none` at the
     // end of the block or returned.

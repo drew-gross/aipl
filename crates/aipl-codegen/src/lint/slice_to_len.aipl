@@ -8,7 +8,7 @@
 #
 # The hit points at the end bound.
 
-import { equal as ==, join, logical_not as !, logical_or as ||, map } from builtins;
+import { collect_ok, equal as ==, logical_not as !, logical_or as ||, map } from builtins;
 import { Slice, collect_expr_cases } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
@@ -19,11 +19,11 @@ pub fn slice_to_len(Function { body }) -> LintHit[] {
     body
         .collect_expr_cases(Slice)
         .map(|slice| {
-            let Slice(receiver, some(lower), some(bound)) = slice else { return []; };
-            if (!bound.is_len_of(receiver) || lower.is_zero()) { return []; };
-            [hit(message(receiver.source, lower.source), bound.span)]
+            let Slice(receiver, some(lower), some(bound)) = slice else { return none; };
+            if (!bound.is_len_of(receiver) || lower.is_zero()) { return none; };
+            some(hit(message(receiver.source, lower.source), bound.span))
         })
-        .join()
+        .collect_ok()
 }.test({
     assert(lint_function_hits("fn f(s: str) -> str { s[3..s.len()] }", slice_to_len)? == [
         hit(message("s", "3"), 27..34),

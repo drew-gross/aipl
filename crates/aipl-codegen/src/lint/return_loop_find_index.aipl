@@ -28,7 +28,7 @@
 # formatter relocates a marker off. `return some(i);` is one line, and it is the line
 # that makes this a search for the first match.
 
-import { equal as ==, join, logical_not as !, logical_or as ||, map } from builtins;
+import { collect_ok, equal as ==, logical_not as !, logical_or as ||, map } from builtins;
 import { Function } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
@@ -41,23 +41,21 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
     body
         .search_loops()
         .map(|found| {
-            let some(index) = found.index else { return []; };
+            let some(index) = found.index else { return none; };
             if (!found.rest.answers_none() || !found.returned.passes_through(
                 "some",
                 index,
             ) || found.condition.mentions_any([index], none) || !found.condition.is_lambda_safe()) {
-                return [];
+                return none;
             };
-            [
-                unfilled(
-                    "find_index",
-                    `this loop returns the position of the first element passing a test, and "none" otherwise — write "return {found.iterable.iterable_text()}.`,
-                    `(|{found.variable}| ..);" and drop the loop`,
-                    found.statement.span,
-                ),
-            ]
+            some(unfilled(
+                "find_index",
+                `this loop returns the position of the first element passing a test, and "none" otherwise — write "return {found.iterable.iterable_text()}.`,
+                `(|{found.variable}| ..);" and drop the loop`,
+                found.statement.span,
+            ))
         })
-        .join()
+        .collect_ok()
 }.test({
     // The `return` is what the advice points at, with `none` at the end of the block or
     // returned.

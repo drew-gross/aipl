@@ -26,14 +26,12 @@
 
 import {
     as_case,
+    collect_ok,
     equal as ==,
     is_nonempty,
-    join,
     logical_not as !,
     logical_or as ||,
-    map,
     not_equal as !=,
-    value_or,
 } from builtins;
 import { ArrayLit, Ident, IfLet, Unit } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
@@ -54,7 +52,7 @@ import { names_case, payload_binders } from "./option_match.aipl";
 pub fn push_loop_collect_ok(program: Program) -> LintHit[] {
     let some(push) = program.items.imported_as("push") else { return []; };
     program.on_functions_filled(|Function { body }| {
-        body.seeded_loops()$collected(push)$map(|found| [found])$value_or([]).join()
+        body.seeded_loops()$collected(push).collect_ok()
     })
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
@@ -168,19 +166,19 @@ fn collected(self: SeededLoop, push: str) -> UnfilledHit? {
 
     // Asking nothing of the element — the iterable already holds the optionals — leaves no
     // first `map` to write, and pushing the bound name itself needs no second one.
-    let asks: (str, str)[] = if (scrutinee.kind != Ident(self.variable)) {
-        [("map", `(|{self.variable}| ..)`)]
+    let asks: (str, str)? = if (scrutinee.kind != Ident(self.variable)) {
+        some(("map", `(|{self.variable}| ..)`))
     } else {
-        []
+        none
     };
-    let maps: (str, str)[] = if (element.kind != Ident(bound)) {
-        [("map", `(|{bound}| ..)`)]
+    let maps: (str, str)? = if (element.kind != Ident(bound)) {
+        some(("map", `(|{bound}| ..)`))
     } else {
-        []
+        none
     };
     some(self.pipeline_hit(
         "filled by this loop with the answers that exist and nothing else",
         "",
-        [..asks, ("collect_ok", "()"), ..maps],
+        [asks, some(("collect_ok", "()")), maps].collect_ok(),
     ))
 }

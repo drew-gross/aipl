@@ -11,14 +11,12 @@
 
 import {
     as_case,
+    collect_ok,
     equal as ==,
     is_empty,
     is_some,
-    join,
     logical_not as !,
-    map,
     not_equal as !=,
-    value_or,
 } from builtins;
 import {
     Assign,
@@ -114,7 +112,7 @@ struct SearchLoop {
 # The body is an else-less `if` around a lone `return`: an `else`, or a second
 # statement, is work a searching builtin has nowhere to put.
 pub fn search_loops(self: Expr) -> SearchLoop[] {
-    self.collect_expr_cases(Seq)$search_loop()$map(|found| [found])$value_or([]).join()
+    self.collect_expr_cases(Seq)$search_loop().collect_ok()
 }.test({
     assert(search_variables("{ for (let x : xs) { if (c(x)) { return some(x); }; } none }")? == [
         "x",

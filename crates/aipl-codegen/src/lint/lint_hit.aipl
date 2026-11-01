@@ -5,6 +5,7 @@
 import {
     Span,
     collect_arms,
+    collect_ok,
     contains,
     ends_with,
     equal as ==,
@@ -286,6 +287,20 @@ pub fn on_functions(self: Program, lint: (Function) -> LintHit[]) -> LintHit[] {
     )? == ["1", "0"]);
 })
 
+# [`on_functions`] for a lint that reports at most one hit for a function.
+pub fn on_functions_once(self: Program, lint: (Function) -> LintHit?) -> LintHit[] {
+    self.code_bodies()$lint().collect_ok()
+}.test({
+    assert(lint_function_once_hits(
+        "fn f() { } fn g() { }",
+        |function| if (function.name.text == "g") {
+            some(hit(function.name.text, 0..1))
+        } else {
+            none
+        },
+    )? == [hit("g", 0..1)]);
+})
+
 # [`on_functions`] for a lint whose hits are [`UnfilledHit`]s.
 pub fn on_functions_unfilled(self: Program, lint: (Function) -> UnfilledHit[]) -> UnfilledHit[] {
     self.code_bodies()$lint().join()
@@ -326,6 +341,12 @@ fn standing_in(self: Function, body: Expr) -> Function {
 # What the function lint `lint` reports for the program `src` parses to.
 pub fn lint_function_hits(src: str, lint: (Function) -> LintHit[]) -> LintHit[]!ParseFailure {
     lint_hits(src, |program: Program| { program.on_functions(lint) })
+}
+
+# What the lint `lint`, which reports at most one hit for a function, reports for the program
+# `src` parses to.
+pub fn lint_function_once_hits(src: str, lint: (Function) -> LintHit?) -> LintHit[]!ParseFailure {
+    lint_hits(src, |program: Program| { program.on_functions_once(lint) })
 }
 
 # [`lint_function_hits`], keeping only the messages.

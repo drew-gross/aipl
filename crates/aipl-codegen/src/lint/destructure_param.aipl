@@ -35,6 +35,7 @@
 import {
     Span,
     as_case,
+    collect_ok,
     equal as ==,
     is_nonempty,
     is_some,
@@ -56,7 +57,7 @@ pub fn destructure_param(Function { sig, body }) -> LintHit[] {
     // anywhere in it counts against each parameter it belongs to; the destructured
     // parameters make reads of their own.
     let reads = [..sig.params$pattern_reads().join(), ..body.field_reads()];
-    sig.params$param_hits(body, reads).join()
+    sig.params$param_hits(body, reads).collect_ok()
 }.test({
     // Only fields are read: take the parameter apart in the signature.
     assert(lint_function_messages("fn f(p: Point) -> i64 { p.x + p.y }", destructure_param)? == [
@@ -126,27 +127,27 @@ pub fn destructure_param(Function { sig, body }) -> LintHit[] {
 })
 
 # The hit for one parameter, or none.
-fn param_hits(self: Param, body: Expr, reads: Read[]) -> LintHit[] {
+fn param_hits(self: Param, body: Expr, reads: Read[]) -> LintHit? {
     if (self.name == "self" || self.mutable || self.arity != One || self.default.is_some() || self.pattern.is_some()) {
-        return [];
+        return none;
     };
-    let Named(struct_name) = self.ty else { return []; };
+    let Named(struct_name) = self.ty.as_case(Named)?;
     let Uses { mentions, field_reads, shadowed, fields as _ } = body.uses_of(self.name);
     if (!shadowed && field_reads == 0 && mentions == 1) {
         if (let some((value_span, opening)) = body.opening_destructure(self.name, struct_name)) {
-            return [hit(opening_message(self.name, struct_name, opening), value_span)];
+            return some(hit(opening_message(self.name, struct_name, opening), value_span));
         };
     };
 
     // There is no right-hand side to discount here the way a `let` has one: a
     // parameter is bound before the body runs, so every read in the function is one
     // the pattern's names would have to live alongside.
-    let some(fields) = body.sole_fields(self.name, reads) else { return []; };
+    let fields = body.sole_fields(self.name, reads)?;
 
     // The body's span starts at the `{` that opens it, which is a single line that
     // survives the formatter — and the closest line to the signature that a
     // parameter can be blamed on, `Param` carrying no span of its own.
-    [hit(message(self.name, struct_name, fields), body.span)]
+    some(hit(message(self.name, struct_name, fields), body.span))
 }
 
 # What is said of a parameter `name` whose `fields` are the ones read.

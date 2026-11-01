@@ -25,9 +25,9 @@
 
 import {
     all,
+    collect_ok,
     ends_with,
     equal as ==,
-    join,
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
@@ -73,31 +73,29 @@ pub fn map_constant_repeat(program: Program) -> LintHit[] {
             .descendants()
             .map(
                 |call| {
-                    let Call(callee, arguments, _) = call.kind else { return []; };
-                    let [receiver, lambda] = arguments else { return []; };
-                    let Lambda(parameters, constant) = lambda.kind else { return []; };
-                    let [parameter] = parameters else { return []; };
+                    let Call(callee, arguments, _) = call.kind else { return none; };
+                    let [receiver, lambda] = arguments else { return none; };
+                    let Lambda(parameters, constant) = lambda.kind else { return none; };
+                    let [parameter] = parameters else { return none; };
                     if (callee != map_name || receiver.is_range() || !constant.is_constant(
                         parameter.name,
                     )) {
-                        return [];
+                        return none;
                     };
-                    [
-                        UnfilledHit {
-                            named: [
-                                Named {
-                                    text: `"{map_name}" with a function that ignores its argument builds the same value once per element — for a sequence, write "[{constant.quote("<element>")}].`,
-                                    builtin: "repeat",
-                                },
-                                Named { text: `({receiver.quote("<items>")}.`, builtin: "len" },
-                            ],
-                            tail: `())"`,
-                            span: lambda.span,
-                        },
-                    ]
+                    some(UnfilledHit {
+                        named: [
+                            Named {
+                                text: `"{map_name}" with a function that ignores its argument builds the same value once per element — for a sequence, write "[{constant.quote("<element>")}].`,
+                                builtin: "repeat",
+                            },
+                            Named { text: `({receiver.quote("<items>")}.`, builtin: "len" },
+                        ],
+                        tail: `())"`,
+                        span: lambda.span,
+                    })
                 },
             )
-            .join()
+            .collect_ok()
     })
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.

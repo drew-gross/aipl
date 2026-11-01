@@ -11,7 +11,7 @@
 #
 # The hit points at the `to_str` call.
 
-import { equal as ==, join, map, not_equal as != } from builtins;
+import { collect_ok, equal as ==, map, not_equal as != } from builtins;
 import { Call } from "../expr.aipl";
 import { Program } from "../item.aipl";
 import { interpolated_values } from "./interpolation.aipl";
@@ -31,9 +31,9 @@ pub fn interp_to_str(program: Program) -> LintHit[] {
         |function| function.body
             .interpolated_values()
             .map(|value| {
-                let Call(callee, arguments, _) = value.kind else { return []; };
-                let [argument] = arguments else { return []; };
-                if (callee != to_str) { return []; };
+                let Call(callee, arguments, _) = value.kind else { return none; };
+                let [argument] = arguments else { return none; };
+                if (callee != to_str) { return none; };
 
                 // The argument is spliced into the advice only where its span is its text:
                 // a call's span stops before its closing paren.
@@ -42,9 +42,9 @@ pub fn interp_to_str(program: Program) -> LintHit[] {
                 } else {
                     "interpolate the value itself"
                 };
-                [hit(message(to_str, advice), value.span)]
+                some(hit(message(to_str, advice), value.span))
             })
-            .join(),
+            .collect_ok(),
     )
 }.test({
     // The function and the method spelling are the same call.

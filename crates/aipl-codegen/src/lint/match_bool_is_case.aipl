@@ -21,11 +21,11 @@
 import {
     Span,
     all,
+    collect_ok,
     contains,
     equal as ==,
     filter,
     is_case,
-    join,
     logical_not as !,
     logical_or as ||,
     map,
@@ -45,19 +45,19 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
     body
         .collect_expr_cases(Match)
         .map(|Match(scrutinee, arms)| {
-            if (!arms.all(|arm| arm.body.kind.is_case(Bool))) { return []; };
+            if (!arms.all(|arm| arm.body.kind.is_case(Bool))) { return none; };
             let [MatchArm { pattern, span, body as _ }] = arms.filter(|arm| arm.body.kind == Bool(
                 true,
             )) else {
-                return [];
+                return none;
             };
-            let Ctor(case, _, _) = pattern else { return []; };
+            let Ctor(case, _, _) = pattern else { return none; };
             if (case.is_binder_name() || ["some", "none", "ok", "err"].contains(case)) {
-                return [];
+                return none;
             };
-            [advice(case, span)]
+            some(advice(case, span))
         })
-        .join()
+        .collect_ok()
 }.test({
     // One case is `true`, the rest `false`.
     assert(lint_function_unfilled_messages(

@@ -26,7 +26,15 @@
 # default is the one part of the shape that is reliably a single line — the `some`
 # arm's body is whatever the mapping is, and may run to several.
 
-import { Span, equal as ==, join, len, logical_not as !, logical_or as ||, map } from builtins;
+import {
+    Span,
+    collect_ok,
+    equal as ==,
+    len,
+    logical_not as !,
+    logical_or as ||,
+    map,
+} from builtins;
 import { Bool, Call, Ident, None, Unit } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { is_constant_default } from "./constant_default.aipl";
@@ -56,8 +64,10 @@ pub fn match_map_value_or(Function { body }) -> UnfilledHit[] {
             } else {
                 false
             };
-            if (identity || none_body.kind == Bool(false) || none_body.kind == Unit) { return []; };
-            if (!some_body.mentions_any([binder], none)) { return []; };
+            if (identity || none_body.kind == Bool(false) || none_body.kind == Unit) {
+                return none;
+            };
+            if (!some_body.mentions_any([binder], none)) { return none; };
             let receiver = scrutinee.receiver_text();
 
             // `some(v) => some(..), none => none`: a `map` with nothing to default. Any other
@@ -68,12 +78,16 @@ pub fn match_map_value_or(Function { body }) -> UnfilledHit[] {
                 } else {
                     false
                 };
-                return if (wraps) { [kept_none(receiver, binder, none_body.span)] } else { [] };
+                return if (wraps) {
+                    some(kept_none(receiver, binder, none_body.span))
+                } else {
+                    none
+                };
             };
-            if (!none_body.is_constant_default()) { return []; };
-            [with_default(receiver, binder, none_body.default_text(), none_body.span)]
+            if (!none_body.is_constant_default()) { return none; };
+            some(with_default(receiver, binder, none_body.default_text(), none_body.span))
         })
-        .join()
+        .collect_ok()
 }.test({
     // A mapping with a default points at the default, in either arm order.
     assert(lint_function_unfilled_hits(

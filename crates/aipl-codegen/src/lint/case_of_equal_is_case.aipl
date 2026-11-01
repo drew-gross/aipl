@@ -7,7 +7,7 @@
 #
 # The hit points at the `==`, a short line the formatter keeps in place.
 
-import { Span, count_if, equal as ==, join, len, map } from builtins;
+import { Span, collect_ok, count_if, equal as ==, len, map } from builtins;
 import { Call, descendants } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import {
@@ -22,17 +22,17 @@ pub fn case_of_equal_is_case(Function { body }) -> UnfilledHit[] {
     body
         .descendants()
         .map(|comparison| {
-            let Call("==", operands, _) = comparison.kind else { return []; };
+            let Call("==", operands, _) = comparison.kind else { return none; };
             if (operands.count_if(|operand| match (operand.kind) {
                 Call("case_of", arguments, _) => arguments.len() == 1,
                 _ => false,
             }) == 1) {
-                [advice(comparison.span)]
+                some(advice(comparison.span))
             } else {
-                []
+                none
             }
         })
-        .join()
+        .collect_ok()
 }.test({
     assert(lint_function_unfilled_messages(
         "fn f(s: Shape) -> bool { s.case_of() == Circle }",

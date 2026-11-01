@@ -11,7 +11,7 @@
 #
 # The hit points at the `0`.
 
-import { equal as ==, join, logical_and as &&, logical_not as !, map } from builtins;
+import { collect_ok, equal as ==, logical_and as &&, logical_not as !, map } from builtins;
 import { Slice, collect_expr_cases } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
@@ -23,14 +23,14 @@ pub fn slice_from_zero(Function { body }) -> LintHit[] {
     body
         .collect_expr_cases(Slice)
         .map(|slice| {
-            let Slice(receiver, some(lower), some(bound)) = slice else { return []; };
+            let Slice(receiver, some(lower), some(bound)) = slice else { return none; };
             if (lower.is_zero() && !bound.is_len_of(receiver)) {
-                [hit(message(receiver.source, bound.source), lower.span)]
+                some(hit(message(receiver.source, bound.source), lower.span))
             } else {
-                []
+                none
             }
         })
-        .join()
+        .collect_ok()
 }.test({
     assert(lint_function_hits("fn f(s: str) -> str { s[0..2] }", slice_from_zero)? == [
         hit(message("s", "2"), 24..25),

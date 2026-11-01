@@ -37,10 +37,10 @@
 
 import {
     any,
+    collect_ok,
     equal as ==,
     is_nonempty,
     is_some,
-    join,
     logical_not as !,
     logical_or as ||,
     map,
@@ -90,7 +90,7 @@ pub fn match_value_or_err(Function { body, sig }) -> UnfilledHit[] {
                         };
                     };
                 };
-                let some(built) = error else { return []; };
+                let some(built) = error else { return none; };
 
                 // Whether the optimizer sinks the error into the `none` branch rather than
                 // evaluating it where it was written. This is the lint's local stand-in for
@@ -111,7 +111,7 @@ pub fn match_value_or_err(Function { body, sig }) -> UnfilledHit[] {
                         Call("assert", _, _) => true,
                         _ => false,
                     });
-                if (stays || sig.effects.is_nonempty()) { return []; };
+                if (stays || sig.effects.is_nonempty()) { return none; };
 
                 // A single token splices back verbatim, escapes and quotes included, while
                 // anything wider has a span that stops at its last token — before a
@@ -133,17 +133,15 @@ pub fn match_value_or_err(Function { body, sig }) -> UnfilledHit[] {
                     `({argument})?"{if (named) { `{with_error},` } else { "" }} and use the payload directly {by_hand}`
                 };
                 let opening = if (leaves.is_some()) { `let {m.binder} = ` } else { "" };
-                [
-                    unfilled(
-                        "value_or_err",
-                        `this \`match\` turns an optional into a result — {if (named) { "write it as " } else { "write " }}"{opening}{m.scrutinee.receiver_text()}.`,
-                        after,
-                        leaves.value_or(m.none_body).span,
-                    ),
-                ]
+                some(unfilled(
+                    "value_or_err",
+                    `this \`match\` turns an optional into a result — {if (named) { "write it as " } else { "write " }}"{opening}{m.scrutinee.receiver_text()}.`,
+                    after,
+                    leaves.value_or(m.none_body).span,
+                ))
             },
         )
-        .join()
+        .collect_ok()
 }.test({
     // The identity `some` arm rewrites to a bare call, in either arm order, with the
     // error quoted when it is a single token and the hit on the `err` call.

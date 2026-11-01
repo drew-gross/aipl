@@ -6255,7 +6255,12 @@ impl Cx<'_> {
             );
         }
         let mark = self.try_errs.borrow().len();
-        let body_ty = self.check_expr(body, &env2, effects)?;
+        // A `return value;` in the body leaves the lambda, so it is checked against
+        // what the lambda is expected to return, not the enclosing function's type.
+        let outer_ret = self.current_ret.replace(expected_ret.clone());
+        let body_ty = self.check_expr(body, &env2, effects);
+        *self.current_ret.borrow_mut() = outer_ret;
+        let body_ty = body_ty?;
         let body_ty = {
             let errs = self.try_errs.borrow();
             err_side_from_tries(body_ty, &errs[mark..])

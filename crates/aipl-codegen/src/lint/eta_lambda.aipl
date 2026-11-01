@@ -37,7 +37,6 @@ import {
     greater_than as >,
     is_digit,
     is_empty,
-    is_nonempty,
     is_some,
     is_some_and,
     join,
@@ -45,10 +44,8 @@ import {
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
-    map,
     not_equal as !=,
     starts_with,
-    value_or,
     zip_with,
 } from builtins;
 import { Call, Expr, Field, Ident, Lambda, LambdaParam, descendants } from "../expr.aipl";
@@ -124,7 +121,7 @@ pub fn eta_lambda(program: Program) -> LintHit[] {
 # file imports. A function from another file is not here — its parameters are not in view
 # when a file is linted.
 fn methods_in_view(self: Item[]) -> str[] {
-    let own = self.collect_arms(Fn)$method_name().join();
+    let own = self.collect_arms(Fn)$method_name().collect_ok();
     let imported = self
         .imported_locals()
         .filter(|name| name[0].is_some_and(|c| "abcdefghijklmnopqrstuvwxyz_".contains(c)));
@@ -132,11 +129,11 @@ fn methods_in_view(self: Item[]) -> str[] {
 }
 
 # The name of the function `self`, when it takes a `self`.
-fn method_name(self: Fn(function)) -> str[] {
+fn method_name(self: Fn(function)) -> str? {
     if (function.sig.params.first().is_some_and(|parameter| parameter.name == "self")) {
-        [function.name.text]
+        some(function.name.text)
     } else {
-        []
+        none
     }
 }
 
@@ -144,15 +141,15 @@ fn method_name(self: Fn(function)) -> str[] {
 # there is one, and the forwarding advice for the lambdas that advice did not already cover.
 fn lambda_hits(self: Expr, map_name: str?, methods: str[]) -> LintHit[] {
     let nodes = self.descendants();
-    let advice = nodes$map_advice(map_name, methods)$map(|found| [found])$value_or([]);
-    let advised = advice.join()$lambda.collect_ok();
+    let advice = nodes$map_advice(map_name, methods);
+    let advised = advice.collect_ok()$lambda.collect_ok();
     zip_with(
         nodes,
         advice,
-        |node: Expr, given: MapAdvice[]| {
-            if (given.is_nonempty()) { given$hit } else { node.forwarded(advised) }
+        |node: Expr, given: MapAdvice?| {
+            if (let some(found) = given) { some(found.hit) } else { node.forwarded(advised) }
         },
-    ).join()
+    ).collect_ok()
 }
 
 # What the `map` rule says about a call, and the span of the lambda it advised on (none for a
@@ -229,22 +226,25 @@ fn slot_shown(self: str) -> str {
 # accept `+` as a value, but `xs.fold(0, +)` is a different reading from `|acc, x| acc + x`
 # rather than an obviously better one, and this lint's job is the case where the lambda adds
 # *nothing* — `|x| to_str(x)` against `to_str`.
-fn forwarded(self: Expr, advised: Span[]) -> LintHit[] {
-    let Lambda(parameters, body) = self.kind else { return []; };
+fn forwarded(self: Expr, advised: Span[]) -> LintHit? {
+    let Lambda(parameters, body) = self.kind.as_case(Lambda)?;
     if (advised.contains(self.span) || parameters.any(|parameter| parameter.name.contains('$'))) {
-        return [];
+        return none;
     };
-    let Call(name, arguments, _) = body.kind else { return []; };
+    let Call(name, arguments, _) = body.kind.as_case(Call)?;
     if (name.is_operator_name() || arguments.len() != parameters.len() || parameters.any(
         |parameter| parameter.name == name,
     )) {
-        return [];
+        return none;
     };
     let forwards = zip_with(
         arguments,
         parameters,
         |argument: Expr, parameter: LambdaParam| argument.kind == Ident(parameter.name),
     );
-    if (!forwards.all(|same| same)) { return []; };
-    [hit(`lambda only forwards its argument(s) to "{name}" — pass "{name}" directly`, self.span)]
+    if (!forwards.all(|same| same)) { return none; };
+    some(hit(
+        `lambda only forwards its argument(s) to "{name}" — pass "{name}" directly`,
+        self.span,
+    ))
 }

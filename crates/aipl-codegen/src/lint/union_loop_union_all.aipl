@@ -46,12 +46,12 @@
 
 import {
     as_case,
+    collect_ok,
     equal as ==,
     first,
     is_nonempty,
     is_some,
     is_some_and,
-    join,
     len,
     logical_and as &&,
     logical_not as !,
@@ -78,7 +78,7 @@ import { lone_statement } from "./loop_shape.aipl";
 pub fn union_loop_union_all(program: Program) -> LintHit[] {
     let some(union) = program.items.imported_as("union") else { return []; };
     program.on_functions_filled(|Function { body }| {
-        body.seeded_loops()$unioned(union)$map(|found| [found])$value_or([]).join()
+        body.seeded_loops()$unioned(union).collect_ok()
     })
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
@@ -216,16 +216,16 @@ fn unioned(self: SeededLoop, union: str) -> UnfilledHit? {
 
     // Unioning the loop variable itself is the identity map, which the pipeline just
     // leaves out.
-    let maps: (str, str)[] = if (mapped.kind != Ident(self.variable)) {
-        [("map", `(|{self.variable}| ..)`)]
+    let maps: (str, str)? = if (mapped.kind != Ident(self.variable)) {
+        some(("map", `(|{self.variable}| ..)`))
     } else {
-        []
+        none
     };
     let how = if (single.is_some()) { "an element at a time" } else { "a set at a time" };
     let fold = if (single.is_some()) { "to_set" } else { "union_all" };
     some(self.pipeline_hit(
         `unioned into by this loop {how} and nothing else`,
         self.annotation.map(|annotation| `: {annotation.type_text()}`).value_or(""),
-        [..maps, (fold, "()")],
+        [maps, some((fold, "()"))].collect_ok(),
     ))
 }

@@ -22,7 +22,7 @@
 # moves a marker written there onto its own line. The literal is always one line,
 # and it is the part that makes the shape recognizable.
 
-import { Span, equal as ==, join, logical_or as ||, map, not_equal as != } from builtins;
+import { Span, collect_ok, equal as ==, logical_or as ||, map, not_equal as != } from builtins;
 import { Bool } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import {
@@ -41,10 +41,10 @@ pub fn match_is_some_and(Function { body }) -> UnfilledHit[] {
     body
         .option_matches()
         .map(|OptionMatch { scrutinee, binder, some_body, none_body }| {
-            if (none_body.kind != Bool(false) || some_body.kind == Bool(true)) { return []; };
-            [advice(scrutinee.receiver_text(), binder, none_body.span)]
+            if (none_body.kind != Bool(false) || some_body.kind == Bool(true)) { return none; };
+            some(advice(scrutinee.receiver_text(), binder, none_body.span))
         })
-        .join()
+        .collect_ok()
 }.test({
     // The `none => false` arm is what is pointed at, in either arm order.
     assert(lint_function_unfilled_hits(

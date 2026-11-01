@@ -19,7 +19,7 @@
 #
 # The hit points at the seed.
 
-import { equal as ==, extend, join, map } from builtins;
+import { equal as ==, extend, filter, map } from builtins;
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Program } from "../item.aipl";
 import { accumulations, element_stages, filled_hit, is_advisable } from "./accumulation.aipl";
@@ -31,14 +31,8 @@ pub fn extend_loop_map_join(program: Program) -> LintHit[] {
     program.on_functions_filled(|Function { body }| {
         body
             .accumulations(extend)
-            .map(|loop| {
-                if (loop.is_advisable()) {
-                    [loop.filled_hit([..loop.element_stages(), ("join", "()")])]
-                } else {
-                    []
-                }
-            })
-            .join()
+            .filter(is_advisable)
+            .map(|loop| loop.filled_hit([..loop.element_stages(), ("join", "()")]))
     })
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.

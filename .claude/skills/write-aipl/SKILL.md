@@ -41,8 +41,9 @@ xs$f()  ≡ xs.map(|e| e.f())      xs$field  ≡ xs.map(|e| e.field)
 ```
 - Blocks: statements end in `;`, optional trailing expression is the value. A construct used as a value
   (`let v = match ..`) may not assign to outer bindings; as a statement (`match ..;`) it may.
-- `.join(sep=", ", final_sep=" and ", only_sep=" and ")` writes English lists. `T?[]` can't `.join()`;
-  flatten with `$f(..)$map(|x| [x])$value_or([]).join()`.
+- `.join(sep=", ", final_sep=" and ", only_sep=" and ")` writes English lists. `T?[]` flattens with
+  `.collect_ok()` (`xs$f().collect_ok()`); a function that finds at most one thing returns `T?`, never `T[]`.
+- `return` inside a lambda leaves the lambda.
 - No list patterns inside ctor patterns; `return` not allowed inside a match arm expression; a bare `none` can't be a tuple slot.
 - Struct patterns rename with `as` (`P { x as px }`, `Pushes { elements, rest as end }`), not `x: px`. `struct`/`variant` are never `pub`. No `is_none`: write `!o.is_some()`.
 - A case with keyword params (`For`, `Ctor`) can't go through `as_case(Case)` as a function value: destructure with `let Case(..) = x else { return none; };`.

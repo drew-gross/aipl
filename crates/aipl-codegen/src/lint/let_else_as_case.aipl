@@ -21,7 +21,7 @@
 # The hit points at the `return none;` line, a short statement the formatter keeps in
 # place, so `#[allow]` squelches it.
 
-import { equal as ==, join, logical_or as ||, map, not_equal as != } from builtins;
+import { collect_ok, equal as ==, logical_or as ||, map, not_equal as != } from builtins;
 import { IfLet, None, Return, Seq, Unit } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { case_pattern, statement_head, tail_matches } from "./case_match.aipl";
@@ -35,23 +35,21 @@ pub fn let_else_as_case(Function { body }) -> UnfilledHit[] {
         .tail_matches()
         .map(
             |tail| {
-                let IfLet(arm, scrutinee, otherwise) = tail.kind else { return []; };
-                let some(pattern) = arm.pattern.case_pattern() else { return []; };
+                let IfLet(arm, scrutinee, otherwise) = tail.kind else { return none; };
+                let some(pattern) = arm.pattern.case_pattern() else { return none; };
                 // `return none;` and nothing else: the statement, then the block's unit tail.
-                let Seq(leave, rest) = otherwise.kind else { return []; };
-                let Return(value) = leave.kind else { return []; };
-                if (rest.kind != Unit || value.kind != None) { return []; };
-                [
-                    unfilled(
-                        "as_case",
-                        `this \`else\` only gives up with none — write "{pattern.statement_head()}{scrutinee.receiver_text()}.`,
-                        `({pattern.case})?;" and drop the block`,
-                        leave.span,
-                    ),
-                ]
+                let Seq(leave, rest) = otherwise.kind else { return none; };
+                let Return(value) = leave.kind else { return none; };
+                if (rest.kind != Unit || value.kind != None) { return none; };
+                some(unfilled(
+                    "as_case",
+                    `this \`else\` only gives up with none — write "{pattern.statement_head()}{scrutinee.receiver_text()}.`,
+                    `({pattern.case})?;" and drop the block`,
+                    leave.span,
+                ))
             },
         )
-        .join()
+        .collect_ok()
 }.test({
     // The value taken apart, with the payload bound by the `let`, and the hit on the
     // `return`.

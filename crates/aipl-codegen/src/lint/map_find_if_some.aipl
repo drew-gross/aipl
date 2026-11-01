@@ -17,8 +17,8 @@
 # The hit points at the whole chain.
 
 import {
+    collect_ok,
     equal as ==,
-    join,
     len,
     logical_and as &&,
     logical_not as !,
@@ -47,24 +47,22 @@ pub fn map_find_if_some(program: Program) -> LintHit[] {
             .descendants()
             .map(
                 |chain| {
-                    let Call(outer, arguments, _) = chain.kind else { return []; };
-                    let [mapped, predicate] = arguments else { return []; };
-                    let Call(inner, inner_arguments, _) = mapped.kind else { return []; };
+                    let Call(outer, arguments, _) = chain.kind else { return none; };
+                    let [mapped, predicate] = arguments else { return none; };
+                    let Call(inner, inner_arguments, _) = mapped.kind else { return none; };
                     if (outer != find_if || inner != map_name || inner_arguments.len() != 2) {
-                        return [];
+                        return none;
                     };
-                    if (!predicate.is_the_function(is_some)) { return []; };
-                    [
-                        unfilled(
-                            "find_map",
-                            `"{map_name}" then "{find_if}({is_some})" is the first element with an answer, wrapped twice — write "`,
-                            `(..)" over the mapping function, which hands the answer back once`,
-                            chain.span,
-                        ),
-                    ]
+                    if (!predicate.is_the_function(is_some)) { return none; };
+                    some(unfilled(
+                        "find_map",
+                        `"{map_name}" then "{find_if}({is_some})" is the first element with an answer, wrapped twice — write "`,
+                        `(..)" over the mapping function, which hands the answer back once`,
+                        chain.span,
+                    ))
                 },
             )
-            .join()
+            .collect_ok()
     })
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.

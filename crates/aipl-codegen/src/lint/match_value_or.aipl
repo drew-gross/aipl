@@ -22,8 +22,8 @@
 
 import {
     Span,
+    collect_ok,
     equal as ==,
-    join,
     logical_not as !,
     logical_or as ||,
     map,
@@ -47,11 +47,11 @@ pub fn match_value_or(Function { body }) -> UnfilledHit[] {
     body
         .option_matches()
         .map(|OptionMatch { scrutinee, binder, some_body, none_body }| {
-            let Ident(payload) = some_body.kind else { return []; };
-            if (payload != binder || !none_body.is_constant_default()) { return []; };
-            [advice(scrutinee.receiver_text(), none_body.default_text(), some_body.span)]
+            let Ident(payload) = some_body.kind else { return none; };
+            if (payload != binder || !none_body.is_constant_default()) { return none; };
+            some(advice(scrutinee.receiver_text(), none_body.default_text(), some_body.span))
         })
-        .join()
+        .collect_ok()
 }.test({
     // The identity arm is what is pointed at, in either arm order.
     assert(lint_function_unfilled_hits(

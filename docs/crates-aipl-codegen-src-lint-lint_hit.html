@@ -218,6 +218,20 @@
 
 
 
+        <section class="item" id="item-on_functions_once">
+          <h3>
+            <a class="anchor" href="#item-on_functions_once">on_functions_once</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn on_functions_once(self: Program, lint: (Function) -&#62; LintHit?) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>[<code>on_functions</code>] for a lint that reports at most one hit for a function.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-on_functions_unfilled">
           <h3>
             <a class="anchor" href="#item-on_functions_unfilled">on_functions_unfilled</a>
@@ -254,6 +268,20 @@
           <pre class="signature"><code>pub fn lint_function_hits(src: str, lint: (Function) -&#62; LintHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
 
           <div class="doc"><p>What the function lint <code>lint</code> reports for the program <code>src</code> parses to.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lint_function_once_hits">
+          <h3>
+            <a class="anchor" href="#item-lint_function_once_hits">lint_function_once_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_function_once_hits(src: str, lint: (Function) -&#62; LintHit?) -&#62; LintHit[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>What the lint <code>lint</code>, which reports at most one hit for a function, reports for the program <code>src</code> parses to.</p></div>
 
 
         </section>

@@ -19,8 +19,8 @@
 # `#[allow]` squelches it.
 
 import {
+    collect_ok,
     equal as ==,
-    join,
     logical_not as !,
     logical_or as ||,
     map,
@@ -38,23 +38,21 @@ pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
         .collect_expr_cases(Match)
         .map(
             |Match(scrutinee, arms)| {
-                let [case_arm, other_arm] = arms else { return []; };
-                let some(pattern) = case_arm.pattern.case_pattern() else { return []; };
-                let Call("some", wrapped, _) = case_arm.body.kind else { return []; };
+                let [case_arm, other_arm] = arms else { return none; };
+                let some(pattern) = case_arm.pattern.case_pattern() else { return none; };
+                let Call("some", wrapped, _) = case_arm.body.kind else { return none; };
                 if (!other_arm.is_give_up() || wrapped$show_expr() != [scrutinee.show_expr()]) {
-                    return [];
+                    return none;
                 };
-                [
-                    unfilled(
-                        "as_case",
-                        `this match only asks whether the value is {pattern.case} — write "{scrutinee.receiver_text()}.`,
-                        `({pattern.case})" and drop the match`,
-                        other_arm.span,
-                    ),
-                ]
+                some(unfilled(
+                    "as_case",
+                    `this match only asks whether the value is {pattern.case} — write "{scrutinee.receiver_text()}.`,
+                    `({pattern.case})" and drop the match`,
+                    other_arm.span,
+                ))
             },
         )
-        .join()
+        .collect_ok()
 }.test({
     // The case, handed back as the value matched, and the hit on the catch-all.
     assert(lint_function_unfilled_messages(

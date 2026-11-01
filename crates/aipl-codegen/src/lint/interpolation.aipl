@@ -1,7 +1,7 @@
 # What the two interpolation lints (`interp_to_str`, `interp_literal`) share: finding
 # the value each `{..}` of a template renders.
 
-import { equal as ==, join, map } from builtins;
+import { collect_ok, equal as ==, first, map } from builtins;
 import { Call, Expr, collect_expr_cases } from "../expr.aipl";
 import { hit, lint_function_messages } from "./lint_hit.aipl";
 
@@ -12,9 +12,9 @@ pub fn interpolated_values(self: Expr) -> Expr[] {
     self
         .collect_expr_cases(Call)
         .map(|Call(name, arguments, _)| {
-            if (name == "__template_interp") { arguments } else { [] }
+            if (name == "__template_interp") { arguments.first() } else { none }
         })
-        .join()
+        .collect_ok()
 }.test({
     assert(lint_function_messages(
         "fn f(n: i64) -> str { `a{n}b{n + 1}` }",

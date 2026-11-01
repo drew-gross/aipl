@@ -29,13 +29,12 @@
 
 import {
     any,
+    collect_ok,
     equal as ==,
     is_empty,
     join,
     logical_or as ||,
-    map,
     not_equal as !=,
-    value_or,
 } from builtins;
 import { ArrayLit, Expr, Ident, LetMut, Spread, collect_expr_cases } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
@@ -48,7 +47,7 @@ import { LintHit, hit, imported_as, lint_messages, on_functions, quote } from ".
 pub fn push_array_literal(program: Program) -> LintHit[] {
     let some(push) = program.items.imported_as("push") else { return []; };
     program.on_functions(|Function { body }| {
-        body.collect_expr_cases(LetMut)$literal(push)$map(|found| [found])$value_or([]).join()
+        body.collect_expr_cases(LetMut)$literal(push).collect_ok()
     })
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.

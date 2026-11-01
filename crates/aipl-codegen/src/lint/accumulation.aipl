@@ -19,12 +19,12 @@
 
 import {
     as_case,
+    collect_ok,
     drop_last,
     equal as ==,
     is_empty,
     is_nonempty,
     is_some,
-    join,
     last,
     logical_and as &&,
     logical_not as !,
@@ -74,7 +74,7 @@ struct SeededLoop {
 # pass each element and have no index to pass with it, so the rewrite would silently
 # drop whatever the body did with it.
 pub fn seeded_loops(self: Expr) -> SeededLoop[] {
-    self.collect_expr_cases(LetMut)$seeded_loop()$map(|found| [found])$value_or([]).join()
+    self.collect_expr_cases(LetMut)$seeded_loop().collect_ok()
 }.test({
     assert(seeded_names("{ mut a = []; for (let x : xs) { g(x); } a }")? == ["a"]);
 
@@ -114,7 +114,7 @@ struct Accumulation { seeded: SeededLoop, guard: Expr?, added: Expr }
 # aliased import is followed and a *user* function that happens to share the name
 # is not.
 pub fn accumulations(self: Expr, adder: str) -> Accumulation[] {
-    self.seeded_loops()$accumulation(adder)$map(|found| [found])$value_or([]).join()
+    self.seeded_loops()$accumulation(adder).collect_ok()
 }.test({
     assert(block_accumulations(
         "{ mut out = []; for (let x : xs) { set out.push(f(x)); } out }",
@@ -284,9 +284,9 @@ pub fn is_advisable(self: Accumulation) -> bool {
 # element itself. Each is a builtin and the arguments it is written with.
 pub fn element_stages(self: Accumulation) -> (str, str)[] {
     let lambda = `(|{self.seeded.variable}| ..)`;
-    let filter: (str, str)[] = if (self.guard.is_some()) { [("filter", lambda)] } else { [] };
-    let map: (str, str)[] = if (self.maps()) { [("map", lambda)] } else { [] };
-    [..filter, ..map]
+    let filter: (str, str)? = if (self.guard.is_some()) { some(("filter", lambda)) } else { none };
+    let map: (str, str)? = if (self.maps()) { some(("map", lambda)) } else { none };
+    [filter, map].collect_ok()
 }
 
 # The hit for an array filled by one loop that is the pipeline of `stages` over its

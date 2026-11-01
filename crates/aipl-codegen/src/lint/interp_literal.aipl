@@ -12,9 +12,9 @@
 # The hit points at the literal.
 
 import {
+    collect_ok,
     equal as ==,
     is_case,
-    join,
     logical_and as &&,
     logical_not as !,
     map,
@@ -38,11 +38,11 @@ pub fn interp_literal(Function { body }) -> LintHit[] {
             } else if (value.kind.is_case(Str) && !raw) {
                 "string"
             } else {
-                return [];
+                return none;
             };
-            [hit(message(what), value.span)]
+            some(hit(message(what), value.span))
         })
-        .join()
+        .collect_ok()
 }.test({
     assert(lint_function_messages("fn f() -> str { `a: {'a'}` }", interp_literal)? == [
         message("char"),

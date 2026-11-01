@@ -19,7 +19,7 @@
 # The hit points at the `_ => none` arm, a short line the formatter keeps in place, so
 # `#[allow]` squelches it.
 
-import { equal as ==, join, logical_not as !, map } from builtins;
+import { collect_ok, equal as ==, logical_not as !, map } from builtins;
 import { Call, Match, show_expr } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { case_pattern, is_give_up, statement_head, tail_matches } from "./case_match.aipl";
@@ -33,25 +33,23 @@ pub fn match_case_try_as_case(Function { body }) -> UnfilledHit[] {
         .tail_matches()
         .map(
             |tail| {
-                let Match(scrutinee, arms) = tail.kind else { return []; };
-                let [case_arm, other_arm] = arms else { return []; };
-                let some(pattern) = case_arm.pattern.case_pattern() else { return []; };
-                if (!other_arm.is_give_up()) { return []; };
+                let Match(scrutinee, arms) = tail.kind else { return none; };
+                let [case_arm, other_arm] = arms else { return none; };
+                let some(pattern) = case_arm.pattern.case_pattern() else { return none; };
+                if (!other_arm.is_give_up()) { return none; };
                 // `K(..) => some(x)` of the matched value is `match_case_as_case`'s.
                 if (let Call("some", wrapped, _) = case_arm.body.kind) {
-                    if (wrapped$show_expr() == [scrutinee.show_expr()]) { return []; };
+                    if (wrapped$show_expr() == [scrutinee.show_expr()]) { return none; };
                 };
-                [
-                    unfilled(
-                        "as_case",
-                        `this match gives up with none unless the value is {pattern.case}, and is the last thing the function does — write "{pattern.statement_head()}{scrutinee.receiver_text()}.`,
-                        `({pattern.case})?;" and continue with the arm's body`,
-                        other_arm.span,
-                    ),
-                ]
+                some(unfilled(
+                    "as_case",
+                    `this match gives up with none unless the value is {pattern.case}, and is the last thing the function does — write "{pattern.statement_head()}{scrutinee.receiver_text()}.`,
+                    `({pattern.case})?;" and continue with the arm's body`,
+                    other_arm.span,
+                ))
             },
         )
-        .join()
+        .collect_ok()
 }.test({
     // The value taken apart, with the payload it names bound by the `let`.
     assert(lint_function_unfilled_messages(

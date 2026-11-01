@@ -19,8 +19,8 @@
 # The hit points at the fallback.
 
 import {
+    collect_ok,
     equal as ==,
-    join,
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
@@ -47,23 +47,21 @@ pub fn with_value_or_self(program: Program) -> LintHit[] {
         body
             .descendants()
             .map(|call| {
-                let Call(callee, arguments, _) = call.kind else { return []; };
-                let [replaced, fallback] = arguments else { return []; };
-                let Call(inner, with_arguments, _) = replaced.kind else { return []; };
-                let [receiver, _, _] = with_arguments else { return []; };
+                let Call(callee, arguments, _) = call.kind else { return none; };
+                let [replaced, fallback] = arguments else { return none; };
+                let Call(inner, with_arguments, _) = replaced.kind else { return none; };
+                let [receiver, _, _] = with_arguments else { return none; };
                 if (callee != value_or || inner != with_name || !receiver.same_place(fallback)) {
-                    return [];
+                    return none;
                 };
-                [
-                    unfilled(
-                        "try_set",
-                        `this \`{value_or}\` falls back to the array it is replacing in — write "{receiver.quote("<array>")}.`,
-                        `(..)" and drop the fallback`,
-                        fallback.span,
-                    ),
-                ]
+                some(unfilled(
+                    "try_set",
+                    `this \`{value_or}\` falls back to the array it is replacing in — write "{receiver.quote("<array>")}.`,
+                    `(..)" and drop the fallback`,
+                    fallback.span,
+                ))
             })
-            .join()
+            .collect_ok()
     })
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
