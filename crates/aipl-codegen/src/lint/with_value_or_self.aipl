@@ -1,0 +1,112 @@
+# The `with_value_or_self` lint:
+#
+#     xs.with(i, v).value_or(xs)
+#
+# — a replacement that falls back to the array it was replacing in. That is
+# `xs.try_set(i, v)`, which says it directly: a write past the end does nothing.
+#
+# The longhand also reads `xs` twice, and the first read is the one that wants to be a
+# move: `with` writes into an array nobody else holds, and the fallback is someone else
+# holding it. So it can never write in place; `try_set` can.
+#
+# Only when the fallback is the *same place* as the receiver — a binding, or a field path
+# off one. A different array (`xs.with(i, v).value_or(ys)`), or an empty one
+# (`.value_or([])`, for an index known to be in range), says something else and is left
+# alone. A function of the file's own named `with` or `value_or` is not the one this lint
+# knows the meaning of, so both have to be imported from builtins; `try_set` only decides
+# whether the advice names an import too.
+#
+# The hit points at the fallback.
+
+import {
+    equal as ==,
+    join,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+} from builtins;
+import { Call, Expr, Field, Ident, descendants } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Function, Program } from "../item.aipl";
+import {
+    LintHit,
+    imported_as,
+    lint_messages,
+    on_functions_filled,
+    quote,
+    unfilled,
+} from "./lint_hit.aipl";
+
+# A hit for each `with(..)` the program falls back from to the array it replaces in.
+pub fn with_value_or_self(program: Program) -> LintHit[] {
+    let some(with_name) = program.items.imported_as("with") else { return []; };
+    let some(value_or) = program.items.imported_as("value_or") else { return []; };
+    program.on_functions_filled(|Function { body }| {
+        body
+            .descendants()
+            .map(|call| {
+                let Call(callee, arguments, _) = call.kind else { return []; };
+                let [replaced, fallback] = arguments else { return []; };
+                let Call(inner, with_arguments, _) = replaced.kind else { return []; };
+                let [receiver, _, _] = with_arguments else { return []; };
+                if (callee != value_or || inner != with_name || !receiver.same_place(fallback)) {
+                    return [];
+                };
+                [
+                    unfilled(
+                        "try_set",
+                        `this \`{value_or}\` falls back to the array it is replacing in — write "{receiver.quote("<array>")}.`,
+                        `(..)" and drop the fallback`,
+                        fallback.span,
+                    ),
+                ]
+            })
+            .join()
+    })
+}.test({
+    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_messages(
+            `import \{ {imports} } from builtins; fn f(xs: i64[], ys: i64[], p: P) -> i64[] \{ {body} }`,
+            with_value_or_self,
+        )
+    }
+    let all = "with, value_or, try_set";
+
+    // A binding and a field path off one are the same place as themselves.
+    assert(messages(all, "xs.with(0, 1).value_or(xs)")? == [
+        """this `value_or` falls back to the array it is replacing in — write "xs.try_set(..)" and drop the fallback""",
+    ]);
+    assert(messages(all, "p.rows.with(0, 1).value_or(p.rows)")? == [
+        """this `value_or` falls back to the array it is replacing in — write "p.rows.try_set(..)" and drop the fallback""",
+    ]);
+
+    // Imports the file lacks are named, and an alias is followed.
+    assert(messages("with, value_or", "xs.with(0, 1).value_or(xs)")? == [
+        """this `value_or` falls back to the array it is replacing in — write "xs.try_set(..)" and drop the fallback, importing `try_set` from builtins""",
+    ]);
+    assert(messages("with, value_or as or_else, try_set", "xs.with(0, 1).or_else(xs)")? == [
+        """this `or_else` falls back to the array it is replacing in — write "xs.try_set(..)" and drop the fallback""",
+    ]);
+
+    // Not the shape: another array, an empty one, a different field, and a file that has not
+    // imported what the shape is made of.
+    assert(messages(all, "xs.with(0, 1).value_or(ys)")? == []);
+    assert(messages(all, "xs.with(0, 1).value_or([])")? == []);
+    assert(messages(all, "p.rows.with(0, 1).value_or(p.cols)")? == []);
+    assert(messages("value_or, try_set", "xs.with(0, 1).value_or(xs)")? == []);
+})
+
+# Whether `self` and `other` read the same binding, or the same field path off one.
+fn same_place(self: Expr, other: Expr) -> bool {
+    if (let Ident(name) = self.kind) {
+        return if (let Ident(other_name) = other.kind) { name == other_name } else { false };
+    };
+    let Field(base, field) = self.kind else { return false; };
+    if (let Field(other_base, other_field) = other.kind) {
+        return field == other_field && base.same_place(other_base);
+    };
+    false
+}

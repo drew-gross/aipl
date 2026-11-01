@@ -14,17 +14,13 @@
 mod arm_block_value;
 mod char_set_literal;
 mod compound_assign;
-mod eta_lambda;
 mod field_init_shorthand;
 mod is_empty_longhand;
 mod len_gt_zero;
-mod map_constant_repeat;
-mod map_find_if_some;
 mod set_spread_field;
 mod set_spread_push;
 mod step_by_one;
 mod value_or_compare;
-mod with_value_or_self;
 
 use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
 use crate::{each_expr, each_subexpr, Error, Span};
@@ -33,17 +29,13 @@ use std::collections::HashSet;
 use self::arm_block_value::arm_block_value;
 use self::char_set_literal::char_set_literal;
 use self::compound_assign::{compound_assign, matching_compound};
-use self::eta_lambda::{eta_lambda, Forwarding};
 use self::field_init_shorthand::field_init_shorthand;
 use self::is_empty_longhand::{empty_names, is_empty_longhand};
 use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
-use self::map_constant_repeat::{map_constant_repeat, repeat_names};
-use self::map_find_if_some::{find_map_names, map_find_if_some};
 use self::set_spread_field::set_spread_field;
 use self::set_spread_push::{append_names, set_spread_push};
 use self::step_by_one::{matching_steps, step_by_one};
 use self::value_or_compare::{value_or_compare, value_or_compare_names};
-use self::with_value_or_self::{with_names, with_value_or_self};
 
 /// What a lint's message ends with: the way to keep what it flagged. Appended by
 /// [`check`] to each hit it returns, so a lint's message says only what is wrong
@@ -65,29 +57,12 @@ pub fn check(
     // reported below.
     let mut squelched: HashSet<usize> = HashSet::new();
     let mut hits: Vec<Error> = Vec::new();
-    // `xs.map(|x| x.name)` is `xs$name`, `xs.map(f)` is `xs$f()`, and a lambda that
-    // only forwards its arguments to a call is that function.
-    let map = imported_as(program, "map");
-    let forwarding = Forwarding::of(program, map.clone());
-    let mut advised: Vec<Span> = Vec::new();
-    each_expr(program, &mut |e| {
-        eta_lambda(e, src, &forwarding, &mut advised, &mut hits)
-    });
     // A char set spelled out element by element, which a string says better.
     // Fires whether or not the file imported `to_set` — the name is only for
     // the advice, which says to import it when it is missing.
     let to_set = imported_as(program, "to_set");
     each_expr(program, &mut |e| {
         char_set_literal(e, src, to_set.as_deref(), &mut hits)
-    });
-    // `map(f).find_if(is_some)` is `find_map(f)` — see `find_map_names` for the
-    // three names the shape is made of.
-    let find_map = find_map_names(program);
-    each_expr(program, &mut |e| map_find_if_some(e, &find_map, &mut hits));
-    // `xs.map(|x| c)` with a constant `c` is `[c].repeat(xs.len())`.
-    let repeat = repeat_names(program);
-    each_expr(program, &mut |e| {
-        map_constant_repeat(e, src, &repeat, &mut hits)
     });
     // A match arm whose block is only its value — braces around nothing.
     each_expr(program, &mut |e| arm_block_value(e, src, &mut hits));
@@ -131,14 +106,6 @@ pub fn check(
     each_expr(program, &mut |e| {
         is_empty_longhand(e, src, &empties, &mut hits)
     });
-    // `xs.with(i, v).value_or(xs)` is `xs.try_set(i, v)`; only where `with` and
-    // `value_or` are the builtins — see `with_names`, which also names the
-    // `try_set` import when it is missing.
-    if let Some(names) = with_names(program) {
-        each_expr(program, &mut |e| {
-            with_value_or_self(e, src, &names, &mut hits)
-        });
-    }
     // The lints ported to AIPL ran with the parse: `unused_imports`,
     // `duplicate_import_source`, `destructure_binding`, `destructure_param` and
     // `fn_body_type_stutter`, so far.

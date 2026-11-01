@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/eta_lambda.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/eta_lambda.aipl</code></h1>
+
+      <div class="module-doc"><p>The <code>eta_lambda</code> lint: a lambda that adds nothing to what it forwards its argument to.</p><p><strong>In a <code>map</code></strong>, a lambda whose whole body is its parameter taken through a chain of member reads and method calls — <code>|x| x.name</code>, <code>|x| x.0</code>, <code>|x| x.f(args)</code>, <code>|x| x.a.f(b).c</code>, <code>|x| to_str(x)</code> — is <code>xs$name</code>, <code>xs$0</code>, <code>xs$f(args)</code>, <code>xs$a$f(b)$c</code> and <code>xs$to_str()</code>: each step written once, with no name for the element to introduce and then repeat. And a bare function name, <code>xs.map(f)</code>, is <code>xs$f()</code>.</p><p>Only the shape <code>$</code> stands for qualifies. The parameter has to be the root of the chain and appear nowhere else (<code>|x| x.f(x)</code> needs the name), it has to be unannotated, since <code>$</code> has no place to write a type, and every call in the chain has to be one <code>$</code> can make — a function of this file whose first parameter is named <code>self</code>, which is what method-call syntax is defined by, a lowercase builtin the file imports, or a call already written as a method. A function from another file is not known here — its parameters are not in view when a file is linted — so it is never advised. An operator is never a step: <code>|x| x + 1</code> does something with <code>x</code>.</p><p><strong>Anywhere else</strong>, a lambda that only forwards its arguments to one call, <code>|x| to_str(x)</code>, is the function itself: pass <code>to_str</code>.</p><p>The hit points at the lambda, or at the bare name — a short span that begins on the line the <code>#[allow]</code> would be written on. The lint runs before checking, so it cannot tell a sequence from an optional; <code>$</code> maps either, as <code>map</code> does.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-eta_lambda">
+          <h3>
+            <a class="anchor" href="#item-eta_lambda">eta_lambda</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn eta_lambda(program: Program) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>A hit for each lambda in the program that adds nothing to what it forwards to.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-MapAdvice">
+          <h3>
+            <a class="anchor" href="#item-MapAdvice">MapAdvice</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct MapAdvice</code></pre>
+
+          <div class="doc"><p>What the <code>map</code> rule says about a call, and the span of the lambda it advised on (none for a function name), so that the lambda itself is not advised on again.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-methods_in_view">
+          <h3>
+            <a class="anchor" href="#item-methods_in_view">methods_in_view</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn methods_in_view(self: Item[]) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The names a call can use as a <code>$</code> step: a function of this file whose first parameter is named <code>self</code>, which is what method-call syntax is defined by, and a lowercase builtin the file imports. A function from another file is not here — its parameters are not in view when a file is linted.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-method_name">
+          <h3>
+            <a class="anchor" href="#item-method_name">method_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn method_name(self: Fn) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The name of the function <code>self</code>, when it takes a <code>self</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lambda_hits">
+          <h3>
+            <a class="anchor" href="#item-lambda_hits">lambda_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lambda_hits(self: Expr, map_name: str?, methods: str[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>A hit for each lambda in <code>self</code> and under it that adds nothing: the <code>map</code> advice where there is one, and the forwarding advice for the lambdas that advice did not already cover.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-map_advice">
+          <h3>
+            <a class="anchor" href="#item-map_advice">map_advice</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn map_advice(self: Expr, map_name: str?, methods: str[]) -&#62; MapAdvice?</code></pre>
+
+          <div class="doc"><p><code>self</code> as the advice for <code>recv.map(arg)</code>, if <code>arg</code> is a function name or a lambda <code>$</code> can say.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-chain">
+          <h3>
+            <a class="anchor" href="#item-chain">chain</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn chain(self: Expr, parameter: str, methods: str[]) -&#62; str[]?</code></pre>
+
+          <div class="doc"><p>The <code>$</code> steps <code>self</code> is made of, outermost last, when it is <code>parameter</code> taken through member reads and calls and nothing else; <code>none</code> otherwise. A call has to be one <code>$</code> can make — see <code>methods_in_view</code> — or already be written as a method call.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slot_shown">
+          <h3>
+            <a class="anchor" href="#item-slot_shown">slot_shown</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn slot_shown(self: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>A tuple slot is the field <code>_0</code>, written <code>0</code>; any other field is its own name.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-forwarded">
+          <h3>
+            <a class="anchor" href="#item-forwarded">forwarded</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn forwarded(self: Expr, advised: Span[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>A hit for <code>self</code> when it is a lambda that only forwards its argument(s) to one call, outside a <code>map</code> that <code>map_advice</code> handles (<code>advised</code> is the lambdas it covered). A lambda the parser wrote for <code>xs$f()</code> names its parameter with a <code>$</code>, which no source can; there is no longer spelling for it to be advised into. An operator is left alone deliberately: the language does accept <code>+</code> as a value, but <code>xs.fold(0, +)</code> is a different reading from <code>|acc, x| acc + x</code> rather than an obviously better one, and this lint's job is the case where the lambda adds <em>nothing</em> — <code>|x| to_str(x)</code> against <code>to_str</code>.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

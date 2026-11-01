@@ -12,12 +12,15 @@ import { destructure_binding } from "./destructure_binding.aipl";
 import { destructure_param } from "./destructure_param.aipl";
 import { destructure_slot } from "./destructure_slot.aipl";
 import { duplicate_import_source } from "./duplicate_import_source.aipl";
+import { eta_lambda } from "./eta_lambda.aipl";
 import { extend_loop_map_join } from "./extend_loop_map_join.aipl";
 import { fn_body_type_stutter } from "./fn_body_type_stutter.aipl";
 import { interp_literal } from "./interp_literal.aipl";
 import { interp_to_str } from "./interp_to_str.aipl";
 import { let_else_as_case } from "./let_else_as_case.aipl";
 import { LintHit, on_functions, on_functions_filled } from "./lint_hit.aipl";
+import { map_constant_repeat } from "./map_constant_repeat.aipl";
+import { map_find_if_some } from "./map_find_if_some.aipl";
 import { match_bool_is_case } from "./match_bool_is_case.aipl";
 import { match_case_as_case } from "./match_case_as_case.aipl";
 import { match_case_try_as_case } from "./match_case_try_as_case.aipl";
@@ -38,6 +41,7 @@ import { slice_to_len } from "./slice_to_len.aipl";
 import { slice_whole } from "./slice_whole.aipl";
 import { union_loop_union_all } from "./union_loop_union_all.aipl";
 import { unused_imports } from "./unused_imports.aipl";
+import { with_value_or_self } from "./with_value_or_self.aipl";
 
 # Every hit the ported lints find in `program`.
 #
@@ -69,6 +73,10 @@ pub fn lint(program: Program) -> LintHit[] {
         ..push_array_literal(program),
         ..program.on_functions_filled(return_loop_find_if),
         ..return_loop_any_all(program),
+        ..eta_lambda(program),
+        ..map_find_if_some(program),
+        ..map_constant_repeat(program),
+        ..with_value_or_self(program),
         ..program.on_functions_filled(return_loop_find_index),
         ..interp_to_str(program),
         ..program.on_functions(interp_literal),

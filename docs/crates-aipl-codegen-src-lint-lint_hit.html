@@ -190,6 +190,20 @@
 
 
 
+        <section class="item" id="item-imported_locals">
+          <h3>
+            <a class="anchor" href="#item-imported_locals">imported_locals</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn imported_locals(self: Item[]) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>Every name a file's <code>items</code> import from builtins, as the file spells it.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-on_functions">
           <h3>
             <a class="anchor" href="#item-on_functions">on_functions</a>
@@ -303,6 +317,20 @@
           <pre class="signature"><code>fn distinct(self: str[]) -&#62; str[]</code></pre>
 
           <div class="doc"><p><code>self</code> without a name it has already listed, in the order it first appears.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-builtin_names">
+          <h3>
+            <a class="anchor" href="#item-builtin_names">builtin_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn builtin_names(self: Import) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>What an import from builtins brings, as the file spells each.</p></div>
 
 
         </section>

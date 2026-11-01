@@ -1,0 +1,118 @@
+# The `map_find_if_some` lint:
+#
+#     xs.map(f).find_if(is_some)
+#
+# — the first element `f` has an answer for, written as a chain that hands back the
+# answer wrapped twice. `xs.find_map(f)` says it in one word, and hands back the answer
+# once: the chain's result is a `U??` whose outer layer every caller then peels
+# (`.value_or(none)`), while `find_map` returns the `U?` that was wanted.
+#
+# The predicate has to *be* `is_some` — the name, or a lambda that only forwards to it —
+# since that is what makes the chain a `find_map` rather than a search over mapped values
+# (`map_find_if`'s shape, which the fusion pass takes care of). `map`, `find_if` and
+# `is_some` are the precondition, since the shape is theirs, and a file that has not
+# imported one of them is not writing it; `find_map` only decides whether the advice names
+# an import too.
+#
+# The hit points at the whole chain.
+
+import {
+    equal as ==,
+    join,
+    len,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+} from builtins;
+import { Call, Expr, Ident, Lambda, descendants } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Function, Program } from "../item.aipl";
+import {
+    LintHit,
+    imported_as,
+    lint_messages,
+    on_functions_filled,
+    unfilled,
+} from "./lint_hit.aipl";
+
+# A hit for each `map(..).find_if(is_some)` chain in the program.
+pub fn map_find_if_some(program: Program) -> LintHit[] {
+    let some(map_name) = program.items.imported_as("map") else { return []; };
+    let some(find_if) = program.items.imported_as("find_if") else { return []; };
+    let some(is_some) = program.items.imported_as("is_some") else { return []; };
+    program.on_functions_filled(|Function { body }| {
+        body
+            .descendants()
+            .map(
+                |chain| {
+                    let Call(outer, arguments, _) = chain.kind else { return []; };
+                    let [mapped, predicate] = arguments else { return []; };
+                    let Call(inner, inner_arguments, _) = mapped.kind else { return []; };
+                    if (outer != find_if || inner != map_name || inner_arguments.len() != 2) {
+                        return [];
+                    };
+                    if (!predicate.is_the_function(is_some)) { return []; };
+                    [
+                        unfilled(
+                            "find_map",
+                            `"{map_name}" then "{find_if}({is_some})" is the first element with an answer, wrapped twice — write "`,
+                            `(..)" over the mapping function, which hands the answer back once`,
+                            chain.span,
+                        ),
+                    ]
+                },
+            )
+            .join()
+    })
+}.test({
+    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_messages(
+            `import \{ {imports} } from builtins; fn f(xs: i64[]) -> i64?? \{ {body} }`,
+            map_find_if_some,
+        )
+    }
+    let all = "map, find_if, is_some, find_map";
+
+    // The name itself, and a lambda that only forwards to it, either way it is called.
+    assert(messages(all, "xs.map(g).find_if(is_some)")? == [
+        `"map" then "find_if(is_some)" is the first element with an answer, wrapped twice — write "find_map(..)" over the mapping function, which hands the answer back once`,
+    ]);
+    assert(messages(all, "xs.map(g).find_if(|r| r.is_some())")? == [
+        `"map" then "find_if(is_some)" is the first element with an answer, wrapped twice — write "find_map(..)" over the mapping function, which hands the answer back once`,
+    ]);
+    assert(messages(all, "xs.map(g).find_if(|r| is_some(r))")? == [
+        `"map" then "find_if(is_some)" is the first element with an answer, wrapped twice — write "find_map(..)" over the mapping function, which hands the answer back once`,
+    ]);
+
+    // An import the file lacks is named, and an alias is followed.
+    assert(messages("map, find_if, is_some", "xs.map(g).find_if(is_some)")? == [
+        ```"map" then "find_if(is_some)" is the first element with an answer, wrapped twice — write "find_map(..)" over the mapping function, which hands the answer back once, importing `find_map` from builtins```,
+    ]);
+    assert(messages(
+        "map as each, find_if as search, is_some as present, find_map",
+        "xs.each(g).search(present)",
+    )? == [
+        `"each" then "search(present)" is the first element with an answer, wrapped twice — write "find_map(..)" over the mapping function, which hands the answer back once`,
+    ]);
+
+    // Not the shape: another predicate, a lambda that does more, and a file that has not
+    // imported what the shape is made of.
+    assert(messages(all, "xs.map(g).find_if(|r| r.is_some() && c)")? == []);
+    assert(messages(all, "xs.map(g).find_if(other)")? == []);
+    assert(messages(all, "xs.filter(g).find_if(is_some)")? == []);
+    assert(messages("map, is_some", "xs.map(g).find_if(is_some)")? == []);
+})
+
+# Whether `self` is the function `name`: the name itself, or a lambda `|x| x.name()` /
+# `|x| name(x)` that only forwards to it.
+fn is_the_function(self: Expr, name: str) -> bool {
+    if (let Ident(spelled) = self.kind) { return spelled == name; };
+    let Lambda(parameters, body) = self.kind else { return false; };
+    let [parameter] = parameters else { return false; };
+    let Call(callee, arguments, _) = body.kind else { return false; };
+    let [argument] = arguments else { return false; };
+    callee == name && argument.kind == Ident(parameter.name)
+}

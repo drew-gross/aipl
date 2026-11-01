@@ -1,0 +1,168 @@
+# The `map_constant_repeat` lint:
+#
+#     xs.map(|x| c)
+#
+# — where `c` is the same value for every element: a function that ignores its argument
+# is a way to write "this many copies of `c`" that builds the copies one at a time and
+# spells the count as a walk over `xs`. `[c].repeat(xs.len())` says it directly — and
+# builds `c` once, then copies it into an exactly-sized result.
+#
+# Only a body that is **constant** qualifies: literals, names read as they are, and
+# constructions or literals of those. Anything that calls a function does not, because
+# `repeat` evaluates its element once where `map` evaluated the body per element, and a
+# call may differ between evaluations (or have an effect). A body that mentions its own
+# parameter is not ignoring it. Names are allowed because reading a binding gives the
+# same value each time.
+#
+# What the lint cannot see is the receiver's type: it runs before checking, and
+# `opt.map(|_| c)` is the optional's `map`, for which `.len()` and `repeat` are no answer.
+# The advice is worded for a sequence for that reason, and a receiver that is a range is
+# skipped outright, being syntactically what it is. The cost of the remaining case is one
+# `#[allow]` on a legitimate optional `map`.
+#
+# The hit points at the lambda, a short span that begins on the line the `#[allow]` would
+# be written on.
+
+import {
+    all,
+    ends_with,
+    equal as ==,
+    join,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+} from builtins;
+import {
+    ArrayLit,
+    Bool,
+    Call,
+    Char,
+    Construct,
+    DictLit,
+    Expr,
+    Ident,
+    Lambda,
+    Neg,
+    None,
+    Num,
+    SetLit,
+    Str,
+    TupleLit,
+    Unit,
+    descendants,
+} from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Function, Program } from "../item.aipl";
+import {
+    LintHit,
+    Named,
+    UnfilledHit,
+    imported_as,
+    lint_messages,
+    on_functions_filled,
+    quote,
+} from "./lint_hit.aipl";
+
+# A hit for each `map` over a function that ignores its argument.
+pub fn map_constant_repeat(program: Program) -> LintHit[] {
+    let some(map_name) = program.items.imported_as("map") else { return []; };
+    program.on_functions_filled(|Function { body }| {
+        body
+            .descendants()
+            .map(
+                |call| {
+                    let Call(callee, arguments, _) = call.kind else { return []; };
+                    let [receiver, lambda] = arguments else { return []; };
+                    let Lambda(parameters, constant) = lambda.kind else { return []; };
+                    let [parameter] = parameters else { return []; };
+                    if (callee != map_name || receiver.is_range() || !constant.is_constant(
+                        parameter.name,
+                    )) {
+                        return [];
+                    };
+                    [
+                        UnfilledHit {
+                            named: [
+                                Named {
+                                    text: `"{map_name}" with a function that ignores its argument builds the same value once per element — for a sequence, write "[{constant.quote("<element>")}].`,
+                                    builtin: "repeat",
+                                },
+                                Named { text: `({receiver.quote("<items>")}.`, builtin: "len" },
+                            ],
+                            tail: `())"`,
+                            span: lambda.span,
+                        },
+                    ]
+                },
+            )
+            .join()
+    })
+}.test({
+    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_messages(
+            `import \{ {imports} } from builtins; fn f(xs: i64[], c: i64) -> i64[] \{ {body} }`,
+            map_constant_repeat,
+        )
+    }
+    let all = "map, repeat, len";
+
+    // A literal, a name, a construction and an array literal of those are constant.
+    assert(messages(all, "xs.map(|x| 0)")? == [
+        `"map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[0].repeat(xs.len())"`,
+    ]);
+    assert(messages(all, "xs.map(|x| c)")? == [
+        `"map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[c].repeat(xs.len())"`,
+    ]);
+    assert(messages(all, `xs.map(|x| "")`)? == [
+        `"map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[""].repeat(xs.len())"`,
+    ]);
+    assert(messages(all, "xs.map(|x| [c, 1])")? == [
+        `"map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[<element>].repeat(xs.len())"`,
+    ]);
+
+    // An iterable that cannot be quoted is a placeholder, and imports the file lacks are
+    // named.
+    assert(messages(all, "g().map(|x| 0)")? == [
+        `"map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[0].repeat(<items>.len())"`,
+    ]);
+    assert(messages("map", "xs.map(|x| 0)")? == [
+        ```"map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[0].repeat(xs.len())", importing `repeat` and `len` from builtins```,
+    ]);
+
+    // Not the shape: a body that reads the parameter, a call, a range and a `map` the file
+    // never imported.
+    assert(messages(all, "xs.map(|x| x)")? == []);
+    assert(messages(all, "xs.map(|x| g())")? == []);
+    assert(messages(all, "(0..3).map(|x| 0)")? == []);
+    assert(messages("repeat, len", "xs.map(|x| 0)")? == []);
+})
+
+# Whether evaluating `self` gives the same value every time, with no effect: a literal, a
+# name other than `parameter` (read as it is), or a construction or literal of such. A call
+# is not constant.
+fn is_constant(self: Expr, parameter: str) -> bool {
+    match (self.kind) {
+        Num(..) | Bool(..) | Str(..) | Char(..) | None | Unit => true,
+        Ident(name) => name != parameter,
+        Neg(inner) => inner.is_constant(parameter),
+        Construct(_, inits) => inits.all(|init| init.value.is_constant(parameter)),
+        ArrayLit(elements) | TupleLit(elements) => elements.all(|e| e.is_constant(parameter)),
+        SetLit(elements, _) => elements.all(|e| e.is_constant(parameter)),
+        DictLit(pairs) => pairs.all(
+            |pair| pair.0.is_constant(parameter) && pair.1.is_constant(parameter),
+        ),
+        _ => false,
+    }
+}
+
+# Whether `self` is a range (`a..b`), which builds the builtin `Span` — the one receiver of
+# `map` that is known from syntax alone not to be an array or an optional.
+fn is_range(self: Expr) -> bool {
+    match (self.kind) {
+        Construct(name, _) => name.ends_with("Span"),
+        _ => false,
+    }
+}

@@ -1,0 +1,250 @@
+# The `eta_lambda` lint: a lambda that adds nothing to what it forwards its argument to.
+#
+# **In a `map`**, a lambda whose whole body is its parameter taken through a chain of
+# member reads and method calls — `|x| x.name`, `|x| x.0`, `|x| x.f(args)`,
+# `|x| x.a.f(b).c`, `|x| to_str(x)` — is `xs$name`, `xs$0`, `xs$f(args)`, `xs$a$f(b)$c` and
+# `xs$to_str()`: each step written once, with no name for the element to introduce and then
+# repeat. And a bare function name, `xs.map(f)`, is `xs$f()`.
+#
+# Only the shape `$` stands for qualifies. The parameter has to be the root of the chain and
+# appear nowhere else (`|x| x.f(x)` needs the name), it has to be unannotated, since `$` has
+# no place to write a type, and every call in the chain has to be one `$` can make — a
+# function of this file whose first parameter is named `self`, which is what method-call
+# syntax is defined by, a lowercase builtin the file imports, or a call already written as a
+# method. A function from another file is not known here — its parameters are not in view
+# when a file is linted — so it is never advised. An operator is never a step: `|x| x + 1`
+# does something with `x`.
+#
+# **Anywhere else**, a lambda that only forwards its arguments to one call, `|x| to_str(x)`,
+# is the function itself: pass `to_str`.
+#
+# The hit points at the lambda, or at the bare name — a short span that begins on the line
+# the `#[allow]` would be written on. The lint runs before checking, so it cannot tell a
+# sequence from an optional; `$` maps either, as `map` does.
+
+import {
+    Span,
+    all,
+    any,
+    as_case,
+    collect_arms,
+    collect_ok,
+    contains,
+    drop_first,
+    equal as ==,
+    filter,
+    first,
+    greater_than as >,
+    is_digit,
+    is_empty,
+    is_nonempty,
+    is_some,
+    is_some_and,
+    join,
+    len,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+    starts_with,
+    value_or,
+    zip_with,
+} from builtins;
+import { Call, Expr, Field, Ident, Lambda, LambdaParam, descendants } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { is_operator_name } from "../is_operator_name.aipl";
+import { Fn, Function, Item, Program } from "../item.aipl";
+import { mentions_any } from "./field_uses.aipl";
+import {
+    LintHit,
+    hit,
+    imported_as,
+    imported_locals,
+    lint_messages,
+    on_functions,
+    quote,
+} from "./lint_hit.aipl";
+
+# A hit for each lambda in the program that adds nothing to what it forwards to.
+pub fn eta_lambda(program: Program) -> LintHit[] {
+    let map_name = program.items.imported_as("map");
+    let methods = program.items.methods_in_view();
+    program.on_functions(|Function { body }| body.lambda_hits(map_name, methods))
+}.test({
+    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_messages(
+            `import \{ {imports} } from builtins; struct P \{ name: str } fn shout(self: str) -> str \{ self } fn f(xs: P[], ys: str[]) -> i64 \{ {body} }`,
+            eta_lambda,
+        )
+    }
+
+    // A member read, a method call with arguments, a chain, a builtin and a function name.
+    assert(messages("map", "xs.map(|p| p.name)")? == [
+        `"map" with a lambda that only uses a member of its argument — write "xs$name"`,
+    ]);
+    assert(messages("map", "xs.map(|p| p.f(1, 2))")? == [
+        `"map" with a lambda that only uses a member of its argument — write "xs$f(...)"`,
+    ]);
+    assert(messages("map", "xs.map(|p| p.a.f().c)")? == [
+        `"map" with a lambda that only uses a member of its argument — write "xs$a$f()$c"`,
+    ]);
+    assert(messages("map, to_str", "ys.map(|n| to_str(n))")? == [
+        `"map" with a lambda that only uses a member of its argument — write "ys$to_str()"`,
+    ]);
+    assert(messages("map", "ys.map(shout)")? == [
+        `"map" over the function "shout" — write "ys$shout()"`,
+    ]);
+    assert(messages("map", "g().map(|p| p.name)")? == [
+        `"map" with a lambda that only uses a member of its argument — write "<items>$name"`,
+    ]);
+
+    // Not a step `$` can make: an annotated parameter, the parameter used twice, an operator,
+    // a function from elsewhere, and a `map` the file never imported.
+    assert(messages("map", "xs.map(|p: P| p.name)")? == []);
+    assert(messages("map", "xs.map(|p| p.f(p))")? == []);
+    assert(messages("map, wrapping_add as +", "xs.map(|n| n + 1)")? == []);
+    assert(messages("", "xs.map(|p| p.name)")? == []);
+
+    // A lambda that only forwards its arguments is the function itself, anywhere.
+    assert(messages("filter", "xs.filter(|p| g(p))")? == [
+        `lambda only forwards its argument(s) to "g" — pass "g" directly`,
+    ]);
+    assert(messages("", "h(|a, b| g(a, b))")? == [
+        `lambda only forwards its argument(s) to "g" — pass "g" directly`,
+    ]);
+    assert(messages("", "h(|a, b| g(b, a))")? == []);
+    assert(messages("wrapping_add as +", "h(|a, b| a + b)")? == []);
+    assert(messages("", "h(|a| a(a))")? == []);
+})
+
+# The names a call can use as a `$` step: a function of this file whose first parameter is
+# named `self`, which is what method-call syntax is defined by, and a lowercase builtin the
+# file imports. A function from another file is not here — its parameters are not in view
+# when a file is linted.
+fn methods_in_view(self: Item[]) -> str[] {
+    let own = self.collect_arms(Fn)$method_name().join();
+    let imported = self
+        .imported_locals()
+        .filter(|name| name[0].is_some_and(|c| "abcdefghijklmnopqrstuvwxyz_".contains(c)));
+    [..own, ..imported]
+}
+
+# The name of the function `self`, when it takes a `self`.
+fn method_name(self: Fn(function)) -> str[] {
+    if (function.sig.params.first().is_some_and(|parameter| parameter.name == "self")) {
+        [function.name.text]
+    } else {
+        []
+    }
+}
+
+# A hit for each lambda in `self` and under it that adds nothing: the `map` advice where
+# there is one, and the forwarding advice for the lambdas that advice did not already cover.
+fn lambda_hits(self: Expr, map_name: str?, methods: str[]) -> LintHit[] {
+    let nodes = self.descendants();
+    let advice = nodes$map_advice(map_name, methods)$map(|found| [found])$value_or([]);
+    let advised = advice.join()$lambda.collect_ok();
+    zip_with(
+        nodes,
+        advice,
+        |node: Expr, given: MapAdvice[]| {
+            if (given.is_nonempty()) { given$hit } else { node.forwarded(advised) }
+        },
+    ).join()
+}
+
+# What the `map` rule says about a call, and the span of the lambda it advised on (none for a
+# function name), so that the lambda itself is not advised on again.
+struct MapAdvice { hit: LintHit, lambda: Span? }
+
+# `self` as the advice for `recv.map(arg)`, if `arg` is a function name or a lambda `$` can say.
+fn map_advice(self: Expr, map_name: str?, methods: str[]) -> MapAdvice? {
+    let name = map_name?;
+    let Call(callee, arguments, _) = self.kind.as_case(Call)?;
+    if (callee != name) { return none; };
+    let [receiver, argument] = arguments else { return none; };
+    let items = receiver.quote("<items>");
+    if (let Ident(function) = argument.kind) {
+        if (!methods.contains(function)) { return none; };
+        return some(MapAdvice {
+            hit: hit(
+                `"map" over the function "{function}" — write "{items}${function}()"`,
+                argument.span,
+            ),
+            lambda: none,
+        });
+    };
+    let Lambda(parameters, body) = argument.kind.as_case(Lambda)?;
+    let [parameter] = parameters else { return none; };
+    if (parameter.ty.is_some() || parameter.name.contains('$')) { return none; };
+    let steps = body.chain(parameter.name, methods)?;
+    if (steps.is_empty()) { return none; };
+    some(MapAdvice {
+        hit: hit(
+            `"map" with a lambda that only uses a member of its argument — write "{items}{steps.join()}"`,
+            argument.span,
+        ),
+        lambda: some(argument.span),
+    })
+}
+
+# The `$` steps `self` is made of, outermost last, when it is `parameter` taken through member
+# reads and calls and nothing else; `none` otherwise. A call has to be one `$` can make — see
+# `methods_in_view` — or already be written as a method call.
+fn chain(self: Expr, parameter: str, methods: str[]) -> str[]? {
+    if (let Ident(name) = self.kind) { return if (name == parameter) { some([]) } else { none }; };
+    if (let Field(inner, name) = self.kind) {
+        let steps = inner.chain(parameter, methods)?;
+        return some([..steps, `${name.slot_shown()}`]);
+    };
+    let Call(name, arguments, method_style) = self.kind.as_case(Call)?;
+    let target = arguments.first()?;
+    let rest = arguments.drop_first();
+    // An operator use is a call named for its spelling.
+    if (name.is_operator_name() || name == parameter || rest.any(|argument| argument.mentions_any(
+        [parameter],
+        none,
+    )) || !(method_style || methods.contains(name))) {
+        return none;
+    };
+    let steps = target.chain(parameter, methods)?;
+    some([..steps, `${name}({if (rest.is_empty()) { "" } else { "..." }})`])
+}
+
+# A tuple slot is the field `_0`, written `0`; any other field is its own name.
+fn slot_shown(self: str) -> str {
+    if (self.starts_with("_") && self.len() > 1 && self.drop_first().all(is_digit)) {
+        self.drop_first()
+    } else {
+        self
+    }
+}
+
+# A hit for `self` when it is a lambda that only forwards its argument(s) to one call, outside
+# a `map` that `map_advice` handles (`advised` is the lambdas it covered). A lambda the parser
+# wrote for `xs$f()` names its parameter with a `$`, which no source can; there is no longer
+# spelling for it to be advised into. An operator is left alone deliberately: the language does
+# accept `+` as a value, but `xs.fold(0, +)` is a different reading from `|acc, x| acc + x`
+# rather than an obviously better one, and this lint's job is the case where the lambda adds
+# *nothing* — `|x| to_str(x)` against `to_str`.
+fn forwarded(self: Expr, advised: Span[]) -> LintHit[] {
+    let Lambda(parameters, body) = self.kind else { return []; };
+    if (advised.contains(self.span) || parameters.any(|parameter| parameter.name.contains('$'))) {
+        return [];
+    };
+    let Call(name, arguments, _) = body.kind else { return []; };
+    if (name.is_operator_name() || arguments.len() != parameters.len() || parameters.any(
+        |parameter| parameter.name == name,
+    )) {
+        return [];
+    };
+    let forwards = zip_with(
+        arguments,
+        parameters,
+        |argument: Expr, parameter: LambdaParam| argument.kind == Ident(parameter.name),
+    );
+    if (!forwards.all(|same| same)) { return []; };
+    [hit(`lambda only forwards its argument(s) to "{name}" — pass "{name}" directly`, self.span)]
+}

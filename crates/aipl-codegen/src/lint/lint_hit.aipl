@@ -219,6 +219,24 @@ pub fn imported_as(self: Item[], name: str) -> str? {
     assert(from_a_file.imported_as("is_case") == none);
 })
 
+# Every name a file's `items` import from builtins, as the file spells it.
+pub fn imported_locals(self: Item[]) -> str[] {
+    self.collect_arms(Import)$builtin_names().join()
+}.test({
+    let items = aipl_parse_surface_file(
+        """import { is_case as case_is, len } from builtins; import { a } from "./a.aipl";""",
+    )?.program.items;
+    assert(items.imported_locals() == ["case_is", "len"]);
+})
+
+# What an import from builtins brings, as the file spells each.
+fn builtin_names(self: Import(ImportDecl { names, source })) -> str[] {
+    match (source) {
+        Builtins => names$local(),
+        Path(..) => [],
+    }
+}
+
 # What an import brings under `name`, when it is from builtins.
 fn builtin_locals(self: Import(ImportDecl { names, source }), name: str) -> str[] {
     match (source) {
