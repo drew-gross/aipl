@@ -1,15 +1,15 @@
-# An empty leaf on either side of a run-time `+++`. This is the one concat case
-# that cannot use `rope_str`: an empty operand is where `+++` hands the other side
+# An empty leaf on either side of a run-time join. This is the one concat case that
+# cannot use `rope_str`: an empty operand is where the join hands the other side
 # straight back instead of building a node, which is the behaviour under test.
-# `heap_str` keeps the non-empty side a run-time value, so the `+++` is one too —
-# two string literals would be constant-folded.
+# `heap_str` keeps both sides run-time values, so the join is one too — a template
+# of two string literals would be constant-folded.
 
-import { concat as +++, equal as ==, heap_str } from builtins;
+import { equal as ==, heap_str } from builtins;
 
-fn lead_empty() -> str { "" +++ heap_str("lone") }.test({
+fn lead_empty() -> str { `{heap_str("")}{heap_str("lone")}` }.test({
     assert(lead_empty() == "lone");
 })
 
-fn trail_empty() -> str { heap_str("lone") +++ "" }.test({
+fn trail_empty() -> str { `{heap_str("lone")}{heap_str("")}` }.test({
     assert(trail_empty() == "lone");
 })

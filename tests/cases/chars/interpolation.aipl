@@ -3,7 +3,7 @@
 # too. Only a char nested inside a rendered container still shows its literal
 # form, where the quotes tell it apart from the structure around it.
 
-import { concat as +++, print, to_str } from builtins;
+import { print } from builtins;
 
 fn main() !prints {
     let c = 'b';
@@ -13,7 +13,7 @@ fn main() !prints {
     // interpolation flags, squelched here because the rendering is the point.
     print(`built: {'x'}{'y'}{'z'}`); #[allow]
     // built: xyz
-    print("to_str: " +++ to_str(c)); // to_str: b
+    print(`to_str: {c}`); // to_str: b
     print(`nested: {['a', 'b']}`); // nested: ['a', 'b']
 
     // Indexing a `str` yields a `char?`, not a `char`, so it gets neither

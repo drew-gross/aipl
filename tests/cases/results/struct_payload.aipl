@@ -4,7 +4,7 @@
 # core uses), so this needed no new runtime support — just widening the
 # checker's/`ok`/`err`-codegen's allowed-payload list.
 
-import { concat as +++, equal as ==, logical_and as &&, print, to_str } from builtins;
+import { equal as ==, logical_and as &&, print } from builtins;
 
 struct Point { x: i64, y: i64, label: str }
 
@@ -23,12 +23,12 @@ fn parse(valid: bool) -> Point!str {
 
 fn main() !prints {
     match (parse(true)) {
-        ok(p) => print(to_str(p.x) +++ "," +++ to_str(p.y) +++ "," +++ p.label),
-        err(e) => print("err: " +++ e),
+        ok(p) => print(`{p.x},{p.y},{p.label}`),
+        err(e) => print(`err: {e}`),
     };
     match (parse(false)) {
         ok(..) => print("ok"),
-        err(e) => print("err: " +++ e),
+        err(e) => print(`err: {e}`),
     };
 }
 --- stdout ---

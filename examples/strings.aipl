@@ -1,14 +1,14 @@
-# Strings: literal comparison, concatenation, and the `print` builtin.
+# Strings: literal comparison, templates, and the `print` builtin.
 # `print` carries the `!prints` effect, so any caller has to declare it.
 
-import { concat as +++, equal as ==, print } from builtins;
+import { equal as ==, print } from builtins;
 
 fn classify(s: str) -> str {
     if (s == "hello") {
         "greeting"
     } else {
-        // `+` on two `str` operands is concat (allocates a new string).
-        "unknown: " +++ s
+        // A template builds a new string.
+        `unknown: {s}`
     }
 }
 

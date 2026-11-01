@@ -113,7 +113,6 @@ variant AiplTok =
     | OrOr
     | Pipe
     | DotDot
-    | PlusPlusPlus
     | PlusPlus
     | MinusMinus
     | PlusEq
@@ -585,10 +584,8 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
             mode: M_TEMPLATE,
         },
         // Operators and punctuation, one `op` rule per spelling, longest first so
-        // first-match-wins is maximal munch: the three-char `+++`, then the
-        // two-char forms (`==`/`=>` before `=`, `<=`/`>=` before `<`/`>`, `++`
+        // first-match-wins is maximal munch: the two-char forms (`==`/`=>` before `=`, `<=`/`>=` before `<`/`>`, `++`
         // before `+`, `||` before `|`, `..` before `.`), then the one-char rest.
-        op("+++", PlusPlusPlus, S_OPERATOR),
         op("==", EqEq, S_OPERATOR),
         op("!=", Ne, S_OPERATOR),
         op("->", Arrow, S_OPERATOR),
@@ -723,7 +720,7 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     ]);
 
     // The rest of the operator/punctuation table: `<=`/`>=` beat `<`/`>`, `++`
-    // beats `+` (but not `+++`), and `|` is the lambda delimiter. `Exact` always
+    // beats `+`, and `|` is the lambda delimiter. `Exact` always
     // takes the longest spelling, so the two-char forms win over their one-char
     // prefixes.
     assert(lex_aipl_kinds("a <= b >= |x| ++")? == [

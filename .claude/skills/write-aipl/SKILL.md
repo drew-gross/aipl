@@ -52,7 +52,7 @@ xs$f()  ≡ xs.map(|e| e.f())      xs$field  ≡ xs.map(|e| e.field)
 ## Operators (import `builtin as op`)
 `+ - * ++ --`: `wrapping_add` / `saturating_add`, `wrapping_sub`.., `wrapping_mul`, `wrapping_increment`..;
 `/` `saturating_divide`, `%` `saturating_remainder`; `== !=` `equal not_equal`; `< > <= >=` `less_than greater_than
-less_than_or_equal greater_than_or_equal`; `&& ||` `logical_and logical_or`; `!` `logical_not`; `+++` `concat`.
+less_than_or_equal greater_than_or_equal`; `&& ||` `logical_and logical_or`; `!` `logical_not`. Strings and arrays are joined with templates, spread literals (`[..a, ..b]`), `push` and `extend`; there is no concat operator.
 
 ## Builtins (import by name from `builtins`)
 - **text/chars**: print put to_str split words trim trim_while starts_with ends_with contains is_digit to_digit is_space is_whitespace is_all_whitespace int_parse int_parse_unsigned inline_str heap_str rope_str

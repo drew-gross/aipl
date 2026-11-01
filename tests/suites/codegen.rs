@@ -142,10 +142,8 @@ fn concat_arg_emits_concat_specialized_instance() {
     // now, and it is the more honest one: it is a property of the body rather
     // than of a shape the inliner happened not to handle.
     //
-    // `rope_str` rather than `+++`: constant folding joins two `str` literals
-    // into one, and then there is no concat value left to specialize on. Naming
-    // the representation is the point — the argument here *is* "a concat-str", so
-    // the fixture says that instead of arranging for a `+++` to survive.
+    // `rope_str` names the representation: the argument here *is* "a concat-str",
+    // so the fixture says that instead of arranging for some operation to build one.
     let comp = compile(
         "import { len, wrapping_add as +, rope_str } from builtins;
          fn label(s: str) -> u64 { s.len() + s.len() + s.len() + s.len() + s.len() }

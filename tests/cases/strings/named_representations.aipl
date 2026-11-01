@@ -50,7 +50,7 @@ fn round_trips(s: str) -> bool { heap_str(s) == s }.performance({
     // the failure the whole family exists to rule out.
     assert(inline_str("twenty-three bytes long") == none);
 
-    // `rope_str` builds its node even where `+++` would hand the other operand
+    // `rope_str` builds its node even where a template would hand the other operand
     // straight back, which is what lets it promise the representation at all.
     assert(rope_str("", "lone") == "lone");
     assert(rope_str("lone", "") == "lone");

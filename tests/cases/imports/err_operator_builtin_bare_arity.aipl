@@ -3,12 +3,12 @@
 # rejected at that point rather than surfacing later as a call to a function
 # that does not exist.
 
-import { concat } from builtins;
+import { equal } from builtins;
 
-fn f() -> str { concat("a") }
+fn f() -> bool { equal("a") }
 --- errors ---
-error: "concat" takes 2 arguments, got 1
- --> ./tests/cases/imports/err_operator_builtin_bare_arity.aipl:8:17
+error: "equal" takes 2 arguments, got 1
+ --> ./tests/cases/imports/err_operator_builtin_bare_arity.aipl:8:18
   |
-8 | fn f() -> str { concat("a") }
-  |                 ^^^^^^^^^^^
+8 | fn f() -> bool { equal("a") }
+  |                  ^^^^^^^^^^

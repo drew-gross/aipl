@@ -1,4 +1,4 @@
-import { concat as +++, equal as ==, wrapping_add as + } from builtins;
+import { equal as ==, wrapping_add as + } from builtins;
 
 fn add2(a: i64?, b: i64?) -> i64? { some(a? + b?) }.test({
     // The postfix `?` unwraps an optional inside a function that itself returns one:
@@ -8,7 +8,7 @@ fn add2(a: i64?, b: i64?) -> i64? { some(a? + b?) }.test({
     // section's balanced alloc/dealloc counts are the check).
     fn bang(o: str?) -> str? {
         let s = o?;
-        some(s +++ "!")
+        some(`{s}!`)
     }
 
     assert(bang(some("hi")) == some("hi!")); // some: unwrap and continue

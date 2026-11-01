@@ -4,7 +4,7 @@
 # all work, including refcounting of heap-carrying arms (the str payloads
 # below) — the allocation accounting confirms retain/drop stay in balance.
 
-import { concat as +++, equal as ==, wrapping_add as + } from builtins;
+import { equal as ==, wrapping_add as + } from builtins;
 
 variant Shape = Empty | Square(i64) | Named(str)
 
@@ -28,7 +28,7 @@ fn shape(n: i64) -> Shape!str {
 })
 
 // A heap-carrying arm as the Ok payload.
-fn label(s: str) -> Shape!str { ok(Named(s +++ "!")) }.test({
+fn label(s: str) -> Shape!str { ok(Named(`{s}!`)) }.test({
     assert(label("hi")? == Named("hi!"));
 })
 

@@ -35,8 +35,7 @@ pub(super) fn append_names(program: &Program) -> AppendNames {
 /// place when nothing else holds it — and when something does, it copies, so
 /// the two spellings agree on what any other binding sees. It is the array
 /// sibling of [`set_spread_field`](super::set_spread_field()), which says the
-/// same thing about a struct rebuilt from itself to replace a field, and of
-/// [`extend_longhand`](super::extend_longhand()), which says it about a `+++`.
+/// same thing about a struct rebuilt from itself to replace a field.
 ///
 /// A spread in the tail is an append too, of a whole array rather than one
 /// element, so it is advised as `extend` — `set out = [..out, ..xs];` is

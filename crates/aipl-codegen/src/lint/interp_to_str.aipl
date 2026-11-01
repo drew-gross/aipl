@@ -6,7 +6,7 @@
 # says the same thing.
 #
 # Only the file's builtins `to_str` counts, by whatever local name it goes by, and
-# only as the interpolation's whole expression: `{to_str(x) +++ y}` is not this
+# only as the interpolation's whole expression: `{to_str(x) == y}` is not this
 # shape, and a `to_str` of the file's own would be some other function.
 #
 # The hit points at the `to_str` call.
@@ -79,7 +79,7 @@ pub fn interp_to_str(program: Program) -> LintHit[] {
     );
     assert(
         lint_messages(
-            """import { concat as +++, to_str } from builtins; fn f(n: i64) -> str { `{to_str(n) +++ "!"}` }""",
+            """import { equal as ==, to_str } from builtins; fn f(n: i64) -> str { `{to_str(n) == "5"}` }""",
             interp_to_str,
         )? == [],
     );

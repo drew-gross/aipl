@@ -2,11 +2,11 @@
 # for the caller and released when the returned struct is dropped — no leak
 # or double-free, even though the string is freshly allocated by `+`.
 
-import { concat as +++, equal as == } from builtins;
+import { equal as == } from builtins;
 
 struct Tagged { label: str, n: i64 }
 
-fn tag(name: str, k: i64) -> Tagged { label: "tag: " +++ name, n: k }.test({
+fn tag(name: str, k: i64) -> Tagged { label: `tag: {name}`, n: k }.test({
     let Tagged { label, n } = tag("alpha", 7);
     assert(label == "tag: alpha");
     assert(n == 7);

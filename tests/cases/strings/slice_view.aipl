@@ -4,7 +4,7 @@
 # refcounts balance at scope exit (the `allocations`/`deallocations` counts below
 # stay equal).
 
-import { concat as +++, equal as ==, print, to_str, wrapping_increment as ++ } from builtins;
+import { equal as ==, print, to_str, wrapping_increment as ++ } from builtins;
 
 fn main() !prints {
     let s = "hello, world!"; // 13 bytes (heap)
@@ -16,7 +16,7 @@ fn main() !prints {
         set n++;
     }
     print(to_str(n)); // 10
-    print(v +++ "!"); // ello, worl!
+    print(`{v}!`); // ello, worl!
     print(to_str(v == "ello, worl")); // true
     print(v[2..4]); // lo  (slice of a view)
 }

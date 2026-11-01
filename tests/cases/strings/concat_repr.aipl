@@ -5,17 +5,9 @@
 # a `str` parameter. Passing a concat value to a `str` parameter also selects a
 # distinct, concat-specialized monomorphization of the callee (here `label`).
 
-import {
-    concat as +++,
-    equal as ==,
-    len,
-    print,
-    rope_str,
-    to_str,
-    wrapping_increment as ++,
-} from builtins;
+import { equal as ==, len, print, rope_str, to_str, wrapping_increment as ++ } from builtins;
 
-fn label(s: str) -> str { "[" +++ s +++ "]" }
+fn label(s: str) -> str { `[{s}]` }
 
 fn main() !prints {
     let g = rope_str("foo", "bar"); // a concat node ("foobar")

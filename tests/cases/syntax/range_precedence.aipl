@@ -1,6 +1,6 @@
 # Where `..` sits in the precedence table. Loosest to tightest:
 #
-#     ||   &&   == !=   ..   < > <= >=   + +++ -   * / %
+#     ||   &&   == !=   ..   < > <= >=   + -   * / %
 #
 # The two ends are what matter. `..` binds *tighter* than equality, so a range
 # on the right of `==` is one operand rather than the comparison being swallowed

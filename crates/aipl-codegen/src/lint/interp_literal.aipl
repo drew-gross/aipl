@@ -4,7 +4,7 @@
 # said had the text been written in place: `` `a: a` ``. The braces, the quotes and
 # the render are all spent on nothing.
 #
-# Only a literal standing alone is this shape — `{"a" +++ s}` computes something —
+# Only a literal standing alone is this shape — `{"a" == s}` computes something —
 # and only the escaping forms of it: a `"""` literal is raw, and its contents may
 # need escapes a template would decode (`\{`, a backtick), so it is a way of getting
 # verbatim text into a template rather than a detour.
@@ -54,7 +54,7 @@ pub fn interp_literal(Function { body }) -> LintHit[] {
     // A literal that is only part of the interpolation computes something, a
     // `"""` literal is raw text a template cannot say, and a name is not a literal.
     assert(
-        lint_function_messages("""fn f(s: str) -> str { `{"a" +++ s}` }""", interp_literal)? == [],
+        lint_function_messages("""fn f(s: str) -> str { `{"a" == s}` }""", interp_literal)? == [],
     );
     assert(
         lint_function_messages(

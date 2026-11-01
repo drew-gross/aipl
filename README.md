@@ -112,7 +112,7 @@ and a `char` insert bare (no quotes); everything else renders as `to_str`
 would, so a `str` in an array still shows its quotes. Interpolations re-lex the
 whole language, so they nest: `` `{`{x}`}` `` is fine, and a `{ .. }` inside the
 expression — a set literal, a struct — balances against its own closing brace.
-Templates are the idiomatic way to build strings; prefer them to `+++`.
+Templates are the idiomatic way to build strings.
 
 Where this lives: the string rules are declared once in
 `crates/aipl-codegen/src/lex_aipl.aipl` (escape sets, delimiters, dedent),

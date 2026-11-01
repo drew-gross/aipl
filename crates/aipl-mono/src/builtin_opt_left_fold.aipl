@@ -18,7 +18,6 @@
 # across scopes.
 
 import {
-    concat as +++,
     equal as ==,
     filter,
     is_some,
@@ -68,7 +67,7 @@ pub fn opt_left_fold<T: any, A: any>(self: T[], init: A, f: (A, T) -> A?) -> A? 
     assert([1, 2].filter(is_big).opt_left_fold(7, add) == some(7));
 
     // A heap accumulator (`str`) is carried across iterations intact.
-    assert(["a", "b", "c"].opt_left_fold("", |acc, s| some(acc +++ s)) == some("abc"));
+    assert(["a", "b", "c"].opt_left_fold("", |acc, s| some(`{acc}{s}`)) == some("abc"));
 
     // The first `none` ends it — including when the very first element fails.
     assert(

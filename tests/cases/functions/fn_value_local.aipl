@@ -4,7 +4,7 @@
 # code address — a `mut` binding can be reassigned and the callee chosen at
 # run time, so nothing is resolved at compile time.
 
-import { concat as +++, equal as ==, wrapping_add as + } from builtins;
+import { equal as ==, wrapping_add as + } from builtins;
 
 fn inc(x: i64) -> i64 { x + 1 }
 
@@ -24,13 +24,13 @@ fn scalar_values() -> i64 {
 
 // Heap arguments and results through an indirect call refcount correctly (a
 // leak or double-free would unbalance the allocation accounting below).
-fn shout(s: str) -> str { s +++ "!" }
+fn shout(s: str) -> str { `{s}!` }
 
 fn heap_values() -> str {
     let f = shout;
     f("hi")
 }.test({
-    fn twice(s: str) -> str { s +++ s }
+    fn twice(s: str) -> str { `{s}{s}` }
 
     assert(heap_values() == "hi!");
     mut g = shout;

@@ -5,7 +5,7 @@
 # in a `match`. (A nullary constructor, which no argument pins, is resolved
 # only when the template has a single instance — see `generic_option`.)
 
-import { concat as +++, print, to_str, wrapping_add as + } from builtins;
+import { print, to_str, wrapping_add as + } from builtins;
 
 variant Wrap<T> = Val(T) | Pair(T, T)
 
@@ -19,7 +19,7 @@ fn combine_i(w: Wrap<i64>) -> i64 {
 fn combine_s(w: Wrap<str>) -> str {
     match (w) {
         Val(v) => v,
-        Pair(a, b) => a +++ b,
+        Pair(a, b) => `{a}{b}`,
     }
 }
 

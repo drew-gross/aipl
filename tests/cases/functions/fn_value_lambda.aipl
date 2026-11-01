@@ -8,7 +8,7 @@
 # `lambdas/value_lambda_inferred`); a bare `let` declares none, so there they
 # are written.
 
-import { concat as +++, equal as ==, map, wrapping_add as + } from builtins;
+import { equal as ==, map, wrapping_add as + } from builtins;
 
 struct Rule { build: (i64) -> Tok, step: (i64) -> i64 }
 
@@ -35,7 +35,7 @@ fn probe() -> i64 {
 // Heap arguments and results flow through a value-lambda call, refcounting
 // correctly (a leak or double-free would unbalance the accounting below).
 fn heap_lambda() -> str {
-    let deco = |s: str| { s +++ "!" };
+    let deco = |s: str| { `{s}!` };
     deco("hi")
 }.test({
     assert(heap_lambda() == "hi!");

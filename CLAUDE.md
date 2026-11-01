@@ -549,7 +549,7 @@ alias buys uniformity: an import list shows every operator a file uses in one
 shape, so a reader never has to know which operators happen to be ambiguous.
 
 The *named builtin* may also be imported **bare** and called as an ordinary
-function — `import { concat }` then `concat(a, b)`, or `a.concat(b)`. That is a
+function — `import { equal }` then `equal(a, b)`, or `a.equal(b)`. That is a
 separate thing from importing the operator: the bare name makes the function
 available, the alias makes the operator spelling available, and a file may have
 either or both. Only the operator has no bare form.
@@ -560,17 +560,15 @@ file's imports and then maps it through the same view every other call goes
 through, landing on the canonical `__builtin_*` impl (or on one of your own
 functions, for `import { my_add as + }`). There is no operator node: `ExprKind`
 has no `Binop`, and nothing downstream of import resolution can tell an operator
-was written. `concat(a, b)` and `a +++ b` are one program because they are
+was written. `equal(a, b)` and `a == b` are one program because they are
 literally the same call.
 
 That is why every operator has a real `__builtin_*` canonical, including the
 single-semantics ones. They used to resolve to the operator spelling itself — a
 *marker* rather than a callable name — which forced the loader to lower a bare
-`concat(a, b)` back into the primitive node the operator produced, and forced
-every pass to carry two shapes for one question. Twice that cost a silent bug:
-mono and codegen each hand-matched the in-place-append shape and disagreed (now
-`aipl_syntax::self_append`, asked by both), and `aliases_or_unsafe` counted an
-operand as a read but a call argument as an escape.
+`equal(a, b)` back into the primitive node the operator produced, and forced
+every pass to carry two shapes for one question. That cost a silent bug:
+`aliases_or_unsafe` counted an operand as a read but a call argument as an escape.
 
 The one exception is unary `-`: it has no named builtin to resolve to, so it
 stays `ExprKind::Neg` and is gated by hand. `BinOp` survives too, but only as an
@@ -588,8 +586,7 @@ would both answer `Add` and the flavor would be lost.
 | `--` | `wrapping_decrement` / `saturating_decrement` | `<=` | `less_than_or_equal` |
 | `/` | `saturating_divide` | `>=` | `greater_than_or_equal` |
 | `%` | `saturating_remainder` | `&&` | `logical_and` |
-| `+++` | `concat` | `\|\|` | `logical_or` |
-| `!` | `logical_not` | | |
+| `!` | `logical_not` | `\|\|` | `logical_or` |
 
 `OPERATOR_BUILTINS` (`crates/aipl-syntax/src/lib.rs`) is where the compiler
 declares these — extend it rather than adding a per-operator special case. The
@@ -924,9 +921,10 @@ future multi-representation types, not just `str`.
 
 **A test that wants a particular representation asks for it by name.** `heap_str`,
 `rope_str` and `inline_str` each return their content in one representation, and
-they are the only correct way to pin one — `"a" +++ "b"` is *not* a way to obtain a
-rope, because constant folding joins two literals (it voided twenty-eight cases
-that relied on it, all of them still green, since only the representation changed).
+they are the only correct way to pin one — an operation chosen for another reason is
+*not* a way to obtain a rope: constant folding once joined two literals and voided
+twenty-eight cases that relied on exactly that, all of them still green, since only
+the representation changed.
 `tests/cases/strings/named_representations.aipl` is the worked example, and
 DESIGN_PRINCIPLES.md's "Just say what you want" is why the family exists.
 

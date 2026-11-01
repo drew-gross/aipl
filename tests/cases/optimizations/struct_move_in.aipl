@@ -13,7 +13,7 @@
 # (`aipl_set_union_mut`, behind an `aipl_arr_reserve` that copies a block
 # anyone else still holds) instead of building a fresh set.
 
-import { concat as +++, len, logical_or as ||, print, union } from builtins;
+import { len, logical_or as ||, print, union } from builtins;
 
 struct First { kinds: #{i64} = #{}, texts: #{str} = #{}, nullable: bool = false }
 
@@ -33,7 +33,7 @@ fn fold(parts: First[]) -> First {
 
 struct Named { name: str, tags: str[] }
 
-fn rename(self: Named, suffix: str) -> Named { name: self.name +++ suffix, tags: self.tags }
+fn rename(self: Named, suffix: str) -> Named { name: `{self.name}{suffix}`, tags: self.tags }
 
 fn width(n: Named) -> u64 { n.name.len() } #[allow]
 
@@ -76,8 +76,8 @@ deallocations     44
 reallocations     3
 bytes allocated   2802
 peak live bytes   2842
-instructions      7402
-binary size       20920 bytes (code 13600, data 195, metadata 7125)
+instructions      7646
+binary size       20616 bytes (code 13260, data 195, metadata 7161)
 
 function                 calls  code bytes
 __arr_drop_First             2         152
@@ -96,4 +96,6 @@ aipl_write_bytes           105    external
 aipl_write_i64               5    external
 aipl_write_u64               2    external
 fold                         2        1960
-main                         1        8568
+main                         1        7168
+rename                       2         500
+rename$own0                  4         560

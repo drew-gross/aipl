@@ -7983,10 +7983,9 @@ impl Mono<'_> {
                     )
                 } else if *callee == Callee::RopeStr && atys.len() == 2 {
                     // `rope_str(a, b)` builds a rope node, so it carries the
-                    // *concat-str* representation exactly as `+++` does below —
-                    // which is what lets a downstream `fn(s: str)` call pick the
-                    // concat-specialized instance. Naming the representation would
-                    // buy nothing if the type then forgot it.
+                    // *concat-str* representation — which is what lets a downstream
+                    // `fn(s: str)` call pick the concat-specialized instance. Naming
+                    // the representation would buy nothing if the type then forgot it.
                     (
                         node(ExprKind::Call(callee.clone(), rargs, method_style)),
                         concat_str_ty(),
@@ -7996,16 +7995,13 @@ impl Mono<'_> {
                 {
                     // The rest of the operators, resolved to their canonical impl.
                     // The result type is the operator's, so this mirrors the
-                    // opcode table the primitive node uses: concatenation carries
-                    // the *concat-str* representation (a lazy concat node, which a
-                    // downstream `fn(s: str)` call uses to pick a
-                    // concat-specialized instance), saturating divide/remainder
-                    // keep a same-width integer, and every comparison and logical
-                    // operator is bool. Kept as-is; codegen intrinsifies it.
+                    // opcode table the primitive node uses: saturating
+                    // divide/remainder keep a same-width integer, and every
+                    // comparison and logical operator is bool. Kept as-is; codegen
+                    // intrinsifies it.
                     let lt = aipl_syntax::flex_int_ty(&rargs[0], &atys[0], &atys[1]);
                     let rt = aipl_syntax::flex_int_ty(&rargs[1], &atys[1], &lt);
                     let ret = match op {
-                        BinOp::Concat => concat_str_ty(),
                         BinOp::Div | BinOp::Rem if aipl_syntax::is_int_ty(&lt) && lt == rt => lt,
                         BinOp::Div | BinOp::Rem => Type::Primitive(Primitive::I64),
                         _ => Type::Primitive(Primitive::Bool),
@@ -8425,7 +8421,7 @@ fn bind_builtin_var(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
 /// For such a function a `str` receiver gets a `str` back. Unification alone binds
 /// `T` to `char` and returns a `char[]`, which holds the same bytes but is not the
 /// same type to the things that care: a template renders it as an array of chars,
-/// and `+++` and a `str` parameter refuse it. So the rule is stated once, on the
+/// and a `str` parameter refuses it. So the rule is stated once, on the
 /// shape of the signature, rather than per builtin — `reverse`, `sort`, `repeat`,
 /// `filter`, `drop_n` and the rest all keep a string a string. It is applied
 /// wherever a result type is computed from such a signature: inference over the
@@ -11514,19 +11510,6 @@ fn aliases_or_unsafe(
             };
             let lhs_bad = if target == name {
                 match &val.kind {
-                    // `set a = concat(a, b)` appends into `a`'s own buffer —
-                    // safe unless we're iterating `a`, or the other operand
-                    // aliases it (it is read while `a` grows).
-                    //
-                    // The shape itself is `aipl_syntax::self_append`, which
-                    // codegen's emitting arm asks too — the two have to agree, and
-                    // once did not: both were hand-written against the old `char`
-                    // opcode encoding and named addition rather than
-                    // concatenation, so neither could fire.
-                    _ if aipl_syntax::self_append(val, name).is_some() => {
-                        let r = aipl_syntax::self_append(val, name).expect("matched");
-                        iterating || rec(r)
-                    }
                     // `set a = a.trim()` / `set a = trim(a)` both fold to the
                     // same arg list `[a]`, so one pattern covers both forms.
                     ExprKind::Call(Callee::Trim, cargs, _)

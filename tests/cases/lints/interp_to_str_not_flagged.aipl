@@ -2,15 +2,14 @@
 # outside any interpolation, one that is only part of the interpolated
 # expression, and a call to some other function.
 
-import { concat as +++, print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 fn main() !prints {
     let n = 42;
     // Not in a template at all.
     print(to_str(n));
-    print("n = " +++ to_str(n));
     // The call is an operand, not the whole interpolation.
-    print(`n = {to_str(n) +++ "!"}`);
+    print(`n = {to_str(n) == "42"}`);
     // A different function.
     print(`n = {shown(n)}`);
 }
@@ -18,6 +17,5 @@ fn main() !prints {
 fn shown(n: i64) -> str { to_str(n) }
 --- stdout ---
 42
-n = 42
-n = 42!
+n = true
 n = 42

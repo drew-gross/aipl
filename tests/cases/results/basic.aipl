@@ -2,14 +2,14 @@
 # 0 = err), matched like an optional. `ok`/`err` are constructors like
 # `some`/`none`: the unbound side is inferred from context.
 
-import { concat as +++, equal as ==, print, saturating_divide as /, to_str } from builtins;
+import { equal as ==, print, saturating_divide as / } from builtins;
 
 fn safe_div(a: i64, b: i64) -> i64!str { if (b == 0) { err("divide by zero") } else { ok(a / b) } }
 
 fn describe(a: i64, b: i64) -> str {
     match (safe_div(a, b)) {
-        ok(v) => "= " +++ to_str(v),
-        err(e) => "error: " +++ e,
+        ok(v) => `= {v}`,
+        err(e) => `error: {e}`,
     }
 }.test({
     assert(describe(10, 2) == "= 5");

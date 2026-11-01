@@ -17,7 +17,6 @@
 # pipeline runs in-engine and Rust's `format_source` is one FFI call.
 
 import {
-    concat as +++,
     equal as ==,
     filter,
     first,
@@ -76,7 +75,7 @@ pub fn format_source(src: str, width: u64) -> str!FmtError {
     aipl_parse_file(cleaned).map_err(first_error)?;
     let laid_out = fmt_layout(cleaned, width)?;
     verify_same_tokens(cleaned, laid_out)?;
-    ok(laid_out +++ sections)
+    ok(`{laid_out}{sections}`)
 }.test({
     // The whole pipeline: whitespace cleaned, laid out, newline normalized, and
     // the sections re-attached exactly as they were.
@@ -169,7 +168,7 @@ fn fmt_prepare(src: str) -> FmtInput {
 # one, so the guarantee is made here rather than there.
 fn fmt_layout(cleaned: str, width: u64) -> str!FmtError {
     let laid_out = format_program(cleaned, width)?;
-    ok(laid_out.trim_end_while(|c| c == '\n') +++ "\n")
+    ok(`{laid_out.trim_end_while(|c| c == '\n')}\n`)
 }.test({
     assert(fmt_layout("fn main() {}", 100) == ok("fn main() {}\n")); // newline added
     assert(fmt_layout("fn main() {}\n\n\n", 100) == ok("fn main() {}\n")); // run collapsed

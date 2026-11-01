@@ -3,13 +3,7 @@
 # `Error` is a distinct named type, but for now it's a string under the hood:
 # it renders, compares, and concatenates like one, and coerces to/from `str`.
 
-import {
-    concat as +++,
-    equal as ==,
-    print,
-    read_file_to_string,
-    write_string_to_file,
-} from builtins;
+import { equal as ==, print, read_file_to_string, write_string_to_file } from builtins;
 
 // A user function can make an `Error` from a string and propagate builtin ones.
 fn nonempty(s: str) -> str!Error { if (s == "") { err("empty input") } else { ok(s) } }
@@ -22,8 +16,8 @@ fn first(path: str) !read_files -> str!Error {
 
 fn describe(path: str) !read_files -> str {
     match (first(path)) {
-        ok(c) => "read: " +++ c,
-        err(e) => "error: " +++ e,
+        ok(c) => `read: {c}`,
+        err(e) => `error: {e}`,
     }
     // e: Error concatenated as a str
 }.test({

@@ -2,10 +2,10 @@
 # list of statements with no trailing expression — there's no value to yield.
 # Such a function is called for its effects alone.
 
-import { concat as +++, print } from builtins;
+import { print } from builtins;
 
 fn banner(title: str) !prints {
-    print("== " +++ title +++ " ==");
+    print(`== {title} ==`);
     print("ready");
 }
 

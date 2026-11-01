@@ -2,22 +2,14 @@
 # case) across a few value kinds: i64, str, array, and dict. The `main` run is
 # what the harness checks for stdout/perf; the `.test` blocks run under `check`.
 
-import {
-    concat as +++,
-    contains_key,
-    equal as ==,
-    get,
-    len,
-    print,
-    wrapping_add as +,
-} from builtins;
+import { contains_key, equal as ==, get, len, print, wrapping_add as + } from builtins;
 
 fn add(a: i64, b: i64) -> i64 { a + b }.test({
     assert(add(2, 3) == 5);
     assert(add(-1, 1) == 0);
 })
 
-fn greet(name: str) -> str { "hi " +++ name }.test({
+fn greet(name: str) -> str { `hi {name}` }.test({
     assert(greet("al") == "hi al");
     assert(greet("") == "hi ");
 })

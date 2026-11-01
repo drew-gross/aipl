@@ -287,9 +287,9 @@ pub enum Callee {
     TrySet,
 
     // ---- operator impls: `import { wrapping_add as + } from builtins;` ----
-    // Importable like the rest, by name (`import { concat }` then `concat(a, b)`)
+    // Importable like the rest, by name (`import { equal }` then `equal(a, b)`)
     // or aliased to the operator spelling. Intrinsified by codegen; an operator
-    // use and a bare `concat(a, b)` are the same call to the same arm.
+    // use and a bare `equal(a, b)` are the same call to the same arm.
     WrappingAdd,
     SaturatingAdd,
     WrappingSub,
@@ -306,7 +306,6 @@ pub enum Callee {
     LogicalAnd,
     LogicalOr,
     LogicalNot,
-    Concat,
 
     // ---- reserved without an import ----
     /// `some(x)`.
@@ -635,7 +634,6 @@ impl Callee {
             Callee::LogicalAnd => "__builtin_logical_and",
             Callee::LogicalOr => "__builtin_logical_or",
             Callee::LogicalNot => "__builtin_logical_not",
-            Callee::Concat => "__builtin_concat",
 
             Callee::Some => "some",
             Callee::Ok => "ok",

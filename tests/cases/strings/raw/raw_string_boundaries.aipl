@@ -4,12 +4,12 @@
 # value is one line as the single-line literal, which is the value each of
 # them has: "", "", and "kept  " with its spaces verbatim.
 
-import { concat as +++, print } from builtins;
+import { join, print } from builtins;
 
 fn main() !prints -> i64 {
-    print("[" +++ "" +++ "]");
-    print("[" +++ "" +++ "]");
-    print("[" +++ "kept  " +++ "]");
+    print(["[", "", "]"].join());
+    print(["[", "", "]"].join());
+    print(["[", "kept  ", "]"].join());
     0
 }
 --- stdout ---

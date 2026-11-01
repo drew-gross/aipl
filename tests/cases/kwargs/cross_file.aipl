@@ -14,6 +14,5 @@ fn main() !prints {
 |hi|
 wrapping_mul as *hiwrapping_mul as *
 --- file: frame.aipl ---
-import { concat as +++} from builtins;
 fn default_edge() -> str { "|" }
-pub fn framed(s: str, edge: str = default_edge()) -> str { edge +++ s +++ edge }
+pub fn framed(s: str, edge: str = default_edge()) -> str { `{edge}{s}{edge}` }

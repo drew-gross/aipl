@@ -4909,7 +4909,7 @@ impl Cx<'_> {
         // it builds, and monomorphization binds the callee's variables from it when
         // the arguments cannot, so the rewrite needs no inference path of its own.
         // Other calls are left alone: their types are read off their arguments, and
-        // a recorded one would pin a representation (`+++` concatenating strings) or
+        // a recorded one would pin a representation (a lazy concat string) or
         // an integer width (`int_parse`) that the context decides.
         if let ExprKind::Call(callee, ..) = &expr.kind {
             if self
@@ -6572,7 +6572,7 @@ impl Cx<'_> {
     /// `wrapping_*`/`saturating_*` builtins they resolve to. `op` is the spelling
     /// (`"+"` or `"-"`), used only for diagnostics. Both operands must be the same
     /// integer width; an unresolved generic operand stays permissive; non-integers
-    /// are rejected (with a `+++`-concat hint for a string given to `+`).
+    /// are rejected (with a template hint for a string given to `+`).
     fn check_int_arith(
         &self,
         op: &str,
@@ -6588,7 +6588,7 @@ impl Cx<'_> {
             return Ok(lt.clone());
         }
         // A string operand is the common mistake now that `+`/`-` are integer-only.
-        // For `+`, point at `+++` (string concatenation).
+        // For `+`, point at a template (string building).
         if is_str_repr(lt) || is_str_repr(rt) {
             let (bad, span) = if is_str_repr(lt) {
                 (lt, lspan)
@@ -6597,7 +6597,7 @@ impl Cx<'_> {
             };
             let verb = if op == "+" { "addition" } else { "subtraction" };
             let hint = if op == "+" {
-                "; use \"+++\" to concatenate strings"
+                "; build a string with a template, `{a}{b}`"
             } else {
                 ""
             };
@@ -6642,29 +6642,8 @@ impl Cx<'_> {
             // Integer add only — the increment sugar `set n++` lowers to a
             // primitive add. A user's `+`/`-` resolves (in the loader) to a call
             // to its bound `wrapping_*`/`saturating_*`/user fn instead; those
-            // calls reuse `check_int_arith` too. Concatenation is its own
-            // operator, below.
+            // calls reuse `check_int_arith` too.
             BinOp::Add => self.check_int_arith("+", lt, rt, lspan, rspan),
-            // Concatenation. `Error` concatenates like `str`; the result is a
-            // plain str. An unresolved generic result stays permissive.
-            BinOp::Concat => {
-                if is_unknown(lt) || is_unknown(rt) {
-                    Ok(Type::Unknown)
-                } else if (is_str_repr(lt) || is_char_array(lt))
-                    && (is_str_repr(rt) || is_char_array(rt))
-                {
-                    // `char[]` is the same representation as `str` (see
-                    // `is_char_array`), and generic returns can hand back the
-                    // `char[]` spelling — `join`'s `-> T[]` at `T = char` is
-                    // exactly that. Accept either spelling on either side.
-                    Ok(Type::Primitive(Primitive::Str))
-                } else {
-                    Err(Error::at(
-                        "\"+++\" concatenates strings: both sides must be str".to_string(),
-                        span.clone(),
-                    ))
-                }
-            }
             BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
                 if same_int {
                     return Ok(lt.clone());

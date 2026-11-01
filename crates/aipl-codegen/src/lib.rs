@@ -12141,8 +12141,8 @@ fn array_drop_fn_addr<M: Module>(
         // `is_str_repr`, not the exact `Primitive::Str`: `Error` and the
         // internal concat-str share the representation, and under the wide ABI
         // they must use the wide element helper rather than falling through to a
-        // generated per-type one that walks 8-byte slots. `map(|s| s +++ x)`
-        // produces concat-str elements, which is how this surfaced.
+        // generated per-type one that walks 8-byte slots. A `map` whose lambda
+        // builds a template produces concat-str elements, which is how this surfaced.
         _ if is_str_repr(elem) => Some(b.id(module, drop_str)),
         // `char[]` shares `str`'s representation (see `is_char_array`), so a
         // nested `char[]` element (e.g. in `char[][]`) is freed the same way
@@ -18786,8 +18786,8 @@ fn compile_call_expr_direct<M: Module>(
             // is a word copied out of the slot. A wide `str` element is not
             // copied out — `component` hands back the slot's own address — so
             // releasing after the store releases the value just written.
-            // Retaining first is what makes the release safe: `map(|s| s +++ x)`
-            // builds its result from the old element, and the result already
+            // Retaining first is what makes the release safe: a `map` over a
+            // template builds its result from the old element, and the result already
             // holds its own reference by then.
             emit_retain(builder, module, builtins, structs, new_val, &new_ty);
             emit_drop(builder, module, builtins, structs, old_val, &old_ty);
@@ -19537,10 +19537,8 @@ fn compile_call_expr_direct<M: Module>(
                 return Err(arity_bug(name, 2, args.len(), &span));
             };
             // A `str` receiver is the `char` sequence too (see `is_char_array`),
-            // so `set s.extend(t)` takes the char path below — the same in-place
-            // `aipl_str_append` that `set s = s +++ t;` reaches, and the reason
-            // that spelling is linted toward this one. The binding stays a
-            // `str`: only an array receiver has an element type to refine.
+            // so `set s.extend(t)` takes the char path below, appending in place
+            // with `aipl_str_append`. The binding stays a `str`: only an array receiver has an element type to refine.
             let str_receiver = mut_str_receiver(env, receiver).is_some();
             let (slot, ty_cell, exclusive, elem_ty) = match mut_str_receiver(env, receiver) {
                 Some((slot, cell, exclusive)) => (
@@ -20363,29 +20361,6 @@ fn compile_binop<M: Module>(
                         builder.ins().iadd(lv, rv),
                         ConcreteType::Primitive(Primitive::I64),
                     )
-                }
-            }
-            // `+++` string concatenation. `Error` is str-represented, so it
-            // concatenates like a `str`. Builds a *lazy concat node* (see
-            // `aipl_concat_lazy`) rather than copying eagerly — the result is
-            // still a `str` to the source, in the concat representation.
-            BinOp::Concat => {
-                if is_str_repr(&lt) && is_str_repr(&rt) {
-                    // The tagged concat node takes ownership of its inputs, so
-                    // inc both before the call to balance our local refs. The
-                    // wide entry point retains for itself (`aipl_concat`), so
-                    // there the pair is dropped rather than mirrored.
-                    let ret = builtins.call(module, builder, "aipl_concat", &[lv, rv]);
-                    scopes
-                        .last_mut()
-                        .expect("scope")
-                        .push(Tracked::new(ret, &ConcreteType::Primitive(Primitive::Str)));
-                    (ret, ConcreteType::Primitive(Primitive::Str))
-                } else {
-                    return Err(Error::at(
-                        "\"+++\" concatenates strings: both sides must be str".to_string(),
-                        span.clone(),
-                    ));
                 }
             }
             BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
@@ -21529,7 +21504,7 @@ fn compile_expr_inner<M: Module>(
                 // Whether that reference is the value's *only* one depends on
                 // `exclusive`. An exclusive binding takes the fresh value's own
                 // reference (its value-track is popped), so the block's count is
-                // 1 and the in-place `push`/`extend`/`+++` paths may grow it
+                // 1 and the in-place `push`/`extend` paths may grow it
                 // under themselves. A non-exclusive one — something else may
                 // name a version of it — follows the array bindings' slot-owned-
                 // reference model (`mut_binding_owns_slot_ref`, and
@@ -21697,36 +21672,7 @@ fn compile_expr_inner<M: Module>(
                     ));
                 }
             };
-            // In-place concat: `set s = concat(s, r)` on an exclusive `str`
-            // binding appends `r` into `s`'s own buffer instead of building a
-            // fresh string (or a rope node) each time. The binding is
-            // slot-tracked, so the — possibly relocated — buffer is still
-            // dropped exactly once.
-            //
-            // The shape is `aipl_syntax::self_append`, which `mono`'s
-            // `aliases_or_unsafe` asks too when it decides `exclusive`: the two
-            // have to agree, and once did not — both were hand-written against the
-            // old `char` opcode encoding and named addition rather than
-            // concatenation, so neither ever matched a `str`.
             if exclusive && expected_ty == ConcreteType::Primitive(Primitive::Str) {
-                let appends_self = aipl_syntax::self_append(value, name);
-                if let Some(r) = appends_self {
-                    let s_ptr = load_binding_str(builder, slot);
-                    let (rv, rt) = compile_expr(module, builder, cx, scopes, r)?;
-                    expect_type(
-                        &rt,
-                        &ConcreteType::Primitive(Primitive::Str),
-                        "concat operand",
-                        r.span.clone(),
-                    )?;
-                    // `aipl_str_append` borrows `r` and takes over the reference
-                    // the slot was holding, writing the result back into the same
-                    // slot — so there is no inc, no dec and no new value-track:
-                    // `r`'s own track still releases it, and the binding's
-                    // slot-track already owns whatever the slot now names.
-                    emit_str_append(module, builder, builtins, s_ptr, rv);
-                    return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
-                }
                 // In-place trim: `set s = trim(s)` / `set s = s.trim()` shifts and
                 // shrinks s's buffer in place rather than allocating a new string.
                 // Both forms fold to the call `trim(s)` with args `[s]`.
@@ -21737,8 +21683,7 @@ fn compile_expr_inner<M: Module>(
                             && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name)
                 );
                 if trims_self {
-                    // Same slot discipline as the concat branch above, and for
-                    // the same reason: a wide `str` binding *is* its slot's 24
+                    // A wide `str` binding *is* its slot's 24
                     // bytes, so it is read with `load_binding_str` and written
                     // with `store_binding_str`. Reading one word out of the slot
                     // and calling `aipl_trim` on it dereferenced `w0` — a buffer's

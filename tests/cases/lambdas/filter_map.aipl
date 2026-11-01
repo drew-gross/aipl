@@ -16,7 +16,6 @@
 # across that split.
 
 import {
-    concat as +++,
     equal as ==,
     filter_map,
     len,
@@ -52,7 +51,7 @@ fn from_call(n: i64, lo: i64) -> i64[] { fresh(n).filter_map(|x| lo <= x, |x| x 
 // the slot write that replaces it, a rejected one by the loop's other arm. The
 // allocation count below is what proves neither is released twice nor leaked.
 fn labels(lo: u64) -> str[] {
-    [trim(" a "), trim(" bb "), trim(" ccc ")].filter_map(|s| lo <= s.len(), |s| s +++ "!")
+    [trim(" a "), trim(" bb "), trim(" ccc ")].filter_map(|s| lo <= s.len(), |s| `{s}!`)
 }.test({
     assert(labels(2) == ["bb!", "ccc!"]);
     assert(labels(0) == ["a!", "bb!", "ccc!"]);

@@ -376,7 +376,7 @@ fn kind_class(kind: SymbolKind) -> &'static str {
 
 /// A URL fragment for `name`.
 ///
-/// An AIPL name can be an operator spelling (`==`, `+++`), which is not a
+/// An AIPL name can be an operator spelling (`==`, `!=`), which is not a
 /// fragment, so anything outside the identifier characters is percent-free
 /// escaped to `-`. Names that differ only in punctuation would collide; that
 /// cannot happen among a file's *declarations*, which are identifiers.

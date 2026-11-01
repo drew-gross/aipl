@@ -514,26 +514,26 @@ the intent from the mechanism, and they can be wrong.
 
 The type case is the `str` representations. A `str` is stored one of three ways —
 packed inline into the value's own words, in a refcounted buffer, or as a rope
-node joining two values lazily — and a test that cares *which* used to say so
-like this:
+node joining two values lazily — and a test that cares *which* used to say so by
+arranging for an operation to produce it:
 
 ```
-let r = "Hello, " +++ "rope world!";   →   let r = rope_str("Hello, ", "rope world!");
-let name = "Ad" +++ "a";                   let name = heap_str("Ada");
-let short = "hi";                          let short = inline_str("hi").value_or("");
+a join of two literals, for a rope      →   let r = rope_str("Hello, ", "rope world!");
+a join of two literals, for a buffer            let name = heap_str("Ada");
+let short = "hi";                               let short = inline_str("hi").value_or("");
 ```
 
-The left column is three different tricks. `"a" +++ "b"` is a concatenation
-written not to concatenate but because concatenation *allocates*, so the result
-is a rope — or a buffer, depending which you were after. The bare literal is
+The left column is three different tricks. A join is written not to join but
+because joining *allocates*, so the result is a rope — or a buffer, depending
+which you were after. The bare literal is
 inline because it is short enough, which the reader has to know. None of the
 three lines says what it is for, and the only way to find out is to read the
 comment above it and trust it.
 
 ### Why the trick is worse than verbose
 
-It reads as something it is not. `"Ad" +++ "a"` is, on its face, a pointless
-concatenation — the kind of line a reader simplifies to `"Ada"` on sight. That is
+It reads as something it is not. A join of `"Ad"` and `"a"` is, on its face, a
+pointless concatenation — the kind of line a reader simplifies to `"Ada"` on sight. That is
 not a hypothetical: constant folding did exactly that, correctly, and voided the
 subject of twenty-eight cases at once. Every one still passed, because what they
 asserted was the content, and only the representation had changed — so the suite
@@ -549,12 +549,12 @@ it is for, because the call *is* the request; there is nothing left to infer.
 
 | Want | Trick it replaces | Says it |
 |---|---|---|
-| a rope | `a +++ b` on two literals | `rope_str(a, b)` |
-| a heap buffer | `"Ad" +++ "a"`, `reverse(reverse(s))` | `heap_str(s)` |
+| a rope | a join of two literals | `rope_str(a, b)` |
+| a heap buffer | a join of two literals, `reverse(reverse(s))` | `heap_str(s)` |
 | an inline value | a literal short enough to fit | `inline_str(s)` |
 | a run-time `str` an optimizer will not fold | a `let` with a type annotation | any of the three above |
 
-`rope_str` earns its keep over `+++` twice over: `+++` hands the other operand
+`rope_str` earns its keep over a join twice over: a join hands the other operand
 straight back when one side is empty, so it cannot promise a node at all, and it
 is subject to constant folding, so it cannot promise a run-time anything.
 

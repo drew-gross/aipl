@@ -467,7 +467,6 @@ fn items() -> Production<AiplTok, Ast>[] {
     // mirrors. Order is immaterial: the lexer already took the longest munch,
     // so each spelling is one token.
     let operator: Rule<AiplTok> = OneOf([
-        Lit("+++"),
         Lit("=="),
         Lit("!="),
         Lit("<="),
@@ -1046,7 +1045,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
             Prec { power: 3, right: false, ops: ["==", "!="] },
             Prec { power: 4, right: false, ops: [".."] },
             Prec { power: 5, right: false, ops: ["<", ">", "<=", ">="] },
-            Prec { power: 6, right: false, ops: ["+", "+++", "-"] },
+            Prec { power: 6, right: false, ops: ["+", "-"] },
             Prec { power: 7, right: false, ops: ["*", "/", "%"] },
         ],
     );
@@ -1242,7 +1241,6 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     // set: `-` and `!` are unary too, and a value has no operand to tell which
     // spelling was meant.
     let op_value: Rule<AiplTok> = OneOf([
-        Lit("+++"),
         Lit("=="),
         Lit("!="),
         Lit("<="),
@@ -1960,7 +1958,7 @@ fn template_slots(toks: str[]) -> str[] {
 # the segment in front of it (stopping at the shorter side, which is `exprs`),
 # and the one segment left over is the tail the fold starts from.
 #
-# Right-associated — `(s0 +++ i0) +++ ((s1 +++ i1) +++ (.. +++ sN))` — because
+# Right-associated — `concat(concat(s0, i0), concat(concat(s1, i1), .. sN))` — because
 # that is the tree the parser's right-recursive `template_rest` produces, and
 # the concat chain has to agree with it.
 fn template_chain(segs: str[], exprs: Expr[], sp: Span) -> Expr {

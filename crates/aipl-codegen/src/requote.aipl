@@ -10,7 +10,6 @@
 import {
     all,
     any,
-    concat as +++,
     contains,
     count_if,
     ends_with,
@@ -177,7 +176,7 @@ pub fn requote(self: str) -> str {
         cost: single_cost(value, '`'),
         block: false,
         foreign: quoted,
-        text: "`" +++ encode(value, '`') +++ "`",
+        text: ["`", encode(value, '`'), "`"].join(),
     });
     if (value.block_ok('"')) {
         set best = best.better(Spelling {
@@ -192,7 +191,7 @@ pub fn requote(self: str) -> str {
             cost: value.count_if(|c| c == '{' || c == '}'),
             block: true,
             foreign: !(!quoted && block),
-            text: "```" +++ brace_escaped(value) +++ "```",
+            text: ["```", brace_escaped(value), "```"].join(),
         });
     };
     best.text
@@ -237,7 +236,7 @@ pub fn requote(self: str) -> str {
 
     // A raw template holds a backtick verbatim, so it is where a value with
     // both quotes and backticks goes.
-    assert(requote(`"\\"\`b\`\\""`) == "```" +++ ```"`b`"``` +++ "```");
+    assert(requote(`"\\"\`b\`\\""`) == ["```", ```"`b`"```, "```"].join());
 
     // A block whose value holds a newline stays as written; so does a
     // single-line literal with a newline escape, save for the `"`/`` ` `` swap.
@@ -403,7 +402,7 @@ pub fn retemplate(raw: bool, segs: str[], interps: str[]) -> str {
     assert(retemplate(true, ["""\{a\} """, ""], ["x"]) == """`\{a\} {x}`""");
     // A raw segment with a backslash or backtick would need escapes: stays raw.
     assert(retemplate(true, ["""C:\dir """, ""], ["x"]) == """```C:\dir {x}```""");
-    assert(retemplate(true, ["`code` ", ""], ["x"]) == "```" +++ "`code` {x}" +++ "```");
+    assert(retemplate(true, ["`code` ", ""], ["x"]) == ["```", "`code` {x}", "```"].join());
 
     // A single segment whose escapes are all backslashes goes raw and sheds
     // them; one with a control-character or backtick escape has nowhere to
@@ -513,7 +512,8 @@ fn join_template(raw: bool, segs: str[], interps: str[]) -> str {
         if (0 < i) { set out.extend(`\{{interps[i - 1].value_or("")}\}`); };
         set out.extend(seg);
     }
-    out +++ delim
+    set out.extend(delim);
+    out
 }.test({
     assert(join_template(false, ["a", "b"], ["x"]) == "`a{x}b`");
     assert(join_template(true, ["", ""], ["x"]) == "```{x}```");

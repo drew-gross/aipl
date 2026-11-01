@@ -28,7 +28,6 @@ pub fn is_operator_name(self: str) -> bool { self.operator_named_forms().is_none
     assert("!".is_operator_name());
     assert("++".is_operator_name());
     assert("--".is_operator_name());
-    assert("+++".is_operator_name());
     assert("+=".is_operator_name());
     assert("-=".is_operator_name());
     assert("*=".is_operator_name());
@@ -40,9 +39,8 @@ pub fn is_operator_name(self: str) -> bool { self.operator_named_forms().is_none
     assert(!"".is_operator_name());
     assert(!"=".is_operator_name()); // a single `=` is not an operator
     assert(!"%=".is_operator_name()); // no compound form for `%`
-    assert(!"+++=".is_operator_name()); // nor for `+++`
     assert(!"&".is_operator_name()); // single, not `&&`
-    assert(!"++++".is_operator_name()); // four, not `+++`
+    assert(!"+++".is_operator_name()); // three, not `++`
     assert(!"---".is_operator_name()); // three, not `--`
     assert(!"and".is_operator_name());
 }).performance({

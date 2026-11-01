@@ -1649,7 +1649,7 @@ pub mod ast {
     /// a spelling still needs an operation before resolution has happened.
     ///
     /// Variants name the **builtin** an operator resolves to, never the spelling
-    /// a source file imported it as — `Concat`, not `+++`. Which alias a file
+    /// a source file imported it as — `Eq`, not `==`. Which alias a file
     /// writes is a property of its import list (`OPERATOR_BUILTINS`); after
     /// import resolution nothing downstream can tell, because there is no
     /// operator left to tell about.
@@ -1659,9 +1659,9 @@ pub mod ast {
     /// which is why [`binop_for_builtin`] deliberately does not answer for the
     /// arithmetic impls: one opcode cannot distinguish them.
     ///
-    /// This was a bare `char` with a private encoding (`'E'` for `==`, `'C'` for
-    /// `+++`), which two passes independently got wrong by testing `'+'` — the
-    /// opcode for addition — when they meant concatenation. Nothing caught it:
+    /// This was a bare `char` with a private encoding (`'E'` for `==`), which two
+    /// passes independently got wrong by testing `'+'` — the opcode for addition —
+    /// when they meant another operator. Nothing caught it:
     /// every `char` is a valid pattern, so a wrong one is a match arm that
     /// silently never fires. The enum makes those matches exhaustive instead.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1692,8 +1692,6 @@ pub mod ast {
         And,
         /// `logical_or`.
         Or,
-        /// `concat`.
-        Concat,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2659,7 +2657,7 @@ const OPERATOR_BUILTINS: &[(&str, &str, Callee)] = &[
     // resolution an operator use is an ordinary call**, and no pass downstream of
     // the loader has to know an operator was involved. These canonicals used to be
     // the operator spelling itself — a *marker* rather than a callable name — which
-    // is what forced the loader to lower a bare `concat(a, b)` back into a
+    // is what forced the loader to lower a bare `equal(a, b)` back into a
     // primitive node so the call and the operator stayed one program. With a real
     // canonical both spellings simply resolve to the same callee and that special
     // case is gone.
@@ -2672,14 +2670,13 @@ const OPERATOR_BUILTINS: &[(&str, &str, Callee)] = &[
     ("logical_and", "&&", Callee::LogicalAnd),
     ("logical_or", "||", Callee::LogicalOr),
     ("logical_not", "!", Callee::LogicalNot),
-    ("concat", "+++", Callee::Concat),
     ("saturating_divide", "/", Callee::SaturatingDivide),
     ("saturating_remainder", "%", Callee::SaturatingRemainder),
 ];
 
 /// The single [`BinOp`] a canonical `__builtin_*` impl performs, for the
 /// operators that have exactly one — the comparisons, the logical pair,
-/// concatenation, and saturating divide/remainder.
+/// and saturating divide/remainder.
 ///
 /// This is the one place a resolved operator call is turned back into an opcode,
 /// and it is deliberately *not* total over the operator builtins: the arithmetic
@@ -2699,7 +2696,6 @@ pub fn binop_for_builtin(canonical: &Callee) -> Option<BinOp> {
         Callee::GreaterThanOrEqual => BinOp::Ge,
         Callee::LogicalAnd => BinOp::And,
         Callee::LogicalOr => BinOp::Or,
-        Callee::Concat => BinOp::Concat,
         Callee::SaturatingDivide => BinOp::Div,
         Callee::SaturatingRemainder => BinOp::Rem,
         _ => return None,
@@ -2733,30 +2729,9 @@ pub fn inherit_set_order(ret: Type, params: &[Type], args: &[Type]) -> Type {
     }
 }
 
-/// The right operand of `name +++ r` — the shape `set a = a +++ b;` takes, where
-/// the append can go into `a`'s own buffer instead of building a fresh string.
-///
-/// Two passes have to agree on this shape exactly: mono decides whether the
-/// binding is `exclusive`, and codegen emits the in-place append. Either one
-/// alone leaves the optimization off. They were two hand-written matches once,
-/// written against the old `char` opcode encoding and naming *addition* rather
-/// than concatenation — so neither ever fired, and nothing noticed. One function,
-/// asked twice, cannot disagree with itself.
-pub fn self_append<'a>(value: &'a ast::Expr, name: &str) -> Option<&'a ast::Expr> {
-    let ast::ExprKind::Call(f, args, _) = &value.kind else {
-        return None;
-    };
-    let [l, r] = args.as_slice() else {
-        return None;
-    };
-    (binop_for_builtin(f) == Some(BinOp::Concat)
-        && matches!(&l.kind, ast::ExprKind::Ident(n) if n == name))
-    .then_some(r)
-}
-
 /// How many operands the canonical `__builtin_*` impl of an operator takes, or
 /// `None` when the name is not one. Used to check the arity of a bare
-/// operator-builtin *call* (`concat(a, b)`), which no signature covers because
+/// operator-builtin *call* (`equal(a, b)`), which no signature covers because
 /// these are intrinsified rather than emitted.
 pub fn operator_arity(canonical: &Callee) -> Option<usize> {
     match canonical {
@@ -3090,7 +3065,6 @@ pub fn binop_spelling(op: BinOp) -> &'static str {
         BinOp::Ge => ">=",
         BinOp::And => "&&",
         BinOp::Or => "||",
-        BinOp::Concat => "+++",
     }
 }
 
@@ -3371,7 +3345,7 @@ fn __builtin_trim(self: str) -> str { self }
 # A fresh refcounted buffer, at every length — so it allocates even where the
 # content would have fit inline, which is the request.
 fn __builtin_heap_str(self: str) -> str { self }
-# A rope node over the two, built even when an operand is empty (where `+++`
+# A rope node over the two, built even when an operand is empty (where a template
 # hands the other side back instead, and so cannot promise a rope).
 fn __builtin_rope_str(self: str, other: str) -> str { self }
 # Internal: `inline_str`'s unchecked half. Content past the inline capacity has
@@ -3573,8 +3547,7 @@ fn __builtin_push<T: any>(mut self: T[], x: T) {}
 # a `str` or a `char[]` source). A builtin rather than an AIPL loop over `push`
 # so it can size the destination once: growing by `other.len()` in a single
 # reserve turns N reallocations into at most one, and the elements move as one
-# `memcpy` plus one retain pass. The `extend_longhand` lint sends the rebuild
-# spelling, `set s = s +++ t;`, here.
+# `memcpy` plus one retain pass.
 #
 # The source is variadic in shape, like `starts_with`'s pattern: the sequence,
 # one element, or an *optional* element — `set xs.extend(maybe)` appends what
@@ -3709,7 +3682,7 @@ pub fn with_reduction_signatures(mut items: Vec<ast::Item>) -> Vec<ast::Item> {
 }
 
 /// The *concatenated-string* representation of `str`: an internal, mono-only
-/// pseudo-type that flows out of `a + b` (string concat) to mark a value built as
+/// pseudo-type that flows out of `rope_str` to mark a value built as
 /// a lazy concat node (see `aipl_concat_lazy`). To the source author it is just a
 /// `str` — it never appears in source and the standalone checker never sees it.
 /// Its only role is in monomorphization: passing a concat-typed value to a

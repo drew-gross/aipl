@@ -1438,7 +1438,7 @@ pub(crate) extern "C" fn aipl_str_sort(out: *mut Str, s: *const Str) {
 // The `*_str` builtins, which hand back the content of their argument in one
 // named representation instead of whichever one it happens to arrive in. They
 // exist because every *other* way to reach a representation is a side effect of
-// some operation chosen for a different reason — `"a" +++ "b"` for a rope,
+// some operation chosen for a different reason — a template for a rope,
 // `reverse(reverse(s))` for a buffer, a short literal for an inline value — and
 // a reader cannot tell such a line from one that means what it says. See
 // DESIGN_PRINCIPLES.md's "Just say what you want".

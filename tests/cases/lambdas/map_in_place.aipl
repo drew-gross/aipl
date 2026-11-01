@@ -10,7 +10,6 @@
 
 import {
     Measurement,
-    concat as +++,
     equal as ==,
     map,
     measure,
@@ -29,7 +28,7 @@ fn doubled(xs: i64[]) -> i64[] { xs.map(|x| x * 2) }.test({
     // Heap (str) elements, T == U: the old string in each slot is dropped and
     // the new one stored in place. A leak or double-free would unbalance the
     // allocation/deallocation counts, which the leak gate refuses.
-    assert(["a", "b", "c"].map(|s| s +++ "!") == ["a!", "b!", "c!"]);
+    assert(["a", "b", "c"].map(|s| `{s}!`) == ["a!", "b!", "c!"]);
 
     // A captured variable, in place.
     let k = 100;

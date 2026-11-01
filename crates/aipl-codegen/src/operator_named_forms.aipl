@@ -31,7 +31,6 @@ pub fn operator_named_forms(self: str) -> str[] {
         "&&" => ["logical_and"],
         "||" => ["logical_or"],
         "!" => ["logical_not"],
-        "+++" => ["concat"],
         "/" => ["saturating_divide"],
         "%" => ["saturating_remainder"],
         _ => [],
@@ -43,7 +42,6 @@ pub fn operator_named_forms(self: str) -> str[] {
     assert("--".operator_named_forms() == ["wrapping_decrement", "saturating_decrement"]);
     // One flavor, still listed: every operator is imported the same way.
     assert("==".operator_named_forms() == ["equal"]);
-    assert("+++".operator_named_forms() == ["concat"]);
     assert("/".operator_named_forms() == ["saturating_divide"]);
     assert("%".operator_named_forms() == ["saturating_remainder"]);
     assert("/=".operator_named_forms() == ["saturating_divide_assign"]);

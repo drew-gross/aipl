@@ -5,7 +5,7 @@
 # loop past the 22-byte inline capacity, where the buffer is grown under itself
 # instead. Without the optimization each of the four appends builds a fresh string.
 
-import { concat as +++, equal as ==, extend, measure } from builtins;
+import { equal as ==, extend, measure } from builtins;
 
 fn build() -> str {
     mut s = "";
@@ -18,20 +18,4 @@ fn build() -> str {
     assert(build() == "abcd");
 }).performance({
     assert(measure("four appends", 0, |_| build()).allocations == 0);
-})
-
-// The rebuild spelling, `set s = s +++ ..`, reaches the same in-place append
-// when the binding is exclusive — it is what `extend` on a `str` is compiled
-// as. The `extend_longhand` lint steers to `extend` (which also appends when the
-// binding *is* aliased, where this form copies), so the shape is kept here under
-// `#[allow]` only to show the two still agree.
-fn rebuilt() -> str {
-    mut s = "";
-    set s = s +++ "a"; #[allow]
-    set s = s +++ "b"; #[allow]
-    s
-}.test({
-    assert(rebuilt() == "ab");
-}).performance({
-    assert(measure("rebuild spelling", 0, |_| rebuilt()).allocations == 0);
 })

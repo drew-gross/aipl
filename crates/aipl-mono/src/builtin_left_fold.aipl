@@ -5,7 +5,7 @@
 # `left_fold` is only for this file's own tests, which read exactly like user
 # code.
 
-import { concat as +++, equal as ==, filter, logical_not as !, wrapping_add as + } from builtins;
+import { equal as ==, filter, logical_not as !, wrapping_add as + } from builtins;
 
 # Combine the elements left to right, starting from `init`: for `[a, b, c]`,
 # `f(f(f(init, a), b), c)` — `xs.left_fold(0, |acc, x| acc + x)`.
@@ -31,7 +31,7 @@ pub fn left_fold<T: any, A: any>(self: T[], init: A, f: (A, T) -> A) -> A {
     assert([1, 2, 3].left_fold(10, |acc, x| acc + x) == 16); // from a nonzero init
     assert(left_fold([2, 3], 1, |acc, x| acc + x) == 6); // free-call form
     // Left-associative: the order of combination is visible in a string.
-    assert(["a", "b", "c"].left_fold("", |acc, s| acc +++ s) == "abc");
+    assert(["a", "b", "c"].left_fold("", |acc, s| `{acc}{s}`) == "abc");
     // The accumulator type need not match the element type.
     assert(['x', 'y'].left_fold(0, |acc, c| acc + 1) == 2);
     assert("hey".left_fold(0, |acc, c| acc + 1) == 3); // a str receiver folds its chars

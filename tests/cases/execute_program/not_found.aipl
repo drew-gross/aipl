@@ -1,12 +1,12 @@
 # A launch failure (program not found) is `err(message)` — the only case
 # that's `err` rather than `ok(ExecResult)`.
 
-import { concat as +++, execute_program, print } from builtins;
+import { execute_program, print } from builtins;
 
 fn main() !prints !execute_program {
     match (execute_program("no_such_binary_xyz_123", args=["a", "b"])) {
         ok(..) => print("ok"),
-        err(e) => print("err:[" +++ e +++ "]"),
+        err(e) => print(`err:[{e}]`),
     };
 }
 --- stdout ---

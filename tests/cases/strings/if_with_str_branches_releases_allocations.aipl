@@ -1,8 +1,8 @@
 # Each branch allocates a fresh string; the merge value must hold exactly one ref
 # so the outer scope can dec safely.
 #
-# `heap_str` is what makes that true. The branches were `"left" +++ ""` and
-# `"right" +++ ""`, which allocate *nothing*: `+++` hands the other operand
+# `heap_str` is what makes that true. The branches were `` `left{""}` `` and
+# `` `right{""}` ``, which allocate *nothing*: a join hands the other operand
 # straight back when one side is empty, so neither branch produced an owned value
 # and the case had stopped exercising the merge it is named for.
 

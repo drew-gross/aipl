@@ -3,7 +3,7 @@
 # (matched by equality). A `str` is matched as its `char[]` view, so its element
 # binders are `char`. Fixed length — the `_` arm covers every other length.
 
-import { concat as +++, print, to_str, wrapping_add as +, wrapping_sub as - } from builtins;
+import { print, to_str, wrapping_add as +, wrapping_sub as - } from builtins;
 
 // Destructure a str: an empty string, a single char, a leading `-` then one
 // more char, any other two chars, else the default. Mixes a string-literal arm
@@ -12,9 +12,9 @@ fn classify(s: str) -> str {
     match (s) {
         "hi" => "greeting",
         [] => "empty",
-        [c] => "one " +++ c.to_str(),
-        ['-', d] => "neg " +++ d.to_str(),
-        [a, b] => "two " +++ a.to_str() +++ b.to_str(),
+        [c] => `one {c}`,
+        ['-', d] => `neg {d}`,
+        [a, b] => `two {a}{b}`,
         _ => "many",
     }
 }

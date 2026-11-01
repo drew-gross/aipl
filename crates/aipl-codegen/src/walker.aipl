@@ -500,7 +500,7 @@ fn fmt_kind(k: AiplTok) -> FmtKind {
         StrLit(_, _) => StrTok,
         CharTok(_) => CharTok,
         EqEq | Ne | Arrow | FatArrow | AndAnd | OrOr | Pipe | DotDot => Op,
-        PlusPlusPlus | PlusPlus | MinusMinus | Eq | Lt | Le | Gt | Ge | Bang => Op,
+        PlusPlus | MinusMinus | Eq | Lt | Le | Gt | Ge | Bang => Op,
         Plus | Minus | Star | Slash | Percent => Op,
         PlusEq | MinusEq | StarEq | SlashEq => Op,
         Period | Comma | Colon | ColonColon | Semi | Question | Hash | Dollar => Punct,
@@ -1986,7 +1986,7 @@ fn binop_tail(self: W, acc0: Doc[]) -> WDocs!FmtError {
 }
 
 fn is_binop(t: str) -> bool {
-    t == "+" || t == "+++" || t == "-" || t == "*" || t == "/" || t == "%" || t == "==" || t == "!=" || t == "<" || t == ">" || t == "<=" || t == ">=" || t == "&&" || t == "||"
+    t == "+" || t == "-" || t == "*" || t == "/" || t == "%" || t == "==" || t == "!=" || t == "<" || t == ">" || t == "<=" || t == ">=" || t == "&&" || t == "||"
 }
 
 fn unary(self: W) -> WDoc!FmtError {

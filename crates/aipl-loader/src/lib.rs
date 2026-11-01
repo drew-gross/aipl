@@ -752,11 +752,11 @@ impl Loader {
                     // to a call to that impl — codegen intrinsifies it. Different
                     // builtins on the same operator (`wrapping_add`/`saturating_add`
                     // → `+`) thus dispatch to different impls, spelling-agnostically.
-                    // Imported bare (`import { concat }`), the name binds to the
+                    // Imported bare (`import { equal }`), the name binds to the
                     // same canonical as the aliased form, so it is callable as an
-                    // ordinary function: `concat(a, b)`. That does *not* make the
-                    // operator itself available — `a +++ b` still needs
-                    // `concat as +++`, because gating looks up the operator's
+                    // ordinary function: `equal(a, b)`. That does *not* make the
+                    // operator itself available — `a == b` still needs
+                    // `equal as ==`, because gating looks up the operator's
                     // spelling in the view and a bare import adds only its name.
                     canonical_impl.to_string()
                 } else if let Some(builtin) = Callee::importable(&n.name) {

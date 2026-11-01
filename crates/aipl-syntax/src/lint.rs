@@ -15,7 +15,6 @@ mod arm_block_value;
 mod char_set_literal;
 mod compound_assign;
 mod eta_lambda;
-mod extend_longhand;
 mod field_init_shorthand;
 mod is_empty_longhand;
 mod len_gt_zero;
@@ -35,7 +34,6 @@ use self::arm_block_value::arm_block_value;
 use self::char_set_literal::char_set_literal;
 use self::compound_assign::{compound_assign, matching_compound};
 use self::eta_lambda::{eta_lambda, Forwarding};
-use self::extend_longhand::{extend_longhand, extend_names};
 use self::field_init_shorthand::field_init_shorthand;
 use self::is_empty_longhand::{empty_names, is_empty_longhand};
 use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
@@ -117,13 +115,6 @@ pub fn check(
         each_expr(program, &mut |e| {
             compound_assign(e, src, &compound, &steps, &mut hits)
         });
-    }
-    // The same accumulate shape for `+++`, whose in-place form is a method
-    // rather than a compound operator. Disjoint from the above by operator, and
-    // only where `+++` is the builtin `concat` — see `extend_names`.
-    let extends = extend_names(program);
-    if !extends.is_empty() {
-        each_expr(program, &mut |e| extend_longhand(e, &extends, &mut hits));
     }
     // Only for the comparisons this file's `<`/`>` really are — see
     // `len_zero_cmp`, which also says whether `is_nonempty` needs importing.

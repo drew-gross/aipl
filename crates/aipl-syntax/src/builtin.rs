@@ -434,12 +434,6 @@ const BUILTINS: &[Builtin] = &[
         "fn logical_not(a: bool) -> bool",
         "Whether `a` is false. Import it as the operator: `logical_not as !`.",
     ),
-    Builtin::described(
-        Callee::Concat,
-        "fn concat<T: any>(a: T[], b: T[]) -> T[]",
-        "The elements of `a` followed by those of `b`. Also joins two `str`s. Import it as \
-         the operator: `concat as +++`.",
-    ),
 ];
 
 #[cfg(test)]

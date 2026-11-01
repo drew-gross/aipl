@@ -1,7 +1,6 @@
 # AIPL's string-escape decoder.
 
 import {
-    concat as +++,
     equal as ==,
     extend,
     less_than_or_equal as <=,
@@ -53,7 +52,8 @@ pub fn unescape(self: str) -> str {
             set run_start = i + 2;
         };
     }
-    out +++ self[run_start..]
+    set out.extend(self[run_start..]);
+    out
 }.test({
     // No escapes: the input is returned verbatim (the common case, one copy).
     assert(unescape("") == "");
@@ -99,7 +99,8 @@ pub fn unescape_braces(self: str) -> str {
             set run_start = i + 1;
         };
     }
-    out +++ self[run_start..]
+    set out.extend(self[run_start..]);
+    out
 }.test({
     assert(unescape_braces("") == "");
     assert(unescape_braces("plain") == "plain");

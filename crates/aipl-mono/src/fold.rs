@@ -19,25 +19,16 @@
 //!   (`__builtin_wrapping_add` etc.) with two `Num` arguments — only the
 //!   `__builtin_*` names, since an operator aliased to a *user* function is an
 //!   ordinary call
-//! - concatenation of two `Str` literals, written either way: `"a" +++ "b"` and
-//!   `concat("a", "b")` are one call after import resolution
 //! - a `match` whose scrutinee is a `str`, `char` or integer literal: the first
 //!   arm whose pattern accepts it, and nothing else ([`fold_match`]). The
 //!   scrutinee may be a `let`-bound `str` literal used for nothing but the
 //!   `match` — the shape an inlined call leaves
 //!
-//! Only a concat whose operands are literals *in place* folds: this pass does
-//! not propagate a `str` literal through a binding (see [`propagatable`]).
-//! A plain `let s = "a"; s +++ "b"` does still fold, but one step earlier —
-//! [`crate::inline_single_use_bindings`] substitutes a single-use binding back
-//! into its use site, which is exactly its job.
-//!
-//! So a `+++` between two literals is **not** a way to obtain a run-time concat,
-//! and nothing in the corpus should use it as one. The `rope_str` builtin is how
-//! a program asks for that representation by name; `heap_str` and `inline_str`
-//! are its siblings. See `tests/cases/strings/named_representations.aipl`, and
-//! DESIGN_PRINCIPLES.md's "Just say what you want" for why naming the result
-//! beats arranging for an optimization to miss.
+//! The `rope_str` builtin is how a program asks for a run-time concat by name;
+//! `heap_str` and `inline_str` are its siblings. See
+//! `tests/cases/strings/named_representations.aipl`, and DESIGN_PRINCIPLES.md's
+//! "Just say what you want" for why naming the result beats arranging for an
+//! optimization to miss.
 //!
 //! **A template literal does not fold**, even when it is constant throughout.
 //! It lowers to a concat chain over *rendered* pieces (`__template_interp`), and
@@ -496,16 +487,6 @@ fn fold_binop(l: &Expr, op: BinOp, r: &Expr) -> Option<ExprKind> {
                 BinOp::Ne => ExprKind::Bool(a != b),
                 _ => return None,
             })
-        }
-        // Two `str` literals concatenate to one. At run time this is an
-        // allocation — codegen builds a lazy concat node holding both sides —
-        // so the fold trades two literals and a heap value for a single
-        // literal. Only `Str` on both sides: `+++` also accepts a `char[]`
-        // (same representation as `str`, see `is_char_array`), but an array
-        // literal of chars folded into a `Str` would change the expression's
-        // *type* from `char[]` to `str`, which is not folding.
-        (ExprKind::Str(a), ExprKind::Str(b)) if op == BinOp::Concat => {
-            Some(ExprKind::Str(format!("{a}{b}")))
         }
         // With both sides literal, `&&`/`||` short-circuiting is unobservable.
         (ExprKind::Bool(a), ExprKind::Bool(b)) => Some(match op {

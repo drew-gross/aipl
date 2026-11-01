@@ -134,9 +134,8 @@ fn call_values_marshals_str_return() {
     // "> 7 bytes" against a threshold that had become 22 — the bug was invisible,
     // because an inline argument owns no allocation to free twice.
     let src = "\
-import { concat as +++} from builtins;
 pub fn id(s: str) -> str { s }
-pub fn shout(s: str) -> str { s +++ \" is loud!\" }";
+pub fn shout(s: str) -> str { `{s} is loud!` }";
     let e = Engine::compile(src).unwrap();
     use aipl::FfiValue::Str;
     // Inline arg, inline return.
@@ -218,12 +217,11 @@ fn call_values_marshals_struct_return() {
     // `find_trailing_whitespace` to report a `Span`. Fields come back in
     // declaration order, each tagged with its name.
     let src = "\
-import { concat as +++} from builtins;
 struct Span { start: i64, end: i64 }
 struct Tagged { name: str, ok: bool, code: char }
 pub fn span(a: i64, b: i64) -> Span { start: a, end: b }
 pub fn tagged(suffix: str, present: bool) -> Tagged {
-    name: \"item-\" +++ suffix, ok: present, code: 'Z'
+    name: `item-{suffix}`, ok: present, code: 'Z'
 }";
     let e = Engine::compile(src).unwrap();
     use aipl::FfiValue::{Int, Str, Struct};
@@ -390,11 +388,11 @@ fn call_values_rejects_unmarshalable_return() {
 /// A variant whose cases span a nullary case and scalar/`str`/`char` payloads —
 /// the shape the AIPL lexer's token type (`AiplTok`) uses.
 const VARIANT_SRC: &str = "\
-import { equal as ==, concat as +++} from builtins;
+import { equal as == } from builtins;
 variant Token = Eof | Ident(str) | Count(i64) | Mark(char)
 pub fn classify(n: i64) -> Token {
     if (n == 0) { Eof }
-    else { if (n == 1) { Ident(\"a long ident value\" +++ \"!\") }
+    else { if (n == 1) { Ident(\"a long ident value!\") }
     else { if (n == 2) { Count(42) }
     else { Mark('Z') } } }
 }

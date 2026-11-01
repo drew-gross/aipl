@@ -512,6 +512,9 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  extend with a 1-char str literal should be push with a char literal
+  go through the lint (and fusion) conditions and comment all of them
+  merged-lint/fusion technique that works as a lint when a structure shows up in source and as a fusion when it shows up after inlining
   maybe do all filling at the end? Seems potentially faster (except that filling only happend on lint hits which a rare)
   empty else block should disappear, empty if block should invert the condition
   loop pipeline lints should work when initial array is not empty

@@ -9,7 +9,6 @@
 # temporary does, and one read again afterwards costs the callee a copy.
 
 import {
-    concat as +++,
     equal as ==,
     extend,
     greater_than as >,
@@ -122,7 +121,7 @@ fn extended_then_read(n: i64) -> u64 {
     p.extended().len() + p.len()
 }
 
-fn stretch(s: str) -> str { s +++ "!" }
+fn stretch(s: str) -> str { `{s}!` }
 
 fn widen(s: #{i64}) -> #{i64} { s.union(#{7}) }
 

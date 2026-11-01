@@ -2,7 +2,7 @@
 # per-variant drop releases only the active case's fields. Used in an array, so
 # a leak or double-free would unbalance the allocation counts.
 
-import { concat as +++, equal as ==, to_str } from builtins;
+import { equal as ==, to_str } from builtins;
 
 variant Json = Null | Num(i64) | Text(str) | Pair(str, i64)
 
@@ -11,7 +11,7 @@ fn describe(j: Json) -> str {
         Null => "null",
         Num(n) => to_str(n),
         Text(s) => s,
-        Pair(k, v) => k +++ "=" +++ to_str(v),
+        Pair(k, v) => `{k}={v}`,
     }
 }.test({
     assert(describe(Num(1)) == "1");

@@ -128,8 +128,8 @@ pub fn aipl_tmlanguage() -> str {
     assert(json.contains("""\\btrue\\b|\\bfalse\\b|\\bnone\\b"""));
 
     // The operator run stays longest-first, which is what keeps the alternation
-    // maximal munch: `+++` ahead of `++`, `==` ahead of `=`.
-    assert(json.contains("""\\+\\+\\+|==|!="""));
+    // maximal munch: `==` ahead of `=`.
+    assert(json.contains("==|!="));
 
     // The three string forms are regions, and the triple-quoted one is listed
     // before the single — the same ordering the lexer rules carry.

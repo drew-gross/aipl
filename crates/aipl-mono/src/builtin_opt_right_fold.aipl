@@ -17,7 +17,6 @@
 # across scopes.
 
 import {
-    concat as +++,
     equal as ==,
     filter,
     greater_than as >,
@@ -71,7 +70,7 @@ pub fn opt_right_fold<T: any, A: any>(self: T[], init: A, f: (T, A) -> A?) -> A?
     assert([1, 2].filter(is_big).opt_right_fold(7, add) == some(7));
 
     // Direction is visible in a string, and mirrors `opt_left_fold`.
-    assert(["a", "b", "c"].opt_right_fold("", |s, acc| some(acc +++ s)) == some("cba"));
+    assert(["a", "b", "c"].opt_right_fold("", |s, acc| some(`{acc}{s}`)) == some("cba"));
 
     // The first `none` — counting from the *right* — ends it.
     assert(

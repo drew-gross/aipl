@@ -16,7 +16,6 @@
 
 import {
     any,
-    concat as +++,
     contains,
     equal as ==,
     greater_than as >,
@@ -268,11 +267,11 @@ fn col_after(col: u64, text: str) -> u64 {
 }
 
 # A line break landing at indentation `sp`: a newline plus `sp` spaces.
-fn newline_str(sp: u64) -> str { "\n" +++ " ".repeat(sp) }
+fn newline_str(sp: u64) -> str { `\n{" ".repeat(sp)}` }
 
 # A blank-line break at indentation `sp`: two newlines plus `sp` spaces (the
 # blank line's own trailing spaces are removed by `cleanup`).
-fn blank_str(sp: u64) -> str { "\n\n" +++ " ".repeat(sp) }
+fn blank_str(sp: u64) -> str { `\n\n{" ".repeat(sp)}` }
 
 # Strip trailing whitespace from every line, and end a multi-line result with a
 # newline — a single line is a fragment, anything longer is a block. The whole
@@ -281,7 +280,7 @@ fn blank_str(sp: u64) -> str { "\n\n" +++ " ".repeat(sp) }
 fn cleanup(out: str) -> str {
     let lines = out.trim_end_while(is_space).split("\n")$trim_end_while(is_space);
     let body = lines.join(sep="\n");
-    if (lines.len() > 1) { body +++ "\n" } else { body }
+    if (lines.len() > 1) { `{body}\n` } else { body }
 }.test({
     // Plain text is emitted verbatim.
     assert(Text("hello").print(100) == "hello");

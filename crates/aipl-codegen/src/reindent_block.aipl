@@ -6,7 +6,6 @@
 # Rust caller holds, and matching the unsigned counts `indent`/`repeat` take.
 
 import {
-    concat as +++,
     drop_first,
     drop_last,
     equal as ==,
@@ -70,7 +69,8 @@ pub fn reindent_block(self: str, base: u64) -> str {
         set out.extend("\n");
         set out.extend(body);
     };
-    out +++ "\n" +++ " ".repeat(base) +++ closing
+    set out.extend(`\n{" ".repeat(base)}{closing}`);
+    out
 }.test({
     // Fewer than two lines: nothing to re-lay-out.
     assert("only".reindent_block(0) == "only");

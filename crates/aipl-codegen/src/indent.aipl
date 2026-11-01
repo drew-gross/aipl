@@ -5,7 +5,7 @@
 # fully dedented (its common indent is 0): it *adds* `target` spaces, it does not
 # rebase an existing indent — `reindent_block` dedents first (via `dedent`).
 
-import { concat as +++, equal as ==, is_all_whitespace, join, map, repeat } from builtins;
+import { equal as ==, is_all_whitespace, join, map, repeat } from builtins;
 import { lines } from "./lines.aipl";
 
 # Indents every non-blank line of `self` by `target` spaces, keeping each line's
@@ -21,7 +21,7 @@ pub fn indent(self: str, target: u64) -> str {
     // add trailing whitespace (illegal), and a dedented block emits blanks empty.
     self
         .lines()
-        .map(|line| if (line.is_all_whitespace()) { "" } else { pad +++ line })
+        .map(|line| if (line.is_all_whitespace()) { "" } else { `{pad}{line}` })
         .join(sep="\n")
 }.test({
     // A dedented block is indented by the target, line for line.

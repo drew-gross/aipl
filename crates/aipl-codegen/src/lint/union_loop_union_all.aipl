@@ -16,8 +16,8 @@
 # gives, and it bows out in the same places — the unioned expression may not mention
 # `out` (a fold reading its own accumulator is not a `map`) and may not propagate with
 # `?`. Both operand orders count: set union is commutative *and* its result is a set, so
-# `out.union(x)` and `x.union(out)` accumulate the same set, unlike `concat`, where the
-# order is the whole answer.
+# `out.union(x)` and `x.union(out)` accumulate the same set, unlike an array append, where
+# the order is the whole answer.
 #
 # The shape has to be exactly this, because anything else in the loop is work `union_all`
 # has nowhere to put: the body is one statement, that statement is the assignment, and

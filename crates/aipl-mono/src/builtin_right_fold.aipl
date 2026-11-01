@@ -9,7 +9,6 @@
 # so the `none` arm is dead — it just hands the accumulator back unchanged.
 
 import {
-    concat as +++,
     equal as ==,
     filter,
     greater_than as >,
@@ -55,8 +54,8 @@ pub fn right_fold<T: any, A: any>(self: T[], init: A, f: (T, A) -> A) -> A {
 
     // Right-associative: the order of combination is visible in a string, and is
     // the reverse of what `left_fold` builds.
-    assert(["a", "b", "c"].right_fold("", |s, acc| acc +++ s) == "cba");
-    assert(["a", "b", "c"].right_fold("", |s, acc| s +++ acc) == "abc");
+    assert(["a", "b", "c"].right_fold("", |s, acc| `{acc}{s}`) == "cba");
+    assert(["a", "b", "c"].right_fold("", |s, acc| `{s}{acc}`) == "abc");
     // The accumulator type need not match the element type.
     assert(['x', 'y'].right_fold(0, |c, acc| acc + 1) == 2);
     assert([1, 2, 3].right_fold(0, add) == 6); // a named combiner, no lambda

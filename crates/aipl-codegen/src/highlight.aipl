@@ -145,7 +145,7 @@ pub fn re_escape(s: str) -> str {
     s.map(|ch| if (RE_META.has(ch)) { `\\{ch}` } else { `{ch}` }).join()
 }.test({
     assert(re_escape("fn") == "fn");
-    assert(re_escape("+++") == """\+\+\+""");
+    assert(re_escape("++") == """\+\+""");
     assert(re_escape("#[allow]") == """#\[allow\]""");
     assert(re_escape("(") == """\(""");
     assert(re_escape("}") == """\}""");

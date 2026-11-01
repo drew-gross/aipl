@@ -2,7 +2,7 @@
 # carries an error (`err(e)`). Useful for fallible effects whose only output is
 # success-or-failure.
 
-import { concat as +++, equal as ==, less_than as <, not_equal as !=, print, to_str } from builtins;
+import { equal as ==, less_than as <, not_equal as !=, print, to_str } from builtins;
 
 fn check_positive(n: i64) -> !str { if (n < 0) { err("negative") } else { ok() } }
 
@@ -17,7 +17,7 @@ fn validate(a: i64, b: i64) -> !str {
 fn describe(r: !str) -> str {
     match (r) {
         ok => "valid",
-        err(e) => "invalid: " +++ e,
+        err(e) => `invalid: {e}`,
     }
 }.test({
     assert(describe(validate(1, 2)) == "valid");

@@ -39,8 +39,8 @@ fn mono_fn_names(p: &aipl::mono::MonoProgram) -> Vec<String> {
 
 /// Monomorphize one source, **through the loader** — mono's input is a loaded
 /// program, not a parsed one. An operator is a call to its spelling until the
-/// loader resolves it against the file's imports, so a source using `+++` has to
-/// be loaded for mono to see the concat it names.
+/// loader resolves it against the file's imports, so a source using an operator has
+/// to be loaded for mono to see the call it names.
 fn mono_names(src: &str) -> Vec<String> {
     aipl::install_parser_hooks();
     let prog = aipl::loader::load_program_sources(&[("./main.aipl", src)], DebugOptions::OFF)
@@ -265,15 +265,15 @@ fn generic_owned_param_requires_substituted_heap_type() {
 }
 
 #[test]
-fn concat_arg_makes_distinct_monomorphization() {
-    // A `str + str` value carries the concat-str representation; passing it to a
+fn rope_arg_makes_distinct_monomorphization() {
+    // A `rope_str` value carries the concat-str representation; passing it to a
     // `str` parameter emits a distinct, concat-specialized instance (`$c0`)
     // alongside the plain instance used for a plain-str argument.
     let names = mono_names(
-        "import { concat as +++ } from builtins;
+        "import { rope_str } from builtins;
          fn label(s: str) -> str { s }
          fn main() {
-             let g = \"a\" +++ \"b\";
+             let g = rope_str(\"a\", \"b\");
              label(g);
              label(\"x\");
          }",

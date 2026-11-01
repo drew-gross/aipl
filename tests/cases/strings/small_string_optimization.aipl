@@ -8,26 +8,17 @@
 # counters that have long read 2). Of the four operations here the literal and
 # `trim` stay inline, while the two that *build* a value allocate whatever their
 # own representation needs, short result or not — which is what the
-# `.performance` block on `main` measures: an 88-byte rope node for the `+++`, and
+# `.performance` block on `main` measures: an 88-byte rope node for the template, and
 # an 18-byte buffer for `to_str`.
 
-import {
-    concat as +++,
-    equal as ==,
-    inline_str,
-    measure,
-    print,
-    to_str,
-    trim,
-    value_or,
-} from builtins;
+import { equal as ==, inline_str, measure, print, to_str, trim, value_or } from builtins;
 
 fn main() !prints {
     // `inline_str` rather than a bare `"hi"`: it names the representation the case
-    // is about, and it keeps `greeting` a run-time value, so the `+++` below is a
-    // run-time concat (two string literals would be constant-folded).
+    // is about, and it keeps `greeting` a run-time value, so the template below is a
+    // run-time join (two string literals would be constant-folded).
     let greeting = inline_str("hi").value_or(""); // inline (2 bytes), no allocation
-    let banged = greeting +++ "!"; // a rope node over two inline leaves
+    let banged = `{greeting}!`; // a rope node over two inline leaves
     print(banged);
     print(trim("  ok  ")); // repacked inline -> "ok" (2 bytes), no allocation
     print(to_str(42)); // a fresh buffer -> "42" (2 bytes)
@@ -41,8 +32,8 @@ fn main() !prints {
 
     // The two that build a value allocate whatever their own representation needs,
     // however short the result.
-    assert(measure("concat", greeting, |g| g +++ "!").allocations == 1);
-    assert(measure("concat bytes", greeting, |g| g +++ "!").bytes_allocated == 88);
+    assert(measure("template", greeting, |g| `{g}!`).allocations == 1);
+    assert(measure("template bytes", greeting, |g| `{g}!`).bytes_allocated == 88);
     assert(measure("to_str", 42, to_str).allocations == 1);
     assert(measure("to_str bytes", 42, to_str).bytes_allocated == 18);
 })

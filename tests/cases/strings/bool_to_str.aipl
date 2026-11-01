@@ -1,7 +1,7 @@
 # `to_str` renders a scalar bool; `to_str` renders a bool[] as
 # `[true, false]` (and `[]` when empty). Both return fresh refcounted strings.
 
-import { concat as +++, equal as ==, print, push, to_str, wrapping_add as + } from builtins;
+import { equal as ==, print, push, to_str, wrapping_add as + } from builtins;
 
 fn main() !prints {
     print(to_str(true)); // true
@@ -11,7 +11,7 @@ fn main() !prints {
     print(to_str([true, false, true])); // [true, false, true]
     print(to_str([])); // []
     // Concatenation of two rendered strings.
-    print("flags: " +++ to_str([false, true])); // flags: [false, true]
+    print(`flags: {[false, true]}`); // flags: [false, true]
     mut bs = [true];
     set bs.push(false);
     print(to_str(bs)); // [true, false]

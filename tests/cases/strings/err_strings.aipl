@@ -15,7 +15,7 @@ import { Span, equal as ==, len, print, wrapping_add as + } from builtins;
 // Comparing a str to an integer.
 fn str_eq_with_i64() -> i64 { if ("hi" == 5) { 1 } else { 2 } }
 
-// `+` is integer addition; string concatenation is `+++`.
+// `+` is integer addition; strings are joined with a template.
 fn str_plus_i64() -> i64 { "hi" + 5 }
 
 // `match` on a str takes string literals and `_` — not a constructor pattern —
@@ -82,7 +82,7 @@ error: "==" between str and i64: both sides must be the same type
 16 | fn str_eq_with_i64() -> i64 { if ("hi" == 5) { 1 } else { 2 } }
    |                                   ^^^^^^^^^
 
-error: "+" is integer addition, but this operand is str; use "+++" to concatenate strings
+error: "+" is integer addition, but this operand is str; build a string with a template, `{a}{b}`
   --> ./tests/cases/strings/err_strings.aipl:19:28
    |
 19 | fn str_plus_i64() -> i64 { "hi" + 5 }

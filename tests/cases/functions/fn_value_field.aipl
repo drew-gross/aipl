@@ -4,13 +4,13 @@
 # through it indirectly. A same-named method would take precedence; the field
 # is reached because no `step`/`decorate` function exists.
 
-import { concat as +++, equal as ==, wrapping_add as + } from builtins;
+import { equal as ==, wrapping_add as + } from builtins;
 
 struct Ops { step: (i64) -> i64, decorate: (str) -> str }
 
 fn inc(x: i64) -> i64 { x + 1 }
 
-fn bang(s: str) -> str { s +++ "!" }
+fn bang(s: str) -> str { `{s}!` }
 
 fn scalar_field() -> i64 {
     let o = Ops { step: inc, decorate: bang };

@@ -1,13 +1,13 @@
 # Shapes that look close but are deliberately left alone.
 
-import { concat as +++, heap_str, print } from builtins;
+import { equal as ==, heap_str, print } from builtins;
 
 fn main() !prints {
     let s = heap_str("x");
 
     // A literal that is *part* of the interpolation's expression computes
     // something; only a literal standing alone is the template's own text.
-    print(`{"a" +++ s}`);
+    print(`{"a" == s}`);
 
     // A `"""` literal is raw: its text reaches the template verbatim, escapes
     // and all, which is a thing the template's own text cannot say.
@@ -17,6 +17,6 @@ fn main() !prints {
     print(`{c}`);
 }
 --- stdout ---
-ax
+false
 back\slash
 c
