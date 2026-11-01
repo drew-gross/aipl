@@ -1,0 +1,167 @@
+# The `return_loop_any_all` lint:
+#
+#     for (let x : xs) {
+#         if (matches(x)) {
+#             return true;
+#         };
+#     }
+#     false
+#
+# — a loop that reports whether *some* element passes a test. That is
+# `xs.any(|x| matches(x))`. The mirror image, returning `false` from the loop and falling
+# through to `true`, asks whether *every* element passes: with the condition negated
+# (`if (!matches(x))`) it is `xs.all(|x| matches(x))`.
+#
+# Both spellings make the reader run the loop in their head to discover that the early
+# return is the only way out and that the literal after the loop is the answer for "no
+# element did" — which is the whole content of `any` and `all`, said in one word.
+#
+# The shape has to be exactly this, for the reasons `return_loop_find_if` spells out: the
+# body is an else-less `if` around a lone `return` of a bool literal, the loop is
+# immediately followed by the *opposite* literal, and a condition that propagates with
+# `?` is left alone. A loop returning the same literal it falls through to is not a fold
+# of anything and is left alone too.
+#
+# **The `all` direction fires only on a syntactically negated condition.**
+# `if (x == 0) { return false; }` is `all(|x| x != 0)`, which needs the comparison
+# inverted — and inverting an arbitrary condition correctly is not something to do in a
+# diagnostic. Advising `!xs.any(..)` instead would be right but worse than what it
+# replaces. So that shape is left alone; only the `!pred(x)` form, where the negation
+# lifts off, is advised. A file may alias `!` to a function of its own, and then `!pred(x)`
+# is an ordinary call whose meaning the rewrite must not assume, so the `all` direction
+# also needs `!` to be `logical_not`.
+#
+# The hit points at the `return`, not the loop: `#[allow]` is line-scoped, so a hit
+# spanning the loop could never be squelched. `return true;` is a short statement that
+# always occupies one line, and it is the line that makes this a fold to a single answer.
+
+import {
+    equal as ==,
+    is_some,
+    join,
+    len,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+} from builtins;
+import { Bool, Call, Return, Seq } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Function, Program } from "../item.aipl";
+import {
+    LintHit,
+    imported_as,
+    lint_messages,
+    on_functions_filled,
+    unfilled,
+} from "./lint_hit.aipl";
+import { is_lambda_safe, iterable_text, search_loops } from "./loop_shape.aipl";
+
+# A hit for each loop in the program that reports whether some or every element passes a
+# test.
+pub fn return_loop_any_all(program: Program) -> LintHit[] {
+    let negation = program.items.imported_as("logical_not") == some("!");
+    program.on_functions_filled(|Function { body }| {
+        body
+            .search_loops()
+            .map(|found| {
+                // An *indexed* loop is not this shape: `any`/`all` pass each element and have
+                // no index to pass with it, so the rewrite would silently drop whatever the
+                // body did with it.
+                if (found.index.is_some() || !found.condition.is_lambda_safe()) { return []; };
+                let Bool(returned) = found.returned.kind else { return []; };
+
+                // What the loop falls through to: a bare `true`/`false` as the block's tail,
+                // or an explicit `return true;`. Anything else, and the fall-through does
+                // work neither builtin would do.
+                let answer = match (found.rest.kind) {
+                    Bool(literal) => some(literal),
+                    Seq(statement, _) => if (let Return(value) = statement.kind) {
+                        if (let Bool(literal) = value.kind) { some(literal) } else { none }
+                    } else {
+                        none
+                    },
+                    _ => none,
+                };
+                let some(fell_through) = answer else { return []; };
+
+                // The two literals must disagree: `return true` above a `true` tail answers
+                // the same thing either way and folds to a constant, not to `any`.
+                if (returned == fell_through) { return []; };
+
+                // `return true` / `false` is `any` of the condition as written; `return
+                // false` / `true` is `all` of it with the negation lifted off.
+                if (!returned) {
+                    let Call("!", operands, _) = found.condition.kind else { return []; };
+                    if (!negation || operands.len() != 1) { return []; };
+                };
+                let what = if (returned) {
+                    "whether any element passes a test"
+                } else {
+                    "whether every element passes a test"
+                };
+
+                // The `all` rewrite takes the condition with its `!` removed, which is the one
+                // part of the advice a reader could get backwards, so it is said.
+                let note = if (returned) { "" } else { ` (the condition with its "!" removed)` };
+                [
+                    unfilled(
+                        if (returned) { "any" } else { "all" },
+                        `this loop reports {what} — write "return {found.iterable.iterable_text()}.`,
+                        `(|{found.variable}| ..);"{note} and drop the loop`,
+                        found.statement.span,
+                    ),
+                ]
+            })
+            .join()
+    })
+}.test({
+    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_messages(
+            `import \{ {imports} } from builtins; fn f(xs: i64[]) -> bool \{ {body} }`,
+            return_loop_any_all,
+        )
+    }
+    let all = "any, all, logical_not as !";
+
+    // Some element passing, and every element passing with the negation lifted off, with
+    // the fall-through a tail or a `return`.
+    assert(messages(all, "for (let x : xs) { if (x > 1) { return true; }; } false")? == [
+        `this loop reports whether any element passes a test — write "return xs.any(|x| ..);" and drop the loop`,
+    ]);
+    assert(messages(all, "for (let x : xs) { if (x > 1) { return true; }; } return false;")? == [
+        `this loop reports whether any element passes a test — write "return xs.any(|x| ..);" and drop the loop`,
+    ]);
+    assert(messages(all, "for (let x : xs) { if (!big(x)) { return false; }; } true")? == [
+        `this loop reports whether every element passes a test — write "return xs.all(|x| ..);" (the condition with its "!" removed) and drop the loop`,
+    ]);
+
+    // An import the file lacks is named, and an alias is followed.
+    assert(messages(
+        "logical_not as !",
+        "for (let x : xs) { if (x > 1) { return true; }; } false",
+    )? == [
+        """this loop reports whether any element passes a test — write "return xs.any(|x| ..);" and drop the loop, importing `any` from builtins""",
+    ]);
+    assert(messages(
+        "any as some_of",
+        "for (let x : xs) { if (x > 1) { return true; }; } false",
+    )? == [
+        `this loop reports whether any element passes a test — write "return xs.some_of(|x| ..);" and drop the loop`,
+    ]);
+
+    // Not the shape: the same literal either side, a `false` loop whose condition is not a
+    // negation (inverting it is not a diagnostic's job), a `!` that is not `logical_not`, an
+    // indexed loop, and a test that propagates with `?`.
+    assert(messages(all, "for (let x : xs) { if (x > 1) { return true; }; } true")? == []);
+    assert(messages(all, "for (let x : xs) { if (x == 0) { return false; }; } true")? == []);
+    assert(
+        messages(
+            "any, all, not_equal as !",
+            "for (let x : xs) { if (!big(x)) { return false; }; } true",
+        )? == [],
+    );
+    assert(messages(all, "for (let i, x : xs) { if (x > 1) { return true; }; } false")? == []);
+    assert(messages(all, "for (let x : xs) { if (g(x)?) { return true; }; } false")? == []);
+})

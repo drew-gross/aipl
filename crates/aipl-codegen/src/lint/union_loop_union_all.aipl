@@ -1,0 +1,231 @@
+# The `union_loop_union_all` lint:
+#
+#     mut out = #{};
+#     for (let s : xs) {
+#         set out = out.union(s);
+#     }
+#
+# — a set seeded empty and grown by a loop that does nothing but union each element into
+# it. That is `xs.union_all()`: one word for "every element of every set in `xs`",
+# instead of three statements the reader has to run in their head to discover that the
+# loop is a plain fold and nothing else happens to `out`.
+#
+# When the loop unions something *derived* from the element rather than the element
+# itself, that derivation is the `map` the pipeline needs first: `set out = out.union(f(s));`
+# is `xs.map(|s| f(s)).union_all()`. This is the same two-stage advice `push_loop_pipeline`
+# gives, and it bows out in the same places — the unioned expression may not mention
+# `out` (a fold reading its own accumulator is not a `map`) and may not propagate with
+# `?`. Both operand orders count: set union is commutative *and* its result is a set, so
+# `out.union(x)` and `x.union(out)` accumulate the same set, unlike `concat`, where the
+# order is the whole answer.
+#
+# The shape has to be exactly this, because anything else in the loop is work `union_all`
+# has nowhere to put: the body is one statement, that statement is the assignment, and
+# the seed is the *empty* set — `mut out = #{1};` folds onto a starting value the builtin
+# cannot express. A guard is refused for the same reason, even though
+# `xs.filter(..).union_all()` would say it: the guard would have to be a predicate on
+# whole sets, which is a different and much rarer thing to write than a predicate on
+# elements, and advising it on the strength of a shape match is how a lint starts being
+# wrong. What comes *after* the loop is unconstrained — the rewrite leaves `out` a `mut`
+# binding that simply starts out full.
+#
+# An early `return` inside the loop takes the shape out of scope automatically: the body
+# is then two statements, so there is no lone statement. That is `seq_labels` in
+# `crates/aipl-codegen/src/parse.aipl`, which stops at the first non-nullable element and
+# is a genuinely different fold.
+#
+# `set out = out.union(#{e});` unions one element at a time: that is `to_set` over the
+# elements, not `union_all` over sets — and `to_set` takes its order from the binding, so
+# this form is advised whatever the accumulator's order. `union_all` builds an unordered
+# set, so the set-at-a-time form is only advised for an unordered accumulator, and a
+# loop accumulating into a `#>{..}` / `#<{..}` with one is not one it can replace. The
+# annotation stays in the advice: for an ordered set it is what `to_set` reads its order
+# from.
+#
+# The hit points at the seed.
+
+import {
+    as_case,
+    equal as ==,
+    first,
+    is_nonempty,
+    is_some,
+    is_some_and,
+    join,
+    len,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+    value_or,
+} from builtins;
+import { Assign, Call, Expr, Ident, SetLit } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Function, Program } from "../item.aipl";
+import { Set, Unordered, type_text } from "../ty.aipl";
+import { SeededLoop, is_liftable, pipeline_hit, seeded_loops } from "./accumulation.aipl";
+import {
+    LintHit,
+    UnfilledHit,
+    imported_as,
+    lint_messages,
+    on_functions_filled,
+} from "./lint_hit.aipl";
+import { lone_statement } from "./loop_shape.aipl";
+
+# A hit for each set the program seeds empty and grows with a loop of `union`s.
+pub fn union_loop_union_all(program: Program) -> LintHit[] {
+    let some(union) = program.items.imported_as("union") else { return []; };
+    program.on_functions_filled(|Function { body }| {
+        body.seeded_loops()$unioned(union)$map(|found| [found])$value_or([]).join()
+    })
+}.test({
+    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_messages(
+            `import \{ {imports} } from builtins; fn f(xs: #\{i64}[]) -> #\{i64} \{ {body} }`,
+            union_loop_union_all,
+        )
+    }
+    let all = "union, map, union_all, to_set";
+
+    // A set at a time, mapped or as it is, in either operand order.
+    assert(messages(all, "mut out = #{}; for (let s : xs) { set out = out.union(s); } out")? == [
+        `"out" is seeded empty and unioned into by this loop a set at a time and nothing else — write "mut out = xs.union_all();" and drop the loop`,
+    ]);
+    assert(messages(all, "mut out = #{}; for (let s : xs) { set out = out.union(g(s)); } out")? == [
+        `"out" is seeded empty and unioned into by this loop a set at a time and nothing else — write "mut out = xs.map(|s| ..).union_all();" and drop the loop`,
+    ]);
+    assert(messages(all, "mut out = #{}; for (let s : xs) { set out = g(s).union(out); } out")? == [
+        `"out" is seeded empty and unioned into by this loop a set at a time and nothing else — write "mut out = xs.map(|s| ..).union_all();" and drop the loop`,
+    ]);
+
+    // An element at a time is `to_set`, whatever the accumulator's order, and the
+    // annotation stays.
+    assert(messages(
+        all,
+        "mut out: #{i64} = #{}; for (let s : xs) { set out = out.union(#{s}); } out",
+    )? == [
+        `"out" is seeded empty and unioned into by this loop an element at a time and nothing else — write "mut out: #\{i64\} = xs.to_set();" and drop the loop`,
+    ]);
+    assert(messages(
+        all,
+        "mut out: #>{i64} = #{}; for (let s : xs) { set out = out.union(#{g(s)}); } out",
+    )? == [
+        `"out" is seeded empty and unioned into by this loop an element at a time and nothing else — write "mut out: #>\{i64\} = xs.map(|s| ..).to_set();" and drop the loop`,
+    ]);
+
+    // Imports the file lacks are named, and an alias is followed.
+    assert(messages(
+        "union",
+        "mut out = #{}; for (let s : xs) { set out = out.union(g(s)); } out",
+    )? == [
+        ```"out" is seeded empty and unioned into by this loop a set at a time and nothing else — write "mut out = xs.map(|s| ..).union_all();" and drop the loop, importing `map`, `union_all` from builtins```,
+    ]);
+    assert(messages(
+        "union, union_all as all_of",
+        "mut out = #{}; for (let s : xs) { set out = out.union(s); } out",
+    )? == [
+        `"out" is seeded empty and unioned into by this loop a set at a time and nothing else — write "mut out = xs.all_of();" and drop the loop`,
+    ]);
+
+    // Not the shape: an ordered accumulator unioned a set at a time, a seed with elements, a
+    // guard, an unioned value that reads the accumulator or propagates with `?`, an indexed
+    // loop, a second statement, the accumulator unioned with itself, and a `union` the
+    // file never imported.
+    assert(
+        messages(
+            all,
+            "mut out: #>{i64} = #{}; for (let s : xs) { set out = out.union(s); } out",
+        )? == [],
+    );
+    assert(
+        messages(all, "mut out = #{1}; for (let s : xs) { set out = out.union(s); } out")? == [],
+    );
+    assert(
+        messages(
+            all,
+            "mut out = #{}; for (let s : xs) { if (c(s)) { set out = out.union(s); }; } out",
+        )? == [],
+    );
+    assert(
+        messages(
+            all,
+            "mut out = #{}; for (let s : xs) { set out = out.union(g(out)); } out",
+        )? == [],
+    );
+    assert(
+        messages(all, "mut out = #{}; for (let s : xs) { set out = out.union(g(s)?); } out")? == [],
+    );
+    assert(
+        messages(all, "mut out = #{}; for (let i, s : xs) { set out = out.union(s); } out")? == [],
+    );
+    assert(
+        messages(
+            all,
+            "mut out = #{}; for (let s : xs) { g(s); set out = out.union(s); } out",
+        )? == [],
+    );
+    assert(
+        messages(all, "mut out = #{}; for (let s : xs) { set out = out.union(out); } out")? == [],
+    );
+    assert(
+        messages(
+            "map, union_all",
+            "mut out = #{}; for (let s : xs) { set out = out.union(s); } out",
+        )? == [],
+    );
+})
+
+# `self` as the hit for a set grown by unioning into it, when it is one.
+fn unioned(self: SeededLoop, union: str) -> UnfilledHit? {
+    let SetLit(elements, order) = self.seed.kind.as_case(SetLit)?;
+    if (elements.is_nonempty() || order != Unordered) { return none; };
+    let ordered = self.annotation.is_some_and(|annotation| match (annotation) {
+        Set(_, annotation_order) => annotation_order != Unordered,
+        _ => false,
+    });
+    let Assign(target, value, _) = self.body.lone_statement()?.kind.as_case(Assign)?;
+    if (target.kind != Ident(self.name)) { return none; };
+
+    // The expression unioned into the accumulator by `value`, when `value` is a union of
+    // the accumulator with exactly one other thing: `out.union(out)` is `out`, and a
+    // union of two other things is not a fold onto this binding at all.
+    let Call(callee, operands, _) = value.kind.as_case(Call)?;
+    let [first, second] = operands else { return none; };
+    if (callee != union) { return none; };
+    let operand = if (first.kind == Ident(self.name) && second.kind != Ident(self.name)) {
+        second
+    } else if (second.kind == Ident(self.name) && first.kind != Ident(self.name)) {
+        first
+    } else {
+        return none;
+    };
+
+    // `#{e}` unioned in is one element: that is `to_set`, and it is advised whatever
+    // the accumulator's order.
+    let single: Expr? = if (let SetLit(members, member_order) = operand.kind) {
+        if (member_order == Unordered && members.len() == 1) { members.first() } else { none }
+    } else {
+        none
+    };
+    if (!single.is_some() && ordered) { return none; };
+    let mapped = single.value_or(operand);
+    if (!mapped.is_liftable(self.name)) { return none; };
+
+    // Unioning the loop variable itself is the identity map, which the pipeline just
+    // leaves out.
+    let maps: (str, str)[] = if (mapped.kind != Ident(self.variable)) {
+        [("map", `(|{self.variable}| ..)`)]
+    } else {
+        []
+    };
+    let how = if (single.is_some()) { "an element at a time" } else { "a set at a time" };
+    let fold = if (single.is_some()) { "to_set" } else { "union_all" };
+    some(self.pipeline_hit(
+        `unioned into by this loop {how} and nothing else`,
+        self.annotation.map(|annotation| `: {annotation.type_text()}`).value_or(""),
+        [..maps, (fold, "()")],
+    ))
+}

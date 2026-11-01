@@ -204,6 +204,20 @@
 
 
 
+        <section class="item" id="item-type_text">
+          <h3>
+            <a class="anchor" href="#item-type_text">type_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn type_text(self: Ty) -&#62; str</code></pre>
+
+          <div class="doc"><p>A type as it is written in source: <code>i64[]</code>, <code>str?</code>, <code>#&gt;{i64}</code>, <code>(i64, str) -&gt; bool</code>. The structural dump below keeps which way a type nested; this is the spelling a diagnostic quotes back, and it is the one <code>aipl_syntax::type_name</code> gives.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-show_ty">
           <h3>
             <a class="anchor" href="#item-show_ty">show_ty</a>
@@ -247,6 +261,40 @@
 
       </section>
 
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-suffix_operand">
+          <h3>
+            <a class="anchor" href="#item-suffix_operand">suffix_operand</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn suffix_operand(self: Ty) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>self</code> as the operand of a postfix <code>?</code>, <code>[]</code> or <code>!E</code>: parenthesized when it is a <code>without</code> refinement, which binds looser than every suffix.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-set_spelling">
+          <h3>
+            <a class="anchor" href="#item-set_spelling">set_spelling</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn set_spelling(self: SetOrder) -&#62; str</code></pre>
+
+          <div class="doc"><p>What follows the <code>#</code> of a set type to say how it is ordered: nothing for the unordered set, <code>&gt;</code> for largest first and <code>&lt;</code> for smallest first.</p></div>
+
+
+        </section>
+
+
+      </section>
 
 
     </main>

@@ -9,7 +9,7 @@ use super::{imported_as, mentions, quote, root_name};
 ///
 /// The shape it flags is all language syntax — an array literal with a spread
 /// in it needs no import at all — so unlike
-/// [`push_array_literal`](super::push_array_literal()) this lint fires whether
+/// `push_array_literal` (in AIPL) this lint fires whether
 /// or not the names are here. They are only for the advice, which says to
 /// import what it uses when it is missing; otherwise following the advice would
 /// just trade this error for an unknown-name one.

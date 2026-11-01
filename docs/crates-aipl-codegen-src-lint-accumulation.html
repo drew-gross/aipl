@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/lint/accumulation.aipl</code></h1>
 
-      <div class="module-doc"><p>What the two loop-accumulation lints (<code>push_loop_pipeline</code>, <code>extend_loop_map_join</code>) share: recognising an array that is seeded empty and then filled by the loop that follows it and nothing else, and phrasing the pipeline that loop is.</p><pre><code>mut out = [];
+      <div class="module-doc"><p>What the lints on a binding seeded and then filled by the loop that follows it (<code>push_loop_pipeline</code>, <code>extend_loop_map_join</code>, <code>push_loop_collect_ok</code>, <code>union_loop_union_all</code>) share: recognising the seed and the loop, and phrasing the pipeline that loop is. For an array filled with one expression per element:</p><pre><code>mut out = [];
 for (let x : xs) {
     if (keep(x)) {
         set out.push(f(x));
@@ -28,6 +28,34 @@ for (let x : xs) {
         <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-SeededLoop">
+          <h3>
+            <a class="anchor" href="#item-SeededLoop">SeededLoop</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct SeededLoop</code></pre>
+
+          <div class="doc"><p>A binding <code>name</code> seeded at <code>seed</code> (annotated as <code>annotation</code>, when it is) and filled by the loop right after it, which binds each element as <code>variable</code> and runs <code>body</code> for it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-seeded_loops">
+          <h3>
+            <a class="anchor" href="#item-seeded_loops">seeded_loops</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn seeded_loops(self: Expr) -&#62; SeededLoop[]</code></pre>
+
+          <div class="doc"><p>Every [<code>SeededLoop</code>] in <code>self</code> and under it. The loop has to be the very next statement: one between the two could read the binding while it is still empty, which the rewrite would reorder. An <em>indexed</em> loop is not this shape: <code>map</code> and <code>filter</code> pass each element and have no index to pass with it, so the rewrite would silently drop whatever the body did with it.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-Accumulation">
           <h3>
             <a class="anchor" href="#item-Accumulation">Accumulation</a>
@@ -35,7 +63,7 @@ for (let x : xs) {
           </h3>
           <pre class="signature"><code>struct Accumulation</code></pre>
 
-          <div class="doc"><p>An array <code>name</code> seeded empty at <code>seed</code> and filled by a loop over <code>iterable</code>, which binds each element as <code>variable</code>, and for each one (that passes <code>guard</code>, if there is one) adds <code>added</code> to it.</p></div>
+          <div class="doc"><p>An array <code>name</code> seeded empty and filled by a loop over <code>iterable</code>, which binds each element as <code>variable</code>, and for each one (that passes <code>guard</code>, if there is one) adds <code>added</code> to it.</p></div>
 
 
         </section>
@@ -56,28 +84,42 @@ for (let x : xs) {
 
 
 
-        <section class="item" id="item-lone_statement">
+        <section class="item" id="item-Pushed">
           <h3>
-            <a class="anchor" href="#item-lone_statement">lone_statement</a>
-            <span class="kind kind-fn">fn</span>
+            <a class="anchor" href="#item-Pushed">Pushed</a>
+            <span class="kind kind-struct">struct</span>
           </h3>
-          <pre class="signature"><code>pub fn lone_statement(self: Expr) -&#62; Expr?</code></pre>
+          <pre class="signature"><code>struct Pushed</code></pre>
 
-          <div class="doc"><p>The one statement a block consists of, or <code>none</code> when it holds anything else — no statements, or more than one. A block is a right-nested chain, and which node carries the rest of it depends on the statement: an expression statement is a <code>Seq</code> whose second operand is the remainder, while an assignment holds its own. Only those two forms are recognized, and each is &quot;lone&quot; exactly when what follows it is the block's tail.</p></div>
+          <div class="doc"><p>What <code>adder</code> adds to <code>acc</code>, and what follows, when <code>self</code> is <code>set acc.adder(element); rest</code> — <code>acc = adder(acc, element)</code> — and nothing else.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-receiver">
+        <section class="item" id="item-pushed">
           <h3>
-            <a class="anchor" href="#item-receiver">receiver</a>
+            <a class="anchor" href="#item-pushed">pushed</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn receiver(self: Accumulation) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn pushed(self: Expr, acc: str, adder: str) -&#62; Pushed?</code></pre>
 
-          <div class="doc"><p>What the pipeline that <code>self</code>'s loop is would iterate, as advice quotes it: what was written where its span covers its text, and a placeholder where it does not (a call's span stops before its closing paren).</p></div>
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_liftable">
+          <h3>
+            <a class="anchor" href="#item-is_liftable">is_liftable</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn is_liftable(self: Expr, acc: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> can move into a lambda in a rewritten pipeline: it may not propagate with <code>?</code>, which would return from the lambda instead of the function, and it may not mention <code>acc</code>, the array being filled, which the rewrite no longer has.</p></div>
 
 
         </section>
@@ -140,14 +182,14 @@ for (let x : xs) {
 
 
 
-        <section class="item" id="item-lead">
+        <section class="item" id="item-filled_hit">
           <h3>
-            <a class="anchor" href="#item-lead">lead</a>
+            <a class="anchor" href="#item-filled_hit">filled_hit</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lead(self: Accumulation) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn filled_hit(self: Accumulation, stages: (str, str)[]) -&#62; UnfilledHit</code></pre>
 
-          <div class="doc"><p>The text before the pipeline in a hit for <code>self</code>.</p></div>
+          <div class="doc"><p>The hit for an array filled by one loop that is the pipeline of <code>stages</code> over its iterable: each stage a builtin and the arguments it is written with.</p></div>
 
 
         </section>
@@ -159,9 +201,9 @@ for (let x : xs) {
             <a class="anchor" href="#item-pipeline_hit">pipeline_hit</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn pipeline_hit(self: Accumulation, stages: (str, str)[]) -&#62; UnfilledHit</code></pre>
+          <pre class="signature"><code>pub fn pipeline_hit(self: SeededLoop, what: str, annotation: str, stages: (str, str)[]) -&#62; UnfilledHit</code></pre>
 
-          <div class="doc"><p>The hit for a loop that is the pipeline of <code>stages</code> over its iterable, assigned to the array: each stage a builtin and the arguments it is written with. It points at the seed, not the loop: <code>#[allow]</code> is line-scoped, so a hit spanning the loop could never be squelched (the marker would have to go on the <code>for (..) {</code> header, and the formatter relocates one written there onto a line of its own, where it squelches nothing). <code>mut out = [];</code> always occupies one line, and is where the shape starts.</p></div>
+          <div class="doc"><p>The hit for a loop that is the pipeline of <code>stages</code> over its iterable, assigned to the binding: <code>what</code> is how the loop fills it, as the message says, and <code>annotation</code> what follows the binding's name in the advice. Each stage is a builtin and the arguments it is written with. It points at the seed, not the loop: <code>#[allow]</code> is line-scoped, so a hit spanning the loop could never be squelched (the marker would have to go on the <code>for (..) {</code> header, and the formatter relocates one written there onto a line of its own, where it squelches nothing). <code>mut out = [];</code> always occupies one line, and is where the shape starts.</p></div>
 
 
         </section>
@@ -173,6 +215,34 @@ for (let x : xs) {
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-seeded_names">
+          <h3>
+            <a class="anchor" href="#item-seeded_names">seeded_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn seeded_names(src: str) -&#62; str[]!ParseError</code></pre>
+
+          <div class="doc"><p>The name of each [<code>seeded_loops</code>] the block <code>src</code> holds.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-seeded_loop">
+          <h3>
+            <a class="anchor" href="#item-seeded_loop">seeded_loop</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn seeded_loop(self: LetMut) -&#62; SeededLoop?</code></pre>
+
+          <div class="doc"><p><code>self</code> as a [<code>SeededLoop</code>], when it is one.</p></div>
+
+
+        </section>
+
 
 
         <section class="item" id="item-block_accumulations">
@@ -194,7 +264,7 @@ for (let x : xs) {
             <a class="anchor" href="#item-accumulation">accumulation</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn accumulation(self: LetMut, adder: str) -&#62; Accumulation?</code></pre>
+          <pre class="signature"><code>fn accumulation(self: SeededLoop, adder: str) -&#62; Accumulation?</code></pre>
 
           <div class="doc"><p><code>self</code> as an [<code>Accumulation</code>], when it is one.</p></div>
 
@@ -203,42 +273,14 @@ for (let x : xs) {
 
 
 
-        <section class="item" id="item-is_block_tail">
+        <section class="item" id="item-block_pushes">
           <h3>
-            <a class="anchor" href="#item-is_block_tail">is_block_tail</a>
+            <a class="anchor" href="#item-block_pushes">block_pushes</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_block_tail(self: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn block_pushes(src: str, acc: str, adder: str) -&#62; str[]!ParseError</code></pre>
 
-          <div class="doc"><p>Whether <code>self</code> is what the parser ends a statement-only block with: <code>()</code> for an ordinary block, and an <code>0</code> with no location of its own — the loop expression's result — for a loop body, which may not end in a value of its own at all. The loop's zero is told from a written one by its empty span, the way <code>slice_from_zero</code> tells an elided slice bound from a typed one.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-added_to">
-          <h3>
-            <a class="anchor" href="#item-added_to">added_to</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn added_to(self: Expr, acc: str, adder: str) -&#62; Expr?</code></pre>
-
-          <div class="doc"><p>The value <code>adder</code> adds, when <code>self</code> is <code>set acc.adder(value);</code> — <code>acc = adder(acc, value)</code> — and nothing else.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-is_liftable">
-          <h3>
-            <a class="anchor" href="#item-is_liftable">is_liftable</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn is_liftable(self: Expr, acc: str) -&#62; bool</code></pre>
-
-          <div class="doc"><p>Whether <code>self</code> can move into a lambda in a rewritten pipeline: a <code>?</code> returns from the function it is written in, so moved into a lambda it would return from the lambda instead, and the rewrite no longer has <code>acc</code>, the array being filled.</p></div>
+          <div class="doc"><p>The element of the push <code>src</code>, a block, starts with, as the dump of its expression.</p></div>
 
 
         </section>

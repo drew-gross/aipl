@@ -60,7 +60,6 @@ import {
     descendants,
 } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { lone_statement } from "./accumulation.aipl";
 import {
     UnfilledHit,
     hit,
@@ -68,6 +67,7 @@ import {
     lint_function_unfilled_messages,
     unfilled,
 } from "./lint_hit.aipl";
+import { lone_statement } from "./loop_shape.aipl";
 import { option_matches, receiver_text } from "./option_match.aipl";
 import { passes_through, wraps_with } from "./result_match.aipl";
 

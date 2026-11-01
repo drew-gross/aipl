@@ -5,20 +5,26 @@
 import {
     Span,
     collect_arms,
+    contains,
+    ends_with,
     equal as ==,
     filter,
     first,
+    greater_than_or_equal as >=,
     is_err_and,
     is_nonempty,
     is_some,
     join,
     len,
+    logical_and as &&,
     logical_not as !,
     map,
     map_join,
+    push,
+    starts_with,
     value_or,
 } from builtins;
-import { Call, Expr, Field, Ident, expr, ident } from "../expr.aipl";
+import { Bool, Call, Char, Expr, Field, Ident, Num, Str, expr, ident, num } from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import { Fn, Function, Import, ImportDecl, Item, Program, Signature, local } from "../item.aipl";
 
@@ -48,13 +54,25 @@ pub fn unfilled(builtin: str, before: str, after: str, span: Span) -> UnfilledHi
     assert(unfilled("len", "use ", "()", 1..2).span == 1..2);
 })
 
+# `self` without a name it has already listed, in the order it first appears.
+fn distinct(self: str[]) -> str[] {
+    mut seen: str[] = [];
+    for (let name : self) {
+        if (!seen.contains(name)) { set seen.push(name); };
+    }
+    seen
+}.test({
+    assert(["map", "join", "map"].distinct() == ["map", "join"]);
+    assert([].distinct() == []);
+})
+
 # `self` as the hit it is for a file that spells builtin `name` as `spelled(name)`,
 # or does not import it (`none`).
 pub fn filled_with(self: UnfilledHit, spelled: (str) -> str?) -> LintHit {
     let text = self.named.map_join(
         |part| `{part.text}{spelled(part.builtin).value_or(part.builtin)}`,
     );
-    let missing = self.named$builtin.filter(|builtin| !spelled(builtin).is_some());
+    let missing = self.named$builtin.filter(|builtin| !spelled(builtin).is_some()).distinct();
     let hint = if (missing.is_nonempty()) {
         `, importing {missing.map(|builtin| `\`{builtin}\``).join(sep=", ")} from builtins`
     } else {
@@ -129,6 +147,35 @@ pub fn spans_its_text(self: Expr) -> bool {
     assert(expr(Field(ident("p"), "x")).spans_its_text());
     assert(!expr(Call("f", [ident("x")], false)).spans_its_text());
     assert(!expr(Field(expr(Call("f", [], false)), "x")).spans_its_text());
+})
+
+# What advice quotes for the expression `self`: its source where that spells it exactly
+# — a name, a field path off one, or a literal written on one line — and `placeholder`
+# for the rest. A literal is *checked* against the source rather than assumed, because
+# the parser also synthesizes literals that carry no text of their own.
+pub fn quote(self: Expr, placeholder: str) -> str {
+    let text = self.source;
+    let spells_it = match (self.kind) {
+        Num(n) => text == `{n}`,
+        Bool(b) => text == `{b}`,
+        Char(..) => text.len() >= 3 && text.starts_with("'") && text.ends_with("'"),
+        Str(..) => text.len() >= 2 && text.starts_with(`"`) && text.ends_with(
+            `"`,
+        ) && !text.contains("\n"),
+        _ => self.spans_its_text(),
+    };
+    if (spells_it) { text } else { placeholder }
+}.test({
+    assert(Expr { ..ident("xs"), source: "xs" }.quote("<array>") == "xs");
+    assert(Expr { ..num(5), source: "5" }.quote("<element>") == "5");
+    assert(Expr { ..expr(Bool(true)), source: "true" }.quote("<element>") == "true");
+    assert(Expr { ..expr(Str("a b")), source: `"a b"` }.quote("<element>") == `"a b"`);
+    assert(Expr { ..expr(Char('c')), source: "'c'" }.quote("<element>") == "'c'");
+
+    // A literal with no text of its own, a call and a multi-line string are not quoted.
+    assert(num(5).quote("<element>") == "<element>");
+    assert(Expr { ..expr(Call("f", [], false)), source: "f(" }.quote("<element>") == "<element>");
+    assert(Expr { ..expr(Str("a\nb")), source: `"a\nb"` }.quote("<element>") == "<element>");
 })
 
 # The name a file's `items` import builtin `name` under, if it does: the spelling a

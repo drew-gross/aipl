@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/loop_shape.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/loop_shape.aipl</code></h1>
+
+      <div class="module-doc"><p>What the lints on a loop share: the one statement a block holds, an expression that can move into a lambda, how advice quotes what a loop walks, and the loop that searches for the first element passing a test and returns from inside.</p><pre><code>for (let x : xs) {
+    if (matches(x)) {
+        return some(x);
+    };
+}
+none
+</code></pre></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-lone_statement">
+          <h3>
+            <a class="anchor" href="#item-lone_statement">lone_statement</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lone_statement(self: Expr) -&#62; Expr?</code></pre>
+
+          <div class="doc"><p>The one statement a block consists of, or <code>none</code> when it holds anything else — no statements, or more than one. A block is a right-nested chain, and which node carries the rest of it depends on the statement: an expression statement is a <code>Seq</code> whose second operand is the remainder, while an assignment holds its own. Only those two forms are recognized, and each is &quot;lone&quot; exactly when what follows it is the block's tail.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_lambda_safe">
+          <h3>
+            <a class="anchor" href="#item-is_lambda_safe">is_lambda_safe</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn is_lambda_safe(self: Expr) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> can move into a lambda in a rewritten pipeline: a <code>?</code> returns from the function it is written in, so moved into a lambda it would return from the lambda instead.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-iterable_text">
+          <h3>
+            <a class="anchor" href="#item-iterable_text">iterable_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn iterable_text(self: Expr) -&#62; str</code></pre>
+
+          <div class="doc"><p>What advice quotes for the iterable <code>self</code> that a loop walks: what was written where its span covers its text, and a placeholder where it does not (a call's span stops before its closing paren).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-SearchLoop">
+          <h3>
+            <a class="anchor" href="#item-SearchLoop">SearchLoop</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct SearchLoop</code></pre>
+
+          <div class="doc"><p>A loop that returns from inside when an element passes a test:</p><pre><code>for (let variable : iterable) { if (condition) { return returned; }; }  rest
+</code></pre><p><code>index</code> is the second binder of an indexed loop, and <code>statement</code> is the <code>return</code>. What the loop returns and what it falls through to are the lint's to read.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-search_loops">
+          <h3>
+            <a class="anchor" href="#item-search_loops">search_loops</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn search_loops(self: Expr) -&#62; SearchLoop[]</code></pre>
+
+          <div class="doc"><p>Every [<code>SearchLoop</code>] in <code>self</code> and under it. A <code>for</code> is a statement of a block, so it is the first operand of a <code>Seq</code> whose second is what the loop falls through to. The body is an else-less <code>if</code> around a lone <code>return</code>: an <code>else</code>, or a second statement, is work a searching builtin has nowhere to put.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-answers_none">
+          <h3>
+            <a class="anchor" href="#item-answers_none">answers_none</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn answers_none(self: Expr) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> — what a loop falls through to — is the not-found answer: a bare <code>none</code> as the block's tail, or an explicit <code>return none;</code>. Anything else, and the fall-through does work a searching builtin would skip.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-block_statements">
+          <h3>
+            <a class="anchor" href="#item-block_statements">block_statements</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn block_statements(src: str) -&#62; u64!ParseError</code></pre>
+
+          <div class="doc"><p>How many statements <code>src</code>, a block, consists of when it is a lone one (one or none).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_block_tail">
+          <h3>
+            <a class="anchor" href="#item-is_block_tail">is_block_tail</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_block_tail(self: Expr) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> is what the parser ends a statement-only block with: <code>()</code> for an ordinary block, and an <code>0</code> with no location of its own — the loop expression's result — for a loop body, which may not end in a value of its own at all. The loop's zero is told from a written one by its empty span, the way <code>slice_from_zero</code> tells an elided slice bound from a typed one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-search_variables">
+          <h3>
+            <a class="anchor" href="#item-search_variables">search_variables</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn search_variables(src: str) -&#62; str[]!ParseError</code></pre>
+
+          <div class="doc"><p>The variable of each [<code>search_loops</code>] the block <code>src</code> holds.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-search_loop">
+          <h3>
+            <a class="anchor" href="#item-search_loop">search_loop</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn search_loop(self: Seq) -&#62; SearchLoop?</code></pre>
+
+          <div class="doc"><p><code>self</code> as a [<code>SearchLoop</code>], when it is one.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

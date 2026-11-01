@@ -61,6 +61,65 @@ pub fn show_order(self: SetOrder) -> str {
     assert(Asc.show_order() == ", Asc");
 })
 
+# A type as it is written in source: `i64[]`, `str?`, `#>{i64}`, `(i64, str) -> bool`. The
+# structural dump below keeps which way a type nested; this is the spelling a diagnostic
+# quotes back, and it is the one `aipl_syntax::type_name` gives.
+pub fn type_text(self: Ty) -> str {
+    match (self) {
+        Unit => "()",
+        Primitive(p) => p.prim_name(),
+        Named(n) => n,
+        Any => "any",
+        TypeVar(n) => if (n == "") { "any" } else { n },
+        Case(t) => `Case<{t.type_text()}>`,
+        Optional(t) => `{t.suffix_operand()}?`,
+        Array(t) => `{t.suffix_operand()}[]`,
+        Set(t, o) => `#{o.set_spelling()}\{{t.type_text()}\}`,
+        Dict(k, v) => `#\{{k.type_text()}: {v.type_text()}\}`,
+        Result(o, e) => `{o.suffix_operand()}!{e.suffix_operand()}`,
+        Fn(ps, r) => `({ps$type_text().join(sep=", ")}) -> {r.type_text()}`,
+        Tuple(ts) => `({ts$type_text().join(sep=", ")})`,
+        Generic(n, args) => `{n}<{args$type_text().join(sep=", ")}>`,
+        Without(t, x) => `{t.type_text()} without {x.show_exclusion()}`,
+    }
+}.test({
+    let i64_ty: Ty = Primitive(I64);
+    assert(i64_ty.type_text() == "i64");
+    assert(Array(Optional(i64_ty)).type_text() == "i64?[]");
+    assert(Set(i64_ty, Unordered).type_text() == "#{i64}");
+    assert(Set(i64_ty, Desc).type_text() == "#>{i64}");
+    assert(Set(Primitive(Str), Asc).type_text() == "#<{str}");
+    assert(Dict(Primitive(Str), i64_ty).type_text() == "#{str: i64}");
+    assert(Result(i64_ty, Primitive(Str)).type_text() == "i64!str");
+    assert(Fn([i64_ty, Primitive(Str)], Unit).type_text() == "(i64, str) -> ()");
+    assert(Tuple([i64_ty, Named("P")]).type_text() == "(i64, P)");
+    assert(Generic("Box", [i64_ty]).type_text() == "Box<i64>");
+    assert(Case(Named("Shape")).type_text() == "Case<Shape>");
+    assert(TypeVar("").type_text() == "any");
+
+    // A refinement binds looser than every suffix, so a suffix wraps it in parentheses.
+    assert(Optional(Without(Array(i64_ty), EmptyArray)).type_text() == "(i64[] without [])?");
+})
+
+# `self` as the operand of a postfix `?`, `[]` or `!E`: parenthesized when it is a `without`
+# refinement, which binds looser than every suffix.
+fn suffix_operand(self: Ty) -> str {
+    match (self) {
+        Without(..) => `({self.type_text()})`,
+        _ => self.type_text(),
+    }
+}
+
+# What follows the `#` of a set type to say how it is ordered: nothing for the unordered set,
+# `>` for largest first and `<` for smallest first.
+fn set_spelling(self: SetOrder) -> str {
+    match (self) {
+        Unordered => "",
+        Desc => ">",
+        Asc => "<",
+    }
+}
+
 # A type as a one-line structural dump: constructors named, leaves bare. It is
 # the oracle the lowering's tests assert against, so it is deliberately *not*
 # the source spelling — `Array(Optional(i64))` says which way `i64?[]` nested,

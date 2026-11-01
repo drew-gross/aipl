@@ -1,0 +1,115 @@
+# The `return_loop_find_index` lint:
+#
+#     for (let i, x : xs) {
+#         if (matches(x)) {
+#             return some(i);
+#         };
+#     }
+#     none
+#
+# — a loop that hands back the *position* of the first element passing a test, and
+# `none` when no element does. That is `xs.find_index(|x| matches(x))`.
+# `return_loop_find_if` asks the same of the same loop shape returning the element; this
+# one is its indexed twin. The two are disjoint by construction: that one matches a loop
+# with no index binder and this one a loop with one, so no loop is a candidate for both.
+#
+# The shape has to be *exactly* this, for the same reasons the element form gives: the
+# loop body is an else-less `if` around a lone `return`, the returned value is `some` of
+# the index binding itself, and the loop is immediately followed by the `none` that
+# makes falling off the end the not-found answer.
+#
+# One condition this form needs that the element form does not: **the test may not
+# mention the index**. `find_index` hands its predicate the element and nothing else, so
+# `if (i > 0 && p(x))` has no rewrite here — it is a scan the builtin cannot express, and
+# it is left alone.
+#
+# The hit points at the `return`, not the loop: `#[allow]` is line-scoped, and a hit
+# spanning the loop could only be squelched from the `for (..) {` header, which the
+# formatter relocates a marker off. `return some(i);` is one line, and it is the line
+# that makes this a search for the first match.
+
+import { equal as ==, join, logical_not as !, logical_or as ||, map } from builtins;
+import { Function } from "../item.aipl";
+import { mentions_any } from "./field_uses.aipl";
+import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
+import { answers_none, is_lambda_safe, iterable_text, search_loops } from "./loop_shape.aipl";
+import { passes_through } from "./result_match.aipl";
+
+# A hit for each indexed loop in the function that returns the position of the first
+# element passing a test.
+pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
+    body
+        .search_loops()
+        .map(|found| {
+            let some(index) = found.index else { return []; };
+            if (!found.rest.answers_none() || !found.returned.passes_through(
+                "some",
+                index,
+            ) || found.condition.mentions_any([index], none) || !found.condition.is_lambda_safe()) {
+                return [];
+            };
+            [
+                unfilled(
+                    "find_index",
+                    `this loop returns the position of the first element passing a test, and "none" otherwise — write "return {found.iterable.iterable_text()}.`,
+                    `(|{found.variable}| ..);" and drop the loop`,
+                    found.statement.span,
+                ),
+            ]
+        })
+        .join()
+}.test({
+    // The `return` is what the advice points at, with `none` at the end of the block or
+    // returned.
+    assert(lint_function_unfilled_messages(
+        "fn f(xs: i64[]) -> u64? { for (let i, x : xs) { if (x > 1) { return some(i); }; } none }",
+        return_loop_find_index,
+    )? == [message("xs", "x")]);
+    assert(lint_function_unfilled_messages(
+        "fn f(xs: i64[]) -> u64? { for (let i, x : xs) { if (x > 1) { return some(i); }; } return none; }",
+        return_loop_find_index,
+    )? == [message("xs", "x")]);
+    assert(lint_function_unfilled_messages(
+        "fn f() -> u64? { for (let i, x : g()) { if (x > 1) { return some(i); }; } none }",
+        return_loop_find_index,
+    )? == [message("<iterable>", "x")]);
+
+    // Not the shape: the element's loop, an adjusted index, a test that reads the index,
+    // work after the loop, and a test that propagates with `?`.
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { return some(x); }; } none }",
+            return_loop_find_index,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(xs: i64[]) -> u64? { for (let i, x : xs) { if (x > 1) { return some(i + 1); }; } none }",
+            return_loop_find_index,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(xs: i64[]) -> u64? { for (let i, x : xs) { if (i > 0 && x > 1) { return some(i); }; } none }",
+            return_loop_find_index,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(xs: i64[]) -> u64? { for (let i, x : xs) { if (x > 1) { return some(i); }; } g(); none }",
+            return_loop_find_index,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(xs: i64[]) -> u64? { for (let i, x : xs) { if (g(x)?) { return some(i); }; } none }",
+            return_loop_find_index,
+        )? == [],
+    );
+})
+
+# What is said of a loop over `receiver` binding `variable`, for a file that does not
+# import `find_index`, as the tests' sources do not.
+fn message(receiver: str, variable: str) -> str {
+    `this loop returns the position of the first element passing a test, and "none" otherwise — write "return {receiver}.find_index(|{variable}| ..);" and drop the loop, importing \`find_index\` from builtins`
+}

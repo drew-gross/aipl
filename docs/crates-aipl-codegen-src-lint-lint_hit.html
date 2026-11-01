@@ -162,6 +162,20 @@
 
 
 
+        <section class="item" id="item-quote">
+          <h3>
+            <a class="anchor" href="#item-quote">quote</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn quote(self: Expr, placeholder: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>What advice quotes for the expression <code>self</code>: its source where that spells it exactly — a name, a field path off one, or a literal written on one line — and <code>placeholder</code> for the rest. A literal is <em>checked</em> against the source rather than assumed, because the parser also synthesizes literals that carry no text of their own.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-imported_as">
           <h3>
             <a class="anchor" href="#item-imported_as">imported_as</a>
@@ -279,6 +293,20 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-distinct">
+          <h3>
+            <a class="anchor" href="#item-distinct">distinct</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn distinct(self: str[]) -&#62; str[]</code></pre>
+
+          <div class="doc"><p><code>self</code> without a name it has already listed, in the order it first appears.</p></div>
+
+
+        </section>
+
 
 
         <section class="item" id="item-builtin_locals">

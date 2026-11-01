@@ -1,0 +1,121 @@
+# The `return_loop_find_if` lint:
+#
+#     for (let x : xs) {
+#         if (matches(x)) {
+#             return some(x);
+#         };
+#     }
+#     none
+#
+# — a loop that hands back the first element passing a test, and `none` when no element
+# does. That is `xs.find_if(|x| matches(x))`: one expression that says the answer *is*
+# the first match, rather than a loop the reader has to run in their head to find out
+# that the early return is the only way out and that falling off the end means "not
+# found".
+#
+# The shape has to be *exactly* this, because anything else is something `find_if`
+# would drop: the loop body is an else-less `if` around a lone `return` (see
+# `search_loops`), the returned value is `some` of the loop variable itself
+# (`some(f(x))` is a `find_if` *and* a map, which the advice would not spell), and the
+# loop is immediately followed by the `none` that makes falling off the end the
+# not-found answer. A guard that propagates with `?` is left alone too.
+#
+# What the shape *does* leave open is where the loop sits: the `none` may be the
+# enclosing block's tail or an explicit `return none;`, since a reader can't tell those
+# apart either. The lint needs no import to fire: every part of the shape it matches
+# (`for`, `if`, `return`, `some`, `none`) is language syntax, not a builtin some other
+# function could be shadowing.
+#
+# The hit points at the `return`, not the loop: `#[allow]` is line-scoped, so a hit
+# spanning the loop could never be squelched (the marker would have to go on the
+# `for (..) {` header, and the formatter relocates one written there onto a line of its
+# own, where it squelches nothing). `return some(x);` is a short statement that always
+# occupies one line, and it is the line that makes this a search for the first match.
+
+import { equal as ==, is_some, join, logical_not as !, logical_or as ||, map } from builtins;
+import { Function } from "../item.aipl";
+import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
+import { answers_none, is_lambda_safe, iterable_text, search_loops } from "./loop_shape.aipl";
+import { passes_through } from "./result_match.aipl";
+
+# A hit for each loop in the function that returns the first element passing a test.
+pub fn return_loop_find_if(Function { body }) -> UnfilledHit[] {
+    body
+        .search_loops()
+        .map(|found| {
+            // An *indexed* loop is `find_index`'s: `find_if` passes each element and has no
+            // index to pass with it, so the rewrite would silently drop whatever the body
+            // did with it.
+            if (found.index.is_some() || !found.rest.answers_none() || !found.returned.passes_through(
+                "some",
+                found.variable,
+            ) || !found.condition.is_lambda_safe()) {
+                return [];
+            };
+            [
+                unfilled(
+                    "find_if",
+                    `this loop returns the first element passing a test, and "none" otherwise — write "return {found.iterable.iterable_text()}.`,
+                    `(|{found.variable}| ..);" and drop the loop`,
+                    found.statement.span,
+                ),
+            ]
+        })
+        .join()
+}.test({
+    // The `return` is what the advice points at, with the loop dropped and `none` at the
+    // end of the block or returned.
+    assert(lint_function_unfilled_messages(
+        "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { return some(x); }; } none }",
+        return_loop_find_if,
+    )? == [message("xs", "x")]);
+    assert(lint_function_unfilled_messages(
+        "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { return some(x); }; } return none; }",
+        return_loop_find_if,
+    )? == [message("xs", "x")]);
+
+    // An iterable that cannot be quoted is a placeholder.
+    assert(lint_function_unfilled_messages(
+        "fn f() -> i64? { for (let x : g()) { if (x > 1) { return some(x); }; } none }",
+        return_loop_find_if,
+    )? == [message("<iterable>", "x")]);
+
+    // Not the shape: a mapped result, another variable, an `else`, work after the loop, an
+    // indexed loop, and a test that propagates with `?`.
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { return some(x + 1); }; } none }",
+            return_loop_find_if,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { return some(y); }; } none }",
+            return_loop_find_if,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { return some(x); }; } g(); none }",
+            return_loop_find_if,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(xs: i64[]) -> i64? { for (let i, x : xs) { if (x > 1) { return some(x); }; } none }",
+            return_loop_find_if,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (g(x)?) { return some(x); }; } none }",
+            return_loop_find_if,
+        )? == [],
+    );
+})
+
+# What is said of a loop over `receiver` binding `variable`, for a file that does not
+# import `find_if`, as the tests' sources do not.
+fn message(receiver: str, variable: str) -> str {
+    `this loop returns the first element passing a test, and "none" otherwise — write "return {receiver}.find_if(|{variable}| ..);" and drop the loop, importing \`find_if\` from builtins`
+}

@@ -21,15 +21,9 @@ mod is_empty_longhand;
 mod len_gt_zero;
 mod map_constant_repeat;
 mod map_find_if_some;
-mod push_array_literal;
-mod push_loop_collect_ok;
-mod return_loop_any_all;
-mod return_loop_find_if;
-mod return_loop_find_index;
 mod set_spread_field;
 mod set_spread_push;
 mod step_by_one;
-mod union_loop_union_all;
 mod value_or_compare;
 mod with_value_or_self;
 
@@ -47,15 +41,9 @@ use self::is_empty_longhand::{empty_names, is_empty_longhand};
 use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
 use self::map_constant_repeat::{map_constant_repeat, repeat_names};
 use self::map_find_if_some::{find_map_names, map_find_if_some};
-use self::push_array_literal::push_array_literal;
-use self::push_loop_collect_ok::{collect_ok_names, push_loop_collect_ok};
-use self::return_loop_any_all::{any_all_names, return_loop_any_all};
-use self::return_loop_find_if::{find_if_name, return_loop_find_if};
-use self::return_loop_find_index::{find_index_name, return_loop_find_index};
 use self::set_spread_field::set_spread_field;
 use self::set_spread_push::{append_names, set_spread_push};
 use self::step_by_one::{matching_steps, step_by_one};
-use self::union_loop_union_all::{union_loop_union_all, union_names};
 use self::value_or_compare::{value_or_compare, value_or_compare_names};
 use self::with_value_or_self::{with_names, with_value_or_self};
 
@@ -112,46 +100,6 @@ pub fn check(
     let appends = append_names(program);
     each_expr(program, &mut |e| {
         set_spread_push(e, src, &appends, &mut hits)
-    });
-    // The optional-guard sibling of the `push` loop lint (in AIPL): an `if let some(..)` where
-    // that one reads a boolean `if`.
-    let collect_ok = collect_ok_names(program);
-    each_expr(program, &mut |e| {
-        push_loop_collect_ok(e, src, &collect_ok, &mut hits)
-    });
-    // The set-valued sibling of the pipeline lint, and disjoint from it: that
-    // one's seed is an empty *array* filled by `push`, this one's an empty set
-    // grown by `union`.
-    let unions = union_names(program);
-    each_expr(program, &mut |e| {
-        union_loop_union_all(e, src, &unions, &mut hits)
-    });
-    // Same precondition, and the two shapes are disjoint: a seed followed by
-    // a loop is the pipeline's, a seed followed by pushes is the literal's.
-    if let Some(push) = imported_as(program, "push") {
-        each_expr(program, &mut |e| {
-            push_array_literal(e, src, &push, &mut hits)
-        });
-    }
-    // The shape is all language syntax, so this one fires whether or not the
-    // file imported `find_if` — the name is only for the advice, which says to
-    // import it when it is missing.
-    let find_if = find_if_name(program);
-    each_expr(program, &mut |e| {
-        return_loop_find_if(e, src, find_if.as_deref(), &mut hits)
-    });
-    // The same loop shape folded to a single yes/no instead — disjoint from
-    // both of the above, which hand back an element or its index rather than a
-    // bool literal.
-    let any_all = any_all_names(program);
-    each_expr(program, &mut |e| {
-        return_loop_any_all(e, src, &any_all, &mut hits)
-    });
-    // The same loop returning the *position* instead. Disjoint from the one
-    // above: a loop returns the element or its index, never both.
-    let find_index = find_index_name(program);
-    each_expr(program, &mut |e| {
-        return_loop_find_index(e, src, find_index.as_deref(), &mut hits)
     });
     // Only where a `++`/`--` flavor provably matches the operator written —
     // see `matching_steps`, which also names the import when it's missing.
@@ -280,67 +228,6 @@ fn imported_as(program: &Program, builtin: &str) -> Option<String> {
     })
 }
 
-/// Whether `e` can be lifted into a rewritten pipeline's lambda: it must be
-/// [`lambda_safe`], and it may not mention `acc` — the binding being
-/// accumulated — because the rewrite no longer has it (`out.len()` as a running
-/// index is the shape this catches).
-///
-/// Shared by the two accumulate-in-a-loop lints, which have to agree on what a
-/// liftable expression is: they differ only in what the loop does with it.
-fn liftable(e: &Expr, acc: &str) -> bool {
-    if !lambda_safe(e) {
-        return false;
-    }
-    let mut ok = true;
-    crate::each_subexpr(e, &mut |x| {
-        if matches!(&x.kind, ExprKind::Ident(n) if n == acc) {
-            ok = false;
-        }
-    });
-    ok
-}
-
-/// Whether `e` can be moved into a lambda unchanged. A `?` propagation returns
-/// from the function it is written in, so relocating it into a lambda would
-/// return from the *lambda* instead: same source, a different early exit. Every
-/// lint whose advice lifts an expression into a lambda has to refuse that.
-fn lambda_safe(e: &Expr) -> bool {
-    let mut ok = true;
-    crate::each_subexpr(e, &mut |x| {
-        if matches!(x.kind, ExprKind::Try(_)) {
-            ok = false;
-        }
-    });
-    ok
-}
-
-/// `set acc.push(elem);` (or its longhand `set acc = acc.push(elem);`) — the
-/// pushed element and the statements that follow, when `stmt` is a push onto
-/// `acc` and nothing else. `push` is the calling file's local name for the
-/// builtin, so an aliased import is followed and a *user* function that
-/// happens to be called `push` is not.
-///
-/// Shared by the two push lints, which have to agree on what a push is: they
-/// differ only in what surrounds one.
-fn pushed_element<'a>(stmt: &'a Expr, acc: &str, push: &str) -> Option<(&'a Expr, &'a Expr)> {
-    let ExprKind::Assign(lhs, value, rest) = &stmt.kind else {
-        return None;
-    };
-    if !matches!(&lhs.kind, ExprKind::Ident(n) if n == acc) {
-        return None;
-    }
-    let ExprKind::Call(name, args, _) = &value.kind else {
-        return None;
-    };
-    if name != push || args.len() != 2 {
-        return None;
-    }
-    if !matches!(&args[0].kind, ExprKind::Ident(n) if n == acc) {
-        return None;
-    }
-    Some((&args[1], rest))
-}
-
 /// The binding a `set` target is rooted in: `p` for `p` and for `p.a.b`, and
 /// `None` for anything that is not a place. Shared by the two `set`-rebuild
 /// lints, which ask it the same two questions: what binding is being rebuilt,
@@ -370,37 +257,6 @@ fn mentions(e: &Expr, name: &str) -> bool {
 /// 0-based line number of byte offset `pos` in `src`.
 fn line_of(src: &str, pos: usize) -> usize {
     src[..pos.min(src.len())].matches('\n').count()
-}
-
-/// The synthetic value the parser ends a statement-only block with: `()` for an
-/// ordinary block, and an i64 `0` — the loop expression's own result — for a
-/// loop body, which may not end in a value of its own at all. The loop's zero is
-/// told from a written one by its empty span, the same way
-/// `slice_from_zero` (in AIPL) tells an elided slice bound from a
-/// typed one.
-fn is_block_tail(e: &Expr) -> bool {
-    match &e.kind {
-        ExprKind::Unit => true,
-        ExprKind::Num(0) => e.span.is_empty(),
-        _ => false,
-    }
-}
-
-/// The single statement a block consists of, or `None` when it holds anything
-/// else — no statements, or more than one.
-///
-/// A block is a right-nested chain, and which node carries the rest of it
-/// depends on the statement: an expression statement is a [`ExprKind::Seq`]
-/// whose second operand is the remainder, while `let`/`mut`/`set` each hold
-/// their own. Only the two forms the loop lints can be made of are recognized
-/// here, and each is "lone" exactly when what follows it is the block's tail
-/// (see [`is_block_tail`]).
-fn lone_stmt(block: &Expr) -> Option<&Expr> {
-    match &block.kind {
-        ExprKind::Seq(stmt, rest) if is_block_tail(rest) => Some(stmt),
-        ExprKind::Assign(_, _, rest) if is_block_tail(rest) => Some(block),
-        _ => None,
-    }
 }
 
 /// Whether `e`'s span covers exactly the text that spells it, so the source can

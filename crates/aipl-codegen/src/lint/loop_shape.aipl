@@ -1,0 +1,177 @@
+# What the lints on a loop share: the one statement a block holds, an expression that
+# can move into a lambda, how advice quotes what a loop walks, and the loop that
+# searches for the first element passing a test and returns from inside.
+#
+#     for (let x : xs) {
+#         if (matches(x)) {
+#             return some(x);
+#         };
+#     }
+#     none
+
+import {
+    as_case,
+    equal as ==,
+    is_empty,
+    is_some,
+    join,
+    logical_not as !,
+    map,
+    not_equal as !=,
+    value_or,
+} from builtins;
+import {
+    Assign,
+    Construct,
+    Expr,
+    For,
+    If,
+    None,
+    Num,
+    Return,
+    Seq,
+    Try,
+    Unit,
+    collect_expr_cases,
+} from "../expr.aipl";
+import { ParseError } from "../grammar.aipl";
+import { lower_aipl_block_surface } from "../grammar_aipl.aipl";
+import { spans_its_text } from "./lint_hit.aipl";
+
+# The one statement a block consists of, or `none` when it holds anything else — no
+# statements, or more than one. A block is a right-nested chain, and which node
+# carries the rest of it depends on the statement: an expression statement is a
+# `Seq` whose second operand is the remainder, while an assignment holds its own.
+# Only those two forms are recognized, and each is "lone" exactly when what follows
+# it is the block's tail.
+pub fn lone_statement(self: Expr) -> Expr? {
+    match (self.kind) {
+        Seq(statement, rest) => if (rest.is_block_tail()) { some(statement) } else { none },
+        Assign(_, _, rest) => if (rest.is_block_tail()) { some(self) } else { none },
+        _ => none,
+    }
+}.test({
+    assert(block_statements("{ f(); }")? == 1);
+    assert(block_statements("{ set x = 1; }")? == 1);
+    assert(block_statements("{ f(); g(); }")? == 0);
+    assert(block_statements("{ f() }")? == 0);
+})
+
+# How many statements `src`, a block, consists of when it is a lone one (one or none).
+fn block_statements(src: str) -> u64!ParseError {
+    ok(if (lower_aipl_block_surface(src)?.lone_statement().is_some()) { 1 } else { 0 })
+}
+
+# Whether `self` is what the parser ends a statement-only block with: `()` for an
+# ordinary block, and an `0` with no location of its own — the loop expression's
+# result — for a loop body, which may not end in a value of its own at all. The
+# loop's zero is told from a written one by its empty span, the way `slice_from_zero`
+# tells an elided slice bound from a typed one.
+fn is_block_tail(self: Expr) -> bool {
+    match (self.kind) {
+        Unit => true,
+        Num(0) => self.span.start == self.span.end,
+        _ => false,
+    }
+}
+
+# Whether `self` can move into a lambda in a rewritten pipeline: a `?` returns from
+# the function it is written in, so moved into a lambda it would return from the
+# lambda instead.
+pub fn is_lambda_safe(self: Expr) -> bool { self.collect_expr_cases(Try).is_empty() }.test({
+    assert(lower_aipl_block_surface("{ f(a) }")?.is_lambda_safe());
+    assert(!lower_aipl_block_surface("{ f(a?) }")?.is_lambda_safe());
+})
+
+# What advice quotes for the iterable `self` that a loop walks: what was written where
+# its span covers its text, and a placeholder where it does not (a call's span stops
+# before its closing paren).
+pub fn iterable_text(self: Expr) -> str {
+    match (self.kind) {
+        Construct("__builtin_Span", _) => "(<range>)",
+        _ => if (self.spans_its_text()) { self.source } else { "<iterable>" },
+    }
+}
+
+# A loop that returns from inside when an element passes a test:
+#
+#     for (let variable : iterable) { if (condition) { return returned; }; }  rest
+#
+# `index` is the second binder of an indexed loop, and `statement` is the `return`.
+# What the loop returns and what it falls through to are the lint's to read.
+struct SearchLoop {
+    variable: str,
+    index: str?,
+    iterable: Expr,
+    condition: Expr,
+    statement: Expr,
+    returned: Expr,
+    rest: Expr,
+}
+
+# Every [`SearchLoop`] in `self` and under it. A `for` is a statement of a block, so
+# it is the first operand of a `Seq` whose second is what the loop falls through to.
+# The body is an else-less `if` around a lone `return`: an `else`, or a second
+# statement, is work a searching builtin has nowhere to put.
+pub fn search_loops(self: Expr) -> SearchLoop[] {
+    self.collect_expr_cases(Seq)$search_loop()$map(|found| [found])$value_or([]).join()
+}.test({
+    assert(search_variables("{ for (let x : xs) { if (c(x)) { return some(x); }; } none }")? == [
+        "x",
+    ]);
+    assert(search_variables("{ for (let i, x : xs) { if (c(x)) { return some(i); }; } none }")? == [
+        "x",
+    ]);
+
+    // An `else`, a second statement, a bare loop and a body that is not a `return`.
+    assert(
+        search_variables(
+            "{ for (let x : xs) { if (c(x)) { return some(x); } else { g(); }; } none }",
+        )? == [],
+    );
+    assert(
+        search_variables(
+            "{ for (let x : xs) { if (c(x)) { g(); return some(x); }; } none }",
+        )? == [],
+    );
+    assert(search_variables("{ for (let x : xs) { g(x); } none }")? == []);
+    assert(search_variables("{ for (let x : xs) { if (c(x)) { g(x); }; } none }")? == []);
+})
+
+# The variable of each [`search_loops`] the block `src` holds.
+fn search_variables(src: str) -> str[]!ParseError {
+    ok(lower_aipl_block_surface(src)?.search_loops()$variable)
+}
+
+# `self` as a [`SearchLoop`], when it is one.
+fn search_loop(self: Seq(first, rest)) -> SearchLoop? {
+    // `as_case(For)` would say this, but `For` has a keyword parameter, which keeps it
+    // from being passed as a function value.
+    let For(variable, iterable, body, index) = first.kind else { return none; }; #[allow]
+    let If(condition, then, otherwise) = body.lone_statement()?.kind.as_case(If)?;
+    if (otherwise.kind != Unit) { return none; };
+    let statement = then.lone_statement()?;
+    let Return(returned) = statement.kind.as_case(Return)?;
+    some(SearchLoop { variable, index, iterable, condition, statement, returned, rest })
+}
+
+# Whether `self` — what a loop falls through to — is the not-found answer: a bare `none`
+# as the block's tail, or an explicit `return none;`. Anything else, and the
+# fall-through does work a searching builtin would skip.
+pub fn answers_none(self: Expr) -> bool {
+    match (self.kind) {
+        None => true,
+        Seq(statement, _) => if (let Return(value) = statement.kind) {
+            value.kind == None
+        } else {
+            false
+        },
+        _ => false,
+    }
+}.test({
+    assert(lower_aipl_block_surface("{ none }")?.answers_none());
+    assert(lower_aipl_block_surface("{ return none; }")?.answers_none());
+    assert(!lower_aipl_block_surface("{ some(1) }")?.answers_none());
+    assert(!lower_aipl_block_surface("{ g(); none }")?.answers_none());
+    assert(!lower_aipl_block_surface("{ return some(1); }")?.answers_none());
+})

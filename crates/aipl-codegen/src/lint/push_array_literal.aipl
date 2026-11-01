@@ -1,0 +1,137 @@
+# The `push_array_literal` lint:
+#
+#     mut out = xs;
+#     set out.push(x);
+#     out
+#
+# — an array bound `mut` only to append to it and hand it straight back. That is the
+# literal `[..xs, x]`: one expression that says what the array *is*, rather than a
+# binding the reader has to follow through two more statements to find out that
+# appending is all that ever happens to it.
+#
+# A run of pushes collapses the same way (`[..xs, a, b]`), and a seed that is itself a
+# literal is spliced open rather than spread into itself — `mut out: i64[] = []; set
+# out.push(x); out` is `[x]`, and `mut out = [5]; ...` is `[5, x]`. A spread in that
+# literal stays a spread, its elements coming across unchanged.
+#
+# The shape has to be *exactly* this: the pushes immediately follow the `mut`, and the
+# binding itself is the very next thing, so nothing can read `out` half-built or touch it
+# afterwards. A pushed element may not mention `out` either (`set out.push(out.len());`
+# is a running index) — the literal has no binding for it to refer to. And this file's
+# `push` must be the builtin, so a *user* function of that name is not mistaken for it.
+#
+# Unlike `push_loop_pipeline` there is no blind spot about the receiver's type: `push` is
+# declared `fn __builtin_push<T: any>(mut self: T[], x: T)`, so an `out` that is pushed
+# to is an array, and `[..out]` always type-checks.
+#
+# The hit points at the seed, where the shape starts: `#[allow]` is line-scoped, and the
+# seed is the same anchor, for the same reason, as `push_loop_pipeline`'s.
+
+import {
+    any,
+    equal as ==,
+    is_empty,
+    join,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+    value_or,
+} from builtins;
+import { ArrayLit, Expr, Ident, LetMut, Spread, collect_expr_cases } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Function, Program } from "../item.aipl";
+import { Pushed, pushed } from "./accumulation.aipl";
+import { mentions_any } from "./field_uses.aipl";
+import { LintHit, hit, imported_as, lint_messages, on_functions, quote } from "./lint_hit.aipl";
+
+# A hit for each array the program binds `mut`, pushes onto and returns.
+pub fn push_array_literal(program: Program) -> LintHit[] {
+    let some(push) = program.items.imported_as("push") else { return []; };
+    program.on_functions(|Function { body }| {
+        body.collect_expr_cases(LetMut)$literal(push)$map(|found| [found])$value_or([]).join()
+    })
+}.test({
+    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_messages(
+            `import \{ {imports} } from builtins; fn f(xs: i64[], x: i64) -> i64[] \{ {body} }`,
+            push_array_literal,
+        )
+    }
+
+    // A seed spread into the literal, a run of pushes, and a literal seed spliced open.
+    assert(messages("push", "mut out = xs; set out.push(x); out")? == [
+        `"out" is seeded and then only appended to before being returned — write "[..xs, x]" and drop the mut`,
+    ]);
+    assert(messages("push", "mut out = xs; set out.push(1); set out.push(2); out")? == [
+        `"out" is seeded and then only appended to before being returned — write "[..xs, 1, 2]" and drop the mut`,
+    ]);
+    assert(messages("push", "mut out: i64[] = []; set out.push(x); out")? == [
+        `"out" is seeded and then only appended to before being returned — write "[x]" and drop the mut`,
+    ]);
+    assert(messages("push", "mut out = [5, ..xs]; set out.push(x); out")? == [
+        `"out" is seeded and then only appended to before being returned — write "[5, ..xs, x]" and drop the mut`,
+    ]);
+
+    // What cannot be quoted is a placeholder.
+    assert(messages("push", "mut out = g(); set out.push(h(x)); out")? == [
+        `"out" is seeded and then only appended to before being returned — write "[..<array>, <element>]" and drop the mut`,
+    ]);
+
+    // Not the shape: no push, a statement after the pushes, a push that reads the array, and
+    // a `push` the file never imported or one that is another function's.
+    assert(messages("push", "mut out = xs; out")? == []);
+    assert(messages("push", "mut out = xs; set out.push(x); g(); out")? == []);
+    assert(messages("push", "mut out = xs; set out.push(x); set out.push(1); xs")? == []);
+    assert(messages("push", "mut out = xs; set out.push(out.len()); out")? == []);
+    assert(messages("map", "mut out = xs; set out.push(x); out")? == []);
+})
+
+# `self` as the hit for an array that is only pushed onto before it is returned, when it
+# is one.
+fn literal(self: LetMut(name, annotation, seed, body), push: str) -> LintHit? {
+    // Every push, in order, for as long as they run consecutively. An annotation on the
+    // `mut` is allowed (it is often what gives an empty seed its element type) and simply
+    // goes away with the binding.
+    let Pushes { elements, rest } = body.pushes(name, push);
+
+    // What follows the pushes must be the binding and nothing else: any other statement
+    // could read or rebind `out`, and the literal would have nowhere to put it.
+    if (elements.is_empty() || rest.kind != Ident(name)) { return none; };
+    if (elements.any(|element| element.mentions_any([name], none))) { return none; };
+
+    // What the seed contributes to the front of the literal. A seed that is *already* a
+    // literal is spliced open rather than spread into itself — `mut xs = [5]; set
+    // xs.push(6); xs` is `[5, 6]`, not `[..[5], 6]` — which also covers the empty seed,
+    // whose contribution is nothing at all.
+    let opening = if (let ArrayLit(members) = seed.kind) {
+        members$element_text()
+    } else {
+        [`..{seed.quote("<array>")}`]
+    };
+    some(hit(
+        `"{name}" is seeded and then only appended to before being returned — write "[{[..opening, ..elements$element_text()].join(sep=", ")}]" and drop the mut`,
+        seed.span,
+    ))
+}
+
+# The pushes that run consecutively from `self`, and what follows them.
+struct Pushes { elements: Expr[], rest: Expr }
+
+fn pushes(self: Expr, acc: str, adder: str) -> Pushes {
+    let some(Pushed { element, rest }) = self.pushed(acc, adder) else {
+        return Pushes { elements: [], rest: self };
+    };
+    let Pushes { elements, rest as end } = rest.pushes(acc, adder);
+    Pushes { elements: [element, ..elements], rest: end }
+}
+
+# One element of the rewritten literal. A spread stays a spread, and what cannot be
+# quoted is a placeholder.
+fn element_text(self: Expr) -> str {
+    if (let Spread(inner) = self.kind) {
+        `..{inner.quote("<array>")}`
+    } else {
+        self.quote("<element>")
+    }
+}

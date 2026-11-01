@@ -22,7 +22,7 @@
 import { equal as ==, extend, join, map } from builtins;
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Program } from "../item.aipl";
-import { accumulations, element_stages, is_advisable, pipeline_hit } from "./accumulation.aipl";
+import { accumulations, element_stages, filled_hit, is_advisable } from "./accumulation.aipl";
 import { LintHit, imported_as, lint_messages, on_functions_filled } from "./lint_hit.aipl";
 
 # A hit for each array the program seeds empty and fills with a loop of `extend`s.
@@ -33,7 +33,7 @@ pub fn extend_loop_map_join(program: Program) -> LintHit[] {
             .accumulations(extend)
             .map(|loop| {
                 if (loop.is_advisable()) {
-                    [loop.pipeline_hit([..loop.element_stages(), ("join", "()")])]
+                    [loop.filled_hit([..loop.element_stages(), ("join", "()")])]
                 } else {
                     []
                 }
