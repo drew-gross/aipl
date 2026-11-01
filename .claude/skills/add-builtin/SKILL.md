@@ -107,6 +107,12 @@ different and heavier: a declaration in `BUILTIN_SIGNATURES`, lowering in
 `aipl-mono`/`aipl-codegen`, and matching runtime support in *both* the JIT and
 the linker. Read an existing intrinsic end to end before starting.
 
+## 2b. Add it to the `write-aipl` skill
+
+`.claude/skills/write-aipl/SKILL.md` carries a one-line-per-category builtin list that every
+task loads. Add the new builtin's name to the right category (and keep it terse: name only),
+or the next author will not know it exists.
+
 ## 3. Dogfood it
 
 Grep the repo for the shape the builtin replaces and convert the real sites —
