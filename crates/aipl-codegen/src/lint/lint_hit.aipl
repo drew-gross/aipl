@@ -74,7 +74,7 @@ pub fn filled_with(self: UnfilledHit, spelled: (str) -> str?) -> LintHit {
     );
     let missing = self.named$builtin.filter(|builtin| !spelled(builtin).is_some()).distinct();
     let hint = if (missing.is_nonempty()) {
-        `, importing {missing.map(|builtin| `\`{builtin}\``).join(sep=", ")} from builtins`
+        `, importing {missing.map(|builtin| `\`{builtin}\``).join(sep=", ", final_sep=" and ", only_sep=" and ")} from builtins`
     } else {
         ""
     };
@@ -86,6 +86,29 @@ pub fn filled_with(self: UnfilledHit, spelled: (str) -> str?) -> LintHit {
         4..5,
     ));
     assert(advice.filled_with(|name| some("isa")) == hit("write isa(x)", 4..5));
+
+    // Several missing imports read as a sentence: `a` and `b`, or `a`, `b` and `c`.
+    let chain = UnfilledHit {
+        named: [
+            Named { text: "", builtin: "filter" },
+            Named { text: ".", builtin: "map" },
+            Named { text: ".", builtin: "join" },
+        ],
+        tail: "",
+        span: 0..1,
+    };
+    assert(
+        chain.filled_with(
+            |name| none,
+        ).message == "filter.map.join, importing `filter`, `map` and `join` from builtins",
+    );
+    assert(
+        chain.filled_with(|name| if (name == "join") {
+            some("join")
+        } else {
+            none
+        }).message == "filter.map.join, importing `filter` and `map` from builtins",
+    );
     let pair = UnfilledHit {
         named: [Named { text: "a ", builtin: "map" }, Named { text: " b ", builtin: "value_or" }],
         tail: " c",

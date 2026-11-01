@@ -92,7 +92,7 @@ pub fn push_loop_collect_ok(program: Program) -> LintHit[] {
         "push",
         "mut out = []; for (let x : xs) { if (let some(v) = f(x)) { set out.push(g(v)); }; } out",
     )? == [
-        ```"out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = xs.map(|x| ..).collect_ok().map(|v| ..);" and drop the loop, importing `map`, `collect_ok` from builtins```,
+        ```"out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = xs.map(|x| ..).collect_ok().map(|v| ..);" and drop the loop, importing `map` and `collect_ok` from builtins```,
     ]);
     assert(messages(
         "push, map, collect_ok as oks",

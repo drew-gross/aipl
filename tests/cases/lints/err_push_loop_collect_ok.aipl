@@ -39,13 +39,13 @@ fn main() !prints {
     print(`{parsed(["1", "x"])} {doubled(["2"])} {present([some(3), none])}`);
 }
 --- errors ---
-error: "out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = words.map(|word| ..).collect_ok();" and drop the loop, importing `map`, `collect_ok` from builtins (or append #[allow] to this line to keep it)
+error: "out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = words.map(|word| ..).collect_ok();" and drop the loop, importing `map` and `collect_ok` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_push_loop_collect_ok.aipl:13:22
    |
 13 |     mut out: i64[] = [];
    |                      ^^
 
-error: "out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = words.map(|word| ..).collect_ok().map(|n| ..);" and drop the loop, importing `map`, `collect_ok` from builtins (or append #[allow] to this line to keep it)
+error: "out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = words.map(|word| ..).collect_ok().map(|n| ..);" and drop the loop, importing `map` and `collect_ok` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_push_loop_collect_ok.aipl:22:22
    |
 22 |     mut out: i64[] = [];

@@ -935,6 +935,7 @@ formatting:
   if (cond) { return; } should be able to format on one line as long as the block is a single statement.
 
 docs:
+  need better docs for builtins so we don't reimplement stuff
   make go to def and doc-on-hover work for operators
   aipl doc command should have nicer formatting, and top-level formatting.
   delete BUILTIN_SIGNATURES, turn it into properties of Callee, integrate into doc

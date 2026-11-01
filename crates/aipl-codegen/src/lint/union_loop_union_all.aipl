@@ -121,7 +121,7 @@ pub fn union_loop_union_all(program: Program) -> LintHit[] {
         "union",
         "mut out = #{}; for (let s : xs) { set out = out.union(g(s)); } out",
     )? == [
-        ```"out" is seeded empty and unioned into by this loop a set at a time and nothing else — write "mut out = xs.map(|s| ..).union_all();" and drop the loop, importing `map`, `union_all` from builtins```,
+        ```"out" is seeded empty and unioned into by this loop a set at a time and nothing else — write "mut out = xs.map(|s| ..).union_all();" and drop the loop, importing `map` and `union_all` from builtins```,
     ]);
     assert(messages(
         "union, union_all as all_of",
