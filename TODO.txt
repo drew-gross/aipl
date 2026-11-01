@@ -22,6 +22,7 @@ projects:
     whats with Key? Why is up/down/left/right special cased?
     before is just saturating sub. Maybe after can have a clamp_add?
     press() should destructure self. Also we should have tuple destructuring
+  make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
 
 argparser:
   make it

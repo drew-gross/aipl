@@ -1241,3 +1241,53 @@ fn a_type_parameter_goes_to_its_declaration() {
     goes(&mut server, "Value>)", "Value>(");
     goes(&mut server, "Value {", "Value>(");
 }
+
+/// A function named where a function value is expected — an argument to a call or
+/// to a method — goes to the function, whether it is declared in the file, takes its
+/// parameter apart, or is imported.
+#[test]
+fn a_function_passed_as_a_value_goes_to_its_declaration() {
+    let main = "import { map } from builtins;\n\
+                import { double } from \"./util.aipl\";\n\
+                struct P { x: i64 }\n\
+                fn inc(n: i64) -> i64 { n }\n\
+                fn first(P { x }) -> i64 { x }\n\
+                fn run(f: (i64) -> i64, v: i64) -> i64 { f(v) }\n\
+                fn on(self: P, f: (P) -> i64) -> i64 { f(self) }\n\
+                fn main() {\n\
+                \u{20}   let a = [1].map(inc);\n\
+                \u{20}   let b = run(inc, 1);\n\
+                \u{20}   let c = P { x: 1 }.on(first);\n\
+                \u{20}   let d = [1].map(double);\n\
+                }\n";
+    let util = "pub fn double(n: i64) -> i64 { n }\n";
+    let workspace = Workspace::new(
+        "function-as-value",
+        &[("main.aipl", main), ("util.aipl", util)],
+    );
+    let mut server = opened(&workspace, "main.aipl");
+    analysed(&mut server, &workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let goes = |server: &mut Server, from: &str, to: &str| {
+        let location = definition_at(server, &uri, cursor_on(main, from));
+        assert_eq!(location["uri"], json!(uri), "from {from:?}");
+        assert_eq!(
+            location["range"]["start"],
+            cursor_on(main, to),
+            "from {from:?}"
+        );
+    };
+    goes(
+        &mut server,
+        "inc);\n\u{20}   let b",
+        "inc(n: i64) -> i64 { n }\nfn first",
+    );
+    goes(&mut server, "inc, 1", "inc(n: i64) -> i64 { n }\nfn first");
+    goes(&mut server, "first);", "first(P { x })");
+    let location = definition_at(&mut server, &uri, cursor_on(main, "double);"));
+    assert_eq!(location["uri"], json!(workspace.uri("util.aipl")));
+    assert_eq!(
+        location["range"]["start"],
+        cursor_on(util, "double(n: i64)")
+    );
+}

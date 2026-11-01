@@ -6178,6 +6178,7 @@ impl Cx<'_> {
                 // for the same reason the lambda branch above does: it may pin a
                 // variable that appears only here (`F` in `map_err`'s `(E) -> F`).
                 let actual_ret = self.check_fn_ref(g, ptys, ret, effects, arg.span.clone())?;
+                self.resolved(&arg.name_span, Target::Function(g.clone()));
                 return Ok(Type::Fn(ptys.clone(), Box::new(actual_ret)));
             }
         }
