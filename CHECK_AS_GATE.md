@@ -94,7 +94,7 @@ Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
 ## Phase 3: forbid importing files that have sections
 - [x] Loader error naming the section (`refuse_sectioned_import` in `crates/aipl-loader/src/lib.rs`, raised at the import site while resolving path imports; covered by the Rust test `check::a_file_with_sections_cannot_be_imported` in `tests/suites/check.rs`; a case fixture cannot express it, because the cases harness stages only `file:` companions and a companion cannot hold sections). Virtual (FFI-supplied) files are not covered.
 - [x] Fix whatever the corpus failure list shows: nothing failed, no corpus file imported a sectioned file.
-- [ ] Check what happens when a `file:` companion body itself contains a section marker.
+- [x] A `file:` companion body that contains a section marker: the marker ends the companion and starts a section of the main file, with no error (the rest of the intended companion becomes e.g. the main file's `stdout`). Pinned by `parser::a_section_marker_inside_a_companion_ends_it_and_belongs_to_the_main_file`. A companion therefore can never hold sections, which is what makes the import rule complete for staged files.
 - [x] `cargo handoff` green (1019s; 1 new baseline row).
 
 ## Phase 4: batch runner
@@ -149,4 +149,4 @@ Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
 
 ## Session log
 - 2026-11-01: plan written and approved; nothing implemented. Next: Phase 0.
-- 2026-11-01 (session 2): Phase 3 done out of order. Loader refuses importing a file with sections; handoff green (1019s: discovery 488s, final 495s), blast radius zero. Open in Phase 3: companion body containing a section marker (unchecked). Next: Phase 0 or Phase 1.
+- 2026-11-01 (session 2): Phase 3 done out of order. Loader refuses importing a file with sections; handoff green (1019s: discovery 488s, final 495s), blast radius zero. Companion-marker behavior pinned (marker ends the companion, silently belongs to the main file). Phase 3 complete. Next: Phase 0 or Phase 1.

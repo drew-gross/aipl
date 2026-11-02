@@ -1146,3 +1146,33 @@ fn a_reductions_signature_is_synthesized_from_its_steps() {
         assert_eq!(got.sig, want.sig, "{}", want.name.text);
     }
 }
+
+/// A `file:` companion cannot contain a section marker: the marker ends the
+/// companion's body and starts a section of the *main* file, with no error. Here
+/// `second` is never part of `util.aipl`, and the `stdout` it would have been
+/// next to belongs to the case.
+#[test]
+fn a_section_marker_inside_a_companion_ends_it_and_belongs_to_the_main_file() {
+    aipl::install_parser_hooks();
+    let src = "fn main() { }\n\
+               --- file: util.aipl ---\n\
+               pub fn first() -> i64 { 1 }\n\
+               --- stdout ---\n\
+               pub fn second() -> i64 { 2 }\n";
+    let spec = aipl::parse_spec(src).expect("the sections parse");
+    assert_eq!(
+        spec.extra_files,
+        vec![(
+            "util.aipl".to_string(),
+            "pub fn first() -> i64 { 1 }".to_string()
+        )]
+    );
+    assert_eq!(spec.stdout.as_deref(), Some("pub fn second() -> i64 { 2 }"));
+    assert_eq!(
+        aipl::companion_files(src),
+        Ok(vec![(
+            "util.aipl".to_string(),
+            "pub fn first() -> i64 { 1 }".to_string()
+        )])
+    );
+}
