@@ -31,8 +31,12 @@ Facts established by reading (nothing timed yet):
 
 ## Decisions
 Settled:
-- `main` is reserved for the entry point of a program that is itself the subject. Files that have
-  `main` + sections only as a hook for printing/asserting are converted (Phase 2).
+- `main` is reserved for exactly two things (decided 2026-11-02, broad scope): **(a)** the entry point of an
+  actual program (`projects/*`, `examples/`), and **(b)** a handful of tests that validate the behavior of the
+  *un-shimmed* builtins (real file I/O, printing, stdin, clock, `execute_program`, terminal), which need some
+  coverage of the real implementation. Everything else stops pinning the behavior of "regular" functions through
+  `main` / `print` / sections: it becomes `.test` blocks (asserts on returned values, or on prints captured with an
+  inline `shim`). This is the **broad** set of the Phase 2b census (~650 files), not just empty placeholders.
 - Because of that, `check` keeps its rule of running `main` only when a run-observing section
   (`stdout`, `stderr`, `exit code`, non-empty `cli`, `expect file:`) exists. No implicit
   "silent and exit 0" assertion for section-less `main`s.
@@ -46,8 +50,13 @@ Settled:
 - Running `main` under the JIT is rejected: the AOT linker runtime is the product.
 
 Open (resolve in the phase noted):
-- [ ] D1 (Phase 0/2): where "real program" ends. Proposed: keep `main` when the case pins exit
-      code, `cli`, stdin, `expect file:`, or process-level behavior; convert when it only prints.
+- [x] D1 (Phase 0/2): "real program" = (a) and (b) above, nothing else (decided 2026-11-02).
+- [x] D6 (Phase 2b): tests of the entry-point mechanics (the 55 `main` files that pin `exit code`, `cli`, `stderr`,
+      `file:` / `expect file:`) **stay `main` tests** (decided 2026-11-02). They are not moved: no directory is
+      created for them.
+- [ ] D7 (Phase 2b): how, if at all, to enforce "`main` only for programs and real-builtin coverage". Directory-based
+      enforcement was rejected (decided 2026-11-02: skip enforcement for now; the user has not settled on a
+      mechanism). Until then the rule is held by review and by the checklist below.
 - [x] D2 (Phase 3): importing a file that has sections is an **error** (done 2026-11-01).
 - [ ] D3 (Phase 1): what marks the project root so rooting does not depend on the cwd.
 - [x] D5 (Phase 2a): no shared capture helpers — each test writes its shim **inline** (decided
@@ -148,15 +157,91 @@ Checklist:
 - [x] `write-aipl` skill states the rule and the inline patterns (DESIGN_PRINCIPLES.md left alone: it is not a numbered principle).
 - [ ] `cargo handoff` green.
 
-### Phase 2b: convert dummy `main`s
-- [ ] Settle the inline print-capture shape (D5: no helper) so the expected text stays visible in the
-      file; document it in the write-aipl skill.
-- [ ] Codemod: `fn main() { body }` + `--- stdout --- X` becomes `fn scenario() { body }` plus a
-      `.test` asserting the captured text equals X. Cases pinning exit code/`cli`/stdin/files keep `main`.
-- [ ] Convert a directory at a time (list directories here as they land):
-  - [ ] _(fill from the Phase 0 census)_
-- [ ] Update CLAUDE.md "Test `main` style" and the `write-aipl` skill.
-- [ ] `cargo handoff` per directory batch; review moved baseline rows (`main` -> test-driver switch).
+### Phase 2b: reserve `main` for programs and real-builtin coverage
+Target state: `fn main` appears only in (a) real programs (`projects/`, `examples/`), (b) tests of the un-shimmed builtins,
+and (c) the entry-point-mechanics tests (exit code, `cli`, `stderr`, `file:`, `expect file:`, D6). Nothing enforces it
+yet (D7); no directory layout is imposed.
+
+Census (2026-11-02; `fn main` plus at least one section, over `tests/cases`, `crates`, `examples`): 704 files.
+| group | files | disposition |
+|---|---|---|
+| empty `fn main() {}` placeholder | 55 | delete the `main` |
+| non-empty `main` + `.test` blocks + sections | 56 | fold the prints into the existing tests |
+| `main`, no `.test`, `stdout` only | 309 | convert: prints become a captured-output assert, values become asserts |
+| `main`, no `.test`, `errors` (compile-error fixtures) | 197 | delete the `main` unless it is the thing that errors; the `errors` section stays (it pins the compiler, not a function) |
+| `main`, no `.test`, `exit code` / `cli` / `file:` / `expect file:` / `stderr` | 55 | keep as `main` tests (D6), where they are |
+| `main`, no `.test`, `report` (+ `stdout`) | 32 | the report is of what the case costs: keep the section, drive the cost from the test driver instead of `main` |
+| `main`, no sections | 15 | decide per file (delete, or it is example/program code) |
+
+How to convert (the shape a reader should see):
+- **Prefer a returned value.** If a function only prints because it was convenient, make it return the value
+  and assert on that: `assert(describe(3) == "three")`. No shim.
+- **If the printing is the behavior** (a function with `!prints`, a formatter that emits), capture it inline.
+  `print` adds a newline and `put` does not, so the stand-in models both, and the expected text stays visible:
+  ```
+  }.test({
+      mut out = "";
+      shim prints {
+          print = |text| { set out = `{out}{text}\n`; },
+          put = |text| { set out = `{out}{text}`; },
+      } {
+          demo();
+      };
+      assert(out == """
+          expected text, copied from the old `--- stdout ---`
+          """);
+  })
+  ```
+  (Watch `--- ` markers inside a `"""` block, and that a `"""` block is dedented.) Boilerplate is the accepted cost
+  of D5; if ~300 copies of this prove too noisy, revisit D5 with that number in hand.
+- The old `--- stdout ---` text is the oracle: the new assert must say the same bytes, so a codemod slip fails a test
+  instead of passing quietly. Read each batch's diff on a sample.
+
+Checklist:
+- [ ] ~~Allowlist rule~~ skipped for now (D7).
+- [x] D6 answered: the 55 entry-point-mechanics tests keep their `main`, in place.
+- [ ] Choose the real-builtin coverage set (kept in place, no new directory): one `main` case per un-shimmed builtin
+      surface (print/put, `read_file_to_string`, `write_string_to_file` + `expect file:`, `list_files`,
+      `read_line`/`read_byte`, `now_nanos`/`monotonic_now`, `execute_program`, terminal). Start from what exists:
+      `tests/cases/files/*`, `builtins/now_nanos`, `builtins/monotonic_now` (already main + `stdout`),
+      `execute_program/*`. Keep each tiny; list them here. Everything else in those directories converts.
+- [ ] Delete the 55 empty `main`s (and the 197 `errors` fixtures' `main`s that are not the error site). Mechanical;
+      handoff refills line-sensitive `errors` sections.
+- [ ] Convert the 56 `main` + `.test` files (fold the prints into their tests).
+- [ ] Convert the 309 `stdout`-only programs, in the batches below (counts per `tests/cases/` directory; one
+      `cargo handoff` per batch; tick a batch when it lands). Each batch is ~20-35 files so a diff stays
+      reviewable. Batch 1 is the small-directories warm-up, which is where the capture template gets shaken out.
+  - [ ] 1. Warm-up, 33: `bindings` 5, `conditionals` 1, `constants` 2, `chars` 2, `compound_assign` 2, `integers` 2,
+        `loops` 2, `results` 2, `syntax` 1, `options` 3, `methods` 3, `functions` 6, `dicts` 4. Settle the template here.
+  - [ ] 2. `strings`, 28. (Mind `named_representations`: it must keep asking for each representation by name.)
+  - [ ] 3. `arrays`, 28.
+  - [ ] 4. `structs` 15 + `variants` 13, 28.
+  - [ ] 5. `tuples` 12 + `sets` 11, 23.
+  - [ ] 6. `generics` 13 + `match_arms` 9 + `lambdas` 8, 30.
+  - [ ] 7. Small leftovers, 19: `kwargs` 7, `grids` 4, `tail_calls` 4, `imports` 1, `docs` 1, `performance` 1, `perf` 1.
+  - [ ] 8. `optimizations`, 33. Take care: these exist to pin what codegen does to a program, so check each converted
+        case still exercises the same optimization (the `report` and baseline row are the evidence), not just the output.
+  - [ ] 9-11. `lints`, 67, in three alphabetical thirds of ~22 by file name (`err_*` fixtures carry `errors`, not this
+        bucket; these are the `*_allow` and `*_not_flagged` fixtures). Their point is "the lint does not fire / the
+        rewrite agrees with the longhand", so the new asserts compare the two spellings directly.
+  - [ ] 12. Decide before converting, 18: `effects` 7, `builtins` 8, `execute_program` 2, `cli` 1. Some of these *are*
+        the real-builtin coverage set (b) and keep their `main`; the `shim_effects`-style ones already test shims and
+        convert. Settle the kept set here, then convert the rest.
+- [ ] Convert the 32 `report` cases: confirm what `aipl report` / the harness measure when there is no `main`
+      (the synthesized test driver), re-pin the section, check the baseline row moves are explained.
+- [ ] The 15 section-less `main` files: decide each.
+- [ ] Per directory batch: `cargo handoff`, then review moved baseline rows (the `main` -> test-driver switch moves
+      `instructions` and `code bytes` for every converted case, as the old "void main" note says).
+- [ ] Update **CLAUDE.md**: delete the "Test `main` style" section (its premise, a void `main` driving a case, is
+      gone for ordinary cases); rewrite "Prefer the cases framework for tests" (it says a case is source plus
+      expected `--- stdout ---`: say instead that behavior is pinned by `.test` blocks, and sections are for
+      `errors`, `report`, and the real-builtin and entry-point-mechanics cases); update "Performance monitoring"
+      (what a case carries; `report` without a `main`); say where `main` may appear (programs, real-builtin coverage, entry-point mechanics).
+- [ ] Update the `write-aipl` skill (the `main`/`stdout` examples, the capture-shim template above) and any other
+      skill or doc that shows a `main` + `stdout` case as the way to write a test (`add-builtin`, `add-lint` say
+      "a case is for ... output a `main` prints": reword).
+- [ ] Re-count the census after the last directory; the number of cases that link a production executable should
+      be small (this is what Phase 0's "fewer executables" saving rests on): record it here.
 
 ## Phase 3: forbid importing files that have sections
 - [x] Loader error naming the section (`refuse_sectioned_import` in `crates/aipl-loader/src/lib.rs`, raised at the import site while resolving path imports; covered by the Rust test `check::a_file_with_sections_cannot_be_imported` in `tests/suites/check.rs`; a case fixture cannot express it, because the cases harness stages only `file:` companions and a companion cannot hold sections). Virtual (FFI-supplied) files are not covered.
@@ -225,3 +310,5 @@ Checklist:
   slots (`CONST_SLOTS`) were never cleared between compilations, so one file's cached constant was read by the next
   (`forget_jit_constants`, pinned by `one_files_cached_constants_do_not_reach_the_next`). Other process-global state
   (shim slots, tallies, `set_current_dir`) is still unaudited.
+
+- 2026-11-02: Phase 2b scope set to the broad reading (~650 files); D1 resolved; D6 resolved (entry-point tests keep `main`, in place); enforcement skipped (D7 open, no directory-based rule).
