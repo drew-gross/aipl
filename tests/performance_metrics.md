@@ -176,7 +176,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/effects/random | 7 | 221 | 221 | 1348 | 5044 | 12.00 | 69.28 | 1456 |
 | cases/effects/random_provider_block | 2 | 40 | 40 | 536 | 2056 | 7.00 | 80.83 | 1440 |
 | cases/effects/shim_clock | 7 | 276 | 276 | 300 | 2280 | 8.00 | 66.56 | 1472 |
-| cases/effects/shim_closures | 13 | 877 | 741 | 1419 | 6668 | 11.00 | 79.52 | 1504 |
+| cases/effects/shim_closures | 13 | 877 | 741 | 1778 | 8216 | 12.00 | 138.81 | 1488 |
 | cases/effects/shim_effects | 29 | 1811 | 1571 | 2151 | 13176 | 18.00 | 80.94 | 1488 |
 | cases/effects/transitive_caller_with_declaration_passes | 0 | 0 | 0 | 17 | 156 | 3.00 | 62.87 | 1440 |
 | cases/equality/arrays | 8 | 640 | 640 | 1882 | 3724 | 4.00 | 77.96 | 1456 |

@@ -85,8 +85,19 @@ impl Mono<'_> {
             let ptys = sig.param_types();
             let returned = sig.return_type();
 
-            let captured = free_vars(closure_body, params, env);
+            let mut captured = free_vars(closure_body, params, env);
             let assigned = aipl_syntax::assigned_names(closure_body);
+            // `free_vars` finds uses, and `set x = ..` is not one, so a variable the
+            // closure only assigns would get no cell. It still has to be captured: the
+            // closure's copy is what the assignment writes to.
+            for name in &assigned {
+                let is_param = params.iter().any(|p| p.name == *name);
+                if !is_param && !captured.iter().any(|(n, _)| n == name) {
+                    if let Some(ty) = env.get(name) {
+                        captured.push((name.clone(), ty.clone()));
+                    }
+                }
+            }
             // The closure's own body: a copy of what it captures, then its code,
             // then what it set put back.
             let mut writes: Vec<(String, usize)> = Vec::new();
