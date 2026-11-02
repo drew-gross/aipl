@@ -38,6 +38,10 @@ Settled:
   "silent and exit 0" assertion for section-less `main`s.
 - Paths in diagnostics and baked `assert`/`trace` labels are relative to the **project root**
   (cmd+clickable). The harness and `aipl report` move to it; `check` already works that way.
+- **Tests and performance blocks may not let an effect escape**: every effect a `.test` body uses
+  (directly or through any function it calls) must be discharged by a `shim` inside the body. Tests
+  that exercise the real (unshimmed) filesystem, clock, stdin or process APIs are real programs: they
+  keep a `main` and pin behavior with `stdout` / `file:` / `expect file:` sections.
 - Crashes and runaway JIT are not mitigated (treated as top-priority bugs; fail loudly).
 - Running `main` under the JIT is rejected: the AOT linker runtime is the product.
 
@@ -46,6 +50,9 @@ Open (resolve in the phase noted):
       code, `cli`, stdin, `expect file:`, or process-level behavior; convert when it only prints.
 - [x] D2 (Phase 3): importing a file that has sections is an **error** (done 2026-11-01).
 - [ ] D3 (Phase 1): what marks the project root so rooting does not depend on the cwd.
+- [x] D5 (Phase 2a): no shared capture helpers — each test writes its shim **inline** (decided
+      2026-11-02). No builtin, no library file, no in-memory filesystem builtin; the shim pattern
+      stays visible at the use, as in `tests/cases/effects/shim_closures.aipl`.
 - [ ] D4 (end of Phase 0): speedup that justifies Phases 4-5 (suggestion: discovery well under
       half of 456s).
 
@@ -81,9 +88,68 @@ Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
       lint hit, unformatted file.
 - [ ] `cargo handoff` green; baseline rows shifted by the rooting change reviewed.
 
-## Phase 2: convert dummy `main`s
-- [ ] Design the capture helper (a `shim print`-based `capture_prints`-style function) so the
-      expected text stays visible in the file; add it with `.test` blocks and a write-aipl skill entry.
+## Phase 2: tests may not let effects escape, then convert dummy `main`s
+
+### Phase 2a: effect-free tests (do first; it defines what a converted test may do)
+Findings (subagent read of the code; line numbers approximate):
+- The checker has no notion of "test". `.test` bodies get every effect only because
+  `synthesize_driver` in `crates/aipl-codegen/src/lib.rs` (`all_effects`, ~1520-1535) declares
+  `prints, read_files, read_stdin, read_stdin_raw, terminal, write_files, list_files,
+  execute_program, clock` on each synthesized `__test$<fn>` and on `__test_main` (`random` and
+  `measure` are already excluded). `.performance` blocks already declare only `measure`, so they
+  are effect-free today.
+- The rule is therefore: declare nothing for `TestKind::Tests`. An effectful call outside a `shim`
+  then fails with the existing "undeclared effect" error, and `check_shim` already discharges a
+  shimmed effect for its body, transitively. Shim functions inside a test must themselves be
+  effect-free (capture-only closures), because the enclosing fn must declare any effect they have.
+- `trace` and `assert` carry no effect, so they stay usable.
+- `aipl check` runs `.test` blocks in the in-process JIT with real effects today: prints go to the
+  process's stdout, files to the cwd (a scratch dir for cases, the repo root for in-place files).
+- No capture helper, in-memory filesystem or fake clock exists. `tests/cases/effects/shim_closures.aipl`
+  shows the inline pattern (capture prints into a `str[]`, script `read_line`, fix the clock). A shim must bind
+  every operation of its effect, so a filesystem stand-in binds `read_file_to_string`,
+  `write_string_to_file` and `list_files` together.
+- Census (lower bound: it does not follow effects reached through imported functions; ~889 `.test`
+  blocks in 500 files): about 6 files use a real effect in a test body today:
+  `tests/cases/files/write_file.aipl`, `tests/cases/files/error_type.aipl`,
+  `crates/aipl-codegen/src/fill_or_add_sections_file.aipl`, `crates/aipl-codegen/src/find_files.aipl`,
+  `tests/cases/builtins/now_nanos.aipl`, `tests/cases/builtins/monotonic_now.aipl` (which also runs
+  `sleep 1`). `projects/minesweeper/main.aipl:516` already shims `random`. No test body prints or reads
+  stdin directly. The real number comes from the checker once the rule is on (fanout rule: change it, read the failure list).
+- Touchpoints: `build_test_program` / `build_performance_program` / `synthesize_driver`; the LSP's
+  use of `build_test_program` (`crates/aipl-lsp/src/server.rs` ~721) and `src/perf.rs` ~41 if they
+  assume the saturated set; stale comments at `aipl-codegen/src/lib.rs` ~1481 and ~1514-1519 ("A test body may
+  call anything") and `aipl-syntax/src/lib.rs` ~4120; DESIGN_PRINCIPLES.md (add the rule beside the shim text).
+
+Effects on other phases:
+- **Phase 4 gets easier:** with no real effects in `.test` blocks, the JIT test run no longer needs a
+  scratch cwd or staged companions; only `main` runs (child processes) do. That removes the main reason
+  `check` calls `set_current_dir`, which is what forced it to be serial per process.
+- **Phase 2b gets a clear target:** a converted dummy `main` becomes a test that captures prints with a shim,
+  because the test is no longer allowed to print for real.
+- Tests of the real filesystem/clock/stdin/process APIs stay as `main` cases (they count as the
+  "real program" bucket of decision D1), so this fits Prerequisite A.
+- Coverage is not lost, but moves: real-IO assertions inside `crates/**` `.test` blocks
+  (`fill_or_add_sections_file`, `find_files`) become shimmed tests, and the real-API check lives in a
+  `main` case with sections.
+
+Checklist:
+- [x] Capture helpers: none (D5) — shims are written inline in each test. The write-aipl skill and
+      DESIGN_PRINCIPLES.md show the inline patterns (print capture, scripted stdin, fixed clock,
+      a filesystem stand-in binding all three operations).
+- [ ] Turn the rule on: empty `all_effects` for `TestKind::Tests` in `synthesize_driver`; fix the
+      stale comments; confirm LSP and `src/perf.rs` still build their test programs.
+- [ ] Fix the failure list: shim the effects in each offending test, or move it to a `main` case with
+      `stdout` / `file:` / `expect file:` sections when the real API is the point (the 6 above are the
+      expected starting set).
+- [ ] `err_*` case under `tests/cases/effects/`: a test that uses an unshimmed effect is an error that
+      names the effect and says to shim it (read the message by eye after the fill).
+- [ ] DESIGN_PRINCIPLES.md and the `write-aipl` skill: state the rule and show the inline patterns.
+- [ ] `cargo handoff` green.
+
+### Phase 2b: convert dummy `main`s
+- [ ] Settle the inline print-capture shape (D5: no helper) so the expected text stays visible in the
+      file; document it in the write-aipl skill.
 - [ ] Codemod: `fn main() { body }` + `--- stdout --- X` becomes `fn scenario() { body }` plus a
       `.test` asserting the captured text equals X. Cases pinning exit code/`cli`/stdin/files keep `main`.
 - [ ] Convert a directory at a time (list directories here as they land):
@@ -150,3 +216,4 @@ Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
 ## Session log
 - 2026-11-01: plan written and approved; nothing implemented. Next: Phase 0.
 - 2026-11-01 (session 2): Phase 3 done out of order. Loader refuses importing a file with sections; handoff green (1019s: discovery 488s, final 495s), blast radius zero. Companion-marker behavior pinned (marker ends the companion, silently belongs to the main file). Phase 3 complete. Next: Phase 0 or Phase 1.
+- 2026-11-01 (session 2): added Phase 2a (tests and performance blocks may not let effects escape) after the design discussion; code read only, nothing implemented for it. Census says ~6 files need migration; rule is mostly a one-line change in `synthesize_driver`.
