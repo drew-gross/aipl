@@ -205,7 +205,7 @@ fn disturbs(e: &Expr, names: &[&str]) -> bool {
         ExprKind::IfLet(arm, _, _) => arm.pattern.bindings().iter().any(named),
         _ => false,
     };
-    here || children(e).into_iter().any(|c| disturbs(c, names))
+    here || children(e).any(|c| disturbs(c, names))
 }
 
 /// `program` with each `try_set` written as the value-returning operation it is.

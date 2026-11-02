@@ -812,7 +812,7 @@ fn keepable(e: &Expr) -> bool {
     !matches!(
         &e.kind,
         ExprKind::Try(_) | ExprKind::Return(_) | ExprKind::Assign(..)
-    ) && crate::children(e).iter().all(|c| keepable(c))
+    ) && crate::children(e).all(|c| keepable(c))
 }
 
 /// `base.field` with the projection applied at each struct `base` ends in:

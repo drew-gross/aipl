@@ -523,13 +523,13 @@ fn with_callers_of<P: Optimizable>(program: &P, changed: &HashSet<String>) -> Ha
 /// — is decided in exactly one place. The counts themselves are not wanted;
 /// only which names appeared.
 fn references(f: &FunctionView<'_>) -> HashSet<String> {
-    let mut bound: HashSet<String> = f.params.iter().cloned().collect();
-    let mut counts: HashMap<String, usize> = HashMap::new();
+    let mut bound: HashSet<&str> = f.params.iter().map(String::as_str).collect();
+    let mut counts: HashMap<&str, usize> = HashMap::new();
     crate::count_uses(f.body, &mut bound, &mut counts);
     if let Some(test_body) = f.test_body {
         crate::count_uses(test_body, &mut bound, &mut counts);
     }
-    counts.into_keys().collect()
+    counts.into_keys().map(str::to_string).collect()
 }
 
 #[cfg(test)]

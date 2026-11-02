@@ -209,7 +209,7 @@ fn can_drop(e: &Expr, blocked: &HashSet<String>) -> bool {
 /// Whether `e` holds a `map` call anywhere — see [`can_drop`].
 fn consumes_a_map(e: &Expr) -> bool {
     matches!(&e.kind, ExprKind::Call(Callee::Map, ..))
-        || crate::children(e).iter().any(|c| consumes_a_map(c))
+        || crate::children(e).any(|c| consumes_a_map(c))
 }
 
 /// `len(arg)` — `whole` being that call — measured without building `arg`, or
@@ -476,7 +476,7 @@ fn stable_index(index: &Expr) -> bool {
 
 /// Whether `e` mentions a number literal anywhere — see [`fold_index`].
 fn mentions_number(e: &Expr) -> bool {
-    matches!(e.kind, ExprKind::Num(_)) || crate::children(e).iter().any(|c| mentions_number(c))
+    matches!(e.kind, ExprKind::Num(_)) || crate::children(e).any(|c| mentions_number(c))
 }
 
 /// `e[index]`, computed from `e`'s shape. `whole` is the index expression, whose

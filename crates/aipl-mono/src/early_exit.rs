@@ -239,9 +239,9 @@ fn always_returns(e: &Expr) -> bool {
 }
 
 fn contains_return(e: &Expr) -> bool {
-    matches!(e.kind, ExprKind::Return(_)) || children(e).iter().any(|c| contains_return(c))
+    matches!(e.kind, ExprKind::Return(_)) || children(e).any(|c| contains_return(c))
 }
 
 fn contains_try(e: &Expr) -> bool {
-    matches!(e.kind, ExprKind::Try(_)) || children(e).iter().any(|c| contains_try(c))
+    matches!(e.kind, ExprKind::Try(_)) || children(e).any(|c| contains_try(c))
 }

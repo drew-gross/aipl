@@ -52,7 +52,11 @@ fn mono_names(src: &str) -> Vec<String> {
 /// Per-function reference counts for `src` (groundwork for inlining). Operates on
 /// the parsed AST — no type-checking — so cases need only parse.
 fn counts(src: &str) -> HashMap<String, usize> {
-    use_counts(&parse(src).expect("parse"))
+    let program = parse(src).expect("parse");
+    use_counts(&program)
+        .into_iter()
+        .map(|(name, count)| (name.to_string(), count))
+        .collect()
 }
 
 #[test]

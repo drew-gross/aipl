@@ -188,9 +188,7 @@ fn reaches_blocked(e: &Expr, blocked: &HashSet<String>) -> bool {
         ExprKind::Shim(..) => true,
         _ => false,
     };
-    here || crate::children(e)
-        .iter()
-        .any(|c| reaches_blocked(c, blocked))
+    here || crate::children(e).any(|c| reaches_blocked(c, blocked))
 }
 
 /// Whether `value` may be moved into a branch — see the module docs.
@@ -204,9 +202,7 @@ pub(crate) fn can_defer(value: &Expr, blocked: &HashSet<String>) -> bool {
             | ExprKind::Assign(..)
             // May not terminate, and its body may do either of the above.
             | ExprKind::For(..) | ExprKind::While(..)
-        ) || crate::children(e)
-            .iter()
-            .any(|c| moves_control_or_writes(c))
+        ) || crate::children(e).any(|c| moves_control_or_writes(c))
     }
     !reaches_blocked(value, blocked) && !moves_control_or_writes(value)
 }
@@ -383,7 +379,7 @@ pub(crate) fn mentions_free(e: &Expr, name: &str) -> bool {
         ExprKind::Lambda(params, body) => {
             !params.iter().any(|p| p.name == name) && mentions_free(body, name)
         }
-        _ => crate::children(e).iter().any(|c| mentions_free(c, name)),
+        _ => crate::children(e).any(|c| mentions_free(c, name)),
     }
 }
 

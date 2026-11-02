@@ -92,6 +92,7 @@ use aipl_syntax::{
     concat_str_ty, is_concat_str, is_empty_array_arg, is_error, is_none_inner, is_none_literal_arg,
     is_str_repr, type_name, DebugOptions, Error, Span, BUILTIN_SIGNATURES, SPAN_TYPE,
 };
+use aipl_syntax::{Children, ChildrenMut};
 
 /// Hard cap on the number of generic instances monomorphization will emit.
 /// For well-behaved generics the reachable instance set is finite (type
@@ -9377,12 +9378,12 @@ fn collect_free(
 /// unreferenced — e.g. `main`, which only the runtime calls); a builtin appears
 /// only once referenced. `.test` blocks are not counted — the count reflects the
 /// production program.
-pub fn use_counts(program: &Program) -> HashMap<String, usize> {
-    let mut counts: HashMap<String, usize> = program
+pub fn use_counts(program: &Program) -> HashMap<&str, usize> {
+    let mut counts: HashMap<&str, usize> = program
         .items
         .iter()
         .filter_map(|it| match it {
-            Item::Fn(f) => Some((f.name.text.clone(), 0)),
+            Item::Fn(f) => Some((f.name.text.as_str(), 0)),
             _ => None,
         })
         .collect();
@@ -9391,7 +9392,7 @@ pub fn use_counts(program: &Program) -> HashMap<String, usize> {
             // A function's parameters shadow same-named globals within its body
             // (e.g. a `(T) -> bool` parameter `pred` called as `pred(x)` is the
             // parameter, not a top-level `pred`).
-            let mut bound: HashSet<String> = f.sig.params.iter().map(|p| p.name.clone()).collect();
+            let mut bound: HashSet<&str> = f.sig.params.iter().map(|p| p.name.as_str()).collect();
             count_uses(&f.body, &mut bound, &mut counts);
         }
     }
@@ -9405,148 +9406,102 @@ pub fn use_counts(program: &Program) -> HashMap<String, usize> {
 /// mirroring [`collect_free`]'s scope handling — so a bound name (a local) is not
 /// counted. In a valid program every other unbound name is a function (user or
 /// builtin), since AIPL has no global variables.
-pub(crate) fn count_uses(
-    e: &Expr,
-    bound: &mut HashSet<String>,
-    counts: &mut HashMap<String, usize>,
+pub(crate) fn count_uses<'a>(
+    e: &'a Expr,
+    bound: &mut HashSet<&'a str>,
+    counts: &mut HashMap<&'a str, usize>,
 ) {
     match &e.kind {
-        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
-        ExprKind::TypeArgs(x, _) => count_uses(x, bound, counts),
-        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         // A shim installs its bound functions by address, which is a use like
         // any other — without counting them here they'd look dead and be pruned.
         ExprKind::Shim(_, bindings, body) => {
             for (_, f) in bindings {
-                if !bound.contains(f) {
-                    *counts.entry(f.clone()).or_insert(0) += 1;
+                if !bound.contains(f.as_str()) {
+                    *counts.entry(f).or_insert(0) += 1;
                 }
             }
             count_uses(body, bound, counts);
         }
         ExprKind::Ident(n) => {
-            if !bound.contains(n) {
-                *counts.entry(n.clone()).or_insert(0) += 1;
+            if !bound.contains(n.as_str()) {
+                *counts.entry(n).or_insert(0) += 1;
             }
         }
         ExprKind::Call(name, args, _) => {
-            if !bound.contains(name.name()) {
-                *counts.entry(name.name().to_string()).or_insert(0) += 1;
+            let name = name.name();
+            if !bound.contains(name) {
+                *counts.entry(name).or_insert(0) += 1;
             }
             for a in args {
                 count_uses(a, bound, counts);
-            }
-        }
-        ExprKind::Num(_)
-        | ExprKind::Bool(_)
-        | ExprKind::Str(_)
-        | ExprKind::Char(_)
-        | ExprKind::None
-        | ExprKind::Unit => {}
-        ExprKind::Neg(x) | ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) => {
-            count_uses(x, bound, counts)
-        }
-        ExprKind::Seq(a, b) | ExprKind::Index(a, b) => {
-            count_uses(a, bound, counts);
-            count_uses(b, bound, counts);
-        }
-        ExprKind::If(a, b, c) => {
-            count_uses(a, bound, counts);
-            count_uses(b, bound, counts);
-            count_uses(c, bound, counts);
-        }
-        ExprKind::Slice(a, b, c) => {
-            count_uses(a, bound, counts);
-            count_uses(b, bound, counts);
-            if let Some(c) = c {
-                count_uses(c, bound, counts);
-            }
-        }
-        ExprKind::ArrayLit(args) | ExprKind::SetLit(args, _) | ExprKind::TupleLit(args) => {
-            for a in args {
-                count_uses(a, bound, counts);
-            }
-        }
-        ExprKind::DictLit(pairs) => {
-            for (k, v) in pairs {
-                count_uses(k, bound, counts);
-                count_uses(v, bound, counts);
-            }
-        }
-        ExprKind::Construct(_, inits) => {
-            for fi in inits {
-                count_uses(&fi.value, bound, counts);
             }
         }
         ExprKind::Match(s, arms) => {
             count_uses(s, bound, counts);
             for arm in arms {
-                let added: Vec<String> = arm
-                    .pattern
-                    .bindings()
-                    .iter()
-                    .filter(|b| bound.insert((*b).clone()))
-                    .cloned()
-                    .collect();
+                let mut added: Vec<&str> = Vec::new();
+                arm.pattern.each_binding(&mut |b| {
+                    if bound.insert(b) {
+                        added.push(b);
+                    }
+                });
                 count_uses(&arm.body, bound, counts);
                 for b in added {
-                    bound.remove(&b);
+                    bound.remove(b);
                 }
             }
         }
         ExprKind::IfLet(arm, s, else_b) => {
             count_uses(s, bound, counts);
-            let added: Vec<String> = arm
-                .pattern
-                .bindings()
-                .iter()
-                .filter(|b| bound.insert((*b).clone()))
-                .cloned()
-                .collect();
+            let mut added: Vec<&str> = Vec::new();
+            arm.pattern.each_binding(&mut |b| {
+                if bound.insert(b) {
+                    added.push(b);
+                }
+            });
             count_uses(&arm.body, bound, counts);
             for b in added {
-                bound.remove(&b);
+                bound.remove(b);
             }
             count_uses(else_b, bound, counts);
         }
         ExprKind::Let(n, _, val, b) | ExprKind::LetMut(n, _, val, b) => {
             count_uses(val, bound, counts);
-            let added = bound.insert(n.clone());
+            let added = bound.insert(n);
             count_uses(b, bound, counts);
             if added {
-                bound.remove(n);
+                bound.remove(n.as_str());
             }
-        }
-        // An `Assign` LHS is rooted at an existing binding (an lvalue) — a
-        // local either way, never a countable function reference.
-        ExprKind::Assign(_, val, b) => {
-            count_uses(val, bound, counts);
-            count_uses(b, bound, counts);
         }
         ExprKind::For(v, index, iter, b) => {
             count_uses(iter, bound, counts);
-            let added = bound.insert(v.clone());
-            let added_index = index.as_ref().is_some_and(|i| bound.insert(i.clone()));
+            let added = bound.insert(v);
+            let added_index = index.as_ref().is_some_and(|i| bound.insert(i));
             count_uses(b, bound, counts);
             if added_index {
-                bound.remove(index.as_ref().expect("inserted above"));
+                bound.remove(index.as_ref().expect("inserted above").as_str());
             }
             if added {
-                bound.remove(v);
+                bound.remove(v.as_str());
             }
         }
-        ExprKind::While(cond, b) => {
-            count_uses(cond, bound, counts);
-            count_uses(b, bound, counts);
-        }
         ExprKind::Lambda(ps, b) => {
-            let added: Vec<String> = ps
+            let added: Vec<&str> = ps
                 .iter()
-                .filter_map(|p| bound.insert(p.name.clone()).then(|| p.name.clone()))
+                .filter(|p| bound.insert(&p.name))
+                .map(|p| p.name.as_str())
                 .collect();
             count_uses(b, bound, counts);
             for n in added {
-                bound.remove(&n);
+                bound.remove(n);
+            }
+        }
+        // Everything else only nests expressions. A `set`'s target is rooted at an
+        // existing binding — a local either way, never a countable function
+        // reference — and `children` leaves it out.
+        _ => {
+            for child in children(e) {
+                count_uses(child, bound, counts);
             }
         }
     }
@@ -9814,7 +9769,7 @@ pub(crate) fn body_size(e: &Expr) -> usize {
             | ExprKind::None
             | ExprKind::Unit
     );
-    usize::from(!leaf) + children(e).iter().map(|c| body_size(c)).sum::<usize>()
+    usize::from(!leaf) + children(e).map(|c| body_size(c)).sum::<usize>()
 }
 
 /// Inline every function whose body is at most `max_exprs` [`body_size`], at all
@@ -9905,7 +9860,7 @@ pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
 /// they differ in how big a body they accept and where they put it.
 fn inline_candidates(
     program: &Program,
-    binders: &HashSet<String>,
+    binders: &HashSet<&str>,
     max_exprs: usize,
     wanted: Option<&HashSet<String>>,
 ) -> Vec<Function> {
@@ -10161,7 +10116,7 @@ pub fn inline_small_post_mono(
         // once nothing names it and nothing outside can ask for it.
         if replaced && !library && !externally_called.contains(&f.name) {
             let counts = use_counts_mono(&program);
-            if counts.get(&f.name) == Some(&0) {
+            if counts.get(f.name.as_str()) == Some(&0) {
                 program.fns.retain(|g| g.name != f.name);
             }
         }
@@ -10175,8 +10130,8 @@ pub fn inline_small_post_mono(
 /// only as a value.
 fn is_inline_candidate(
     f: &Function,
-    counts: &HashMap<String, usize>,
-    binders: &HashSet<String>,
+    counts: &HashMap<&str, usize>,
+    binders: &HashSet<&str>,
     skip: &HashSet<String>,
 ) -> bool {
     counts.get(f.name.as_str()) == Some(&1)
@@ -10238,12 +10193,12 @@ fn is_inline_shape(higher_order_or_variadic: bool, body: &Expr) -> bool {
 /// Every name bound by a parameter / `let` / `for` / `match` arm / lambda
 /// parameter anywhere in `program` — used to confirm a candidate's name is never
 /// shadowed (so its single use is unambiguous).
-fn collect_binders(program: &Program) -> HashSet<String> {
+fn collect_binders(program: &Program) -> HashSet<&str> {
     let mut set = HashSet::new();
     for it in &program.items {
         if let Item::Fn(f) = it {
             for p in &f.sig.params {
-                set.insert(p.name.clone());
+                set.insert(p.name.as_str());
             }
             collect_body_binders(&f.body, &mut set);
         }
@@ -10256,8 +10211,8 @@ fn collect_binders(program: &Program) -> HashSet<String> {
 /// and monomorphization leaves no type parameters.
 fn is_inline_candidate_mono(
     f: &ConcreteFn,
-    counts: &HashMap<String, usize>,
-    binders: &HashSet<String>,
+    counts: &HashMap<&str, usize>,
+    binders: &HashSet<&str>,
     skip: &HashSet<String>,
 ) -> bool {
     counts.get(f.name.as_str()) == Some(&1)
@@ -10297,49 +10252,49 @@ fn is_inline_candidate_mono(
 }
 
 /// [`use_counts`] for a [`MonoProgram`].
-fn use_counts_mono(program: &MonoProgram) -> HashMap<String, usize> {
-    let mut counts: HashMap<String, usize> =
-        program.fns.iter().map(|f| (f.name.clone(), 0)).collect();
+fn use_counts_mono(program: &MonoProgram) -> HashMap<&str, usize> {
+    let mut counts: HashMap<&str, usize> =
+        program.fns.iter().map(|f| (f.name.as_str(), 0)).collect();
     for f in &program.fns {
-        let mut bound: HashSet<String> = f.params.iter().map(|p| p.name.clone()).collect();
+        let mut bound: HashSet<&str> = f.params.iter().map(|p| p.name.as_str()).collect();
         count_uses(&f.body, &mut bound, &mut counts);
     }
     counts
 }
 
 /// [`collect_binders`] for a [`MonoProgram`].
-fn collect_binders_mono(program: &MonoProgram) -> HashSet<String> {
+fn collect_binders_mono(program: &MonoProgram) -> HashSet<&str> {
     let mut set = HashSet::new();
     for f in &program.fns {
         for p in &f.params {
-            set.insert(p.name.clone());
+            set.insert(p.name.as_str());
         }
         collect_body_binders(&f.body, &mut set);
     }
     set
 }
 
-fn collect_body_binders(e: &Expr, set: &mut HashSet<String>) {
+fn collect_body_binders<'a>(e: &'a Expr, set: &mut HashSet<&'a str>) {
     match &e.kind {
         ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) => {
-            set.insert(n.clone());
+            set.insert(n);
         }
         ExprKind::For(n, index, _, _) => {
-            set.insert(n.clone());
+            set.insert(n);
             if let Some(i) = index {
-                set.insert(i.clone());
+                set.insert(i);
             }
         }
         ExprKind::Lambda(ps, _) => {
             for p in ps {
-                set.insert(p.name.clone());
+                set.insert(&p.name);
             }
         }
         ExprKind::Match(_, arms) => {
             for a in arms {
-                for b in a.pattern.bindings() {
-                    set.insert(b.clone());
-                }
+                a.pattern.each_binding(&mut |b| {
+                    set.insert(b);
+                });
             }
         }
         _ => {}
@@ -10349,55 +10304,21 @@ fn collect_body_binders(e: &Expr, set: &mut HashSet<String>) {
     }
 }
 
-/// The direct sub-expressions of `e` (read-only traversal helper). Public so
-/// codegen's tail-position walk (`tail_callees`) can reuse the one exhaustive
-/// list of child expressions rather than keep a second copy in step with it.
-pub fn children(e: &Expr) -> Vec<&Expr> {
+/// The direct sub-expressions of `e` (read-only traversal helper), as an iterator
+/// that allocates nothing. Public so codegen's tail-position walk (`tail_callees`)
+/// can reuse the one exhaustive list of child expressions rather than keep a second
+/// copy in step with it.
+///
+/// This is [`aipl_syntax::Expr::children`] for a program that has been through the
+/// loader: `set`'s target is a name by now, so it is not yielded, and a keyword
+/// argument or a spread, which the loader expands, is a bug to meet here.
+pub fn children(e: &Expr) -> Children<'_> {
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
-        // Checking walks through the wrapper to the call it holds; it is gone
-        // once checking has stamped the program.
-        ExprKind::TypeArgs(call, _) => vec![call],
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
-        ExprKind::Shim(_, _, body) => vec![body],
-        ExprKind::Num(_)
-        | ExprKind::Bool(_)
-        | ExprKind::Str(_)
-        | ExprKind::Char(_)
-        | ExprKind::Ident(_)
-        | ExprKind::None
-        | ExprKind::Unit => vec![],
-        ExprKind::Neg(x) | ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) => {
-            vec![x]
-        }
-        ExprKind::Seq(a, b)
-        | ExprKind::Index(a, b)
-        | ExprKind::Let(_, _, a, b)
-        | ExprKind::LetMut(_, _, a, b)
-        | ExprKind::Assign(_, a, b)
-        | ExprKind::For(_, _, a, b)
-        | ExprKind::While(a, b) => vec![a, b],
-        ExprKind::If(a, b, c) => vec![a, b, c],
-        ExprKind::Slice(a, b, c) => {
-            let mut v = vec![a.as_ref(), b.as_ref()];
-            if let Some(c) = c {
-                v.push(c);
-            }
-            v
-        }
-        ExprKind::Call(_, args, _)
-        | ExprKind::ArrayLit(args)
-        | ExprKind::SetLit(args, _)
-        | ExprKind::TupleLit(args) => args.iter().collect(),
-        ExprKind::DictLit(pairs) => pairs.iter().flat_map(|(k, v)| [k, v]).collect(),
-        ExprKind::Construct(_, inits) => inits.iter().map(|i| &i.value).collect(),
-        ExprKind::Match(s, arms) => {
-            let mut v = vec![s.as_ref()];
-            v.extend(arms.iter().map(|a| &a.body));
-            v
-        }
-        ExprKind::IfLet(arm, s, else_b) => vec![s.as_ref(), &arm.body, else_b.as_ref()],
-        ExprKind::Lambda(_, b) => vec![b],
+        // The target of a `set` is a name by now, not an expression to walk.
+        ExprKind::Assign(_, value, body) => Children::of([value, body]),
+        _ => e.children(),
     }
 }
 
@@ -10446,53 +10367,21 @@ fn has_placeholder(t: &Type) -> bool {
     }
 }
 
-/// [`children`], by mutable reference. Kept adjacent so the two stay in step:
-/// a new `ExprKind` arm has to be added to both, and the compiler says so.
-pub fn children_mut(e: &mut Expr) -> Vec<&mut Expr> {
-    match &mut e.kind {
-        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
-        ExprKind::TypeArgs(call, _) => vec![call],
-        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
-        ExprKind::Shim(_, _, body) => vec![body],
-        ExprKind::Num(_)
-        | ExprKind::Bool(_)
-        | ExprKind::Str(_)
-        | ExprKind::Char(_)
-        | ExprKind::Ident(_)
-        | ExprKind::None
-        | ExprKind::Unit => vec![],
-        ExprKind::Neg(x) | ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) => {
-            vec![x]
-        }
-        ExprKind::Seq(a, b)
-        | ExprKind::Index(a, b)
-        | ExprKind::Let(_, _, a, b)
-        | ExprKind::LetMut(_, _, a, b)
-        | ExprKind::Assign(_, a, b)
-        | ExprKind::For(_, _, a, b)
-        | ExprKind::While(a, b) => vec![a, b],
-        ExprKind::If(a, b, c) => vec![a, b, c],
-        ExprKind::Slice(a, b, c) => {
-            let mut v = vec![a.as_mut(), b.as_mut()];
-            if let Some(c) = c {
-                v.push(c);
-            }
-            v
-        }
-        ExprKind::Call(_, args, _)
-        | ExprKind::ArrayLit(args)
-        | ExprKind::SetLit(args, _)
-        | ExprKind::TupleLit(args) => args.iter_mut().collect(),
-        ExprKind::DictLit(pairs) => pairs.iter_mut().flat_map(|(k, v)| [k, v]).collect(),
-        ExprKind::Construct(_, inits) => inits.iter_mut().map(|i| &mut i.value).collect(),
-        ExprKind::Match(s, arms) => {
-            let mut v = vec![s.as_mut()];
-            v.extend(arms.iter_mut().map(|a| &mut a.body));
-            v
-        }
-        ExprKind::IfLet(arm, s, else_b) => vec![s.as_mut(), &mut arm.body, else_b.as_mut()],
-        ExprKind::Lambda(_, b) => vec![b],
+/// [`children`], mutably.
+pub fn children_mut(e: &mut Expr) -> ChildrenMut<'_> {
+    if matches!(e.kind, ExprKind::KwArg(..)) {
+        unreachable!("keyword arguments are expanded by the loader");
     }
+    if matches!(e.kind, ExprKind::Spread(..)) {
+        unreachable!("array spreads are desugared by the loader");
+    }
+    if matches!(e.kind, ExprKind::Assign(..)) {
+        let ExprKind::Assign(_, value, body) = &mut e.kind else {
+            unreachable!()
+        };
+        return ChildrenMut::of([value, body]);
+    }
+    e.children_mut()
 }
 
 /// Whether `e` (or any sub-expression) calls an in-place higher-order intrinsic:
@@ -10512,9 +10401,7 @@ fn contains_inplace_hof_intrinsic(e: &Expr) -> bool {
             return true;
         }
     }
-    children(e)
-        .iter()
-        .any(|c| contains_inplace_hof_intrinsic(c))
+    children(e).any(|c| contains_inplace_hof_intrinsic(c))
 }
 
 /// Whether `e` (or any sub-expression) is a *context-typed* literal — `none`, or
@@ -10537,7 +10424,7 @@ pub(crate) fn contains_context_literal(e: &Expr) -> bool {
         ExprKind::Call(n, _, _) => matches!(n, Callee::Ok | Callee::Err),
         _ => false,
     };
-    here || children(e).iter().any(|c| contains_context_literal(c))
+    here || children(e).any(|c| contains_context_literal(c))
 }
 
 /// Whether `e` references `name` as a `Call` callee or an `Ident` value. Only
@@ -10546,7 +10433,7 @@ fn references_name(e: &Expr, name: &str) -> bool {
     match &e.kind {
         ExprKind::Ident(n) => n == name,
         ExprKind::Call(n, args, _) => n == name || args.iter().any(|a| references_name(a, name)),
-        _ => children(e).iter().any(|c| references_name(c, name)),
+        _ => children(e).any(|c| references_name(c, name)),
     }
 }
 
@@ -11282,7 +11169,7 @@ pub fn assigns_binding(name: &str, body: &Expr) -> bool {
             return true;
         }
     }
-    children(body).into_iter().any(|c| assigns_binding(name, c))
+    children(body).any(|c| assigns_binding(name, c))
 }
 
 /// Whether `body` moves the binding `name` — whole (`__move(name)`) or by a
@@ -11300,7 +11187,7 @@ pub fn moves_binding(name: &str, body: &Expr) -> bool {
             return true;
         }
     }
-    children(body).into_iter().any(|c| moves_binding(name, c))
+    children(body).any(|c| moves_binding(name, c))
 }
 
 /// Whether `name`'s slot can be treated as the sole owner of its block, so a

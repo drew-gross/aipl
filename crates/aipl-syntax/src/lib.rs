@@ -364,6 +364,8 @@ pub fn set_caret_block_hook(f: fn(&str, Span, &str) -> String) {
 pub mod aipl_builtins;
 pub mod builtin;
 pub mod callee;
+mod children;
+pub use children::{Children, ChildrenMut};
 pub mod rename;
 pub mod resolution;
 pub use rename::{
@@ -2047,22 +2049,32 @@ pub mod ast {
         /// nested pattern — every [`Pattern::Bind`] in it, depth first, left to
         /// right. Empty for a string-literal or wildcard pattern.
         pub fn bindings(&self) -> Vec<String> {
+            let mut names = Vec::new();
+            self.each_binding(&mut |name| names.push(name.to_string()));
+            names
+        }
+
+        /// [`Pattern::bindings`] without copying a name: `f` is handed each binder,
+        /// borrowed from the pattern, in the same order.
+        pub fn each_binding<'a>(&'a self, f: &mut impl FnMut(&'a str)) {
             match self {
-                Pattern::Ctor { bindings, .. } => bindings.clone(),
-                Pattern::Array(elems) | Pattern::ArrayRest(elems) => elems
-                    .iter()
-                    .filter_map(|e| match &e.kind {
-                        ExprKind::Ident(name) => Some(name.clone()),
-                        _ => None,
-                    })
-                    .collect(),
-                Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard | Pattern::Int(_) => {
-                    Vec::new()
+                Pattern::Ctor { bindings, .. } => bindings.iter().for_each(|b| f(b)),
+                Pattern::Array(elems) | Pattern::ArrayRest(elems) => {
+                    for e in elems {
+                        if let ExprKind::Ident(name) = &e.kind {
+                            f(name);
+                        }
+                    }
                 }
-                Pattern::Bind(name) => vec![name.clone()],
+                Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard | Pattern::Int(_) => {}
+                Pattern::Bind(name) => f(name),
                 Pattern::Tuple(ps)
                 | Pattern::Nested { args: ps, .. }
-                | Pattern::ArrayNested(ps) => ps.iter().flat_map(Pattern::bindings).collect(),
+                | Pattern::ArrayNested(ps) => {
+                    for p in ps {
+                        p.each_binding(f);
+                    }
+                }
             }
         }
 
@@ -4346,7 +4358,7 @@ pub fn erase_refinements(program: &mut ast::Program) {
 /// [`erase_refinements`] for the `assume_nonempty` calls in one expression
 /// tree: each becomes its argument.
 fn erase_assumptions(e: &mut ast::Expr) {
-    for child in each_subexpr_mut(e) {
+    for child in e.children_mut() {
         erase_assumptions(child);
     }
     if let ast::ExprKind::Call(Callee::AssumeNonempty, args, _) = &mut e.kind {
@@ -4742,55 +4754,8 @@ fn each_type_in_expr_mut(e: &mut ast::Expr, f: &mut impl FnMut(&mut Type)) {
         }
         _ => {}
     }
-    for child in each_subexpr_mut(e) {
+    for child in e.children_mut() {
         each_type_in_expr_mut(child, f);
-    }
-}
-
-/// The direct sub-expressions of `e`, mutably — the shape [`each_subexpr`]
-/// walks, for passes that rewrite rather than inspect.
-pub fn each_subexpr_mut(e: &mut ast::Expr) -> Vec<&mut ast::Expr> {
-    use ast::ExprKind as K;
-    match &mut e.kind {
-        K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::Ident(_) | K::None | K::Unit => {
-            vec![]
-        }
-        K::Shim(_, _, body) => vec![body.as_mut()],
-        K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args, _) | K::TupleLit(args) => {
-            args.iter_mut().collect()
-        }
-        K::Construct(_, inits) => inits.iter_mut().map(|i| &mut i.value).collect(),
-        K::DictLit(pairs) => pairs.iter_mut().flat_map(|(k, v)| [k, v]).collect(),
-        K::Seq(a, b)
-        | K::Index(a, b)
-        | K::Let(_, _, a, b)
-        | K::LetMut(_, _, a, b)
-        | K::For(_, _, a, b)
-        | K::While(a, b) => vec![a.as_mut(), b.as_mut()],
-        K::Assign(a, b, c) | K::If(a, b, c) => vec![a.as_mut(), b.as_mut(), c.as_mut()],
-        K::Neg(x)
-        | K::Field(x, _)
-        | K::Try(x)
-        | K::Return(x)
-        | K::KwArg(_, x, _)
-        | K::TypeArgs(x, _)
-        | K::Spread(x)
-        | K::Lambda(_, x) => vec![x.as_mut()],
-        K::Match(scrutinee, arms) => {
-            let mut v = vec![scrutinee.as_mut()];
-            v.extend(arms.iter_mut().map(|a| &mut a.body));
-            v
-        }
-        K::IfLet(arm, scrutinee, else_b) => {
-            vec![scrutinee.as_mut(), &mut arm.body, else_b.as_mut()]
-        }
-        K::Slice(a, b, c) => {
-            let mut v = vec![a.as_mut(), b.as_mut()];
-            if let Some(c) = c {
-                v.push(c.as_mut());
-            }
-            v
-        }
     }
 }
 
@@ -4863,68 +4828,9 @@ pub fn diverges(e: &ast::Expr) -> bool {
 }
 
 pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
-    use ast::ExprKind as K;
     f(e);
-    match &e.kind {
-        K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::Ident(_) | K::None | K::Unit => {}
-        // A shim's bindings name functions; only its body nests expressions.
-        K::Shim(_, _, body) => each_subexpr(body, f),
-        K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args, _) | K::TupleLit(args) => {
-            for a in args {
-                each_subexpr(a, f);
-            }
-        }
-        K::Construct(_, inits) => {
-            for init in inits {
-                each_subexpr(&init.value, f);
-            }
-        }
-        K::DictLit(pairs) => {
-            for (k, v) in pairs {
-                each_subexpr(k, f);
-                each_subexpr(v, f);
-            }
-        }
-        K::Seq(a, b)
-        | K::Index(a, b)
-        | K::Let(_, _, a, b)
-        | K::LetMut(_, _, a, b)
-        | K::For(_, _, a, b)
-        | K::While(a, b) => {
-            each_subexpr(a, f);
-            each_subexpr(b, f);
-        }
-        K::Assign(a, b, c) | K::If(a, b, c) => {
-            each_subexpr(a, f);
-            each_subexpr(b, f);
-            each_subexpr(c, f);
-        }
-        K::Neg(x)
-        | K::Field(x, _)
-        | K::Try(x)
-        | K::Return(x)
-        | K::KwArg(_, x, _)
-        | K::TypeArgs(x, _)
-        | K::Spread(x)
-        | K::Lambda(_, x) => each_subexpr(x, f),
-        K::Match(scrutinee, arms) => {
-            each_subexpr(scrutinee, f);
-            for arm in arms {
-                each_subexpr(&arm.body, f);
-            }
-        }
-        K::IfLet(arm, scrutinee, else_b) => {
-            each_subexpr(scrutinee, f);
-            each_subexpr(&arm.body, f);
-            each_subexpr(else_b, f);
-        }
-        K::Slice(a, b, c) => {
-            each_subexpr(a, f);
-            each_subexpr(b, f);
-            if let Some(c) = c {
-                each_subexpr(c, f);
-            }
-        }
+    for child in e.children() {
+        each_subexpr(child, f);
     }
 }
 
@@ -5013,55 +4919,9 @@ fn collect_free(
             collect_free(else_b, bound, out);
         }
         _ => {
-            for child in children(e) {
+            for child in e.children() {
                 collect_free(child, bound, out);
             }
-        }
-    }
-}
-
-/// `e`'s immediate sub-expressions — the shared-shape half of
-/// [`collect_free`], whose own arms cover every node that *binds* a name.
-/// Mirrors [`each_subexpr_mut`].
-fn children(e: &ast::Expr) -> Vec<&ast::Expr> {
-    use ast::ExprKind as K;
-    match &e.kind {
-        K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::Ident(_) | K::None | K::Unit => {
-            vec![]
-        }
-        K::Shim(_, _, body) => vec![body],
-        K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args, _) | K::TupleLit(args) => {
-            args.iter().collect()
-        }
-        K::Construct(_, inits) => inits.iter().map(|i| &i.value).collect(),
-        K::DictLit(pairs) => pairs.iter().flat_map(|(k, v)| [k, v]).collect(),
-        K::Seq(a, b)
-        | K::Index(a, b)
-        | K::Let(_, _, a, b)
-        | K::LetMut(_, _, a, b)
-        | K::For(_, _, a, b)
-        | K::While(a, b) => vec![a, b],
-        K::Assign(a, b, c) | K::If(a, b, c) => vec![a, b, c],
-        K::Neg(x)
-        | K::Field(x, _)
-        | K::Try(x)
-        | K::Return(x)
-        | K::KwArg(_, x, _)
-        | K::TypeArgs(x, _)
-        | K::Spread(x)
-        | K::Lambda(_, x) => vec![x],
-        K::Match(scrutinee, arms) => {
-            let mut v = vec![&**scrutinee];
-            v.extend(arms.iter().map(|a| &a.body));
-            v
-        }
-        K::IfLet(arm, scrutinee, else_b) => vec![scrutinee, &arm.body, else_b],
-        K::Slice(a, b, c) => {
-            let mut v = vec![&**a, &**b];
-            if let Some(c) = c {
-                v.push(c);
-            }
-            v
         }
     }
 }

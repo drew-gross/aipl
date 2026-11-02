@@ -1204,7 +1204,7 @@ fn splice_constants(e: &mut Expr, values: &HashMap<String, Expr>) {
             return;
         }
     }
-    for kid in aipl_syntax::each_subexpr_mut(e) {
+    for kid in e.children_mut() {
         splice_constants(kid, values);
     }
 }

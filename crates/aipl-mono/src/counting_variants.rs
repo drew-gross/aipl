@@ -337,11 +337,11 @@ fn mint(
 /// not reason about (see the module docs).
 fn lambda_returns(e: &Expr) -> bool {
     fn has_return(e: &Expr) -> bool {
-        matches!(e.kind, ExprKind::Return(_)) || crate::children(e).iter().any(|c| has_return(c))
+        matches!(e.kind, ExprKind::Return(_)) || crate::children(e).any(|c| has_return(c))
     }
     match &e.kind {
         ExprKind::Lambda(_, body) => has_return(body),
-        _ => crate::children(e).iter().any(|c| lambda_returns(c)),
+        _ => crate::children(e).any(|c| lambda_returns(c)),
     }
 }
 

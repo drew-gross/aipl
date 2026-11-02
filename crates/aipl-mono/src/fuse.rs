@@ -289,7 +289,7 @@ fn has_effect(e: &Expr, effectful: &HashSet<String>) -> bool {
         ExprKind::Shim(..) => true,
         _ => false,
     };
-    here || crate::children(e).iter().any(|c| has_effect(c, effectful))
+    here || crate::children(e).any(|c| has_effect(c, effectful))
 }
 
 /// The functions in `items` whose signature declares an effect — what

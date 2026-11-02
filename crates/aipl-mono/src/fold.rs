@@ -342,7 +342,7 @@ fn binds_name(e: &Expr, name: &str) -> bool {
         ExprKind::IfLet(arm, _, _) => pattern_binds(&arm.pattern, name),
         _ => false,
     };
-    here || crate::children(e).iter().any(|c| binds_name(c, name))
+    here || crate::children(e).any(|c| binds_name(c, name))
 }
 
 /// The folded form of `kind` (whose children are already folded), if it is a

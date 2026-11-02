@@ -418,7 +418,7 @@ fn already_moves(name: &str, body: &Expr) -> bool {
             return true;
         }
     }
-    children(body).into_iter().any(|c| already_moves(name, c))
+    children(body).any(|c| already_moves(name, c))
 }
 
 /// `e` with every binding under it marked, innermost first — a binding's marks
@@ -516,7 +516,7 @@ fn only_call_arguments(
         ExprKind::IfLet(arm, scrutinee, else_body) => {
             !binds(arm, name) && all(&[scrutinee, &arm.body, else_body])
         }
-        _ => all(&children(e)),
+        _ => children(e).all(|c| only_call_arguments(name, c, false, heap_fields)),
     }
 }
 
@@ -578,7 +578,7 @@ fn forwarded(name: &str, e: &Expr, tail: bool, heap_fields: &HashSet<String>) ->
             if tail && count_ident(name, e) == 1 =>
         {
             let call = matches!(&e.kind, ExprKind::Call(..));
-            children(e).into_iter().all(|part| {
+            children(e).all(|part| {
                 if is_name(part, name) {
                     true
                 } else if is_composite_literal(part) {
@@ -759,12 +759,12 @@ fn mark(
         // them alive past itself.
         _ => {
             let later: Vec<bool> = {
-                let kids = children(e);
+                let kids: Vec<&Expr> = children(e).collect();
                 (0..kids.len())
                     .map(|i| kids[i + 1..].iter().any(|c| mentions(name, c)))
                     .collect()
             };
-            for (child, later) in children_mut(e).into_iter().zip(later) {
+            for (child, later) in children_mut(e).zip(later) {
                 mark(name, child, tail && !later, mutating, alias_outlives);
             }
         }

@@ -264,7 +264,7 @@ impl Baker<'_> {
 /// Any other arity is the shared diagnostic below: a reserved name has exactly
 /// one meaning, so there is nothing for a second argument to be.
 ///
-/// The recursion is [`aipl_syntax::each_subexpr_mut`] rather than a match of its
+/// The recursion is [`aipl_syntax::Expr::children_mut`] rather than a match of its
 /// own. A hand-rolled walk has to be kept in step with `ExprKind` by hand, and a
 /// missing arm here is silent — a reserved call in that position simply would not
 /// be rewritten, and would surface much later as an unresolved name.
@@ -296,7 +296,7 @@ fn rewrite_reserved_call(
             return Ok(());
         }
     }
-    for child in aipl_syntax::each_subexpr_mut(e) {
+    for child in e.children_mut() {
         rewrite_reserved_call(child, r, rebuild)?;
     }
     Ok(())
