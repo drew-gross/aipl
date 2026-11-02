@@ -1,4 +1,4 @@
-import { equal as ==, read_file_to_string, write_string_to_file } from builtins;
+import { equal as ==, push, read_file_to_string, write_string_to_file } from builtins;
 import { fill_or_add_sections } from "./fill_or_add_sections.aipl";
 
 # Reads the file at `path`, splices every fill in `fills` into (or appends it
@@ -8,13 +8,24 @@ pub fn fill_or_add_sections_file(path: str, fills: #{str: str}) !read_files !wri
     let contents = read_file_to_string(path)?;
     write_string_to_file(path, fill_or_add_sections(contents, fills))
 }.test({
-    // This file is loaded in place by `aipl check` (some callers run it with
-    // cwd at the repo root, not a staged throwaway dir like `tests/cases/
-    // files/` fixtures get), so only the read-failure path — which touches
-    // nothing on disk — is safe to exercise directly here. The write-failure
-    // branch mirrors it exactly, and `write_string_to_file`'s own error
-    // behavior is covered in `tests/cases/files/write_file.aipl`.
-    assert(fill_or_add_sections_file("no_such_file_xyz_12345.aipl", #{"foo": "bar"}) == err(
-        "could not read file",
-    ));
+    // Stand-in files: a read that fails, and a read-then-write round trip.
+    shim read_files { read_file_to_string = |path| err("could not read file") } {
+        shim write_files { write_string_to_file = |path, contents| ok() } {
+            assert(fill_or_add_sections_file("no_such_file_xyz_12345.aipl", #{"foo": "bar"}) == err(
+                "could not read file",
+            ));
+        };
+    };
+    mut written: str[] = [];
+    shim write_files {
+        write_string_to_file = |path, contents| {
+            set written.push(contents);
+            ok()
+        },
+    } {
+        shim read_files { read_file_to_string = |path| ok("fn f() {}\n") } {
+            assert(fill_or_add_sections_file("x.aipl", #{"stdout": "hi"}) == ok());
+        };
+    };
+    assert(written == [fill_or_add_sections("fn f() {}\n", #{"stdout": "hi"})]);
 })

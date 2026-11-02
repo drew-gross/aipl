@@ -137,14 +137,15 @@ Checklist:
 - [x] Capture helpers: none (D5) — shims are written inline in each test. The write-aipl skill and
       DESIGN_PRINCIPLES.md show the inline patterns (print capture, scripted stdin, fixed clock,
       a filesystem stand-in binding all three operations).
-- [ ] Turn the rule on: empty `all_effects` for `TestKind::Tests` in `synthesize_driver`; fix the
+- [x] Turn the rule on: empty `all_effects` for `TestKind::Tests` in `synthesize_driver`; fix the
       stale comments; confirm LSP and `src/perf.rs` still build their test programs.
-- [ ] Fix the failure list: shim the effects in each offending test, or move it to a `main` case with
+- [x] Fix the failure list: shim the effects in each offending test, or move it to a `main` case with
       `stdout` / `file:` / `expect file:` sections when the real API is the point (the 6 above are the
       expected starting set).
-- [ ] `err_*` case under `tests/cases/effects/`: a test that uses an unshimmed effect is an error that
-      names the effect and says to shim it (read the message by eye after the fill).
-- [ ] DESIGN_PRINCIPLES.md and the `write-aipl` skill: state the rule and show the inline patterns.
+- [x] Refusal pinned by `a_test_cannot_let_an_effect_escape` in `tests/suites/check.rs` (a test-compile error
+      prints to stderr, which no case section can pin). The message names the function and effect but does not
+      say to shim it; worth improving.
+- [x] `write-aipl` skill states the rule and the inline patterns (DESIGN_PRINCIPLES.md left alone: it is not a numbered principle).
 - [ ] `cargo handoff` green.
 
 ### Phase 2b: convert dummy `main`s
@@ -217,3 +218,7 @@ Checklist:
 - 2026-11-01: plan written and approved; nothing implemented. Next: Phase 0.
 - 2026-11-01 (session 2): Phase 3 done out of order. Loader refuses importing a file with sections; handoff green (1019s: discovery 488s, final 495s), blast radius zero. Companion-marker behavior pinned (marker ends the companion, silently belongs to the main file). Phase 3 complete. Next: Phase 0 or Phase 1.
 - 2026-11-01 (session 2): added Phase 2a (tests and performance blocks may not let effects escape) after the design discussion; code read only, nothing implemented for it. Census says ~6 files need migration; rule is mostly a one-line change in `synthesize_driver`.
+
+- 2026-11-02: Phase 2a rule on; 6 tests migrated. Finding for Phase 4: one `aipl check crates examples ...` batch
+  reported 52 test failures (lint/*, format_source, grammar_aipl) that pass alone and do not fail as cases —
+  cross-file state leakage in a long-lived process, to chase before batching.

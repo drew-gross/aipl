@@ -21,14 +21,26 @@ fn describe(path: str) !read_files -> str {
     }
     // e: Error concatenated as a str
 }.test({
-    assert(describe("data.txt") == "read: hi");
-    assert(describe("missing.txt") == "error: could not read file");
-    assert(describe("empty.txt") == "error: empty input");
+    shim read_files {
+        read_file_to_string = |path| {
+            match (path) {
+                "data.txt" => ok("hi"),
+                "empty.txt" => ok(""),
+                _ => err("could not read file"),
+            }
+        },
+    } {
+        assert(describe("data.txt") == "read: hi");
+        assert(describe("missing.txt") == "error: could not read file");
+        assert(describe("empty.txt") == "error: empty input");
+    };
 
     // An Error compares equal to the string it carries (Error == str).
-    match (write_string_to_file("nope/x", "y")) {
-        ok => assert(false),
-        err(e) => assert(e == "could not write file"),
+    shim write_files { write_string_to_file = |path, contents| err("could not write file") } {
+        match (write_string_to_file("nope/x", "y")) {
+            ok => assert(false),
+            err(e) => assert(e == "could not write file"),
+        };
     };
 })
 

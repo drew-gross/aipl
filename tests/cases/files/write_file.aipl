@@ -2,23 +2,34 @@
 # returning `ok()` on success and `err(message)` on any failure. It carries the
 # `!write_files` effect (distinct from `!read_files`). The harness runs in a
 # temp dir, so writes land beside the program — the `expect file:` section below
-# validates what was actually written, directly (no read-back needed).
+# validates what was actually written, directly (no read-back needed). The test
+# block runs against a stand-in, since a test may not write for real.
 
-import { equal as ==, print, to_str, write_string_to_file } from builtins;
+import { equal as ==, print, push, starts_with, to_str, write_string_to_file } from builtins;
 
 fn write_to(path: str, contents: str) !write_files -> !str {
     write_string_to_file(path, contents)
 }.test({
-    // ok() on a writable path.
-    match (write_to("rt.txt", "ok")) {
-        ok => assert(true),
-        err(..) => assert(false),
+    // A stand-in that writes nothing: only a path under `no_such_dir/` fails.
+    mut written: str[] = [];
+    shim write_files {
+        write_string_to_file = |path, contents| {
+            set written.push(`{path}={contents}`);
+            if (path.starts_with("no_such_dir/")) { err("could not write file") } else { ok() }
+        },
+    } {
+        // ok() on a writable path.
+        match (write_to("rt.txt", "ok")) {
+            ok => assert(true),
+            err(..) => assert(false),
+        };
+        // err(message) when the directory doesn't exist.
+        match (write_to("no_such_dir/x.txt", "data")) {
+            ok => assert(false),
+            err(e) => assert(e == "could not write file"),
+        };
     };
-    // err(message) when the directory doesn't exist.
-    match (write_to("no_such_dir/x.txt", "data")) {
-        ok => assert(false),
-        err(e) => assert(e == "could not write file"),
-    };
+    assert(written == ["rt.txt=ok", "no_such_dir/x.txt=data"]); // both attempts reached the shim
 })
 
 fn main() !prints !write_files {

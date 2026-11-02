@@ -8,12 +8,14 @@ import { ends_with, equal as ==, filter, list_files, sort } from builtins;
 pub fn find_files(dir: str, ext: str) !list_files -> str[]!Error {
     ok(with_extension(list_files(dir)?, ext))
 }.test({
-    // `list_files` is the disk-touching half, and this file is loaded in place by
-    // `aipl check` (whose cwd is the repo root, not a staged throwaway dir), so
-    // only the failure path — which reads nothing — is safe to exercise here. The
-    // success path is `with_extension` below, plus the end-to-end walk in
-    // `tests/cases/files/list_files.aipl`.
-    assert(find_files("no_such_dir_xyz_12345", ".aipl") == err("could not list files"));
+    // `list_files` is the disk-touching half, so a stand-in answers for it; the
+    // end-to-end walk is `tests/cases/files/list_files.aipl`.
+    shim list_files { list_files = |dir| err("could not list files") } {
+        assert(find_files("no_such_dir_xyz_12345", ".aipl") == err("could not list files"));
+    };
+    shim list_files { list_files = |dir| ok(["b/x.aipl", "a.txt", "a.aipl"]) } {
+        assert(find_files("anywhere", ".aipl") == ok(["a.aipl", "b/x.aipl"]));
+    };
 })
 
 # The paths ending with `ext`, sorted — the pure half of `find_files`, applied

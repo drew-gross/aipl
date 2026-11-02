@@ -11,7 +11,16 @@
 # wall clock, which NTP or a manual change can step backwards at any moment;
 # `now_nanos` answers "when", not reliably "how long".
 
-import { greater_than as >, less_than as <, logical_and as &&, now_nanos } from builtins;
+import {
+    greater_than as >,
+    less_than as <,
+    logical_and as &&,
+    logical_not as !,
+    monotonic_now,
+    now_nanos,
+    print,
+    to_str,
+} from builtins;
 
 // 2024-01-01 and 2100-01-01 UTC, in nanoseconds since the epoch.
 fn year_2024_nanos() -> u64 { 1704067200000000000 }
@@ -22,6 +31,21 @@ fn now_is_plausible() !clock -> bool {
     let t = now_nanos();
     t > year_2024_nanos() && t < year_2100_nanos()
 }.test({
-    assert(now_is_plausible());
-    assert(now_is_plausible()); // reading it twice is fine — nothing is consumed
+    // The window is checked against stand-in clocks; the live one is read by `main`.
+    shim clock { now_nanos = || 1767225600000000000, monotonic_now = || 0 } {
+        assert(now_is_plausible());
+        assert(now_is_plausible()); // reading it twice is fine — nothing is consumed
+    };
+    shim clock { now_nanos = || 1704067199999999999, monotonic_now = || 0 } {
+        assert(!now_is_plausible()); // just before 2024
+    };
+    shim clock { now_nanos = || 1767225600000, monotonic_now = || 0 } {
+        assert(!now_is_plausible()); // a milliseconds-since-epoch reading
+    };
 })
+
+fn main() !prints !clock {
+    print(to_str(now_is_plausible()));
+}
+--- stdout ---
+true

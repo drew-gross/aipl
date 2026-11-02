@@ -12,6 +12,10 @@ import {
     logical_and as &&,
     logical_not as !,
     monotonic_now,
+    now_nanos,
+    print,
+    to_str,
+    wrapping_add_assign as +=,
     wrapping_sub as -,
 } from builtins;
 
@@ -23,10 +27,29 @@ fn readings_never_go_backwards() !clock -> bool {
     // the guarantee is "never decreases", not "always increases".
     b >= a
 }.test({
-    assert(readings_never_go_backwards());
-    // 0 is what an unreadable clock reads as, so a live one is never there.
-    assert(monotonic_now() > 0);
+    // Stand-in clocks; `main` reads the live one.
+    mut ticks: u64 = 0;
+    shim clock {
+        now_nanos = || 0,
+        monotonic_now = || {
+            set ticks += 1000;
+            ticks
+        },
+    } {
+        assert(readings_never_go_backwards());
+    };
+    shim clock { now_nanos = || 0, monotonic_now = || 7 } {
+        assert(readings_never_go_backwards()); // two readings in one tick
+    };
+    shim clock { now_nanos = || 0, monotonic_now = || 7 } {
+        // 0 is what an unreadable clock reads as, so a live one is never there.
+        assert(monotonic_now() > 0);
+    };
 })
+
+// Loose on both ends deliberately: `sleep` never returns early, and the ceiling
+// is far enough out that a loaded machine can't trip it.
+fn is_about_one_second(ns: u64) -> bool { ns > 500000000 && ns < 60000000000 }
 
 fn elapsed_over_a_one_second_sleep() !clock !execute_program -> u64 {
     let start = monotonic_now();
@@ -37,17 +60,18 @@ fn elapsed_over_a_one_second_sleep() !clock !execute_program -> u64 {
         err(..) => 0,
     }
 }.test({
-    // Loose on both ends deliberately: `sleep` never returns early, and the ceiling
-    // is far enough out that a loaded machine can't trip it.
-    fn is_about_one_second(ns: u64) -> bool { ns > 500000000 && ns < 60000000000 }
     assert(is_about_one_second(1000000000)); // one second, on the nose
     assert(is_about_one_second(1400000000)); // a slow second still counts
     assert(!is_about_one_second(1000000)); // a millisecond clock: 1000x small
     assert(!is_about_one_second(1000)); // a microsecond clock: 1e6 too small
     assert(!is_about_one_second(0));
-
-    // Sleeping a second has to show up as roughly a billion nanoseconds. This is
-    // what pins the *unit*: a micro- or millisecond clock reads a thousand or a
-    // million times smaller, and would fail here.
-    assert(is_about_one_second(elapsed_over_a_one_second_sleep()));
 })
+
+// Sleeping a second has to show up as roughly a billion nanoseconds. This is what
+// pins the *unit*: a micro- or millisecond clock reads a thousand or a million
+// times smaller, and would fail here.
+fn main() !prints !clock !execute_program {
+    print(to_str(is_about_one_second(elapsed_over_a_one_second_sleep())));
+}
+--- stdout ---
+true

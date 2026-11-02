@@ -272,6 +272,8 @@ lsp:
   docs hover should work on Error, err, ok, etc.
 
 bugs:
+  improve error message for unshimmed effects in tests
+  set tracker = params; from inside a shim closure should work
   Printing a call that constant-folds to none (for example print({f(0)}) with f returning None) fails with "to_str: rendering none is not yet supported"
   Gate bug: the_leak_gate_runs_for_a_case_with_no_sections re-runs examples_arrays and requires it to pass. When that case's baseline row is stale, the test fails without printing a handoff-fill: line. Handoff then stops before it reaches the step that would refresh the row. I got past it once by refreshing that single row with the scoped refresh_perfmon command. The fix would be either to have the test print the Fill it needs, or to have it ignore baseline movement.
   main should return u8 since that's what OSes use
@@ -482,6 +484,7 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  add some helpers for shimming in tests maybe
   turn map into a real function that can be inlined, rather than a synthetic one, so that map/join fusion can be both normal and after mono
   make a "static_ok" method that evaluates a top-level function at compile time and fails the compile if err, then users don't have to check for err
   is_case_and: variant matches case and predicate
@@ -841,6 +844,7 @@ check:
   can for sure recover from format errors
 
 tests:
+  section test that asserts on expecting files to be written
   make sure check passes on all files (needs to account for sections maybe?)
   test operation fusion by re-rendering the fused code back to aipl and asserting on that. The measure() assertions (especially the doesn't-fire assertions) are fragile.
   allow top-level test({}) to kill the stupid fn main() {}.test() pattern (also lint against that pattern - tests on empty main or other empty function)

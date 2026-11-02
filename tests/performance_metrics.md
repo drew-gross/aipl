@@ -126,8 +126,8 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/builtins/int_parse_through_generics | 15 | 839 | 839 | 6890 | 4340 | 11.00 | 171.03 | 1456 |
 | cases/builtins/int_parse_widths | 43 | 2571 | 2571 | 15725 | 9840 | 29.00 | 157.39 | 1472 |
 | cases/builtins/is_nonempty | 5 | 288 | 192 | 756 | 3496 | 5.00 | 69.54 | 1488 |
-| cases/builtins/monotonic_now | 4 | 88 | 88 | 314 | 1768 | 1008339.00 | 65.05 | 1488 |
-| cases/builtins/now_nanos | 0 | 0 | 0 | 69 | 356 | 1.00 | 79.53 | 1440 |
+| cases/builtins/monotonic_now | 5 | 108 | 88 | 169 | 1108 | 1010566.00 | 109.36 | 1504 |
+| cases/builtins/now_nanos | 1 | 20 | 20 | 55 | 468 | 3.00 | 93.06 | 1440 |
 | cases/builtins/range | 18 | 889 | 921 | 1441 | 3928 | 14.00 | 67.90 | 1488 |
 | cases/builtins/read_byte | 1 | 20 | 20 | 58 | 632 | 4.00 | 97.88 | 1440 |
 | cases/builtins/read_key | 2 | 106 | 106 | 141 | 2008 | 5.00 | 103.03 | 1472 |
@@ -263,7 +263,6 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/imports/operator_alias | 1 | 17 | 17 | 35 | 360 | 5.00 | 61.51 | 1456 |
 | cases/imports/operator_builtin_bare | 0 | 0 | 0 | 127 | 616 | 1.00 | 63.29 | 1440 |
 | cases/imports/operator_imports | 1 | 18 | 18 | 35 | 360 | 5.00 | 62.32 | 1440 |
-| cases/imports/sectioned_module | 1 | 17 | 17 | 55 | 516 | 5.00 | 175.16 | 1456 |
 | cases/integers/flexible_literals | 3 | 59 | 59 | 109 | 1020 | 6.00 | 65.12 | 1456 |
 | cases/integers/literal_flex_boundaries | 0 | 0 | 0 | 157 | 760 | 2.00 | 65.05 | 1440 |
 | cases/integers/literal_flexing | 11 | 198 | 198 | 375 | 1964 | 11.00 | 65.67 | 1456 |
@@ -728,8 +727,8 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/ebnf | 1357 | 131352 | 19328 | 254421 | 110704 | 153.00 | 588.12 | 1824 |
 | crates/aipl-codegen/src/expr | 1103 | 116206 | 26202 | 83172 | 284368 | 157.00 | 1017.60 | 1888 |
 | crates/aipl-codegen/src/fill_or_add_sections | 133 | 10761 | 6469 | 34842 | 11452 | 24.00 | 92.10 | 1504 |
-| crates/aipl-codegen/src/fill_or_add_sections_file | 2 | 108 | 108 | 163 | 6816 | 7.00 | 103.35 | 1488 |
-| crates/aipl-codegen/src/find_files | 19 | 1096 | 1040 | 1869 | 6708 | 13.00 | 106.41 | 1520 |
+| crates/aipl-codegen/src/fill_or_add_sections_file | 21 | 1474 | 900 | 4400 | 9972 | 7.00 | 94.97 | 1504 |
+| crates/aipl-codegen/src/find_files | 23 | 1424 | 1040 | 2375 | 8012 | 8.00 | 107.25 | 1520 |
 | crates/aipl-codegen/src/find_trailing_whitespace | 0 | 0 | 0 | 6230 | 2488 | 2.00 | 69.36 | 1440 |
 | crates/aipl-codegen/src/fn_names | 25 | 1876 | 1876 | 13422 | 12516 | 11.00 | 138.33 | 1472 |
 | crates/aipl-codegen/src/format | 2211 | 168657 | 19208 | 296414 | 161048 | 206.00 | 957.79 | 1968 |

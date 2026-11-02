@@ -167,6 +167,34 @@ fn a_file_with_sections_cannot_be_imported() {
     assert_eq!(code, 1);
 }
 
+/// A `.test` body declares no effect, so one that uses an effect it has not
+/// shimmed is refused, and a `shim` inside the body discharges it.
+#[test]
+fn a_test_cannot_let_an_effect_escape() {
+    let unshimmed = "import { print } from builtins;\n\n\
+         fn greet() !prints {\n    print(\"hello\");\n}.test({\n    greet();\n})\n";
+    let (stdout, stderr, code) = check_here("test_unshimmed_effect", unshimmed);
+    assert_eq!(stdout, "");
+    assert_eq!(
+        stderr,
+        "error: fn \"greet\" has effect \"!prints\" but the calling function does not declare it\n \
+         --> test_unshimmed_effect.aipl:6:5\n  \
+         |\n\
+         6 |     greet();\n  \
+         |     ^^^^^^^\n"
+    );
+    assert_eq!(code, 1);
+
+    let shimmed = "import { print } from builtins;\n\n\
+         fn greet() !prints {\n    print(\"hello\");\n}.test({\n    \
+         shim prints { print = |text| {}, put = |text| {} } {\n        greet();\n    };\n})\n";
+    let (stdout, stderr, code) = check_here("test_shimmed_effect", shimmed);
+    assert_eq!(
+        (stdout.as_str(), stderr.as_str(), code),
+        ("1 tests: 1 passed, 0 failed\n", "", 0)
+    );
+}
+
 /// `PASSES` with the import's inner spacing squeezed — parses and passes, but
 /// isn't what the formatter would write.
 const UNFORMATTED: &str = "import { equal as ==} from builtins;\n\
@@ -374,23 +402,6 @@ fn all_asserts_in_a_test_run_and_each_failure_is_reported() {
     assert!(stdout.contains(":5 bar() == 7"), "got:\n{stdout}");
     assert!(stdout.contains("1 tests: 0 passed, 1 failed"));
     assert_eq!(code, 1);
-}
-
-#[test]
-fn a_test_may_call_effectful_functions() {
-    // "Implicitly allow all effects": a test can call a `!prints` function with
-    // no effect annotation. (Its output lands in the check output.)
-    let (stdout, _stderr, code) = check(
-        "effects",
-        "import { equal as ==, print } from builtins;\n\n\
-         fn greet() !prints { print(\"hi\") }.test({\n    greet();\n    assert(1 == 1);\n})\n",
-    );
-    assert!(
-        stdout.contains("hi"),
-        "expected greet output, got:\n{stdout}"
-    );
-    assert!(stdout.contains("1 tests: 1 passed, 0 failed"));
-    assert_eq!(code, 0);
 }
 
 #[test]

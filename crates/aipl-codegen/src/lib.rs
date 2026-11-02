@@ -1478,7 +1478,7 @@ enum TestKind {
 /// Build the program the `check` command JIT-runs. Keeps every original item
 /// (with any `.test` body stripped so `run`/`build` semantics are unchanged),
 /// adds a `__test$<fn>` function per tested function (body = the test block,
-/// all effects allowed since a test isn't production code), and a `__test_main`
+/// no effects declared, so a test shims any it uses), and a `__test_main`
 /// driver that, for each test, calls `__test_begin(name)` / the test /
 /// `__test_end()`, then yields `__test_summary()` as its i64 exit code.
 /// `Compilation::new(&that).run_0("__test_main")` runs the suite.
@@ -1514,24 +1514,12 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
     let seq = |first: Expr, rest: Expr| {
         Expr::new(ExprKind::Seq(Box::new(first), Box::new(rest)), span.clone())
     };
-    // A test body may call anything (incl. `!prints`/`!read_files`/`!read_stdin`/`!write_files`/
-    // `!list_files`/`!execute_program`/`!clock` functions), so the synthesized
-    // test fns / driver declare every known effect — except `measure`, which only
-    // a `.performance` block has, and the shim-only effects (`random`), which a
-    // test body shims for itself. A performance block declares that and nothing
-    // else.
+    // A test body declares no effect, so one that uses an effect must discharge it
+    // with a `shim` inside the body: a test cannot print, touch the filesystem or
+    // read the clock for real. A performance block declares `measure`, which only
+    // it has, and nothing else.
     let all_effects = || match kind {
-        TestKind::Tests => vec![
-            "prints".to_string(),
-            "read_files".to_string(),
-            "read_stdin".to_string(),
-            "read_stdin_raw".to_string(),
-            "terminal".to_string(),
-            "write_files".to_string(),
-            "list_files".to_string(),
-            "execute_program".to_string(),
-            "clock".to_string(),
-        ],
+        TestKind::Tests => Vec::new(),
         TestKind::Performance => vec!["measure".to_string()],
     };
 
