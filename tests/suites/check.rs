@@ -131,6 +131,42 @@ fn a_file_that_does_not_compile_is_reported_without_stopping_the_run() {
     assert_eq!(code, 1);
 }
 
+/// A file with `--- section ---` blocks is a case of its own, so another file may
+/// not import it: the importer would load its code and drop the sections, its
+/// `.test` blocks and its `file:` companions. (A case cannot show this: the cases
+/// harness stages only a case's `file:` companions, and a companion cannot hold
+/// sections.)
+#[test]
+fn a_file_with_sections_cannot_be_imported() {
+    let (stdout, stderr, code) = check_tree(
+        "import_sectioned",
+        &[
+            (
+                "main.aipl",
+                "import { shared } from \"./sectioned.aipl\";\n\nfn main() -> i64 { shared(1) }\n",
+            ),
+            (
+                "sectioned.aipl",
+                "import { wrapping_add as + } from builtins;\n\n\
+                 pub fn shared(n: i64) -> i64 { n + 1 }\n--- stdout ---\n",
+            ),
+        ],
+        &["main.aipl"],
+    );
+    assert_eq!(stdout, "");
+    assert_eq!(
+        stderr,
+        "error: import \"./sectioned.aipl\": that file has a `--- stdout ---` section, which makes it \
+         a case of its own, and a file with sections cannot be imported — move what is shared into \
+         a file without sections\n \
+         --> main.aipl:1:24\n  \
+         |\n\
+         1 | import { shared } from \"./sectioned.aipl\";\n  \
+         |                        ^^^^^^^^^^^^^^^^^^\n"
+    );
+    assert_eq!(code, 1);
+}
+
 /// `PASSES` with the import's inner spacing squeezed — parses and passes, but
 /// isn't what the formatter would write.
 const UNFORMATTED: &str = "import { equal as ==} from builtins;\n\

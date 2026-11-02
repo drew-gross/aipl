@@ -263,6 +263,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/imports/operator_alias | 1 | 17 | 17 | 35 | 360 | 5.00 | 61.51 | 1456 |
 | cases/imports/operator_builtin_bare | 0 | 0 | 0 | 127 | 616 | 1.00 | 63.29 | 1440 |
 | cases/imports/operator_imports | 1 | 18 | 18 | 35 | 360 | 5.00 | 62.32 | 1440 |
+| cases/imports/sectioned_module | 1 | 17 | 17 | 55 | 516 | 5.00 | 175.16 | 1456 |
 | cases/integers/flexible_literals | 3 | 59 | 59 | 109 | 1020 | 6.00 | 65.12 | 1456 |
 | cases/integers/literal_flex_boundaries | 0 | 0 | 0 | 157 | 760 | 2.00 | 65.05 | 1440 |
 | cases/integers/literal_flexing | 11 | 198 | 198 | 375 | 1964 | 11.00 | 65.67 | 1456 |

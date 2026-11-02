@@ -44,7 +44,7 @@ Settled:
 Open (resolve in the phase noted):
 - [ ] D1 (Phase 0/2): where "real program" ends. Proposed: keep `main` when the case pins exit
       code, `cli`, stdin, `expect file:`, or process-level behavior; convert when it only prints.
-- [ ] D2 (Phase 3): importing a file that has sections: **error** (recommended) or warning.
+- [x] D2 (Phase 3): importing a file that has sections is an **error** (done 2026-11-01).
 - [ ] D3 (Phase 1): what marks the project root so rooting does not depend on the cwd.
 - [ ] D4 (end of Phase 0): speedup that justifies Phases 4-5 (suggestion: discovery well under
       half of 456s).
@@ -55,7 +55,7 @@ Open (resolve in the phase noted):
       `scripts/flamegraph_check.sh`.
 - [ ] Repeat in both launch environments (iTerm-exempt terminal; backgrounded Claude session).
 - [ ] Census: files with `main` + sections, bucketed (print-only / exit code / cli,stdin,files).
-- [ ] Census: how many files with sections are imported by other files (Phase 3 blast radius).
+- [x] Census: how many files with sections are imported by other files: 0 (Phase 3 found none).
 - [ ] Check that a `Compilation` frees its JIT code on drop (memory growth in a long process).
 - [ ] Check what "binary size" in `aipl report` reads (object vs linked exe).
 - [ ] Write the timing table and census into this doc; resolve D1 and D4; go/no-go.
@@ -92,10 +92,10 @@ Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
 - [ ] `cargo handoff` per directory batch; review moved baseline rows (`main` -> test-driver switch).
 
 ## Phase 3: forbid importing files that have sections
-- [ ] Loader error naming the section (resolve D2).
-- [ ] Fix whatever the corpus failure list shows (per the repo's fanout rule, not by grepping ahead).
+- [x] Loader error naming the section (`refuse_sectioned_import` in `crates/aipl-loader/src/lib.rs`, raised at the import site while resolving path imports; covered by the Rust test `check::a_file_with_sections_cannot_be_imported` in `tests/suites/check.rs`; a case fixture cannot express it, because the cases harness stages only `file:` companions and a companion cannot hold sections). Virtual (FFI-supplied) files are not covered.
+- [x] Fix whatever the corpus failure list shows: nothing failed, no corpus file imported a sectioned file.
 - [ ] Check what happens when a `file:` companion body itself contains a section marker.
-- [ ] `cargo handoff` green.
+- [x] `cargo handoff` green (1019s; 1 new baseline row).
 
 ## Phase 4: batch runner
 - [ ] `aipl check --shard i/n` over a file list; deterministic assignment.
@@ -135,5 +135,18 @@ Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
 - Baseline rows shift once from rooting and again per converted directory; keep these in separate
   handoffs so a moved row has one cause.
 
+## Findings to carry into other phases
+- Phase 1 (G4/G6): `aipl check <dir>` on `tests/cases/imports/` reports 9 `errors` mismatches for
+  cases with `file:` companions: their labels use the scratch dir
+  (`/private/var/folders/.../aipl-check-N/util.aipl`, or `./util.aipl` expected) instead of the
+  harness's labels. Single-file `check` of a companion case may differ the same way. The differential
+  test must cover companion cases, and the label rule for staged files needs settling.
+- The batch `check` also printed `fn "print" has effect` style errors only for real faults; no other surprises.
+
+- The cases harness stages a case alone into a scratch dir with only its `file:` companions, so a
+  case can never import a real sibling file. A first fixture for Phase 3 was refilled by handoff with a
+  file-not-found error and looked green; check a freshly filled `--- errors ---` body by eye once.
+
 ## Session log
 - 2026-11-01: plan written and approved; nothing implemented. Next: Phase 0.
+- 2026-11-01 (session 2): Phase 3 done out of order. Loader refuses importing a file with sections; handoff green (1019s: discovery 488s, final 495s), blast radius zero. Open in Phase 3: companion body containing a section marker (unchecked). Next: Phase 0 or Phase 1.

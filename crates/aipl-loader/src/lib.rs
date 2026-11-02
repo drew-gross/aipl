@@ -287,8 +287,15 @@ impl Loader {
                         span.clone(),
                     )
                 })?;
-                canonicalize(&candidate)
-                    .map_err(|e| Error::at(format!("import {from:?}: {}", e.message), span))
+                let target = canonicalize(&candidate).map_err(|e| {
+                    Error::at(format!("import {from:?}: {}", e.message), span.clone())
+                })?;
+                // A loaded file was checked when first imported, except the entry, which
+                // is loaded before anything imports it.
+                if !self.files.contains_key(&target) || self.entry.as_deref() == Some(&target) {
+                    refuse_sectioned_import(&target, from, span)?;
+                }
+                Ok(target)
             })?;
 
         // Reserve the slot *before* recursing so cycles short-circuit at
@@ -2177,6 +2184,37 @@ fn import_conflict(
             }
         }
     }
+}
+
+/// Refuse to import the file at `target` when it has `--- section ---` blocks.
+/// A file with sections is a case of its own, checked against them with its own
+/// companions; an importer would load its code and silently drop the sections,
+/// its `.test` blocks and its `file:` companions.
+fn refuse_sectioned_import(target: &Path, from: &str, span: Span) -> Result<(), Error> {
+    // A read error is reported by the load that follows.
+    let Ok(src) = fs::read_to_string(target) else {
+        return Ok(());
+    };
+    // A marker starts at column 0, so most files need no section scan.
+    if !(src.starts_with("---") || src.contains("\n---")) {
+        return Ok(());
+    }
+    let (_, sections) = aipl_parser::split_test_sections(&src);
+    let Some(name) = sections
+        .lines()
+        .next()
+        .and_then(aipl_parser::parse_test_section_header)
+    else {
+        return Ok(());
+    };
+    Err(Error::at(
+        format!(
+            "import {from:?}: that file has a `--- {name} ---` section, which makes it a case \
+             of its own, and a file with sections cannot be imported — move what is shared \
+             into a file without sections"
+        ),
+        span,
+    ))
 }
 
 fn canonicalize(path: &Path) -> Result<PathBuf, Error> {
