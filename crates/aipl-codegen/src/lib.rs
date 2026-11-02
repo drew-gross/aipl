@@ -369,6 +369,18 @@ extern "C" fn aipl_const_slot(idx: i64, bytes: i64) -> i64 {
     })
 }
 
+/// Forget every constant a JIT program cached. The slot numbers are per
+/// compilation, so a later compilation on this thread would otherwise find an
+/// earlier one's value (of another type) in its slot. The blocks are left
+/// allocated: the earlier program's code may still be reading them.
+fn forget_jit_constants() {
+    CONST_SLOTS.with(|slots| {
+        for slot in &slots[JIT_CONST_BASE..] {
+            slot.set(0);
+        }
+    });
+}
+
 /// The cache block for constant `idx` if one was ever requested, else 0.
 #[no_mangle]
 extern "C" fn aipl_const_peek(idx: i64) -> i64 {
@@ -4150,6 +4162,7 @@ impl Compilation {
 
     fn jit(program: &Program, dbg: DebugOptions, frame_pointers: bool) -> Result<Self, Vec<Error>> {
         let mut module = new_jit_module(frame_pointers)?;
+        forget_jit_constants();
 
         // The JIT never reports perf counters, so it's never instrumented.
         let (funcs, structs, ir) =

@@ -195,6 +195,38 @@ fn a_test_cannot_let_an_effect_escape() {
     );
 }
 
+/// Files checked in one process do not see each other's cached constants: the
+/// first file's shim closure keeps a `str[]` in a cell, and the second file's
+/// own constant must not read it.
+#[test]
+fn one_files_cached_constants_do_not_reach_the_next() {
+    let (stdout, stderr, code) = check_tree(
+        "constants_across_files",
+        &[
+            (
+                "a.aipl",
+                "import { equal as ==, push, write_string_to_file } from builtins;\n\n\
+                 fn save() !write_files -> !Error { write_string_to_file(\"x\", \"y\") }.test({\n    \
+                 mut written: str[] = [];\n    \
+                 shim write_files {\n        write_string_to_file = |path, contents| {\n            \
+                 set written.push(contents);\n            ok()\n        },\n    } {\n        \
+                 assert(save() == ok());\n    };\n    assert(written == [\"y\"]);\n})\n",
+            ),
+            (
+                "b.aipl",
+                "import { equal as == } from builtins;\n\nfn make() -> str[] { [\"p\", \"q\"] }\n\n\
+                 let NAMES: str[] = make();\n\n\
+                 fn names() -> str[] { NAMES }.test({\n    assert(names() == [\"p\", \"q\"]);\n})\n",
+            ),
+        ],
+        &["a.aipl", "b.aipl"],
+    );
+    assert_eq!(
+        (stdout.as_str(), stderr.as_str(), code),
+        ("2 files, 2 tests: 2 passed, 0 failed\n", "", 0)
+    );
+}
+
 /// `PASSES` with the import's inner spacing squeezed — parses and passes, but
 /// isn't what the formatter would write.
 const UNFORMATTED: &str = "import { equal as ==} from builtins;\n\

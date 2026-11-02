@@ -221,4 +221,7 @@ Checklist:
 
 - 2026-11-02: Phase 2a rule on; 6 tests migrated. Finding for Phase 4: one `aipl check crates examples ...` batch
   reported 52 test failures (lint/*, format_source, grammar_aipl) that pass alone and do not fail as cases —
-  cross-file state leakage in a long-lived process, to chase before batching.
+  cross-file state leakage in a long-lived process. Cause found and fixed: the JIT's thread-local constant/shim-cell
+  slots (`CONST_SLOTS`) were never cleared between compilations, so one file's cached constant was read by the next
+  (`forget_jit_constants`, pinned by `one_files_cached_constants_do_not_reach_the_next`). Other process-global state
+  (shim slots, tallies, `set_current_dir`) is still unaudited.

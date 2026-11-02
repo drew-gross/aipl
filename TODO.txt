@@ -103,6 +103,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  come up with a better strategy for constant slots
   make reserved_names_not_bound into a lint (and also make the assert and trace work a bit more like builtin functions for most purposes so that they can be shadowed. It should fail at lint but work if squelched)
   make should work for perf block and top level text. Unify the "collect all the functions" logic in baking and linting.
   better name for OptionMatch
@@ -849,7 +850,6 @@ tests:
   test operation fusion by re-rendering the fused code back to aipl and asserting on that. The measure() assertions (especially the doesn't-fire assertions) are fragile.
   allow top-level test({}) to kill the stupid fn main() {}.test() pattern (also lint against that pattern - tests on empty main or other empty function)
   make a better way to test non-aipl-implemented builtins
-  make tests unable to write files, using shimming
   make tests leverage better parallelism and caching by using more files
   make ? in tests a _desugaring_ that happens earlier than codegen, then this inlining restriction can also be lifted
   find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)
