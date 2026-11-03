@@ -1044,7 +1044,7 @@ pub fn add_test_totals(total: i64, failed: i64) {
 pub struct TestRecord {
     /// The file it ran in, in batch mode (see [`set_test_file`]).
     pub file: Option<String>,
-    /// The function the test is attached to, or `line N` for a top-level
+    /// The function the test is attached to, or `block N` for a top-level
     /// `test({ .. })` (see [`TestRecord::is_standalone`]).
     pub name: String,
     pub assertions_passed: u64,
@@ -1052,9 +1052,10 @@ pub struct TestRecord {
     pub failed: bool,
 }
 
-/// What a top-level `test({ .. })` is called in a report: `line N`. A function name
-/// has no space, so nothing attached to a function can be mistaken for one.
-const STANDALONE_TEST_LABEL: &str = "line ";
+/// What a top-level `test({ .. })` is called in a report: `block N`, N counting the
+/// file's such blocks from 1. A function name has no space, so nothing attached to a
+/// function can be mistaken for one.
+const STANDALONE_TEST_LABEL: &str = "block ";
 
 impl TestRecord {
     /// Whether this is a top-level `test({ .. })`, which is attached to no
@@ -1632,7 +1633,7 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
         match item {
             Item::Fn(f) if f.test_body.is_some() => {
                 let is_performance = aipl_syntax::performance_source_name(&f.name).is_some();
-                let unattached = aipl_syntax::unattached_test_line(&f.name);
+                let unattached = aipl_syntax::unattached_test_ordinal(&f.name);
                 // Every function loses its test body here, run or not, so the
                 // program carries only what `run` and `build` would compile. A
                 // top-level `test({ .. })` has no function behind it, so only
@@ -1664,7 +1665,7 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
                 // attribute that holds it, not as the function standing in for it.
                 let reported = match (aipl_syntax::performance_source_name(&f.name), unattached) {
                     (Some(owner), _) => format!("{owner}.performance"),
-                    (None, Some(line)) => format!("{STANDALONE_TEST_LABEL}{line}"),
+                    (None, Some(n)) => format!("{STANDALONE_TEST_LABEL}{n}"),
                     (None, None) => f.name.text.clone(),
                 };
                 tests.push((reported, test_fn));

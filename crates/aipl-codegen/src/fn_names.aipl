@@ -55,21 +55,20 @@ pub fn performance_fn_name(f: str) -> str { `{PERFORMANCE_PREFIX}{f}` }.test({
 })
 
 # The name of the function standing for a top-level `test({ .. })` block, which
-# is attached to no function. The line is for a reader (a failing block is
-# reported by it) and the offset keeps two blocks on one line apart. The name is
-# a plain function's, and its own `.test` body is the block, so the block reaches
-# everything downstream as the test code of a function nobody calls.
-pub fn unattached_test_name(line: u64, offset: u64) -> str {
-    `{UNATTACHED_TEST_PREFIX}{line}_{offset}`
-}.test({
-    assert(unattached_test_name(12, 340) == "__test_block_12_340");
-    assert(unattached_test_name(12, 340).fn_role() == Plain);
-    assert(test_fn_name(unattached_test_name(12, 340)).fn_role() == TestBody);
+# is attached to no function. `ordinal` counts the file's such blocks from 1, so
+# the name does not move when anything else in the file does (a pinned `aipl
+# report` lists it). The name is a plain function's, and its own `.test` body is
+# the block, so the block reaches everything downstream as the test code of a
+# function nobody calls.
+pub fn unattached_test_name(ordinal: u64) -> str { `{UNATTACHED_TEST_PREFIX}{ordinal}` }.test({
+    assert(unattached_test_name(2) == "__test_block_2");
+    assert(unattached_test_name(2).fn_role() == Plain);
+    assert(test_fn_name(unattached_test_name(2)).fn_role() == TestBody);
 })
 
 # Whether `self` is a name `unattached_test_name` made.
 pub fn is_unattached_test(self: str) -> bool { self.starts_with(UNATTACHED_TEST_PREFIX) }.test({
-    assert(unattached_test_name(1, 0).is_unattached_test());
+    assert(unattached_test_name(1).is_unattached_test());
     assert(!"map".is_unattached_test());
 })
 

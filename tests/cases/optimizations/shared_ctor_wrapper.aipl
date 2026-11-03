@@ -13,7 +13,7 @@
 # a `map(Nums)` is specialized and inlined until nothing is left to count.
 # Held in a field and called through it, as a lowering is, it stays an address.
 
-import { print } from builtins;
+import { equal as == } from builtins;
 
 variant Tagged = Nums(i64[]) | Word(str)
 
@@ -23,33 +23,32 @@ fn rule(name: str) -> Rule { name, make: Nums }
 
 fn applied(r: Rule, xs: i64[]) -> str { `{r.name}:{r.make(xs)}` }
 
-fn main() !prints {
-    print(applied(rule("a"), [1, 2]));
-    print(applied(rule("b"), [3]));
-    print(applied(rule("c"), [4, 5]));
-}
---- stdout ---
-a:Nums([1, 2])
-b:Nums([3])
-c:Nums([4, 5])
-
+test({
+    assert(applied(rule("a"), [1, 2]) == "a:Nums([1, 2])");
+    assert(applied(rule("b"), [3]) == "b:Nums([3])");
+    assert(applied(rule("c"), [4, 5]) == "c:Nums([4, 5])");
+})
 --- report ---
 allocations       9
 deallocations     9
 reallocations     0
 bytes allocated   609
 peak live bytes   609
-instructions      1294
-binary size       5352 bytes (code 2752, data 130, metadata 2470)
+instructions      1338
+binary size       6120 bytes (code 2924, data 410, metadata 2786)
 
-function                calls  code bytes
-__ctor$Tagged$Nums          3         192
-__to_str_Tagged             3        1184
-aipl_arr_inc                6    external
-aipl_array_dec              6    external
-aipl_i64_len               10    external
-aipl_shim_get               3    external
-aipl_write_bytes           17    external
-aipl_write_i64              5    external
-applied                     3         564
-main                        1         812
+function                   calls  code bytes
+__ctor$Tagged$Nums             3         192
+__test$__test_block_1          1         876
+__to_str_Tagged                3        1184
+aipl_arr_inc                   6    external
+aipl_array_dec                 6    external
+aipl_assert                    3    external
+aipl_i64_len                  10    external
+aipl_test_begin                1    external
+aipl_test_end                  1    external
+aipl_test_summary              1    external
+aipl_write_bytes              17    external
+aipl_write_i64                 5    external
+applied                        3         564
+main                           1         108

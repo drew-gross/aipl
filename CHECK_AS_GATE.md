@@ -247,8 +247,15 @@ Checklist:
       the body; a `shim` body may use its effect without the function declaring it. Fix: the `Shim` arm of `infer` (`aipl-mono`)
       adds the shim's effect to `cur_effects` while it infers the body. Pinned by `tests/cases/effects/shim_covers_synthesized_functions.aipl`
       (fails without the fix); the three files are converted.
-- [ ] Convert the 32 `report` cases: confirm what `aipl report` / the harness measure when there is no `main`
-      (the synthesized test driver), re-pin the section, check the baseline row moves are explained.
+- [x] The `report` cases (2026-11-03): 31 converted. A report pins the whole program's call counts, so print-capture would add
+      its own rows; where the printing was incidental the prints became asserts (`scripts/main_to_asserts.py`: `print(X)` ->
+      `assert(X == "line")`), and where helper functions print (the `*_effects` cases and a few more) the capture shim stayed
+      (`main_to_test.py`, which now keeps a trailing `report`). The report is then of the test driver, listing
+      `__test$__test_block_<n>` and the assert/test runtime calls; the cases' comments' claims (one `aipl_array_new`, `reallocations
+      0` against 4) hold in the new tables. Kept as `main`: `strings/concat/print_rope` (printing is the point), `inline_inspected`
+      and `report/runtime_calls` (`cli` args), `report/with_companion` (`file:`), `report/writes_a_file` (`expect file:`), and
+      `report/smallest_program` (the smallest real program is the point). A top-level test block is named by its order in the
+      file (`__test_block_<n>`), not its line, so a pinned report does not change when other code moves.
 - [ ] The 15 section-less `main` files: decide each.
 - [ ] Per directory batch: `cargo handoff`, then review moved baseline rows (the `main` -> test-driver switch moves
       `instructions` and `code bytes` for every converted case, as the old "void main" note says).
@@ -348,8 +355,8 @@ Checklist:
 
 ### Top-level `test({ .. })` (language addition, 2026-11-02)
 Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered by the parser to a private function
-`__test_block_<line>_<offset>` with an empty body whose `.test` body is the block; never part of `run`/`build` output (checked:
-`aipl report` is byte-identical with and without one). A `# ..` block directly above it is an error. Reported as `test line N`.
+`__test_block_<n>` (n counts the file's such blocks from 1, so the name does not move when other code does) with an empty body whose `.test` body is the block; never part of `run`/`build` output (checked:
+`aipl report` is byte-identical with and without one). A `# ..` block directly above it is an error. Reported as `test block N`.
 
 - 2026-11-02: `aipl check` output is now grouped by file (`file:` then `function: N assertions passed[, M failed]`, one row
   `standalone tests` for the top-level `test` blocks) with every failure gathered under `test failures:` at the bottom,
@@ -374,3 +381,5 @@ Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered
 - 2026-11-03: Phase 2b batch 8 (`optimizations`): 26 converted; 3 files held back by a mono bug (D9 in the checklist), 4 by D8.
 - 2026-11-03: D9 fixed (shim effect now counts for functions mono synthesizes inside the shim body); regression case added; the 3 held-back
   `optimizations` files converted.
+- 2026-11-03: Phase 2b `report` cases (31 files). The unattached test function's name is now `__test_block_<n>` (order in the file) and
+  its report name `block N`, because a line/offset in the name made every pinned report line-sensitive.

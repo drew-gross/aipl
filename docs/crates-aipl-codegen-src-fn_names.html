@@ -93,9 +93,9 @@
             <a class="anchor" href="#item-unattached_test_name">unattached_test_name</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn unattached_test_name(line: u64, offset: u64) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn unattached_test_name(ordinal: u64) -&#62; str</code></pre>
 
-          <div class="doc"><p>The name of the function standing for a top-level <code>test({ .. })</code> block, which is attached to no function. The line is for a reader (a failing block is reported by it) and the offset keeps two blocks on one line apart. The name is a plain function's, and its own <code>.test</code> body is the block, so the block reaches everything downstream as the test code of a function nobody calls.</p></div>
+          <div class="doc"><p>The name of the function standing for a top-level <code>test({ .. })</code> block, which is attached to no function. <code>ordinal</code> counts the file's such blocks from 1, so the name does not move when anything else in the file does (a pinned <code>aipl report</code> lists it). The name is a plain function's, and its own <code>.test</code> body is the block, so the block reaches everything downstream as the test code of a function nobody calls.</p></div>
 
 
         </section>

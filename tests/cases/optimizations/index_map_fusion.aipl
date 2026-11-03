@@ -31,7 +31,6 @@ import {
     len,
     map,
     measure,
-    print,
     value_or,
     wrapping_add_assign as +=,
     wrapping_mul as *,
@@ -109,68 +108,64 @@ fn walk(xs: i64[]) -> i64 {
     total
 }
 
-fn main() !prints {
+test({
     let v = [1, 2, 3, 4, 5];
 
     // A named function, in bounds and out.
-    print(`{v.map(dbl)[1]} {v.map(dbl)[99]}`);
+    assert(`{v.map(dbl)[1]} {v.map(dbl)[99]}` == "some(4) none");
 
     // A lambda, and the free-call spelling of the same shape.
-    print(`{v.map(|x| x * 10)[3]} {map(v, dbl)[0]}`);
+    assert(`{v.map(|x| x * 10)[3]} {map(v, dbl)[0]}` == "some(40) some(2)");
 
     // The index is an expression, not a literal — it is evaluated once either
     // way, and the fusion moves it ahead of the (dropped) mapping calls.
-    print(`{v.map(dbl)[v.len() - 2]}`);
+    assert(`{v.map(dbl)[v.len() - 2]}` == "some(8)");
 
     // The `Span` reading: the same node, slicing instead of indexing.
-    print(`{v.map(dbl)[Span { start: 1, end: 3 }]}`);
+    assert(`{v.map(dbl)[Span { start: 1, end: 3 }]}` == "[4, 6]");
 
     // Under the `let`s inlining leaves: `token_texts(n, src)[0]` is the
     // motivating shape, and only the first token is ever sliced out of `src`.
     let src = "let x = 1;";
     let n = Node { tokens: [Span { start: 0, end: 3 }, Span { start: 4, end: 5 }] };
-    print(`{n.token_texts(src)[0].value_or("?")} {n.token_texts(src)[1].value_or("?")}`);
-    print(`{n.token_texts(src)[9].value_or("?")}`);
+    assert(
+        `{n.token_texts(src)[0].value_or("?")} {n.token_texts(src)[1].value_or("?")}` == "let x",
+    );
+    assert(`{n.token_texts(src)[9].value_or("?")}` == "?");
 
     // A `str` receiver, which is the `char` sequence and not an array block —
     // so the fused `s[i]` is a `char?` where the unfused `map` built a `str[]`.
-    print(`{"abc".map(bracket)[1]}`);
+    assert(`{"abc".map(bracket)[1]}` == `some("[b]")`);
 
     // An empty receiver: `none` either way, and `f` is never called.
     let empty: i64[] = [];
-    print(`{empty.map(dbl)[0]}`);
+    assert(`{empty.map(dbl)[0]}` == "none");
 
-    print(`{walk(v)}`);
-}
---- stdout ---
-some(4) none
-some(40) some(2)
-some(8)
-[4, 6]
-let x
-?
-some("[b]")
-none
-30
+    assert(`{walk(v)}` == "30");
+})
 --- report ---
 allocations       19
 deallocations     19
 reallocations     0
 bytes allocated   991
 peak live bytes   991
-instructions      1906
-binary size       12232 bytes (code 8016, data 122, metadata 4094)
+instructions      2010
+binary size       13896 bytes (code 8276, data 970, metadata 4650)
 
-function              calls  code bytes
-__to_str_i64              1         204
-__to_str_i64$arr          1         704
-__to_str_i64$opt          6         376
-__to_str_str$opt          1         460
-aipl_arr_inc              1    external
-aipl_array_dec            4    external
-aipl_array_new            1    external
-aipl_i64_len             14    external
-aipl_shim_get             9    external
-aipl_write_bytes         16    external
-aipl_write_i64            7    external
-main                      1        6272
+function                   calls  code bytes
+__test$__test_block_1          1        6424
+__to_str_i64                   1         204
+__to_str_i64$arr               1         704
+__to_str_i64$opt               6         376
+__to_str_str$opt               1         460
+aipl_arr_inc                   1    external
+aipl_array_dec                 4    external
+aipl_array_new                 1    external
+aipl_assert                    9    external
+aipl_i64_len                  14    external
+aipl_test_begin                1    external
+aipl_test_end                  1    external
+aipl_test_summary              1    external
+aipl_write_bytes              16    external
+aipl_write_i64                 7    external
+main                           1         108

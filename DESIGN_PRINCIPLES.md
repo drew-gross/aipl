@@ -611,8 +611,8 @@ test({
 })
 ```
 
-It runs with the file's other tests and is reported by the line it starts on
-(`test line 12 ... FAIL`). It is for **rare** use, and the rarity is the point:
+It runs with the file's other tests and is reported by its position among the
+file's such blocks (`test block 2 ... FAIL`; the failing assertion names its own line). It is for **rare** use, and the rarity is the point:
 the more tests are unattached, the less an attachment-based measurement can say.
 Before writing one, ask whether a function is the subject. If it is, attach the
 test to it; if a *helper* would make the subject a function, define the helper.
@@ -626,7 +626,7 @@ test to it; if a *helper* would make the subject a function, define the helper.
   refused, because there is no declaration for it to describe; a note about the
   test is a `//` comment.
 - **It is not a function.** The parser lowers it to a private function with a
-  name made for it (`__test_block_<line>_<offset>`) so that everything downstream
+  name made for it (`__test_block_<n>`, n counting the file's blocks from 1, so a pinned `aipl report` does not change when other code moves) so that everything downstream
   treats it as test code already, but the function is never part of the program
   `run` and `build` compile, and no source name can spell it.
 

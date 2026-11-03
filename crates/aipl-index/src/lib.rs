@@ -337,7 +337,7 @@ fn symbols(program: &Program, src: &str) -> Vec<Symbol> {
                 // is the one carrying a top-level `test({ .. })`.
                 if aipl_syntax::test_helper_source_name(&f.name).is_some()
                     || aipl_syntax::performance_source_name(&f.name).is_some()
-                    || aipl_syntax::unattached_test_line(&f.name).is_some()
+                    || aipl_syntax::unattached_test_ordinal(&f.name).is_some()
                 {
                     continue;
                 }

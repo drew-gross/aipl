@@ -121,69 +121,90 @@ fn triple(x: i64) -> i64 { x * 3 }.performance({
     assert(instructions == 8984);
 })
 
-fn main() !prints {
-    let xs = many();
-    // A lambda, capturing a local; the body accumulates.
-    let offset = 1000;
-    mut total = 0;
-    for (let y : xs.map(|x| x + offset)) {
-        set total += y;
-    }
-    print(total.to_str());
-    // A named function; the body prints.
-    mut n = 0;
-    for (let y : xs.map(triple)) {
-        if (n < 3) { print(y.to_str()); };
-        set n++;
-    }
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let xs = many();
+        // A lambda, capturing a local; the body accumulates.
+        let offset = 1000;
+        mut total = 0;
+        for (let y : xs.map(|x| x + offset)) {
+            set total += y;
+        }
+        print(total.to_str());
+        // A named function; the body prints.
+        mut n = 0;
+        for (let y : xs.map(triple)) {
+            if (n < 3) { print(y.to_str()); };
+            set n++;
+        }
 
-    // The lambda's parameter shares the loop variable's name, and an outer
-    // binding of that name is what the lambda reads: each still means what it
-    // did unfused.
-    let x = 5;
-    for (let x : [1, 2].map(|x| x * 10)) {
-        print(x.to_str());
-    }
-    for (let y : [1, 2].map(|z| z + x)) {
-        print(y.to_str());
-    }
-    // A filter, and a filter-then-map chain.
-    mut kept = 0;
-    for (let y : xs.filter(|x| x < 100)) {
-        set kept += y;
-    }
-    print(kept.to_str());
-    mut chained = 0;
-    for (let y : xs.filter(|x| x < 100).map(|x| x * 2)) {
-        set chained += y;
-    }
-    print(chained.to_str());
-}
---- stdout ---
-221100
-0
-3
-6
-10
-20
-6
-7
-4950
-9900
+        // The lambda's parameter shares the loop variable's name, and an outer
+        // binding of that name is what the lambda reads: each still means what it
+        // did unfused.
+        let x = 5;
+        for (let x : [1, 2].map(|x| x * 10)) {
+            print(x.to_str());
+        }
+        for (let y : [1, 2].map(|z| z + x)) {
+            print(y.to_str());
+        }
+        // A filter, and a filter-then-map chain.
+        mut kept = 0;
+        for (let y : xs.filter(|x| x < 100)) {
+            set kept += y;
+        }
+        print(kept.to_str());
+        mut chained = 0;
+        for (let y : xs.filter(|x| x < 100).map(|x| x * 2)) {
+            set chained += y;
+        }
+        print(chained.to_str());
+    };
+    assert(out == """
+        221100
+        0
+        3
+        6
+        10
+        20
+        6
+        7
+        4950
+        9900
+
+    """);
+})
 --- report ---
-allocations       11
-deallocations     11
+allocations       30
+deallocations     30
 reallocations     7
-bytes allocated   215
-peak live bytes   2126
-instructions      24182
-binary size       3792 bytes (code 2176, data 41, metadata 1575)
+bytes allocated   1887
+peak live bytes   3919
+instructions      25414
+binary size       7960 bytes (code 4392, data 270, metadata 3298)
 
-function            calls  code bytes
-__to_str_i64           10         204
-aipl_arr_inc            1    external
-aipl_array_dec          1    external
-aipl_i64_len           20    external
-aipl_shim_get          10    external
-aipl_write_i64         10    external
-main                    1        1972
+function                                 calls  code bytes
+__aipl_const_teardown                        1          92
+__test$__test_block_1                        1        2588
+__test$__test_block_1$shim_closure0          0         700
+__test$__test_block_1$shim_closure1         10         700
+__to_str_i64                                10         204
+aipl_arr_inc                                 1    external
+aipl_array_dec                               1    external
+aipl_assert                                  1    external
+aipl_i64_len                                20    external
+aipl_shim_get                               12    external
+aipl_shim_set                                4    external
+aipl_test_begin                              1    external
+aipl_test_end                                1    external
+aipl_test_summary                            1    external
+aipl_write_i64                              10    external
+main                                         1         108

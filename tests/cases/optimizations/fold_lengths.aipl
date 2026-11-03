@@ -39,13 +39,13 @@
 # spread that holds one. Nothing above those lines allocates an array at all.
 
 import {
+    equal as ==,
     filter,
     filter_map,
     greater_than as >,
     join,
     len,
     map,
-    print,
     reverse,
     sort,
     wrapping_add as +,
@@ -61,42 +61,40 @@ fn pair(n: i64) -> i64[] { [n, n] }
 
 fn source() -> i64[] { [1, 2, 3, 4] }
 
-fn main() !prints {
+test({
     let xs = source();
-    print(`{[].len()} {[7, 8, 9].len()} {[0, ..xs, ..xs].len()}`);
-    print(`{xs.sort().len()} {xs.reverse().len()}`);
-    print(`{xs.filter(is_big).len()} {xs.filter_map(is_big, double).len()}`);
-    print(`{xs.map(pair).join().len()}`);
+    assert(`{[].len()} {[7, 8, 9].len()} {[0, ..xs, ..xs].len()}` == "0 3 9");
+    assert(`{xs.sort().len()} {xs.reverse().len()}` == "4 4");
+    assert(`{xs.filter(is_big).len()} {xs.filter_map(is_big, double).len()}` == "2 2");
+    assert(`{xs.map(pair).join().len()}` == "8");
 
     // Not folded, and right anyway: a `map` is left where it is, and so is the
     // spread holding one.
-    print(`{xs.map(double).len()} {[0, ..xs.map(|n| n + 1)].len()}`);
-}
---- stdout ---
-0 3 9
-4 4
-2 2
-8
-4 5
+    assert(`{xs.map(double).len()} {[0, ..xs.map(|n| n + 1)].len()}` == "4 5");
+})
 --- report ---
 allocations       23
 deallocations     23
 reallocations     0
 bytes allocated   1202
 peak live bytes   1202
-instructions      1501
-binary size       7576 bytes (code 4540, data 65, metadata 2971)
+instructions      1565
+binary size       8592 bytes (code 4700, data 552, metadata 3340)
 
 function                               calls  code bytes
 __builtin_count_if$i64$lam$is_big          2         192
+__test$__test_block_1                      1        3992
 __to_str_i64                               2         204
 __to_str_u64                               8         204
 aipl_arr_inc                               5    external
 aipl_array_dec                             7    external
 aipl_array_with_cap                        2    external
+aipl_assert                                5    external
 aipl_i64_len                               4    external
-aipl_shim_get                              5    external
+aipl_test_begin                            1    external
+aipl_test_end                              1    external
+aipl_test_summary                          1    external
 aipl_u64_len                              16    external
 aipl_write_i64                             2    external
 aipl_write_u64                             8    external
-main                                       1        3940
+main                                       1         108

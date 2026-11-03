@@ -38,7 +38,6 @@ import {
     less_than_or_equal as <=,
     map,
     measure,
-    print,
     push,
     to_str,
     wrapping_add as +,
@@ -115,51 +114,46 @@ fn pts() -> Pt[] {
 // to the source length.
 fn points(lo: i64) -> i64[] { pts().filter(|p| lo <= p.x).map(|p| p.x * p.y) }
 
-fn main() !prints {
+test({
     let xs = many();
-    print(borrowed(xs, 150).len().to_str());
-    print(owned(150).len().to_str());
-    print(spelled_out(150).len().to_str());
+    assert(borrowed(xs, 150).len().to_str() == "51");
+    assert(owned(150).len().to_str() == "51");
+    assert(spelled_out(150).len().to_str() == "51");
     // The fused chain and the hand-written call agree element for element.
-    print(borrowed(xs, 199)[0].to_str());
-    print(owned(199)[0].to_str());
-    print(spelled_out(199)[0].to_str());
+    assert(borrowed(xs, 199)[0].to_str() == "some(398)");
+    assert(owned(199)[0].to_str() == "some(398)");
+    assert(spelled_out(199)[0].to_str() == "some(398)");
     // The composite-element chain, where the intermediate array is the cost.
-    print(points(1).len().to_str());
-    print(points(1)[0].to_str());
-}
---- stdout ---
-51
-51
-51
-some(398)
-some(398)
-some(398)
-100
-some(2)
+    assert(points(1).len().to_str() == "100");
+    assert(points(1)[0].to_str() == "some(2)");
+})
 --- report ---
 allocations       17
 deallocations     17
 reallocations     49
 bytes allocated   2843
 peak live bytes   17067
-instructions      63732
-binary size       8560 bytes (code 5676, data 42, metadata 2842)
+instructions      63826
+binary size       9976 bytes (code 5892, data 714, metadata 3370)
 
-function                    calls  code bytes
-__to_str_i64$opt                4         376
-__to_str_u64                    4         204
-aipl_arr_inc                   12    external
-aipl_array_dec                 16    external
-aipl_array_new                  2    external
-aipl_array_with_cap             2    external
-aipl_i64_len                    8    external
-aipl_shim_get                   8    external
-aipl_u64_len                    8    external
-aipl_write_bytes                8    external
-aipl_write_i64                  4    external
-aipl_write_u64                  4    external
-main                            1        3712
-main$filter_map11$own0          1         508
-main$filter_map8$own0           1         508
-many                            5         368
+function                                     calls  code bytes
+__test$__test_block_1                            1        3820
+__test$__test_block_1$filter_map11$own0          1         508
+__test$__test_block_1$filter_map8$own0           1         508
+__to_str_i64$opt                                 4         376
+__to_str_u64                                     4         204
+aipl_arr_inc                                    12    external
+aipl_array_dec                                  16    external
+aipl_array_new                                   2    external
+aipl_array_with_cap                              2    external
+aipl_assert                                      8    external
+aipl_i64_len                                     8    external
+aipl_test_begin                                  1    external
+aipl_test_end                                    1    external
+aipl_test_summary                                1    external
+aipl_u64_len                                     8    external
+aipl_write_bytes                                 8    external
+aipl_write_i64                                   4    external
+aipl_write_u64                                   4    external
+main                                             1         108
+many                                             5         368

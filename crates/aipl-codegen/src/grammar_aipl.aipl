@@ -59,7 +59,6 @@ import {
     any,
     contains,
     count,
-    count_if,
     count_while,
     equal as ==,
     extend,
@@ -3308,7 +3307,30 @@ fn lower_program(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             set items.push(as_item(k, sp)?);
         };
     }
-    ok(AProgram(Program { items, doc }))
+    ok(AProgram(Program { items: items.number_unattached_tests(), doc }))
+}
+
+# The items with each top-level `test({ .. })` block named by its order among them,
+# from 1, so a block's name is stable under edits elsewhere in the file.
+fn number_unattached_tests(self: Item[]) -> Item[] {
+    mut ordinal: u64 = 0;
+    mut out: Item[] = [];
+    for (let it : self) {
+        if (let ItemFn(f) = it) {
+            if (f.name.text.is_unattached_test()) {
+                set ordinal++;
+                set out.push(ItemFn(Function {
+                    ..f,
+                    name: SpanStr { text: unattached_test_name(ordinal), span: f.name.span },
+                }));
+            } else {
+                set out.push(it);
+            };
+        } else {
+            set out.push(it);
+        };
+    }
+    out
 }
 
 # `item` — a declaration and the `# ..` lines in front of it. The lines are this
@@ -3929,12 +3951,11 @@ fn lower_test_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let TestBlock { fns, body } = as_test_block(kid(kids, 0, sp)?, sp)?;
 
-    // The node's span runs from the end of the previous item, so where the block
-    // is comes from its `test` token.
+    // Named by `lower_program`, which knows the order. The span is the `test` token's:
+    // the node's own runs from the end of the previous item.
     let at = node.tokens[0].value_or(sp);
-    let line = src[..at.start].count_if(|c| c == '\n') + 1;
     ok(AFunction(Function {
-        name: SpanStr { text: unattached_test_name(line, at.start), span: at },
+        name: SpanStr { text: unattached_test_name(0), span: at },
         is_pub: false,
         sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
         body: at(Unit, sp),
@@ -5136,17 +5157,22 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
         ) == "fn f() -> i64 = 1 .test(Seq(assert(==(f(), 1)), ()))",
     );
 
-    // A top-level `test({ .. })` is a function made for it, named by its line and
-    // offset, whose `.test` body is the block; helpers declared inside ride along.
+    // A top-level `test({ .. })` is a function made for it, named by its order among the
+    // file's, whose `.test` body is the block; helpers declared inside ride along.
     assert(
         program_dump(
             "test({ assert(1 == 1); })",
-        ) == "fn __test_block_1_0() = () .test(Seq(assert(==(1, 1)), ()))",
+        ) == "fn __test_block_1() = () .test(Seq(assert(==(1, 1)), ()))",
     );
     assert(
         program_dump(
             "fn f() {}\n\n  test({ fn g() {} g(); })",
-        ) == "fn f() = ()\nfn __test_block_3_13() = () .test(Seq(g(), ()) fn g() = ())",
+        ) == "fn f() = ()\nfn __test_block_1() = () .test(Seq(g(), ()) fn g() = ())",
+    );
+    assert(
+        program_dump(
+            "test({ }) fn f() {} test({ })",
+        ) == "fn __test_block_1() = () .test(())\nfn f() = ()\nfn __test_block_2() = () .test(())",
     );
     assert(
         program_dump(

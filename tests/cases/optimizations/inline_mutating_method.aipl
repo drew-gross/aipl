@@ -17,8 +17,8 @@
 # both bodies ended up in `main`.
 
 import {
+    equal as ==,
     len,
-    print,
     push,
     to_str,
     wrapping_add_assign as +=,
@@ -47,54 +47,49 @@ fn stagger(mut self: Counter) {
     set self.n += 5;
 }
 
-fn main() !prints {
+test({
     mut c = Counter { n: 1 };
     set c.bump(5); // in place: 1 + 5
-    print(c.n.to_str());
+    assert(c.n.to_str() == "6");
 
     // Value position: `c` must be untouched by the copy that `d` gets.
     let d = bump(c, 100);
-    print(d.n.to_str());
-    print(c.n.to_str());
+    assert(d.n.to_str() == "106");
+    assert(c.n.to_str() == "6");
 
     mut v = [1];
     set v.append_twice(7); // in place: one element becomes three
-    print(v.len().to_str());
+    assert(v.len().to_str() == "3");
 
     let w = append_twice(v, 9);
-    print(w.len().to_str());
-    print(v.len().to_str());
+    assert(w.len().to_str() == "5");
+    assert(v.len().to_str() == "3");
 
     mut s = Counter { n: 0 };
     set s.stagger(); // 1 + 2 + 3 + 4 + 5
-    print(s.n.to_str());
-}
---- stdout ---
-6
-106
-6
-3
-5
-3
-15
-
+    assert(s.n.to_str() == "15");
+})
 --- report ---
 allocations       11
 deallocations     11
 reallocations     0
 bytes allocated   298
 peak live bytes   298
-instructions      789
-binary size       5024 bytes (code 2968, data 17, metadata 2039)
+instructions      873
+binary size       6128 bytes (code 3128, data 516, metadata 2484)
 
-function            calls  code bytes
-__to_str_i64            4         204
-__to_str_u64            3         204
-aipl_arr_inc            8    external
-aipl_array_dec          8    external
-aipl_i64_len            8    external
-aipl_shim_get           7    external
-aipl_u64_len            6    external
-aipl_write_i64          4    external
-aipl_write_u64          3    external
-main                    1        2560
+function                   calls  code bytes
+__test$__test_block_1          1        2612
+__to_str_i64                   4         204
+__to_str_u64                   3         204
+aipl_arr_inc                   8    external
+aipl_array_dec                 8    external
+aipl_assert                    7    external
+aipl_i64_len                   8    external
+aipl_test_begin                1    external
+aipl_test_end                  1    external
+aipl_test_summary              1    external
+aipl_u64_len                   6    external
+aipl_write_i64                 4    external
+aipl_write_u64                 3    external
+main                           1         108

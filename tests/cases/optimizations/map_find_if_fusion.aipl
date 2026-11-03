@@ -20,7 +20,6 @@ import {
     less_than as <,
     map,
     measure,
-    print,
     push,
     wrapping_increment as ++,
     wrapping_mul as *,
@@ -68,36 +67,36 @@ fn first_big_twice(xs: i64[]) -> str {
     `{ys.find_if(is_big)} {ys.find_if(|y| 1990 < y)}`
 }
 
-fn main() !prints {
+test({
     let xs = many();
-    print(`{first_big(xs)}`);
-    print(first_big_twice(xs));
-    print(`{[1, 2].map(stepped).find_if(|y| 99 < y)}`);
-}
---- stdout ---
-some(10)
-some(10) some(2000)
-none
+    assert(`{first_big(xs)}` == "some(10)");
+    assert(first_big_twice(xs) == "some(10) some(2000)");
+    assert(`{[1, 2].map(stepped).find_if(|y| 99 < y)}` == "none");
+})
 --- report ---
 allocations       8
 deallocations     8
 reallocations     7
 bytes allocated   1926
 peak live bytes   3958
-instructions      15172
-binary size       5384 bytes (code 3024, data 66, metadata 2294)
+instructions      15216
+binary size       6144 bytes (code 3196, data 330, metadata 2618)
 
-function                                                    calls  code bytes
-__builtin_find_if$i64$lam$is_big                                1         224
-__builtin_find_if$i64$lam$main$lambda1                          1         224
-__builtin_map_find_if$i64$i64$lam$stepped$is_big                1         232
-__builtin_map_find_if$i64$i64$lam$stepped$main$lambda2          1         232
-__to_str_i64$opt                                                4         376
-aipl_arr_inc                                                    1    external
-aipl_array_dec                                                  2    external
-aipl_array_with_cap                                             1    external
-aipl_i64_len                                                    6    external
-aipl_shim_get                                                   3    external
-aipl_write_bytes                                                7    external
-aipl_write_i64                                                  3    external
-main                                                            1        1736
+function                                                                     calls  code bytes
+__builtin_find_if$i64$lam$__test$__test_block_1$lambda1                          1         224
+__builtin_find_if$i64$lam$is_big                                                 1         224
+__builtin_map_find_if$i64$i64$lam$stepped$__test$__test_block_1$lambda2          1         232
+__builtin_map_find_if$i64$i64$lam$stepped$is_big                                 1         232
+__test$__test_block_1                                                            1        1800
+__to_str_i64$opt                                                                 4         376
+aipl_arr_inc                                                                     1    external
+aipl_array_dec                                                                   2    external
+aipl_array_with_cap                                                              1    external
+aipl_assert                                                                      3    external
+aipl_i64_len                                                                     6    external
+aipl_test_begin                                                                  1    external
+aipl_test_end                                                                    1    external
+aipl_test_summary                                                                1    external
+aipl_write_bytes                                                                 7    external
+aipl_write_i64                                                                   3    external
+main                                                                             1         108

@@ -6,7 +6,7 @@
 # pairs array of `by_square_twice`, which binds the pairs and reads them twice, so
 # it has to exist. `by_square` never builds one.
 
-import { get, len, map, print, to_dict, wrapping_add as +, wrapping_mul as * } from builtins;
+import { equal as ==, get, len, map, to_dict, wrapping_add as +, wrapping_mul as * } from builtins;
 
 fn by_square(xs: i64[]) -> #{i64: i64} { xs.map(|x| (x * x, x)).to_dict() }
 
@@ -15,33 +15,34 @@ fn by_square_twice(xs: i64[]) -> u64 {
     pairs.to_dict().len() + pairs.len()
 }
 
-fn main() !prints {
+test({
     let d = by_square([1, 2, 3, 2]);
-    print(`{d.get(4)} {d.get(9)} {d.get(5)} {d.len()}`);
-    print(`{by_square_twice([1, 2, 3])}`);
-}
---- stdout ---
-some(2) some(3) none 3
-6
+    assert(`{d.get(4)} {d.get(9)} {d.get(5)} {d.len()}` == "some(2) some(3) none 3");
+    assert(`{by_square_twice([1, 2, 3])}` == "6");
+})
 --- report ---
 allocations       14
 deallocations     14
 reallocations     5
 bytes allocated   732
 peak live bytes   852
-instructions      962
-binary size       5624 bytes (code 3028, data 98, metadata 2498)
+instructions      996
+binary size       6232 bytes (code 3180, data 298, metadata 2754)
 
-function                 calls  code bytes
-__to_str_i64$opt             3         376
-__to_str_u64                 2         204
-aipl_arr_inc                 9    external
-aipl_array_dec              10    external
-aipl_array_with_cap          1    external
-aipl_i64_len                 4    external
-aipl_shim_get                2    external
-aipl_u64_len                 4    external
-aipl_write_bytes             5    external
-aipl_write_i64               2    external
-aipl_write_u64               2    external
-main                         1        2448
+function                   calls  code bytes
+__test$__test_block_1          1        2492
+__to_str_i64$opt               3         376
+__to_str_u64                   2         204
+aipl_arr_inc                   9    external
+aipl_array_dec                10    external
+aipl_array_with_cap            1    external
+aipl_assert                    2    external
+aipl_i64_len                   4    external
+aipl_test_begin                1    external
+aipl_test_end                  1    external
+aipl_test_summary              1    external
+aipl_u64_len                   4    external
+aipl_write_bytes               5    external
+aipl_write_i64                 2    external
+aipl_write_u64                 2    external
+main                           1         108

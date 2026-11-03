@@ -15,7 +15,7 @@
 # - a `mut` struct binding that the body moves out of is taken from, not copied;
 # - a test that only looks into an array field (`board.cells[i]`) holds nothing.
 
-import { equal as ==, print, repeat, saturating_remainder as %, try_set } from builtins;
+import { equal as ==, repeat, saturating_remainder as %, try_set } from builtins;
 
 variant Cell = Empty | Flag
 
@@ -40,34 +40,38 @@ fn toggled(self: Board, at: u64) -> Board {
     }
 }
 
-fn main() !prints {
+test({
     mut board = Board { width: 8, cells: [Empty].repeat(64) };
     for (let i : 0..100) {
         set board = board.toggled(i % 64);
     }
     // A second call site keeps `toggled` from being inlined into the loop.
     let other = Board { width: 2, cells: [Empty].repeat(4) }.toggled(1);
-    print(`{board.is_flag(0)} {board.is_flag(63)} {board.is_flag(36)} {other.is_flag(1)}`);
-}
---- stdout ---
-false true true true
+    assert(
+        `{board.is_flag(0)} {board.is_flag(63)} {board.is_flag(36)} {other.is_flag(1)}` == "false true true true",
+    );
+})
 --- report ---
 allocations       15
 deallocations     15
 reallocations     0
 bytes allocated   1761
 peak live bytes   1761
-instructions      29006
-binary size       5848 bytes (code 3716, data 22, metadata 2110)
+instructions      29030
+binary size       6352 bytes (code 3860, data 174, metadata 2318)
 
 function                   calls  code bytes
 __builtin_repeat$Cell          2         412
+__test$__test_block_1          1        2168
 __to_str_bool                  4         224
 aipl_arr_inc                 173    external
 aipl_array_dec               478    external
 aipl_array_new                 2    external
-aipl_shim_get                  1    external
+aipl_assert                    1    external
+aipl_test_begin                1    external
+aipl_test_end                  1    external
+aipl_test_summary              1    external
 aipl_write_bytes               4    external
-main                           1        2132
+main                           1         108
 marked$own0                  101         292
 toggled$own0                 101         656

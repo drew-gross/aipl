@@ -34,7 +34,7 @@
 # a separator and one without — so `c(0) = 0` and `c(n) = 2 + 3 * c(n - 1)`,
 # giving 0, 2, 8, 26, 80.
 
-import { extend, join, len, map, print, value_or, wrapping_sub as - } from builtins;
+import { equal as ==, extend, join, len, map, value_or, wrapping_sub as - } from builtins;
 
 variant Rule = Then(Rule[]) | Many(Rule, Rule?) | Leaf
 
@@ -64,47 +64,50 @@ fn gather(rs: Rule[]) -> u64 {
     groups.len()
 }
 
-fn main() !prints {
+test({
     // The shapes one at a time: nothing, one bare group, a group with a
     // separator, and a `Then` that only passes its children through.
-    print(`{gather([Leaf])} {gather([Many(Leaf, none)])} {gather([Many(Leaf, some(Leaf))])}`);
-    print(`{gather([Then([])])} {gather([Then([Leaf, Many(Leaf, none)])])}`);
+    assert(
+        `{gather([Leaf])} {gather([Many(Leaf, none)])} {gather([Many(Leaf, some(Leaf))])}` == "0 1 1",
+    );
+    assert(`{gather([Then([])])} {gather([Then([Leaf, Many(Leaf, none)])])}` == "0 1");
     // Several producers into one accumulator, and the recurrence as a series.
-    print(`{gather([Leaf, Many(Leaf, none), Many(Leaf, none)])}`);
-    print(`{gather([deep(1)])} {gather([deep(2)])} {gather([deep(3)])} {gather([deep(4)])}`);
-}
---- stdout ---
-0 1 1
-0 1
-2
-2 8 26 80
+    assert(`{gather([Leaf, Many(Leaf, none), Many(Leaf, none)])}` == "2");
+    assert(
+        `{gather([deep(1)])} {gather([deep(2)])} {gather([deep(3)])} {gather([deep(4)])}` == "2 8 26 80",
+    );
+})
 --- report ---
 allocations       404
 deallocations     404
 reallocations     8
 bytes allocated   24508
 peak live bytes   24730
-instructions      48833
-binary size       12352 bytes (code 7516, data 9, metadata 4827)
+instructions      48887
+binary size       13336 bytes (code 7672, data 507, metadata 5157)
 
-function                 calls  code bytes
-__arr_drop_Rule             69         116
-__arr_retain_Rule            0         116
-__rec_drop_Rule            310         124
-__to_str_u64                10         204
-aipl_arr_inc               321    external
-aipl_array_dec             708    external
-aipl_array_new              69    external
-aipl_array_with_cap          3    external
-aipl_rec_alloc             310    external
-aipl_rec_dec_strong        369    external
-aipl_rec_dec_weak          180    external
-aipl_rec_inc_strong         59    external
-aipl_rec_inc_weak          180    external
-aipl_shim_get                4    external
-aipl_u64_len                20    external
-aipl_write_u64              10    external
-deep                       178         596
-gather                      10        1372
-main                         1        4064
-styles$into$own0           298         924
+function                   calls  code bytes
+__arr_drop_Rule               69         116
+__arr_retain_Rule              0         116
+__rec_drop_Rule              310         124
+__test$__test_block_1          1        4112
+__to_str_u64                  10         204
+aipl_arr_inc                 321    external
+aipl_array_dec               708    external
+aipl_array_new                69    external
+aipl_array_with_cap            3    external
+aipl_assert                    4    external
+aipl_rec_alloc               310    external
+aipl_rec_dec_strong          369    external
+aipl_rec_dec_weak            180    external
+aipl_rec_inc_strong           59    external
+aipl_rec_inc_weak            180    external
+aipl_test_begin                1    external
+aipl_test_end                  1    external
+aipl_test_summary              1    external
+aipl_u64_len                  20    external
+aipl_write_u64                10    external
+deep                         178         596
+gather                        10        1372
+main                           1         108
+styles$into$own0             298         924

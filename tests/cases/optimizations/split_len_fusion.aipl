@@ -12,7 +12,7 @@
 # `aipl_array_new` — the array `first_and_count` binds and reads twice, which
 # therefore has to exist — and no array for the other five.
 
-import { join, len, print, split, split_len } from builtins;
+import { equal as ==, join, len, split, split_len } from builtins;
 
 fn lines(self: str) -> str[] { self.split("\n") }
 
@@ -29,36 +29,34 @@ fn first_and_count(s: str) -> str {
     `{ps.join(sep="|")} {ps.len()}`
 }
 
-fn main() !prints {
+test({
     let src = "let a = 1;\nlet b = 2;\nassert(a + b == 3);\n";
-    print(`{line_of(src, 22)}`);
-    print(`{parts("a--b--c", "--")}`);
+    assert(`{line_of(src, 22)}` == "3");
+    assert(`{parts("a--b--c", "--")}` == "3");
     // An empty separator never matches: the whole string is the one part.
-    print(`{parts("abc", "")}`);
-    print(first_and_count("first\nsecond"));
+    assert(`{parts("abc", "")}` == "1");
+    assert(first_and_count("first\nsecond") == "first|second 2");
     // The fused builtin is importable too, and answers the same as the chain.
-    print(`{"x\ny\n".split_len("\n")} {"x\ny\n".split("\n").len()}`);
-}
---- stdout ---
-3
-3
-1
-first|second 2
-3 3
+    assert(`{"x\ny\n".split_len("\n")} {"x\ny\n".split("\n").len()}` == "3 3");
+})
 --- report ---
 allocations       12
 deallocations     12
 reallocations     0
 bytes allocated   573
 peak live bytes   534
-instructions      438
-binary size       4672 bytes (code 2484, data 59, metadata 2129)
+instructions      502
+binary size       5632 bytes (code 2644, data 492, metadata 2496)
 
-function            calls  code bytes
-__to_str_u64            6         204
-aipl_array_dec          1    external
-aipl_array_new          1    external
-aipl_shim_get           5    external
-aipl_u64_len           12    external
-aipl_write_u64          6    external
-main                    1        2280
+function                   calls  code bytes
+__test$__test_block_1          1        2332
+__to_str_u64                   6         204
+aipl_array_dec                 1    external
+aipl_array_new                 1    external
+aipl_assert                    5    external
+aipl_test_begin                1    external
+aipl_test_end                  1    external
+aipl_test_summary              1    external
+aipl_u64_len                  12    external
+aipl_write_u64                 6    external
+main                           1         108

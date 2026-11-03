@@ -5,34 +5,55 @@
 # shows the `__to_str_i64` helper still generated and called, and the output
 # shows the print landing where the source put it.
 
-import { len, print, to_str } from builtins;
+import { equal as ==, len, print, to_str } from builtins;
 
 fn noisy_value() !prints -> i64 {
     print("value");
     12345
 }
 
-fn main() !prints {
-    print(`{noisy_value().to_str().len()}`);
-}
---- stdout ---
-value
-5
---- report ---
-allocations       2
-deallocations     2
-reallocations     0
-bytes allocated   38
-peak live bytes   38
-instructions      105
-binary size       2192 bytes (code 892, data 1, metadata 1299)
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`{noisy_value().to_str().len()}`);
+    };
+    assert(out == """
+        value
+        5
 
-function            calls  code bytes
-__to_str_i64            1         204
-__to_str_u64            1         204
-aipl_i64_len            2    external
-aipl_shim_get           2    external
-aipl_u64_len            2    external
-aipl_write_i64          1    external
-aipl_write_u64          1    external
-main                    1         484
+    """);
+})
+--- report ---
+allocations       5
+deallocations     5
+reallocations     0
+bytes allocated   302
+peak live bytes   302
+instructions      448
+binary size       6168 bytes (code 3132, data 94, metadata 2942)
+
+function                                 calls  code bytes
+__aipl_const_teardown                        1          92
+__test$__test_block_1                        1        1124
+__test$__test_block_1$shim_closure0          0         700
+__test$__test_block_1$shim_closure1          2         700
+__to_str_i64                                 1         204
+__to_str_u64                                 1         204
+aipl_assert                                  1    external
+aipl_i64_len                                 2    external
+aipl_shim_get                                4    external
+aipl_shim_set                                4    external
+aipl_test_begin                              1    external
+aipl_test_end                                1    external
+aipl_test_summary                            1    external
+aipl_u64_len                                 2    external
+aipl_write_i64                               1    external
+aipl_write_u64                               1    external
+main                                         1         108

@@ -12,6 +12,7 @@
 # separate `map` over an intermediate.
 
 import {
+    equal as ==,
     filter,
     greater_than as >,
     join,
@@ -67,33 +68,54 @@ fn effect_order() !prints -> i64 {
     a
 }
 
-fn main() !prints {
-    print(show(big_doubled([1, 5, 3])));
-    print(in_loop([1, 2]).to_str());
-    print(write_between().to_str());
-    print(effect_order().to_str());
-}
---- stdout ---
-10,6
-43
-110
-computing
-after
-2
---- report ---
-allocations       7
-deallocations     7
-reallocations     0
-bytes allocated   150
-peak live bytes   115
-instructions      830
-binary size       5080 bytes (code 3216, data 65, metadata 1799)
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(show(big_doubled([1, 5, 3])));
+        print(in_loop([1, 2]).to_str());
+        print(write_between().to_str());
+        print(effect_order().to_str());
+    };
+    assert(out == """
+        10,6
+        43
+        110
+        computing
+        after
+        2
 
-function                 calls  code bytes
-__to_str_i64                 5         204
-aipl_array_dec               2    external
-aipl_array_with_cap          1    external
-aipl_i64_len                10    external
-aipl_shim_get                6    external
-aipl_write_i64               5    external
-main                         1        3012
+    """);
+})
+--- report ---
+allocations       18
+deallocations     18
+reallocations     0
+bytes allocated   1118
+peak live bytes   1083
+instructions      1618
+binary size       9224 bytes (code 5440, data 259, metadata 3525)
+
+function                                 calls  code bytes
+__aipl_const_teardown                        1          92
+__test$__test_block_1                        1        3636
+__test$__test_block_1$shim_closure0          0         700
+__test$__test_block_1$shim_closure1          6         700
+__to_str_i64                                 5         204
+aipl_array_dec                               2    external
+aipl_array_with_cap                          1    external
+aipl_assert                                  1    external
+aipl_i64_len                                10    external
+aipl_shim_get                                8    external
+aipl_shim_set                                4    external
+aipl_test_begin                              1    external
+aipl_test_end                                1    external
+aipl_test_summary                            1    external
+aipl_write_i64                               5    external
+main                                         1         108

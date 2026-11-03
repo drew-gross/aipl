@@ -9,7 +9,12 @@ def convert(path):
     m=re.search(r'^--- stdout ---\n',s,re.M)
     if not m: return 'no stdout section'
     body_text=s[m.end():]
-    if re.search(r'^--- ',body_text,re.M): return 'more sections'
+    nxt=re.search(r'^--- ',body_text,re.M)
+    tail=''
+    if nxt:
+        tail=body_text[nxt.start():]
+        body_text=body_text[:nxt.start()]
+        if re.search(r'^--- (cli|file|expect file)',tail,re.M): return 'cli/file section'
     head=s[:m.start()]
     mm=re.search(r'^(pub )?fn main\(\)( !\w+)*( -> i64)? \{\n',head,re.M)
     if not mm: return 'main shape'
@@ -45,7 +50,7 @@ def convert(path):
            '            set out = `{out}{text}`;\n        },\n    } {\n'+body+'    };\n'
            '    assert(out == '+lit+');\n})\n')
     out=head[:mm.start()]+block+rest
-    out=out.rstrip('\n')+'\n'
+    out=out.rstrip('\n')+'\n'+tail
     if not re.search(r'equal as ==',out):
         im=re.search(r'^import \{([^}]*)\} from builtins;',out,re.M)
         if not im: return 'no builtins import'

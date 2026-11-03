@@ -7,7 +7,7 @@
 
 import {
     cartesian_product,
-    print,
+    equal as ==,
     wrapping_add as +,
     wrapping_add_assign as +=,
     wrapping_mul as *,
@@ -29,30 +29,31 @@ fn numbered(n: u64) -> u64 {
     total
 }
 
-fn main() !prints {
-    print(`{weighted_sum(3)}`);
-    print(`{numbered(3)}`);
-}
---- stdout ---
-9
-45
+test({
+    assert(`{weighted_sum(3)}` == "9");
+    assert(`{numbered(3)}` == "45");
+})
 --- report ---
 allocations       5
 deallocations     5
 reallocations     4
 bytes allocated   147
 peak live bytes   387
-instructions      1535
-binary size       4728 bytes (code 2968, data 9, metadata 1751)
+instructions      1569
+binary size       5280 bytes (code 3084, data 166, metadata 2030)
 
-function                 calls  code bytes
-__to_str_u64                 2         204
-aipl_arr_inc                 1    external
-aipl_array_dec               3    external
-aipl_array_with_cap          2    external
-aipl_shim_get                2    external
-aipl_u64_len                 4    external
-aipl_write_u64               2    external
-main                         1        1956
-main$map1                    0         404
-main$map3                    0         404
+function                        calls  code bytes
+__test$__test_block_1               1        1964
+__test$__test_block_1$map1          0         404
+__test$__test_block_1$map3          0         404
+__to_str_u64                        2         204
+aipl_arr_inc                        1    external
+aipl_array_dec                      3    external
+aipl_array_with_cap                 2    external
+aipl_assert                         2    external
+aipl_test_begin                     1    external
+aipl_test_end                       1    external
+aipl_test_summary                   1    external
+aipl_u64_len                        4    external
+aipl_write_u64                      2    external
+main                                1         108

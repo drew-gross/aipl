@@ -11,33 +11,35 @@
 # elements as a single block copy. A loop of `push` has to rediscover the
 # length one element at a time, doubling the block whenever it runs out.
 
-import { len, print, push, to_str } from builtins;
+import { equal as ==, len, push, to_str } from builtins;
 
 fn source() -> i64[] { [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19] }
 
-fn main() !prints {
+test({
     mut out = [0];
     for (let x : source()) {
         set out.push(x);
     }
-    print(out.len().to_str());
-}
---- stdout ---
-21
+    assert(out.len().to_str() == "21");
+})
 --- report ---
 allocations       2
 deallocations     2
 reallocations     4
 bytes allocated   50
 peak live bytes   290
-instructions      629
-binary size       2160 bytes (code 776, data 185, metadata 1199)
+instructions      653
+binary size       2552 bytes (code 884, data 257, metadata 1411)
 
-function            calls  code bytes
-__to_str_u64            1         204
-aipl_arr_inc            1    external
-aipl_array_dec          1    external
-aipl_shim_get           1    external
-aipl_u64_len            2    external
-aipl_write_u64          1    external
-main                    1         572
+function                   calls  code bytes
+__test$__test_block_1          1         572
+__to_str_u64                   1         204
+aipl_arr_inc                   1    external
+aipl_array_dec                 1    external
+aipl_assert                    1    external
+aipl_test_begin                1    external
+aipl_test_end                  1    external
+aipl_test_summary              1    external
+aipl_u64_len                   2    external
+aipl_write_u64                 1    external
+main                           1         108

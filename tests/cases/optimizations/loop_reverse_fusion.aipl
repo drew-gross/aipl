@@ -21,6 +21,7 @@
 # is in calls, which only the report shows.)
 
 import {
+    equal as ==,
     extend,
     less_than as <,
     print,
@@ -62,40 +63,54 @@ fn backwards(s: str) -> str {
 
 fn materialized(xs: i64[]) -> i64[] { xs.reverse() }
 
-fn main() !prints {
-    let xs = many();
-    print(last_three(xs));
-    print(backwards("abc"));
-    print(to_str(materialized(xs)[0]));
-    for (let i, x : [7, 8].reverse()) {
-        print(`{i}:{x}`);
-    }
-}
---- stdout ---
-200 199 198 
-cba
-some(200)
-0:8
-1:7
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let xs = many();
+        print(last_three(xs));
+        print(backwards("abc"));
+        print(to_str(materialized(xs)[0]));
+        for (let i, x : [7, 8].reverse()) {
+            print(`{i}:{x}`);
+        }
+    };
+    assert(out == "200 199 198 \ncba\nsome(200)\n0:8\n1:7\n");
+})
 --- report ---
-allocations       20
-deallocations     20
+allocations       29
+deallocations     29
 reallocations     7
-bytes allocated   954
-peak live bytes   2338
-instructions      12484
-binary size       6272 bytes (code 3544, data 58, metadata 2670)
+bytes allocated   1746
+peak live bytes   3340
+instructions      13161
+binary size       10360 bytes (code 5772, data 210, metadata 4378)
 
-function              calls  code bytes
-__to_str_i64              5         204
-__to_str_i64$opt          1         376
-__to_str_u64              2         204
-aipl_arr_inc              2    external
-aipl_array_dec            2    external
-aipl_i64_len             12    external
-aipl_shim_get             5    external
-aipl_u64_len              4    external
-aipl_write_bytes          2    external
-aipl_write_i64            6    external
-aipl_write_u64            2    external
-main                      1        2760
+function                                 calls  code bytes
+__aipl_const_teardown                        1          92
+__test$__test_block_1                        1        3388
+__test$__test_block_1$shim_closure0          0         700
+__test$__test_block_1$shim_closure1          5         700
+__to_str_i64                                 5         204
+__to_str_i64$opt                             1         376
+__to_str_u64                                 2         204
+aipl_arr_inc                                 2    external
+aipl_array_dec                               2    external
+aipl_assert                                  1    external
+aipl_i64_len                                12    external
+aipl_shim_get                                7    external
+aipl_shim_set                                4    external
+aipl_test_begin                              1    external
+aipl_test_end                                1    external
+aipl_test_summary                            1    external
+aipl_u64_len                                 4    external
+aipl_write_bytes                             2    external
+aipl_write_i64                               6    external
+aipl_write_u64                               2    external
+main                                         1         108

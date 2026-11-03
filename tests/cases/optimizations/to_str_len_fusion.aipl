@@ -13,7 +13,7 @@
 # that string genuinely has to exist; it is also the unfused answer the fused
 # ones are checked against.
 
-import { len, print, to_str, to_str_len } from builtins;
+import { equal as ==, len, to_str, to_str_len } from builtins;
 
 struct Point { x: i64, y: str }
 
@@ -39,38 +39,37 @@ fn built_then_measured(n: i64) -> str {
     `{s} {s.len()}`
 }
 
-fn main() !prints {
+test({
     let p = Point { x: 1, y: "ab" };
-    print(`{digits(12345)} {width(p)} {text_width("hello")}`);
+    assert(`{digits(12345)} {width(p)} {text_width("hello")}` == "5 23 5");
 
     // A `char[]` keeps its array-bracket rendering rather than a `str`'s, so
     // this measure is a walk over the elements, not one length field.
-    print(`{['a', 'b'].to_str().len()} {some(5).to_str().len()}`);
+    assert(`{['a', 'b'].to_str().len()} {some(5).to_str().len()}` == "10 7");
     // The built rendering and its own length agree with the measured one.
-    print(`{built_then_measured(12345)} {digits(12345)}`);
+    assert(`{built_then_measured(12345)} {digits(12345)}` == "12345 5 5");
     // The fused builtin is importable too, and answers the same as the chain.
-    print(`{to_str_len(p)} {width(p)}`);
-}
---- stdout ---
-5 23 5
-10 7
-12345 5 5
-23 23
+    assert(`{to_str_len(p)} {width(p)}` == "23 23");
+})
 --- report ---
 allocations       22
 deallocations     22
 reallocations     0
 bytes allocated   1234
 peak live bytes   1234
-instructions      768
-binary size       5760 bytes (code 3296, data 1, metadata 2463)
+instructions      822
+binary size       6664 bytes (code 3448, data 402, metadata 2814)
 
-function            calls  code bytes
-__to_str_i64            1         204
-__to_str_u64            9         204
-aipl_i64_len            8    external
-aipl_shim_get           4    external
-aipl_u64_len           18    external
-aipl_write_i64          1    external
-aipl_write_u64          9    external
-main                    1        2888
+function                   calls  code bytes
+__test$__test_block_1          1        2932
+__to_str_i64                   1         204
+__to_str_u64                   9         204
+aipl_assert                    4    external
+aipl_i64_len                   8    external
+aipl_test_begin                1    external
+aipl_test_end                  1    external
+aipl_test_summary              1    external
+aipl_u64_len                  18    external
+aipl_write_i64                 1    external
+aipl_write_u64                 9    external
+main                           1         108

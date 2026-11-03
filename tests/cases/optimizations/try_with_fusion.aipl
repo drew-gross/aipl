@@ -8,7 +8,6 @@
 import {
     equal as ==,
     logical_and as &&,
-    print,
     repeat,
     saturating_remainder as %,
     to_str,
@@ -28,7 +27,7 @@ fn through_a_call(xs: i64[], i: u64) -> i64[] { xs.with(i, 7).value_or(same(xs))
 
 fn on_a_field(b: Board, i: u64) -> Board { cells: b.cells.with(i, 7).value_or(b.cells) } #[allow]
 
-fn main() !prints {
+test({
     mut a: i64[] = [0].repeat(64);
     mut b: i64[] = [0].repeat(64);
     mut c = Board { cells: [0].repeat(64) };
@@ -38,31 +37,30 @@ fn main() !prints {
         set c = on_a_field(c, i % 64);
     }
     // A miss changes nothing, whichever way it is written.
-    print(to_str(direct([1, 2], 5) == [1, 2]));
-    print(to_str(through_a_call([1, 2], 5) == [1, 2]));
-    print(to_str(holds(on_a_field(Board { cells: [1, 2] }, 5), [1, 2])));
-    print(to_str(a == b && holds(c, b)));
-}
---- stdout ---
-true
-true
-true
-true
+    assert(to_str(direct([1, 2], 5) == [1, 2]) == "true");
+    assert(to_str(through_a_call([1, 2], 5) == [1, 2]) == "true");
+    assert(to_str(holds(on_a_field(Board { cells: [1, 2] }, 5), [1, 2])) == "true");
+    assert(to_str(a == b && holds(c, b)) == "true");
+})
 --- report ---
 allocations       10
 deallocations     10
 reallocations     0
 bytes allocated   3248
 peak live bytes   3248
-instructions      48811
-binary size       7360 bytes (code 4848, data 62, metadata 2450)
+instructions      48865
+binary size       8208 bytes (code 4988, data 438, metadata 2782)
 
-function                  calls  code bytes
-__builtin_repeat$i64          3         532
-__eq_i64$arr                  5         264
-__to_str_bool                 4         224
-aipl_arr_inc                504    external
-aipl_array_dec              908    external
-aipl_shim_get                 4    external
-aipl_write_bytes              4    external
-main                          1        3828
+function                   calls  code bytes
+__builtin_repeat$i64           3         532
+__eq_i64$arr                   5         264
+__test$__test_block_1          1        3860
+__to_str_bool                  4         224
+aipl_arr_inc                 504    external
+aipl_array_dec               908    external
+aipl_assert                    4    external
+aipl_test_begin                1    external
+aipl_test_end                  1    external
+aipl_test_summary              1    external
+aipl_write_bytes               4    external
+main                           1         108

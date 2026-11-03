@@ -21,7 +21,7 @@
 # unrelated reason — they are one-liners, so the inliner folded them into their
 # callers, which is what would have happened without either pass.
 
-import { extend, len, print, value_or, wrapping_add as + } from builtins;
+import { equal as ==, extend, len, value_or, wrapping_add as + } from builtins;
 
 fn parts(n: i64) -> i64[] { [n, n + 1, n + 2] }
 
@@ -50,32 +50,33 @@ fn via_optional(n: i64) -> u64 {
 # Measured rather than appended, so this is the counting family's shape.
 fn counted(n: i64) -> u64 { parts(n).len() }
 
-fn main() !prints {
-    print(`{via_handed_back([1, 2])} {via_optional(0)} {via_optional(5)}`);
-    print(`{counted(7)}`);
-}
---- stdout ---
-2 0 3
-3
+test({
+    assert(`{via_handed_back([1, 2])} {via_optional(0)} {via_optional(5)}` == "2 0 3");
+    assert(`{counted(7)}` == "3");
+})
 --- report ---
 allocations       12
 deallocations     12
 reallocations     0
 bytes allocated   556
 peak live bytes   452
-instructions      508
-binary size       4224 bytes (code 2152, data 33, metadata 2039)
+instructions      542
+binary size       4792 bytes (code 2272, data 235, metadata 2285)
 
-function            calls  code bytes
-__to_str_i64            1         204
-__to_str_u64            3         204
-aipl_arr_inc            5    external
-aipl_array_dec          6    external
-aipl_array_new          1    external
-aipl_i64_len            2    external
-aipl_shim_get           2    external
-aipl_u64_len            6    external
-aipl_write_i64          1    external
-aipl_write_u64          3    external
-main                    1        1264
-via_optional            2         480
+function                   calls  code bytes
+__test$__test_block_1          1        1276
+__to_str_i64                   1         204
+__to_str_u64                   3         204
+aipl_arr_inc                   5    external
+aipl_array_dec                 6    external
+aipl_array_new                 1    external
+aipl_assert                    2    external
+aipl_i64_len                   2    external
+aipl_test_begin                1    external
+aipl_test_end                  1    external
+aipl_test_summary              1    external
+aipl_u64_len                   6    external
+aipl_write_i64                 1    external
+aipl_write_u64                 3    external
+main                           1         108
+via_optional                   2         480

@@ -13,7 +13,7 @@
 # `match` on `"a"` would survive into the program. The report holds the result: no
 # call to `classify` or `known`, and no string comparison left to run.
 
-import { is_nonempty, print } from builtins;
+import { equal as ==, is_nonempty } from builtins;
 
 fn forms(self: str) -> str[] {
     match (self) {
@@ -34,32 +34,34 @@ fn classify(self: str) -> i64 {
     }
 }
 
-fn main() !prints {
-    print(`{classify("a")} {classify("b")} {classify("zzz")}`);
-    print(`{known("a")} {known("z")}`);
-    print(match ('x') {
-        'x' => "ex",
-        _ => "other",
-    });
-}
---- stdout ---
-1 2 3
-true false
-ex
+test({
+    assert(`{classify("a")} {classify("b")} {classify("zzz")}` == "1 2 3");
+    assert(`{known("a")} {known("z")}` == "true false");
+    assert(
+        match ('x') {
+            'x' => "ex",
+            _ => "other",
+        } == "ex",
+    );
+})
 --- report ---
 allocations       11
 deallocations     11
 reallocations     0
 bytes allocated   620
 peak live bytes   620
-instructions      300
-binary size       3800 bytes (code 1952, data 14, metadata 1834)
+instructions      344
+binary size       4504 bytes (code 2092, data 318, metadata 2094)
 
-function              calls  code bytes
-__to_str_bool             2         224
-__to_str_i64              3         204
-aipl_i64_len              6    external
-aipl_shim_get             3    external
-aipl_write_bytes          2    external
-aipl_write_i64            3    external
-main                      1        1524
+function                   calls  code bytes
+__test$__test_block_1          1        1556
+__to_str_bool                  2         224
+__to_str_i64                   3         204
+aipl_assert                    3    external
+aipl_i64_len                   6    external
+aipl_test_begin                1    external
+aipl_test_end                  1    external
+aipl_test_summary              1    external
+aipl_write_bytes               2    external
+aipl_write_i64                 3    external
+main                           1         108

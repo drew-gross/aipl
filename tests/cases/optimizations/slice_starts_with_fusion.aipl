@@ -15,7 +15,7 @@
 # on `many` holds the cost: nothing allocated, and the same instructions however
 # much of the array is left after the offset.
 
-import { Measurement, equal as ==, measure, print, repeat, starts_with, to_str } from builtins;
+import { Measurement, equal as ==, measure, repeat, starts_with, to_str } from builtins;
 
 fn many() -> i64[] { [7].repeat(201) }.performance({
     let long = many();
@@ -41,60 +41,49 @@ fn many() -> i64[] { [7].repeat(201) }.performance({
     assert(instructions == 14);
 })
 
-fn main() !prints {
+test({
     // Decided by two elements, not by copying the other 200.
-    print(many()[1..].starts_with([7, 7]).to_str());
-    print(many()[1..].starts_with([1, 2]).to_str());
+    assert(many()[1..].starts_with([7, 7]).to_str() == "true");
+    assert(many()[1..].starts_with([1, 2]).to_str() == "false");
 
     // A str receiver: no view is built for the tail.
     let s = "hello, world!";
-    print(s[7..].starts_with("wor").to_str());
-    print(s[7..].starts_with("hello").to_str());
+    assert(s[7..].starts_with("wor").to_str() == "true");
+    assert(s[7..].starts_with("hello").to_str() == "false");
 
     // Every pattern shape fuses — the sequence, a single element, an optional.
-    print(s[7..].starts_with('w').to_str());
-    print(s[7..].starts_with(some('w')).to_str());
-    print(s[7..].starts_with(none).to_str());
+    assert(s[7..].starts_with('w').to_str() == "true");
+    assert(s[7..].starts_with(some('w')).to_str() == "true");
+    assert(s[7..].starts_with(none).to_str() == "true");
     let xs = [1, 2, 3, 4];
-    print(xs[2..].starts_with([3, 4]).to_str());
-    print(xs[2..].starts_with(3).to_str());
-    print(xs[2..].starts_with(some(3)).to_str());
-    print(xs[2..].starts_with(none).to_str());
+    assert(xs[2..].starts_with([3, 4]).to_str() == "true");
+    assert(xs[2..].starts_with(3).to_str() == "true");
+    assert(xs[2..].starts_with(some(3)).to_str() == "true");
+    assert(xs[2..].starts_with(none).to_str() == "true");
 
     // An offset past the end clamps exactly as the slice does: nothing is left
     // there, so only the empty pattern matches.
-    print(xs[9..].starts_with([1]).to_str());
-    print(xs[9..].starts_with([]).to_str());
-}
---- stdout ---
-true
-false
-true
-false
-true
-true
-true
-true
-true
-true
-true
-false
-true
-
+    assert(xs[9..].starts_with([1]).to_str() == "false");
+    assert(xs[9..].starts_with([]).to_str() == "true");
+})
 --- report ---
 allocations       15
 deallocations     15
 reallocations     0
 bytes allocated   3511
 peak live bytes   3511
-instructions      16346
-binary size       7768 bytes (code 4828, data 166, metadata 2774)
+instructions      16490
+binary size       9984 bytes (code 5096, data 1438, metadata 3450)
 
-function                  calls  code bytes
-__builtin_repeat$i64          2         532
-__to_str_bool                13         224
-aipl_arr_inc                406    external
-aipl_array_dec              406    external
-aipl_shim_get                13    external
-aipl_write_bytes             13    external
-main                          1        4072
+function                   calls  code bytes
+__builtin_repeat$i64           2         532
+__test$__test_block_1          1        4232
+__to_str_bool                 13         224
+aipl_arr_inc                 406    external
+aipl_array_dec               406    external
+aipl_assert                   13    external
+aipl_test_begin                1    external
+aipl_test_end                  1    external
+aipl_test_summary              1    external
+aipl_write_bytes              13    external
+main                           1         108

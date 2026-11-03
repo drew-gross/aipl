@@ -17,7 +17,7 @@
 # builds is a constant the compiler can put in the binary instead — and the
 # `stdout` shows each `print` landing exactly where the source put it.
 
-import { len, print, wrapping_add as + } from builtins;
+import { equal as ==, len, print, wrapping_add as + } from builtins;
 
 fn noisy(n: i64) !prints -> i64 {
     print("e");
@@ -37,35 +37,56 @@ fn read_parts(n: i64) !prints -> u64 {
     parts.len()
 }
 
-fn main() !prints {
-    print(`{noisy_count(7)}`);
-    print(`{read_parts(10)}`);
-}
---- stdout ---
-e
-e
-e
-3
-first some(10)
-3
---- report ---
-allocations       5
-deallocations     5
-reallocations     0
-bytes allocated   186
-peak live bytes   186
-instructions      343
-binary size       4144 bytes (code 2072, data 50, metadata 2022)
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`{noisy_count(7)}`);
+        print(`{read_parts(10)}`);
+    };
+    assert(out == """
+        e
+        e
+        e
+        3
+        first some(10)
+        3
 
-function              calls  code bytes
-__to_str_i64$opt          1         376
-__to_str_u64              2         204
-aipl_array_dec            1    external
-aipl_array_new            1    external
-aipl_i64_len              2    external
-aipl_shim_get             6    external
-aipl_u64_len              4    external
-aipl_write_bytes          2    external
-aipl_write_i64            1    external
-aipl_write_u64            2    external
-main                      1        1492
+    """);
+})
+--- report ---
+allocations       16
+deallocations     16
+reallocations     0
+bytes allocated   1154
+peak live bytes   1154
+instructions      1131
+binary size       8256 bytes (code 4292, data 242, metadata 3722)
+
+function                                 calls  code bytes
+__aipl_const_teardown                        1          92
+__test$__test_block_1                        1        2112
+__test$__test_block_1$shim_closure0          0         700
+__test$__test_block_1$shim_closure1          6         700
+__to_str_i64$opt                             1         376
+__to_str_u64                                 2         204
+aipl_array_dec                               1    external
+aipl_array_new                               1    external
+aipl_assert                                  1    external
+aipl_i64_len                                 2    external
+aipl_shim_get                                8    external
+aipl_shim_set                                4    external
+aipl_test_begin                              1    external
+aipl_test_end                                1    external
+aipl_test_summary                            1    external
+aipl_u64_len                                 4    external
+aipl_write_bytes                             2    external
+aipl_write_i64                               1    external
+aipl_write_u64                               2    external
+main                                         1         108

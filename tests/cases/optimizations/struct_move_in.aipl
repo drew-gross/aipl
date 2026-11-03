@@ -13,7 +13,7 @@
 # (`aipl_set_union_mut`, behind an `aipl_arr_reserve` that copies a block
 # anyone else still holds) instead of building a fresh set.
 
-import { len, logical_or as ||, print, union } from builtins;
+import { equal as ==, len, logical_or as ||, union } from builtins;
 
 struct First { kinds: #{i64} = #{}, texts: #{str} = #{}, nullable: bool = false }
 
@@ -37,65 +37,66 @@ fn rename(self: Named, suffix: str) -> Named { name: `{self.name}{suffix}`, tags
 
 fn width(n: Named) -> u64 { n.name.len() } #[allow]
 
-fn main() !prints {
+test({
     let f = fold([
         First { kinds: #{1}, nullable: true },
         First { texts: #{"a"}, nullable: true },
         First { kinds: #{2}, texts: #{"b"} },
     ]);
-    print(`{f}`);
+    assert(`{f}` == """First { kinds: {1, 2}, texts: {"a", "b"}, nullable: false }""");
     let g = fold([First { kinds: #{5}, nullable: true }, First { kinds: #{6} }]);
-    print(`{g}`);
+    assert(`{g}` == "First { kinds: {5, 6}, texts: {}, nullable: false }");
     // Two fresh receivers: both move in whole.
-    print(`{First { kinds: #{9} }.merge(First { texts: #{"z"} })}`);
+    assert(
+        `{First { kinds: #{9} }.merge(First { texts: #{"z"} })}` == """First { kinds: {9}, texts: {"z"}, nullable: false }""",
+    );
 
     // A borrowed struct is retained field by field and stays intact; a fresh
     // one moves; a chain of fresh results moves at every step.
     let n = Named { name: "x", tags: ["p", "q"] };
-    print(`{n.rename("!")} {n}`);
-    print(`{Named { name: "y", tags: [] }.rename("?")}`);
-    print(`{width(n.rename("."))} {width(n)} {n}`);
+    assert(
+        `{n.rename("!")} {n}` == """Named { name: "x!", tags: ["p", "q"] } Named { name: "x", tags: ["p", "q"] }""",
+    );
+    assert(`{Named { name: "y", tags: [] }.rename("?")}` == """Named { name: "y?", tags: [] }""");
+    assert(
+        `{width(n.rename("."))} {width(n)} {n}` == """2 1 Named { name: "x", tags: ["p", "q"] }""",
+    );
     let m = Named { name: "z", tags: ["r"] };
-    print(`{m.rename("+").rename("-")}`);
+    assert(`{m.rename("+").rename("-")}` == """Named { name: "z+-", tags: ["r"] }""");
     // A binding at its last use moves in whole.
     let k = Named { name: "k", tags: ["s", "t", "u"] };
-    print(`{k.rename("=")}`);
-}
---- stdout ---
-First { kinds: {1, 2}, texts: {"a", "b"}, nullable: false }
-First { kinds: {5, 6}, texts: {}, nullable: false }
-First { kinds: {9}, texts: {"z"}, nullable: false }
-Named { name: "x!", tags: ["p", "q"] } Named { name: "x", tags: ["p", "q"] }
-Named { name: "y?", tags: [] }
-2 1 Named { name: "x", tags: ["p", "q"] }
-Named { name: "z+-", tags: ["r"] }
-Named { name: "k=", tags: ["s", "t", "u"] }
+    assert(`{k.rename("=")}` == """Named { name: "k=", tags: ["s", "t", "u"] }""");
+})
 --- report ---
 allocations       44
 deallocations     44
 reallocations     3
 bytes allocated   2802
 peak live bytes   2842
-instructions      7646
-binary size       20616 bytes (code 13260, data 195, metadata 7161)
+instructions      7748
+binary size       23352 bytes (code 13456, data 1771, metadata 8125)
 
-function                 calls  code bytes
-__arr_drop_First             2         152
-__arr_retain_First           0         152
-__to_str_First               3        1464
-__to_str_Named               6        1100
-__to_str_u64                 2         204
-aipl_arr_inc                53    external
-aipl_array_dec             104    external
-aipl_array_new               5    external
-aipl_array_with_cap          8    external
-aipl_i64_len                10    external
-aipl_shim_get                8    external
-aipl_u64_len                 4    external
-aipl_write_bytes           105    external
-aipl_write_i64               5    external
-aipl_write_u64               2    external
-fold                         2        1960
-main                         1        7168
-rename                       2         500
-rename$own0                  4         560
+function                   calls  code bytes
+__arr_drop_First               2         152
+__arr_retain_First             0         152
+__test$__test_block_1          1        7256
+__to_str_First                 3        1464
+__to_str_Named                 6        1100
+__to_str_u64                   2         204
+aipl_arr_inc                  53    external
+aipl_array_dec               104    external
+aipl_array_new                 5    external
+aipl_array_with_cap            8    external
+aipl_assert                    8    external
+aipl_i64_len                  10    external
+aipl_test_begin                1    external
+aipl_test_end                  1    external
+aipl_test_summary              1    external
+aipl_u64_len                   4    external
+aipl_write_bytes             105    external
+aipl_write_i64                 5    external
+aipl_write_u64                 2    external
+fold                           2        1960
+main                           1         108
+rename                         2         500
+rename$own0                    4         560
