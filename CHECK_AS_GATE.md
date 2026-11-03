@@ -1,25 +1,28 @@
-# `aipl check` as the whole case gate (multi-session plan)
+# `aipl check` as the whole case gate: what is left
 
-Living plan. Tick boxes as work lands, append to the **Session log** at the end of every
-session, and keep **Decisions** current. Each phase lands green via `cargo handoff` and is
-worth merging on its own; Phases 1-3 stand even if Phase 0 says to stop before Phase 4.
+Status as of 2026-11-03. Done and removed from this list (git has the history): effect-free tests
+(Phase 2a), forbidding imports of sectioned files (Phase 3), top-level `test`/`benchmark` blocks, the
+`.performance` to `.benchmark` rename, root-relative `./` labels (DESIGN_PRINCIPLES.md §6 and §7), and most of
+Phase 2b, which reserved `main` for programs and tests of the real implementation of an effect.
+
+Each phase lands green via `cargo handoff` and is worth merging on its own.
 
 ## Goal
 Validate the whole corpus (`tests/cases/**`, `crates/**`, `examples/`) in a few long-lived,
 sharded `aipl check` processes instead of ~1183 per-case nextest processes, with `aipl check`
 the single definition of "this file is correct" for the dev loop, handoff and user projects.
-Success is measured against the current handoff **discovery run: 456s** (final-gate-only
-handoff: 546s total), taken in the same launch environment as handoff really runs in.
+Success is measured against the current handoff **discovery run: ~410-460s** (a clean full
+handoff: ~500s), taken in the same launch environment as handoff really runs in.
 
-## Background (read before starting)
+## Background
 Two separate costs sit under "process startup":
 1. **Per-test process overhead** (nextest process, test-binary start, ~0.2s dogfood engine
    load; ~0.9s overhead per ~0.6s of work). In-process batching removes it.
 2. **macOS fresh-executable assessment** (~0.19s per newly linked exe, serialized, ~1.7 exes
    per case, ~350s floor; ~2ms under iTerm; see memory `project_handoff_slow_exec_assessment`).
-   Batching alone does not remove it; fewer `main`s (Phase 2) do.
+   Batching alone does not remove it; fewer `main`s do (Phase 2b is what cut them).
 
-Facts established by reading (nothing timed yet):
+Facts that shape the remaining phases:
 - `aipl check` already validates `stdout`, `stderr`, `exit code`, `errors`, `report`,
   `expect file:`, `cli`, `file:` companions (`src/sections.rs`, `check_file` in `src/main.rs`),
   and `--fix` writes them with the same `fill_or_add_sections_file` as `fill_expected`.
@@ -27,56 +30,33 @@ Facts established by reading (nothing timed yet):
 - Serial `aipl check crates` took ~123s for 144 files (~0.85s/file, compute not startup), so a
   serial single process is **not** faster than parallel nextest: the batch must be sharded.
 - `check` is serial in-process (`env::set_current_dir`, global test tallies, global shim slots).
-- Imported files' sections, `.test` bodies and `file:` companions are silently dropped today.
+  Tests no longer have real effects, so the JIT test run no longer needs a scratch cwd or staged
+  companions; only `main` runs do. That is most of what made `set_current_dir` necessary.
+- `check` runs `main` only when a run-observing section (`stdout`, `stderr`, `exit code`, non-empty
+  `cli`, `expect file:`) exists; there is no implicit "silent and exit 0" assertion.
 
-## Decisions
-Settled:
-- `main` is reserved for exactly two things (decided 2026-11-02, broad scope): **(a)** the entry point of an
-  actual program (`projects/*`, `examples/`), and **(b)** a handful of tests that validate the behavior of the
-  *un-shimmed* builtins (real file I/O, printing, stdin, clock, `execute_program`, terminal), which need some
-  coverage of the real implementation. Everything else stops pinning the behavior of "regular" functions through
-  `main` / `print` / sections: it becomes `.test` blocks (asserts on returned values, or on prints captured with an
-  inline `shim`). This is the **broad** set of the Phase 2b census (~650 files), not just empty placeholders.
-- Because of that, `check` keeps its rule of running `main` only when a run-observing section
-  (`stdout`, `stderr`, `exit code`, non-empty `cli`, `expect file:`) exists. No implicit
-  "silent and exit 0" assertion for section-less `main`s.
-- Paths in diagnostics and baked `assert`/`trace` labels are relative to the **project root**
-  (cmd+clickable). The harness and `aipl report` move to it; `check` already works that way.
-- **Tests and performance blocks may not let an effect escape**: every effect a `.test` body uses
-  (directly or through any function it calls) must be discharged by a `shim` inside the body. Tests
-  that exercise the real (unshimmed) filesystem, clock, stdin or process APIs are real programs: they
-  keep a `main` and pin behavior with `stdout` / `file:` / `expect file:` sections.
-- Crashes and runaway JIT are not mitigated (treated as top-priority bugs; fail loudly).
-- Running `main` under the JIT is rejected: the AOT linker runtime is the product.
+Non-goals (decided): crashes and runaway JIT are not mitigated (treated as top-priority bugs; fail
+loudly); running `main` under the JIT is rejected (the AOT linker runtime is the product).
 
-Open (resolve in the phase noted):
-- [x] D1 (Phase 0/2): "real program" = (a) and (b) above, nothing else (decided 2026-11-02).
-- [x] D6 (Phase 2b): tests of the entry-point mechanics (the 55 `main` files that pin `exit code`, `cli`, `stderr`,
-      `file:` / `expect file:`) **stay `main` tests** (decided 2026-11-02). They are not moved: no directory is
-      created for them.
-- [ ] D7 (Phase 2b): how, if at all, to enforce "`main` only for programs and real-builtin coverage". Directory-based
-      enforcement was rejected (decided 2026-11-02: skip enforcement for now; the user has not settled on a
-      mechanism). Until then the rule is held by review and by the checklist below.
-- [x] D2 (Phase 3): importing a file that has sections is an **error** (done 2026-11-01).
-- [ ] D3 (Phase 1): what marks the project root so rooting does not depend on the cwd.
-      (Note, DESIGN_PRINCIPLES.md §7: a directory under `projects/` is its own project with its own root, not the repository's;
-      whatever marks a root has to find `projects/word_count`, not walk up to the repository. `aipl.build` sits at each project's root today.)
-- [x] D5 (Phase 2a): no shared capture helpers — each test writes its shim **inline** (decided
-      2026-11-02). No builtin, no library file, no in-memory filesystem builtin; the shim pattern
-      stays visible at the use, as in `tests/cases/effects/shim_closures.aipl`.
-- [ ] D4 (end of Phase 0): speedup that justifies Phases 4-5 (suggestion: discovery well under
-      half of 456s).
+## Open decisions
+- [ ] **D3 (Phase 1):** what marks the project root, so rooting does not depend on the cwd. A directory
+      under `projects/` is its own project with its own root, not the repository's (DESIGN_PRINCIPLES.md
+      §7), so the marker has to find `projects/word_count` and not walk up to the repository.
+      `aipl.build` sits at each project's root today.
+- [ ] **D4 (end of Phase 0):** the speedup that justifies Phases 4-5 (suggestion: discovery well under
+      half of the current number).
+- [ ] **D7:** how, if at all, to enforce "`main` only for programs, real-builtin coverage and
+      entry-point mechanics". Directory-based enforcement was rejected; no mechanism chosen. Until then it
+      is held by review.
 
 ## Phase 0: measure and decide (no code)
 - [ ] Time, over ~100 sampled cases, each step separately: per-test overhead, load/lint/mono,
       JIT, clang link, exec. Use `aipl check <dir>` (batch mode exists) and
       `scripts/flamegraph_check.sh`.
 - [ ] Repeat in both launch environments (iTerm-exempt terminal; backgrounded Claude session).
-- [ ] Census: files with `main` + sections, bucketed (print-only / exit code / cli,stdin,files).
-- [x] Census: how many files with sections are imported by other files: 0 (Phase 3 found none).
-- [ ] Check that a `Compilation` frees its JIT code on drop (memory growth in a long process).
 - [ ] Check what "binary size" in `aipl report` reads (object vs linked exe).
-- [ ] Write the timing table and census into this doc; resolve D1 and D4; go/no-go.
+- [ ] Check that a `Compilation` frees its JIT code on drop (memory growth in a long process).
+- [ ] Write the timing table into this doc; resolve D4; go/no-go for Phases 4-5.
 
 ## Phase 1: close the parity gaps in `check`
 Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
@@ -84,103 +64,75 @@ Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
 - [ ] G1 baseline row compare vs `tests/performance_metrics.md` (5 asserted columns), with
       `BaselineMoved`/`BaselineMissing` outcomes.
 - [ ] G2 leak gate for every file that has `main` or tests (library cases measure the synthesized
-      test driver), not only `.performance`/`report`.
+      test driver), not only `.benchmark`/`report`.
 - [ ] G3 `check` / `check exit code` sections: run a child `aipl check --ignore-sections` and
-      compare (8 + 4 cases).
-- [ ] G4 project-root rooting (resolve D3): move the harness and `aipl report` to it; keep
-      `report_does_not_depend_on_where_it_is_run_from` (tests/suites/report.rs) meaningful; test
+      compare (about a dozen cases).
+- [ ] G4 root the cases harness at the project root (resolve D3). Today it roots each case at its own
+      directory, so a loader error opens with `./err_x.aipl` while its caret block says
+      `./tests/cases/…/err_x.aipl`: two roots in one message. Rooting moves every baked `assert`/`trace`
+      label, so baseline `code bytes`/`data` rows and pinned reports move once; do it in its own handoff.
+      Keep `report_does_not_depend_on_where_it_is_run_from` (tests/suites/report.rs) meaningful, and test
       that `check`'s `report` == `aipl report` == the pinned section from different cwds.
+      Related: `aipl check <dir>` on `tests/cases/imports/` reports 9 `errors` mismatches for cases with
+      `file:` companions (their labels use the scratch dir), so the label rule for staged files needs settling.
 - [ ] G5 keep the "`file:` section on an in-place source is an error" rule in `check`.
 - [ ] G6 `check` prints `handoff-fill:` lines via `handoff::protocol::Fill` (one definition).
-- [ ] Differential test: for every corpus file, old harness and new `check` agree on pass/fail,
-      and fill mode yields byte-identical files and baseline rows.
-- [ ] Canary set of deliberately broken copies that both must reject: wrong stdout, wrong exit
-      code, leak, moved baseline, missing baseline, stale report, errors mismatch, trace left in,
-      lint hit, unformatted file.
+- [ ] G7 `check` and the harness compile different sets of functions. A mono-phase error (found while
+      instantiating or checking code) is reported by `aipl check` with no `main`, but the harness's compile
+      only reaches it from a `main`. Decide which is right (check's is the stricter) and make them agree.
+      Pins 26 error fixtures to a `main` until then (see Phase 2b).
+- [ ] Differential test: for every corpus file, old harness and new `check` agree on pass/fail, and fill
+      mode yields byte-identical files and baseline rows.
+- [ ] Canary set of deliberately broken copies that both must reject: wrong stdout, wrong exit code, leak,
+      moved baseline, missing baseline, stale report, errors mismatch, trace left in, lint hit,
+      unformatted file.
 - [ ] `cargo handoff` green; baseline rows shifted by the rooting change reviewed.
 
-## Phase 2: tests may not let effects escape, then convert dummy `main`s
+## Phase 2b: what is left of reserving `main`
+Target state: `fn main` appears only in (a) real programs (`projects/`, `examples/`), (b) tests of the real
+implementation of an effect (stdin, terminal, process, real clock, real files), and (c) the
+entry-point-mechanics tests (exit code, `cli`, `stderr`, `file:`, `expect file:`).
 
-### Phase 2a: effect-free tests (do first; it defines what a converted test may do)
-Findings (subagent read of the code; line numbers approximate):
-- The checker has no notion of "test". `.test` bodies get every effect only because
-  `synthesize_driver` in `crates/aipl-codegen/src/lib.rs` (`all_effects`, ~1520-1535) declares
-  `prints, read_files, read_stdin, read_stdin_raw, terminal, write_files, list_files,
-  execute_program, clock` on each synthesized `__test$<fn>` and on `__test_main` (`random` and
-  `measure` are already excluded). `.performance` blocks already declare only `measure`, so they
-  are effect-free today.
-- The rule is therefore: declare nothing for `TestKind::Tests`. An effectful call outside a `shim`
-  then fails with the existing "undeclared effect" error, and `check_shim` already discharges a
-  shimmed effect for its body, transitively. Shim functions inside a test must themselves be
-  effect-free (capture-only closures), because the enclosing fn must declare any effect they have.
-- `trace` and `assert` carry no effect, so they stay usable.
-- `aipl check` runs `.test` blocks in the in-process JIT with real effects today: prints go to the
-  process's stdout, files to the cwd (a scratch dir for cases, the repo root for in-place files).
-- No capture helper, in-memory filesystem or fake clock exists. `tests/cases/effects/shim_closures.aipl`
-  shows the inline pattern (capture prints into a `str[]`, script `read_line`, fix the clock). A shim must bind
-  every operation of its effect, so a filesystem stand-in binds `read_file_to_string`,
-  `write_string_to_file` and `list_files` together.
-- Census (lower bound: it does not follow effects reached through imported functions; ~889 `.test`
-  blocks in 500 files): about 6 files use a real effect in a test body today:
-  `tests/cases/files/write_file.aipl`, `tests/cases/files/error_type.aipl`,
-  `crates/aipl-codegen/src/fill_or_add_sections_file.aipl`, `crates/aipl-codegen/src/find_files.aipl`,
-  `tests/cases/builtins/now_nanos.aipl`, `tests/cases/builtins/monotonic_now.aipl` (which also runs
-  `sleep 1`). `projects/minesweeper/main.aipl:516` already shims `random`. No test body prints or reads
-  stdin directly. The real number comes from the checker once the rule is on (fanout rule: change it, read the failure list).
-- Touchpoints: `build_test_program` / `build_performance_program` / `synthesize_driver`; the LSP's
-  use of `build_test_program` (`crates/aipl-lsp/src/server.rs` ~721) and `src/perf.rs` ~41 if they
-  assume the saturated set; stale comments at `aipl-codegen/src/lib.rs` ~1481 and ~1514-1519 ("A test body may
-  call anything") and `aipl-syntax/src/lib.rs` ~4120; DESIGN_PRINCIPLES.md (add the rule beside the shim text).
-
-Effects on other phases:
-- **Phase 4 gets easier:** with no real effects in `.test` blocks, the JIT test run no longer needs a
-  scratch cwd or staged companions; only `main` runs (child processes) do. That removes the main reason
-  `check` calls `set_current_dir`, which is what forced it to be serial per process.
-- **Phase 2b gets a clear target:** a converted dummy `main` becomes a test that captures prints with a shim,
-  because the test is no longer allowed to print for real.
-- Tests of the real filesystem/clock/stdin/process APIs stay as `main` cases (they count as the
-  "real program" bucket of decision D1), so this fits Prerequisite A.
-- Coverage is not lost, but moves: real-IO assertions inside `crates/**` `.test` blocks
-  (`fill_or_add_sections_file`, `find_files`) become shimmed tests, and the real-API check lives in a
-  `main` case with sections.
-
-Checklist:
-- [x] Capture helpers: none (D5) — shims are written inline in each test. The write-aipl skill and
-      DESIGN_PRINCIPLES.md show the inline patterns (print capture, scripted stdin, fixed clock,
-      a filesystem stand-in binding all three operations).
-- [x] Turn the rule on: empty `all_effects` for `TestKind::Tests` in `synthesize_driver`; fix the
-      stale comments; confirm LSP and `src/perf.rs` still build their test programs.
-- [x] Fix the failure list: shim the effects in each offending test, or move it to a `main` case with
-      `stdout` / `file:` / `expect file:` sections when the real API is the point (the 6 above are the
-      expected starting set).
-- [x] Refusal pinned by `a_test_cannot_let_an_effect_escape` in `tests/suites/check.rs` (a test-compile error
-      prints to stderr, which no case section can pin). The message names the function and effect but does not
-      say to shim it; worth improving.
-- [x] `write-aipl` skill states the rule and the inline patterns (DESIGN_PRINCIPLES.md left alone: it is not a numbered principle).
-- [ ] `cargo handoff` green.
-
-### Phase 2b: reserve `main` for programs and real-builtin coverage
-Target state: `fn main` appears only in (a) real programs (`projects/`, `examples/`), (b) tests of the un-shimmed builtins,
-and (c) the entry-point-mechanics tests (exit code, `cli`, `stderr`, `file:`, `expect file:`, D6). Nothing enforces it
-yet (D7); no directory layout is imposed.
-
-Census (2026-11-02; `fn main` plus at least one section, over `tests/cases`, `crates`, `examples`): 704 files.
-| group | files | disposition |
-|---|---|---|
-| empty `fn main() {}` placeholder | 55 | delete the `main` |
-| non-empty `main` + `.test` blocks + sections | 56 | fold the prints into the existing tests |
-| `main`, no `.test`, `stdout` only | 309 | convert: prints become a captured-output assert, values become asserts |
-| `main`, no `.test`, `errors` (compile-error fixtures) | 197 | delete the `main` unless it is the thing that errors; the `errors` section stays (it pins the compiler, not a function) |
-| `main`, no `.test`, `exit code` / `cli` / `file:` / `expect file:` / `stderr` | 55 | keep as `main` tests (D6), where they are |
-| `main`, no `.test`, `report` (+ `stdout`) | 32 | the report is of what the case costs: keep the section, drive the cost from the test driver instead of `main` |
-| `main`, no sections | 15 | decide per file (delete, or it is example/program code) |
+- [ ] **Convert the 56 `main` + `.test` files with sections.** Fold the prints into their tests (assert the
+      value, or capture the prints inline, below). Recount first: the passes since the census (empty mains,
+      `report` cases, `.performance` files) already took some.
+- [ ] **Recount the empty `fn main() {}` files that carry sections other than `errors`** (`check`,
+      `report`, `.test` cases) and delete what is left.
+- [ ] **26 error fixtures keep their `main`** because of G7; drop it once `check` is the gate or the harness
+      compiles every function: `arrays/spread/err_spread_in_call, builtins/err_span_without_import,
+      builtins/err_use_without_import, effects/err_random_main, effects/err_shim_partial_coverage,
+      effects/err_shim_signature_mismatch, effects/err_shim_undeclared_effect,
+      effects/err_shim_unshimmable_effect, generics/err_explicit_type_args,
+      generics/err_return_only_type_param, generics/errors/err_ord_bound_violation,
+      generics/errors/err_type_param_conflict, integers/err_literal_out_of_range, kwargs/err_duplicate_kw,
+      kwargs/err_kw_for_positional, kwargs/err_kw_passed_positionally, kwargs/err_positional_after_kw,
+      kwargs/err_unknown_kw, lambdas/err_operator_value_not_imported, structs/errors/err_generic_cannot_infer,
+      syntax/err_call_missing_comma, syntax/err_missing_semicolon_before_refusal,
+      syntax/err_operator_starts_expr, syntax/err_unexpected_token_in_expr,
+      variants/err_payload_kw_for_positional, variants/err_payload_unknown_kw`.
+- [ ] **Lint fixtures still in `tests/cases/lints/`** (58 files): the fixtures of the 10 lints still written in
+      Rust (19 files: convert them into the lint's own `.test` assertions when each is ported, with
+      `scripts/lint_fixtures_to_tests.py`), 24 files in groups named for a shape and not a lint (`slices`,
+      `interpolations`, `struct_literals`, `decr_shapes`, ...: map each to its lint first), and 12 `_allow`
+      fixtures that need a `struct`/`variant` or output a test block cannot hold.
+- [ ] **Per batch:** `cargo handoff`, then review moved baseline rows (the `main` to test-driver switch moves
+      `instructions` and `code bytes` for every converted case).
+- [ ] **Update CLAUDE.md:** delete "Test `main` style" (its premise, a void `main` driving a case, is gone for
+      ordinary cases); rewrite "Prefer the cases framework for tests" (it says a case is source plus expected
+      `--- stdout ---`: say instead that behavior is pinned by `.test` blocks, and sections are for `errors`,
+      `report`, and the real-implementation and entry-point-mechanics cases); update "Performance monitoring"
+      (what a case carries; a `report` is of the test driver when there is no `main`); say where `main` may appear.
+- [ ] **Update the skills:** `write-aipl` (its `main`/`stdout` examples and the capture-shim template) and
+      any skill or doc that shows a `main` + `stdout` case as the way to write a test (`add-builtin` says
+      "a case is for ... output a `main` prints": reword).
+- [ ] **Re-count** the cases that link a production executable after the last conversion; it should be small
+      (this is what Phase 0's "fewer executables" saving rests on). Record it here.
 
 How to convert (the shape a reader should see):
 - **Prefer a returned value.** If a function only prints because it was convenient, make it return the value
   and assert on that: `assert(describe(3) == "three")`. No shim.
-- **If the printing is the behavior** (a function with `!prints`, a formatter that emits), capture it inline in a
-  **top-level `test({ .. })`** (no dummy function: see DESIGN_PRINCIPLES.md §6 and "Top-level `test`" below). `print`
-  adds a newline and `put` does not, so the stand-in models both, and the expected text stays visible:
+- **If the printing is the behavior**, capture it inline in a top-level `test({ .. })` (no dummy function).
+  `print` adds a newline and `put` does not, so the stand-in models both, and the expected text stays visible:
   ```
   test({
       mut out = "";
@@ -195,109 +147,32 @@ How to convert (the shape a reader should see):
           """);
   })
   ```
-  (Watch `--- ` markers inside a `"""` block; that a `"""` block is dedented, drops trailing whitespace on a line, and
-  needs a blank line before the closing quotes for the final newline.) Boilerplate is the accepted cost of D5; if
-  ~300 copies of this prove too noisy, revisit D5 with that number in hand.
-- The old `--- stdout ---` text is the oracle: the new assert must say the same bytes, so a codemod slip fails a test
-  instead of passing quietly. Read each batch's diff on a sample.
+  A `"""` block is dedented, drops trailing whitespace on a line, and needs a blank line before the closing
+  quotes for the final newline; use an escaped string when the output has trailing whitespace or blank lines
+  at the end. Watch `--- ` markers inside a `"""` block.
+- **A `report` case** pins the whole program's call counts, so print-capture adds rows of its own: turn the
+  prints into asserts (`print(X)` to `assert(X == "line")`) and keep the capture only where helper functions
+  print.
+- The old `--- stdout ---` text is the oracle: the new assert must say the same bytes, so a codemod slip fails a
+  test and does not pass quietly. Read a sample of each batch's diff.
+- **Verify a fixture change with the same compile path the gate uses**, not only `check` (G7), and read a
+  freshly filled `--- errors ---` body by eye once: a refill pins whatever the compiler now says, including a
+  different error.
 
-Checklist:
-- [ ] ~~Allowlist rule~~ skipped for now (D7).
-- [x] D6 answered: the 55 entry-point-mechanics tests keep their `main`, in place.
-- [ ] Choose the real-builtin coverage set (kept in place, no new directory): one `main` case per un-shimmed builtin
-      surface (print/put, `read_file_to_string`, `write_string_to_file` + `expect file:`, `list_files`,
-      `read_line`/`read_byte`, `now_nanos`/`monotonic_now`, `execute_program`, terminal). Start from what exists:
-      `tests/cases/files/*`, `builtins/now_nanos`, `builtins/monotonic_now` (already main + `stdout`),
-      `execute_program/*`. Keep each tiny; list them here. Everything else in those directories converts.
-- [x] Compile-error fixtures with a `main` (2026-11-03, `scripts/errors_fixture_main.py`): 92 had it deleted (their `error:` lines are
-      identical without it) and 99 had it renamed `subject` (the broken code lives in `main`, so deleting it deletes the error; a rename
-      keeps it). The script compares the messages before and after and leaves a file alone if they change, because a refill would otherwise
-      pin whatever the compiler now says (the failure that once pinned a wrong error into `err_import_file_with_sections`).
-- [ ] **Harness/`check` parity gap (found 2026-11-03):** 26 of those fixtures kept `main` after all. Their error is a mono-phase one (found
-      while instantiating or checking code), and the cases harness's compile only reaches it from a `main`; `aipl check` reports it with
-      none. The script verified with `check`, the handoff run (the harness) disagreed and found them. They are restored and can drop their
-      `main` once `check` is the gate (Phase 5), or once the harness compiles every function:
-      `arrays/spread/err_spread_in_call, builtins/err_span_without_import, builtins/err_use_without_import, effects/err_random_main, effects/err_shim_partial_coverage, effects/err_shim_signature_mismatch, effects/err_shim_undeclared_effect, effects/err_shim_unshimmable_effect, generics/err_explicit_type_args, generics/err_return_only_type_param, generics/errors/err_ord_bound_violation, generics/errors/err_type_param_conflict, integers/err_literal_out_of_range, kwargs/err_duplicate_kw, kwargs/err_kw_for_positional, kwargs/err_kw_passed_positionally, kwargs/err_positional_after_kw, kwargs/err_unknown_kw, lambdas/err_operator_value_not_imported, structs/errors/err_generic_cannot_infer, syntax/err_call_missing_comma, syntax/err_missing_semicolon_before_refusal, syntax/err_operator_starts_expr, syntax/err_unexpected_token_in_expr, variants/err_payload_kw_for_positional, variants/err_payload_unknown_kw.
-- [x] The 3 error fixtures that seemed to depend on `main` did not (2026-11-03): the script's comparison was fooled twice. A loader error's
-      first line names the file (`error: ./err_duplicate_struct.aipl: ...`, rooted at the fixture's directory by the harness, an absolute
-      path from `check` at the repo root: the rooting gap G4 again), and a checker error names the function (`fn "main": ...`, which a
-      rename changes). `err_duplicate_struct` lost its `main`; `err_functions` and `err_unknown_type_in_annotation` had it renamed `subject`;
-      three more files whose `import ..; #[allow]` line made the script's splitter swallow the `main` after it
-      (`strings/err_char_at_removed`, `builtins/err_import_conflicts_with_local`, `builtins/err_unknown_builtin`) lost it too. The script
-      now ignores the file path and reads `subject` as `main` when comparing.
-- [ ] The 55 empty `main`s that carry sections other than `errors` (`check`, `report`, `.test` cases): the errors-only ones are done above.
-- [ ] Convert the 56 `main` + `.test` files (fold the prints into their tests).
-- [ ] Convert the 309 `stdout`-only programs, in the batches below (counts per `tests/cases/` directory; one
-      `cargo handoff` per batch; tick a batch when it lands). Each batch is ~20-35 files so a diff stays
-      reviewable. Batch 1 is the small-directories warm-up, which is where the capture template gets shaken out.
-  - [x] 1. Warm-up, 35 files (redone as top-level `test` blocks after that form landed) (the census said 33; it missed `bindings/*/` and `functions/void/`): `bindings` 5, `conditionals` 1, `constants` 2, `chars` 2, `compound_assign` 2, `integers` 2,
-        `loops` 2, `results` 2, `syntax` 1, `options` 3, `methods` 3, `functions` 6, `dicts` 4. Template settled (below).
-  - [x] 2. `strings`, 28 (27 converted; `small_string_optimization` is left, see D8). (Mind `named_representations`: it must keep asking for each representation by name.)
-  - [x] 3. `arrays`, 28.
-  - [x] 4. `structs` 15 + `variants` 13, 28.
-  - [x] 5. `tuples` 12 + `sets` 11, 23.
-  - [x] 6. `generics` 13 + `match_arms` 9 + `lambdas` 8, 30.
-  - [x] 7. Small leftovers, 19: `kwargs` 7, `grids` 4, `tail_calls` 4, `imports` 1, `docs` 1, `performance` 1, `perf` 1.
-  - [x] 8. `optimizations`, 33 (29 converted, the 3 effectful ones once D9 was fixed; the 4 on the D8 list are left). Take care: these exist to pin what codegen does to a program, so check each converted
-        case still exercises the same optimization (the `report` and baseline row are the evidence), not just the output.
-  - [x] 9-11. `lints`: done a different way (decided 2026-11-03). A lint's flagged / not-flagged / allow-agreement cases are
-        `.test` assertions in the lint's own `.aipl` file (`scripts/lint_fixtures_to_tests.py`), not fixtures; the add-lint skill
-        says so for new and ported lints. 118 files in `tests/cases/lints/` became 58. Left there: the `allow_squelch` and
-        `return_loop_find_if` triple (infrastructure), 12 `_allow` fixtures converted to top-level tests (they need a
-        `struct`/`variant` or a loop's output a test block cannot hold), and the fixtures of the 10 lints still in Rust
-        (19 files) plus 24 files in groups named for a shape rather than a lint (`slices`, `interpolations`, `struct_literals`,
-        `decr_shapes`, ...). Convert the Rust ones when each lint is ported; map the shape-named ones to their lint first.
-  - [x] 12. `effects`, `builtins`, `execute_program`, `cli` (2026-11-03): 8 converted (`builtins/{int_parse_through_generics,int_parse_widths,range,span}`,
-        `effects/{declaring_prints_allows_print_call,transitive_caller_with_declaration_passes,shim_closures,shim_effects}`). **Kept as `main`, decided with the user:** the real implementation
-        of an effect: `builtins/{read_byte,read_key,read_line,terminal}` (stdin and the terminal at end of input),
-        `execute_program/{success,not_found}` (a real process), `cli/no_args` (D6). Also kept, because they read the real clock on
-        purpose (the real clock returning after a shim ends; the clock-seeded `random` provider): `effects/{shim_clock,random,random_provider_block}`.
-        Real-builtin coverage set, in full: those 10 plus `files/*` and `builtins/{now_nanos,monotonic_now}`.
-- [x] **D8 (resolved 2026-11-03):** `.performance` is now `.benchmark`, with a top-level `benchmark({ .. })` for a benchmark attached to no
-      function (the way `test({ .. })` is). The 11 files that hung a block off `main` were converted: `main` became a top-level `test`
-      (print-capture, or an assert where it returned its answer as the exit code) and the block a top-level `benchmark`.
-- [x] **D9 (compiler bug, fixed 2026-11-03):** `optimizations/{fusion_named_effects,loop_map_fusion_effects,predicate_fusion_effects}`
-      pass an effectful function or a printing closure to a higher-order builtin, which a test's `shim` rejected ("fn print has
-      effect !prints but the calling function does not declare it"). Cause: mono hands everything it synthesizes inside a function
-      (a lifted lambda, a `map`/`filter` loop wrapper) the function's declared effects (`cur_effects`), on the footing that they cover
-      the body; a `shim` body may use its effect without the function declaring it. Fix: the `Shim` arm of `infer` (`aipl-mono`)
-      adds the shim's effect to `cur_effects` while it infers the body. Pinned by `tests/cases/effects/shim_covers_synthesized_functions.aipl`
-      (fails without the fix); the three files are converted.
-- [x] The `report` cases (2026-11-03): 31 converted. A report pins the whole program's call counts, so print-capture would add
-      its own rows; where the printing was incidental the prints became asserts (`scripts/main_to_asserts.py`: `print(X)` ->
-      `assert(X == "line")`), and where helper functions print (the `*_effects` cases and a few more) the capture shim stayed
-      (`main_to_test.py`, which now keeps a trailing `report`). The report is then of the test driver, listing
-      `__test$__test_block_<n>` and the assert/test runtime calls; the cases' comments' claims (one `aipl_array_new`, `reallocations
-      0` against 4) hold in the new tables. Kept as `main`: `strings/concat/print_rope` (printing is the point), `inline_inspected`
-      and `report/runtime_calls` (`cli` args), `report/with_companion` (`file:`), `report/writes_a_file` (`expect file:`), and
-      `report/smallest_program` (the smallest real program is the point). A top-level test block is named by its order in the
-      file (`__test_block_<n>`), not its line, so a pinned report does not change when other code moves.
-- [x] The 15 section-less `main` files (decided with the user 2026-11-03): 8 empty `main`s beside a function's `.test` deleted
-      (`lambdas/value_lambda_inferred`, `options/types/set_optional`, `strings/compare`, `results/variant_payload`,
-      `optimizations/builds_into_struct_stays_in_place`, `structs/fields/field_init_shorthand`, `lints/field_init_range_value`,
-      `benchmark/block_runs_under_check`); the benchmarks hung on dummy functions (`benchmark/measure_claims`,
-      `optimizations/is_empty_keeps_push_in_place`, and the `main`-attached ones above) became top-level `benchmark({ .. })`;
-      `loops/for_loop_empty_string` and `for_loop_var_typed_as_char` became top-level tests that assert (iteration count 0; one `'a'`
-      among `"abc"`); `effects/over_declared_effects_are_fine` became a function that declares `!prints` with a `.test` calling it under
-      a `shim`. Kept: `examples/arrays.aipl` (an example program).
-- [ ] Per directory batch: `cargo handoff`, then review moved baseline rows (the `main` -> test-driver switch moves
-      `instructions` and `code bytes` for every converted case, as the old "void main" note says).
-- [ ] Update **CLAUDE.md**: delete the "Test `main` style" section (its premise, a void `main` driving a case, is
-      gone for ordinary cases); rewrite "Prefer the cases framework for tests" (it says a case is source plus
-      expected `--- stdout ---`: say instead that behavior is pinned by `.test` blocks, and sections are for
-      `errors`, `report`, and the real-builtin and entry-point-mechanics cases); update "Performance monitoring"
-      (what a case carries; `report` without a `main`); say where `main` may appear (programs, real-builtin coverage, entry-point mechanics).
-- [ ] Update the `write-aipl` skill (the `main`/`stdout` examples, the capture-shim template above) and any other
-      skill or doc that shows a `main` + `stdout` case as the way to write a test (`add-builtin`, `add-lint` say
-      "a case is for ... output a `main` prints": reword).
-- [ ] Re-count the census after the last directory; the number of cases that link a production executable should
-      be small (this is what Phase 0's "fewer executables" saving rests on): record it here.
+Tools in `scripts/`, for the conversions above: `main_to_test.py` (print-only `main` to a capturing top-level
+test), `main_to_asserts.py` (prints to asserts, for `report` cases), `errors_fixture_main.py` (take `main` out
+of an `errors` fixture only if the messages stay the same), `lint_fixtures_to_tests.py`.
 
-## Phase 3: forbid importing files that have sections
-- [x] Loader error naming the section (`refuse_sectioned_import` in `crates/aipl-loader/src/lib.rs`, raised at the import site while resolving path imports; covered by the Rust test `check::a_file_with_sections_cannot_be_imported` in `tests/suites/check.rs`; a case fixture cannot express it, because the cases harness stages only `file:` companions and a companion cannot hold sections). Virtual (FFI-supplied) files are not covered.
-- [x] Fix whatever the corpus failure list shows: nothing failed, no corpus file imported a sectioned file.
-- [x] A `file:` companion body that contains a section marker: the marker ends the companion and starts a section of the main file, with no error (the rest of the intended companion becomes e.g. the main file's `stdout`). Pinned by `parser::a_section_marker_inside_a_companion_ends_it_and_belongs_to_the_main_file`. A companion therefore can never hold sections, which is what makes the import rule complete for staged files.
-- [x] `cargo handoff` green (1019s; 1 new baseline row).
+## Small follow-ups found on the way
+- [ ] The "undeclared effect" error a test gets for an unshimmed effect names the function and effect but does
+      not say to add a `shim`; worth saying.
+- [ ] `.benchmark` blocks run in another process, so `check` counts them in its totals and prints their
+      failures, but gives them no row of their own in the per-file listing. Needs the assertion tally to
+      cross back from the instrumented run.
+- [ ] The converted print-and-compare tests carry roughly 10-50 extra allocations from the capture shim. Where a
+      function only printed out of convenience, rewrite it to return its value.
+- [ ] `aipl doc` has not been checked against the placeholder function behind a top-level `test`/`benchmark`
+      (private functions are not listed, so probably fine).
 
 ## Phase 4: batch runner
 - [ ] `aipl check --shard i/n` over a file list; deterministic assignment.
@@ -306,6 +181,9 @@ Checklist:
       `check --fix`) merges.
 - [ ] Memoize pure loader work (parse+lint of builtins and shared crate files) across files in a
       process; profile first.
+- [ ] Audit the process-global state a batch run leans on. The JIT's cached constants and shim cells leaked
+      between files and are fixed (`forget_jit_constants`); shim slots, test tallies and `set_current_dir` are
+      still unaudited.
 - [ ] Shuffled-order test: results identical to the fixed order (cross-file state leakage).
 - [ ] Re-measure against the Phase 0 table; record in this doc; confirm D4 still holds.
 
@@ -325,9 +203,9 @@ Checklist:
       assessment is paid once. Needs per-case symbol prefixing in `ObjectCompilation`.
 
 ## Must keep running, unchanged
-`fmt::all_aipl_files_stay_formatted` (also covers `projects/`, `tests/ffi_fixtures`), the five
-`report_agrees_with_the_pinned_report_*` tests, `compiler_aipl_files_are_tested`, `docs_site`,
-`checked_in_ir_is_current`.
+`fmt::all_aipl_files_stay_formatted` (also covers `projects/`, `tests/ffi_fixtures`),
+`fmt::no_pinned_file_names_a_path_on_one_machine`, the five `report_agrees_with_the_pinned_report_*`
+tests, `compiler_aipl_files_are_tested`, `docs_site`, `checked_in_ir_is_current`.
 
 ## Risks to watch
 - Cross-file state (shim slots, counters, allocator stats, thread-locals) making results order-dependent.
@@ -336,98 +214,5 @@ Checklist:
   `aipl check <path>`.
 - Baseline rows shift once from rooting and again per converted directory; keep these in separate
   handoffs so a moved row has one cause.
-
-## Findings to carry into other phases
-- Phase 1 (G4/G6): `aipl check <dir>` on `tests/cases/imports/` reports 9 `errors` mismatches for
-  cases with `file:` companions: their labels use the scratch dir
-  (`/private/var/folders/.../aipl-check-N/util.aipl`, or `./util.aipl` expected) instead of the
-  harness's labels. Single-file `check` of a companion case may differ the same way. The differential
-  test must cover companion cases, and the label rule for staged files needs settling.
-- The batch `check` also printed `fn "print" has effect` style errors only for real faults; no other surprises.
-
-- The cases harness stages a case alone into a scratch dir with only its `file:` companions, so a
-  case can never import a real sibling file. A first fixture for Phase 3 was refilled by handoff with a
-  file-not-found error and looked green; check a freshly filled `--- errors ---` body by eye once.
-
-## Session log
-- 2026-11-01: plan written and approved; nothing implemented. Next: Phase 0.
-- 2026-11-01 (session 2): Phase 3 done out of order. Loader refuses importing a file with sections; handoff green (1019s: discovery 488s, final 495s), blast radius zero. Companion-marker behavior pinned (marker ends the companion, silently belongs to the main file). Phase 3 complete. Next: Phase 0 or Phase 1.
-- 2026-11-01 (session 2): added Phase 2a (tests and performance blocks may not let effects escape) after the design discussion; code read only, nothing implemented for it. Census says ~6 files need migration; rule is mostly a one-line change in `synthesize_driver`.
-
-- 2026-11-02: Phase 2a rule on; 6 tests migrated. Finding for Phase 4: one `aipl check crates examples ...` batch
-  reported 52 test failures (lint/*, format_source, grammar_aipl) that pass alone and do not fail as cases —
-  cross-file state leakage in a long-lived process. Cause found and fixed: the JIT's thread-local constant/shim-cell
-  slots (`CONST_SLOTS`) were never cleared between compilations, so one file's cached constant was read by the next
-  (`forget_jit_constants`, pinned by `one_files_cached_constants_do_not_reach_the_next`). Other process-global state
-  (shim slots, tallies, `set_current_dir`) is still unaudited.
-
-- 2026-11-02: Phase 2b scope set to the broad reading (~650 files); D1 resolved; D6 resolved (entry-point tests keep `main`, in place); enforcement skipped (D7 open, no directory-based rule).
-
-- 2026-11-02: Phase 2b batch 1 (35 files) converted with `scripts/main_to_test.py` (rename `main` to `scenario`, capture
-  prints with an inline shim, assert the old stdout text); 34 passed first time, 1 needed a hand edit. Findings:
-  a `"""` block drops trailing whitespace on a line (use an escaped string when the output has any), and a blank line
-  before the closing `"""` is how the expected text gets its final newline. The converted files are print-and-compare,
-  not returned-value asserts; the returned-value rewrite is a follow-up where a function only printed out of convenience.
-- 2026-11-02: top-level `test({ .. })` added (decided mid-2b: converting `main` to a `fn scenario()` only swapped one dummy
-  function for another). Parser (`grammar_aipl.aipl` `test_item` / `lower_test_item`, naming in `fn_names.aipl`
-  `unattached_test_name`), formatter (`walker.aipl` `test_item`), driver (`synthesize_driver` drops the placeholder fn and
-  reports `line N`; `aipl_syntax::unattached_test_line`), Rust test `check::a_top_level_test_block_runs_and_is_reported_by_its_line`,
-  DESIGN_PRINCIPLES.md §6 (rare by design: coverage will be measured by attachment). One handoff for the grammar bootstrap
-  (1671s; refresh_perfmon dominated: 49 compiler-source rows moved). Batch 1 redone with the new form; `scripts/main_to_test.py`
-  now emits it. The symbol index (LSP outline) listed the placeholder; `aipl-index` now skips it (`corpus::indexes_the_whole_repository_with_correct_spans` caught it). `aipl doc` not checked (private functions are not listed).
-
-### Top-level `test({ .. })` (language addition, 2026-11-02)
-Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered by the parser to a private function
-`__test_block_<n>` (n counts the file's such blocks from 1, so the name does not move when other code does) with an empty body whose `.test` body is the block; never part of `run`/`build` output (checked:
-`aipl report` is byte-identical with and without one). A `# ..` block directly above it is an error. Reported as `test block N`.
-
-- 2026-11-02: `aipl check` output is now grouped by file (`file:` then `function: N assertions passed[, M failed]`, one row
-  `standalone tests` for the top-level `test` blocks) with every failure gathered under `test failures:` at the bottom,
-  before the summary lines. The JIT test runtime counts assertions per test (`TestRecord`, `take_test_records`) and buffers
-  failure text (`take_failure_report`). A `.performance` block runs in another process, so it is counted in the totals and
-  its failures land under `test failures:` but it has no row of its own yet. 17 `check::` assertions updated.
-
-- 2026-11-02: Phase 2b batch 2 (`strings`): 27 of 28 converted; `main_to_test.py` gained an escaped-string fallback for output
-  with trailing whitespace. **D8 (open; the 11 are left alone, see the Phase 2b checklist):** 11 files hang a `.performance` block off `main`
-  (`strings/small_string_optimization`, `constants/computed`, `arrays/{reduce,reverse_allocates_nothing,slice_allocates_nothing,inline_empty}`,
-  `optimizations/{join_emptiness_fusion,map_map_fusion,fold_emptiness_and_index,map_reduce_fusion}`, `performance/refcount_balance`).
-  The performance block is not about `main`, but `.performance` attaches to a function and has no top-level form. Options: a
-  top-level `performance({ .. })` like `test` (same rarity argument), or attach each to the function it measures. Unconverted until decided.
-
-- 2026-11-03: Phase 2b batches 3-7 converted together (125 files: `arrays` minus its 4 `.performance`-on-`main` files, `structs`,
-  `variants`, `tuples`, `sets`, `generics`, `match_arms`, `lambdas`, `kwargs`, `grids`, `tail_calls`, `imports`, `docs`, `perf`).
-  The codemod matched every one; all 125 passed `aipl check` first time. (`performance/refcount_balance` is on the D8 list.)
-
-- 2026-11-03: lint fixtures moved into the lints' own tests (27 AIPL lints; see Phase 2b batches 9-11 above). The script reads the
-  messages off the running lint rather than typing them; its comments come from the fixture. `.performance`/Rust-lint fixtures untouched.
-
-- 2026-11-03: Phase 2b batch 8 (`optimizations`): 26 converted; 3 files held back by a mono bug (D9 in the checklist), 4 by D8.
-- 2026-11-03: D9 fixed (shim effect now counts for functions mono synthesizes inside the shim body); regression case added; the 3 held-back
-  `optimizations` files converted.
-- 2026-11-03: Phase 2b `report` cases (31 files). The unattached test function's name is now `__test_block_<n>` (order in the file) and
-  its report name `block N`, because a line/offset in the name made every pinned report line-sensitive.
-
-- 2026-11-03: **Harness hole found and fixed:** `check_plan` in `tests/cases.rs` decided whether to run `aipl check` for a case by looking for
-  `.test` / `.performance` in the source, so a case whose only tests are top-level `test({ .. })` blocks never had them run: a failing one
-  passed. `has_test_blocks` now also matches a line starting `test(` or `benchmark(`. (Every top-level-test case converted before this was
-  checked by `aipl check` when converted, but not held by the per-case run since.)
-- 2026-11-03: Rename `.performance` -> `.benchmark` round 1 (additive, bootstrap-safe): grammar accepts `.benchmark` (and still reads
-  `.performance` as it), adds top-level `benchmark({ .. })`; hoisted blocks are `__benchmark$<f>` (role `Benchmark`), unattached ones
-  `__benchmark_block_<n>` reported as `benchmark block N`; internal identifiers renamed. Round 2 (after promotion): rewrite the 65 corpus
-  files and the docs, stop reading `.performance`, drop the `Performance` alias in `fn_role`'s marshalling.
-- 2026-11-03: Rename round 2: corpus `.performance(` -> `.benchmark(` (60 files; the parser now refuses `.performance` and says what to write),
-  `tests/cases/performance/` -> `tests/cases/benchmark/`, the 11 D8 files converted, CLAUDE.md / README / skills / DESIGN_PRINCIPLES updated.
-- 2026-11-03: Phase 2b batch 12 done. The 8 shim/pure cases converted; the real-effect cases (stdin, terminal, process, real clock) keep `main`.
-- 2026-11-03: the 15 section-less `main`s decided and converted (14 changed, `examples/arrays` kept).
-- 2026-11-03: error fixtures' `main` removed or renamed (217 of 223), 3 left with a checklist item to revisit, 3 not matched by the script.
-- 2026-11-03: the harness found 26 of the error-fixture conversions wrong (a mono-phase error that only the harness's `main`-rooted compile reaches);
-  restored. Lesson: verify a fixture change with the same compile path the gate uses, not just `check` (see the parity-gap item).
-- 2026-11-03: the last 6 error fixtures converted (see the item above); every errors-only fixture except the 26 parity-gap ones is done.
-- 2026-11-03: **Absolute paths were pinned into the repo** (my doing): the grouped `check` heading printed the path it was given, which the harness passed
-  absolute, so 6 `--- check ---` sections held `/Users/...`, and `check --fix` from the root wrote an absolute label into 2 loader-error headers
-  (the `errors` branch loaded without a project root). Fixed: the heading is root-relative, `load_program_overlay` takes the root, the harness runs
-  `check` from the root with a relative path. DESIGN_PRINCIPLES.md §7 states the rule; `fmt::no_pinned_file_names_a_path_on_one_machine` enforces it.
-  Remaining: the harness roots each case at its own directory (G4), so a loader error header and its caret block use two roots.
-- 2026-11-03: every file label now has the leading `./` (`aipl_loader::root_label`): caret blocks, loader errors, `check` headings and `test ./a.aipl::f` headers,
-  `fixed`/`formatted`, `aipl doc`, and the location baked into `assert`/`trace` (so every baked label is two bytes longer: baseline `code bytes`/`data` rows
-  and pinned reports move). DESIGN_PRINCIPLES.md §7 says so.
+- The cases harness stages a case alone into a scratch dir with only its `file:` companions, so a case can
+  never import a real sibling file.
