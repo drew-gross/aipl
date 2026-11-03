@@ -8,7 +8,7 @@ fn double(n: i64) -> i64 { n + n }
 
 fn describe(o: i64?) -> str { o.map(|v| `some({v})`).value_or("none") }
 
-fn main() !prints {
+fn scenario() !prints {
     let three: i64? = some(3);
     let absent: i64? = none;
 
@@ -28,13 +28,27 @@ fn main() !prints {
     // Chains: the result is an optional, so it maps again and unwraps as one.
     print(three.map(double).map(double).value_or(0).to_str());
     print((absent.map(double) == none).to_str());
-}
---- stdout ---
-some(4)
-none
-some(6)
-n=3
-nothing
-some(13)
-12
-true
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        some(4)
+        none
+        some(6)
+        n=3
+        nothing
+        some(13)
+        12
+        true
+
+    """);
+})

@@ -2,7 +2,7 @@
 # -> `err(e)`. Unlike `value_or`, which substitutes a default and forgets that
 # anything was missing, it keeps the absence as a failure the caller can report.
 
-import { print, to_digit, value_or_err } from builtins;
+import { equal as ==, print, to_digit, value_or_err } from builtins;
 
 // Its main use is in front of `?`: each step's `none` becomes a message and
 // leaves the function, so the body reads as the happy path alone. Without it,
@@ -18,7 +18,7 @@ fn describe(r: i64!str) -> str {
     }
 }
 
-fn main() !prints {
+fn scenario() !prints {
     print(describe(first_digit("42"))); // some -> ok, carrying the value
     print(describe(first_digit(""))); // the first `?` fires
     print(describe(first_digit("x"))); // the second one does
@@ -30,9 +30,23 @@ fn main() !prints {
         err(n) => n,
     };
     print(`code {code}`);
-}
---- stdout ---
-digit 4
-error: empty input
-error: not a digit
-code 404
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        digit 4
+        error: empty input
+        error: not a digit
+        code 404
+
+    """);
+})

@@ -211,8 +211,8 @@ Checklist:
 - [ ] Convert the 309 `stdout`-only programs, in the batches below (counts per `tests/cases/` directory; one
       `cargo handoff` per batch; tick a batch when it lands). Each batch is ~20-35 files so a diff stays
       reviewable. Batch 1 is the small-directories warm-up, which is where the capture template gets shaken out.
-  - [ ] 1. Warm-up, 33: `bindings` 5, `conditionals` 1, `constants` 2, `chars` 2, `compound_assign` 2, `integers` 2,
-        `loops` 2, `results` 2, `syntax` 1, `options` 3, `methods` 3, `functions` 6, `dicts` 4. Settle the template here.
+  - [x] 1. Warm-up, 35 files (the census said 33; it missed `bindings/*/` and `functions/void/`): `bindings` 5, `conditionals` 1, `constants` 2, `chars` 2, `compound_assign` 2, `integers` 2,
+        `loops` 2, `results` 2, `syntax` 1, `options` 3, `methods` 3, `functions` 6, `dicts` 4. Template settled (below).
   - [ ] 2. `strings`, 28. (Mind `named_representations`: it must keep asking for each representation by name.)
   - [ ] 3. `arrays`, 28.
   - [ ] 4. `structs` 15 + `variants` 13, 28.
@@ -312,3 +312,9 @@ Checklist:
   (shim slots, tallies, `set_current_dir`) is still unaudited.
 
 - 2026-11-02: Phase 2b scope set to the broad reading (~650 files); D1 resolved; D6 resolved (entry-point tests keep `main`, in place); enforcement skipped (D7 open, no directory-based rule).
+
+- 2026-11-02: Phase 2b batch 1 (35 files) converted with `scripts/main_to_test.py` (rename `main` to `scenario`, capture
+  prints with an inline shim, assert the old stdout text); 34 passed first time, 1 needed a hand edit. Findings:
+  a `"""` block drops trailing whitespace on a line (use an escaped string when the output has any), and a blank line
+  before the closing `"""` is how the expected text gets its final newline. The converted files are print-and-compare,
+  not returned-value asserts; the returned-value rewrite is a follow-up where a function only printed out of convenience.

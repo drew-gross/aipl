@@ -24,7 +24,7 @@ import {
     value_or,
 } from builtins;
 
-fn main() !prints {
+fn scenario() !prints {
     mut d = #{"a": 1, "b": 2, "c": 3};
 
     // From the middle: the entries around it close up, in order.
@@ -77,15 +77,29 @@ fn main() !prints {
         set seen.extend(`{k}{v};`);
     }
     print(seen);
-}
---- stdout ---
-{"a": 1, "c": 3} 2 true
-{2: "y", 3: "z"}
-{1: "x", 2: "y"}
-{"a": 1, "c": 3}
-{} 0 true
-{"j": "ww"} {"k": "vv", "j": "ww"}
-vv gone
-{} {"j": "ww"}
-{1: [1, 2], 3: [4, 5, 6]} 2
-p1;r3;
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        {"a": 1, "c": 3} 2 true
+        {2: "y", 3: "z"}
+        {1: "x", 2: "y"}
+        {"a": 1, "c": 3}
+        {} 0 true
+        {"j": "ww"} {"k": "vv", "j": "ww"}
+        vv gone
+        {} {"j": "ww"}
+        {1: [1, 2], 3: [4, 5, 6]} 2
+        p1;r3;
+
+    """);
+})

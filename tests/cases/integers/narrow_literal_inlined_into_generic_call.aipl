@@ -13,7 +13,17 @@
 # type of their argument — `minimum` and `maximum` among them, since a reduction
 # is the one generic `reduce`.
 
-import { count_if, find_if, first, greater_than as >, last, maximum, minimum, print } from builtins;
+import {
+    count_if,
+    equal as ==,
+    find_if,
+    first,
+    greater_than as >,
+    last,
+    maximum,
+    minimum,
+    print,
+} from builtins;
 
 fn i8s() -> i8[] { [3, -128, 127] }
 
@@ -21,16 +31,30 @@ fn u8s() -> u8[] { [3, 255, 0] }
 
 fn i16s() -> i16[] { [-32768, 5, 32767] }
 
-fn main() !prints {
+fn scenario() !prints {
     print(
         `{i8s().first()} {i8s().last()} {i8s().find_if(|x| x > 100)} {i8s().count_if(|x| x > 0)}`,
     );
     print(`{i8s().minimum()} {i8s().maximum()}`);
     print(`{u8s().minimum()} {u8s().maximum()}`);
     print(`{i16s().minimum()} {i16s().maximum()} {i16s().first()}`);
-}
---- stdout ---
-some(3) some(127) some(127) 2
-some(-128) some(127)
-some(0) some(255)
-some(-32768) some(32767) some(-32768)
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        some(3) some(127) some(127) 2
+        some(-128) some(127)
+        some(0) some(255)
+        some(-32768) some(32767) some(-32768)
+
+    """);
+})

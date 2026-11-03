@@ -3,9 +3,9 @@
 # Both lower to the same builtin their `+` counterpart does — incrementing is
 # adding 1 — so the flavor is chosen entirely by which one the file imports.
 
-import { print, saturating_increment as ++, to_str } from builtins;
+import { equal as ==, print, saturating_increment as ++, to_str } from builtins;
 
-fn main() !prints {
+fn scenario() !prints {
     mut n: u8 = 253;
     set n++;
     print(n.to_str()); // 254
@@ -13,8 +13,22 @@ fn main() !prints {
     print(n.to_str()); // 255 — at the bound
     set n++;
     print(n.to_str()); // 255 — clamped, where wrapping would give 0
-}
---- stdout ---
-254
-255
-255
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        254
+        255
+        255
+
+    """);
+})

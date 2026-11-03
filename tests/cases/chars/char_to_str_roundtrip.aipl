@@ -3,9 +3,20 @@
 
 import { equal as ==, print, to_str } from builtins;
 
-fn main() !prints {
+fn scenario() !prints {
     let s = to_str('X');
     print(to_str(if (s == "X") { 1 } else { 0 })); // 1
-}
---- stdout ---
-1
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == "1\n");
+})

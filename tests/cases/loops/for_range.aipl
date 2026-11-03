@@ -4,6 +4,7 @@
 # (either signedness), and the variable is a `u64` like them.
 
 import {
+    equal as ==,
     len,
     print,
     push,
@@ -13,7 +14,7 @@ import {
     wrapping_add_assign as +=,
 } from builtins;
 
-fn main() !prints {
+fn scenario() !prints {
     // The common case: a count.
     mut seen: u64[] = [];
     for (let i : 0..3) {
@@ -52,13 +53,27 @@ fn main() !prints {
         let doubled = i + i;
         print(doubled.to_str());
     }
-}
---- stdout ---
-[0, 1, 2]
-120
-false
-0: 10
-1: 11
-2: 12
-0
-2
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        [0, 1, 2]
+        120
+        false
+        0: 10
+        1: 11
+        2: 12
+        0
+        2
+
+    """);
+})

@@ -7,7 +7,7 @@
 # The ALL_CAPS rule is what keeps a substituted use readable at the site that
 # reads it: the name says "not a binding from around here".
 
-import { print } from builtins;
+import { equal as ==, print } from builtins;
 
 # The TextMate scope a keyword is painted with.
 pub let S_KEYWORD: str = "keyword.control.aipl";
@@ -26,13 +26,26 @@ let TAB = '\t';
 
 fn shown(port: u16) -> str { `{port}` }
 
-fn main() !prints {
+fn scenario() !prints {
     print(S_KEYWORD);
     print(GREETING);
     print(`{shown(PORT)} {OFFSET} {ENABLED} [{TAB}]`);
-}
---- stdout ---
-keyword.control.aipl
-hello
-8080 -1 true [	]
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        keyword.control.aipl
+        hello
+        8080 -1 true [	]
 
+    """);
+})

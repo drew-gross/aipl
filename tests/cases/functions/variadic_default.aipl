@@ -5,7 +5,7 @@
 # default makes it a *keyword* parameter in how it's passed, exactly as a
 # default does anywhere else. So it is omitted or named, never positional.
 
-import { len, print, to_str } from builtins;
+import { equal as ==, len, print, to_str } from builtins;
 
 fn count<T: any>(self: T[], sep: T* = []) -> u64 { sep.len() }
 
@@ -13,7 +13,7 @@ fn count<T: any>(self: T[], sep: T* = []) -> u64 { sep.len() }
 // its default is a string rather than an array.
 fn chars(self: char[], sep: char* = "") -> u64 { sep.len() }
 
-fn main() !prints {
+fn scenario() !prints {
     // Omitted: the default applies.
     print(to_str(count([1, 2])));
     // Named: every variadic argument shape still works.
@@ -30,14 +30,28 @@ fn main() !prints {
     print(to_str(chars(['a'], sep="xy")));
     print(to_str(chars(['a'], sep='z')));
     print(to_str(chars(['a'])));
-}
---- stdout ---
-0
-1
-2
-1
-0
-1
-2
-1
-0
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        0
+        1
+        2
+        1
+        0
+        1
+        2
+        1
+        0
+
+    """);
+})

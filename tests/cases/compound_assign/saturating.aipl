@@ -4,16 +4,36 @@
 # can tell which spelling produced the operation, so the flavor is the whole
 # difference between these two files.
 
-import { print, saturating_add_assign as +=, saturating_sub_assign as -=, to_str } from builtins;
+import {
+    equal as ==,
+    print,
+    saturating_add_assign as +=,
+    saturating_sub_assign as -=,
+    to_str,
+} from builtins;
 
-fn main() !prints {
+fn scenario() !prints {
     mut n: u8 = 250;
     set n += 10; // clamps at 255 rather than wrapping to 4
     print(n.to_str());
     mut m: u8 = 3;
     set m -= 10; // clamps at 0
     print(m.to_str());
-}
---- stdout ---
-255
-0
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        255
+        0
+
+    """);
+})

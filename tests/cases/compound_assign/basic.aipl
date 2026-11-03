@@ -8,6 +8,7 @@
 # without importing `+`, `-` or `/`, and imports `*` only for `triple`'s body.
 
 import {
+    equal as ==,
     print,
     saturating_divide_assign as /=,
     to_str,
@@ -19,7 +20,7 @@ import {
 
 fn triple(x: i64) -> i64 { x * 3 }
 
-fn main() !prints {
+fn scenario() !prints {
     mut n = 10;
     set n += 5;
     print(n.to_str());
@@ -35,10 +36,24 @@ fn main() !prints {
     mut m = 5;
     set m += triple(m);
     print(m.to_str());
-}
---- stdout ---
-15
-12
-48
-8
-20
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        15
+        12
+        48
+        8
+        20
+
+    """);
+})

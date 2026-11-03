@@ -15,7 +15,7 @@
 # equal deallocations. Each function is called on the *failing* path, with a
 # heap-allocated value already in place ahead of the `?`.
 
-import { first, int_parse, print, value_or, value_or_err } from builtins;
+import { equal as ==, first, int_parse, print, value_or, value_or_err } from builtins;
 
 struct S { a: str, n: i64 }
 
@@ -43,7 +43,7 @@ fn msg(r: str!str) -> str {
     }
 }
 
-fn main() !prints {
+fn scenario() !prints {
     // Runtime-built so each is a real allocation; a static literal is never
     // freed and so could never show a leak.
     let tags = ["a_tag_long_enough_to_need_the_heap"];
@@ -67,10 +67,24 @@ fn main() !prints {
     };
     // The success path still works: nothing is dropped that the value needs.
     print(msg(ok(`G{t}`)));
-}
---- stdout ---
-nope
-nope
-nope
-nope
-Ga_tag_long_enough_to_need_the_heap
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        nope
+        nope
+        nope
+        nope
+        Ga_tag_long_enough_to_need_the_heap
+
+    """);
+})

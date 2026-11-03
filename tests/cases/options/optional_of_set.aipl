@@ -13,7 +13,7 @@ fn grow(s: #{i64}?) -> #{i64}? {
     if (let some(inner) = s) { some(inner.union(#{9})) } else { none }
 }
 
-fn main() !prints {
+fn scenario() !prints {
     let a = pick(true);
     let b = grow(a);
     print(`{a} {b} {pick(false)}`);
@@ -25,10 +25,24 @@ fn main() !prints {
     print(`{many.len()}`);
     let o: #>{i64}? = some(#>{5, 9, 7});
     print(`{o.value_or(#>{}).to_array()}`);
-}
---- stdout ---
-some({1, 2, 3}) some({1, 2, 3, 9}) none
-4 false true
-2 0
-3
-[9, 7, 5]
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        some({1, 2, 3}) some({1, 2, 3, 9}) none
+        4 false true
+        2 0
+        3
+        [9, 7, 5]
+
+    """);
+})

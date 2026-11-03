@@ -1,8 +1,18 @@
-import { print } from builtins;
+import { equal as ==, print } from builtins;
 
-fn main() !prints -> i64 {
+fn scenario() !prints {
     "hello".print();
-    0
-}
---- stdout ---
-hello
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == "hello\n");
+})

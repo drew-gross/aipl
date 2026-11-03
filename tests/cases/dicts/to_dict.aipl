@@ -1,9 +1,9 @@
 # `to_dict` turns an array of `(key, value)` pairs into a dict. A key that occurs
 # more than once takes the value of its last pair: the later write wins.
 
-import { contains_key, get, len, print, to_dict } from builtins;
+import { contains_key, equal as ==, get, len, print, to_dict } from builtins;
 
-fn main() !prints {
+fn scenario() !prints {
     let ages = [("ana", 31), ("bo", 27), ("cy", 45)].to_dict();
     print(`{ages.get("bo")} {ages.get("zed")} {ages.len()}`);
 
@@ -14,8 +14,22 @@ fn main() !prints {
     // Keys of any dict key type.
     let by_char = [('a', 1), ('b', 2)].to_dict();
     print(`{by_char.contains_key('b')}`);
-}
---- stdout ---
-some(27) none 3
-some("last") 2
-true
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        some(27) none 3
+        some("last") 2
+        true
+
+    """);
+})

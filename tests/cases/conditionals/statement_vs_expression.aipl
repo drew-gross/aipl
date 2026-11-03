@@ -26,7 +26,7 @@ fn fixed_monotonic() -> u64 { 7 }
 
 fn reads() !clock -> u64 { now_nanos() }
 
-fn main() !prints {
+fn scenario() !prints {
     // Statement: the value is discarded, so the branches may drive the
     // surrounding `mut` bindings — and the `if` ends with `;`.
     mut ticks = 0;
@@ -72,10 +72,24 @@ fn main() !prints {
         set stamp = reads();
     };
     print(stamp.to_str());
-}
---- stdout ---
-2
-b
-6
-5
-7
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        2
+        b
+        6
+        5
+        7
+
+    """);
+})

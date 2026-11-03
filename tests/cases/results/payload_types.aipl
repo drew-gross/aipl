@@ -46,7 +46,7 @@ fn first_of_pair(n: i64) -> i64!Error {
     ok(p.0)
 }
 
-fn main() !prints {
+fn scenario() !prints {
     print(to_str(wide(41)));
     print(to_str(narrow(-3)));
     print(to_str(maybe(some(5))));
@@ -68,21 +68,35 @@ fn main() !prints {
         ok(d) => print(to_str(d.get("b"))),
         err(e) => print(e),
     };
-}
---- stdout ---
-ok(42)
-ok(-3)
-ok(some(5))
-ok(none)
-ok(some(["a", "b"]))
-ok({2, 4, 6})
-ok({"a": 1, "b": 2})
-ok(Point { x: 1, y: 2 })
-ok(Circle(3))
-ok(3)
-err("no evens")
-ok(7)
-err("zero")
-true
-false
-some(2)
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        ok(42)
+        ok(-3)
+        ok(some(5))
+        ok(none)
+        ok(some(["a", "b"]))
+        ok({2, 4, 6})
+        ok({"a": 1, "b": 2})
+        ok(Point { x: 1, y: 2 })
+        ok(Circle(3))
+        ok(3)
+        err("no evens")
+        ok(7)
+        err("zero")
+        true
+        false
+        some(2)
+
+    """);
+})

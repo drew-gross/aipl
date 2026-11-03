@@ -5,7 +5,7 @@
 # then renames the parameter — and must not touch the call, which is not a use of
 # the parameter however it is spelled.
 
-import { print, wrapping_add as + } from builtins;
+import { equal as ==, print, wrapping_add as + } from builtins;
 
 fn reads(self: i64) -> i64 { self + 1 }
 
@@ -13,8 +13,19 @@ fn inner(self: i64) -> i64 { self.reads() }
 
 fn outer(self: i64, reads: i64) -> i64 { self.inner() + reads }
 
-fn main() !prints {
+fn scenario() !prints {
     print(`{3.outer(10)}`);
-}
---- stdout ---
-14
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == "14\n");
+})

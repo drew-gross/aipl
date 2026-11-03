@@ -2,9 +2,9 @@
 # index counts iterations, so it is the element's position for an array and the
 # byte offset for a `str`.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
-fn main() !prints {
+fn scenario() !prints {
     let words = ["zero", "one", "two"];
     for (let i, w : words) {
         print(to_str(i));
@@ -16,14 +16,28 @@ fn main() !prints {
             print(`{outer}{inner}{c}`);
         }
     }
-}
---- stdout ---
-0
-zero
-1
-one
-2
-two
-00a
-01b
-10c
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        0
+        zero
+        1
+        one
+        2
+        two
+        00a
+        01b
+        10c
+
+    """);
+})

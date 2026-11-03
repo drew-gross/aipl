@@ -7,7 +7,7 @@
 # This is what a lexer wants. A class asked for per rule rebuilt itself once
 # per keyword; as a constant it is spliced into each use already built.
 
-import { has, len, logical_not as !, print, to_set, to_str } from builtins;
+import { equal as ==, has, len, logical_not as !, print, to_set, to_str } from builtins;
 
 pub let IDENT_START: #{char} = "abcdefghijklmnopqrstuvwxyz_".to_set();
 
@@ -15,7 +15,7 @@ let PUNCT: #{char} = "(){}[],;".to_set();
 
 fn is_ident_start(c: char) -> bool { IDENT_START.has(c) }
 
-fn main() !prints {
+fn scenario() !prints {
     print(IDENT_START.len().to_str());
     print(is_ident_start('q').to_str());
     print((!is_ident_start('Q')).to_str());
@@ -26,14 +26,27 @@ fn main() !prints {
     print((!PUNCT.has('q')).to_str());
     // Duplicates in the source string collapse, as they must.
     print("aab".to_set().len().to_str());
-}
---- stdout ---
-27
-true
-true
-true
-8
-true
-true
-2
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        27
+        true
+        true
+        true
+        8
+        true
+        true
+        2
 
+    """);
+})

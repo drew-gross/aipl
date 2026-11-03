@@ -3,7 +3,7 @@
 # `Span { start, end }` does, and keeps `self` bound to the whole value — so the
 # function is still a method, and its body can still use `self` itself.
 
-import { print, wrapping_add as +, wrapping_sub as - } from builtins;
+import { equal as ==, print, wrapping_add as +, wrapping_sub as - } from builtins;
 
 struct Span { start: i64, end: i64 }
 
@@ -15,13 +15,27 @@ fn widened(self: Span { end }, by: i64) -> Span { ..self, end: end + by }
 // A field may be bound under another name, as in any pattern.
 fn describe(self: Span { start as lo, end as hi }) -> str { `{lo}..{hi} ({self.len()})` }
 
-fn main() !prints {
+fn scenario() !prints {
     let s = Span { start: 3, end: 10 };
     print(`{s.len()}`);
     print(s.widened(5).describe());
     print(s.describe());
-}
---- stdout ---
-7
-3..15 (12)
-3..10 (7)
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        7
+        3..15 (12)
+        3..10 (7)
+
+    """);
+})

@@ -2,7 +2,7 @@
 # tuple or a case's payload, in a `let ... else`, an `if let` and a `match` arm.
 # It always matches, so it binds its names wherever a plain name would.
 
-import { print, wrapping_add as +, wrapping_mul as * } from builtins;
+import { equal as ==, print, wrapping_add as +, wrapping_mul as * } from builtins;
 
 struct Point { x: i64, y: i64 }
 
@@ -46,7 +46,7 @@ fn lone(points: Point[]) -> i64 {
     }
 }
 
-fn main() !prints {
+fn scenario() !prints {
     print(`{only_x([Point { x: 4, y: 5 }])} {only_x([])}`);
     print(`{offset((Point { x: 1, y: 2 }, 10))}`);
     print(`{dot_y(Dot(Point { x: 1, y: 7 }))} {dot_y(Empty)}`);
@@ -55,11 +55,25 @@ fn main() !prints {
     );
     print(`{tagged((Point { x: 3, y: 8 }, 1))} {tagged((Point { x: 3, y: 8 }, 2))}`);
     print(`{lone([Point { x: 3, y: 4 }])} {lone([])}`);
-}
---- stdout ---
-9 -1
-13
-8 0
-11 3
-11 -1
-12 -1
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        9 -1
+        13
+        8 0
+        11 3
+        11 -1
+        12 -1
+
+    """);
+})

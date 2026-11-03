@@ -3,9 +3,9 @@
 # too. Only a char nested inside a rendered container still shows its literal
 # form, where the quotes tell it apart from the structure around it.
 
-import { print } from builtins;
+import { equal as ==, print } from builtins;
 
-fn main() !prints {
+fn scenario() !prints {
     let c = 'b';
     print(`bare: {c}`); // bare: b
 
@@ -23,11 +23,25 @@ fn main() !prints {
 
     // A `str` interpolation is still passed through unquoted, as before.
     print(`str: {s}`); // str: hi
-}
---- stdout ---
-bare: b
-built: xyz
-to_str: b
-nested: ['a', 'b']
-opt: some('h')
-str: hi
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        bare: b
+        built: xyz
+        to_str: b
+        nested: ['a', 'b']
+        opt: some('h')
+        str: hi
+
+    """);
+})

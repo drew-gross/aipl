@@ -5,7 +5,7 @@
 #
 # The pattern is anything a `match` arm takes.
 
-import { print, wrapping_add as + } from builtins;
+import { equal as ==, print, wrapping_add as + } from builtins;
 
 variant Shape = Circle(i64) | Rect(i64, i64) | Empty
 
@@ -58,7 +58,7 @@ fn picky(o: i64?, flag: bool) -> i64 {
     n
 }
 
-fn main() !prints {
+fn scenario() !prints {
     print(`{doubled(some(4))} {doubled(none)}`);
     print(`{area(Rect(2, 3))} {area(Empty)}`);
     let missing: str? = none;
@@ -67,12 +67,26 @@ fn main() !prints {
     print(`{only_zero(0)} {only_zero(7)}`);
     print(`{both(some(1), some(2))} {both(none, some(2))} {both(some(1), none)}`);
     print(`{picky(some(5), true)} {picky(none, true)} {picky(none, false)}`);
-}
---- stdout ---
-8 -1
-5 0
-n5 nothing
-2 0
-zero nonzero
-3 1 2
-5 10 20
+}.test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        scenario();
+    };
+    assert(out == """
+        8 -1
+        5 0
+        n5 nothing
+        2 0
+        zero nonzero
+        3 1 2
+        5 10 20
+
+    """);
+})
