@@ -1,8 +1,16 @@
-import { print } from builtins;
+import { equal as ==, print } from builtins;
 
-fn main() !prints -> i64 {
-    print("ok");
-    0
-}
---- stdout ---
-ok
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print("ok");
+    };
+    assert(out == "ok\n");
+})

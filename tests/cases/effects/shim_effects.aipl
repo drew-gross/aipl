@@ -10,6 +10,7 @@ import {
     ExecResult,
     clear_terminal,
     enter_alternate_screen,
+    equal as ==,
     execute_program,
     join,
     leave_alternate_screen,
@@ -122,25 +123,37 @@ fn shimmed_run() -> str {
     }
 }
 
-fn main() !prints {
-    shimmed_print();
-    print("after the silenced greeting");
-    print(shimmed_read());
-    print(shimmed_write());
-    print(shimmed_listing());
-    print(shimmed_stdin());
-    print(shimmed_key());
-    print(shimmed_terminal());
-    print(shimmed_run());
-    greet();
-}
---- stdout ---
-after the silenced greeting
-ok("contents of a.txt")
-err("cannot write out.txt")
-ok(["d/a", "d/b"])
-some("scripted")
-some(65)
-enter, move to 2,5, clear, leave
-ran tool exit=3
-hello
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        shimmed_print();
+        print("after the silenced greeting");
+        print(shimmed_read());
+        print(shimmed_write());
+        print(shimmed_listing());
+        print(shimmed_stdin());
+        print(shimmed_key());
+        print(shimmed_terminal());
+        print(shimmed_run());
+        greet();
+    };
+    assert(out == """
+        after the silenced greeting
+        ok("contents of a.txt")
+        err("cannot write out.txt")
+        ok(["d/a", "d/b"])
+        some("scripted")
+        some(65)
+        enter, move to 2,5, clear, leave
+        ran tool exit=3
+        hello
+
+    """);
+})

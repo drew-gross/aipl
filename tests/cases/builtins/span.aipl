@@ -1,18 +1,30 @@
 import { Span, equal as ==, hash, print, to_str } from builtins;
 
-fn main() !prints {
-    let s = Span { start: 3, end: 7 };
-    print(s.start.to_str());
-    print(s.end.to_str());
-    print(to_str(s));
-    print((s == Span { start: 3, end: 7 }).to_str());
-    print((s == Span { start: 3, end: 8 }).to_str());
-    print((hash(s) == hash(Span { start: 3, end: 7 })).to_str());
-}
---- stdout ---
-3
-7
-Span { start: 3, end: 7 }
-true
-false
-true
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let s = Span { start: 3, end: 7 };
+        print(s.start.to_str());
+        print(s.end.to_str());
+        print(to_str(s));
+        print((s == Span { start: 3, end: 7 }).to_str());
+        print((s == Span { start: 3, end: 8 }).to_str());
+        print((hash(s) == hash(Span { start: 3, end: 7 })).to_str());
+    };
+    assert(out == """
+        3
+        7
+        Span { start: 3, end: 7 }
+        true
+        false
+        true
+
+    """);
+})

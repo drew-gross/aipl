@@ -5,21 +5,33 @@
 
 import { equal as ==, map, print, range, to_str } from builtins;
 
-fn main() !prints {
-    print([10, 20, 30].range().to_str());
-    // Empty in, empty out — not an error, and not a one-element range.
-    print([1, 2][..0].range().to_str());
-    // Only the length is read, so the element type never reaches the result.
-    print(range(["a", "b"]).to_str()); // free-call form
-    // The whole receiver, by the span that names it.
-    let xs = ["a", "b", "c"];
-    print((xs[xs.range()] == xs).to_str());
-    // What it is for: the positions, mapped.
-    print(xs.range().map(|i| `_{i}`).to_str());
-}
---- stdout ---
-Span { start: 0, end: 3 }
-Span { start: 0, end: 0 }
-Span { start: 0, end: 2 }
-true
-["_0", "_1", "_2"]
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print([10, 20, 30].range().to_str());
+        // Empty in, empty out — not an error, and not a one-element range.
+        print([1, 2][..0].range().to_str());
+        // Only the length is read, so the element type never reaches the result.
+        print(range(["a", "b"]).to_str()); // free-call form
+        // The whole receiver, by the span that names it.
+        let xs = ["a", "b", "c"];
+        print((xs[xs.range()] == xs).to_str());
+        // What it is for: the positions, mapped.
+        print(xs.range().map(|i| `_{i}`).to_str());
+    };
+    assert(out == """
+        Span { start: 0, end: 3 }
+        Span { start: 0, end: 0 }
+        Span { start: 0, end: 2 }
+        true
+        ["_0", "_1", "_2"]
+
+    """);
+})

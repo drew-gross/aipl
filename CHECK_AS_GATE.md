@@ -230,9 +230,12 @@ Checklist:
         `struct`/`variant` or a loop's output a test block cannot hold), and the fixtures of the 10 lints still in Rust
         (19 files) plus 24 files in groups named for a shape rather than a lint (`slices`, `interpolations`, `struct_literals`,
         `decr_shapes`, ...). Convert the Rust ones when each lint is ported; map the shape-named ones to their lint first.
-  - [ ] 12. Decide before converting, 18: `effects` 7, `builtins` 8, `execute_program` 2, `cli` 1. Some of these *are*
-        the real-builtin coverage set (b) and keep their `main`; the `shim_effects`-style ones already test shims and
-        convert. Settle the kept set here, then convert the rest.
+  - [x] 12. `effects`, `builtins`, `execute_program`, `cli` (2026-11-03): 8 converted (`builtins/{int_parse_through_generics,int_parse_widths,range,span}`,
+        `effects/{declaring_prints_allows_print_call,transitive_caller_with_declaration_passes,shim_closures,shim_effects}`). **Kept as `main`, decided with the user:** the real implementation
+        of an effect: `builtins/{read_byte,read_key,read_line,terminal}` (stdin and the terminal at end of input),
+        `execute_program/{success,not_found}` (a real process), `cli/no_args` (D6). Also kept, because they read the real clock on
+        purpose (the real clock returning after a shim ends; the clock-seeded `random` provider): `effects/{shim_clock,random,random_provider_block}`.
+        Real-builtin coverage set, in full: those 10 plus `files/*` and `builtins/{now_nanos,monotonic_now}`.
 - [x] **D8 (resolved 2026-11-03):** `.performance` is now `.benchmark`, with a top-level `benchmark({ .. })` for a benchmark attached to no
       function (the way `test({ .. })` is). The 11 files that hung a block off `main` were converted: `main` became a top-level `test`
       (print-capture, or an assert where it returned its answer as the exit code) and the block a top-level `benchmark`.
@@ -390,3 +393,4 @@ Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered
   files and the docs, stop reading `.performance`, drop the `Performance` alias in `fn_role`'s marshalling.
 - 2026-11-03: Rename round 2: corpus `.performance(` -> `.benchmark(` (60 files; the parser now refuses `.performance` and says what to write),
   `tests/cases/performance/` -> `tests/cases/benchmark/`, the 11 D8 files converted, CLAUDE.md / README / skills / DESIGN_PRINCIPLES updated.
+- 2026-11-03: Phase 2b batch 12 done. The 8 shim/pure cases converted; the real-effect cases (stdin, terminal, process, real clock) keep `main`.

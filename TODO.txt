@@ -850,6 +850,7 @@ check:
   can for sure recover from format errors
 
 tests:
+  scripted-input via sections for read_* testing
   show test failures when there are also lint or format failures
   when one function fails to typecheck we should still be able to run other tests that don't depend on it
   section test that asserts on expecting files to be written

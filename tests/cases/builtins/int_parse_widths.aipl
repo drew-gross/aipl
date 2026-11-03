@@ -7,7 +7,7 @@
 # An unsigned target reaches its whole range — a `u64` parses past `i64::MAX` —
 # and takes no sign at all, not even `-0`.
 
-import { int_parse, print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, int_parse, print, to_str, wrapping_add as + } from builtins;
 
 struct Port { number: u16? }
 
@@ -27,24 +27,36 @@ fn sum_u8(a: str, b: str) -> u8? {
     some(x + y)
 }
 
-fn main() !prints {
-    print(`{as_u8("255")} {as_u8("256")} {as_u8("-1")} {as_u8("-0")} {as_u8("x")}`);
-    print(`{as_i8("-128")} {as_i8("127")} {as_i8("128")} {as_i8("-129")}`);
-    print(`{as_u64("18446744073709551615")} {as_u64("18446744073709551616")}`);
-    print(`{as_i32("-2147483648")} {as_i32("2147483648")}`);
-    let bound: u16? = "8080".int_parse();
-    let port = Port { number: "443".int_parse() };
-    print(`{bound} {port.number} {takes_u16("70000".int_parse())}`);
-    print(`{sum_u8("200", "55")} {sum_u8("200", "x")}`);
-    // No integer optional asked for: the `i64?` it always was.
-    let wide = "9000000000".int_parse();
-    print(wide.to_str());
-}
---- stdout ---
-some(255) none none none none
-some(-128) some(127) none none
-some(18446744073709551615) none
-some(-2147483648) none
-some(8080) some(443) none
-some(255) none
-some(9000000000)
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`{as_u8("255")} {as_u8("256")} {as_u8("-1")} {as_u8("-0")} {as_u8("x")}`);
+        print(`{as_i8("-128")} {as_i8("127")} {as_i8("128")} {as_i8("-129")}`);
+        print(`{as_u64("18446744073709551615")} {as_u64("18446744073709551616")}`);
+        print(`{as_i32("-2147483648")} {as_i32("2147483648")}`);
+        let bound: u16? = "8080".int_parse();
+        let port = Port { number: "443".int_parse() };
+        print(`{bound} {port.number} {takes_u16("70000".int_parse())}`);
+        print(`{sum_u8("200", "55")} {sum_u8("200", "x")}`);
+        // No integer optional asked for: the `i64?` it always was.
+        let wide = "9000000000".int_parse();
+        print(wide.to_str());
+    };
+    assert(out == """
+        some(255) none none none none
+        some(-128) some(127) none none
+        some(18446744073709551615) none
+        some(-2147483648) none
+        some(8080) some(443) none
+        some(255) none
+        some(9000000000)
+
+    """);
+})

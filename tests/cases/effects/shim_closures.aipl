@@ -5,6 +5,7 @@
 # state of its own.
 
 import {
+    equal as ==,
     first,
     join,
     len,
@@ -38,65 +39,77 @@ fn deeper() !prints {
     greet();
 }
 
-fn main() !prints {
-    // Two operations recording into one array, and one counting: the closures share
-    // what they capture.
-    mut log: str[] = [];
-    mut calls = 0;
+test({
+    mut out = "";
     shim prints {
         print = |text| {
-            set log.push(`print {text}`);
-            set calls++;
+            set out = `{out}{text}\n`;
         },
         put = |text| {
-            set log.push(`put {text}`);
-            set calls++;
+            set out = `{out}{text}`;
         },
     } {
-        deeper();
-    };
-    print(log.join(sep=", "));
-    print(to_str(calls));
+        // Two operations recording into one array, and one counting: the closures share
+        // what they capture.
+        mut log: str[] = [];
+        mut calls = 0;
+        shim prints {
+            print = |text| {
+                set log.push(`print {text}`);
+                set calls++;
+            },
+            put = |text| {
+                set log.push(`put {text}`);
+                set calls++;
+            },
+        } {
+            deeper();
+        };
+        print(log.join(sep=", "));
+        print(to_str(calls));
 
-    // A closure that returns reads what it captures, and a bare literal takes the
-    // operation's integer width.
-    let start: u64 = 1000;
-    print(to_str(shim clock { now_nanos = || start, monotonic_now = || 7 } { elapsed() }));
+        // A closure that returns reads what it captures, and a bare literal takes the
+        // operation's integer width.
+        let start: u64 = 1000;
+        print(to_str(shim clock { now_nanos = || start, monotonic_now = || 7 } { elapsed() }));
 
-    // A script: each call takes the next line. The shim sets what it captures, so it
-    // is a statement, and what its body made is carried out in a variable.
-    mut lines = ["first", "second", "third"];
-    mut answer = "";
-    shim read_stdin {
-        read_line = || {
-            let next = lines.first();
-            set lines = lines[1..];
-            next
-        },
-    } {
-        set answer = ask_twice();
-    };
-    print(answer);
-    print(to_str(lines.len()));
+        // A script: each call takes the next line. The shim sets what it captures, so it
+        // is a statement, and what its body made is carried out in a variable.
+        mut lines = ["first", "second", "third"];
+        mut answer = "";
+        shim read_stdin {
+            read_line = || {
+                let next = lines.first();
+                set lines = lines[1..];
+                next
+            },
+        } {
+            set answer = ask_twice();
+        };
+        print(answer);
+        print(to_str(lines.len()));
 
-    // A variable the closures only assign, never read, is captured too.
-    mut last = "";
-    shim prints {
-        print = |text| {
-            set last = text;
-        },
-        put = |text| {
-            set last = text;
-        },
-    } {
-        greet();
+        // A variable the closures only assign, never read, is captured too.
+        mut last = "";
+        shim prints {
+            print = |text| {
+                set last = text;
+            },
+            put = |text| {
+                set last = text;
+            },
+        } {
+            greet();
+        };
+        print(last);
     };
-    print(last);
-}
---- stdout ---
-print a, put b, print c
-3
-1007
-first,second
-1
-c
+    assert(out == """
+        print a, put b, print c
+        3
+        1007
+        first,second
+        1
+        c
+
+    """);
+})
