@@ -19,5 +19,3 @@ fn triple(x: i64) -> i64 { x + x + x }.benchmark({
 }).test({
     assert(triple(1) == 3);
 })
-
-fn main() {}

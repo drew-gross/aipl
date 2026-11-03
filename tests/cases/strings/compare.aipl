@@ -9,7 +9,7 @@ import {
     logical_not as !,
 } from builtins;
 
-fn main() {}.test({
+test({
     assert("a" < "b");
     assert(!("b" < "a"));
     assert(!("a" < "a"));

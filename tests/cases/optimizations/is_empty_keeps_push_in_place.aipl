@@ -30,7 +30,7 @@ fn after_empty(n: i64) -> bool {
     seen
 }
 
-fn main() {}.benchmark({
+benchmark({
     assert(measure("is_nonempty", 1, after_nonempty).allocations == 1);
     assert(measure("is_empty", 1, after_empty).allocations == 1);
 })

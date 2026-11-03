@@ -1,3 +1,9 @@
 # Declaring an effect you don't actually use should still compile/run.
 
-fn main() !prints -> i64 { 0 }
+import { equal as == } from builtins;
+
+fn declares_prints_but_never_prints() !prints -> i64 { 0 }.test({
+    shim prints { print = |text| {}, put = |text| {} } {
+        assert(declares_prints_but_never_prints() == 0);
+    };
+})

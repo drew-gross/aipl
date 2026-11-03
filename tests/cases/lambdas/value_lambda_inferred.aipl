@@ -53,5 +53,3 @@ fn fields() -> i64 {
 }.test({
     assert(fields() == 126);
 })
-
-fn main() {}

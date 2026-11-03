@@ -1,9 +1,11 @@
 # `c == 'a'` only type-checks if `c` is char.
 
-import { equal as == } from builtins;
+import { equal as ==, wrapping_increment as ++ } from builtins;
 
-fn main() {
+test({
+    mut matches = 0;
     for (let c : "abc") {
-        let _ = c == 'a';
+        if (c == 'a') { set matches++; };
     }
-}
+    assert(matches == 1);
+})

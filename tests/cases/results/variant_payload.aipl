@@ -56,5 +56,3 @@ fn double(n: i64) -> i64!Fail {
     assert(double(0) == err(NotFound));
     assert(double(1) == err(Parse("bad digit")));
 })
-
-fn main() {}

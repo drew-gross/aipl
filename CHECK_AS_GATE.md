@@ -255,7 +255,14 @@ Checklist:
       and `report/runtime_calls` (`cli` args), `report/with_companion` (`file:`), `report/writes_a_file` (`expect file:`), and
       `report/smallest_program` (the smallest real program is the point). A top-level test block is named by its order in the
       file (`__test_block_<n>`), not its line, so a pinned report does not change when other code moves.
-- [ ] The 15 section-less `main` files: decide each.
+- [x] The 15 section-less `main` files (decided with the user 2026-11-03): 8 empty `main`s beside a function's `.test` deleted
+      (`lambdas/value_lambda_inferred`, `options/types/set_optional`, `strings/compare`, `results/variant_payload`,
+      `optimizations/builds_into_struct_stays_in_place`, `structs/fields/field_init_shorthand`, `lints/field_init_range_value`,
+      `benchmark/block_runs_under_check`); the benchmarks hung on dummy functions (`benchmark/measure_claims`,
+      `optimizations/is_empty_keeps_push_in_place`, and the `main`-attached ones above) became top-level `benchmark({ .. })`;
+      `loops/for_loop_empty_string` and `for_loop_var_typed_as_char` became top-level tests that assert (iteration count 0; one `'a'`
+      among `"abc"`); `effects/over_declared_effects_are_fine` became a function that declares `!prints` with a `.test` calling it under
+      a `shim`. Kept: `examples/arrays.aipl` (an example program).
 - [ ] Per directory batch: `cargo handoff`, then review moved baseline rows (the `main` -> test-driver switch moves
       `instructions` and `code bytes` for every converted case, as the old "void main" note says).
 - [ ] Update **CLAUDE.md**: delete the "Test `main` style" section (its premise, a void `main` driving a case, is
@@ -394,3 +401,4 @@ Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered
 - 2026-11-03: Rename round 2: corpus `.performance(` -> `.benchmark(` (60 files; the parser now refuses `.performance` and says what to write),
   `tests/cases/performance/` -> `tests/cases/benchmark/`, the 11 D8 files converted, CLAUDE.md / README / skills / DESIGN_PRINCIPLES updated.
 - 2026-11-03: Phase 2b batch 12 done. The 8 shim/pure cases converted; the real-effect cases (stdin, terminal, process, real clock) keep `main`.
+- 2026-11-03: the 15 section-less `main`s decided and converted (14 changed, `examples/arrays` kept).

@@ -17,7 +17,7 @@ fn pick(b: bool) -> #{i64}? { if (b) { some(#{1, 2, 3}) } else { none } }
 
 fn ordered() -> #>{i64}? { some(#>{5, 9, 7}) }
 
-fn main() {}.test({
+test({
     let present = pick(true).value_or(#{});
     assert(present.has(2));
     let absent = pick(false).value_or(#{});

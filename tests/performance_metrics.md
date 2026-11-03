@@ -99,9 +99,9 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/arrays/with_in_place | 4 | 1603 | 1603 | 23961 | 2700 | 8.00 | 79.49 | 1488 |
 | cases/benchmark/block_failure | 0 | 0 | 0 | 3 | 8 | 1.00 | 68.72 | 1440 |
 | cases/benchmark/block_in_imported_file_is_not_run | 0 | 0 | 0 | 3 | 8 | 0.00 | 68.75 | 1424 |
-| cases/benchmark/block_runs_under_check | 0 | 0 | 0 | 3 | 8 | 0.00 | 68.65 | 1424 |
+| cases/benchmark/block_runs_under_check | 0 | 0 | 0 | 54 | 320 | 1.00 | 113.56 | 1456 |
 | cases/benchmark/measure_claim_fails | 0 | 0 | 0 | 3 | 8 | 1.00 | 105.98 | 1424 |
-| cases/benchmark/measure_claims | 0 | 0 | 0 | 3 | 8 | 0.00 | 133.03 | 1440 |
+| cases/benchmark/measure_claims | 0 | 0 | 0 | 2 | 32 | 0.00 | 117.80 | 1424 |
 | cases/benchmark/refcount_balance | 3 | 177 | 177 | 643 | 3432 | 5.00 | 95.98 | 1472 |
 | cases/bindings/lambda/destructure_params | 20 | 1200 | 1224 | 3247 | 7416 | 8.00 | 168.53 | 1520 |
 | cases/bindings/let/let_binding_basic | 0 | 0 | 0 | 28 | 172 | 1.00 | 61.14 | 1424 |
@@ -178,7 +178,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/docs/doc_comments | 8 | 427 | 427 | 340 | 2040 | 9.00 | 65.63 | 1440 |
 | cases/docs/module_docs | 3 | 193 | 193 | 287 | 2748 | 4.00 | 72.66 | 1488 |
 | cases/effects/declaring_prints_allows_print_call | 1 | 88 | 88 | 250 | 2392 | 3.00 | 80.70 | 1456 |
-| cases/effects/over_declared_effects_are_fine | 0 | 0 | 0 | 2 | 8 | 0.00 | 61.48 | 1408 |
+| cases/effects/over_declared_effects_are_fine | 0 | 0 | 0 | 40 | 392 | 1.00 | 67.05 | 1440 |
 | cases/effects/random | 7 | 221 | 221 | 1348 | 5044 | 12.00 | 69.28 | 1456 |
 | cases/effects/random_provider_block | 2 | 40 | 40 | 536 | 2056 | 7.00 | 80.83 | 1440 |
 | cases/effects/shim_clock | 7 | 276 | 276 | 300 | 2280 | 8.00 | 66.56 | 1472 |
@@ -318,7 +318,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/lambdas/recursive_hof | 0 | 0 | 0 | 62 | 252 | 1.00 | 62.82 | 1440 |
 | cases/lambdas/try_error_inferred | 12 | 942 | 910 | 2091 | 9576 | 9.00 | 100.45 | 1520 |
 | cases/lambdas/two_lambda_args | 4 | 210 | 210 | 421 | 2188 | 4.00 | 82.52 | 1472 |
-| cases/lambdas/value_lambda_inferred | 0 | 0 | 0 | 3 | 8 | 0.00 | 66.61 | 1408 |
+| cases/lambdas/value_lambda_inferred | 24 | 1440 | 944 | 1224 | 4344 | 6.00 | 71.29 | 1520 |
 | cases/lambdas/zip_concat_minimal | 9 | 800 | 720 | 1153 | 5308 | 5.00 | 69.72 | 1472 |
 | cases/lambdas/zip_with | 56 | 3821 | 3821 | 4957 | 7024 | 11.00 | 75.14 | 1504 |
 | cases/lambdas/zip_with_owned | 73 | 5076 | 5068 | 7248 | 13916 | 15.00 | 82.41 | 1504 |
@@ -334,7 +334,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/lints/decr_user_minus | 1 | 21 | 21 | 49 | 396 | 5.00 | 64.22 | 1456 |
 | cases/lints/destructure_param_allow | 5 | 304 | 304 | 481 | 3088 | 4.00 | 67.55 | 1472 |
 | cases/lints/destructure_slot_allow | 5 | 304 | 304 | 534 | 3192 | 5.00 | 68.12 | 1472 |
-| cases/lints/field_init_range_value | 0 | 0 | 0 | 3 | 8 | 0.00 | 60.54 | 1408 |
+| cases/lints/field_init_range_value | 0 | 0 | 0 | 45 | 248 | 2.00 | 63.21 | 1440 |
 | cases/lints/incr_flavor_mismatch | 2 | 36 | 36 | 96 | 544 | 6.00 | 73.21 | 1440 |
 | cases/lints/incr_shapes_not_flagged | 3 | 51 | 51 | 155 | 712 | 7.00 | 63.08 | 1456 |
 | cases/lints/incr_user_plus | 1 | 20 | 20 | 49 | 396 | 5.00 | 62.11 | 1456 |
@@ -364,9 +364,9 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/loops/for_body_without_tail_expr | 0 | 0 | 0 | 665 | 628 | 2.00 | 62.92 | 1440 |
 | cases/loops/for_index | 34 | 2361 | 2361 | 2079 | 4216 | 8.00 | 67.10 | 1504 |
 | cases/loops/for_loop_count_specific_char | 0 | 0 | 0 | 390 | 444 | 2.00 | 62.27 | 1424 |
-| cases/loops/for_loop_empty_string | 0 | 0 | 0 | 49 | 228 | 0.00 | 61.49 | 1424 |
+| cases/loops/for_loop_empty_string | 0 | 0 | 0 | 83 | 416 | 1.00 | 61.75 | 1456 |
 | cases/loops/for_loop_mutates_outer_counter | 0 | 0 | 0 | 824 | 548 | 1.00 | 63.97 | 1440 |
-| cases/loops/for_loop_var_typed_as_char | 0 | 0 | 0 | 182 | 232 | 1.00 | 61.63 | 1408 |
+| cases/loops/for_loop_var_typed_as_char | 0 | 0 | 0 | 231 | 440 | 1.00 | 61.45 | 1440 |
 | cases/loops/for_range | 33 | 2116 | 2116 | 2339 | 5388 | 7.00 | 77.53 | 1488 |
 | cases/loops/strlen_via_for | 0 | 0 | 0 | 666 | 424 | 2.00 | 69.69 | 1424 |
 | cases/loops/while_loop | 0 | 0 | 0 | 242 | 428 | 2.00 | 67.51 | 1440 |
@@ -397,7 +397,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/optimizations/appending_variant | 404 | 24508 | 24730 | 48887 | 7672 | 28.00 | 110.16 | 1568 |
 | cases/optimizations/appending_variant_not_minted | 12 | 556 | 452 | 542 | 2272 | 5.00 | 75.50 | 1504 |
 | cases/optimizations/borrowed_bindings | 46 | 3191 | 3191 | 5334 | 12424 | 14.00 | 138.42 | 1520 |
-| cases/optimizations/builds_into_struct_stays_in_place | 0 | 0 | 0 | 3 | 8 | 0.00 | 84.94 | 1408 |
+| cases/optimizations/builds_into_struct_stays_in_place | 4 | 256 | 64 | 2584 | 4660 | 4.00 | 91.31 | 1472 |
 | cases/optimizations/cartesian_product_loop_fusion | 5 | 147 | 387 | 1569 | 3084 | 7.00 | 74.10 | 1536 |
 | cases/optimizations/const_array_literal | 51 | 3290 | 3290 | 6905 | 11868 | 14.00 | 148.22 | 1520 |
 | cases/optimizations/const_fold | 0 | 0 | 0 | 2 | 8 | 0.00 | 82.31 | 1392 |
@@ -426,7 +426,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/optimizations/inline_mutating_method | 11 | 298 | 298 | 873 | 3128 | 5.00 | 68.44 | 1520 |
 | cases/optimizations/inline_small_stale_body | 3 | 264 | 264 | 152 | 904 | 2.00 | 61.55 | 1440 |
 | cases/optimizations/inspect_only_args | 1 | 21 | 21 | 1663 | 1488 | 3.00 | 62.86 | 1440 |
-| cases/optimizations/is_empty_keeps_push_in_place | 0 | 0 | 0 | 3 | 8 | 0.00 | 75.87 | 1392 |
+| cases/optimizations/is_empty_keeps_push_in_place | 0 | 0 | 0 | 2 | 32 | 0.00 | 79.79 | 1424 |
 | cases/optimizations/join_emptiness_fusion | 38 | 2558 | 2558 | 3503 | 7428 | 13.00 | 172.55 | 1520 |
 | cases/optimizations/loop_map_fusion | 30 | 1887 | 3919 | 25414 | 4392 | 11.00 | 137.57 | 1504 |
 | cases/optimizations/loop_map_fusion_effects | 43 | 2842 | 2842 | 2685 | 4860 | 9.00 | 76.76 | 1504 |
@@ -476,7 +476,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/options/types/bool_optional | 0 | 0 | 0 | 67 | 340 | 1.00 | 67.16 | 1424 |
 | cases/options/types/boxed_variant_optional | 5 | 280 | 280 | 152 | 1016 | 2.00 | 69.43 | 1456 |
 | cases/options/types/char_optional | 0 | 0 | 0 | 104 | 404 | 2.00 | 77.23 | 1424 |
-| cases/options/types/set_optional | 0 | 0 | 0 | 3 | 8 | 0.00 | 65.35 | 1424 |
+| cases/options/types/set_optional | 9 | 352 | 192 | 631 | 4000 | 4.00 | 75.53 | 1472 |
 | cases/options/types/str_optional | 0 | 0 | 0 | 98 | 656 | 2.00 | 62.50 | 1456 |
 | cases/options/value_or_err | 13 | 1004 | 1004 | 1024 | 4328 | 6.00 | 75.22 | 1472 |
 | cases/perf/instructions_executed | 2 | 106 | 106 | 879 | 2856 | 5.00 | 98.16 | 1488 |
@@ -494,7 +494,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/results/struct_payload | 7 | 474 | 386 | 184 | 1708 | 7.00 | 64.27 | 1456 |
 | cases/results/try_inside_composite_releases | 17 | 1464 | 1464 | 3096 | 9600 | 7.00 | 172.09 | 1504 |
 | cases/results/try_operator | 0 | 0 | 0 | 229 | 1064 | 2.00 | 64.56 | 1456 |
-| cases/results/variant_payload | 0 | 0 | 0 | 3 | 8 | 0.00 | 66.07 | 1392 |
+| cases/results/variant_payload | 1 | 88 | 88 | 1101 | 5412 | 5.00 | 71.77 | 1472 |
 | cases/results/void_ok | 2 | 108 | 108 | 220 | 2068 | 7.00 | 65.58 | 1456 |
 | cases/sets/as_sequence | 41 | 2221 | 1989 | 4010 | 12188 | 17.00 | 195.64 | 1504 |
 | cases/sets/basic | 2 | 96 | 96 | 278 | 1500 | 3.00 | 65.28 | 1456 |
@@ -514,7 +514,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/sets/union | 14 | 744 | 328 | 944 | 4804 | 7.00 | 78.77 | 1488 |
 | cases/sets/union_from_array_elem | 18 | 924 | 900 | 1067 | 4624 | 7.00 | 66.71 | 1504 |
 | cases/strings/bool_to_str | 22 | 1421 | 1421 | 2025 | 4540 | 7.00 | 66.67 | 1504 |
-| cases/strings/compare | 0 | 0 | 0 | 3 | 8 | 0.00 | 62.82 | 1408 |
+| cases/strings/compare | 0 | 0 | 0 | 389 | 1876 | 2.00 | 66.14 | 1440 |
 | cases/strings/concat/concat_in_function_param | 1 | 88 | 88 | 49 | 332 | 2.00 | 73.05 | 1424 |
 | cases/strings/concat/concat_no_leak_across_calls | 1 | 88 | 88 | 52 | 320 | 2.00 | 62.18 | 1424 |
 | cases/strings/concat/print_rope | 4 | 352 | 352 | 73 | 584 | 7.00 | 62.12 | 1440 |
@@ -583,7 +583,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/structs/destructure_imported | 5 | 227 | 227 | 158 | 964 | 6.00 | 76.73 | 1456 |
 | cases/structs/destructure_mut | 17 | 1107 | 1107 | 946 | 4124 | 6.00 | 70.72 | 1488 |
 | cases/structs/destructure_rename | 22 | 1444 | 1444 | 949 | 4100 | 6.00 | 66.58 | 1472 |
-| cases/structs/fields/field_init_shorthand | 0 | 0 | 0 | 3 | 8 | 0.00 | 80.45 | 1408 |
+| cases/structs/fields/field_init_shorthand | 0 | 0 | 0 | 87 | 404 | 2.00 | 63.16 | 1440 |
 | cases/structs/fields/field_order_independent | 0 | 0 | 0 | 40 | 212 | 1.00 | 64.17 | 1440 |
 | cases/structs/fields/fn_field | 1 | 32 | 32 | 167 | 620 | 3.00 | 64.28 | 1456 |
 | cases/structs/fields/nested_struct | 0 | 0 | 0 | 182 | 616 | 2.00 | 65.03 | 1456 |

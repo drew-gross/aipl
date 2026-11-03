@@ -1,1 +1,11 @@
-fn main() { for (let c : "") {} }
+# A `for` over the empty string runs its body zero times.
+
+import { equal as ==, wrapping_increment as ++ } from builtins;
+
+test({
+    mut iterations = 0;
+    for (let c : "") {
+        set iterations++;
+    }
+    assert(iterations == 0);
+})

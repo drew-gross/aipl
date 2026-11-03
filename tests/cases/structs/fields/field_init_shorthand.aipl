@@ -16,5 +16,3 @@ fn shift(x: i64, y: i64) -> Point { x, y: y + 1 }.test({
     assert(q.x == 1);
     assert(q.y == 3);
 })
-
-fn main() {}
