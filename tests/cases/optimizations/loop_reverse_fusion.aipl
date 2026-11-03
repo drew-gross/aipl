@@ -16,7 +16,7 @@
 # calls' own work is invisible in it (14,392 becomes 15,396: the backward
 # index is one add per element more than the forward one). The `--- report ---`
 # is the evidence — one `aipl_arr_reverse`, `materialized`'s, where the unfused
-# case has three. (There is no `.performance` block: a reversed view allocates
+# case has three. (There is no `.benchmark` block: a reversed view allocates
 # nothing either way, and the instruction count moves the wrong way, so the saving
 # is in calls, which only the report shows.)
 

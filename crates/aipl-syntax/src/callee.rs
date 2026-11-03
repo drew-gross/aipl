@@ -148,7 +148,7 @@ pub enum Callee {
     /// `measure(label, input, f) -> Measurement` — runs `f(input)` once inside a
     /// counting window and reports what it cost. Written in AIPL
     /// (`builtin_measure.aipl`) on top of the three runtime hooks below, which only
-    /// it may reach. Legal only in a `.performance` block: it carries the internal
+    /// it may reach. Legal only in a `.benchmark` block: it carries the internal
     /// `!measure` effect, which nothing else declares.
     Measure,
     /// Open the counting window: snapshot the allocation, byte and instruction

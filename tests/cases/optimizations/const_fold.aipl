@@ -1,5 +1,5 @@
 # All-constant expressions are folded at compile time: each costs exactly what
-# returning the literal it folds to costs (the `.performance` block on `arith`),
+# returning the literal it folds to costs (the `.benchmark` block on `arith`),
 # where the same expression over a variable costs more. The asserts pin the folded
 # values to the run-time semantics they must match.
 
@@ -23,7 +23,7 @@ import {
 
 fn arith() -> i64 { ((2 + 3) * 10) - ((7 / 2) + (7 % 2)) }.test({
     assert(arith() == 46);
-}).performance({
+}).benchmark({
     let literal = measure("literal", 0, |_| 46);
     let arithmetic = measure("arith", 0, |_| arith());
     let wrapping = measure("wraps", 0, |_| wraps());

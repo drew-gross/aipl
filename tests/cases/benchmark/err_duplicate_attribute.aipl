@@ -1,0 +1,15 @@
+# One `.benchmark` per function, as one `.test`: with two, which would win?
+
+fn f() -> i64 { 1 }.benchmark({
+    assert(f() == 1);
+}).benchmark({
+    assert(f() == 1);
+})
+
+fn main() {}
+--- errors ---
+error: duplicate `.benchmark` attribute
+ --> ./tests/cases/benchmark/err_duplicate_attribute.aipl:5:4
+  |
+5 | }).benchmark({
+  |    ^^^^^^^^^

@@ -11,7 +11,7 @@
 # the body (`let self: str = src; split(self, "\n")`), so the fusion looks
 # under that binding — which is what `numbered` below proves.
 #
-# The saving is in allocations, which the `.performance` block on `count_parts`
+# The saving is in allocations, which the `.benchmark` block on `count_parts`
 # measures: a walked split costs none, where the same split built as an array is
 # one block holding a view of the source per part. With the fusion switched off
 # the walked loops below each allocated that block, and ran 3,085 instructions
@@ -87,7 +87,7 @@ fn count_parts(s: str, sep: str) -> u64 {
         set n++;
     }
     n
-}.performance({
+}.benchmark({
     let src = "the first long piece\nthe second long piece\nthe third long piece";
 
     // Walked, the three parts cost no allocation: the cursor hands each one to

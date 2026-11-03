@@ -23,36 +23,50 @@ import {
     wrapping_sub as -,
 } from builtins;
 
-fn main() !prints {
-    let xs = [3, 1, 2];
-    print(`{xs.minimum()} {xs.maximum()} {xs.reduce(min)} {xs.reduce(max)}`);
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let xs = [3, 1, 2];
+        print(`{xs.minimum()} {xs.maximum()} {xs.reduce(min)} {xs.reduce(max)}`);
 
-    // Any step. This one sums, seeded by the first element.
-    print(`{xs.reduce(|acc, x| acc + x)}`);
+        // Any step. This one sums, seeded by the first element.
+        print(`{xs.reduce(|acc, x| acc + x)}`);
 
-    // Nothing to reduce, and one element.
-    let nothing: i64[] = [];
-    print(`{nothing.minimum()} {[7].maximum()}`);
+        // Nothing to reduce, and one element.
+        let nothing: i64[] = [];
+        print(`{nothing.minimum()} {[7].maximum()}`);
 
-    // Strings and chars order as `<` does.
-    print(`{["pear", "apple", "fig"].minimum()} {["pear", "apple", "fig"].maximum()}`);
-    print(`{['b', 'a', 'c'].minimum()}`);
+        // Strings and chars order as `<` does.
+        print(`{["pear", "apple", "fig"].minimum()} {["pear", "apple", "fig"].maximum()}`);
+        print(`{['b', 'a', 'c'].minimum()}`);
 
-    // An unsigned value above `i64::MAX` is the largest, not the smallest.
-    let zero: u64 = 0;
-    let huge = zero - 1;
-    let wide: u64[] = [huge, 1, 5];
-    print(`{wide.minimum()} {wide.maximum() == some(huge)}`);
-}.performance({
+        // An unsigned value above `i64::MAX` is the largest, not the smallest.
+        let zero: u64 = 0;
+        let huge = zero - 1;
+        let wide: u64[] = [huge, 1, 5];
+        print(`{wide.minimum()} {wide.maximum() == some(huge)}`);
+    };
+    assert(out == """
+        some(1) some(3) some(1) some(3)
+        some(6)
+        none some(7)
+        some("apple") some("pear")
+        some('a')
+        some(1) true
+
+    """);
+})
+
+benchmark({
     // The generic fold costs no allocation: the accumulator is a scalar optional.
     let xs = [3, 1, 2];
     assert(measure("minimum", xs, minimum).allocations == 0);
     assert(measure("reduce", xs, |a| a.reduce(min)).allocations == 0);
 })
---- stdout ---
-some(1) some(3) some(1) some(3)
-some(6)
-none some(7)
-some("apple") some("pear")
-some('a')
-some(1) true

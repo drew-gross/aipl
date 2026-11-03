@@ -6,4 +6,4 @@
 # current compiler — a project of your own would not have one. Checked by
 # `projects::checked_in_compilers_are_current`; rewritten, with the
 # binary, by `cargo handoff`.
-source-fingerprint 12850539936036202132
+source-fingerprint 12581447429218975189

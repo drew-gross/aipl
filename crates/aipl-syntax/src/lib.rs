@@ -2829,8 +2829,8 @@ pub enum FnRole {
     /// A function hoisted out of a `.test` block, with the name it was
     /// declared with.
     TestHelper(String),
-    /// The function standing for `<source>`'s `.performance` block.
-    Performance(String),
+    /// The function standing for `<source>`'s `.benchmark` block.
+    Benchmark(String),
 }
 
 /// The hooks into `fn_names.aipl`, installed by the compiler via
@@ -2838,24 +2838,14 @@ pub enum FnRole {
 struct FnNamesHooks {
     role: fn(&str) -> FnRole,
     test_fn_name: fn(&str) -> String,
-    performance_fn_name: fn(&str) -> String,
 }
 
 static FN_NAMES_HOOKS: std::sync::OnceLock<FnNamesHooks> = std::sync::OnceLock::new();
 
-/// Install the function-name hooks: the dogfooded AIPL `fn_role`,
-/// `test_fn_name` and `performance_fn_name`, run through the embedding FFI.
-/// Idempotent — first install wins.
-pub fn set_fn_names_hooks(
-    role: fn(&str) -> FnRole,
-    test_fn_name: fn(&str) -> String,
-    performance_fn_name: fn(&str) -> String,
-) {
-    let _ = FN_NAMES_HOOKS.set(FnNamesHooks {
-        role,
-        test_fn_name,
-        performance_fn_name,
-    });
+/// Install the function-name hooks: the dogfooded AIPL `fn_role` and
+/// `test_fn_name`, run through the embedding FFI. Idempotent — first install wins.
+pub fn set_fn_names_hooks(role: fn(&str) -> FnRole, test_fn_name: fn(&str) -> String) {
+    let _ = FN_NAMES_HOOKS.set(FnNamesHooks { role, test_fn_name });
 }
 
 fn fn_names_hooks() -> &'static FnNamesHooks {
@@ -2887,20 +2877,23 @@ pub fn unattached_test_ordinal(name: &str) -> Option<&str> {
     (!rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit())).then_some(rest)
 }
 
-/// The name of the function standing for `f`'s `.performance` block. The parser
-/// reads that attribute off `f` and turns it into a function of its own, whose
-/// `.test` body is the block — so a performance block reaches everything
-/// downstream as the test code it currently is.
-pub fn performance_fn_name(f: &str) -> String {
-    (fn_names_hooks().performance_fn_name)(f)
+/// The position among its file's top-level `benchmark({ .. })` blocks (from 1) of
+/// the one `name` stands for, when `name` is the name the parser made for it
+/// (`fn_names.aipl`'s `unattached_benchmark_name`: `__benchmark_block_<n>`), else
+/// `None`. Such a function carries the block and nothing else.
+pub fn unattached_benchmark_ordinal(name: &str) -> Option<&str> {
+    let rest = name.strip_prefix("__benchmark_block_")?;
+    (!rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit())).then_some(rest)
 }
 
-/// The function `name` stands for the `.performance` block of, or `None` when
-/// `name` is not one — see [`performance_fn_name`].
-pub fn performance_source_name(name: &str) -> Option<&str> {
+/// The function `name` stands for the `.benchmark` block of, or `None` when
+/// `name` is not one. The parser reads the attribute off the function and turns it
+/// into a function of its own (`__benchmark$<f>`) whose `.test` body is the block,
+/// so a benchmark block reaches everything downstream as the test code it is.
+pub fn benchmark_source_name(name: &str) -> Option<&str> {
     match fn_role(name) {
         // The source name is what follows the prefix, so it is a suffix of `name`.
-        FnRole::Performance(source) => Some(&name[name.len() - source.len()..]),
+        FnRole::Benchmark(source) => Some(&name[name.len() - source.len()..]),
         FnRole::Plain | FnRole::TestBody | FnRole::TestHelper(_) => None,
     }
 }
@@ -2932,7 +2925,7 @@ pub fn test_helper_source_name(name: &str) -> Option<&str> {
     match fn_role(name) {
         // The declared name is what follows the last `$`, so it is a suffix.
         FnRole::TestHelper(helper) => Some(&name[name.len() - helper.len()..]),
-        FnRole::Plain | FnRole::TestBody | FnRole::Performance(_) => None,
+        FnRole::Plain | FnRole::TestBody | FnRole::Benchmark(_) => None,
     }
 }
 
@@ -3000,7 +2993,7 @@ pub fn trace_diagnostics(program: &ast::Program, command: &str) -> Vec<Error> {
     out
 }
 
-/// The ways a `.performance` block is wrong that its types and effects do not
+/// The ways a `.benchmark` block is wrong that its types and effects do not
 /// already say: a literal measurement label used twice in one block.
 ///
 /// A label names a measurement in a report, so two with the same text could not
@@ -3009,11 +3002,11 @@ pub fn trace_diagnostics(program: &ast::Program, command: &str) -> Vec<Error> {
 /// Labels are per block: two blocks may each have a `"small"`.
 ///
 /// Reported by `aipl check` before the block runs, the way a type error is.
-pub fn performance_diagnostics(program: &ast::Program) -> Vec<Error> {
+pub fn benchmark_diagnostics(program: &ast::Program) -> Vec<Error> {
     let mut out = Vec::new();
     for item in &program.items {
         let ast::Item::Fn(f) = item else { continue };
-        if performance_source_name(&f.name).is_none() {
+        if benchmark_source_name(&f.name).is_none() {
             continue;
         }
         let Some(block) = f.test_body.as_ref() else {
@@ -3033,7 +3026,7 @@ pub fn performance_diagnostics(program: &ast::Program) -> Vec<Error> {
             if !seen.insert(label.clone()) {
                 let e = Error::at(
                     format!(
-                        "duplicate measurement label {label:?} in this `.performance` block — a report could not tell the two apart"
+                        "duplicate measurement label {label:?} in this `.benchmark` block — a report could not tell the two apart"
                     ),
                     args[0].span.clone(),
                 );
@@ -3377,7 +3370,7 @@ fn __builtin_pack_inline(self: str) -> str { self }
 # Internal: the bound `inline_str` checks against, so nothing hardcodes it.
 fn __builtin_inline_capacity() -> u64 { 0 }
 # Internal: the counting window behind `measure`. `!measure` is an effect only so
-# that nothing outside a `.performance` block can call these (or `measure`), and
+# that nothing outside a `.benchmark` block can call these (or `measure`), and
 # so that the optimizer, which never reorders or drops an effectful call, keeps
 # the window around exactly the work it was opened for.
 fn __builtin_measure_begin() !measure {}
@@ -4144,7 +4137,7 @@ pub const SHIM_ONLY_EFFECTS: &[&str] = &["random"];
 /// (so a function's result depends on when it ran); `random` = draws random
 /// numbers, which only a `shim` can supply ([`SHIM_ONLY_EFFECTS`]). `measure` is internal:
 /// it marks `measure(..)` and the counting window it is built from, so only a
-/// `.performance` block (which declares it, and nothing else) can reach them.
+/// `.benchmark` block (which declares it, and nothing else) can reach them.
 pub const KNOWN_EFFECTS: &[&str] = &[
     "prints",
     "read_files",

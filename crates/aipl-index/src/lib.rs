@@ -333,11 +333,12 @@ fn symbols(program: &Program, src: &str) -> Vec<Symbol> {
                 // A function declared inside a `.test` block is hoisted to the
                 // top level under a name the source never spells. It is private
                 // to its test, so it is not indexed. Neither is the function
-                // standing in for a `.performance` block, which no source names. Nor
+                // standing in for a `.benchmark` block, which no source names. Nor
                 // is the one carrying a top-level `test({ .. })`.
                 if aipl_syntax::test_helper_source_name(&f.name).is_some()
-                    || aipl_syntax::performance_source_name(&f.name).is_some()
+                    || aipl_syntax::benchmark_source_name(&f.name).is_some()
                     || aipl_syntax::unattached_test_ordinal(&f.name).is_some()
+                    || aipl_syntax::unattached_benchmark_ordinal(&f.name).is_some()
                 {
                     continue;
                 }

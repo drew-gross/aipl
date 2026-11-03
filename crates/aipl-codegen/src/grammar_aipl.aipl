@@ -215,7 +215,12 @@ import {
     show_expr,
 } from "./expr.aipl";
 import { find_trailing_whitespace } from "./find_trailing_whitespace.aipl";
-import { is_unattached_test, unattached_test_name } from "./fn_names.aipl";
+import {
+    is_unattached_benchmark,
+    is_unattached_test,
+    unattached_benchmark_name,
+    unattached_test_name,
+} from "./fn_names.aipl";
 import { format_cst, render_cst } from "./format.aipl";
 import {
     Build,
@@ -246,6 +251,7 @@ import {
     prod_names,
 } from "./grammar.aipl";
 import {
+    BenchmarkBlock,
     Builtins,
     CaseParam,
     Const as ItemConst,
@@ -262,7 +268,6 @@ import {
     Param,
     ParamPattern,
     Path,
-    PerformanceBlock,
     Program,
     Refinement as ItemRefinement,
     RefinementDecl,
@@ -417,6 +422,7 @@ fn items() -> Production<AiplTok, Ast>[] {
             Named("function"),
             // `test({ .. })`: a test attached to no function.
             Named("test_item"),
+            Named("benchmark_item"),
             Named("struct_decl"),
             // Before `variant_decl`: `variant W = V without C` opens the way a
             // one-case variant does, and only the `without` after the first
@@ -588,7 +594,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         Then([Term(Name), Lit(","), Many(Named("field_init"), sep=Lit(","))]),
     ]);
 
-    // `.test({ .. })` and `.performance({ .. })`, the only attributes. The
+    // `.test({ .. })` and `.benchmark({ .. })`, the only attributes. The
     // string-argument form parses so that the retired `.doc("..")` can be
     // refused by name, with the migration to `# ..` lines in the message.
     let fn_attr: Rule<AiplTok> = Then([
@@ -601,6 +607,13 @@ fn items() -> Production<AiplTok, Ast>[] {
     // from. Rare by design — a test on a function says what it covers.
     let test_item: Rule<AiplTok> = Then([
         Lit("test"),
+        nest("(", Named("test_block"), ")", strict()),
+    ]);
+
+    // `benchmark({ .. })` at the top level: a `.benchmark` block with no function to
+    // hang from, the benchmark counterpart of `test({ .. })`.
+    let benchmark_item: Rule<AiplTok> = Then([
+        Lit("benchmark"),
         nest("(", Named("test_block"), ")", strict()),
     ]);
 
@@ -709,6 +722,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         pl("construct_fields", construct_fields, "a field", TryMk(lower_construct_fields)),
         p("fn_attr", fn_attr, TryMk(lower_fn_attr)),
         p("test_item", test_item, TryMk(lower_test_item)),
+        p("benchmark_item", benchmark_item, TryMk(lower_benchmark_item)),
         p("test_block", test_block, TryMk(lower_test_block)),
         p("test_body", test_body, TryMk(lower_test_body)),
         p("test_tail", test_tail, TryMk(lower_test_tail)),
@@ -3307,24 +3321,37 @@ fn lower_program(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             set items.push(as_item(k, sp)?);
         };
     }
-    ok(AProgram(Program { items: items.number_unattached_tests(), doc }))
+    ok(AProgram(Program { items: items.number_unattached_blocks(), doc }))
 }
 
-# The items with each top-level `test({ .. })` block named by its order among them,
-# from 1, so a block's name is stable under edits elsewhere in the file.
-fn number_unattached_tests(self: Item[]) -> Item[] {
-    mut ordinal: u64 = 0;
+# The items with each top-level `test({ .. })` block, and each top-level `benchmark({ .. })`
+# block, named by its order among its own kind, from 1, so a block's name is stable under
+# edits elsewhere in the file.
+fn number_unattached_blocks(self: Item[]) -> Item[] {
+    mut tests: u64 = 0;
+    mut benchmarks: u64 = 0;
     mut out: Item[] = [];
     for (let it : self) {
         if (let ItemFn(f) = it) {
             if (f.name.text.is_unattached_test()) {
-                set ordinal++;
+                set tests++;
                 set out.push(ItemFn(Function {
                     ..f,
-                    name: SpanStr { text: unattached_test_name(ordinal), span: f.name.span },
+                    name: SpanStr { text: unattached_test_name(tests), span: f.name.span },
                 }));
             } else {
-                set out.push(it);
+                if (f.name.text.is_unattached_benchmark()) {
+                    set benchmarks++;
+                    set out.push(ItemFn(Function {
+                        ..f,
+                        name: SpanStr {
+                            text: unattached_benchmark_name(benchmarks),
+                            span: f.name.span,
+                        },
+                    }));
+                } else {
+                    set out.push(it);
+                };
             };
         } else {
             set out.push(it);
@@ -3364,9 +3391,9 @@ fn lower_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 fn lower_decl(src: str, decl: Ast, lines: Span[], sp: Span) -> Item!ParseError {
     let docs = doc_block(lines.map(|t| src[t]));
     if (let AFunction(f) = decl) {
-        if (f.name.text.is_unattached_test() && docs.is_some()) {
+        if ((f.name.text.is_unattached_test() || f.name.text.is_unattached_benchmark()) && docs.is_some()) {
             return err(ParseError {
-                message: "a `test` block documents nothing, so a `# ..` block directly above it has nothing to attach to — use `//` for a note about the test",
+                message: "a `test` or `benchmark` block documents nothing, so a `# ..` block directly above it has nothing to attach to — use `//` for a note about it",
                 span: sp,
             });
         };
@@ -3829,7 +3856,7 @@ fn lower_construct_fields(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError 
     }
 }
 
-# `fn_attr` — `.test({ .. })` or `.performance({ .. })`, the only two. The
+# `fn_attr` — `.test({ .. })` or `.benchmark({ .. })`, the only two. The
 # argument shape is fixed by the production; what is checked here is that the
 # name matches it. Every string-argument attribute is refused, which is the
 # whole reason that alternative parses: so each can be refused *by name*.
@@ -3838,6 +3865,13 @@ fn lower_fn_attr(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     match (node.own_texts(src)) {
         [_, name, ..] => {
             let name_span = node.second_tok(node.tok_span());
+
+            if (name == "performance") {
+                return err(ParseError {
+                    message: "`.performance` is now `.benchmark`",
+                    span: name_span,
+                });
+            };
             if (kids.is_empty()) {
                 if (name == "doc") {
                     return err(ParseError {
@@ -3845,7 +3879,7 @@ fn lower_fn_attr(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
                         span: name_span,
                     });
                 };
-                if (name == "test" || name == "performance") {
+                if (name == "test" || name == "benchmark") {
                     return err(ParseError {
                         message: `\`.{name}\` takes a \`\{ .. }\` block, not a string argument`,
                         span: name_span,
@@ -3853,7 +3887,7 @@ fn lower_fn_attr(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
                 };
                 return err(ParseError { message: unknown_attr(name), span: name_span });
             };
-            if (name != "test" && name != "performance") {
+            if (name != "test" && name != "benchmark") {
                 return err(ParseError { message: unknown_attr(name), span: name_span });
             };
             let TestBlock { fns, body } = as_test_block(kid(kids, 0, sp)?, sp)?;
@@ -3906,9 +3940,9 @@ fn lower_test_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
                 span: fn_span,
             });
         };
-        if (f.performance.is_some()) {
+        if (f.benchmark.is_some()) {
             return err(ParseError {
-                message: `a function inside a \`.test\` block cannot carry a \`.performance\` of its own: "{f.name.text}" is test code already`,
+                message: `a function inside a \`.test\` block cannot carry a \`.benchmark\` of its own: "{f.name.text}" is test code already`,
                 span: fn_span,
             });
         };
@@ -3962,13 +3996,33 @@ fn lower_test_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         shorthand_body: false,
         test_body: some(body.value_or(at(Unit, 0..0))),
         test_fns: fns,
-        performance: none,
+        benchmark: none,
+        doc: none,
+    }))
+}
+
+# `benchmark_item` — a top-level `benchmark({ .. })`. Lowered to a function with a name
+# made for it and an empty body, carrying the block as its `.benchmark`, exactly as if
+# the block were written on that function.
+fn lower_benchmark_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let TestBlock { fns, body } = as_test_block(kid(kids, 0, sp)?, sp)?;
+    let at = node.tokens[0].value_or(sp);
+    ok(AFunction(Function {
+        name: SpanStr { text: unattached_benchmark_name(0), span: at },
+        is_pub: false,
+        sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
+        body: at(Unit, sp),
+        shorthand_body: false,
+        test_body: none,
+        test_fns: [],
+        benchmark: some(BenchmarkBlock { body: body.value_or(at(Unit, 0..0)), fns, span: at }),
         doc: none,
     }))
 }
 
 fn unknown_attr(name: str) -> str {
-    `unknown function attribute "{name}"; only \`.test(\{ .. })\` and \`.performance(\{ .. })\` are supported`
+    `unknown function attribute "{name}"; only \`.test(\{ .. })\` and \`.benchmark(\{ .. })\` are supported`
 }
 
 fn lower_struct_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
@@ -4137,7 +4191,7 @@ fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     mut body: ParsedBody = PBlock(at(Unit, sp));
     mut test_body: Expr? = none;
     mut test_fns: Function[] = [];
-    mut performance: PerformanceBlock? = none;
+    mut benchmark: BenchmarkBlock? = none;
     for (let k : kids) {
         if (let ATypeParams(tps) = k) { set type_vars = tps; };
         if (let AParam(p) = k) { set params.push(p); };
@@ -4148,14 +4202,14 @@ fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         // One slot per attribute, so a repeated one is refused: which would
         // silently win?
         if (let AAttr(a) = k) {
-            if (a.name == "performance") {
-                if (performance.is_some()) {
+            if (a.name == "benchmark") {
+                if (benchmark.is_some()) {
                     return err(ParseError {
-                        message: "duplicate `.performance` attribute",
+                        message: "duplicate `.benchmark` attribute",
                         span: a.span,
                     });
                 };
-                set performance = some(PerformanceBlock { body: a.body, fns: a.fns, span: a.span });
+                set benchmark = some(BenchmarkBlock { body: a.body, fns: a.fns, span: a.span });
             } else {
                 if (test_body.is_some()) {
                     return err(ParseError { message: "duplicate `.test` attribute", span: a.span });
@@ -4174,7 +4228,7 @@ fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         shorthand_body: body.is_case(PConstruct),
         test_body,
         test_fns,
-        performance,
+        benchmark,
         // Documentation comes from the `# ..` lines in front of the
         // declaration, which `item` holds; this never sees them.
         doc: none,
@@ -5169,6 +5223,25 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
             "fn f() {}\n\n  test({ fn g() {} g(); })",
         ) == "fn f() = ()\nfn __test_block_1() = () .test(Seq(g(), ()) fn g() = ())",
     );
+
+    // A top-level `benchmark({ .. })` is a function made for it carrying the block as its
+    // `.benchmark`, numbered among the file's own kind.
+    assert(
+        program_dump(
+            "benchmark({ assert(1 == 1); })",
+        ) == "fn __benchmark_block_1() = () .benchmark(Seq(assert(==(1, 1)), ()))",
+    );
+    assert(
+        program_dump(
+            "test({ }) benchmark({ }) test({ }) benchmark({ })",
+        ) == "fn __test_block_1() = () .test(())\nfn __benchmark_block_1() = () .benchmark(())\nfn __test_block_2() = () .test(())\nfn __benchmark_block_2() = () .benchmark(())",
+    );
+    // `.performance` was renamed `.benchmark`, and says so.
+    assert(
+        program_dump(
+            "fn f() -> i64 { 1 }.performance({ 2 })",
+        ) == "error: `.performance` is now `.benchmark`",
+    );
     assert(
         program_dump(
             "test({ }) fn f() {} test({ })",
@@ -5177,7 +5250,7 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     assert(
         program_dump(
             "# note\ntest({ })",
-        ) == "error: a `test` block documents nothing, so a `# ..` block directly above it has nothing to attach to — use `//` for a note about the test",
+        ) == "error: a `test` or `benchmark` block documents nothing, so a `# ..` block directly above it has nothing to attach to — use `//` for a note about it",
     );
 
     // Functions declared inside a `.test` block ride along with it, wherever
@@ -5204,43 +5277,43 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
         ) == """error: a function inside a `.test` block cannot carry a `.test` of its own: "g" is test code already""",
     );
 
-    // `.performance({ .. })` is a second attribute with a block of its own: it
+    // `.benchmark({ .. })` is a second attribute with a block of its own: it
     // takes helpers like a `.test` block does, and the two coexist in either
     // order. Helpers are refused the same things a `.test` block refuses them.
     assert(
         program_dump(
-            "fn f() -> i64 { 1 }.performance({ assert(f() == 1); })",
-        ) == "fn f() -> i64 = 1 .performance(Seq(assert(==(f(), 1)), ()))",
+            "fn f() -> i64 { 1 }.benchmark({ assert(f() == 1); })",
+        ) == "fn f() -> i64 = 1 .benchmark(Seq(assert(==(f(), 1)), ()))",
     );
     assert(
         program_dump(
-            "fn f() -> i64 { 1 }.performance({ fn g() -> i64 { 1 } assert(f() == g()); })",
-        ) == "fn f() -> i64 = 1 .performance(Seq(assert(==(f(), g())), ()) fn g() -> i64 = 1)",
+            "fn f() -> i64 { 1 }.benchmark({ fn g() -> i64 { 1 } assert(f() == g()); })",
+        ) == "fn f() -> i64 = 1 .benchmark(Seq(assert(==(f(), g())), ()) fn g() -> i64 = 1)",
     );
     assert(
         program_dump(
-            "fn f() -> i64 { 1 }.test({ 1 }).performance({ 2 })",
-        ) == "fn f() -> i64 = 1 .test(1) .performance(2)",
+            "fn f() -> i64 { 1 }.test({ 1 }).benchmark({ 2 })",
+        ) == "fn f() -> i64 = 1 .test(1) .benchmark(2)",
     );
     assert(
         program_dump(
-            "fn f() -> i64 { 1 }.performance({ 2 }).test({ 1 })",
-        ) == "fn f() -> i64 = 1 .test(1) .performance(2)",
+            "fn f() -> i64 { 1 }.benchmark({ 2 }).test({ 1 })",
+        ) == "fn f() -> i64 = 1 .test(1) .benchmark(2)",
     );
     assert(
         program_dump(
-            "fn f() -> i64 { 1 }.performance({ pub fn g() -> i64 { 1 } })",
+            "fn f() -> i64 { 1 }.benchmark({ pub fn g() -> i64 { 1 } })",
         ) == """error: a function inside a `.test` block cannot be `pub`: "g" exists only for that test""",
     );
     assert(
         program_dump(
-            "fn f() -> i64 { 1 }.performance({ fn g() { } fn g() { } })",
-        ) == """error: duplicate function "g" in this `.performance` block""",
+            "fn f() -> i64 { 1 }.benchmark({ fn g() { } fn g() { } })",
+        ) == """error: duplicate function "g" in this `.benchmark` block""",
     );
     assert(
         program_dump(
-            "fn f() -> i64 { 1 }.test({ fn g() -> i64 { 1 }.performance({ }) })",
-        ) == """error: a function inside a `.test` block cannot carry a `.performance` of its own: "g" is test code already""",
+            "fn f() -> i64 { 1 }.test({ fn g() -> i64 { 1 }.benchmark({ }) })",
+        ) == """error: a function inside a `.test` block cannot carry a `.benchmark` of its own: "g" is test code already""",
     );
 
     // A bare type parameter takes the `any` bound, which is what almost every
@@ -5477,7 +5550,7 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
         ) == "error: this `# ..` block documents nothing — a blank line detaches it from the declaration below, and only the block at the top of a file, which documents the file, may stand apart",
     );
 
-    // One slot per attribute, filled by `.test({ .. })` and `.performance({ .. })`.
+    // One slot per attribute, filled by `.test({ .. })` and `.benchmark({ .. })`.
     assert(
         program_dump(
             "fn f() -> i64 { 1 }.test({ 1 }).test({ 2 })",
@@ -5485,13 +5558,13 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     );
     assert(
         program_dump(
-            "fn f() -> i64 { 1 }.performance({ 1 }).performance({ 2 })",
-        ) == "error: duplicate `.performance` attribute",
+            "fn f() -> i64 { 1 }.benchmark({ 1 }).benchmark({ 2 })",
+        ) == "error: duplicate `.benchmark` attribute",
     );
     assert(
         program_dump(
-            """fn f() -> i64 { 1 }.performance("x")""",
-        ) == "error: `.performance` takes a `{ .. }` block, not a string argument",
+            """fn f() -> i64 { 1 }.benchmark("x")""",
+        ) == "error: `.benchmark` takes a `{ .. }` block, not a string argument",
     );
     assert(
         program_dump(
@@ -5501,7 +5574,7 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     assert(
         program_dump(
             "fn f() -> i64 { 1 }.bogus({ 1 })",
-        ) == """error: unknown function attribute "bogus"; only `.test({ .. })` and `.performance({ .. })` are supported""",
+        ) == """error: unknown function attribute "bogus"; only `.test({ .. })` and `.benchmark({ .. })` are supported""",
     );
 
     // And a whole small file, which is the shape everything above is a piece of.

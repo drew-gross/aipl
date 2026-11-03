@@ -29,7 +29,7 @@
 //!                          (There is no `--- performance ---` any more: a case's
 //!                          counts are its row in `tests/performance_metrics.md`,
 //!                          and the properties an optimization is *for* are stated
-//!                          by a `.performance` block or a `--- report ---`.)
+//!                          by a `.benchmark` block or a `--- report ---`.)
 //!
 //! Every running case is also *measured*, whatever sections it has, and refused if
 //! it leaks (allocations != deallocations): the leak gate is not a side effect of
@@ -247,20 +247,30 @@ struct CheckPlan<'a> {
     require_success: bool,
 }
 
+/// Whether the source holds a test or benchmark block: on a function (`.test(`,
+/// `.benchmark(`) or a top-level `test({ .. })` / `benchmark({ .. })` at the start of a line.
+fn has_test_blocks(source: &str) -> bool {
+    source.contains(".test")
+        || source.contains(".benchmark")
+        || source
+            .lines()
+            .any(|l| l.starts_with("test(") || l.starts_with("benchmark("))
+}
+
 /// Whether `aipl check` has to run for this case, and what its one run is
 /// compared against.
 ///
 /// `None` is the block-less majority of the corpus, which pays nothing. Otherwise
-/// the run happens because the source carries `.test` or `.performance` blocks —
+/// the run happens because the source carries test or benchmark blocks —
 /// `check` is the only thing that runs either, so a case whose claims live in a
-/// `.performance` block is held to them only by this run — or because a section
+/// benchmark block is held to them only by this run — or because a section
 /// pins something about `check`: a case may pin a report with no tests of its own
 /// (a compile failure's report, say), which is why the sections count on their own.
 fn check_plan(spec: &Spec) -> Option<CheckPlan<'_>> {
     let report = spec.check.as_deref();
     let exit_code = spec.check_exit_code;
     let pinned = report.is_some() || exit_code.is_some();
-    if !pinned && !spec.source.contains(".test") && !spec.source.contains(".performance") {
+    if !pinned && !has_test_blocks(&spec.source) {
         return None;
     }
     Some(CheckPlan {
@@ -1844,11 +1854,11 @@ fn run_success_case(
     // **Every running case is measured, whether or not it pins anything**: the run
     // is what the leak gate needs, and the gate is the one check here that has
     // found real bugs, so it must not depend on a case having a section to compare.
-    // (That used to be true by accident — a `performance` section was required on
+    // (That used to be true by accident — a `benchmark` section was required on
     // every case but the examples.)
     // What is *compared* is the case's row in the metrics table, and its `report`
     // where it pins one: one measurement serves both.
-    check_section!(run_performance_check(
+    check_section!(run_benchmark_check(
         ctx,
         orig_path,
         &measured,
@@ -1874,7 +1884,7 @@ fn run_success_case(
 /// section. The instrumented object is separate from the behavior-check one so
 /// production/JIT runs carry no counter overhead.
 #[allow(clippy::too_many_arguments)]
-fn run_performance_check(
+fn run_benchmark_check(
     ctx: &str,
     orig_path: &Path,
     program: &Program,
@@ -1972,16 +1982,30 @@ fn check_runs_at_most_once_whichever_sections_are_used() {
         check_plan(&spec).map(|p| (p.report.map(str::to_string), p.exit_code, p.require_success))
     };
 
-    // Neither section and no `.test` or `.performance` blocks: nothing to ask `check`, so it never
+    // Neither section and no test or benchmark blocks: nothing to ask `check`, so it never
     // runs — which is what keeps the testless majority of the corpus free.
     for src in ["fn main() {}\n", "fn main() {}\n--- stdout ---\nhi\n"] {
         assert!(plan(src).is_none(), "should not run check: {src:?}");
     }
 
-    // A `.performance` block is run by `check` and by nothing else, so a file with
+    // A top-level `test({ .. })` or `benchmark({ .. })` is a block too: with nothing else
+    // in the file to ask `check`, it is the only reason the run happens, and a failing
+    // top-level test would otherwise pass.
+    for src in [
+        "test({ assert(true); })\n",
+        "fn f() {}\n\nbenchmark({ assert(true); })\n",
+    ] {
+        assert_eq!(
+            plan(src),
+            Some((None, None, true)),
+            "should run check: {src:?}"
+        );
+    }
+
+    // A `.benchmark` block is run by `check` and by nothing else, so a file with
     // only that block still needs the run: its claims are otherwise never held.
-    let performance = "fn f() -> i64 { 1 }.performance({ assert(true); })\nfn main() {}\n";
-    assert_eq!(plan(performance), Some((None, None, true)));
+    let benchmark = "fn f() -> i64 { 1 }.benchmark({ assert(true); })\nfn main() {}\n";
+    assert_eq!(plan(benchmark), Some((None, None, true)));
 
     // Every other combination is exactly one run. Two of the three reasons to run
     // are the sections themselves, so a case may pin `check` with no tests of its

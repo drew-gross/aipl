@@ -233,13 +233,9 @@ Checklist:
   - [ ] 12. Decide before converting, 18: `effects` 7, `builtins` 8, `execute_program` 2, `cli` 1. Some of these *are*
         the real-builtin coverage set (b) and keep their `main`; the `shim_effects`-style ones already test shims and
         convert. Settle the kept set here, then convert the rest.
-- [ ] **Left alone for now (D8, decided 2026-11-02):** the 11 files that hang a `.performance` block off `main` keep
-      their `main` and their `stdout` section untouched until D8 is settled (a top-level `performance({ .. })`, or attach
-      each block to the function it measures): `strings/small_string_optimization`, `constants/computed`,
-      `arrays/{reduce,reverse_allocates_nothing,slice_allocates_nothing,inline_empty}`,
-      `optimizations/{join_emptiness_fusion,map_map_fusion,fold_emptiness_and_index,map_reduce_fusion}`,
-      `performance/refcount_balance`. Skip them in every batch below (the codemod already skips what it cannot match;
-      check each batch's list for these names). They are the known exceptions in the final recount.
+- [x] **D8 (resolved 2026-11-03):** `.performance` is now `.benchmark`, with a top-level `benchmark({ .. })` for a benchmark attached to no
+      function (the way `test({ .. })` is). The 11 files that hung a block off `main` were converted: `main` became a top-level `test`
+      (print-capture, or an assert where it returned its answer as the exit code) and the block a top-level `benchmark`.
 - [x] **D9 (compiler bug, fixed 2026-11-03):** `optimizations/{fusion_named_effects,loop_map_fusion_effects,predicate_fusion_effects}`
       pass an effectful function or a printing closure to a higher-order builtin, which a test's `shim` rejected ("fn print has
       effect !prints but the calling function does not declare it"). Cause: mono hands everything it synthesizes inside a function
@@ -383,3 +379,14 @@ Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered
   `optimizations` files converted.
 - 2026-11-03: Phase 2b `report` cases (31 files). The unattached test function's name is now `__test_block_<n>` (order in the file) and
   its report name `block N`, because a line/offset in the name made every pinned report line-sensitive.
+
+- 2026-11-03: **Harness hole found and fixed:** `check_plan` in `tests/cases.rs` decided whether to run `aipl check` for a case by looking for
+  `.test` / `.performance` in the source, so a case whose only tests are top-level `test({ .. })` blocks never had them run: a failing one
+  passed. `has_test_blocks` now also matches a line starting `test(` or `benchmark(`. (Every top-level-test case converted before this was
+  checked by `aipl check` when converted, but not held by the per-case run since.)
+- 2026-11-03: Rename `.performance` -> `.benchmark` round 1 (additive, bootstrap-safe): grammar accepts `.benchmark` (and still reads
+  `.performance` as it), adds top-level `benchmark({ .. })`; hoisted blocks are `__benchmark$<f>` (role `Benchmark`), unattached ones
+  `__benchmark_block_<n>` reported as `benchmark block N`; internal identifiers renamed. Round 2 (after promotion): rewrite the 65 corpus
+  files and the docs, stop reading `.performance`, drop the `Performance` alias in `fn_role`'s marshalling.
+- 2026-11-03: Rename round 2: corpus `.performance(` -> `.benchmark(` (60 files; the parser now refuses `.performance` and says what to write),
+  `tests/cases/performance/` -> `tests/cases/benchmark/`, the 11 D8 files converted, CLAUDE.md / README / skills / DESIGN_PRINCIPLES updated.

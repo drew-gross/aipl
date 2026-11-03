@@ -512,6 +512,7 @@ utilities:
   string_with_span -> strings already are represented as pointer+slice half the time, exposing that representation should make a lot of parser/grammer stuff cleaner
 
 skills:
+  we don't have backwards compatiple users yet, we don't need to say "x is now y" in errors
   make "develop aipl project" skill that describes how currently projects are for dogfooding the compiler, working on a project should work like how it works for users, and should generate ideas for how to improve the language or dev loop, but not implement them (I'll record the suggestions for later implementation)
   make an "add lint" skill that describes how to lint against a reimplementation
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
@@ -822,6 +823,7 @@ allocator:
   make own allocator
 
 perfmon:
+  figure out ways to make perfmon refresh faster, seems like it's often the long pole in handoff
   allow comments in report sections
   measure() needs to block optimizations
   show call-sites of each function in the final binary

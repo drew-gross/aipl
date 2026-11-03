@@ -22,7 +22,7 @@ fn trimmed() -> u64 {
 
     assert(build() == "padded");
     assert(trimmed() == 1);
-}).performance({
+}).benchmark({
     assert(measure("trim an inline string", 0, |_| trimmed()).allocations == 0);
 
     // A string long enough to need a buffer pays for that buffer, and trimming it

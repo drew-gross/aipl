@@ -7,7 +7,7 @@
 #     is_nonempty(match (s) { "a" => [x, y], _ => [] })
 #         →  match (s) { "a" => true, _ => false }
 #
-# The `.performance` blocks hold the property that matters: no array is built, so
+# The `.benchmark` blocks hold the property that matters: no array is built, so
 # nothing is allocated, for a hit and for a miss. The program body checks the
 # answers are still the right ones.
 #
@@ -51,12 +51,31 @@ fn small() -> u8 {
     xs[0].value_or(0)
 }
 
-fn main() !prints {
-    print(`{known("a")} {known("z")} {unknown("a")} {unknown("z")}`);
-    print(`{first_form("a")} {first_form("c")} {first_form("z")}`);
-    print(`{second_form("a")} {second_form("b")}`);
-    print(`{second_of("x", "y")} {blank("q")} {small()}`);
-}.performance({
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`{known("a")} {known("z")} {unknown("a")} {unknown("z")}`);
+        print(`{first_form("a")} {first_form("c")} {first_form("z")}`);
+        print(`{second_form("a")} {second_form("b")}`);
+        print(`{second_of("x", "y")} {blank("q")} {small()}`);
+    };
+    assert(out == """
+        true false false true
+        alpha gamma none
+        alef none
+        y false 200
+
+    """);
+})
+
+benchmark({
     assert(measure("hit", "a", known).allocations == 0);
     assert(measure("miss", "z", known).allocations == 0);
     assert(measure("hit, asked empty", "a", unknown).allocations == 0);
@@ -64,8 +83,3 @@ fn main() !prints {
     assert(measure("first of a miss", "z", first_form).allocations == 0);
     assert(measure("from a literal", "x", blank).allocations == 0);
 })
---- stdout ---
-true false false true
-alpha gamma none
-alef none
-y false 200

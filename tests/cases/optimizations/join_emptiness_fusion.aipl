@@ -24,15 +24,34 @@ fn no_text(xs: str[]) -> bool { xs.join().is_empty() }
 
 fn no_text_dashed(xs: str[]) -> bool { xs.join(sep="-").is_empty() }
 
-fn main() !prints {
-    let words = ["", "a", ""];
-    let blanks = ["", "", ""];
-    let pair = ["", ""];
-    print(`{has_text(words)} {has_text(blanks)} {has_text(pair)}`);
-    print(`{has_text_dashed(words)} {has_text_dashed(blanks)} {has_text_dashed(pair)}`);
-    print(`{no_text(words)} {no_text(blanks)} {no_text(pair)}`);
-    print(`{no_text_dashed(words)} {no_text_dashed(blanks)} {no_text_dashed(pair)}`);
-}.performance({
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let words = ["", "a", ""];
+        let blanks = ["", "", ""];
+        let pair = ["", ""];
+        print(`{has_text(words)} {has_text(blanks)} {has_text(pair)}`);
+        print(`{has_text_dashed(words)} {has_text_dashed(blanks)} {has_text_dashed(pair)}`);
+        print(`{no_text(words)} {no_text(blanks)} {no_text(pair)}`);
+        print(`{no_text_dashed(words)} {no_text_dashed(blanks)} {no_text_dashed(pair)}`);
+    };
+    assert(out == """
+        true false false
+        true true true
+        false true true
+        false false false
+
+    """);
+})
+
+benchmark({
     let words = "a,b,c".split(",");
     let blanks = ",,".split(",");
     assert(measure("a piece has text", words, has_text).allocations == 0);
@@ -42,8 +61,3 @@ fn main() !prints {
     assert(measure("every piece blank, asked empty", blanks, no_text).allocations == 0);
     assert(measure("a separator decides, asked empty", blanks, no_text_dashed).allocations == 0);
 })
---- stdout ---
-true false false
-true true true
-false true true
-false false false

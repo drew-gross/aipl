@@ -246,8 +246,8 @@ baseline table, which pins what every case costs.
 
   | the case is… | it carries |
   |---|---|
-  | a test of behavior | nothing — no report, no `.performance` block |
-  | a small test that an optimization removes **instructions or allocations** | a `.performance` block stating it |
+  | a test of behavior | nothing — no report, no `.benchmark` block |
+  | a small test that an optimization removes **instructions or allocations** | a `.benchmark` block stating it |
   | a small test that an optimization removes **calls** (or reallocations) | a `--- report ---` section |
 
   Both optimization kinds at once get both. Everything about the *size* of a
@@ -272,7 +272,7 @@ baseline table, which pins what every case costs.
   **The leak gate does not depend on any section.** Every instrumented run is held
   to freeing every block it allocates — the harness measures *every* running case
   (examples, which pin nothing, included), `aipl report` exits 1, and `aipl check`
-  fails a file whose `.performance` blocks or `--- report ---` leak (it makes no
+  fails a file whose `.benchmark` blocks or `--- report ---` leak (it makes no
   instrumented run of a file with neither, so a plain file's leak is the harness's
   to find). Nothing in the language can leak on purpose, so the instrumented
   runtime has a test switch, `AIPL_INJECT_LEAK=1`, that stops it counting frees;
@@ -287,7 +287,7 @@ baseline table, which pins what every case costs.
   readable documentation of what the program costs and refilled by handoff when
   codegen moves — which a number written into a Rust test is not. It is for the
   properties only the function list shows (an instance not minted, a call inlined
-  away, a reallocation saved); reach for a `.performance` block first when
+  away, a reallocation saved); reach for a `.benchmark` block first when
   `measure` can state the property, since a pinned report churns with every
   codegen change that moves a size. Examples: `tests/cases/report/`, and the
   fusion cases in `tests/cases/optimizations/`.
@@ -337,8 +337,8 @@ print the exact command to run.
 `fill_expected` always overwrites every section with current values — no need
 to set bodies to `?` first.
 
-## `.performance` blocks and `measure`
-A function can carry a `.performance({ .. })` block beside its `.test`, in either
+## `.benchmark` blocks and `measure`
+A function can carry a `.benchmark({ .. })` block beside its `.test`, in either
 order. It is not the baseline table above: that records a case's whole-program counts
 and is refreshed; this is code that states a property and is held to it. What exists:
 
@@ -350,19 +350,24 @@ and is refreshed; this is code that states a property and is held to it. What ex
 - **It is `check`'s to run, and runs instrumented.** Blocks run apart from the
   `.test` blocks, in an AOT build linked against the instrumented runtime, so a
   file with one needs the linker `aipl build` does. Failures print as
-  `test f.performance ... FAIL` and count in the same summary.
-- **Where it can be written.** Only in a `.performance` block: `measure` carries
-  the internal `!measure` effect, which the performance functions declare and
+  `test f.benchmark ... FAIL` and count in the same summary.
+- **Where it can be written.** Only in a `.benchmark` block: `measure` carries
+  the internal `!measure` effect, which the benchmark functions declare and
   nothing else does (not even `.test`). The same functions declare *no other*
   effect, so a block, or a closure it measures, that prints or reads a file is a
-  compile error ("effects are not supported in a `.performance` block yet").
+  compile error ("effects are not supported in a `.benchmark` block yet").
   Effects in a block are a future project. A repeated *literal* label in one block
   is an error.
 - **It is left out of production.** `aipl run` / `build` ignore it, and the IR and
-  binary are byte-identical with and without it. (A `.performance` is parsed into
-  a function plus a private `__performance$<f>` standing in for its block — the
+  binary are byte-identical with and without it. (A `.benchmark` is parsed into
+  a function plus a private `__benchmark$<f>` standing in for its block — the
   Rust AST has no field for it — and everything downstream treats that as test
-  code. Names: `aipl_syntax::performance_fn_name` / `performance_source_name`.)
+  code. Names: `aipl_syntax::benchmark_source_name`.)
+
+- **A benchmark with no function to hang from** is a top-level `benchmark({ .. })`, the way a
+  test with none is a top-level `test({ .. })` (DESIGN_PRINCIPLES.md §6). Rare by design: a
+  benchmark on a function says what it measures. It is reported as `benchmark block N`, N
+  counting the file's such blocks from 1.
 
 **Writing claims — exact when the code measured is small.** The counts are exact
 and repeatable. For a small closure the number *is* the claim (`allocations == 1`
@@ -384,7 +389,7 @@ entry, which is why `begin` and `end` get blocks of their own in codegen; a
 window inside one block would count nothing.
 
 Fixtures: claims that pass, and one that fails and is pinned by `--- check ---`,
-live in `tests/cases/performance/`. The compile-time refusals print to stderr,
+live in `tests/cases/benchmark/`. The compile-time refusals print to stderr,
 which a case section cannot pin, so they are tests in `tests/suites/check.rs`.
 Two `lint` interactions to know: two measurements compared by field are fine (the
 destructure lint stays quiet when a field is read off more than one value), but a

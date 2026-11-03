@@ -61,7 +61,7 @@ variant Stmt =
 # sugar is gone.
 variant ParsedBody = Block(Expr) | Construct(FieldInit[], Span)
 
-# One function attribute, `.test({ .. })` or `.performance({ .. })`: which one
+# One function attribute, `.test({ .. })` or `.benchmark({ .. })`: which one
 # (`name`), its block, the functions declared inside the block, and the span of
 # the attribute name, which is where a duplicate is reported.
 struct FnAttr { name: str, body: Expr, fns: Function[], span: Span }

@@ -7,7 +7,7 @@
 # that order either way. It is only the second step, moving into the arm, that
 # defers anything.
 #
-# As in `sink_into_branch`, the allocations are the assertion (the `.performance`
+# As in `sink_into_branch`, the allocations are the assertion (the `.benchmark`
 # block on `size`): the call that does not take the arm builds no string.
 
 import { equal as ==, is_nonempty, len, measure, print, to_str, wrapping_add as + } from builtins;
@@ -23,7 +23,7 @@ fn size(flag: bool, n: u64) -> u64 {
         set out = 1;
     };
     out + 1
-}.performance({
+}.benchmark({
     assert(measure("arm not taken", false, |f| size(f, 1)).allocations == 0);
     assert(measure("arm taken", true, |f| size(f, 2)).allocations == 3);
 })

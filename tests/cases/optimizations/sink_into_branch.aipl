@@ -4,7 +4,7 @@
 # other call stops paying for a string it throws away.
 #
 # Both calls below run and only one takes the arm that needs the string, so the
-# program builds it only then. The `.performance` block on `size` is the
+# program builds it only then. The `.benchmark` block on `size` is the
 # assertion: the call that does not take the arm allocates nothing, where without
 # sinking it would pay for the string it throws away.
 
@@ -15,7 +15,7 @@ fn label(n: i64) -> str { `value {n} padded out well past the inline-string limi
 fn size(flag: bool, n: i64) -> u64 {
     let big = label(n);
     if (flag) { big.len() } else { 0 }
-}.performance({
+}.benchmark({
     assert(measure("arm not taken", false, |f| size(f, 1)).allocations == 0);
     // Building the string takes three allocations (its rendering, in pieces).
     assert(measure("arm taken", true, |f| size(f, 2)).allocations == 3);

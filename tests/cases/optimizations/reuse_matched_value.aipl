@@ -4,7 +4,7 @@
 # (`simplify` below) therefore allocates only for the nodes it really changes —
 # a leaf comes back as the very value it was.
 #
-# The `.performance` block holds that: simplifying a leaf allocates nothing, and
+# The `.benchmark` block holds that: simplifying a leaf allocates nothing, and
 # neither does a tree with nothing to fold. `convert` is the soundness check: `A`
 # and `B` have a case of the same name with the same payload, but a `B` is not an
 # `A`, so rebuilding `X(v)` as a `B` must still build one.
@@ -20,7 +20,7 @@ fn simplify(e: Expr) -> Expr {
         Neg(x) => Neg(simplify(x)),
         Add(l, r) => Add(simplify(l), simplify(r)),
     }
-}.performance({
+}.benchmark({
     let leaf = Num(7);
     assert(measure("leaf", leaf, simplify).allocations == 0);
     let nothing = Zero;

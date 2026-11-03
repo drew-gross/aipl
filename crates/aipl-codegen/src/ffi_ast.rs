@@ -126,9 +126,9 @@ fn program(v: &FfiValue) -> R<ast::Program> {
     })
 }
 
-/// One parsed item. A function's `.test` helpers and `.performance` attribute have
+/// One parsed item. A function's `.test` helpers and `.benchmark` attribute have
 /// already become functions of their own: `parse_and_partial_load` runs
-/// `hoist_test_fns` before the value crosses, so the `test_fns` and `performance`
+/// `hoist_test_fns` before the value crosses, so the `test_fns` and `benchmark`
 /// fields it carries are empty here.
 fn item(v: &FfiValue) -> R<ast::Item> {
     let (case, payload) = variant(v)?;

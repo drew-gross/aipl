@@ -619,6 +619,9 @@ test to it; if a *helper* would make the subject a function, define the helper.
 
 ### Downstream decisions
 
+- **The same holds for benchmarks.** A `.benchmark({ .. })` hangs from the function it measures;
+  a top-level `benchmark({ .. })` is the rare form for a claim about no function in particular
+  (a representation, the cost of a language construct), reported as `benchmark block N`.
 - **`main` is not a place to put tests.** `main` is the entry point of a program
   or the subject of a test of the un-shimmed builtins; a test that needs
   somewhere to live uses its function, or a top-level `test`.

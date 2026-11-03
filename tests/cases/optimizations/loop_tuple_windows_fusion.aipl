@@ -24,7 +24,7 @@
 # `--- report ---` is the readable evidence — no `__builtin_tuple_windows$..`
 # specialization is emitted at all. Unfused, every loop below shares one
 # `__builtin_tuple_windows$i64`; fused, only `materialized` still calls it, and
-# that single use is inlined into `main`. The `.performance` block on
+# that single use is inlined into `main`. The `.benchmark` block on
 # `materialized` holds the cost: the fused loops allocate nothing.
 
 import {
@@ -77,7 +77,7 @@ fn doubled_at(s: str) -> str {
 }
 
 // The array itself: not a loop, so not fused.
-fn materialized(xs: i64[]) -> u64 { xs.tuple_windows().len() }.performance({
+fn materialized(xs: i64[]) -> u64 { xs.tuple_windows().len() }.benchmark({
     let xs = many();
 
     // A loop over the pairs builds no array of them: nothing is allocated, whether

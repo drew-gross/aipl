@@ -10,12 +10,12 @@
 
 import { equal as ==, first, last, len, measure, not_equal as !=, print, sort } from builtins;
 
-fn smallest(xs: i64[]) -> i64? { xs.sort().first() }.performance({
+fn smallest(xs: i64[]) -> i64? { xs.sort().first() }.benchmark({
     let xs = [5, 3, 9, 1, 7, 1, 8];
     assert(measure("smallest", xs, smallest).allocations == 0);
 })
 
-fn largest(xs: i64[]) -> i64? { xs.sort().last() }.performance({
+fn largest(xs: i64[]) -> i64? { xs.sort().last() }.benchmark({
     let xs = [5, 3, 9, 1, 7, 1, 8];
     assert(measure("largest", xs, largest).allocations == 0);
 })

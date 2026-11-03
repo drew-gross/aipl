@@ -7,7 +7,7 @@
 #
 # What has moved so far:
 #
-# - `hoist_test_fns`: a `.test` or `.performance` attribute becomes ordinary
+# - `hoist_test_fns`: a `.test` or `.benchmark` attribute becomes ordinary
 #   top-level functions.
 # - `promote_type_vars`: a declaration's own type parameters become type
 #   variables.
@@ -86,23 +86,23 @@ pub fn parse_and_partial_load(src: str) -> PartialLoad!ParseFailure {
     assert(names.contains("__test$double$five()"));
     assert(!names.contains(" four()"));
 
-    // A `.performance` block becomes `__performance$<f>`, after `f` and its
+    // A `.benchmark` block becomes `__benchmark$<f>`, after `f` and its
     // helpers, with the block's own helpers after it.
-    let performance = parse_and_partial_load("""
+    let benchmark = parse_and_partial_load("""
         fn answer() -> i64 { 42 }.test({
             fn t() -> i64 { 1 }
             assert(t() == 1);
-        }).performance({
+        }).benchmark({
             fn p() -> i64 { 2 }
             assert(p() == 2);
         })
     """)?;
-    let order = performance.program.items$item_name();
+    let order = benchmark.program.items$item_name();
     assert(order == [
         "answer",
         "__test$answer$t",
-        "__performance$answer",
-        "__test$__performance$answer$p",
+        "__benchmark$answer",
+        "__test$__benchmark$answer$p",
     ]);
 })
 

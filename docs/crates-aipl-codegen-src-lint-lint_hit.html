@@ -211,7 +211,7 @@
           </h3>
           <pre class="signature"><code>pub fn on_functions(self: Program, lint: (Function) -&#62; LintHit[]) -&#62; LintHit[]</code></pre>
 
-          <div class="doc"><p>Lints come in two kinds. A <em>program</em> lint is a function of the whole <code>Program</code> (<code>unused_imports</code>, which compares the imports with every name the file mentions). A <em>function</em> lint is a function of one <code>Function</code>, and [<code>on_functions</code>] is what runs it over a program, so no function lint decides for itself which bodies to look at.</p><p>Every body that is code to check is a function here: each function, the <code>.test</code> block it carries, the <code>.performance</code> block it carries, and the helpers declared in a <code>.test</code> block. A block is checked as a function of its own when tests run, so it is handed over as one — no parameters, no return type, the block as its body.</p></div>
+          <div class="doc"><p>Lints come in two kinds. A <em>program</em> lint is a function of the whole <code>Program</code> (<code>unused_imports</code>, which compares the imports with every name the file mentions). A <em>function</em> lint is a function of one <code>Function</code>, and [<code>on_functions</code>] is what runs it over a program, so no function lint decides for itself which bodies to look at.</p><p>Every body that is code to check is a function here: each function, the <code>.test</code> block it carries, the <code>.benchmark</code> block it carries, and the helpers declared in a <code>.test</code> block. A block is checked as a function of its own when tests run, so it is handed over as one — no parameters, no return type, the block as its body.</p></div>
 
 
         </section>

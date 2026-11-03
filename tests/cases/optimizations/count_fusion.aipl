@@ -5,7 +5,7 @@
 # All six comparisons fuse, in both operand orders — `n > xs.count(x)` is the
 # same claim as `xs.count(x) < n`, so one rule covers the mirrored form.
 #
-# The saving is in the instructions, which the `.performance` block on `many`
+# The saving is in the instructions, which the `.benchmark` block on `many`
 # measures: it holds 201 matches, and every answer below is decided within the
 # first few elements — a fraction of what counting them all costs.
 
@@ -24,7 +24,7 @@ import {
     to_str,
 } from builtins;
 
-fn many() -> i64[] { [2].repeat(201) }.performance({
+fn many() -> i64[] { [2].repeat(201) }.benchmark({
     let xs = many();
 
     // Each comparison is decided at the second or third match, and stops there:

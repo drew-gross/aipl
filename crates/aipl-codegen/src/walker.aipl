@@ -1166,7 +1166,7 @@ fn item(self: W) -> WDoc!FmtError {
     let kind = if (t == "pub") { self.peek_text_n(1) } else { t };
     if (kind == "let") { return self.const_item(); };
     if (t == "pub" || t == "fn") { return self.fn_item(); };
-    if (t == "test") { return self.test_item(); };
+    if (t == "test" || t == "benchmark") { return self.test_item(); };
     if (t == "struct") { return self.struct_item(); };
     if (t == "variant") { return self.variant_item(); };
     err(self.err_here(`formatter: expected an item (fn/struct/variant/let/import), found "{t}"`))
@@ -1195,11 +1195,12 @@ fn const_item(self: W) -> WDoc!FmtError {
     })
 }
 
-# `test({ .. })` at the top level: laid out like the `.test({ .. })` attribute
-# of a function, minus the function.
+# `test({ .. })` or `benchmark({ .. })` at the top level: laid out like the `.test({ .. })`
+# attribute of a function, minus the function.
 fn test_item(self: W) -> WDoc!FmtError {
-    let WDoc { w, doc } = self.bump().w.expect("(")?.w.block()?;
-    ok(WDoc { w: w.expect(")")?.w, doc: Concat([Text("test("), doc, Text(")")]) })
+    let WStr { w as after_keyword, text as keyword } = self.bump();
+    let WDoc { w, doc } = after_keyword.expect("(")?.w.block()?;
+    ok(WDoc { w: w.expect(")")?.w, doc: Concat([Text(`{keyword}(`), doc, Text(")")]) })
 }
 
 fn fn_item(self: W) -> WDoc!FmtError {
@@ -3589,6 +3590,12 @@ fn walker_of(src: str) -> W!FmtError {
         walker_of("fn f ( ) { }  test ( { assert ( 1 == 1 ) ; } )")?
             .program()
             .rendered(100)? == "fn f() {}\n\ntest({\n    assert(1 == 1);\n})\n",
+    );
+    // A top-level `benchmark({ .. })` too.
+    assert(
+        walker_of("benchmark ( { assert ( 1 == 1 ) ; } )")?
+            .program()
+            .rendered(100)? == "benchmark({\n    assert(1 == 1);\n})\n",
     );
     // A struct and a variant are items too.
     assert(

@@ -7,7 +7,7 @@
 # `aipl_array_with_cap`/`aipl_array_push_mut` pair for the mapped array and
 # calls `dbl` once per index rather than once per element. `walk` below is the
 # unfused counterpart over the same data, so the two sit in one list. The
-# `.performance` block on `dbl` holds the cost: no allocation, and the same
+# `.benchmark` block on `dbl` holds the cost: no allocation, and the same
 # instructions however long the array is.
 #
 # Both readings of `recv[i]` fuse, and the pass never finds out which it has:
@@ -39,7 +39,7 @@ import {
 
 struct Node { tokens: Span[] }
 
-fn dbl(n: i64) -> i64 { n * 2 }.performance({
+fn dbl(n: i64) -> i64 { n * 2 }.benchmark({
     let short = [1, 2, 3, 4, 5];
     let long = [
         1,

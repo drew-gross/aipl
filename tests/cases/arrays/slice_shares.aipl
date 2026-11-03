@@ -1,7 +1,7 @@
 # An array slice is a window onto its source, the way a `str`'s slice is a
 # window onto its bytes: `xs[a..b]` is the source's block with the window's
 # bounds carried in the value, never a copy of the elements. So its cost does not
-# grow with the window — the `.performance` block on `numbers` measures no
+# grow with the window — the `.benchmark` block on `numbers` measures no
 # allocation for any of these, where a copy of a thousand elements would be
 # thousands of bytes — and slicing a slice is a window of the same block rather
 # than a view stacked on a view. A reversal is a value of the same kind — the
@@ -30,7 +30,7 @@ fn numbers(n: u64) -> u64[] {
         set out.push(i);
     }
     out
-}.performance({
+}.benchmark({
     let big = numbers(1000);
     assert(measure("head of 1000", big, |b| b[..500]).allocations == 0);
     assert(measure("tail of 1000", big, |b| b[500..]).allocations == 0);

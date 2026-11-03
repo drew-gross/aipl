@@ -103,7 +103,7 @@ pub fn parse_spec(src: str) -> Spec!str {
     // `performance` was a section once; a file that still has one is told where
     // its job went, rather than that the name is unknown.
     assert(parse_spec("x\n--- performance ---\nallocations: 0\n").is_err_and(|m| m.contains(
-        "`.performance` block",
+        "`.benchmark` block",
     )));
 
     // `exit code` is parsed, and must be an integer.
@@ -169,7 +169,7 @@ fn finalize(spec: Spec, name: str, buf: str) -> Spec!str {
         "stderr" => ok(Spec { ..spec, stderr: some(body) }),
         "errors" => ok(Spec { ..spec, errors: some(body) }),
         "performance" => err(
-            "the `performance` section is gone: a case's counts are its row in tests/performance_metrics.md, and a property is stated by a `.performance` block or a `--- report ---` section",
+            "the `performance` section is gone: a case's counts are its row in tests/performance_metrics.md, and a property is stated by a `.benchmark` block or a `--- report ---` section",
         ),
         "report" => ok(Spec { ..spec, report: some(body) }),
         "check" => ok(Spec { ..spec, check: some(body) }),

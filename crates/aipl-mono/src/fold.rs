@@ -101,7 +101,7 @@ pub fn fold_constants(program: &Program, scope: &Scope) -> Program {
 ///
 /// Only matches, not [`fold_constants`] as a whole. The rest would be sound here
 /// too, but it would also propagate a literal through the inlined `measure` of a
-/// `.performance` block into the closure it measures, and `measure("..", 1, |n|
+/// `.benchmark` block into the closure it measures, and `measure("..", 1, |n|
 /// [n, n + 1])` is written with a literal precisely so that the array is built at
 /// run time. Folding it to a constant array would make every such claim measure
 /// nothing. Choosing an arm moves no literal into anything it was not already

@@ -104,7 +104,7 @@ struct Signature { type_vars: TypeParam[], params: Param[], effects: str[], retu
 # `hoist_test_fns` moves them to top-level items under a name only the test can
 # reach, so nothing past it sees the nesting.
 #
-# `performance` is the function's `.performance({ .. })` attribute, if it has
+# `benchmark` is the function's `.benchmark({ .. })` attribute, if it has
 # one. The Rust AST has no such field: the bridge turns the attribute into a
 # function of its own before anything else sees the program (see `ffi_ast.rs`),
 # the way the `.test` helpers are hoisted, so this is the parser's account of
@@ -121,14 +121,14 @@ struct Function {
     shorthand_body: bool = false,
     test_body: Expr?,
     test_fns: Function[] = [],
-    performance: PerformanceBlock? = none,
+    benchmark: BenchmarkBlock? = none,
     doc: str?,
 }
 
-# One `.performance({ .. })` attribute: its block, the functions declared inside
+# One `.benchmark({ .. })` attribute: its block, the functions declared inside
 # the block (helpers private to it, as in a `.test` block), and the span of the
 # attribute name, which is where a diagnostic about the attribute points.
-struct PerformanceBlock { body: Expr, fns: Function[], span: Span }
+struct BenchmarkBlock { body: Expr, fns: Function[], span: Span }
 
 struct FieldDecl { name: SpanStr, ty: Ty, default: Expr? }
 
@@ -240,12 +240,12 @@ fn show_fn(self: Function) -> str {
     let effects = sig.effects$effect_marker().join();
     let helpers = self.test_fns.map(|h| ` {h.show_fn()}`).join();
     let test = self.test_body.map(|b| ` .test({b.show_expr()}{helpers})`).value_or("");
-    let performance = self.performance$show_performance().value_or("");
-    `{show_doc(self.doc)}{vis}fn {self.name.text}{show_type_params(sig.type_vars)}({sig.params$show_param().join(sep=", ")}){effects}{ret} = {self.body.show_expr()}{test}{performance}`
+    let benchmark = self.benchmark$show_benchmark().value_or("");
+    `{show_doc(self.doc)}{vis}fn {self.name.text}{show_type_params(sig.type_vars)}({sig.params$show_param().join(sep=", ")}){effects}{ret} = {self.body.show_expr()}{test}{benchmark}`
 }
 
-fn show_performance(self: PerformanceBlock) -> str {
-    ` .performance({self.body.show_expr()}{self.fns.map(|h| ` {h.show_fn()}`).join()})`
+fn show_benchmark(self: BenchmarkBlock) -> str {
+    ` .benchmark({self.body.show_expr()}{self.fns.map(|h| ` {h.show_fn()}`).join()})`
 }
 
 fn effect_marker(self: str) -> str { ` !{self}` }

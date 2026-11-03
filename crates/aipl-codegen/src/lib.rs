@@ -929,7 +929,7 @@ extern "C" fn aipl_count_insns(_n: i64) {}
 
 /// The counting window behind `measure`. The JIT does not instrument, so there is
 /// nothing to count: the window opens and closes on nothing and every counter
-/// reads zero. A `.performance` block is never run here — `check` runs it in an
+/// reads zero. A `.benchmark` block is never run here — `check` runs it in an
 /// instrumented build — so this only has to resolve.
 #[no_mangle]
 extern "C" fn aipl_measure_begin() {}
@@ -1028,7 +1028,7 @@ pub fn test_file() -> Option<String> {
 }
 
 /// Fold tests run elsewhere into the cumulative counts: `total` of them, `failed`
-/// of which failed. This is how a file's `.performance` blocks, which have to run
+/// of which failed. This is how a file's `.benchmark` blocks, which have to run
 /// in an instrumented build rather than in this process, still land in the one
 /// aggregate the summary reports.
 pub fn add_test_totals(total: i64, failed: i64) {
@@ -1079,7 +1079,7 @@ pub fn take_failure_report() -> String {
     )
 }
 
-/// Add to the failure report text produced elsewhere, such as a `.performance`
+/// Add to the failure report text produced elsewhere, such as a `.benchmark`
 /// run's, which happens in another process.
 pub fn add_failure_report(text: &str) {
     TEST_FAILURE_REPORT
@@ -1569,14 +1569,14 @@ fn builtin_struct_decls() -> Vec<StructDecl> {
         .collect()
 }
 
-/// Which of a program's tests a synthesized driver runs. A `.performance` block is
+/// Which of a program's tests a synthesized driver runs. A `.benchmark` block is
 /// test code, but it is run apart from the `.test` blocks: it needs an
 /// instrumented build (its counts are the point), and it is the only code allowed
 /// the internal `!measure` effect — which the `.test` blocks, in turn, are not.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum TestKind {
     Tests,
-    Performance,
+    Benchmark,
 }
 
 /// Build the program the `check` command JIT-runs. Keeps every original item
@@ -1587,27 +1587,27 @@ enum TestKind {
 /// `__test_end()`, then yields `__test_summary()` as its i64 exit code.
 /// `Compilation::new(&that).run_0("__test_main")` runs the suite.
 ///
-/// A `.performance` block is not among them; see [`build_performance_program`].
+/// A `.benchmark` block is not among them; see [`build_benchmark_program`].
 pub fn build_test_program(program: &Program) -> Program {
     synthesize_driver(program, TestKind::Tests)
 }
 
-/// The counterpart of [`build_test_program`] for the program's `.performance`
+/// The counterpart of [`build_test_program`] for the program's `.benchmark`
 /// blocks, or `None` when it has none. Same shape — `__test$<fn>` per block, a
 /// `__test_main` driver — but every synthesized function declares the `!measure`
 /// effect and no other, so a block can call `measure` and cannot print, read a
 /// file or reach the clock. (That is the whole of "effects are not supported in a
-/// `.performance` block yet": the checker's ordinary effect discipline, applied
+/// `.benchmark` block yet": the checker's ordinary effect discipline, applied
 /// to a function that declares almost nothing.)
 ///
 /// The caller builds it instrumented — see `aipl check` — because the counts a
 /// block asserts on exist only there.
-pub fn build_performance_program(program: &Program) -> Option<Program> {
-    let has_performance = program.items.iter().any(|item| {
+pub fn build_benchmark_program(program: &Program) -> Option<Program> {
+    let has_benchmark = program.items.iter().any(|item| {
         matches!(item, Item::Fn(f)
-            if f.test_body.is_some() && aipl_syntax::performance_source_name(&f.name).is_some())
+            if f.test_body.is_some() && aipl_syntax::benchmark_source_name(&f.name).is_some())
     });
-    has_performance.then(|| synthesize_driver(program, TestKind::Performance))
+    has_benchmark.then(|| synthesize_driver(program, TestKind::Benchmark))
 }
 
 fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
@@ -1620,11 +1620,11 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
     };
     // A test body declares no effect, so one that uses an effect must discharge it
     // with a `shim` inside the body: a test cannot print, touch the filesystem or
-    // read the clock for real. A performance block declares `measure`, which only
+    // read the clock for real. A benchmark block declares `measure`, which only
     // it has, and nothing else.
     let all_effects = || match kind {
         TestKind::Tests => Vec::new(),
-        TestKind::Performance => vec!["measure".to_string()],
+        TestKind::Benchmark => vec!["measure".to_string()],
     };
 
     let mut items: Vec<Item> = Vec::new();
@@ -1632,7 +1632,7 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
     for item in &program.items {
         match item {
             Item::Fn(f) if f.test_body.is_some() => {
-                let is_performance = aipl_syntax::performance_source_name(&f.name).is_some();
+                let is_benchmark = aipl_syntax::benchmark_source_name(&f.name).is_some();
                 let unattached = aipl_syntax::unattached_test_ordinal(&f.name);
                 // Every function loses its test body here, run or not, so the
                 // program carries only what `run` and `build` would compile. A
@@ -1643,7 +1643,7 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
                     orig.test_body = None;
                     items.push(Item::Fn(orig));
                 }
-                if is_performance != (kind == TestKind::Performance) {
+                if is_benchmark != (kind == TestKind::Benchmark) {
                     continue;
                 }
                 let test_fn = aipl_syntax::test_fn_name(&f.name);
@@ -1661,10 +1661,15 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
                     test_fns: Vec::new(),
                     doc: None,
                 }));
-                // A `.performance` block is reported as `f.performance`, after the
-                // attribute that holds it, not as the function standing in for it.
-                let reported = match (aipl_syntax::performance_source_name(&f.name), unattached) {
-                    (Some(owner), _) => format!("{owner}.performance"),
+                // A `.benchmark` block is reported as `f.benchmark`, after the
+                // attribute that holds it, not as the function standing in for it;
+                // a top-level `benchmark({ .. })` has no function, so it is `benchmark
+                // block N`, N counting the file's.
+                let reported = match (aipl_syntax::benchmark_source_name(&f.name), unattached) {
+                    (Some(owner), _) => match aipl_syntax::unattached_benchmark_ordinal(owner) {
+                        Some(n) => format!("benchmark block {n}"),
+                        None => format!("{owner}.benchmark"),
+                    },
                     (None, Some(n)) => format!("{STANDALONE_TEST_LABEL}{n}"),
                     (None, None) => f.name.text.clone(),
                 };
@@ -1933,7 +1938,6 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "parse_and_partial_load",
     "fn_role",
     "test_fn_name",
-    "performance_fn_name",
     "format_source",
 ];
 
@@ -2583,7 +2587,7 @@ fn fn_role(name: &str) -> aipl_syntax::FnRole {
                 ("Plain", []) => FnRole::Plain,
                 ("TestBody", []) => FnRole::TestBody,
                 ("TestHelper", [FfiValue::Str(helper)]) => FnRole::TestHelper(helper.clone()),
-                ("Performance", [FfiValue::Str(source)]) => FnRole::Performance(source.clone()),
+                ("Benchmark", [FfiValue::Str(source)]) => FnRole::Benchmark(source.clone()),
                 other => panic!("dogfooded fn_role() returned an unknown role: {other:?}"),
             },
             other => panic!("dogfooded fn_role() call: {other:?}"),
@@ -2591,8 +2595,8 @@ fn fn_role(name: &str) -> aipl_syntax::FnRole {
     })
 }
 
-/// One of the dogfooded function-name constructors (`test_fn_name`,
-/// `performance_fn_name`): `f` to the name it is given. No native fallback.
+/// The dogfooded function-name constructor (`test_fn_name`): `f` to the name it is
+/// given. No native fallback.
 fn fn_name_of(entry: &str, f: &str) -> String {
     DOGFOOD_ENGINE.with(
         |comp| match comp.call_values(entry, &[FfiValue::Str(f.to_string())]) {
@@ -2604,10 +2608,6 @@ fn fn_name_of(entry: &str, f: &str) -> String {
 
 fn test_fn_name(f: &str) -> String {
     fn_name_of("test_fn_name", f)
-}
-
-fn performance_fn_name(f: &str) -> String {
-    fn_name_of("performance_fn_name", f)
 }
 
 /// Marshal the dogfooded `aipl_token_scopes` from the dogfood engine: call it on
@@ -2717,7 +2717,7 @@ pub fn install_parser_hooks() {
     aipl_syntax::set_caret_block_hook(caret_block);
     aipl_syntax::set_int_fits_hook(int_fits);
     aipl_syntax::set_is_operator_name_hook(is_operator_name);
-    aipl_syntax::set_fn_names_hooks(fn_role, test_fn_name, performance_fn_name);
+    aipl_syntax::set_fn_names_hooks(fn_role, test_fn_name);
 }
 
 /// What [`frontend`] produces: a program that has passed the type checker, plus

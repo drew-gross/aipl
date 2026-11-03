@@ -8,7 +8,7 @@
 # Every fused result is compared against the same chain through a binding that is
 # used twice (`slow`), which keeps the intermediate array alive and so keeps the
 # chain unfused: the two must agree, including on the empty array, where `all`
-# is true and `any` is false. The `.performance` blocks hold the cost: nothing is
+# is true and `any` is false. The `.benchmark` blocks hold the cost: nothing is
 # allocated, and the work does not grow with the part of the array past the hit.
 
 import {
@@ -42,7 +42,7 @@ fn even(x: i64) -> bool { x % 2 == 0 }
 
 fn huge(x: i64) -> bool { x > 12 }
 
-fn any_mapped(xs: i64[]) -> bool { xs.map(dbl).any(big) }.performance({
+fn any_mapped(xs: i64[]) -> bool { xs.map(dbl).any(big) }.benchmark({
     let near = [3, 1, 1, 1];
     let far = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3];
     assert(measure("hit first", near, any_mapped).allocations == 0);
@@ -52,7 +52,7 @@ fn any_mapped(xs: i64[]) -> bool { xs.map(dbl).any(big) }.performance({
     assert(stops < measure("walks to the hit", far, any_mapped).instructions);
 })
 
-fn count_filtered(xs: i64[]) -> u64 { xs.filter(big).count_if(even) }.performance({
+fn count_filtered(xs: i64[]) -> u64 { xs.filter(big).count_if(even) }.benchmark({
     let xs = [1, 7, 8, 2, 9, 10];
     assert(measure("count", xs, count_filtered).allocations == 0);
 })
@@ -60,22 +60,22 @@ fn count_filtered(xs: i64[]) -> u64 { xs.filter(big).count_if(even) }.performanc
 // The ends of a stage: `first` and `last` want one element, so the first
 // stage runs on that element alone (a `map`) or only until the answer (a
 // `filter`, whose `last` walks backwards).
-fn first_big(xs: i64[]) -> i64? { xs.filter(big).first() }.performance({
+fn first_big(xs: i64[]) -> i64? { xs.filter(big).first() }.benchmark({
     let xs = [1, 2, 9, 4, 5, 6];
     assert(measure("first of filter", xs, first_big).allocations == 0);
 })
 
-fn last_big(xs: i64[]) -> i64? { xs.filter(big).last() }.performance({
+fn last_big(xs: i64[]) -> i64? { xs.filter(big).last() }.benchmark({
     let xs = [1, 2, 9, 4, 5, 6];
     assert(measure("last of filter", xs, last_big).allocations == 0);
 })
 
-fn first_doubled(xs: i64[]) -> i64? { xs.map(dbl).first() }.performance({
+fn first_doubled(xs: i64[]) -> i64? { xs.map(dbl).first() }.benchmark({
     let xs = [1, 2, 3];
     assert(measure("first of map", xs, first_doubled).allocations == 0);
 })
 
-fn last_doubled(xs: i64[]) -> i64? { xs.map(dbl).last() }.performance({
+fn last_doubled(xs: i64[]) -> i64? { xs.map(dbl).last() }.benchmark({
     let xs = [1, 2, 3];
     assert(measure("last of map", xs, last_doubled).allocations == 0);
 })

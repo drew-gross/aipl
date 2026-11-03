@@ -1,7 +1,7 @@
 # Building a string by repeated `set s.extend(..)` on a never-aliased binding:
 # each append writes into `s`'s own storage. The result is four bytes, so it
 # never leaves the inline form and the whole function allocates *nothing* (the
-# `.performance` block on `build`) — see `concat_in_place_grows.aipl` for the same
+# `.benchmark` block on `build`) — see `concat_in_place_grows.aipl` for the same
 # loop past the 22-byte inline capacity, where the buffer is grown under itself
 # instead. Without the optimization each of the four appends builds a fresh string.
 
@@ -16,6 +16,6 @@ fn build() -> str {
     s
 }.test({
     assert(build() == "abcd");
-}).performance({
+}).benchmark({
     assert(measure("four appends", 0, |_| build()).allocations == 0);
 })

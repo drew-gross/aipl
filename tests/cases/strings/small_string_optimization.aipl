@@ -8,22 +8,36 @@
 # counters that have long read 2). Of the four operations here the literal and
 # `trim` stay inline, while the two that *build* a value allocate whatever their
 # own representation needs, short result or not — which is what the
-# `.performance` block on `main` measures: an 88-byte rope node for the template, and
+# `.benchmark` block on `main` measures: an 88-byte rope node for the template, and
 # an 18-byte buffer for `to_str`.
 
 import { equal as ==, inline_str, measure, print, to_str, trim, value_or } from builtins;
 
-fn main() !prints {
-    // `inline_str` rather than a bare `"hi"`: it names the representation the case
-    // is about, and it keeps `greeting` a run-time value, so the template below is a
-    // run-time join (two string literals would be constant-folded).
-    let greeting = inline_str("hi").value_or(""); // inline (2 bytes), no allocation
-    let banged = `{greeting}!`; // a rope node over two inline leaves
-    print(banged);
-    print(trim("  ok  ")); // repacked inline -> "ok" (2 bytes), no allocation
-    print(to_str(42)); // a fresh buffer -> "42" (2 bytes)
-    print(""); // the empty string is inline too (a blank line)
-}.performance({
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // `inline_str` rather than a bare `"hi"`: it names the representation the case
+        // is about, and it keeps `greeting` a run-time value, so the template below is a
+        // run-time join (two string literals would be constant-folded).
+        let greeting = inline_str("hi").value_or(""); // inline (2 bytes), no allocation
+        let banged = `{greeting}!`; // a rope node over two inline leaves
+        print(banged);
+        print(trim("  ok  ")); // repacked inline -> "ok" (2 bytes), no allocation
+        print(to_str(42)); // a fresh buffer -> "42" (2 bytes)
+        print(""); // the empty string is inline too (a blank line)
+    };
+    // The last line is the empty string's.
+    assert(out == "hi!\nok\n42\n\n");
+})
+
+benchmark({
     let greeting = inline_str("hi").value_or("");
     // The literal, `trim` and the empty string stay inline: nothing allocated.
     assert(measure("literal", "hi", |s| s).allocations == 0);
@@ -37,8 +51,3 @@ fn main() !prints {
     assert(measure("to_str", 42, to_str).allocations == 1);
     assert(measure("to_str bytes", 42, to_str).bytes_allocated == 18);
 })
---- stdout ---
-hi!
-ok
-42
-

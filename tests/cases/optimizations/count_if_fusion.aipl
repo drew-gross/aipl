@@ -5,7 +5,7 @@
 # All six comparisons fuse, in both operand orders. Each is checked against the
 # same comparison made on a count held in a binding, which is a plain `u64` the
 # fusion cannot see through, for every bound from zero past the number of
-# matches. The `.performance` block holds the cost: a comparison decided at the
+# matches. The `.benchmark` block holds the cost: a comparison decided at the
 # second match costs the same on two hundred matches as on a handful, and a
 # bound the count never reaches walks them all.
 
@@ -27,7 +27,7 @@ fn is_two(x: i64) -> bool { x == 2 }
 
 fn many() -> i64[] { [2].repeat(201) }
 
-fn some_matches(xs: i64[]) -> bool { xs.count_if(is_two) > 1 }.performance({
+fn some_matches(xs: i64[]) -> bool { xs.count_if(is_two) > 1 }.benchmark({
     let xs = many();
     let few = [2, 2, 1];
     // Decided at the second match: the same instructions however many follow.

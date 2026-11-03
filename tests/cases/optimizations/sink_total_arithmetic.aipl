@@ -12,7 +12,7 @@
 # abort, and arithmetic pins nothing.
 #
 # `q` is read by one arm only, so the shape is the one the pass looks for. The
-# instruction counts (the `.performance` block on `pick`) are the assertion: the
+# instruction counts (the `.benchmark` block on `pick`) are the assertion: the
 # three remainders sink into the arm, so a call that does not take it executes
 # none of them. Before, they ran on the discarded path and showed up in the count.
 #
@@ -37,7 +37,7 @@ fn scaled(n: u64, d: u64) -> u64 { ratio(n, d) + ratio(n + 1, d) + ratio(n + 2, 
 fn pick(flag: bool, d: u64) -> u64 {
     let q = scaled(10, d);
     if (flag) { q } else { 0 }
-}.performance({
+}.benchmark({
     // Not taking the arm costs the branch and nothing else...
     assert(measure("arm not taken", false, |f| pick(f, 2)).instructions == 11);
     // ...where taking it pays for the three remainders.

@@ -50,8 +50,8 @@ pub fn measured_program(program: &Program) -> Program {
     }
 }
 
-/// A program's `.performance` driver (see
-/// [`crate::codegen::build_performance_program`]) as a program that can be built
+/// A program's `.benchmark` driver (see
+/// [`crate::codegen::build_benchmark_program`]) as a program that can be built
 /// and run: its `__test_main` becomes the entry, and any `main` of the user's own
 /// steps aside for it.
 pub fn driver_as_main(driver: &Program) -> Program {
@@ -69,7 +69,7 @@ pub fn driver_as_main(driver: &Program) -> Program {
     program
 }
 
-/// What running a file's `.performance` blocks produced.
+/// What running a file's `.benchmark` blocks produced.
 pub struct TestRun {
     /// Blocks run, and how many of them failed.
     pub total: i64,
@@ -84,7 +84,7 @@ pub struct TestRun {
     pub report: String,
 }
 
-/// Run a `.performance` driver: build it instrumented, link it against the
+/// Run a `.benchmark` driver: build it instrumented, link it against the
 /// instrumented runtime, and run it once in the current directory (the caller has
 /// staged the file's companions there).
 ///
@@ -93,7 +93,7 @@ pub struct TestRun {
 /// reports its own failures — `file_label` is the batch label it qualifies each
 /// header with, empty for a single file — and its tallies come back through a file
 /// it is told to write, so the caller can fold them into its aggregate.
-pub fn run_performance_tests(
+pub fn run_benchmark_tests(
     driver: &Program,
     stem: &str,
     file_label: &str,
@@ -104,7 +104,7 @@ pub fn run_performance_tests(
         .map_err(MeasureError::Compile)?;
     let dir = binary::scratch_dir("check-perf").map_err(MeasureError::Link)?;
     let result = (|| {
-        let exe = dir.join(binary::default_exe_name(&format!("{stem}_performance")));
+        let exe = dir.join(binary::default_exe_name(&format!("{stem}_benchmark")));
         binary::link_instrumented(&object, &exe).map_err(MeasureError::Link)?;
         let tally_path = dir.join("tally.txt");
         let stats_path = dir.join("alloc_stats.txt");
@@ -113,17 +113,17 @@ pub fn run_performance_tests(
             .env("AIPL_TEST_TALLY", &tally_path)
             .env("AIPL_ALLOC_STATS", &stats_path)
             .output()
-            .map_err(|e| MeasureError::Run(format!("`.performance` run failed to start: {e}")))?;
+            .map_err(|e| MeasureError::Run(format!("`.benchmark` run failed to start: {e}")))?;
         let tally = fs::read_to_string(&tally_path).map_err(|e| {
             MeasureError::Run(format!(
-                "`.performance` run exited with {:?} before reporting its results: {e}",
+                "`.benchmark` run exited with {:?} before reporting its results: {e}",
                 output.status.code()
             ))
         })?;
         let mut counts = tally.split_whitespace().map(|n| n.parse::<i64>());
         let (Some(Ok(total)), Some(Ok(failed))) = (counts.next(), counts.next()) else {
             return Err(MeasureError::Run(format!(
-                "`.performance` run reported an unreadable tally: {tally:?}"
+                "`.benchmark` run reported an unreadable tally: {tally:?}"
             )));
         };
         // The allocation tallies the runtime writes at exit. A run that reported a

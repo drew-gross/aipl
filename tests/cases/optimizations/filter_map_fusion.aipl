@@ -25,7 +25,7 @@
 # `__filter_map*` specializations and no `__filter*`/`__map*` pair beside them. Unfused it
 # reads `__filter7`, `__map4`, `__map4$tail`, `__map9` — and one
 # `__filter_map13`, which is `spelled_out` below, the call the other two fuse
-# into. The `.performance` block on `many` holds the numbers: what the chains cost
+# into. The `.benchmark` block on `many` holds the numbers: what the chains cost
 # in allocations and instructions.
 
 import {
@@ -53,7 +53,7 @@ fn many() -> i64[] {
         set xs.push(n);
     }
     xs
-}.performance({
+}.benchmark({
     let source = measure("source alone", 0, |_| many());
 
     // A uniquely-owned source is compacted into its own buffer: the fused chain

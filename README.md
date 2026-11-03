@@ -27,11 +27,11 @@ cargo build
 `.test({ .. })` block after its body, and `check` runs them all, reports any
 file that is not in canonical format, and exits non-zero on any failure.
 
-A function can also carry a `.performance({ .. })` block, which states what the
+A function can also carry a `.benchmark({ .. })` block, which states what the
 function costs and has `check` hold it to that:
 
 ```
-fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }.performance({
+fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }.benchmark({
     let small = measure("ten elements", filled(10, 2), decided_early);
     let large = measure("ten thousand", filled(10000, 2), decided_early);
     assert(small.allocations == 0);
@@ -47,7 +47,7 @@ change did to a program.
 
 `measure(label, input, f)` runs `f(input)` once and returns a `Measurement` — its
 `allocations`, `bytes_allocated`, `peak_live_bytes` and `instructions`, all exact
-and repeatable. A performance block runs in an instrumented build (so `check`
+and repeatable. A benchmark block runs in an instrumented build (so `check`
 needs the linker `build` does), can use no effects, and is left out of anything
 `run` or `build` produces.
 

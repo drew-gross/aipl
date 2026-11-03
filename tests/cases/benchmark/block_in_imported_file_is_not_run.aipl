@@ -1,4 +1,4 @@
-# Importing a file does not run its `.performance` blocks, any more than its
+# Importing a file does not run its `.benchmark` blocks, any more than its
 # `.test` blocks: they belong to the file that holds them, and `check` runs a
 # file's own. `lib.aipl` below holds one that would fail; this file's check
 # passes because it is never run from here.
@@ -14,6 +14,6 @@ fn use_answer() -> i64 { answer() }.test({
 --- file: lib.aipl ---
 import { equal as == } from builtins;
 
-pub fn answer() -> i64 { 42 }.performance({
+pub fn answer() -> i64 { 42 }.benchmark({
     assert(answer() == 0);
 })

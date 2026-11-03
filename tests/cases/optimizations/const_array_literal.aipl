@@ -1,6 +1,6 @@
 # A constant array literal — every element a scalar literal, or no elements at
 # all — is laid out in the binary's data section, exactly as a string literal
-# is. Reading one costs no allocation: the `.performance` blocks below measure
+# is. Reading one costs no allocation: the `.benchmark` blocks below measure
 # none for `digits()`, `flags()` or `letters()` (a `char[]` literal *is* a static
 # `str`, the same object `"abc"` is).
 #
@@ -28,7 +28,7 @@ import {
     wrapping_mul as *,
 } from builtins;
 
-fn digits() -> i64[] { [0, 3, 5] }.performance({
+fn digits() -> i64[] { [0, 3, 5] }.benchmark({
     // Reading the literal costs nothing but the call.
     assert(measure("read", 0, |_| digits()).allocations == 0);
 
@@ -55,11 +55,11 @@ fn digits() -> i64[] { [0, 3, 5] }.performance({
     assert(peak_live_bytes == 80);
 })
 
-fn flags() -> bool[] { [true, false, true, true, true, true, true, true, false] }.performance({
+fn flags() -> bool[] { [true, false, true, true, true, true, true, true, false] }.benchmark({
     assert(measure("read", 0, |_| flags()).allocations == 0);
 })
 
-fn letters() -> char[] { ['a', 'b', 'c'] }.performance({
+fn letters() -> char[] { ['a', 'b', 'c'] }.benchmark({
     assert(measure("read", 0, |_| letters()).allocations == 0);
 })
 

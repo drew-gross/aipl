@@ -3,7 +3,7 @@
 # fixed) CLIF instruction count — so it reflects *executed* instructions (a
 # loop body counts once per iteration), and it's deterministic for a fixed
 # program. That determinism is what lets the count be asserted — here by the
-# `.performance` block on `triangle`.
+# `.benchmark` block on `triangle`.
 
 import {
     equal as ==,
@@ -23,7 +23,7 @@ fn triangle() -> i64 {
         set i++;
     }
     sum
-}.performance({
+}.benchmark({
     fn sum_over(digits: str) -> i64 {
         mut sum = 0;
         mut i = 1;

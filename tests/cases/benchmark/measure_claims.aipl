@@ -1,5 +1,5 @@
 # `measure(label, input, f)` runs `f(input)` once and reports what it cost, so a
-# `.performance` block can state a property of the code and have `aipl check` hold
+# `.benchmark` block can state a property of the code and have `aipl check` hold
 # it to that.
 #
 # **Claims here are exact, because the code they measure is small.** The counts
@@ -46,7 +46,7 @@ fn filled(n: i64, x: i64) -> i64[] {
         set i++;
     }
     xs
-}.performance({
+}.benchmark({
     let Measurement { allocations, bytes_allocated, peak_live_bytes, instructions } = measure(
         "build 100",
         100,
@@ -66,7 +66,7 @@ fn filled(n: i64, x: i64) -> i64[] {
 // Counting stops once the answer is settled, so it costs the same on ten elements
 // as on ten thousand. That is a comparison, so it is stated as one; the number it
 // compares is pinned too.
-fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }.performance({
+fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }.benchmark({
     let small = filled(10, 2);
     let large = filled(10000, 2);
     let at_ten = measure("ten elements", small, decided_early);
@@ -83,7 +83,7 @@ fn main() {}
 // a one-element array, a short string. The claim is the point of the section's
 // existence — that building one is free — and states it where a change to the
 // representation would break it.
-fn inline_values() {}.performance({
+fn inline_values() {}.benchmark({
     let Measurement { allocations, bytes_allocated, peak_live_bytes, instructions } = measure(
         "one element",
         1,

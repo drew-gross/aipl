@@ -1,9 +1,9 @@
-# The two rewrites that turn a function's `.test` and `.performance` attributes
+# The two rewrites that turn a function's `.test` and `.benchmark` attributes
 # into ordinary top-level functions, so that everything after the parse — the
 # loader's rewrites included, which is how they recognize test code — sees only
 # functions.
 #
-# - A `.performance({ .. })` attribute becomes `__performance$<f>`: private, no
+# - A `.benchmark({ .. })` attribute becomes `__benchmark$<f>`: private, no
 #   parameters, a unit body, and the block as its `.test` body (so `aipl check`
 #   runs it, `assert` works in it, and an imported file's is dropped, all by the
 #   machinery `.test` already has). It sits right after `f` and the helpers `f`'s
@@ -21,11 +21,11 @@
 
 import { equal as ==, get, is_empty, join, map, to_dict, value_or } from builtins;
 import { Call, Expr, Ident, Unit, at, expr, ident, map_subexprs, show_expr } from "./expr.aipl";
-import { performance_fn_name, test_helper_name } from "./fn_names.aipl";
-import { Fn, Function, Item, PerformanceBlock, Program, Signature } from "./item.aipl";
+import { benchmark_fn_name, test_helper_name } from "./fn_names.aipl";
+import { BenchmarkBlock, Fn, Function, Item, Program, Signature } from "./item.aipl";
 import { SpanStr } from "./lexer.aipl";
 
-# `program` with every `.test` helper and `.performance` block moved out to a
+# `program` with every `.test` helper and `.benchmark` block moved out to a
 # top-level function of its own.
 pub fn hoist_test_fns(self: Program) -> Program { ..self, items: self.items$hoisted_items().join() }
 
@@ -36,26 +36,26 @@ fn hoisted_items(self: Item) -> Item[] {
     }
 }
 
-# `f`, then its helpers, then the function standing for its `.performance` block
+# `f`, then its helpers, then the function standing for its `.benchmark` block
 # and that block's helpers.
 fn function_items(self: Function) -> Item[] {
-    let own = Function { ..self, performance: none }.hoisted();
-    let stand_in = self.performance
-        .map(|block| self.performance_function(block).hoisted())
+    let own = Function { ..self, benchmark: none }.hoisted();
+    let stand_in = self.benchmark
+        .map(|block| self.benchmark_function(block).hoisted())
         .value_or([]);
     [..own, ..stand_in].map(Fn)
 }
 
-# The function standing for `self`'s `.performance` block. Named at the
+# The function standing for `self`'s `.benchmark` block. Named at the
 # attribute, which is where a diagnostic about the function itself points.
-fn performance_function(self: Function, PerformanceBlock { body, fns, span }) -> Function {
-    name: SpanStr { text: performance_fn_name(self.name.text), span },
+fn benchmark_function(self: Function, BenchmarkBlock { body, fns, span }) -> Function {
+    name: SpanStr { text: benchmark_fn_name(self.name.text), span },
     is_pub: false,
     sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
     body: at(Unit, span),
     test_body: some(body),
     test_fns: fns,
-    performance: none,
+    benchmark: none,
     doc: none,
 }
 

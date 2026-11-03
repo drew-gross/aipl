@@ -5,7 +5,7 @@
 # over nothing all produce one, and each used to allocate a block to hold no
 # elements.
 #
-# The `.performance` block on `main` is the proof: **no array allocates** — `xs` is
+# The `.benchmark` block on `main` is the proof: **no array allocates** — `xs` is
 # a literal (a static block), and each zero-length slice, empty `filter` result and
 # `map` over nothing is inline. Before this, every one of them was a freshly
 # allocated block.
@@ -24,23 +24,44 @@ import {
     wrapping_add as +,
 } from builtins;
 
-fn main() !prints {
-    let xs = [1, 2, 3];
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let xs = [1, 2, 3];
 
-    // A zero-length slice of a non-empty array.
-    let mid = xs[1..1];
-    print(to_str(len(mid))); // 0
-    print(to_str(mid.is_empty())); // true
+        // A zero-length slice of a non-empty array.
+        let mid = xs[1..1];
+        print(to_str(len(mid))); // 0
+        print(to_str(mid.is_empty())); // true
 
-    // It compares and reads like any other empty array — the representation is not
-    // visible to the program, exactly as an inline `str` is not.
-    print(to_str(mid == [])); // true
-    print(to_str(!(mid == xs))); // true
+        // It compares and reads like any other empty array — the representation is not
+        // visible to the program, exactly as an inline `str` is not.
+        print(to_str(mid == [])); // true
+        print(to_str(!(mid == xs))); // true
 
-    // A slice past the end clamps to empty, and so does a backwards one.
-    print(to_str(len(xs[3..3]))); // 0
-    print(to_str(len(xs[2..1]))); // 0
-}.performance({
+        // A slice past the end clamps to empty, and so does a backwards one.
+        print(to_str(len(xs[3..3]))); // 0
+        print(to_str(len(xs[2..1]))); // 0
+    };
+    assert(out == """
+        0
+        true
+        true
+        true
+        0
+        0
+
+    """);
+})
+
+benchmark({
     let xs = [1, 2, 3];
 
     // A zero-length slice, one past the end, and a backwards one: each is an
@@ -52,10 +73,3 @@ fn main() !prints {
     assert(measure("filter over nothing", xs, |a| a[1..1].filter(|x| x > 9)).allocations == 0);
     assert(measure("map over nothing", xs, |a| a[1..1].map(|x| x + 1)).allocations == 0);
 })
---- stdout ---
-0
-true
-true
-true
-0
-0

@@ -244,7 +244,7 @@ macro_rules! count_builtin {
 ///
 /// A test hook, and the reason it exists is that nothing in the language can leak
 /// on purpose: every gate that refuses a leak (`aipl report`, the cases harness,
-/// `aipl check` on `.performance` blocks) would otherwise have no way to be shown
+/// `aipl check` on `.benchmark` blocks) would otherwise have no way to be shown
 /// still working, and a gate that quietly stops running looks exactly like a
 /// clean codebase. Instrumented build only, so nothing that ships can be affected;
 /// it changes only what is *counted*, never what is freed.
@@ -2326,7 +2326,7 @@ pub extern "C" fn aipl_measure_read(which: i64) -> i64 {
 //   - a *library* case's driver, which the cases harness builds to measure
 //     its run for the baseline table: it only needs the pass/fail tally, and failures were
 //     already diagnosed by `aipl check`, so by default nothing is printed;
-//   - a file's `.performance` blocks, which `aipl check` must run in an
+//   - a file's `.benchmark` blocks, which `aipl check` must run in an
 //     instrumented build (their counts exist nowhere else) and so cannot hand to
 //     the JIT. There the failures are the point, so `check` sets
 //     `AIPL_TEST_REPORT` and they are printed exactly as the JIT prints them.

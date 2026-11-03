@@ -43,7 +43,7 @@ pub fn is_operator_name(self: str) -> bool { self.operator_named_forms().is_none
     assert(!"+++".is_operator_name()); // three, not `++`
     assert(!"---".is_operator_name()); // three, not `--`
     assert(!"and".is_operator_name());
-}).performance({
+}).benchmark({
     // Asked of every identifier the loader sees, so it allocates nothing.
     // `operator_named_forms` builds the array of named builtins an operator is
     // imported under, and this only asks whether that array is empty: the call

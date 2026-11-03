@@ -56,7 +56,7 @@ pub fn dedent(self: str) -> str {
             "        first long line\n        second long line",
         ) == "first long line\nsecond long line",
     );
-}).performance({
+}).benchmark({
     // `dedent` is the parser's raw-string de-denter, run on every `"""` block it
     // reads, and a pipeline: `lines`, a `filter`, a `map` and a `minimum` to find
     // the indent, then a `map` and a `join` to strip it. Each stage is a pass

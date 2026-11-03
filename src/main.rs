@@ -101,7 +101,7 @@ otherwise.
 `check` with no path checks every `.aipl` file under the working directory (one
 process, so the engine links once); pass a file to check just that one, or a
 directory to check the tree under it. It also reports any file that isn't in
-canonical format, runs a function's `.performance({{ .. }})` block too (in an
+canonical format, runs a function's `.benchmark({{ .. }})` block too (in an
 instrumented build, which needs the linker `build` does), and validates the
 `--- section ---` blocks a file may end with: `errors` (the file must fail to
 compile with exactly those diagnostics, named relative to where `check` was
@@ -373,9 +373,9 @@ fn check_file(
         });
     }
     let program = loader::load_program_rooted(&staged.entry, &staged.root, dbg).map_err(render)?;
-    // A `.performance` block can be wrong in a way its types and effects do not
+    // A `.benchmark` block can be wrong in a way its types and effects do not
     // say; that is reported up front, like a type error, and nothing runs.
-    let faults = aipl::performance_diagnostics(&program);
+    let faults = aipl::benchmark_diagnostics(&program);
     if !faults.is_empty() {
         return Err(render(faults));
     }
@@ -387,18 +387,18 @@ fn check_file(
     let comp = Compilation::new(&test_program, dbg).map_err(render)?;
     let mut exit_code = comp.run_0("__test_main").map_err(|e| e.to_string())?;
 
-    // The `.performance` blocks, run apart from the tests above: they need an
+    // The `.benchmark` blocks, run apart from the tests above: they need an
     // instrumented build, which the JIT is not. Their failures print as the tests'
     // do and their tallies join the same aggregate, so a failing block fails the
     // file exactly as a failing test does — and, like one, stops nothing else.
-    if let Some(driver) = aipl::codegen::build_performance_program(&program) {
+    if let Some(driver) = aipl::codegen::build_benchmark_program(&program) {
         let stem = staged
             .entry
             .file_stem()
             .and_then(OsStr::to_str)
             .unwrap_or("a.out");
         let batch_label = aipl::codegen::test_file().unwrap_or_default();
-        match aipl::perf::run_performance_tests(&driver, stem, &batch_label, dbg) {
+        match aipl::perf::run_benchmark_tests(&driver, stem, &batch_label, dbg) {
             Ok(run) => {
                 aipl::codegen::add_failure_report(&run.report);
                 let mut failed = run.failed;
@@ -412,7 +412,7 @@ fn check_file(
                         format!("{batch_label}::")
                     };
                     aipl::codegen::add_failure_report(&format!(
-                        "test {at}performance blocks ... FAIL\n  leak: {} of {allocated} allocations were never freed ({freed} deallocations)\n",
+                        "test {at}benchmark blocks ... FAIL\n  leak: {} of {allocated} allocations were never freed ({freed} deallocations)\n",
                         allocated.abs_diff(freed)
                     ));
                     total += 1;
@@ -655,7 +655,7 @@ fn check_formatting(file: &Path, label: &str) -> bool {
 }
 
 /// `check [path...]` — JIT-run every function's `.test({ .. })` block, run its
-/// `.performance({ .. })` block in an instrumented build, and report.
+/// `.benchmark({ .. })` block in an instrumented build, and report.
 ///
 /// With no path, checks every `.aipl` file under the working directory: `aipl
 /// check` on its own is meant to be a project's whole handoff step. A path may
@@ -955,7 +955,7 @@ fn print_test_failures() {
 /// What it runs is what the cases harness measures for the baseline table: the
 /// file's `main`, or for a library with only `.test` blocks the synthesized test
 /// driver (so the report is of the same run `aipl check` makes, minus
-/// `.performance` blocks). It is built and run the way `check` stages a file —
+/// `.benchmark` blocks). It is built and run the way `check` stages a file —
 /// `--- file: ---` companions beside it, in a scratch directory the program runs
 /// in — so a program that reads fixtures or writes files neither fails nor
 /// litters.

@@ -59,7 +59,7 @@ Rules that bite:
   structs and constants, use context-typed calls (`narrow`, `to_set`), and take
   keyword and variadic parameters (`sep: U* = [], final_sep: U* = sep`, as
   `builtin_map_join.aipl` declares). Only its `pub fn` is special — it is named
-  `__builtin_<name>`. Its `.test` and `.performance` blocks run when the file
+  `__builtin_<name>`. Its `.test` and `.benchmark` blocks run when the file
   itself is checked, not in the programs that use it.
 - Prefer a **void `main`** and, in predicates, the `fn is_x(self: T) -> bool`
   method form.

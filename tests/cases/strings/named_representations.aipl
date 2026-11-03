@@ -4,7 +4,7 @@
 # `crates/aipl-codegen/src/str24.rs`): the content packed *inline* into the value's
 # own words, a refcounted *buffer*, or a *rope* node joining two values lazily.
 #
-# The `.performance` block on `round_trips` is the proof: `heap_str` allocates its
+# The `.benchmark` block on `round_trips` is the proof: `heap_str` allocates its
 # buffer and `rope_str` allocates its node, while `inline_str` allocates nothing,
 # because an inline value has nowhere to allocate. Every argument is a short
 # literal, which arrives *inline* already — so neither allocation would happen if
@@ -20,7 +20,7 @@ fn main() !prints {
 
 # Content survives every conversion, in both directions — the representation is
 # the only thing that changes.
-fn round_trips(s: str) -> bool { heap_str(s) == s }.performance({
+fn round_trips(s: str) -> bool { heap_str(s) == s }.benchmark({
     // A buffer for the content: one allocation, and `heap_str` makes it even
     // where "hi" would have fit inline.
     assert(measure("heap_str", "hi", heap_str).allocations == 1);

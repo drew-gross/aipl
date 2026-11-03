@@ -10,6 +10,7 @@
 import { collect_arms, equal as ==, map } from builtins;
 import { Call, Expr, Ident, at, map_subexprs, subexprs } from "./expr.aipl";
 import {
+    BenchmarkBlock,
     CaseParam,
     Const,
     ConstDecl,
@@ -18,7 +19,6 @@ import {
     Function,
     Item,
     Param,
-    PerformanceBlock,
     Program,
     Signature,
     Struct,
@@ -73,7 +73,7 @@ fn sourced_case(self: VariantCase, text: str) -> VariantCase {
     payload: self.payload.map(|slot| CaseParam { ..slot, default: slot.default$sourced(text) }),
 }
 
-# A function, with its `.test` block and `.performance` block and the helpers
+# A function, with its `.test` block and `.benchmark` block and the helpers
 # declared in either.
 fn sourced_function(self: Function, text: str) -> Function {
     ..self,
@@ -84,7 +84,7 @@ fn sourced_function(self: Function, text: str) -> Function {
     body: self.body.sourced(text),
     test_body: self.test_body$sourced(text),
     test_fns: self.test_fns$sourced_function(text),
-    performance: self.performance.map(|block| PerformanceBlock {
+    benchmark: self.benchmark.map(|block| BenchmarkBlock {
         ..block,
         body: block.body.sourced(text),
         fns: block.fns$sourced_function(text),

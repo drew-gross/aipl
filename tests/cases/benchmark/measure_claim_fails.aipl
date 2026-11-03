@@ -1,5 +1,5 @@
-# A `.performance` claim that does not hold is a failing check, reported under the
-# function it is attached to followed by `.performance`, with the location of the
+# A `.benchmark` claim that does not hold is a failing check, reported under the
+# function it is attached to followed by `.benchmark`, with the location of the
 # assertion — the same shape a failing `.test` has. The claim here is false: the
 # closure builds an array, so it allocates.
 
@@ -17,13 +17,13 @@ fn filled(n: i64) -> i64[] {
 
 fn main() {}
 
-fn building() {}.performance({
+fn building() {}.benchmark({
     assert(measure("build", 10, filled).allocations == 0);
 })
 --- check ---
 test failures:
-test building.performance ... FAIL
-  assert failed at tests/cases/performance/measure_claim_fails.aipl:21 measure("build", 10, filled).allocations == 0
+test building.benchmark ... FAIL
+  assert failed at tests/cases/benchmark/measure_claim_fails.aipl:21 measure("build", 10, filled).allocations == 0
 1 tests: 0 passed, 1 failed
 --- check exit code ---
 1

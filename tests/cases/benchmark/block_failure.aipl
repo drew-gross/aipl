@@ -1,0 +1,22 @@
+# A failing `.benchmark` block is a failing check, reported under the name of
+# the function it is attached to followed by `.benchmark`, so it reads as the
+# attribute it is. The `.test` block on the same function passes and stays silent.
+
+import { equal as == } from builtins;
+
+fn answer() -> i64 { 41 }.test({
+    assert(answer() == 41);
+}).benchmark({
+    assert(answer() == 42);
+})
+
+fn main() {}
+--- check ---
+/Users/drewgross/Projects/aipl/tests/cases/benchmark/block_failure.aipl:
+    answer: 1 assertion passed
+test failures:
+test answer.benchmark ... FAIL
+  assert failed at tests/cases/benchmark/block_failure.aipl:10 answer() == 42
+2 tests: 1 passed, 1 failed
+--- check exit code ---
+1

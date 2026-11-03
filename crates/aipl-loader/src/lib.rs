@@ -394,7 +394,7 @@ impl Loader {
     /// after the checker introduce without any file naming them.
     ///
     /// A builtin file is the program's own only when it is the root, checked
-    /// by `aipl check`: then its `.test` and `.performance` blocks run. Loaded
+    /// by `aipl check`: then its `.test` and `.benchmark` blocks run. Loaded
     /// for another program, those are dropped, as they are not that program's
     /// to run.
     fn load_builtins(&mut self, root: &Path) -> Result<(), Vec<Error>> {
@@ -953,11 +953,11 @@ fn syntax_builtins(items: &[Item]) -> Vec<Callee> {
 }
 
 /// `item` with its `.test` block and the functions declared in it dropped, and
-/// `None` for the function a `.performance` block stands as — what a file
+/// `None` for the function a `.benchmark` block stands as — what a file
 /// keeps when it is loaded for a program that is not its own.
 fn without_tests(item: Item) -> Option<Item> {
     match item {
-        Item::Fn(f) if aipl_syntax::performance_source_name(&f.name).is_some() => None,
+        Item::Fn(f) if aipl_syntax::benchmark_source_name(&f.name).is_some() => None,
         Item::Fn(mut f) => {
             f.test_body = None;
             f.test_fns = Vec::new();

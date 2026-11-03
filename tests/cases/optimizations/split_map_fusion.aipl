@@ -16,7 +16,7 @@
 # spends the split's own block on the result, so what goes is the retain per
 # part and the second block where the mapped type is not `str`-sized. The pass
 # shows up more in the work than the allocation: 2,359 instructions become
-# 1,929, and the binary 10,640 bytes become 8,760. The `.performance` block on
+# 1,929, and the binary 10,640 bytes become 8,760. The `.benchmark` block on
 # `widths` states the result as a comparison: the chain costs exactly what the
 # hand-written `split_map` call does.
 
@@ -34,7 +34,7 @@ fn tagged_lines(src: str) -> str {
 }
 
 // Fused, spelled directly, mapping to a type other than `str`.
-fn widths(s: str, sep: str) -> u64[] { s.split(sep)$len() }.performance({
+fn widths(s: str, sep: str) -> u64[] { s.split(sep)$len() }.benchmark({
     let chain = measure("split then map", "aa--b--cccc", |s| widths(s, "--"));
     let by_hand = measure("split_map", "aa--b--cccc", |s| s.split_map("--", len));
     assert(chain.allocations == by_hand.allocations);

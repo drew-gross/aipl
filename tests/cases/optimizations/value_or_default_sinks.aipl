@@ -6,14 +6,14 @@
 # — which is exactly the shape the sinking pass moves into that arm.
 #
 # So the two calls below build one string between them, not two. The allocations
-# (the `.performance` block on `text`) are the assertion: the call whose optional
+# (the `.benchmark` block on `text`) are the assertion: the call whose optional
 # is present builds no default at all.
 
 import { equal as ==, len, measure, print, to_str, value_or } from builtins;
 
 fn fallback(n: u64) -> str { `fallback {n} padded out well past the inline limit` }
 
-fn text(o: str?, n: u64) -> u64 { o.value_or(fallback(n)).len() }.performance({
+fn text(o: str?, n: u64) -> u64 { o.value_or(fallback(n)).len() }.benchmark({
     assert(measure("present", some("found"), |o| text(o, 1)).allocations == 0);
     // The default is built when it is needed: three allocations to render it.
     let nothing: str? = none;

@@ -11,7 +11,7 @@
 # become 22,716 and 3,638 bytes allocated become 1,998. The `--- report ---`
 # is the readable evidence: three chains, but one `aipl_array_with_cap` — the
 # unfused chain's array in `first_big_twice` — and no `__map*` beside the two
-# `__builtin_map_find_if*` specializations. The `.performance` block on `first_big`
+# `__builtin_map_find_if*` specializations. The `.benchmark` block on `first_big`
 # holds the cost.
 
 import {
@@ -40,7 +40,7 @@ fn stepped(x: i64) -> i64 { x * 10 }
 fn is_big(y: i64) -> bool { 5 < y }
 
 // Fused: `stepped` runs on the first two elements only.
-fn first_big(xs: i64[]) -> i64? { xs.map(stepped).find_if(is_big) }.performance({
+fn first_big(xs: i64[]) -> i64? { xs.map(stepped).find_if(is_big) }.benchmark({
     let xs = many();
     let short = [0, 1, 2, 3];
 

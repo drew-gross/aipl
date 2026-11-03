@@ -253,7 +253,7 @@ fn builtin_locals(self: Import(ImportDecl { names, source }), name: str) -> str[
 # bodies to look at.
 #
 # Every body that is code to check is a function here: each function, the `.test`
-# block it carries, the `.performance` block it carries, and the helpers declared
+# block it carries, the `.benchmark` block it carries, and the helpers declared
 # in a `.test` block. A block is checked as a function of its own when tests run, so
 # it is handed over as one — no parameters, no return type, the block as its body.
 pub fn on_functions(self: Program, lint: (Function) -> LintHit[]) -> LintHit[] {
@@ -265,14 +265,14 @@ pub fn on_functions(self: Program, lint: (Function) -> LintHit[]) -> LintHit[] {
         |function| { [hit(function.name.text, 0..1)] },
     )? == ["f", "g"]);
 
-    // A `.test` block, a `.performance` block and the helpers declared in a block
+    // A `.test` block, a `.benchmark` block and the helpers declared in a block
     // are each another body of the function that carries them.
     assert(lint_function_messages(
         "fn f() { }.test({ g(); })",
         |function| { [hit(function.name.text, 0..1)] },
     )? == ["f", "f"]);
     assert(lint_function_messages(
-        "fn f() { }.performance({ g(); })",
+        "fn f() { }.benchmark({ g(); })",
         |function| { [hit(function.name.text, 0..1)] },
     )? == ["f", "f"]);
     assert(lint_function_messages(
@@ -321,8 +321,8 @@ fn declared(self: Fn(function)) -> Function { function }
 # `self`, and a function standing for each other body it holds.
 fn bodies(self: Function) -> Function[] {
     let test = self.test_body.map(|body| [self.standing_in(body)]).value_or([]);
-    let performance = self.performance.map(|block| [self.standing_in(block.body)]).value_or([]);
-    [self, ..test, ..performance, ..self.test_fns]
+    let benchmark = self.benchmark.map(|block| [self.standing_in(block.body)]).value_or([]);
+    [self, ..test, ..benchmark, ..self.test_fns]
 }
 
 # `self`, with `body` as its whole body: what a block is when it is checked. A block
@@ -335,7 +335,7 @@ fn standing_in(self: Function, body: Expr) -> Function {
     shorthand_body: false,
     test_body: none,
     test_fns: [],
-    performance: none,
+    benchmark: none,
 }
 
 # What the function lint `lint` reports for the program `src` parses to.

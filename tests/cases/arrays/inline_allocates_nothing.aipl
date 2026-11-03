@@ -7,7 +7,7 @@
 # An array becomes inline wherever it is built small: a literal whose elements
 # are not all constants (a constant one is a static block, already free), a
 # `push` onto an empty array, and a `map` or `filter` over an inline input,
-# which writes its result into the same bytes. The `.performance` block on `ones`
+# which writes its result into the same bytes. The `.benchmark` block on `ones`
 # is the proof: each of those allocates nothing, up to the capacity and one past it
 # exactly once. (`main` returns its answer as the exit code because rendering an
 # array would allocate a buffer.)
@@ -32,7 +32,7 @@ fn ones(n: u64) -> i64[] {
         set out.push(1);
     }
     out
-}.performance({
+}.benchmark({
     let two: u64 = 2;
     let three: u64 = 3;
     // The most an `i64[]` holds inline is two; a third needs a block.

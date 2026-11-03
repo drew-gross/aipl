@@ -4,7 +4,7 @@
 # arguments (`move_last_use`), and what this case pins is that every one of
 # the shapes below still computes the right answer, and that the borrows that
 # must survive — an alias, a later read, a use inside a loop — do. The moves
-# themselves are invisible except in the counts, which the `.performance` block
+# themselves are invisible except in the counts, which the `.benchmark` block
 # on `merge` states: a binding at its last use costs exactly what a fresh
 # temporary does, and one read again afterwards costs the callee a copy.
 
@@ -52,7 +52,7 @@ fn merge(a: i64[], b: i64[]) -> i64[] {
     set ys.push(0);
     set xs.extend(ys);
     xs
-}.performance({
+}.benchmark({
     // Handed over at its last use, a binding costs exactly what a fresh value
     // does: the same allocations and the same instructions, no retain and no
     // release. Read again afterwards it stays a borrow, and the callee has to copy

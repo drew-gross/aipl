@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/fn_names.aipl</code></h1>
 
-      <div class="module-doc"><p>The names the parser gives functions it synthesizes from a declaration's attributes, and the inverse: what a function's name says it is.</p><p>A <code>.test({ .. })</code> block on <code>f</code> becomes the function <code>__test$f</code>; a function declared inside that block is hoisted to <code>__test$f$helper</code>; a <code>.performance({ .. })</code> block on <code>f</code> becomes <code>__performance$f</code>, whose own <code>.test</code> body is the block. A <code>$</code> cannot appear in a source name, so no program can spell any of them, and a <code>$</code> past the prefix is the mark of something synthesized from a body rather than the body itself — a lambda lifted out of a test body is <code>__test$f$lambda0</code>, and its <code>?</code> acts on the lambda's own return type.</p><p>Rust asks the questions of this file through the FFI (<code>fn_role</code>, <code>test_fn_name</code>, <code>performance_fn_name</code>); <code>test_helper_name</code> is only asked by the pass that hoists helpers, which is AIPL too.</p></div>
+      <div class="module-doc"><p>The names the parser gives functions it synthesizes from a declaration's attributes, and the inverse: what a function's name says it is.</p><p>A <code>.test({ .. })</code> block on <code>f</code> becomes the function <code>__test$f</code>; a function declared inside that block is hoisted to <code>__test$f$helper</code>; a <code>.benchmark({ .. })</code> block on <code>f</code> becomes <code>__benchmark$f</code>, whose own <code>.test</code> body is the block. A <code>$</code> cannot appear in a source name, so no program can spell any of them, and a <code>$</code> past the prefix is the mark of something synthesized from a body rather than the body itself — a lambda lifted out of a test body is <code>__test$f$lambda0</code>, and its <code>?</code> acts on the lambda's own return type.</p><p>Rust asks the questions of this file through the FFI (<code>fn_role</code>, <code>test_fn_name</code>, <code>benchmark_fn_name</code>); <code>test_helper_name</code> is only asked by the pass that hoists helpers, which is AIPL too.</p></div>
 
 
 
@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>variant FnRole</code></pre>
 
-          <div class="doc"><p>What a function's name says it is. A source name is <code>Plain</code>.</p><ul><li><code>TestBody</code>: exactly a <code>.test</code> body (<code>__test$f</code>, or <code>__test$__performance$f</code></li></ul><p>for a <code>.performance</code> block).</p><ul><li><code>TestHelper(helper)</code>: a function hoisted out of a <code>.test</code> block, with the</li></ul><p>name it was declared with.</p><ul><li><code>Performance(source)</code>: the function standing for <code>source</code>'s <code>.performance</code></li></ul><p>block.</p></div>
+          <div class="doc"><p>What a function's name says it is. A source name is <code>Plain</code>.</p><ul><li><code>TestBody</code>: exactly a <code>.test</code> body (<code>__test$f</code>, or <code>__test$__benchmark$f</code></li></ul><p>for a <code>.benchmark</code> block).</p><ul><li><code>TestHelper(helper)</code>: a function hoisted out of a <code>.test</code> block, with the</li></ul><p>name it was declared with.</p><ul><li><code>Benchmark(source)</code>: the function standing for <code>source</code>'s <code>.benchmark</code></li></ul><p>block.</p></div>
 
 
           <ul class="cases">
@@ -49,7 +49,7 @@
 
             </li>
 
-            <li id="item-Performance"><code>Performance(source: str)</code>
+            <li id="item-Benchmark"><code>Benchmark(source: str)</code>
 
 
             </li>
@@ -74,14 +74,14 @@
 
 
 
-        <section class="item" id="item-performance_fn_name">
+        <section class="item" id="item-benchmark_fn_name">
           <h3>
-            <a class="anchor" href="#item-performance_fn_name">performance_fn_name</a>
+            <a class="anchor" href="#item-benchmark_fn_name">benchmark_fn_name</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn performance_fn_name(f: str) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn benchmark_fn_name(f: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>The name of the function standing for <code>f</code>'s <code>.performance</code> block.</p></div>
+          <div class="doc"><p>The name of the function standing for <code>f</code>'s <code>.benchmark</code> block.</p></div>
 
 
         </section>
@@ -96,6 +96,34 @@
           <pre class="signature"><code>pub fn unattached_test_name(ordinal: u64) -&#62; str</code></pre>
 
           <div class="doc"><p>The name of the function standing for a top-level <code>test({ .. })</code> block, which is attached to no function. <code>ordinal</code> counts the file's such blocks from 1, so the name does not move when anything else in the file does (a pinned <code>aipl report</code> lists it). The name is a plain function's, and its own <code>.test</code> body is the block, so the block reaches everything downstream as the test code of a function nobody calls.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-unattached_benchmark_name">
+          <h3>
+            <a class="anchor" href="#item-unattached_benchmark_name">unattached_benchmark_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn unattached_benchmark_name(ordinal: u64) -&#62; str</code></pre>
+
+          <div class="doc"><p>The name of the function standing for a top-level <code>benchmark({ .. })</code> block: a plain function with an empty body that carries the block as its <code>.benchmark</code>, numbered like <code>unattached_test_name</code>'s.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_unattached_benchmark">
+          <h3>
+            <a class="anchor" href="#item-is_unattached_benchmark">is_unattached_benchmark</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn is_unattached_benchmark(self: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> is a name <code>unattached_benchmark_name</code> made.</p></div>
 
 
         </section>
@@ -165,12 +193,12 @@
 
 
 
-        <section class="item" id="item-PERFORMANCE_PREFIX">
+        <section class="item" id="item-BENCHMARK_PREFIX">
           <h3>
-            <a class="anchor" href="#item-PERFORMANCE_PREFIX">PERFORMANCE_PREFIX</a>
+            <a class="anchor" href="#item-BENCHMARK_PREFIX">BENCHMARK_PREFIX</a>
             <span class="kind kind-const">let</span>
           </h3>
-          <pre class="signature"><code>let PERFORMANCE_PREFIX = &#34;__performance$&#34;</code></pre>
+          <pre class="signature"><code>let BENCHMARK_PREFIX = &#34;__benchmark$&#34;</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -185,6 +213,20 @@
             <span class="kind kind-const">let</span>
           </h3>
           <pre class="signature"><code>let UNATTACHED_TEST_PREFIX = &#34;__test_block_&#34;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-UNATTACHED_BENCHMARK_PREFIX">
+          <h3>
+            <a class="anchor" href="#item-UNATTACHED_BENCHMARK_PREFIX">UNATTACHED_BENCHMARK_PREFIX</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let UNATTACHED_BENCHMARK_PREFIX = &#34;__benchmark_block_&#34;</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -214,7 +256,7 @@
           </h3>
           <pre class="signature"><code>fn split_test_owner(rest: str) -&#62; (str, str)?</code></pre>
 
-          <div class="doc"><p>What follows <code>__test$</code>, split into the function the test belongs to and whatever was synthesized under it (empty for the body itself, <code>$&lt;..&gt;</code> for anything else). The owner is <code>&lt;f&gt;</code>, or <code>__performance$&lt;f&gt;</code> for a <code>.performance</code> block; one with no name is no owner.</p></div>
+          <div class="doc"><p>What follows <code>__test$</code>, split into the function the test belongs to and whatever was synthesized under it (empty for the body itself, <code>$&lt;..&gt;</code> for anything else). The owner is <code>&lt;f&gt;</code>, or <code>__benchmark$&lt;f&gt;</code> for a <code>.benchmark</code> block; one with no name is no owner.</p></div>
 
 
         </section>

@@ -1,4 +1,4 @@
-# `.performance({ .. })` is a second function attribute, written where `.test`
+# `.benchmark({ .. })` is a second function attribute, written where `.test`
 # is. For now it behaves exactly like `.test`: `aipl check` runs the block, its
 # `assert`s count, and the functions declared inside it are private to it. (What
 # makes it more than a test — measuring, and being left out of production — comes
@@ -8,13 +8,13 @@ import { equal as ==, wrapping_add as + } from builtins;
 
 fn double(x: i64) -> i64 { x + x }.test({
     assert(double(2) == 4);
-}).performance({
+}).benchmark({
     fn expected(x: i64) -> i64 { x + x }
     assert(double(3) == expected(3));
 })
 
-// In the other order, with nothing but the performance block.
-fn triple(x: i64) -> i64 { x + x + x }.performance({
+// In the other order, with nothing but the benchmark block.
+fn triple(x: i64) -> i64 { x + x + x }.benchmark({
     assert(triple(2) == 6);
 }).test({
     assert(triple(1) == 3);

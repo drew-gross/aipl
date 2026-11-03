@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">196 files, 1789 items.</p>
+      <p class="summary">196 files, 1793 items.</p>
 
       <ul class="files">
 
@@ -709,7 +709,7 @@
           <p class="file-summary">The names the parser gives functions it synthesizes from a declaration's attributes, and the inverse: what a function's name says it is.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-fn_names.html#private">8 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-fn_names.html#private">9 private</a></span>
 
 
           <ul class="items">
@@ -725,12 +725,22 @@
             </li>
 
             <li>
-              <a href="crates-aipl-codegen-src-fn_names.html#item-performance_fn_name"><code>performance_fn_name</code></a>
+              <a href="crates-aipl-codegen-src-fn_names.html#item-benchmark_fn_name"><code>benchmark_fn_name</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
             <li>
               <a href="crates-aipl-codegen-src-fn_names.html#item-unattached_test_name"><code>unattached_test_name</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-fn_names.html#item-unattached_benchmark_name"><code>unattached_benchmark_name</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-fn_names.html#item-is_unattached_benchmark"><code>is_unattached_benchmark</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -929,7 +939,7 @@
           <p class="file-summary">AIPL's own syntax, as a <code>Grammar</code> value — the third and largest consumer of the parser library, and the one the whole thing was built for. It is the only description of the language there is: every compile runs this grammar over <code>lex_aipl.aipl</code>'s token stream, the compiler's own sources included.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">205 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">206 private</a></span>
 
 
           <ul class="items">
@@ -1336,7 +1346,7 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-hoist_test_fns.html">crates/aipl-codegen/src/hoist_test_fns.aipl</a>
 
-          <p class="file-summary">The two rewrites that turn a function's <code>.test</code> and <code>.performance</code> attributes into ordinary top-level functions, so that everything after the parse — the loader's rewrites included, which is how they recognize test code — sees only functions.</p>
+          <p class="file-summary">The two rewrites that turn a function's <code>.test</code> and <code>.benchmark</code> attributes into ordinary top-level functions, so that everything after the parse — the loader's rewrites included, which is how they recognize test code — sees only functions.</p>
 
 
           <span class="private-count"><a href="crates-aipl-codegen-src-hoist_test_fns.html#private">6 private</a></span>
@@ -1475,7 +1485,7 @@
             </li>
 
             <li>
-              <a href="crates-aipl-codegen-src-item.html#item-PerformanceBlock"><code>PerformanceBlock</code></a>
+              <a href="crates-aipl-codegen-src-item.html#item-BenchmarkBlock"><code>BenchmarkBlock</code></a>
               <span class="kind kind-struct">struct</span>
             </li>
 

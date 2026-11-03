@@ -24,7 +24,7 @@
 # receivers at once. Drop any one of the three and the fold compiled correctly
 # while never reaching the path.
 #
-# What the fold saves is the array between `f` and the receiver. The `.performance`
+# What the fold saves is the array between `f` and the receiver. The `.benchmark`
 # block on `appended` measures it: the same row costs what the `match` it is
 # rewritten to costs. `f` returns three elements because two fit in an inline array,
 # which allocates nothing, and there would be no array to save.
@@ -117,7 +117,7 @@ fn appended(v: i64[], o: i64?) -> i64[] {
     mut out = v;
     set out.extend(o.map(twin).value_or([]));
     out
-}.performance({
+}.benchmark({
     // What the fold rewrites it to, written out.
     let folded = measure("folded", roomy(), |v| appended(v, some(3)));
     let by_hand = measure("by hand", roomy(), |v| matched(v, some(3)));

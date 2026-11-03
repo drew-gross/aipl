@@ -1,5 +1,5 @@
 # An array of a narrow integer packs each element at its own width: a `u8[]` is
-# a byte per element, an `i16[]` two, an `i32[]` four. The `.performance` block on
+# a byte per element, an `i16[]` two, an `i32[]` four. The `.benchmark` block on
 # `bytes` is the proof — it grows a `u8[]` to a thousand elements, whose peak is
 # about a thousand bytes, where a word apiece would be eight thousand.
 #
@@ -36,7 +36,7 @@ fn bytes(n: u64) -> u8[] {
         set out.push(7);
     }
     out
-}.performance({
+}.benchmark({
     let n: u64 = 1000;
 
     // One allocation that grows in place to 1,488 bytes: a thousand elements and

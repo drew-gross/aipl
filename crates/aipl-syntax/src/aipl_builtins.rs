@@ -5,7 +5,7 @@
 //! Most builtins stay codegen-generated because the generated IR beats what
 //! compiled AIPL would produce; when it wouldn't, the implementation belongs in
 //! real AIPL source, where it doubles as documentation and carries its own
-//! `.test` and `.performance` blocks (see `builtin_all.aipl`).
+//! `.test` and `.benchmark` blocks (see `builtin_all.aipl`).
 //!
 //! Such a source is an ordinary AIPL file. The loader loads it as one more file
 //! of any program that reaches it — by importing it, or through [`companions`]
@@ -14,7 +14,7 @@
 //! constants. The one difference is its `pub fn`: written under the builtin's
 //! user-facing spelling, so the file's tests read like user code, it is named
 //! by the builtin's canonical `__builtin_*` name, which every call to the
-//! builtin already carries. Its `.test` and `.performance` blocks run when the
+//! builtin already carries. Its `.test` and `.benchmark` blocks run when the
 //! file itself is checked (`aipl check`), not in every program that uses it.
 
 use std::collections::HashSet;

@@ -2,7 +2,7 @@
 # literal, or a call result like `xs.map(..)`), it filters in place: kept
 # elements are compacted toward the front of the same allocation and the
 # filtered-out ones are dropped, so no separate output array is allocated. The
-# `.performance` block on `keep_gt3` is the measurement: a filter over a fresh
+# `.benchmark` block on `keep_gt3` is the measurement: a filter over a fresh
 # array allocates exactly what the array itself did, whatever it keeps.
 
 import {
@@ -32,7 +32,7 @@ fn keep_gt3(xs: i64[]) -> i64[] { xs.filter(|x| x > 3) }.test({
 
     // Chained: `map` allocates a fresh array, `filter` consumes it in place.
     assert([1, 2, 3, 4].map(|x| x * 10).filter(|x| x > 15) == [20, 30, 40]);
-}).performance({
+}).benchmark({
     let Measurement { allocations, bytes_allocated } = measure(
         "the array alone",
         1,

@@ -6,7 +6,7 @@
 # So the only heap here is the rope nodes: the `--- report ---` below shows
 # `allocations` at 4, one per `rope_str` below (one for `greeting`, three for the
 # nested rope), with nothing flattened. (It is a report rather than a
-# `.performance` block because printing is an effect, which a block cannot use.)
+# `.benchmark` block because printing is an effect, which a block cannot use.)
 # A nested rope streams its sub-ropes the same way.
 
 import { print, rope_str } from builtins;

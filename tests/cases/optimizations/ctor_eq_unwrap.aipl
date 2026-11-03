@@ -9,7 +9,7 @@
 # on `x` that compares payloads directly, which is what the comparison did
 # anyway, minus the value it had to be handed.
 #
-# The `.performance` block on `is_long` is the assertion for the heap case below:
+# The `.benchmark` block on `is_long` is the assertion for the heap case below:
 # without the rewrite, building `some("a string long past the inline limit")` to
 # throw it away would be an allocation, and the comparison makes none.
 
@@ -28,7 +28,7 @@ fn failed_with(r: i64!str, m: str) -> bool { r == err(m) }
 // A heap payload, where the construction also cost a retain.
 fn long() -> str { "a string long past the inline limit, so it lives on the heap" }
 
-fn is_long(x: str?) -> bool { x == some(long()) }.performance({
+fn is_long(x: str?) -> bool { x == some(long()) }.benchmark({
     // `long()` is still called — it is the comparison's operand — but nothing is
     // built to hold its result, whether the comparison hits or misses.
     let nothing: str? = none;

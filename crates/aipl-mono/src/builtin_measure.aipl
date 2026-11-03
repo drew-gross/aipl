@@ -14,7 +14,7 @@
 # altogether, and a measurement of nothing is not a measurement.
 #
 # All of them carry the internal `!measure` effect, and so does this function.
-# That is the whole of why it can only be called from a `.performance` block: the
+# That is the whole of why it can only be called from a `.benchmark` block: the
 # block declares `!measure` and nothing else, and no other function can.
 #
 # **No lint.** Nothing is being reimplemented: there is no longhand to match.
@@ -50,7 +50,7 @@ import {
 #
 # The `input` is built outside the window and handed in so that building it is
 # not what is measured, and `f` is called with it exactly once. Callable only in a
-# `.performance` block.
+# `.benchmark` block.
 pub fn measure<T: any, R: any>(label: str, input: T, f: (T) -> R) !measure -> Measurement {
     measure_begin();
     measure_consume(f(input));
@@ -68,7 +68,7 @@ pub fn measure<T: any, R: any>(label: str, input: T, f: (T) -> R) !measure -> Me
     assert(m.bytes_allocated == 2);
     assert(m.peak_live_bytes == 3);
     assert(m.instructions == 4);
-}).performance({
+}).benchmark({
     // A closure that allocates nothing costs no allocations and no memory.
     let Measurement { allocations, bytes_allocated, peak_live_bytes, instructions } = measure(
         "nothing",

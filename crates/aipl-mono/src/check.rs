@@ -167,16 +167,16 @@ pub(crate) const TUPLE_TEMPLATE: &str = "__tuple";
 ///
 /// Two cases are not the general discipline but a consequence of what `!measure`
 /// is. The effect is internal, declared by `measure` and nothing a program can
-/// reach except from a `.performance` block, whose synthesized function declares
+/// reach except from a `.benchmark` block, whose synthesized function declares
 /// it *and no other effect*. So a missing `!measure` means a call to `measure`
-/// from anywhere else, and a caller that has `!measure` is a `.performance`
+/// from anywhere else, and a caller that has `!measure` is a `.benchmark`
 /// block that reached for an effect — which is not supported there yet.
 fn undeclared_effect_message(callee: &str, effect: &str, caller_effects: &[String]) -> String {
     if effect == "measure" {
-        format!("fn {callee:?} can only be called from a `.performance` block")
+        format!("fn {callee:?} can only be called from a `.benchmark` block")
     } else if caller_effects.iter().any(|e| e == "measure") {
         format!(
-            "effects are not supported in a `.performance` block yet: fn {callee:?} has effect \"!{effect}\""
+            "effects are not supported in a `.benchmark` block yet: fn {callee:?} has effect \"!{effect}\""
         )
     } else {
         format!(

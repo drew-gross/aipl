@@ -5,7 +5,7 @@
 # means both are 8-byte (scalars, `str`, arrays), so `T` and `U` may DIFFER;
 # the per-slot element drop-fn is patched from `T`'s to `U`'s as it goes.
 #
-# The `.performance` block on `doubled` is the measurement: a map over a fresh
+# The `.benchmark` block on `doubled` is the measurement: a map over a fresh
 # array allocates exactly what the array itself did, nothing for the result.
 
 import {
@@ -43,7 +43,7 @@ fn doubled(xs: i64[]) -> i64[] { xs.map(|x| x * 2) }.test({
     // can't reuse the 8-byte-per-element `str` buffer. Built fresh via the
     // copying path; still correct, just not in-place.
     assert(["a", "bb", "a"].map(|s| s == "a") == [true, false, true]);
-}).performance({
+}).benchmark({
     // The fresh array, built from a run-time value so it is a heap block rather than
     // a constant, and costing what it costs before anything is mapped over it.
     let Measurement { allocations, bytes_allocated } = measure(

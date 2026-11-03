@@ -5,7 +5,7 @@
 #
 # Each result is compared with the same chain through a binding that is used
 # twice, which keeps the intermediate array alive and so the chain unfused. The
-# `.performance` block holds the cost: nothing is allocated, and a hit at the
+# `.benchmark` block holds the cost: nothing is allocated, and a hit at the
 # front costs less than a hit at the back.
 
 import {
@@ -26,7 +26,7 @@ fn dbl(x: i64) -> i64 { x * 2 }
 
 fn big(x: i64) -> bool { x > 5 }
 
-fn has_big(xs: i64[]) -> bool { xs.filter(big).is_nonempty() }.performance({
+fn has_big(xs: i64[]) -> bool { xs.filter(big).is_nonempty() }.benchmark({
     let near = [9, 1, 1, 1];
     let far = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 9];
     let first = measure("hit first", near, has_big);

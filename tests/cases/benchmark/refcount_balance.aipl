@@ -1,18 +1,31 @@
 # A refcount-correct program frees everything it allocates, which the leak gate
-# holds every running case to (allocations == deallocations). The `.performance`
+# holds every running case to (allocations == deallocations). The `.benchmark`
 # block pins the other half: how many allocations the program makes at all, so a
 # regression in the refcount protocol that adds one (an extra copy, a retained
 # temporary) shows up as a changed count.
 
 import { Measurement, equal as ==, len, measure, print, push, to_str } from builtins;
 
-fn main() !prints {
-    mut xs = [];
-    set xs.push(1);
-    set xs.push(2);
-    set xs.push(3);
-    print(to_str(xs));
-}.performance({
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        mut xs = [];
+        set xs.push(1);
+        set xs.push(2);
+        set xs.push(3);
+        print(to_str(xs));
+    };
+    assert(out == "[1, 2, 3]\n");
+})
+
+benchmark({
     // Three pushes onto an empty array are one allocation that grows in place...
     let Measurement { allocations, bytes_allocated, peak_live_bytes } = measure(
         "three pushes",
@@ -31,5 +44,3 @@ fn main() !prints {
     // ...and rendering them is one more buffer.
     assert(measure("rendered", 0, |_| to_str([1, 2, 3])).allocations == 1);
 })
---- stdout ---
-[1, 2, 3]

@@ -19,7 +19,7 @@ pub fn f<T: any>(self: T[], n: i64 = 0, sep: str* = []) !prints -> T? { .. }.tes
 struct P { x: i64, y: i64 = 0 }
 variant Shape = Circle(r: i64) | Square(i64) | Empty
 ```
-- Unused imports are errors. `.test`/`.performance` blocks follow the body; helper `fn`s inside a block come first.
+- Unused imports are errors. `.test`/`.benchmark` blocks follow the body; helper `fn`s inside a block come first.
 - Bounds: `any`, `ord`, `variant`. First param named `self` makes `x.f(y)` ≡ `f(x, y)`. Predicates: `fn is_x(self: T) -> bool`.
 - Param/let destructuring: `fn f(P { x, y as b })`, `let (a, b) = t;`, `let Circle(r) = s else { return none; };`.
 - `fn main() { .. }` void; effects (`!prints`, `!read_files`, ..) must be declared by callers too.
@@ -51,7 +51,7 @@ xs$f()  ≡ xs.map(|e| e.f())      xs$field  ≡ xs.map(|e| e.field)
 - **A test hangs from the function it covers** (`fn f() {..}.test({ .. })`). A test with no function to cover (a language
   feature, not a function) is a top-level `test({ .. })`: rare, reported as `test block N` (its order among the file's), no `#` docs above it.
   Never use a `main` or a dummy function as a place to put tests.
-- **A `.test` / `.performance` body declares no effect**: it cannot print, read or write files, read stdin or the clock, or run a program unless it wraps that in a `shim` inside the body. Write the stand-in inline, binding every operation of the effect (`read_files`: `read_file_to_string`; `write_files`: `write_string_to_file`; `list_files`: `list_files`; `clock`: `now_nanos` + `monotonic_now`; `prints`: `print` + `put`). A closure records calls with `set log.push(..)` on an outer `mut`, it cannot `return` or use `?`, and the shim is then a statement (`shim .. { .. };`). To exercise the real API, keep a `main` and pin it with `stdout` / `file:` / `expect file:` sections (`tests/cases/files/write_file.aipl`, `tests/cases/builtins/monotonic_now.aipl`).
+- **A `.test` / `.benchmark` body declares no effect**: it cannot print, read or write files, read stdin or the clock, or run a program unless it wraps that in a `shim` inside the body. Write the stand-in inline, binding every operation of the effect (`read_files`: `read_file_to_string`; `write_files`: `write_string_to_file`; `list_files`: `list_files`; `clock`: `now_nanos` + `monotonic_now`; `prints`: `print` + `put`). A closure records calls with `set log.push(..)` on an outer `mut`, it cannot `return` or use `?`, and the shim is then a statement (`shim .. { .. };`). To exercise the real API, keep a `main` and pin it with `stdout` / `file:` / `expect file:` sections (`tests/cases/files/write_file.aipl`, `tests/cases/builtins/monotonic_now.aipl`).
 - Debug with `trace(expr)` (remove before handoff). `assert` works in tests only.
 
 ## Operators (import `builtin as op`)
