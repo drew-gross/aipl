@@ -2,7 +2,7 @@
 # retains the payload, dropping the struct releases it (the asserted
 # alloc/dealloc balance below proves ownership is threaded through the field).
 
-import { heap_str, print, to_str } from builtins;
+import { equal as ==, heap_str, print, to_str } from builtins;
 
 variant Name = Anon | Named(str)
 
@@ -17,18 +17,30 @@ fn label(Person { name }) -> str {
 
 fn rename(Person { age }, n: str) -> Person { name: Named(n), age }
 
-fn main() !prints {
-    let p = Person { name: Named(heap_str("alice")), age: 30 };
-    print(label(p));
-    print(label(Person { name: Anon, age: 1 }));
-    // Struct with a variant field round-trips through a function return.
-    let q = rename(p, "bob");
-    print(label(q));
-    // Rendering recurses through the field into the active case's payload.
-    print(to_str(q));
-}
---- stdout ---
-alice
-anon
-bob
-Person { name: Named("bob"), age: 30 }
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let p = Person { name: Named(heap_str("alice")), age: 30 };
+        print(label(p));
+        print(label(Person { name: Anon, age: 1 }));
+        // Struct with a variant field round-trips through a function return.
+        let q = rename(p, "bob");
+        print(label(q));
+        // Rendering recurses through the field into the active case's payload.
+        print(to_str(q));
+    };
+    assert(out == """
+        alice
+        anon
+        bob
+        Person { name: Named("bob"), age: 30 }
+
+    """);
+})

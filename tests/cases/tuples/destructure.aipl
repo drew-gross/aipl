@@ -1,16 +1,28 @@
-import { print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
-fn main() !prints {
-    let my_tuple = (1, "two", 3);
-    let (a, b, c) = my_tuple;
-    print(to_str(a));
-    print(b);
-    print(to_str(c));
-    let (x, y) = (10, 20);
-    print(to_str(x + y));
-}
---- stdout ---
-1
-two
-3
-30
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let my_tuple = (1, "two", 3);
+        let (a, b, c) = my_tuple;
+        print(to_str(a));
+        print(b);
+        print(to_str(c));
+        let (x, y) = (10, 20);
+        print(to_str(x + y));
+    };
+    assert(out == """
+        1
+        two
+        3
+        30
+
+    """);
+})

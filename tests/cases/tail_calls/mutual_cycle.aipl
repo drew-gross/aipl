@@ -55,21 +55,33 @@ fn work_of(n: u64, acc: Work) -> Work {
     if (n == 0) { acc } else { work_of(n - 1, WCons("ab", acc)) }
 }
 
-fn main() !prints {
-    let work = work_of(150000, WNil);
-    // 150,000 two-byte atoms need exactly 300,000 columns to fit.
-    print(fits(300000, work).to_str());
-    print(fits(299999, work).to_str());
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let work = work_of(150000, WNil);
+        // 150,000 two-byte atoms need exactly 300,000 columns to fit.
+        print(fits(300000, work).to_str());
+        print(fits(299999, work).to_str());
 
-    // Second call sites, so the cycle survives as three functions:
-    // `inline_single_use` moves any body reached from exactly one place, which
-    // would otherwise fold the whole cycle into `fits` and turn it into plain
-    // self-recursion — the very thing this case exists to distinguish.
-    print(fits_atom(4, "ab", WNil).to_str());
-    print(fits_after(4, 2, WNil).to_str());
-}
---- stdout ---
-true
-false
-true
-true
+        // Second call sites, so the cycle survives as three functions:
+        // `inline_single_use` moves any body reached from exactly one place, which
+        // would otherwise fold the whole cycle into `fits` and turn it into plain
+        // self-recursion — the very thing this case exists to distinguish.
+        print(fits_atom(4, "ab", WNil).to_str());
+        print(fits_after(4, 2, WNil).to_str());
+    };
+    assert(out == """
+        true
+        false
+        true
+        true
+
+    """);
+})

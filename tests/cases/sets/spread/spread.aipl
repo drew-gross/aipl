@@ -8,37 +8,49 @@
 
 import { equal as ==, len, print, to_array, to_set } from builtins;
 
-fn main() !prints {
-    let a = #{1, 2, 3};
-    let b = #{3, 4, 5};
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let a = #{1, 2, 3};
+        let b = #{3, 4, 5};
 
-    // Elements and spreads mix freely, in any position, and overlap is deduplicated.
-    let both = #{..a, ..b};
-    let mixed = #{0, ..a, 9, 3, ..b, 7};
-    let extended = #{..a, 4};
-    print(`{both.len()} {mixed.len()} {extended == #{1, 2, 3, 4}}`);
+        // Elements and spreads mix freely, in any position, and overlap is deduplicated.
+        let both = #{..a, ..b};
+        let mixed = #{0, ..a, 9, 3, ..b, 7};
+        let extended = #{..a, 4};
+        print(`{both.len()} {mixed.len()} {extended == #{1, 2, 3, 4}}`);
 
-    // An ordered literal orders its result, whatever order the operands have.
-    let down = #>{..a, 10};
-    let up = #<{10, ..a, ..b};
-    print(`{down.to_array()} {up.to_array()}`);
-    let from_up = #<{7, 8};
-    let copied = #>{..from_up};
-    print(`{copied.to_array()}`);
+        // An ordered literal orders its result, whatever order the operands have.
+        let down = #>{..a, 10};
+        let up = #<{10, ..a, ..b};
+        print(`{down.to_array()} {up.to_array()}`);
+        let from_up = #<{7, 8};
+        let copied = #>{..from_up};
+        print(`{copied.to_array()}`);
 
-    // An array becomes a set first.
-    let from_array = #{..[3, 3, 1].to_set(), 2};
-    print(`{from_array == #{1, 2, 3}}`);
+        // An array becomes a set first.
+        let from_array = #{..[3, 3, 1].to_set(), 2};
+        print(`{from_array == #{1, 2, 3}}`);
 
-    // A spread of nothing adds nothing.
-    let empty: #{i64} = #{};
-    let only = #{..empty, 1};
-    let nothing = #{..empty};
-    print(`{only == #{1}} {nothing.len()}`);
-}
---- stdout ---
-5 8 true
-[10, 3, 2, 1] [1, 2, 3, 4, 5, 10]
-[8, 7]
-true
-true 0
+        // A spread of nothing adds nothing.
+        let empty: #{i64} = #{};
+        let only = #{..empty, 1};
+        let nothing = #{..empty};
+        print(`{only == #{1}} {nothing.len()}`);
+    };
+    assert(out == """
+        5 8 true
+        [10, 3, 2, 1] [1, 2, 3, 4, 5, 10]
+        [8, 7]
+        true
+        true 0
+
+    """);
+})

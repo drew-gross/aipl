@@ -4,36 +4,48 @@
 # expression-only arm could never make, and the reason the printer in
 # `doc.aipl` used to thread its loop state through a returned struct.
 
-import { print, push, to_str, wrapping_increment as ++ } from builtins;
+import { equal as ==, print, push, to_str, wrapping_increment as ++ } from builtins;
 
 variant Ev = Tick | Tock | Reset(u64)
 
-fn main() !prints {
-    mut count: u64 = 0;
-    mut log = [];
-    for (let e : [Tick, Tock, Reset(7), Tick]) {
-        match (e) {
-            Tick => {
-                set count++;
-                set log.push("tick");
-            },
-            Tock => {
-                set log.push("tock");
-            },
-            Reset(n) => {
-                set count = n;
-                set log.push(`reset {n}`);
-            },
-        };
-    }
-    print(count.to_str());
-    for (let entry : log) {
-        print(entry);
-    }
-}
---- stdout ---
-8
-tick
-tock
-reset 7
-tick
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        mut count: u64 = 0;
+        mut log = [];
+        for (let e : [Tick, Tock, Reset(7), Tick]) {
+            match (e) {
+                Tick => {
+                    set count++;
+                    set log.push("tick");
+                },
+                Tock => {
+                    set log.push("tock");
+                },
+                Reset(n) => {
+                    set count = n;
+                    set log.push(`reset {n}`);
+                },
+            };
+        }
+        print(count.to_str());
+        for (let entry : log) {
+            print(entry);
+        }
+    };
+    assert(out == """
+        8
+        tick
+        tock
+        reset 7
+        tick
+
+    """);
+})

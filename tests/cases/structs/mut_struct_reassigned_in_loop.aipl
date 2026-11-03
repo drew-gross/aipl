@@ -52,9 +52,18 @@ fn run() -> u64 {
     s.acc.len()
 }
 
-fn main() !prints {
-    // Exactly one iteration runs, pushing exactly one element.
-    print(if (run() == 1) { "one element" } else { "corrupted" });
-}
---- stdout ---
-one element
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Exactly one iteration runs, pushing exactly one element.
+        print(if (run() == 1) { "one element" } else { "corrupted" });
+    };
+    assert(out == "one element\n");
+})

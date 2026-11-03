@@ -2,7 +2,7 @@
 # once, in the order it is written. The `print`s pin it down: `a b c`, not a
 # repeat of any of them.
 
-import { len, print } from builtins;
+import { equal as ==, len, print } from builtins;
 
 fn a() !prints -> #{i64} {
     print("a");
@@ -19,13 +19,25 @@ fn plain(n: i64) !prints -> i64 {
     n
 }
 
-fn main() !prints {
-    print(`{(#{..a(), plain(1), plain(2), ..b(), plain(3)}).len()}`);
-}
---- stdout ---
-a
-p1
-p2
-b
-p3
-3
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`{(#{..a(), plain(1), plain(2), ..b(), plain(3)}).len()}`);
+    };
+    assert(out == """
+        a
+        p1
+        p2
+        b
+        p3
+        3
+
+    """);
+})

@@ -7,7 +7,7 @@
 # `match (a, b)` is a tuple scrutinee without its own parentheses, and its
 # elements are matched directly: no tuple is built.
 
-import { print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
 fn rep_suffix(min: u64, max: u64?) -> str {
     match (min, max) {
@@ -64,43 +64,55 @@ fn pair_ok(r: (i64, i64)!str) -> i64 {
     }
 }
 
-fn main() !prints {
-    print(`{rep_suffix(1, some(1))}|{rep_suffix(0, some(1))}`);
-    print(rep_suffix(2, some(5)));
-    print(`{rep_suffix(0, none)}{rep_suffix(1, none)}{rep_suffix(3, none)}`);
-    print(describe(Circle(0), "x"));
-    print(describe(Circle(4), "big"));
-    print(describe(Circle(4), "small"));
-    print(describe(Rect(2, 3), "t"));
-    print(describe(Dot, "t"));
-    print(depth(some(some(0))));
-    print(depth(some(some(7))));
-    print(depth(some(none)));
-    print(depth(none));
-    print(to_str(pair_ok(ok((0, 5)))));
-    print(to_str(pair_ok(ok((2, 5)))));
-    print(to_str(pair_ok(err("no"))));
-    print(`{span_of(some(Span { start: 1, end: 2 }), some(Span { start: 5, end: 9 }))}`);
-    print(`{span_of(some(Span { start: 1, end: 2 }), none)}`);
-    // `if let` takes a nested pattern too.
-    if (let (1, some(x)) = (1, some(9))) { print(`x={x}`); };
-}
---- stdout ---
-|?
-{2,5}
-*+{3,}
-point-circle
-big circle 4
-circle 4
-rect 2x3 t
-dot
-zero
-n=7
-inner none
-none
-5
-7
--1
-some(Span { start: 1, end: 9 })
-none
-x=9
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`{rep_suffix(1, some(1))}|{rep_suffix(0, some(1))}`);
+        print(rep_suffix(2, some(5)));
+        print(`{rep_suffix(0, none)}{rep_suffix(1, none)}{rep_suffix(3, none)}`);
+        print(describe(Circle(0), "x"));
+        print(describe(Circle(4), "big"));
+        print(describe(Circle(4), "small"));
+        print(describe(Rect(2, 3), "t"));
+        print(describe(Dot, "t"));
+        print(depth(some(some(0))));
+        print(depth(some(some(7))));
+        print(depth(some(none)));
+        print(depth(none));
+        print(to_str(pair_ok(ok((0, 5)))));
+        print(to_str(pair_ok(ok((2, 5)))));
+        print(to_str(pair_ok(err("no"))));
+        print(`{span_of(some(Span { start: 1, end: 2 }), some(Span { start: 5, end: 9 }))}`);
+        print(`{span_of(some(Span { start: 1, end: 2 }), none)}`);
+        // `if let` takes a nested pattern too.
+        if (let (1, some(x)) = (1, some(9))) { print(`x={x}`); };
+    };
+    assert(out == """
+        |?
+        {2,5}
+        *+{3,}
+        point-circle
+        big circle 4
+        circle 4
+        rect 2x3 t
+        dot
+        zero
+        n=7
+        inner none
+        none
+        5
+        7
+        -1
+        some(Span { start: 1, end: 9 })
+        none
+        x=9
+
+    """);
+})

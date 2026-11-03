@@ -4,7 +4,7 @@
 # read a type off — so every answer has to come from where the constructor
 # sits.
 
-import { first, len, map, print, to_str, value_or } from builtins;
+import { equal as ==, first, len, map, print, to_str, value_or } from builtins;
 
 variant Tok = Space | Word(str)
 
@@ -41,15 +41,26 @@ fn count(hs: Holder<Tok2>[]) -> u64 { hs.len() }
 // its mangled name, which is not what this case is about.
 fn shown(p: Pair<Tok>) -> str { p.holders.first().map(|h| `{h.tag}={h.slot}`).value_or("empty") }
 
-fn main() !prints {
-    print(to_str(blank()));
-    print(to_str(filled()));
-    print(shown(nested()));
-    print(to_str(count([Holder { slot: Blank, tag: "x" }])));
-}
---- stdout ---
-Blank
-Filled(Dot)
-t=Blank
-1
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(blank()));
+        print(to_str(filled()));
+        print(shown(nested()));
+        print(to_str(count([Holder { slot: Blank, tag: "x" }])));
+    };
+    assert(out == """
+        Blank
+        Filled(Dot)
+        t=Blank
+        1
 
+    """);
+})

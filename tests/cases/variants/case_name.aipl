@@ -14,43 +14,55 @@ variant Tok = Space | Name(str) | IntLit(i64) | StrLit(str, i64) | InterpolatedT
 // needs — and the reason this is a builtin rather than a per-variant `match`.
 fn label<K: variant>(k: K) -> str { k.case_name() }
 
-fn main() !prints {
-    // The payload is not read, so it does not appear and does not matter.
-    print(Name("x").case_name());
-    print(Name("a longer payload entirely").case_name());
-    print(IntLit(42).case_name());
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // The payload is not read, so it does not appear and does not matter.
+        print(Name("x").case_name());
+        print(Name("a longer payload entirely").case_name());
+        print(IntLit(42).case_name());
 
-    // A payload-free case, and a multi-payload one.
-    print(Space.case_name());
-    print(StrLit("a", 1).case_name());
+        // A payload-free case, and a multi-payload one.
+        print(Space.case_name());
+        print(StrLit("a", 1).case_name());
 
-    // A case name of more than 7 bytes is a static literal rather than an
-    // inline one — the same split every `str` constant goes through.
-    print(InterpolatedText("x").case_name());
+        // A case name of more than 7 bytes is a static literal rather than an
+        // inline one — the same split every `str` constant goes through.
+        print(InterpolatedText("x").case_name());
 
-    // What it replaces: `to_str` renders the payload too, so a caller wanting
-    // just the case had to render it and cut the string back at the `(`.
-    print(Name("x").to_str());
+        // What it replaces: `to_str` renders the payload too, so a caller wanting
+        // just the case had to render it and cut the string back at the `(`.
+        print(Name("x").to_str());
 
-    // Free-call form, and through a generic function.
-    print(case_name(Space));
-    print(label(IntLit(1)));
-    print(label(Space));
+        // Free-call form, and through a generic function.
+        print(case_name(Space));
+        print(label(IntLit(1)));
+        print(label(Space));
 
-    // It is a `str` like any other.
-    print((Name("x").case_name() == "Name").to_str());
-    print((Name("x").case_name() == Space.case_name()).to_str());
-}
---- stdout ---
-Name
-Name
-IntLit
-Space
-StrLit
-InterpolatedText
-Name("x")
-Space
-IntLit
-Space
-true
-false
+        // It is a `str` like any other.
+        print((Name("x").case_name() == "Name").to_str());
+        print((Name("x").case_name() == Space.case_name()).to_str());
+    };
+    assert(out == """
+        Name
+        Name
+        IntLit
+        Space
+        StrLit
+        InterpolatedText
+        Name("x")
+        Space
+        IntLit
+        Space
+        true
+        false
+
+    """);
+})

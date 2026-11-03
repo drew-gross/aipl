@@ -15,74 +15,86 @@
 
 import { equal as ==, extend, len, print, to_str } from builtins;
 
-fn main() !prints {
-    mut xs = [1, 2];
-    // The sequence, unchanged.
-    set xs.extend([3, 4]);
-    // One element — the same thing `push` says, and reached by being `push`.
-    set xs.extend(5);
-    // An optional: `some` appends its element, `none` appends nothing.
-    let sixth: i64? = some(6);
-    let nothing: i64? = none;
-    set xs.extend(sixth);
-    set xs.extend(nothing);
-    print(xs.to_str());
-    print(xs.len().to_str());
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        mut xs = [1, 2];
+        // The sequence, unchanged.
+        set xs.extend([3, 4]);
+        // One element — the same thing `push` says, and reached by being `push`.
+        set xs.extend(5);
+        // An optional: `some` appends its element, `none` appends nothing.
+        let sixth: i64? = some(6);
+        let nothing: i64? = none;
+        set xs.extend(sixth);
+        set xs.extend(nothing);
+        print(xs.to_str());
+        print(xs.len().to_str());
 
-    // A heap element type, so the appended element's refcount is exercised
-    // rather than a copied scalar.
-    mut names = ["a"];
-    let maybe_b: str? = some("b");
-    set names.extend(maybe_b);
-    set names.extend("c");
-    print(names.to_str());
+        // A heap element type, so the appended element's refcount is exercised
+        // rather than a copied scalar.
+        mut names = ["a"];
+        let maybe_b: str? = some("b");
+        set names.extend(maybe_b);
+        set names.extend("c");
+        print(names.to_str());
 
-    // A `str` receiver takes all three too. It has no `push` to reach — a `str`
-    // has no in-place growable form — so one element and a `some` both become
-    // the one-char `str` they already are, which `extend` appends the same way
-    // it appends a longer one.
-    mut s = "ab";
-    set s.extend("cd");
-    set s.extend('e');
-    let f: char? = some('f');
-    let no_char: char? = none;
-    set s.extend(f);
-    set s.extend(no_char);
-    print(s);
+        // A `str` receiver takes all three too. It has no `push` to reach — a `str`
+        // has no in-place growable form — so one element and a `some` both become
+        // the one-char `str` they already are, which `extend` appends the same way
+        // it appends a longer one.
+        mut s = "ab";
+        set s.extend("cd");
+        set s.extend('e');
+        let f: char? = some('f');
+        let no_char: char? = none;
+        set s.extend(f);
+        set s.extend(no_char);
+        print(s);
 
-    // A `char[]` binding is an *array* binding, not the `str` case: `push` has
-    // its own char path for it.
-    mut cs = ['x'];
-    set cs.extend('y');
-    let z: char? = some('z');
-    set cs.extend(z);
-    print(cs.to_str());
+        // A `char[]` binding is an *array* binding, not the `str` case: `push` has
+        // its own char path for it.
+        mut cs = ['x'];
+        set cs.extend('y');
+        let z: char? = some('z');
+        set cs.extend(z);
+        print(cs.to_str());
 
-    // An untyped-empty receiver (`mut ys = []`) keeps the *sequence* shape, the
-    // only one it has ever had: the shape is fitted against the destination's
-    // element type, and this destination takes its element type from the source
-    // instead. Whether `ys.extend("ab")` appended two chars or one `str` is
-    // exactly what has not been said yet, so neither of the other two shapes is
-    // available until something pins it — `push` is the spelling for the first
-    // element, and pinning the type is what it is for.
-    mut ys = [];
-    set ys.extend([7]);
-    set ys.extend([8, 9]);
-    print(`{ys} {ys.len() == 3}`);
+        // An untyped-empty receiver (`mut ys = []`) keeps the *sequence* shape, the
+        // only one it has ever had: the shape is fitted against the destination's
+        // element type, and this destination takes its element type from the source
+        // instead. Whether `ys.extend("ab")` appended two chars or one `str` is
+        // exactly what has not been said yet, so neither of the other two shapes is
+        // available until something pins it — `push` is the spelling for the first
+        // element, and pinning the type is what it is for.
+        mut ys = [];
+        set ys.extend([7]);
+        set ys.extend([8, 9]);
+        print(`{ys} {ys.len() == 3}`);
 
-    // One annotation is all it takes, which is why `lex_all` in `lexer.aipl`
-    // annotates every accumulator it appends an optional to.
-    mut zs: i64[] = [];
-    let seventh: i64? = some(7);
-    set zs.extend(seventh);
-    set zs.extend(8);
-    print(zs.to_str());
-}
---- stdout ---
-[1, 2, 3, 4, 5, 6]
-6
-["a", "b", "c"]
-abcdef
-['x', 'y', 'z']
-[7, 8, 9] true
-[7, 8]
+        // One annotation is all it takes, which is why `lex_all` in `lexer.aipl`
+        // annotates every accumulator it appends an optional to.
+        mut zs: i64[] = [];
+        let seventh: i64? = some(7);
+        set zs.extend(seventh);
+        set zs.extend(8);
+        print(zs.to_str());
+    };
+    assert(out == """
+        [1, 2, 3, 4, 5, 6]
+        6
+        ["a", "b", "c"]
+        abcdef
+        ['x', 'y', 'z']
+        [7, 8, 9] true
+        [7, 8]
+
+    """);
+})

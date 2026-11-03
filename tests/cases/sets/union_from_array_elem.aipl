@@ -25,38 +25,50 @@
 #
 # Introduced by `25f946d` (sets and dicts as array elements).
 
-import { len, print, to_str, union } from builtins;
+import { equal as ==, len, print, to_str, union } from builtins;
 
-fn main() !prints {
-    let ls: #{i64}[] = [#{1}, #{2}];
-    mut acc: #{i64} = #{9};
-    match (ls[0]) {
-        some(s) => {
-            set acc = acc.union(s);
-            print(acc.len().to_str());
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
         },
-        none => print("unreachable"),
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let ls: #{i64}[] = [#{1}, #{2}];
+        mut acc: #{i64} = #{9};
+        match (ls[0]) {
+            some(s) => {
+                set acc = acc.union(s);
+                print(acc.len().to_str());
+            },
+            none => print("unreachable"),
+        };
+        // The assignment outlives the arm that made it.
+        print(acc.len().to_str());
+
+        print(ls.len().to_str());
+
+        // The loop this shape stands in for. Under the value-track model the
+        // per-iteration teardown freed the accumulator every trip, and this form
+        // aborted the process outright rather than printing a wrong number.
+        //
+        // `union_loop_union_all` flags it, correctly — `ls.union_all()` is the
+        // spelling. The loop is the point here: the builtin is one call, and this
+        // case exists to drive the per-iteration reassignment the bug lived in.
+        mut all: #{i64} = #{}; #[allow]
+        for (let s : ls) {
+            set all = all.union(s);
+        }
+        print(all.len().to_str());
     };
-    // The assignment outlives the arm that made it.
-    print(acc.len().to_str());
+    assert(out == """
+        2
+        2
+        2
+        2
 
-    print(ls.len().to_str());
-
-    // The loop this shape stands in for. Under the value-track model the
-    // per-iteration teardown freed the accumulator every trip, and this form
-    // aborted the process outright rather than printing a wrong number.
-    //
-    // `union_loop_union_all` flags it, correctly — `ls.union_all()` is the
-    // spelling. The loop is the point here: the builtin is one call, and this
-    // case exists to drive the per-iteration reassignment the bug lived in.
-    mut all: #{i64} = #{}; #[allow]
-    for (let s : ls) {
-        set all = all.union(s);
-    }
-    print(all.len().to_str());
-}
---- stdout ---
-2
-2
-2
-2
+    """);
+})

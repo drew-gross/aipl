@@ -3,7 +3,7 @@
 # (matched by equality). A `str` is matched as its `char[]` view, so its element
 # binders are `char`. Fixed length — the `_` arm covers every other length.
 
-import { print, to_str, wrapping_add as +, wrapping_sub as - } from builtins;
+import { equal as ==, print, to_str, wrapping_add as +, wrapping_sub as - } from builtins;
 
 // Destructure a str: an empty string, a single char, a leading `-` then one
 // more char, any other two chars, else the default. Mixes a string-literal arm
@@ -29,26 +29,38 @@ fn sum_head(xs: i64[]) -> i64 {
     }
 }
 
-fn main() !prints {
-    print(classify("hi"));
-    print(classify(""));
-    print(classify("q"));
-    print(classify("-5"));
-    print(classify("ab"));
-    print(classify("abc"));
-    print(to_str(sum_head([])));
-    print(to_str(sum_head([7])));
-    print(to_str(sum_head([3, 4])));
-    print(to_str(sum_head([1, 2, 3])))
-}
---- stdout ---
-greeting
-empty
-one q
-neg 5
-two ab
-many
-0
-7
-7
--1
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(classify("hi"));
+        print(classify(""));
+        print(classify("q"));
+        print(classify("-5"));
+        print(classify("ab"));
+        print(classify("abc"));
+        print(to_str(sum_head([])));
+        print(to_str(sum_head([7])));
+        print(to_str(sum_head([3, 4])));
+        print(to_str(sum_head([1, 2, 3])))
+    };
+    assert(out == """
+        greeting
+        empty
+        one q
+        neg 5
+        two ab
+        many
+        0
+        7
+        7
+        -1
+
+    """);
+})

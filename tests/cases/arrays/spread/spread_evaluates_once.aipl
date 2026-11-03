@@ -20,7 +20,7 @@
 # twice. `ordered` interleaves plain elements with spreads and shows the
 # evaluation following the source left to right.
 
-import { len, map, print, wrapping_add as + } from builtins;
+import { equal as ==, len, map, print, wrapping_add as + } from builtins;
 
 fn a() !prints -> i64[] {
     print("a");
@@ -53,22 +53,34 @@ fn mapped(xs: i64[]) !prints -> i64[] { [0, ..xs.map(loud)] }
 
 fn ordered() !prints -> i64[] { [plain(1), ..b(), plain(2), ..c()] }
 
-fn main() !prints {
-    print(`{each().len()}`);
-    print(`{mapped([1, 2, 3]).len()}`);
-    print(`{ordered().len()}`);
-}
---- stdout ---
-a
-b
-c
-3
-f1
-f2
-f3
-4
-p1
-b
-p2
-c
-4
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`{each().len()}`);
+        print(`{mapped([1, 2, 3]).len()}`);
+        print(`{ordered().len()}`);
+    };
+    assert(out == """
+        a
+        b
+        c
+        3
+        f1
+        f2
+        f3
+        4
+        p1
+        b
+        p2
+        c
+        4
+
+    """);
+})

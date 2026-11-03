@@ -6,7 +6,7 @@
 # is what `tests/cases/structs/boxed_field_with_array.aipl` locks in for a
 # single struct; this is the same shape one level up, held in an array.
 
-import { len, print, to_str, value_or, wrapping_add as + } from builtins;
+import { equal as ==, len, print, to_str, value_or, wrapping_add as + } from builtins;
 
 variant Tree = Leaf(i64) | Node(Tree, Tree)
 
@@ -27,18 +27,32 @@ fn sum_holders(hs: Holder[]) -> i64 {
     acc
 }
 
-fn main() !prints {
-    let hs = [Holder { tag: 1, tree: Leaf(10) }, Holder { tag: 2, tree: Node(Leaf(20), Leaf(30)) }];
-    print(sum_holders(hs).to_str());
-    print(hs.len().to_str());
-    // Copying one out and reading it must not disturb the array's own reference.
-    let first = hs[0];
-    print(first$tree$total().value_or(0).to_str());
-    print(sum_holders(hs).to_str());
-}
---- stdout ---
-63
-2
-10
-63
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let hs = [
+            Holder { tag: 1, tree: Leaf(10) },
+            Holder { tag: 2, tree: Node(Leaf(20), Leaf(30)) },
+        ];
+        print(sum_holders(hs).to_str());
+        print(hs.len().to_str());
+        // Copying one out and reading it must not disturb the array's own reference.
+        let first = hs[0];
+        print(first$tree$total().value_or(0).to_str());
+        print(sum_holders(hs).to_str());
+    };
+    assert(out == """
+        63
+        2
+        10
+        63
 
+    """);
+})

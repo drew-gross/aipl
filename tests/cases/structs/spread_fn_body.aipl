@@ -4,7 +4,7 @@
 # and next to a `..self` the repeated type name is pure noise, which is why
 # `fn_body_type_stutter` flags the long form here too.
 
-import { print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
 struct W { pos: u64, cpos: u64, last_end: u64 }
 
@@ -16,21 +16,32 @@ fn skip_comment(self: W) -> W { ..self, cpos: self.cpos + 1 }
 // there is nothing to spell. The field-only shorthand is unchanged.
 fn at(pos: u64) -> W { pos, cpos: 0, last_end: 0 }
 
-fn main() !prints {
-    let w = at(3);
-    let a = w.advance(9);
-    print(a.pos.to_str());
-    print(a.last_end.to_str());
-    print(a.cpos.to_str());
-    let s = a.skip_comment();
-    print(s.cpos.to_str());
-    // The spread's untouched fields carry through.
-    print(s.pos.to_str());
-}
---- stdout ---
-4
-9
-0
-1
-4
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let w = at(3);
+        let a = w.advance(9);
+        print(a.pos.to_str());
+        print(a.last_end.to_str());
+        print(a.cpos.to_str());
+        let s = a.skip_comment();
+        print(s.cpos.to_str());
+        // The spread's untouched fields carry through.
+        print(s.pos.to_str());
+    };
+    assert(out == """
+        4
+        9
+        0
+        1
+        4
 
+    """);
+})

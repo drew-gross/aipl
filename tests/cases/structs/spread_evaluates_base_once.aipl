@@ -3,7 +3,7 @@
 # `make` three times here; the loader binds a non-name operand to a synthetic
 # `let` first. `"called"` printing exactly once is the assertion.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 struct P { a: i64, b: i64, c: i64 }
 
@@ -12,14 +12,26 @@ fn make(n: i64) !prints -> P {
     P { a: n, b: n, c: n }
 }
 
-fn main() !prints {
-    let p = P { ..make(7), a: 1 };
-    print(p.a.to_str());
-    print(p.b.to_str());
-    print(p.c.to_str());
-}
---- stdout ---
-called
-1
-7
-7
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let p = P { ..make(7), a: 1 };
+        print(p.a.to_str());
+        print(p.b.to_str());
+        print(p.c.to_str());
+    };
+    assert(out == """
+        called
+        1
+        7
+        7
+
+    """);
+})

@@ -13,7 +13,7 @@
 # keyword-argument pass wraps each supplied argument in `some(..)` and nothing
 # downstream can tell them apart.
 
-import { map, print, value_or, wrapping_add as + } from builtins;
+import { equal as ==, map, print, value_or, wrapping_add as + } from builtins;
 
 fn clamp(x: u64, lo: u64 = 0, hi?: u64 = none) -> str { `{x} lo={lo} hi={hi.value_or(99)}` }
 
@@ -31,38 +31,50 @@ fn show(r: Rep) -> str {
 // while a later one is given, and the body still sees an optional.
 fn describe(hi?: u64 = none) -> str { hi.map(|h| `bounded at {h}`).value_or("unbounded") }
 
-fn main() !prints {
-    // Omitted: the body sees `none`.
-    print(clamp(5));
-    // Supplied: a bare `u64`, not `some(9)`.
-    print(clamp(5, hi=9));
-    print(clamp(5, lo=1, hi=9));
-    // The keyword parameters are still independent of each other.
-    print(clamp(5, lo=1));
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Omitted: the body sees `none`.
+        print(clamp(5));
+        // Supplied: a bare `u64`, not `some(9)`.
+        print(clamp(5, hi=9));
+        print(clamp(5, lo=1, hi=9));
+        // The keyword parameters are still independent of each other.
+        print(clamp(5, lo=1));
 
-    print(show(Bounded("a")));
-    print(show(Bounded("b", max=3)));
-    print(show(Bounded("c", min=1, max=2)));
+        print(show(Bounded("a")));
+        print(show(Bounded("b", max=3)));
+        print(show(Bounded("c", min=1, max=2)));
 
-    print(describe());
-    print(describe(hi=4));
+        print(describe());
+        print(describe(hi=4));
 
-    // The value passed is an ordinary expression, evaluated once like any
-    // argument — nothing about `?:` is special at the call site beyond the
-    // missing `some(..)`.
-    let n: u64 = 2;
-    print(describe(hi=n + 1));
-    print(clamp(5, hi=n));
-}
---- stdout ---
-5 lo=0 hi=99
-5 lo=0 hi=9
-5 lo=1 hi=9
-5 lo=1 hi=99
-a min=0 max=99
-b min=0 max=3
-c min=1 max=2
-unbounded
-bounded at 4
-bounded at 3
-5 lo=0 hi=2
+        // The value passed is an ordinary expression, evaluated once like any
+        // argument — nothing about `?:` is special at the call site beyond the
+        // missing `some(..)`.
+        let n: u64 = 2;
+        print(describe(hi=n + 1));
+        print(clamp(5, hi=n));
+    };
+    assert(out == """
+        5 lo=0 hi=99
+        5 lo=0 hi=9
+        5 lo=1 hi=9
+        5 lo=1 hi=99
+        a min=0 max=99
+        b min=0 max=3
+        c min=1 max=2
+        unbounded
+        bounded at 4
+        bounded at 3
+        5 lo=0 hi=2
+
+    """);
+})

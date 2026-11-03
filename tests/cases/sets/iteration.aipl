@@ -7,6 +7,7 @@
 # assertion below either sorts the result or is order-independent.
 
 import {
+    equal as ==,
     print,
     push,
     sort,
@@ -53,22 +54,34 @@ fn bool_score(s: #{bool}) -> i64 {
     n
 }
 
-fn main() !prints {
-    print(elems(#{"b", "a", "c", "a"}).sort().to_str());
-    print(total(#{1, 2, 3, 2}).to_str());
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(elems(#{"b", "a", "c", "a"}).sort().to_str());
+        print(total(#{1, 2, 3, 2}).to_str());
 
-    // Spelled out beside the other three element types, so the four read as one
-    // list (`#[allow]`, against `char_set_literal`).
-    print(char_strs(#{'x', 'y', 'x'}).sort().to_str()); #[allow]
-    print(bool_score(#{true, false, true}).to_str());
+        // Spelled out beside the other three element types, so the four read as one
+        // list (`#[allow]`, against `char_set_literal`).
+        print(char_strs(#{'x', 'y', 'x'}).sort().to_str()); #[allow]
+        print(bool_score(#{true, false, true}).to_str());
 
-    // An empty set yields no iterations.
-    let empty: #{i64} = #{};
-    print(total(empty).to_str());
-}
---- stdout ---
-["a", "b", "c"]
-6
-["x", "y"]
-11
-0
+        // An empty set yields no iterations.
+        let empty: #{i64} = #{};
+        print(total(empty).to_str());
+    };
+    assert(out == """
+        ["a", "b", "c"]
+        6
+        ["x", "y"]
+        11
+        0
+
+    """);
+})

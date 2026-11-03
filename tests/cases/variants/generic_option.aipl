@@ -2,7 +2,7 @@
 # instance `Opt$i64` is an ordinary variant whose constructors resolve like
 # any other. (A variant may currently be instantiated at only one type.)
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 variant Opt<T> = Some(T) | Nothing
 
@@ -13,10 +13,22 @@ fn or_default(o: Opt<i64>, d: i64) -> i64 {
     }
 }
 
-fn main() !prints {
-    print(to_str(or_default(Some(5), 0)));
-    print(to_str(or_default(Nothing, 9)));
-}
---- stdout ---
-5
-9
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(or_default(Some(5), 0)));
+        print(to_str(or_default(Nothing, 9)));
+    };
+    assert(out == """
+        5
+        9
+
+    """);
+})

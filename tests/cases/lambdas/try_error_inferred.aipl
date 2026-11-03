@@ -21,31 +21,43 @@ fn checked(n: i64) -> i64!str { if (n == 0) { err("zero") } else { ok(n) } }
 // builtin: `E` is mentioned by the callback and by nothing else.
 fn apply_to<T: any, U: any, E: any>(self: T, f: (T) -> U!E) -> U!E { f(self) }
 
-fn main() !prints {
-    // Through a user-defined generic, both ways.
-    let one = apply_to(3, |n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
-    print(if (one.is_err_and(|e| e == "zero")) { "err" } else { "ok" });
-    let zero = apply_to(0, |n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
-    print(if (zero.is_err_and(|e| e == "zero")) { "err" } else { "ok" });
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Through a user-defined generic, both ways.
+        let one = apply_to(3, |n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
+        print(if (one.is_err_and(|e| e == "zero")) { "err" } else { "ok" });
+        let zero = apply_to(0, |n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
+        print(if (zero.is_err_and(|e| e == "zero")) { "err" } else { "ok" });
 
-    // Through `try_map` — the call shape this inference was needed for. Every
-    // element is wrapped, and the first failure comes back whole.
-    let ws = [3, 4].try_map(|n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
-    print(match (ws) {
-        ok(list) => list$n.to_str(),
-        err(e) => e,
-    });
-    let bad = [3, 0, 5].try_map(|n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
-    print(if (bad.is_err_and(|e| e == "zero")) { "err" } else { "ok" });
+        // Through `try_map` — the call shape this inference was needed for. Every
+        // element is wrapped, and the first failure comes back whole.
+        let ws = [3, 4].try_map(|n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
+        print(match (ws) {
+            ok(list) => list$n.to_str(),
+            err(e) => e,
+        });
+        let bad = [3, 0, 5].try_map(|n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
+        print(if (bad.is_err_and(|e| e == "zero")) { "err" } else { "ok" });
 
-    // An explicit `err(..)` still wins: a lambda that names its own error type
-    // keeps it, and this inference only fills a side nothing else named.
-    let named = [3].try_map(|n| if (n == 3) { err("three") } else { ok(checked(n)?) });
-    print(if (named.is_err_and(|e| e == "three")) { "three" } else { "ok" });
-}
---- stdout ---
-ok
-err
-[3, 4]
-err
-three
+        // An explicit `err(..)` still wins: a lambda that names its own error type
+        // keeps it, and this inference only fills a side nothing else named.
+        let named = [3].try_map(|n| if (n == 3) { err("three") } else { ok(checked(n)?) });
+        print(if (named.is_err_and(|e| e == "three")) { "three" } else { "ok" });
+    };
+    assert(out == """
+        ok
+        err
+        [3, 4]
+        err
+        three
+
+    """);
+})

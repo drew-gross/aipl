@@ -1,16 +1,28 @@
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
-fn main() !prints {
-    let pairs = [(1, "one"), (2, "two"), (3, "three")];
-    for (let (n, s) : pairs) {
-        print(to_str(n));
-        print(s);
-    }
-}
---- stdout ---
-1
-one
-2
-two
-3
-three
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let pairs = [(1, "one"), (2, "two"), (3, "three")];
+        for (let (n, s) : pairs) {
+            print(to_str(n));
+            print(s);
+        }
+    };
+    assert(out == """
+        1
+        one
+        2
+        two
+        3
+        three
+
+    """);
+})

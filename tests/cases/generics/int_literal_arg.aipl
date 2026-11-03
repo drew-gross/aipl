@@ -10,30 +10,42 @@
 # folds single-call-site instances away — so this asserts behavior. The naming
 # is pinned in `tests/suites/mono.rs`.
 
-import { len, print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, len, print, to_str, wrapping_add as + } from builtins;
 
 fn identity<T: any>(x: T) -> T { x }
 
 fn wrap<T: any>(x: T) -> T[] { [x] }
 
-fn main() !prints {
-    // Once the literal is inlined, `identity`'s body *is* the literal, so the
-    // call folds to it. Its type is still the `i64` the call returns: a fold is
-    // not a literal the checker saw, so `let narrow: u8 = identity(200)` is a
-    // narrowing, refused like any other.
-    let wide: i64 = identity(200);
-    print(to_str(wide)); // 200
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Once the literal is inlined, `identity`'s body *is* the literal, so the
+        // call folds to it. Its type is still the `i64` the call returns: a fold is
+        // not a literal the checker saw, so `let narrow: u8 = identity(200)` is a
+        // narrowing, refused like any other.
+        let wide: i64 = identity(200);
+        print(to_str(wide)); // 200
 
-    // A body that isn't just the literal keeps its instance — one per value,
-    // since two values are two different bodies.
-    let a = wrap(5);
-    let b = wrap(7);
-    print(to_str(a.len() + b.len())); // 2
-    print(to_str(a)); // [5]
-    print(to_str(b)); // [7]
-}
---- stdout ---
-200
-2
-[5]
-[7]
+        // A body that isn't just the literal keeps its instance — one per value,
+        // since two values are two different bodies.
+        let a = wrap(5);
+        let b = wrap(7);
+        print(to_str(a.len() + b.len())); // 2
+        print(to_str(a)); // [5]
+        print(to_str(b)); // [7]
+    };
+    assert(out == """
+        200
+        2
+        [5]
+        [7]
+
+    """);
+})

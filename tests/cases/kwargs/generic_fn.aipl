@@ -2,17 +2,29 @@
 # One typed by the function's own type variable works too, and defers its
 # check to the call site — see `generic_default`.
 
-import { len, narrow, print, to_str, value_or, wrapping_add as + } from builtins;
+import { equal as ==, len, narrow, print, to_str, value_or, wrapping_add as + } from builtins;
 
 fn padded_len<T: any>(xs: T[], extra: i64 = 10) -> i64 {
     let n: i64 = xs.len().narrow().value_or(0);
     n + extra
 }
 
-fn main() !prints {
-    print(to_str(padded_len([1, 2, 3])));
-    print(to_str(padded_len(["a"], extra=1)));
-}
---- stdout ---
-13
-2
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(padded_len([1, 2, 3])));
+        print(to_str(padded_len(["a"], extra=1)));
+    };
+    assert(out == """
+        13
+        2
+
+    """);
+})

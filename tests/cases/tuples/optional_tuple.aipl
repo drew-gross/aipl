@@ -11,14 +11,26 @@ fn lookup(want: bool) -> (i64, str)? { if (want) { some((7, "seven")) } else { n
 // rather than a `base_ty` that more suffixes could attach to.
 fn describe(p: (i64, str)?) -> str { p.map(|pair| `{pair.0}={pair.1}`).value_or("nothing") }
 
-fn main() !prints {
-    print(describe(lookup(true)));
-    print(describe(lookup(false)));
-    print((lookup(true) == some((7, "seven"))).to_str());
-    print((lookup(false) == none).to_str());
-}
---- stdout ---
-7=seven
-nothing
-true
-true
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(describe(lookup(true)));
+        print(describe(lookup(false)));
+        print((lookup(true) == some((7, "seven"))).to_str());
+        print((lookup(false) == none).to_str());
+    };
+    assert(out == """
+        7=seven
+        nothing
+        true
+        true
+
+    """);
+})

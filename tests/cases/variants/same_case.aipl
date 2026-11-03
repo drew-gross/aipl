@@ -9,30 +9,41 @@ import { equal as ==, print, same_case, to_str } from builtins;
 
 variant Tok = Space | Name(str) | IntLit(i64) | StrLit(str, i64)
 
-fn main() !prints {
-    // Same case, different payloads — the question `==` cannot ask.
-    print(Name("x").same_case(Name("y")).to_str());
-    print((Name("x") == Name("y")).to_str()); // `==` says false: payloads differ
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Same case, different payloads — the question `==` cannot ask.
+        print(Name("x").same_case(Name("y")).to_str());
+        print((Name("x") == Name("y")).to_str()); // `==` says false: payloads differ
 
-    // Different cases.
-    print(Name("x").same_case(Space).to_str());
-    print(IntLit(1).same_case(Name("a")).to_str());
+        // Different cases.
+        print(Name("x").same_case(Space).to_str());
+        print(IntLit(1).same_case(Name("a")).to_str());
 
-    // A payload-free case, and a multi-payload one.
-    print(Space.same_case(Space).to_str());
-    print(StrLit("a", 1).same_case(StrLit("zzz", 99)).to_str());
-    print(StrLit("a", 1).same_case(IntLit(1)).to_str());
+        // A payload-free case, and a multi-payload one.
+        print(Space.same_case(Space).to_str());
+        print(StrLit("a", 1).same_case(StrLit("zzz", 99)).to_str());
+        print(StrLit("a", 1).same_case(IntLit(1)).to_str());
 
-    // Free-call form.
-    print(same_case(Name("p"), Name("q")).to_str());
-}
---- stdout ---
-true
-false
-false
-false
-true
-true
-false
-true
+        // Free-call form.
+        print(same_case(Name("p"), Name("q")).to_str());
+    };
+    assert(out == """
+        true
+        false
+        false
+        false
+        true
+        true
+        false
+        true
 
+    """);
+})

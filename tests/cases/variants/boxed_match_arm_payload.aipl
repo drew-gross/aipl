@@ -9,7 +9,7 @@
 # parameter and was always correct. `render` differs from it by one identity
 # copy, and printed `[ ]` instead of `[a b]`.
 
-import { join, map, print } from builtins;
+import { equal as ==, join, map, print } from builtins;
 
 variant R = Nm(str) | Seq(R[])
 
@@ -45,13 +45,25 @@ fn render_plain(r: R) -> str {
     }
 }
 
-fn main() !prints {
-    let t = Seq([Nm("a"), Nm("b")]);
-    print(`copy at each level: [{render(t)}]`);
-    print(`no copy:            [{render_plain(t)}]`);
-    print(`copy once:          [{render_plain(copy_or(t))}]`);
-}
---- stdout ---
-copy at each level: [a b]
-no copy:            [a b]
-copy once:          [a b]
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let t = Seq([Nm("a"), Nm("b")]);
+        print(`copy at each level: [{render(t)}]`);
+        print(`no copy:            [{render_plain(t)}]`);
+        print(`copy once:          [{render_plain(copy_or(t))}]`);
+    };
+    assert(out == """
+        copy at each level: [a b]
+        no copy:            [a b]
+        copy once:          [a b]
+
+    """);
+})

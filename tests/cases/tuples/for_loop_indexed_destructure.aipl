@@ -2,30 +2,42 @@
 # composed: `i` counts iterations from 0, and each element is destructured
 # as `for (let (a, b) : xs)` would. The pattern needs at least two names.
 
-import { print, tuple_windows, wrapping_add as + } from builtins;
+import { equal as ==, print, tuple_windows, wrapping_add as + } from builtins;
 
-fn main() !prints {
-    let pairs = [(1, "one"), (2, "two"), (3, "three")];
-    for (let i, (n, s) : pairs) {
-        print(`{i}: {n} {s}`);
-    }
-    // The shape it was added for: an indexed walk over adjacent pairs.
-    for (let i, (c, next) : "abcd".tuple_windows()) {
-        print(`{i}: {c}{next}`);
-    }
-    // Nested: each loop has its own counter.
-    for (let i, (a, b) : [(1, 2), (3, 4)]) {
-        for (let j, (c, d) : [(5, 6)]) {
-            print(`{i}{j} {a + b + c + d}`);
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let pairs = [(1, "one"), (2, "two"), (3, "three")];
+        for (let i, (n, s) : pairs) {
+            print(`{i}: {n} {s}`);
         }
-    }
-}
---- stdout ---
-0: 1 one
-1: 2 two
-2: 3 three
-0: ab
-1: bc
-2: cd
-00 14
-10 18
+        // The shape it was added for: an indexed walk over adjacent pairs.
+        for (let i, (c, next) : "abcd".tuple_windows()) {
+            print(`{i}: {c}{next}`);
+        }
+        // Nested: each loop has its own counter.
+        for (let i, (a, b) : [(1, 2), (3, 4)]) {
+            for (let j, (c, d) : [(5, 6)]) {
+                print(`{i}{j} {a + b + c + d}`);
+            }
+        }
+    };
+    assert(out == """
+        0: 1 one
+        1: 2 two
+        2: 3 three
+        0: ab
+        1: bc
+        2: cd
+        00 14
+        10 18
+
+    """);
+})

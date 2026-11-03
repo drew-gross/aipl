@@ -2,7 +2,7 @@
 # elementwise equality, with a required `_` default as the last arm. The
 # elements are literals (validated by the checker).
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 fn code(xs: i64[]) -> i64 {
     match (xs) {
@@ -24,22 +24,34 @@ fn label(xs: str[]) -> str {
     }
 }
 
-fn main() !prints {
-    print(to_str(code([1, 2, 3]))); // 1
-    print(to_str(code([4, 5]))); // 2
-    print(to_str(code([]))); // 3
-    print(to_str(code([1, 2]))); // 0  (length mismatch with [1,2,3])
-    print(to_str(code([1, 2, 4]))); // 0  (element mismatch)
-    print(label(["a", "b"])); // ab
-    print(label(["greeting", "msg"])); // found
-    print(label(["x"])); // other
-}
---- stdout ---
-1
-2
-3
-0
-0
-ab
-found
-other
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(code([1, 2, 3]))); // 1
+        print(to_str(code([4, 5]))); // 2
+        print(to_str(code([]))); // 3
+        print(to_str(code([1, 2]))); // 0  (length mismatch with [1,2,3])
+        print(to_str(code([1, 2, 4]))); // 0  (element mismatch)
+        print(label(["a", "b"])); // ab
+        print(label(["greeting", "msg"])); // found
+        print(label(["x"])); // other
+    };
+    assert(out == """
+        1
+        2
+        3
+        0
+        0
+        ab
+        found
+        other
+
+    """);
+})

@@ -3,7 +3,7 @@
 # field, applied via `match` + indirect call. The struct's type argument `K` is
 # inferred from the nested generic `Emit<K>` field of the constructed value.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 variant Tok = Ident(str) | Num(i64) | Plus
 
@@ -27,13 +27,29 @@ fn show(t: Tok) -> str {
     }
 }
 
-fn main() !prints {
-    let rules = [Rule { emit: OfStr(Ident) }, Rule { emit: OfInt(Num) }, Rule { emit: Bare(Plus) }];
-    for (let r : rules) {
-        print(show(run(r.emit, "hi", 42)));
-    }
-}
---- stdout ---
-hi
-42
-+
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let rules = [
+            Rule { emit: OfStr(Ident) },
+            Rule { emit: OfInt(Num) },
+            Rule { emit: Bare(Plus) },
+        ];
+        for (let r : rules) {
+            print(show(run(r.emit, "hi", 42)));
+        }
+    };
+    assert(out == """
+        hi
+        42
+        +
+
+    """);
+})

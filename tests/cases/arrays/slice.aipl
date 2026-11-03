@@ -5,37 +5,49 @@
 # result is a window onto the source's elements (see `slice_shares` for what
 # that costs and what it means for mutation); the source is unchanged.
 
-import { print, reverse, to_str } from builtins;
+import { equal as ==, print, reverse, to_str } from builtins;
 
-fn main() !prints {
-    let xs = [10, 20, 30, 40, 50];
-    print(xs[1..4].to_str()); // [20, 30, 40]
-    print(xs[..2].to_str()); // [10, 20]
-    print(xs[2..].to_str()); // [30, 40, 50]
-    print(xs[3..100].to_str()); // [40, 50]  (end clamped to len)
-    print(xs[4..2].to_str()); // []  (start > end)
-    print(xs.to_str()); // the source is unchanged
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let xs = [10, 20, 30, 40, 50];
+        print(xs[1..4].to_str()); // [20, 30, 40]
+        print(xs[..2].to_str()); // [10, 20]
+        print(xs[2..].to_str()); // [30, 40, 50]
+        print(xs[3..100].to_str()); // [40, 50]  (end clamped to len)
+        print(xs[4..2].to_str()); // []  (start > end)
+        print(xs.to_str()); // the source is unchanged
 
-    // Heap elements are co-owned: the slice and the source stay independently
-    // usable (and independently droppable).
-    let ss = ["a", "bb", "ccc", "dddd"];
-    let mid = ss[1..3];
-    print(mid.to_str()); // ["bb", "ccc"]
-    print(ss.to_str()); // ["a", "bb", "ccc", "dddd"]
-    // `bool[]` is bit-packed; the slice start need not be byte-aligned.
-    let bs = [true, false, true, true, false];
-    print(bs[1..4].to_str()); // [false, true, true]
-    // A reversed-view source reads its elements through the view.
-    print(xs.reverse()[1..3].to_str()); // [40, 30]
-}
---- stdout ---
-[20, 30, 40]
-[10, 20]
-[30, 40, 50]
-[40, 50]
-[]
-[10, 20, 30, 40, 50]
-["bb", "ccc"]
-["a", "bb", "ccc", "dddd"]
-[false, true, true]
-[40, 30]
+        // Heap elements are co-owned: the slice and the source stay independently
+        // usable (and independently droppable).
+        let ss = ["a", "bb", "ccc", "dddd"];
+        let mid = ss[1..3];
+        print(mid.to_str()); // ["bb", "ccc"]
+        print(ss.to_str()); // ["a", "bb", "ccc", "dddd"]
+        // `bool[]` is bit-packed; the slice start need not be byte-aligned.
+        let bs = [true, false, true, true, false];
+        print(bs[1..4].to_str()); // [false, true, true]
+        // A reversed-view source reads its elements through the view.
+        print(xs.reverse()[1..3].to_str()); // [40, 30]
+    };
+    assert(out == """
+        [20, 30, 40]
+        [10, 20]
+        [30, 40, 50]
+        [40, 50]
+        []
+        [10, 20, 30, 40, 50]
+        ["bb", "ccc"]
+        ["a", "bb", "ccc", "dddd"]
+        [false, true, true]
+        [40, 30]
+
+    """);
+})

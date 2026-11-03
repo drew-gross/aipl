@@ -12,8 +12,17 @@ import { equal as ==, print, saturating_sub as -, to_str, wrapping_add as + } fr
 
 fn sum_to(n: u64, acc: u64) -> u64 { if (n == 0) { acc } else { sum_to(n - 1, acc + n) } }
 
-fn main() !prints {
-    print(sum_to(300000, 0).to_str());
-}
---- stdout ---
-45000150000
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(sum_to(300000, 0).to_str());
+    };
+    assert(out == "45000150000\n");
+})

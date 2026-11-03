@@ -6,7 +6,7 @@
 # case is empty" from "I'm ignoring what it holds" without going to look up the
 # variant.
 
-import { print, to_str, wrapping_sub as - } from builtins;
+import { equal as ==, print, to_str, wrapping_sub as - } from builtins;
 
 variant Shape = Circle(i64) | Rect(i64, i64) | Point | Line(i64, i64, i64, i64)
 
@@ -68,36 +68,48 @@ fn boom() -> !str { err("no") }
 
 fn fine() -> !str { ok() }
 
-fn main() !prints {
-    print(arity_free(Rect(1, 2)));
-    print(arity_free(Line(1, 2, 3, 4)));
-    print(arity_free(Circle(5)));
-    print(arity_free(Point));
-    print(is_flat(Point).to_str());
-    print(is_flat(Rect(1, 2)).to_str());
-    print(width(Between(2, 9)).to_str());
-    print(width(Nested(3, 5)).to_str());
-    print(width(Empty).to_str());
-    print(present(some(1)).to_str());
-    print(present(none).to_str());
-    print(succeeded(ok(1)).to_str());
-    print(succeeded(err("x")).to_str());
-    print(quiet(fine()).to_str());
-    print(quiet(boom()).to_str());
-}
---- stdout ---
-rect
-line
-circle
-point
-true
-false
-7
-2
-0
-true
-false
-true
-false
-true
-false
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(arity_free(Rect(1, 2)));
+        print(arity_free(Line(1, 2, 3, 4)));
+        print(arity_free(Circle(5)));
+        print(arity_free(Point));
+        print(is_flat(Point).to_str());
+        print(is_flat(Rect(1, 2)).to_str());
+        print(width(Between(2, 9)).to_str());
+        print(width(Nested(3, 5)).to_str());
+        print(width(Empty).to_str());
+        print(present(some(1)).to_str());
+        print(present(none).to_str());
+        print(succeeded(ok(1)).to_str());
+        print(succeeded(err("x")).to_str());
+        print(quiet(fine()).to_str());
+        print(quiet(boom()).to_str());
+    };
+    assert(out == """
+        rect
+        line
+        circle
+        point
+        true
+        false
+        7
+        2
+        0
+        true
+        false
+        true
+        false
+        true
+        false
+
+    """);
+})

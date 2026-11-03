@@ -1,10 +1,22 @@
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
-fn main() !prints {
-    let t = (42, "hello");
-    print(to_str(t.0));
-    print(t.1);
-}
---- stdout ---
-42
-hello
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let t = (42, "hello");
+        print(to_str(t.0));
+        print(t.1);
+    };
+    assert(out == """
+        42
+        hello
+
+    """);
+})

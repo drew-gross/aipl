@@ -1,18 +1,30 @@
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 fn make_pairs() -> (i64, str)[] { [(1, "one"), (2, "two"), (3, "three")] }
 
-fn main() !prints {
-    let pairs = make_pairs();
-    for (let p : pairs) {
-        print(to_str(p.0));
-        print(p.1);
-    }
-}
---- stdout ---
-1
-one
-2
-two
-3
-three
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let pairs = make_pairs();
+        for (let p : pairs) {
+            print(to_str(p.0));
+            print(p.1);
+        }
+    };
+    assert(out == """
+        1
+        one
+        2
+        two
+        3
+        three
+
+    """);
+})

@@ -55,15 +55,27 @@ fn shift<K: variant>(self: Rule<K>, by: u64) -> Rule<K> {
 // is a different lookup again from the abstract one above.
 fn grammar() -> Rule<Tok> { Then([Term(Name("")), Repeat(Idx(1))]) }
 
-fn main() !prints {
-    print(grammar().size().to_str());
-    // Structural equality recurses through the boxed payloads.
-    print((grammar() == grammar()).to_str());
-    print(to_str(Repeat(Term(Space))));
-    print(to_str(grammar().shift(2)));
-}
---- stdout ---
-4
-true
-Repeat(Term(Space))
-Then([Term(Name("")), Repeat(Idx(3))])
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(grammar().size().to_str());
+        // Structural equality recurses through the boxed payloads.
+        print((grammar() == grammar()).to_str());
+        print(to_str(Repeat(Term(Space))));
+        print(to_str(grammar().shift(2)));
+    };
+    assert(out == """
+        4
+        true
+        Repeat(Term(Space))
+        Then([Term(Name("")), Repeat(Idx(3))])
+
+    """);
+})

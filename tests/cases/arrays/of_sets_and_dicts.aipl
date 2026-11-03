@@ -44,46 +44,58 @@ fn grown() -> #{str}[] {
     out
 }
 
-fn main() !prints {
-    let sets = tag_sets();
-    print(sets.len().to_str());
-    print(total_size(sets).to_str());
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let sets = tag_sets();
+        print(sets.len().to_str());
+        print(total_size(sets).to_str());
 
-    // Elements come back out intact, not as freed blocks.
-    match (sets[0]) {
-        some(s) => print(`{has_a(s)} {set_size(s)}`),
-        none => print("missing"),
+        // Elements come back out intact, not as freed blocks.
+        match (sets[0]) {
+            some(s) => print(`{has_a(s)} {set_size(s)}`),
+            none => print("missing"),
+        };
+
+        let ds = counts();
+        print(ds.len().to_str());
+        match (ds[0]) {
+            some(d) => print(d.get("b").to_str()),
+            none => print("missing"),
+        };
+        match (ds[1]) {
+            some(d) => print(d.is_empty().to_str()),
+            none => print("missing"),
+        };
+
+        // Copied element by element into a second array — both arrays co-own the
+        // same element blocks until each is released.
+        print(total_size(grown()).to_str());
+
+        // Equality compares element blocks, not pointers.
+        print((tag_sets() == tag_sets()).to_str());
+
+        // Nested one level further: an array of arrays of sets.
+        let nested: #{str}[][] = [tag_sets(), []];
+        print(nested.len().to_str());
     };
+    assert(out == """
+        3
+        3
+        true 2
+        2
+        some(2)
+        true
+        3
+        true
+        2
 
-    let ds = counts();
-    print(ds.len().to_str());
-    match (ds[0]) {
-        some(d) => print(d.get("b").to_str()),
-        none => print("missing"),
-    };
-    match (ds[1]) {
-        some(d) => print(d.is_empty().to_str()),
-        none => print("missing"),
-    };
-
-    // Copied element by element into a second array — both arrays co-own the
-    // same element blocks until each is released.
-    print(total_size(grown()).to_str());
-
-    // Equality compares element blocks, not pointers.
-    print((tag_sets() == tag_sets()).to_str());
-
-    // Nested one level further: an array of arrays of sets.
-    let nested: #{str}[][] = [tag_sets(), []];
-    print(nested.len().to_str());
-}
---- stdout ---
-3
-3
-true 2
-2
-some(2)
-true
-3
-true
-2
+    """);
+})

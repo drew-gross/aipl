@@ -6,7 +6,7 @@
 # asserts the shape below is what the formatter produces, and running it at all
 # asserts the parser accepts that shape.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 fn wide() -> (str, str) {
     (
@@ -24,12 +24,24 @@ fn narrow() -> (i64, i64) { (1, 2) }
 // element onward, which is where a tuple starts being one.
 fn three() -> (i64, i64, i64) { (1, 2, 3) }
 
-fn main() !prints {
-    print(wide().0);
-    print(narrow().1.to_str());
-    print(three().2.to_str());
-}
---- stdout ---
-a fairly long string, long enough that the pair cannot fit on one line
-2
-3
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(wide().0);
+        print(narrow().1.to_str());
+        print(three().2.to_str());
+    };
+    assert(out == """
+        a fairly long string, long enough that the pair cannot fit on one line
+        2
+        3
+
+    """);
+})

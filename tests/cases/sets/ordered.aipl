@@ -17,52 +17,64 @@ import {
     wrapping_add as +,
 } from builtins;
 
-fn main() !prints {
-    // Literals sort and dedup at construction.
-    let d = #>{3, 1, 2, 3, 10};
-    print(`{d}`);
-    let a = #<{"pear", "apple", "fig", "apple"};
-    print(`{a}`);
-    print(`{#<{'z', 'a', 'm'}}`);
-    print(`{#<{-5, 3, -20, 0}}`);
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Literals sort and dedup at construction.
+        let d = #>{3, 1, 2, 3, 10};
+        print(`{d}`);
+        let a = #<{"pear", "apple", "fig", "apple"};
+        print(`{a}`);
+        print(`{#<{'z', 'a', 'm'}}`);
+        print(`{#<{-5, 3, -20, 0}}`);
 
-    // An empty `#{}` is any set, so it seeds an ordered binding; `union` keeps
-    // the receiver's order, and takes any set of the element type for the other
-    // side — a plain `#{x}` is the natural way to add one element.
-    mut s: #>{i64} = #{};
-    set s = s.union(#>{5, 9});
-    set s = s.union(#{1});
-    set s = s.union(#<{9, 7});
-    print(`{s}`);
-    // Walking one visits the elements in its order.
-    for (let x : s) {
-        print(x.to_str());
-    }
-    // The set operations, and equality across orders of construction.
-    print(`{s.has(9)} {s.has(2)} {s.len()} {s.is_empty()}`);
-    print(`{#>{1, 2} == #>{2, 1}}`);
-    // `to_array` is the elements in order — the array that a `map`/`join` wants.
-    print(`{d.to_array()}`);
-    print(`{a.to_array()}`);
+        // An empty `#{}` is any set, so it seeds an ordered binding; `union` keeps
+        // the receiver's order, and takes any set of the element type for the other
+        // side — a plain `#{x}` is the natural way to add one element.
+        mut s: #>{i64} = #{};
+        set s = s.union(#>{5, 9});
+        set s = s.union(#{1});
+        set s = s.union(#<{9, 7});
+        print(`{s}`);
+        // Walking one visits the elements in its order.
+        for (let x : s) {
+            print(x.to_str());
+        }
+        // The set operations, and equality across orders of construction.
+        print(`{s.has(9)} {s.has(2)} {s.len()} {s.is_empty()}`);
+        print(`{#>{1, 2} == #>{2, 1}}`);
+        // `to_array` is the elements in order — the array that a `map`/`join` wants.
+        print(`{d.to_array()}`);
+        print(`{a.to_array()}`);
 
-    // Unsigned elements order as unsigned: the top bit is a big number, not a
-    // sign.
-    let half: u64 = 9223372036854775807;
-    let u = #<{half + half + 1, half + 1, half};
-    print(`{u}`);
-}
---- stdout ---
-{10, 3, 2, 1}
-{"apple", "fig", "pear"}
-{'a', 'm', 'z'}
-{-20, -5, 0, 3}
-{9, 7, 5, 1}
-9
-7
-5
-1
-true false 4 false
-true
-[10, 3, 2, 1]
-["apple", "fig", "pear"]
-{9223372036854775807, 9223372036854775808, 18446744073709551615}
+        // Unsigned elements order as unsigned: the top bit is a big number, not a
+        // sign.
+        let half: u64 = 9223372036854775807;
+        let u = #<{half + half + 1, half + 1, half};
+        print(`{u}`);
+    };
+    assert(out == """
+        {10, 3, 2, 1}
+        {"apple", "fig", "pear"}
+        {'a', 'm', 'z'}
+        {-20, -5, 0, 3}
+        {9, 7, 5, 1}
+        9
+        7
+        5
+        1
+        true false 4 false
+        true
+        [10, 3, 2, 1]
+        ["apple", "fig", "pear"]
+        {9223372036854775807, 9223372036854775808, 18446744073709551615}
+
+    """);
+})

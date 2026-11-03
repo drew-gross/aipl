@@ -11,7 +11,7 @@
 # effect of the `match`: it computed `x`. Anything that also mutates is spelled
 # as a statement, where a reader expects effects.
 
-import { print, to_str, wrapping_increment as ++ } from builtins;
+import { equal as ==, print, to_str, wrapping_increment as ++ } from builtins;
 
 variant Ev = Tick | Tock | Reset(u64)
 
@@ -27,51 +27,63 @@ fn label(e: Ev) -> str {
     }
 }
 
-fn main() !prints {
-    print(label(Tick));
-    print(label(Tock));
-    print(label(Reset(3)));
-
-    // Statement: arms yield nothing, so they may drive the surrounding `mut`
-    // bindings — and the `match` ends with `;`.
-    mut ticks: u64 = 0;
-    mut last = "";
-    for (let e : [Tick, Tock, Reset(9), Tick]) {
-        match (e) {
-            Tick => {
-                set ticks++;
-            },
-            Tock => {
-                set last = "tock";
-            },
-            Reset(n) => {
-                set ticks = n;
-                set last = "reset";
-            },
-        };
-    }
-    print(ticks.to_str());
-    print(last);
-
-    // An arm of an *expression* match may still use `mut` freely, as long as it
-    // declares what it assigns to.
-    let counted = match (Tock) {
-        Tick => 0,
-        Tock => {
-            mut n: u64 = 0;
-            for (let c : "abc") {
-                set n++;
-            }
-            n
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
         },
-        Reset(k) => k,
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(label(Tick));
+        print(label(Tock));
+        print(label(Reset(3)));
+
+        // Statement: arms yield nothing, so they may drive the surrounding `mut`
+        // bindings — and the `match` ends with `;`.
+        mut ticks: u64 = 0;
+        mut last = "";
+        for (let e : [Tick, Tock, Reset(9), Tick]) {
+            match (e) {
+                Tick => {
+                    set ticks++;
+                },
+                Tock => {
+                    set last = "tock";
+                },
+                Reset(n) => {
+                    set ticks = n;
+                    set last = "reset";
+                },
+            };
+        }
+        print(ticks.to_str());
+        print(last);
+
+        // An arm of an *expression* match may still use `mut` freely, as long as it
+        // declares what it assigns to.
+        let counted = match (Tock) {
+            Tick => 0,
+            Tock => {
+                mut n: u64 = 0;
+                for (let c : "abc") {
+                    set n++;
+                }
+                n
+            },
+            Reset(k) => k,
+        };
+        print(counted.to_str());
     };
-    print(counted.to_str());
-}
---- stdout ---
-tick
-TOCK
-reset 3
-10
-reset
-3
+    assert(out == """
+        tick
+        TOCK
+        reset 3
+        10
+        reset
+        3
+
+    """);
+})

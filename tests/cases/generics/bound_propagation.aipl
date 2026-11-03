@@ -6,7 +6,7 @@
 # — every type variable looked alike to the checker, so there was no bound left
 # to consult and `xs.minimum()` below was a compile error.
 
-import { minimum, print, same_case, to_str } from builtins;
+import { equal as ==, minimum, print, same_case, to_str } from builtins;
 
 variant Tok = Space | Name(str) | IntLit(i64)
 
@@ -25,22 +25,33 @@ fn matches<K: variant>(rule: Rule<K>, tok: K) -> bool {
     }
 }
 
-fn main() !prints {
-    print(smallest([3, 1, 2]).to_str());
-    print(smallest(['c', 'a']).to_str());
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(smallest([3, 1, 2]).to_str());
+        print(smallest(['c', 'a']).to_str());
 
-    // The payload is ignored, so one rule matches every identifier.
-    print(matches(Term(Name("")), Name("ident")).to_str());
-    print(matches(Term(Name("")), Name("other")).to_str());
-    // and still discriminates between cases.
-    print(matches(Term(Name("")), Space).to_str());
-    print(matches(Term(IntLit(0)), IntLit(42)).to_str());
-}
---- stdout ---
-some(1)
-some('a')
-true
-true
-false
-true
+        // The payload is ignored, so one rule matches every identifier.
+        print(matches(Term(Name("")), Name("ident")).to_str());
+        print(matches(Term(Name("")), Name("other")).to_str());
+        // and still discriminates between cases.
+        print(matches(Term(Name("")), Space).to_str());
+        print(matches(Term(IntLit(0)), IntLit(42)).to_str());
+    };
+    assert(out == """
+        some(1)
+        some('a')
+        true
+        true
+        false
+        true
 
+    """);
+})

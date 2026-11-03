@@ -26,54 +26,66 @@ import {
     wrapping_sub as -,
 } from builtins;
 
-fn main() !prints {
-    let s = [3, 1, 2, 3].to_set();
-    // Collision-free: every element survives, in the order iterating gives.
-    print(s.set_map(|x| x * 10).to_str());
-    print(s.set_map(to_str).to_str());
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let s = [3, 1, 2, 3].to_set();
+        // Collision-free: every element survives, in the order iterating gives.
+        print(s.set_map(|x| x * 10).to_str());
+        print(s.set_map(to_str).to_str());
 
-    // The headline: three elements all mapping to one answer are one element
-    // out, and the length says so.
-    let flat = s.set_map(|x| 0);
-    print(`{flat} {flat.len()} {s.len()}`);
+        // The headline: three elements all mapping to one answer are one element
+        // out, and the length says so.
+        let flat = s.set_map(|x| 0);
+        print(`{flat} {flat.len()} {s.len()}`);
 
-    // Partial collapse — the two odd elements share an answer, the even one
-    // does not, so three elements give two.
-    print(s.set_map(|x| x % 2).to_str());
+        // Partial collapse — the two odd elements share an answer, the even one
+        // does not, so three elements give two.
+        print(s.set_map(|x| x % 2).to_str());
 
-    // The receiver may be a set of any order; the result is always unordered,
-    // because `f` changes the very values an order would be over.
-    let asc: #<{i64} = [3, 1, 2].to_set();
-    print(asc.set_map(|x| x * 10).to_str());
-    let desc: #>{i64} = [3, 1, 2].to_set();
-    print(desc.set_map(|x| x * 10).to_str());
+        // The receiver may be a set of any order; the result is always unordered,
+        // because `f` changes the very values an order would be over.
+        let asc: #<{i64} = [3, 1, 2].to_set();
+        print(asc.set_map(|x| x * 10).to_str());
+        let desc: #>{i64} = [3, 1, 2].to_set();
+        print(desc.set_map(|x| x * 10).to_str());
 
-    // Asking for an order is a written step, not an inference: take the ordered
-    // set's elements, map them, and say which set to rebuild.
-    let sorted: #<{i64} = asc.to_array().map(|x| 0 - x).to_set();
-    print(sorted.to_str());
+        // Asking for an order is a written step, not an inference: take the ordered
+        // set's elements, map them, and say which set to rebuild.
+        let sorted: #<{i64} = asc.to_array().map(|x| 0 - x).to_set();
+        print(sorted.to_str());
 
-    // Generic in both directions: the result type need not be the element's,
-    // and collapsing onto a `bool` is the extreme case.
-    let chars: #{char} = ['a', 'b'].to_set();
-    print(chars.set_map(to_str).to_str());
-    print(chars.set_map(|c| c == 'z').to_str());
-    // A set of parts joins exactly as an array of them would.
-    print(chars.set_map(to_str).join(sep="+"));
+        // Generic in both directions: the result type need not be the element's,
+        // and collapsing onto a `bool` is the extreme case.
+        let chars: #{char} = ['a', 'b'].to_set();
+        print(chars.set_map(to_str).to_str());
+        print(chars.set_map(|c| c == 'z').to_str());
+        // A set of parts joins exactly as an array of them would.
+        print(chars.set_map(to_str).join(sep="+"));
 
-    // An empty set maps to the empty set.
-    let empty: #{i64} = #{};
-    print(empty.set_map(|x| x * 2).to_str());
-}
---- stdout ---
-{30, 10, 20}
-{"3", "1", "2"}
-{0} 1 3
-{1, 0}
-{10, 20, 30}
-{30, 20, 10}
-{-3, -2, -1}
-{"a", "b"}
-{false}
-a+b
-{}
+        // An empty set maps to the empty set.
+        let empty: #{i64} = #{};
+        print(empty.set_map(|x| x * 2).to_str());
+    };
+    assert(out == """
+        {30, 10, 20}
+        {"3", "1", "2"}
+        {0} 1 3
+        {1, 0}
+        {10, 20, 30}
+        {30, 20, 10}
+        {-3, -2, -1}
+        {"a", "b"}
+        {false}
+        a+b
+        {}
+
+    """);
+})

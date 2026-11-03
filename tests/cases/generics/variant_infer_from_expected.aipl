@@ -7,7 +7,7 @@
 # program-wide, and adding a second broke the first: the two grammars below
 # could not coexist.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 variant Tok = Space | Word(str)
 
@@ -46,24 +46,35 @@ fn via_annotation2() -> str {
     r.to_str()
 }
 
-fn main() !prints {
-    print(to_str(paren(true)));
-    print(to_str(paren(false)));
-    print(to_str(dot(true)));
-    print(to_str(dot(false)));
-    print(via_annotation());
-    print(via_annotation2());
-    // A constructor that *does* pin K needs no help, and coexists with both.
-    print(to_str(Term(Space)));
-    print(to_str(Term(Dot)));
-}
---- stdout ---
-Literal("(")
-Literal(")")
-Named("a")
-Named("b")
-Literal("[")
-Named("n")
-Term(Space)
-Term(Dot)
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(paren(true)));
+        print(to_str(paren(false)));
+        print(to_str(dot(true)));
+        print(to_str(dot(false)));
+        print(via_annotation());
+        print(via_annotation2());
+        // A constructor that *does* pin K needs no help, and coexists with both.
+        print(to_str(Term(Space)));
+        print(to_str(Term(Dot)));
+    };
+    assert(out == """
+        Literal("(")
+        Literal(")")
+        Named("a")
+        Named("b")
+        Literal("[")
+        Named("n")
+        Term(Space)
+        Term(Dot)
 
+    """);
+})

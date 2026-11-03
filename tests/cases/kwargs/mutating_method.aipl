@@ -1,16 +1,25 @@
 # A mutating method can carry a keyword parameter after its `mut self`.
 
-import { len, print, push, to_str } from builtins;
+import { equal as ==, len, print, push, to_str } from builtins;
 
 fn extend(mut self: i64[], v: i64 = 5) {
     set self.push(v);
 }
 
-fn main() !prints {
-    mut xs = [1];
-    set xs.extend();
-    set xs.extend(v=9);
-    print(to_str(xs.len()));
-}
---- stdout ---
-3
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        mut xs = [1];
+        set xs.extend();
+        set xs.extend(v=9);
+        print(to_str(xs.len()));
+    };
+    assert(out == "3\n");
+})

@@ -9,7 +9,7 @@
 # value, `hi?=o` supplies the presence-or-absence itself, and omitting it is the
 # same as forwarding a `none`.
 
-import { print, value_or } from builtins;
+import { equal as ==, print, value_or } from builtins;
 
 fn clamp(x: u64, hi?: u64 = none) -> str { `{x} hi={hi.value_or(99)}` }
 
@@ -21,34 +21,46 @@ fn outer(x: u64, hi?: u64 = none) -> str { clamp(x, hi?=hi) }
 // at one boundary.
 fn outer2(hi?: u64 = none) -> str { outer(7, hi?=hi) }
 
-fn main() !prints {
-    // Supplied and omitted, straight through.
-    print(clamp(5));
-    print(clamp(5, hi=9));
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Supplied and omitted, straight through.
+        print(clamp(5));
+        print(clamp(5, hi=9));
 
-    // The same, one wrapper deep.
-    print(outer(5));
-    print(outer(5, hi=9));
+        // The same, one wrapper deep.
+        print(outer(5));
+        print(outer(5, hi=9));
 
-    // And two.
-    print(outer2());
-    print(outer2(hi=1));
+        // And two.
+        print(outer2());
+        print(outer2(hi=1));
 
-    // Any expression of the optional type forwards, not just a parameter.
-    let o: u64? = some(3);
-    print(clamp(5, hi?=o));
+        // Any expression of the optional type forwards, not just a parameter.
+        let o: u64? = some(3);
+        print(clamp(5, hi?=o));
 
-    // Forwarding a `none` is how "absent" travels: the same answer omitting it
-    // gives, which is what makes a wrapper's pass-through faithful.
-    let n: u64? = none;
-    print(clamp(5, hi?=n));
-}
---- stdout ---
-5 hi=99
-5 hi=9
-5 hi=99
-5 hi=9
-7 hi=99
-7 hi=1
-5 hi=3
-5 hi=99
+        // Forwarding a `none` is how "absent" travels: the same answer omitting it
+        // gives, which is what makes a wrapper's pass-through faithful.
+        let n: u64? = none;
+        print(clamp(5, hi?=n));
+    };
+    assert(out == """
+        5 hi=99
+        5 hi=9
+        5 hi=99
+        5 hi=9
+        7 hi=99
+        7 hi=1
+        5 hi=3
+        5 hi=99
+
+    """);
+})

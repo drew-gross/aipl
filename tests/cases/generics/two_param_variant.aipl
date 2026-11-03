@@ -6,7 +6,7 @@
 # mangling of a second parameter went unexercised on the variant path. The
 # parser library wants it for a result-shaped node (`Ok(A) | Fail(B)`).
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 variant Either<A: any, B: any> = Left(A) | Right(B)
 
@@ -24,26 +24,37 @@ fn is_left<A: any, B: any>(e: Either<A, B>) -> bool {
     }
 }
 
-fn main() !prints {
-    // Two distinct instantiations coexist, each mangled on *both* parameters.
-    let a: Either<i64, str> = Left(5);
-    let b: Either<i64, str> = Right("nope");
-    print(left_or(a, 0).to_str());
-    print(left_or(b, 0).to_str());
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Two distinct instantiations coexist, each mangled on *both* parameters.
+        let a: Either<i64, str> = Left(5);
+        let b: Either<i64, str> = Right("nope");
+        print(left_or(a, 0).to_str());
+        print(left_or(b, 0).to_str());
 
-    // A different pairing of the same parameters is a different instance.
-    let c: Either<str, i64> = Left("yes");
-    print(left_or(c, "fallback"));
-    print(is_left(c).to_str());
+        // A different pairing of the same parameters is a different instance.
+        let c: Either<str, i64> = Left("yes");
+        print(left_or(c, "fallback"));
+        print(is_left(c).to_str());
 
-    // Swapping only the second parameter is also a distinct instance.
-    let d: Either<i64, char> = Right('x');
-    print(is_left(d).to_str());
-}
---- stdout ---
-5
-0
-yes
-true
-false
+        // Swapping only the second parameter is also a distinct instance.
+        let d: Either<i64, char> = Right('x');
+        print(is_left(d).to_str());
+    };
+    assert(out == """
+        5
+        0
+        yes
+        true
+        false
 
+    """);
+})

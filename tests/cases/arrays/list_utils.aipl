@@ -10,6 +10,7 @@ import {
     drop_last,
     drop_last_n,
     drop_n,
+    equal as ==,
     first,
     last,
     len,
@@ -17,46 +18,57 @@ import {
     to_str,
 } from builtins;
 
-fn main() !prints {
-    let xs = [1, 2, 3, 4];
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let xs = [1, 2, 3, 4];
 
-    print(xs.first().to_str());
-    print(xs.last().to_str());
-    print(xs.drop_first().len().to_str());
-    print(xs.drop_last().last().to_str());
-    print(xs.drop_n(2).first().to_str());
-    print(xs.drop_last_n(2).last().to_str());
+        print(xs.first().to_str());
+        print(xs.last().to_str());
+        print(xs.drop_first().len().to_str());
+        print(xs.drop_last().last().to_str());
+        print(xs.drop_n(2).first().to_str());
+        print(xs.drop_last_n(2).last().to_str());
 
-    // Saturating: dropping past the end is empty, never an error.
-    print(xs.drop_n(99).len().to_str());
-    print(xs.drop_last_n(99).len().to_str());
+        // Saturating: dropping past the end is empty, never an error.
+        print(xs.drop_n(99).len().to_str());
+        print(xs.drop_last_n(99).len().to_str());
 
-    // Empty: no ends to take, and dropping leaves it empty.
-    let e = xs[..0];
-    print(e.first().to_str());
-    print(e.last().to_str());
-    print(e.drop_first().len().to_str());
-    print(e.drop_last().len().to_str());
+        // Empty: no ends to take, and dropping leaves it empty.
+        let e = xs[..0];
+        print(e.first().to_str());
+        print(e.last().to_str());
+        print(e.drop_first().len().to_str());
+        print(e.drop_last().len().to_str());
 
-    // `str` counts as a list of `char` here, so the same six apply.
-    print("abc".first().to_str());
-    print("abc".drop_first());
-    print("abc".drop_last());
-}
---- stdout ---
-some(1)
-some(4)
-3
-some(3)
-some(3)
-some(2)
-0
-0
-none
-none
-0
-0
-some('a')
-bc
-ab
+        // `str` counts as a list of `char` here, so the same six apply.
+        print("abc".first().to_str());
+        print("abc".drop_first());
+        print("abc".drop_last());
+    };
+    assert(out == """
+        some(1)
+        some(4)
+        3
+        some(3)
+        some(3)
+        some(2)
+        0
+        0
+        none
+        none
+        0
+        0
+        some('a')
+        bc
+        ab
 
+    """);
+})

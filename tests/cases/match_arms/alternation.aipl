@@ -9,7 +9,7 @@
 # all see exactly the shape they would have seen written longhand. Writing the
 # arms out one per line and grouping them here compile to the same program.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 variant Tok = Fn | If | Else | Name(str) | Num(i64)
 
@@ -47,23 +47,34 @@ fn is_vowel(c: char) -> bool {
     }
 }
 
-fn main() !prints {
-    print(label(classify(Fn)));
-    print(label(classify(Else)));
-    print(label(classify(Num(1))));
-    print(keyword_group("mut").to_str());
-    print(keyword_group("else").to_str());
-    print(keyword_group("nope").to_str());
-    print(is_vowel('e').to_str());
-    print(is_vowel('z').to_str());
-}
---- stdout ---
-kw
-kw
-other
-1
-2
-0
-true
-false
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(label(classify(Fn)));
+        print(label(classify(Else)));
+        print(label(classify(Num(1))));
+        print(keyword_group("mut").to_str());
+        print(keyword_group("else").to_str());
+        print(keyword_group("nope").to_str());
+        print(is_vowel('e').to_str());
+        print(is_vowel('z').to_str());
+    };
+    assert(out == """
+        kw
+        kw
+        other
+        1
+        2
+        0
+        true
+        false
 
+    """);
+})

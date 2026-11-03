@@ -8,7 +8,7 @@
 # leading one reads as "start from base, then override" — the same text with
 # two plausible meanings, so only the unambiguous order is accepted.
 
-import { print, to_str, value_or } from builtins;
+import { equal as ==, print, to_str, value_or } from builtins;
 
 struct Config { host: str, port: i64, debug: bool }
 
@@ -22,44 +22,56 @@ struct Box<T> { value: T, tag: i64 }
 // freed exactly once.
 struct Rec { name: str, tags: str[], n: i64 }
 
-fn main() !prints {
-    let base = Config { host: "localhost", port: 80, debug: false };
-    let prod = Config { ..base, port: 443, debug: true };
-    print(prod.host);
-    print(prod.port.to_str());
-    print(prod.debug.to_str());
-    // The spread reads `base`; it does not consume it.
-    print(base.port.to_str());
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let base = Config { host: "localhost", port: 80, debug: false };
+        let prod = Config { ..base, port: 443, debug: true };
+        print(prod.host);
+        print(prod.port.to_str());
+        print(prod.debug.to_str());
+        // The spread reads `base`; it does not consume it.
+        print(base.port.to_str());
 
-    // Overriding nothing is a plain copy.
-    let same = Config { ..base };
-    print(same.host);
-    print(same.port.to_str());
+        // Overriding nothing is a plain copy.
+        let same = Config { ..base };
+        print(same.host);
+        print(same.port.to_str());
 
-    let b1 = Box { value: 7, tag: 1 };
-    let b2 = Box { ..b1, tag: 2 };
-    print(b2.value.to_str());
-    print(b2.tag.to_str());
+        let b1 = Box { value: 7, tag: 1 };
+        let b2 = Box { ..b1, tag: 2 };
+        print(b2.value.to_str());
+        print(b2.tag.to_str());
 
-    let r = Rec { name: "orig", tags: ["a", "b"], n: 1 };
-    let r2 = Rec { ..r, n: 2 };
-    print(r.name);
-    print(r2.name);
-    print(r.tags[0].value_or("?"));
-    print(r2.tags[1].value_or("?"));
-    print(r2.n.to_str());
-}
---- stdout ---
-localhost
-443
-true
-80
-localhost
-80
-7
-2
-orig
-orig
-a
-b
-2
+        let r = Rec { name: "orig", tags: ["a", "b"], n: 1 };
+        let r2 = Rec { ..r, n: 2 };
+        print(r.name);
+        print(r2.name);
+        print(r.tags[0].value_or("?"));
+        print(r2.tags[1].value_or("?"));
+        print(r2.n.to_str());
+    };
+    assert(out == """
+        localhost
+        443
+        true
+        80
+        localhost
+        80
+        7
+        2
+        orig
+        orig
+        a
+        b
+        2
+
+    """);
+})

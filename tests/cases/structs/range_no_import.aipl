@@ -1,11 +1,20 @@
 # A range expression needs no `Span` import — no name is spelled, matching
 # `..` in slice position (which has always worked unimported).
 
-import { print } from builtins;
+import { equal as ==, print } from builtins;
 
-fn main() !prints {
-    let r = 2..6;
-    print("hello, world"[r]);
-}
---- stdout ---
-llo,
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let r = 2..6;
+        print("hello, world"[r]);
+    };
+    assert(out == "llo,\n");
+})

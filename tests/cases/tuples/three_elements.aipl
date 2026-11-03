@@ -1,12 +1,24 @@
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
-fn main() !prints {
-    let t = (1, "two", 3);
-    print(to_str(t.0));
-    print(t.1);
-    print(to_str(t.2));
-}
---- stdout ---
-1
-two
-3
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let t = (1, "two", 3);
+        print(to_str(t.0));
+        print(t.1);
+        print(to_str(t.2));
+    };
+    assert(out == """
+        1
+        two
+        3
+
+    """);
+})

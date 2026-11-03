@@ -7,28 +7,39 @@
 
 import { equal as ==, intersperse, join, len, print, to_str } from builtins;
 
-fn main() !prints {
-    // Between, not around: three elements give five slots.
-    print(["a", "b", "c"].intersperse("-").len().to_str());
-    print(["a", "b", "c"].intersperse("-").join());
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Between, not around: three elements give five slots.
+        print(["a", "b", "c"].intersperse("-").len().to_str());
+        print(["a", "b", "c"].intersperse("-").join());
 
-    // Fewer than two elements: nothing to separate, so the array is unchanged.
-    print(["a"].intersperse("-").len().to_str());
-    print([].intersperse("-").len().to_str());
+        // Fewer than two elements: nothing to separate, so the array is unchanged.
+        print(["a"].intersperse("-").len().to_str());
+        print([].intersperse("-").len().to_str());
 
-    // Generic over the element type — the separator is an ordinary element.
-    print([1, 2, 3].intersperse(0).len().to_str());
-    print(([1, 2, 3].intersperse(0)[1] == some(0)).to_str());
+        // Generic over the element type — the separator is an ordinary element.
+        print([1, 2, 3].intersperse(0).len().to_str());
+        print(([1, 2, 3].intersperse(0)[1] == some(0)).to_str());
 
-    // Free-call form.
-    print(intersperse([7, 8], 9).len().to_str());
-}
---- stdout ---
-5
-a-b-c
-1
-0
-5
-true
-3
+        // Free-call form.
+        print(intersperse([7, 8], 9).len().to_str());
+    };
+    assert(out == """
+        5
+        a-b-c
+        1
+        0
+        5
+        true
+        3
 
+    """);
+})

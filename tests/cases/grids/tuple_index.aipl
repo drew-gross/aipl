@@ -7,36 +7,48 @@ fn at(row: u64, column: u64) -> (u64, u64) { (row, column) }
 
 fn row_of(cell: (u64, u64)) -> u64 { cell.0 }
 
-fn main() !prints {
-    mut grid: i64[,] = [[1, 2], [3, 4]];
-    let cell = at(1, 0);
-    // A pair of literals takes the type it is written for.
-    let corner: (u64, u64) = (1, 1);
-    print(to_str(grid[corner]));
-    print(to_str(grid[(0, 0)]));
-    print(to_str(row_of((7, 8))));
-    // They flex in an array being compared, and as a default.
-    print(to_str([at(0, 1), at(2, 3)] == [(0, 1), (2, 3)]));
-    let none_at: (u64, u64)? = none;
-    print(to_str(none_at.value_or((4, 5))));
-    print(to_str(grid[cell]));
-    print(to_str(grid[at(0, 1)]));
-    // Off the grid is `none`, as with two indexes.
-    print(to_str(grid[at(2, 0)]));
-    set grid[cell] = 30 else {};
-    set grid[at(5, 5)] = 9 else {
-        print("missed");
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        mut grid: i64[,] = [[1, 2], [3, 4]];
+        let cell = at(1, 0);
+        // A pair of literals takes the type it is written for.
+        let corner: (u64, u64) = (1, 1);
+        print(to_str(grid[corner]));
+        print(to_str(grid[(0, 0)]));
+        print(to_str(row_of((7, 8))));
+        // They flex in an array being compared, and as a default.
+        print(to_str([at(0, 1), at(2, 3)] == [(0, 1), (2, 3)]));
+        let none_at: (u64, u64)? = none;
+        print(to_str(none_at.value_or((4, 5))));
+        print(to_str(grid[cell]));
+        print(to_str(grid[at(0, 1)]));
+        // Off the grid is `none`, as with two indexes.
+        print(to_str(grid[at(2, 0)]));
+        set grid[cell] = 30 else {};
+        set grid[at(5, 5)] = 9 else {
+            print("missed");
+        };
+        print(to_str(grid));
     };
-    print(to_str(grid));
-}
---- stdout ---
-some(4)
-some(1)
-7
-true
-(4, 5)
-some(3)
-some(2)
-none
-missed
-[[1, 2], [30, 4]]
+    assert(out == """
+        some(4)
+        some(1)
+        7
+        true
+        (4, 5)
+        some(3)
+        some(2)
+        none
+        missed
+        [[1, 2], [30, 4]]
+
+    """);
+})

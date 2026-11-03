@@ -9,7 +9,14 @@
 # every pattern kind, which is what this covers: constructor arms with payload
 # bindings, `some`/`none`, string- and char-literal arms, and the wildcard.
 
-import { len, print, to_str, wrapping_add as +, wrapping_increment as ++ } from builtins;
+import {
+    equal as ==,
+    len,
+    print,
+    to_str,
+    wrapping_add as +,
+    wrapping_increment as ++,
+} from builtins;
 
 variant Shape = Dot | Line(u64) | Box(u64, u64)
 
@@ -68,26 +75,38 @@ fn shout(c: char) -> str {
     }
 }
 
-fn main() !prints {
-    print(area(Dot).to_str());
-    print(area(Line(3)).to_str());
-    print(area(Box(2, 5)).to_str());
-    print(opt(some(4)).to_str());
-    print(opt(none).to_str());
-    print(classify(""));
-    print(classify("a"));
-    print(classify("xyz"));
-    print(shout('a'));
-    print(shout('z'));
-}
---- stdout ---
-0
-6
-14
-5
-0
-empty
-single 1
-many 3
-AY
-?
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(area(Dot).to_str());
+        print(area(Line(3)).to_str());
+        print(area(Box(2, 5)).to_str());
+        print(opt(some(4)).to_str());
+        print(opt(none).to_str());
+        print(classify(""));
+        print(classify("a"));
+        print(classify("xyz"));
+        print(shout('a'));
+        print(shout('z'));
+    };
+    assert(out == """
+        0
+        6
+        14
+        5
+        0
+        empty
+        single 1
+        many 3
+        AY
+        ?
+
+    """);
+})

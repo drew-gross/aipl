@@ -14,6 +14,7 @@
 # deallocations agree.
 
 import {
+    equal as ==,
     join,
     less_than as <,
     map,
@@ -56,12 +57,24 @@ fn eval(self: Calc) -> i64 {
 // A heap-backed operator string, as the compiler's own grammars build theirs.
 fn op(parts: str[]) -> str { parts.map(|p| p).join() }
 
-fn main() !prints {
-    print(`{Bin(op(["^"]), Num(2), Num(3)).eval()}`);
-    print(`{Bin(op(["+"]), Num(2), Num(3)).eval()}`);
-    print(`{Bin(op(["^"]), Bin(op(["^"]), Num(2), Num(2)), Num(2)).eval()}`);
-}
---- stdout ---
-8
-5
-16
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`{Bin(op(["^"]), Num(2), Num(3)).eval()}`);
+        print(`{Bin(op(["+"]), Num(2), Num(3)).eval()}`);
+        print(`{Bin(op(["^"]), Bin(op(["^"]), Num(2), Num(2)), Num(2)).eval()}`);
+    };
+    assert(out == """
+        8
+        5
+        16
+
+    """);
+})

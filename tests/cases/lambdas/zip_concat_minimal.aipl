@@ -1,4 +1,4 @@
-import { print, zip_with } from builtins;
+import { equal as ==, print, zip_with } from builtins;
 
 fn show_strs(label: str, xs: str[]) !prints {
     print(label);
@@ -7,10 +7,22 @@ fn show_strs(label: str, xs: str[]) !prints {
     }
 }
 
-fn main() !prints {
-    show_strs("concat", zip_with(["a", "b", "c"], ["x", "y"], |s, t| `{s}{t}`));
-}
---- stdout ---
-concat
-ax
-by
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        show_strs("concat", zip_with(["a", "b", "c"], ["x", "y"], |s, t| `{s}{t}`));
+    };
+    assert(out == """
+        concat
+        ax
+        by
+
+    """);
+})

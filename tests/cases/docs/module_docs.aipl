@@ -8,7 +8,7 @@
 # It is the one position an `import` makes impossible to document, which is what
 # lets it sit where a reader looks first — above the imports.
 
-import { print, wrapping_add as + } from builtins;
+import { equal as ==, print, wrapping_add as + } from builtins;
 
 # Adds two integers.
 #
@@ -17,8 +17,17 @@ import { print, wrapping_add as + } from builtins;
 pub fn add(a: i64, b: i64) -> i64 { a + b }
 
 // Documentation is ignored by run/check/build, here as anywhere else.
-fn main() !prints {
-    print(`sum {add(2, 3)}`);
-}
---- stdout ---
-sum 5
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`sum {add(2, 3)}`);
+    };
+    assert(out == "sum 5\n");
+})

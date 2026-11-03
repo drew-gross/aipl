@@ -14,29 +14,41 @@ variant Tok = Str(str) | Num(i64) | End
 
 fn describe(k: Case<Tok>) -> str { k.case_name() }
 
-fn main() !prints {
-    // A bare constructor name, payload-carrying or not, is the case.
-    print(`{describe(Str)} {describe(Num)} {describe(End)}`);
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // A bare constructor name, payload-carrying or not, is the case.
+        print(`{describe(Str)} {describe(Num)} {describe(End)}`);
 
-    // Comparing a value against a case reads the tag and nothing else, so the
-    // payload never has to be produced or matched.
-    print(`{Str("hello").is_case(Str)} {Str("hello").is_case(Num)}`);
-    print(`{End.is_case(End)} {Num(7).is_case(Num)}`);
+        // Comparing a value against a case reads the tag and nothing else, so the
+        // payload never has to be produced or matched.
+        print(`{Str("hello").is_case(Str)} {Str("hello").is_case(Num)}`);
+        print(`{End.is_case(End)} {Num(7).is_case(Num)}`);
 
-    // Cases compare with each other. The annotation is what asks for one: with
-    // no expected type a bare `Str` is still the constructor function, so this
-    // is also where the two readings are told apart.
-    let a: Case<Tok> = Str;
-    print(`{a == Str} {a == Num}`);
+        // Cases compare with each other. The annotation is what asks for one: with
+        // no expected type a bare `Str` is still the constructor function, so this
+        // is also where the two readings are told apart.
+        let a: Case<Tok> = Str;
+        print(`{a == Str} {a == Num}`);
 
-    // The other reading is untouched: here `Str` is still the constructor
-    // function, because a `(str) -> Tok` is what `map` wants.
-    let built = ["a", "b"].map(Str);
-    print(`{built.len()} {built[0].is_some_and(|t| t.is_case(Str))}`);
-}
---- stdout ---
-Str Num End
-true false
-true true
-true false
-2 true
+        // The other reading is untouched: here `Str` is still the constructor
+        // function, because a `(str) -> Tok` is what `map` wants.
+        let built = ["a", "b"].map(Str);
+        print(`{built.len()} {built[0].is_some_and(|t| t.is_case(Str))}`);
+    };
+    assert(out == """
+        Str Num End
+        true false
+        true true
+        true false
+        2 true
+
+    """);
+})

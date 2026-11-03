@@ -2,7 +2,7 @@
 # elements, in the order written — `(a, b).to_array()` is `[a, b]`. It is what lets
 # a list of pairs be flattened: `pairs$to_array().join()`.
 
-import { join, len, print, to_array } from builtins;
+import { equal as ==, join, len, print, to_array } from builtins;
 
 struct Point { x: i64, y: i64 }
 
@@ -15,33 +15,45 @@ fn noisy_pair() !prints -> (i64, i64) { (noisy(3), noisy(4)) }
 
 fn ends(pair: (i64, i64)) -> i64[] { pair.to_array() }
 
-fn main() !prints {
-    // Written out, or held in a binding.
-    print(`{(1, 2).to_array()} {(1, 2, 3).to_array().len()}`);
-    let pair = (7, 9);
-    print(`{pair.to_array()} {ends((4, 5))}`);
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Written out, or held in a binding.
+        print(`{(1, 2).to_array()} {(1, 2, 3).to_array().len()}`);
+        let pair = (7, 9);
+        print(`{pair.to_array()} {ends((4, 5))}`);
 
-    // Any element type, not only the ones a set takes.
-    print(
-        `{("a", "b").to_array()} {(Point { x: 1, y: 2 }, Point { x: 3, y: 4 }).to_array().len()}`,
-    );
+        // Any element type, not only the ones a set takes.
+        print(
+            `{("a", "b").to_array()} {(Point { x: 1, y: 2 }, Point { x: 3, y: 4 }).to_array().len()}`,
+        );
 
-    // Evaluated once, whatever the tuple is: written out, or the result of a call.
-    print(`{(noisy(1), noisy(2)).to_array()}`);
-    print(`{noisy_pair().to_array()}`);
+        // Evaluated once, whatever the tuple is: written out, or the result of a call.
+        print(`{(noisy(1), noisy(2)).to_array()}`);
+        print(`{noisy_pair().to_array()}`);
 
-    // Pairs flattened.
-    let pairs = [(1, 2), (3, 4), (5, 6)];
-    print(`{pairs$to_array().join()}`);
-}
---- stdout ---
-[1, 2] 3
-[7, 9] [4, 5]
-["a", "b"] 2
-eval 1
-eval 2
-[1, 2]
-eval 3
-eval 4
-[3, 4]
-[1, 2, 3, 4, 5, 6]
+        // Pairs flattened.
+        let pairs = [(1, 2), (3, 4), (5, 6)];
+        print(`{pairs$to_array().join()}`);
+    };
+    assert(out == """
+        [1, 2] 3
+        [7, 9] [4, 5]
+        ["a", "b"] 2
+        eval 1
+        eval 2
+        [1, 2]
+        eval 3
+        eval 4
+        [3, 4]
+        [1, 2, 3, 4, 5, 6]
+
+    """);
+})

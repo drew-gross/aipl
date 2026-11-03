@@ -27,61 +27,73 @@ fn takes_holder(h: Holder) -> u64 {
     len(h.cs) #[allow]
 }
 
-fn main() !prints {
-    let populated: #{char} = "xyz".to_set();
-    let annotated: #{char} = #{};
-    print(`annotated: {len(annotated)}`);
-    print(`declared return: {len(declared_return())}`);
-    print(`call argument: {takes_set(#{})}`);
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let populated: #{char} = "xyz".to_set();
+        let annotated: #{char} = #{};
+        print(`annotated: {len(annotated)}`);
+        print(`declared return: {len(declared_return())}`);
+        print(`call argument: {takes_set(#{})}`);
 
-    // An assignment's place type. Unlocked this copied 32 bytes out of the
-    // 8-byte empty array block, so the "cleared" set kept a garbage member —
-    // and `== #{}` then agreed with it, because both sides were that block.
-    mut reassigned: #{char} = #{'a', 'b'};
-    set reassigned = #{};
-    print(`reassigned: {len(reassigned)}`);
-    print(`reassigned renders: {reassigned}`);
+        // An assignment's place type. Unlocked this copied 32 bytes out of the
+        // 8-byte empty array block, so the "cleared" set kept a garbage member —
+        // and `== #{}` then agreed with it, because both sides were that block.
+        mut reassigned: #{char} = #{'a', 'b'};
+        set reassigned = #{};
+        print(`reassigned: {len(reassigned)}`);
+        print(`reassigned renders: {reassigned}`);
 
-    // A struct field — including through the fn-body shorthand, where the
-    // field is the only thing naming the position.
-    print(`struct field: {takes_holder(Holder { cs: #{} })}`);
-    print(`shorthand field: {len(shorthand_field().cs)}`);
+        // A struct field — including through the fn-body shorthand, where the
+        // field is the only thing naming the position.
+        print(`struct field: {takes_holder(Holder { cs: #{} })}`);
+        print(`shorthand field: {len(shorthand_field().cs)}`);
 
-    // A variant payload.
-    let carried = match (Payload(#{})) {
-        Payload(c) => len(c),
-        Nothing => 999,
+        // A variant payload.
+        let carried = match (Payload(#{})) {
+            Payload(c) => len(c),
+            Nothing => 999,
+        };
+        print(`variant payload: {carried}`);
+
+        // An array element, whose type comes from an earlier element.
+        let arr: #{char}[] = [#{'a'}, #{}];
+        print(`array element: {len(arr[1].value_or(#{'z'}))}`);
+
+        // A binary operand, where the other side is the only context — `flex_fit`
+        // flexes only a *non-empty* literal, so an empty one gets nothing from it.
+        print(`empty on the left: {#{} == populated}`);
+        print(`empty on the right: {reassigned == #{}}`);
+        print(`populated on the right: {populated == #{}}`);
+
+        // A generic builtin's argument, where the type variable is pinned by the
+        // *other* argument — so the receiver has no context until the whole
+        // substitution is known.
+        print(`empty receiver: {len(#{}.union(populated))}`);
+        print(`empty argument: {len(populated.union(#{}))}`);
     };
-    print(`variant payload: {carried}`);
+    assert(out == """
+        annotated: 0
+        declared return: 0
+        call argument: 0
+        reassigned: 0
+        reassigned renders: {}
+        struct field: 0
+        shorthand field: 0
+        variant payload: 0
+        array element: 0
+        empty on the left: false
+        empty on the right: true
+        populated on the right: false
+        empty receiver: 3
+        empty argument: 3
 
-    // An array element, whose type comes from an earlier element.
-    let arr: #{char}[] = [#{'a'}, #{}];
-    print(`array element: {len(arr[1].value_or(#{'z'}))}`);
-
-    // A binary operand, where the other side is the only context — `flex_fit`
-    // flexes only a *non-empty* literal, so an empty one gets nothing from it.
-    print(`empty on the left: {#{} == populated}`);
-    print(`empty on the right: {reassigned == #{}}`);
-    print(`populated on the right: {populated == #{}}`);
-
-    // A generic builtin's argument, where the type variable is pinned by the
-    // *other* argument — so the receiver has no context until the whole
-    // substitution is known.
-    print(`empty receiver: {len(#{}.union(populated))}`);
-    print(`empty argument: {len(populated.union(#{}))}`);
-}
---- stdout ---
-annotated: 0
-declared return: 0
-call argument: 0
-reassigned: 0
-reassigned renders: {}
-struct field: 0
-shorthand field: 0
-variant payload: 0
-array element: 0
-empty on the left: false
-empty on the right: true
-populated on the right: false
-empty receiver: 3
-empty argument: 3
+    """);
+})

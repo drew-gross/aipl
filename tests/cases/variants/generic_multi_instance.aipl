@@ -5,7 +5,7 @@
 # in a `match`. (A nullary constructor, which no argument pins, is resolved
 # only when the template has a single instance — see `generic_option`.)
 
-import { print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
 variant Wrap<T> = Val(T) | Pair(T, T)
 
@@ -23,14 +23,26 @@ fn combine_s(w: Wrap<str>) -> str {
     }
 }
 
-fn main() !prints {
-    print(to_str(combine_i(Val(5))));
-    print(to_str(combine_i(Pair(2, 3))));
-    print(combine_s(Val("hi")));
-    print(combine_s(Pair("a", "b")));
-}
---- stdout ---
-5
-5
-hi
-ab
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(combine_i(Val(5))));
+        print(to_str(combine_i(Pair(2, 3))));
+        print(combine_s(Val("hi")));
+        print(combine_s(Pair("a", "b")));
+    };
+    assert(out == """
+        5
+        5
+        hi
+        ab
+
+    """);
+})

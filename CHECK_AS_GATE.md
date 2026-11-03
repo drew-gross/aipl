@@ -216,11 +216,11 @@ Checklist:
   - [x] 1. Warm-up, 35 files (redone as top-level `test` blocks after that form landed) (the census said 33; it missed `bindings/*/` and `functions/void/`): `bindings` 5, `conditionals` 1, `constants` 2, `chars` 2, `compound_assign` 2, `integers` 2,
         `loops` 2, `results` 2, `syntax` 1, `options` 3, `methods` 3, `functions` 6, `dicts` 4. Template settled (below).
   - [x] 2. `strings`, 28 (27 converted; `small_string_optimization` is left, see D8). (Mind `named_representations`: it must keep asking for each representation by name.)
-  - [ ] 3. `arrays`, 28.
-  - [ ] 4. `structs` 15 + `variants` 13, 28.
-  - [ ] 5. `tuples` 12 + `sets` 11, 23.
-  - [ ] 6. `generics` 13 + `match_arms` 9 + `lambdas` 8, 30.
-  - [ ] 7. Small leftovers, 19: `kwargs` 7, `grids` 4, `tail_calls` 4, `imports` 1, `docs` 1, `performance` 1, `perf` 1.
+  - [x] 3. `arrays`, 28.
+  - [x] 4. `structs` 15 + `variants` 13, 28.
+  - [x] 5. `tuples` 12 + `sets` 11, 23.
+  - [x] 6. `generics` 13 + `match_arms` 9 + `lambdas` 8, 30.
+  - [x] 7. Small leftovers, 19: `kwargs` 7, `grids` 4, `tail_calls` 4, `imports` 1, `docs` 1, `performance` 1, `perf` 1.
   - [ ] 8. `optimizations`, 33. Take care: these exist to pin what codegen does to a program, so check each converted
         case still exercises the same optimization (the `report` and baseline row are the evidence), not just the output.
   - [ ] 9-11. `lints`, 67, in three alphabetical thirds of ~22 by file name (`err_*` fixtures carry `errors`, not this
@@ -352,3 +352,7 @@ Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered
   `optimizations/{join_emptiness_fusion,map_map_fusion,fold_emptiness_and_index,map_reduce_fusion}`, `performance/refcount_balance`).
   The performance block is not about `main`, but `.performance` attaches to a function and has no top-level form. Options: a
   top-level `performance({ .. })` like `test` (same rarity argument), or attach each to the function it measures. Unconverted until decided.
+
+- 2026-11-03: Phase 2b batches 3-7 converted together (125 files: `arrays` minus its 4 `.performance`-on-`main` files, `structs`,
+  `variants`, `tuples`, `sets`, `generics`, `match_arms`, `lambdas`, `kwargs`, `grids`, `tail_calls`, `imports`, `docs`, `perf`).
+  The codemod matched every one; all 125 passed `aipl check` first time. (`performance/refcount_balance` is on the D8 list.)

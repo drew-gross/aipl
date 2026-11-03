@@ -10,7 +10,7 @@
 # value is one specific case, and anything else is false however the variant
 # grows — and wrong where a new case would need a decision.
 
-import { print, wrapping_add as + } from builtins;
+import { equal as ==, print, wrapping_add as + } from builtins;
 
 variant Shape = Circle(i64) | Square(i64) | Point | Tri(i64, i64) | Empty
 
@@ -38,13 +38,24 @@ fn widened(s: Shape) -> Shape {
     }
 }
 
-fn main() !prints {
-    print(`{size(Circle(3))} {size(Tri(4, 5))} {size(Square(9))} {size(Point)} {size(Empty)}`);
-    print(`{is_point(Point)} {is_point(Empty)}`);
-    print(`{widened(Circle(1))} {widened(Square(2))}`);
-}
---- stdout ---
-3 9 0 0 0
-true false
-Circle(2) Square(2)
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`{size(Circle(3))} {size(Tri(4, 5))} {size(Square(9))} {size(Point)} {size(Empty)}`);
+        print(`{is_point(Point)} {is_point(Empty)}`);
+        print(`{widened(Circle(1))} {widened(Square(2))}`);
+    };
+    assert(out == """
+        3 9 0 0 0
+        true false
+        Circle(2) Square(2)
 
+    """);
+})

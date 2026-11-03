@@ -3,7 +3,7 @@
 # resolved there to what it was bound to at the call — including the locals that
 # function captured.
 
-import { filter, greater_than as >, map, print, wrapping_add as + } from builtins;
+import { equal as ==, filter, greater_than as >, map, print, wrapping_add as + } from builtins;
 
 fn inc(x: i64) -> i64 { x + 1 }
 
@@ -24,21 +24,33 @@ fn both(f: (i64) -> i64, g: (i64) -> i64, offset: i64, xs: i64[]) -> i64[] {
     xs.map(|x| f(x) + g(x) + offset)
 }
 
-fn main() !prints {
-    print(`{twice(inc, [(1, 2), (3, 4)])}`);
-    // The bound function captures a local of the caller.
-    let step = 10;
-    print(`{twice(|x| x + step, [(1, 2)])}`);
-    print(`{on_all(inc, [1, 2, 3])}`);
-    let limit = 1;
-    print(`{keep(|x| x > limit, [1, 2, 3])}`);
-    print(`{via(|x| x + step, [1, 2])}`);
-    print(`{both(inc, |x| x + step, 100, [1, 2])}`);
-}
---- stdout ---
-[(2, 3), (4, 5)]
-[(11, 12)]
-[2, 3, 4]
-[2, 3]
-[11, 12]
-[113, 115]
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`{twice(inc, [(1, 2), (3, 4)])}`);
+        // The bound function captures a local of the caller.
+        let step = 10;
+        print(`{twice(|x| x + step, [(1, 2)])}`);
+        print(`{on_all(inc, [1, 2, 3])}`);
+        let limit = 1;
+        print(`{keep(|x| x > limit, [1, 2, 3])}`);
+        print(`{via(|x| x + step, [1, 2])}`);
+        print(`{both(inc, |x| x + step, 100, [1, 2])}`);
+    };
+    assert(out == """
+        [(2, 3), (4, 5)]
+        [(11, 12)]
+        [2, 3, 4]
+        [2, 3]
+        [11, 12]
+        [113, 115]
+
+    """);
+})

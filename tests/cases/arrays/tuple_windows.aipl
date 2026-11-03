@@ -12,29 +12,41 @@ import {
     wrapping_increment as ++,
 } from builtins;
 
-fn main() !prints {
-    for (let (a, b) : [1, 2, 3, 4].tuple_windows()) {
-        print(`{a} -> {b}`);
-    }
-    // The array itself, when it is wanted rather than looped over.
-    let ws = ["x", "y", "z"].tuple_windows();
-    print(ws.len().to_str());
-    print(`{ws[0]}`);
-    print(`{[7].tuple_windows().is_empty()}`);
-    print(`{tuple_windows([1, 2][..0]).is_empty()}`);
-    // Chars of a str.
-    mut doubled = 0;
-    for (let (c, d) : "aabcc".tuple_windows()) {
-        if (c == d) { set doubled++; };
-    }
-    print(doubled.to_str());
-}
---- stdout ---
-1 -> 2
-2 -> 3
-3 -> 4
-2
-some(("x", "y"))
-true
-true
-2
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        for (let (a, b) : [1, 2, 3, 4].tuple_windows()) {
+            print(`{a} -> {b}`);
+        }
+        // The array itself, when it is wanted rather than looped over.
+        let ws = ["x", "y", "z"].tuple_windows();
+        print(ws.len().to_str());
+        print(`{ws[0]}`);
+        print(`{[7].tuple_windows().is_empty()}`);
+        print(`{tuple_windows([1, 2][..0]).is_empty()}`);
+        // Chars of a str.
+        mut doubled = 0;
+        for (let (c, d) : "aabcc".tuple_windows()) {
+            if (c == d) { set doubled++; };
+        }
+        print(doubled.to_str());
+    };
+    assert(out == """
+        1 -> 2
+        2 -> 3
+        3 -> 4
+        2
+        some(("x", "y"))
+        true
+        true
+        2
+
+    """);
+})

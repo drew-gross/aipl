@@ -11,23 +11,35 @@ import { Span, equal as ==, print, to_str, wrapping_add as +, wrapping_mul as * 
 
 fn width(s: Span) -> u64 { s.end } #[allow]
 
-fn main() !prints {
-    let s = 1..4;
-    print(s.start.to_str()); // 1
-    print(s.end.to_str()); // 4
-    print(((1..4) == Span { start: 1, end: 4 }).to_str()); // true
-    // A range is an ordinary Span value: pass it around, slice with it.
-    print(width(5..9).to_str()); // 9
-    print("hello, world"[s]); // ell
-    print([10, 20, 30, 40, 50][s].to_str()); // [20, 30, 40]
-    let i = 2;
-    print("hello, world"[i + 1..i * 4]); // lo, w
-}
---- stdout ---
-1
-4
-true
-9
-ell
-[20, 30, 40]
-lo, w
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let s = 1..4;
+        print(s.start.to_str()); // 1
+        print(s.end.to_str()); // 4
+        print(((1..4) == Span { start: 1, end: 4 }).to_str()); // true
+        // A range is an ordinary Span value: pass it around, slice with it.
+        print(width(5..9).to_str()); // 9
+        print("hello, world"[s]); // ell
+        print([10, 20, 30, 40, 50][s].to_str()); // [20, 30, 40]
+        let i = 2;
+        print("hello, world"[i + 1..i * 4]); // lo, w
+    };
+    assert(out == """
+        1
+        4
+        true
+        9
+        ell
+        [20, 30, 40]
+        lo, w
+
+    """);
+})

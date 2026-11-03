@@ -1,7 +1,7 @@
 # An argument a default reads is mentioned twice in the expanded call, so the
 # loader binds it to a temporary first: `noisy` runs once, not twice.
 
-import { print, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
+import { equal as ==, print, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
 
 fn tick(label: str, n: i64) !prints -> i64 {
     print(label);
@@ -14,13 +14,25 @@ fn scaled(n: i64, by: i64 = n * 10) -> i64 { n + by }
 // side effects between them: "a" still runs before "b".
 fn sum(a: i64, b: i64, c: i64 = b + 1) -> i64 { a + b + c }
 
-fn main() !prints {
-    print(to_str(scaled(tick("noisy", 3))));
-    print(to_str(sum(tick("a", 1), tick("b", 2))));
-}
---- stdout ---
-noisy
-33
-a
-b
-6
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(scaled(tick("noisy", 3))));
+        print(to_str(sum(tick("a", 1), tick("b", 2))));
+    };
+    assert(out == """
+        noisy
+        33
+        a
+        b
+        6
+
+    """);
+})

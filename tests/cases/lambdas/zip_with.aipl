@@ -3,7 +3,7 @@
 # an operator passed as a value (`+`), a lambda, or a named function. The
 # result runs to the shorter input (Python `zip` semantics).
 
-import { print, to_str, wrapping_add as +, wrapping_mul as *, zip_with } from builtins;
+import { equal as ==, print, to_str, wrapping_add as +, wrapping_mul as *, zip_with } from builtins;
 
 fn tagged(x: i64, y: i64) -> i64 { x + y + 1000 }
 
@@ -14,32 +14,44 @@ fn show(label: str, xs: i64[]) !prints {
     }
 }
 
-fn main() !prints {
-    let a = [1, 2, 3];
-    let b = [10, 20, 30];
-    show("plus", zip_with(a, b, +)); // [11, 22, 33]
-    show("times", zip_with(a, b, *)); // [10, 40, 90]
-    show("lambda", zip_with(a, b, |x, y| x * y + y)); // [20, 60, 120]
-    show("named", zip_with(a, b, tagged)); // [1011, 1022, 1033]
-    show("shorter", zip_with([1, 2, 3, 4], [100, 200], +)); // [101, 202]
-}
---- stdout ---
-plus
-11
-22
-33
-times
-10
-40
-90
-lambda
-20
-60
-120
-named
-1011
-1022
-1033
-shorter
-101
-202
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let a = [1, 2, 3];
+        let b = [10, 20, 30];
+        show("plus", zip_with(a, b, +)); // [11, 22, 33]
+        show("times", zip_with(a, b, *)); // [10, 40, 90]
+        show("lambda", zip_with(a, b, |x, y| x * y + y)); // [20, 60, 120]
+        show("named", zip_with(a, b, tagged)); // [1011, 1022, 1033]
+        show("shorter", zip_with([1, 2, 3, 4], [100, 200], +)); // [101, 202]
+    };
+    assert(out == """
+        plus
+        11
+        22
+        33
+        times
+        10
+        40
+        90
+        lambda
+        20
+        60
+        120
+        named
+        1011
+        1022
+        1033
+        shorter
+        101
+        202
+
+    """);
+})

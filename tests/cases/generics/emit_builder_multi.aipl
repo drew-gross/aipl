@@ -2,7 +2,7 @@
 # generic variant carrying constructors, whose shared constructor names
 # (`OfStr`, `OfInt`, `Bare`) resolve to the right instance per construction.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 variant TokA = IdentA(str) | NumA(i64)
 
@@ -42,16 +42,28 @@ fn show_b(t: TokB) -> str {
     }
 }
 
-fn main() !prints {
-    for (let r : [Rule { emit: OfStr(IdentA) }, Rule { emit: OfInt(NumA) }]) {
-        print(show_a(run_a(r.emit, "aa", 7)));
-    }
-    for (let r : [Rule { emit: OfStr(WordB) }, Rule { emit: Bare(PlusB) }]) {
-        print(show_b(run_b(r.emit, "bb", 0)));
-    }
-}
---- stdout ---
-aa
-7
-bb
-+
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        for (let r : [Rule { emit: OfStr(IdentA) }, Rule { emit: OfInt(NumA) }]) {
+            print(show_a(run_a(r.emit, "aa", 7)));
+        }
+        for (let r : [Rule { emit: OfStr(WordB) }, Rule { emit: Bare(PlusB) }]) {
+            print(show_b(run_b(r.emit, "bb", 0)));
+        }
+    };
+    assert(out == """
+        aa
+        7
+        bb
+        +
+
+    """);
+})

@@ -2,21 +2,33 @@
 # subset of `ord` that excludes `char` and `str`. An integer is ordered, so a
 # variable bound `int` may be passed on where `ord` is required.
 
-import { minimum, print, to_str } from builtins;
+import { equal as ==, minimum, print, to_str } from builtins;
 
 fn identity<T: int>(x: T) -> T { x }
 
 fn smallest<T: int>(xs: T[]) -> T? { xs.minimum() }
 
-fn main() !prints {
-    print(identity(5).to_str());
-    let small: u8 = 255;
-    print(identity(small).to_str());
-    print(smallest([3, 1, 2]).to_str());
-    print(smallest([-4, 9]).to_str());
-}
---- stdout ---
-5
-255
-some(1)
-some(-4)
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(identity(5).to_str());
+        let small: u8 = 255;
+        print(identity(small).to_str());
+        print(smallest([3, 1, 2]).to_str());
+        print(smallest([-4, 9]).to_str());
+    };
+    assert(out == """
+        5
+        255
+        some(1)
+        some(-4)
+
+    """);
+})

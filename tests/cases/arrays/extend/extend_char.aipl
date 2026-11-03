@@ -3,24 +3,36 @@
 # value semantics hold for the aliases. `extend_char_in_place.aipl` covers the
 # unaliased receiver, which appends into its own storage instead.
 
-import { extend, print } from builtins;
+import { equal as ==, extend, print } from builtins;
 
-fn main() !prints {
-    mut cs = ['a'];
-    let more = ['b', 'c'];
-    set cs.extend(more);
-    print(cs);
-    print(more);
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        mut cs = ['a'];
+        let more = ['b', 'c'];
+        set cs.extend(more);
+        print(cs);
+        print(more);
 
-    // A shared receiver is copied, so the alias keeps the old bytes.
-    mut d = ['x'];
-    let alias = d;
-    set d.extend(['y']);
-    print(d);
-    print(alias);
-}
---- stdout ---
-abc
-bc
-xy
-x
+        // A shared receiver is copied, so the alias keeps the old bytes.
+        mut d = ['x'];
+        let alias = d;
+        set d.extend(['y']);
+        print(d);
+        print(alias);
+    };
+    assert(out == """
+        abc
+        bc
+        xy
+        x
+
+    """);
+})

@@ -1,10 +1,19 @@
 # A duplicate import is a lint, so `#[allow]` on the redundant line keeps it.
 
-import { print } from builtins;
+import { equal as ==, print } from builtins;
 import { to_str } from builtins; #[allow]
 
-fn main() !prints {
-    print(to_str(1));
-}
---- stdout ---
-1
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(1));
+    };
+    assert(out == "1\n");
+})

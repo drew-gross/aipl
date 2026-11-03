@@ -8,6 +8,7 @@
 # and a parameter.
 
 import {
+    equal as ==,
     less_than as <,
     print,
     to_str,
@@ -29,27 +30,39 @@ fn manhattan(Point { x as ax, y as ay }, Point { x as bx, y as by }) -> i64 {
     dx + dy
 }
 
-fn main() !prints {
-    let p = Point { x: 10, y: 20 };
-    let q = origin();
-    let Point { x as px, y as py } = p;
-    let Point { x as qx, y } = q;
-    print(`{px} {py} {qx} {y}`);
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let p = Point { x: 10, y: 20 };
+        let q = origin();
+        let Point { x as px, y as py } = p;
+        let Point { x as qx, y } = q;
+        print(`{px} {py} {qx} {y}`);
 
-    // A mutable rename: the copy is rebound, the source untouched.
-    mut Point { x as moved } = p;
-    set moved += 5;
-    print(`{moved} {p.x}`);
+        // A mutable rename: the copy is rebound, the source untouched.
+        mut Point { x as moved } = p;
+        set moved += 5;
+        print(`{moved} {p.x}`);
 
-    // A `str` field renames like any other.
-    let n = Named { id: 1, label: "a label long enough to be a buffer" };
-    let Named { label as title } = n;
-    print(title);
+        // A `str` field renames like any other.
+        let n = Named { id: 1, label: "a label long enough to be a buffer" };
+        let Named { label as title } = n;
+        print(title);
 
-    print(to_str(manhattan(p, q)));
-}
---- stdout ---
-10 20 1 2
-15 10
-a label long enough to be a buffer
-27
+        print(to_str(manhattan(p, q)));
+    };
+    assert(out == """
+        10 20 1 2
+        15 10
+        a label long enough to be a buffer
+        27
+
+    """);
+})

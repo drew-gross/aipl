@@ -4,7 +4,7 @@
 # pinned — which is the behavior that predates per-value instances and has to
 # keep working.
 
-import { print, to_str, value_or } from builtins;
+import { equal as ==, print, to_str, value_or } from builtins;
 
 fn pick<T: any>(a: T?, b: T) -> T { a.value_or(b) }
 
@@ -17,12 +17,24 @@ fn widths(hint: u8?, wide: u64?) !prints -> u8 {
     narrow
 }
 
-fn main() !prints {
-    print(to_str(widths(none, none))); // 200
-    print(to_str(widths(some(7), some(9)))); // 7 (and 9 from inside)
-}
---- stdout ---
-200
-200
-9
-7
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(widths(none, none))); // 200
+        print(to_str(widths(some(7), some(9)))); // 7 (and 9 from inside)
+    };
+    assert(out == """
+        200
+        200
+        9
+        7
+
+    """);
+})

@@ -6,7 +6,7 @@
 # shape the parser library needs for a grammar's per-rule builder, and it is
 # what makes the return's ownership transfer indirect.
 
-import { print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
 variant Tree = Leaf(i64) | Node(Tree, Tree)
 
@@ -25,16 +25,27 @@ fn total(self: Tree) -> i64 {
     }
 }
 
-fn main() !prints {
-    print(build(leaf, 5).total().to_str());
-    print(build(pair, 5).total().to_str());
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(build(leaf, 5).total().to_str());
+        print(build(pair, 5).total().to_str());
 
-    // Called twice through the same fn value: the second build must not see a
-    // tree the first one freed.
-    print((build(pair, 1).total() + build(pair, 10).total()).to_str());
-}
---- stdout ---
-5
-11
-24
+        // Called twice through the same fn value: the second build must not see a
+        // tree the first one freed.
+        print((build(pair, 1).total() + build(pair, 10).total()).to_str());
+    };
+    assert(out == """
+        5
+        11
+        24
 
+    """);
+})

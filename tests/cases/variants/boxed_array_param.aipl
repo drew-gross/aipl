@@ -5,7 +5,15 @@
 # new array from them has to retain. This is the parser library's node list —
 # a rule's children arrive as exactly this shape.
 
-import { len, print, push, to_str, wrapping_add as +, wrapping_add_assign as += } from builtins;
+import {
+    equal as ==,
+    len,
+    print,
+    push,
+    to_str,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+} from builtins;
 
 variant Tree = Leaf(i64) | Node(Tree, Tree)
 
@@ -36,18 +44,29 @@ fn wrap_each(ts: Tree[]) -> Tree[] {
     out
 }
 
-fn main() !prints {
-    let ts = [Leaf(1), Node(Leaf(2), Leaf(3)), Leaf(4)];
-    print(sum_all(ts).to_str());
-    let wrapped = wrap_each(ts);
-    print(wrapped.len().to_str());
-    // The originals survive being wrapped — the wrap retained rather than moved.
-    print(sum_all(ts).to_str());
-    print(sum_all(wrapped).to_str());
-}
---- stdout ---
-10
-3
-10
-10
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let ts = [Leaf(1), Node(Leaf(2), Leaf(3)), Leaf(4)];
+        print(sum_all(ts).to_str());
+        let wrapped = wrap_each(ts);
+        print(wrapped.len().to_str());
+        // The originals survive being wrapped — the wrap retained rather than moved.
+        print(sum_all(ts).to_str());
+        print(sum_all(wrapped).to_str());
+    };
+    assert(out == """
+        10
+        3
+        10
+        10
 
+    """);
+})

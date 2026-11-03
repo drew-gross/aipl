@@ -4,7 +4,15 @@
 # It is a builtin rather than an AIPL loop over `push` so it can size the
 # destination once — see `extend_reserves_once`, where that is the assertion.
 
-import { extend, join, print, to_str, wrapping_add as +, wrapping_add_assign as += } from builtins;
+import {
+    equal as ==,
+    extend,
+    join,
+    print,
+    to_str,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+} from builtins;
 
 variant Tree = Leaf(i64) | Node(Tree, Tree)
 
@@ -23,66 +31,78 @@ fn sum(ts: Tree[]) -> i64 {
     acc
 }
 
-fn main() !prints {
-    // The ordinary case, and an empty source, which is a no-op.
-    mut a = [1, 2];
-    set a.extend([3, 4]);
-    let empty: i64[] = [];
-    set a.extend(empty);
-    print(to_str(a));
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // The ordinary case, and an empty source, which is a no-op.
+        mut a = [1, 2];
+        set a.extend([3, 4]);
+        let empty: i64[] = [];
+        set a.extend(empty);
+        print(to_str(a));
 
-    // The source aliases the destination. Retaining the source is what makes
-    // the block shared, which forces the copy before anything is written — so
-    // the elements read are the original six, not a half-written array.
-    mut b = [1, 2, 3];
-    set b.extend(b);
-    print(to_str(b));
+        // The source aliases the destination. Retaining the source is what makes
+        // the block shared, which forces the copy before anything is written — so
+        // the elements read are the original six, not a half-written array.
+        mut b = [1, 2, 3];
+        set b.extend(b);
+        print(to_str(b));
 
-    // Value semantics, as for `push`: a shared destination is copied first and
-    // the other holder sees nothing.
-    mut c = [1, 2];
-    let alias = c;
-    set c.extend([9]);
-    print(`{c} {alias}`);
+        // Value semantics, as for `push`: a shared destination is copied first and
+        // the other holder sees nothing.
+        mut c = [1, 2];
+        let alias = c;
+        set c.extend([9]);
+        print(`{c} {alias}`);
 
-    // Heap elements are retained, not moved: the source is still usable.
-    mut s = ["a"];
-    let more = ["b", "c"];
-    set s.extend(more);
-    print(`{s.join(sep=",")} {more.join(sep=",")}`);
+        // Heap elements are retained, not moved: the source is still usable.
+        mut s = ["a"];
+        let more = ["b", "c"];
+        set s.extend(more);
+        print(`{s.join(sep=",")} {more.join(sep=",")}`);
 
-    // Boxed recursive elements, through the same retain pass.
-    mut ts = [Leaf(1)];
-    let src = [Node(Leaf(2), Leaf(3)), Leaf(4)];
-    set ts.extend(src);
-    print(`{sum(ts)} {sum(src)}`);
+        // Boxed recursive elements, through the same retain pass.
+        mut ts = [Leaf(1)];
+        let src = [Node(Leaf(2), Leaf(3)), Leaf(4)];
+        set ts.extend(src);
+        print(`{sum(ts)} {sum(src)}`);
 
-    // `bool[]` is bit-packed, so it has no pre-sized form and appends bit by
-    // bit — the answer is the same either way.
-    mut flags = [true, false];
-    set flags.extend([true, true]);
-    print(to_str(flags));
+        // `bool[]` is bit-packed, so it has no pre-sized form and appends bit by
+        // bit — the answer is the same either way.
+        mut flags = [true, false];
+        set flags.extend([true, true]);
+        print(to_str(flags));
 
-    // Nested arrays, and a destination that starts as the untyped empty
-    // literal and takes its element type from the source.
-    mut nest = [];
-    set nest.extend([[1], [2]]);
-    set nest.extend([[3, 4]]);
-    print(to_str(nest));
+        // Nested arrays, and a destination that starts as the untyped empty
+        // literal and takes its element type from the source.
+        mut nest = [];
+        set nest.extend([[1], [2]]);
+        set nest.extend([[3, 4]]);
+        print(to_str(nest));
 
-    // Growing repeatedly in a loop — the shape this builtin exists to replace.
-    mut loops = []; #[allow]
-    for (let i : [1, 2, 3]) {
-        set loops.extend([i, i]);
-    }
-    print(to_str(loops));
-}
---- stdout ---
-[1, 2, 3, 4]
-[1, 2, 3, 1, 2, 3]
-[1, 2, 9] [1, 2]
-a,b,c b,c
-10 9
-[true, false, true, true]
-[[1], [2], [3, 4]]
-[1, 1, 2, 2, 3, 3]
+        // Growing repeatedly in a loop — the shape this builtin exists to replace.
+        mut loops = []; #[allow]
+        for (let i : [1, 2, 3]) {
+            set loops.extend([i, i]);
+        }
+        print(to_str(loops));
+    };
+    assert(out == """
+        [1, 2, 3, 4]
+        [1, 2, 3, 1, 2, 3]
+        [1, 2, 9] [1, 2]
+        a,b,c b,c
+        10 9
+        [true, false, true, true]
+        [[1], [2], [3, 4]]
+        [1, 1, 2, 2, 3, 3]
+
+    """);
+})

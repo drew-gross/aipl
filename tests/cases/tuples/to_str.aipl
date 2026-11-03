@@ -3,19 +3,31 @@
 # to a synthetic struct, but that struct's name and field names are the
 # compiler's, and never appear in output.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
-fn main() !prints {
-    let t = (1, "a");
-    print(t.to_str());
-    print(`{t}`);
-    print(`{(1, (2, 3), [4])}`);
-    print(`{[(1, 'x'), (2, 'y')]}`);
-    print(`{some((true, "yes"))}`);
-}
---- stdout ---
-(1, "a")
-(1, "a")
-(1, (2, 3), [4])
-[(1, 'x'), (2, 'y')]
-some((true, "yes"))
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let t = (1, "a");
+        print(t.to_str());
+        print(`{t}`);
+        print(`{(1, (2, 3), [4])}`);
+        print(`{[(1, 'x'), (2, 'y')]}`);
+        print(`{some((true, "yes"))}`);
+    };
+    assert(out == """
+        (1, "a")
+        (1, "a")
+        (1, (2, 3), [4])
+        [(1, 'x'), (2, 'y')]
+        some((true, "yes"))
+
+    """);
+})

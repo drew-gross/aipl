@@ -13,16 +13,28 @@
 # instantiation is still free to supply its own. Omitting it there is an error
 # (`err_generic_default_conflicts`).
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 fn padded<T: any>(xs: T[], pad: T = 0) -> T[] { [..xs, pad] }
 
-fn main() !prints {
-    print(to_str(padded([1, 2])));
-    print(to_str(padded([1, 2], pad=9)));
-    print(to_str(padded(["a"], pad="z")));
-}
---- stdout ---
-[1, 2, 0]
-[1, 2, 9]
-["a", "z"]
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(padded([1, 2])));
+        print(to_str(padded([1, 2], pad=9)));
+        print(to_str(padded(["a"], pad="z")));
+    };
+    assert(out == """
+        [1, 2, 0]
+        [1, 2, 9]
+        ["a", "z"]
+
+    """);
+})

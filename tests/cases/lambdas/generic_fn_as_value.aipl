@@ -19,27 +19,39 @@ fn add_one(n: i64) -> i64 { n + 1 }
 
 fn plus<T: any>(x: T, f: (T) -> T) -> T { f(x) }
 
-fn main() !prints {
-    // `boxed` at `T = i64`, then at `T = str` — two instances of one function.
-    print(`{[1, 2].map(boxed)}`);
-    print(`{["a"].map(boxed)}`);
-    print(`{[[1], [2, 3], [4]].filter(is_lone)}`);
-    print(`{zip_with([1, 2], ["x", "y"], pair)}`);
-    match ([1, 2].try_map(checked)) {
-        ok(xs) => print(`{xs}`),
-        err(e) => print(e),
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // `boxed` at `T = i64`, then at `T = str` — two instances of one function.
+        print(`{[1, 2].map(boxed)}`);
+        print(`{["a"].map(boxed)}`);
+        print(`{[[1], [2, 3], [4]].filter(is_lone)}`);
+        print(`{zip_with([1, 2], ["x", "y"], pair)}`);
+        match ([1, 2].try_map(checked)) {
+            ok(xs) => print(`{xs}`),
+            err(e) => print(e),
+        };
+        print(`{twice(1, add_one)}`);
+        // A generic function forwarded to a generic parameter.
+        print(`{plus("s", boxed_first)}`);
     };
-    print(`{twice(1, add_one)}`);
-    // A generic function forwarded to a generic parameter.
-    print(`{plus("s", boxed_first)}`);
-}
+    assert(out == """
+        [[1], [2]]
+        [["a"]]
+        [[1], [4]]
+        [(1, "x"), (2, "y")]
+        [1, 2]
+        3
+        s
+
+    """);
+})
 
 fn boxed_first<T: any>(x: T) -> T { x }
---- stdout ---
-[[1], [2]]
-[["a"]]
-[[1], [4]]
-[(1, "x"), (2, "y")]
-[1, 2]
-3
-s

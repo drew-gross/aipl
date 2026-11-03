@@ -14,11 +14,23 @@ fn first_labelled(nodes: Node[]) -> str? {
     some(found.label)
 }
 
-fn main() !prints {
-    let nodes = [Node { kind: Leaf("a"), label: "x" }];
-    print(first_labelled(nodes).value_or("none"));
-    print(nodes[0]$label.value_or("none"));
-}
---- stdout ---
-x
-x
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let nodes = [Node { kind: Leaf("a"), label: "x" }];
+        print(first_labelled(nodes).value_or("none"));
+        print(nodes[0]$label.value_or("none"));
+    };
+    assert(out == """
+        x
+        x
+
+    """);
+})

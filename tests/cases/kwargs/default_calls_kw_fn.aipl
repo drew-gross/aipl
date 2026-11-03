@@ -2,16 +2,28 @@
 # parameters — the loader expands defaults recursively (`shifted(1)` fills
 # `by = base()`, whose call fills `x = 7`).
 
-import { print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
 fn base(x: i64 = 7) -> i64 { x }
 
 fn shifted(a: i64, by: i64 = base()) -> i64 { a + by }
 
-fn main() !prints {
-    print(to_str(shifted(1)));
-    print(to_str(shifted(1, by=base(x=2))));
-}
---- stdout ---
-8
-3
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(shifted(1)));
+        print(to_str(shifted(1, by=base(x=2))));
+    };
+    assert(out == """
+        8
+        3
+
+    """);
+})

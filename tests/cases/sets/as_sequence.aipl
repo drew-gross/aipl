@@ -9,6 +9,7 @@
 import {
     all,
     count_if,
+    equal as ==,
     find_if,
     greater_than as >,
     join,
@@ -18,31 +19,43 @@ import {
     union_all,
 } from builtins;
 
-fn main() !prints {
-    let s = [3, 1, 2, 3].to_set();
-    print(s$to_str().join(sep=", "));
-    print(`{s.all(|x| x > 0)} {s.find_if(|x| x > 2)} {s.count_if(|x| x > 1)}`);
-    let asc: #<{i64} = [3, 1, 2].to_set();
-    print(asc$to_str().join(sep=" "));
-    let desc: #>{i64} = [3, 1, 2].to_set();
-    print(desc$to_str().join(sep=" "));
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let s = [3, 1, 2, 3].to_set();
+        print(s$to_str().join(sep=", "));
+        print(`{s.all(|x| x > 0)} {s.find_if(|x| x > 2)} {s.count_if(|x| x > 1)}`);
+        let asc: #<{i64} = [3, 1, 2].to_set();
+        print(asc$to_str().join(sep=" "));
+        let desc: #>{i64} = [3, 1, 2].to_set();
+        print(desc$to_str().join(sep=" "));
 
-    // `join` reads the sequence and nothing else, so a set of parts joins
-    // exactly as an array of them would.
-    let parts: #{str} = ["ab", "cd", "ab"].to_set();
-    print(parts.join(sep="-"));
+        // `join` reads the sequence and nothing else, so a set of parts joins
+        // exactly as an array of them would.
+        let parts: #{str} = ["ab", "cd", "ab"].to_set();
+        print(parts.join(sep="-"));
 
-    // `union_all` declares `self: #{T}[]`, and ordered sets go in just the same.
-    // Its result is a plain `#{T}`: it builds a fresh set rather than extending
-    // one of the arguments, so there is no order for it to carry over — the
-    // printed order below is the insertion order the walk produced, not a sort.
-    let more: #<{i64} = [5, 0].to_set();
-    print([asc, more].union_all().to_str());
-}
---- stdout ---
-3, 1, 2
-true some(3) 2
-1 2 3
-3 2 1
-ab-cd
-{1, 2, 3, 0, 5}
+        // `union_all` declares `self: #{T}[]`, and ordered sets go in just the same.
+        // Its result is a plain `#{T}`: it builds a fresh set rather than extending
+        // one of the arguments, so there is no order for it to carry over — the
+        // printed order below is the insertion order the walk produced, not a sort.
+        let more: #<{i64} = [5, 0].to_set();
+        print([asc, more].union_all().to_str());
+    };
+    assert(out == """
+        3, 1, 2
+        true some(3) 2
+        1 2 3
+        3 2 1
+        ab-cd
+        {1, 2, 3, 0, 5}
+
+    """);
+})

@@ -1,9 +1,18 @@
-import { print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
-fn main() !prints {
-    let pair = (10, 20);
-    let sum = pair.0 + pair.1;
-    print(to_str(sum));
-}
---- stdout ---
-30
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let pair = (10, 20);
+        let sum = pair.0 + pair.1;
+        print(to_str(sum));
+    };
+    assert(out == "30\n");
+})

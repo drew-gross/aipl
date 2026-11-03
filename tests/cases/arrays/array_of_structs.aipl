@@ -2,31 +2,43 @@
 # with heap fields needs per-element retain/drop, which codegen generates once
 # per element type.
 
-import { print, push, to_str, wrapping_add_assign as += } from builtins;
+import { equal as ==, print, push, to_str, wrapping_add_assign as += } from builtins;
 
 struct Point { x: i64, y: i64 }
 
 struct Named { id: i64, label: str }
 
-fn main() !prints {
-    // Scalar-field structs: literal, to_str, index (→ Point?), iteration.
-    let pts = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];
-    print(to_str(pts)); // [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }]
-    print(to_str(pts[1])); // some(Point { x: 3, y: 4 })
-    mut sx = 0;
-    for (let p : pts) {
-        set sx += p.x;
-    }
-    print(to_str(sx)); // 4
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Scalar-field structs: literal, to_str, index (→ Point?), iteration.
+        let pts = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];
+        print(to_str(pts)); // [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }]
+        print(to_str(pts[1])); // some(Point { x: 3, y: 4 })
+        mut sx = 0;
+        for (let p : pts) {
+            set sx += p.x;
+        }
+        print(to_str(sx)); // 4
 
-    // Heap-field structs (`str`): exercises the generated per-struct element
-    // drop/retain — a leak or double-free would unbalance the alloc counts.
-    mut ns = [Named { id: 1, label: "a" }];
-    set ns.push(Named { id: 2, label: "bb" });
-    print(to_str(ns)); // [Named { id: 1, label: "a" }, Named { id: 2, label: "bb" }]
-}
---- stdout ---
-[Point { x: 1, y: 2 }, Point { x: 3, y: 4 }]
-some(Point { x: 3, y: 4 })
-4
-[Named { id: 1, label: "a" }, Named { id: 2, label: "bb" }]
+        // Heap-field structs (`str`): exercises the generated per-struct element
+        // drop/retain — a leak or double-free would unbalance the alloc counts.
+        mut ns = [Named { id: 1, label: "a" }];
+        set ns.push(Named { id: 2, label: "bb" });
+        print(to_str(ns)); // [Named { id: 1, label: "a" }, Named { id: 2, label: "bb" }]
+    };
+    assert(out == """
+        [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }]
+        some(Point { x: 3, y: 4 })
+        4
+        [Named { id: 1, label: "a" }, Named { id: 2, label: "bb" }]
+
+    """);
+})

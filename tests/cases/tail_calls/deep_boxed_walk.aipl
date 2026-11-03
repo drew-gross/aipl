@@ -25,8 +25,17 @@ fn total(xs: List, acc: u64) -> u64 {
     }
 }
 
-fn main() !prints {
-    print(total(build(200000, Nil), 0).to_str());
-}
---- stdout ---
-800000
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(total(build(200000, Nil), 0).to_str());
+    };
+    assert(out == "800000\n");
+})

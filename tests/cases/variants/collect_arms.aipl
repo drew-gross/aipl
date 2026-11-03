@@ -7,7 +7,7 @@
 # The case is written as a constructor name because that is the one place it is
 # known; the result's type depends on it.
 
-import { collect_arms, len, print, to_str, wrapping_add_assign as += } from builtins;
+import { collect_arms, equal as ==, len, print, to_str, wrapping_add_assign as += } from builtins;
 
 variant Shape = Circle(i64) | Square(i64) | Dot
 
@@ -35,18 +35,30 @@ fn total_radius(shapes: Shape[]) -> i64 {
 // And the array goes where an array of the refined type is wanted.
 fn radii(shapes: Shape[]) -> i64[] { shapes.collect_arms(Circle)$radius() }
 
-fn main() !prints {
-    let shapes = [Circle(1), Square(2), Dot, Circle(3), Dot, Square(4)];
-    print(total_radius(shapes).to_str());
-    print(`{radii(shapes)}`);
-    print(`{shapes.collect_arms(Square)}`);
-    print(`{shapes.collect_arms(Dot).len()}`);
-    let none_of_them: Shape[] = [Dot];
-    print(`{none_of_them.collect_arms(Circle).len()}`);
-}
---- stdout ---
-4
-[1, 3]
-[Square(2), Square(4)]
-2
-0
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let shapes = [Circle(1), Square(2), Dot, Circle(3), Dot, Square(4)];
+        print(total_radius(shapes).to_str());
+        print(`{radii(shapes)}`);
+        print(`{shapes.collect_arms(Square)}`);
+        print(`{shapes.collect_arms(Dot).len()}`);
+        let none_of_them: Shape[] = [Dot];
+        print(`{none_of_them.collect_arms(Circle).len()}`);
+    };
+    assert(out == """
+        4
+        [1, 3]
+        [Square(2), Square(4)]
+        2
+        0
+
+    """);
+})

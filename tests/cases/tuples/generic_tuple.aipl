@@ -11,7 +11,7 @@
 # do: an instance of a tuple template is named by its element types alone,
 # which is exactly what the concrete route spells.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 fn first<T: any>(p: (T, T)) -> T { p.0 }
 
@@ -27,29 +27,41 @@ fn unbox<T: any>(p: (Box<T>, Box<T>)) -> T { p.1.v }
 // direction that catches the two naming routes disagreeing.
 fn pair_up<T: any>(a: T, b: T) -> (T, T) { (a, b) }
 
-fn main() !prints {
-    print(first((1, 2)).to_str());
-    print(first(("a", "b")));
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(first((1, 2)).to_str());
+        print(first(("a", "b")));
 
-    let s = swap((1, "one"));
-    print(`{s.0} {s.1}`);
+        let s = swap((1, "one"));
+        print(`{s.0} {s.1}`);
 
-    print(unbox((Box { v: 7 }, Box { v: 8 })).to_str());
+        print(unbox((Box { v: 7 }, Box { v: 8 })).to_str());
 
-    // Built generically, read concretely.
-    let p = pair_up(3, 4);
-    print(p.0.to_str());
-    print(first(p).to_str());
+        // Built generically, read concretely.
+        let p = pair_up(3, 4);
+        print(p.0.to_str());
+        print(first(p).to_str());
 
-    // The same tuple type written out concretely is the same type.
-    let q: (i64, i64) = (5, 6);
-    print(first(q).to_str());
-}
---- stdout ---
-1
-a
-one 1
-8
-3
-3
-5
+        // The same tuple type written out concretely is the same type.
+        let q: (i64, i64) = (5, 6);
+        print(first(q).to_str());
+    };
+    assert(out == """
+        1
+        a
+        one 1
+        8
+        3
+        3
+        5
+
+    """);
+})

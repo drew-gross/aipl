@@ -6,7 +6,7 @@
 # The arms are tried in order, so an exact arm above a `..` arm is its special
 # case, as with any pattern.
 
-import { print, split } from builtins;
+import { equal as ==, print, split } from builtins;
 
 fn head(xs: i64[]) -> str {
     match (xs) {
@@ -43,34 +43,46 @@ fn opens(s: str) -> str {
     }
 }
 
-fn main() !prints {
-    print(head([7, 8]));
-    print(head([]));
-    print(shape([1, 5, 9]));
-    print(shape([2, 5]));
-    print(shape([2]));
-    print(count([]));
-    print(count([4]));
-    print(count([4, 5, 6]));
-    print(opens("# note"));
-    print(opens("abc"));
-    print(opens(""));
-    // The first of the parts of a split.
-    match ("a.b.c".split(".")) {
-        [part, ..] => print(part),
-        _ => print("no parts"),
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(head([7, 8]));
+        print(head([]));
+        print(shape([1, 5, 9]));
+        print(shape([2, 5]));
+        print(shape([2]));
+        print(count([]));
+        print(count([4]));
+        print(count([4, 5, 6]));
+        print(opens("# note"));
+        print(opens("abc"));
+        print(opens(""));
+        // The first of the parts of a split.
+        match ("a.b.c".split(".")) {
+            [part, ..] => print(part),
+            _ => print("no parts"),
+        };
     };
-}
---- stdout ---
-starts 7
-empty
-one then 5
-2 then 5
-short
-none
-just 4
-several
-comment
-starts with a
-blank
-a
+    assert(out == """
+        starts 7
+        empty
+        one then 5
+        2 then 5
+        short
+        none
+        just 4
+        several
+        comment
+        starts with a
+        blank
+        a
+
+    """);
+})

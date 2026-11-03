@@ -5,7 +5,7 @@
 # reused array's surplus elements are dropped and its length truncated, so the
 # balanced allocation counters below double as a leak check.
 
-import { map, print, to_str, wrapping_add as +, zip_with } from builtins;
+import { equal as ==, map, print, to_str, wrapping_add as +, zip_with } from builtins;
 
 fn show(label: str, xs: i64[]) !prints {
     print(label);
@@ -21,52 +21,64 @@ fn show_strs(label: str, xs: str[]) !prints {
     }
 }
 
-fn main() !prints {
-    // Both fresh, first longer: the first buffer is reused, its surplus
-    // elements dropped, and the second input freed.
-    show("a longer", zip_with([1, 2, 3, 4], [10, 20], +));
-    // Both fresh, second longer: the second buffer is reused.
-    show("b longer", zip_with([1, 2], [10, 20, 30, 40], +));
-    let b = [5, 5, 5];
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Both fresh, first longer: the first buffer is reused, its surplus
+        // elements dropped, and the second input freed.
+        show("a longer", zip_with([1, 2, 3, 4], [10, 20], +));
+        // Both fresh, second longer: the second buffer is reused.
+        show("b longer", zip_with([1, 2], [10, 20, 30, 40], +));
+        let b = [5, 5, 5];
 
-    // Only the first input is fresh: its buffer is reused even when it's the
-    // shorter side (the borrowed one is only indexed).
-    show("a fresh", zip_with([1, 2], b, +));
-    // Only the second input is fresh: reused, truncated from 4 to len(b).
-    show("b fresh", zip_with(b, [100, 200, 300, 400], +));
-    // A call result is as fresh as a literal.
-    show("call result", zip_with(b.map(|x| x + 1), [10, 10, 10], +));
+        // Only the first input is fresh: its buffer is reused even when it's the
+        // shorter side (the borrowed one is only indexed).
+        show("a fresh", zip_with([1, 2], b, +));
+        // Only the second input is fresh: reused, truncated from 4 to len(b).
+        show("b fresh", zip_with(b, [100, 200, 300, 400], +));
+        // A call result is as fresh as a literal.
+        show("call result", zip_with(b.map(|x| x + 1), [10, 10, 10], +));
 
-    // The result type may differ from the reused element type (each slot's
-    // element drop-fn is patched as it's overwritten): i64 slots, str results.
-    show_strs("strs", zip_with([1, 2, 3], [4, 5, 6], |x, y| to_str(x + y)));
+        // The result type may differ from the reused element type (each slot's
+        // element drop-fn is patched as it's overwritten): i64 slots, str results.
+        show_strs("strs", zip_with([1, 2, 3], [4, 5, 6], |x, y| to_str(x + y)));
 
-    // Heap elements: the overwritten slots and the dropped tail ("c") are
-    // released exactly once.
-    show_strs("concat", zip_with(["a", "b", "c"], ["x", "y"], |s, t| `{s}{t}`));
-}
---- stdout ---
-a longer
-11
-22
-b longer
-11
-22
-a fresh
-6
-7
-b fresh
-105
-205
-305
-call result
-16
-16
-16
-strs
-5
-7
-9
-concat
-ax
-by
+        // Heap elements: the overwritten slots and the dropped tail ("c") are
+        // released exactly once.
+        show_strs("concat", zip_with(["a", "b", "c"], ["x", "y"], |s, t| `{s}{t}`));
+    };
+    assert(out == """
+        a longer
+        11
+        22
+        b longer
+        11
+        22
+        a fresh
+        6
+        7
+        b fresh
+        105
+        205
+        305
+        call result
+        16
+        16
+        16
+        strs
+        5
+        7
+        9
+        concat
+        ax
+        by
+
+    """);
+})

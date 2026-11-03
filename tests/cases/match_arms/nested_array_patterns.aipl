@@ -7,7 +7,7 @@
 # elements are all plain binders or literals is unchanged, and lowers to the
 # same simple form it always did — see `array_patterns.aipl` for that one.
 
-import { print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
 variant Slot = Tok(str) | Sub(i64)
 
@@ -65,45 +65,56 @@ fn mixed(slots: Slot[]) -> str {
     }
 }
 
-fn main() !prints {
-    print(arity([Sub(0), Sub(1), Sub(2), Sub(3), Sub(4)]));
-    print(arity([Sub(0), Sub(1), Sub(2)]));
-    print(arity([Sub(0)]));
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(arity([Sub(0), Sub(1), Sub(2), Sub(3), Sub(4)]));
+        print(arity([Sub(0), Sub(1), Sub(2)]));
+        print(arity([Sub(0)]));
 
-    print(kind([Tok("?"), Sub(1)]));
-    print(kind([Tok("="), Sub(2)]));
-    print(kind([Sub(3), Sub(4)]));
-    print(kind([Tok("x")]));
+        print(kind([Tok("?"), Sub(1)]));
+        print(kind([Tok("="), Sub(2)]));
+        print(kind([Sub(3), Sub(4)]));
+        print(kind([Tok("x")]));
 
-    print(pick([some(7), none]).to_str());
-    print(pick([none, some(9)]).to_str());
-    print(pick([some(1), some(2)]).to_str());
-    print(pick([none, none]).to_str());
+        print(pick([some(7), none]).to_str());
+        print(pick([none, some(9)]).to_str());
+        print(pick([some(1), some(2)]).to_str());
+        print(pick([none, none]).to_str());
 
-    print(named([Tok("w"), Tok(":"), Sub(5), Tok(";")]));
-    print(named([Sub(0)]));
+        print(named([Tok("w"), Tok(":"), Sub(5), Tok(";")]));
+        print(named([Sub(0)]));
 
-    print(mixed([Tok("!"), Sub(0)]));
-    print(mixed([Tok("?"), Sub(0)]));
-    print(mixed([Sub(0)]));
-    print(mixed([]));
-}
---- stdout ---
-five
-three
-other
-optional 1
-= 2
-pair 3 4
-other
-7
-9
-3
-0
-w=5
-none
-bang
-two
-one
-other
+        print(mixed([Tok("!"), Sub(0)]));
+        print(mixed([Tok("?"), Sub(0)]));
+        print(mixed([Sub(0)]));
+        print(mixed([]));
+    };
+    assert(out == """
+        five
+        three
+        other
+        optional 1
+        = 2
+        pair 3 4
+        other
+        7
+        9
+        3
+        0
+        w=5
+        none
+        bang
+        two
+        one
+        other
 
+    """);
+})
