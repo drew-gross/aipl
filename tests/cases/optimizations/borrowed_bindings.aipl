@@ -6,7 +6,7 @@
 # is those, each checked by value, so a missing retain shows up as a corrupt
 # print or as the leak gate refusing the run.
 
-import { len, print, push, wrapping_add as + } from builtins;
+import { equal as ==, len, print, push, wrapping_add as + } from builtins;
 
 variant Tree = Leaf(items: i64[]) | Node(left: Tree, right: Tree, tag: str)
 
@@ -97,22 +97,34 @@ fn nested(trees: Tree[]) -> u64 {
     n
 }
 
-fn main() !prints {
-    let small = Node(Leaf([1, 2]), Leaf([3]), "small");
-    let deep = Node(small, Node(Leaf([4, 5, 6]), Leaf([7]), "inner"), "deep");
-    print(`{total(deep)} {first_tag(deep)} {first_tag(small)}`);
-    print(`{total(leftmost(deep))}`);
-    print(`{grown(deep)} {total(deep)}`);
-    let Box { values, name } = boxed(deep);
-    print(`{values} {name}`);
-    let rows = [[1, 2], [3], []];
-    print(`{keep_all(rows)} {grow_each(rows)} {rows}`);
-    print(`{nested([deep, small, Leaf([8, 9])])}`);
-}
---- stdout ---
-7 deep small
-2
-[1, 2, 99] 7
-[1, 2] deep
-[[1, 2], [3], []] 6 [[1, 2], [3], []]
-8
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let small = Node(Leaf([1, 2]), Leaf([3]), "small");
+        let deep = Node(small, Node(Leaf([4, 5, 6]), Leaf([7]), "inner"), "deep");
+        print(`{total(deep)} {first_tag(deep)} {first_tag(small)}`);
+        print(`{total(leftmost(deep))}`);
+        print(`{grown(deep)} {total(deep)}`);
+        let Box { values, name } = boxed(deep);
+        print(`{values} {name}`);
+        let rows = [[1, 2], [3], []];
+        print(`{keep_all(rows)} {grow_each(rows)} {rows}`);
+        print(`{nested([deep, small, Leaf([8, 9])])}`);
+    };
+    assert(out == """
+        7 deep small
+        2
+        [1, 2, 99] 7
+        [1, 2] deep
+        [[1, 2], [3], []] 6 [[1, 2], [3], []]
+        8
+
+    """);
+})

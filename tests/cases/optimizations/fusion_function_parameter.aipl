@@ -37,20 +37,32 @@ fn is_three(n: i64) -> bool { n == 3 }
 
 fn width(s: str) -> u64 { s.len() }
 
-fn main() !prints {
-    print(`{flatten_with([1, 2], pair)}`);
-    print(`{flatten_generic([1, 2], pair)}`);
-    print(`{flatten_mapped([1, 2], pair)}`);
-    print(`{dict_with([1, 2], keyed)}`);
-    print(`{find_with([1, 2], bump, is_three)}`);
-    print(`{reduce_with([1, 2], bump)}`);
-    print(`{split_with("a,bb", width)}`);
-}
---- stdout ---
-[1, 1, 2, 2]
-[1, 1, 2, 2]
-[1, 1, 2, 2]
-{1: 2, 2: 3}
-some(3)
-some(5)
-[1, 2]
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`{flatten_with([1, 2], pair)}`);
+        print(`{flatten_generic([1, 2], pair)}`);
+        print(`{flatten_mapped([1, 2], pair)}`);
+        print(`{dict_with([1, 2], keyed)}`);
+        print(`{find_with([1, 2], bump, is_three)}`);
+        print(`{reduce_with([1, 2], bump)}`);
+        print(`{split_with("a,bb", width)}`);
+    };
+    assert(out == """
+        [1, 1, 2, 2]
+        [1, 1, 2, 2]
+        [1, 1, 2, 2]
+        {1: 2, 2: 3}
+        some(3)
+        some(5)
+        [1, 2]
+
+    """);
+})

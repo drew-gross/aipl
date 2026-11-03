@@ -874,7 +874,7 @@ expression matcher:
 vscode:
   autocomplete
   go to definition should work for destructurings (types and fields)
-  lint should work on _some_ documents that fail to compile e.g. if it has unused imports, or fails lint
+  go to def should work on _some_ documents that fail to compile e.g. if it has unused imports, or fails lint
   PBlock on body in lower_function gives Message: the compiler's name resolution does not cover `PBlock` here (imports, parameters, patterns and types are not tracked yet)
   refresh on code edit (with watcher? check for edits when command received? possily go-to-* should block rather than error while parsing? Maybe need partial update?)
   go to definition and go to references should work for local variables

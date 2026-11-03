@@ -27,7 +27,7 @@
 # pins is the answer, not the path — the guard stays because soundness should
 # not depend on an earlier pass happening to run first.
 
-import { len, map, print, value_or, wrapping_mul as * } from builtins;
+import { equal as ==, len, map, print, value_or, wrapping_mul as * } from builtins;
 
 fn loud(n: i64) !prints -> i64 {
     print(`f{n}`);
@@ -49,43 +49,55 @@ fn noisy_index() !prints -> u64 {
 # own `i` must not be moved under them.
 fn scaled(xs: i64[], i: i64) -> i64[] { xs.map(|x| x * i) }
 
-fn main() !prints {
-    let v = [1, 2, 3];
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let v = [1, 2, 3];
 
-    // An effectful named `f`: not fused, so `loud` runs for every element.
-    print(`{v.map(loud)[1]}`);
+        // An effectful named `f`: not fused, so `loud` runs for every element.
+        print(`{v.map(loud)[1]}`);
 
-    // An effectful lambda: the same bar, reached through the lambda's body.
-    print(`{v.map(|x| { print(`g{x}`); x * 3 })[0]}`);
+        // An effectful lambda: the same bar, reached through the lambda's body.
+        print(`{v.map(|x| { print(`g{x}`); x * 3 })[0]}`);
 
-    // An effectful *receiver* is fine — it is evaluated once either way — so
-    // this one fuses and "source" prints once with no `f` output at all.
-    print(`{noisy_source().map(loud2)[2]}`);
+        // An effectful *receiver* is fine — it is evaluated once either way — so
+        // this one fuses and "source" prints once with no `f` output at all.
+        print(`{noisy_source().map(loud2)[2]}`);
 
-    // An effectful *index* is fine for the same reason, even though the fusion
-    // moves it ahead of the mapping calls: `loud2` is pure, so nothing can tell.
-    print(`{v.map(loud2)[noisy_index()]}`);
+        // An effectful *index* is fine for the same reason, even though the fusion
+        // moves it ahead of the mapping calls: `loud2` is pure, so nothing can tell.
+        print(`{v.map(loud2)[noisy_index()]}`);
 
-    // The index names `i`, which `scaled`'s parameter also names: declined.
-    let i = 2;
-    print(`{scaled(v, 10)[i].value_or(0)}`);
+        // The index names `i`, which `scaled`'s parameter also names: declined.
+        let i = 2;
+        print(`{scaled(v, 10)[i].value_or(0)}`);
 
-    print(`{v.len()}`);
-}
+        print(`{v.len()}`);
+    };
+    assert(out == """
+        f1
+        f2
+        f3
+        some(4)
+        g1
+        g2
+        g3
+        some(3)
+        source
+        some(6)
+        index
+        some(4)
+        30
+        3
+
+    """);
+})
 
 fn loud2(n: i64) -> i64 { n * 2 }
---- stdout ---
-f1
-f2
-f3
-some(4)
-g1
-g2
-g3
-some(3)
-source
-some(6)
-index
-some(4)
-30
-3

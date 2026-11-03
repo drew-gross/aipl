@@ -12,7 +12,7 @@
 # (Symbol lists are not evidence either way here: post-mono inlining folds a
 # single-use `count` into its caller, so the name disappears regardless.)
 
-import { count, less_than as <, print, repeat, to_str } from builtins;
+import { count, equal as ==, less_than as <, print, repeat, to_str } from builtins;
 
 fn many() -> i64[] { [2].repeat(201) }
 
@@ -23,14 +23,25 @@ fn noisy_bound() !prints -> u64 {
     3
 }
 
-fn main() !prints {
-    // Not fused: `noisy_bound()` prints. The count walks all 201 matches.
-    print((many().count(2) < noisy_bound()).to_str());
-    // Fused: same shape, pure bound.
-    print((many().count(2) < 3).to_str());
-}
---- stdout ---
-bound
-false
-false
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Not fused: `noisy_bound()` prints. The count walks all 201 matches.
+        print((many().count(2) < noisy_bound()).to_str());
+        // Fused: same shape, pure bound.
+        print((many().count(2) < 3).to_str());
+    };
+    assert(out == """
+        bound
+        false
+        false
 
+    """);
+})

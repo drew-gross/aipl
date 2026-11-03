@@ -123,37 +123,38 @@ fn count_lines(s: str) -> u64 {
     n
 }
 
-fn main() !prints {
-    print(numbered("alpha\nbeta\n\ngamma"));
-    print(widths("aa--b--cccc", "--"));
-    // An empty separator never matches: the whole string is the one part.
-    print(widths("abcd", ""));
-    print(to_str(first_blank("x\ny\n\nz")));
-    print(to_str(first_blank("none here")));
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(numbered("alpha\nbeta\n\ngamma"));
+        print(widths("aa--b--cccc", "--"));
+        // An empty separator never matches: the whole string is the one part.
+        print(widths("abcd", ""));
+        print(to_str(first_blank("x\ny\n\nz")));
+        print(to_str(first_blank("none here")));
 
-    // A rope source, so the cursor's walk crosses a representation it cannot
-    // index directly.
-    print(numbered(rope_str("one\ntw", "o\nthree")));
-    // Long enough that every part is a heap window rather than an inline value.
-    print(widths("first long piece\nsecond long piece", "\n"));
-    print(materialized("alpha\nbeta\ngamma"));
-    print(rewriting("alpha,beta,gamma"));
+        // A rope source, so the cursor's walk crosses a representation it cannot
+        // index directly.
+        print(numbered(rope_str("one\ntw", "o\nthree")));
+        // Long enough that every part is a heap window rather than an inline value.
+        print(widths("first long piece\nsecond long piece", "\n"));
+        print(materialized("alpha\nbeta\ngamma"));
+        print(rewriting("alpha,beta,gamma"));
 
-    // An indexed loop desugars to a counter around the same `for`, so it fuses
-    // like any other.
-    for (let i, part : "x--y".split("--")) {
-        print(`{i}:{part}`);
-    }
-}
---- stdout ---
-1:alpha 2:beta 3: 4:gamma 
-2 1 4 
-4 
-2
--1
-1:one 2:two 3:three 
-16 17 
-some("beta") of 3
-[alpha][beta][gamma]
-0:x
-1:y
+        // An indexed loop desugars to a counter around the same `for`, so it fuses
+        // like any other.
+        for (let i, part : "x--y".split("--")) {
+            print(`{i}:{part}`);
+        }
+    };
+    assert(
+        out == `1:alpha 2:beta 3: 4:gamma \n2 1 4 \n4 \n2\n-1\n1:one 2:two 3:three \n16 17 \nsome("beta") of 3\n[alpha][beta][gamma]\n0:x\n1:y\n`,
+    );
+})

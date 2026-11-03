@@ -27,19 +27,31 @@ fn slow(xs: i64[]) -> str {
 
 fn fast(xs: i64[]) -> str { `{xs.sort().first()} {xs.sort().last()} {xs.len()}` }
 
-fn main() !prints {
-    let empty: i64[] = [];
-    for (let xs : [empty, [4], [2, 2], [5, 3, 9, 1, 7, 1, 8], [-3, 0, -3, 6]]) {
-        print(fast(xs));
-        if (fast(xs) != slow(xs)) { print("MISMATCH"); };
-    }
-    // Strings and chars order too.
-    print(`{["pear", "apple", "fig"].sort().first()} {"hello".sort().last()}`);
-}
---- stdout ---
-none none 0
-some(4) some(4) 1
-some(2) some(2) 2
-some(1) some(9) 7
-some(-3) some(6) 4
-some("apple") some('o')
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let empty: i64[] = [];
+        for (let xs : [empty, [4], [2, 2], [5, 3, 9, 1, 7, 1, 8], [-3, 0, -3, 6]]) {
+            print(fast(xs));
+            if (fast(xs) != slow(xs)) { print("MISMATCH"); };
+        }
+        // Strings and chars order too.
+        print(`{["pear", "apple", "fig"].sort().first()} {"hello".sort().last()}`);
+    };
+    assert(out == """
+        none none 0
+        some(4) some(4) 1
+        some(2) some(2) 2
+        some(1) some(9) 7
+        some(-3) some(6) 4
+        some("apple") some('o')
+
+    """);
+})

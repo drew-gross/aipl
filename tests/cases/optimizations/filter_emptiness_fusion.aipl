@@ -47,17 +47,29 @@ fn fast(xs: i64[]) -> str {
     `{xs.filter(big).is_empty()} {xs.filter(big).is_nonempty()} {xs.filter(big).map(dbl).is_empty()} {xs.filter(big).map(dbl).is_nonempty()}`
 }
 
-fn main() !prints {
-    let empty: i64[] = [];
-    for (let xs : [empty, [1], [7], [1, 2, 3], [9, 1, 8, 2], [3, 4, 5, 6, 7]]) {
-        print(fast(xs));
-        if (fast(xs) != slow(xs)) { print("MISMATCH"); };
-    }
-}
---- stdout ---
-true false true false
-true false true false
-false true false true
-true false true false
-false true false true
-false true false true
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let empty: i64[] = [];
+        for (let xs : [empty, [1], [7], [1, 2, 3], [9, 1, 8, 2], [3, 4, 5, 6, 7]]) {
+            print(fast(xs));
+            if (fast(xs) != slow(xs)) { print("MISMATCH"); };
+        }
+    };
+    assert(out == """
+        true false true false
+        true false true false
+        false true false true
+        true false true false
+        false true false true
+        false true false true
+
+    """);
+})

@@ -71,16 +71,28 @@ fn into_str() -> u64 {
     s.len()
 }
 
-fn main() !prints {
-    print(`{rows([7, 8])}`);
-    print(`{mapped([1, 2, 3], some([4, 5]))} {mapped([1], none)}`);
-    print(`{reads_receiver()} {into_str()}`);
-}
---- stdout ---
-e1
-e2
-e3
-e4
-8
-10 2
-3 4
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`{rows([7, 8])}`);
+        print(`{mapped([1, 2, 3], some([4, 5]))} {mapped([1], none)}`);
+        print(`{reads_receiver()} {into_str()}`);
+    };
+    assert(out == """
+        e1
+        e2
+        e3
+        e4
+        8
+        10 2
+        3 4
+
+    """);
+})

@@ -164,42 +164,54 @@ fn effects(o: i64?) !prints -> i64[] {
     v
 }
 
-fn main() !prints {
-    let leaf: Rule<Tok> = Leaf(A);
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let leaf: Rule<Tok> = Leaf(A);
 
-    // `Leaf` alone: the recursion never reaches the row.
-    print(`{gather(leaf)}`);
+        // `Leaf` alone: the recursion never reaches the row.
+        print(`{gather(leaf)}`);
 
-    // `some` payload, one level: `[1, ..styles(leaf), ..opt_styles(some(leaf))]`.
-    print(`{gather(Many(leaf, some(leaf)))}`);
+        // `some` payload, one level: `[1, ..styles(leaf), ..opt_styles(some(leaf))]`.
+        print(`{gather(Many(leaf, some(leaf)))}`);
 
-    // `none` payload: the row's other arm, under the same minted variant.
-    print(`{gather(Many(leaf, none))}`);
+        // `none` payload: the row's other arm, under the same minted variant.
+        print(`{gather(Many(leaf, none))}`);
 
-    // Two levels, so a minted variant appends into a receiver another level of
-    // itself has already grown.
-    print(`{gather(Many(Many(leaf, some(leaf)), none))}`);
+        // Two levels, so a minted variant appends into a receiver another level of
+        // itself has already grown.
+        print(`{gather(Many(Many(leaf, some(leaf)), none))}`);
 
-    // Reached through `map(..).join()`, which is its own folder row, so the
-    // `value_or` row runs inside a loop body appending to the same receiver.
-    print(`{gather(Then([Many(leaf, none), leaf]))}`);
+        // Reached through `map(..).join()`, which is its own folder row, so the
+        // `value_or` row runs inside a loop body appending to the same receiver.
+        print(`{gather(Then([Many(leaf, none), leaf]))}`);
 
-    // The receiver crosses the loop *and* the recursion.
-    print(`{gather_two([Many(leaf, some(leaf)), leaf])}`);
+        // The receiver crosses the loop *and* the recursion.
+        print(`{gather_two([Many(leaf, some(leaf)), leaf])}`);
 
-    print(`{plain(some(3))} {plain(none)}`);
+        print(`{plain(some(3))} {plain(none)}`);
 
-    print(`{effects(some(7))}`);
-    print(`{effects(none)}`);
-}
---- stdout ---
-[2]
-[1, 2, 2]
-[1, 2]
-[1, 1, 2, 2]
-[1, 2, 2]
-[1, 2, 2, 2]
-[9, 3, 4] [9]
-f7
-[7]
-[]
+        print(`{effects(some(7))}`);
+        print(`{effects(none)}`);
+    };
+    assert(out == """
+        [2]
+        [1, 2, 2]
+        [1, 2]
+        [1, 1, 2, 2]
+        [1, 2, 2]
+        [1, 2, 2, 2]
+        [9, 3, 4] [9]
+        f7
+        [7]
+        []
+
+    """);
+})

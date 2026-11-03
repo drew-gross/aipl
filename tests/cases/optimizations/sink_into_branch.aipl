@@ -24,10 +24,22 @@ fn size(flag: bool, n: i64) -> u64 {
 // The flags come from `is_nonempty` rather than `true`/`false` so that constant
 // folding can't collapse the branch before this pass sees it — a folded-away
 // branch is nothing to sink into, and the case would then assert nothing.
-fn main() !prints {
-    print(size("".is_nonempty(), 1).to_str());
-    print(size("x".is_nonempty(), 2).to_str());
-}
---- stdout ---
-0
-52
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(size("".is_nonempty(), 1).to_str());
+        print(size("x".is_nonempty(), 2).to_str());
+    };
+    assert(out == """
+        0
+        52
+
+    """);
+})

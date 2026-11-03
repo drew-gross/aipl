@@ -108,46 +108,58 @@ fn fast(xs: i64[]) -> str {
     `{xs.map(dbl).any(big)} {xs.map(dbl).all(big)} {xs.map(dbl).count_if(even)} {xs.filter(big).any(even)} {xs.filter(big).all(even)} {xs.filter(big).count_if(even)} {xs.filter(big).find_if(even)} {xs.filter(big).filter(even)} {first_doubled(xs)} {last_doubled(xs)} {first_big(xs)} {last_big(xs)} {xs.filter(big).map(dbl).any(huge)} {xs.filter(big).map(dbl).all(huge)} {xs.filter(big).map(dbl).count_if(huge)} {xs.filter(big).map(dbl).first()} {xs.filter(big).map(dbl).last()} {xs.len() + xs.len()}`
 }
 
-fn main() !prints {
-    let empty: i64[] = [];
-    let arrays = [empty, [1], [7], [3, 8], [1, 2, 3], [7, 9, 11], [6, 7, 8, 9, 10]];
-    for (let xs : arrays) {
-        print(fast(xs));
-        print(slow(xs));
-        if (fast_search(xs) != slow_search(xs)) { print("SEARCH MISMATCH"); };
-        print(fast_search(xs));
-        if (fast(xs) != slow(xs)) { print("MISMATCH"); };
-    }
-    print(`{filter_twice([1, 6, 7, 8, 12, 5])}`);
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let empty: i64[] = [];
+        let arrays = [empty, [1], [7], [3, 8], [1, 2, 3], [7, 9, 11], [6, 7, 8, 9, 10]];
+        for (let xs : arrays) {
+            print(fast(xs));
+            print(slow(xs));
+            if (fast_search(xs) != slow_search(xs)) { print("SEARCH MISMATCH"); };
+            print(fast_search(xs));
+            if (fast(xs) != slow(xs)) { print("MISMATCH"); };
+        }
+        print(`{filter_twice([1, 6, 7, 8, 12, 5])}`);
 
-    // A `Span` is mappable but is not an array, so each of these hands the fused
-    // call a range: it is the array of positions `map` makes of it.
-    let positions = 0..6;
-    print(
-        `{positions.map(udbl).any(ubig)} {positions.map(udbl).all(ubig)} {positions.map(udbl).count_if(ubig)} {positions.map(udbl).first()} {positions.map(udbl).last()}`,
-    );
-}
---- stdout ---
-false true 0 false true 0 none [] none none none none false true 0 none none 0
-false true 0 false true 0 none [] none none none none false true 0 none none 0
-none none none none 0
-false false 1 false true 0 none [] some(2) some(2) none none false true 0 none none 2
-false false 1 false true 0 none [] some(2) some(2) none none false true 0 none none 2
-none none none none 1
-true true 1 false false 0 none [] some(14) some(14) some(7) some(7) true true 1 some(14) some(14) 2
-true true 1 false false 0 none [] some(14) some(14) some(7) some(7) true true 1 some(14) some(14) 2
-some(14) some(0) some(7) some(14) 2
-true true 2 true true 1 some(8) [8] some(6) some(16) some(8) some(8) true true 1 some(16) some(16) 4
-true true 2 true true 1 some(8) [8] some(6) some(16) some(8) some(8) true true 1 some(16) some(16) 4
-some(16) some(0) some(8) some(16) 3
-true false 3 false true 0 none [] some(2) some(6) none none false true 0 none none 6
-true false 3 false true 0 none [] some(2) some(6) none none false true 0 none none 6
-none some(2) none none 3
-true true 3 false false 0 none [] some(14) some(22) some(7) some(11) true true 3 some(14) some(22) 6
-true true 3 false false 0 none [] some(14) some(22) some(7) some(11) true true 3 some(14) some(22) 6
-some(14) some(0) some(7) some(14) 6
-true true 5 true false 3 some(6) [6, 8, 10] some(12) some(20) some(6) some(10) true false 4 some(12) some(20) 10
-true true 5 true false 3 some(6) [6, 8, 10] some(12) some(20) some(6) some(10) true false 4 some(12) some(20) 10
-some(12) some(0) some(7) some(12) 10
-[6, 8, 12]
-true false 4 some(0) some(10)
+        // A `Span` is mappable but is not an array, so each of these hands the fused
+        // call a range: it is the array of positions `map` makes of it.
+        let positions = 0..6;
+        print(
+            `{positions.map(udbl).any(ubig)} {positions.map(udbl).all(ubig)} {positions.map(udbl).count_if(ubig)} {positions.map(udbl).first()} {positions.map(udbl).last()}`,
+        );
+    };
+    assert(out == """
+        false true 0 false true 0 none [] none none none none false true 0 none none 0
+        false true 0 false true 0 none [] none none none none false true 0 none none 0
+        none none none none 0
+        false false 1 false true 0 none [] some(2) some(2) none none false true 0 none none 2
+        false false 1 false true 0 none [] some(2) some(2) none none false true 0 none none 2
+        none none none none 1
+        true true 1 false false 0 none [] some(14) some(14) some(7) some(7) true true 1 some(14) some(14) 2
+        true true 1 false false 0 none [] some(14) some(14) some(7) some(7) true true 1 some(14) some(14) 2
+        some(14) some(0) some(7) some(14) 2
+        true true 2 true true 1 some(8) [8] some(6) some(16) some(8) some(8) true true 1 some(16) some(16) 4
+        true true 2 true true 1 some(8) [8] some(6) some(16) some(8) some(8) true true 1 some(16) some(16) 4
+        some(16) some(0) some(8) some(16) 3
+        true false 3 false true 0 none [] some(2) some(6) none none false true 0 none none 6
+        true false 3 false true 0 none [] some(2) some(6) none none false true 0 none none 6
+        none some(2) none none 3
+        true true 3 false false 0 none [] some(14) some(22) some(7) some(11) true true 3 some(14) some(22) 6
+        true true 3 false false 0 none [] some(14) some(22) some(7) some(11) true true 3 some(14) some(22) 6
+        some(14) some(0) some(7) some(14) 6
+        true true 5 true false 3 some(6) [6, 8, 10] some(12) some(20) some(6) some(10) true false 4 some(12) some(20) 10
+        true true 5 true false 3 some(6) [6, 8, 10] some(12) some(20) some(6) some(10) true false 4 some(12) some(20) 10
+        some(12) some(0) some(7) some(12) 10
+        [6, 8, 12]
+        true false 4 some(0) some(10)
+
+    """);
+})

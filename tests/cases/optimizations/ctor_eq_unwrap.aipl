@@ -50,56 +50,68 @@ fn starts_one_two(l: List) -> bool { l == Cons(1, Cons(2, Nil)) }
 
 fn nonempty(l: List) -> bool { l != Nil }
 
-fn main() !prints {
-    // The optionals come from a call rather than a literal so constant folding
-    // can't settle the comparison before this pass sees it.
-    let three: i64? = if ("x".is_nonempty()) { some(3) } else { none };
-    let absent: i64? = if ("".is_nonempty()) { some(3) } else { none };
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // The optionals come from a call rather than a literal so constant folding
+        // can't settle the comparison before this pass sees it.
+        let three: i64? = if ("x".is_nonempty()) { some(3) } else { none };
+        let absent: i64? = if ("".is_nonempty()) { some(3) } else { none };
 
-    print(matches(three, 3).to_str());
-    print(matches(three, 4).to_str());
-    print(matches(absent, 3).to_str());
+        print(matches(three, 3).to_str());
+        print(matches(three, 4).to_str());
+        print(matches(absent, 3).to_str());
 
-    print(differs(three, 3).to_str());
-    print(differs(absent, 3).to_str());
+        print(differs(three, 3).to_str());
+        print(differs(absent, 3).to_str());
 
-    let ro: i64!str = if ("x".is_nonempty()) { ok(1) } else { err("no") };
-    print(is_ok_with(ro, 1).to_str());
-    print(is_ok_with(ro, 2).to_str());
-    print(failed_with(ro, "no").to_str());
+        let ro: i64!str = if ("x".is_nonempty()) { ok(1) } else { err("no") };
+        print(is_ok_with(ro, 1).to_str());
+        print(is_ok_with(ro, 2).to_str());
+        print(failed_with(ro, "no").to_str());
 
-    // The miss path: `long()` is still called (it is the comparison's operand,
-    // and dropping it would be a behaviour change), but nothing is built to hold
-    // its result.
-    print(is_long(none).to_str());
-    print(is_long(some(long())).to_str());
+        // The miss path: `long()` is still called (it is the comparison's operand,
+        // and dropping it would be a behaviour change), but nothing is built to hold
+        // its result.
+        print(is_long(none).to_str());
+        print(is_long(some(long())).to_str());
 
-    print(is_absent(absent).to_str());
-    print(is_absent(three).to_str());
-    let done: !str = if ("x".is_nonempty()) { ok() } else { err("no") };
-    print(succeeded(done).to_str());
+        print(is_absent(absent).to_str());
+        print(is_absent(three).to_str());
+        let done: !str = if ("x".is_nonempty()) { ok() } else { err("no") };
+        print(succeeded(done).to_str());
 
-    let l = Cons(1, Cons(2, Nil));
-    print(starts_one_two(l).to_str());
-    print(starts_one_two(Cons(1, Nil)).to_str());
-    print(nonempty(l).to_str());
-    print(nonempty(Nil).to_str());
-}
---- stdout ---
-true
-false
-false
-false
-true
-true
-false
-false
-false
-true
-true
-false
-true
-true
-false
-true
-false
+        let l = Cons(1, Cons(2, Nil));
+        print(starts_one_two(l).to_str());
+        print(starts_one_two(Cons(1, Nil)).to_str());
+        print(nonempty(l).to_str());
+        print(nonempty(Nil).to_str());
+    };
+    assert(out == """
+        true
+        false
+        false
+        false
+        true
+        true
+        false
+        false
+        false
+        true
+        true
+        false
+        true
+        true
+        false
+        true
+        false
+
+    """);
+})

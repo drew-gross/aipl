@@ -44,8 +44,17 @@ fn pick(flag: bool, d: u64) -> u64 {
     assert(measure("arm taken", true, |f| pick(f, 2)).instructions == 35);
 })
 
-fn main() !prints {
-    print(pick("".is_nonempty(), "ab".len()).to_str());
-}
---- stdout ---
-0
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(pick("".is_nonempty(), "ab".len()).to_str());
+    };
+    assert(out == "0\n");
+})

@@ -44,48 +44,59 @@ fn many() -> i64[] { [2].repeat(201) }.performance({
 
 fn small() -> i64[] { [1, 2, 2, 3, 2] }
 
-fn main() !prints {
-    // Decided after 3 matches, not 201.
-    print((many().count(2) < 3).to_str());
-    print((many().count(2) > 2).to_str());
-    print((many().count(2) >= 2).to_str());
-    print((many().count(2) != 2).to_str());
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Decided after 3 matches, not 201.
+        print((many().count(2) < 3).to_str());
+        print((many().count(2) > 2).to_str());
+        print((many().count(2) >= 2).to_str());
+        print((many().count(2) != 2).to_str());
 
-    // Every comparison, against a count of 3.
-    print((small().count(2) < 4).to_str());
-    print((small().count(2) <= 2).to_str());
-    print((small().count(2) > 2).to_str());
-    print((small().count(2) >= 3).to_str());
-    print((small().count(2) == 3).to_str());
-    print((small().count(2) != 3).to_str());
+        // Every comparison, against a count of 3.
+        print((small().count(2) < 4).to_str());
+        print((small().count(2) <= 2).to_str());
+        print((small().count(2) > 2).to_str());
+        print((small().count(2) >= 3).to_str());
+        print((small().count(2) == 3).to_str());
+        print((small().count(2) != 3).to_str());
 
-    // Mirrored: the bound on the left.
-    print((4 > small().count(2)).to_str());
-    print((2 >= small().count(2)).to_str());
-    print((3 == small().count(2)).to_str());
-    print((3 != small().count(2)).to_str());
+        // Mirrored: the bound on the left.
+        print((4 > small().count(2)).to_str());
+        print((2 >= small().count(2)).to_str());
+        print((3 == small().count(2)).to_str());
+        print((3 != small().count(2)).to_str());
 
-    // Zero bounds, where the early exit has to not fire too eagerly.
-    print((small().count(9) < 1).to_str());
-    print((small().count(9) >= 0).to_str());
-    print((small().count(2) < 0).to_str());
-}
---- stdout ---
-false
-true
-true
-true
-true
-false
-true
-true
-true
-false
-true
-false
-true
-false
-true
-true
-false
+        // Zero bounds, where the early exit has to not fire too eagerly.
+        print((small().count(9) < 1).to_str());
+        print((small().count(9) >= 0).to_str());
+        print((small().count(2) < 0).to_str());
+    };
+    assert(out == """
+        false
+        true
+        true
+        true
+        true
+        false
+        true
+        true
+        true
+        false
+        true
+        false
+        true
+        false
+        true
+        true
+        false
 
+    """);
+})

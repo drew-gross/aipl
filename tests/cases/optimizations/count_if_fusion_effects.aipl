@@ -3,18 +3,30 @@
 # elements after it. A predicate that prints is called once per element, as
 # written, even though the first match already settles `> 0`.
 
-import { count_if, greater_than as >, print, to_str } from builtins;
+import { count_if, equal as ==, greater_than as >, print, to_str } from builtins;
 
 fn loud(x: i64) !prints -> bool {
     print(`p{x}`);
     x > 1
 }
 
-fn main() !prints {
-    print((count_if([1, 2, 3], loud) > 0).to_str());
-}
---- stdout ---
-p1
-p2
-p3
-true
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print((count_if([1, 2, 3], loud) > 0).to_str());
+    };
+    assert(out == """
+        p1
+        p2
+        p3
+        true
+
+    """);
+})

@@ -53,21 +53,33 @@ fn plain(xs: i64[], k: u64) -> str {
     `{n < k} {n <= k} {n > k} {n >= k} {n == k} {n != k} {k > n} {k >= n} {k < n} {k <= n} {k == n} {k != n}`
 }
 
-fn main() !prints {
-    let empty: i64[] = [];
-    let bounds: u64[] = [0, 1, 2, 3, 5];
-    for (let xs : [empty, [1], [2], [2, 1, 2], [2, 2, 2, 1, 2]]) {
-        for (let k : bounds) {
-            if (fused(xs, k) != plain(xs, k)) { print(`MISMATCH {xs} {k}`); };
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let empty: i64[] = [];
+        let bounds: u64[] = [0, 1, 2, 3, 5];
+        for (let xs : [empty, [1], [2], [2, 1, 2], [2, 2, 2, 1, 2]]) {
+            for (let k : bounds) {
+                if (fused(xs, k) != plain(xs, k)) { print(`MISMATCH {xs} {k}`); };
+            }
         }
-    }
-    print((many().count_if(is_two) < 3).to_str());
-    print((many().count_if(is_two) >= 2).to_str());
-    print((3 > [2, 2, 1, 2].count_if(is_two)).to_str());
-    print(plain([2, 1, 2], 2));
-}
---- stdout ---
-false
-true
-false
-false true false true true false false true false true true false
+        print((many().count_if(is_two) < 3).to_str());
+        print((many().count_if(is_two) >= 2).to_str());
+        print((3 > [2, 2, 1, 2].count_if(is_two)).to_str());
+        print(plain([2, 1, 2], 2));
+    };
+    assert(out == """
+        false
+        true
+        false
+        false true false true true false false true false true true false
+
+    """);
+})

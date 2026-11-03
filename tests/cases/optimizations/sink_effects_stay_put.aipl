@@ -13,7 +13,7 @@
 # (`reaches_blocked` in `aipl-mono`'s `sink`), which is what the second pair of
 # lines below pins down.
 
-import { len, map, print, to_str } from builtins;
+import { equal as ==, len, map, print, to_str } from builtins;
 
 fn noisy(n: i64) !prints -> i64 {
     print(`computing {n}`);
@@ -30,18 +30,30 @@ fn mapped(flag: bool, xs: i64[]) !prints -> u64 {
     if (flag) { all.len() } else { 0 }
 }
 
-fn main() !prints {
-    print(size(false, 1).to_str());
-    print(size(true, 2).to_str());
-    print(mapped(false, [3]).to_str());
-    print(mapped(true, [4]).to_str());
-}
---- stdout ---
-computing 1
-0
-computing 2
-2
-computing 3
-0
-computing 4
-1
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(size(false, 1).to_str());
+        print(size(true, 2).to_str());
+        print(mapped(false, [3]).to_str());
+        print(mapped(true, [4]).to_str());
+    };
+    assert(out == """
+        computing 1
+        0
+        computing 2
+        2
+        computing 3
+        0
+        computing 4
+        1
+
+    """);
+})

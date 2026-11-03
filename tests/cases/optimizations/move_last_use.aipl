@@ -127,88 +127,100 @@ fn widen(s: #{i64}) -> #{i64} { s.union(#{7}) }
 
 fn build(n: i64) -> i64[] { [n, n + 1, n + 2] }
 
-fn main() !prints {
-    // An immutable binding, read once and then handed over.
-    let a = build(1);
-    print(`{a.len()} {consume(a)}`);
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // An immutable binding, read once and then handed over.
+        let a = build(1);
+        print(`{a.len()} {consume(a)}`);
 
-    // A `mut` array reassigned from a call on itself: the old value moves into
-    // the call, the new one lands in the slot.
-    mut b = build(1);
-    set b = grow(b);
-    set b = grow(b);
-    print(`{b}`);
+        // A `mut` array reassigned from a call on itself: the old value moves into
+        // the call, the new one lands in the slot.
+        mut b = build(1);
+        set b = grow(b);
+        set b = grow(b);
+        print(`{b}`);
 
-    // The same for a `mut` str — a wide value that lives in its slot.
-    mut s = "ab";
-    set s = stretch(s);
-    set s = stretch(s);
-    print(s);
+        // The same for a `mut` str — a wide value that lives in its slot.
+        mut s = "ab";
+        set s = stretch(s);
+        set s = stretch(s);
+        print(s);
 
-    // And a `mut` set.
-    mut t = #{1};
-    set t = widen(t);
-    print(`{t}`);
+        // And a `mut` set.
+        mut t = #{1};
+        set t = widen(t);
+        print(`{t}`);
 
-    // An alias holds no reference of its own, so the binding it reads through
-    // is never moved: `c` stays valid after `d` is handed over.
-    let c = build(4);
-    let d = c;
-    print(`{consume(d)} {c}`);
+        // An alias holds no reference of its own, so the binding it reads through
+        // is never moved: `c` stays valid after `d` is handed over.
+        let c = build(4);
+        let d = c;
+        print(`{consume(d)} {c}`);
 
-    // A later read keeps the earlier call a borrow.
-    let e = build(7);
-    let n = consume(e);
-    print(`{n} {e}`);
+        // A later read keeps the earlier call a borrow.
+        let e = build(7);
+        let n = consume(e);
+        print(`{n} {e}`);
 
-    // A use inside a loop is followed by the next iteration, so it borrows;
-    // the use after the loop is the last one.
-    let f = build(2);
-    mut total: u64 = 0;
-    for (let i : "abc") {
-        set total += consume(f);
-    }
-    print(`{total} {consume(f)}`);
+        // A use inside a loop is followed by the next iteration, so it borrows;
+        // the use after the loop is the last one.
+        let f = build(2);
+        mut total: u64 = 0;
+        for (let i : "abc") {
+            set total += consume(f);
+        }
+        print(`{total} {consume(f)}`);
 
-    // Each branch has its own last use.
-    let g = build(3);
-    let h = if (total == 9) { consume(g) } else { grow(g).len() };
-    print(`{h}`);
+        // Each branch has its own last use.
+        let g = build(3);
+        let h = if (total == 9) { consume(g) } else { grow(g).len() };
+        print(`{h}`);
 
-    // A binding moved from inside a branch it was declared in.
-    if (total == 9) {
-        let k = build(5);
-        print(`{consume(k)}`);
+        // A binding moved from inside a branch it was declared in.
+        if (total == 9) {
+            let k = build(5);
+            print(`{consume(k)}`);
+        };
+
+        // Both fresh; fresh and borrowed; a last-use binding and a fresh one.
+        print(`{merge(build(1), build(2))}`);
+        let q = build(3);
+        print(`{merge(build(1), q)} {q}`);
+        let r = build(4);
+        print(`{merge(r, build(5))}`);
+
+        // Receivers: a fresh one and a last-use binding move into `extended`'s
+        // owned instance; one read again afterwards is borrowed, and unchanged.
+        print(`{build(1).extended()}`);
+        let m = build(2);
+        print(`{m.extended()}`);
+        let p = build(3);
+        print(`{p.extended()} {p}`);
     };
+    assert(out == """
+        3 3
+        [1, 2, 3, 9, 9, 9, 9]
+        ab!!
+        {1, 7}
+        3 [4, 5, 6]
+        3 [7, 8, 9]
+        9 3
+        3
+        3
+        [1, 2, 3, 2, 3, 4, 0]
+        [1, 2, 3, 3, 4, 5, 0] [3, 4, 5]
+        [4, 5, 6, 5, 6, 7, 0]
+        [1, 2, 3, 8, 8]
+        [2, 3, 4, 8, 8]
+        [3, 4, 5, 8, 8] [3, 4, 5]
 
-    // Both fresh; fresh and borrowed; a last-use binding and a fresh one.
-    print(`{merge(build(1), build(2))}`);
-    let q = build(3);
-    print(`{merge(build(1), q)} {q}`);
-    let r = build(4);
-    print(`{merge(r, build(5))}`);
-
-    // Receivers: a fresh one and a last-use binding move into `extended`'s
-    // owned instance; one read again afterwards is borrowed, and unchanged.
-    print(`{build(1).extended()}`);
-    let m = build(2);
-    print(`{m.extended()}`);
-    let p = build(3);
-    print(`{p.extended()} {p}`);
-}
---- stdout ---
-3 3
-[1, 2, 3, 9, 9, 9, 9]
-ab!!
-{1, 7}
-3 [4, 5, 6]
-3 [7, 8, 9]
-9 3
-3
-3
-[1, 2, 3, 2, 3, 4, 0]
-[1, 2, 3, 3, 4, 5, 0] [3, 4, 5]
-[4, 5, 6, 5, 6, 7, 0]
-[1, 2, 3, 8, 8]
-[2, 3, 4, 8, 8]
-[3, 4, 5, 8, 8] [3, 4, 5]
+    """);
+})

@@ -28,10 +28,22 @@ fn size(flag: bool, n: u64) -> u64 {
     assert(measure("arm taken", true, |f| size(f, 2)).allocations == 3);
 })
 
-fn main() !prints {
-    print(size("".is_nonempty(), 1).to_str());
-    print(size("x".is_nonempty(), 2).to_str());
-}
---- stdout ---
-2
-53
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(size("".is_nonempty(), 1).to_str());
+        print(size("x".is_nonempty(), 2).to_str());
+    };
+    assert(out == """
+        2
+        53
+
+    """);
+})

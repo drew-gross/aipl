@@ -57,14 +57,26 @@ fn describe(b: B) -> str {
     }
 }
 
-fn main() !prints {
-    print(show(simplify(Add(Num(1), Neg(Neg(Add(Num(2), Zero)))))));
-    print(show(simplify(Num(5))));
-    print(describe(convert(A.X(3))));
-    print(describe(convert(A.Y)));
-}
---- stdout ---
-(1 + --(2 + 0))
-5
-B.X(3)
-B.Y
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(show(simplify(Add(Num(1), Neg(Neg(Add(Num(2), Zero)))))));
+        print(show(simplify(Num(5))));
+        print(describe(convert(A.X(3))));
+        print(describe(convert(A.Y)));
+    };
+    assert(out == """
+        (1 + --(2 + 0))
+        5
+        B.X(3)
+        B.Y
+
+    """);
+})

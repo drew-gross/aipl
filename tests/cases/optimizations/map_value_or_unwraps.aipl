@@ -28,14 +28,21 @@ fn edge_long(src: str, sp: Span?) -> str {
     }
 }
 
-fn main() !prints {
-    print(edge("hello", some(1..3)));
-    print(edge("hello", none));
-    print(edge_long("hello", some(1..3)));
-    print(edge_long("hello", none));
-}
---- stdout ---
-el
-
-el
-
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(edge("hello", some(1..3)));
+        print(edge("hello", none));
+        print(edge_long("hello", some(1..3)));
+        print(edge_long("hello", none));
+    };
+    // The `none` cases print an empty line.
+    assert(out == "el\n\nel\n\n");
+})
