@@ -63,6 +63,7 @@ pub fn interp_literal(Function { body }) -> LintHit[] {
         )? == [],
     );
     assert(lint_function_messages("fn f(c: char) -> str { `{c}` }", interp_literal)? == []);
+    // Shapes the lint must leave alone.
 })
 
 # What is said of a `what` literal in an interpolation.

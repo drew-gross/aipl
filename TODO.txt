@@ -848,7 +848,6 @@ check:
   can for sure recover from format errors
 
 tests:
-  convert most of the not-flagged tests for lints and section based tests for lints into reglar aipl tests. Retain a few, primarily for coverage of the linting invocation infrastructure, not the individual lints. Make a note of this in the "add lint" skill, for when I return to port the remaining lints from rust to aipl.
   show test failures when there are also lint or format failures
   when one function fails to typecheck we should still be able to run other tests that don't depend on it
   section test that asserts on expecting files to be written

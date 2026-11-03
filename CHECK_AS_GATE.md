@@ -223,9 +223,13 @@ Checklist:
   - [x] 7. Small leftovers, 19: `kwargs` 7, `grids` 4, `tail_calls` 4, `imports` 1, `docs` 1, `performance` 1, `perf` 1.
   - [ ] 8. `optimizations`, 33. Take care: these exist to pin what codegen does to a program, so check each converted
         case still exercises the same optimization (the `report` and baseline row are the evidence), not just the output.
-  - [ ] 9-11. `lints`, 67, in three alphabetical thirds of ~22 by file name (`err_*` fixtures carry `errors`, not this
-        bucket; these are the `*_allow` and `*_not_flagged` fixtures). Their point is "the lint does not fire / the
-        rewrite agrees with the longhand", so the new asserts compare the two spellings directly.
+  - [x] 9-11. `lints`: done a different way (decided 2026-11-03). A lint's flagged / not-flagged / allow-agreement cases are
+        `.test` assertions in the lint's own `.aipl` file (`scripts/lint_fixtures_to_tests.py`), not fixtures; the add-lint skill
+        says so for new and ported lints. 118 files in `tests/cases/lints/` became 58. Left there: the `allow_squelch` and
+        `return_loop_find_if` triple (infrastructure), 12 `_allow` fixtures converted to top-level tests (they need a
+        `struct`/`variant` or a loop's output a test block cannot hold), and the fixtures of the 10 lints still in Rust
+        (19 files) plus 24 files in groups named for a shape rather than a lint (`slices`, `interpolations`, `struct_literals`,
+        `decr_shapes`, ...). Convert the Rust ones when each lint is ported; map the shape-named ones to their lint first.
   - [ ] 12. Decide before converting, 18: `effects` 7, `builtins` 8, `execute_program` 2, `cli` 1. Some of these *are*
         the real-builtin coverage set (b) and keep their `main`; the `shim_effects`-style ones already test shims and
         convert. Settle the kept set here, then convert the rest.
@@ -356,3 +360,6 @@ Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered
 - 2026-11-03: Phase 2b batches 3-7 converted together (125 files: `arrays` minus its 4 `.performance`-on-`main` files, `structs`,
   `variants`, `tuples`, `sets`, `generics`, `match_arms`, `lambdas`, `kwargs`, `grids`, `tail_calls`, `imports`, `docs`, `perf`).
   The codemod matched every one; all 125 passed `aipl check` first time. (`performance/refcount_balance` is on the D8 list.)
+
+- 2026-11-03: lint fixtures moved into the lints' own tests (27 AIPL lints; see Phase 2b batches 9-11 above). The script reads the
+  messages off the running lint rather than typing them; its comments come from the fixture. `.performance`/Rust-lint fixtures untouched.

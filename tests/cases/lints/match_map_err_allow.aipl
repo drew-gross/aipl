@@ -34,14 +34,26 @@ fn code_of(r: i64!Wrapped) -> i64 {
     }
 }
 
-fn main() !prints {
-    print(code_of(wrap(parse("1"))).to_str());
-    print(code_of(wrap_short(parse("1"))).to_str());
-    print(code_of(wrap(parse("x"))).to_str());
-    print(code_of(wrap_short(parse("x"))).to_str());
-}
---- stdout ---
-1
-1
-7
-7
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(code_of(wrap(parse("1"))).to_str());
+        print(code_of(wrap_short(parse("1"))).to_str());
+        print(code_of(wrap(parse("x"))).to_str());
+        print(code_of(wrap_short(parse("x"))).to_str());
+    };
+    assert(out == """
+        1
+        1
+        7
+        7
+
+    """);
+})

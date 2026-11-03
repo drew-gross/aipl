@@ -2,7 +2,7 @@
 # on the `mut out = [];` seed, which is where this lint points: `#[allow]` is
 # line-scoped, so a hit spanning the loop could never be squelched.
 
-import { collect_ok, int_parse, join, print, push, to_str } from builtins;
+import { collect_ok, equal as ==, int_parse, join, print, push, to_str } from builtins;
 
 fn parsed(words: str[]) -> i64[] {
     mut out: i64[] = []; #[allow]
@@ -18,12 +18,21 @@ fn parsed_short(words: str[]) -> i64[] { words$int_parse().collect_ok() }
 
 fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }
 
-fn main() !prints {
-    print(show(parsed(["1", "x", "3"])));
-    print(show(parsed_short(["1", "x", "3"])));
-    print(show(parsed([])));
-    print(show(parsed_short([])));
-}
---- stdout ---
-1,3
-1,3
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(show(parsed(["1", "x", "3"])));
+        print(show(parsed_short(["1", "x", "3"])));
+        print(show(parsed([])));
+        print(show(parsed_short([])));
+    };
+    // The last two lines are the empty results.
+    assert(out == "1,3\n1,3\n\n\n");
+})

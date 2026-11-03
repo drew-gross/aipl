@@ -28,7 +28,16 @@
 # formatter relocates a marker off. `return some(i);` is one line, and it is the line
 # that makes this a search for the first match.
 
-import { collect_ok, equal as ==, logical_not as !, logical_or as ||, map } from builtins;
+import {
+    collect_ok,
+    equal as ==,
+    find_index,
+    less_than as <,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    to_str,
+} from builtins;
 import { Function } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
@@ -104,6 +113,209 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
             return_loop_find_index,
         )? == [],
     );
+
+    // Shapes the lint must leave alone.
+    // **The test reads the index.** `find_index` hands its predicate the element and
+    // nothing else, so there is nowhere for `i` to go: this is a scan the builtin
+    // cannot express, and mis-advising it would silently change what is searched.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn later_big(xs: i64[], lo: i64) -> u64? {
+                    for (let i, x : xs) {
+                        if (0 < i && lo < x) { return some(i); };
+                    }
+                    none
+                }
+            """,
+            return_loop_find_index,
+        )? == [],
+    );
+
+    // The position is adjusted on the way out — a `find_index` *and* an arithmetic
+    // step, which is two things the one-line advice doesn't spell.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn one_past_big(xs: i64[], lo: i64) -> u64? {
+                    for (let i, x : xs) {
+                        if (lo < x) { return some(i + 1); };
+                    }
+                    none
+                }
+            """,
+            return_loop_find_index,
+        )? == [],
+    );
+
+    // The *element* is returned, not the index. That is `return_loop_find_if`'s
+    // shape, and this lint leaves it to that one — a loop returns one or the other,
+    // never both, so the two lints never fire on the same loop.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn first_big(xs: i64[], lo: i64) -> i64? {
+                    for (let i, x : xs) {
+                        if (lo < x) { return some(x); };
+                    }
+                    none
+                }
+            """,
+            return_loop_find_index,
+        )? == [],
+    );
+
+    // An `if`/`else`: the loop returns on every element, so it never runs past the
+    // first one and is not a search at all.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn head_sign(xs: i64[]) -> u64? {
+                    for (let i, x : xs) {
+                        if (0 < x) {
+                            return some(i);
+                        } else {
+                            return some(0);
+                        };
+                    }
+                    none
+                }
+            """,
+            return_loop_find_index,
+        )? == [],
+    );
+    // A second statement in the loop body — work `find_index` has nowhere to put.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn noisy(xs: i64[], lo: i64) !prints -> u64? {
+                    for (let i, x : xs) {
+                        print(x.to_str());
+                        if (lo < x) { return some(i); };
+                    }
+                    none
+                }
+            """,
+            return_loop_find_index,
+        )? == [],
+    );
+
+    // The fall-through is not the not-found answer: falling off the end does work,
+    // so the loop is not simply a search.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn index_or_len(xs: i64[], lo: i64) -> u64? {
+                    for (let i, x : xs) {
+                        if (lo < x) { return some(i); };
+                    }
+                    some(xs.len())
+                }
+            """,
+            return_loop_find_index,
+        )? == [],
+    );
+
+    // A plain (unindexed) loop returning a *count* it kept itself. There is no
+    // index binding to match, and the counter is the user's, not the fold's.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn count_to_big(xs: i64[], lo: i64) -> u64? {
+                    mut n: u64 = 0;
+                    for (let x : xs) {
+                        if (lo < x) { return some(n); };
+                        set n++;
+                    }
+                    none
+                }
+            """,
+            return_loop_find_index,
+        )? == [],
+    );
+    // The rewrite itself, which of course must not fire.
+    assert(
+        lint_function_unfilled_messages(
+            "fn index_of_big(xs: i64[], lo: i64) -> u64? { xs.find_index(|x| lo < x) }",
+            return_loop_find_index,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    // The `none` as the block's tail.
+    assert(lint_function_unfilled_messages(
+        """
+            fn index_of_big(xs: i64[], lo: i64) -> u64? {
+                for (let i, x : xs) {
+                    if (lo < x) { return some(i); };
+                }
+                none
+            }
+        """,
+        return_loop_find_index,
+    )? == [
+        """this loop returns the position of the first element passing a test, and "none" otherwise — write "return xs.find_index(|x| ..);" and drop the loop, importing `find_index` from builtins""",
+    ]);
+
+    // An explicit `return none;` is the same shape — a reader can't tell the two
+    // apart either — so it is flagged the same way.
+    assert(lint_function_unfilled_messages(
+        """
+            fn index_of_go(names: str[]) -> u64? {
+                for (let i, n : names) {
+                    if (n == "go") { return some(i); };
+                }
+                return none;
+            }
+        """,
+        return_loop_find_index,
+    )? == [
+        """this loop returns the position of the first element passing a test, and "none" otherwise — write "return names.find_index(|n| ..);" and drop the loop, importing `find_index` from builtins""",
+    ]);
+    assert(
+        lint_function_unfilled_messages(
+            "fn evens(n: i64) -> i64[] { [n, n * 2] }",
+            return_loop_find_index,
+        )? == [],
+    );
+
+    // A call-shaped iterable can't be quoted back into the advice — its span stops
+    // before its parens — so the message leaves a placeholder where it would go.
+    assert(lint_function_unfilled_messages(
+        """
+            fn index_of_even_over(n: i64, lo: i64) -> u64? {
+                for (let i, x : evens(n)) {
+                    if (lo < x) { return some(i); };
+                }
+                none
+            }
+        """,
+        return_loop_find_index,
+    )? == [
+        """this loop returns the position of the first element passing a test, and "none" otherwise — write "return <iterable>.find_index(|x| ..);" and drop the loop, importing `find_index` from builtins""",
+    ]);
+
+    // `#[allow]` keeps the longhand and the rewrite agrees with it.
+    fn index_of_big_loop(xs: i64[], lo: i64) -> u64? {
+        for (let i, x : xs) {
+            if (lo < x) {
+                return some(i); #[allow]
+            };
+        }
+        none
+    }
+    fn index_of_big(xs: i64[], lo: i64) -> u64? { xs.find_index(|x| lo < x) }
+    let xs = [1, 5, 9];
+    assert(index_of_big_loop(xs, 2).to_str() == "some(1)");
+    assert(index_of_big(xs, 2).to_str() == "some(1)");
+
+    // Found at the front, and not found at all — the two answers a sentinel
+    // would conflate.
+    assert(index_of_big_loop(xs, 0).to_str() == "some(0)");
+    assert(index_of_big(xs, 0).to_str() == "some(0)");
+    assert(index_of_big_loop(xs, 99).to_str() == "none");
+    assert(index_of_big(xs, 99).to_str() == "none");
+    assert((index_of_big_loop(xs, 2) == index_of_big(xs, 2)).to_str() == "true");
 })
 
 # What is said of a loop over `receiver` binding `variable`, for a file that does not

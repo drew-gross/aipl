@@ -11,6 +11,7 @@
 # line, so it always takes a trailing marker and keeps it through the formatter.
 
 import {
+    equal as ==,
     filter,
     join,
     less_than_or_equal as <=,
@@ -35,12 +36,21 @@ fn scaled_above_short(xs: i64[], lo: i64) -> i64[] { xs.filter(|x| lo <= x).map(
 
 fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }
 
-fn main() !prints {
-    print(show(scaled_above([1, 5, 3], 2)));
-    print(show(scaled_above_short([1, 5, 3], 2)));
-    print(show(scaled_above([], 2)));
-    print(show(scaled_above_short([], 2)));
-}
---- stdout ---
-10,6
-10,6
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(show(scaled_above([1, 5, 3], 2)));
+        print(show(scaled_above_short([1, 5, 3], 2)));
+        print(show(scaled_above([], 2)));
+        print(show(scaled_above_short([], 2)));
+    };
+    // The last two lines are the empty results.
+    assert(out == "10,6\n10,6\n\n\n");
+})

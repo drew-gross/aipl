@@ -84,6 +84,8 @@ pub fn interp_to_str(program: Program) -> LintHit[] {
         )? == [],
     );
     assert(lint_messages("fn f(n: i64) -> str { `{to_str(n)}` }", interp_to_str)? == []);
+    // Shapes the lint must leave alone.
+    assert(lint_messages("fn shown(n: i64) -> str { to_str(n) }", interp_to_str)? == []);
 })
 
 # What is said of an interpolated `to_str` that the file spells `to_str`, with

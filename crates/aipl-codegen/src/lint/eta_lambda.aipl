@@ -114,6 +114,13 @@ pub fn eta_lambda(program: Program) -> LintHit[] {
     assert(messages("", "h(|a, b| g(b, a))")? == []);
     assert(messages("wrapping_add as +", "h(|a, b| a + b)")? == []);
     assert(messages("", "h(|a| a(a))")? == []);
+
+    // Shapes the lint flags, and what it says of them.
+    assert(lint_messages("fn is_big(x: i64) -> bool { x > 100 }", eta_lambda)? == []);
+    assert(lint_messages(
+        "fn big(xs: i64[]) -> i64[] { xs.filter(|x| is_big(x)) }",
+        eta_lambda,
+    )? == [`lambda only forwards its argument(s) to "is_big" — pass "is_big" directly`]);
 })
 
 # The names a call can use as a `$` step: a function of this file whose first parameter is

@@ -95,6 +95,62 @@ pub fn with_value_or_self(program: Program) -> LintHit[] {
     assert(messages(all, "xs.with(0, 1).value_or([])")? == []);
     assert(messages(all, "p.rows.with(0, 1).value_or(p.cols)")? == []);
     assert(messages("value_or, try_set", "xs.with(0, 1).value_or(xs)")? == []);
+
+    // Shapes the lint must leave alone.
+    // A different array: not "leave it alone".
+    assert(
+        lint_messages(
+            "fn other(xs: i64[], ys: i64[]) -> i64[] { xs.with(0, 9).value_or(ys) }",
+            with_value_or_self,
+        )? == [],
+    );
+    // An empty fallback, for an index known to be in range.
+    assert(
+        lint_messages(
+            "fn known_in_range(xs: i64[]) -> i64[] { xs.with(0, 9).value_or([]) }",
+            with_value_or_self,
+        )? == [],
+    );
+    // A fallback that is computed is not the receiver read again.
+    assert(
+        lint_messages(
+            "fn computed(xs: i64[]) -> i64[] { xs.with(0, 9).value_or(xs[..1]) }",
+            with_value_or_self,
+        )? == [],
+    );
+    // `with` on its own, and `value_or` on something else.
+    assert(
+        lint_messages("fn plain(xs: i64[]) -> i64[]? { xs.with(0, 9) }", with_value_or_self)? == [],
+    );
+    assert(
+        lint_messages(
+            """
+                fn agree() {}.test({
+                    assert(other([1], [2]) == [9]);
+                    assert(known_in_range([1]) == [9]);
+                    assert(computed([1, 2]) == [9, 2]);
+                    assert(plain([]) == none);
+                    let p = Pair { a: [1], b: [2] };
+                    assert(p.a.with(0, 9).value_or(p.b) == [9]);
+                })
+            """,
+            with_value_or_self,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    assert(
+        lint_messages(
+            "fn local(xs: i64[]) -> i64[] { xs.with(1, 9).value_or(xs) }",
+            with_value_or_self,
+        )? == [],
+    );
+    assert(
+        lint_messages(
+            "fn free_call(xs: i64[]) -> i64[] { value_or(with(xs, 2, 5), xs) }",
+            with_value_or_self,
+        )? == [],
+    );
 })
 
 # Whether `self` and `other` read the same binding, or the same field path off one.

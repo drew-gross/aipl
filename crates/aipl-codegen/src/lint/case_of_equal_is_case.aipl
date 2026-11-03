@@ -80,6 +80,37 @@ pub fn case_of_equal_is_case(Function { body }) -> UnfilledHit[] {
             case_of_equal_is_case,
         )? == [],
     );
+
+    // Shapes the lint must leave alone.
+    // Two values' cases against each other is `same_case`, which `is_case` cannot say.
+    assert(
+        lint_function_unfilled_messages(
+            "fn same_kind(a: Shape, b: Shape) -> bool { a.case_of() == b.case_of() }",
+            case_of_equal_is_case,
+        )? == [],
+    );
+    // Cases held in variables compare without a `case_of()` call at all.
+    assert(
+        lint_function_unfilled_messages(
+            "fn same_held(a: Case<Shape>, b: Case<Shape>) -> bool { a == b }",
+            case_of_equal_is_case,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    assert(lint_function_unfilled_messages(
+        "fn is_circle(shape: Shape) -> bool { shape.case_of() == Circle }",
+        case_of_equal_is_case,
+    )? == [
+        """this compares a value's case — write "<value>.is_case(<case>)" instead of reading it with "case_of()", importing `is_case` from builtins""",
+    ]);
+    // The case on the left, and the call form.
+    assert(lint_function_unfilled_messages(
+        "fn is_dot(shape: Shape) -> bool { Dot == case_of(shape) }",
+        case_of_equal_is_case,
+    )? == [
+        """this compares a value's case — write "<value>.is_case(<case>)" instead of reading it with "case_of()", importing `is_case` from builtins""",
+    ]);
 })
 
 # The hit for one expression, or none: it is `==` with a `case_of()` on one side.

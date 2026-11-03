@@ -96,6 +96,79 @@ pub fn destructure_slot(Function { sig, body }) -> LintHit[] {
     // are the other lints' business.
     assert(lint_function_messages("fn f(Fn(P { sig })) -> i64 { sig }", destructure_slot)? == []);
     assert(lint_function_messages("fn f(p: P) -> i64 { p.sig }", destructure_slot)? == []);
+    // Shapes the lint must leave alone.
+    assert(
+        lint_function_messages("fn show(Pos { line }) -> i64 { line }", destructure_slot)? == [],
+    );
+    // The slot is passed on whole, so it is more than its fields.
+    assert(
+        lint_function_messages(
+            "fn whole(Dot(pos)) -> i64 { show(pos) + pos.col }",
+            destructure_slot,
+        )? == [],
+    );
+    // A field's name is already spoken for in the body.
+    assert(
+        lint_function_messages(
+            "fn spoken_for(Dot(pos), line: i64) -> i64 { pos.line + line }",
+            destructure_slot,
+        )? == [],
+    );
+    // The same field is read off two values, which the names of the values tell apart.
+    assert(
+        lint_function_messages(
+            "fn shared(Dot(pos), other: Pos) -> i64 { pos.line + other.line }",
+            destructure_slot,
+        )? == [],
+    );
+    // The pattern already takes it apart.
+    assert(
+        lint_function_messages(
+            "fn nested(Dot(Pos { line, col })) -> i64 { line + col }",
+            destructure_slot,
+        )? == [],
+    );
+    // A slot nothing reads from.
+    assert(lint_function_messages("fn unused(Dot(pos)) -> i64 { 1 }", destructure_slot)? == []);
+
+    // Shapes the lint flags, and what it says of them.
+    // A case parameter's payload.
+    assert(lint_function_messages(
+        "fn dot(Dot(pos)) -> i64 { pos.line + pos.col }",
+        destructure_slot,
+    )? == [
+        `only the fields of "pos" are read — destructure it in the pattern instead: "Dot(<Type> \{ line, col \})"`,
+    ]);
+    assert(lint_function_messages(
+        "fn both(self: Both(pos, n)) -> i64 { pos.line + n }",
+        destructure_slot,
+    )? == [
+        `only the fields of "pos" are read — destructure it in the pattern instead: "Both(<Type> \{ line \}, n)"`,
+    ]);
+    // A `let` over a case.
+    assert(lint_function_messages(
+        """
+            fn opened(shape: Shape) -> i64 {
+                let Dot(pos) = shape;
+                pos.col
+            }
+        """,
+        destructure_slot,
+    )? == [
+        `only the fields of "pos" are read — destructure it in the pattern instead: "Dot(<Type> \{ col \})"`,
+    ]);
+    // A `let` over a tuple.
+    assert(lint_function_messages(
+        """
+            fn paired(pair: (Pos, i64)) -> i64 {
+                let (pos, n) = pair;
+                pos.line + n
+            }
+        """,
+        destructure_slot,
+    )? == [
+        `only the fields of "pos" are read — destructure it in the pattern instead: "(<Type> \{ line \}, n)"`,
+    ]);
 })
 
 # The hits in one parameter's case pattern. The body's span starts at the `{` that

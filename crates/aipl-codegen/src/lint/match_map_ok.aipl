@@ -20,7 +20,15 @@
 # That pass-through is always one line — the `ok` arm's replacement need not be — and
 # it is the arm that identifies the shape.
 
-import { equal as ==, filter, logical_and as &&, map } from builtins;
+import {
+    equal as ==,
+    filter,
+    logical_and as &&,
+    map,
+    map_ok,
+    to_str,
+    wrapping_add as +,
+} from builtins;
 import { Function } from "../item.aipl";
 import {
     UnfilledHit,
@@ -104,6 +112,196 @@ pub fn match_map_ok(Function { body }) -> UnfilledHit[] {
             match_map_ok,
         )? == [],
     );
+    // Shapes the lint must leave alone.
+    assert(
+        lint_function_unfilled_messages(
+            """fn parse(s: str) -> i64!str { if (s == "1") { ok(1) } else { err("not a one") } }""",
+            match_map_ok,
+        )? == [],
+    );
+
+    // The `err` arm rebuilds the error, so this rewrites both sides — more than
+    // `map_ok` can express. (It is not a `map_err` either: that one wants the *value*
+    // passed through untouched.)
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn bump_and_wrap(r: i64!str) -> i64!Wrapped {
+                    match (r) {
+                        ok(v) => ok(v + 1),
+                        err(e) => err(Wrapped { message: e }),
+                    }
+                }
+            """,
+            match_map_ok,
+        )? == [],
+    );
+    // The `err` arm ignores its binding, so the error does not pass through.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn bump_and_replace(r: i64!str) -> i64!str {
+                    match (r) {
+                        ok(v) => ok(v + 1),
+                        err(e) => err("replaced"),
+                    }
+                }
+            """,
+            match_map_ok,
+        )? == [],
+    );
+
+    // `ok(v) => ok(v)` alongside `err(e) => err(e)` rebuilds the result unchanged,
+    // so the whole `match` is its own scrutinee. `map_ok(|v| v)` would be a longer
+    // way to write that nothing, so neither this lint nor `map_err`'s fires.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn passthrough(r: i64!str) -> i64!str {
+                    match (r) {
+                        ok(v) => ok(v),
+                        err(e) => err(e),
+                    }
+                }
+            """,
+            match_map_ok,
+        )? == [],
+    );
+
+    // The `ok` arm leaves the result world entirely — this is an unwrap, not a
+    // conversion.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn or_zero(r: i64!str) -> i64 {
+                    match (r) {
+                        ok(v) => v,
+                        err(e) => 0,
+                    }
+                }
+            """,
+            match_map_ok,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn msg_len(r: i64!Wrapped) -> i64 {
+                    match (r) {
+                        ok(v) => v,
+                        err(e) => -1,
+                    }
+                }
+            """,
+            match_map_ok,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    assert(
+        lint_function_unfilled_messages(
+            """fn parse(s: str) -> i64!str { if (s == "1") { ok(1) } else { err("not a one") } }""",
+            match_map_ok,
+        )? == [],
+    );
+    assert(lint_function_unfilled_messages(
+        """
+            fn bumped(r: i64!str) -> i64!str {
+                match (r) {
+                    ok(v) => ok(v + 1),
+                    err(e) => err(e),
+                }
+            }
+        """,
+        match_map_ok,
+    )? == [
+        """this `match` rewrites the result's value side and passes its error through — write "r.map_ok(|v| ..)" instead, importing `map_ok` from builtins""",
+    ]);
+    assert(lint_function_unfilled_messages(
+        """
+            fn err_first(r: i64!str) -> i64!str {
+                match (r) {
+                    err(e) => err(e),
+                    ok(v) => ok(v + 2),
+                }
+            }
+        """,
+        match_map_ok,
+    )? == [
+        """this `match` rewrites the result's value side and passes its error through — write "r.map_ok(|v| ..)" instead, importing `map_ok` from builtins""",
+    ]);
+    assert(
+        lint_function_unfilled_messages("fn double(x: i64) -> i64 { x * 2 }", match_map_ok)? == [],
+    );
+
+    // A *call* in the `ok` arm is flagged too. Unlike `value_or`, there is no
+    // eager/lazy question to guard against: `map_ok` takes a function, which runs on
+    // the value path exactly when the arm did.
+    assert(lint_function_unfilled_messages(
+        """
+            fn doubled(r: i64!str) -> i64!str {
+                match (r) {
+                    ok(v) => ok(double(v)),
+                    err(e) => err(e),
+                }
+            }
+        """,
+        match_map_ok,
+    )? == [
+        """this `match` rewrites the result's value side and passes its error through — write "r.map_ok(|v| ..)" instead, importing `map_ok` from builtins""",
+    ]);
+
+    // A call-shaped scrutinee has no name to quote back — its span stops before its
+    // parens — so the message names the method without a receiver.
+    assert(lint_function_unfilled_messages(
+        """
+            fn parsed_and_doubled(s: str) -> i64!str {
+                match (parse(s)) {
+                    ok(v) => ok(double(v)),
+                    err(e) => err(e),
+                }
+            }
+        """,
+        match_map_ok,
+    )? == [
+        """this `match` rewrites the result's value side and passes its error through — write "parse(s).map_ok(|v| ..)" instead, importing `map_ok` from builtins""",
+    ]);
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn or_zero(r: i64!str) -> i64 {
+                    match (r) {
+                        ok(v) => v,
+                        err(e) => 0,
+                    }
+                }
+            """,
+            match_map_ok,
+        )? == [],
+    );
+
+    // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
+    fn parse(s: str) -> i64!str { if (s == "1") { ok(1) } else { err("not a one") } }
+    fn bumped(r: i64!str) -> i64!str {
+        match (r) {
+            ok(v) => ok(v + 1),
+            err(e) => err(e), #[allow]
+        }
+    }
+
+    // The rewrite the lint asks for, so the two spellings are checked side by side
+    // and proven to agree.
+    fn bumped_short(r: i64!str) -> i64!str { r.map_ok(|v| v + 1) }
+    fn show(r: i64!str) -> str {
+        match (r) {
+            ok(v) => v.to_str(),
+            err(e) => e,
+        }
+    }
+    assert(show(bumped(parse("1"))) == "2");
+    assert(show(bumped_short(parse("1"))) == "2");
+    assert(show(bumped(parse("x"))) == "not a one");
+    assert(show(bumped_short(parse("x"))) == "not a one");
 })
 
 # What is said of a `match` over `receiver` whose value is bound as `binder`, for a file

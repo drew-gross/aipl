@@ -87,6 +87,7 @@ pub fn fn_body_type_stutter(Function { name as function, shorthand_body, sig, bo
 
     // A range is a synthesized literal.
     assert(lint_function_once_hits("fn f(a: i64) -> Span { a..a }", fn_body_type_stutter)? == []);
+    // Shapes the lint must leave alone.
 })
 
 # The type name a return type offers a literal, if it offers one.

@@ -20,11 +20,23 @@ fn squelched_inline(p: Pos) -> i64 { p.line } #[allow]
 // to agree.
 fn rewritten(Pos { line, col }) -> i64 { line + col }
 
-fn main() !prints {
-    let p = Pos { line: 2, col: 3 };
-    print(`{squelched(p) == rewritten(p)}`);
-    print(`{squelched_inline(p) == 2}`);
-}
---- stdout ---
-true
-true
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let p = Pos { line: 2, col: 3 };
+        print(`{squelched(p) == rewritten(p)}`);
+        print(`{squelched_inline(p) == 2}`);
+    };
+    assert(out == """
+        true
+        true
+
+    """);
+})

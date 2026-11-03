@@ -100,6 +100,123 @@ pub fn match_case_try_as_case(Function { body }) -> UnfilledHit[] {
             match_case_try_as_case,
         )? == [],
     );
+
+    // Shapes the lint must leave alone.
+    // Not the function's last act: a `?` would return from the function, where the
+    // `match` only ended a statement.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn doubled(s: Shape) -> i64? {
+                    let r = match (s) {
+                        Circle(r) => some(r),
+                        _ => none,
+                    };
+                    r
+                }
+            """,
+            match_case_try_as_case,
+        )? == [],
+    );
+    // The fallthrough is not `none`.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn radius_or_zero(s: Shape) -> i64? {
+                    match (s) {
+                        Circle(r) => some(r),
+                        _ => some(0),
+                    }
+                }
+            """,
+            match_case_try_as_case,
+        )? == [],
+    );
+    // More than one case is named.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn extent(s: Shape) -> i64? {
+                    match (s) {
+                        Circle(r) => some(r),
+                        Rect(w, h) => some(w + h),
+                        _ => none,
+                    }
+                }
+            """,
+            match_case_try_as_case,
+        )? == [],
+    );
+    // Inside a lambda, where `?` would leave the lambda and not this function.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn radii(shapes: Shape[]) -> i64?[] {
+                    shapes.map(|s| {
+                        match (s) {
+                            Circle(r) => some(r),
+                            _ => none,
+                        }
+                    })
+                }
+            """,
+            match_case_try_as_case,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn show(o: i64?) -> str { `{o}` }",
+            match_case_try_as_case,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    // The arm takes the payload apart.
+    assert(lint_function_unfilled_messages(
+        """
+            fn radius(s: Shape) -> i64? {
+                match (s) {
+                    Circle(r) => some(r * 2),
+                    _ => none,
+                }
+            }
+        """,
+        match_case_try_as_case,
+    )? == [
+        """this match gives up with none unless the value is Circle, and is the last thing the function does — write "let Circle(r) = s.as_case(Circle)?;" and continue with the arm's body, importing `as_case` from builtins""",
+    ]);
+    // Nested: the inner `match` is also the function's last act.
+    assert(lint_function_unfilled_messages(
+        """
+            fn wide(s: Shape) -> i64? {
+                match (s) {
+                    Rect(w, h) => match (Circle(w)) {
+                        Circle(r) => some(r + h),
+                        _ => none,
+                    },
+                    _ => none,
+                }
+            }
+        """,
+        match_case_try_as_case,
+    )? == [
+        """this match gives up with none unless the value is Rect, and is the last thing the function does — write "let Rect(w, h) = s.as_case(Rect)?;" and continue with the arm's body, importing `as_case` from builtins""",
+        """this match gives up with none unless the value is Circle, and is the last thing the function does — write "let Circle(r) = Circle(w).as_case(Circle)?;" and continue with the arm's body, importing `as_case` from builtins""",
+    ]);
+    // A case with no payload to bind.
+    assert(lint_function_unfilled_messages(
+        """
+            fn only_empty(s: Shape, n: i64) -> i64? {
+                match (s) {
+                    Empty => some(n),
+                    _ => none,
+                }
+            }
+        """,
+        match_case_try_as_case,
+    )? == [
+        """this match gives up with none unless the value is Empty, and is the last thing the function does — write "s.as_case(Empty)?;" and continue with the arm's body, importing `as_case` from builtins""",
+    ]);
 })
 
 # What is said of a tail `match` over `receiver` on `case`, whose statement begins

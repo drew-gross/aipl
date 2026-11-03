@@ -36,14 +36,18 @@
 # always occupies one line, and it is the line that makes this a fold to a single answer.
 
 import {
+    all,
+    any,
     collect_ok,
     equal as ==,
+    greater_than as >,
     is_some,
     len,
     logical_not as !,
     logical_or as ||,
     map,
     not_equal as !=,
+    to_str,
 } from builtins;
 import { Bool, Call, Return, Seq } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
@@ -162,4 +166,226 @@ pub fn return_loop_any_all(program: Program) -> LintHit[] {
     );
     assert(messages(all, "for (let i, x : xs) { if (x > 1) { return true; }; } false")? == []);
     assert(messages(all, "for (let x : xs) { if (g(x)?) { return true; }; } false")? == []);
+
+    // Shapes the lint must leave alone.
+    // A second statement in the loop: work neither builtin has anywhere to put.
+    assert(
+        lint_messages(
+            """
+                fn counted(xs: i64[], lo: i64) -> bool {
+                    mut seen = 0;
+                    for (let x : xs) {
+                        set seen++;
+                        if (x > lo) { return true; };
+                    }
+                    seen > 99
+                }
+            """,
+            return_loop_any_all,
+        )? == [],
+    );
+    // An `else` branch — same reason.
+    assert(
+        lint_messages(
+            """
+                fn with_else(xs: i64[], lo: i64) !prints -> bool {
+                    for (let x : xs) {
+                        if (x > lo) {
+                            return true;
+                        } else {
+                            print("looked");
+                        };
+                    }
+                    false
+                }
+            """,
+            return_loop_any_all,
+        )? == [],
+    );
+
+    // The fall-through is not the opposite literal, so this is not a fold: both
+    // exits answer the same thing and the loop is a constant, not an `any`.
+    assert(
+        lint_messages(
+            """
+                fn always_true(xs: i64[], lo: i64) -> bool {
+                    for (let x : xs) {
+                        if (x > lo) { return true; };
+                    }
+                    true
+                }
+            """,
+            return_loop_any_all,
+        )? == [],
+    );
+    // The fall-through does work, so it is not an answer at all.
+    assert(
+        lint_messages(
+            """
+                fn falls_through_to_work(xs: i64[], lo: i64) !prints -> bool {
+                    for (let x : xs) {
+                        if (x > lo) { return true; };
+                    }
+                    print("none matched");
+                    false
+                }
+            """,
+            return_loop_any_all,
+        )? == [],
+    );
+
+    // Returns an element rather than a verdict: that is `find_if`, and
+    // `return_loop_find_if` is the lint that says so — squelched here so this file
+    // stays about the one lint it is a fixture for, and kept because the two lints
+    // matching disjoint shapes is the thing being shown.
+    assert(
+        lint_messages(
+            """
+                fn first_big(xs: i64[], lo: i64) -> i64? {
+                    for (let x : xs) {
+                        if (x > lo) {
+                            return some(x); #[allow]
+                        };
+                    }
+                    none
+                }
+            """,
+            return_loop_any_all,
+        )? == [],
+    );
+
+    // The `all` direction with a condition that is not syntactically negated.
+    // `xs.all(|x| x != 0)` is the rewrite, and it needs the comparison inverted —
+    // which is not something a diagnostic should attempt, so this is left alone.
+    assert(
+        lint_messages(
+            """
+                fn none_zero(xs: i64[]) -> bool {
+                    for (let x : xs) {
+                        if (x == 0) { return false; };
+                    }
+                    true
+                }
+            """,
+            return_loop_any_all,
+        )? == [],
+    );
+    // A condition that propagates with `?` cannot move into a lambda unchanged.
+    assert(
+        lint_messages(
+            """
+                fn any_big_checked(xs: i64[], lo: i64) -> bool!Error {
+                    for (let x : xs) {
+                        if (checked(x)? > lo) { return ok(true); };
+                    }
+                    ok(false)
+                }
+            """,
+            return_loop_any_all,
+        )? == [],
+    );
+    assert(lint_messages("fn checked(x: i64) -> i64!Error { ok(x) }", return_loop_any_all)? == []);
+
+    // Shapes the lint flags, and what it says of them.
+    // The `any` direction: an early `return true`, falling through to `false`.
+    assert(lint_messages(
+        """
+            fn has_big(xs: i64[], lo: i64) -> bool {
+                for (let x : xs) {
+                    if (x > lo) { return true; };
+                }
+                false
+            }
+        """,
+        return_loop_any_all,
+    )? == [
+        """this loop reports whether any element passes a test — write "return xs.any(|x| ..);" and drop the loop, importing `any` from builtins""",
+    ]);
+
+    // The `all` direction: an early `return false` under a negated condition,
+    // falling through to `true`. The negation lifts off, so the advice names the
+    // predicate rather than asking the reader to invert anything.
+    assert(
+        lint_messages(
+            """
+                fn all_big(xs: i64[], lo: i64) -> bool {
+                    for (let x : xs) {
+                        if (!(x > lo)) { return false; };
+                    }
+                    true
+                }
+            """,
+            return_loop_any_all,
+        )? == [],
+    );
+
+    // The fall-through may be an explicit `return`, since a reader cannot tell that
+    // apart from the block's tail either.
+    assert(lint_messages(
+        """
+            fn has_big_explicit(xs: i64[], lo: i64) -> bool {
+                for (let x : xs) {
+                    if (x > lo) { return true; };
+                }
+                return false;
+            }
+        """,
+        return_loop_any_all,
+    )? == [
+        """this loop reports whether any element passes a test — write "return xs.any(|x| ..);" and drop the loop, importing `any` from builtins""",
+    ]);
+
+    // A receiver whose span does not cover its text gets the `<iterable>`
+    // placeholder rather than a misquoted rewrite.
+    assert(lint_messages(
+        """
+            fn any_doubled(xs: i64[], lo: i64) -> bool {
+                for (let x : xs.map(|v| v)) {
+                    if (x > lo) { return true; };
+                }
+                false
+            }
+        """,
+        return_loop_any_all,
+    )? == [
+        """this loop reports whether any element passes a test — write "return <iterable>.any(|x| ..);" and drop the loop, importing `any` from builtins""",
+    ]);
+
+    // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
+    fn has_big(xs: i64[], lo: i64) -> bool {
+        for (let x : xs) {
+            if (x > lo) {
+                return true; #[allow]
+            };
+        }
+        false
+    }
+    fn all_big(xs: i64[], lo: i64) -> bool {
+        for (let x : xs) {
+            if (!(x > lo)) {
+                return false; #[allow]
+            };
+        }
+        true
+    }
+
+    // The rewrites the lint asks for, so both spellings are checked side by side and
+    // proven to agree — including on the empty receiver, where the two builtins
+    // disagree with each other (`any` is false, `all` is true) and a reader most
+    // wants the short form to be the one they can trust.
+    fn has_big_short(xs: i64[], lo: i64) -> bool { xs.any(|x| x > lo) }
+    fn all_big_short(xs: i64[], lo: i64) -> bool { xs.all(|x| x > lo) }
+    let empty: i64[] = [];
+    assert(has_big([1, 5, 9], 4).to_str() == "true");
+    assert(has_big_short([1, 5, 9], 4).to_str() == "true");
+    assert(has_big([1, 2], 5).to_str() == "false");
+    assert(has_big_short([1, 2], 5).to_str() == "false");
+    assert(all_big([6, 7], 5).to_str() == "true");
+    assert(all_big_short([6, 7], 5).to_str() == "true");
+    assert(all_big([6, 1], 5).to_str() == "false");
+    assert(all_big_short([6, 1], 5).to_str() == "false");
+    assert(has_big(empty, 5).to_str() == "false");
+    assert(has_big_short(empty, 5).to_str() == "false");
+    assert(all_big(empty, 5).to_str() == "true");
+    assert(all_big_short(empty, 5).to_str() == "true");
 })

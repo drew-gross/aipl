@@ -75,12 +75,43 @@ parser cannot express in one body). When you do that:
 - **report it to the user in your task summary**, so it can be undone when the
   feature lands.
 
-## 4. Finish
+## 4. Tests belong in the lint, not in fixtures
 
-Each lint file needs `.test` blocks (compiler AIPL must be well-tested), the
-three fixtures under `tests/cases/lints/` (`err_<lint>`, `<lint>_allow`,
-`<lint>_not_flagged`), a registration, and a `DOGFOOD_SOURCE_FILES` entry. Then
-`cargo handoff` once.
+**A lint's tests are `.test` assertions in its own file.** Each assertion runs the lint's driver
+(`lint_function_messages`, `lint_function_unfilled_messages`, `lint_messages`, ...) on one small source
+string and checks the messages, so the flagged shape, the near-miss and the message text sit beside the
+code that produces them and run in-process with the file's other tests. The three kinds:
+
+- **Flagged:** `assert(driver("fn f(..) {..}", lint_fn)? == [message(..)])`, what the lint says of the shape.
+- **Not flagged:** `assert(driver("fn f(..) {..}", lint_fn)? == [])` for every near-miss, each with a comment
+  saying *why* it must be left alone. These are most of a lint's tests; write the near-misses first.
+- **`#[allow]` and the rewrite agree:** helper functions declared in the test block, the longhand carrying
+  `#[allow]`, and an assert that both spellings give the same answer. Keep this only when the advice could be
+  wrong about meaning; a struct or variant it needs cannot be declared in a test block, so such a case stays a
+  fixture.
+
+A source string with `"""` raw blocks holds quotes and backslashes without escapes. The lint function never
+sees `#[allow]` (the squelch is applied by the driver in `lint.aipl`), so a snippet that carries the marker
+does not belong in these assertions.
+
+**Do not add the per-lint fixtures** (`err_<lint>`, `<lint>_allow`, `<lint>_not_flagged` under
+`tests/cases/lints/`). What stays under `tests/cases/lints/` covers the *infrastructure* only: that a hit is
+rendered as a diagnostic with the import hint filled in, that `#[allow]` squelches a line and survives
+`aipl check --fix`, and that a lint's hit points at one line. `allow_squelch.aipl` and the
+`return_loop_find_if` triple are those; add one only for a behavior the drivers in `lint_hit.aipl` do not
+exercise.
+
+**Porting a Rust lint** brings its fixtures with it: when the lint becomes AIPL, convert its `err_`, `_allow`
+and `_not_flagged` fixtures into assertions in the new file and delete them. `scripts/lint_fixtures_to_tests.py
+<lint>` does the mechanical part (not-flagged functions become `== []` assertions; flagged functions get the
+messages the lint actually gives, read off by running it; an `_allow` fixture whose `main` only prints becomes
+helper functions plus asserts) and leaves a fixture alone when it cannot translate it. Read the result:
+the comments above each assertion came from the fixture and are the reason it exists.
+
+## 5. Finish
+
+Each lint file needs `.test` blocks (compiler AIPL must be well-tested; section 4 says what they
+hold), a registration, and a `DOGFOOD_SOURCE_FILES` entry. No per-lint fixtures. Then `cargo handoff` once.
 
 Bootstrap trap: removing a Rust lint and adding its AIPL replacement in one
 change fails discovery with `#[allow] squelches nothing` on the markers that

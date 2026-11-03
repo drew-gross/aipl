@@ -99,6 +99,109 @@ pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
             match_case_as_case,
         )? == [],
     );
+
+    // Shapes the lint must leave alone.
+    // The arm hands back its payload, not the value: `as_case` is not its spelling.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn radius(s: Shape) -> i64? {
+                    match (s) {
+                        Circle(r) => some(r),
+                        _ => none, #[allow]
+                    }
+                }
+            """,
+            match_case_as_case,
+        )? == [],
+    );
+    // A third arm: this is asking about more than one case.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn sized(s: Shape) -> Shape? {
+                    match (s) {
+                        Circle(..) => some(s),
+                        Rect(..) => some(s),
+                        _ => none,
+                    }
+                }
+            """,
+            match_case_as_case,
+        )? == [],
+    );
+    // The fallthrough is not `none`.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn circle_or_empty(s: Shape) -> Shape? {
+                    match (s) {
+                        Circle(..) => some(s),
+                        _ => some(Empty),
+                    }
+                }
+            """,
+            match_case_as_case,
+        )? == [],
+    );
+    // Not the value matched: a different value is a different program.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn unit_circle(s: Shape) -> Shape? {
+                    match (s) {
+                        Circle(..) => some(Circle(1)),
+                        _ => none, #[allow]
+                    }
+                }
+            """,
+            match_case_as_case,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    // A payload-carrying case, its payload ignored.
+    assert(lint_function_unfilled_messages(
+        """
+            fn circle(s: Shape) -> Shape? {
+                match (s) {
+                    Circle(..) => some(s),
+                    _ => none,
+                }
+            }
+        """,
+        match_case_as_case,
+    )? == [
+        """this match only asks whether the value is Circle — write "s.as_case(Circle)" and drop the match, importing `as_case` from builtins""",
+    ]);
+    // A case with no payload.
+    assert(lint_function_unfilled_messages(
+        """
+            fn empty(s: Shape) -> Shape? {
+                match (s) {
+                    Empty => some(s),
+                    _ => none,
+                }
+            }
+        """,
+        match_case_as_case,
+    )? == [
+        """this match only asks whether the value is Empty — write "s.as_case(Empty)" and drop the match, importing `as_case` from builtins""",
+    ]);
+    // Binders the body never reads change nothing.
+    assert(lint_function_unfilled_messages(
+        """
+            fn rect(s: Shape) -> Shape? {
+                match (s) {
+                    Rect(w, h) => some(s),
+                    _ => none,
+                }
+            }
+        """,
+        match_case_as_case,
+    )? == [
+        """this match only asks whether the value is Rect — write "s.as_case(Rect)" and drop the match, importing `as_case` from builtins""",
+    ]);
 })
 
 # What is said of a match over `receiver` that only asks whether it is `case`, for a

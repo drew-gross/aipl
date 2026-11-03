@@ -24,11 +24,23 @@ fn rewritten_let(shape: Shape) -> i64 {
     line + col
 }
 
-fn main() !prints {
-    let dot = Dot(Pos { line: 2, col: 3 });
-    print(`{squelched(dot) == rewritten(dot)}`);
-    print(`{squelched_let(dot) == rewritten_let(dot)}`);
-}
---- stdout ---
-true
-true
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let dot = Dot(Pos { line: 2, col: 3 });
+        print(`{squelched(dot) == rewritten(dot)}`);
+        print(`{squelched_let(dot) == rewritten_let(dot)}`);
+    };
+    assert(out == """
+        true
+        true
+
+    """);
+})

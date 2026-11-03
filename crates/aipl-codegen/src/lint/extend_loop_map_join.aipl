@@ -19,7 +19,7 @@
 #
 # The hit points at the seed.
 
-import { equal as ==, extend, filter, map } from builtins;
+import { equal as ==, extend, filter, join, map, to_str } from builtins;
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Program } from "../item.aipl";
 import { accumulations, element_stages, filled_hit, is_advisable } from "./accumulation.aipl";
@@ -84,4 +84,148 @@ pub fn extend_loop_map_join(program: Program) -> LintHit[] {
             "mut out = []; for (let x : xs) { set out.extend(g(x)); } out",
         )? == [],
     );
+
+    // Shapes the lint must leave alone.
+    // The loop does something else as well. A pipeline has nowhere to put it.
+    assert(
+        lint_messages(
+            """
+                fn logged(xs: i64[]) !prints -> i64[] {
+                    mut out: i64[] = [];
+                    for (let x : xs) {
+                        print(to_str(x));
+                        set out.extend([x]);
+                    }
+                    out
+                }
+            """,
+            extend_loop_map_join,
+        )? == [],
+    );
+    // A seed with elements is not an empty array to be filled.
+    assert(
+        lint_messages(
+            """
+                fn seeded(xs: i64[]) -> i64[] {
+                    mut out: i64[] = [0];
+                    for (let x : xs) {
+                        set out.extend([x]);
+                    }
+                    out
+                }
+            """,
+            extend_loop_map_join,
+        )? == [],
+    );
+    // An `else` branch is work the pipeline has nowhere to put.
+    assert(
+        lint_messages(
+            """
+                fn either(xs: i64[]) -> i64[] {
+                    mut out: i64[] = [];
+                    for (let x : xs) {
+                        if (0 != x) {
+                            set out.extend([x]);
+                        } else {
+                            set out.extend([]);
+                        };
+                    }
+                    out
+                }
+            """,
+            extend_loop_map_join,
+        )? == [],
+    );
+    // What is added reads the array itself, which the pipeline no longer has.
+    assert(
+        lint_messages(
+            """
+                fn doubling(xs: i64[]) -> i64[] {
+                    mut out: i64[] = [1];
+                    for (let x : xs) {
+                        set out.extend(out);
+                    }
+                    out
+                }
+            """,
+            extend_loop_map_join,
+        )? == [],
+    );
+    // An indexed loop uses its index, which `map` has no way to pass.
+    assert(
+        lint_messages(
+            """
+                fn indexed(xs: u64[]) -> u64[] {
+                    mut out: u64[] = [];
+                    for (let i, x : xs) {
+                        set out.extend([i, x]);
+                    }
+                    out
+                }
+            """,
+            extend_loop_map_join,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    // A transformed piece per element: a `map` then a `join`.
+    assert(
+        lint_messages(
+            """
+                fn pairs(xs: i64[]) -> i64[] {
+                    mut out: i64[] = [];
+                    for (let x : xs) {
+                        set out.extend([x, x]);
+                    }
+                    out
+                }
+            """,
+            extend_loop_map_join,
+        )? == [],
+    );
+    // Under a guard, a `filter` first.
+    assert(
+        lint_messages(
+            """
+                fn pairs_of_positives(xs: i64[]) -> i64[] {
+                    mut out: i64[] = [];
+                    for (let x : xs) {
+                        if (0 != x) { set out.extend([x, x]); };
+                    }
+                    out
+                }
+            """,
+            extend_loop_map_join,
+        )? == [],
+    );
+    // The elements are themselves arrays, added unchanged: just a `join`.
+    assert(
+        lint_messages(
+            """
+                fn flattened(xs: i64[][]) -> i64[] {
+                    mut out: i64[] = [];
+                    for (let x : xs) {
+                        set out.extend(x);
+                    }
+                    out
+                }
+            """,
+            extend_loop_map_join,
+        )? == [],
+    );
+
+    // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
+    fn pairs(xs: i64[]) -> i64[] {
+        mut out: i64[] = []; #[allow]
+        for (let x : xs) {
+            set out.extend([x, x]);
+        }
+        out
+    }
+
+    // The rewrite the lint asks for, so the two spellings are checked side by side and
+    // proven to agree.
+    fn pairs_short(xs: i64[]) -> i64[] { xs.map(|x| [x, x]).join() }
+    assert(to_str(pairs([1, 2])) == "[1, 1, 2, 2]");
+    assert(to_str(pairs_short([1, 2])) == "[1, 1, 2, 2]");
 })

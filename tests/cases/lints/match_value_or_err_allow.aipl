@@ -45,14 +45,26 @@ fn unwrap(r: i64!str) -> i64 {
     }
 }
 
-fn main() !prints {
-    if (unwrap(need(some(5))) == unwrap(need_short(some(5)))) { print("agree on some"); };
-    if (unwrap(need(none)) == unwrap(need_short(none))) { print("agree on none"); };
-    if (unwrap(need_returning(some(0))) == -1 && unwrap(need_returning(some(2))) == 1) {
-        print("returning form kept");
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        if (unwrap(need(some(5))) == unwrap(need_short(some(5)))) { print("agree on some"); };
+        if (unwrap(need(none)) == unwrap(need_short(none))) { print("agree on none"); };
+        if (unwrap(need_returning(some(0))) == -1 && unwrap(need_returning(some(2))) == 1) {
+            print("returning form kept");
+        };
     };
-}
---- stdout ---
-agree on some
-agree on none
-returning form kept
+    assert(out == """
+        agree on some
+        agree on none
+        returning form kept
+
+    """);
+})

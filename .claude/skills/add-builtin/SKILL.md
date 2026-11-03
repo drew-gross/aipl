@@ -198,6 +198,10 @@ back into the advice only when `spans_its_text` says its span covers its text â€
 otherwise write the `<iterable>` placeholder, because a call's span stops before
 its closing paren.
 
+**For a lint written in AIPL (the default), none of these fixtures: the flagged, not-flagged and
+`#[allow]`-agreement cases are `.test` assertions in the lint's own file (add-lint skill, "Tests belong in
+the lint"). The table below is for a lint still written in Rust.**
+
 **Fixtures â€” three, under `tests/cases/lints/`:**
 
 | file | holds |

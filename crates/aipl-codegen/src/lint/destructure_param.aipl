@@ -124,6 +124,130 @@ pub fn destructure_param(Function { sig, body }) -> LintHit[] {
             destructure_param,
         )? == [],
     );
+
+    // Shapes the lint must leave alone.
+    // `self` is what makes a function method-callable, so a pattern there would
+    // change how it is called.
+    assert(
+        lint_function_messages(
+            "fn total(self: Pos) -> i64 { self.line + self.col }",
+            destructure_param,
+        )? == [],
+    );
+
+    // A keyword parameter's name *is* the call-site spelling, so destructuring it
+    // would break every caller.
+    assert(
+        lint_function_messages(
+            "fn keyworded(n: i64, at: Pos = Pos { line: 0, col: 0 }) -> i64 { n + at.line + at.col }",
+            destructure_param,
+        )? == [],
+    );
+    // `mut` is written through rather than read.
+    assert(
+        lint_function_messages(
+            """
+                fn bumped(mut self: Pos) {
+                    set self.line++;
+                }
+            """,
+            destructure_param,
+        )? == [],
+    );
+
+    // One mention that is not a field read is enough: the value itself is passed,
+    // and a pattern keeps only the fields.
+    assert(
+        lint_function_messages(
+            "fn passed(p: Pos) -> i64 { p.line + take(p) }",
+            destructure_param,
+        )? == [],
+    );
+
+    // A field read off two values: `line` would name two things, and the parameter
+    // names are what tell them apart.
+    assert(
+        lint_function_messages(
+            "fn between(a: Pos, b: Pos) -> i64 { a.line + b.line + a.col + b.col }",
+            destructure_param,
+        )? == [],
+    );
+    // The name the pattern would introduce is taken.
+    assert(
+        lint_function_messages(
+            """
+                fn shadowing(p: Pos) -> i64 {
+                    let line = 5;
+                    p.line + p.col + line
+                }
+            """,
+            destructure_param,
+        )? == [],
+    );
+
+    // A destructuring `let` that renames a field: the signature's pattern would have
+    // to spell the rename too.
+    assert(
+        lint_function_messages(
+            """
+                fn renamed(p: Pos) -> i64 {
+                    let Pos { line as row, col } = p;
+                    row + col
+                }
+            """,
+            destructure_param,
+        )? == [],
+    );
+    // The parameter is used again after the `let`, so it has to stay a name.
+    assert(
+        lint_function_messages(
+            """
+                fn kept(p: Pos) -> i64 {
+                    let Pos { line, col } = p;
+                    line + col + take(p)
+                }
+            """,
+            destructure_param,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    assert(lint_function_messages("fn f(p: Pos) -> i64 { p.line + p.col }", destructure_param)? == [
+        `only the fields of parameter "p" are read — destructure it instead: "Pos \{ line, col \}" in place of "p: Pos"`,
+    ]);
+    // One field is enough; the pattern names only what is read.
+    assert(lint_function_messages("fn g(p: Pos) -> i64 { p.col }", destructure_param)? == [
+        `only the fields of parameter "p" are read — destructure it instead: "Pos \{ col \}" in place of "p: Pos"`,
+    ]);
+
+    // Neither `pub` nor a wide struct is an exception. A public function's
+    // parameter name is not documentation enough to keep the longhand, and a
+    // pattern that lists six fields is still the honest statement of what the
+    // function reads.
+    assert(lint_function_messages(
+        "pub fn area(p: Pos) -> i64 { p.line + p.col }",
+        destructure_param,
+    )? == [
+        `only the fields of parameter "p" are read — destructure it instead: "Pos \{ line, col \}" in place of "p: Pos"`,
+    ]);
+    assert(lint_function_messages(
+        "fn wide(w: Wide) -> i64 { w.a + w.b + w.c + w.d }",
+        destructure_param,
+    )? == [
+        `only the fields of parameter "w" are read — destructure it instead: "Wide \{ a, b, c, d \}" in place of "w: Wide"`,
+    ]);
+    // Taken apart by a `let` that opens the body: the same pattern, written late.
+    assert(lint_function_messages(
+        """
+            fn late(p: Pos) -> i64 {
+                let Pos { line, col } = p;
+                line + col
+            }
+        """,
+        destructure_param,
+    )? == [
+        ```parameter "p" is only taken apart by a destructuring `let` — destructure it in the signature instead: "Pos \{ line, col \}" in place of "p: Pos"```,
+    ]);
 })
 
 # The hit for one parameter, or none.

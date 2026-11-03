@@ -102,6 +102,128 @@ pub fn let_else_as_case(Function { body }) -> UnfilledHit[] {
             let_else_as_case,
         )? == [],
     );
+
+    // Shapes the lint must leave alone.
+    // The block returns something other than `none`.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn radius(s: Shape) -> i64 {
+                    let Circle(r) = s else { return 0; };
+                    r
+                }
+            """,
+            let_else_as_case,
+        )? == [],
+    );
+    // The block does something before it returns.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn logged(s: Shape) !prints -> i64? {
+                    let Circle(r) = s else {
+                        print("not a circle");
+                        return none;
+                    };
+                    some(r)
+                }
+            """,
+            let_else_as_case,
+        )? == [],
+    );
+    // An optional's `some` has no `as_case`, and neither has an array pattern.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn double(o: i64?) -> i64? {
+                    let some(n) = o else { return none; };
+                    some(n + n)
+                }
+            """,
+            let_else_as_case,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn second(xs: i64[]) -> i64? {
+                    let [_, b, ..] = xs else { return none; };
+                    some(b)
+                }
+            """,
+            let_else_as_case,
+        )? == [],
+    );
+
+    // Not the function's last act: the `?` would leave the function where the `if let`
+    // only chose a value for a binding.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn width(s: Shape) -> i64? {
+                    let w = if (let Rect(a, b) = s) {
+                        a + b
+                    } else {
+                        return none;
+                    };
+                    some(w)
+                }
+            """,
+            let_else_as_case,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn show(o: i64?) -> str { `{o}` }",
+            let_else_as_case,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    // A payload the `let` takes apart.
+    assert(lint_function_unfilled_messages(
+        """
+            fn radius(s: Shape) -> i64? {
+                let Circle(r) = s else { return none; };
+                some(r * 2)
+            }
+        """,
+        let_else_as_case,
+    )? == [
+        """this `else` only gives up with none — write "let Circle(r) = s.as_case(Circle)?;" and drop the block, importing `as_case` from builtins""",
+    ]);
+    // Written as an `if let`, which is the same tree.
+    assert(lint_function_unfilled_messages(
+        """
+            fn width(s: Shape) -> i64? {
+                if (let Rect(w, h) = s) {
+                    some(w + h)
+                } else {
+                    return none;
+                }
+            }
+        """,
+        let_else_as_case,
+    )? == [
+        """this `else` only gives up with none — write "let Rect(w, h) = s.as_case(Rect)?;" and drop the block, importing `as_case` from builtins""",
+    ]);
+
+    // A case with no payload to bind has no pattern for a `let`, so it is asked of
+    // the value alone.
+    assert(lint_function_unfilled_messages(
+        """
+            fn only_empty(s: Shape, n: i64) -> i64? {
+                if (let Empty = s) {
+                    some(n)
+                } else {
+                    return none;
+                }
+            }
+        """,
+        let_else_as_case,
+    )? == [
+        """this `else` only gives up with none — write "s.as_case(Empty)?;" and drop the block, importing `as_case` from builtins""",
+    ]);
 })
 
 # What is said of a tail `let .. else` over `receiver` on `case`, whose statement begins

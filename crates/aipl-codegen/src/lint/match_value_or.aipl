@@ -28,6 +28,8 @@ import {
     logical_or as ||,
     map,
     not_equal as !=,
+    to_str,
+    value_or,
 } from builtins;
 import { Ident } from "../expr.aipl";
 import { Function } from "../item.aipl";
@@ -104,6 +106,157 @@ pub fn match_value_or(Function { body }) -> UnfilledHit[] {
             match_value_or,
         )? == [],
     );
+
+    // Shapes the lint must leave alone.
+    // The `some` arm transforms the payload, so this is a `map`, not a `value_or`
+    // — which is `match_map_value_or`'s shape, squelched here so this case stays
+    // about which lint does *not* fire.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn plus_one(o: i64?) -> i64 {
+                    match (o) {
+                        some(v) => v + 1,
+                        none => 0, #[allow]
+                    }
+                }
+            """,
+            match_value_or,
+        )? == [],
+    );
+    // The `some` arm ignores its binding, so the payload never comes out.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn always_zero(o: i64?) -> i64 {
+                    match (o) {
+                        some(v) => 0,
+                        none => 0,
+                    }
+                }
+            """,
+            match_value_or,
+        )? == [],
+    );
+    assert(lint_function_unfilled_messages("fn fallback() -> i64 { 7 }", match_value_or)? == []);
+
+    // The default is a call. `value_or`'s argument is evaluated eagerly, but this
+    // `none` arm runs only when the optional is empty — rewriting would call
+    // `fallback()` even for a populated optional, so the lint stays quiet.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn or_call(o: i64?) -> i64 {
+                    match (o) {
+                        some(v) => v,
+                        none => fallback(),
+                    }
+                }
+            """,
+            match_value_or,
+        )? == [],
+    );
+
+    // The default is a struct literal built from a *call*, so it is not constant
+    // either — the lint looks through the construction at what fills it.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn or_computed_struct(o: Pt?) -> Pt {
+                    match (o) {
+                        some(v) => v,
+                        none => Pt { x: fallback(), y: 0 },
+                    }
+                }
+            """,
+            match_value_or,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    assert(lint_function_unfilled_messages(
+        """
+            fn or_zero(o: i64?) -> i64 {
+                match (o) {
+                    some(v) => v,
+                    none => 0,
+                }
+            }
+        """,
+        match_value_or,
+    )? == [
+        """this `match` hands back the optional's payload or a default — write "o.value_or(0)" instead, importing `value_or` from builtins""",
+    ]);
+    assert(lint_function_unfilled_messages(
+        """
+            fn none_first(o: i64?) -> i64 {
+                match (o) {
+                    none => 0,
+                    some(v) => v,
+                }
+            }
+        """,
+        match_value_or,
+    )? == [
+        """this `match` hands back the optional's payload or a default — write "o.value_or(0)" instead, importing `value_or` from builtins""",
+    ]);
+
+    // An inline *struct* default is flagged too. It used not to be — not for
+    // formatting reasons, but because `value_or` was emitted natively as a tag
+    // select over one i64 payload and genuinely could not unwrap such an optional.
+    // It is AIPL-implemented now and generic over every payload, so the rewrite the
+    // lint advises is one that compiles.
+    //
+    // The message quotes the default as written, its closing brace included. A
+    // default that runs over several lines is quoted as `..` instead.
+    assert(lint_function_unfilled_messages(
+        """
+            fn or_origin(o: Pt?) -> Pt {
+                match (o) {
+                    some(v) => v,
+                    none => Pt { x: 0, y: 0 },
+                }
+            }
+        """,
+        match_value_or,
+    )? == [
+        """this `match` hands back the optional's payload or a default — write "o.value_or(Pt { x: 0, y: 0 })" instead, importing `value_or` from builtins""",
+    ]);
+
+    // Arithmetic in the `none` arm is flagged. It used to be exempt: `/` and `%`
+    // trapped on a zero divisor, so evaluating one eagerly could turn a program that
+    // returns into one that dies. Both are total now — `/` saturates and `%` answers
+    // the dividend — so a division costs the same computed eagerly as lazily, like
+    // any other constant.
+    assert(lint_function_unfilled_messages(
+        """
+            fn or_divided(o: i64?) -> i64 {
+                match (o) {
+                    some(v) => v,
+                    none => 100 / 4,
+                }
+            }
+        """,
+        match_value_or,
+    )? == [
+        """this `match` hands back the optional's payload or a default — write "o.value_or(100 / 4)" instead, importing `value_or` from builtins""",
+    ]);
+
+    // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
+    fn or_zero(o: i64?) -> i64 {
+        match (o) {
+            some(v) => v, #[allow]
+            none => 0,
+        }
+    }
+
+    // The rewrite the lint asks for, so the two spellings are checked side by side
+    // and proven to agree.
+    fn or_zero_short(o: i64?) -> i64 { o.value_or(0) }
+    assert(or_zero(some(5)).to_str() == "5");
+    assert(or_zero_short(some(5)).to_str() == "5");
+    assert(or_zero(none).to_str() == "0");
+    assert(or_zero_short(none).to_str() == "0");
 })
 
 # What is said of a `match` that unwraps the optional `receiver` or gives `default`,

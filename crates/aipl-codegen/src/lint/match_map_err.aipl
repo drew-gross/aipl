@@ -103,6 +103,173 @@ pub fn match_map_err(Function { body }) -> UnfilledHit[] {
             match_map_err,
         )? == [],
     );
+    // Shapes the lint must leave alone.
+    assert(
+        lint_function_unfilled_messages(
+            """fn parse(s: str) -> i64!str { if (s == "1") { ok(1) } else { err("not a one") } }""",
+            match_map_err,
+        )? == [],
+    );
+
+    // The `ok` arm transforms the value, so this rewrites both sides — more than
+    // `map_err` can express.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn wrap_and_bump(r: i64!str) -> i64!Wrapped {
+                    match (r) {
+                        ok(v) => ok(v + 1),
+                        err(e) => err(Wrapped { message: e }),
+                    }
+                }
+            """,
+            match_map_err,
+        )? == [],
+    );
+    // The `ok` arm ignores its binding, so the value does not pass through.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn wrap_and_replace(r: i64!str) -> i64!Wrapped {
+                    match (r) {
+                        ok(v) => ok(0),
+                        err(e) => err(Wrapped { message: e }),
+                    }
+                }
+            """,
+            match_map_err,
+        )? == [],
+    );
+
+    // `err(e) => err(e)` rebuilds the result unchanged, so the whole `match` is its
+    // own scrutinee. `map_err(|e| e)` would be a longer way to write that nothing,
+    // so the lint stays quiet rather than advising it — and so does `map_ok`'s, from
+    // the other side (see `match_map_ok_not_flagged.aipl`).
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn passthrough(r: i64!str) -> i64!str {
+                    match (r) {
+                        ok(v) => ok(v),
+                        err(e) => err(e),
+                    }
+                }
+            """,
+            match_map_err,
+        )? == [],
+    );
+
+    // The `err` arm leaves the result world entirely — this is an unwrap, not a
+    // conversion.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn or_zero(r: i64!str) -> i64 {
+                    match (r) {
+                        ok(v) => v,
+                        err(e) => 0,
+                    }
+                }
+            """,
+            match_map_err,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn code_of(r: i64!Wrapped) -> i64 {
+                    match (r) {
+                        ok(v) => v,
+                        err(e) => -1,
+                    }
+                }
+            """,
+            match_map_err,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    assert(
+        lint_function_unfilled_messages(
+            """fn parse(s: str) -> i64!str { if (s == "1") { ok(1) } else { err("not a one") } }""",
+            match_map_err,
+        )? == [],
+    );
+    assert(lint_function_unfilled_messages(
+        """
+            fn wrap(r: i64!str) -> i64!Wrapped {
+                match (r) {
+                    ok(v) => ok(v),
+                    err(e) => err(Wrapped { message: e, code: 1 }),
+                }
+            }
+        """,
+        match_map_err,
+    )? == [
+        """this `match` rewrites the result's error side and passes its value through — write "r.map_err(|e| ..)" instead, importing `map_err` from builtins""",
+    ]);
+    assert(lint_function_unfilled_messages(
+        """
+            fn err_first(r: i64!str) -> i64!Wrapped {
+                match (r) {
+                    err(e) => err(Wrapped { message: e, code: 2 }),
+                    ok(v) => ok(v),
+                }
+            }
+        """,
+        match_map_err,
+    )? == [
+        """this `match` rewrites the result's error side and passes its value through — write "r.map_err(|e| ..)" instead, importing `map_err` from builtins""",
+    ]);
+    assert(
+        lint_function_unfilled_messages("fn shout(s: str) -> str { `{s}!` }", match_map_err)? == [],
+    );
+
+    // A *call* in the `err` arm is flagged too. Unlike `value_or`, there is no
+    // eager/lazy question to guard against: `map_err` takes a function, which runs
+    // on the error path exactly when the arm did.
+    assert(lint_function_unfilled_messages(
+        """
+            fn wrap_call(r: i64!str) -> i64!str {
+                match (r) {
+                    ok(v) => ok(v),
+                    err(e) => err(shout(e)),
+                }
+            }
+        """,
+        match_map_err,
+    )? == [
+        """this `match` rewrites the result's error side and passes its value through — write "r.map_err(|e| ..)" instead, importing `map_err` from builtins""",
+    ]);
+
+    // A call-shaped scrutinee has no name to quote back — its span stops before its
+    // parens — so the message names the method without a receiver.
+    assert(lint_function_unfilled_messages(
+        """
+            fn wrap_inline(s: str) -> i64!str {
+                match (parse(s)) {
+                    ok(v) => ok(v),
+                    err(e) => err(shout(e)),
+                }
+            }
+        """,
+        match_map_err,
+    )? == [
+        """this `match` rewrites the result's error side and passes its value through — write "parse(s).map_err(|e| ..)" instead, importing `map_err` from builtins""",
+    ]);
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn code_of(r: i64!Wrapped) -> i64 {
+                    match (r) {
+                        ok(v) => v,
+                        err(e) => e.code,
+                    }
+                }
+            """,
+            match_map_err,
+        )? == [],
+    );
 })
 
 # What is said of a `match` over `receiver` whose error is bound as `binder`, for a file

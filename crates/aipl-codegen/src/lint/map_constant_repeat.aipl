@@ -136,6 +136,31 @@ pub fn map_constant_repeat(program: Program) -> LintHit[] {
     assert(messages(all, "xs.map(|x| g())")? == []);
     assert(messages(all, "(0..3).map(|x| 0)")? == []);
     assert(messages("repeat, len", "xs.map(|x| 0)")? == []);
+    // Shapes the lint must leave alone.
+    assert(lint_messages("fn next_id() -> i64 { 1 }", map_constant_repeat)? == []);
+
+    // Shapes the lint flags, and what it says of them.
+    assert(
+        lint_messages("fn zeros(xs: i64[]) -> i64[] { xs.map(|x| 0) }", map_constant_repeat)? == [],
+    );
+    assert(
+        lint_messages(
+            """fn blanks(names: str[]) -> str[] { names.map(|_| "") }""",
+            map_constant_repeat,
+        )? == [],
+    );
+    assert(
+        lint_messages(
+            "fn defaults(xs: i64[], fallback: i64) -> i64[] { xs.map(|x| fallback) }",
+            map_constant_repeat,
+        )? == [],
+    );
+    assert(
+        lint_messages(
+            """fn cells(xs: i64[]) -> Cell[] { xs.map(|x| Cell { filled: false, label: "empty" }) }""",
+            map_constant_repeat,
+        )? == [],
+    );
 })
 
 # Whether evaluating `self` gives the same value every time, with no effect: a literal, a

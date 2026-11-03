@@ -127,6 +127,109 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
             match_bool_is_case,
         )? == [],
     );
+
+    // Shapes the lint must leave alone.
+    // Two cases answer `true`: `is_case` asks about one.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn round_or_square(shape: Shape) -> bool {
+                    match (shape) {
+                        Circle(..) | Square(..) => true,
+                        Dot => false,
+                    }
+                }
+            """,
+            match_bool_is_case,
+        )? == [],
+    );
+    // The case answering `true` is the catch-all: the question is "is it not a Dot".
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn not_dot(shape: Shape) -> bool {
+                    match (shape) {
+                        Dot => false,
+                        _ => true,
+                    }
+                }
+            """,
+            match_bool_is_case,
+        )? == [],
+    );
+    // An arm that is not a literal does work of its own.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn is_big(shape: Shape) -> bool {
+                    match (shape) {
+                        Circle(r) => r > 10,
+                        _ => false,
+                    }
+                }
+            """,
+            match_bool_is_case,
+        )? == [],
+    );
+    // An optional is not a variant case, and has `is_some`.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn has(value: i64?) -> bool {
+                    match (value) {
+                        some(..) => true,
+                        none => false,
+                    }
+                }
+            """,
+            match_bool_is_case,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    // The other cases spelled out.
+    assert(lint_function_unfilled_messages(
+        """
+            fn is_circle(shape: Shape) -> bool {
+                match (shape) {
+                    Circle(..) => true,
+                    Square(..) => false,
+                    Dot => false,
+                }
+            }
+        """,
+        match_bool_is_case,
+    )? == [
+        """this match only asks whether the value is Circle — write "<value>.is_case(Circle)" and drop the match, importing `is_case` from builtins""",
+    ]);
+    // A catch-all `false`, with the payload bound and ignored.
+    assert(lint_function_unfilled_messages(
+        """
+            fn is_square(shape: Shape) -> bool {
+                match (shape) {
+                    Square(side) => true,
+                    _ => false,
+                }
+            }
+        """,
+        match_bool_is_case,
+    )? == [
+        """this match only asks whether the value is Square — write "<value>.is_case(Square)" and drop the match, importing `is_case` from builtins""",
+    ]);
+    // A nullary case, and the `false` arm first.
+    assert(lint_function_unfilled_messages(
+        """
+            fn is_dot(shape: Shape) -> bool {
+                match (shape) {
+                    Circle(..) | Square(..) => false,
+                    Dot => true,
+                }
+            }
+        """,
+        match_bool_is_case,
+    )? == [
+        """this match only asks whether the value is Dot — write "<value>.is_case(Dot)" and drop the match, importing `is_case` from builtins""",
+    ]);
 })
 
 # What is said of a match that only asks whether a value is `case`, with the name

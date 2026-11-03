@@ -234,6 +234,70 @@ pub fn destructure_binding(Function { sig, body }) -> LintHit[] {
         "fn f() { }.test({ let p = g(); assert(p.a == 1); })",
         destructure_binding,
     )? == [message("p", "a", "<Type>")]);
+    // Shapes the lint must leave alone.
+    assert(
+        lint_function_messages("fn make() -> Pos { line: 3, col: 7 }", destructure_binding)? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn take(p: Pos) -> i64 { p.line } #[allow]",
+            destructure_binding,
+        )? == [],
+    );
+    assert(lint_function_messages("fn pair() -> Pair { a: 1, b: 2 }", destructure_binding)? == []);
+
+    // Shapes the lint flags, and what it says of them.
+    assert(
+        lint_function_messages("fn make() -> Pos { line: 3, col: 7 }", destructure_binding)? == [],
+    );
+    assert(lint_function_messages(
+        """
+            fn f() -> i64 {
+                let p = make();
+                p.line
+            }
+        """,
+        destructure_binding,
+    )? == [
+        `only the fields of "p" are read — destructure the binding instead: "let <Type> \{ line \} = ..."`,
+    ]);
+
+    // `line` is read off two values here, so `head` stays quiet — but `step` does
+    // not, because the competing read is inside `step`'s *own value*, evaluated
+    // before the pattern binds anything. By the time a bare `line` means the field,
+    // `head.line` is spent. Threading a cursor writes this shape constantly.
+    assert(lint_function_messages(
+        """
+            fn threaded() -> i64 {
+                let head = make();
+                let step = shift(head.line);
+                step.line + step.col
+            }
+        """,
+        destructure_binding,
+    )? == [
+        `only the fields of "step" are read — destructure the binding instead: "let <Type> \{ line, col \} = ..."`,
+    ]);
+
+    // The binding sharing a name with one of its own fields is the same story: the
+    // name the pattern takes over belongs to the binding that is going away.
+    assert(lint_function_messages(
+        """
+            fn self_named() -> i64 {
+                let col = make();
+                col.col + col.line
+            }
+        """,
+        destructure_binding,
+    )? == [
+        `only the fields of "col" are read — destructure the binding instead: "let <Type> \{ col, line \} = ..."`,
+    ]);
+    assert(
+        lint_function_messages(
+            "fn shift(n: i64) -> Pos { line: n, col: n }",
+            destructure_binding,
+        )? == [],
+    );
 })
 
 # What is said of the binding `name`, whose `fields` are the ones read.

@@ -157,6 +157,130 @@ pub fn match_map_value_or(Function { body }) -> UnfilledHit[] {
             match_map_value_or,
         )? == [],
     );
+
+    // Shapes the lint must leave alone.
+    // The identity arm is `match_value_or`'s shape, not a map of anything —
+    // squelched so this case stays about which lint does *not* fire.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn or_zero(o: i64?) -> i64 {
+                    match (o) {
+                        some(v) => v, #[allow]
+                        none => 0,
+                    }
+                }
+            """,
+            match_map_value_or,
+        )? == [],
+    );
+    // A `bool` answered with `none => false` is `match_is_some_and`'s shape.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn is_big(o: i64?) -> bool {
+                    match (o) {
+                        some(v) => v > 3,
+                        none => false, #[allow]
+                    }
+                }
+            """,
+            match_map_value_or,
+        )? == [],
+    );
+
+    // The default does work — a call — which `value_or` would run whether or not
+    // the optional is empty, so the rewrite is not advised.
+    assert(
+        lint_function_unfilled_messages("fn fallback() -> i64 { 7 }", match_map_value_or)? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn or_computed(o: i64?) -> i64 {
+                    match (o) {
+                        some(v) => v + 1,
+                        none => fallback(),
+                    }
+                }
+            """,
+            match_map_value_or,
+        )? == [],
+    );
+
+    // A `none` arm that does nothing: a `match` run for effect, not a value with
+    // a fallback.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn say(o: i64?) !prints {
+                    match (o) {
+                        some(v) => print(v.to_str()),
+                        none => {},
+                    };
+                }
+            """,
+            match_map_value_or,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    assert(lint_function_unfilled_messages(
+        """
+            fn plus_one_or_zero(o: i64?) -> i64 {
+                match (o) {
+                    some(v) => v + 1,
+                    none => 0,
+                }
+            }
+        """,
+        match_map_value_or,
+    )? == [
+        """this `match` transforms the optional's payload or falls back to a default — write "o.map(|v| ..).value_or(0)" with the `some` arm's body as the mapping, importing `map` and `value_or` from builtins""",
+    ]);
+    assert(lint_function_unfilled_messages(
+        """
+            fn none_first(o: i64?) -> i64 {
+                match (o) {
+                    none => 0,
+                    some(v) => v + 1,
+                }
+            }
+        """,
+        match_map_value_or,
+    )? == [
+        """this `match` transforms the optional's payload or falls back to a default — write "o.map(|v| ..).value_or(0)" with the `some` arm's body as the mapping, importing `map` and `value_or` from builtins""",
+    ]);
+    // An inline struct default is flagged too; the message quotes it as written.
+    assert(lint_function_unfilled_messages(
+        """
+            fn shifted_or_origin(o: i64?) -> Pt {
+                match (o) {
+                    some(v) => Pt { x: v, y: v },
+                    none => Pt { x: 0, y: 0 },
+                }
+            }
+        """,
+        match_map_value_or,
+    )? == [
+        """this `match` transforms the optional's payload or falls back to a default — write "o.map(|v| ..).value_or(Pt { x: 0, y: 0 })" with the `some` arm's body as the mapping, importing `map` and `value_or` from builtins""",
+    ]);
+
+    // `some(v) => some(f(v)), none => none` maps and keeps `none`: a bare `map`,
+    // with nothing to default.
+    assert(lint_function_unfilled_messages(
+        """
+            fn plus_one(o: i64?) -> i64? {
+                match (o) {
+                    some(v) => some(v + 1),
+                    none => none,
+                }
+            }
+        """,
+        match_map_value_or,
+    )? == [
+        """this `match` maps the optional's payload and keeps `none` — write "o.map(|v| ..)" with the value the `some` arm wraps, importing `map` from builtins""",
+    ]);
 })
 
 # What is said of a `match` that maps the payload and keeps `none`, pointing at `span`.

@@ -255,6 +255,251 @@ pub fn match_value_or_err(Function { body, sig }) -> UnfilledHit[] {
             match_value_or_err,
         )? == [],
     );
+
+    // Shapes the lint must leave alone.
+    // The `none` arm does not build an `err`, so this is an ordinary unwrap with a
+    // fallback — `value_or` territory, and a different lint's business.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn or_zero(o: i64?) -> i64 {
+                    match (o) {
+                        // `match_value_or` flags this one, which is the point — it is that
+                        // lint's shape, not this one's. Squelched so the case stays about which
+                        // lint does *not* fire here.
+                        some(v) => v, #[allow]
+                        none => 0,
+                    }
+                }
+            """,
+            match_value_or_err,
+        )? == [],
+    );
+
+    // The `none` arm does more than build the error. `value_or_err` takes the error
+    // as a plain argument and has nowhere to put the rest of the arm, so rewriting
+    // would drop the print — the lint stays quiet rather than advising that.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn need_loud(o: i64?) !prints -> i64!str {
+                    match (o) {
+                        some(v) => ok(v),
+                        none => {
+                            print("about to fail");
+                            err("missing")
+                        },
+                    }
+                }
+            """,
+            match_value_or_err,
+        )? == [],
+    );
+
+    // The same, leaving with the error: a `return` after other statements is an
+    // arm that does more than build the error, exactly as above.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn need_loud_return(o: i64?) !prints -> i64!str {
+                    match (o) {
+                        some(v) => {
+                            print(`have {v}`);
+                        },
+                        none => {
+                            print("about to fail");
+                            return err("missing");
+                        },
+                    };
+                    ok(0)
+                }
+            """,
+            match_value_or_err,
+        )? == [],
+    );
+
+    // The enclosing function declares an effect, so the lint cannot tell whether
+    // building the error is the part that has it — and an effect hoisted onto the
+    // success path would happen on every call. AIPL requires a caller to declare at
+    // least the effects of what it calls, which is exactly why "declares none" is
+    // the proof the lint relies on everywhere else.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn need_effectful(o: i64?, tag: str) !prints -> i64!str {
+                    match (o) {
+                        some(v) => ok(v),
+                        none => err(shout(tag)),
+                    }
+                }
+            """,
+            match_value_or_err,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn shout(tag: str) !prints -> str {
+                    print("building an error");
+                    `no rule named "{tag}"`
+                }
+            """,
+            match_value_or_err,
+        )? == [],
+    );
+
+    // A `match` on a *result*, not an optional: the arms are `ok`/`err`, so there is
+    // no optional here to bridge and nothing for this lint to say.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn unwrap(r: i64!str) -> i64 {
+                    match (r) {
+                        ok(v) => v,
+                        err(e) => -1,
+                    }
+                }
+            """,
+            match_value_or_err,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn faulted(r: i64!Fault) -> i64 {
+                    match (r) {
+                        ok(v) => v,
+                        err(e) => -2,
+                    }
+                }
+            """,
+            match_value_or_err,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    assert(lint_function_unfilled_messages(
+        """
+            fn need(o: i64?) -> i64!str {
+                match (o) {
+                    some(v) => ok(v),
+                    none => err("missing"),
+                }
+            }
+        """,
+        match_value_or_err,
+    )? == [
+        """this `match` turns an optional into a result — write "o.value_or_err("missing")" instead, importing `value_or_err` from builtins""",
+    ]);
+    assert(lint_function_unfilled_messages(
+        """
+            fn none_first(o: i64?) -> i64!str {
+                match (o) {
+                    none => err("missing"),
+                    some(v) => ok(v),
+                }
+            }
+        """,
+        match_value_or_err,
+    )? == [
+        """this `match` turns an optional into a result — write "o.value_or_err("missing")" instead, importing `value_or_err` from builtins""",
+    ]);
+
+    // The `some` arm need not be the identity. `some(v) => ok(f(v))` rewrites just
+    // as well, with `?` doing the early return the `none` arm was doing by hand —
+    // so the message advises the `?` form instead. This is the shape that started
+    // the lint: a typo inside such an arm is what it looked like in the wild.
+    assert(lint_function_unfilled_messages(
+        """
+            fn tokenize(o: i64?) -> Tok!str {
+                match (o) {
+                    some(v) => ok(IntTok(v)),
+                    none => err("integer literal overflows i64"),
+                }
+            }
+        """,
+        match_value_or_err,
+    )? == [
+        """this `match` turns an optional into a result — write "o.value_or_err("integer literal overflows i64")?" and use the payload directly — `?` does the early return this arm is doing by hand, importing `value_or_err` from builtins""",
+    ]);
+
+    // The `none` arm may *leave* with the error instead of yielding it: the
+    // statement form, where the `match` runs for effect and the `some` arm's block
+    // is the rest of the function. A `return` there is a `?` written by hand, so
+    // the advice is the `let` that binds the payload ahead of that block.
+    assert(lint_function_unfilled_messages(
+        """
+            fn scale(o: i64?, k: i64) -> i64!str {
+                match (o) {
+                    some(v) => {
+                        print(`scaling {v}`);
+                    },
+                    none => {
+                        return err("missing");
+                    },
+                };
+                ok(k)
+            }
+        """,
+        match_value_or_err,
+    )? == [
+        """this `match` turns an optional into a result — write "let v = o.value_or_err("missing")?;" and continue with the `some` arm's body — `?` does the early return this arm is doing by hand, importing `value_or_err` from builtins""",
+    ]);
+    assert(
+        lint_function_unfilled_messages(
+            """fn describe(tag: str) -> str { `no rule named "{tag}"` }""",
+            match_value_or_err,
+        )? == [],
+    );
+
+    // A *computed* error is flagged too, and that is the whole point: written out,
+    // `value_or_err`'s error looks eager, but the optimizer inlines the builtin and
+    // sinks the argument into the `none` branch, so it is built exactly when this
+    // `match` builds it. Measured on `grammar.aipl`, the rewrite allocates the same
+    // to the byte and executes ~260 fewer instructions.
+    assert(lint_function_unfilled_messages(
+        """
+            fn need_computed(o: i64?, tag: str) -> i64!str {
+                match (o) {
+                    some(v) => ok(v),
+                    none => err(describe(tag)),
+                }
+            }
+        """,
+        match_value_or_err,
+    )? == [
+        """this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error, importing `value_or_err` from builtins""",
+    ]);
+
+    // An inline struct error is flagged too. The message names it rather than
+    // quoting it: a construction's span stops at its last token, before the closing
+    // brace, so quoting would print advice that doesn't parse.
+    assert(lint_function_unfilled_messages(
+        """
+            fn need_struct(o: i64?) -> i64!Fault {
+                match (o) {
+                    some(v) => ok(v),
+                    none => err(Fault { code: 7 }),
+                }
+            }
+        """,
+        match_value_or_err,
+    )? == [
+        """this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error, importing `value_or_err` from builtins""",
+    ]);
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn unwrap(r: i64!str) -> i64 {
+                    match (r) {
+                        ok(v) => v,
+                        err(e) => -1,
+                    }
+                }
+            """,
+            match_value_or_err,
+        )? == [],
+    );
 })
 
 # What is said of an optional turned into a result with the given `advice`, for a file

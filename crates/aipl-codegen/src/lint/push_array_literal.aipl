@@ -35,6 +35,8 @@ import {
     join,
     logical_or as ||,
     not_equal as !=,
+    push,
+    to_str,
 } from builtins;
 import { ArrayLit, Expr, Ident, LetMut, Spread, collect_expr_cases } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
@@ -84,6 +86,152 @@ pub fn push_array_literal(program: Program) -> LintHit[] {
     assert(messages("push", "mut out = xs; set out.push(x); set out.push(1); xs")? == []);
     assert(messages("push", "mut out = xs; set out.push(out.len()); out")? == []);
     assert(messages("map", "mut out = xs; set out.push(x); out")? == []);
+
+    // Shapes the lint must leave alone.
+    // A pushed element that mentions the binding: `out.len()` is a running index,
+    // and the literal has no `out` for it to refer to.
+    assert(
+        lint_messages(
+            """
+                fn indexed(xs: u64[]) -> u64[] {
+                    mut out = xs;
+                    set out.push(out.len());
+                    out
+                }
+            """,
+            push_array_literal,
+        )? == [],
+    );
+
+    // A statement between the pushes and the result reads `out` half-built, so the
+    // pushes are not the last thing that happens to it.
+    assert(
+        lint_messages(
+            """
+                fn logged(xs: i64[], x: i64) !prints -> i64[] {
+                    mut out = xs;
+                    set out.push(x);
+                    print(out.len().to_str());
+                    out
+                }
+            """,
+            push_array_literal,
+        )? == [],
+    );
+
+    // The binding outlives the pushes — something else appends to it later, so
+    // there is no single literal that spells it.
+    assert(
+        lint_messages(
+            """
+                fn twice(xs: u64[], x: u64) -> u64[] {
+                    mut out = xs;
+                    set out.push(x);
+                    let n = out.len();
+                    set out.push(n);
+                    out
+                }
+            """,
+            push_array_literal,
+        )? == [],
+    );
+    // A push is not the last statement: the block returns something else.
+    assert(
+        lint_messages(
+            """
+                fn counted(xs: i64[], x: i64) -> u64 {
+                    mut out = xs;
+                    set out.push(x);
+                    out.len()
+                }
+            """,
+            push_array_literal,
+        )? == [],
+    );
+    assert(
+        lint_messages(
+            """fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }""",
+            push_array_literal,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    // One push onto a named seed — the plain case.
+    assert(
+        lint_messages(
+            """
+                fn appended(xs: i64[], x: i64) -> i64[] {
+                    mut out = xs;
+                    set out.push(x);
+                    out
+                }
+            """,
+            push_array_literal,
+        )? == [],
+    );
+
+    // A run of pushes collapses the same way, and an empty seed needs no spread
+    // at all. The annotation goes away with the binding.
+    assert(
+        lint_messages(
+            """
+                fn pair(a: i64, b: i64) -> i64[] {
+                    mut out: i64[] = [];
+                    set out.push(a);
+                    set out.push(b);
+                    out
+                }
+            """,
+            push_array_literal,
+        )? == [],
+    );
+    assert(lint_messages("fn evens(n: i64) -> i64[] { [n, n * 2] }", push_array_literal)? == []);
+
+    // A call-shaped seed can't be quoted back into the advice — its span stops
+    // before its parens — so the literal is shown with a placeholder in its place.
+    assert(
+        lint_messages(
+            """
+                fn from_call(n: i64, x: i64) -> i64[] {
+                    mut out = evens(n);
+                    set out.push(x);
+                    out
+                }
+            """,
+            push_array_literal,
+        )? == [],
+    );
+
+    // The same goes for a computed element. The longhand `set out = out.push(..)`
+    // is the same statement written out, so it is flagged the same way.
+    assert(
+        lint_messages(
+            """
+                fn scaled(xs: i64[], n: i64) -> i64[] {
+                    mut out = xs;
+                    set out = out.push(n * 2);
+                    out
+                }
+            """,
+            push_array_literal,
+        )? == [],
+    );
+
+    // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
+    fn appended(xs: i64[], x: i64) -> i64[] {
+        mut out = xs; #[allow]
+        set out.push(x);
+        out
+    }
+
+    // The rewrite the lint asks for, so the two spellings are checked side by side
+    // and proven to agree.
+    fn appended_short(xs: i64[], x: i64) -> i64[] { [..xs, x] }
+    fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }
+    assert(show(appended([1, 2], 3)) == "1,2,3");
+    assert(show(appended_short([1, 2], 3)) == "1,2,3");
+    assert(show(appended([], 3)) == "3");
+    assert(show(appended_short([], 3)) == "3");
 })
 
 # `self` as the hit for an array that is only pushed onto before it is returned, when it

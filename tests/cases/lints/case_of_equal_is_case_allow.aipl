@@ -9,12 +9,24 @@ fn squelched(shape: Shape) -> bool { shape.case_of() == Circle } #[allow]
 
 fn rewritten(shape: Shape) -> bool { shape.is_case(Circle) }
 
-fn main() !prints {
-    for (let shape : [Circle(1), Square(2), Dot]) {
-        print(`{squelched(shape)} {rewritten(shape)}`);
-    }
-}
---- stdout ---
-true true
-false false
-false false
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        for (let shape : [Circle(1), Square(2), Dot]) {
+            print(`{squelched(shape)} {rewritten(shape)}`);
+        }
+    };
+    assert(out == """
+        true true
+        false false
+        false false
+
+    """);
+})

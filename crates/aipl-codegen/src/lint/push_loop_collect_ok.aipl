@@ -150,6 +150,133 @@ pub fn push_loop_collect_ok(program: Program) -> LintHit[] {
             "mut out = []; for (let x : xs) { if (let some(v) = f(x)) { set out.push(v); }; } out",
         )? == [],
     );
+    // Shapes the lint must leave alone.
+    assert(
+        lint_messages(
+            """fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }""",
+            push_loop_collect_ok,
+        )? == [],
+    );
+    assert(
+        lint_messages(
+            """fn show_u(xs: u64[]) -> str { xs$to_str().join(sep=",") }""",
+            push_loop_collect_ok,
+        )? == [],
+    );
+    // An `else` that does something: the pipeline has nowhere to put it.
+    assert(
+        lint_messages(
+            """
+                fn parsed_or_zero(words: str[]) -> i64[] {
+                    mut out: i64[] = [];
+                    for (let word : words) {
+                        if (let some(n) = word.int_parse()) {
+                            set out.push(n);
+                        } else {
+                            set out.push(0);
+                        };
+                    }
+                    out
+                }
+            """,
+            push_loop_collect_ok,
+        )? == [],
+    );
+    // The loop does something else as well.
+    assert(
+        lint_messages(
+            """
+                fn logged(words: str[]) !prints -> i64[] {
+                    mut out: i64[] = [];
+                    for (let word : words) {
+                        print(word);
+                        if (let some(n) = word.int_parse()) { set out.push(n); };
+                    }
+                    out
+                }
+            """,
+            push_loop_collect_ok,
+        )? == [],
+    );
+
+    // The question reads the array being built, so it depends on how much the loop
+    // has already done, which no `map` lambda can see.
+    assert(
+        lint_messages(
+            """
+                fn limited(words: str[]) -> i64[] {
+                    mut out: i64[] = [];
+                    for (let word : words) {
+                        if (let some(n) = word.int_parse()) { if (out.len() < 2) { set out.push(n); }; };
+                    }
+                    out
+                }
+            """,
+            push_loop_collect_ok,
+        )? == [],
+    );
+    // An indexed loop: `map` has no index to pass.
+    assert(
+        lint_messages(
+            """
+                fn at_even(words: str[]) -> u64[] {
+                    mut out: u64[] = [];
+                    for (let i, word : words) {
+                        if (let some(_) = word.int_parse()) { set out.push(word.len() + i); };
+                    }
+                    out
+                }
+            """,
+            push_loop_collect_ok,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    // The answers kept as they are: a `map` of the question, then `collect_ok`.
+    assert(
+        lint_messages(
+            """
+                fn parsed(words: str[]) -> i64[] {
+                    mut out: i64[] = [];
+                    for (let word : words) {
+                        if (let some(n) = word.int_parse()) { set out.push(n); };
+                    }
+                    out
+                }
+            """,
+            push_loop_collect_ok,
+        )? == [],
+    );
+    // The answers changed on the way in.
+    assert(
+        lint_messages(
+            """
+                fn doubled(words: str[]) -> i64[] {
+                    mut out: i64[] = [];
+                    for (let word : words) {
+                        if (let some(n) = word.int_parse()) { set out.push(n * 2); };
+                    }
+                    out
+                }
+            """,
+            push_loop_collect_ok,
+        )? == [],
+    );
+    // The iterable already holds the optionals, so there is nothing to map first.
+    assert(
+        lint_messages(
+            """
+                fn present(slots: i64?[]) -> i64[] {
+                    mut out: i64[] = [];
+                    for (let slot : slots) {
+                        if (let some(n) = slot) { set out.push(n); };
+                    }
+                    out
+                }
+            """,
+            push_loop_collect_ok,
+        )? == [],
+    );
 })
 
 # `self` as the hit for an array filled with the answers that exist, when it is one.
