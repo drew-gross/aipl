@@ -332,3 +332,9 @@ Checklist:
 Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered by the parser to a private function
 `__test_block_<line>_<offset>` with an empty body whose `.test` body is the block; never part of `run`/`build` output (checked:
 `aipl report` is byte-identical with and without one). A `# ..` block directly above it is an error. Reported as `test line N`.
+
+- 2026-11-02: `aipl check` output is now grouped by file (`file:` then `function: N assertions passed[, M failed]`, one row
+  `standalone tests` for the top-level `test` blocks) with every failure gathered under `test failures:` at the bottom,
+  before the summary lines. The JIT test runtime counts assertions per test (`TestRecord`, `take_test_records`) and buffers
+  failure text (`take_failure_report`). A `.performance` block runs in another process, so it is counted in the totals and
+  its failures land under `test failures:` but it has no row of its own yet. 17 `check::` assertions updated.

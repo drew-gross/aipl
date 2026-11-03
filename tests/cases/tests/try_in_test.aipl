@@ -47,6 +47,12 @@ fn hits_none() -> i64 { 0 }.test({
 
 fn main() {}
 --- check ---
+/Users/drewgross/Projects/aipl/tests/cases/tests/try_in_test.aipl:
+    all_ok: 1 assertion passed
+    hits_err: 0 assertions passed, test failed
+    all_some: 2 assertions passed
+    hits_none: 0 assertions passed, test failed
+test failures:
 test hits_err ... FAIL
   `?` propagated an error: "zero is not allowed"
 test hits_none ... FAIL

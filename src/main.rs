@@ -400,7 +400,7 @@ fn check_file(
         let batch_label = aipl::codegen::test_file().unwrap_or_default();
         match aipl::perf::run_performance_tests(&driver, stem, &batch_label, dbg) {
             Ok(run) => {
-                print!("{}", run.report);
+                aipl::codegen::add_failure_report(&run.report);
                 let mut failed = run.failed;
                 let mut total = run.total;
                 // A leak fails the file as a test of its own would, named like one:
@@ -411,10 +411,10 @@ fn check_file(
                     } else {
                         format!("{batch_label}::")
                     };
-                    println!(
-                        "test {at}performance blocks ... FAIL\n  leak: {} of {allocated} allocations were never freed ({freed} deallocations)",
+                    aipl::codegen::add_failure_report(&format!(
+                        "test {at}performance blocks ... FAIL\n  leak: {} of {allocated} allocations were never freed ({freed} deallocations)\n",
                         allocated.abs_diff(freed)
-                    );
+                    ));
                     total += 1;
                     failed += 1;
                 }
@@ -772,6 +772,8 @@ fn check_cmd(args: &[String]) -> ExitCode {
                 } else {
                     checked.sections
                 };
+                print_test_rows(label, &aipl::codegen::take_test_records());
+                print_test_failures();
                 if checked.ran_tests {
                     let (total, passed, failed) = aipl::codegen::test_totals();
                     println!("{total} tests: {passed} passed, {failed} failed");
@@ -814,6 +816,7 @@ fn check_cmd(args: &[String]) -> ExitCode {
         }
         aipl::codegen::set_test_file(Some(label));
         let outcome = check_resolved(path, label, &project_root, validate_sections, dbg);
+        print_test_rows(label, &aipl::codegen::take_test_records());
         match outcome {
             Ok(checked) => {
                 if let Some(report) = &checked.traces {
@@ -838,6 +841,7 @@ fn check_cmd(args: &[String]) -> ExitCode {
     }
     aipl::codegen::set_test_file(None);
 
+    print_test_failures();
     let (total, passed, failed) = aipl::codegen::test_totals();
     let n = files.len();
     let files_word = if n == 1 { "file" } else { "files" };
@@ -882,6 +886,66 @@ fn check_cmd(args: &[String]) -> ExitCode {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
+    }
+}
+
+/// "3 assertions passed", "1 assertion passed".
+fn assertions_passed(n: u64) -> String {
+    format!("{n} assertion{} passed", if n == 1 { "" } else { "s" })
+}
+
+/// What a test (or the standalone tests together) came to: the assertions that
+/// held, and — only when there are some — the ones that did not. A test that
+/// failed with no assertion failing, by a `?` that propagated an error, says so.
+fn tally(passed: u64, failed: u64, test_failed: bool) -> String {
+    let mut out = assertions_passed(passed);
+    if failed > 0 {
+        out.push_str(&format!(", {failed} failed"));
+    } else if test_failed {
+        out.push_str(", test failed");
+    }
+    out
+}
+
+/// A file's tests as rows under its name: each tested function with its
+/// assertion tally, and one row for the top-level `test({ .. })` blocks together.
+/// A file with no tests has no rows and no heading.
+fn print_test_rows(label: &str, records: &[aipl::codegen::TestRecord]) {
+    if records.is_empty() {
+        return;
+    }
+    println!("{label}:");
+    for record in records.iter().filter(|r| !r.is_standalone()) {
+        println!(
+            "    {}: {}",
+            record.name,
+            tally(
+                record.assertions_passed,
+                record.assertions_failed,
+                record.failed
+            )
+        );
+    }
+    let standalone: Vec<_> = records.iter().filter(|r| r.is_standalone()).collect();
+    if !standalone.is_empty() {
+        println!(
+            "    standalone tests: {}",
+            tally(
+                standalone.iter().map(|r| r.assertions_passed).sum(),
+                standalone.iter().map(|r| r.assertions_failed).sum(),
+                standalone.iter().any(|r| r.failed),
+            )
+        );
+    }
+}
+
+/// What the failing tests said, under one heading after every line about the
+/// tests that passed. Nothing when none failed.
+fn print_test_failures() {
+    let report = aipl::codegen::take_failure_report();
+    if !report.is_empty() {
+        println!("test failures:");
+        print!("{report}");
     }
 }
 

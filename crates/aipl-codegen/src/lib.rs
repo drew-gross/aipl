@@ -972,6 +972,15 @@ static TEST_HEADER_PRINTED: AtomicBool = AtomicBool::new(false);
 /// So the name is materialized at `test_begin` instead of read back at report
 /// time.
 static TEST_CUR_NAME: Mutex<Option<String>> = Mutex::new(None);
+/// The running test's assertion tallies, reset at `test_begin`.
+static TEST_CUR_ASSERTS_PASSED: AtomicI64 = AtomicI64::new(0);
+static TEST_CUR_ASSERTS_FAILED: AtomicI64 = AtomicI64::new(0);
+/// One record per finished test, kept until [`take_test_records`] hands them over.
+static TEST_RECORDS: Mutex<Vec<TestRecord>> = Mutex::new(Vec::new());
+/// Everything the failing tests said, in the order they said it. Held rather than
+/// printed so the caller can put it after the lines about the tests that passed,
+/// where nobody has to scroll past them to find it.
+static TEST_FAILURE_REPORT: Mutex<String> = Mutex::new(String::new());
 static TEST_TOTAL: AtomicI64 = AtomicI64::new(0);
 static TEST_PASSED: AtomicI64 = AtomicI64::new(0);
 static TEST_FAILED: AtomicI64 = AtomicI64::new(0);
@@ -1028,6 +1037,65 @@ pub fn add_test_totals(total: i64, failed: i64) {
     TEST_PASSED.fetch_add(total - failed, TestOrd::Relaxed);
 }
 
+/// What running one test came to: how many of its assertions held and how many
+/// did not, and whether the test as a whole failed (an assertion, or a `?` that
+/// propagated an error).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TestRecord {
+    /// The file it ran in, in batch mode (see [`set_test_file`]).
+    pub file: Option<String>,
+    /// The function the test is attached to, or `line N` for a top-level
+    /// `test({ .. })` (see [`TestRecord::is_standalone`]).
+    pub name: String,
+    pub assertions_passed: u64,
+    pub assertions_failed: u64,
+    pub failed: bool,
+}
+
+/// What a top-level `test({ .. })` is called in a report: `line N`. A function name
+/// has no space, so nothing attached to a function can be mistaken for one.
+const STANDALONE_TEST_LABEL: &str = "line ";
+
+impl TestRecord {
+    /// Whether this is a top-level `test({ .. })`, which is attached to no
+    /// function.
+    pub fn is_standalone(&self) -> bool {
+        self.name.starts_with(STANDALONE_TEST_LABEL)
+    }
+}
+
+/// Hand over the records of every test that has finished since the last call.
+pub fn take_test_records() -> Vec<TestRecord> {
+    std::mem::take(&mut *TEST_RECORDS.lock().unwrap_or_else(|e| e.into_inner()))
+}
+
+/// Hand over what the failing tests have said since the last call.
+pub fn take_failure_report() -> String {
+    std::mem::take(
+        &mut *TEST_FAILURE_REPORT
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()),
+    )
+}
+
+/// Add to the failure report text produced elsewhere, such as a `.performance`
+/// run's, which happens in another process.
+pub fn add_failure_report(text: &str) {
+    TEST_FAILURE_REPORT
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .push_str(text);
+}
+
+/// One line of the failure report.
+fn report_line(line: &str) {
+    let mut report = TEST_FAILURE_REPORT
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    report.push_str(line);
+    report.push('\n');
+}
+
 /// Print the `test <name> ... FAIL` header once per failing test, qualified by
 /// the current file in batch mode. Shared by every failure path below so the
 /// header appears exactly once no matter which of them reports first.
@@ -1038,8 +1106,8 @@ fn print_fail_header() {
     let held = TEST_CUR_NAME.lock().unwrap_or_else(|e| e.into_inner());
     let name = held.as_deref().unwrap_or("<unknown>");
     match &*TEST_CUR_FILE.lock().unwrap_or_else(|e| e.into_inner()) {
-        Some(file) => println!("test {file}::{name} ... FAIL"),
-        None => println!("test {name} ... FAIL"),
+        Some(file) => report_line(&format!("test {file}::{name} ... FAIL")),
+        None => report_line(&format!("test {name} ... FAIL")),
     }
 }
 
@@ -1049,7 +1117,7 @@ fn print_fail_header() {
 #[no_mangle]
 extern "C" fn aipl_test_fail_none() {
     print_fail_header();
-    println!("  `?` propagated a `none`");
+    report_line("  `?` propagated a `none`");
     TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
 }
 
@@ -1068,6 +1136,8 @@ extern "C" fn aipl_test_begin(name: *const str24::Str) {
     *TEST_CUR_NAME.lock().unwrap_or_else(|e| e.into_inner()) = Some(wide_text(name));
     TEST_CUR_FAILED.store(false, TestOrd::Relaxed);
     TEST_HEADER_PRINTED.store(false, TestOrd::Relaxed);
+    TEST_CUR_ASSERTS_PASSED.store(0, TestOrd::Relaxed);
+    TEST_CUR_ASSERTS_FAILED.store(0, TestOrd::Relaxed);
 }
 
 /// [`aipl_assert`] under the wide ABI.
@@ -1075,8 +1145,11 @@ extern "C" fn aipl_test_begin(name: *const str24::Str) {
 extern "C" fn aipl_assert(cond: i64, loc: *const str24::Str) {
     if cond == 0 {
         print_fail_header();
-        println!("  assert failed at {}", wide_text(loc));
+        report_line(&format!("  assert failed at {}", wide_text(loc)));
         TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
+        TEST_CUR_ASSERTS_FAILED.fetch_add(1, TestOrd::Relaxed);
+    } else {
+        TEST_CUR_ASSERTS_PASSED.fetch_add(1, TestOrd::Relaxed);
     }
 }
 
@@ -1084,14 +1157,32 @@ extern "C" fn aipl_assert(cond: i64, loc: *const str24::Str) {
 #[no_mangle]
 extern "C" fn aipl_test_fail(msg: *const str24::Str) {
     print_fail_header();
-    println!("  `?` propagated an error: {}", wide_text(msg));
+    report_line(&format!("  `?` propagated an error: {}", wide_text(msg)));
     TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
 }
 
 #[no_mangle]
 extern "C" fn aipl_test_end() {
     TEST_TOTAL.fetch_add(1, TestOrd::Relaxed);
-    if TEST_CUR_FAILED.load(TestOrd::Relaxed) {
+    let failed = TEST_CUR_FAILED.load(TestOrd::Relaxed);
+    TEST_RECORDS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .push(TestRecord {
+            file: TEST_CUR_FILE
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone(),
+            name: TEST_CUR_NAME
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone()
+                .unwrap_or_default(),
+            assertions_passed: TEST_CUR_ASSERTS_PASSED.load(TestOrd::Relaxed) as u64,
+            assertions_failed: TEST_CUR_ASSERTS_FAILED.load(TestOrd::Relaxed) as u64,
+            failed,
+        });
+    if failed {
         TEST_FAILED.fetch_add(1, TestOrd::Relaxed);
     } else {
         TEST_PASSED.fetch_add(1, TestOrd::Relaxed);
@@ -1573,7 +1664,7 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
                 // attribute that holds it, not as the function standing in for it.
                 let reported = match (aipl_syntax::performance_source_name(&f.name), unattached) {
                     (Some(owner), _) => format!("{owner}.performance"),
-                    (None, Some(line)) => format!("line {line}"),
+                    (None, Some(line)) => format!("{STANDALONE_TEST_LABEL}{line}"),
                     (None, None) => f.name.text.clone(),
                 };
                 tests.push((reported, test_fn));

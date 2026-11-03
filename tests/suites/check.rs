@@ -78,7 +78,11 @@ fn bare_check_runs_every_file_under_the_working_directory() {
         &[],
     );
     // Both files' tests ran, counted into one aggregate.
-    assert_eq!(stdout, "2 files, 2 tests: 2 passed, 0 failed\n");
+    assert_eq!(
+        stdout,
+        "./a.aipl:\n    a: 1 assertion passed\n./sub/b.aipl:\n    a: 1 assertion passed\n\
+         2 files, 2 tests: 2 passed, 0 failed\n"
+    );
     assert_eq!(code, 0);
 }
 
@@ -191,7 +195,11 @@ fn a_test_cannot_let_an_effect_escape() {
     let (stdout, stderr, code) = check_here("test_shimmed_effect", shimmed);
     assert_eq!(
         (stdout.as_str(), stderr.as_str(), code),
-        ("1 tests: 1 passed, 0 failed\n", "", 0)
+        (
+            "test_shimmed_effect.aipl:\n    greet: 0 assertions passed\n1 tests: 1 passed, 0 failed\n",
+            "",
+            0
+        )
     );
 }
 
@@ -223,7 +231,12 @@ fn one_files_cached_constants_do_not_reach_the_next() {
     );
     assert_eq!(
         (stdout.as_str(), stderr.as_str(), code),
-        ("2 files, 2 tests: 2 passed, 0 failed\n", "", 0)
+        (
+            "a.aipl:\n    save: 2 assertions passed\nb.aipl:\n    names: 1 assertion passed\n\
+             2 files, 2 tests: 2 passed, 0 failed\n",
+            "",
+            0
+        )
     );
 }
 
@@ -236,8 +249,29 @@ fn a_top_level_test_block_runs_and_is_reported_by_its_line() {
     let (stdout, stderr, code) = check_here("top_level_test_blocks", src);
     assert_eq!(
         stdout,
-        "test line 7 ... FAIL\n  assert failed at top_level_test_blocks.aipl:8 1 == 2\n\
+        "top_level_test_blocks.aipl:\n    standalone tests: 1 assertion passed, 1 failed\n\
+         test failures:\ntest line 7 ... FAIL\n  assert failed at top_level_test_blocks.aipl:8 1 == 2\n\
          2 tests: 1 passed, 1 failed\n"
+    );
+    assert_eq!((stderr.as_str(), code), ("", 1));
+}
+
+/// Failures are gathered at the bottom, so nobody scrolls past the passing files to
+/// find them: a failing file that comes first still reports after the one that
+/// passes.
+#[test]
+fn failures_come_after_every_file_that_passed() {
+    let (stdout, stderr, code) = check_tree(
+        "failures_last",
+        &[("a_fails.aipl", FAILS), ("b_passes.aipl", PASSES)],
+        &[],
+    );
+    assert_eq!(
+        stdout,
+        "./a_fails.aipl:\n    b: 0 assertions passed, 1 failed\n\
+         ./b_passes.aipl:\n    a: 1 assertion passed\n\
+         test failures:\ntest ./a_fails.aipl::b ... FAIL\n  assert failed at a_fails.aipl:4 b() == 6\n\
+         2 files, 2 tests: 1 passed, 1 failed\n"
     );
     assert_eq!((stderr.as_str(), code), ("", 1));
 }
@@ -251,7 +285,10 @@ const UNFORMATTED: &str = "import { equal as ==} from builtins;\n\
 fn an_unformatted_file_fails_even_when_its_tests_pass() {
     let (stdout, stderr, code) = check_here("unformatted", UNFORMATTED);
     // The tests still ran — formatting is reported alongside them, not instead.
-    assert_eq!(stdout, "1 tests: 1 passed, 0 failed\n");
+    assert_eq!(
+        stdout,
+        "unformatted.aipl:\n    a: 1 assertion passed\n1 tests: 1 passed, 0 failed\n"
+    );
     // And the diagnostic names the command that fixes it.
     assert_eq!(
         stderr,
@@ -332,7 +369,10 @@ fn discovery_skips_hidden_directories_and_target() {
         ],
         &[],
     );
-    assert_eq!(stdout, "1 file, 1 tests: 1 passed, 0 failed\n");
+    assert_eq!(
+        stdout,
+        "./a.aipl:\n    a: 1 assertion passed\n1 file, 1 tests: 1 passed, 0 failed\n"
+    );
     assert_eq!(code, 0);
 }
 
@@ -344,7 +384,10 @@ fn a_directory_argument_checks_the_tree_under_it() {
         &["sub"],
     );
     // Only the named subtree runs — the failing file outside it is untouched.
-    assert_eq!(stdout, "1 file, 1 tests: 1 passed, 0 failed\n");
+    assert_eq!(
+        stdout,
+        "sub/a.aipl:\n    a: 1 assertion passed\n1 file, 1 tests: 1 passed, 0 failed\n"
+    );
     assert_eq!(code, 0);
 }
 
@@ -359,7 +402,11 @@ fn several_explicit_paths_are_checked_as_one_batch() {
         ],
         &["a.aipl", "b.aipl"],
     );
-    assert_eq!(stdout, "2 files, 2 tests: 2 passed, 0 failed\n");
+    assert_eq!(
+        stdout,
+        "a.aipl:\n    a: 1 assertion passed\nb.aipl:\n    a: 1 assertion passed\n\
+         2 files, 2 tests: 2 passed, 0 failed\n"
+    );
     assert_eq!(code, 0);
 }
 
@@ -393,8 +440,14 @@ fn all_tests_pass_is_silent_and_exit_zero() {
          fn a() -> i64 { 1 }.test({\n    assert(a() == 1);\n})\n\n\
          fn b() -> i64 { 2 }.test({\n    assert(b() == 2);\n    assert(b() > 0);\n})\n",
     );
-    // Passing tests print nothing; only the summary.
-    assert_eq!(stdout, "2 tests: 2 passed, 0 failed\n");
+    // Passing tests are listed under their file, with how many assertions held. (The
+    // file is named by the absolute path it was staged at.)
+    let (file, rows) = stdout.split_once(":\n").expect("a file heading");
+    assert!(file.ends_with("all_pass.aipl"), "got {file:?}");
+    assert_eq!(
+        rows,
+        "    a: 1 assertion passed\n    b: 2 assertions passed\n2 tests: 2 passed, 0 failed\n"
+    );
     assert_eq!(code, 0);
 }
 
@@ -866,7 +919,11 @@ fn companions_are_staged_for_the_tests_too() {
     let (stdout, stderr, code) = check_here("sections_companion_tests", src);
     assert_eq!(
         (stdout.as_str(), stderr.as_str(), code),
-        ("1 tests: 1 passed, 0 failed\n", "", 0)
+        (
+            "sections_companion_tests.aipl:\n    f: 1 assertion passed\n1 tests: 1 passed, 0 failed\n",
+            "",
+            0
+        )
     );
 }
 
@@ -880,6 +937,9 @@ fn a_mismatched_section_does_not_hide_a_failing_test() {
     assert_eq!(
         stdout,
         "\
+sections_with_failing_test.aipl:
+    f: 0 assertions passed, 1 failed
+test failures:
 test f ... FAIL
   assert failed at sections_with_failing_test.aipl:4 f() == 2
 1 tests: 0 passed, 1 failed
@@ -1099,6 +1159,7 @@ fn a_performance_claim_that_does_not_hold_fails_the_check() {
     assert_eq!(
         stdout,
         "\
+test failures:
 test work.performance ... FAIL
   assert failed at performance_fails.aipl:4 measure(\"scalar\", 3, |n| n).instructions == 0
 1 tests: 0 passed, 1 failed
@@ -1115,10 +1176,15 @@ fn performance_and_ordinary_tests_share_one_summary_and_a_failure_of_either_fail
                fn two() -> i64 { 2 }.test({\n    assert(two() == 3);\n})\n";
     let (stdout, stderr, code) = check_here("performance_summary", src);
     // Three tests — `one`, `one.performance`, `two` — and the one that fails is
-    // the ordinary one; the performance block passes silently.
+    // the ordinary one. A performance block runs in another process, so it is
+    // counted but has no row of its own.
     assert_eq!(
         stdout,
         "\
+performance_summary.aipl:
+    one: 1 assertion passed
+    two: 0 assertions passed, 1 failed
+test failures:
 test two ... FAIL
   assert failed at performance_summary.aipl:10 two() == 3
 3 tests: 2 passed, 1 failed
@@ -1147,6 +1213,7 @@ fn a_performance_failure_in_a_batch_names_its_file_and_does_not_stop_the_run() {
     assert_eq!(
         stdout,
         "\
+test failures:
 test ./a_fails.aipl::work.performance ... FAIL
   assert failed at a_fails.aipl:4 measure(\"scalar\", 3, |n| n).instructions == 0
 2 files, 2 tests: 1 passed, 1 failed
@@ -1321,6 +1388,7 @@ fn a_performance_block_that_leaks_fails_the_file_like_a_failing_test() {
         run(&[("AIPL_INJECT_LEAK", "1")]),
         (
             "\
+test failures:
 test performance blocks ... FAIL
   leak: 1 of 1 allocations were never freed (0 deallocations)
 2 tests: 1 passed, 1 failed
@@ -1476,9 +1544,12 @@ fn fix_does_not_hide_a_failing_test() {
     assert_eq!(
         stdout,
         "\
+fixed t.aipl: stdout
+t.aipl:
+    f: 0 assertions passed, 1 failed
+test failures:
 test f ... FAIL
   assert failed at t.aipl:4 f() == 2
-fixed t.aipl: stdout
 1 tests: 0 passed, 1 failed
 "
     );

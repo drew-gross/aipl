@@ -16,6 +16,10 @@ fn answer() -> i64 { 41 }.test({
 
 fn main() {}
 --- check ---
+/Users/drewgross/Projects/aipl/tests/cases/tests/failing_test.aipl:
+    one: 1 assertion passed
+    answer: 0 assertions passed, 2 failed
+test failures:
 test answer ... FAIL
   assert failed at tests/cases/tests/failing_test.aipl:13 answer() == 42
   assert failed at tests/cases/tests/failing_test.aipl:14 answer() > 100

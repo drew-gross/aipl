@@ -18,6 +18,8 @@ fn bump(v: i64) -> i64 { trace(v + 2) }.test({
 })
 --- check ---
 tests/cases/debug/trace_fails_check.aipl:16 v + 2 = 7
+/Users/drewgross/Projects/aipl/tests/cases/debug/trace_fails_check.aipl:
+    bump: 1 assertion passed
 1 tests: 1 passed, 0 failed
 --- check exit code ---
 1

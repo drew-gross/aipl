@@ -21,4 +21,7 @@ fn triple(x: i64) -> i64 { x * 3 }.test({
 
 fn main() {}
 --- check ---
+/Users/drewgross/Projects/aipl/tests/cases/tests/all_tests_in_file_run.aipl:
+    double: 2 assertions passed
+    triple: 2 assertions passed
 2 tests: 2 passed, 0 failed
