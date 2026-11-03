@@ -107,6 +107,7 @@ pub fn load_program_rooted(
 /// rather than read a second time from under the overlay.
 pub fn load_program_overlay(
     root: &Path,
+    project_root: Option<&Path>,
     source: &str,
     dbg: DebugOptions,
 ) -> Result<Program, Vec<Error>> {
@@ -115,6 +116,7 @@ pub fn load_program_overlay(
     let mut loader = Loader {
         dbg,
         entry: Some(root_canon.clone()),
+        project_root: project_root.and_then(|p| p.canonicalize().ok()),
         ..Loader::default()
     };
     loader.load_source(&root_canon, source)?;

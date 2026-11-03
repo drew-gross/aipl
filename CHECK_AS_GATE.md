@@ -59,6 +59,8 @@ Open (resolve in the phase noted):
       mechanism). Until then the rule is held by review and by the checklist below.
 - [x] D2 (Phase 3): importing a file that has sections is an **error** (done 2026-11-01).
 - [ ] D3 (Phase 1): what marks the project root so rooting does not depend on the cwd.
+      (Note, DESIGN_PRINCIPLES.md §7: a directory under `projects/` is its own project with its own root, not the repository's;
+      whatever marks a root has to find `projects/word_count`, not walk up to the repository. `aipl.build` sits at each project's root today.)
 - [x] D5 (Phase 2a): no shared capture helpers — each test writes its shim **inline** (decided
       2026-11-02). No builtin, no library file, no in-memory filesystem builtin; the shim pattern
       stays visible at the use, as in `tests/cases/effects/shim_closures.aipl`.
@@ -216,11 +218,13 @@ Checklist:
       none. The script verified with `check`, the handoff run (the harness) disagreed and found them. They are restored and can drop their
       `main` once `check` is the gate (Phase 5), or once the harness compiles every function:
       `arrays/spread/err_spread_in_call, builtins/err_span_without_import, builtins/err_use_without_import, effects/err_random_main, effects/err_shim_partial_coverage, effects/err_shim_signature_mismatch, effects/err_shim_undeclared_effect, effects/err_shim_unshimmable_effect, generics/err_explicit_type_args, generics/err_return_only_type_param, generics/errors/err_ord_bound_violation, generics/errors/err_type_param_conflict, integers/err_literal_out_of_range, kwargs/err_duplicate_kw, kwargs/err_kw_for_positional, kwargs/err_kw_passed_positionally, kwargs/err_positional_after_kw, kwargs/err_unknown_kw, lambdas/err_operator_value_not_imported, structs/errors/err_generic_cannot_infer, syntax/err_call_missing_comma, syntax/err_missing_semicolon_before_refusal, syntax/err_operator_starts_expr, syntax/err_unexpected_token_in_expr, variants/err_payload_kw_for_positional, variants/err_payload_unknown_kw.
-- [ ] **Revisit these 3 error fixtures**, where neither deleting nor renaming `main` keeps the errors, so the error is about `main` or about
-      something its presence changes: `structs/err_duplicate_struct`, `functions/err_functions`, `bindings/err_unknown_type_in_annotation`.
-      Find out why (is it a `main`-specific check, or an ordering effect between errors?) and either rewrite the fixture so it does not
-      depend on `main` or record why it must keep one. Three more files with `fn main` in an errors-only case were not recognised as having
-      one by the script (`strings/err_char_at_removed`, `builtins/err_import_conflicts_with_local`, `builtins/err_unknown_builtin`): check them too.
+- [x] The 3 error fixtures that seemed to depend on `main` did not (2026-11-03): the script's comparison was fooled twice. A loader error's
+      first line names the file (`error: ./err_duplicate_struct.aipl: ...`, rooted at the fixture's directory by the harness, an absolute
+      path from `check` at the repo root: the rooting gap G4 again), and a checker error names the function (`fn "main": ...`, which a
+      rename changes). `err_duplicate_struct` lost its `main`; `err_functions` and `err_unknown_type_in_annotation` had it renamed `subject`;
+      three more files whose `import ..; #[allow]` line made the script's splitter swallow the `main` after it
+      (`strings/err_char_at_removed`, `builtins/err_import_conflicts_with_local`, `builtins/err_unknown_builtin`) lost it too. The script
+      now ignores the file path and reads `subject` as `main` when comparing.
 - [ ] The 55 empty `main`s that carry sections other than `errors` (`check`, `report`, `.test` cases): the errors-only ones are done above.
 - [ ] Convert the 56 `main` + `.test` files (fold the prints into their tests).
 - [ ] Convert the 309 `stdout`-only programs, in the batches below (counts per `tests/cases/` directory; one
@@ -418,3 +422,9 @@ Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered
 - 2026-11-03: error fixtures' `main` removed or renamed (217 of 223), 3 left with a checklist item to revisit, 3 not matched by the script.
 - 2026-11-03: the harness found 26 of the error-fixture conversions wrong (a mono-phase error that only the harness's `main`-rooted compile reaches);
   restored. Lesson: verify a fixture change with the same compile path the gate uses, not just `check` (see the parity-gap item).
+- 2026-11-03: the last 6 error fixtures converted (see the item above); every errors-only fixture except the 26 parity-gap ones is done.
+- 2026-11-03: **Absolute paths were pinned into the repo** (my doing): the grouped `check` heading printed the path it was given, which the harness passed
+  absolute, so 6 `--- check ---` sections held `/Users/...`, and `check --fix` from the root wrote an absolute label into 2 loader-error headers
+  (the `errors` branch loaded without a project root). Fixed: the heading is root-relative, `load_program_overlay` takes the root, the harness runs
+  `check` from the root with a relative path. DESIGN_PRINCIPLES.md §7 states the rule; `fmt::no_pinned_file_names_a_path_on_one_machine` enforces it.
+  Remaining: the harness roots each case at its own directory (G4), so a loader error header and its caret block use two roots.

@@ -33,7 +33,7 @@ fn triple(n: i64) -> i64 { n + n + n }.test({
 
 fn main() {}
 --- check ---
-/Users/drewgross/Projects/aipl/tests/cases/tests/fn_in_test.aipl:
+tests/cases/tests/fn_in_test.aipl:
     double: 6 assertions passed
     triple: 1 assertion passed
 2 tests: 2 passed, 0 failed

@@ -12,7 +12,7 @@ fn answer() -> i64 { 41 }.test({
 
 fn main() {}
 --- check ---
-/Users/drewgross/Projects/aipl/tests/cases/benchmark/block_failure.aipl:
+tests/cases/benchmark/block_failure.aipl:
     answer: 1 assertion passed
 test failures:
 test answer.benchmark ... FAIL

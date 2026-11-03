@@ -69,7 +69,7 @@ fn bind_void_result() !prints -> i64 {
 fn unit_used_as_value() !prints -> i64 { print("hi") + 1 }
 
 // A void `main` (the default) with a trailing value.
-fn main() { 5 }
+fn subject() { 5 }
 --- errors ---
 error: fn "add" expects 2 arg(s), got 1
   --> ./tests/cases/functions/err_functions.aipl:18:30
@@ -155,8 +155,8 @@ error: arithmetic operand: expected i64, got ()
 69 | fn unit_used_as_value() !prints -> i64 { print("hi") + 1 }
    |                                          ^^^^^^^^^^^
 
-error: fn "main": body returns i64, but the declared return type is ()
-  --> ./tests/cases/functions/err_functions.aipl:72:13
+error: fn "subject": body returns i64, but the declared return type is ()
+  --> ./tests/cases/functions/err_functions.aipl:72:16
    |
-72 | fn main() { 5 }
-   |             ^
+72 | fn subject() { 5 }
+   |                ^

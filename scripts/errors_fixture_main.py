@@ -10,9 +10,13 @@ import os,re,subprocess,sys,shutil
 sys.path.insert(0,os.path.dirname(__file__))
 import lint_fixtures_to_tests as L
 AIPL=os.path.abspath('target/debug/aipl')
-def errors_of(text):
+def errors_of(text,renamed=False):
+    """The `error:` lines of a file's errors section, with what a rename or the rooting changes
+    left out: the file path a loader error names, and `subject` read as `main`."""
     m=re.search(r'^--- ',text,re.M)
-    return re.findall(r'^error: .*$',text[m.start():],re.M) if m else []
+    lines=re.findall(r'^error: .*$',text[m.start():],re.M) if m else []
+    lines=[re.sub(r'^error: \S+\.aipl: ','error: <file>: ',l) for l in lines]
+    return [l.replace('"subject"','"main"') for l in lines] if renamed else lines
 def fixed(path,text):
     open(path,'w').write(text)
     subprocess.run([AIPL,'check','--fix',path],capture_output=True,text=True)
@@ -26,13 +30,14 @@ def convert(path):
     mains=[it for it in L.split_items(head) if it[1]=='fn' and re.match(r'(pub )?fn main\b',it[2])]
     if not mains: return 'skipped (no main)'
     want=errors_of(original)
+    if 'main' in ' '.join(want): pass
     deleted=head.replace(mains[0][2]+'\n','',1)
     candidates=[('deleted',deleted)]
     if not re.search(r'\bsubject\b',head):
         candidates.append(('renamed',re.sub(r'^(pub )?fn main\(','fn subject(',head,count=1,flags=re.M)))
     for how,new_head in candidates:
         after=fixed(path,new_head+tail)
-        if errors_of(after)==want:
+        if errors_of(after,renamed=(how=='renamed'))==want:
             return how
     open(path,'w').write(original)
     return 'skipped (errors change either way)'

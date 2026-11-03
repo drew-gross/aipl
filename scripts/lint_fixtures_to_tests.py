@@ -107,7 +107,7 @@ def split_items(text):
             i += 1
             if kind in ("fn", "struct") and seen_open and depth == 0:
                 break
-            if kind in ("let", "import") and lines[i - 1].rstrip().endswith(";"):
+            if kind in ("let", "import") and re.search(r";\s*(#\[allow\])?\s*$", lines[i - 1]):
                 break
             if kind == "variant" and depth == 0 and not lines[i - 1].rstrip().endswith("="):
                 nxt = lines[i] if i < len(lines) else ""

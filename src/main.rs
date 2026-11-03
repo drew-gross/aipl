@@ -361,8 +361,9 @@ fn check_file(
         // Loaded from the text the section was recorded against (`spec.source`),
         // not whatever the loader would cut from the file, so an end-of-file
         // diagnostic sits where it did when the section was written.
-        let compiled = loader::load_program_overlay(&staged.entry, &spec.source, dbg)
-            .and_then(|program| Compilation::new(&program, dbg).map(|_| ()));
+        let compiled =
+            loader::load_program_overlay(&staged.entry, Some(&staged.root), &spec.source, dbg)
+                .and_then(|program| Compilation::new(&program, dbg).map(|_| ()));
         let mut found = sections::conflicts(spec);
         found.extend(sections::errors(spec, compiled, section_label));
         return Ok(Checked {
@@ -736,15 +737,24 @@ fn check_cmd(args: &[String]) -> ExitCode {
     // discovered labels are relative to, and so what a `trace(..)` names its
     // file against (see `check_file`).
     let project_root = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    // Canonical, so it shares a spelling with the canonical paths it is stripped from.
+    let project_root_canonical =
+        std::fs::canonicalize(&project_root).unwrap_or_else(|_| project_root.clone());
 
     // Resolve up front: the tests below run from a scratch directory, so a
     // relative path would no longer find its file. Diagnostics keep naming the
-    // path as discovery found it.
+    // path as discovery found it — except an absolute one under the project root, which
+    // is named relative to it: output that names a place on this machine is output nobody
+    // else can reproduce.
     let resolved: Vec<(PathBuf, String)> = files
         .iter()
         .map(|f| {
             let abs = std::fs::canonicalize(f).unwrap_or_else(|_| f.clone());
-            (abs, f.display().to_string())
+            let label = match (f.is_absolute(), abs.strip_prefix(&project_root_canonical)) {
+                (true, Ok(rel)) => rel.display().to_string(),
+                _ => f.display().to_string(),
+            };
+            (abs, label)
         })
         .collect();
 

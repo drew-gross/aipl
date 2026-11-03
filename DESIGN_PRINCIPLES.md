@@ -633,3 +633,69 @@ test to it; if a *helper* would make the subject a function, define the helper.
   treats it as test code already, but the function is never part of the program
   `run` and `build` compile, and no source name can spell it.
 
+---
+
+## 7. Paths are relative to the project root
+
+**Anything the toolchain prints or records that names a file names it relative to the project
+root, never by a path on the machine it ran on.** `./tests/cases/strings/slice.aipl:12`, not
+`/Users/someone/work/aipl/tests/cases/strings/slice.aipl:12`.
+
+Three things depend on it:
+
+- **Reproducibility.** Output that is pinned in the repository (an `--- errors ---` or
+  `--- check ---` section, a `--- report ---`, a baked `assert` or `trace` location) is compared on
+  every checkout. A pinned path from one person's home directory passes where it was recorded and
+  fails everywhere else, and nothing about the failure says why.
+- **Navigation.** A person at the project root can cmd+click a root-relative path in a terminal and
+  land on the file. A path relative to some scratch directory, or an absolute one, only sometimes
+  works.
+- **Reading.** `./sub/lib.aipl` says which file of that name; the first half of an absolute path is
+  noise to everyone who is not its owner.
+
+### Downstream decisions
+
+- **A diagnostic's file label is root-relative** (`./path`), including the one a loader error opens
+  with, the heading `aipl check` prints over a file's tests, and the location baked into an `assert`.
+- **A tool that runs somewhere else is told the root.** `check` stages a file's companions in a
+  scratch directory and runs the tests there; it passes the project root along so nothing it prints
+  names the scratch directory (`load_program_rooted`, and `load_program_overlay`'s `project_root`).
+- **A caller passes the root-relative path.** The cases harness runs `check` from the project root
+  with the case named relative to it. An absolute path given on the command line is shown relative
+  to the root when it lies under it.
+- **It is a test, not a habit.** `fmt::no_pinned_file_names_a_path_on_one_machine` fails when a
+  checked-in file holds a home or temporary directory, so a recorded section that leaked one is found
+  by the next run, not by the next person to clone.
+
+### The project root is not the repository root
+
+"The project root" means the root of *the project being worked on*, which is the directory its
+tools run from. For the compiler's own corpus (`tests/cases/`, `crates/`, `examples/`) that is the
+root of this repository, so a label reads `./tests/cases/strings/slice.aipl`.
+
+Each directory under `projects/` is a different project. It is standalone (`projects/README.md`):
+it carries its own compiler, is run from inside its own directory, and "can be copied out to its own
+repository and will keep working, unchanged." So **its root is that directory, not the repository's.**
+Inside `projects/word_count`, `./aipl check` labels its files `./main.aipl`, not
+`./projects/word_count/main.aipl`, because that is the path a user of that project would see and
+could cmd+click, and it is the path that stays true when the project is copied out. The harness
+runs these checks with the project as the working directory for the same reason
+(`projects::projects_pass_their_own_check`).
+
+So the repository root appears in a path only when the thing being checked is the repository's own
+corpus. Anything pinned inside a project, whether a section in one of its files or output a test
+captures from running it, is relative to the project, and the repository around it is invisible.
+Code that works out a root must not assume it is the repository's (the test that rejects paths
+from one machine scans `projects/` as well, but a project-relative path is what belongs there).
+
+### What it does not mean
+
+A file outside the root keeps its full path, since nothing shorter identifies it. That is the one
+case where an absolute path is the honest answer, and no pinned output should depend on it.
+
+It does not yet hold everywhere: the cases harness still roots each *case* at its own directory, so a
+loader error opens with `./err_duplicate_struct.aipl` while the caret block below it says
+`./tests/cases/structs/err_duplicate_struct.aipl`. Both are relative and neither names a machine, but
+they are two roots in one message. Rooting the harness at the project root removes the second one
+(`CHECK_AS_GATE.md`, gap 4).
+

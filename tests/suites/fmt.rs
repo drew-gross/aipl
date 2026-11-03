@@ -50,6 +50,37 @@ fn enforced_files() -> Vec<PathBuf> {
     files
 }
 
+/// No checked-in AIPL file names a place on one machine (DESIGN_PRINCIPLES.md, "Paths are
+/// relative to the project root"). A pinned `--- errors ---` or `--- check ---` section that
+/// holds `/Users/someone/...` passes where it was recorded and fails on every other checkout.
+/// A fixture that needs to show an absolute path writes one that is plainly not real.
+#[test]
+fn no_pinned_file_names_a_path_on_one_machine() {
+    // Where a home directory or a temporary directory begins on the systems this runs on.
+    const MACHINE_PATHS: [&str; 5] = [
+        "/Users/",
+        "/home/",
+        "/private/var/",
+        "/var/folders/",
+        ":\\Users\\",
+    ];
+    let mut offenders: Vec<String> = Vec::new();
+    for path in enforced_files() {
+        let text = std::fs::read_to_string(&path).unwrap();
+        for (n, line) in text.lines().enumerate() {
+            if MACHINE_PATHS.iter().any(|p| line.contains(p)) {
+                offenders.push(format!("{}:{}: {}", path.display(), n + 1, line.trim()));
+            }
+        }
+    }
+    assert!(
+        offenders.is_empty(),
+        "{} line(s) name a path on one machine; output is rendered relative to the project root:\n{}",
+        offenders.len(),
+        offenders.join("\n")
+    );
+}
+
 /// Every checked-in `.aipl` file (outside the formatter's own fixtures) must
 /// already be in canonical format — this is what keeps the corpus, and any new
 /// file, formatted. A file that doesn't parse (a parse-error fixture) can't be

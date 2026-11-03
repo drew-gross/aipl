@@ -1805,13 +1805,18 @@ fn run_success_case(
     // those sections from the unstripped source. That keeps one staging
     // implementation — `check`'s — rather than a second one here.
     if let Some(plan) = check_plan(spec) {
+        // Run from the project root with the case named relative to it, the way a person at
+        // the root runs it: `check` prints the file's name, and a `--- check ---` section
+        // that pinned this machine's path would fail on every other checkout.
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let output = match Command::new(env!("CARGO_BIN_EXE_aipl"))
+            .current_dir(root)
             .arg("check")
             // The harness validates the sections itself (and, in fill mode,
             // against the file as it was before this run rewrites it), so this
             // run is for the `.test` blocks alone.
             .arg("--ignore-sections")
-            .arg(orig_path)
+            .arg(orig_path.strip_prefix(root).unwrap_or(orig_path))
             .output()
         {
             Ok(o) => o,

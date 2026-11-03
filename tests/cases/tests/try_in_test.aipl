@@ -47,7 +47,7 @@ fn hits_none() -> i64 { 0 }.test({
 
 fn main() {}
 --- check ---
-/Users/drewgross/Projects/aipl/tests/cases/tests/try_in_test.aipl:
+tests/cases/tests/try_in_test.aipl:
     all_ok: 1 assertion passed
     hits_err: 0 assertions passed, test failed
     all_some: 2 assertions passed
