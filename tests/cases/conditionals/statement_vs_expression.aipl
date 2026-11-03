@@ -26,53 +26,7 @@ fn fixed_monotonic() -> u64 { 7 }
 
 fn reads() !clock -> u64 { now_nanos() }
 
-fn scenario() !prints {
-    // Statement: the value is discarded, so the branches may drive the
-    // surrounding `mut` bindings — and the `if` ends with `;`.
-    mut ticks = 0;
-    mut last = "";
-    for (let c : "aba") {
-        if (c == 'a') {
-            set ticks++;
-        } else {
-            set last = "b";
-        };
-    }
-    print(ticks.to_str());
-    print(last);
-
-    // Expression: nothing outside is touched, but a branch may declare and
-    // drive its own `mut` to compute the value it yields.
-    let total = if (ticks == 2) {
-        mut n = 0;
-        for (let d : [1, 2, 3]) {
-            set n += d;
-        }
-        n
-    } else {
-        0
-    };
-    print(total.to_str());
-
-    // An `if let` branch may assign to the pattern's own binders: they are
-    // declared *by* the branch, not outside it.
-    let bumped = if (let some(x) = some(4)) {
-        mut v = x;
-        set v++;
-        v
-    } else {
-        0
-    };
-    print(bumped.to_str());
-
-    // A `shim` obeys the same rule. Installed for effect it is a statement, so
-    // its body may write the `mut` outside it.
-    mut stamp: u64 = 0;
-    shim clock { now_nanos = fixed_now, monotonic_now = fixed_monotonic } {
-        set stamp = reads();
-    };
-    print(stamp.to_str());
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -82,7 +36,51 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        // Statement: the value is discarded, so the branches may drive the
+        // surrounding `mut` bindings — and the `if` ends with `;`.
+        mut ticks = 0;
+        mut last = "";
+        for (let c : "aba") {
+            if (c == 'a') {
+                set ticks++;
+            } else {
+                set last = "b";
+            };
+        }
+        print(ticks.to_str());
+        print(last);
+
+        // Expression: nothing outside is touched, but a branch may declare and
+        // drive its own `mut` to compute the value it yields.
+        let total = if (ticks == 2) {
+            mut n = 0;
+            for (let d : [1, 2, 3]) {
+                set n += d;
+            }
+            n
+        } else {
+            0
+        };
+        print(total.to_str());
+
+        // An `if let` branch may assign to the pattern's own binders: they are
+        // declared *by* the branch, not outside it.
+        let bumped = if (let some(x) = some(4)) {
+            mut v = x;
+            set v++;
+            v
+        } else {
+            0
+        };
+        print(bumped.to_str());
+
+        // A `shim` obeys the same rule. Installed for effect it is a statement, so
+        // its body may write the `mut` outside it.
+        mut stamp: u64 = 0;
+        shim clock { now_nanos = fixed_now, monotonic_now = fixed_monotonic } {
+            set stamp = reads();
+        };
+        print(stamp.to_str());
     };
     assert(out == """
         2

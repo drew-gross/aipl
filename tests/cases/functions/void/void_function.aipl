@@ -9,10 +9,7 @@ fn banner(title: str) !prints {
     print("ready");
 }
 
-fn scenario() !prints {
-    banner("start");
-    banner("again");
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -22,7 +19,8 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        banner("start");
+        banner("again");
     };
     assert(out == """
         == start ==

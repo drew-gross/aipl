@@ -13,24 +13,7 @@ fn count<T: any>(self: T[], sep: T* = []) -> u64 { sep.len() }
 // its default is a string rather than an array.
 fn chars(self: char[], sep: char* = "") -> u64 { sep.len() }
 
-fn scenario() !prints {
-    // Omitted: the default applies.
-    print(to_str(count([1, 2])));
-    // Named: every variadic argument shape still works.
-    print(to_str(count([1, 2], sep=5)));
-    print(to_str(count([1, 2], sep=[5, 6])));
-    print(to_str(count([1, 2], sep=7)));
-    print(to_str(count([1, 2], sep=none)));
-
-    // The `str`/`char` ambiguity resolves from the *other* arguments, which are
-    // bound first precisely because a variadic's own argument can't settle it:
-    // with `T = str` a string is one element, with `T = char` it is the whole
-    // sequence.
-    print(to_str(count(["a"], sep="xy")));
-    print(to_str(chars(['a'], sep="xy")));
-    print(to_str(chars(['a'], sep='z')));
-    print(to_str(chars(['a'])));
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -40,7 +23,22 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        // Omitted: the default applies.
+        print(to_str(count([1, 2])));
+        // Named: every variadic argument shape still works.
+        print(to_str(count([1, 2], sep=5)));
+        print(to_str(count([1, 2], sep=[5, 6])));
+        print(to_str(count([1, 2], sep=7)));
+        print(to_str(count([1, 2], sep=none)));
+
+        // The `str`/`char` ambiguity resolves from the *other* arguments, which are
+        // bound first precisely because a variadic's own argument can't settle it:
+        // with `T = str` a string is one element, with `T = char` it is the whole
+        // sequence.
+        print(to_str(count(["a"], sep="xy")));
+        print(to_str(chars(['a'], sep="xy")));
+        print(to_str(chars(['a'], sep='z')));
+        print(to_str(chars(['a'])));
     };
     assert(out == """
         0

@@ -3,10 +3,7 @@
 
 import { equal as ==, print, to_str } from builtins;
 
-fn scenario() !prints {
-    let s = to_str('X');
-    print(to_str(if (s == "X") { 1 } else { 0 })); // 1
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -16,7 +13,8 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        let s = to_str('X');
+        print(to_str(if (s == "X") { 1 } else { 0 })); // 1
     };
     assert(out == "1\n");
 })

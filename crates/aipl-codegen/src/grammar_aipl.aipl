@@ -59,6 +59,7 @@ import {
     any,
     contains,
     count,
+    count_if,
     count_while,
     equal as ==,
     extend,
@@ -215,6 +216,7 @@ import {
     show_expr,
 } from "./expr.aipl";
 import { find_trailing_whitespace } from "./find_trailing_whitespace.aipl";
+import { is_unattached_test, unattached_test_name } from "./fn_names.aipl";
 import { format_cst, render_cst } from "./format.aipl";
 import {
     Build,
@@ -414,6 +416,8 @@ fn items() -> Production<AiplTok, Ast>[] {
         Many(Term(DocComment)),
         OneOf([
             Named("function"),
+            // `test({ .. })`: a test attached to no function.
+            Named("test_item"),
             Named("struct_decl"),
             // Before `variant_decl`: `variant W = V without C` opens the way a
             // one-case variant does, and only the `without` after the first
@@ -594,6 +598,13 @@ fn items() -> Production<AiplTok, Ast>[] {
         nest("(", OneOf([Named("test_block"), Term(StrLit)]), ")", strict()),
     ]);
 
+    // `test({ .. })` at the top level: a `.test` block with no function to hang
+    // from. Rare by design — a test on a function says what it covers.
+    let test_item: Rule<AiplTok> = Then([
+        Lit("test"),
+        nest("(", Named("test_block"), ")", strict()),
+    ]);
+
     // A `.test` block is a block that may also declare functions — helpers
     // private to the test — anywhere a statement could go. `fn` opens none of
     // the statement or expression forms, so the choice stays one token.
@@ -698,6 +709,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         p("fn_body", fn_body, TryMk(lower_fn_body)),
         pl("construct_fields", construct_fields, "a field", TryMk(lower_construct_fields)),
         p("fn_attr", fn_attr, TryMk(lower_fn_attr)),
+        p("test_item", test_item, TryMk(lower_test_item)),
         p("test_block", test_block, TryMk(lower_test_block)),
         p("test_body", test_body, TryMk(lower_test_body)),
         p("test_tail", test_tail, TryMk(lower_test_tail)),
@@ -3329,7 +3341,15 @@ fn lower_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # what the message says.
 fn lower_decl(src: str, decl: Ast, lines: Span[], sp: Span) -> Item!ParseError {
     let docs = doc_block(lines.map(|t| src[t]));
-    if (let AFunction(f) = decl) { return ok(ItemFn(Function { ..f, doc: docs })); };
+    if (let AFunction(f) = decl) {
+        if (f.name.text.is_unattached_test() && docs.is_some()) {
+            return err(ParseError {
+                message: "a `test` block documents nothing, so a `# ..` block directly above it has nothing to attach to — use `//` for a note about the test",
+                span: sp,
+            });
+        };
+        return ok(ItemFn(Function { ..f, doc: docs }));
+    };
     if (let AStruct(st) = decl) { return ok(ItemStruct(StructDecl { ..st, doc: docs })); };
     if (let AVariant(v) = decl) { return ok(ItemVariant(VariantDecl { ..v, doc: docs })); };
     if (let ARefinement(r) = decl) {
@@ -3900,6 +3920,30 @@ fn lower_test_tail(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 fn as_test_block(v: Ast, span: Span) -> TestBlock!ParseError {
     if (let ATestBlock(b) = v) { return ok(b); };
     err(wrong_kind("a test block", v, span))
+}
+
+# `test_item` — a top-level `test({ .. })`. It is lowered to a function with a
+# name made for it and an empty body, whose `.test` body is the block, which is
+# how the rest of the compiler already knows to run it.
+fn lower_test_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let TestBlock { fns, body } = as_test_block(kid(kids, 0, sp)?, sp)?;
+
+    // The node's span runs from the end of the previous item, so where the block
+    // is comes from its `test` token.
+    let at = node.tokens[0].value_or(sp);
+    let line = src[..at.start].count_if(|c| c == '\n') + 1;
+    ok(AFunction(Function {
+        name: SpanStr { text: unattached_test_name(line, at.start), span: at },
+        is_pub: false,
+        sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
+        body: at(Unit, sp),
+        shorthand_body: false,
+        test_body: some(body.value_or(at(Unit, 0..0))),
+        test_fns: fns,
+        performance: none,
+        doc: none,
+    }))
 }
 
 fn unknown_attr(name: str) -> str {
@@ -5090,6 +5134,24 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
         program_dump(
             "fn f() -> i64 { 1 }.test({ assert(f() == 1); })",
         ) == "fn f() -> i64 = 1 .test(Seq(assert(==(f(), 1)), ()))",
+    );
+
+    // A top-level `test({ .. })` is a function made for it, named by its line and
+    // offset, whose `.test` body is the block; helpers declared inside ride along.
+    assert(
+        program_dump(
+            "test({ assert(1 == 1); })",
+        ) == "fn __test_block_1_0() = () .test(Seq(assert(==(1, 1)), ()))",
+    );
+    assert(
+        program_dump(
+            "fn f() {}\n\n  test({ fn g() {} g(); })",
+        ) == "fn f() = ()\nfn __test_block_3_13() = () .test(Seq(g(), ()) fn g() = ())",
+    );
+    assert(
+        program_dump(
+            "# note\ntest({ })",
+        ) == "error: a `test` block documents nothing, so a `# ..` block directly above it has nothing to attach to — use `//` for a note about the test",
     );
 
     // Functions declared inside a `.test` block ride along with it, wherever

@@ -46,29 +46,7 @@ fn first_of_pair(n: i64) -> i64!Error {
     ok(p.0)
 }
 
-fn scenario() !prints {
-    print(to_str(wide(41)));
-    print(to_str(narrow(-3)));
-    print(to_str(maybe(some(5))));
-    print(to_str(maybe(none)));
-    print(to_str(maybe_strs()));
-    print(to_str(evens(6)));
-    print(to_str(counts()));
-    print(to_str(point()));
-    print(to_str(shape()));
-    print(to_str(count_evens(6)));
-    print(to_str(count_evens(0)));
-    print(to_str(first_of_pair(7)));
-    print(to_str(pair(0)));
-
-    // Payload-aware equality and matching, not just rendering.
-    print(to_str(evens(6) == evens(6)));
-    print(to_str(evens(6) == evens(8)));
-    match (counts()) {
-        ok(d) => print(to_str(d.get("b"))),
-        err(e) => print(e),
-    };
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -78,7 +56,27 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        print(to_str(wide(41)));
+        print(to_str(narrow(-3)));
+        print(to_str(maybe(some(5))));
+        print(to_str(maybe(none)));
+        print(to_str(maybe_strs()));
+        print(to_str(evens(6)));
+        print(to_str(counts()));
+        print(to_str(point()));
+        print(to_str(shape()));
+        print(to_str(count_evens(6)));
+        print(to_str(count_evens(0)));
+        print(to_str(first_of_pair(7)));
+        print(to_str(pair(0)));
+
+        // Payload-aware equality and matching, not just rendering.
+        print(to_str(evens(6) == evens(6)));
+        print(to_str(evens(6) == evens(8)));
+        match (counts()) {
+            ok(d) => print(to_str(d.get("b"))),
+            err(e) => print(e),
+        };
     };
     assert(out == """
         ok(42)

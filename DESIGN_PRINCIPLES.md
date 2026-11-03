@@ -576,3 +576,57 @@ It does not mean a named result must be a builtin. A function in the file that
 needs it is the same answer at a smaller scale; what matters is that the call
 site reads as the request. These three are builtins because the representations
 are the runtime's, so no AIPL-level function could construct one.
+
+---
+
+## 6. A test says what it covers
+
+**A `.test` block hangs from the function it tests.** The attachment is
+information: it says which function the assertions are about, it is what lets a
+test be found from the function and the function from the test, and it is what a
+coverage measurement (which functions have tests, which lines their tests reach)
+is built on. A test that belongs to nothing says none of that.
+
+So a test is written beside the thing it covers:
+
+```
+pub fn clamp(self: i64, low: i64, high: i64) -> i64 { .. }.test({
+    assert(5.clamp(0, 3) == 3);
+})
+```
+
+### The one exception: a top-level `test({ .. })`
+
+Some tests have no function to hang from. A case pinning that a loop form
+parses, that an integer literal takes its width from context, that two lambdas
+capture the same cell — the subject is a piece of the language, not a function
+anyone defined. Giving it a function would mean inventing one: a `fn main()`
+that nothing calls, or a `fn scenario()` that exists only to carry the block.
+Dummy anything is worse than the honest form, which is a block that says it
+belongs to the file:
+
+```
+test({
+    assert(1 + 1 == 2);
+})
+```
+
+It runs with the file's other tests and is reported by the line it starts on
+(`test line 12 ... FAIL`). It is for **rare** use, and the rarity is the point:
+the more tests are unattached, the less an attachment-based measurement can say.
+Before writing one, ask whether a function is the subject. If it is, attach the
+test to it; if a *helper* would make the subject a function, define the helper.
+
+### Downstream decisions
+
+- **`main` is not a place to put tests.** `main` is the entry point of a program
+  or the subject of a test of the un-shimmed builtins; a test that needs
+  somewhere to live uses its function, or a top-level `test`.
+- **A top-level `test` documents nothing.** A `# ..` block directly above one is
+  refused, because there is no declaration for it to describe; a note about the
+  test is a `//` comment.
+- **It is not a function.** The parser lowers it to a private function with a
+  name made for it (`__test_block_<line>_<offset>`) so that everything downstream
+  treats it as test code already, but the function is never part of the program
+  `run` and `build` compile, and no source name can spell it.
+

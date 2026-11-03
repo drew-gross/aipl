@@ -176,24 +176,26 @@ Census (2026-11-02; `fn main` plus at least one section, over `tests/cases`, `cr
 How to convert (the shape a reader should see):
 - **Prefer a returned value.** If a function only prints because it was convenient, make it return the value
   and assert on that: `assert(describe(3) == "three")`. No shim.
-- **If the printing is the behavior** (a function with `!prints`, a formatter that emits), capture it inline.
-  `print` adds a newline and `put` does not, so the stand-in models both, and the expected text stays visible:
+- **If the printing is the behavior** (a function with `!prints`, a formatter that emits), capture it inline in a
+  **top-level `test({ .. })`** (no dummy function: see DESIGN_PRINCIPLES.md §6 and "Top-level `test`" below). `print`
+  adds a newline and `put` does not, so the stand-in models both, and the expected text stays visible:
   ```
-  }.test({
+  test({
       mut out = "";
       shim prints {
           print = |text| { set out = `{out}{text}\n`; },
           put = |text| { set out = `{out}{text}`; },
       } {
-          demo();
+          demo();            // the old main's body, verbatim
       };
       assert(out == """
           expected text, copied from the old `--- stdout ---`
           """);
   })
   ```
-  (Watch `--- ` markers inside a `"""` block, and that a `"""` block is dedented.) Boilerplate is the accepted cost
-  of D5; if ~300 copies of this prove too noisy, revisit D5 with that number in hand.
+  (Watch `--- ` markers inside a `"""` block; that a `"""` block is dedented, drops trailing whitespace on a line, and
+  needs a blank line before the closing quotes for the final newline.) Boilerplate is the accepted cost of D5; if
+  ~300 copies of this prove too noisy, revisit D5 with that number in hand.
 - The old `--- stdout ---` text is the oracle: the new assert must say the same bytes, so a codemod slip fails a test
   instead of passing quietly. Read each batch's diff on a sample.
 
@@ -211,7 +213,7 @@ Checklist:
 - [ ] Convert the 309 `stdout`-only programs, in the batches below (counts per `tests/cases/` directory; one
       `cargo handoff` per batch; tick a batch when it lands). Each batch is ~20-35 files so a diff stays
       reviewable. Batch 1 is the small-directories warm-up, which is where the capture template gets shaken out.
-  - [x] 1. Warm-up, 35 files (the census said 33; it missed `bindings/*/` and `functions/void/`): `bindings` 5, `conditionals` 1, `constants` 2, `chars` 2, `compound_assign` 2, `integers` 2,
+  - [x] 1. Warm-up, 35 files (redone as top-level `test` blocks after that form landed) (the census said 33; it missed `bindings/*/` and `functions/void/`): `bindings` 5, `conditionals` 1, `constants` 2, `chars` 2, `compound_assign` 2, `integers` 2,
         `loops` 2, `results` 2, `syntax` 1, `options` 3, `methods` 3, `functions` 6, `dicts` 4. Template settled (below).
   - [ ] 2. `strings`, 28. (Mind `named_representations`: it must keep asking for each representation by name.)
   - [ ] 3. `arrays`, 28.
@@ -318,3 +320,15 @@ Checklist:
   a `"""` block drops trailing whitespace on a line (use an escaped string when the output has any), and a blank line
   before the closing `"""` is how the expected text gets its final newline. The converted files are print-and-compare,
   not returned-value asserts; the returned-value rewrite is a follow-up where a function only printed out of convenience.
+- 2026-11-02: top-level `test({ .. })` added (decided mid-2b: converting `main` to a `fn scenario()` only swapped one dummy
+  function for another). Parser (`grammar_aipl.aipl` `test_item` / `lower_test_item`, naming in `fn_names.aipl`
+  `unattached_test_name`), formatter (`walker.aipl` `test_item`), driver (`synthesize_driver` drops the placeholder fn and
+  reports `line N`; `aipl_syntax::unattached_test_line`), Rust test `check::a_top_level_test_block_runs_and_is_reported_by_its_line`,
+  DESIGN_PRINCIPLES.md §6 (rare by design: coverage will be measured by attachment). One handoff for the grammar bootstrap
+  (1671s; refresh_perfmon dominated: 49 compiler-source rows moved). Batch 1 redone with the new form; `scripts/main_to_test.py`
+  now emits it. The symbol index (LSP outline) listed the placeholder; `aipl-index` now skips it (`corpus::indexes_the_whole_repository_with_correct_spans` caught it). `aipl doc` not checked (private functions are not listed).
+
+### Top-level `test({ .. })` (language addition, 2026-11-02)
+Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered by the parser to a private function
+`__test_block_<line>_<offset>` with an empty body whose `.test` body is the block; never part of `run`/`build` output (checked:
+`aipl report` is byte-identical with and without one). A `# ..` block directly above it is an error. Reported as `test line N`.

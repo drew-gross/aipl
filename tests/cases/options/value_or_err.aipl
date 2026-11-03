@@ -18,19 +18,7 @@ fn describe(r: i64!str) -> str {
     }
 }
 
-fn scenario() !prints {
-    print(describe(first_digit("42"))); // some -> ok, carrying the value
-    print(describe(first_digit(""))); // the first `?` fires
-    print(describe(first_digit("x"))); // the second one does
-
-    // The error is any type, not just a message — here an i64 code. And the
-    // result is an ordinary value, so it needn't be propagated with `?`.
-    let code = match (""[0].value_or_err(404)) {
-        ok(..) => 0,
-        err(n) => n,
-    };
-    print(`code {code}`);
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -40,7 +28,17 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        print(describe(first_digit("42"))); // some -> ok, carrying the value
+        print(describe(first_digit(""))); // the first `?` fires
+        print(describe(first_digit("x"))); // the second one does
+
+        // The error is any type, not just a message — here an i64 code. And the
+        // result is an ordinary value, so it needn't be propagated with `?`.
+        let code = match (""[0].value_or_err(404)) {
+            ok(..) => 0,
+            err(n) => n,
+        };
+        print(`code {code}`);
     };
     assert(out == """
         digit 4

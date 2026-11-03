@@ -5,25 +5,7 @@
 
 import { equal as ==, print } from builtins;
 
-fn scenario() !prints {
-    let c = 'b';
-    print(`bare: {c}`); // bare: b
-
-    // Literal chars, one per interpolation — what the lint against a literal
-    // interpolation flags, squelched here because the rendering is the point.
-    print(`built: {'x'}{'y'}{'z'}`); #[allow]
-    // built: xyz
-    print(`to_str: {c}`); // to_str: b
-    print(`nested: {['a', 'b']}`); // nested: ['a', 'b']
-
-    // Indexing a `str` yields a `char?`, not a `char`, so it gets neither
-    // treatment — it renders as the optional it is.
-    let s = "hi";
-    print(`opt: {s[0]}`); // opt: some('h')
-
-    // A `str` interpolation is still passed through unquoted, as before.
-    print(`str: {s}`); // str: hi
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -33,7 +15,23 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        let c = 'b';
+        print(`bare: {c}`); // bare: b
+
+        // Literal chars, one per interpolation — what the lint against a literal
+        // interpolation flags, squelched here because the rendering is the point.
+        print(`built: {'x'}{'y'}{'z'}`); #[allow]
+        // built: xyz
+        print(`to_str: {c}`); // to_str: b
+        print(`nested: {['a', 'b']}`); // nested: ['a', 'b']
+
+        // Indexing a `str` yields a `char?`, not a `char`, so it gets neither
+        // treatment — it renders as the optional it is.
+        let s = "hi";
+        print(`opt: {s[0]}`); // opt: some('h')
+
+        // A `str` interpolation is still passed through unquoted, as before.
+        print(`str: {s}`); // str: hi
     };
     assert(out == """
         bare: b

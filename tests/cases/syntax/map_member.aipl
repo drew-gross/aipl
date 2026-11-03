@@ -10,27 +10,7 @@ fn scaled(self: Point, by: i64) -> i64 { self.x * by }
 
 fn others(self: Point, ys: i64[]) -> u64 { ys.len() }
 
-fn scenario() !prints {
-    let ps = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];
-    print(`{ps$x} {ps$y}`);
-    let pairs = [(1, "a"), (2, "bb")];
-    print(`{pairs$0} {pairs$1}`);
-    // A method call, with and without arguments, and the sequence it yields.
-    print(`{ps$scaled(10)} {pairs$1$len()}`);
-
-    // Each step maps the result of the one before; a `.` after it applies to the
-    // whole result.
-    print(`{pairs$1$len().reverse()} {ps$x.reverse()}`);
-
-    // The mapped sequence fuses with what consumes it, as a written `map` does,
-    // though the program never imported `map`.
-    print(pairs$1.join(sep="+"));
-    // An optional maps too, as `map` does.
-    let maybe: Point? = some(Point { x: 7, y: 8 });
-    print(`{maybe$y}`);
-    // An argument may map in turn.
-    print(`{ps$others(ps$y)}`);
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -40,7 +20,25 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        let ps = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];
+        print(`{ps$x} {ps$y}`);
+        let pairs = [(1, "a"), (2, "bb")];
+        print(`{pairs$0} {pairs$1}`);
+        // A method call, with and without arguments, and the sequence it yields.
+        print(`{ps$scaled(10)} {pairs$1$len()}`);
+
+        // Each step maps the result of the one before; a `.` after it applies to the
+        // whole result.
+        print(`{pairs$1$len().reverse()} {ps$x.reverse()}`);
+
+        // The mapped sequence fuses with what consumes it, as a written `map` does,
+        // though the program never imported `map`.
+        print(pairs$1.join(sep="+"));
+        // An optional maps too, as `map` does.
+        let maybe: Point? = some(Point { x: 7, y: 8 });
+        print(`{maybe$y}`);
+        // An argument may map in turn.
+        print(`{ps$others(ps$y)}`);
     };
     assert(out == """
         [1, 3] [2, 4]

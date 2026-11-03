@@ -3,18 +3,7 @@
 
 import { contains_key, equal as ==, get, len, print, to_dict } from builtins;
 
-fn scenario() !prints {
-    let ages = [("ana", 31), ("bo", 27), ("cy", 45)].to_dict();
-    print(`{ages.get("bo")} {ages.get("zed")} {ages.len()}`);
-
-    // The later of two pairs for one key wins; the key keeps one entry.
-    let last = [(1, "first"), (2, "other"), (1, "last")].to_dict();
-    print(`{last.get(1)} {last.len()}`);
-
-    // Keys of any dict key type.
-    let by_char = [('a', 1), ('b', 2)].to_dict();
-    print(`{by_char.contains_key('b')}`);
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -24,7 +13,16 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        let ages = [("ana", 31), ("bo", 27), ("cy", 45)].to_dict();
+        print(`{ages.get("bo")} {ages.get("zed")} {ages.len()}`);
+
+        // The later of two pairs for one key wins; the key keeps one entry.
+        let last = [(1, "first"), (2, "other"), (1, "last")].to_dict();
+        print(`{last.get(1)} {last.len()}`);
+
+        // Keys of any dict key type.
+        let by_char = [('a', 1), ('b', 2)].to_dict();
+        print(`{by_char.contains_key('b')}`);
     };
     assert(out == """
         some(27) none 3

@@ -4,19 +4,7 @@
 
 import { equal as ==, print, to_str } from builtins;
 
-fn scenario() !prints {
-    let words = ["zero", "one", "two"];
-    for (let i, w : words) {
-        print(to_str(i));
-        print(w);
-    }
-    // Nested: the inner index restarts each time the inner loop is entered.
-    for (let outer, w : ["ab", "c"]) {
-        for (let inner, c : w) {
-            print(`{outer}{inner}{c}`);
-        }
-    }
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -26,7 +14,17 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        let words = ["zero", "one", "two"];
+        for (let i, w : words) {
+            print(to_str(i));
+            print(w);
+        }
+        // Nested: the inner index restarts each time the inner loop is entered.
+        for (let outer, w : ["ab", "c"]) {
+            for (let inner, c : w) {
+                print(`{outer}{inner}{c}`);
+            }
+        }
     };
     assert(out == """
         0

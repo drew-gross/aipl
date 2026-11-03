@@ -5,15 +5,7 @@
 
 import { equal as ==, print, saturating_decrement as --, to_str } from builtins;
 
-fn scenario() !prints {
-    mut n: u8 = 2;
-    set n--;
-    print(n.to_str()); // 1
-    set n--;
-    print(n.to_str()); // 0 — at the bound
-    set n--;
-    print(n.to_str()); // 0 — clamped, where wrapping would give 255
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -23,7 +15,13 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        mut n: u8 = 2;
+        set n--;
+        print(n.to_str()); // 1
+        set n--;
+        print(n.to_str()); // 0 — at the bound
+        set n--;
+        print(n.to_str()); // 0 — clamped, where wrapping would give 255
     };
     assert(out == """
         1

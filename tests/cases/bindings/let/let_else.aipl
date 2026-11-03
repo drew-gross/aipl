@@ -58,16 +58,7 @@ fn picky(o: i64?, flag: bool) -> i64 {
     n
 }
 
-fn scenario() !prints {
-    print(`{doubled(some(4))} {doubled(none)}`);
-    print(`{area(Rect(2, 3))} {area(Empty)}`);
-    let missing: str? = none;
-    print(`{label((some("n"), 5))} {label((missing, 1))}`);
-    print(`{second([1, 2, 3])} {second([1])}`);
-    print(`{only_zero(0)} {only_zero(7)}`);
-    print(`{both(some(1), some(2))} {both(none, some(2))} {both(some(1), none)}`);
-    print(`{picky(some(5), true)} {picky(none, true)} {picky(none, false)}`);
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -77,7 +68,14 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        print(`{doubled(some(4))} {doubled(none)}`);
+        print(`{area(Rect(2, 3))} {area(Empty)}`);
+        let missing: str? = none;
+        print(`{label((some("n"), 5))} {label((missing, 1))}`);
+        print(`{second([1, 2, 3])} {second([1])}`);
+        print(`{only_zero(0)} {only_zero(7)}`);
+        print(`{both(some(1), some(2))} {both(none, some(2))} {both(some(1), none)}`);
+        print(`{picky(some(5), true)} {picky(none, true)} {picky(none, false)}`);
     };
     assert(out == """
         8 -1

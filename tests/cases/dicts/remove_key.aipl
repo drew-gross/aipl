@@ -24,60 +24,7 @@ import {
     value_or,
 } from builtins;
 
-fn scenario() !prints {
-    mut d = #{"a": 1, "b": 2, "c": 3};
-
-    // From the middle: the entries around it close up, in order.
-    set d.remove_key("b");
-    print(`{d} {d.len()} {!d.contains_key("b")}`);
-
-    // From the front, and from the back — each keeps the rest's order.
-    mut front = #{1: "x", 2: "y", 3: "z"};
-    set front.remove_key(1);
-    print(front.to_str());
-    mut back = #{1: "x", 2: "y", 3: "z"};
-    set back.remove_key(3);
-    print(back.to_str());
-
-    // A key the dict never held changes nothing.
-    set d.remove_key("zz");
-    print(d.to_str());
-
-    // Down to empty, and still a dict.
-    set d.remove_key("a");
-    set d.remove_key("c");
-    print(`{d} {d.len()} {d.get("a") == none}`);
-
-    // Value semantics: a binding made before the removal keeps what was
-    // removed. The dict is copied first because the removal would otherwise
-    // write into a block `snapshot` is still reading.
-    mut shared = #{"k": "vv", "j": "ww"};
-    let snapshot = shared;
-    set shared.remove_key("k");
-    print(`{shared} {snapshot}`);
-
-    // The removed value is released from `shared` alone — `snapshot`'s copy of
-    // the heap string is still readable.
-    print(`{snapshot.get("k").value_or("gone")} {shared.get("k").value_or("gone")}`);
-
-    // Expression position copies and modifies, leaving the receiver alone.
-    let without_j = shared.remove_key("j");
-    print(`{without_j} {shared}`);
-
-    // Heap *values* of other shapes are released the same way.
-    mut lists = #{1: [1, 2], 2: [3], 3: [4, 5, 6]};
-    set lists.remove_key(2);
-    print(`{lists} {lists.len()}`);
-
-    // Removing every key one at a time, then iterating what is left.
-    mut counts = #{"p": 1, "q": 2, "r": 3};
-    set counts.remove_key("q");
-    mut seen = "";
-    for (let k, v : counts) {
-        set seen.extend(`{k}{v};`);
-    }
-    print(seen);
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -87,7 +34,58 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        mut d = #{"a": 1, "b": 2, "c": 3};
+
+        // From the middle: the entries around it close up, in order.
+        set d.remove_key("b");
+        print(`{d} {d.len()} {!d.contains_key("b")}`);
+
+        // From the front, and from the back — each keeps the rest's order.
+        mut front = #{1: "x", 2: "y", 3: "z"};
+        set front.remove_key(1);
+        print(front.to_str());
+        mut back = #{1: "x", 2: "y", 3: "z"};
+        set back.remove_key(3);
+        print(back.to_str());
+
+        // A key the dict never held changes nothing.
+        set d.remove_key("zz");
+        print(d.to_str());
+
+        // Down to empty, and still a dict.
+        set d.remove_key("a");
+        set d.remove_key("c");
+        print(`{d} {d.len()} {d.get("a") == none}`);
+
+        // Value semantics: a binding made before the removal keeps what was
+        // removed. The dict is copied first because the removal would otherwise
+        // write into a block `snapshot` is still reading.
+        mut shared = #{"k": "vv", "j": "ww"};
+        let snapshot = shared;
+        set shared.remove_key("k");
+        print(`{shared} {snapshot}`);
+
+        // The removed value is released from `shared` alone — `snapshot`'s copy of
+        // the heap string is still readable.
+        print(`{snapshot.get("k").value_or("gone")} {shared.get("k").value_or("gone")}`);
+
+        // Expression position copies and modifies, leaving the receiver alone.
+        let without_j = shared.remove_key("j");
+        print(`{without_j} {shared}`);
+
+        // Heap *values* of other shapes are released the same way.
+        mut lists = #{1: [1, 2], 2: [3], 3: [4, 5, 6]};
+        set lists.remove_key(2);
+        print(`{lists} {lists.len()}`);
+
+        // Removing every key one at a time, then iterating what is left.
+        mut counts = #{"p": 1, "q": 2, "r": 3};
+        set counts.remove_key("q");
+        mut seen = "";
+        for (let k, v : counts) {
+            set seen.extend(`{k}{v};`);
+        }
+        print(seen);
     };
     assert(out == """
         {"a": 1, "c": 3} 2 true

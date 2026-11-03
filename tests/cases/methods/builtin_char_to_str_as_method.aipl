@@ -1,8 +1,6 @@
 import { equal as ==, print, to_str } from builtins;
 
-fn scenario() !prints {
-    'X'.to_str().print();
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -12,7 +10,7 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        'X'.to_str().print();
     };
     assert(out == "X\n");
 })

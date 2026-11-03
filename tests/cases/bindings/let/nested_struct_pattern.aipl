@@ -46,16 +46,7 @@ fn lone(points: Point[]) -> i64 {
     }
 }
 
-fn scenario() !prints {
-    print(`{only_x([Point { x: 4, y: 5 }])} {only_x([])}`);
-    print(`{offset((Point { x: 1, y: 2 }, 10))}`);
-    print(`{dot_y(Dot(Point { x: 1, y: 7 }))} {dot_y(Empty)}`);
-    print(
-        `{span_width(Segment(Point { x: 2, y: 0 }, Point { x: 9, y: 0 }))} {span_width(Dot(Point { x: 3, y: 0 }))}`,
-    );
-    print(`{tagged((Point { x: 3, y: 8 }, 1))} {tagged((Point { x: 3, y: 8 }, 2))}`);
-    print(`{lone([Point { x: 3, y: 4 }])} {lone([])}`);
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -65,7 +56,14 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        print(`{only_x([Point { x: 4, y: 5 }])} {only_x([])}`);
+        print(`{offset((Point { x: 1, y: 2 }, 10))}`);
+        print(`{dot_y(Dot(Point { x: 1, y: 7 }))} {dot_y(Empty)}`);
+        print(
+            `{span_width(Segment(Point { x: 2, y: 0 }, Point { x: 9, y: 0 }))} {span_width(Dot(Point { x: 3, y: 0 }))}`,
+        );
+        print(`{tagged((Point { x: 3, y: 8 }, 1))} {tagged((Point { x: 3, y: 8 }, 2))}`);
+        print(`{lone([Point { x: 3, y: 4 }])} {lone([])}`);
     };
     assert(out == """
         9 -1

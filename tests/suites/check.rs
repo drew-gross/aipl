@@ -227,6 +227,21 @@ fn one_files_cached_constants_do_not_reach_the_next() {
     );
 }
 
+/// A top-level `test({ .. })` is a test attached to no function: it runs with the
+/// file's other tests and is reported by the line it starts on.
+#[test]
+fn a_top_level_test_block_runs_and_is_reported_by_its_line() {
+    let src = "import { equal as == } from builtins;\n\ntest({\n    assert(1 == 1);\n})\n\n\
+               test({\n    assert(1 == 2);\n})\n";
+    let (stdout, stderr, code) = check_here("top_level_test_blocks", src);
+    assert_eq!(
+        stdout,
+        "test line 7 ... FAIL\n  assert failed at top_level_test_blocks.aipl:8 1 == 2\n\
+         2 tests: 1 passed, 1 failed\n"
+    );
+    assert_eq!((stderr.as_str(), code), ("", 1));
+}
+
 /// `PASSES` with the import's inner spacing squeezed — parses and passes, but
 /// isn't what the formatter would write.
 const UNFORMATTED: &str = "import { equal as ==} from builtins;\n\

@@ -13,9 +13,7 @@ fn inner(self: i64) -> i64 { self.reads() }
 
 fn outer(self: i64, reads: i64) -> i64 { self.inner() + reads }
 
-fn scenario() !prints {
-    print(`{3.outer(10)}`);
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -25,7 +23,7 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        print(`{3.outer(10)}`);
     };
     assert(out == "14\n");
 })

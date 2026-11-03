@@ -15,18 +15,7 @@ let PUNCT: #{char} = "(){}[],;".to_set();
 
 fn is_ident_start(c: char) -> bool { IDENT_START.has(c) }
 
-fn scenario() !prints {
-    print(IDENT_START.len().to_str());
-    print(is_ident_start('q').to_str());
-    print((!is_ident_start('Q')).to_str());
-    print(is_ident_start('_').to_str());
-    // Substituted at more than one use, and in another constant's company.
-    print(PUNCT.len().to_str());
-    print(PUNCT.has('{').to_str());
-    print((!PUNCT.has('q')).to_str());
-    // Duplicates in the source string collapse, as they must.
-    print("aab".to_set().len().to_str());
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -36,7 +25,16 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        print(IDENT_START.len().to_str());
+        print(is_ident_start('q').to_str());
+        print((!is_ident_start('Q')).to_str());
+        print(is_ident_start('_').to_str());
+        // Substituted at more than one use, and in another constant's company.
+        print(PUNCT.len().to_str());
+        print(PUNCT.has('{').to_str());
+        print((!PUNCT.has('q')).to_str());
+        // Duplicates in the source string collapse, as they must.
+        print("aab".to_set().len().to_str());
     };
     assert(out == """
         27

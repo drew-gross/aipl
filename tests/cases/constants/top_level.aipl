@@ -26,11 +26,7 @@ let TAB = '\t';
 
 fn shown(port: u16) -> str { `{port}` }
 
-fn scenario() !prints {
-    print(S_KEYWORD);
-    print(GREETING);
-    print(`{shown(PORT)} {OFFSET} {ENABLED} [{TAB}]`);
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -40,7 +36,9 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        print(S_KEYWORD);
+        print(GREETING);
+        print(`{shown(PORT)} {OFFSET} {ENABLED} [{TAB}]`);
     };
     assert(out == """
         keyword.control.aipl

@@ -1541,11 +1541,16 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
         match item {
             Item::Fn(f) if f.test_body.is_some() => {
                 let is_performance = aipl_syntax::performance_source_name(&f.name).is_some();
+                let unattached = aipl_syntax::unattached_test_line(&f.name);
                 // Every function loses its test body here, run or not, so the
-                // program carries only what `run` and `build` would compile.
-                let mut orig = f.clone();
-                orig.test_body = None;
-                items.push(Item::Fn(orig));
+                // program carries only what `run` and `build` would compile. A
+                // top-level `test({ .. })` has no function behind it, so only
+                // its block is kept.
+                if unattached.is_none() {
+                    let mut orig = f.clone();
+                    orig.test_body = None;
+                    items.push(Item::Fn(orig));
+                }
                 if is_performance != (kind == TestKind::Performance) {
                     continue;
                 }
@@ -1566,9 +1571,10 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
                 }));
                 // A `.performance` block is reported as `f.performance`, after the
                 // attribute that holds it, not as the function standing in for it.
-                let reported = match aipl_syntax::performance_source_name(&f.name) {
-                    Some(owner) => format!("{owner}.performance"),
-                    None => f.name.text.clone(),
+                let reported = match (aipl_syntax::performance_source_name(&f.name), unattached) {
+                    (Some(owner), _) => format!("{owner}.performance"),
+                    (None, Some(line)) => format!("line {line}"),
+                    (None, None) => f.name.text.clone(),
                 };
                 tests.push((reported, test_fn));
             }

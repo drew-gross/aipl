@@ -88,6 +88,34 @@
 
 
 
+        <section class="item" id="item-unattached_test_name">
+          <h3>
+            <a class="anchor" href="#item-unattached_test_name">unattached_test_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn unattached_test_name(line: u64, offset: u64) -&#62; str</code></pre>
+
+          <div class="doc"><p>The name of the function standing for a top-level <code>test({ .. })</code> block, which is attached to no function. The line is for a reader (a failing block is reported by it) and the offset keeps two blocks on one line apart. The name is a plain function's, and its own <code>.test</code> body is the block, so the block reaches everything downstream as the test code of a function nobody calls.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_unattached_test">
+          <h3>
+            <a class="anchor" href="#item-is_unattached_test">is_unattached_test</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn is_unattached_test(self: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> is a name <code>unattached_test_name</code> made.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-test_helper_name">
           <h3>
             <a class="anchor" href="#item-test_helper_name">test_helper_name</a>
@@ -143,6 +171,20 @@
             <span class="kind kind-const">let</span>
           </h3>
           <pre class="signature"><code>let PERFORMANCE_PREFIX = &#34;__performance$&#34;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-UNATTACHED_TEST_PREFIX">
+          <h3>
+            <a class="anchor" href="#item-UNATTACHED_TEST_PREFIX">UNATTACHED_TEST_PREFIX</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let UNATTACHED_TEST_PREFIX = &#34;__test_block_&#34;</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

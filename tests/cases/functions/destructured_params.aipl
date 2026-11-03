@@ -23,14 +23,7 @@ fn describe(Named { label, at }) -> str { `{label}={sum(at)}` }
 // The named form still works and means the same thing.
 fn sum_named(p: Point) -> i64 { p.x + p.y } #[allow]
 
-fn scenario() !prints {
-    let p = Point { x: 3, y: 4 };
-    print(`{sum(p)}`);
-    print(`{sum(p) == sum_named(p)}`);
-    print(`{shifted(p, 5)}`);
-    print(`{first(p)}`);
-    print(describe(Named { label: "p", at: p }));
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -40,7 +33,12 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        let p = Point { x: 3, y: 4 };
+        print(`{sum(p)}`);
+        print(`{sum(p) == sum_named(p)}`);
+        print(`{shifted(p, 5)}`);
+        print(`{first(p)}`);
+        print(describe(Named { label: "p", at: p }));
     };
     assert(out == """
         7

@@ -31,14 +31,7 @@ fn u8s() -> u8[] { [3, 255, 0] }
 
 fn i16s() -> i16[] { [-32768, 5, 32767] }
 
-fn scenario() !prints {
-    print(
-        `{i8s().first()} {i8s().last()} {i8s().find_if(|x| x > 100)} {i8s().count_if(|x| x > 0)}`,
-    );
-    print(`{i8s().minimum()} {i8s().maximum()}`);
-    print(`{u8s().minimum()} {u8s().maximum()}`);
-    print(`{i16s().minimum()} {i16s().maximum()} {i16s().first()}`);
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -48,7 +41,12 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        print(
+            `{i8s().first()} {i8s().last()} {i8s().find_if(|x| x > 100)} {i8s().count_if(|x| x > 0)}`,
+        );
+        print(`{i8s().minimum()} {i8s().maximum()}`);
+        print(`{u8s().minimum()} {u8s().maximum()}`);
+        print(`{i16s().minimum()} {i16s().maximum()} {i16s().first()}`);
     };
     assert(out == """
         some(3) some(127) some(127) 2

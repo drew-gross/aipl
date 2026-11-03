@@ -20,23 +20,7 @@ import {
 
 fn triple(x: i64) -> i64 { x * 3 }
 
-fn scenario() !prints {
-    mut n = 10;
-    set n += 5;
-    print(n.to_str());
-    set n -= 3;
-    print(n.to_str());
-    set n *= 4;
-    print(n.to_str());
-    set n /= 6;
-    print(n.to_str());
-
-    // The right-hand side is an arbitrary expression, not just a literal —
-    // and it is the *operand*, so `m` is read once on each side of the store.
-    mut m = 5;
-    set m += triple(m);
-    print(m.to_str());
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -46,7 +30,21 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        mut n = 10;
+        set n += 5;
+        print(n.to_str());
+        set n -= 3;
+        print(n.to_str());
+        set n *= 4;
+        print(n.to_str());
+        set n /= 6;
+        print(n.to_str());
+
+        // The right-hand side is an arbitrary expression, not just a literal —
+        // and it is the *operand*, so `m` is read once on each side of the store.
+        mut m = 5;
+        set m += triple(m);
+        print(m.to_str());
     };
     assert(out == """
         15

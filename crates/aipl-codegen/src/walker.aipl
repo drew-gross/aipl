@@ -1166,6 +1166,7 @@ fn item(self: W) -> WDoc!FmtError {
     let kind = if (t == "pub") { self.peek_text_n(1) } else { t };
     if (kind == "let") { return self.const_item(); };
     if (t == "pub" || t == "fn") { return self.fn_item(); };
+    if (t == "test") { return self.test_item(); };
     if (t == "struct") { return self.struct_item(); };
     if (t == "variant") { return self.variant_item(); };
     err(self.err_here(`formatter: expected an item (fn/struct/variant/let/import), found "{t}"`))
@@ -1192,6 +1193,13 @@ fn const_item(self: W) -> WDoc!FmtError {
         w: v.w.expect(";")?.w,
         doc: Concat([..head.docs, Text(`let {n.text}`), ty.doc, Text(" = "), v.doc, Text(";")]),
     })
+}
+
+# `test({ .. })` at the top level: laid out like the `.test({ .. })` attribute
+# of a function, minus the function.
+fn test_item(self: W) -> WDoc!FmtError {
+    let WDoc { w, doc } = self.bump().w.expect("(")?.w.block()?;
+    ok(WDoc { w: w.expect(")")?.w, doc: Concat([Text("test("), doc, Text(")")]) })
 }
 
 fn fn_item(self: W) -> WDoc!FmtError {
@@ -3575,6 +3583,12 @@ fn walker_of(src: str) -> W!FmtError {
             .rendered(
                 100,
             )? == "import { a, b } from builtins;\nimport { x } from \"./m.aipl\";\n\nfn f() {}\n",
+    );
+    // A top-level `test({ .. })` is laid out like a `.test` attribute.
+    assert(
+        walker_of("fn f ( ) { }  test ( { assert ( 1 == 1 ) ; } )")?
+            .program()
+            .rendered(100)? == "fn f() {}\n\ntest({\n    assert(1 == 1);\n})\n",
     );
     // A struct and a variant are items too.
     assert(

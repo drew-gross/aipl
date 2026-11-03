@@ -15,12 +15,7 @@ fn widened(self: Span { end }, by: i64) -> Span { ..self, end: end + by }
 // A field may be bound under another name, as in any pattern.
 fn describe(self: Span { start as lo, end as hi }) -> str { `{lo}..{hi} ({self.len()})` }
 
-fn scenario() !prints {
-    let s = Span { start: 3, end: 10 };
-    print(`{s.len()}`);
-    print(s.widened(5).describe());
-    print(s.describe());
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -30,7 +25,10 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        let s = Span { start: 3, end: 10 };
+        print(`{s.len()}`);
+        print(s.widened(5).describe());
+        print(s.describe());
     };
     assert(out == """
         7

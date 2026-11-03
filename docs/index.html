@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">196 files, 1783 items.</p>
+      <p class="summary">196 files, 1788 items.</p>
 
       <ul class="files">
 
@@ -709,7 +709,7 @@
           <p class="file-summary">The names the parser gives functions it synthesizes from a declaration's attributes, and the inverse: what a function's name says it is.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-fn_names.html#private">7 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-fn_names.html#private">8 private</a></span>
 
 
           <ul class="items">
@@ -726,6 +726,16 @@
 
             <li>
               <a href="crates-aipl-codegen-src-fn_names.html#item-performance_fn_name"><code>performance_fn_name</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-fn_names.html#item-unattached_test_name"><code>unattached_test_name</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-fn_names.html#item-is_unattached_test"><code>is_unattached_test</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -919,7 +929,7 @@
           <p class="file-summary">AIPL's own syntax, as a <code>Grammar</code> value — the third and largest consumer of the parser library, and the one the whole thing was built for. It is the only description of the language there is: every compile runs this grammar over <code>lex_aipl.aipl</code>'s token stream, the compiler's own sources included.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">203 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">204 private</a></span>
 
 
           <ul class="items">
@@ -3643,7 +3653,7 @@
           <p class="file-summary">The formatter's token-stream walker, dogfooded in AIPL: the port of the Rust <code>aipl-fmt</code> <code>Walker</code> (<code>crates/aipl-fmt/src/lib.rs</code>). It walks the token stream <code>lex_aipl</code> produces — not the AST, since the parser desugars as it builds (template literals, <code>set n++</code>, destructuring), so an AST can't be printed back faithfully — and builds a <code>Doc</code> layout tree for <code>print</code> to lay out.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-walker.html#private">166 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-walker.html#private">167 private</a></span>
 
 
           <ul class="items">

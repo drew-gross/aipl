@@ -2877,6 +2877,16 @@ pub fn test_fn_name(f: &str) -> String {
     (fn_names_hooks().test_fn_name)(f)
 }
 
+/// The line a top-level `test({ .. })` block sits on, when `name` is the name
+/// the parser made for one (`fn_names.aipl`'s `unattached_test_name`:
+/// `__test_block_<line>_<offset>`), else `None`. Such a function exists only to
+/// carry the block, so it has no body of its own to run and no source name to
+/// report the block by.
+pub fn unattached_test_line(name: &str) -> Option<&str> {
+    let rest = name.strip_prefix("__test_block_")?;
+    rest.split('_').next().filter(|line| !line.is_empty())
+}
+
 /// The name of the function standing for `f`'s `.performance` block. The parser
 /// reads that attribute off `f` and turns it into a function of its own, whose
 /// `.test` body is the block — so a performance block reaches everything

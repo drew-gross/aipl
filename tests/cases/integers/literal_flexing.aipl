@@ -38,37 +38,7 @@ fn merged(m: u8, b: bool) -> u8 { if (b) { m } else { 9 } }
 // Both branches literal: they flex together to the declared return type.
 fn both_branches(b: bool) -> u8 { if (b) { 1 } else { 200 } }
 
-fn scenario() !prints {
-    print(takes_u64(3).to_str());
-    print(ret_u8().to_str());
-    print(tail_after_let().to_str());
-    print(early_return(true).to_str());
-    print(merged(3, false).to_str());
-    print(both_branches(false).to_str());
-
-    // Struct field initializers take the field's type.
-    let p = Pair { a: 2, b: 200 };
-    print(p.a.to_str());
-    print(p.b.to_str());
-
-    // So do variant constructor payloads — including where the constructor is
-    // inferred rather than driven by a declared return type.
-    let t = Wrapped(9, true);
-    print(
-        match (t) {
-            Wrapped(n, _) => n,
-        }.to_str(),
-    );
-
-    // `set` to an existing mut binding takes that binding's type.
-    mut m: u8 = 0;
-    set m = 7;
-    print(m.to_str());
-
-    // Arithmetic against a `u64` needs no cast on the literal operand.
-    let big = takes_u64(40);
-    print((big + 2).to_str());
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -78,7 +48,35 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        print(takes_u64(3).to_str());
+        print(ret_u8().to_str());
+        print(tail_after_let().to_str());
+        print(early_return(true).to_str());
+        print(merged(3, false).to_str());
+        print(both_branches(false).to_str());
+
+        // Struct field initializers take the field's type.
+        let p = Pair { a: 2, b: 200 };
+        print(p.a.to_str());
+        print(p.b.to_str());
+
+        // So do variant constructor payloads — including where the constructor is
+        // inferred rather than driven by a declared return type.
+        let t = Wrapped(9, true);
+        print(
+            match (t) {
+                Wrapped(n, _) => n,
+            }.to_str(),
+        );
+
+        // `set` to an existing mut binding takes that binding's type.
+        mut m: u8 = 0;
+        set m = 7;
+        print(m.to_str());
+
+        // Arithmetic against a `u64` needs no cast on the literal operand.
+        let big = takes_u64(40);
+        print((big + 2).to_str());
     };
     assert(out == """
         3

@@ -8,27 +8,7 @@ fn double(n: i64) -> i64 { n + n }
 
 fn describe(o: i64?) -> str { o.map(|v| `some({v})`).value_or("none") }
 
-fn scenario() !prints {
-    let three: i64? = some(3);
-    let absent: i64? = none;
-
-    // A lambda, and a named function.
-    print(describe(three.map(|n| n + 1)));
-    print(describe(absent.map(|n| n + 1)));
-    print(describe(three.map(double)));
-
-    // The result type follows the lambda: an `i64?` mapped to a `str?`.
-    print(three.map(|n| `n={n}`).value_or("nothing"));
-    print(absent.map(|n| `n={n}`).value_or("nothing"));
-
-    // A capture is threaded through like any lambda's.
-    let k = 10;
-    print(describe(three.map(|n| n + k)));
-
-    // Chains: the result is an optional, so it maps again and unwraps as one.
-    print(three.map(double).map(double).value_or(0).to_str());
-    print((absent.map(double) == none).to_str());
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -38,7 +18,25 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        let three: i64? = some(3);
+        let absent: i64? = none;
+
+        // A lambda, and a named function.
+        print(describe(three.map(|n| n + 1)));
+        print(describe(absent.map(|n| n + 1)));
+        print(describe(three.map(double)));
+
+        // The result type follows the lambda: an `i64?` mapped to a `str?`.
+        print(three.map(|n| `n={n}`).value_or("nothing"));
+        print(absent.map(|n| `n={n}`).value_or("nothing"));
+
+        // A capture is threaded through like any lambda's.
+        let k = 10;
+        print(describe(three.map(|n| n + k)));
+
+        // Chains: the result is an optional, so it maps again and unwraps as one.
+        print(three.map(double).map(double).value_or(0).to_str());
+        print((absent.map(double) == none).to_str());
     };
     assert(out == """
         some(4)

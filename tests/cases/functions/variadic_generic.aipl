@@ -16,13 +16,7 @@ fn total<T: any>(self: T[], extra: T*) -> u64 {
     n
 }
 
-fn scenario() !prints {
-    print(to_str(total([1, 2], 3)));
-    print(to_str(total([1, 2], [3, 4])));
-    print(to_str(total([1, 2], some(3))));
-    print(to_str(total([1, 2], none)));
-    print(to_str(total(["a"], "b")));
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -32,7 +26,11 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        print(to_str(total([1, 2], 3)));
+        print(to_str(total([1, 2], [3, 4])));
+        print(to_str(total([1, 2], some(3))));
+        print(to_str(total([1, 2], none)));
+        print(to_str(total(["a"], "b")));
     };
     assert(out == """
         3

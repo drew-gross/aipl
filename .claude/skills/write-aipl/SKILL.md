@@ -48,6 +48,9 @@ xs$f()  ≡ xs.map(|e| e.f())      xs$field  ≡ xs.map(|e| e.field)
 - Struct patterns rename with `as` (`P { x as px }`, `Pushes { elements, rest as end }`), not `x: px`. `struct`/`variant` are never `pub`. No `is_none`: write `!o.is_some()`.
 - A case with keyword params (`For`, `Ctor`) can't go through `as_case(Case)` as a function value: destructure with `let Case(..) = x else { return none; };`.
 - `xs.map(f)` over a named function is flagged: write `xs$f()`. A method call needs the fn's first param named `self`.
+- **A test hangs from the function it covers** (`fn f() {..}.test({ .. })`). A test with no function to cover (a language
+  feature, not a function) is a top-level `test({ .. })`: rare, reported as `test line N`, no `#` docs above it.
+  Never use a `main` or a dummy function as a place to put tests.
 - **A `.test` / `.performance` body declares no effect**: it cannot print, read or write files, read stdin or the clock, or run a program unless it wraps that in a `shim` inside the body. Write the stand-in inline, binding every operation of the effect (`read_files`: `read_file_to_string`; `write_files`: `write_string_to_file`; `list_files`: `list_files`; `clock`: `now_nanos` + `monotonic_now`; `prints`: `print` + `put`). A closure records calls with `set log.push(..)` on an outer `mut`, it cannot `return` or use `?`, and the shim is then a statement (`shim .. { .. };`). To exercise the real API, keep a `main` and pin it with `stdout` / `file:` / `expect file:` sections (`tests/cases/files/write_file.aipl`, `tests/cases/builtins/monotonic_now.aipl`).
 - Debug with `trace(expr)` (remove before handoff). `assert` works in tests only.
 

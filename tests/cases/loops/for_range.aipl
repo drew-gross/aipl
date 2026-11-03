@@ -14,46 +14,7 @@ import {
     wrapping_add_assign as +=,
 } from builtins;
 
-fn scenario() !prints {
-    // The common case: a count.
-    mut seen: u64[] = [];
-    for (let i : 0..3) {
-        set seen.push(i);
-    }
-    print(seen.to_str());
-
-    // Bounds are expressions, evaluated once, before the loop runs.
-    let lo = 2;
-    let xs = [10, 20, 30, 40, 50];
-    mut total = 0;
-    for (let i : lo..xs.len()) {
-        set total += xs[i].value_or(0);
-    }
-    print(total.to_str());
-
-    // An empty range — `end` not past `start` — runs the body zero times.
-    mut ran = false;
-    for (let i : 3..3) {
-        set ran = true;
-    }
-    for (let i : 5..2) {
-        set ran = true;
-    }
-    print(ran.to_str());
-
-    // The index-and-value form counts the values walked, like any iterable's.
-    for (let n, v : 10..13) {
-        print(`{n}: {v}`);
-    }
-
-    // The variable is fresh per iteration; a signed bound is accepted, as a
-    // slice's would be.
-    let upto: i64 = 2;
-    for (let i : 0..upto) {
-        let doubled = i + i;
-        print(doubled.to_str());
-    }
-}.test({
+test({
     mut out = "";
     shim prints {
         print = |text| {
@@ -63,7 +24,44 @@ fn scenario() !prints {
             set out = `{out}{text}`;
         },
     } {
-        scenario();
+        // The common case: a count.
+        mut seen: u64[] = [];
+        for (let i : 0..3) {
+            set seen.push(i);
+        }
+        print(seen.to_str());
+
+        // Bounds are expressions, evaluated once, before the loop runs.
+        let lo = 2;
+        let xs = [10, 20, 30, 40, 50];
+        mut total = 0;
+        for (let i : lo..xs.len()) {
+            set total += xs[i].value_or(0);
+        }
+        print(total.to_str());
+
+        // An empty range — `end` not past `start` — runs the body zero times.
+        mut ran = false;
+        for (let i : 3..3) {
+            set ran = true;
+        }
+        for (let i : 5..2) {
+            set ran = true;
+        }
+        print(ran.to_str());
+
+        // The index-and-value form counts the values walked, like any iterable's.
+        for (let n, v : 10..13) {
+            print(`{n}: {v}`);
+        }
+
+        // The variable is fresh per iteration; a signed bound is accepted, as a
+        // slice's would be.
+        let upto: i64 = 2;
+        for (let i : 0..upto) {
+            let doubled = i + i;
+            print(doubled.to_str());
+        }
     };
     assert(out == """
         [0, 1, 2]
