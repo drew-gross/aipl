@@ -163,7 +163,7 @@ fn a_file_with_sections_cannot_be_imported() {
         "error: import \"./sectioned.aipl\": that file has a `--- stdout ---` section, which makes it \
          a case of its own, and a file with sections cannot be imported — move what is shared into \
          a file without sections\n \
-         --> main.aipl:1:24\n  \
+         --> ./main.aipl:1:24\n  \
          |\n\
          1 | import { shared } from \"./sectioned.aipl\";\n  \
          |                        ^^^^^^^^^^^^^^^^^^\n"
@@ -182,7 +182,7 @@ fn a_test_cannot_let_an_effect_escape() {
     assert_eq!(
         stderr,
         "error: fn \"greet\" has effect \"!prints\" but the calling function does not declare it\n \
-         --> test_unshimmed_effect.aipl:6:5\n  \
+         --> ./test_unshimmed_effect.aipl:6:5\n  \
          |\n\
          6 |     greet();\n  \
          |     ^^^^^^^\n"
@@ -196,7 +196,7 @@ fn a_test_cannot_let_an_effect_escape() {
     assert_eq!(
         (stdout.as_str(), stderr.as_str(), code),
         (
-            "test_shimmed_effect.aipl:\n    greet: 0 assertions passed\n1 tests: 1 passed, 0 failed\n",
+            "./test_shimmed_effect.aipl:\n    greet: 0 assertions passed\n1 tests: 1 passed, 0 failed\n",
             "",
             0
         )
@@ -232,7 +232,7 @@ fn one_files_cached_constants_do_not_reach_the_next() {
     assert_eq!(
         (stdout.as_str(), stderr.as_str(), code),
         (
-            "a.aipl:\n    save: 2 assertions passed\nb.aipl:\n    names: 1 assertion passed\n\
+            "./a.aipl:\n    save: 2 assertions passed\n./b.aipl:\n    names: 1 assertion passed\n\
              2 files, 2 tests: 2 passed, 0 failed\n",
             "",
             0
@@ -249,8 +249,8 @@ fn a_top_level_test_block_runs_and_is_reported_by_its_position() {
     let (stdout, stderr, code) = check_here("top_level_test_blocks", src);
     assert_eq!(
         stdout,
-        "top_level_test_blocks.aipl:\n    standalone tests: 1 assertion passed, 1 failed\n\
-         test failures:\ntest block 2 ... FAIL\n  assert failed at top_level_test_blocks.aipl:8 1 == 2\n\
+        "./top_level_test_blocks.aipl:\n    standalone tests: 1 assertion passed, 1 failed\n\
+         test failures:\ntest block 2 ... FAIL\n  assert failed at ./top_level_test_blocks.aipl:8 1 == 2\n\
          2 tests: 1 passed, 1 failed\n"
     );
     assert_eq!((stderr.as_str(), code), ("", 1));
@@ -270,7 +270,7 @@ fn failures_come_after_every_file_that_passed() {
         stdout,
         "./a_fails.aipl:\n    b: 0 assertions passed, 1 failed\n\
          ./b_passes.aipl:\n    a: 1 assertion passed\n\
-         test failures:\ntest ./a_fails.aipl::b ... FAIL\n  assert failed at a_fails.aipl:4 b() == 6\n\
+         test failures:\ntest ./a_fails.aipl::b ... FAIL\n  assert failed at ./a_fails.aipl:4 b() == 6\n\
          2 files, 2 tests: 1 passed, 1 failed\n"
     );
     assert_eq!((stderr.as_str(), code), ("", 1));
@@ -287,12 +287,12 @@ fn an_unformatted_file_fails_even_when_its_tests_pass() {
     // The tests still ran — formatting is reported alongside them, not instead.
     assert_eq!(
         stdout,
-        "unformatted.aipl:\n    a: 1 assertion passed\n1 tests: 1 passed, 0 failed\n"
+        "./unformatted.aipl:\n    a: 1 assertion passed\n1 tests: 1 passed, 0 failed\n"
     );
     // And the diagnostic names the command that fixes it.
     assert_eq!(
         stderr,
-        "unformatted.aipl: needs formatting (run `aipl check --fix unformatted.aipl`)\n"
+        "./unformatted.aipl: needs formatting (run `aipl check --fix ./unformatted.aipl`)\n"
     );
     assert_eq!(code, 1);
 }
@@ -386,7 +386,7 @@ fn a_directory_argument_checks_the_tree_under_it() {
     // Only the named subtree runs — the failing file outside it is untouched.
     assert_eq!(
         stdout,
-        "sub/a.aipl:\n    a: 1 assertion passed\n1 file, 1 tests: 1 passed, 0 failed\n"
+        "./sub/a.aipl:\n    a: 1 assertion passed\n1 file, 1 tests: 1 passed, 0 failed\n"
     );
     assert_eq!(code, 0);
 }
@@ -404,7 +404,7 @@ fn several_explicit_paths_are_checked_as_one_batch() {
     );
     assert_eq!(
         stdout,
-        "a.aipl:\n    a: 1 assertion passed\nb.aipl:\n    a: 1 assertion passed\n\
+        "./a.aipl:\n    a: 1 assertion passed\n./b.aipl:\n    a: 1 assertion passed\n\
          2 files, 2 tests: 2 passed, 0 failed\n"
     );
     assert_eq!(code, 0);
@@ -484,7 +484,7 @@ fn a_failure_location_names_its_file_relative_to_where_check_was_invoked() {
     // placeholder `input`.
     let (stdout, _stderr, code) = check_tree("assert_label", &[("sub/fails.aipl", FAILS)], &[]);
     assert!(
-        stdout.contains("assert failed at sub/fails.aipl:4 b() == 6"),
+        stdout.contains("assert failed at ./sub/fails.aipl:4 b() == 6"),
         "expected a project-relative assert location, got:\n{stdout}"
     );
     assert_eq!(code, 1);
@@ -692,7 +692,7 @@ fn a_stdout_mismatch_names_the_file_the_section_and_both_sides() {
     assert_eq!(
         stderr,
         "\
-sections_stdout_wrong.aipl: `stdout` mismatch
+./sections_stdout_wrong.aipl: `stdout` mismatch
 --- expected ---
 bye
 --- actual ---
@@ -712,7 +712,7 @@ fn an_absent_section_records_silence_and_a_clean_exit() {
     assert_eq!(
         stderr,
         "\
-sections_absent_means_empty.aipl: `stdout` mismatch
+./sections_absent_means_empty.aipl: `stdout` mismatch
 --- expected ---
 
 --- actual ---
@@ -734,7 +734,7 @@ fn an_exit_code_section_is_compared_with_the_status_main_returns() {
     assert_eq!(
         stderr,
         "\
-sections_exit_wrong.aipl: `exit code` mismatch
+./sections_exit_wrong.aipl: `exit code` mismatch
 --- expected ---
 4
 --- actual ---
@@ -772,7 +772,7 @@ fn an_expect_file_section_checks_what_the_run_wrote() {
     assert_eq!(
         stderr,
         "\
-sections_expect_wrong.aipl: `expect file: out.txt` mismatch
+./sections_expect_wrong.aipl: `expect file: out.txt` mismatch
 --- expected ---
 other
 --- actual ---
@@ -788,7 +788,7 @@ written
     assert_eq!(stdout, NO_TESTS);
     assert_eq!(
         stderr,
-        "sections_expect_missing.aipl: expected output file \"never.txt\" was not written: No such file or directory (os error 2)\n"
+        "./sections_expect_missing.aipl: expected output file \"never.txt\" was not written: No such file or directory (os error 2)\n"
     );
     assert_eq!(code, 1);
 }
@@ -800,7 +800,7 @@ fn a_run_section_on_a_file_with_no_main_is_reported() {
     assert_eq!(stdout, NO_TESTS);
     assert_eq!(
         stderr,
-        "sections_no_main.aipl: a file with no `main` runs only its `.test` blocks — it can't have a stdout/stderr/exit/cli/expect-file section\n"
+        "./sections_no_main.aipl: a file with no `main` runs only its `.test` blocks — it can't have a stdout/stderr/exit/cli/expect-file section\n"
     );
     assert_eq!(code, 1);
 }
@@ -869,7 +869,7 @@ fn an_errors_section_on_a_file_that_compiles_is_reported() {
     assert_eq!(stdout, "");
     assert_eq!(
         stderr,
-        "sections_errors_compiles.aipl: expected an error, but compilation succeeded\n"
+        "./sections_errors_compiles.aipl: expected an error, but compilation succeeded\n"
     );
     assert_eq!(code, 1);
 }
@@ -882,8 +882,8 @@ fn an_errors_section_cannot_sit_with_a_section_that_observes_a_run() {
     assert_eq!(
         stderr,
         "\
-sections_errors_conflict.aipl: `errors` section is mutually exclusive with stdout/stderr/exit code
-sections_errors_conflict.aipl: `errors` mismatch
+./sections_errors_conflict.aipl: `errors` section is mutually exclusive with stdout/stderr/exit code
+./sections_errors_conflict.aipl: `errors` mismatch
 --- expected ---
 x
 --- actual ---
@@ -920,7 +920,7 @@ fn companions_are_staged_for_the_tests_too() {
     assert_eq!(
         (stdout.as_str(), stderr.as_str(), code),
         (
-            "sections_companion_tests.aipl:\n    f: 1 assertion passed\n1 tests: 1 passed, 0 failed\n",
+            "./sections_companion_tests.aipl:\n    f: 1 assertion passed\n1 tests: 1 passed, 0 failed\n",
             "",
             0
         )
@@ -937,18 +937,18 @@ fn a_mismatched_section_does_not_hide_a_failing_test() {
     assert_eq!(
         stdout,
         "\
-sections_with_failing_test.aipl:
+./sections_with_failing_test.aipl:
     f: 0 assertions passed, 1 failed
 test failures:
 test f ... FAIL
-  assert failed at sections_with_failing_test.aipl:4 f() == 2
+  assert failed at ./sections_with_failing_test.aipl:4 f() == 2
 1 tests: 0 passed, 1 failed
 "
     );
     assert_eq!(
         stderr,
         "\
-sections_with_failing_test.aipl: `stdout` mismatch
+./sections_with_failing_test.aipl: `stdout` mismatch
 --- expected ---
 bye
 --- actual ---
@@ -1019,7 +1019,7 @@ fn a_malformed_section_is_the_files_error_not_a_dropped_expectation() {
     assert_eq!(stdout, "");
     assert_eq!(
         stderr,
-        "sections_unknown.aipl: unknown section name \"stdotu\"\n"
+        "./sections_unknown.aipl: unknown section name \"stdotu\"\n"
     );
     assert_eq!(code, 1);
 }
@@ -1055,7 +1055,7 @@ fn a_report_section_that_does_not_match_shows_what_report_printed() {
     assert_eq!(
         stderr,
         format!(
-            "sections_report_wrong.aipl: `report` mismatch\n--- expected ---\n?\n--- actual ---\n{REPORT_OF_EMPTY_MAIN}\n"
+            "./sections_report_wrong.aipl: `report` mismatch\n--- expected ---\n?\n--- actual ---\n{REPORT_OF_EMPTY_MAIN}\n"
         )
     );
     assert_eq!(code, 1);
@@ -1074,7 +1074,7 @@ fn a_report_is_of_the_run_the_cli_section_asks_for() {
     assert_eq!(
         stderr,
         "\
-sections_report_cli.aipl: `report` mismatch
+./sections_report_cli.aipl: `report` mismatch
 --- expected ---
 ?
 --- actual ---
@@ -1107,8 +1107,8 @@ fn a_report_section_cannot_sit_with_an_errors_section() {
     assert_eq!(
         stderr,
         "\
-sections_report_errors.aipl: `report` section requires a running program, so it cannot coexist with `errors`
-sections_report_errors.aipl: `errors` mismatch
+./sections_report_errors.aipl: `report` section requires a running program, so it cannot coexist with `errors`
+./sections_report_errors.aipl: `errors` mismatch
 --- expected ---
 x
 --- actual ---
@@ -1161,7 +1161,7 @@ fn a_benchmark_claim_that_does_not_hold_fails_the_check() {
         "\
 test failures:
 test work.benchmark ... FAIL
-  assert failed at benchmark_fails.aipl:4 measure(\"scalar\", 3, |n| n).instructions == 0
+  assert failed at ./benchmark_fails.aipl:4 measure(\"scalar\", 3, |n| n).instructions == 0
 1 tests: 0 passed, 1 failed
 "
     );
@@ -1179,7 +1179,7 @@ fn a_top_level_benchmark_block_runs_and_is_reported_by_its_position() {
     assert_eq!(
         stdout,
         "test failures:\ntest benchmark block 2 ... FAIL\n  \
-         assert failed at benchmark_top_level.aipl:8 measure(\"scalar\", 3, |n| n).instructions == 0\n\
+         assert failed at ./benchmark_top_level.aipl:8 measure(\"scalar\", 3, |n| n).instructions == 0\n\
          2 tests: 1 passed, 1 failed\n"
     );
     assert_eq!((stderr.as_str(), code), ("", 1));
@@ -1198,12 +1198,12 @@ fn benchmark_and_ordinary_tests_share_one_summary_and_a_failure_of_either_fails(
     assert_eq!(
         stdout,
         "\
-benchmark_summary.aipl:
+./benchmark_summary.aipl:
     one: 1 assertion passed
     two: 0 assertions passed, 1 failed
 test failures:
 test two ... FAIL
-  assert failed at benchmark_summary.aipl:10 two() == 3
+  assert failed at ./benchmark_summary.aipl:10 two() == 3
 3 tests: 2 passed, 1 failed
 "
     );
@@ -1232,7 +1232,7 @@ fn a_benchmark_failure_in_a_batch_names_its_file_and_does_not_stop_the_run() {
         "\
 test failures:
 test ./a_fails.aipl::work.benchmark ... FAIL
-  assert failed at a_fails.aipl:4 measure(\"scalar\", 3, |n| n).instructions == 0
+  assert failed at ./a_fails.aipl:4 measure(\"scalar\", 3, |n| n).instructions == 0
 2 files, 2 tests: 1 passed, 1 failed
 "
     );
@@ -1251,7 +1251,7 @@ fn measure_outside_a_benchmark_block_is_refused() {
         stderr,
         "\
 error: fn \"measure\" can only be called from a `.benchmark` block
- --> measure_in_test.aipl:4:12
+ --> ./measure_in_test.aipl:4:12
   |
 4 |     assert(measure(\"x\", 1, |n| n).allocations == 0);
   |            ^^^^^^^^^^^^^^^^^^^^^^
@@ -1267,7 +1267,7 @@ error: fn \"measure\" can only be called from a `.benchmark` block
         stderr,
         "\
 error: fn \"measure\" can only be called from a `.benchmark` block
- --> measure_in_main.aipl:4:5
+ --> ./measure_in_main.aipl:4:5
   |
 4 |     measure(\"x\", 1, |n| n);
   |     ^^^^^^^^^^^^^^^^^^^^^^
@@ -1307,19 +1307,19 @@ fn work() {}.benchmark({
         stderr,
         "\
 error: effects are not supported in a `.benchmark` block yet: fn \"print\" has effect \"!prints\"
- --> benchmark_effects.aipl:9:5
+ --> ./benchmark_effects.aipl:9:5
   |
 9 |     print(\"direct\");
   |     ^^^^^^^^^^^^^^^
 
 error: effects are not supported in a `.benchmark` block yet: fn \"noisy\" has effect \"!prints\"
-  --> benchmark_effects.aipl:10:25
+  --> ./benchmark_effects.aipl:10:25
    |
 10 |     measure(\"named\", 1, noisy);
    |                         ^^^^^
 
 error: effects are not supported in a `.benchmark` block yet: fn \"print\" has effect \"!prints\"
-  --> benchmark_effects.aipl:15:13
+  --> ./benchmark_effects.aipl:15:13
    |
 15 |             print(\"inside\");
    |             ^^^^^^^^^^^^^^^
@@ -1338,7 +1338,7 @@ fn a_literal_measurement_label_used_twice_in_one_block_is_refused() {
         stderr,
         "\
 error: duplicate measurement label \"same\" in this `.benchmark` block — a report could not tell the two apart
- --> benchmark_duplicate_label.aipl:5:13
+ --> ./benchmark_duplicate_label.aipl:5:13
   |
 5 |     measure(\"same\", 2, |n| n);
   |             ^^^^^^
@@ -1368,7 +1368,7 @@ fn a_type_error_in_a_benchmark_block_is_reported_with_its_source() {
         stderr,
         "\
 error: \"==\" between u64 and bool: both sides must be the same type
- --> benchmark_type_error.aipl:4:12
+ --> ./benchmark_type_error.aipl:4:12
   |
 4 |     assert(measure(\"x\", 1, |n| n).allocations == true);
   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1477,7 +1477,7 @@ fn fix_formats_the_file_and_refreshes_the_sections_that_went_stale() {
     let (stdout, stderr, code) = check_tree("fix_stale", &[("a.aipl", src)], &["--fix", "a.aipl"]);
     assert_eq!(
         stdout,
-        format!("formatted a.aipl\nfixed a.aipl: stdout, exit code\n{NO_TESTS}")
+        format!("formatted ./a.aipl\nfixed ./a.aipl: stdout, exit code\n{NO_TESTS}")
     );
     assert_eq!((stderr.as_str(), code), ("", 0));
     assert_eq!(
@@ -1521,7 +1521,7 @@ fn fix_refreshes_an_errors_section_after_formatting_has_moved_its_line_numbers()
     let src = "fn   bad()  ->  i64   {   true   }\n--- errors ---\nstale\n";
     let (stdout, stderr, code) =
         check_tree("fix_errors", &[("bad.aipl", src)], &["--fix", "bad.aipl"]);
-    assert_eq!(stdout, "formatted bad.aipl\nfixed bad.aipl: errors\n");
+    assert_eq!(stdout, "formatted ./bad.aipl\nfixed ./bad.aipl: errors\n");
     assert_eq!((stderr.as_str(), code), ("", 0));
     assert_eq!(
         tree_file("fix_errors", "bad.aipl"),
@@ -1541,7 +1541,7 @@ error: fn \"bad\": body returns bool, but the declared return type is i64
 fn fix_refreshes_a_report_section() {
     let src = "fn main() {}\n--- report ---\nstale\n";
     let (stdout, stderr, code) = check_tree("fix_report", &[("r.aipl", src)], &["--fix", "r.aipl"]);
-    assert_eq!(stdout, format!("fixed r.aipl: report\n{NO_TESTS}"));
+    assert_eq!(stdout, format!("fixed ./r.aipl: report\n{NO_TESTS}"));
     assert_eq!((stderr.as_str(), code), ("", 0));
     assert_eq!(
         tree_file("fix_report", "r.aipl"),
@@ -1561,12 +1561,12 @@ fn fix_does_not_hide_a_failing_test() {
     assert_eq!(
         stdout,
         "\
-fixed t.aipl: stdout
-t.aipl:
+fixed ./t.aipl: stdout
+./t.aipl:
     f: 0 assertions passed, 1 failed
 test failures:
 test f ... FAIL
-  assert failed at t.aipl:4 f() == 2
+  assert failed at ./t.aipl:4 f() == 2
 1 tests: 0 passed, 1 failed
 "
     );
@@ -1585,7 +1585,7 @@ fn fix_leaves_what_a_rewrite_cannot_repair() {
     assert_eq!(stdout, NO_TESTS);
     assert_eq!(
         stderr,
-        "n.aipl: a file with no `main` runs only its `.test` blocks — it can't have a stdout/stderr/exit/cli/expect-file section\n"
+        "./n.aipl: a file with no `main` runs only its `.test` blocks — it can't have a stdout/stderr/exit/cli/expect-file section\n"
     );
     assert_eq!(code, 1);
     // And the file is as it was.
@@ -1597,7 +1597,7 @@ fn fix_leaves_what_a_rewrite_cannot_repair() {
     assert_eq!(stdout, NO_TESTS);
     assert_eq!(
         stderr,
-        "m.aipl: expected output file \"never.txt\" was not written: No such file or directory (os error 2)\n"
+        "./m.aipl: expected output file \"never.txt\" was not written: No such file or directory (os error 2)\n"
     );
     assert_eq!(code, 1);
     assert_eq!(tree_file("fix_missing", "m.aipl"), missing);
@@ -1630,7 +1630,7 @@ fn fix_with_ignore_sections_only_formats() {
         &[("i.aipl", &src)],
         &["--fix", "--ignore-sections", "i.aipl"],
     );
-    assert_eq!(stdout, format!("formatted i.aipl\n{NO_TESTS}"));
+    assert_eq!(stdout, format!("formatted ./i.aipl\n{NO_TESTS}"));
     assert_eq!((stderr.as_str(), code), ("", 0));
     // The section is still wrong; this run was not asked about it.
     assert!(tree_file("fix_ignore", "i.aipl").ends_with("--- stdout ---\nbye\n"));

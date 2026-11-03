@@ -74,7 +74,7 @@ reallocations     3
 bytes allocated   2802
 peak live bytes   2842
 instructions      7748
-binary size       23352 bytes (code 13456, data 1771, metadata 8125)
+binary size       23360 bytes (code 13456, data 1779, metadata 8125)
 
 function                   calls  code bytes
 __arr_drop_First               2         152

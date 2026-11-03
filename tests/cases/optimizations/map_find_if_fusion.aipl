@@ -80,7 +80,7 @@ reallocations     7
 bytes allocated   1926
 peak live bytes   3958
 instructions      15216
-binary size       6144 bytes (code 3196, data 330, metadata 2618)
+binary size       6160 bytes (code 3196, data 346, metadata 2618)
 
 function                                                                     calls  code bytes
 __builtin_find_if$i64$lam$__test$__test_block_1$lambda1                          1         224

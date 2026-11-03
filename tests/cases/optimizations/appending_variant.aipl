@@ -84,7 +84,7 @@ reallocations     8
 bytes allocated   24508
 peak live bytes   24730
 instructions      48887
-binary size       13336 bytes (code 7672, data 507, metadata 5157)
+binary size       13352 bytes (code 7672, data 525, metadata 5155)
 
 function                   calls  code bytes
 __arr_drop_Rule               69         116

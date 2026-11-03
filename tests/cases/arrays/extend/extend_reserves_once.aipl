@@ -27,7 +27,7 @@ reallocations     0
 bytes allocated   202
 peak live bytes   202
 instructions      163
-binary size       2552 bytes (code 852, data 256, metadata 1444)
+binary size       2560 bytes (code 852, data 258, metadata 1450)
 
 function                   calls  code bytes
 __test$__test_block_1          1         540

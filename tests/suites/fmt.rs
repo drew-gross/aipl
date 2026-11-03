@@ -405,7 +405,7 @@ fn cli_check_formats_with_fix() {
         run(&["check", "wide.aipl"]),
         (
             "0 tests: 0 passed, 0 failed\n".to_string(),
-            "wide.aipl: needs formatting (run `aipl check --fix wide.aipl`)\n".to_string(),
+            "./wide.aipl: needs formatting (run `aipl check --fix ./wide.aipl`)\n".to_string(),
             Some(1)
         )
     );
@@ -414,7 +414,7 @@ fn cli_check_formats_with_fix() {
     assert_eq!(
         run(&["check", "--fix", "wide.aipl"]),
         (
-            "formatted wide.aipl\n0 tests: 0 passed, 0 failed\n".to_string(),
+            "formatted ./wide.aipl\n0 tests: 0 passed, 0 failed\n".to_string(),
             String::new(),
             Some(0)
         )

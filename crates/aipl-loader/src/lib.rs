@@ -2120,18 +2120,31 @@ fn tag_origin(
     errs.into_iter().map(|e| e.in_file(&label, src)).collect()
 }
 
-/// What a diagnostic that points into `path` calls the file: the path relative
-/// to the project root as `./sub/file.aipl`, the way the entry file is named
-/// under a root-relative invocation, so an error in an imported file says which
-/// file of that name. A virtual source's key is already such a name; a file
-/// outside the root keeps its full path, since nothing shorter identifies it.
+/// What a diagnostic that points into `path` calls the file: [`root_label`].
 fn diagnostic_label(path: &Path, project_root: Option<&Path>) -> String {
-    if path.is_relative() {
-        return path.display().to_string();
-    }
-    match project_root.and_then(|root| path.strip_prefix(root).ok()) {
-        Some(rel) => format!("./{}", bake::slash_joined(rel)),
-        None => path.display().to_string(),
+    root_label(path, project_root)
+}
+
+/// How anything the toolchain prints names a file: relative to the project root, with a
+/// leading `./` (`./sub/file.aipl`), the way a person at the root would type it and can
+/// click it. A relative `path` is taken to be relative to the root already and gets the `./`
+/// if it lacks one; an absolute one under the root has the root taken off. A path that is
+/// not under the root keeps its full spelling, since nothing shorter identifies it
+/// (`../x.aipl` is also left as written). DESIGN_PRINCIPLES.md §7.
+pub fn root_label(path: &Path, project_root: Option<&Path>) -> String {
+    let relative = if path.is_absolute() {
+        match project_root.and_then(|root| path.strip_prefix(root).ok()) {
+            Some(rel) => rel,
+            None => return path.display().to_string(),
+        }
+    } else {
+        path
+    };
+    let joined = bake::slash_joined(relative);
+    if joined == "." || joined.starts_with("./") || joined.starts_with("../") {
+        joined
+    } else {
+        format!("./{joined}")
     }
 }
 

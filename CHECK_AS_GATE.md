@@ -428,3 +428,6 @@ Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered
   (the `errors` branch loaded without a project root). Fixed: the heading is root-relative, `load_program_overlay` takes the root, the harness runs
   `check` from the root with a relative path. DESIGN_PRINCIPLES.md §7 states the rule; `fmt::no_pinned_file_names_a_path_on_one_machine` enforces it.
   Remaining: the harness roots each case at its own directory (G4), so a loader error header and its caret block use two roots.
+- 2026-11-03: every file label now has the leading `./` (`aipl_loader::root_label`): caret blocks, loader errors, `check` headings and `test ./a.aipl::f` headers,
+  `fixed`/`formatted`, `aipl doc`, and the location baked into `assert`/`trace` (so every baked label is two bytes longer: baseline `code bytes`/`data` rows
+  and pinned reports move). DESIGN_PRINCIPLES.md §7 says so.

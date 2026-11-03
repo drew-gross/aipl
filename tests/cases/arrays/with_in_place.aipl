@@ -35,7 +35,7 @@ reallocations     0
 bytes allocated   1603
 peak live bytes   1603
 instructions      23961
-binary size       4800 bytes (code 2700, data 105, metadata 1995)
+binary size       4800 bytes (code 2700, data 107, metadata 1993)
 
 function                   calls  code bytes
 __builtin_repeat$i64           2         532

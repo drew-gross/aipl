@@ -638,8 +638,14 @@ test to it; if a *helper* would make the subject a function, define the helper.
 ## 7. Paths are relative to the project root
 
 **Anything the toolchain prints or records that names a file names it relative to the project
-root, never by a path on the machine it ran on.** `./tests/cases/strings/slice.aipl:12`, not
+root, never by a path on the machine it ran on, and always with the leading `./`.**
+`./tests/cases/strings/slice.aipl:12`, not `tests/cases/strings/slice.aipl:12` and not
 `/Users/someone/work/aipl/tests/cases/strings/slice.aipl:12`.
+
+The `./` is part of the name, not decoration. It says "relative to the root" without a reader
+having to know that, it makes every spelling of one file the same string whether `check` was pointed
+at `a.aipl`, `./a.aipl`, an absolute path or found it by walking a directory (so a recorded
+diagnostic can be compared at all), and a path with it is one a terminal can open.
 
 Three things depend on it:
 
@@ -655,8 +661,12 @@ Three things depend on it:
 
 ### Downstream decisions
 
-- **A diagnostic's file label is root-relative** (`./path`), including the one a loader error opens
-  with, the heading `aipl check` prints over a file's tests, and the location baked into an `assert`.
+- **One function names a file** (`aipl_loader::root_label`), and every surface goes through it: the
+  ` --> ` line of a caret block, the file a loader error opens with, the heading `aipl check` prints
+  over a file's tests and the `test ./a.aipl::f ... FAIL` header, `fixed`/`formatted` lines, the
+  `aipl doc` heading, the location baked into an `assert` or a `trace`, and the label an `errors`
+  section is recorded against. A new place that names a file calls it; it does not format a path
+  itself.
 - **A tool that runs somewhere else is told the root.** `check` stages a file's companions in a
   scratch directory and runs the tests there; it passes the project root along so nothing it prints
   names the scratch directory (`load_program_rooted`, and `load_program_overlay`'s `project_root`).
@@ -690,8 +700,9 @@ from one machine scans `projects/` as well, but a project-relative path is what 
 
 ### What it does not mean
 
-A file outside the root keeps its full path, since nothing shorter identifies it. That is the one
-case where an absolute path is the honest answer, and no pinned output should depend on it.
+A file outside the root keeps its full path, since nothing shorter identifies it, and a path that
+climbs out of it (`../x.aipl`) is left as written. Those are the cases where the `./` does not apply,
+and no pinned output should depend on either.
 
 It does not yet hold everywhere: the cases harness still roots each *case* at its own directory, so a
 loader error opens with `./err_duplicate_struct.aipl` while the caret block below it says

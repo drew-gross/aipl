@@ -15,7 +15,20 @@ use aipl::{sections, DebugOptions, Error, SpecFields};
 /// message is still right), falling back to the plain messages if the file
 /// can't be read.
 fn render_err(file: &str, errors: Vec<Error>) -> String {
-    render_err_at(Path::new(file), file, errors)
+    render_err_at(Path::new(file), &named(Path::new(file)), errors)
+}
+
+/// How output names `file`: relative to the project root, with a leading `./`
+/// (`loader::root_label`). The root is the directory the command runs in.
+fn named(file: &Path) -> String {
+    let root = env::current_dir()
+        .ok()
+        .and_then(|dir| std::fs::canonicalize(dir).ok());
+    let file = match (file.is_absolute(), std::fs::canonicalize(file)) {
+        (true, Ok(canonical)) => canonical,
+        _ => file.to_path_buf(),
+    };
+    loader::root_label(&file, root.as_deref())
 }
 
 /// [`render_err`] for a file whose source lives at `path` but should be *named*
@@ -750,10 +763,10 @@ fn check_cmd(args: &[String]) -> ExitCode {
         .iter()
         .map(|f| {
             let abs = std::fs::canonicalize(f).unwrap_or_else(|_| f.clone());
-            let label = match (f.is_absolute(), abs.strip_prefix(&project_root_canonical)) {
-                (true, Ok(rel)) => rel.display().to_string(),
-                _ => f.display().to_string(),
-            };
+            let label = loader::root_label(
+                if f.is_absolute() { &abs } else { f },
+                Some(&project_root_canonical),
+            );
             (abs, label)
         })
         .collect();
@@ -1123,11 +1136,12 @@ fn doc_cmd(args: &[String]) -> Result<(), String> {
     // Strip any trailing `--- .. ---` harness sections (some `.aipl` files carry
     // a `--- stdout ---` block) so the source parses on its own.
     let stripped = aipl::strip_test_sections(&src);
-    let program = aipl::parse(stripped).map_err(|e| e.render(stripped, file))?;
+    let label = named(Path::new(file));
+    let program = aipl::parse(stripped).map_err(|e| e.render(stripped, &label))?;
     // The file's own documentation leads, under the file's name — it is about
     // no declaration, so it has no other name to print under.
     if let Some(doc) = &program.doc {
-        print_doc(file, doc);
+        print_doc(&label, doc);
     }
     for item in &program.items {
         // Every kind of declaration a `# ..` block can sit above; an `import`

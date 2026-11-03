@@ -769,7 +769,7 @@ of those programs. One such lint took out 66 cases at once.
   matters, where an ordinary escaped literal is predictable.
 
 ## Debugging a program: `trace(expr)`, and removing it before handoff
-`trace(expr)` prints `path/to/file.aipl:12 expr = value` and evaluates to `expr`,
+`trace(expr)` prints `./path/to/file.aipl:12 expr = value` and evaluates to `expr`,
 so it wraps a subexpression without restructuring anything around it
 (`trace(w) * trace(h)`). It needs no import and declares no effect — it is the
 only call that prints without one — which is what makes it reachable the moment
@@ -811,7 +811,7 @@ body, `assert` only in test code.
 and its path together. `assert`'s rewrite used to live in the parser's
 `post_parse`, which is exactly why its locations read `input:13:` — `input` stood
 in for the filename the parser could not know. They now read
-`sub/lib.aipl:13 answer() == 42`.
+`./sub/lib.aipl:13 answer() == 42`.
 
 The line and text come from **one** dogfooded formatter, `source_loc`
 (`crates/aipl-codegen/src/source_loc.aipl`); the loader prefixes the file name,

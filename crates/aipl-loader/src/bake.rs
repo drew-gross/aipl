@@ -111,25 +111,19 @@ pub(crate) fn reserved_names_not_bound(program: &Program) -> Result<(), Error> {
     Ok(())
 }
 
-/// What a baked location names a file: `path` relative to the project root, with
-/// forward slashes so the string reads the same on every platform.
+/// What a baked location names a file: [`crate::root_label`], `./` and forward slashes
+/// included, so the string reads the same on every platform and is the name a diagnostic
+/// about the file uses.
 ///
-/// A file outside the project root — or one loaded with no project root known,
-/// which is every in-memory entry point — falls back to its bare name, the same
-/// thing [`file_label`] shows a diagnostic about it. An absolute path would be
-/// both noisy and particular to one machine.
+/// A file outside the project root — or one loaded with no project root known, which is
+/// every in-memory entry point — falls back to its bare name, the same thing [`file_label`]
+/// shows a diagnostic about it. An absolute path would be both noisy and particular to one
+/// machine.
 pub(crate) fn location_label(path: &Path, project_root: Option<&Path>) -> String {
-    // A virtual source's key *is* the name the caller gave it (`"./util.aipl"`),
-    // so there is nothing to make it relative to.
-    let rel = if path.is_relative() {
-        path.strip_prefix(".").unwrap_or(path)
-    } else {
-        match project_root.and_then(|root| path.strip_prefix(root).ok()) {
-            Some(rel) => rel,
-            None => return file_label(path),
-        }
-    };
-    slash_joined(rel)
+    if path.is_absolute() && !project_root.is_some_and(|root| path.starts_with(root)) {
+        return file_label(path);
+    }
+    crate::root_label(path, project_root)
 }
 
 /// `rel`'s components joined with forward slashes.
