@@ -24,6 +24,7 @@ projects:
     press() should destructure self. Also we should have tuple destructuring
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg metagame analyzer
+    probably need floats for this
 
 argparser:
   make it
@@ -821,7 +822,7 @@ allocator:
   make own allocator
 
 perfmon:
-  allow comments in report   sections
+  allow comments in report sections
   measure() needs to block optimizations
   show call-sites of each function in the final binary
   show regression and improvements
@@ -830,7 +831,7 @@ perfmon:
 
 report:
   count lines of code, split by comments, tests, perf, blank, etc.
-  show syntehsized functions
+  show synthesized functions
   options to dump the clif, the binary, the asm, etc.
 
 flamegraph:
@@ -847,11 +848,12 @@ check:
   can for sure recover from format errors
 
 tests:
+  convert most of the not-flagged tests for lints and section based tests for lints into reglar aipl tests. Retain a few, primarily for coverage of the linting invocation infrastructure, not the individual lints. Make a note of this in the "add lint" skill, for when I return to port the remaining lints from rust to aipl.
+  show test failures when there are also lint or format failures
+  when one function fails to typecheck we should still be able to run other tests that don't depend on it
   section test that asserts on expecting files to be written
   make sure check passes on all files (needs to account for sections maybe?)
   test operation fusion by re-rendering the fused code back to aipl and asserting on that. The measure() assertions (especially the doesn't-fire assertions) are fragile.
-  allow top-level test({}) to kill the stupid fn main() {}.test() pattern (also lint against that pattern - tests on empty main or other empty function)
-  make a better way to test non-aipl-implemented builtins
   make tests leverage better parallelism and caching by using more files
   make ? in tests a _desugaring_ that happens earlier than codegen, then this inlining restriction can also be lifted
   find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)

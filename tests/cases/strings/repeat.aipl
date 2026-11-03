@@ -1,13 +1,25 @@
-import { print, repeat } from builtins;
+import { equal as ==, print, repeat } from builtins;
 
-fn main() !prints {
-    print("abc".repeat(3));
-    print("x".repeat(1));
-    print("-".repeat(0));
-    print("hi".repeat(2));
-}
---- stdout ---
-abcabcabc
-x
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print("abc".repeat(3));
+        print("x".repeat(1));
+        print("-".repeat(0));
+        print("hi".repeat(2));
+    };
+    assert(out == """
+        abcabcabc
+        x
 
-hihi
+        hihi
+
+    """);
+})

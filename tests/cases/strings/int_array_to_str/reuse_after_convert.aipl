@@ -1,15 +1,27 @@
 # Converting doesn't consume the array: the refcount protocol (caller incs,
 # callee decs) leaves `xs` usable afterward — no double-free or leak.
 
-import { len, print, to_str } from builtins;
+import { equal as ==, len, print, to_str } from builtins;
 
-fn main() !prints {
-    let xs = [7, 8, 9];
-    print(to_str(xs));
-    print(to_str(xs));
-    print(to_str(len(xs)));
-}
---- stdout ---
-[7, 8, 9]
-[7, 8, 9]
-3
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let xs = [7, 8, 9];
+        print(to_str(xs));
+        print(to_str(xs));
+        print(to_str(len(xs)));
+    };
+    assert(out == """
+        [7, 8, 9]
+        [7, 8, 9]
+        3
+
+    """);
+})

@@ -1,21 +1,33 @@
-import { print } from builtins;
+import { equal as ==, print } from builtins;
 
-fn main() !prints {
-    let name = "world";
-    let n = 42;
-    print(`hello {name}`);
-    print(`value is {n}`);
-    print(`no interpolation`);
-    print(```
-        indented {name}
-        and {n}
-    ```);
-    print(`prefix {name} middle {n} suffix`);
-}
---- stdout ---
-hello world
-value is 42
-no interpolation
-indented world
-and 42
-prefix world middle 42 suffix
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let name = "world";
+        let n = 42;
+        print(`hello {name}`);
+        print(`value is {n}`);
+        print(`no interpolation`);
+        print(```
+            indented {name}
+            and {n}
+        ```);
+        print(`prefix {name} middle {n} suffix`);
+    };
+    assert(out == """
+        hello world
+        value is 42
+        no interpolation
+        indented world
+        and 42
+        prefix world middle 42 suffix
+
+    """);
+})

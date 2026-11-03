@@ -7,18 +7,23 @@
 # content there anyway (only a triple closes it), and a backslash is content
 # too, so `` \` `` reads back as written.
 
-import { print } from builtins;
+import { equal as ==, print } from builtins;
 
-fn main() !prints {
-    let s = "abc";
-    print(`\`{s}\``);
-    print(`\{{s}\}`);
-    print(`a \\ b \n c`);
-    print(```\`{s}\` and \{raw\}```);
-}
---- stdout ---
-`abc`
-{abc}
-a \ b 
- c
-\abc`\` and {raw}
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let s = "abc";
+        print(`\`{s}\``);
+        print(`\{{s}\}`);
+        print(`a \\ b \n c`);
+        print(```\`{s}\` and \{raw\}```);
+    };
+    assert(out == "`abc`\n{abc}\na \\ b \n c\n\\abc`\\` and {raw}\n");
+})

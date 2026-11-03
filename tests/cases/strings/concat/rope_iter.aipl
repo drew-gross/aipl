@@ -5,17 +5,29 @@
 
 import { equal as ==, print, rope_str, to_str, wrapping_increment as ++ } from builtins;
 
-fn main() !prints {
-    let r = rope_str("Hello, ", "rope world!"); // 18-byte rope (two leaves)
-    mut n = 0;
-    mut last_is_bang = false;
-    for (let c : r) {
-        set n++;
-        set last_is_bang = c == '!'; // exercises the char binding each step
-    }
-    print(to_str(n)); // 18
-    print(to_str(last_is_bang)); // true
-}
---- stdout ---
-18
-true
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let r = rope_str("Hello, ", "rope world!"); // 18-byte rope (two leaves)
+        mut n = 0;
+        mut last_is_bang = false;
+        for (let c : r) {
+            set n++;
+            set last_is_bang = c == '!'; // exercises the char binding each step
+        }
+        print(to_str(n)); // 18
+        print(to_str(last_is_bang)); // true
+    };
+    assert(out == """
+        18
+        true
+
+    """);
+})

@@ -29,12 +29,16 @@ def convert(path):
     exp=expected_body+'\n' if expected_body!='' or 'print(' in head else ''
     if '\n' not in exp.rstrip('\n'):
         lit='"'+exp.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n')+'"'
-        lit=lit.replace('{','\\{')
+        lit=lit
     else:
-        if '"""' in exp: return 'triple quote in output'
+        escaped=any(l!=l.rstrip() for l in exp.split('\n')) or '"""' in exp
         ind=' '*8
         lines=exp.split('\n')
-        lit='"""\n'+'\n'.join((ind+l if l else '') for l in lines[:-1])+'\n\n'+ind+'"""'
+        if escaped:
+            # A `"""` block drops trailing whitespace and cannot hold `"""`.
+            lit='"'+exp.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n')+'"'
+        else:
+            lit='"""\n'+'\n'.join((ind+l if l else '') for l in lines[:-1])+'\n\n'+ind+'"""'
     body=''.join(('    '+l if l.strip() else l) for l in fn_body.splitlines(True))
     block=('test({\n    mut out = "";\n    shim prints {\n        print = |text| {\n'
            '            set out = `{out}{text}\\n`;\n        },\n        put = |text| {\n'

@@ -1,14 +1,26 @@
 # `to_str(xs)` renders an i64[] as a bracketed, comma-separated
 # list. Negatives and zero render via the same decimal logic as to_str.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
-fn main() !prints {
-    print(to_str([1, 2, 3]));
-    print(to_str([42]));
-    print(to_str([-5, 0, 100]));
-}
---- stdout ---
-[1, 2, 3]
-[42]
-[-5, 0, 100]
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str([1, 2, 3]));
+        print(to_str([42]));
+        print(to_str([-5, 0, 100]));
+    };
+    assert(out == """
+        [1, 2, 3]
+        [42]
+        [-5, 0, 100]
+
+    """);
+})

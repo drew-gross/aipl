@@ -2,9 +2,18 @@
 
 import { equal as ==, print, to_str } from builtins;
 
-fn main() !prints {
-    let s = (123).to_str();
-    print(to_str(if (s == "123") { 1 } else { 0 }));
-}
---- stdout ---
-1
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let s = (123).to_str();
+        print(to_str(if (s == "123") { 1 } else { 0 }));
+    };
+    assert(out == "1\n");
+})

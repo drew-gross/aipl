@@ -2,15 +2,26 @@
 # it exercises the magnitude-via-wrapping path; it's built by `MIN+1 - 1` since
 # the literal `9223372036854775808` itself overflows i64.
 
-import { print, to_str, wrapping_sub as - } from builtins;
+import { equal as ==, print, to_str, wrapping_sub as - } from builtins;
 
-fn main() !prints -> i64 {
-    print(to_str(-1));
-    print(to_str(-9223372036854775807 - 1));
-    print(to_str(9223372036854775807));
-    0
-}
---- stdout ---
--1
--9223372036854775808
-9223372036854775807
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(-1));
+        print(to_str(-9223372036854775807 - 1));
+        print(to_str(9223372036854775807));
+    };
+    assert(out == """
+        -1
+        -9223372036854775808
+        9223372036854775807
+
+    """);
+})

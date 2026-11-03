@@ -3,24 +3,36 @@
 
 import { equal as ==, print, push, to_str, wrapping_add as + } from builtins;
 
-fn main() !prints {
-    print(to_str(true)); // true
-    print(to_str(false)); // false
-    // A bool expression, not just a literal.
-    print(to_str(1 + 1 == 2)); // true
-    print(to_str([true, false, true])); // [true, false, true]
-    print(to_str([])); // []
-    // Concatenation of two rendered strings.
-    print(`flags: {[false, true]}`); // flags: [false, true]
-    mut bs = [true];
-    set bs.push(false);
-    print(to_str(bs)); // [true, false]
-}
---- stdout ---
-true
-false
-true
-[true, false, true]
-[]
-flags: [false, true]
-[true, false]
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(true)); // true
+        print(to_str(false)); // false
+        // A bool expression, not just a literal.
+        print(to_str(1 + 1 == 2)); // true
+        print(to_str([true, false, true])); // [true, false, true]
+        print(to_str([])); // []
+        // Concatenation of two rendered strings.
+        print(`flags: {[false, true]}`); // flags: [false, true]
+        mut bs = [true];
+        set bs.push(false);
+        print(to_str(bs)); // [true, false]
+    };
+    assert(out == """
+        true
+        false
+        true
+        [true, false, true]
+        []
+        flags: [false, true]
+        [true, false]
+
+    """);
+})

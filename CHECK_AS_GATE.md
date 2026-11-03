@@ -215,7 +215,7 @@ Checklist:
       reviewable. Batch 1 is the small-directories warm-up, which is where the capture template gets shaken out.
   - [x] 1. Warm-up, 35 files (redone as top-level `test` blocks after that form landed) (the census said 33; it missed `bindings/*/` and `functions/void/`): `bindings` 5, `conditionals` 1, `constants` 2, `chars` 2, `compound_assign` 2, `integers` 2,
         `loops` 2, `results` 2, `syntax` 1, `options` 3, `methods` 3, `functions` 6, `dicts` 4. Template settled (below).
-  - [ ] 2. `strings`, 28. (Mind `named_representations`: it must keep asking for each representation by name.)
+  - [x] 2. `strings`, 28 (27 converted; `small_string_optimization` is left, see D8). (Mind `named_representations`: it must keep asking for each representation by name.)
   - [ ] 3. `arrays`, 28.
   - [ ] 4. `structs` 15 + `variants` 13, 28.
   - [ ] 5. `tuples` 12 + `sets` 11, 23.
@@ -229,6 +229,13 @@ Checklist:
   - [ ] 12. Decide before converting, 18: `effects` 7, `builtins` 8, `execute_program` 2, `cli` 1. Some of these *are*
         the real-builtin coverage set (b) and keep their `main`; the `shim_effects`-style ones already test shims and
         convert. Settle the kept set here, then convert the rest.
+- [ ] **Left alone for now (D8, decided 2026-11-02):** the 11 files that hang a `.performance` block off `main` keep
+      their `main` and their `stdout` section untouched until D8 is settled (a top-level `performance({ .. })`, or attach
+      each block to the function it measures): `strings/small_string_optimization`, `constants/computed`,
+      `arrays/{reduce,reverse_allocates_nothing,slice_allocates_nothing,inline_empty}`,
+      `optimizations/{join_emptiness_fusion,map_map_fusion,fold_emptiness_and_index,map_reduce_fusion}`,
+      `performance/refcount_balance`. Skip them in every batch below (the codemod already skips what it cannot match;
+      check each batch's list for these names). They are the known exceptions in the final recount.
 - [ ] Convert the 32 `report` cases: confirm what `aipl report` / the harness measure when there is no `main`
       (the synthesized test driver), re-pin the section, check the baseline row moves are explained.
 - [ ] The 15 section-less `main` files: decide each.
@@ -338,3 +345,10 @@ Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered
   before the summary lines. The JIT test runtime counts assertions per test (`TestRecord`, `take_test_records`) and buffers
   failure text (`take_failure_report`). A `.performance` block runs in another process, so it is counted in the totals and
   its failures land under `test failures:` but it has no row of its own yet. 17 `check::` assertions updated.
+
+- 2026-11-02: Phase 2b batch 2 (`strings`): 27 of 28 converted; `main_to_test.py` gained an escaped-string fallback for output
+  with trailing whitespace. **D8 (open; the 11 are left alone, see the Phase 2b checklist):** 11 files hang a `.performance` block off `main`
+  (`strings/small_string_optimization`, `constants/computed`, `arrays/{reduce,reverse_allocates_nothing,slice_allocates_nothing,inline_empty}`,
+  `optimizations/{join_emptiness_fusion,map_map_fusion,fold_emptiness_and_index,map_reduce_fusion}`, `performance/refcount_balance`).
+  The performance block is not about `main`, but `.performance` attaches to a function and has no top-level form. Options: a
+  top-level `performance({ .. })` like `test` (same rarity argument), or attach each to the function it measures. Unconverted until decided.

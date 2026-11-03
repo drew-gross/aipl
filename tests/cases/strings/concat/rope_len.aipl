@@ -3,11 +3,20 @@
 # rope. Building an 18-byte rope and only measuring it allocates just the concat
 # node (1 allocation) — not a flattened 18-byte buffer (which would be a 2nd).
 
-import { len, print, rope_str, to_str } from builtins;
+import { equal as ==, len, print, rope_str, to_str } from builtins;
 
-fn main() !prints {
-    let r = rope_str("Hello, ", "rope world!"); // 18 bytes; never read as bytes
-    print(to_str(len(r))); // 18
-}
---- stdout ---
-18
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let r = rope_str("Hello, ", "rope world!"); // 18 bytes; never read as bytes
+        print(to_str(len(r))); // 18
+    };
+    assert(out == "18\n");
+})

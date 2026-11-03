@@ -4,18 +4,29 @@
 # the escapes its value needs, so it is now the backtick spelling of the same
 # text. Both lines print exactly as written.
 
-import { print } from builtins;
+import { equal as ==, print } from builtins;
 
-fn main() !prints -> i64 {
-    print("""path C:\dir\new "quoted" and ""doubled"" end""");
-    let multi = """
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print("""path C:\dir\new "quoted" and ""doubled"" end""");
+        let multi = """
+            line "with" quotes
+            and a \backslash
+        """;
+        print(multi);
+    };
+    assert(out == """
+        path C:\dir\new "quoted" and ""doubled"" end
         line "with" quotes
         and a \backslash
-    """;
-    print(multi);
-    0
-}
---- stdout ---
-path C:\dir\new "quoted" and ""doubled"" end
-line "with" quotes
-and a \backslash
+
+    """);
+})

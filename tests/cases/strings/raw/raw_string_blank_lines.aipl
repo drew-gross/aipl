@@ -1,16 +1,27 @@
 # Interior blank lines are preserved (and don't affect the common indent).
 
-import { print } from builtins;
+import { equal as ==, print } from builtins;
 
-fn main() !prints -> i64 {
-    print("""
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print("""
+            first
+
+            second
+        """);
+    };
+    assert(out == """
         first
 
         second
-    """);
-    0
-}
---- stdout ---
-first
 
-second
+    """);
+})

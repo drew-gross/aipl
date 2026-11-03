@@ -4,15 +4,26 @@
 # value is one line as the single-line literal, which is the value each of
 # them has: "", "", and "kept  " with its spaces verbatim.
 
-import { join, print } from builtins;
+import { equal as ==, join, print } from builtins;
 
-fn main() !prints -> i64 {
-    print(["[", "", "]"].join());
-    print(["[", "", "]"].join());
-    print(["[", "kept  ", "]"].join());
-    0
-}
---- stdout ---
-[]
-[]
-[kept  ]
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(["[", "", "]"].join());
+        print(["[", "", "]"].join());
+        print(["[", "kept  ", "]"].join());
+    };
+    assert(out == """
+        []
+        []
+        [kept  ]
+
+    """);
+})

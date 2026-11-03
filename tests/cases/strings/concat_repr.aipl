@@ -9,40 +9,52 @@ import { equal as ==, len, print, rope_str, to_str, wrapping_increment as ++ } f
 
 fn label(s: str) -> str { `[{s}]` }
 
-fn main() !prints {
-    let g = rope_str("foo", "bar"); // a concat node ("foobar")
-    print(g); // foobar
-    print(to_str(len(g))); // 6
-    print(to_str(g == "foobar")); // true
-    print(to_str(g == "nope")); // false
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let g = rope_str("foo", "bar"); // a concat node ("foobar")
+        print(g); // foobar
+        print(to_str(len(g))); // 6
+        print(to_str(g == "foobar")); // true
+        print(to_str(g == "nope")); // false
 
-    // Nested: a rope of ropes.
-    let h = rope_str(rope_str("a", "b"), rope_str("c", "d"));
-    print(h); // abcd
+        // Nested: a rope of ropes.
+        let h = rope_str(rope_str("a", "b"), rope_str("c", "d"));
+        print(h); // abcd
 
-    // Index and slice transparently materialize.
-    print(to_str(g[0])); // some('f')
-    print(g[..3]); // foo
+        // Index and slice transparently materialize.
+        print(to_str(g[0])); // some('f')
+        print(g[..3]); // foo
 
-    // Iterate the materialized bytes.
-    mut n = 0;
-    for (let c : g) {
-        set n++;
-    }
-    print(to_str(n)); // 6
+        // Iterate the materialized bytes.
+        mut n = 0;
+        for (let c : g) {
+            set n++;
+        }
+        print(to_str(n)); // 6
 
-    // Pass a concat (and a plain str) to a `str` parameter — distinct instances.
-    print(label(g)); // [foobar]
-    print(label("plain")); // [plain]
-}
---- stdout ---
-foobar
-6
-true
-false
-abcd
-some('f')
-foo
-6
-[foobar]
-[plain]
+        // Pass a concat (and a plain str) to a `str` parameter — distinct instances.
+        print(label(g)); // [foobar]
+        print(label("plain")); // [plain]
+    };
+    assert(out == """
+        foobar
+        6
+        true
+        false
+        abcd
+        some('f')
+        foo
+        6
+        [foobar]
+        [plain]
+
+    """);
+})

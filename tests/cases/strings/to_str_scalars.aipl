@@ -5,28 +5,40 @@
 # quoted, where the quotes tell it apart from the structure around it.)
 # Callable as a function or a method.
 
-import { print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
-fn main() !prints {
-    print(to_str(42)); // 42
-    print(to_str(-7)); // -7
-    print(to_str(true)); // true
-    print(to_str(false)); // false
-    print(to_str('c')); // c
-    print(to_str("hi")); // hi
-    print(to_str(["a", "b"])); // ["a", "b"]
-    print(to_str(some('c'))); // some('c')
-    print((1 + 2).to_str()); // 3 (method form)
-    print(`x = {5}`); // x = 5
-}
---- stdout ---
-42
--7
-true
-false
-c
-hi
-["a", "b"]
-some('c')
-3
-x = 5
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(42)); // 42
+        print(to_str(-7)); // -7
+        print(to_str(true)); // true
+        print(to_str(false)); // false
+        print(to_str('c')); // c
+        print(to_str("hi")); // hi
+        print(to_str(["a", "b"])); // ["a", "b"]
+        print(to_str(some('c'))); // some('c')
+        print((1 + 2).to_str()); // 3 (method form)
+        print(`x = {5}`); // x = 5
+    };
+    assert(out == """
+        42
+        -7
+        true
+        false
+        c
+        hi
+        ["a", "b"]
+        some('c')
+        3
+        x = 5
+
+    """);
+})

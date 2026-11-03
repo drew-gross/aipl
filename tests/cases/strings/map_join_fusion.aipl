@@ -2,32 +2,44 @@
 # piece into a single buffer (`map_join`), so the pieces are never gathered
 # into an array first. The three separators are `join`'s.
 
-import { join, map, print, to_str } from builtins;
+import { equal as ==, join, map, print, to_str } from builtins;
 
-fn main() !prints {
-    print([1, 2, 3]$to_str().join(sep=", "));
-    print([1, 2, 3]$to_str().join(sep=", ", final_sep=", or ", only_sep=" or "));
-    print([1, 2]$to_str().join(sep=", ", final_sep=", or ", only_sep=" or "));
-    print([7]$to_str().join(sep=", "));
-    print(`[{[1, 2][..0]$to_str().join(sep=", ")}]`);
-    // No separator: a plain concatenation of the pieces.
-    print([1, 2, 3].map(|x| `<{x}>`).join());
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print([1, 2, 3]$to_str().join(sep=", "));
+        print([1, 2, 3]$to_str().join(sep=", ", final_sep=", or ", only_sep=" or "));
+        print([1, 2]$to_str().join(sep=", ", final_sep=", or ", only_sep=" or "));
+        print([7]$to_str().join(sep=", "));
+        print(`[{[1, 2][..0]$to_str().join(sep=", ")}]`);
+        // No separator: a plain concatenation of the pieces.
+        print([1, 2, 3].map(|x| `<{x}>`).join());
 
-    // Pieces longer than the inline form, so the buffer is re-sized from what
-    // the first pieces taught rather than from the guess.
-    let long = [1, 2, 3].map(|x| `{x}: 0123456789abcdefghijklmnopqrstuvwxyz`).join(sep="\n");
-    print(long);
-    // Any element type joins the same way; a bare element is a separator too.
-    print(`{[1, 2].map(|x| [x, x]).join(sep=0)}`);
-}
---- stdout ---
-1, 2, 3
-1, 2, or 3
-1 or 2
-7
-[]
-<1><2><3>
-1: 0123456789abcdefghijklmnopqrstuvwxyz
-2: 0123456789abcdefghijklmnopqrstuvwxyz
-3: 0123456789abcdefghijklmnopqrstuvwxyz
-[1, 1, 0, 2, 2]
+        // Pieces longer than the inline form, so the buffer is re-sized from what
+        // the first pieces taught rather than from the guess.
+        let long = [1, 2, 3].map(|x| `{x}: 0123456789abcdefghijklmnopqrstuvwxyz`).join(sep="\n");
+        print(long);
+        // Any element type joins the same way; a bare element is a separator too.
+        print(`{[1, 2].map(|x| [x, x]).join(sep=0)}`);
+    };
+    assert(out == """
+        1, 2, 3
+        1, 2, or 3
+        1 or 2
+        7
+        []
+        <1><2><3>
+        1: 0123456789abcdefghijklmnopqrstuvwxyz
+        2: 0123456789abcdefghijklmnopqrstuvwxyz
+        3: 0123456789abcdefghijklmnopqrstuvwxyz
+        [1, 1, 0, 2, 2]
+
+    """);
+})

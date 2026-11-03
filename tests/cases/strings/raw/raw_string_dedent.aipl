@@ -2,23 +2,34 @@
 # so a more-indented line keeps its extra indent, while a line flush at
 # column 0 makes the common indent empty (nothing is stripped).
 
-import { print } from builtins;
+import { equal as ==, print } from builtins;
 
-fn main() !prints -> i64 {
-    print("""
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print("""
+              four spaces
+            two spaces
+        """);
+        print("----");
+        print("""
+            flush left
+                indented under it
+        """);
+    };
+    assert(out == """
           four spaces
         two spaces
-    """);
-    print("----");
-    print("""
+        ----
         flush left
             indented under it
+
     """);
-    0
-}
---- stdout ---
-  four spaces
-two spaces
-----
-flush left
-    indented under it
+})

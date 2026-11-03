@@ -9,26 +9,38 @@
 # that built it exits, so a snapshot taken in the outer scope stays good even
 # when the binding is rebuilt inside a loop body.
 
-import { extend, len, less_than as <, print, wrapping_increment as ++ } from builtins;
+import { equal as ==, extend, len, less_than as <, print, wrapping_increment as ++ } from builtins;
 
-fn main() !prints {
-    mut s = "hello world, long enough to live on the heap";
-    set s.extend("!");
-    let snap = s;
-    set s.extend("?");
-    let filler = "a different heap string, glad to reuse a freed block";
-    print(`{snap}`);
-    print(`{s}`);
-    mut n = 0;
-    while (n < 3) {
-        set n++;
-        set s.extend(".");
-    }
-    print(`{snap} {filler.len()}`);
-    print(`{s}`);
-}
---- stdout ---
-hello world, long enough to live on the heap!
-hello world, long enough to live on the heap!?
-hello world, long enough to live on the heap! 52
-hello world, long enough to live on the heap!?...
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        mut s = "hello world, long enough to live on the heap";
+        set s.extend("!");
+        let snap = s;
+        set s.extend("?");
+        let filler = "a different heap string, glad to reuse a freed block";
+        print(`{snap}`);
+        print(`{s}`);
+        mut n = 0;
+        while (n < 3) {
+            set n++;
+            set s.extend(".");
+        }
+        print(`{snap} {filler.len()}`);
+        print(`{s}`);
+    };
+    assert(out == """
+        hello world, long enough to live on the heap!
+        hello world, long enough to live on the heap!?
+        hello world, long enough to live on the heap! 52
+        hello world, long enough to live on the heap!?...
+
+    """);
+})
