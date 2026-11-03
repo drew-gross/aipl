@@ -4,7 +4,6 @@
 
 import { -- } from builtins;
 
-fn main() {}
 --- errors ---
 error: the "--" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_decrement as --` or `saturating_decrement as --` from builtins
  --> ./tests/cases/imports/err_bare_decr_operator.aipl:5:10

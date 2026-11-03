@@ -10,7 +10,7 @@ fn f(a: i64, b: i64?) -> str {
     }
 }
 
-fn main() !prints {
+fn subject() !prints {
     print(f(1, none));
 }
 --- errors ---

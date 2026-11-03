@@ -4,7 +4,7 @@
 
 import { has, print, to_set as to_char_set } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     let vowels: #{char} = #{'a', 'e', 'i', 'o', 'u'};
     let digits: #{char} = "0123456789".to_char_set();
     print(`{vowels.has('e')} {digits.has('7')}`);

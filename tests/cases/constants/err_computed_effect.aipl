@@ -9,10 +9,6 @@ fn noisy() !prints -> str {
 }
 
 let VALUE: str = noisy();
-
-fn main() !prints {
-    print(VALUE);
-}
 --- errors ---
 error: fn "noisy" has effect "!prints" but the calling function does not declare it
   --> ./tests/cases/constants/err_computed_effect.aipl:11:18

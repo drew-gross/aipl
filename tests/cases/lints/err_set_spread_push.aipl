@@ -27,7 +27,7 @@ fn other(mut out: u64[], xs: u64[]) {
     set out = [..out, out.len(), out.len()];
 }
 
-fn main() !prints {
+fn subject() !prints {
     mut xs = [1];
     set xs.grow([2]);
     print(to_str(xs));

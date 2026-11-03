@@ -4,7 +4,7 @@
 
 import { has, print } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     // Three is the threshold: below it the two spellings are a tie.
     let abc: #{char} = #{'a', 'b', 'c'};
     // The wider the set, the more the quotes and commas outweigh the content.

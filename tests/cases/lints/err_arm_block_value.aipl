@@ -27,7 +27,7 @@ fn f(x: i64) -> i64 {
     }
 }
 
-fn main() !prints {
+fn subject() !prints {
     print(f(0).to_str());
 }
 --- errors ---

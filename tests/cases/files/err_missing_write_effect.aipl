@@ -4,7 +4,7 @@
 
 import { write_string_to_file } from builtins;
 
-fn main() !read_files {
+fn subject() !read_files {
     write_string_to_file("x.txt", "data");
 }
 --- errors ---

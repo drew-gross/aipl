@@ -7,7 +7,7 @@ import { len, print, to_str } from builtins;
 
 fn count<T: any>(self: T[], sep: T* = []) -> u64 { sep.len() }
 
-fn main() !prints {
+fn subject() !prints {
     print(to_str(count([1, 2], 5)));
 }
 --- errors ---

@@ -2,7 +2,7 @@
 # pattern asks each *value* to be a tuple, which it is not here, and the error
 # says so and names the form that was meant.
 
-fn main() {
+fn subject() {
     let d = #{1: 2, 3: 4};
     for (let (k, v) : d) {
         let pair = [k, v];

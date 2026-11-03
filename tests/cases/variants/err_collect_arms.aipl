@@ -21,8 +21,6 @@ fn held_case(shapes: Shape[]) {
     let held: Case<Shape> = Dot;
     print(`{shapes.collect_arms(held)}`);
 }
-
-fn main() {}
 --- errors ---
 error: Shape without Square without Dot has no constructor "Square"
   --> ./tests/cases/variants/err_collect_arms.aipl:14:13

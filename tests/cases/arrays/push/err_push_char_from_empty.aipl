@@ -10,7 +10,7 @@
 
 import { push } from builtins;
 
-fn main() {
+fn subject() {
     mut cs = [];
     set cs.push('a');
 }

@@ -3,7 +3,6 @@
 
 fn f() -> i64 { 1 }.benchmark("fast")
 
-fn main() {}
 --- errors ---
 error: `.benchmark` takes a `{ .. }` block, not a string argument
  --> ./tests/cases/benchmark/err_string_argument.aipl:4:21

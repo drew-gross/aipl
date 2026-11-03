@@ -4,7 +4,7 @@
 
 fn f(a: str, b: i64 = a) -> i64 { b }
 
-fn main() -> i64 { f("x") }
+fn subject() -> i64 { f("x") }
 --- errors ---
 error: default for fn "f" parameter "b": expected i64, got str
  --> ./tests/cases/kwargs/err_default_param_type_mismatch.aipl:5:23

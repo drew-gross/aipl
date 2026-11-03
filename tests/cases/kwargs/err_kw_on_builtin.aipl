@@ -2,10 +2,10 @@
 
 import { len, split } from builtins;
 
-fn main() -> i64 { "a,b".split(sep=",").len() }
+fn subject() -> i64 { "a,b".split(sep=",").len() }
 --- errors ---
 error: fn "split" has no keyword parameter "sep" (a keyword parameter is one declared with a default, e.g. `k: i64 = 0`)
- --> ./tests/cases/kwargs/err_kw_on_builtin.aipl:5:32
+ --> ./tests/cases/kwargs/err_kw_on_builtin.aipl:5:35
   |
-5 | fn main() -> i64 { "a,b".split(sep=",").len() }
-  |                                ^^^^^^^
+5 | fn subject() -> i64 { "a,b".split(sep=",").len() }
+  |                                   ^^^^^^^

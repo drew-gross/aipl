@@ -3,7 +3,7 @@
 
 import { print, to_str, wrapping_add as + } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     mut n = 1 + 1;
     set n += 2;
     print(n.to_str());

@@ -1,7 +1,7 @@
 # `trace` prints one expression and the value it produced, so one argument is
 # the only arity it has — there is nothing for a second to mean.
 
-fn main() {
+fn subject() {
     trace(1, 2);
 }
 --- errors ---

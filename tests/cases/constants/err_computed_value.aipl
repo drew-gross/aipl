@@ -4,10 +4,6 @@
 fn two() -> i64 { 2 }
 
 let VALUE = two();
-
-fn main() {
-    let x = VALUE;
-}
 --- errors ---
 error: a top-level constant that is given something to evaluate needs a type — write `let VALUE: <type> = ...;`, since a constant computed on first use has no declaration to say what it returns
  --> ./tests/cases/constants/err_computed_value.aipl:6:13

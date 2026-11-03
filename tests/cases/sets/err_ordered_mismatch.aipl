@@ -3,7 +3,7 @@
 
 import { print } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     let a: #>{i64} = #<{1};
     print(`{a}`);
 }

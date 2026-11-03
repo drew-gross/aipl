@@ -6,7 +6,7 @@
 
 import { print, saturating_add as +, to_str } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     mut n: u8 = 254;
     set n = n + 1;
     print(n.to_str());

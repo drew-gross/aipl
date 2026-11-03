@@ -4,8 +4,6 @@
 import { wrapping_add as + } from builtins;
 
 fn combine(a: i32, b: i8) -> i32 { a + b }
-
-fn main() -> i64 { 0 }
 --- errors ---
 error: arithmetic operand: expected i64, got i32
  --> ./tests/cases/integers/err_mixed_widths.aipl:6:36

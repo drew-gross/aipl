@@ -3,7 +3,7 @@
 
 import { execute_program, print } from builtins;
 
-fn main() !prints !execute_program {
+fn subject() !prints !execute_program {
     match (execute_program("echo", ["a"])) {
         ok(r) => print(r.stdout),
         err(e) => print(e),

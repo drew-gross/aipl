@@ -5,7 +5,7 @@ fn identity<T: int>(x: T) -> T { x }
 
 fn needs_int<T: ord>(x: T) -> T { identity(x) }
 
-fn main() {
+fn subject() {
     identity('a');
     identity("text");
 }

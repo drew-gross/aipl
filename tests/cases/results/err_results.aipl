@@ -30,8 +30,6 @@ fn payload_invalid_type() -> #{i64[]}!Error { err("x") }
 
 // The void-success form `!E` still needs an argument for `err`.
 fn void_err() -> !str { err() }
-
-fn main() {}
 --- errors ---
 error: this result is discarded, ignoring its possible error; handle it with `match` or propagate it with `?`
   --> ./tests/cases/results/err_results.aipl:14:5

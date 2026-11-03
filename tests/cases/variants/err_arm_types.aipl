@@ -21,8 +21,6 @@ fn wrong_case(s: Square) -> i64 {
 
 // A parameter's pattern is held to the same rule: a `Circle` has one slot.
 fn too_many(Circle(a, b)) -> i64 { a }
-
-fn main() {}
 --- errors ---
 error: non-exhaustive match: missing Square, Dot
  --> ./tests/cases/variants/err_arm_types.aipl:9:21

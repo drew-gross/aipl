@@ -17,7 +17,7 @@ fn free_form(c: char?) -> bool { value_or(c, ' ') == '.' }
 // "none or dot" test that `c == some('.')` would answer differently.
 fn dot_or_none(c: char?) -> bool { c.value_or('.') == '.' }
 
-fn main() !prints {
+fn subject() !prints {
     print(is_dot(some('.')).to_str());
     print(dot_first(some('.')).to_str());
     print(not_dot(some('.')).to_str());

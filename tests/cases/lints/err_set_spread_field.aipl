@@ -20,7 +20,7 @@ fn swap(mut self: Point) {
     set self = Point { ..self, x: self.y, y: self.x };
 }
 
-fn main() !prints {
+fn subject() !prints {
     mut p = Point { x: 0, y: 0 };
     set p.bump();
     print(to_str(p));

@@ -12,10 +12,6 @@ fn run(e: Ev) !prints {
         Tock => print("tock"),
     }
 }
-
-fn main() !prints {
-    run(Tick);
-}
 --- errors ---
 error: this `match` produces no value, so it is a statement — end it with ";" (to use it as an expression, every arm must produce a value)
   --> ./tests/cases/match_arms/err_statement_match_used.aipl:10:5

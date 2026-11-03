@@ -6,7 +6,7 @@ import { print } from builtins;
 
 variant Ev = Tick | Tock
 
-fn main() !prints {
+fn subject() !prints {
     match (Tick) {
         Tick => 1,
         Tock => 2,

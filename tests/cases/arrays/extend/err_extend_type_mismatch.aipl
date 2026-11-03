@@ -10,7 +10,7 @@
 
 import { extend } from builtins;
 
-fn main() {
+fn subject() {
     mut xs = [1];
     set xs.extend(["a"]);
 }

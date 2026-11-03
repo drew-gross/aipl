@@ -5,7 +5,7 @@
 
 import { print, to_str, wrapping_increment as ++ } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     mut n = 0;
     let v = if (let some(x) = some(3)) {
         set n++;

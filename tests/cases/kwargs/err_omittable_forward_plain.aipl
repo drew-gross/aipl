@@ -6,7 +6,7 @@ import { print } from builtins;
 
 fn plain(k: u64 = 0) -> u64 { k }
 
-fn main() !prints {
+fn subject() !prints {
     print(plain(k?=some(1)));
 }
 --- errors ---

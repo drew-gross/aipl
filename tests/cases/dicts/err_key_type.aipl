@@ -1,6 +1,6 @@
 # A dict key must be a scalar/str, not a container.
 
-fn main() -> i64 {
+fn subject() -> i64 {
     let d = #{[1]: "a"};
     0
 }

@@ -3,7 +3,6 @@
 
 import { * } from builtins;
 
-fn main() -> i64 { 6 * 7 }
 --- errors ---
 error: the "*" operator has no bare form; import it aliased: `wrapping_mul as *` from builtins
  --> ./tests/cases/arithmetic/err_bare_star.aipl:4:10

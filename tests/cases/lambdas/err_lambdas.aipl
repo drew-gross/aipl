@@ -72,8 +72,6 @@ fn map_not_array() !prints {
 
 // A function value cannot be returned.
 fn return_function() -> (i64) -> i64 { inc }
-
-fn main() {}
 --- errors ---
 error: "x" is not a function and cannot be called
   --> ./tests/cases/lambdas/err_lambdas.aipl:31:5

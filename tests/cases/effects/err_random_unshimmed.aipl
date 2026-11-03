@@ -6,7 +6,7 @@ import { print, random_u64, to_str } from builtins;
 
 fn roll() !random -> u64 { random_u64() }
 
-fn main() !prints {
+fn subject() !prints {
     print(to_str(roll()));
 }
 --- errors ---

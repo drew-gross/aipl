@@ -74,8 +74,6 @@ fn range_bound_type() {
 fn range_chained() {
     let r = 1..2..3;
 }
-
-fn main() {}
 --- errors ---
 error: fn "unknown_type": unknown type "Widget"
   --> ./tests/cases/structs/err_structs.aipl:25:4

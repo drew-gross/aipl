@@ -3,7 +3,7 @@
 
 import { len, print } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     let s = "hello, world";
 
     // `x[y..x.len()]` — the end bound is the receiver's own length, which the

@@ -1,7 +1,7 @@
 # A nested literal is an array of arrays unless a grid is expected, so reading
 # it with two indexes is an error.
 
-fn main() {
+fn subject() {
     let rows = [[1, 2], [3, 4]];
     let cell = rows[0, 1];
 }

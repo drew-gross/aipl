@@ -2,7 +2,7 @@
 
 import { to_set } from builtins;
 
-fn main() {
+fn subject() {
     let xs = [1, 2];
     let s = (xs, xs).to_set();
 }

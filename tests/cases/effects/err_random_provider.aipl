@@ -4,7 +4,7 @@
 
 import { random_u64 } from builtins;
 
-fn main() {
+fn subject() {
     shim random seeded_with_clock(1) {
         random_u64();
     };

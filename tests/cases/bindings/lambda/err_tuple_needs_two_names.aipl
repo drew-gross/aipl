@@ -2,7 +2,7 @@
 
 import { map } from builtins;
 
-fn main() {
+fn subject() {
     let xs = [(1, 2)].map(|(a)| a);
 }
 --- errors ---

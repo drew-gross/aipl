@@ -38,7 +38,7 @@ fn an_optional(o: i64?) -> i64[] { o.map(|x| x + 1) }
 // and `f(a, b)` are one AST, so there is no call form to read back.
 fn bad_arg(xs: i64[]) -> i64[] { xs.zip_with(5, |a, b| a + b) }
 
-fn main() !prints {
+fn subject() !prints {
     print(to_str(scalar().len()));
 }
 --- errors ---

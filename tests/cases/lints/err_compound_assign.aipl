@@ -4,7 +4,7 @@
 
 import { print, saturating_divide as /, to_str, wrapping_add as + } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     mut n = 10;
     set n = n + 5;
     set n = 3 + n; // the commutative order counts too

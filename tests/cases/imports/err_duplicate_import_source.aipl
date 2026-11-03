@@ -5,7 +5,7 @@
 import { print } from builtins;
 import { to_str } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     print(to_str(1));
 }
 --- errors ---

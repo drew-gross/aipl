@@ -4,7 +4,7 @@
 
 import { reserve } from builtins;
 
-fn main() {
+fn subject() {
     mut xs: i64[] = [];
     set xs.reserve(4);
 }

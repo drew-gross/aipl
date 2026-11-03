@@ -2,7 +2,7 @@ import { map } from builtins;
 
 fn pair<A: any, B: any>(a: A, b: B) -> (A, B) { (a, b) }
 
-fn main() {
+fn subject() {
     let ps = [1].map(pair);
 }
 --- errors ---

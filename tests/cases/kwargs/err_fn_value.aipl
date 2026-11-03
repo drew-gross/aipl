@@ -6,10 +6,10 @@ import { len, map } from builtins;
 
 fn double(x: i64, k: i64 = 0) -> i64 { x }
 
-fn main() -> i64 { [1].map(double).len() }
+fn subject() -> i64 { [1].map(double).len() }
 --- errors ---
 error: fn "double" has keyword parameters, so it cannot be passed as a function value
- --> ./tests/cases/kwargs/err_fn_value.aipl:9:28
+ --> ./tests/cases/kwargs/err_fn_value.aipl:9:31
   |
-9 | fn main() -> i64 { [1].map(double).len() }
-  |                            ^^^^^^
+9 | fn subject() -> i64 { [1].map(double).len() }
+  |                               ^^^^^^

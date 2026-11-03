@@ -11,7 +11,7 @@
 
 import { print } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     print(```{1 ```)
 }
 --- errors ---

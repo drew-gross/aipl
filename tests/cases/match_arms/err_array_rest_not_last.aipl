@@ -7,7 +7,6 @@ fn f(xs: i64[]) -> i64 {
     }
 }
 
-fn main() {}
 --- errors ---
 error: `..` is only allowed as the last element of an array pattern, as in `[a, ..]`
  --> ./tests/cases/match_arms/err_array_rest_not_last.aipl:5:12

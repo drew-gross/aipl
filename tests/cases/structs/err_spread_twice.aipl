@@ -5,7 +5,7 @@ import { print, to_str } from builtins;
 
 struct P { a: i64, b: i64 }
 
-fn main() !prints {
+fn subject() !prints {
     let x = P { a: 1, b: 2 };
     let y = P { a: 3, b: 4 };
     let p = P { ..x, ..y };

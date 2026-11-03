@@ -13,7 +13,7 @@ fn labelled(n: i64) -> str { `n = {to_str(n)} ({n.to_str()})` }
 // text, which the template could have said in place: `` `a: a, aa: aa` ``.
 fn spelled() -> str { `a: {'a'}, aa: {"aa"}` }
 
-fn main() !prints {
+fn subject() !prints {
     print(labelled(1));
     print(spelled());
 }

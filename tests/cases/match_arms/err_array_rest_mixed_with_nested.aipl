@@ -8,8 +8,6 @@ fn f(xs: i64?[]) -> i64 {
         _ => 0,
     }
 }
-
-fn main() {}
 --- errors ---
 error: an array pattern ending in `..` cannot share a `match` with a nested pattern — write the nested arms in their own `match`
  --> ./tests/cases/match_arms/err_array_rest_mixed_with_nested.aipl:7:9

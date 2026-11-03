@@ -6,7 +6,7 @@
 
 import { filter, len, map, print, wrapping_add as + } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     print(`{[1, 2].map(|x| x).len()}`);
 }
 --- errors ---

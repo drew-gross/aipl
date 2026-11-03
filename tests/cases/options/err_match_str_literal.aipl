@@ -9,7 +9,7 @@ fn label(x: i64?) -> str {
     }
 }
 
-fn main() !prints {
+fn subject() !prints {
     print(label(some(1)));
 }
 --- errors ---

@@ -10,8 +10,6 @@ fn f(v: V) -> i64 {
         B => 2,
     }
 }
-
-fn main() -> i64 { f(B) }
 --- errors ---
 error: constructor "A@V" binds 1 value(s), but 0 given (write "A(..)" to match it without naming the payload)
  --> ./tests/cases/match_arms/err_nullary_for_payload.aipl:9:9

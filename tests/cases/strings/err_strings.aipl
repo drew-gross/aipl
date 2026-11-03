@@ -73,8 +73,6 @@ fn slice_span_unsliceable() -> i64 {
     let sp = Span { start: 0, end: 2 };
     n[sp].len()
 }
-
-fn main() {}
 --- errors ---
 error: "==" between str and i64: both sides must be the same type
   --> ./tests/cases/strings/err_strings.aipl:16:35

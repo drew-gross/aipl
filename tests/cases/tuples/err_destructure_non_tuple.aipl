@@ -1,7 +1,7 @@
 # A tuple pattern takes apart a tuple. Given any other value, the error is about
 # the pattern, not about a field read on a binding that was never written.
 
-fn main() {
+fn subject() {
     let (a, b) = 5;
 }
 --- errors ---

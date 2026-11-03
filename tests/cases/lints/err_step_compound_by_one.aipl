@@ -5,7 +5,7 @@
 
 import { print, to_str, wrapping_add_assign as +=, wrapping_sub_assign as -= } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     mut n = 3;
     set n += 1;
     set n -= 1;

@@ -4,7 +4,7 @@ import { equal as ==, print } from builtins;
 
 fn apply(f: (i64) -> i64) -> bool { f == f }
 
-fn main() {
+fn subject() {
     print("unreachable");
 }
 --- errors ---

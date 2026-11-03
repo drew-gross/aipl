@@ -6,7 +6,7 @@ import { print, value_or } from builtins;
 
 fn clamp(x: u64, hi?: u64 = none) -> str { `{x} {hi.value_or(99)}` }
 
-fn main() !prints {
+fn subject() !prints {
     print(clamp(5, hi=none));
 }
 --- errors ---

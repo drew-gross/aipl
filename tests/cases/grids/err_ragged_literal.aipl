@@ -1,6 +1,6 @@
 # Every row of a grid literal has the same length.
 
-fn main() {
+fn subject() {
     let grid: i64[,] = [[1, 2, 3], [4, 5]];
 }
 --- errors ---

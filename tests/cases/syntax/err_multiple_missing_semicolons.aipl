@@ -2,7 +2,7 @@
 # the parse reads on: every slip in the file comes back from one run, across
 # statements and across functions.
 
-fn main() {
+fn subject() {
     let a = 1
     let b = 2
     let c = a

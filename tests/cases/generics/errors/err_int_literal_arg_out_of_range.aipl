@@ -7,7 +7,7 @@ import { print, to_str } from builtins;
 
 fn identity<T: any>(x: T) -> T { x }
 
-fn main() !prints {
+fn subject() !prints {
     let r: u8 = identity(300);
     print(to_str(r));
 }

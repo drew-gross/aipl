@@ -28,7 +28,7 @@ fn tag_short(id: i64) -> Tag { Tag { id } }
 // still the whole body.
 fn from_tag(Tag { id }) -> Tag { Tag { id: id + 1 } }
 
-fn main() !prints {
+fn subject() !prints {
     print(make(1, 2).x.to_str());
     print(tag(1).id.to_str());
     print(tag_short(2).id.to_str());

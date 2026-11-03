@@ -32,8 +32,6 @@ fn drive(v: str[]) {
 // And the function's own first *unrecoverable* error still lands, after the
 // recovered ones — the return type here can't be recovered from.
 fn tally(v: str[]) -> bool { len(v) + 1 }
-
-fn main() {}
 --- errors ---
 error: struct "Rule" field "pat": expected str, got i64
   --> ./tests/cases/errors/err_several_per_function.aipl:19:37

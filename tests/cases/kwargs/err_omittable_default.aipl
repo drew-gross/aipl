@@ -8,7 +8,7 @@ import { print, value_or } from builtins;
 
 fn bad_default(hi?: u64 = 0) -> u64 { hi.value_or(0) }
 
-fn main() !prints {
+fn subject() !prints {
     print(bad_default(hi=1));
 }
 --- errors ---

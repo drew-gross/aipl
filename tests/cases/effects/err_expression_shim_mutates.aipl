@@ -11,7 +11,7 @@ fn fixed_monotonic() -> u64 { 7 }
 
 fn reads() !clock -> u64 { now_nanos() }
 
-fn main() !prints {
+fn subject() !prints {
     mut seen: u64 = 0;
     let v = shim clock { now_nanos = fixed_now, monotonic_now = fixed_monotonic } {
         set seen = reads();

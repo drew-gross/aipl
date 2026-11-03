@@ -4,7 +4,7 @@
 
 import { print, push } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     let t = (none, 1);
     print(`{t.1}`);
 

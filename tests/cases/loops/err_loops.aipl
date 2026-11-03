@@ -32,8 +32,6 @@ fn while_non_bool_condition() {
         set i++;
     }
 }
-
-fn main() {}
 --- errors ---
 error: "==" between char and i64: both sides must be the same type
   --> ./tests/cases/loops/err_loops.aipl:11:17

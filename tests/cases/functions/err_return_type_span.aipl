@@ -27,11 +27,6 @@ fn no_tail_expression() !prints -> i64 {
 }
 
 fn empty_body() -> i64 {}
-
-fn main() !prints {
-    print(one_statement());
-    print(leading_statements());
-}
 --- errors ---
 error: fn "one_statement": body returns i64, but the declared return type is str
   --> ./tests/cases/functions/err_return_type_span.aipl:18:29

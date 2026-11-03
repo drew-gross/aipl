@@ -13,7 +13,6 @@ fn first(v: V) -> i64 {
     }
 }
 
-fn main() -> i64 { first(A(1)) }
 --- errors ---
 error: alternatives of one arm must bind the same names: "A" binds "x", but "B" binds "x", "y"
   --> ./tests/cases/match_arms/err_alternation_binding_mismatch.aipl:12:9

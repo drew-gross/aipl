@@ -6,8 +6,6 @@ import { collect_arms } from builtins;
 variant Shape = Circle(r: i64) | Square(s: i64) | Dot
 
 fn radii(shapes: Shape[]) -> i64[] { shapes.collect_arms(Circle)$r }
-
-fn main() {}
 --- errors ---
 error: field access on non-struct value of type Shape (only Circle)
  --> ./tests/cases/structs/err_field_of_refined_variant.aipl:8:66

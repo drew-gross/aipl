@@ -5,7 +5,7 @@ import { as_case, case_of, print } from builtins;
 
 variant Shape = Circle(i64) | Empty
 
-fn main() !prints {
+fn subject() !prints {
     let s = Circle(1);
     print(`{s.as_case(s.case_of())}`);
 }

@@ -18,8 +18,6 @@ fn clock_without_shim() -> u64 { now_nanos() }
 fn inner() !prints -> i64 { print("hi") }
 
 fn outer() -> i64 { inner() }
-
-fn main() {}
 --- errors ---
 error: fn "declares_unknown_effect" declares unknown effect "!mystery"
  --> ./tests/cases/effects/err_effects.aipl:7:4

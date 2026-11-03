@@ -6,7 +6,7 @@ import { print, to_str } from builtins;
 
 struct P { a: i64, b: i64 }
 
-fn main() !prints {
+fn subject() !prints {
     let base = P { a: 1, b: 2 };
     let p = P { a: 9, ..base };
     print(p.a.to_str());

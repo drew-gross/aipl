@@ -25,7 +25,7 @@ fn bump_field(mut self: Counter) {
 
 struct Counter { n: i64 }
 
-fn main() !prints {
+fn subject() !prints {
     print(bump(1).to_str());
     print(drop_one(1).to_str());
     mut c = Counter { n: 1 };

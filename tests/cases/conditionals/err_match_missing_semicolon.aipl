@@ -3,7 +3,7 @@
 
 import { print } from builtins;
 
-fn main() !io {
+fn subject() !io {
     let x = 1;
     match (x) {
         1 => print("one"),

@@ -3,7 +3,7 @@
 
 import { print, to_array } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     print(`{#{1, 2}.to_array()}`);
 }
 --- errors ---

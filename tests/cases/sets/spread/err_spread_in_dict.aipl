@@ -1,7 +1,7 @@
 # A dict literal has no spread: `..` splices a set's elements into a set, and a
 # `#{ .. }` holding a `key: value` pair is a dict.
 
-fn main() {
+fn subject() {
     let a = #{1, 2};
     let d = #{1: 2, ..a};
 }

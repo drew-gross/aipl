@@ -30,7 +30,7 @@ fn shown(ps: Point[]) -> str[] { ps.map(|p| to_str(p.x)) }
 
 fn doubled(xs: i64[]) -> i64[] { xs.map(twice) }
 
-fn main() !prints {
+fn subject() !prints {
     print(xs_of([Point { x: 1, y: 2 }]).len().to_str());
 }
 --- errors ---

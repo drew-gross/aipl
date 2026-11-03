@@ -207,8 +207,21 @@ Checklist:
       `read_line`/`read_byte`, `now_nanos`/`monotonic_now`, `execute_program`, terminal). Start from what exists:
       `tests/cases/files/*`, `builtins/now_nanos`, `builtins/monotonic_now` (already main + `stdout`),
       `execute_program/*`. Keep each tiny; list them here. Everything else in those directories converts.
-- [ ] Delete the 55 empty `main`s (and the 197 `errors` fixtures' `main`s that are not the error site). Mechanical;
-      handoff refills line-sensitive `errors` sections.
+- [x] Compile-error fixtures with a `main` (2026-11-03, `scripts/errors_fixture_main.py`): 92 had it deleted (their `error:` lines are
+      identical without it) and 99 had it renamed `subject` (the broken code lives in `main`, so deleting it deletes the error; a rename
+      keeps it). The script compares the messages before and after and leaves a file alone if they change, because a refill would otherwise
+      pin whatever the compiler now says (the failure that once pinned a wrong error into `err_import_file_with_sections`).
+- [ ] **Harness/`check` parity gap (found 2026-11-03):** 26 of those fixtures kept `main` after all. Their error is a mono-phase one (found
+      while instantiating or checking code), and the cases harness's compile only reaches it from a `main`; `aipl check` reports it with
+      none. The script verified with `check`, the handoff run (the harness) disagreed and found them. They are restored and can drop their
+      `main` once `check` is the gate (Phase 5), or once the harness compiles every function:
+      `arrays/spread/err_spread_in_call, builtins/err_span_without_import, builtins/err_use_without_import, effects/err_random_main, effects/err_shim_partial_coverage, effects/err_shim_signature_mismatch, effects/err_shim_undeclared_effect, effects/err_shim_unshimmable_effect, generics/err_explicit_type_args, generics/err_return_only_type_param, generics/errors/err_ord_bound_violation, generics/errors/err_type_param_conflict, integers/err_literal_out_of_range, kwargs/err_duplicate_kw, kwargs/err_kw_for_positional, kwargs/err_kw_passed_positionally, kwargs/err_positional_after_kw, kwargs/err_unknown_kw, lambdas/err_operator_value_not_imported, structs/errors/err_generic_cannot_infer, syntax/err_call_missing_comma, syntax/err_missing_semicolon_before_refusal, syntax/err_operator_starts_expr, syntax/err_unexpected_token_in_expr, variants/err_payload_kw_for_positional, variants/err_payload_unknown_kw.
+- [ ] **Revisit these 3 error fixtures**, where neither deleting nor renaming `main` keeps the errors, so the error is about `main` or about
+      something its presence changes: `structs/err_duplicate_struct`, `functions/err_functions`, `bindings/err_unknown_type_in_annotation`.
+      Find out why (is it a `main`-specific check, or an ordering effect between errors?) and either rewrite the fixture so it does not
+      depend on `main` or record why it must keep one. Three more files with `fn main` in an errors-only case were not recognised as having
+      one by the script (`strings/err_char_at_removed`, `builtins/err_import_conflicts_with_local`, `builtins/err_unknown_builtin`): check them too.
+- [ ] The 55 empty `main`s that carry sections other than `errors` (`check`, `report`, `.test` cases): the errors-only ones are done above.
 - [ ] Convert the 56 `main` + `.test` files (fold the prints into their tests).
 - [ ] Convert the 309 `stdout`-only programs, in the batches below (counts per `tests/cases/` directory; one
       `cargo handoff` per batch; tick a batch when it lands). Each batch is ~20-35 files so a diff stays
@@ -402,3 +415,6 @@ Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered
   `tests/cases/performance/` -> `tests/cases/benchmark/`, the 11 D8 files converted, CLAUDE.md / README / skills / DESIGN_PRINCIPLES updated.
 - 2026-11-03: Phase 2b batch 12 done. The 8 shim/pure cases converted; the real-effect cases (stdin, terminal, process, real clock) keep `main`.
 - 2026-11-03: the 15 section-less `main`s decided and converted (14 changed, `examples/arrays` kept).
+- 2026-11-03: error fixtures' `main` removed or renamed (217 of 223), 3 left with a checklist item to revisit, 3 not matched by the script.
+- 2026-11-03: the harness found 26 of the error-fixture conversions wrong (a mono-phase error that only the harness's `main`-rooted compile reaches);
+  restored. Lesson: verify a fixture change with the same compile path the gate uses, not just `check` (see the parity-gap item).

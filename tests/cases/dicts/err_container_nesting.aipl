@@ -20,7 +20,7 @@ fn dict_value() -> i64 {
     0
 }
 
-fn main() -> i64 { opt_core() + dict_value() }
+fn subject() -> i64 { opt_core() + dict_value() }
 --- errors ---
 error: fn "opt_core": a dict can be an array element but not an optional or dict element
   --> ./tests/cases/dicts/err_container_nesting.aipl:14:27

@@ -4,7 +4,6 @@
 
 mut COUNT = 1;
 
-fn main() { let x = COUNT; }
 --- errors ---
 error: aipl does not allow mutable global variables
  --> ./tests/cases/constants/err_mut.aipl:5:1

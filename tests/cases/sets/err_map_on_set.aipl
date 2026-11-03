@@ -10,7 +10,7 @@
 
 import { len, print, to_set, to_str } from builtins;
 
-fn main() !prints {
+fn subject() !prints {
     let s: #{i64} = [3, 1, 2].to_set();
     print(s$to_str().len().to_str());
 }

@@ -13,7 +13,7 @@ struct LexError { message: str, span: u64 }
 
 struct FmtError { message: str, span: u64 }
 
-fn main() !prints {
+fn subject() !prints {
     let e = LexError { message: "unexpected", span: 3 };
     let f = FmtError { ..e };
     print(f.message);

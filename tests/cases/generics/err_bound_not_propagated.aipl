@@ -13,8 +13,6 @@ fn wrong_variant<T: any>(a: T, b: T) -> bool { a.same_case(b) }
 
 // `ord` and `variant` are unrelated -- neither implies the other.
 fn ord_is_not_variant<T: ord>(a: T, b: T) -> bool { a.same_case(b) }
-
-fn main() -> i64 { 0 }
 --- errors ---
 error: fn "minimum": type parameter "T" requires "ord", but the enclosing "T" is declared "any"
   --> ./tests/cases/generics/err_bound_not_propagated.aipl:10:39

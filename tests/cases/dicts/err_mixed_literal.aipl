@@ -2,7 +2,7 @@
 
 import { print } from builtins;
 
-fn main() -> i64 {
+fn subject() -> i64 {
     let d = #{1, 2: "a"};
     0
 }
