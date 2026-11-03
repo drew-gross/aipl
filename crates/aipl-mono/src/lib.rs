@@ -6638,7 +6638,17 @@ impl Mono<'_> {
                 for (_, f) in bindings {
                     self.enqueue_concrete(f);
                 }
-                let (b, t) = self.infer(body, env)?;
+                // The body may use the shim's effect without the enclosing function
+                // declaring it, and anything synthesized there (a lifted lambda, a
+                // `map` loop wrapper) takes `cur_effects` on the footing that the
+                // function covers it. So it covers the shim's effect here too.
+                let outer_effects = self.cur_effects.clone();
+                if !self.cur_effects.contains(effect) {
+                    self.cur_effects.push(effect.clone());
+                }
+                let inferred_body = self.infer(body, env);
+                self.cur_effects = outer_effects;
+                let (b, t) = inferred_body?;
                 (
                     node(ExprKind::Shim(
                         effect.clone(),

@@ -221,7 +221,7 @@ Checklist:
   - [x] 5. `tuples` 12 + `sets` 11, 23.
   - [x] 6. `generics` 13 + `match_arms` 9 + `lambdas` 8, 30.
   - [x] 7. Small leftovers, 19: `kwargs` 7, `grids` 4, `tail_calls` 4, `imports` 1, `docs` 1, `performance` 1, `perf` 1.
-  - [x] 8. `optimizations`, 33 (26 converted; the 4 on the D8 list and 3 held back by D9, below). Take care: these exist to pin what codegen does to a program, so check each converted
+  - [x] 8. `optimizations`, 33 (29 converted, the 3 effectful ones once D9 was fixed; the 4 on the D8 list are left). Take care: these exist to pin what codegen does to a program, so check each converted
         case still exercises the same optimization (the `report` and baseline row are the evidence), not just the output.
   - [x] 9-11. `lints`: done a different way (decided 2026-11-03). A lint's flagged / not-flagged / allow-agreement cases are
         `.test` assertions in the lint's own `.aipl` file (`scripts/lint_fixtures_to_tests.py`), not fixtures; the add-lint skill
@@ -240,13 +240,13 @@ Checklist:
       `optimizations/{join_emptiness_fusion,map_map_fusion,fold_emptiness_and_index,map_reduce_fusion}`,
       `performance/refcount_balance`. Skip them in every batch below (the codemod already skips what it cannot match;
       check each batch's list for these names). They are the known exceptions in the final recount.
-- [ ] **Left alone, D9 (compiler bug, found 2026-11-03):** `optimizations/{fusion_named_effects,loop_map_fusion_effects,predicate_fusion_effects}`
-      pass an effectful function (or a closure that prints) to a higher-order builtin. Under a test's `shim` that is rejected with
-      "fn print has effect !prints but the calling function does not declare it" at the `print` inside the passed function, even when
-      the call sits in a `fn .. !prints` the shim calls. The same code in a `main` that declares `!prints` works. Looks like mono
-      specialises `map(loud)` with the shim-reduced effect set of the function it is instantiated from. Reproducers:
-      a test whose shim body is `[1, 2].map(loud)` with `fn loud(x: i64) !prints -> i64`. Fix in `aipl-mono` (effect accounting for
-      function values under a shim), then convert these three.
+- [x] **D9 (compiler bug, fixed 2026-11-03):** `optimizations/{fusion_named_effects,loop_map_fusion_effects,predicate_fusion_effects}`
+      pass an effectful function or a printing closure to a higher-order builtin, which a test's `shim` rejected ("fn print has
+      effect !prints but the calling function does not declare it"). Cause: mono hands everything it synthesizes inside a function
+      (a lifted lambda, a `map`/`filter` loop wrapper) the function's declared effects (`cur_effects`), on the footing that they cover
+      the body; a `shim` body may use its effect without the function declaring it. Fix: the `Shim` arm of `infer` (`aipl-mono`)
+      adds the shim's effect to `cur_effects` while it infers the body. Pinned by `tests/cases/effects/shim_covers_synthesized_functions.aipl`
+      (fails without the fix); the three files are converted.
 - [ ] Convert the 32 `report` cases: confirm what `aipl report` / the harness measure when there is no `main`
       (the synthesized test driver), re-pin the section, check the baseline row moves are explained.
 - [ ] The 15 section-less `main` files: decide each.
@@ -372,3 +372,5 @@ Syntax: an item `test({ .. })`, the body of a `.test` (helpers allowed). Lowered
   messages off the running lint rather than typing them; its comments come from the fixture. `.performance`/Rust-lint fixtures untouched.
 
 - 2026-11-03: Phase 2b batch 8 (`optimizations`): 26 converted; 3 files held back by a mono bug (D9 in the checklist), 4 by D8.
+- 2026-11-03: D9 fixed (shim effect now counts for functions mono synthesizes inside the shim body); regression case added; the 3 held-back
+  `optimizations` files converted.

@@ -4,18 +4,38 @@
 # `map_find_if` would stop at the first match and skip it on the rest. The
 # stdout shows `loud` running for all three elements.
 
-import { find_if, greater_than as >, map, print, to_str, wrapping_mul as * } from builtins;
+import {
+    equal as ==,
+    find_if,
+    greater_than as >,
+    map,
+    print,
+    to_str,
+    wrapping_mul as *,
+} from builtins;
 
 fn loud(x: i64) !prints -> i64 {
     print(`f{x}`);
     x * 2
 }
 
-fn main() !prints {
-    print([1, 2, 3].map(loud).find_if(|y| y > 2).to_str());
-}
---- stdout ---
-f1
-f2
-f3
-some(4)
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print([1, 2, 3].map(loud).find_if(|y| y > 2).to_str());
+    };
+    assert(out == """
+        f1
+        f2
+        f3
+        some(4)
+
+    """);
+})

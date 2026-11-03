@@ -1,0 +1,45 @@
+# A `shim` lets its body use an effect the enclosing function never declares, and that has to
+# hold for the functions the compiler builds out of the body too: the loop a `map` or `filter`
+# expands to, and a lambda lifted out of it. Each is declared with the effects its enclosing
+# function declares, so the effect a shim discharges has to count there, or the lifted
+# function calls `print` without declaring it.
+
+import { any, equal as ==, filter, greater_than as >, map, print, wrapping_mul as * } from builtins;
+
+fn loud(x: i64) !prints -> i64 {
+    print(`f{x}`);
+    x * 2
+}
+
+fn loud_big(x: i64) !prints -> bool {
+    print(`g{x}`);
+    x > 1
+}
+
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text},`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // A named function with the effect, handed to a builtin by name.
+        let doubled = [1, 2].map(loud);
+        assert(doubled == [2, 4]);
+
+        // A lambda that prints.
+        let tripled = [1, 2].map(|x| {
+            print(`h{x}`);
+            x * 3
+        });
+        assert(tripled == [3, 6]);
+
+        // The other expansions: a filter by name, and a short-circuiting `any`.
+        assert([1, 2, 3].filter(loud_big) == [2, 3]);
+        assert([1, 2, 3].any(loud_big));
+    };
+    assert(out == "f1,f2,h1,h2,g1,g2,g3,g1,g2,");
+})

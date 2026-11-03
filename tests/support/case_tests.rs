@@ -224,6 +224,7 @@ case_tests! {
     cases_effects_random_provider_block = "cases/effects/random_provider_block",
     cases_effects_shim_clock = "cases/effects/shim_clock",
     cases_effects_shim_closures = "cases/effects/shim_closures",
+    cases_effects_shim_covers_synthesized_functions = "cases/effects/shim_covers_synthesized_functions",
     cases_effects_shim_effects = "cases/effects/shim_effects",
     cases_effects_transitive_caller_with_declaration_passes = "cases/effects/transitive_caller_with_declaration_passes",
     cases_equality_arrays = "cases/equality/arrays",

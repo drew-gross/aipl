@@ -10,39 +10,58 @@
 # the body's updates. The second loop's output is the unfused answer: every
 # element offset by the *initial* `n`.
 
-import { map, print, to_str, wrapping_add as +, wrapping_add_assign as += } from builtins;
+import {
+    equal as ==,
+    map,
+    print,
+    to_str,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+} from builtins;
 
 fn noisy(x: i64) !prints -> i64 {
     print(`f{x}`);
     x
 }
 
-fn main() !prints {
-    // Not fused: `noisy` prints, so all three `f` lines come first.
-    for (let y : [1, 2, 3].map(noisy)) {
-        print(`body{y}`);
-    }
-    // Not fused: the body assigns `n`, which the lambda reads.
-    mut n = 0;
-    for (let y : [1, 2, 3].map(|x| x + n)) {
-        set n += 100;
-        print(y.to_str());
-    }
-    // Fused: same lambda, but the body leaves `n` alone.
-    for (let y : [1, 2, 3].map(|x| x + n)) {
-        print(y.to_str());
-    }
-}
---- stdout ---
-f1
-f2
-f3
-body1
-body2
-body3
-1
-2
-3
-301
-302
-303
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Not fused: `noisy` prints, so all three `f` lines come first.
+        for (let y : [1, 2, 3].map(noisy)) {
+            print(`body{y}`);
+        }
+        // Not fused: the body assigns `n`, which the lambda reads.
+        mut n = 0;
+        for (let y : [1, 2, 3].map(|x| x + n)) {
+            set n += 100;
+            print(y.to_str());
+        }
+        // Fused: same lambda, but the body leaves `n` alone.
+        for (let y : [1, 2, 3].map(|x| x + n)) {
+            print(y.to_str());
+        }
+    };
+    assert(out == """
+        f1
+        f2
+        f3
+        body1
+        body2
+        body3
+        1
+        2
+        3
+        301
+        302
+        303
+
+    """);
+})

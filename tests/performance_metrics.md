@@ -177,6 +177,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/effects/random_provider_block | 2 | 40 | 40 | 536 | 2056 | 7.00 | 80.83 | 1440 |
 | cases/effects/shim_clock | 7 | 276 | 276 | 300 | 2280 | 8.00 | 66.56 | 1472 |
 | cases/effects/shim_closures | 13 | 877 | 741 | 1778 | 8216 | 12.00 | 138.81 | 1488 |
+| cases/effects/shim_covers_synthesized_functions | 38 | 2545 | 2545 | 2702 | 6052 | 9.00 | 170.25 | 1520 |
 | cases/effects/shim_effects | 29 | 1811 | 1571 | 2151 | 13176 | 18.00 | 80.94 | 1488 |
 | cases/effects/transitive_caller_with_declaration_passes | 0 | 0 | 0 | 17 | 156 | 3.00 | 62.87 | 1440 |
 | cases/equality/arrays | 8 | 640 | 640 | 1882 | 3724 | 4.00 | 77.96 | 1456 |
@@ -410,7 +411,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/optimizations/fold_lengths | 23 | 1202 | 1202 | 1501 | 4540 | 16.00 | 121.35 | 1488 |
 | cases/optimizations/fold_match | 11 | 620 | 620 | 300 | 1952 | 9.00 | 63.74 | 1456 |
 | cases/optimizations/fusion_function_parameter | 25 | 1532 | 1516 | 4898 | 11696 | 10.00 | 203.77 | 1520 |
-| cases/optimizations/fusion_named_effects | 8 | 378 | 145 | 529 | 1864 | 9.00 | 110.00 | 1456 |
+| cases/optimizations/fusion_named_effects | 15 | 994 | 994 | 1094 | 4120 | 6.00 | 134.17 | 1504 |
 | cases/optimizations/fusion_swapped_operators | 41 | 2664 | 2664 | 3073 | 6644 | 9.00 | 154.12 | 1488 |
 | cases/optimizations/index_map_fusion | 19 | 991 | 991 | 1906 | 8016 | 22.00 | 96.89 | 1472 |
 | cases/optimizations/index_map_fusion_effects | 47 | 3213 | 3213 | 3062 | 7124 | 10.00 | 81.53 | 1504 |
@@ -422,7 +423,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/optimizations/is_empty_keeps_push_in_place | 0 | 0 | 0 | 3 | 8 | 0.00 | 75.87 | 1392 |
 | cases/optimizations/join_emptiness_fusion | 31 | 1942 | 1942 | 2937 | 5196 | 16.00 | 144.41 | 1472 |
 | cases/optimizations/loop_map_fusion | 11 | 215 | 2126 | 24182 | 2176 | 16.00 | 126.62 | 1488 |
-| cases/optimizations/loop_map_fusion_effects | 20 | 818 | 145 | 1231 | 2636 | 17.00 | 63.58 | 1456 |
+| cases/optimizations/loop_map_fusion_effects | 43 | 2842 | 2842 | 2685 | 4860 | 9.00 | 76.76 | 1504 |
 | cases/optimizations/loop_reverse_fusion | 20 | 954 | 2338 | 12484 | 3544 | 15.00 | 77.96 | 1504 |
 | cases/optimizations/loop_split_fusion | 99 | 6540 | 2877 | 3721 | 8880 | 18.00 | 98.65 | 1520 |
 | cases/optimizations/loop_tuple_windows_fusion | 11 | 329 | 6297 | 31744 | 5484 | 22.00 | 90.47 | 1520 |
@@ -434,7 +435,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/optimizations/move_last_use | 78 | 5027 | 5019 | 10261 | 14948 | 19.00 | 121.50 | 1536 |
 | cases/optimizations/owned_param_shared_result | 15 | 936 | 984 | 3247 | 5712 | 8.00 | 72.70 | 1520 |
 | cases/optimizations/predicate_fusion | 1829 | 117928 | 65135 | 92773 | 29248 | 125.00 | 247.98 | 1584 |
-| cases/optimizations/predicate_fusion_effects | 36 | 1671 | 388 | 2116 | 6680 | 32.00 | 123.88 | 1488 |
+| cases/optimizations/predicate_fusion_effects | 71 | 4751 | 4751 | 4236 | 8896 | 12.00 | 145.95 | 1504 |
 | cases/optimizations/read_only_builtin_args | 14 | 492 | 395 | 2963 | 5028 | 13.00 | 73.09 | 1488 |
 | cases/optimizations/reuse_matched_value | 35 | 2412 | 2412 | 1276 | 4992 | 8.00 | 96.31 | 1488 |
 | cases/optimizations/shared_ctor_wrapper | 9 | 609 | 609 | 1294 | 2752 | 8.00 | 63.20 | 1456 |
