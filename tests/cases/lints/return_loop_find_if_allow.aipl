@@ -8,7 +8,7 @@
 # occupies one line, and it is the line that makes this loop a search for the
 # first match.
 
-import { find_if, less_than as <, print, to_str } from builtins;
+import { equal as ==, find_if, less_than as <, print, to_str } from builtins;
 
 fn first_big(xs: i64[], lo: i64) -> i64? {
     for (let x : xs) {
@@ -23,14 +23,26 @@ fn first_big(xs: i64[], lo: i64) -> i64? {
 // and proven to agree.
 fn first_big_short(xs: i64[], lo: i64) -> i64? { xs.find_if(|x| lo < x) }
 
-fn main() !prints {
-    print(first_big([1, 5, 9], 2).to_str());
-    print(first_big_short([1, 5, 9], 2).to_str());
-    print(first_big([1, 2], 5).to_str());
-    print(first_big_short([1, 2], 5).to_str());
-}
---- stdout ---
-some(5)
-some(5)
-none
-none
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(first_big([1, 5, 9], 2).to_str());
+        print(first_big_short([1, 5, 9], 2).to_str());
+        print(first_big([1, 2], 5).to_str());
+        print(first_big_short([1, 2], 5).to_str());
+    };
+    assert(out == """
+        some(5)
+        some(5)
+        none
+        none
+
+    """);
+})

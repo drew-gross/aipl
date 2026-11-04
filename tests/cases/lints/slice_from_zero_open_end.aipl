@@ -8,13 +8,25 @@
 #   - `x[..2]` — an open start with a real end. Only a `len` end would make this
 #     the whole receiver.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
-fn main() !prints {
-    let xs = [10, 20, 30];
-    print(xs[1..].to_str());
-    print(xs[..2].to_str());
-}
---- stdout ---
-[20, 30]
-[10, 20]
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let xs = [10, 20, 30];
+        print(xs[1..].to_str());
+        print(xs[..2].to_str());
+    };
+    assert(out == """
+        [20, 30]
+        [10, 20]
+
+    """);
+})

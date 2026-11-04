@@ -61,8 +61,8 @@ Rules that bite:
   `builtin_map_join.aipl` declares). Only its `pub fn` is special — it is named
   `__builtin_<name>`. Its `.test` and `.benchmark` blocks run when the file
   itself is checked, not in the programs that use it.
-- Prefer a **void `main`** and, in predicates, the `fn is_x(self: T) -> bool`
-  method form.
+- In predicates, use the `fn is_x(self: T) -> bool` method form. Don't add a
+  `main`; tests are `.test` blocks.
 
 ### The `.test` block is not optional
 
@@ -122,8 +122,7 @@ the shape that motivated `find_if`, and converting it proved the lambda captured
 two outer bindings fine). The builtin's own `.test` block is already a test as
 user code — the file is checked like any other — so it needs no duplicate in
 `tests/cases/`. A case is for what the file cannot hold: how the builtin
-interacts with something else (a fusion, a lint, a `shim`), or output a `main`
-prints.
+interacts with something else (a fusion, a lint, a `shim`) or a real effect.
 
 Expect the conversion to show up as a small instruction-count shift in every
 case that transitively compiles the converted file. Handoff refreshes those

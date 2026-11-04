@@ -105,28 +105,40 @@ fn first_big_after(xs: i64[], lo: i64, skip: u64) -> i64? {
 
 fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }
 
-fn main() !prints {
-    print(first_big_doubled([1, 5], 2).to_str());
-    print(head_sign([-3, 1]).to_str());
-    print(first_big_or_first([1, 2], 5).to_str());
-    print(first_big_logged([1, 5], 2).to_str());
-    print(has_big([1, 5], 2).to_str());
-    print(lo_if_any_big([1, 5], 2).to_str());
-    print(first_multiple(5, 3).to_str());
-    print(first_big_after([9, 1, 7], 2, 1).to_str());
-    // The rewrite itself must not flag.
-    print([1, 5, 9].find_if(|x| 2 < x).to_str());
-    print(show([1, 2]));
-}
---- stdout ---
-some(10)
-some(0)
-some(1)
-5
-some(5)
-true
-some(2)
-some(3)
-some(7)
-some(5)
-1,2
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(first_big_doubled([1, 5], 2).to_str());
+        print(head_sign([-3, 1]).to_str());
+        print(first_big_or_first([1, 2], 5).to_str());
+        print(first_big_logged([1, 5], 2).to_str());
+        print(has_big([1, 5], 2).to_str());
+        print(lo_if_any_big([1, 5], 2).to_str());
+        print(first_multiple(5, 3).to_str());
+        print(first_big_after([9, 1, 7], 2, 1).to_str());
+        // The rewrite itself must not flag.
+        print([1, 5, 9].find_if(|x| 2 < x).to_str());
+        print(show([1, 2]));
+    };
+    assert(out == """
+        some(10)
+        some(0)
+        some(1)
+        5
+        some(5)
+        true
+        some(2)
+        some(3)
+        some(7)
+        some(5)
+        1,2
+
+    """);
+})

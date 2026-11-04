@@ -5,6 +5,7 @@
 # proven to agree.
 
 import {
+    equal as ==,
     greater_than as >,
     is_empty,
     is_nonempty,
@@ -15,15 +16,27 @@ import {
     to_str,
 } from builtins;
 
-fn main() !prints {
-    let xs = [1, 2, 3];
-    print(to_str(0 < xs.len())); #[allow]
-    print(to_str(xs.len() > 0)); #[allow]
-    print(to_str(!xs.is_empty())); #[allow]
-    print(to_str(xs.is_nonempty()));
-}
---- stdout ---
-true
-true
-true
-true
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let xs = [1, 2, 3];
+        print(to_str(0 < xs.len())); #[allow]
+        print(to_str(xs.len() > 0)); #[allow]
+        print(to_str(!xs.is_empty())); #[allow]
+        print(to_str(xs.is_nonempty()));
+    };
+    assert(out == """
+        true
+        true
+        true
+        true
+
+    """);
+})

@@ -3,16 +3,28 @@
 # `framed`'s default calls `default_edge`, a private helper of frame.aipl that
 # this root file never imports (and couldn't — it isn't pub).
 
-import { print } from builtins;
+import { equal as ==, print } from builtins;
 import { framed } from "./frame.aipl";
 
-fn main() !prints {
-    print(framed("hi"));
-    print(framed("hi", edge="wrapping_mul as *"));
-}
---- stdout ---
-|hi|
-wrapping_mul as *hiwrapping_mul as *
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(framed("hi"));
+        print(framed("hi", edge="wrapping_mul as *"));
+    };
+    assert(out == """
+        |hi|
+        wrapping_mul as *hiwrapping_mul as *
+
+    """);
+})
 --- file: frame.aipl ---
 fn default_edge() -> str { "|" }
 pub fn framed(s: str, edge: str = default_edge()) -> str { `{edge}{s}{edge}` }

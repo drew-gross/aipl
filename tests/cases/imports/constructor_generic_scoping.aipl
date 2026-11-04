@@ -3,17 +3,29 @@
 # from the argument), and importing the variant `Opt` lets you write its nullary
 # case as `Opt.Nothing`.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 import { Opt, Some, unwrap_or } from "./opt.aipl";
 
-fn main() !prints {
-    print(unwrap_or(Some(7), 0).to_str()); // imported generic constructor
-    print(unwrap_or(Opt.Nothing, 9).to_str()); // qualified generic nullary
-}
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(unwrap_or(Some(7), 0).to_str()); // imported generic constructor
+        print(unwrap_or(Opt.Nothing, 9).to_str()); // qualified generic nullary
+    };
+    assert(out == """
+        7
+        9
+
+    """);
+})
 --- file: opt.aipl ---
 variant Opt<T> = Some(T) | Nothing
 
 pub fn unwrap_or(o: Opt<i64>, d: i64) -> i64 { match (o) { Some(v) => v, Nothing => d } }
---- stdout ---
-7
-9

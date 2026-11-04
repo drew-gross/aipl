@@ -2,17 +2,29 @@
 # name — for both path imports and builtins. The alias is what the importing
 # file uses; the original name is what the source exports.
 
-import { print, to_str as show } from builtins;
+import { equal as ==, print, to_str as show } from builtins;
 import { greeting, helper as double } from "./util.aipl";
 
-fn main() !prints {
-    print(show(double(21))); // double = util's `helper`; show = to_str
-    print(greeting()); // imported under its own name, alongside aliases
-}
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(show(double(21))); // double = util's `helper`; show = to_str
+        print(greeting()); // imported under its own name, alongside aliases
+    };
+    assert(out == """
+        42
+        hi
+
+    """);
+})
 --- file: util.aipl ---
 import { wrapping_mul as * } from builtins;
 pub fn helper(n: i64) -> i64 { n * 2 }
 pub fn greeting() -> str { "hi" }
---- stdout ---
-42
-hi

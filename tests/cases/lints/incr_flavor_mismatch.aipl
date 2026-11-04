@@ -7,17 +7,29 @@
 # line (`wrapping_add_assign as +=` does match this file's `+`), so it is
 # squelched: the long-hand spelling is what this case is here to show.
 
-import { print, saturating_increment as ++, to_str, wrapping_add as + } from builtins;
+import { equal as ==, print, saturating_increment as ++, to_str, wrapping_add as + } from builtins;
 
-fn main() !prints {
-    mut n: u8 = 255;
-    set n = n + 1; #[allow]
-    // wraps to 0
-    print(n.to_str());
-    mut m: u8 = 255;
-    set m++; // saturates at 255
-    print(m.to_str());
-}
---- stdout ---
-0
-255
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        mut n: u8 = 255;
+        set n = n + 1; #[allow]
+        // wraps to 0
+        print(n.to_str());
+        mut m: u8 = 255;
+        set m++; // saturates at 255
+        print(m.to_str());
+    };
+    assert(out == """
+        0
+        255
+
+    """);
+})

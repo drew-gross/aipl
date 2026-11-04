@@ -2,11 +2,20 @@
 # program compiles and runs as written. Only lints are squelchable; regular
 # errors (type mismatches etc.) take no notice of the marker.
 
-import { len, print } from builtins;
+import { equal as ==, len, print } from builtins;
 
-fn main() !prints {
-    let x = "hello, world";
-    print(x[3..x.len()]); #[allow]
-}
---- stdout ---
-lo, world
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let x = "hello, world";
+        print(x[3..x.len()]); #[allow]
+    };
+    assert(out == "lo, world\n");
+})

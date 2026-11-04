@@ -1,14 +1,23 @@
 # `helper` isn't imported by main, but `entry` calls it internally —
 # the loader must keep within-file references wired up post-rewrite.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 import { entry } from "./util.aipl";
 
-fn main() !prints {
-    print(to_str(entry(5)));
-}
---- stdout ---
-51
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(entry(5)));
+    };
+    assert(out == "51\n");
+})
 --- file: util.aipl ---
 import { wrapping_mul as *, wrapping_add as + } from builtins;
 fn helper(n: i64) -> i64 { n * 10 }

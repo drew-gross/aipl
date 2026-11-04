@@ -215,29 +215,36 @@ Target state: `fn main` appears only in (a) real programs (`projects/`, `example
 implementation of an effect (stdin, terminal, process, real clock, real files), and (c) the
 entry-point-mechanics tests (exit code, `cli`, `stderr`, `file:`, `expect file:`).
 
-- [ ] **Recount the files with a `main`, sections and tests** (the 64 found on 2026-11-03 are converted; the 4 kept are
-      `files/{error_type,write_file}` and `builtins/{now_nanos,monotonic_now}`, tests of the real filesystem and clock).
+- [x] **Recount the files with a `main`, sections and tests** (2026-11-04): the 64 of 2026-11-03 plus 31 more
+      (every `file:` import case, the lint fixtures, `options/is_some_and`, `chars/to_digit`, ...) are converted.
+      47 remain, all deliberate: entry mechanics and real effects (`cli/`, `results/`, `functions/exit_code`,
+      `functions/void/main_returns_nothing`, `execute_program/`, `files/`, `builtins/{read_*,terminal,now_nanos,
+      monotonic_now}`, `debug/trace`), whole-program `report` pins (`report/`, `optimizations/inline_inspected`,
+      `strings/concat/print_rope`), `strings/int_parse` (exit-code paths), `effects/{shim_clock,random,
+      random_provider_block}` (a second effect besides `prints`), and 17 `err_` fixtures whose messages change
+      when `main` goes (the import-error ones, the unclosed-literal and missing-semicolon ones,
+      `err_random_main`, `err_type_param_conflict`).
 - [x] The 26 error fixtures that kept their `main` (2026-11-03): 24 had it renamed `subject` once the conversion was
       verified by compiling the file and reading its errors (the earlier verification went through `--fix`, which
       leaves a section untouched when the file compiles, so it called a deletion "unchanged" when it had removed the
       error). Two keep it: `effects/err_random_main` (the error is that `main` cannot declare `!random`) and
       `generics/errors/err_type_param_conflict` (needs a root: G7).
-- [ ] **Lint fixtures still in `tests/cases/lints/`** (41 files). The 10 lints that were Rust (2026-11-04: all
+- [ ] **Lint fixtures still in `tests/cases/lints/`** (their `main`s are converted; mapping each shape-named one to its lint is left, tracked in `CLAUDE_TODO.txt`) (41 files). The 10 lints that were Rust (2026-11-04: all
       lints are AIPL now; the Rust lint code is gone, and their `err_`/`_allow`/`_not_flagged` fixtures moved into
       each lint's own `.test` assertions) left behind the fixtures that are named for a shape and not a lint
       (`err_struct_literals`, `err_emptiness_tests`, `incr_shapes_not_flagged`, `decr_*`, `err_step_*`, ...: map
       each to its lint first), and the `_allow` fixtures that need a `struct`/`variant` or output a test block
       cannot hold (`len_gt_zero_allow`, `set_spread_field_allow`).
-- [ ] **Per batch:** `cargo handoff`, then review moved baseline rows (the `main` to test-driver switch moves
+- [x] **Per batch:** `cargo handoff`, then review moved baseline rows (the `main` to test-driver switch moves
       `instructions` and `code bytes` for every converted case).
-- [ ] **Update CLAUDE.md for `main` only, now:** delete "Test `main` style" (its premise, a void `main` driving a
+- [x] **Update CLAUDE.md for `main` only, now:** delete "Test `main` style" (its premise, a void `main` driving a
       case, is gone for ordinary cases); say where `main` may appear; say that behavior is pinned by `.test` blocks
       and sections are for diagnostics, reports and the real-implementation and entry-point cases. The section
       *vocabulary* in CLAUDE.md changes again in Phase 3, so leave it for 3.13 and do not rewrite it twice.
-- [ ] **Update the skills for `main` only, now:** `write-aipl` (its `main`/`stdout` examples and the capture-shim
+- [x] **Update the skills for `main` only, now:** `write-aipl` (its `main`/`stdout` examples and the capture-shim
       template) and `add-builtin` ("a case is for ... output a `main` prints"). Section names in the skills wait for 3.13.
-- [ ] **Re-count** the cases that link a production executable after the last conversion; it should be small
-      (this is what Phase 0's "fewer executables" saving rests on). Record it here.
+- [x] **Re-count** the cases that link a production executable after the last conversion; it should be small
+      (this is what Phase 0's "fewer executables" saving rests on). Record it here: 47 files keep a `main` with sections, listed above.
 
 How to convert (the shape a reader should see):
 - **Prefer a returned value.** If a function only prints because it was convenient, make it return the value
@@ -271,9 +278,8 @@ How to convert (the shape a reader should see):
   pins whatever the compiler now says, including a different error; read a freshly filled `--- errors ---` body by
   eye once.
 
-Tools in `scripts/`, for the conversions above: `main_to_test.py` (print-only `main` to a capturing top-level
-test), `main_to_asserts.py` (prints to asserts, for `report` cases), `errors_fixture_main.py` (take `main` out
-of an `errors` fixture only if the messages stay the same), `lint_fixtures_to_tests.py`.
+The conversion scripts (`main_to_test.py`, `main_to_asserts.py`, `errors_fixture_main.py`,
+`lint_fixtures_to_tests.py`) are deleted: their work is done, and git has them.
 
 ## Small follow-ups found on the way
 - [x] **A leak the new gate found: `projects/minesweeper`'s tests leaked** (51 of 7028 allocations). Not minesweeper's

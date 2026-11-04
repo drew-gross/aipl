@@ -2,14 +2,23 @@
 # The entry only imports from a; the cycle is internal. The loader
 # must terminate rather than walking the cycle forever.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 import { a_fn } from "./a.aipl";
 
-fn main() !prints {
-    print(to_str(a_fn()));
-}
---- stdout ---
-42
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(a_fn()));
+    };
+    assert(out == "42\n");
+})
 --- file: a.aipl ---
 import { b_fn } from "./b.aipl";
 import { wrapping_add as + } from builtins;

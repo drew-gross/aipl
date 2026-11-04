@@ -936,16 +936,16 @@ the representation changed.
 `tests/cases/strings/named_representations.aipl` is the worked example, and
 DESIGN_PRINCIPLES.md's "Just say what you want" is why the family exists.
 
-## Test `main` style: prefer a void `main`
-When a test case's `main` exists only to drive the program (its return value
-isn't the thing under test), write a **void** `main` — `fn main() { ... }` — not
-`fn main() -> i64 { ...; 0 }`. A trailing literal `0` is extraneous: a void
-`main` already exits 0. Reserve `fn main() -> i64 { ... }` for cases whose point
-*is* the return value (e.g. an `--- exit code ---` test, or a `main` that returns
-a computed expression being checked). This applies to new cases and to edits;
-note that switching a `main` between `-> i64 { ...; 0 }` and `{ ... }` shifts the
-case's baseline row (`instructions`, `code bytes`), which handoff refreshes and reports as
-a moved row to review.
+## Where `main` may appear
+A test does not need a `main`: behavior is pinned by `.test` blocks (asserts), and a
+function that only printed out of convenience returns its value instead. Printing that
+*is* the behavior is captured inline with a `shim prints` in a top-level `test({ .. })`.
+`fn main` belongs only to (a) real programs (`projects/`, `examples/`), (b) tests of the
+real implementation of an effect (stdin, terminal, process, real clock, real files), and
+(c) the entry-point mechanics (`exit code`, `cli`, `stderr`, `file:`, `expect file:`), and
+cases that pin a whole program's `report`. A void `main` (`fn main() { .. }`), not
+`-> i64 { ..; 0 }`, unless the return value is the point. A case with no `main` links
+no production executable, which is most of why the suite is fast.
 
 ## Fanout updates from test failures
 When a language change forces fixture/example edits across many files, don't

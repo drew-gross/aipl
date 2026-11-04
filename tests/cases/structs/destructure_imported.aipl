@@ -4,19 +4,31 @@
 # load-bearing when the scrutinee binding started carrying it — before that the
 # name was parsed and dropped, and no import resolution happened at all.
 
-import { print } from builtins;
+import { equal as ==, print } from builtins;
 import { Rec, make } from "./destructure_imported_lib.aipl";
 
-fn main() !prints {
-    let Rec { a, b } = make();
-    print(`{a} {b}`);
-    let r = Rec { a: 1, b: 2 };
-    let Rec { b } = r;
-    print(`{b}`);
-}
---- stdout ---
-4 5
-2
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let Rec { a, b } = make();
+        print(`{a} {b}`);
+        let r = Rec { a: 1, b: 2 };
+        let Rec { b } = r;
+        print(`{b}`);
+    };
+    assert(out == """
+        4 5
+        2
+
+    """);
+})
 --- file: destructure_imported_lib.aipl ---
 struct Rec { a: i64, b: i64 }
 

@@ -27,8 +27,17 @@ fn named(xs: i64[]) -> i64[] { xs.map(plain) }
 # A name that is a value rather than a function of this file.
 fn passed(xs: i64[], f: (i64) -> i64) -> i64[] { xs.map(f) }
 
-fn main() !prints {
-    print(both([1]).len().to_str());
-}
---- stdout ---
-1
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(both([1]).len().to_str());
+    };
+    assert(out == "1\n");
+})

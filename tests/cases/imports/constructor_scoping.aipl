@@ -4,7 +4,7 @@
 # bare imported `Circle(r)`, or a qualified `Shape.Empty`. The defining file uses
 # its own cases directly (see `area` in the companion), with no import needed.
 
-import { print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 import { Circle, Rect, Shape, area } from "./shapes.aipl";
 
 fn describe(s: Shape) -> i64 {
@@ -15,15 +15,32 @@ fn describe(s: Shape) -> i64 {
     }
 }
 
-fn main() !prints {
-    let a = Circle(5); // imported constructor
-    let b = Shape.Rect(3, 4); // qualified call
-    let e = Shape.Empty; // qualified nullary
-    print(a.area().to_str()); // 5
-    print(b.area().to_str()); // 7
-    print(e.area().to_str()); // 0
-    print(describe(b).to_str()); // 7
-}
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let a = Circle(5); // imported constructor
+        let b = Shape.Rect(3, 4); // qualified call
+        let e = Shape.Empty; // qualified nullary
+        print(a.area().to_str()); // 5
+        print(b.area().to_str()); // 7
+        print(e.area().to_str()); // 0
+        print(describe(b).to_str()); // 7
+    };
+    assert(out == """
+        5
+        7
+        0
+        7
+
+    """);
+})
 --- file: shapes.aipl ---
 import { wrapping_add as + } from builtins;
 
@@ -36,8 +53,3 @@ pub fn area(self: Shape) -> i64 {
         Empty => 0,
     }
 }
---- stdout ---
-5
-7
-0
-7

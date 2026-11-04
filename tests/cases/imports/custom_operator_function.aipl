@@ -3,14 +3,23 @@
 # Here the "custom +" tags its result with +1000 so the output proves the
 # dispatch reached the user function rather than the primitive add.
 
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 import { my_custom_add as + } from "./mymath.aipl";
 
-fn main() !prints {
-    print(to_str(2 + 3)); // == my_custom_add(2, 3) == 2 + 3 + 1000 == 1005
-}
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(2 + 3)); // == my_custom_add(2, 3) == 2 + 3 + 1000 == 1005
+    };
+    assert(out == "1005\n");
+})
 --- file: mymath.aipl ---
 import { wrapping_add as + } from builtins;
 pub fn my_custom_add(a: i64, b: i64) -> i64 { a + b + 1000 }
---- stdout ---
-1005

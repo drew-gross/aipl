@@ -5,16 +5,28 @@
 # (The added value is 10 rather than 1 so the *increment* lint has nothing to
 # say here either — this case is about the compound one.)
 
-import { print, saturating_add_assign as +=, to_str, wrapping_add as + } from builtins;
+import { equal as ==, print, saturating_add_assign as +=, to_str, wrapping_add as + } from builtins;
 
-fn main() !prints {
-    mut n: u8 = 250;
-    set n = n + 10; // wraps to 4
-    print(n.to_str());
-    mut m: u8 = 250;
-    set m += 10; // saturates at 255
-    print(m.to_str());
-}
---- stdout ---
-4
-255
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        mut n: u8 = 250;
+        set n = n + 10; // wraps to 4
+        print(n.to_str());
+        mut m: u8 = 250;
+        set m += 10; // saturates at 255
+        print(m.to_str());
+    };
+    assert(out == """
+        4
+        255
+
+    """);
+})

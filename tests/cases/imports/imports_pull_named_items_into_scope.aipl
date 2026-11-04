@@ -1,11 +1,20 @@
-import { print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 import { add } from "./util.aipl";
 
-fn main() !prints {
-    print(to_str(add(3, 4)));
-}
---- stdout ---
-7
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(add(3, 4)));
+    };
+    assert(out == "7\n");
+})
 --- file: util.aipl ---
 import { wrapping_add as + } from builtins;
 pub fn add(x: i64, y: i64) -> i64 { x + y }

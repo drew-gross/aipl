@@ -18,10 +18,22 @@ fn len(self: List) -> i64 {
     }
 }
 
-fn main() !prints {
-    print(to_str(Nil.len() == 0));
-    print(to_str(Cons(1).len() == 0));
-}
---- stdout ---
-true
-false
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(Nil.len() == 0));
+        print(to_str(Cons(1).len() == 0));
+    };
+    assert(out == """
+        true
+        false
+
+    """);
+})

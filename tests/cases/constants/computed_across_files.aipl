@@ -3,12 +3,23 @@
 # Types the cache holds by pointer (a recursive variant) are shared the same
 # way as those it holds inline.
 
-import { len, print } from builtins;
+import { equal as ==, len, print } from builtins;
 import { ITEMS, TREE, depth, tree } from "./tree_constants.aipl";
 
-fn main() !prints {
-    print(`{ITEMS.len()} {depth(tree())} {depth(TREE)}`);
-}
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`{ITEMS.len()} {depth(tree())} {depth(TREE)}`);
+    };
+    assert(out == "3 3 3\n");
+})
 --- file: tree_constants.aipl ---
 import { equal as ==, greater_than as >, map, wrapping_add as +, wrapping_sub as - } from builtins;
 
@@ -34,5 +45,3 @@ pub let ITEMS: str[] = ["a", "b", "c"].map(shout);
 pub let TREE: Tree = build(3);
 
 fn shout(s: str) -> str { s }
---- stdout ---
-3 3 3

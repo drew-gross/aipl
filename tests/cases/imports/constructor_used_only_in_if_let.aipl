@@ -2,7 +2,7 @@
 # import: the unused-import lint reads the pattern of an `if let` exactly as
 # it reads a `match` arm's, so `Circle` below is not reported as dead.
 
-import { print } from builtins;
+import { equal as ==, print } from builtins;
 import { Circle, Shape } from "./shapes.aipl";
 
 fn radius(s: Shape) -> i64 {
@@ -10,12 +10,24 @@ fn radius(s: Shape) -> i64 {
     0
 }
 
-fn main() !prints {
-    print(`{radius(Shape.Circle(5))}`);
-    print(`{radius(Shape.Empty)}`);
-}
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(`{radius(Shape.Circle(5))}`);
+        print(`{radius(Shape.Empty)}`);
+    };
+    assert(out == """
+        5
+        0
+
+    """);
+})
 --- file: shapes.aipl ---
 variant Shape = Circle(i64) | Empty
---- stdout ---
-5
-0
