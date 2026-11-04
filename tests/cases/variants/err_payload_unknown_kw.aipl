@@ -1,6 +1,6 @@
 variant Shape = Circle(r: i64, color: str = "red")
 
-fn main() -> i64 {
+fn subject() -> i64 {
     match (Circle(1, colour="blue")) {
         Circle(..) => 0,
     }

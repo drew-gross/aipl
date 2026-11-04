@@ -177,10 +177,14 @@ Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
       `file:` companions (their labels use the scratch dir), so the label rule for staged files needs settling.
 - [ ] G5 keep the "`file:` section on an in-place source is an error" rule in `check`.
 - [ ] G6 `check` prints `handoff-fill:` lines via `handoff::protocol::Fill` (one definition).
-- [ ] G7 `check` and the harness compile different sets of functions. A mono-phase error (found while
-      instantiating or checking code) is reported by `aipl check` with no `main`, but the harness's compile
-      only reaches it from a `main`. Decide which is right (check's is the stricter) and make them agree.
-      Pins 26 error fixtures to a `main` until then (see Phase 2b).
+- [ ] G7 **which functions does `check` compile?** (Corrected 2026-11-03: `check` and the cases harness compile
+      error fixtures identically; the "parity gap" recorded here earlier was a verification mistake, since `--fix`
+      leaves a section alone when the file compiles.) The real question is reachability. Errors found while
+      instantiating generic code (`conflicting types for "T"`) are only found for code reachable from a root
+      (`main`, or a test), so an uncalled function with such a call compiles clean under both. Principle #2
+      says `check` reports everything it can: make every non-generic function a mono root for `check`'s compile
+      (recommended; measure the cost over `crates/` first), or accept it and keep a root in those fixtures. Today
+      it pins `generics/errors/err_type_param_conflict` to a `main`.
 - [ ] Differential test: for every corpus file, old harness and new `check` agree on pass/fail, and fill
       mode yields byte-identical files and baseline rows. (Phase 3 extends it to the migrated section names.)
 - [ ] Canary set of deliberately broken copies that both must reject: wrong stdout, wrong exit code, leak,
@@ -195,18 +199,11 @@ entry-point-mechanics tests (exit code, `cli`, `stderr`, `file:`, `expect file:`
 
 - [ ] **Recount the files with a `main`, sections and tests** (the 64 found on 2026-11-03 are converted; the 4 kept are
       `files/{error_type,write_file}` and `builtins/{now_nanos,monotonic_now}`, tests of the real filesystem and clock).
-- [ ] **26 error fixtures keep their `main`** because of G7; drop it once `check` is the gate or the harness
-      compiles every function: `arrays/spread/err_spread_in_call, builtins/err_span_without_import,
-      builtins/err_use_without_import, effects/err_random_main, effects/err_shim_partial_coverage,
-      effects/err_shim_signature_mismatch, effects/err_shim_undeclared_effect,
-      effects/err_shim_unshimmable_effect, generics/err_explicit_type_args,
-      generics/err_return_only_type_param, generics/errors/err_ord_bound_violation,
-      generics/errors/err_type_param_conflict, integers/err_literal_out_of_range, kwargs/err_duplicate_kw,
-      kwargs/err_kw_for_positional, kwargs/err_kw_passed_positionally, kwargs/err_positional_after_kw,
-      kwargs/err_unknown_kw, lambdas/err_operator_value_not_imported, structs/errors/err_generic_cannot_infer,
-      syntax/err_call_missing_comma, syntax/err_missing_semicolon_before_refusal,
-      syntax/err_operator_starts_expr, syntax/err_unexpected_token_in_expr,
-      variants/err_payload_kw_for_positional, variants/err_payload_unknown_kw`.
+- [x] The 26 error fixtures that kept their `main` (2026-11-03): 24 had it renamed `subject` once the conversion was
+      verified by compiling the file and reading its errors (the earlier verification went through `--fix`, which
+      leaves a section untouched when the file compiles, so it called a deletion "unchanged" when it had removed the
+      error). Two keep it: `effects/err_random_main` (the error is that `main` cannot declare `!random`) and
+      `generics/errors/err_type_param_conflict` (needs a root: G7).
 - [ ] **Lint fixtures still in `tests/cases/lints/`** (58 files): the fixtures of the 10 lints still written in
       Rust (19 files: convert them into the lint's own `.test` assertions when each is ported, with
       `scripts/lint_fixtures_to_tests.py`), 24 files in groups named for a shape and not a lint (`slices`,
@@ -250,9 +247,10 @@ How to convert (the shape a reader should see):
   print.
 - The old `--- stdout ---` text is the oracle: the new assert must say the same bytes, so a codemod slip fails a
   test and does not pass quietly. Read a sample of each batch's diff.
-- **Verify a fixture change with the same compile path the gate uses**, not only `check` (G7), and read a
-  freshly filled `--- errors ---` body by eye once: a refill pins whatever the compiler now says, including a
-  different error.
+- **Verify a fixture change by compiling the file and reading the errors it really prints**, never through
+  `--fix`: it leaves a section alone when the file compiles, so it compares the old text with itself. A refill
+  pins whatever the compiler now says, including a different error; read a freshly filled `--- errors ---` body by
+  eye once.
 
 Tools in `scripts/`, for the conversions above: `main_to_test.py` (print-only `main` to a capturing top-level
 test), `main_to_asserts.py` (prints to asserts, for `report` cases), `errors_fixture_main.py` (take `main` out
@@ -329,8 +327,7 @@ touched anywhere in this phase except where `check` reads them into the structur
 - [ ] Replace its per-section code (`run_error_case`, the section checks in `run_success_case`, `check_plan`,
       `run_benchmark_check`, `check_or_fill`'s per-name logic) with one `aipl check` run per case, for the new
       sections and the run-observing ones alike (`check` already validates the latter). It keeps the baseline
-      compare and `refresh_perfmon` until G1 moves them into `check`. Verify with the compile path the gate uses
-      (G7), not only with `check`.
+      compare and `refresh_perfmon` until G1 moves them into `check`.
 - [ ] `fill_expected` becomes a wrapper over `check --fix`, scoped by `AIPL_CASE`.
 
 **3.8 Make the old `check` name free**
@@ -341,7 +338,7 @@ touched anywhere in this phase except where `check` reads them into the structur
 Each script rewrites headers, runs both validators and refuses to write a file whose verdict or `--fix` result
 changes (the lesson from the error-fixture pass: a refill pins whatever the compiler now says). Each leaves the
 differential test green.
-- [ ] `errors` (273) to `check --compile`; the 26 fixtures held by G7 move with the rest.
+- [ ] `errors` (273) to `check --compile`.
 - [ ] The `formatted` fixtures (27 in `tests/fmt`) to `check --format --fix` (DS5b), and port the fixture runner and
       `fill_expected_fmt` in `tests/suites/fmt.rs`.
 - [ ] Files with these sections outside `tests/cases/` and `tests/fmt` (`examples/`, `projects/`).
@@ -394,8 +391,8 @@ only after the whole tree has moved (3.10), so a half-migrated tree is never gre
 - During 3.4-3.9 two validators exist. The differential test is what stops them drifting; do not skip it.
 - Section bodies embed root-relative paths (DESIGN_PRINCIPLES.md §7): a moved file changes its pinned text, as it
   does for `errors` today. Not new, but now true of every `check` section.
-- `check` and the harness compile different sets of functions (G7). Decide it in Phase 1; Phase 3 would otherwise
-  build the new `--compile` projection on the stricter of two behaviors.
+- Which functions `check` compiles (G7) decides what `--compile` can report. Decide it in Phase 1, before the projection
+  is built.
 
 ## Phase 4: batch runner
 - [ ] `aipl check --shard i/n` over a file list; deterministic assignment.

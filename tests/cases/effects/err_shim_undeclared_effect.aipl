@@ -11,7 +11,7 @@ fn logging_clock() !prints -> u64 {
 
 fn fake_mono() -> u64 { 2 }
 
-fn main() {
+fn subject() {
     shim clock { now_nanos = logging_clock, monotonic_now = fake_mono } {};
 }
 --- errors ---

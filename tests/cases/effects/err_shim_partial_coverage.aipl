@@ -9,7 +9,7 @@ fn fake() -> u64 { 1 }
 
 fn reads() !clock -> u64 { now_nanos() }
 
-fn main() {
+fn subject() {
     shim clock { now_nanos = fake } {
         reads();
     };

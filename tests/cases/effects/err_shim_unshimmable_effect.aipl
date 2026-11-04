@@ -5,7 +5,7 @@
 
 fn fake() -> u64 { 1 }
 
-fn main() {
+fn subject() {
     shim measure { now_nanos = fake } {};
 }
 --- errors ---

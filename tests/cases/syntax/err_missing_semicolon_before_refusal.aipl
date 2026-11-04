@@ -1,7 +1,7 @@
 # A `Refuse` still ends the parse — the loop body's missing-`;` message is better
 # than "expected" — but it comes last, after the slips met before it.
 
-fn main() {
+fn subject() {
     let a = 1
     while (true) {
         f() g();

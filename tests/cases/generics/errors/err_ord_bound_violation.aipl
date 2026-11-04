@@ -5,7 +5,7 @@ struct Point { x: i64, y: i64 }
 
 fn identity<T: ord>(x: T) -> T { x }
 
-fn main() -> i64 {
+fn subject() -> i64 {
     identity(Point { x: 1, y: 2 });
     0
 }

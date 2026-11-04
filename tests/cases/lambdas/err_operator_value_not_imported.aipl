@@ -3,10 +3,10 @@
 
 fn apply(a: i64, b: i64, f: (i64, i64) -> i64) -> i64 { f(a, b) }
 
-fn main() -> i64 { apply(2, 3, +) }
+fn subject() -> i64 { apply(2, 3, +) }
 --- errors ---
 error: operator "+" must be imported: add `import { wrapping_add as + } from builtins;`
- --> ./tests/cases/lambdas/err_operator_value_not_imported.aipl:6:32
+ --> ./tests/cases/lambdas/err_operator_value_not_imported.aipl:6:35
   |
-6 | fn main() -> i64 { apply(2, 3, +) }
-  |                                ^
+6 | fn subject() -> i64 { apply(2, 3, +) }
+  |                                   ^

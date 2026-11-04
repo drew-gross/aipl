@@ -6,7 +6,7 @@ fn nothing<T: int>(s: str) -> T? { none }
 
 fn empty<T: any>() -> T[] { [] }
 
-fn main() {
+fn subject() {
     let unpinned = empty();
     let text: str? = nothing("x");
 }

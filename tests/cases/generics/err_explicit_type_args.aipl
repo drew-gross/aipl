@@ -10,7 +10,7 @@ fn plain(x: i64) -> i64 { x }
 
 fn identity<T: any>(x: T) -> T { x }
 
-fn main() {
+fn subject() {
     nothing::<u8, u8>("x");
     nothing::<str>("x");
     plain::<u8>(1);
