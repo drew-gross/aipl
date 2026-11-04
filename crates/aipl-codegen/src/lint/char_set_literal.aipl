@@ -1,0 +1,168 @@
+# The `char_set_literal` lint: `#{'a', 'b', 'c'}` — a set of char literals spelled out one quoted
+# element at a time. `"abc".to_set()` is the same set, written as the thing it describes: the
+# characters, in a row, with nothing between them.
+#
+# It reads better at every size and it costs nothing. `to_set` on a *string literal* is folded by
+# codegen into the four immediate stores that are a `#{char}`'s whole representation (see the
+# `Callee::ToSet` arm in `aipl-codegen`), which is exactly what the set literal compiles to — the
+# two spellings emit byte-identical IR, so the shorter one is free.
+#
+# **Three elements or more**: two is where the spellings are a tie — `#{'a', 'b'}` and
+# `"ab".to_set()` are the same width, and the literal keeps each element visibly a `char`. From
+# three on, the quotes and commas outweigh the characters they separate, and the sets that matter
+# in practice (a character class, a set of punctuation, the digits) are far past three, where the
+# literal form is almost unreadable.
+#
+# **Only the unordered `#{..}`.** An ordered literal is not interchangeable: `to_set` leaves its
+# order to the use site, so `#<{'z', 'a', 'm'}` where nothing pins an order — rendered straight into
+# a template, say — would become the *unordered* set and stop sorting. A lint may not advise a
+# rewrite that changes what the program does.
+#
+# **Only a literal written on one line**, which is what keeps every hit squelchable. `#[allow]` is
+# line-scoped, and the formatter breaks a set literal too wide for one line into one element per
+# line — then relocates a trailing marker from inside the braces onto the statement's closing `};`,
+# a line the span does not start on. A literal it keeps on one line carries the marker at the end
+# of that line, where it does squelch.
+#
+# **Only elements with a spelling in a string.** The escapes are the ones AIPL's own string rule
+# accepts (`\n`, `\t`, `\r`, `\\`, `\"`); anything else non-printable is left alone rather than
+# guessed at, since advice that does not lex is worse than no advice.
+#
+# The advice puts the string in backticks, not the quotes the other lints use: the advice *is* a
+# string literal, and `""abc".to_set()"` reads as neither. The file's `to_set` is named if the file
+# has none, which is what makes the advice followable.
+
+import {
+    as_case,
+    collect_ok,
+    contains,
+    equal as ==,
+    is_case,
+    join,
+    len,
+    less_than as <,
+    logical_not as !,
+    logical_or as ||,
+    not_equal as !=,
+    to_set,
+} from builtins;
+import { Char, Expr, SetLit, descendants } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Function } from "../item.aipl";
+import { Unordered } from "../ty.aipl";
+import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
+
+# How many spelled-out elements it takes before the string form wins.
+fn minimum_elements() -> u64 { 3 }
+
+# Every printable ASCII character but the blank, which the dedent of a raw block would eat.
+fn printable_without_blank() -> str {
+    """!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""
+}
+
+# A hit for each unordered set literal in the function that is only characters, written on one line.
+pub fn char_set_literal(Function { body }) -> UnfilledHit[] {
+    body.descendants()$spelled_out().collect_ok()
+}.test({
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_function_unfilled_messages(
+            `import \{ {imports} } from builtins; fn f() -> #\{char} \{ {body} }`,
+            char_set_literal,
+        )
+    }
+    assert(messages("to_set", "#{'a', 'b', 'c'}")? == [
+        """a char set of 3 elements spelled out — write `"abc".to_set()`""",
+    ]);
+
+    // The file's spelling of `to_set`, or the import to add.
+    assert(messages("to_set as chars", "#{'a', 'b', 'c'}")? == [
+        """a char set of 3 elements spelled out — write `"abc".chars()`""",
+    ]);
+    assert(messages("len", "#{'a', 'b', 'c'}")? == [
+        """a char set of 3 elements spelled out — write `"abc".to_set()`, importing `to_set` from builtins""",
+    ]);
+
+    // The escapes a string takes.
+    assert(messages("to_set", """#{'"', '\\', '\n', 'x'}""")? == [
+        """a char set of 4 elements spelled out — write `"\"\\\nx".to_set()`""",
+    ]);
+
+    // Two elements are a tie, an ordered set is another thing, a character with no spelling and
+    // a literal broken over lines are left alone.
+    assert(messages("to_set", "#{'a', 'b'}")? == []);
+    assert(messages("to_set", "#<{'a', 'b', 'c'}")? == []);
+    assert(messages("to_set", "#{'a',\n 'b',\n 'c'}")? == []);
+
+    // Shapes the lint must leave alone.
+
+    // Shapes the lint flags, and what it says of them.
+    assert(lint_function_unfilled_messages(
+        """
+            fn subject() !prints {
+                // Three is the threshold: below it the two spellings are a tie.
+                let abc: #{char} = #{'a', 'b', 'c'};
+                // The wider the set, the more the quotes and commas outweigh the content.
+                let digits: #{char} = #{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
+
+                // A char needing an escape keeps it, in the form a `str` literal takes: a
+                // quote and a backslash are escaped, a `'` needs nothing inside quotes.
+                let escapes: #{char} = #{'"', '\\', '\'', '\n', '\t'};
+                print(`{abc.has('b')} {digits.has('7')} {escapes.has('\n')}`);
+            }
+        """,
+        char_set_literal,
+    )? == [
+        """a char set of 3 elements spelled out — write `"abc".to_set()`, importing `to_set` from builtins""",
+        """a char set of 10 elements spelled out — write `"0123456789".to_set()`, importing `to_set` from builtins""",
+        """a char set of 5 elements spelled out — write `"\"\\'\n\t".to_set()`, importing `to_set` from builtins""",
+    ]);
+
+    // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
+    let kept: #{char} = #{'a', 'b', 'a', 'c'}; #[allow]
+    let rewritten: #{char} = "abac".to_set();
+    assert(`{kept == rewritten} {len(kept) == 3}` == "true true");
+
+    // The escapes travel too: a quote and a backslash are escaped inside the
+    // string, a `'` is not, and `\n`/`\t` keep the spelling they already had.
+    let punct: #{char} = #{'"', '\\', '\'', '\n', '\t'}; #[allow]
+    assert(`{punct == "\"\\'\n\t".to_set()}` == "true");
+})
+
+# The hit for `self`, when it is a one-line unordered set of at least three character literals
+# that a string can spell.
+fn spelled_out(self: Expr) -> UnfilledHit? {
+    let SetLit(elements, order) = self.kind.as_case(SetLit)?;
+    if (!order.is_case(Unordered)) { return none; };
+    if (elements.len() < minimum_elements() || self.source.contains('\n')) { return none; };
+
+    // Every element a char *literal*: that is what makes this a char set without asking the type
+    // checker (lints run before it), and what lets the advice name the string it would become.
+    let characters = elements$character().collect_ok();
+    if (characters.len() != elements.len()) { return none; };
+    let spelled = characters$spelling().collect_ok();
+    if (spelled.len() != characters.len()) { return none; };
+    some(unfilled(
+        "to_set",
+        `a char set of {elements.len()} elements spelled out — write \`"{spelled.join()}".`,
+        "()`",
+        self.span,
+    ))
+}
+
+# The character `self` is, when it is a character literal.
+fn character(self: Expr) -> char? {
+    let Char(c) = self.kind.as_case(Char)?;
+    some(c)
+}
+
+# What spells `self` inside a string literal, or `none` when nothing does. Only the escapes AIPL's
+# own string rule accepts are used, and a quote needs none outside double quotes.
+fn spelling(self: char) -> str? {
+    if (self == '"') { return some(`\\"`); };
+    if (self == '\\') { return some("""\\"""); };
+    if (self == '\n') { return some("""\n"""); };
+    if (self == '\t') { return some("""\t"""); };
+    if (self == '\r') { return some("""\r"""); };
+    if (self == ' ' || printable_without_blank().contains(self)) { return some(`{self}`); };
+    none
+}

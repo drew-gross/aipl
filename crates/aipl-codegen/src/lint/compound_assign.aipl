@@ -1,0 +1,153 @@
+# The `compound_assign` lint: `set x = x + e;` — an accumulate written the long way; `set x += e;` is the
+# form for it, and likewise `-=`, `*=`, `/=`.
+#
+# For the commutative operators either operand order counts (`x * k` and `k * x` both scale `x`), but
+# `-` and `/` are flagged only with the receiver on the left: `set x = k - x;` is not `set x -= k;`, and
+# rewriting it that way would silently change the program.
+#
+# The target may be a name or a field path off one (`set p.n = p.n + 1;` is `set p.n += 1;`): every `set`
+# form takes either, and a path's text spells it, so the advice can quote it as written.
+#
+# `step_by_one` has the more specific advice for `set x = x ± 1;` — `set x++;` / `set x--;` — wherever it
+# has advice for the operator, so this lint leaves that shape to it rather than offering a second
+# rewrite of the same line. Where it has none (no step flavor matches this file's operator), `±= 1` is the
+# only advice left and this lint gives it.
+#
+# Only the operators whose compound spelling provably means the same thing are advised — see `paired`:
+# the compound spelling has to be the flavor of the file's operator, and one the file already binds to
+# something else is not offered. The advice names the import to add when the file lacks it, since no
+# compound operator has a bare form.
+#
+# The hit points at the `set` statement.
+
+import {
+    as_case,
+    collect_ok,
+    contains,
+    equal as ==,
+    filter,
+    find_if,
+    is_empty,
+    is_some,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    value_or,
+} from builtins;
+import { Assign, Call, Expr, Num, descendants } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Function, Program } from "../item.aipl";
+import { LintHit, hit, lint_messages, on_functions, spans_its_text } from "./lint_hit.aipl";
+import { Pairing, paired } from "./operator_pairs.aipl";
+import { is_same_place } from "./places.aipl";
+import { step_for } from "./step_by_one.aipl";
+
+# The compound spelling a plain operator is advised to become, and the builtin to import when the file
+# lacks it (`none` when it has it).
+struct Compound { operator: str, spelling: str, missing: str? }
+
+# A hit for each long-hand accumulate in the program.
+pub fn compound_assign(program: Program) -> LintHit[] {
+    let items = program.items;
+    let compounds = [("+", "+="), ("-", "-="), ("*", "*="), ("/", "/=")]
+        .map(
+            |(operator, spelling)| items
+                .paired(operator, spelling)
+                .map(|Pairing { builtin, imported }| Compound {
+                    operator,
+                    spelling,
+                    missing: if (imported) { none } else { some(builtin) },
+                }),
+        )
+        .collect_ok();
+    if (compounds.is_empty()) { return []; };
+    let stepped = ["+", "-"].filter(|operator| items.step_for(operator).is_some());
+    program.on_functions(
+        |Function { body }| body.descendants()$long_accumulate(compounds, stepped).collect_ok(),
+    )
+}.test({
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_messages(
+            `import \{ {imports} } from builtins; fn f(x: i64) -> i64 \{ mut n = x; {body} n }`,
+            compound_assign,
+        )
+    }
+    let all = "wrapping_add as +, wrapping_add_assign as +=, wrapping_sub as -, wrapping_sub_assign as -=, wrapping_mul as *, wrapping_mul_assign as *=";
+    assert(messages(all, "set n = n + x;")? == [
+        `"n" accumulates onto itself — use the compound form "set n += ...;"`,
+    ]);
+    assert(messages(all, "set n = x * n;")? == [
+        `"n" accumulates onto itself — use the compound form "set n *= ...;"`,
+    ]);
+
+    // The import to add is named, in the flavor of the file's operator.
+    assert(messages("wrapping_mul as *", "set n = n * 2;")? == [
+        ```"n" accumulates onto itself — use the compound form "set n *= ...;", importing `wrapping_mul_assign as *=` from builtins```,
+    ]);
+
+    // `k - n` is not an accumulate.
+    assert(messages(all, "set n = x - n;")? == []);
+
+    // `n + 1` is the step lint's wherever it has advice, whether or not `++` is imported yet; where
+    // it has none (here `++` is another flavor) the compound form is the only advice left.
+    assert(messages(all, "set n = n + 1;")? == []);
+    assert(messages(
+        "saturating_add as +, saturating_add_assign as +=, wrapping_increment as ++",
+        "set n = n + 1;",
+    )? == [`"n" accumulates onto itself — use the compound form "set n += ...;"`]);
+
+    // Shapes the lint must leave alone.
+
+    // Shapes the lint flags, and what it says of them.
+    assert(
+        lint_messages(
+            """
+                fn subject() !prints {
+                    mut n = 10;
+                    set n = n + 5;
+                    set n = 3 + n; // the commutative order counts too
+                    set n = n / 2;
+                    print(n.to_str());
+                    // A field path is a target like any other, quoted as written.
+                    mut c = Counter { n: 1 };
+                    set c.n = c.n + 5;
+                    print(c.n.to_str());
+                }
+            """,
+            compound_assign,
+        )? == [],
+    );
+})
+
+# The hit for `self`, when it is a `set` of a place to itself combined with something.
+fn long_accumulate(self: Expr, compounds: Compound[], stepped: str[]) -> LintHit? {
+    let Assign(target, value, _) = self.kind.as_case(Assign)?;
+    if (!target.spans_its_text()) { return none; };
+    // An operator use is a call named for the spelling written.
+    let Call(written, args, _) = value.kind.as_case(Call)?;
+    let [left, right] = args else { return none; };
+    let Compound { operator, spelling, missing } = compounds.find_if(
+        |candidate| candidate.operator == written,
+    )?;
+
+    // The receiver on the left works for every operator; on the right only where the operation is
+    // commutative, since `k - x` and `k / x` are not accumulations of `x` at all.
+    let operand = if (left.is_same_place(target)) {
+        right
+    } else if (right.is_same_place(target) && (written == "+" || written == "*")) {
+        left
+    } else {
+        return none;
+    };
+    // `set x = x ± 1;` is the step lint's when that lint can fire here.
+    if (operand.kind == Num(1) && stepped.contains(written)) { return none; };
+    let name = target.source;
+    let hint = missing
+        .map(|builtin| `, importing \`{builtin} as {spelling}\` from builtins`)
+        .value_or("");
+    some(hit(
+        `"{name}" accumulates onto itself — use the compound form "set {name} {spelling} ...;"{hint}`,
+        self.span,
+    ))
+}

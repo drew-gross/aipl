@@ -1,0 +1,215 @@
+# The `set_spread_push` lint: `set out = [..out, x];` — a binding rebuilt from itself only to
+# append to it. `set out.push(x);` is the append spelled as one: it names the element added, and
+# the array's other contents never come up.
+#
+# The rebuild spelling says "build the longer array, then store it", and that is what it costs: a
+# fresh array of the combined length on every append, with `out`'s old buffer released afterwards.
+# `push` grows `out`'s own buffer in place when nothing else holds it — and when something does, it
+# copies, so the two spellings agree on what any other binding sees. It is the array sibling of
+# `set_spread_field`, which says the same thing about a struct rebuilt from itself to replace a
+# field.
+#
+# A spread in the tail is an append too, of a whole array rather than one element, so it is advised
+# as `extend` — `set out = [..out, ..xs];` is `set out.extend(xs);`. A field path works the same way
+# as a bare name (`set self.hits = [..self.hits, x]` is `set self.hits.push(x)`), which is the whole
+# set of targets: `push` writes the grown array back into the place it was given, and only a name
+# or a field path off one is a place.
+#
+# Two shapes are left alone. The spread must be the **first** element and must be the target itself
+# — `[x, ..out]` prepends and `[..other, x]` starts from a different array, and neither is something
+# `push` can spell. And with more than one appended element the rewrite is one call per element, so
+# it is offered only when no element reads the target: `set out = [..out, out.len(), out.len()];`
+# appends the *same* index twice, where the two pushes would see the array grow between them. A
+# single element is always safe — it is computed before the append either way.
+#
+# The shape is all language syntax — an array literal with a spread in it needs no import — so the
+# lint fires whether or not `push` and `extend` are imported. The names are only for the advice,
+# which says to import what it uses when it is missing.
+#
+# The hit points at the spread, which is a single line however the literal is broken.
+
+import {
+    any,
+    as_case,
+    collect_ok,
+    drop_first,
+    equal as ==,
+    extend,
+    first,
+    greater_than as >,
+    is_empty,
+    len,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    push,
+    to_str,
+} from builtins;
+import { ArrayLit, Assign, Expr, Spread, descendants } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Function } from "../item.aipl";
+import { mentions_any } from "./field_uses.aipl";
+import { Named, UnfilledHit, lint_function_unfilled_messages, quote } from "./lint_hit.aipl";
+import { is_same_place, root_name } from "./places.aipl";
+
+# A hit for each `set` in the program that rebuilds an array from itself to append to it.
+pub fn set_spread_push(self: Function) -> UnfilledHit[] {
+    self.body.descendants()$rebuild().collect_ok()
+}.test({
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_function_unfilled_messages(
+            `import \{ {imports} } from builtins; fn f(xs: i64[], x: i64) -> i64[] \{ {body} }`,
+            set_spread_push,
+        )
+    }
+    assert(messages("push", "mut out = xs; set out = [..out, x]; out")? == [
+        `this "set" rebuilds "out" from itself only to append to it — append in place: "set out.push(x);"`,
+    ]);
+
+    // A spread appends a whole array, and each is one call, in the names the file imports.
+    assert(messages("push as add, extend", "mut out = xs; set out = [..out, x, ..xs]; out")? == [
+        `this "set" rebuilds "out" from itself only to append to it — append each in place: "set out.add(x); set out.extend(xs);"`,
+    ]);
+
+    // What the file lacks is named once each.
+    assert(messages("len", "mut out = xs; set out = [..out, x, 1, ..xs]; out")? == [
+        """this "set" rebuilds "out" from itself only to append to it — append each in place: "set out.push(x); set out.push(1); set out.extend(xs);", importing `push` and `extend` from builtins""",
+    ]);
+    assert(messages("len", "mut out = xs; set out = [..out, g(x)]; out")? == [
+        """this "set" rebuilds "out" from itself only to append to it — append in place: "set out.push(<element>);", importing `push` from builtins""",
+    ]);
+
+    // The target may be a field path.
+    assert(messages("push", "mut s = P { a: xs }; set s.a = [..s.a, x]; s.a")? == [
+        `this "set" rebuilds "s.a" from itself only to append to it — append in place: "set s.a.push(x);"`,
+    ]);
+
+    // Not the shape: the spread is not first, it is of another array, nothing is appended, or
+    // several elements read the target.
+    assert(messages("push", "mut out = xs; set out = [x, ..out]; out")? == []);
+    assert(messages("push", "mut out = xs; set out = [..xs, x]; out")? == []);
+    assert(messages("push", "mut out = xs; set out = [..out]; out")? == []);
+    assert(messages("push", "mut out = xs; set out = [..out, out.len(), out.len()]; out")? == []);
+
+    // Shapes the lint flags, and what it says of them.
+    assert(lint_function_unfilled_messages(
+        """
+            fn grow(mut out: i64[], more: i64[]) {
+                set out = [..out, 1];
+                set out = [..out, 2, 3];
+                set out = [..out, ..more];
+            }
+        """,
+        set_spread_push,
+    )? == [
+        """this "set" rebuilds "out" from itself only to append to it — append in place: "set out.push(1);", importing `push` from builtins""",
+        """this "set" rebuilds "out" from itself only to append to it — append each in place: "set out.push(2); set out.push(3);", importing `push` from builtins""",
+        """this "set" rebuilds "out" from itself only to append to it — append in place: "set out.extend(more);", importing `extend` from builtins""",
+    ]);
+    assert(lint_function_unfilled_messages(
+        """
+            fn stash(mut self: Bag, x: i64) {
+                set self.hits = [..self.hits, x];
+            }
+        """,
+        set_spread_push,
+    )? == [
+        """this "set" rebuilds "self.hits" from itself only to append to it — append in place: "set self.hits.push(x);", importing `push` from builtins""",
+    ]);
+
+    // Not flagged: a prepend and a rebuild from a *different* array are not
+    // appends, and a multi-element rewrite whose elements read the target would see
+    // it grow between the two pushes.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn other(mut out: u64[], xs: u64[]) {
+                    set out = [0, ..out];
+                    set out = [..xs, 9];
+                    set out = [..out, out.len(), out.len()];
+                }
+            """,
+            set_spread_push,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn subject() !prints {
+                    mut xs = [1];
+                    set xs.grow([2]);
+                    print(to_str(xs));
+                    mut b = Bag { hits: [] };
+                    set b.stash(1 + 1);
+                    print(to_str(b));
+                    mut us: u64[] = [1];
+                    set us.other([2]);
+                    print(to_str(us));
+                }
+            """,
+            set_spread_push,
+        )? == [],
+    );
+
+    // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
+    fn rebuilt(mut self: i64[]) {
+        set self = [..self, 3]; #[allow]
+    }
+    fn joined(mut self: i64[], more: i64[]) {
+        set self = [..self, ..more]; #[allow]
+    }
+
+    // The rewrites the lint asks for, so each pair of spellings is checked side by
+    // side and proven to agree.
+    fn appended(mut self: i64[]) {
+        set self.push(3);
+    }
+    fn extended(mut self: i64[], more: i64[]) {
+        set self.extend(more);
+    }
+    mut a = [1, 2];
+    mut b = [1, 2];
+    set a.rebuilt();
+    set b.appended();
+    assert(to_str(a == b) == "true");
+    mut c = [1, 2];
+    mut d = [1, 2];
+    set c.joined([8, 9]);
+    set d.extended([8, 9]);
+    assert(to_str(c == d) == "true");
+    assert(to_str(a) == "[1, 2, 3]");
+    assert(to_str(c) == "[1, 2, 8, 9]");
+})
+
+# The hit for `self`, when it is a `set` of a place to an array literal that starts by spreading it.
+fn rebuild(self: Expr) -> UnfilledHit? {
+    let Assign(target, value, _) = self.kind.as_case(Assign)?;
+    let ArrayLit(elements) = value.kind.as_case(ArrayLit)?;
+    let root = target.root_name()?;
+    let spread = elements.first()?;
+    let Spread(base) = spread.kind.as_case(Spread)?;
+    let appended = elements.drop_first();
+    if (!base.is_same_place(target) || appended.is_empty()) { return none; };
+    if (appended.len() > 1 && appended.any(|element| element.mentions_any([root], none))) {
+        return none;
+    };
+    let place = target.source;
+
+    // The advice, a stretch of text at a time, each followed by the builtin it calls.
+    mut named: Named[] = [];
+    mut text = `this "set" rebuilds "{place}" from itself only to append to it — {if (appended.len() == 1) {
+        "append in place"
+    } else {
+        "append each in place"
+    }}: "`;
+    for (let i, element : appended) {
+        let separator = if (i == 0) { "" } else { " " };
+        let (builtin, argument) = match (element.kind) {
+            Spread(inner) => ("extend", inner.quote("<array>")),
+            _ => ("push", element.quote("<element>")),
+        };
+        set named.push(Named { text: `{text}{separator}set {place}.`, builtin });
+        set text = `({argument});`;
+    }
+    some(UnfilledHit { named, tail: `{text}"`, span: spread.span })
+}

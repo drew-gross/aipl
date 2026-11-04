@@ -316,7 +316,7 @@ impl Loader {
     /// block it desugars to.
     fn parse_and_lint(&self, src: &str) -> Result<(Program, Vec<Span>), Vec<Error>> {
         let parsed = parse_with_allows(src)?;
-        aipl_syntax::lint::check(&parsed.program, src, &parsed.allows, parsed.lints)?;
+        aipl_syntax::lint::check(src, &parsed.allows, parsed.lints)?;
         Ok((parsed.program, parsed.type_uses))
     }
 

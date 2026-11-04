@@ -35,18 +35,6 @@ fn subject() !prints {
     print(from_tag(Tag { id: 1 }).id.to_str());
 }
 --- errors ---
-error: field "x" is set to the identifier of the same name — use the shorthand "x" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_struct_literals.aipl:14:47
-   |
-14 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
-   |                                               ^
-
-error: field "y" is set to the identifier of the same name — use the shorthand "y" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_struct_literals.aipl:14:53
-   |
-14 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
-   |                                                     ^
-
 error: fn "make" returns "Point" and its body is a "Point" literal, naming the type twice — write the fields directly as the body (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_struct_literals.aipl:14:36
    |
@@ -70,3 +58,15 @@ error: fn "from_tag" returns "Tag" and its body is a "Tag" literal, naming the t
    |
 29 | fn from_tag(Tag { id }) -> Tag { Tag { id: id + 1 } }
    |                                  ^^^^^^^^^^^^^^^^^^
+
+error: field "x" is set to the identifier of the same name — use the shorthand "x" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_struct_literals.aipl:14:47
+   |
+14 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+   |                                               ^
+
+error: field "y" is set to the identifier of the same name — use the shorthand "y" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_struct_literals.aipl:14:53
+   |
+14 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+   |                                                     ^

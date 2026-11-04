@@ -1,22 +1,27 @@
-# The lints that have moved to AIPL, run over a parsed file.
+# The lints, run over a parsed file.
 #
-# `aipl_syntax::lint::check` is the driver: it runs the lints still written in
-# Rust, adds what this returns, and squelches the hits an `#[allow]` marker covers.
-# A lint moves here by getting its own file and a line in `lint`; the hits come
-# back in the order the lints are listed.
+# `aipl_syntax::lint::check` is the driver: it squelches the hits an `#[allow]`
+# marker covers and says how to keep the rest. A lint is added by giving it its
+# own file and a line in `lint`; the hits come back in the order the lints are listed.
 
 import { equal as == } from builtins;
 import { Program } from "../item.aipl";
+import { arm_block_value } from "./arm_block_value.aipl";
 import { case_of_equal_is_case } from "./case_of_equal_is_case.aipl";
+import { char_set_literal } from "./char_set_literal.aipl";
+import { compound_assign } from "./compound_assign.aipl";
 import { destructure_binding } from "./destructure_binding.aipl";
 import { destructure_param } from "./destructure_param.aipl";
 import { destructure_slot } from "./destructure_slot.aipl";
 import { duplicate_import_source } from "./duplicate_import_source.aipl";
 import { eta_lambda } from "./eta_lambda.aipl";
 import { extend_loop_map_join } from "./extend_loop_map_join.aipl";
+import { field_init_shorthand } from "./field_init_shorthand.aipl";
 import { fn_body_type_stutter } from "./fn_body_type_stutter.aipl";
 import { interp_literal } from "./interp_literal.aipl";
 import { interp_to_str } from "./interp_to_str.aipl";
+import { is_empty_longhand } from "./is_empty_longhand.aipl";
+import { len_gt_zero } from "./len_gt_zero.aipl";
 import { let_else_as_case } from "./let_else_as_case.aipl";
 import { LintHit, on_functions, on_functions_filled, on_functions_once } from "./lint_hit.aipl";
 import { map_constant_repeat } from "./map_constant_repeat.aipl";
@@ -36,11 +41,15 @@ import { push_loop_pipeline } from "./push_loop_pipeline.aipl";
 import { return_loop_any_all } from "./return_loop_any_all.aipl";
 import { return_loop_find_if } from "./return_loop_find_if.aipl";
 import { return_loop_find_index } from "./return_loop_find_index.aipl";
+import { set_spread_field } from "./set_spread_field.aipl";
+import { set_spread_push } from "./set_spread_push.aipl";
 import { slice_from_zero } from "./slice_from_zero.aipl";
 import { slice_to_len } from "./slice_to_len.aipl";
 import { slice_whole } from "./slice_whole.aipl";
+import { step_by_one } from "./step_by_one.aipl";
 import { union_loop_union_all } from "./union_loop_union_all.aipl";
 import { unused_imports } from "./unused_imports.aipl";
+import { value_or_compare } from "./value_or_compare.aipl";
 import { with_value_or_self } from "./with_value_or_self.aipl";
 
 # Every hit the ported lints find in `program`.
@@ -83,6 +92,16 @@ pub fn lint(program: Program) -> LintHit[] {
         ..program.on_functions(slice_whole),
         ..program.on_functions(slice_to_len),
         ..program.on_functions(slice_from_zero),
+        ..program.on_functions_filled(char_set_literal),
+        ..program.on_functions(arm_block_value),
+        ..program.on_functions(field_init_shorthand),
+        ..program.on_functions(set_spread_field),
+        ..program.on_functions_filled(set_spread_push),
+        ..step_by_one(program),
+        ..compound_assign(program),
+        ..len_gt_zero(program),
+        ..value_or_compare(program),
+        ..is_empty_longhand(program),
     ]
 }.test({
     let program = Program { items: [], doc: none };

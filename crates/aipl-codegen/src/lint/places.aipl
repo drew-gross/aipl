@@ -1,0 +1,37 @@
+# A *place* is what a `set` can write to: a name, or a field path off one (`p`, `p.a.b`). The lints
+# that advise a different spelling of a `set` ask the same questions of its target, and ask them here.
+
+import { equal as ==, logical_and as &&, logical_not as ! } from builtins;
+import { Expr, Field, Ident, Neg, expr, ident } from "../expr.aipl";
+
+# The name a place is rooted in: `p` for `p` and for `p.a.b`, and `none` for anything that is not a place.
+pub fn root_name(self: Expr) -> str? {
+    match (self.kind) {
+        Ident(name) => some(name),
+        Field(receiver, _) => receiver.root_name(),
+        _ => none,
+    }
+}.test({
+    assert(ident("p").root_name() == some("p"));
+    assert(expr(Field(expr(Field(ident("p"), "a")), "b")).root_name() == some("p"));
+    assert(expr(Field(expr(Neg(ident("p"))), "a")).root_name() == none);
+})
+
+# Whether `self` and `other` name the same place, however far apart they are written: the tree
+# compared without the positions its nodes carry.
+pub fn is_same_place(self: Expr, other: Expr) -> bool {
+    match ((self.kind, other.kind)) {
+        (Ident(a), Ident(b)) => a == b,
+        (Field(receiver, a), Field(other_receiver, b)) => a == b && receiver.is_same_place(
+            other_receiver,
+        ),
+        _ => false,
+    }
+}.test({
+    assert(ident("p").is_same_place(Expr { ..ident("p"), span: 4..5 }));
+    assert(!ident("p").is_same_place(ident("q")));
+    let path = expr(Field(ident("p"), "a"));
+    assert(path.is_same_place(Expr { ..path, span: 1..4 }));
+    assert(!path.is_same_place(expr(Field(ident("p"), "b"))));
+    assert(!path.is_same_place(ident("p")));
+})

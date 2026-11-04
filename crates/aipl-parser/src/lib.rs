@@ -221,9 +221,8 @@ static PARSE_HOOK: std::sync::OnceLock<fn(&str) -> Result<Parsed, Vec<Error>>> =
     std::sync::OnceLock::new();
 
 /// What a parse returns: the program, the spans of its `#[allow]` markers, and the
-/// hits of the lints that have been ported to AIPL, which ran on the program on
-/// the AIPL side. The loader gives the hits to [`aipl_syntax::lint::check`], which
-/// squelches and reports them with the hits of the lints still written in Rust.
+/// hits of the lints, which ran on the program on the AIPL side. The loader gives
+/// the hits to [`aipl_syntax::lint::check`], which squelches and reports them.
 pub struct Parsed {
     pub program: Program,
     pub allows: Vec<Span>,

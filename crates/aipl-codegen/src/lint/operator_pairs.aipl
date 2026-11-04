@@ -1,0 +1,94 @@
+# Operators that come in more than one flavor (`wrapping_add` and `saturating_add`) are bound by
+# import, and nothing fixes which flavor a file chose for `+`. A lint that advises another spelling of
+# the same arithmetic — `set x = x + 1;` as `set x++;`, or as `set x += 1;` — is only right when the
+# spelling it advises has the flavor the file's operator has, and it is the import that names it.
+# This is where that is decided, so each such lint asks the same question the same way.
+
+import {
+    contains,
+    equal as ==,
+    find_if,
+    first,
+    len,
+    logical_not as !,
+    split,
+    value_or,
+} from builtins;
+import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
+import { Item } from "../item.aipl";
+import { operator_named_forms } from "../operator_named_forms.aipl";
+import { bound_to } from "./lint_hit.aipl";
+
+# The builtin that provides the operator `target` with the flavor of the operator `written`, as this
+# file binds it, and whether the file has imported it already.
+struct Pairing { builtin: str, imported: bool }
+
+# The flavor of the operator builtin `self`: `wrapping` for `wrapping_add_assign`.
+fn flavor(self: str) -> str { self.split("_").first().value_or("") }.test({
+    assert("wrapping_add_assign".flavor() == "wrapping");
+    assert("saturating_decrement".flavor() == "saturating");
+    assert("".flavor() == "");
+})
+
+# How `items` can be advised to write `target` where they write `written`, or `none` when there is
+# nothing that provably means the same.
+#
+# The written operator has to be the file's own and a builtin: a user function of that name has no
+# flavor to pair with. Where `target` has only one flavor there is nothing to choose and it is that
+# one; where it has several, the one sharing the written operator's flavor is the one that means the
+# same. A `target` the file already imports counts only if it is that builtin — one bound to the other
+# flavor, or to a function of the file's own, would not mean what the advice says.
+pub fn paired(self: Item[], written: str, target: str) -> Pairing? {
+    let written_name = self.bound_to(written)?;
+    if (!written.operator_named_forms().contains(written_name)) { return none; };
+    let forms = target.operator_named_forms();
+    let builtin = if (forms.len() == 1) {
+        forms.first()?
+    } else {
+        forms.find_if(|form| form.flavor() == written_name.flavor())?
+    };
+    match (self.bound_to(target)) {
+        none => some(Pairing { builtin, imported: false }),
+        some(bound) => if (bound == builtin) {
+            some(Pairing { builtin, imported: true })
+        } else {
+            none
+        },
+    }
+}.test({
+    fn pairing(src: str, written: str, target: str) -> Pairing?!ParseFailure {
+        ok(aipl_parse_surface_file(src)?.program.items.paired(written, target))
+    }
+    // The flavor of the file's `+` picks the step, and the import is named until it is made.
+    assert(pairing("import { wrapping_add as + } from builtins;", "+", "++")? == some(Pairing {
+        builtin: "wrapping_increment",
+        imported: false,
+    }));
+    assert(pairing("import { saturating_add as + } from builtins;", "+", "++")? == some(Pairing {
+        builtin: "saturating_increment",
+        imported: false,
+    }));
+    assert(pairing(
+        "import { saturating_add as +, saturating_increment as ++ } from builtins;",
+        "+",
+        "++",
+    )? == some(Pairing { builtin: "saturating_increment", imported: true }));
+
+    // An operator with one flavor has nothing to choose.
+    assert(pairing("import { wrapping_mul as * } from builtins;", "*", "*=")? == some(Pairing {
+        builtin: "wrapping_mul_assign",
+        imported: false,
+    }));
+
+    // The other flavor already bound to the target, a function of the file's own, or no import at all.
+    assert(
+        pairing(
+            "import { saturating_add as +, wrapping_increment as ++ } from builtins;",
+            "+",
+            "++",
+        )? == none,
+    );
+    assert(pairing("import { wrapping_add as ++ } from builtins;", "+", "++")? == none);
+    assert(pairing("""import { plus as + } from "./a.aipl";""", "+", "++")? == none);
+    assert(pairing("fn f() { }", "+", "++")? == none);
+})

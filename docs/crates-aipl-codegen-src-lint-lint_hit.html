@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/lint/lint_hit.aipl</code></h1>
 
-      <div class="module-doc"><p>What a lint reports: the message, and the span the caret goes under. The Rust side rebuilds each as an <code>aipl_syntax::Error</code> and runs it through the same <code>#[allow]</code> squelching as the lints still written in Rust.</p></div>
+      <div class="module-doc"><p>What a lint reports: the message, and the span the caret goes under. The Rust side rebuilds each as an <code>aipl_syntax::Error</code> and runs it through the <code>#[allow]</code> squelching.</p></div>
 
 
 
@@ -190,6 +190,48 @@
 
 
 
+        <section class="item" id="item-bound_to">
+          <h3>
+            <a class="anchor" href="#item-bound_to">bound_to</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn bound_to(self: Item[], local: str) -&#62; str?</code></pre>
+
+          <div class="doc"><p>The builtin a file's <code>items</code> import under the local name <code>local</code>, as builtins exports it (<code>wrapping_add</code> for <code>import { wrapping_add as + } from builtins;</code>), or <code>none</code> when that name is not bound by an import from builtins — unbound, or one of the file's own.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-text_after">
+          <h3>
+            <a class="anchor" href="#item-text_after">text_after</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn text_after(self: Expr, container: Expr) -&#62; str</code></pre>
+
+          <div class="doc"><p>The text of <code>container</code> after <code>self</code> ends. <code>self</code> is an expression inside <code>container</code>, so a lint that needs what was written around a node reads it from the enclosing one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-text_before">
+          <h3>
+            <a class="anchor" href="#item-text_before">text_before</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn text_before(self: Expr, container: Expr) -&#62; str</code></pre>
+
+          <div class="doc"><p>The text of <code>container</code> before <code>self</code> starts.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-imported_locals">
           <h3>
             <a class="anchor" href="#item-imported_locals">imported_locals</a>
@@ -345,6 +387,20 @@
           <pre class="signature"><code>fn distinct(self: str[]) -&#62; str[]</code></pre>
 
           <div class="doc"><p><code>self</code> without a name it has already listed, in the order it first appears.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-builtin_bound_to">
+          <h3>
+            <a class="anchor" href="#item-builtin_bound_to">builtin_bound_to</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn builtin_bound_to(self: Import, local: str) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The name an import from builtins exports under the local name <code>local</code>.</p></div>
 
 
         </section>

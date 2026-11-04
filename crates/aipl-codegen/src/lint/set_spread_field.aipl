@@ -1,0 +1,153 @@
+# The `set_spread_field` lint: `set p = P { ..p, x: 1 };` — a binding rebuilt from itself only to
+# replace a field. `set p.x = 1;` is the field store spelled as one: it names the one thing that
+# changes, and the struct's name and its other fields never come up. A field path works the same
+# way — `set o.inner = Inner { ..o.inner, n: 2 }` is `set o.inner.n = 2`.
+#
+# Only the spread *of the target itself* qualifies: `set acc = First { ..acc.merge(other),
+# nullable: true }` starts from a different value, and the two stores it would take are no
+# shorter. With several fields the rewrite is one store per field, so it is offered only when no
+# replacement reads the target — `set p = P { ..p, x: p.y, y: p.x }` swaps, and `set p.x = p.y;
+# set p.y = p.x;` does not. A single replacement is always safe: the value is computed before
+# the store either way.
+#
+# The hit points at the spread, which is a single line however the literal is broken.
+
+import {
+    any,
+    as_case,
+    collect_ok,
+    drop_first,
+    equal as ==,
+    first,
+    greater_than as >,
+    is_empty,
+    len,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map_join,
+    value_or,
+} from builtins;
+import { Assign, Construct, Expr, Spread, descendants } from "../expr.aipl";
+import { Function } from "../item.aipl";
+import { mentions_any } from "./field_uses.aipl";
+import { LintHit, hit, lint_function_messages, quote } from "./lint_hit.aipl";
+import { is_same_place, root_name } from "./places.aipl";
+
+# A hit for each `set` in the function that rebuilds a place from itself to replace fields.
+pub fn set_spread_field(Function { body }) -> LintHit[] {
+    body.descendants()$rebuild().collect_ok()
+}.test({
+    assert(lint_function_messages(
+        "fn f(p: P) -> P { mut q = p; set q = P { ..q, x: 1 }; q }",
+        set_spread_field,
+    )? == [
+        `this "set" rebuilds "q" from itself only to replace "x" — assign the field directly: "set q.x = 1;"`,
+    ]);
+    assert(lint_function_messages(
+        "fn f(p: P) -> P { mut q = p; set q.inner = Inner { ..q.inner, n: 2 }; q }",
+        set_spread_field,
+    )? == [
+        `this "set" rebuilds "q.inner" from itself only to replace "n" — assign the field directly: "set q.inner.n = 2;"`,
+    ]);
+
+    // Several fields are one store each, quoted where they can be and a placeholder where not.
+    assert(lint_function_messages(
+        "fn f(p: P) -> P { mut q = p; set q = P { ..q, x: 1, y: g(2) }; q }",
+        set_spread_field,
+    )? == [
+        `this "set" rebuilds "q" from itself only to replace some fields — assign each field directly: "set q.x = 1; set q.y = ..;"`,
+    ]);
+
+    // A swap reads the target, so it cannot be split; a different base or no replacement is no
+    // field store either.
+    assert(
+        lint_function_messages(
+            "fn f(p: P) -> P { mut q = p; set q = P { ..q, x: q.y, y: q.x }; q }",
+            set_spread_field,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(p: P) -> P { mut q = p; set q = P { ..p, x: 1 }; q }",
+            set_spread_field,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(p: P) -> P { mut q = p; set q = P { ..q }; q }",
+            set_spread_field,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    assert(lint_function_messages(
+        """
+            fn bump(mut self: Point) {
+                set self = Point { ..self, x: 1 };
+                set self.inner = Inner { ..self.inner, n: self.inner.n + 1 };
+                set self = Point { ..self, x: 5, y: 6 };
+            }
+        """,
+        set_spread_field,
+    )? == [
+        `this "set" rebuilds "self" from itself only to replace "x" — assign the field directly: "set self.x = 1;"`,
+        `this "set" rebuilds "self.inner" from itself only to replace "n" — assign the field directly: "set self.inner.n = ..;"`,
+        `this "set" rebuilds "self" from itself only to replace some fields — assign each field directly: "set self.x = 5; set self.y = 6;"`,
+    ]);
+
+    // Not flagged: the base is a different value, and a multi-field replacement
+    // that reads the target would not survive being split into two stores.
+    assert(
+        lint_function_messages(
+            """
+                fn swap(mut self: Point) {
+                    set self = Point { ..self, x: self.y, y: self.x };
+                }
+            """,
+            set_spread_field,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            """
+                fn subject() !prints {
+                    mut p = Point { x: 0, y: 0 };
+                    set p.bump();
+                    print(to_str(p));
+                    set p.swap();
+                    print(to_str(p));
+                }
+            """,
+            set_spread_field,
+        )? == [],
+    );
+})
+
+# The hit for `self`, when it is a `set` of a place to a literal that starts from the same place.
+fn rebuild(self: Expr) -> LintHit? {
+    let Assign(target, value, _) = self.kind.as_case(Assign)?;
+    let Construct(_, inits) = value.kind.as_case(Construct)?;
+    let root = target.root_name()?;
+    let spread = inits.first()?;
+    let Spread(base) = spread.value.kind.as_case(Spread)?;
+    let fields = inits.drop_first();
+    if (!base.is_same_place(target) || fields.is_empty()) { return none; };
+    if (fields.len() > 1 && fields.any(|field| field.value.mentions_any([root], none))) {
+        return none;
+    };
+    let place = target.source;
+    let stores = fields.map_join(
+        |field| `set {place}.{field.name} = {field.value.quote("..")};`,
+        sep=" ",
+    );
+    let (what, advice) = if (fields.len() == 1) {
+        (`replace "{fields[0]$name.value_or("")}"`, "assign the field")
+    } else {
+        ("replace some fields", "assign each field")
+    };
+    some(hit(
+        `this "set" rebuilds "{place}" from itself only to {what} — {advice} directly: "{stores}"`,
+        spread.value.span,
+    ))
+}

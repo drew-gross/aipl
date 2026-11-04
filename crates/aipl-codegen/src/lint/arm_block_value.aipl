@@ -1,0 +1,208 @@
+# The `arm_block_value` lint: `A => { expr }` — a match arm whose block holds nothing but
+# its value. The braces add a level of nesting and say nothing: `A => expr` is the same arm.
+#
+# A block is transparent in the tree — `{ expr }` lowers to `expr` — so which spelling was
+# written is recovered from the source around the body: a `{` between the arm's `=>` and
+# where the body starts, and a `}` right after it ends. Only a body that *is* its value
+# qualifies: a block with a statement in it lowers to a `Let`/`Seq`/… chain, and those need
+# their braces. A block holding a comment is left alone too — the comment has no place to go
+# once the braces are gone.
+#
+# The hit points at the closing brace, which is the one line that carries an `#[allow]`
+# whatever the layout: an arm on one line ends there, and a broken block's `}` sits on its own
+# line. A marker after the opening `{`, or after the value's first line, is moved by the
+# formatter to where it squelches nothing.
+
+import {
+    collect_ok,
+    equal as ==,
+    is_whitespace,
+    join,
+    len,
+    less_than as <,
+    logical_not as !,
+    not_equal as !=,
+    saturating_sub as -,
+    starts_with,
+    to_str,
+    trim_while,
+    wrapping_add as +,
+} from builtins;
+import {
+    Assign,
+    Expr,
+    For,
+    Let,
+    LetMut,
+    Match,
+    MatchArm,
+    Return,
+    Seq,
+    While,
+    descendants,
+} from "../expr.aipl";
+import { Function } from "../item.aipl";
+import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
+
+# A hit for each arm of a match in the function whose block holds nothing but its value.
+pub fn arm_block_value(Function { body }) -> LintHit[] {
+    body.descendants()$block_arms().join()
+}.test({
+    assert(lint_function_messages(
+        "fn f(x: i64) -> i64 { match (x) { 0 => { 1 }, _ => 2 } }",
+        arm_block_value,
+    )? == [message()]);
+
+    // The hit is the closing brace.
+    assert(lint_function_hits(
+        "fn f(x: i64) -> i64 { match (x) { 0 => { 1 }, _ => 2 } }",
+        arm_block_value,
+    )?$span == [43..44]);
+
+    // An alternation shares one body, so it is reported once.
+    assert(lint_function_messages(
+        "fn f(x: i64) -> i64 { match (x) { 0 | 1 => { 1 }, _ => 2 } }",
+        arm_block_value,
+    )? == [message()]);
+
+    // An empty block holds no value to write without braces.
+    assert(
+        lint_function_messages(
+            "fn f(x: i64) { match (x) { 0 => {}, _ => {} }; }",
+            arm_block_value,
+        )? == [],
+    );
+
+    // The bare form, a block with a statement in it, a block with a comment in it, and a
+    // block that does something else keep their braces.
+    assert(
+        lint_function_messages(
+            "fn f(x: i64) -> i64 { match (x) { 0 => 1, _ => 2 } }",
+            arm_block_value,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(x: i64) -> i64 { match (x) { 0 => { let y = x; y }, _ => 2 } }",
+            arm_block_value,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(x: i64) -> i64 { match (x) { 0 => { /* kept */ 1 }, _ => 2 } }",
+            arm_block_value,
+        )? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    assert(lint_function_messages(
+        """
+            fn f(x: i64) -> i64 {
+                match (x) {
+                    0 => { 1 },
+                    1 => { x + 1 },
+                    2 => {
+                        let y = x;
+                        y
+                    },
+                    3 => {
+                        // kept
+                        x
+                    },
+                    4 | 5 => { x },
+                    6 => {
+                        x;
+                    },
+                    _ => x,
+                }
+            }
+        """,
+        arm_block_value,
+    )? == [
+        "this arm's block holds nothing but its value — write the value as the arm's body, without the braces",
+        "this arm's block holds nothing but its value — write the value as the arm's body, without the braces",
+        "this arm's block holds nothing but its value — write the value as the arm's body, without the braces",
+    ]);
+    assert(
+        lint_function_messages(
+            """
+                fn subject() !prints {
+                    print(f(0).to_str());
+                }
+            """,
+            arm_block_value,
+        )? == [],
+    );
+
+    // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
+    fn f(x: i64) -> i64 {
+        match (x) {
+            0 => { 1 }, #[allow]
+            1 => {
+                x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + 1
+            }, #[allow]
+            _ => x,
+        }
+    }
+    // The rewrite the lint asks for, proven to agree.
+    fn g(x: i64) -> i64 {
+        match (x) {
+            0 => 1,
+            1 => x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + x + 1,
+            _ => x,
+        }
+    }
+    assert(f(0).to_str() == "1");
+    assert(g(0).to_str() == "1");
+    assert(f(1).to_str() == "23");
+    assert(g(1).to_str() == "23");
+    assert(f(7).to_str() == "7");
+    assert(g(7).to_str() == "7");
+})
+
+# The hits for the arms of `self`, when it is a match.
+fn block_arms(self: Expr) -> LintHit[] {
+    let Match(_, arms) = self.kind else { return []; };
+    arms$block_hit(self).collect_ok()
+}
+
+# The hit for `self`, an arm of the match `within`, when its body is written as a block that
+# holds nothing but the value.
+fn block_hit(self: MatchArm, within: Expr) -> LintHit? {
+    // An alternation `A | B => body` is one arm per pattern here, sharing the body; only the
+    // last pattern is followed by the `=>`, so the shared block is reported once.
+    let source = within.source;
+    let base = within.span.start;
+    let arrow = source.blank_end(self.span.end - base);
+    if (!source[arrow..].starts_with("=>")) { return none; };
+    let open = source.blank_end(arrow + 2);
+    if (!source[open..].starts_with("{")) { return none; };
+    // A chain from a statement is a block that needs its braces.
+    let needs_braces = match (self.body.kind) {
+        Let(..) | LetMut(..) | Assign(..) | Seq(..) | For(..) | While(..) | Return(..) => true,
+        _ => false,
+    };
+    if (needs_braces) { return none; };
+    // A body with no text of its own (an empty block) is not a value written between braces.
+    if (self.body.span.start < base + open + 1) { return none; };
+    // Anything but blanks between the braces and the value is a comment.
+    if (source[open + 1..self.body.span.start - base].trim_while(is_whitespace) != "") {
+        return none;
+    };
+    let close = source.blank_end(self.body.span.end - base);
+    if (!source[close..].starts_with("}")) { return none; };
+    some(hit(message(), base + close..base + close + 1))
+}
+
+# The index in `self` of the first character at or after `start` that is not blank.
+fn blank_end(self: str, start: u64) -> u64 {
+    self.len() - self[start..].trim_while(is_whitespace).len()
+}.test({
+    assert("a  b".blank_end(1) == 3);
+    assert("a  b".blank_end(0) == 0);
+    assert("a  ".blank_end(1) == 3);
+})
+
+fn message() -> str {
+    "this arm's block holds nothing but its value — write the value as the arm's body, without the braces"
+}

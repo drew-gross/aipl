@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/char_set_literal.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/char_set_literal.aipl</code></h1>
+
+      <div class="module-doc"><p>The <code>char_set_literal</code> lint: <code>#{'a', 'b', 'c'}</code> — a set of char literals spelled out one quoted element at a time. <code>&quot;abc&quot;.to_set()</code> is the same set, written as the thing it describes: the characters, in a row, with nothing between them.</p><p>It reads better at every size and it costs nothing. <code>to_set</code> on a <em>string literal</em> is folded by codegen into the four immediate stores that are a <code>#{char}</code>'s whole representation (see the <code>Callee::ToSet</code> arm in <code>aipl-codegen</code>), which is exactly what the set literal compiles to — the two spellings emit byte-identical IR, so the shorter one is free.</p><p><strong>Three elements or more</strong>: two is where the spellings are a tie — <code>#{'a', 'b'}</code> and <code>&quot;ab&quot;.to_set()</code> are the same width, and the literal keeps each element visibly a <code>char</code>. From three on, the quotes and commas outweigh the characters they separate, and the sets that matter in practice (a character class, a set of punctuation, the digits) are far past three, where the literal form is almost unreadable.</p><p><strong>Only the unordered <code>#{..}</code>.</strong> An ordered literal is not interchangeable: <code>to_set</code> leaves its order to the use site, so <code>#&lt;{'z', 'a', 'm'}</code> where nothing pins an order — rendered straight into a template, say — would become the <em>unordered</em> set and stop sorting. A lint may not advise a rewrite that changes what the program does.</p><p><strong>Only a literal written on one line</strong>, which is what keeps every hit squelchable. <code>#[allow]</code> is line-scoped, and the formatter breaks a set literal too wide for one line into one element per line — then relocates a trailing marker from inside the braces onto the statement's closing <code>};</code>, a line the span does not start on. A literal it keeps on one line carries the marker at the end of that line, where it does squelch.</p><p><strong>Only elements with a spelling in a string.</strong> The escapes are the ones AIPL's own string rule accepts (<code>\n</code>, <code>\t</code>, <code>\r</code>, <code>\\</code>, <code>\&quot;</code>); anything else non-printable is left alone rather than guessed at, since advice that does not lex is worse than no advice.</p><p>The advice puts the string in backticks, not the quotes the other lints use: the advice <em>is</em> a string literal, and <code>&quot;&quot;abc&quot;.to_set()&quot;</code> reads as neither. The file's <code>to_set</code> is named if the file has none, which is what makes the advice followable.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-char_set_literal">
+          <h3>
+            <a class="anchor" href="#item-char_set_literal">char_set_literal</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn char_set_literal(__spat$3302: Function) -&#62; UnfilledHit[]</code></pre>
+
+          <div class="doc"><p>A hit for each unordered set literal in the function that is only characters, written on one line.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-minimum_elements">
+          <h3>
+            <a class="anchor" href="#item-minimum_elements">minimum_elements</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn minimum_elements() -&#62; u64</code></pre>
+
+          <div class="doc"><p>How many spelled-out elements it takes before the string form wins.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-printable_without_blank">
+          <h3>
+            <a class="anchor" href="#item-printable_without_blank">printable_without_blank</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn printable_without_blank() -&#62; str</code></pre>
+
+          <div class="doc"><p>Every printable ASCII character but the blank, which the dedent of a raw block would eat.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-spelled_out">
+          <h3>
+            <a class="anchor" href="#item-spelled_out">spelled_out</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn spelled_out(self: Expr) -&#62; UnfilledHit?</code></pre>
+
+          <div class="doc"><p>The hit for <code>self</code>, when it is a one-line unordered set of at least three character literals that a string can spell.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-character">
+          <h3>
+            <a class="anchor" href="#item-character">character</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn character(self: Expr) -&#62; char?</code></pre>
+
+          <div class="doc"><p>The character <code>self</code> is, when it is a character literal.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-spelling">
+          <h3>
+            <a class="anchor" href="#item-spelling">spelling</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn spelling(self: char) -&#62; str?</code></pre>
+
+          <div class="doc"><p>What spells <code>self</code> inside a string literal, or <code>none</code> when nothing does. Only the escapes AIPL's own string rule accepts are used, and a quote needs none outside double quotes.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

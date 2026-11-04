@@ -10,106 +10,26 @@
 //! message must name that better spelling. The loader runs `aipl_mono::check` on every
 //! file right after parsing (the markers come from the lexer via
 //! `parse_with_allows`), so lints fire before type checking.
+//!
+//! Every lint is written in AIPL (`crates/aipl-codegen/src/lint/`) and runs with the parse; this
+//! module takes the hits they return and applies the squelching.
 
-mod arm_block_value;
-mod char_set_literal;
-mod compound_assign;
-mod field_init_shorthand;
-mod is_empty_longhand;
-mod len_gt_zero;
-mod set_spread_field;
-mod set_spread_push;
-mod step_by_one;
-mod value_or_compare;
-
-use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
-use crate::{each_expr, each_subexpr, Error, Span};
+use crate::{Error, Span};
 use std::collections::HashSet;
-
-use self::arm_block_value::arm_block_value;
-use self::char_set_literal::char_set_literal;
-use self::compound_assign::{compound_assign, matching_compound};
-use self::field_init_shorthand::field_init_shorthand;
-use self::is_empty_longhand::{empty_names, is_empty_longhand};
-use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
-use self::set_spread_field::set_spread_field;
-use self::set_spread_push::{append_names, set_spread_push};
-use self::step_by_one::{matching_steps, step_by_one};
-use self::value_or_compare::{value_or_compare, value_or_compare_names};
 
 /// What a lint's message ends with: the way to keep what it flagged. Appended by
 /// [`check`] to each hit it returns, so a lint's message says only what is wrong
 /// and what to write instead.
 const SQUELCH_ADVICE: &str = " (or append #[allow] to this line to keep it)";
 
-/// Run every lint over `program` — function bodies, `.test` blocks, and
-/// keyword-parameter / struct-field default expressions — then drop the
-/// hits squelched by a same-line `#[allow]` (`allows` are the marker spans
-/// the lexer collected). Returns every surviving lint error.
-pub fn check(
-    program: &Program,
-    src: &str,
-    allows: &[Span],
-    ported: Vec<Error>,
-) -> Result<(), Vec<Error>> {
+/// Drop the `hits` squelched by a same-line `#[allow]` (`allows` are the marker
+/// spans the lexer collected) and say how to keep each of the rest. Returns every
+/// surviving lint error.
+pub fn check(src: &str, allows: &[Span], mut hits: Vec<Error>) -> Result<(), Vec<Error>> {
     let allowed: HashSet<usize> = allows.iter().map(|sp| line_of(src, sp.start)).collect();
     // The lines whose marker squelched a hit; a marker on any other line is
     // reported below.
     let mut squelched: HashSet<usize> = HashSet::new();
-    let mut hits: Vec<Error> = Vec::new();
-    // A char set spelled out element by element, which a string says better.
-    // Fires whether or not the file imported `to_set` — the name is only for
-    // the advice, which says to import it when it is missing.
-    let to_set = imported_as(program, "to_set");
-    each_expr(program, &mut |e| {
-        char_set_literal(e, src, to_set.as_deref(), &mut hits)
-    });
-    // A match arm whose block is only its value — braces around nothing.
-    each_expr(program, &mut |e| arm_block_value(e, src, &mut hits));
-    each_expr(program, &mut |e| field_init_shorthand(e, src, &mut hits));
-    each_expr(program, &mut |e| set_spread_field(e, src, &mut hits));
-    // The array sibling of the above, and disjoint from it by the kind of
-    // literal the `set` rebuilds from: a struct there, an array here.
-    let appends = append_names(program);
-    each_expr(program, &mut |e| {
-        set_spread_push(e, src, &appends, &mut hits)
-    });
-    // Only where a `++`/`--` flavor provably matches the operator written —
-    // see `matching_steps`, which also names the import when it's missing.
-    let steps = matching_steps(program);
-    if !steps.is_empty() {
-        each_expr(program, &mut |e| step_by_one(e, src, &steps, &mut hits));
-    }
-    // The general form of the above, and partitioned against it rather than
-    // overlapping: `set x = x + 1;` belongs to the step lint whenever that lint
-    // is live here, so `compound_assign` is told and leaves that one shape
-    // alone. Only the operators whose compound spelling provably means the same
-    // thing are advised — see `matching_compound`.
-    let compound = matching_compound(program);
-    if !compound.is_empty() {
-        each_expr(program, &mut |e| {
-            compound_assign(e, src, &compound, &steps, &mut hits)
-        });
-    }
-    // Only for the comparisons this file's `<`/`>` really are — see
-    // `len_zero_cmp`, which also says whether `is_nonempty` needs importing.
-    let cmp = len_zero_cmp(program);
-    each_expr(program, &mut |e| len_gt_zero(e, src, &cmp, &mut hits));
-    // `x.value_or(d) == lit` — same import caution for `==`/`!=`.
-    let filled = value_or_compare_names(program);
-    each_expr(program, &mut |e| {
-        value_or_compare(e, src, &filled, &mut hits)
-    });
-    // The mirror of the above: `<`/`>` against zero go to `is_nonempty`, `== 0`
-    // and the negated predicate go to `is_empty`. Same import caution.
-    let empties = empty_names(program);
-    each_expr(program, &mut |e| {
-        is_empty_longhand(e, src, &empties, &mut hits)
-    });
-    // The lints ported to AIPL ran with the parse: `unused_imports`,
-    // `duplicate_import_source`, `destructure_binding`, `destructure_param` and
-    // `fn_body_type_stutter`, so far.
-    hits.extend(ported);
     hits.retain(|e| match &e.span {
         Some(sp) => {
             let line = line_of(src, sp.start);
@@ -148,112 +68,7 @@ pub fn check(
     }
 }
 
-/// The local name this file's builtins `len` goes by, or `None` when `len` here
-/// is **not** the builtin — either the file never imported it, or it defines a
-/// function of that name.
-///
-/// A user's `len` is a different question with a different answer:
-/// `tests/cases/variants/recursive_list.aipl` has `fn len(self: List) -> i64`,
-/// and `Nil.len() == 0` there is a list-length test, not an emptiness test on a
-/// sequence. `is_empty`/`is_nonempty` do not apply to it — they are refused on a
-/// variant — so a lint that advised them would advise code that does not
-/// compile. Both length lints ask this before flagging anything.
-///
-/// The import is the whole test: a file defining its own `len` cannot also
-/// import the builtin one (the loader refuses a builtin import that collides
-/// with a local item), so "imported from builtins" and "not shadowed" are the
-/// same condition here.
-fn builtin_len_name(program: &Program) -> Option<String> {
-    imported_as(program, "len")
-}
-
-/// The local name this file's `import { .. } from builtins;` gives `builtin`,
-/// or `None` when it never imported it. Matched on the *exported* name, so an
-/// alias (`filter as keep`) is followed rather than missed, and only a builtins
-/// import counts — a user function of the same name is not this builtin.
-fn imported_as(program: &Program, builtin: &str) -> Option<String> {
-    program.items.iter().find_map(|item| {
-        let Item::Import(decl) = item else {
-            return None;
-        };
-        if !matches!(decl.source, ImportSource::Builtins) {
-            return None;
-        }
-        decl.names
-            .iter()
-            .find(|n| n.name == builtin)
-            .map(|n| n.local().to_string())
-    })
-}
-
-/// The binding a `set` target is rooted in: `p` for `p` and for `p.a.b`, and
-/// `None` for anything that is not a place. Shared by the two `set`-rebuild
-/// lints, which ask it the same two questions: what binding is being rebuilt,
-/// and is the target spellable back into the advice at all.
-fn root_name(e: &Expr) -> Option<&str> {
-    match &e.kind {
-        ExprKind::Ident(n) => Some(n),
-        ExprKind::Field(recv, _) => root_name(recv),
-        _ => None,
-    }
-}
-
-/// Whether `e` mentions `name` as a bare identifier anywhere. Asked by every lint
-/// whose rewrite drops a binding or
-/// splits one statement into several — either way the question is whether some
-/// sub-expression still refers to it.
-fn mentions(e: &Expr, name: &str) -> bool {
-    let mut found = false;
-    each_subexpr(e, &mut |x| {
-        if matches!(&x.kind, ExprKind::Ident(n) if n == name) {
-            found = true;
-        }
-    });
-    found
-}
-
 /// 0-based line number of byte offset `pos` in `src`.
 fn line_of(src: &str, pos: usize) -> usize {
     src[..pos.min(src.len())].matches('\n').count()
-}
-
-/// Whether `e`'s span covers exactly the text that spells it, so the source can
-/// be spliced back into advice. Only a name and a field path off one qualify:
-/// their spans run from the first character to the last. Most other forms do
-/// not — a call's span stops before its closing paren, so `f(x)` splices back as
-/// `f(x`, which doesn't parse — and the ones that might are left out rather than
-/// each having to be re-checked whenever a span moves.
-fn spans_its_text(e: &Expr) -> bool {
-    match &e.kind {
-        ExprKind::Ident(_) => true,
-        ExprKind::Field(recv, _) => spans_its_text(recv),
-        _ => false,
-    }
-}
-
-/// The source text that spells `e`, or `placeholder` when its span doesn't
-/// cover it. [`spans_its_text`] settles the name and field-path forms; a
-/// literal is added on top of them here, and *checked* against the source
-/// rather than assumed, because the parser also synthesizes literals carrying
-/// the span of whatever desugared into them — the `1` an `++` expands to holds
-/// the `++`'s own span, and splicing that back would quote the wrong text. A
-/// literal that fails its check simply falls back to the placeholder.
-fn quote<'a>(e: &Expr, src: &'a str, placeholder: &'a str) -> &'a str {
-    let text = src.get(e.span.clone()).unwrap_or("");
-    let spells_it = match &e.kind {
-        ExprKind::Num(n) => text.parse::<i64>() == Ok(*n),
-        ExprKind::Bool(b) => text == if *b { "true" } else { "false" },
-        ExprKind::Char(_) => text.len() >= 3 && text.starts_with('\'') && text.ends_with('\''),
-        // A `"""` block spells itself too — it is raw source either way — but
-        // only while it stays on one line, which is all a message can hold.
-        ExprKind::Str(_) => {
-            text.len() >= 2 && text.starts_with('"') && text.ends_with('"') && !text.contains('\n')
-        }
-        _ => spans_its_text(e),
-    };
-    if spells_it {
-        text
-    } else {
-        placeholder
-    }
 }

@@ -10,20 +10,8 @@ registered in `lint/lint.aipl`, listed in `DOGFOOD_SOURCE_FILES`
 (`crates/aipl-codegen/src/lib.rs`), run on the written-form AST and returning
 hits. Read a neighbour first: `match_value_or.aipl` (a lint over shared matching
 helpers), `case_of_equal_is_case.aipl` (a lint that names a builtin). The
-Rust-side recipe for the fixtures, the one-line hit span and `#[allow]`
-squelching is in the "Authoring a lint" section of CLAUDE.md and in the
-add-builtin skill's step 4; it applies unchanged.
-
-## Porting a Rust lint
-
-Do not transliterate it. The Rust lint predates these rules, so a port applies
-all of sections 1–3 to it: look for shared helpers (the Rust lint's private
-functions often duplicate ones already in the lint libraries), return
-`UnfilledHit[]` if its message names a builtin (rather than carrying an import
-parameter or calling `imported_as` itself), and inline helpers with one caller.
-Anything the port moves into a library gets its `.test` blocks and, if the Rust
-lints still use the original, a note to the user that the Rust copy is now a
-duplicate to delete once its lint is ported.
+one-line hit span and `#[allow]` squelching are in the "Authoring a lint" section of
+CLAUDE.md and in the add-builtin skill's step 4.
 
 ## 1. Check for existing utilities before writing any
 
@@ -101,20 +89,7 @@ rendered as a diagnostic with the import hint filled in, that `#[allow]` squelch
 `return_loop_find_if` triple are those; add one only for a behavior the drivers in `lint_hit.aipl` do not
 exercise.
 
-**Porting a Rust lint** brings its fixtures with it: when the lint becomes AIPL, convert its `err_`, `_allow`
-and `_not_flagged` fixtures into assertions in the new file and delete them. `scripts/lint_fixtures_to_tests.py
-<lint>` does the mechanical part (not-flagged functions become `== []` assertions; flagged functions get the
-messages the lint actually gives, read off by running it; an `_allow` fixture whose `main` only prints becomes
-helper functions plus asserts) and leaves a fixture alone when it cannot translate it. Read the result:
-the comments above each assertion came from the fixture and are the reason it exists.
-
 ## 5. Finish
 
 Each lint file needs `.test` blocks (compiler AIPL must be well-tested; section 4 says what they
 hold), a registration, and a `DOGFOOD_SOURCE_FILES` entry. No per-lint fixtures. Then `cargo handoff` once.
-
-Bootstrap trap: removing a Rust lint and adding its AIPL replacement in one
-change fails discovery with `#[allow] squelches nothing` on the markers that
-the Rust lint used to consume, until the artifact is promoted. Strip those
-markers, run the staged-IR flow by hand once, restore them, then hand off.
-Say that you did.

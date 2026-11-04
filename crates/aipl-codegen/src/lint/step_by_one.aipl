@@ -1,0 +1,183 @@
+# The `step_by_one` lint: a step of one written the long way — `set x = x + 1;`, `set x += 1;`, and
+# their `-` mirrors — where `set x++;` / `set x--;` is the form for it.
+#
+# Every spelling that adds or subtracts exactly one is the same statement, so they are one lint
+# rather than four: the plain operator with either operand order for `+` (`x + 1` and `1 + x` both add
+# one) but only the left for `-` (`set x = 1 - x;` is not a decrement), and the compound forms, whose
+# receiver is always on the left.
+#
+# The target may be a name or a field path off one (`set p.n = p.n + 1;` is `set p.n++;`): every `set`
+# form takes either, and a path's text spells it, so the advice can quote it as written.
+#
+# A written operator has a step form only where it provably means the same here — see `paired` — and
+# the advice names the import to add when the file lacks it. Neither step operator has a bare form,
+# so following the advice without the import would only trade this error for the operator gate's.
+#
+# The hit points at the `set` statement.
+
+import {
+    as_case,
+    collect_ok,
+    equal as ==,
+    find_if,
+    is_empty,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    value_or,
+} from builtins;
+import { Assign, Call, Expr, Num, descendants } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Function, Item, Program } from "../item.aipl";
+import { LintHit, hit, lint_messages, on_functions, spans_its_text } from "./lint_hit.aipl";
+import { Pairing, paired } from "./operator_pairs.aipl";
+import { is_same_place } from "./places.aipl";
+
+# The advice for one written operator: the step spelling that replaces it, whether the operation
+# reads in either operand order, and the builtin to import when the file does not have that spelling
+# yet (`none` when it does).
+struct Step { spelling: str, commutative: bool, missing: str? }
+
+# The operator spellings that add or subtract one, with the step each is advised to become.
+struct Written { operator: str, step: Step }
+
+# The advice for the operator `written`, when it has any in a file with these `items`.
+pub fn step_for(self: Item[], written: str) -> Step? {
+    let (spelling, commutative) = if (written == "+") {
+        ("++", true)
+    } else if (written == "+=") {
+        ("++", false)
+    } else if (written == "-" || written == "-=") {
+        ("--", false)
+    } else {
+        return none;
+    };
+    let Pairing { builtin, imported } = self.paired(written, spelling)?;
+    some(Step { spelling, commutative, missing: if (imported) { none } else { some(builtin) } })
+}
+
+# A hit for each long-hand step by one in the program.
+pub fn step_by_one(program: Program) -> LintHit[] {
+    let steps = ["+", "+=", "-", "-="]
+        .map(|operator| program.items.step_for(operator).map(|step| Written { operator, step }))
+        .collect_ok();
+    if (steps.is_empty()) { return []; };
+    program.on_functions(|Function { body }| body.descendants()$long_step(steps).collect_ok())
+}.test({
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_messages(
+            `import \{ {imports} } from builtins; fn f(x: i64) -> i64 \{ mut n = x; {body} n }`,
+            step_by_one,
+        )
+    }
+    let wrapping = "wrapping_add as +, wrapping_sub as -, wrapping_increment as ++, wrapping_decrement as --";
+    assert(messages(wrapping, "set n = n + 1;")? == [
+        `adding 1 to "n" — use the increment form "set n++;"`,
+    ]);
+    assert(messages(wrapping, "set n = 1 + n;")? == [
+        `adding 1 to "n" — use the increment form "set n++;"`,
+    ]);
+    assert(messages(wrapping, "set n = n - 1;")? == [
+        `subtracting 1 from "n" — use the decrement form "set n--;"`,
+    ]);
+
+    // The import to add is named, in the flavor of the file's operator.
+    assert(messages("saturating_add as +", "set n = n + 1;")? == [
+        """adding 1 to "n" — use the increment form "set n++;", importing `saturating_increment as ++` from builtins""",
+    ]);
+
+    // `1 - n` is not a decrement; another amount is not a step; a flavor that does not match, or an
+    // operator the file defines itself, is quiet.
+    assert(messages(wrapping, "set n = 1 - n;")? == []);
+    assert(messages(wrapping, "set n = n + 2;")? == []);
+    assert(messages("saturating_add as +, wrapping_increment as ++", "set n = n + 1;")? == []);
+    assert(messages("len", "set n = n + 1;")? == []);
+
+    // Shapes the lint flags, and what it says of them.
+    assert(
+        lint_messages(
+            """
+                fn bump(start: i64) -> i64 {
+                    mut n = start;
+                    set n = n + 1;
+                    n
+                }
+            """,
+            step_by_one,
+        )? == [],
+    );
+
+    // The same lint the other way round: `set x--;` is the form for `set x = x - 1;`.
+    // Only the receiver-on-the-left order counts here — `1 - n` subtracts `n` from
+    // one, which is no decrement at all.
+    assert(
+        lint_messages(
+            """
+                fn drop_one(start: i64) -> i64 {
+                    mut n = start;
+                    set n = n - 1;
+                    n
+                }
+            """,
+            step_by_one,
+        )? == [],
+    );
+    // A field path is a target like any other, quoted as written.
+    assert(
+        lint_messages(
+            """
+                fn bump_field(mut self: Counter) {
+                    set self.n = self.n + 1;
+                }
+            """,
+            step_by_one,
+        )? == [],
+    );
+    assert(
+        lint_messages(
+            """
+                fn subject() !prints {
+                    print(bump(1).to_str());
+                    print(drop_one(1).to_str());
+                    mut c = Counter { n: 1 };
+                    set c.bump_field();
+                    print(c.n.to_str());
+                }
+            """,
+            step_by_one,
+        )? == [],
+    );
+})
+
+# The hit for `self`, when it is a `set` of a place to itself plus or minus one.
+fn long_step(self: Expr, steps: Written[]) -> LintHit? {
+    let Assign(target, value, _) = self.kind.as_case(Assign)?;
+    if (!target.spans_its_text()) { return none; };
+
+    // An operator use is a call whose callee is the spelling that was written, which is what this
+    // lint keys on, since `+` and `+=` want different advice and are told apart by nothing else.
+    let Call(written, args, _) = value.kind.as_case(Call)?;
+    let [left, right] = args else { return none; };
+    let step = steps.find_if(|candidate| candidate.operator == written)$step?;
+    let stepped = if (left.is_same_place(target)) {
+        right.is_one()
+    } else {
+        // The other order is a step only where the operation is commutative: `1 + x` adds one to
+        // `x`, `1 - x` does not subtract one from it.
+        step.commutative && left.is_one() && right.is_same_place(target)
+    };
+    if (!stepped) { return none; };
+    let name = target.source;
+    let (what, form) = if (step.spelling == "++") {
+        (`adding 1 to "{name}"`, "increment")
+    } else {
+        (`subtracting 1 from "{name}"`, "decrement")
+    };
+    let missing = step.missing
+        .map(|builtin| `, importing \`{builtin} as {step.spelling}\` from builtins`)
+        .value_or("");
+    some(hit(`{what} — use the {form} form "set {name}{step.spelling};"{missing}`, self.span))
+}
+
+fn is_one(self: Expr) -> bool { self.kind == Num(1) }

@@ -160,12 +160,10 @@ and the worked example of matching a *desugared* shape), `match_value_or`,
 `match_is_some_and`, `match_map_ok`/`match_map_err`, `len_gt_zero`
 (→ `is_nonempty`), `incr_by_one` (→ `++`).
 
-**Layout.** One lint per file: `crates/aipl-syntax/src/lint/<name>.rs`, holding a
-`pub(super) fn <name>(..)` and that lint's own helpers. Add `mod <name>;`, a
-`use self::<name>::<name>;`, and a call in `check` — all in
-`crates/aipl-syntax/src/lint.rs`, which also holds the helpers more than one lint
-shares: `line_of`, `lone_stmt`/`is_block_tail`, `spans_its_text`, `lambda_safe`,
-`imported_as`, `end_is_receiver_len`. Name the lint `<bad shape>_<replacement>`.
+**Layout.** One lint per file, in AIPL: `crates/aipl-codegen/src/lint/<name>.aipl`, registered in
+`lint/lint.aipl` and listed in `DOGFOOD_SOURCE_FILES`. The add-lint skill is the recipe, and the
+helpers more than one lint shares live in `lint_hit.aipl` (`quote`, `spans_its_text`,
+`imported_as`, `bound_to`, `text_after`) and `places.aipl`. Name the lint `<bad shape>_<replacement>`.
 
 **Match exactly one shape, and bow out of every near-miss.** Before flagging,
 ask what the rewrite would silently change: work the builtin has nowhere to put
@@ -198,22 +196,8 @@ back into the advice only when `spans_its_text` says its span covers its text �
 otherwise write the `<iterable>` placeholder, because a call's span stops before
 its closing paren.
 
-**For a lint written in AIPL (the default), none of these fixtures: the flagged, not-flagged and
-`#[allow]`-agreement cases are `.test` assertions in the lint's own file (add-lint skill, "Tests belong in
-the lint"). The table below is for a lint still written in Rust.**
-
-**Fixtures — three, under `tests/cases/lints/`:**
-
-| file | holds |
-|---|---|
-| `err_<lint>.aipl` | every firing variant, with a `--- errors ---` section |
-| `<lint>_allow.aipl` | the `#[allow]` squelch **and** the rewrite side by side, so both spellings run and are proven to agree |
-| `<lint>_not_flagged.aipl` | every near-miss, each with a comment saying why |
-
-Never hand-write the `--- errors ---` body — write `?` and let handoff (or
-`AIPL_CASE='lints/err_<lint>' cargo test --test cases -- --ignored fill_expected`)
-render it. Add the two companion names to the lists in `err_lints.aipl`; that
-edit shifts its line numbers, so its error block gets refilled — expected.
+**No per-lint fixtures:** the flagged, not-flagged and `#[allow]`-agreement cases are `.test` assertions in the
+lint's own file (add-lint skill, "Tests belong in the lint").
 
 **Fanout:** don't grep-and-patch the corpus ahead of time; implement, run, read
 the failure list. The one grep worth doing first is over `crates/**/*.aipl` for

@@ -1,0 +1,77 @@
+# The `field_init_shorthand` lint: `Point { x: x }` — a field initialized with the bare
+# identifier of the same name; `Point { x }` is the same literal.
+#
+# The shorthand lowers to exactly the tree the explicit form builds, so the two are
+# indistinguishable by shape alone: the explicit form is recognized from the source, by a `:`
+# right before the value (the shorthand's value *is* the field name, with no colon before
+# it). A comment between the `:` and the value leaves the field alone, the conservative choice
+# that never mis-flags a shorthand.
+#
+# A literal the parser synthesizes from other syntax carries a `__builtin_`-prefixed name a user
+# cannot write — a range `start..end` is `__builtin_Span { start: start, end: end }` — and its
+# bound identifiers are not a written `field: field`, so those are skipped.
+#
+# The hit points at the value.
+
+import {
+    as_case,
+    collect_ok,
+    ends_with,
+    equal as ==,
+    join,
+    logical_not as !,
+    not_equal as !=,
+    starts_with,
+    trim,
+} from builtins;
+import { Construct, Expr, FieldInit, Ident, descendants } from "../expr.aipl";
+import { Function } from "../item.aipl";
+import { LintHit, hit, lint_function_messages, text_before } from "./lint_hit.aipl";
+
+# A hit for each field of a struct literal in the function that is set to a name it shares.
+pub fn field_init_shorthand(Function { body }) -> LintHit[] {
+    body.descendants()$spelled_out().join()
+}.test({
+    assert(lint_function_messages("fn f(x: i64) -> P { P { x: x } }", field_init_shorthand)? == [
+        message("x"),
+    ]);
+
+    // Each field that repeats its name, and only those.
+    assert(lint_function_messages(
+        "fn f(x: i64, y: i64) -> P { P { x: x, y: y + 1, z: y } }",
+        field_init_shorthand,
+    )? == [message("x")]);
+
+    // The shorthand itself, a different name, a spread and a range are not flagged.
+    assert(lint_function_messages("fn f(x: i64) -> P { P { x } }", field_init_shorthand)? == []);
+    assert(lint_function_messages("fn f(x: i64) -> P { P { x: y } }", field_init_shorthand)? == []);
+    assert(
+        lint_function_messages("fn f(p: P) -> P { P { ..p, x: 1 } }", field_init_shorthand)? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(a: u64, b: u64) -> u64[] { a..b }",
+            field_init_shorthand,
+        )? == [],
+    );
+})
+
+# The hits for the fields of `self` that are written `name: name`, when it is a struct literal.
+fn spelled_out(self: Expr) -> LintHit[] {
+    let Construct(name, inits) = self.kind else { return []; };
+    if (name.starts_with("__builtin_")) { return []; };
+    inits$spelled_out_in(self).collect_ok()
+}
+
+# The hit for the field `self` of the literal `within`, if it is written out in full.
+fn spelled_out_in(self: FieldInit, within: Expr) -> LintHit? {
+    let Ident(name) = self.value.kind.as_case(Ident)?;
+    if (name != self.name) { return none; };
+    // The shorthand's value starts the field; the explicit form has the colon before it.
+    if (!self.value.text_before(within).trim().ends_with(":")) { return none; };
+    some(hit(message(name), self.value.span))
+}
+
+fn message(name: str) -> str {
+    `field "{name}" is set to the identifier of the same name — use the shorthand "{name}"`
+}

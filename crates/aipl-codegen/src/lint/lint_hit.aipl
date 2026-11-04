@@ -1,6 +1,6 @@
 # What a lint reports: the message, and the span the caret goes under. The Rust
-# side rebuilds each as an `aipl_syntax::Error` and runs it through the same
-# `#[allow]` squelching as the lints still written in Rust.
+# side rebuilds each as an `aipl_syntax::Error` and runs it through the `#[allow]`
+# squelching.
 
 import {
     Span,
@@ -24,6 +24,7 @@ import {
     push,
     starts_with,
     value_or,
+    wrapping_sub as -,
 } from builtins;
 import { Bool, Call, Char, Expr, Field, Ident, Num, Str, expr, ident, num } from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
@@ -218,6 +219,48 @@ pub fn imported_as(self: Item[], name: str) -> str? {
         """import { is_case } from "./a.aipl";""",
     )?.program.items;
     assert(from_a_file.imported_as("is_case") == none);
+})
+
+# The builtin a file's `items` import under the local name `local`, as builtins
+# exports it (`wrapping_add` for `import { wrapping_add as + } from builtins;`), or `none`
+# when that name is not bound by an import from builtins — unbound, or one of the file's own.
+pub fn bound_to(self: Item[], local: str) -> str? {
+    self.collect_arms(Import)$builtin_bound_to(local).join().first()
+}.test({
+    let items = aipl_parse_surface_file(
+        """import { wrapping_add as +, len } from builtins; import { less_than as < } from "./a.aipl";""",
+    )?.program.items;
+    assert(items.bound_to("+") == some("wrapping_add"));
+    assert(items.bound_to("len") == some("len"));
+    assert(items.bound_to("<") == none);
+    assert(items.bound_to("map") == none);
+})
+
+# The name an import from builtins exports under the local name `local`.
+fn builtin_bound_to(self: Import(ImportDecl { names, source }), local: str) -> str[] {
+    match (source) {
+        Builtins => names.filter(|n| n.local() == local)$name,
+        Path(..) => [],
+    }
+}
+
+# The text of `container` after `self` ends. `self` is an expression inside `container`, so
+# a lint that needs what was written around a node reads it from the enclosing one.
+pub fn text_after(self: Expr, container: Expr) -> str {
+    container.source[self.span.end - container.span.start..]
+}.test({
+    let inner = Expr { ..ident("x"), span: 4..5, source: "x" };
+    let outer = Expr { ..ident("x"), span: 4..12, source: "x.len() " };
+    assert(inner.text_after(outer) == ".len() ");
+})
+
+# The text of `container` before `self` starts.
+pub fn text_before(self: Expr, container: Expr) -> str {
+    container.source[..self.span.start - container.span.start]
+}.test({
+    let inner = Expr { ..ident("x"), span: 6..7, source: "x" };
+    let outer = Expr { ..ident("x"), span: 4..12, source: "{ x: x }" };
+    assert(inner.text_before(outer) == "{ ");
 })
 
 # Every name a file's `items` import from builtins, as the file spells it.

@@ -2782,17 +2782,6 @@ pub fn operator_builtin(name: &str) -> Option<(&'static str, &'static Callee)> {
         .map(|(_, op, canonical)| (*op, canonical))
 }
 
-/// The operator builtin providing `op` with the semantics of `canonical_impl` —
-/// the inverse of [`operator_builtin`], for naming the import that pairs with
-/// one a file already has (`__builtin_saturating_add` + `"++"` →
-/// `saturating_increment`).
-pub fn operator_builtin_named(op: &str, canonical_impl: &Callee) -> Option<&'static str> {
-    OPERATOR_BUILTINS
-        .iter()
-        .find(|(_, o, c)| *o == op && c == canonical_impl)
-        .map(|(name, _, _)| *name)
-}
-
 /// Whether `s` spells a built-in operator that must be imported to be used
 /// (e.g. `import { equal as == } from builtins;`; `+` comes via `wrapping_add as +`).
 /// Computed by the dogfooded AIPL `is_operator_name` via the embedding FFI (see
@@ -4230,14 +4219,9 @@ pub fn builtin_type_canonical(name: &str) -> Option<String> {
     }
 }
 
-/// Visit every expression in `program` — function bodies, `.test` blocks, and
+/// Visit every expression in `items` — function bodies, `.test` blocks, and
 /// keyword-parameter / struct-field / variant-payload default expressions —
 /// pre-order.
-pub fn each_expr(program: &ast::Program, f: &mut impl FnMut(&ast::Expr)) {
-    each_item_expr(&program.items, f);
-}
-
-/// [`each_expr`] over `items`, which need not make up a program.
 pub fn each_item_expr(items: &[ast::Item], f: &mut impl FnMut(&ast::Expr)) {
     for item in items {
         match item {

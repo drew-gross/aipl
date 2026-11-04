@@ -222,11 +222,12 @@ entry-point-mechanics tests (exit code, `cli`, `stderr`, `file:`, `expect file:`
       leaves a section untouched when the file compiles, so it called a deletion "unchanged" when it had removed the
       error). Two keep it: `effects/err_random_main` (the error is that `main` cannot declare `!random`) and
       `generics/errors/err_type_param_conflict` (needs a root: G7).
-- [ ] **Lint fixtures still in `tests/cases/lints/`** (58 files): the fixtures of the 10 lints still written in
-      Rust (19 files: convert them into the lint's own `.test` assertions when each is ported, with
-      `scripts/lint_fixtures_to_tests.py`), 24 files in groups named for a shape and not a lint (`slices`,
-      `interpolations`, `struct_literals`, `decr_shapes`, ...: map each to its lint first), and 12 `_allow`
-      fixtures that need a `struct`/`variant` or output a test block cannot hold.
+- [ ] **Lint fixtures still in `tests/cases/lints/`** (41 files). The 10 lints that were Rust (2026-11-04: all
+      lints are AIPL now; the Rust lint code is gone, and their `err_`/`_allow`/`_not_flagged` fixtures moved into
+      each lint's own `.test` assertions) left behind the fixtures that are named for a shape and not a lint
+      (`err_struct_literals`, `err_emptiness_tests`, `incr_shapes_not_flagged`, `decr_*`, `err_step_*`, ...: map
+      each to its lint first), and the `_allow` fixtures that need a `struct`/`variant` or output a test block
+      cannot hold (`len_gt_zero_allow`, `set_spread_field_allow`).
 - [ ] **Per batch:** `cargo handoff`, then review moved baseline rows (the `main` to test-driver switch moves
       `instructions` and `code bytes` for every converted case).
 - [ ] **Update CLAUDE.md for `main` only, now:** delete "Test `main` style" (its premise, a void `main` driving a
