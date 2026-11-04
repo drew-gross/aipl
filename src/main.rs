@@ -101,7 +101,7 @@ fn usage(prog: &str) -> String {
   {prog} doc   <file.aipl>                  print the file's and each declaration's `# ..` docs
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
-  {prog} check [path...] [--fix] [--ignore-sections]  run the tests, and check formatting and each file's sections
+  {prog} check [path...] [--fix] [--ignore-sections] [--baseline <table.md>]  run the tests, and check formatting and each file's sections
   {prog} report <file.aipl> [--machine] [-- args...]  count what a run of the file costs
   {prog} lsp                                serve the Language Server Protocol on stdin/stdout
 
@@ -121,8 +121,10 @@ compile with exactly those diagnostics, named relative to where `check` was
 started), `stdout`, `stderr`, `exit code`, `cli` and `expect file: p` (one run of
 its `main`, made only when one of them is present), and `report` (what `aipl
 report` prints for it). `--- file: p ---` sections are staged beside the file so
-its imports and fixtures resolve. `--ignore-sections` checks the tests alone. It
-reports every failure rather than stopping at the first, and exits 0 only if all
+its imports and fixtures resolve. `--ignore-sections` checks the tests alone.
+`--baseline <table.md>` also holds each file's run to its row in that table (the five
+counts `report` prints, exactly; the row is named by the file's path from where `check`
+was started, without `.aipl`), and a file with no row fails. It reports every failure rather than stopping at the first, and exits 0 only if all
 of them were formatted, compiled, passed, and matched.
 
 `--fix` repairs what a rewrite can: it formats each file in place, then rewrites
@@ -367,6 +369,7 @@ fn check_file(
     label: &str,
     spec: &SpecFields,
     section_label: Option<&str>,
+    baseline: Option<&sections::Baseline>,
     dbg: DebugOptions,
 ) -> Result<Checked, String> {
     let render = |e| render_err_at(&staged.entry, label, e);
@@ -494,6 +497,24 @@ fn check_file(
         found.extend(
             sections::report(&program, spec, stem, label, dbg)
                 .unwrap_or_else(|msg| vec![sections::Finding::unfixable(msg)]),
+        );
+    }
+    // The run's row in the baseline table, when `check` was given one: validated with the other
+    // sections, so it is held to what the file is for the same way and is skipped with them.
+    if let (Some(table), Some(section_label)) = (baseline, section_label) {
+        let case = section_label.trim_start_matches("./");
+        found.extend(
+            sections::baseline(
+                table,
+                case.trim_end_matches(".aipl"),
+                case,
+                &program,
+                spec,
+                stem,
+                label,
+                dbg,
+            )
+            .unwrap_or_else(|msg| vec![sections::Finding::unfixable(msg)]),
         );
     }
     Ok(Checked {
@@ -665,12 +686,20 @@ fn check_resolved(
     label: &str,
     project_root: &Path,
     sections: bool,
+    baseline: Option<&sections::Baseline>,
     dbg: DebugOptions,
 ) -> Result<Checked, String> {
     let spec = read_spec(path, label)?;
     let section_label = sections.then(|| section_label(path, project_root));
     in_staged_dir(path, &spec, project_root, |staged| {
-        check_file(staged, label, &spec, section_label.as_deref(), dbg)
+        check_file(
+            staged,
+            label,
+            &spec,
+            section_label.as_deref(),
+            baseline,
+            dbg,
+        )
     })?
 }
 
@@ -812,6 +841,21 @@ fn check_cmd(args: &[String]) -> ExitCode {
     let (args, dbg) = take_debug_flag(args);
     let validate_sections = !args.iter().any(|a| a == "--ignore-sections");
     let fix = args.iter().any(|a| a == "--fix");
+    let (args, baseline_path) = match take_value_flag(args, "--baseline") {
+        Ok(taken) => taken,
+        Err(msg) => {
+            eprintln!("{msg}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let baseline = match baseline_path.map(|path| read_baseline_table(&path)) {
+        Some(Ok(table)) => Some(table),
+        Some(Err(msg)) => {
+            eprintln!("{msg}");
+            return ExitCode::FAILURE;
+        }
+        None => None,
+    };
     let args: Vec<String> = args
         .into_iter()
         .filter(|a| a != "--ignore-sections" && a != "--fix")
@@ -893,7 +937,14 @@ fn check_cmd(args: &[String]) -> ExitCode {
         // The summary is printed here, once both kinds of test have run, rather
         // than by the JIT runner when its own tests finish.
         aipl::codegen::set_quiet_summary(true);
-        let outcome = check_resolved(path, label, &project_root, validate_sections, dbg);
+        let outcome = check_resolved(
+            path,
+            label,
+            &project_root,
+            validate_sections,
+            baseline.as_ref(),
+            dbg,
+        );
         let (tests_ok, traced, mismatched) = match outcome {
             // Reported after the run, so a trace the tests hit has already
             // printed its value by the time the diagnostic explains itself.
@@ -948,7 +999,14 @@ fn check_cmd(args: &[String]) -> ExitCode {
             unformatted += 1;
         }
         aipl::codegen::set_test_file(Some(label));
-        let outcome = check_resolved(path, label, &project_root, validate_sections, dbg);
+        let outcome = check_resolved(
+            path,
+            label,
+            &project_root,
+            validate_sections,
+            baseline.as_ref(),
+            dbg,
+        );
         print_test_rows(label, &aipl::codegen::take_test_records());
         match outcome {
             Ok(checked) => {
@@ -1448,4 +1506,29 @@ fn build_cmd(args: &[String]) -> Result<(), String> {
     binary::link(&obj_bytes, &output).map_err(|e| e.to_string())?;
     println!("wrote {}", output.display());
     Ok(())
+}
+
+/// Remove `--flag <value>` from `args`, returning the value. An error when the flag has no value.
+fn take_value_flag(args: Vec<String>, flag: &str) -> Result<(Vec<String>, Option<String>), String> {
+    let mut rest = Vec::new();
+    let mut value = None;
+    let mut args = args.into_iter();
+    while let Some(arg) = args.next() {
+        if arg == flag {
+            value = Some(args.next().ok_or_else(|| format!("{flag} needs a file"))?);
+        } else {
+            rest.push(arg);
+        }
+    }
+    Ok((rest, value))
+}
+
+/// The baseline table `--baseline` names, read once for the whole run.
+fn read_baseline_table(path: &str) -> Result<sections::Baseline, String> {
+    let rows = aipl::perf::read_baseline(Path::new(path))
+        .ok_or_else(|| format!("cannot read the baseline table {path}"))?;
+    Ok(sections::Baseline {
+        path: path.to_string(),
+        rows,
+    })
 }

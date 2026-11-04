@@ -723,3 +723,67 @@ impl PerfStats {
         })
     }
 }
+
+/// The deterministic columns of the baseline table (`tests/performance_metrics.md`), in
+/// the order they appear after the row's name: one list, so reading the table, comparing a
+/// run against it and naming a column in a failure cannot disagree about which are asserted.
+pub const BASELINE_METRICS: [&str; 5] = [
+    "allocations",
+    "bytes allocated",
+    "peak live bytes",
+    "instructions",
+    "code bytes",
+];
+
+/// A run's values for [`BASELINE_METRICS`], in that order.
+pub fn baseline_values(stats: &PerfStats) -> [u64; 5] {
+    [
+        stats.allocations,
+        stats.bytes_allocated,
+        stats.peak_live_bytes,
+        stats.instructions,
+        stats.binary_size.code,
+    ]
+}
+
+/// The asserted columns of every row of a baseline table, by row name. A row whose
+/// columns do not read as numbers is not a row (the heading and rule are such lines).
+/// `None` if the table cannot be read at all.
+pub fn read_baseline(path: &Path) -> Option<HashMap<String, [u64; 5]>> {
+    let contents = fs::read_to_string(path).ok()?;
+    let mut rows = HashMap::new();
+    for line in contents.lines().map(str::trim) {
+        let cols: Vec<&str> = line.trim_matches('|').split('|').map(str::trim).collect();
+        if !line.starts_with('|') || cols.len() < 6 {
+            continue;
+        }
+        let mut values = [0u64; 5];
+        let numeric = cols[1..6]
+            .iter()
+            .zip(&mut values)
+            .all(|(col, value)| col.parse().map(|v| *value = v).is_ok());
+        if numeric {
+            rows.insert(cols[0].to_string(), values);
+        }
+    }
+    Some(rows)
+}
+
+/// What moved between a table row and a run, one line per column: `allocations: 3 -> 4
+/// (+33.3%)`. Empty when the run reproduces the row exactly, which is what is asserted.
+pub fn baseline_moves(row: [u64; 5], stats: &PerfStats) -> Vec<String> {
+    BASELINE_METRICS
+        .iter()
+        .zip(row)
+        .zip(baseline_values(stats))
+        .filter(|((_, was), now)| was != now)
+        .map(|((name, was), now)| {
+            let pct = if was > 0 {
+                format!(" ({:+.1}%)", (now as f64 - was as f64) / was as f64 * 100.0)
+            } else {
+                String::new()
+            };
+            format!("{name}: {was} -> {now}{pct}")
+        })
+        .collect()
+}

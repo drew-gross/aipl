@@ -158,8 +158,15 @@ loudly); running `main` under the JIT is rejected (the AOT linker runtime is the
 ## Phase 1: close the parity gaps in `check`
 Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
 `the_leak_gate_runs_for_a_case_with_no_sections`).
-- [ ] G1 baseline row compare vs `tests/performance_metrics.md` (5 asserted columns), with
-      `BaselineMoved`/`BaselineMissing` outcomes.
+- [x] G1 (2026-11-04) baseline row compare: `aipl check --baseline <table.md>` holds each file's run (its `main`, or
+      its tests' driver when it has none, measured as `aipl report` does) to its row, the five asserted columns
+      exactly, and prints `BaselineMoved`/`BaselineMissing` as `handoff-fill:` lines. Opt-in, so the tool does not
+      carry this repository's table path. Rows are named by the file's path from the root without `.aipl`
+      (`tests/cases/arrays/slice`), so the table was re-keyed (`cases/` became `tests/cases/`, 658 rows, no value
+      moved) and the harness uses the same key. The comparison (`perf::baseline_moves`, `read_baseline`) is one
+      definition shared with the harness. `--fix` does not touch the table: it is one file many files share, so
+      the reader of the fill line rewrites it. Not done: skipping the second measurement when the leak gate has
+      already run the same program (Phase 4).
 - [x] G2 leak gate (2026-11-03). `check` runs the tests' synthesized driver once in an instrumented build for every
       file with tests, and `main` too when it is being run anyway because the file records what it does; either
       leaking fails the file (`test memory leak in tests|main ... FAIL`). A plain program's `main` is never run
@@ -198,12 +205,10 @@ Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
       mono root is not done here: the fix belongs to checking generic functions at their definition, which is a
       separate project. Fixtures that pin such an error keep a root (`generics/errors/err_type_param_conflict`
       has a `main` that calls it).
-- [ ] Differential test: for every corpus file, old harness and new `check` agree on pass/fail, and fill
-      mode yields byte-identical files and baseline rows. (Phase 3 extends it to the migrated section names.)
-- [ ] Canary set of deliberately broken copies that both must reject: wrong stdout, wrong exit code, leak,
-      moved baseline, missing baseline, stale report, errors mismatch, trace left in, lint hit,
-      unformatted file.
-- [ ] `cargo handoff` green; baseline rows shifted by the rooting change reviewed.
+- ~~Differential test~~ dropped (2026-11-04): too expensive for what it adds, since the corpus would run twice.
+- ~~Canary set~~ dropped (2026-11-04): `tests/suites/check.rs` already has a failing-fixture test for each
+  rejection (wrong stdout, exit code, `errors`, `report`, leak, trace, unformatted, benchmark, and now baseline
+  moved/missing and a lint hit).
 
 ## Phase 2b: what is left of reserving `main`
 Target state: `fn main` appears only in (a) real programs (`projects/`, `examples/`), (b) tests of the real

@@ -30,6 +30,7 @@ use crate::ast::{Item, Program};
 use crate::binary;
 use crate::codegen::{normalize_output, ObjectCompilation};
 use crate::{DebugOptions, Error, SpecFields};
+use handoff::protocol::Fill;
 
 /// One way a file disagrees with its recorded sections.
 ///
@@ -268,4 +269,72 @@ pub fn report(
         )));
     }
     Ok(found)
+}
+
+/// A baseline table to hold a file's run to: where it was read from, for the messages, and its rows.
+pub struct Baseline {
+    pub path: String,
+    pub rows: std::collections::HashMap<String, [u64; 5]>,
+}
+
+/// Hold a file's run to its row in the baseline table: every asserted column must match
+/// exactly, and a file with no row fails too. `key` is the row's name, the file's path from
+/// the root without its extension; `case` is the file's path from the root, which a
+/// `handoff-fill:` line names it by.
+///
+/// The file is measured the way the harness measures a case and `aipl report` a file: its
+/// `main`, or when it has none the run of its tests, built both ways in a scratch directory
+/// holding its companions and run with `cli` as its arguments. Neither finding has a rewrite
+/// that `--fix` applies, because the table is one file that many files' rows share. It is
+/// refreshed by whoever reads the `handoff-fill:` line.
+///
+/// A program that leaks has no row worth comparing (the leak is reported by the leak gate),
+/// so it is left to that.
+pub fn baseline(
+    table: &Baseline,
+    key: &str,
+    case: &str,
+    program: &Program,
+    spec: &SpecFields,
+    stem: &str,
+    label: &str,
+    dbg: DebugOptions,
+) -> Result<Vec<Finding>, String> {
+    let dir = binary::scratch_dir("check-baseline").map_err(|e| e.to_string())?;
+    let measured = crate::stage_companions(&dir, &spec.extra_files)
+        .map_err(|e| format!("stage companions in {}: {e}", dir.display()))
+        .and_then(|()| {
+            crate::perf::measure_program(program, stem, &spec.cli, &dir, dbg)
+                .map_err(|e| e.render(&spec.source, label))
+        });
+    let _ = fs::remove_dir_all(&dir);
+    let stats = measured?;
+    if stats.leaked().is_some() {
+        return Ok(Vec::new());
+    }
+    let Some(row) = table.rows.get(key) else {
+        return Ok(vec![Finding::unfixable(format!(
+            "performance baseline missing: {} has no row for `{key}`\n{}",
+            table.path,
+            Fill::BaselineMissing {
+                case: case.to_string()
+            }
+            .marker()
+        ))]);
+    };
+    let moves = crate::perf::baseline_moves(*row, &stats);
+    if moves.is_empty() {
+        return Ok(Vec::new());
+    }
+    let shown: Vec<String> = moves.iter().map(|m| format!("  {m}")).collect();
+    Ok(vec![Finding::unfixable(format!(
+        "performance baseline moved ({}):\n{}\n{}",
+        table.path,
+        shown.join("\n"),
+        Fill::BaselineMoved {
+            case: case.to_string(),
+            moves
+        }
+        .marker()
+    ))])
 }

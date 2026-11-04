@@ -729,6 +729,24 @@ fn a_mismatch_a_rewrite_repairs_asks_handoff_for_it_by_path_from_the_root() {
 }
 
 #[test]
+fn a_lint_hit_fails_the_file_like_a_compile_error() {
+    let src = "fn f(x: i64) -> i64 {\n    match (x) {\n        0 => { 1 },\n        _ => 2,\n    }\n}.test({\n    assert(f(0) == 1);\n})\n";
+    let (stdout, stderr, code) = check_here("lint_hit", src);
+    assert_eq!(stdout, "");
+    assert_eq!(
+        stderr,
+        "\
+error: this arm's block holds nothing but its value — write the value as the arm's body, without the braces (or append #[allow] to this line to keep it)
+ --> ./lint_hit.aipl:3:18
+  |
+3 |         0 => { 1 },
+  |                  ^
+"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
 fn an_absent_section_records_silence_and_a_clean_exit() {
     // Only `exit code` is written, but a run is now being checked, so the
     // missing `stdout` means "prints nothing" — and `hi` is a finding.
@@ -1769,4 +1787,71 @@ fn fix_leaves_a_file_that_does_not_parse_alone() {
     assert!(stderr.starts_with("error:"), "got:\n{stderr}");
     assert_eq!(code, 1);
     assert_eq!(tree_file("fix_unparsed", "p.aipl"), src);
+}
+
+// ---------------------------------------------------------------------------
+// `--baseline`: a file's run is held to its row in a baseline table
+// ---------------------------------------------------------------------------
+
+/// Write `<name>.aipl` (an empty `main`) and `table.md` to a scratch directory and run
+/// `aipl check --baseline table.md` on the file from there.
+fn check_against(name: &str, table: &str) -> (String, String, i32) {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join("check_baseline")
+        .join(name);
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let file = format!("{name}.aipl");
+    fs::write(dir.join(&file), "fn main() {}\n").expect("write temp source");
+    fs::write(dir.join("table.md"), table).expect("write temp table");
+    let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
+        .args(["check", "--baseline", "table.md", &file])
+        .current_dir(&dir)
+        .output()
+        .expect("run aipl check");
+    (
+        String::from_utf8_lossy(&out.stdout).into_owned(),
+        String::from_utf8_lossy(&out.stderr).into_owned(),
+        out.status.code().unwrap_or(-1),
+    )
+}
+
+const TABLE_HEAD: &str = "| Test | allocations | bytes allocated | peak live bytes | instructions \
+                          | code bytes | wall-clock (µs) | build (ms) | peak RSS (KB) |\n\
+                          | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n";
+
+#[test]
+fn a_run_that_reproduces_its_baseline_row_passes() {
+    let table = format!("{TABLE_HEAD}| baseline_ok | 0 | 0 | 0 | 3 | 8 | 1.00 | 1.0 | 1 |\n");
+    let (stdout, stderr, code) = check_against("baseline_ok", &table);
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), (NO_TESTS, "", 0));
+}
+
+#[test]
+fn a_run_that_moved_from_its_baseline_row_names_each_column_and_asks_for_a_refresh() {
+    let table = format!("{TABLE_HEAD}| baseline_moved | 0 | 0 | 0 | 1 | 8 | 1.00 | 1.0 | 1 |\n");
+    let (stdout, stderr, code) = check_against("baseline_moved", &table);
+    assert_eq!(stdout, NO_TESTS);
+    assert_eq!(
+        stderr,
+        "\
+./baseline_moved.aipl: performance baseline moved (table.md):
+  instructions: 1 -> 3 (+200.0%)
+handoff-fill: baseline-moved\tbaseline_moved.aipl\tinstructions: 1 -> 3 (+200.0%)
+"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_file_with_no_baseline_row_fails_and_asks_for_one() {
+    let (stdout, stderr, code) = check_against("baseline_missing", TABLE_HEAD);
+    assert_eq!(stdout, NO_TESTS);
+    assert_eq!(
+        stderr,
+        "\
+./baseline_missing.aipl: performance baseline missing: table.md has no row for `baseline_missing`
+handoff-fill: baseline-missing\tbaseline_missing.aipl
+"
+    );
+    assert_eq!(code, 1);
 }

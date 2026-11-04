@@ -1110,17 +1110,6 @@ struct PerfRow {
     peak_kb: u64,
 }
 
-/// A deterministic metric of the table: its column heading, and how to read it off
-/// a row. One list, so the table, the comparison and the failure message cannot
-/// disagree about which columns are asserted or what they are called.
-const BASELINE_METRICS: [(&str, fn(&PerfRow) -> u64); 5] = [
-    ("allocations", |r| r.allocations),
-    ("bytes allocated", |r| r.bytes_allocated),
-    ("peak live bytes", |r| r.peak_live_bytes),
-    ("instructions", |r| r.instructions),
-    ("code bytes", |r| r.code_bytes),
-];
-
 /// Number of times each binary is run; we keep the minimum wall-clock/peak (the
 /// least noise-perturbed sample).
 const PERFMON_RUNS: usize = 5;
@@ -1219,12 +1208,19 @@ fn metrics_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(METRICS_FILE)
 }
 
-/// The display path a case's table row is keyed by: `cases/arrays/slice` — the
-/// text a case's `[..]` context brackets, minus the `.aipl`.
+/// The key a case's table row is filed under: its path from the repository root,
+/// without the `.aipl` (`tests/cases/arrays/slice`), which is the name `aipl check`
+/// gives the file. A case's display path (`cases/arrays/slice`, what its `[..]`
+/// context brackets) lacks the `tests/` its directory sits under.
 fn row_key(display_with_extension: &str) -> String {
-    display_with_extension
+    let key = display_with_extension
         .trim_end_matches(".aipl")
-        .replace('\\', "/")
+        .replace('\\', "/");
+    if key.starts_with("cases/") {
+        format!("tests/{key}")
+    } else {
+        key
+    }
 }
 
 fn run_perfmon_refresh(cases: &[CaseFile], out_root: &Path) {
@@ -1441,38 +1437,30 @@ fn check_baseline(ctx: &str, stats: &PerfStats) -> Outcome {
             Fill::BaselineMissing { case: case_of(ctx) }.marker()
         ));
     };
-    let actual = [
-        stats.allocations,
-        stats.bytes_allocated,
-        stats.peak_live_bytes,
-        stats.instructions,
-        stats.binary_size.code,
-    ];
-    let moved: Vec<String> = BASELINE_METRICS
-        .iter()
-        .zip(actual)
-        .filter_map(|((name, read), now)| {
-            let was = read(row);
-            (was != now).then(|| {
-                let pct = if was > 0 {
-                    format!(" ({:+.1}%)", (now as f64 - was as f64) / was as f64 * 100.0)
-                } else {
-                    String::new()
-                };
-                format!("  {name}: {was} -> {now}{pct}")
-            })
-        })
-        .collect();
+    let moved = perf::baseline_moves(
+        [
+            row.allocations,
+            row.bytes_allocated,
+            row.peak_live_bytes,
+            row.instructions,
+            row.code_bytes,
+        ],
+        stats,
+    );
     if moved.is_empty() {
         return Outcome::Pass;
     }
     Outcome::Fail(format!(
         "{ctx}: performance baseline moved ({METRICS_FILE}):\n{}\n\
          If this change is intended, accept it with `{accept}`.\n{}",
-        moved.join("\n"),
+        moved
+            .iter()
+            .map(|m| format!("  {m}"))
+            .collect::<Vec<_>>()
+            .join("\n"),
         Fill::BaselineMoved {
             case: case_of(ctx),
-            moves: moved.iter().map(|m| m.trim().to_string()).collect(),
+            moves: moved.clone(),
         }
         .marker()
     ))
