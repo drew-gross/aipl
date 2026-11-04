@@ -697,9 +697,35 @@ fn a_stdout_mismatch_names_the_file_the_section_and_both_sides() {
 bye
 --- actual ---
 hi
+handoff-fill: section\tsections_stdout_wrong.aipl\tstdout
 "
     );
     assert_eq!(code, 1);
+}
+
+#[test]
+fn a_mismatch_a_rewrite_repairs_asks_handoff_for_it_by_path_from_the_root() {
+    // The same line a failing case prints, so `cargo handoff` reads `check` and the
+    // harness alike. The case is the file's path from the directory `check` is run in.
+    let src = format!("{GREETS}--- stdout ---\nbye\n");
+    let (_, stderr, _) = check_tree("sections_fill_marker", &[("sub/wrong.aipl", &src)], &[]);
+    let (asked, unreadable) = handoff::protocol::Fill::scan(&stderr);
+    assert_eq!(
+        asked,
+        vec![handoff::protocol::Fill::Section {
+            case: "sub/wrong.aipl".to_string(),
+            section: "stdout".to_string(),
+        }]
+    );
+    assert!(unreadable.is_empty(), "{unreadable:?}");
+
+    // A finding no rewrite repairs asks for nothing: `errors` and `report` cannot
+    // sit together, and the conflict itself has no fix.
+    let src = "fn bad() -> i64 { true }\n--- errors ---\nx\n--- report ---\ny\n";
+    let (_, stderr, _) = check_here("sections_fill_marker_conflict", src);
+    let conflict = stderr.lines().next().unwrap_or_default();
+    assert!(conflict.contains("cannot coexist"), "{conflict}");
+    assert!(!conflict.contains("handoff-fill"), "{conflict}");
 }
 
 #[test]
@@ -717,6 +743,7 @@ fn an_absent_section_records_silence_and_a_clean_exit() {
 
 --- actual ---
 hi
+handoff-fill: section\tsections_absent_means_empty.aipl\tstdout
 "
     );
     assert_eq!(code, 1);
@@ -739,6 +766,7 @@ fn an_exit_code_section_is_compared_with_the_status_main_returns() {
 4
 --- actual ---
 3
+handoff-fill: section\tsections_exit_wrong.aipl\texit code
 "
     );
     assert_eq!(code, 1);
@@ -777,6 +805,7 @@ fn an_expect_file_section_checks_what_the_run_wrote() {
 other
 --- actual ---
 written
+handoff-fill: section\tsections_expect_wrong.aipl\texpect file: out.txt
 "
     );
     assert_eq!(code, 1);
@@ -831,7 +860,7 @@ fn an_errors_section_makes_a_failing_compile_the_expected_outcome() {
     assert_eq!(
         stderr,
         format!(
-            "./bad.aipl: `errors` mismatch\n--- expected ---\n?\n--- actual ---\n{BAD_ERRORS}\n"
+            "./bad.aipl: `errors` mismatch\n--- expected ---\n?\n--- actual ---\n{BAD_ERRORS}\nhandoff-fill: section\tbad.aipl\terrors\n"
         )
     );
     assert_eq!(code, 1);
@@ -892,6 +921,7 @@ error: fn \"bad\": body returns bool, but the declared return type is i64
   |
 1 | fn bad() -> i64 { true }
   |                   ^^^^
+handoff-fill: section\tsections_errors_conflict.aipl\terrors
 "
     );
     assert_eq!(code, 1);
@@ -953,6 +983,7 @@ test f ... FAIL
 bye
 --- actual ---
 hi
+handoff-fill: section\tsections_with_failing_test.aipl\tstdout
 "
     );
     assert_eq!(code, 1);
@@ -977,11 +1008,13 @@ fn the_batch_counts_files_with_mismatched_sections_and_keeps_going() {
 bye
 --- actual ---
 hi
+handoff-fill: section\ta_wrong.aipl\tstdout
 ./c_wrong.aipl: `stdout` mismatch
 --- expected ---
 bye
 --- actual ---
 hi
+handoff-fill: section\tc_wrong.aipl\tstdout
 "
     );
     assert_eq!(
@@ -1055,7 +1088,7 @@ fn a_report_section_that_does_not_match_shows_what_report_printed() {
     assert_eq!(
         stderr,
         format!(
-            "./sections_report_wrong.aipl: `report` mismatch\n--- expected ---\n?\n--- actual ---\n{REPORT_OF_EMPTY_MAIN}\n"
+            "./sections_report_wrong.aipl: `report` mismatch\n--- expected ---\n?\n--- actual ---\n{REPORT_OF_EMPTY_MAIN}\nhandoff-fill: section\tsections_report_wrong.aipl\treport\n"
         )
     );
     assert_eq!(code, 1);
@@ -1094,6 +1127,7 @@ aipl_shim_get           1    external
 aipl_u64_len            2    external
 aipl_write_u64          1    external
 main                    1         196
+handoff-fill: section\tsections_report_cli.aipl\treport
 "
     );
     assert_eq!(code, 1);
@@ -1117,6 +1151,7 @@ error: fn \"bad\": body returns bool, but the declared return type is i64
   |
 1 | fn bad() -> i64 { true }
   |                   ^^^^
+handoff-fill: section\tsections_report_errors.aipl\terrors
 "
     );
     assert_eq!(code, 1);

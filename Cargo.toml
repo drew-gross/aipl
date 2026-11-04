@@ -73,10 +73,10 @@ aipl-docs = { workspace = true }
 libc = { workspace = true }
 object = { workspace = true }
 rustc-demangle = { workspace = true }
+# The line a failing test or `check` prints to tell `cargo handoff` what fixes it.
+handoff = { path = "handoff" }
 
 [dev-dependencies]
-# The line a failing test prints to tell `cargo handoff` what fixes it.
-handoff = { path = "handoff" }
 serde_json = { workspace = true }
 regex = { workspace = true }
 

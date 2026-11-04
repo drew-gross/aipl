@@ -678,6 +678,18 @@ fn check_resolved(
 fn report_sections(label: &str, found: &[sections::Finding]) {
     for f in found {
         eprintln!("{label}: {}", f.message);
+        // A finding a rewrite repairs also says so in the line `cargo handoff` reads,
+        // naming the file by its path from the project root, as everywhere else.
+        if let Some((section, _)) = &f.fix {
+            eprintln!(
+                "{}",
+                handoff::protocol::Fill::Section {
+                    case: label.trim_start_matches("./").to_string(),
+                    section: section.clone(),
+                }
+                .marker()
+            );
+        }
     }
 }
 

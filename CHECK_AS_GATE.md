@@ -185,7 +185,12 @@ Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
       than copied into `check`: it would have put this repository's directory names into the tool users run. Both
       now stage any file that has `file:` sections and load the rest in place. No corpus file had one outside
       `tests/cases/`.
-- [ ] G6 `check` prints `handoff-fill:` lines via `handoff::protocol::Fill` (one definition).
+- [x] G6 `check` prints `handoff-fill:` lines via `handoff::protocol::Fill` (one definition).
+      A section finding that a rewrite repairs prints `Fill::Section` on its own stderr line after the message, with
+      the file's path from the root (`sub/wrong.aipl`) as the case and the section as `--fix` names it. Findings no
+      rewrite repairs print none. `handoff` is now a normal dependency of the root package. The baseline kinds
+      (`BaselineMoved`/`BaselineMissing`) arrive with G1. The names are not yet the harness's display paths
+      (`cases/x/y`); Phase 5, when handoff reads `check`, settles that.
 - [ ] G7 **which functions does `check` compile?** (Corrected 2026-11-03: `check` and the cases harness compile
       error fixtures identically; the "parity gap" recorded here earlier was a verification mistake, since `--fix`
       leaves a section alone when the file compiles.) The real question is reachability. Errors found while
