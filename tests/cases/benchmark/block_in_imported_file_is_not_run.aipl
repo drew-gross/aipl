@@ -6,8 +6,6 @@
 import { equal as == } from builtins;
 import { answer } from "./lib.aipl";
 
-fn main() {}
-
 fn use_answer() -> i64 { answer() }.test({
     assert(use_answer() == 42);
 })

@@ -91,12 +91,24 @@ fn returned(n: i64) -> i16? {
     assert(returned(40000) == none);
 })
 
-fn main() !prints {
-    print(as_u8(200).to_str());
-    print(as_u8(300).to_str());
-    print(positions(42));
-}
---- stdout ---
-some(200)
-none
-some(42) some(42) some(42) some(42)
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(as_u8(200).to_str());
+        print(as_u8(300).to_str());
+        print(positions(42));
+    };
+    assert(out == """
+        some(200)
+        none
+        some(42) some(42) some(42) some(42)
+
+    """);
+})

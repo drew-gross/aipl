@@ -21,19 +21,33 @@ fn first_index_reaching(xs: i64[], limit: i64) -> str {
     log
 }
 
-fn main() !prints {
-    print(to_str(clamp_low(-3))); // 0
-    print(to_str(clamp_low(5))); // 5
-    print(first_index_reaching([1, 5, 9], 4)); // 1  (5 is the first >= 4)
-    print(first_index_reaching([1, 2], 9)); // ss  (limit never reached)
-}.test({
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(clamp_low(-3))); // 0
+        print(to_str(clamp_low(5))); // 5
+        print(first_index_reaching([1, 5, 9], 4)); // 1  (5 is the first >= 4)
+        print(first_index_reaching([1, 2], 9)); // ss  (limit never reached)
+    };
+    assert(out == """
+        0
+        5
+        1
+        ss
+
+    """);
+})
+
+test({
     assert(clamp_low(-3) == 0);
     assert(clamp_low(5) == 5);
     assert(first_index_reaching([1, 5, 9], 4) == "1");
     assert(first_index_reaching([1, 2], 9) == "ss");
 })
---- stdout ---
-0
-5
-1
-ss

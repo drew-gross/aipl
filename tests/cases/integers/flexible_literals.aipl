@@ -33,13 +33,25 @@ fn make() -> i16 {
     assert(make() == 1000);
 })
 
-fn main() !prints {
-    let imax8: i8 = 127;
-    print(to_str(imax8 + 1)); // -128
-    print(to_str(inc(200))); // 201
-    print(to_str(make())); // 1000
-}
---- stdout ---
--128
-201
-1000
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let imax8: i8 = 127;
+        print(to_str(imax8 + 1)); // -128
+        print(to_str(inc(200))); // 201
+        print(to_str(make())); // 1000
+    };
+    assert(out == """
+        -128
+        201
+        1000
+
+    """);
+})

@@ -11,12 +11,24 @@ fn pair<T: any>(x: T, y: T = x) -> T[] { [x, y] }.test({
     assert(pair("a", y="b") == ["a", "b"]);
 })
 
-fn main() !prints {
-    print(to_str(pair(1)));
-    print(to_str(pair("a")));
-    print(to_str(pair("a", y="b")));
-}
---- stdout ---
-[1, 1]
-["a", "a"]
-["a", "b"]
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(pair(1)));
+        print(to_str(pair("a")));
+        print(to_str(pair("a", y="b")));
+    };
+    assert(out == """
+        [1, 1]
+        ["a", "a"]
+        ["a", "b"]
+
+    """);
+})

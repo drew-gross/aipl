@@ -14,8 +14,17 @@ fn compute(a: i64, b: i64) -> i64 { a * b + a }.test({
     assert(2 < 3);
 })
 
-fn main() !prints {
-    print(to_str(compute(3, 4))); // 15
-}
---- stdout ---
-15
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(compute(3, 4))); // 15
+    };
+    assert(out == "15\n");
+})

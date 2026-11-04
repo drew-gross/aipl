@@ -31,10 +31,22 @@ fn oxford(items: str[]) -> str { items.join(sep=", ", final_sep=", or ", only_se
     ]);
 })
 
-fn main() !prints {
-    print(oxford(["red", "green", "blue"]));
-    print(to_str([["x"], ["y"], ["z"]].join(sep=["!"], final_sep=["?"])));
-}
---- stdout ---
-red, green, or blue
-["x", "!", "y", "?", "z"]
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(oxford(["red", "green", "blue"]));
+        print(to_str([["x"], ["y"], ["z"]].join(sep=["!"], final_sep=["?"])));
+    };
+    assert(out == """
+        red, green, or blue
+        ["x", "!", "y", "?", "z"]
+
+    """);
+})

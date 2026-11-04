@@ -18,8 +18,6 @@ fn triple(x: i64) -> i64 { x * 3 }.test({
     assert(triple(2) == 6);
     assert(triple(0) == 0);
 })
-
-fn main() {}
 --- check ---
 ./tests/cases/tests/all_tests_in_file_run.aipl:
     double: 2 assertions passed

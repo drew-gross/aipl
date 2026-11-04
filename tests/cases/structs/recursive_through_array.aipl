@@ -28,19 +28,37 @@ fn total(self: Tree) -> i64 {
 
 fn leaf(label: i64) -> Tree { label, kids: [] }
 
-fn main() !prints {
-    // Grow a spine by wrapping the previous node in a new parent — the shape
-    // that used to leave the binding pointing at freed heap.
-    mut t = leaf(0);
-    mut i = 1;
-    while (i < 5) {
-        set t = Tree { label: i, kids: [t] };
-        set i++;
-    }
-    print(to_str(t.total()));
-    print(to_str(leaf(7)));
-    print(to_str(Tree { label: 1, kids: [leaf(2), leaf(3)] }));
-}.test({
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // Grow a spine by wrapping the previous node in a new parent — the shape
+        // that used to leave the binding pointing at freed heap.
+        mut t = leaf(0);
+        mut i = 1;
+        while (i < 5) {
+            set t = Tree { label: i, kids: [t] };
+            set i++;
+        }
+        print(to_str(t.total()));
+        print(to_str(leaf(7)));
+        print(to_str(Tree { label: 1, kids: [leaf(2), leaf(3)] }));
+    };
+    assert(out == """
+        10
+        Tree { label: 7, kids: [] }
+        Tree { label: 1, kids: [Tree { label: 2, kids: [] }, Tree { label: 3, kids: [] }] }
+
+    """);
+})
+
+test({
     assert(leaf(5).total() == 5);
     assert(leaf(5).kids.is_empty());
 
@@ -52,7 +70,3 @@ fn main() !prints {
     // Structural equality recurses through the array field.
     assert(t == Tree { label: 1, kids: [leaf(2), Tree { label: 3, kids: [leaf(4)] }] });
 })
---- stdout ---
-10
-Tree { label: 7, kids: [] }
-Tree { label: 1, kids: [Tree { label: 2, kids: [] }, Tree { label: 3, kids: [] }] }

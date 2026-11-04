@@ -78,14 +78,26 @@ fn shadowed() -> i64 {
     assert(shadowed() == 7);
 })
 
-fn main() !prints {
-    print(wrapped().to_str());
-    print(widths());
-    print(shapes());
-    print(shadowed().to_str());
-}
---- stdout ---
-4
--128 255 -32768 65535 -2147483648 4294967295 5
-hi 3 9 1 3
-7
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(wrapped().to_str());
+        print(widths());
+        print(shapes());
+        print(shadowed().to_str());
+    };
+    assert(out == """
+        4
+        -128 255 -32768 65535 -2147483648 4294967295 5
+        hi 3 9 1 3
+        7
+
+    """);
+})

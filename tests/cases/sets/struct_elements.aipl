@@ -76,16 +76,28 @@ fn pair(p: Point) -> #{Point} { (p, p).to_set() }.test({
     assert(pair(Point { x: 1, y: 2 }).len() == 1);
 })
 
-fn main() !prints {
-    for (let p : corners()) {
-        print(`{p.x},{p.y}`);
-    }
-    print(`{labels().len()} {sources().len()}`);
-    print(`{corners() == corners().union(corners())}`);
-}
---- stdout ---
-0,0
-4,0
-4,4
-2 2
-true
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        for (let p : corners()) {
+            print(`{p.x},{p.y}`);
+        }
+        print(`{labels().len()} {sources().len()}`);
+        print(`{corners() == corners().union(corners())}`);
+    };
+    assert(out == """
+        0,0
+        4,0
+        4,4
+        2 2
+        true
+
+    """);
+})

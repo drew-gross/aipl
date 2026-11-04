@@ -47,8 +47,17 @@ fn positions() -> str {
     assert(positions() == "200 -5 200 200 -5 200 200 -4 200 -5");
 })
 
-fn main() !prints {
-    print(positions());
-}
---- stdout ---
-200 -5 200 200 -5 200 200 -4 200 -5
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(positions());
+    };
+    assert(out == "200 -5 200 200 -5 200 200 -4 200 -5\n");
+})

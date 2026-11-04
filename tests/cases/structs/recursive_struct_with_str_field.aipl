@@ -19,14 +19,28 @@ fn show(self: Node) -> str {
     }
 }
 
-fn main() !prints {
-    print(leaf("x").show());
-    print(leaf("y").show());
-    print(Node { kind: Pair(leaf("a"), leaf("b")), label: "pair" }.show());
-}.test({
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(leaf("x").show());
+        print(leaf("y").show());
+        print(Node { kind: Pair(leaf("a"), leaf("b")), label: "pair" }.show());
+    };
+    assert(out == """
+        x
+        y
+        (a b)
+
+    """);
+})
+
+test({
     assert(leaf("z").show() == "z");
 })
---- stdout ---
-x
-y
-(a b)

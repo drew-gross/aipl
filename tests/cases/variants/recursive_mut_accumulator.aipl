@@ -61,11 +61,29 @@ fn conditional() -> List {
     acc
 }
 
-fn main() !prints {
-    print(to_str(reversed([1, 2, 3])));
-    print(to_str(last_only([1, 2, 3])));
-    print(to_str(conditional()));
-}.test({
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(reversed([1, 2, 3])));
+        print(to_str(last_only([1, 2, 3])));
+        print(to_str(conditional()));
+    };
+    assert(out == """
+        Cons(3, Cons(2, Cons(1, Nil)))
+        Cons(3, Nil)
+        Cons(7, Cons(1, Nil))
+
+    """);
+})
+
+test({
     // A boxed accumulator grown in a nested scope while an earlier version is still
     // borrowed: `first` names the pre-loop value, which stays valid because its
     // creation-scope track outlives the loop.
@@ -103,7 +121,3 @@ fn main() !prints {
     assert(nodes([1, 2, 3]).v == 3);
     assert(nodes([1, 2, 3]).chain() == 4);
 })
---- stdout ---
-Cons(3, Cons(2, Cons(1, Nil)))
-Cons(3, Nil)
-Cons(7, Cons(1, Nil))

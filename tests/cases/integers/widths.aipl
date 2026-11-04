@@ -56,11 +56,23 @@ fn add8(a: i8, b: i8) -> i8 { a + b }.test({
     assert(to_str(umax8) == "255");
 })
 
-fn main() !prints {
-    let uwide: u32 = 4000000000;
-    print(to_str(add8(100, 50))); // -106
-    print(to_str(uwide)); // 4000000000
-}
---- stdout ---
--106
-4000000000
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let uwide: u32 = 4000000000;
+        print(to_str(add8(100, 50))); // -106
+        print(to_str(uwide)); // 4000000000
+    };
+    assert(out == """
+        -106
+        4000000000
+
+    """);
+})

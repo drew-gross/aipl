@@ -29,14 +29,26 @@ fn greet(name: str) -> str {
     assert(greet("Drew") == "hi, Drew");
 })
 
-fn main() !prints {
-    print(describe_result(safe_add(2, 3, false)));
-    print(describe_result(safe_add(2, -3, false)));
-    print(greet("world"));
-    print(greet("Drew"));
-}
---- stdout ---
-5
-error
-hello, world!
-hi, Drew
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(describe_result(safe_add(2, 3, false)));
+        print(describe_result(safe_add(2, -3, false)));
+        print(greet("world"));
+        print(greet("Drew"));
+    };
+    assert(out == """
+        5
+        error
+        hello, world!
+        hi, Drew
+
+    """);
+})

@@ -80,13 +80,33 @@ fn climb(n: i64) -> Both {
     b
 }
 
-fn main() !prints {
-    print(to_str(spine(3)));
-    print(to_str(climb(3)));
-    print(to_str(Climb(Term(1), [Prec { power: 1, right: false }])));
-    print(to_str(Mixed { tails: [Cons(1, Nil), Nil], head: Cons(2, Nil) }));
-    print(to_str(Node { v: 1, next: some(leaf(2)), kids: [leaf(3)] }));
-}.test({
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(spine(3)));
+        print(to_str(climb(3)));
+        print(to_str(Climb(Term(1), [Prec { power: 1, right: false }])));
+        print(to_str(Mixed { tails: [Cons(1, Nil), Nil], head: Cons(2, Nil) }));
+        print(to_str(Node { v: 1, next: some(leaf(2)), kids: [leaf(3)] }));
+    };
+    assert(out == """
+        Both { head: Cons(2, Cons(1, Cons(0, Nil))), nums: [7, 8] }
+        Both { head: Cons(4, Cons(2, Cons(1, Cons(1, Nil)))), nums: [7, 8] }
+        Climb(Term(1), [Prec { power: 1, right: false }])
+        Mixed { tails: [Cons(1, Nil), Nil], head: Cons(2, Nil) }
+        Node { v: 1, next: some(Node { v: 2, next: none, kids: [] }), kids: [Node { v: 3, next: none, kids: [] }] }
+
+    """);
+})
+
+test({
     // Rebinding the boxed field in a loop leaves the array field untouched.
     let b = spine(3);
     assert(b.head.sum() == 3);
@@ -122,9 +142,3 @@ fn main() !prints {
         kids: [leaf(3), Node { v: 4, next: none, kids: [leaf(5)] }],
     });
 })
---- stdout ---
-Both { head: Cons(2, Cons(1, Cons(0, Nil))), nums: [7, 8] }
-Both { head: Cons(4, Cons(2, Cons(1, Cons(1, Nil)))), nums: [7, 8] }
-Climb(Term(1), [Prec { power: 1, right: false }])
-Mixed { tails: [Cons(1, Nil), Nil], head: Cons(2, Nil) }
-Node { v: 1, next: some(Node { v: 2, next: none, kids: [] }), kids: [Node { v: 3, next: none, kids: [] }] }

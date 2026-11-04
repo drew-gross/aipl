@@ -28,23 +28,46 @@ fn len(self: List) -> i64 {
 
 fn prepend(self: List, x: i64) -> List { Cons(x, self) }
 
-fn main() !prints {
-    let l = Cons(1, Cons(2, Cons(3, Nil)));
-    print(to_str(l));
-    print(to_str(l.sum()));
-    print(to_str(l.len()));
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let l = Cons(1, Cons(2, Cons(3, Nil)));
+        print(to_str(l));
+        print(to_str(l.sum()));
+        print(to_str(l.len()));
 
-    // A shared tail: `a` and `b` both point at `shared`. `shared`'s block is
-    // held by the local plus two internal (weak) references from the heads.
-    let shared = Cons(20, Cons(30, Nil));
-    let a = shared.prepend(1);
-    let b = shared.prepend(9);
-    print(to_str(a));
-    print(to_str(b));
-    print(to_str(a == b));
-    print(to_str(a == Cons(1, Cons(20, Cons(30, Nil)))));
-    print(to_str(a != b));
-}.test({
+        // A shared tail: `a` and `b` both point at `shared`. `shared`'s block is
+        // held by the local plus two internal (weak) references from the heads.
+        let shared = Cons(20, Cons(30, Nil));
+        let a = shared.prepend(1);
+        let b = shared.prepend(9);
+        print(to_str(a));
+        print(to_str(b));
+        print(to_str(a == b));
+        print(to_str(a == Cons(1, Cons(20, Cons(30, Nil)))));
+        print(to_str(a != b));
+    };
+    assert(out == """
+        Cons(1, Cons(2, Cons(3, Nil)))
+        6
+        3
+        Cons(1, Cons(20, Cons(30, Nil)))
+        Cons(9, Cons(20, Cons(30, Nil)))
+        false
+        true
+        true
+
+    """);
+})
+
+test({
     assert(Cons(1, Cons(2, Nil)).sum() == 3);
     assert(Cons(1, Cons(2, Cons(3, Nil))).len() == 3);
     assert(Nil.len() == 0);
@@ -61,12 +84,3 @@ fn main() !prints {
     assert(tail.prepend(9) == Cons(9, Cons(2, Cons(3, Nil))));
     assert(tail.len() == 2);
 })
---- stdout ---
-Cons(1, Cons(2, Cons(3, Nil)))
-6
-3
-Cons(1, Cons(20, Cons(30, Nil)))
-Cons(9, Cons(20, Cons(30, Nil)))
-false
-true
-true

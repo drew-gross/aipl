@@ -37,22 +37,34 @@ fn total<T: any>(self: T[], more: T+) -> u64 {
 // call site is still held to one char or more.
 fn wrap(self: str, around: char+) -> str { `{around}{self}{around}` }
 
-fn main() !prints {
-    print(to_str(total([1, 2], 3)));
-    print(to_str(total([1, 2], [3, 4])));
-    print(wrap("x", '*'));
-    let stars: char[] without [] = ['*', '*'];
-    print(wrap("x", stars));
-    // The runtime road in: `ensure_nonempty` hands back the shape `T+` takes.
-    let xs = [9, 8, 7];
-    match (xs.ensure_nonempty()) {
-        some(ne) => print(ne.first_and_last()),
-        none => print("empty"),
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(total([1, 2], 3)));
+        print(to_str(total([1, 2], [3, 4])));
+        print(wrap("x", '*'));
+        let stars: char[] without [] = ['*', '*'];
+        print(wrap("x", stars));
+        // The runtime road in: `ensure_nonempty` hands back the shape `T+` takes.
+        let xs = [9, 8, 7];
+        match (xs.ensure_nonempty()) {
+            some(ne) => print(ne.first_and_last()),
+            none => print("empty"),
+        };
     };
-}
---- stdout ---
-3
-4
-*x*
-**x**
-9..7
+    assert(out == """
+        3
+        4
+        *x*
+        **x**
+        9..7
+
+    """);
+})

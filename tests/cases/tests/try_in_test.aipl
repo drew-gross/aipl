@@ -44,8 +44,6 @@ fn hits_none() -> i64 { 0 }.test({
     let bad = first("")?;
     assert(false);
 })
-
-fn main() {}
 --- check ---
 ./tests/cases/tests/try_in_test.aipl:
     all_ok: 1 assertion passed

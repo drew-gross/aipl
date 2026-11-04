@@ -27,10 +27,22 @@ fn show(r: str!str) -> str {
     assert(show(err("b")) == "err(b)");
 })
 
-fn main() !prints {
-    print(show(greet("x")));
-    print(show(greet("nope")));
-}
---- stdout ---
-ok(hello found-x)
-err(missing: nope)
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(show(greet("x")));
+        print(show(greet("nope")));
+    };
+    assert(out == """
+        ok(hello found-x)
+        err(missing: nope)
+
+    """);
+})

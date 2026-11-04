@@ -49,15 +49,27 @@ fn undocumented(n: i64) -> i64 {
     n + n
 }
 
-fn main() !prints {
-    let p = Point { x: 1, y: 2 };
-    print(`sum {add(p.x, p.y)}`);
-    print(`doubled {undocumented(2)}`);
-    print(`yes {Yes == Maybe.Yes}`);
-    print(`square {Rect(3) == Rect(3, h=3)}`);
-}
---- stdout ---
-sum 3
-doubled 4
-yes true
-square false
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let p = Point { x: 1, y: 2 };
+        print(`sum {add(p.x, p.y)}`);
+        print(`doubled {undocumented(2)}`);
+        print(`yes {Yes == Maybe.Yes}`);
+        print(`square {Rect(3) == Rect(3, h=3)}`);
+    };
+    assert(out == """
+        sum 3
+        doubled 4
+        yes true
+        square false
+
+    """);
+})

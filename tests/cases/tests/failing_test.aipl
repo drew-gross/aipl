@@ -13,8 +13,6 @@ fn answer() -> i64 { 41 }.test({
     assert(answer() == 42);
     assert(answer() > 100);
 })
-
-fn main() {}
 --- check ---
 ./tests/cases/tests/failing_test.aipl:
     one: 1 assertion passed

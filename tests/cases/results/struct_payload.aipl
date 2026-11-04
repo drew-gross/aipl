@@ -21,16 +21,28 @@ fn parse(valid: bool) -> Point!str {
     };
 })
 
-fn main() !prints {
-    match (parse(true)) {
-        ok(p) => print(`{p.x},{p.y},{p.label}`),
-        err(e) => print(`err: {e}`),
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        match (parse(true)) {
+            ok(p) => print(`{p.x},{p.y},{p.label}`),
+            err(e) => print(`err: {e}`),
+        };
+        match (parse(false)) {
+            ok(..) => print("ok"),
+            err(e) => print(`err: {e}`),
+        };
     };
-    match (parse(false)) {
-        ok(..) => print("ok"),
-        err(e) => print(`err: {e}`),
-    };
-}
---- stdout ---
-1,2,hi
-err: bad point
+    assert(out == """
+        1,2,hi
+        err: bad point
+
+    """);
+})

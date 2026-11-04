@@ -65,14 +65,12 @@ fn total(xs: i64[]) -> i64 {
     n
 }
 
-fn main() -> i64 {
+test({
     let p = ones(2); // the most an i64[] holds inline
     let bumped = ones(2).map(|x| x + 10); // 11, 11
     let small = ones(2).filter(|x| x < 5); // 1, 1
     let b = bytes(22); // the most a u8[] holds inline
     let lens = [b.len(), p.len()]; // not constants, so built inline
     let full = if (lens[0] == some(22) && b[21] == some(1)) { 100 } else { 0 };
-    total(p) + total(bumped) + total(small) + full // 2 + 22 + 2 + 100
-}
---- exit code ---
-126
+    assert(total(p) + total(bumped) + total(small) + full == 126); // 2 + 22 + 2 + 100
+})

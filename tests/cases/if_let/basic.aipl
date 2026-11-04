@@ -10,10 +10,22 @@ fn describe(x: i64?) -> str { if (let some(v) = x) { `got {v}` } else { "nothing
     assert(describe(none) == "nothing");
 })
 
-fn main() !prints {
-    print(describe(some(5)));
-    print(describe(none));
-}
---- stdout ---
-got 5
-nothing
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(describe(some(5)));
+        print(describe(none));
+    };
+    assert(out == """
+        got 5
+        nothing
+
+    """);
+})

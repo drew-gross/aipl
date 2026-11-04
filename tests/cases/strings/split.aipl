@@ -7,16 +7,37 @@
 
 import { equal as ==, print, split, to_str, wrapping_increment as ++ } from builtins;
 
-fn main() !prints {
-    print(to_str(split("a,bb,ccc", ","))); // ["a", "bb", "ccc"]
-    print(to_str(split("a,,b", ","))); // ["a", "", "b"]  (empty middle)
-    print(to_str(split("a,b,", ","))); // ["a", "b", ""]  (trailing sep)
-    print(to_str(split("abc", ","))); // ["abc"]         (no separator)
-    print(to_str(split("", ","))); // [""]            (empty source)
-    print(to_str(split("xyz", ""))); // ["xyz"]         (empty separator)
-    print(to_str(split("a::b::cee", "::"))); // ["a", "b", "cee"] (multi-char sep)
-    print(to_str(split("name=longvaluehere", "="))); // ["name", "longvaluehere"] (view part)
-}
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(split("a,bb,ccc", ","))); // ["a", "bb", "ccc"]
+        print(to_str(split("a,,b", ","))); // ["a", "", "b"]  (empty middle)
+        print(to_str(split("a,b,", ","))); // ["a", "b", ""]  (trailing sep)
+        print(to_str(split("abc", ","))); // ["abc"]         (no separator)
+        print(to_str(split("", ","))); // [""]            (empty source)
+        print(to_str(split("xyz", ""))); // ["xyz"]         (empty separator)
+        print(to_str(split("a::b::cee", "::"))); // ["a", "b", "cee"] (multi-char sep)
+        print(to_str(split("name=longvaluehere", "="))); // ["name", "longvaluehere"] (view part)
+    };
+    assert(out == """
+        ["a", "bb", "ccc"]
+        ["a", "", "b"]
+        ["a", "b", ""]
+        ["abc"]
+        [""]
+        ["xyz"]
+        ["a", "b", "cee"]
+        ["name", "longvaluehere"]
+
+    """);
+})
 
 // A long part (>= 8 bytes) is a buffer-sharing view, yet still compares equal to a
 // literal by content (str equality materializes views). Counts matching parts.
@@ -33,12 +54,3 @@ fn count_eq(s: str, sep: str, target: str) -> i64 {
     assert(count_eq("a,b,c,d,e", ",", "z") == 0);
     assert(count_eq("k=v=longpartword", "=", "longpartword") == 1);
 })
---- stdout ---
-["a", "bb", "ccc"]
-["a", "", "b"]
-["a", "b", ""]
-["abc"]
-[""]
-["xyz"]
-["a", "b", "cee"]
-["name", "longvaluehere"]

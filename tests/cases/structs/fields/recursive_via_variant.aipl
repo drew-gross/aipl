@@ -17,13 +17,31 @@ fn depth(self: S) -> i64 {
     }
 }
 
-fn main() !prints {
-    let leaf = S { tag: 1, child: Leaf };
-    let nested = S { tag: 2, child: Node(S { tag: 3, child: Leaf }) };
-    print(to_str(leaf.depth()));
-    print(to_str(nested.depth()));
-    print(to_str(nested));
-}.test({
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let leaf = S { tag: 1, child: Leaf };
+        let nested = S { tag: 2, child: Node(S { tag: 3, child: Leaf }) };
+        print(to_str(leaf.depth()));
+        print(to_str(nested.depth()));
+        print(to_str(nested));
+    };
+    assert(out == """
+        0
+        1
+        S { tag: 2, child: Node(S { tag: 3, child: Leaf }) }
+
+    """);
+})
+
+test({
     assert(S { tag: 1, child: Leaf }.depth() == 0);
     assert(S { tag: 2, child: Node(S { tag: 3, child: Leaf }) }.depth() == 1);
 
@@ -31,7 +49,3 @@ fn main() !prints {
     assert(S { tag: 1, child: Leaf } == S { tag: 1, child: Leaf });
     assert(S { tag: 1, child: Leaf } == S { tag: 9, child: Leaf } == false);
 })
---- stdout ---
-0
-1
-S { tag: 2, child: Node(S { tag: 3, child: Leaf }) }

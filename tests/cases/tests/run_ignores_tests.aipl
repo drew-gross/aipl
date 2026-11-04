@@ -9,8 +9,17 @@ fn double(x: i64) -> i64 { x * 2 }.test({
     assert(double(0) == 0);
 })
 
-fn main() !prints {
-    print(to_str(double(21))); // 42
-}
---- stdout ---
-42
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(double(21))); // 42
+    };
+    assert(out == "42\n");
+})

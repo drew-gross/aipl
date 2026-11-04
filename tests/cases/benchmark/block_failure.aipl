@@ -9,8 +9,6 @@ fn answer() -> i64 { 41 }.test({
 }).benchmark({
     assert(answer() == 42);
 })
-
-fn main() {}
 --- check ---
 ./tests/cases/benchmark/block_failure.aipl:
     answer: 1 assertion passed

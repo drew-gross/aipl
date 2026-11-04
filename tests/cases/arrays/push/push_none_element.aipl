@@ -45,14 +45,26 @@ fn first_only<T: any>(xs: T[]) -> T[] {
     assert(first_only([7, 8]) == [7]);
 })
 
-fn main() !prints {
-    print(to_str(collect([]) == rebuilt([])));
-    print(to_str(collect([1, 2])));
-    print(to_str(first_only(["a", "b"])));
-    print(to_str(first_only([])));
-}
---- stdout ---
-true
-[1, 2]
-["a"]
-[]
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(collect([]) == rebuilt([])));
+        print(to_str(collect([1, 2])));
+        print(to_str(first_only(["a", "b"])));
+        print(to_str(first_only([])));
+    };
+    assert(out == """
+        true
+        [1, 2]
+        ["a"]
+        []
+
+    """);
+})

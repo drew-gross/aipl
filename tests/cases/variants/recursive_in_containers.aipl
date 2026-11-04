@@ -18,18 +18,38 @@ fn sumall(self: List) -> i64 {
     }
 }
 
-fn main() !prints {
-    let lists = [Cons(1, Nil), Cons(2, Cons(3, Nil)), Nil];
-    print(to_str(lists));
-    print(to_str(lists.len()));
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let lists = [Cons(1, Nil), Cons(2, Cons(3, Nil)), Nil];
+        print(to_str(lists));
+        print(to_str(lists.len()));
 
-    let h = Holder { name: "xs", list: Cons(5, Cons(6, Nil)) };
-    print(to_str(h));
-    print(to_str(h.list.sumall()));
+        let h = Holder { name: "xs", list: Cons(5, Cons(6, Nil)) };
+        print(to_str(h));
+        print(to_str(h.list.sumall()));
 
-    let maybe = some(Cons(7, Nil));
-    print(to_str(maybe));
-}.test({
+        let maybe = some(Cons(7, Nil));
+        print(to_str(maybe));
+    };
+    assert(out == """
+        [Cons(1, Nil), Cons(2, Cons(3, Nil)), Nil]
+        3
+        Holder { name: "xs", list: Cons(5, Cons(6, Nil)) }
+        11
+        some(Cons(7, Nil))
+
+    """);
+})
+
+test({
     // Array of boxed values.
     let lists = [Cons(1, Nil), Cons(2, Cons(3, Nil))];
     assert(lists.len() == 2);
@@ -43,9 +63,3 @@ fn main() !prints {
     // Boxed core of an optional.
     assert(some(Cons(7, Nil)) == some(Cons(7, Nil)));
 })
---- stdout ---
-[Cons(1, Nil), Cons(2, Cons(3, Nil)), Nil]
-3
-Holder { name: "xs", list: Cons(5, Cons(6, Nil)) }
-11
-some(Cons(7, Nil))

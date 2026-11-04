@@ -59,12 +59,24 @@ fn u64_max() -> u64 {
     assert([0 - 1, 1].sort() == [0 - 1, 1]);
 })
 
-fn main() !prints {
-    print(to_str([3, 1, 2].sort()));
-    print(to_str([u64_max()]));
-    print(sum([1, 2]).to_str());
-}
---- stdout ---
-[1, 2, 3]
-[18446744073709551615]
-3
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str([3, 1, 2].sort()));
+        print(to_str([u64_max()]));
+        print(sum([1, 2]).to_str());
+    };
+    assert(out == """
+        [1, 2, 3]
+        [18446744073709551615]
+        3
+
+    """);
+})

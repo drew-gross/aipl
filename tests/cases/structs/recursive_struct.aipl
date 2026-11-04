@@ -17,16 +17,34 @@ fn total(self: Tree) -> i64 {
 
 fn leaf(v: i64) -> Tree { value: v, left: none, right: none }
 
-fn main() !prints {
-    let t = Tree {
-        value: 1,
-        left: some(leaf(2)),
-        right: some(Tree { value: 3, left: some(leaf(4)), right: none }),
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let t = Tree {
+            value: 1,
+            left: some(leaf(2)),
+            right: some(Tree { value: 3, left: some(leaf(4)), right: none }),
+        };
+        print(to_str(t.total()));
+        print(to_str(t.value));
+        print(to_str(leaf(7)));
     };
-    print(to_str(t.total()));
-    print(to_str(t.value));
-    print(to_str(leaf(7)));
-}.test({
+    assert(out == """
+        10
+        1
+        Tree { value: 7, left: none, right: none }
+
+    """);
+})
+
+test({
     assert(leaf(5).total() == 5);
     assert(leaf(5).value == 5);
 
@@ -41,7 +59,3 @@ fn main() !prints {
         right: none,
     });
 })
---- stdout ---
-10
-1
-Tree { value: 7, left: none, right: none }

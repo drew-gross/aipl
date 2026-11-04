@@ -6,12 +6,24 @@ fn scaled(n: i64, bump: i64 = 100, scale: i64 = 2) -> i64 { (n + bump) * scale }
     assert(scaled(1, scale=3, bump=0) == 3);
 })
 
-fn main() !prints {
-    print(to_str(scaled(1)));
-    print(to_str(scaled(1, bump=5)));
-    print(to_str(scaled(1, scale=3, bump=0)));
-}
---- stdout ---
-202
-12
-3
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(scaled(1)));
+        print(to_str(scaled(1, bump=5)));
+        print(to_str(scaled(1, scale=3, bump=0)));
+    };
+    assert(out == """
+        202
+        12
+        3
+
+    """);
+})

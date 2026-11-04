@@ -25,8 +25,17 @@ fn ages() -> #{str: i64} { #{"al": 30, "mo": 25} }.test({
     assert(len(ages()) == 2);
 })
 
-fn main() !prints {
-    print("ok");
-}
---- stdout ---
-ok
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print("ok");
+    };
+    assert(out == "ok\n");
+})

@@ -110,18 +110,30 @@ fn wrap_from_elem(xs: u8[]) -> u8 { xs[0].value_or(0) + 100 }.test({
     assert(wrap_from_elem([1]) == 101);
 })
 
-fn main() !prints {
-    print(i8s().sort().to_str());
-    print(u8s().sort().to_str());
-    print(i32s().to_str());
-    print(u32s().sort().to_str());
-    print(first([65535]).to_str());
-    print(nested().to_str());
-}
---- stdout ---
-[-128, 3, 127]
-[0, 3, 255]
-[-2147483648, 2147483647]
-[1, 4294967295]
-some(65535)
-[[-128], [127, 0]]
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(i8s().sort().to_str());
+        print(u8s().sort().to_str());
+        print(i32s().to_str());
+        print(u32s().sort().to_str());
+        print(first([65535]).to_str());
+        print(nested().to_str());
+    };
+    assert(out == """
+        [-128, 3, 127]
+        [0, 3, 255]
+        [-2147483648, 2147483647]
+        [1, 4294967295]
+        some(65535)
+        [[-128], [127, 0]]
+
+    """);
+})

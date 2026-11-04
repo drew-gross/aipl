@@ -82,31 +82,61 @@ fn sum(xs: i64[]) -> i64 {
     total
 }
 
-fn main() !prints {
-    mut cells: i64[] = [0].repeat(64);
-    for (let i : 0..100) {
-        set cells.try_set(i % 64, 7);
-    }
-    // A miss changes nothing.
-    set cells.try_set(64, 1);
-    print(to_str(sum(cells)));
-}
---- stdout ---
-448
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        mut cells: i64[] = [0].repeat(64);
+        for (let i : 0..100) {
+            set cells.try_set(i % 64, 7);
+        }
+        // A miss changes nothing.
+        set cells.try_set(64, 1);
+        print(to_str(sum(cells)));
+    };
+    assert(out == "448\n");
+})
 --- report ---
-allocations       3
-deallocations     3
+allocations       24
+deallocations     24
 reallocations     0
-bytes allocated   1075
-peak live bytes   1075
-instructions      15847
-binary size       3400 bytes (code 1876, data 25, metadata 1499)
+bytes allocated   2096
+peak live bytes   1163
+instructions      21389
+binary size       25560 bytes (code 14628, data 2202, metadata 8730)
 
-function            calls  code bytes
-__to_str_i64            1         204
-aipl_arr_inc          167    external
-aipl_array_dec        269    external
-aipl_i64_len            2    external
-aipl_shim_get           1    external
-aipl_write_i64          1    external
-main                    1        1672
+function                                 calls  code bytes
+__aipl_const_teardown                        1          92
+__eq_Cell                                    4         100
+__eq_Cell$arr                                2         240
+__eq_bool$arr                                3         160
+__eq_i64$arr                                17         264
+__eq_i64$arr$arr                             1         240
+__eq_str$arr                                 1         320
+__eq_u8$arr                                  1         264
+__test$__test_block_1                        1        2312
+__test$__test_block_1$shim_closure0          0         700
+__test$__test_block_1$shim_closure1          1         700
+__test$basics                                1        2896
+__test$other_elements                        1        3120
+__test$statement                             1        1744
+__test$views                                 1         892
+__to_str_i64                                 1         204
+aipl_arr_inc                               192    external
+aipl_array_dec                             306    external
+aipl_array_new                              10    external
+aipl_assert                                 24    external
+aipl_i64_len                                 2    external
+aipl_shim_get                                3    external
+aipl_shim_set                                4    external
+aipl_test_begin                              5    external
+aipl_test_end                                5    external
+aipl_test_summary                            1    external
+aipl_write_i64                               1    external
+main                                         1         380

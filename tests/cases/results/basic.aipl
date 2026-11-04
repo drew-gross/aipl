@@ -23,10 +23,22 @@ fn describe(a: i64, b: i64) -> str {
     };
 })
 
-fn main() !prints {
-    print(describe(10, 2));
-    print(describe(1, 0));
-}
---- stdout ---
-= 5
-error: divide by zero
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(describe(10, 2));
+        print(describe(1, 0));
+    };
+    assert(out == """
+        = 5
+        error: divide by zero
+
+    """);
+})

@@ -9,8 +9,17 @@ fn compute(a: i64, b: i64) -> i64 { a - b }.test({
     assert(10 - 5 == 15);
 })
 
-fn main() !prints {
-    print(to_str(compute(3, 4))); // 7
-}
---- stdout ---
-7
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(compute(3, 4))); // 7
+    };
+    assert(out == "7\n");
+})

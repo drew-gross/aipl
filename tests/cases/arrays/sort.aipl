@@ -53,12 +53,24 @@ fn does_not_mutate() -> bool {
     assert(does_not_mutate());
 })
 
-fn main() !prints {
-    print(to_str(sorted_ints()));
-    print(to_str(names()));
-    print(to_str(chars()));
-}
---- stdout ---
-[1, 2, 3]
-["apple", "fig", "pear"]
-['a', 'b', 'c']
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(sorted_ints()));
+        print(to_str(names()));
+        print(to_str(chars()));
+    };
+    assert(out == """
+        [1, 2, 3]
+        ["apple", "fig", "pear"]
+        ['a', 'b', 'c']
+
+    """);
+})

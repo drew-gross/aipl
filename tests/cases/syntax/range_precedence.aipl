@@ -49,12 +49,24 @@ fn middle(s: str, at: i64) -> str { s[at..at + 3] }.test({
     assert(middle("hello world", 6) == "wor");
 })
 
-fn main() !prints {
-    print(is_one_two(1..2).to_str());
-    print(to_str(shifted(1, 3)));
-    print(middle("abcdef", 2));
-}
---- stdout ---
-true
-Span { start: 2, end: 6 }
-cde
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(is_one_two(1..2).to_str());
+        print(to_str(shifted(1, 3)));
+        print(middle("abcdef", 2));
+    };
+    assert(out == """
+        true
+        Span { start: 2, end: 6 }
+        cde
+
+    """);
+})

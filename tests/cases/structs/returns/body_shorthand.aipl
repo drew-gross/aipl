@@ -31,13 +31,34 @@ fn logged(x: i64) !prints -> Vec2 {
     Vec2 { x, y: x }
 }
 
-fn main() !prints {
-    print(to_str(origin()));
-    print(to_str(square(3)));
-    print(to_str(shifted(1, 2)));
-    print(to_str(place("home", 7)));
-    print(to_str(logged(4)));
-}.test({
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(to_str(origin()));
+        print(to_str(square(3)));
+        print(to_str(shifted(1, 2)));
+        print(to_str(place("home", 7)));
+        print(to_str(logged(4)));
+    };
+    assert(out == """
+        Vec2 { x: 0, y: 0 }
+        Vec2 { x: 3, y: 3 }
+        Vec2 { x: 1, y: 2 }
+        Named { name: "home", at: Vec2 { x: 7, y: 0 } }
+        built
+        Vec2 { x: 4, y: 4 }
+
+    """);
+})
+
+test({
     // A single *explicit* field needs no comma, since `id:` already rules out a
     // block. A single *shorthand* field is the one shape that does need one —
     // `{ id }` is a block whose value is `id`, which is what it has always meant —
@@ -62,10 +83,3 @@ fn main() !prints {
     assert(passthrough(Vec2 { x: 8, y: 9 }) == Vec2 { x: 8, y: 9 });
     assert(place("home", 7) == Named { name: "home", at: Vec2 { x: 7, y: 0 } });
 })
---- stdout ---
-Vec2 { x: 0, y: 0 }
-Vec2 { x: 3, y: 3 }
-Vec2 { x: 1, y: 2 }
-Named { name: "home", at: Vec2 { x: 7, y: 0 } }
-built
-Vec2 { x: 4, y: 4 }

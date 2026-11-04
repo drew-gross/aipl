@@ -26,13 +26,33 @@ fn escaped(c: char) -> str {
     }
 }
 
-fn main() !prints {
-    print(kind('a'));
-    print(kind('z'));
-    print(kind(' '));
-    print(escaped('\n'));
-    print(escaped('x'));
-}.test({
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(kind('a'));
+        print(kind('z'));
+        print(kind(' '));
+        print(escaped('\n'));
+        print(escaped('x'));
+    };
+    assert(out == """
+        vowel
+        consonant
+        space
+        newline
+        plain
+
+    """);
+})
+
+test({
     // A char match is an ordinary expression, so it nests and composes.
     fn score(s: str) -> i64 {
         mut total = 0;
@@ -61,9 +81,3 @@ fn main() !prints {
     assert(score("") == 0);
     assert(score("zzz") == 0);
 })
---- stdout ---
-vowel
-consonant
-space
-newline
-plain

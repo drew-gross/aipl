@@ -52,14 +52,26 @@ fn filtered<T: any>(xs: T[], keep: (T) -> bool) -> T[] {
     assert(filtered([1, 5, 2], |n| n < 3) == [1, 2]);
 })
 
-fn main() !prints {
-    print(collect([1, 2, 3]).to_str());
-    print(collect(["a", "b"]).to_str());
-    print(first_or([7, 8], 0).to_str());
-    print(filtered([1, 5, 2], |n| n < 3).to_str());
-}
---- stdout ---
-[1, 2, 3]
-["a", "b"]
-7
-[1, 2]
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(collect([1, 2, 3]).to_str());
+        print(collect(["a", "b"]).to_str());
+        print(first_or([7, 8], 0).to_str());
+        print(filtered([1, 5, 2], |n| n < 3).to_str());
+    };
+    assert(out == """
+        [1, 2, 3]
+        ["a", "b"]
+        7
+        [1, 2]
+
+    """);
+})

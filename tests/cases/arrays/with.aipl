@@ -50,21 +50,33 @@ fn views() {}.test({
     assert(xs == [1, 2, 3, 4]);
 })
 
-fn main() !prints {
-    let xs = [10, 20, 30];
-    print(to_str(xs.with(1, 99)));
-    print(to_str(xs.with(3, 99)));
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let xs = [10, 20, 30];
+        print(to_str(xs.with(1, 99)));
+        print(to_str(xs.with(3, 99)));
 
-    // Updating a variable: a write that missed leaves the array as it was, which
-    // is what `try_set` says directly.
-    mut ys = xs;
-    set ys = ys.try_set(0, 1);
-    set ys = ys.try_set(7, 2);
-    print(to_str(ys));
-    print(to_str(xs));
-}
---- stdout ---
-some([10, 99, 30])
-none
-[1, 20, 30]
-[10, 20, 30]
+        // Updating a variable: a write that missed leaves the array as it was, which
+        // is what `try_set` says directly.
+        mut ys = xs;
+        set ys = ys.try_set(0, 1);
+        set ys = ys.try_set(7, 2);
+        print(to_str(ys));
+        print(to_str(xs));
+    };
+    assert(out == """
+        some([10, 99, 30])
+        none
+        [1, 20, 30]
+        [10, 20, 30]
+
+    """);
+})

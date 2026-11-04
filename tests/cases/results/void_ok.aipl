@@ -32,12 +32,24 @@ fn describe(r: !str) -> str {
     assert(to_str(err("bad")) == `err("bad")`); // to_str quotes strings
 })
 
-fn main() !prints {
-    print(describe(validate(3, 4)));
-    print(describe(validate(3, -4)));
-    print(to_str(check_positive(5)));
-}
---- stdout ---
-valid
-invalid: negative
-ok()
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(describe(validate(3, 4)));
+        print(describe(validate(3, -4)));
+        print(to_str(check_positive(5)));
+    };
+    assert(out == """
+        valid
+        invalid: negative
+        ok()
+
+    """);
+})

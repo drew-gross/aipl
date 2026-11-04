@@ -12,11 +12,27 @@
 
 import { equal as ==, heap_str, inline_str, measure, print, rope_str, value_or } from builtins;
 
-fn main() !prints {
-    print(heap_str("hi")); // a fresh buffer, though "hi" would fit inline
-    print(rope_str("ba", "nana")); // a node over the two, flattened only to print
-    print(inline_str("hi").value_or("?")); // already inline; repacked, not allocated
-}
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(heap_str("hi")); // a fresh buffer, though "hi" would fit inline
+        print(rope_str("ba", "nana")); // a node over the two, flattened only to print
+        print(inline_str("hi").value_or("?")); // already inline; repacked, not allocated
+    };
+    assert(out == """
+        hi
+        banana
+        hi
+
+    """);
+})
 
 # Content survives every conversion, in both directions — the representation is
 # the only thing that changes.
@@ -55,7 +71,3 @@ fn round_trips(s: str) -> bool { heap_str(s) == s }.benchmark({
     assert(rope_str("", "lone") == "lone");
     assert(rope_str("lone", "") == "lone");
 })
---- stdout ---
-hi
-banana
-hi

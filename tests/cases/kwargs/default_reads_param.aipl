@@ -15,12 +15,24 @@ fn span(lo: i64, hi: i64 = lo + 10, step: i64 = hi - lo) -> str { `{lo}..{hi} by
     assert(span(1, hi=4, step=100) == "1..4 by 100");
 })
 
-fn main() !prints {
-    print(span(1));
-    print(span(1, hi=4));
-    print(span(1, hi=4, step=100));
-}
---- stdout ---
-1..11 by 10
-1..4 by 3
-1..4 by 100
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print(span(1));
+        print(span(1, hi=4));
+        print(span(1, hi=4, step=100));
+    };
+    assert(out == """
+        1..11 by 10
+        1..4 by 3
+        1..4 by 100
+
+    """);
+})

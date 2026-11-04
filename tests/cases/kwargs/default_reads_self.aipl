@@ -9,15 +9,27 @@ fn head(self: str, n: u64 = self.len()) -> str { self[..n] }.test({
     assert("hello".head(n=2) == "he");
 })
 
-fn main() !prints {
-    print("hello".head());
-    print("hello".head(n=2));
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print("hello".head());
+        print("hello".head(n=2));
 
-    // A receiver that isn't already a name is evaluated once, into the binding
-    // the default reads.
-    print(heap_str("hello").head());
-}
---- stdout ---
-hello
-he
-hello
+        // A receiver that isn't already a name is evaluated once, into the binding
+        // the default reads.
+        print(heap_str("hello").head());
+    };
+    assert(out == """
+        hello
+        he
+        hello
+
+    """);
+})

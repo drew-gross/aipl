@@ -4,14 +4,28 @@
 
 import { equal as ==, print, to_str, wrapping_mul as * } from builtins;
 
-fn main() !prints {
-    print((6 * 7).to_str()); // 42
-    print((2 * 3 * 4).to_str()); // 24
-}.test({
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text}\n`;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        print((6 * 7).to_str()); // 42
+        print((2 * 3 * 4).to_str()); // 24
+    };
+    assert(out == """
+        42
+        24
+
+    """);
+})
+
+test({
     assert(6 * 7 == 42);
     assert(2 * 3 * 4 == 24);
     assert(9223372036854775807 * 2 == -2); // i64::MAX * 2 wraps to -2
 })
---- stdout ---
-42
-24

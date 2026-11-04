@@ -93,11 +93,8 @@ Target state: `fn main` appears only in (a) real programs (`projects/`, `example
 implementation of an effect (stdin, terminal, process, real clock, real files), and (c) the
 entry-point-mechanics tests (exit code, `cli`, `stderr`, `file:`, `expect file:`).
 
-- [ ] **Convert the 56 `main` + `.test` files with sections.** Fold the prints into their tests (assert the
-      value, or capture the prints inline, below). Recount first: the passes since the census (empty mains,
-      `report` cases, `.performance` files) already took some.
-- [ ] **Recount the empty `fn main() {}` files that carry sections other than `errors`** (`check`,
-      `report`, `.test` cases) and delete what is left.
+- [ ] **Recount the files with a `main`, sections and tests** (the 64 found on 2026-11-03 are converted; the 4 kept are
+      `files/{error_type,write_file}` and `builtins/{now_nanos,monotonic_now}`, tests of the real filesystem and clock).
 - [ ] **26 error fixtures keep their `main`** because of G7; drop it once `check` is the gate or the harness
       compiles every function: `arrays/spread/err_spread_in_call, builtins/err_span_without_import,
       builtins/err_use_without_import, effects/err_random_main, effects/err_shim_partial_coverage,
