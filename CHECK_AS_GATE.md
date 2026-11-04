@@ -181,7 +181,10 @@ Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
       `report_names_the_file_by_its_path_from_the_directory_it_is_run_in`: the spelling of the path does not matter,
       the directory does. Not done: the report == pinned section check from a second cwd (a file's report
       differs by design from another directory).
-- [ ] G5 keep the "`file:` section on an in-place source is an error" rule in `check`.
+- [x] G5 (2026-11-04) the harness's "`file:` section on an in-place source is an error" rule is dropped rather
+      than copied into `check`: it would have put this repository's directory names into the tool users run. Both
+      now stage any file that has `file:` sections and load the rest in place. No corpus file had one outside
+      `tests/cases/`.
 - [ ] G6 `check` prints `handoff-fill:` lines via `handoff::protocol::Fill` (one definition).
 - [ ] G7 **which functions does `check` compile?** (Corrected 2026-11-03: `check` and the cases harness compile
       error fixtures identically; the "parity gap" recorded here earlier was a verification mistake, since `--fix`

@@ -957,18 +957,13 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
     let mut fills = Fills::new(fill);
 
     // Two modes for staging:
-    //   - tests/cases/: stage source + companion `file:` sections into
-    //     a per-case temp dir, so the case file is self-contained.
-    //   - examples/: load in place, so user-facing examples can `import`
-    //     real companion files (e.g. examples/math/geometry.aipl).
-    let (src_path, case_dir) = if stage_to_temp {
+    //   - tests/cases/, or any file with `file:` sections (as `check` does): stage
+    //     source + companions into a per-case temp dir, so the case is self-contained.
+    //   - the rest (examples/, crates/): load in place, so user-facing examples can
+    //     `import` real companion files (e.g. examples/math/geometry.aipl).
+    let (src_path, case_dir) = if stage_to_temp || !spec.extra_files.is_empty() {
         stage_case(path, rel, out_root, stem, &spec)
     } else {
-        if !spec.extra_files.is_empty() {
-            return Outcome::Fail(format!(
-                "{ctx}: `file:` sections are not supported for in-place sources"
-            ));
-        }
         // Output executable still lands in a per-case temp dir so we
         // don't litter the source tree.
         let dir = out_root.join(rel.with_extension(""));
@@ -1141,7 +1136,7 @@ fn stage_case_for_build(
     spec: &Spec,
     stage_to_temp: bool,
 ) -> (PathBuf, PathBuf) {
-    if stage_to_temp {
+    if stage_to_temp || !spec.extra_files.is_empty() {
         stage_case(path, rel, out_root, stem, spec)
     } else {
         let dir = out_root.join(rel.with_extension(""));
