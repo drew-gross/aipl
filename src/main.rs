@@ -443,6 +443,35 @@ fn check_file(
         }
     }
 
+    // The leak gate: an instrumented run must free every block it allocates. It covers the
+    // tests (the synthesized driver, run once) and, when `check` is running `main` anyway
+    // because the file records what it does, `main`. A plain program's `main` is never run:
+    // it may be a server, or read its input from a terminal.
+    let stem = staged
+        .entry
+        .file_stem()
+        .and_then(OsStr::to_str)
+        .unwrap_or("a.out");
+    let leaks = leak_gate(&program, spec, stem, section_label.is_some(), label, dbg)?;
+    if !leaks.is_empty() {
+        let batch_label = aipl::codegen::test_file().unwrap_or_default();
+        let at = if batch_label.is_empty() {
+            String::new()
+        } else {
+            format!("{batch_label}::")
+        };
+        for (what, leak) in &leaks {
+            aipl::codegen::add_failure_report(&format!(
+                "test {at}{what} ... FAIL\n  leak: {} of {} allocations were never freed ({} deallocations)\n",
+                leak.allocations.abs_diff(leak.deallocations),
+                leak.allocations,
+                leak.deallocations,
+            ));
+        }
+        aipl::codegen::add_test_totals(leaks.len() as i64, leaks.len() as i64);
+        exit_code = 1;
+    }
+
     let mut found = Vec::new();
     if section_label.is_some() && sections::runs_main(spec) {
         let stem = staged
@@ -473,6 +502,55 @@ fn check_file(
         sections: found,
         ran_tests: true,
     })
+}
+
+/// Run the instrumented builds the leak gate needs and return what leaked, named the way a failure
+/// reports it (`memory leak in tests`, `memory leak in main`).
+///
+/// - The tests, when the file has any: the synthesized driver, once.
+/// - `main`, when `check` is validating sections and the file records what its run does
+///   (`sections::runs_main`), and no `report` section is there to measure it: that section's own
+///   measurement already holds the run to the same gate.
+///
+/// Each runs in a scratch directory holding the file's companions, with `cli` as its arguments.
+fn leak_gate(
+    program: &aipl::ast::Program,
+    spec: &SpecFields,
+    stem: &str,
+    sections_on: bool,
+    label: &str,
+    dbg: DebugOptions,
+) -> Result<Vec<(&'static str, aipl::perf::Leak)>, String> {
+    let has_tests = program.items.iter().any(|item| {
+        matches!(item, aipl::ast::Item::Fn(f) if f.test_body.is_some()
+            && aipl::benchmark_source_name(&f.name).is_none())
+    });
+    let main_runs = sections_on && sections::runs_main(spec) && spec.report.is_none();
+    let mut runs: Vec<(&'static str, aipl::ast::Program)> = Vec::new();
+    if has_tests {
+        runs.push((
+            "memory leak in tests",
+            aipl::perf::test_driver_as_main(program),
+        ));
+    }
+    if main_runs {
+        runs.push(("memory leak in main", aipl::perf::measured_program(program)));
+    }
+    let mut leaks = Vec::new();
+    for (what, driver) in runs {
+        let dir = binary::scratch_dir("check-leaks").map_err(|e| e.to_string())?;
+        let result = aipl::stage_companions(&dir, &spec.extra_files)
+            .map_err(|e| format!("stage companions in {}: {e}", dir.display()))
+            .and_then(|()| {
+                aipl::perf::leak_check(&driver, stem, &spec.cli, &dir, dbg)
+                    .map_err(|e| e.render(&spec.source, label))
+            });
+        let _ = std::fs::remove_dir_all(&dir);
+        if let Some(leak) = result? {
+            leaks.push((what, leak));
+        }
+    }
+    Ok(leaks)
 }
 
 /// A file's trailing sections, parsed. An unreadable file has none: loading it

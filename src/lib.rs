@@ -8,7 +8,9 @@
 //! single unified API.
 
 // Core types: spans, errors, debug tracing, and the AST.
-pub use aipl_syntax::{ast, benchmark_diagnostics, trace_diagnostics, DebugOptions, Error, Span};
+pub use aipl_syntax::{
+    ast, benchmark_diagnostics, benchmark_source_name, trace_diagnostics, DebugOptions, Error, Span,
+};
 
 // Lexer + parser surface.
 pub use aipl_parser::{

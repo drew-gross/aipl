@@ -38,16 +38,25 @@ pub fn measured_program(program: &Program) -> Program {
     if has_main {
         program.clone()
     } else {
-        let mut tp = crate::codegen::build_test_program(program);
-        for it in &mut tp.items {
-            if let Item::Fn(f) = it {
-                if f.name == "__test_main" {
-                    f.name.text = "main".to_string();
-                }
+        test_driver_as_main(program)
+    }
+}
+
+/// `program`'s synthesized `.test` driver as a program that can be built and run: its
+/// `__test_main` becomes the entry, and a `main` of the user's own steps aside for it.
+/// It is the run `aipl check` makes of the tests, in an instrumented build.
+pub fn test_driver_as_main(program: &Program) -> Program {
+    let mut tp = crate::codegen::build_test_program(program);
+    tp.items
+        .retain(|it| !matches!(it, Item::Fn(f) if f.name == "main"));
+    for it in &mut tp.items {
+        if let Item::Fn(f) = it {
+            if f.name == "__test_main" {
+                f.name.text = "main".to_string();
             }
         }
-        tp
     }
+    tp
 }
 
 /// A program's `.benchmark` driver (see
@@ -223,6 +232,31 @@ pub fn measure(
     dbg: DebugOptions,
 ) -> Result<PerfStats, MeasureError> {
     let (prod_sizes, fn_sizes) = BinSizes::of(production, symbol_names);
+    let contents = run_instrumented(program, stem, cli, dir, dbg)?;
+    // The runtime reports the execution counters and per-function call counts;
+    // append the (measured here) binary size split so the combined text parses
+    // into a full `PerfStats`, then fold the per-function byte sizes into the
+    // `functions:` block the counts opened.
+    let contents = format!("{contents}\n{}", prod_sizes.render());
+    let mut stats = PerfStats::parse(&contents).ok_or_else(|| {
+        MeasureError::Run(format!("malformed perf stats from runtime:\n{contents}"))
+    })?;
+    stats.merge_fn_sizes(symbol_names, fn_sizes);
+    Ok(stats)
+}
+
+/// Build `program` against the instrumented runtime, link it, run it once in `dir` with `cli`
+/// as its arguments, and return the statistics text the runtime wrote at exit.
+///
+/// A program may exit nonzero by design, so the status alone is not a failure; a run that never
+/// reported is, and its status is the best clue why.
+fn run_instrumented(
+    program: &Program,
+    stem: &str,
+    cli: &[String],
+    dir: &Path,
+    dbg: DebugOptions,
+) -> Result<String, MeasureError> {
     let instrumented = ObjectCompilation::new(program, stem, dbg, true)
         .and_then(|c| c.emit().map_err(Vec::from))
         .map_err(MeasureError::Compile)?;
@@ -239,8 +273,6 @@ pub fn measure(
         .output()
         .map_err(|e| MeasureError::Run(format!("instrumented spawn failed: {e}")))?;
 
-    // A program may exit nonzero by design, so the status alone is not a failure;
-    // a run that never reported is, and its status is the best clue why.
     let contents = fs::read_to_string(&stats_path).map_err(|e| {
         MeasureError::Run(format!(
             "could not read alloc stats at {} (the program exited with {:?} before \
@@ -258,16 +290,45 @@ pub fn measure(
              {contents}"
         )));
     }
-    // The runtime reports the execution counters and per-function call counts;
-    // append the (measured here) binary size split so the combined text parses
-    // into a full `PerfStats`, then fold the per-function byte sizes into the
-    // `functions:` block the counts opened.
-    let contents = format!("{contents}\n{}", prod_sizes.render());
-    let mut stats = PerfStats::parse(&contents).ok_or_else(|| {
-        MeasureError::Run(format!("malformed perf stats from runtime:\n{contents}"))
-    })?;
-    stats.merge_fn_sizes(symbol_names, fn_sizes);
-    Ok(stats)
+    Ok(contents)
+}
+
+/// What an instrumented run allocated and what it freed, when those differ.
+pub struct Leak {
+    pub allocations: u64,
+    pub deallocations: u64,
+}
+
+/// Run `program` (one that has a `main`: [`measured_program`] or [`test_driver_as_main`] makes
+/// one) once in an instrumented build in `dir`, with `cli` as its arguments, and report whether it
+/// freed every block it allocated.
+///
+/// This is the leak gate and nothing else: the production object, the binary-size split and the
+/// per-function table that [`measure`] also produces are not built.
+pub fn leak_check(
+    program: &Program,
+    stem: &str,
+    cli: &[String],
+    dir: &Path,
+    dbg: DebugOptions,
+) -> Result<Option<Leak>, MeasureError> {
+    let contents = run_instrumented(program, stem, cli, dir, dbg)?;
+    let count = |key: &str| {
+        contents
+            .lines()
+            .find_map(|l| l.trim().strip_prefix(key))
+            .and_then(|v| v.trim().parse::<u64>().ok())
+    };
+    let (Some(allocations), Some(deallocations)) = (count("allocations:"), count("deallocations:"))
+    else {
+        return Err(MeasureError::Run(format!(
+            "malformed alloc stats from runtime:\n{contents}"
+        )));
+    };
+    Ok((allocations != deallocations).then_some(Leak {
+        allocations,
+        deallocations,
+    }))
 }
 
 /// Measured performance statistics for a case run. `instructions` is the CLIF instructions

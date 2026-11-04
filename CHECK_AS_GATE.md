@@ -163,8 +163,14 @@ Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
 `the_leak_gate_runs_for_a_case_with_no_sections`).
 - [ ] G1 baseline row compare vs `tests/performance_metrics.md` (5 asserted columns), with
       `BaselineMoved`/`BaselineMissing` outcomes.
-- [ ] G2 leak gate for every file that has `main` or tests (library cases measure the synthesized
-      test driver), not only `.benchmark`/`report`.
+- [x] G2 leak gate (2026-11-03). `check` runs the tests' synthesized driver once in an instrumented build for every
+      file with tests, and `main` too when it is being run anyway because the file records what it does; either
+      leaking fails the file (`test memory leak in tests|main ... FAIL`). A plain program's `main` is never run
+      (it may be a server or read a terminal), so a `main` with no run-observing section is not gated by `check`.
+      Open: the harness still measures `main` of every case, including `examples/` with no sections; to move that
+      into `check`, such a file would need a section (even `--- exit code ---` / `0`), which makes it a test of
+      `main` and so safe to run. While the harness also measures, a case's tests are built and run twice (once
+      in `check --ignore-sections`, once by the harness); that duplication ends when the harness delegates (3.7).
 - [x] ~~G3 `check` / `check exit code` sections~~ subsumed by Phase 3 (a `check` section is validated by the same
       mechanism as every other section).
 - [ ] G4 root the cases harness at the project root (resolve D3). Today it roots each case at its own
@@ -257,6 +263,17 @@ test), `main_to_asserts.py` (prints to asserts, for `report` cases), `errors_fix
 of an `errors` fixture only if the messages stay the same), `lint_fixtures_to_tests.py`.
 
 ## Small follow-ups found on the way
+- [ ] **A leak the new gate found: `projects/minesweeper`'s tests leak** (51 of 7028 allocations never freed; handoff
+      is red on `projects::projects_pass_their_own_check` until it is fixed). Nothing in the language may leak, so this is a
+      compiler or runtime bug, found only because the tests' driver is now measured (the corpus cases all pass).
+      Localized (2026-11-03): only the `place_mines` test leaks. It reduces to two statements that each call
+      `place_mines` under its own `shim random seeded_with_int(1)` (a 3 by 3 board, then a 3 by 1 board with a flag),
+      neither of which leaks alone; and `place_mines` itself reduces to the single statement
+      `let clear = [away_from, ..self.neighbors(away_from)];` (a spread of a call result, in a function whose receiver is
+      `mut self: Mark[,]`). A standalone version with a toy `neighbors` and no grid does not leak, so the grid, the
+      real `neighbors`, or the `!random` shim around it matters. Next: reproduce outside minesweeper (the full-file
+      reduction is saved in the session scratchpad as `leak_repro.aipl`, ~460 lines, and cannot shrink further by
+      dropping whole items), then find which block is not released.
 - [ ] The "undeclared effect" error a test gets for an unshimmed effect names the function and effect but does
       not say to add a `shim`; worth saying.
 - [ ] `.benchmark` blocks run in another process, so `check` counts them in its totals and prints their

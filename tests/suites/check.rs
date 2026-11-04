@@ -1168,6 +1168,93 @@ test work.benchmark ... FAIL
     assert_eq!((stderr.as_str(), code), ("", 1));
 }
 
+/// `check` with `AIPL_INJECT_LEAK` set (a switch of the instrumented runtime that stops it counting
+/// frees, since nothing in the language can leak on purpose): its stdout, stderr and exit status.
+fn check_leaking(name: &str, src: &str, leak: bool) -> (String, String, Option<i32>) {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("check_here");
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let file = format!("{name}.aipl");
+    fs::write(dir.join(&file), src).expect("write temp source");
+    let mut command = Command::new(env!("CARGO_BIN_EXE_aipl"));
+    command.args(["check", &file]).current_dir(&dir);
+    if leak {
+        command.env("AIPL_INJECT_LEAK", "1");
+    }
+    let out = command.output().expect("run aipl check");
+    (
+        String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n"),
+        String::from_utf8_lossy(&out.stderr).into_owned(),
+        out.status.code(),
+    )
+}
+
+/// The leak gate holds every file with tests to freeing what its tests allocate, whether or not the
+/// file pins anything: the tests are run once more, as the synthesized driver, in an instrumented
+/// build.
+#[test]
+fn the_leak_gate_covers_the_tests_of_a_file_that_pins_nothing() {
+    let src = "import { equal as ==, heap_str } from builtins;\n\n\
+               fn word() -> str { heap_str(\"hello\") }.test({\n    assert(word() == \"hello\");\n})\n";
+    assert_eq!(
+        check_leaking("leak_gate_tests", src, true),
+        (
+            "\
+./leak_gate_tests.aipl:
+    word: 1 assertion passed
+test failures:
+test memory leak in tests ... FAIL
+  leak: 1 of 1 allocations were never freed (0 deallocations)
+2 tests: 1 passed, 1 failed
+"
+            .to_string(),
+            String::new(),
+            Some(1)
+        )
+    );
+    assert_eq!(
+        check_leaking("leak_gate_tests", src, false),
+        (
+            "./leak_gate_tests.aipl:\n    word: 1 assertion passed\n1 tests: 1 passed, 0 failed\n"
+                .to_string(),
+            String::new(),
+            Some(0)
+        )
+    );
+}
+
+/// `main` is run only when the file records what its run does, so only then can the gate hold it
+/// to freeing what it allocates.
+#[test]
+fn the_leak_gate_holds_a_main_that_check_runs_and_leaves_a_plain_one_alone() {
+    let recorded = "import { len, print, to_str } from builtins;\n\n\
+                    fn main() !prints {\n    print(to_str([1, 2, 3].len()));\n}\n--- stdout ---\n3\n";
+    assert_eq!(
+        check_leaking("leak_gate_main", recorded, true),
+        (
+            "\
+test failures:
+test memory leak in main ... FAIL
+  leak: 1 of 1 allocations were never freed (0 deallocations)
+1 tests: 0 passed, 1 failed
+"
+            .to_string(),
+            String::new(),
+            Some(1)
+        )
+    );
+    // The same program with nothing recorded is never run, so there is nothing to hold.
+    let plain = "import { len, print, to_str } from builtins;\n\n\
+                 fn main() !prints {\n    print(to_str([1, 2, 3].len()));\n}\n";
+    assert_eq!(
+        check_leaking("leak_gate_plain", plain, true),
+        (
+            "0 tests: 0 passed, 0 failed\n".to_string(),
+            String::new(),
+            Some(0)
+        )
+    );
+}
+
 /// A top-level `benchmark({ .. })` is a benchmark attached to no function: it runs with the
 /// file's other benchmarks and is reported as `benchmark block N`, N counting the file's.
 #[test]
