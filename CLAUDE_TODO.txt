@@ -2,6 +2,7 @@ lints:
   unused-import doesn't count `shim random seeded_with_int(..)` inside a .test block as a use
 
 type checker:
+  generic fns are only checked when reachable from a root (main/test); check them at the definition (Drew's own project)
   `set self[(0, 0)] = ..` types the tuple literal as i64, then rejects it as the index (needs a (u64, u64) annotation)
 
 effects / shims:

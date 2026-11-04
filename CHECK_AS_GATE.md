@@ -191,14 +191,13 @@ Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
       rewrite repairs print none. `handoff` is now a normal dependency of the root package. The baseline kinds
       (`BaselineMoved`/`BaselineMissing`) arrive with G1. The names are not yet the harness's display paths
       (`cases/x/y`); Phase 5, when handoff reads `check`, settles that.
-- [ ] G7 **which functions does `check` compile?** (Corrected 2026-11-03: `check` and the cases harness compile
-      error fixtures identically; the "parity gap" recorded here earlier was a verification mistake, since `--fix`
-      leaves a section alone when the file compiles.) The real question is reachability. Errors found while
-      instantiating generic code (`conflicting types for "T"`) are only found for code reachable from a root
-      (`main`, or a test), so an uncalled function with such a call compiles clean under both. Principle #2
-      says `check` reports everything it can: make every non-generic function a mono root for `check`'s compile
-      (recommended; measure the cost over `crates/` first), or accept it and keep a root in those fixtures. Today
-      it pins `generics/errors/err_type_param_conflict` to a `main`.
+- [x] G7 **which functions does `check` compile?** Decided 2026-11-04: accept. `check` and the cases harness
+      compile identically (both load, then `Compilation::new`; `tests/cases.rs` and `check_file` agree), so there is
+      no parity gap to close. Errors found while instantiating generic code (`conflicting types for "T"`) are only
+      found for code reachable from a root (`main`, or a test), under both. Making every non-generic function a
+      mono root is not done here: the fix belongs to checking generic functions at their definition, which is a
+      separate project. Fixtures that pin such an error keep a root (`generics/errors/err_type_param_conflict`
+      has a `main` that calls it).
 - [ ] Differential test: for every corpus file, old harness and new `check` agree on pass/fail, and fill
       mode yields byte-identical files and baseline rows. (Phase 3 extends it to the migrated section names.)
 - [ ] Canary set of deliberately broken copies that both must reject: wrong stdout, wrong exit code, leak,
