@@ -25,7 +25,7 @@ reallocations     0
 bytes allocated   34
 peak live bytes   34
 instructions      573
-binary size       2848 bytes (code 1080, data 314, metadata 1454)
+binary size       2904 bytes (code 1080, data 376, metadata 1448)
 
 function               calls  code bytes
 __eq_bool$arr              3         160

@@ -122,16 +122,23 @@ fn report_agrees_with_the_pinned_report_of_a_case_with_companions() {
 }
 
 #[test]
-fn report_does_not_depend_on_where_it_is_run_from() {
-    // The file's label is baked into the binary, so rooting it at the working
-    // directory would change `binary size` with the directory.
-    let case = format!(
-        "{}/tests/cases/report/test_driver_run.aipl",
-        env!("CARGO_MANIFEST_DIR")
-    );
-    let from_root = report(&["--machine", &case]).0;
-    let from_elsewhere = report_in(env!("CARGO_TARGET_TMPDIR"), &["--machine", &case]).0;
-    assert_eq!(from_root, from_elsewhere);
+fn report_names_the_file_by_its_path_from_the_directory_it_is_run_in() {
+    // The file's label is baked into the binary, so the project root — the working
+    // directory, as for `check` — decides `binary size`. The spelling of the path to the
+    // file does not: a relative path, an absolute one and a `./` one are one file.
+    let case = "tests/cases/report/test_driver_run.aipl";
+    let absolute = format!("{}/{case}", env!("CARGO_MANIFEST_DIR"));
+    let relative = report(&["--machine", case]).0;
+    assert_eq!(relative, report(&["--machine", &absolute]).0);
+    assert_eq!(relative, report(&["--machine", &format!("./{case}")]).0);
+    // Run from the file's own directory, the same file is `./test_driver_run.aipl`:
+    // a shorter label, so a smaller data section.
+    let from_its_directory = report_in(
+        &format!("{}/tests/cases/report", env!("CARGO_MANIFEST_DIR")),
+        &["--machine", "test_driver_run.aipl"],
+    )
+    .0;
+    assert_ne!(relative, from_its_directory);
 }
 
 // ---- what a report looks like -------------------------------------------------

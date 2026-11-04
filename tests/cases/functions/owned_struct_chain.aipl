@@ -58,7 +58,7 @@ reallocations     0
 bytes allocated   1761
 peak live bytes   1761
 instructions      29030
-binary size       6352 bytes (code 3860, data 174, metadata 2318)
+binary size       6376 bytes (code 3860, data 198, metadata 2318)
 
 function                   calls  code bytes
 __builtin_repeat$Cell          2         412

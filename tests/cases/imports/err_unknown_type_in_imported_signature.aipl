@@ -10,7 +10,7 @@ fn main() {
 pub fn area(side: i64) -> Measure { 0 }
 --- errors ---
 error: fn "area": unknown type "Measure"
- --> ./shapes.aipl:1:8
+ --> ./tests/cases/imports/shapes.aipl:1:8
   |
 1 | pub fn area(side: i64) -> Measure { 0 }
   |        ^^^^

@@ -90,7 +90,7 @@ reallocations     7
 bytes allocated   1746
 peak live bytes   3340
 instructions      13161
-binary size       10360 bytes (code 5772, data 210, metadata 4378)
+binary size       10392 bytes (code 5772, data 242, metadata 4378)
 
 function                                 calls  code bytes
 __aipl_const_teardown                        1          92

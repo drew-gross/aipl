@@ -6,7 +6,7 @@ import { len } from builtins; #[allow]
 
 fn len(x: i64) -> i64 { x }
 --- errors ---
-error: ./err_import_conflicts_with_local.aipl: builtin import "len" conflicts with a local item
+error: ./tests/cases/builtins/err_import_conflicts_with_local.aipl: builtin import "len" conflicts with a local item
  --> ./tests/cases/builtins/err_import_conflicts_with_local.aipl:5:10
   |
 5 | import { len } from builtins; #[allow]

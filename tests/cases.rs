@@ -962,13 +962,7 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
     //   - examples/: load in place, so user-facing examples can `import`
     //     real companion files (e.g. examples/math/geometry.aipl).
     let (src_path, case_dir) = if stage_to_temp {
-        let dir = out_root.join(rel.with_extension(""));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).expect("mkdir case staging");
-        let src = dir.join(format!("{stem}.aipl"));
-        fs::write(&src, &spec.source).expect("write staged source");
-        aipl::stage_companions(&dir, &spec.extra_files).expect("stage companions");
-        (src, dir)
+        stage_case(path, rel, out_root, stem, &spec)
     } else {
         if !spec.extra_files.is_empty() {
             return Outcome::Fail(format!(
@@ -1019,17 +1013,52 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
     }
 }
 
-/// Load a case, rooted at its own directory.
+/// The directory a staged case's project root is: the staging directory holds the case at
+/// the path it has in the repository, under this name.
+const STAGED_ROOT: &str = "case-root";
+
+/// Stage a `tests/cases/` case: its section-stripped source and its `--- file: ---`
+/// companions, in a directory of its own that mirrors the case's place in the repository
+/// (`<out>/<case>/case-root/tests/cases/<dir>/`). The mirroring is what lets a staged case
+/// be loaded with the repository's layout — see [`load_case`]. Returns the staged source and
+/// the directory it sits in, where the program runs.
+fn stage_case(
+    path: &Path,
+    rel: &Path,
+    out_root: &Path,
+    stem: &str,
+    spec: &Spec,
+) -> (PathBuf, PathBuf) {
+    let case_out = out_root.join(rel.with_extension(""));
+    let _ = fs::remove_dir_all(&case_out);
+    let in_repo = path
+        .strip_prefix(env!("CARGO_MANIFEST_DIR"))
+        .expect("a case lies under the repository");
+    let dir = case_out
+        .join(STAGED_ROOT)
+        .join(in_repo.parent().unwrap_or(Path::new("")));
+    fs::create_dir_all(&dir).expect("mkdir case staging");
+    let src = dir.join(format!("{stem}.aipl"));
+    fs::write(&src, &spec.source).expect("write staged source");
+    aipl::stage_companions(&dir, &spec.extra_files).expect("stage companions");
+    (src, dir)
+}
+
+/// Load a case, rooted at the repository.
 ///
-/// A case is a one-file project (plus whatever its `--- file: ---` companions
-/// stage beside it), so its directory *is* its project root — which is what a
-/// `trace(..)` names its file relative to. Rooting it anywhere else would make
-/// that name depend on where the staging directory happens to sit, and
-/// `CARGO_TARGET_TMPDIR` moves with `CARGO_TARGET_DIR`: the baked label is in the
-/// program's data section, so a case's `binary size` would stop being a property
-/// of the case.
+/// The repository is the project a case belongs to (DESIGN_PRINCIPLES.md §7), so a case's
+/// file is named `./tests/cases/<dir>/<case>.aipl` — what `aipl check` calls it, and what a
+/// `trace(..)` or a diagnostic in it says. The baked label is in the program's data section,
+/// so it has to be the same wherever the staging directory sits (`CARGO_TARGET_TMPDIR` moves
+/// with `CARGO_TARGET_DIR`): a staged case is rooted at the directory [`stage_case`] built
+/// the repository's layout under, and a case loaded in place (`examples/`) at the repository.
 fn load_case(src_path: &Path) -> Result<Program, Vec<Error>> {
-    let root = src_path.parent().unwrap_or(Path::new("."));
+    // The staging directory is itself under the repository's `target/`, so look for
+    // the staged root before concluding the case is in place.
+    let root = src_path
+        .ancestors()
+        .find(|dir| dir.file_name().is_some_and(|name| name == STAGED_ROOT))
+        .unwrap_or(Path::new(env!("CARGO_MANIFEST_DIR")));
     loader::load_program_rooted(src_path, root, debug_opts())
 }
 
@@ -1112,15 +1141,10 @@ fn stage_case_for_build(
     spec: &Spec,
     stage_to_temp: bool,
 ) -> (PathBuf, PathBuf) {
-    let dir = out_root.join(rel.with_extension(""));
     if stage_to_temp {
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).expect("mkdir case staging");
-        let src = dir.join(format!("{stem}.aipl"));
-        fs::write(&src, &spec.source).expect("write staged source");
-        aipl::stage_companions(&dir, &spec.extra_files).expect("stage companions");
-        (src, dir)
+        stage_case(path, rel, out_root, stem, spec)
     } else {
+        let dir = out_root.join(rel.with_extension(""));
         fs::create_dir_all(&dir).expect("mkdir case output");
         (path.to_path_buf(), dir)
     }

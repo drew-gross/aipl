@@ -26,7 +26,7 @@ reallocations     0
 bytes allocated   88
 peak live bytes   88
 instructions      637
-binary size       3136 bytes (code 1344, data 337, metadata 1455)
+binary size       3200 bytes (code 1344, data 407, metadata 1449)
 
 function               calls  code bytes
 __eq_i64$arr               3         264

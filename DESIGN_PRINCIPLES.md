@@ -704,9 +704,13 @@ A file outside the root keeps its full path, since nothing shorter identifies it
 climbs out of it (`../x.aipl`) is left as written. Those are the cases where the `./` does not apply,
 and no pinned output should depend on either.
 
-It does not yet hold everywhere: the cases harness still roots each *case* at its own directory, so a
-loader error opens with `./err_duplicate_struct.aipl` while the caret block below it says
-`./tests/cases/structs/err_duplicate_struct.aipl`. Both are relative and neither names a machine, but
-they are two roots in one message. Rooting the harness at the project root removes the second one
-(`CHECK_AS_GATE.md`, gap 4).
+### What the root is
+
+The directory the tool is run in, for `check`, `report` and `run` alike: there is no marker file, so
+the same file has one name however it was spelled on the command line, and a different one (a
+shorter one) when the tool is run from another directory. The cases harness is run for the
+repository, so it roots a case at the repository, and stages a case that has companions in a
+directory that mirrors its place there. That makes a case's name the same in the harness, under
+`check`, and in `aipl report`: `./tests/cases/structs/err_duplicate_struct.aipl` in the loader error
+and in the caret block, and in a baked `assert`.
 

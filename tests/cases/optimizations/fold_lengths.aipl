@@ -79,7 +79,7 @@ reallocations     0
 bytes allocated   1202
 peak live bytes   1202
 instructions      1565
-binary size       8608 bytes (code 4700, data 562, metadata 3346)
+binary size       8744 bytes (code 4700, data 700, metadata 3344)
 
 function                               calls  code bytes
 __builtin_count_if$i64$lam$is_big          2         192

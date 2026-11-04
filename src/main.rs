@@ -603,24 +603,44 @@ fn in_staged_dir<T>(
     f: impl FnOnce(&Staged) -> T,
 ) -> Result<T, String> {
     let dir = binary::scratch_dir("check").map_err(|e| e.to_string())?;
+    // The staged entry, and the directory the run happens in: the scratch directory, or
+    // for a file with companions the directory they were staged beside it.
     let staged = (|| {
-        aipl::stage_companions(&dir, &spec.extra_files)
-            .map_err(|e| format!("stage companions in {}: {e}", dir.display()))?;
         if spec.extra_files.is_empty() {
-            return Ok(Staged {
-                entry: file.to_path_buf(),
-                root: project_root.to_path_buf(),
-            });
+            return Ok((
+                Staged {
+                    entry: file.to_path_buf(),
+                    root: project_root.to_path_buf(),
+                },
+                dir.clone(),
+            ));
         }
-        let entry = dir.join(file.file_name().unwrap_or(OsStr::new("a.aipl")));
+        // Beside its companions, at the place it has under the root: a label is the
+        // file's path from the root, so the copy must sit where the file does.
+        let root = project_root
+            .canonicalize()
+            .unwrap_or_else(|_| project_root.to_path_buf());
+        let beside = file
+            .parent()
+            .and_then(|parent| parent.strip_prefix(&root).ok())
+            .unwrap_or(Path::new(""));
+        let entry_dir = dir.join(beside);
+        std::fs::create_dir_all(&entry_dir)
+            .map_err(|e| format!("stage {}: {e}", entry_dir.display()))?;
+        aipl::stage_companions(&entry_dir, &spec.extra_files)
+            .map_err(|e| format!("stage companions in {}: {e}", entry_dir.display()))?;
+        let entry = entry_dir.join(file.file_name().unwrap_or(OsStr::new("a.aipl")));
         std::fs::write(&entry, &spec.source)
             .map_err(|e| format!("stage {}: {e}", entry.display()))?;
-        Ok(Staged {
-            entry,
-            root: dir.clone(),
-        })
+        Ok((
+            Staged {
+                entry,
+                root: dir.clone(),
+            },
+            entry_dir,
+        ))
     })();
-    let staged = match staged {
+    let (staged, run_dir) = match staged {
         Ok(s) => s,
         Err(e) => {
             let _ = std::fs::remove_dir_all(&dir);
@@ -628,7 +648,7 @@ fn in_staged_dir<T>(
         }
     };
     let prev = env::current_dir().map_err(|e| format!("current dir: {e}"))?;
-    env::set_current_dir(&dir).map_err(|e| format!("enter {}: {e}", dir.display()))?;
+    env::set_current_dir(&run_dir).map_err(|e| format!("enter {}: {e}", run_dir.display()))?;
     let out = f(&staged);
     // Restore first, so a failure to clean up can't leave the process parked in
     // a directory it is about to delete.
@@ -1129,12 +1149,14 @@ fn report_resolved(
     dbg: DebugOptions,
 ) -> Result<aipl::perf::PerfStats, String> {
     let spec = read_spec(path, label)?;
-    // The file is a one-file project rooted at its own directory, not at wherever
-    // `report` was run from. That root is what an `assert` or `trace` names its file
-    // relative to, and the name is baked into the binary's data: rooted anywhere
-    // else, `binary size` would depend on the working directory, and would stop
-    // agreeing with the cases harness, which roots a case the same way.
-    let project_root = path.parent().unwrap_or(path).to_path_buf();
+    // The project is the directory `report` is run from, as it is for `check` and `run`
+    // (DESIGN_PRINCIPLES.md §7): that root is what an `assert` or `trace` names its file
+    // relative to, and the name is baked into the binary's data, so run from elsewhere the
+    // same file has a different `binary size`. The cases harness roots a case at the
+    // repository, which is where a pinned `--- report ---` is made.
+    let project_root = env::current_dir()
+        .and_then(|dir| dir.canonicalize())
+        .map_err(|e| format!("current dir: {e}"))?;
     // Explicit arguments win; otherwise the file's own `--- cli ---`.
     let cli = program_args.unwrap_or_else(|| spec.cli.clone());
     in_staged_dir(path, &spec, &project_root, |staged| {

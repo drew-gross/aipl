@@ -15,7 +15,7 @@ reallocations     0
 bytes allocated   0
 peak live bytes   0
 instructions      39
-binary size       1176 bytes (code 228, data 112, metadata 836)
+binary size       1224 bytes (code 228, data 155, metadata 841)
 
 function               calls  code bytes
 __test$double              1         124

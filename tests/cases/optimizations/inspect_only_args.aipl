@@ -59,7 +59,7 @@ reallocations     0
 bytes allocated   21
 peak live bytes   21
 instructions      1663
-binary size       3960 bytes (code 1488, data 516, metadata 1956)
+binary size       4144 bytes (code 1488, data 702, metadata 1954)
 
 function                         calls  code bytes
 __test$count_via_copy                1         748

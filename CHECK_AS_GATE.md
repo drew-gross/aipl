@@ -138,10 +138,7 @@ Non-goals (decided): crashes and runaway JIT are not mitigated (treated as top-p
 loudly); running `main` under the JIT is rejected (the AOT linker runtime is the product).
 
 ## Open decisions
-- [ ] **D3 (Phase 1):** what marks the project root, so rooting does not depend on the cwd. A directory
-      under `projects/` is its own project with its own root, not the repository's (DESIGN_PRINCIPLES.md
-      §7), so the marker has to find `projects/word_count` and not walk up to the repository.
-      `aipl.build` sits at each project's root today.
+- [x] **D3 (Phase 1):** the project root is the directory the tool is run in; no marker file (see G4).
 - [ ] **D4 (end of Phase 0):** the speedup that justifies Phases 4-5 (suggestion: discovery well under
       half of the current number).
 - [ ] **DS1-DS7:** see "Direction" above (DS5 is decided); settle the rest before Phase 3 starts.
@@ -173,14 +170,17 @@ Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
       in `check --ignore-sections`, once by the harness); that duplication ends when the harness delegates (3.7).
 - [x] ~~G3 `check` / `check exit code` sections~~ subsumed by Phase 3 (a `check` section is validated by the same
       mechanism as every other section).
-- [ ] G4 root the cases harness at the project root (resolve D3). Today it roots each case at its own
-      directory, so a loader error opens with `./err_x.aipl` while its caret block says
-      `./tests/cases/…/err_x.aipl`: two roots in one message. Rooting moves every baked `assert`/`trace`
-      label, so baseline `code bytes`/`data` rows and pinned reports move once; do it in its own handoff.
-      Keep `report_does_not_depend_on_where_it_is_run_from` (tests/suites/report.rs) meaningful, and test
-      that `check`'s `report` == `aipl report` == the pinned section from different cwds.
-      Related: `aipl check <dir>` on `tests/cases/imports/` reports 9 `errors` mismatches for cases with
-      `file:` companions (their labels use the scratch dir), so the label rule for staged files needs settling.
+- [x] G4 root the harness at the project root (2026-11-04; D3 resolved: **the root is the directory the tool
+      is run in**, no marker file). The harness roots a case at the repository (`load_case`) and stages a case
+      with companions under `<out>/<case>/case-root/` at the path it has in the repository; `check` stages the
+      same way (`in_staged_dir`), and `aipl report` roots at the cwd like `check`. A case is now
+      `./tests/cases/<dir>/<case>.aipl` in the loader error, the caret block and a baked `assert`/`trace`; the
+      9 `imports` cases that `check <dir>` disagreed with now agree. A baked label is longer, so baseline
+      `code bytes` and pinned stdout/reports/errors moved once (handoff refills them).
+      `report_does_not_depend_on_where_it_is_run_from` became
+      `report_names_the_file_by_its_path_from_the_directory_it_is_run_in`: the spelling of the path does not matter,
+      the directory does. Not done: the report == pinned section check from a second cwd (a file's report
+      differs by design from another directory).
 - [ ] G5 keep the "`file:` section on an in-place source is an error" rule in `check`.
 - [ ] G6 `check` prints `handoff-fill:` lines via `handoff::protocol::Fill` (one definition).
 - [ ] G7 **which functions does `check` compile?** (Corrected 2026-11-03: `check` and the cases harness compile

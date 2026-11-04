@@ -166,7 +166,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/constants/computed_across_files | 22 | 1291 | 1291 | 813 | 2632 | 8.00 | 58.56 | 1472 |
 | cases/constants/pub_across_files | 0 | 0 | 0 | 18 | 156 | 3.00 | 60.95 | 1424 |
 | cases/constants/top_level | 15 | 1114 | 1114 | 657 | 4020 | 6.00 | 65.35 | 1472 |
-| cases/debug/trace | 6 | 315 | 315 | 117 | 704 | 6.00 | 107.53 | 1456 |
+| cases/debug/trace | 6 | 315 | 315 | 119 | 648 | 6.00 | 111.48 | 1440 |
 | cases/debug/trace_fails_check | 2 | 105 | 105 | 68 | 532 | 5.00 | 61.45 | 1440 |
 | cases/dicts/basic | 5 | 544 | 256 | 1043 | 5636 | 6.00 | 70.42 | 1504 |
 | cases/dicts/empty_literal_flexes | 32 | 2063 | 2063 | 1994 | 5176 | 7.00 | 76.83 | 1472 |
@@ -486,7 +486,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/report/with_companion | 1 | 18 | 18 | 35 | 360 | 6.00 | 67.17 | 1456 |
 | cases/report/writes_a_file | 2 | 28 | 20 | 82 | 988 | 63.00 | 62.74 | 1456 |
 | cases/results/array_payload | 2 | 88 | 48 | 1914 | 4212 | 5.00 | 136.04 | 1472 |
-| cases/results/basic | 9 | 650 | 457 | 881 | 4208 | 5.00 | 65.75 | 1472 |
+| cases/results/basic | 9 | 650 | 457 | 882 | 4144 | 6.00 | 67.03 | 1488 |
 | cases/results/heap_payload | 19 | 1672 | 880 | 1109 | 4840 | 6.00 | 66.63 | 1456 |
 | cases/results/main_returns_error | 0 | 0 | 0 | 42 | 264 | 3.00 | 61.21 | 1424 |
 | cases/results/main_returns_ok | 0 | 0 | 0 | 25 | 220 | 4.00 | 65.45 | 1440 |

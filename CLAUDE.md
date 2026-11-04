@@ -269,8 +269,9 @@ baseline table, which pins what every case costs.
   `aipl::perf::measure`, the one implementation the harness uses, so its numbers
   are the baseline row's and a `--- report ---` section's byte for byte
   (`tests/suites/report.rs` checks that on a spread of cases), and it roots the
-  file at its own directory for the same reason the harness does: an `assert`'s
-  file label is baked into the binary's data. It needs the linker `aipl build`
+  file at the directory it is run in, as `check` does and the harness does for the
+  repository: an `assert`'s file label is baked into the binary's data, so run from
+  another directory the same file has a different `binary size`. It needs the linker `aipl build`
   does, and exits 1 for a program that leaks.
 
   **The leak gate does not depend on any section.** Every instrumented run is held

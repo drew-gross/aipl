@@ -69,7 +69,7 @@ reallocations     1
 bytes allocated   2501
 peak live bytes   2074
 instructions      2053
-binary size       12280 bytes (code 7216, data 590, metadata 4474)
+binary size       12400 bytes (code 7216, data 710, metadata 4474)
 
 function                   calls  code bytes
 __eq_str$arr                   1         320

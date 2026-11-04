@@ -35,7 +35,7 @@ reallocations     0
 bytes allocated   609
 peak live bytes   609
 instructions      1338
-binary size       6120 bytes (code 2924, data 410, metadata 2786)
+binary size       6192 bytes (code 2924, data 482, metadata 2786)
 
 function                   calls  code bytes
 __ctor$Tagged$Nums             3         192
