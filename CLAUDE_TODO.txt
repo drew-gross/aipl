@@ -1,5 +1,9 @@
 lints:
   unused-import doesn't count `shim random seeded_with_int(..)` inside a .test block as a use
+  `++`/`+=` flavor matching (operator_pairs.aipl) pairs by the `wrapping_`/`saturating_` name prefix; the old Rust lint used the canonical-callee table. Differs only for an absurd alias like `wrapping_add as ++`; use the table if it ever matters
+  char_set_literal: the unspellable-character branch is untested
+  tests/cases/lints: 3 `_allow` fixtures and the shape-named fixtures (err_struct_literals, err_emptiness_tests, ..) are not per-lint .test blocks yet
+  scripts/lint_fixtures_to_tests.py has no Rust lints left to convert; retire it
 
 type checker:
   generic fns are only checked when reachable from a root (main/test); check them at the definition (Drew's own project)
@@ -7,3 +11,9 @@ type checker:
 
 effects / shims:
   undeclared-effect error in a test should say to add a `shim`
+
+check:
+  `.benchmark` blocks run in another process, so `check` counts them in its totals and prints their failures but gives them no row in the per-file listing; the assertion tally needs to cross back from the instrumented run
+  converted print-and-compare tests carry ~10-50 extra allocations from the capture shim; where a function only printed out of convenience, make it return its value
+  `aipl doc` unchecked against the placeholder function behind a top-level `test`/`benchmark` (private fns aren't listed, so probably fine)
+  a file that runs tests and also measures `main` is built more than once (Phase 4 note)

@@ -283,15 +283,7 @@ of an `errors` fixture only if the messages stay the same), `lint_fixtures_to_te
       move empties a binding's buffer field by field, so the call's release found nothing. The mutating-method arm
       of `compile_call_expr` now gives a struct receiver a buffer of its own. Pinned by
       `tests/cases/structs/mut_method_then_move.aipl`.
-- [ ] The "undeclared effect" error a test gets for an unshimmed effect names the function and effect but does
-      not say to add a `shim`; worth saying.
-- [ ] `.benchmark` blocks run in another process, so `check` counts them in its totals and prints their
-      failures, but gives them no row of their own in the per-file listing. Needs the assertion tally to
-      cross back from the instrumented run.
-- [ ] The converted print-and-compare tests carry roughly 10-50 extra allocations from the capture shim. Where a
-      function only printed out of convenience, rewrite it to return its value.
-- [ ] `aipl doc` has not been checked against the placeholder function behind a top-level `test`/`benchmark`
-      (private functions are not listed, so probably fine).
+The open follow-ups from this list moved to `CLAUDE_TODO.txt`.
 
 ## Phase 3: `check`'s own output is written as `check` sections
 Order matters, and the reasons are in "Why this order" below. Each numbered item is a stage that lands green on
