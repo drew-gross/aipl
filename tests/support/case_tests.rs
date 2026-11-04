@@ -829,6 +829,7 @@ case_tests! {
     cases_structs_generic_default_field = "cases/structs/generic_default_field",
     cases_structs_generic_nested = "cases/structs/generic_nested",
     cases_structs_generic_pair = "cases/structs/generic_pair",
+    cases_structs_mut_method_then_move = "cases/structs/mut_method_then_move",
     cases_structs_mut_struct_reassigned_in_loop = "cases/structs/mut_struct_reassigned_in_loop",
     cases_structs_range_literal = "cases/structs/range_literal",
     cases_structs_range_no_import = "cases/structs/range_no_import",

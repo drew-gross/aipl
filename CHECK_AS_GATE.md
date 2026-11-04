@@ -263,17 +263,13 @@ test), `main_to_asserts.py` (prints to asserts, for `report` cases), `errors_fix
 of an `errors` fixture only if the messages stay the same), `lint_fixtures_to_tests.py`.
 
 ## Small follow-ups found on the way
-- [ ] **A leak the new gate found: `projects/minesweeper`'s tests leak** (51 of 7028 allocations never freed; handoff
-      is red on `projects::projects_pass_their_own_check` until it is fixed). Nothing in the language may leak, so this is a
-      compiler or runtime bug, found only because the tests' driver is now measured (the corpus cases all pass).
-      Localized (2026-11-03): only the `place_mines` test leaks. It reduces to two statements that each call
-      `place_mines` under its own `shim random seeded_with_int(1)` (a 3 by 3 board, then a 3 by 1 board with a flag),
-      neither of which leaks alone; and `place_mines` itself reduces to the single statement
-      `let clear = [away_from, ..self.neighbors(away_from)];` (a spread of a call result, in a function whose receiver is
-      `mut self: Mark[,]`). A standalone version with a toy `neighbors` and no grid does not leak, so the grid, the
-      real `neighbors`, or the `!random` shim around it matters. Next: reproduce outside minesweeper (the full-file
-      reduction is saved in the session scratchpad as `leak_repro.aipl`, ~460 lines, and cannot shrink further by
-      dropping whole items), then find which block is not released.
+- [x] **A leak the new gate found: `projects/minesweeper`'s tests leaked** (51 of 7028 allocations). Not minesweeper's
+      and not the shim's: any struct with an array field, a `mut self` method that is not inlined (called twice),
+      and a move of the binding afterwards (`let f = a;`, or an inlined callee taking it) leaked one block. After
+      the call the binding's slot named the call's own result buffer, which the call also tracks for release; the
+      move empties a binding's buffer field by field, so the call's release found nothing. The mutating-method arm
+      of `compile_call_expr` now gives a struct receiver a buffer of its own. Pinned by
+      `tests/cases/structs/mut_method_then_move.aipl`.
 - [ ] The "undeclared effect" error a test gets for an unshimmed effect names the function and effect but does
       not say to add a `shim`; worth saying.
 - [ ] `.benchmark` blocks run in another process, so `check` counts them in its totals and prints their

@@ -20024,7 +20024,24 @@ fn compile_call_expr_direct<M: Module>(
             // recursive `mut self: str` method surfaced as a wrong receiver on
             // one level and `misaligned pointer dereference` in `aipl_str_len`
             // on three.
-            store_binding(builder, slot, new_self, &old_ty, structs);
+            // A struct receiver gets a buffer of its own rather than the call's
+            // result buffer. The call tracks that buffer for release, and a
+            // binding the body moves out of is emptied field by field (see
+            // `private_struct`): pointing the slot at the tracked buffer let the
+            // move empty it, and the call's release then freed nothing.
+            if is_composite(&old_ty, structs) && !lives_in_slot(&old_ty) {
+                let size = field_size(&info.return_ty, structs);
+                let buffer = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    size,
+                    3,
+                ));
+                let buffer_addr = builder.ins().stack_addr(types::I64, buffer, 0);
+                copy_composite(builder, buffer_addr, new_self, &info.return_ty, structs);
+                builder.ins().stack_store(types::I64, buffer_addr, slot, 0);
+            } else {
+                store_binding(builder, slot, new_self, &old_ty, structs);
+            }
             *ty_cell.borrow_mut() = info.return_ty.clone();
             // A mutating method yields nothing.
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)

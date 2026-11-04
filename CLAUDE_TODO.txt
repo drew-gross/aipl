@@ -1,0 +1,8 @@
+lints:
+  unused-import doesn't count `shim random seeded_with_int(..)` inside a .test block as a use
+
+type checker:
+  `set self[(0, 0)] = ..` types the tuple literal as i64, then rejects it as the index (needs a (u64, u64) annotation)
+
+effects / shims:
+  undeclared-effect error in a test should say to add a `shim`

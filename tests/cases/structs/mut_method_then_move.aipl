@@ -1,0 +1,25 @@
+# A `mut self` method called twice, and then the binding moved on, frees what it built.
+#
+# The slot of a binding that is moved out of is emptied field by field. After a call to a
+# method that is not inlined, the slot used to name the call's own result buffer, which the
+# call also tracks for release, so emptying it left that release nothing to free.
+
+import { equal as ==, wrapping_increment as ++ } from builtins;
+
+struct Counter { values: u64[], n: u64 }
+
+fn bump(mut self: Counter) {
+    set self.values[0] = 7 else {};
+    set self.n++;
+}
+
+fn total(self: Counter) -> u64 { self.n }
+
+fn scenario() -> u64 {
+    mut counter = Counter { values: [1, 2, 3], n: 0 };
+    set counter.bump();
+    set counter.bump();
+    total(counter)
+}.test({
+    assert(scenario() == 2);
+})

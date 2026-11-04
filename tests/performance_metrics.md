@@ -593,7 +593,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/structs/fields/optional_struct_field_layout | 14 | 627 | 657 | 1845 | 4632 | 6.00 | 68.92 | 1472 |
 | cases/structs/fields/recursive_via_variant | 42 | 1920 | 1214 | 2023 | 6112 | 7.00 | 66.59 | 1488 |
 | cases/structs/fields/set_field | 2 | 78 | 78 | 379 | 1660 | 3.00 | 67.35 | 1424 |
-| cases/structs/fields/set_field_forms | 0 | 0 | 0 | 3903 | 8096 | 4.00 | 67.72 | 1472 |
+| cases/structs/fields/set_field_forms | 0 | 0 | 0 | 3951 | 8288 | 5.00 | 119.55 | 1504 |
 | cases/structs/fields/set_field_nested | 3 | 117 | 78 | 877 | 3376 | 3.00 | 67.32 | 1440 |
 | cases/structs/fields/struct_field_used_in_arithmetic | 0 | 0 | 0 | 40 | 212 | 1.00 | 73.07 | 1424 |
 | cases/structs/fields/struct_optional_field | 1 | 39 | 39 | 266 | 1164 | 2.00 | 67.82 | 1440 |
@@ -610,6 +610,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | cases/structs/generic_default_field | 0 | 0 | 0 | 111 | 648 | 2.00 | 72.79 | 1456 |
 | cases/structs/generic_nested | 0 | 0 | 0 | 31 | 188 | 2.00 | 62.21 | 1424 |
 | cases/structs/generic_pair | 0 | 0 | 0 | 71 | 408 | 2.00 | 62.47 | 1440 |
+| cases/structs/mut_method_then_move | 2 | 80 | 80 | 782 | 1748 | 4.00 | 72.45 | 1472 |
 | cases/structs/mut_struct_reassigned_in_loop | 2 | 144 | 144 | 469 | 3340 | 4.00 | 63.99 | 1472 |
 | cases/structs/range_literal | 18 | 1243 | 1243 | 1476 | 4616 | 5.00 | 65.31 | 1472 |
 | cases/structs/range_no_import | 1 | 88 | 88 | 262 | 2464 | 2.00 | 63.80 | 1472 |

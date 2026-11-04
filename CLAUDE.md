@@ -4,6 +4,10 @@
 - NEVER touch TODO.txt. It is for the user only.
 - If you ever accidentally touch it and the user reprimands you, do not touch it again to fix it, not even to revert it.
 
+## CLAUDE_TODO.txt
+- Yours to write: ideas, bugs and suggestions you find on the way, in TODO.txt's style (super concise, basic categories). Add an item rather than fixing something off-task.
+- Drew may move items to TODO.txt or delete them once done; don't re-add a deleted one.
+
 ## Git
 - Do not perform any git operations except when explicitly asked. Write code; the user will review and commit it.
 - You may investigate git history for learning and debugging, but perform no writes.
