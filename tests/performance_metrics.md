@@ -372,7 +372,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | tests/cases/constants/computed_across_files | 23 | 1379 | 1379 | 1045 | 4840 | 6.00 | 69.41 | 1504 |
 | tests/cases/constants/pub_across_files | 1 | 88 | 88 | 250 | 2400 | 3.00 | 66.00 | 1488 |
 | tests/cases/constants/top_level | 15 | 1114 | 1114 | 657 | 4020 | 6.00 | 65.35 | 1472 |
-| tests/cases/debug/trace | 6 | 315 | 315 | 119 | 648 | 6.00 | 111.48 | 1440 |
+| tests/cases/debug/trace | 6 | 315 | 315 | 159 | 868 | 7.00 | 153.16 | 1456 |
 | tests/cases/debug/trace_fails_check | 2 | 105 | 105 | 68 | 532 | 5.00 | 61.45 | 1440 |
 | tests/cases/dicts/basic | 5 | 544 | 256 | 1043 | 5636 | 6.00 | 70.42 | 1504 |
 | tests/cases/dicts/empty_literal_flexes | 32 | 2063 | 2063 | 1994 | 5176 | 7.00 | 76.83 | 1472 |

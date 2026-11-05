@@ -10,20 +10,40 @@
 # what makes it usable the moment you want it. `aipl check` is what keeps that
 # from being a hole — it fails on a program that still contains a trace, after
 # running the tests, so a trace a test hit has printed before it is reported.
+# That is what the section below records: the values first, then the refusal for
+# each trace in the program and in the file it imports.
 
-import { wrapping_mul as * } from builtins;
+import { equal as ==, wrapping_mul as * } from builtins;
 import { bump } from "./subdir/file.aipl";
 
-fn area(w: i64, h: i64) -> i64 { trace(w) * trace(h) }
-
-fn main() {
-    bump(5);
-    area(3, 4);
-}
+fn area(w: i64, h: i64) -> i64 { trace(w) * trace(h) }.test({
+    assert(bump(5) == 7);
+    assert(area(3, 4) == 12);
+})
 --- file: subdir/file.aipl ---
 import { wrapping_add as + } from builtins;
 pub fn bump(v: i64) -> i64 { trace(v + 2) }
---- stdout ---
+--- check --tests ---
 ./tests/cases/debug/subdir/file.aipl:2 v + 2 = 7
-./tests/cases/debug/trace.aipl:17 w = 3
-./tests/cases/debug/trace.aipl:17 h = 4
+./tests/cases/debug/trace.aipl:19 w = 3
+./tests/cases/debug/trace.aipl:19 h = 4
+./tests/cases/debug/trace.aipl:
+    area: 2 assertions passed
+error: `trace(..)` prints for debugging and declares no effect, so `check` refuses a program that still contains one; remove it
+ --> ./tests/cases/debug/subdir/file.aipl:2:36
+  |
+2 | pub fn bump(v: i64) -> i64 { trace(v + 2) }
+  |                                    ^^^^^
+
+error: `trace(..)` prints for debugging and declares no effect, so `check` refuses a program that still contains one; remove it
+  --> ./tests/cases/debug/trace.aipl:19:40
+   |
+19 | fn area(w: i64, h: i64) -> i64 { trace(w) * trace(h) }.test({
+   |                                        ^
+
+error: `trace(..)` prints for debugging and declares no effect, so `check` refuses a program that still contains one; remove it
+  --> ./tests/cases/debug/trace.aipl:19:51
+   |
+19 | fn area(w: i64, h: i64) -> i64 { trace(w) * trace(h) }.test({
+   |                                                   ^
+1 tests: 1 passed, 0 failed

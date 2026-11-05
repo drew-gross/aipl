@@ -1,59 +1,44 @@
 //! "Examples as tests": each file under `tests/cases/**/*.aipl` contains
 //! an AIPL program followed by zero or more `--- section ---` blocks
-//! describing the expected outcome. The harness builds + links + runs
-//! the program (via the same pipeline as `aipl build`) and compares.
+//! describing the expected outcome.
 //!
-//! Every present section is *validated* on a normal `cargo test` run: if the
-//! actual output differs from the section body, the case fails (there is no `?`
-//! or placeholder escape — a stale or `?` body is just a mismatch). The
-//! `fill_expected` helper (below) refreshes every section from the actual output
-//! in a single pass.
+//! **`aipl check` validates the file; the harness runs it, once per case.** Every section a
+//! case records (`stdout`, `stderr`, `exit code`, `errors`, `report`, `check <flags>`,
+//! `expect file:`) is compared by `check`'s own code (`src/sections.rs`), so a case is held to
+//! exactly what a user's project is. A failed run is the case's failure, carrying the
+//! `handoff-fill:` lines `check` printed, said under the case's display path.
+//! `fill_expected` is `check --fix` over the same cases.
+//!
+//! What the harness still holds itself, because `check` does not yet: **every running case is
+//! measured** (an instrumented build, run once), refused if it leaks (allocations !=
+//! deallocations), and held to its row in `tests/performance_metrics.md`.
 //!
 //! Section format (all lines like `--- name ---` on their own line):
-//!   `--- stdout ---`     — expected stdout (default: empty)
-//!   `--- stderr ---`     — expected stderr (default: empty)
-//!   `--- exit code ---`  — expected exit code (default: 0)
+//!   `--- stdout ---`, `--- stderr ---`, `--- exit code ---` — what a run of `main` prints and
+//!                          returns (defaults: empty, empty, 0).
 //!   `--- cli ---`        — CLI arguments for the built binary, one per
 //!                          line (default: none). The program receives them
 //!                          as `main`'s `str[]` parameter.
-//!   `--- errors ---`     — expected compiler error output. Presence of
+//!   `--- errors ---`     — expected compiler error output (`check --compile`). Presence of
 //!                          this section means the program is expected
-//!                          to fail to compile; mutually exclusive with
-//!                          stdout/stderr/exit code.
+//!                          to fail to compile; mutually exclusive with the sections that
+//!                          need a program.
 //!   `--- report ---`     — expected `aipl report` for the case, as that command prints
-//!                          it: aligned counts, the peak of live heap, a table of
-//!                          functions. Optional, and for the properties the function
+//!                          it. Optional, and for the properties the function
 //!                          list shows — an instance that was not minted, a call
-//!                          inlined away. Refreshed by `fill_expected` where it is
-//!                          present, never added. Mutually exclusive with `errors`.
-//!                          (There is no `--- performance ---` any more: a case's
-//!                          counts are its row in `tests/performance_metrics.md`,
+//!                          inlined away. Mutually exclusive with `errors`.
+//!                          (A case's counts are its row in `tests/performance_metrics.md`,
 //!                          and the properties an optimization is *for* are stated
 //!                          by a `.benchmark` block or a `--- report ---`.)
-//!
-//! Every running case is also *measured*, whatever sections it has, and refused if
-//! it leaks (allocations != deallocations): the leak gate is not a side effect of
-//! comparing `report`, and applies to the exempt `examples/` too.
+//!   `--- check --tests ---` and the other `check <flags>` sections — what `aipl check` prints
+//!                          for those parts, byte-for-byte; a *failing* test can be a
+//!                          documented fixture. `--- check ---` and `--- check exit code ---`
+//!                          are the old spellings of the tests part and its status.
 //!
 //! A case need not define `main`. A *library* case has `.test` blocks but no
-//! `main`: it's exercised only through `aipl check`, and its baseline row and
-//! `report` measure that test run (the harness AOT-builds the synthesized `.test`
-//! driver).
+//! `main`: its baseline row measures the synthesized `.test` driver.
 //! Such a case can't have a `stdout`/`stderr`/`exit code`/`cli`/`expect file`
 //! section, since those observe a `main`-driven run.
-//!   `--- check ---`      — expected stdout of `aipl check` (the in-language
-//!                          `.test` runner) for this case, byte-for-byte. Lets a
-//!                          *failing* test be a documented fixture.
-//!                          Mutually exclusive with `errors`.
-//!   `--- check exit code ---` — the status that same `aipl check` run exits
-//!                          with. The other half of `check`: a `--- check ---`
-//!                          section pins only stdout, so a case whose point is
-//!                          that `check` *fails* while its tests pass needs this
-//!                          to say so.
-//!
-//! Both read one `aipl check` run, so pinning either, both or neither costs the
-//! same single subprocess (`check_plan`). With *neither*, a case that has `.test`
-//! blocks must instead pass cleanly — the harness requires `check` to exit 0.
 //!   `--- file: rel/path.aipl ---` — additional source files, staged
 //!                          alongside the entry source so `import`s
 //!                          resolve as written.
@@ -81,9 +66,8 @@
 //!
 //! Two author-helper "refresh" modes are `#[ignore]`d tests (a normal `cargo
 //! test` skips them; opt in by name):
-//!   - `cargo test --test cases -- --ignored fill_expected` — in a single pass,
-//!     overwrite every section that differs (`stdout`/`stderr`/`exit code`/
-//!     `report`/`check`/`errors`/`expect file`) with the
+//!   - `cargo test --test cases -- --ignored fill_expected` — `aipl check --fix`
+//!     over the cases: every section that differs is overwritten with the
 //!     actual output. Set `AIPL_CASE` to a path substring — or a comma-separated
 //!     list of them — to target a subset; this is the one mode that still reads
 //!     it, since it is a single test and libtest's filter can't reach inside it.
@@ -117,7 +101,7 @@ use std::time::Instant;
 
 use aipl::ast::Program;
 use aipl::binary;
-use aipl::codegen::{Compilation, ObjectCompilation};
+use aipl::codegen::ObjectCompilation;
 use aipl::loader;
 use aipl::perf::{self, PerfStats};
 use aipl::{DebugOptions, Error};
@@ -172,187 +156,43 @@ struct Spec {
     /// (relative path, contents) for any `--- file: ... ---` companion
     /// sources. Resolved relative to the staging directory.
     extra_files: Vec<(String, String)>,
-    /// (relative path, expected contents) for any `--- expect file: ... ---`
-    /// section: a file the program is expected to have *written* (e.g. via
-    /// `write_string_to_file`), checked against the staging dir after the run.
-    expect_files: Vec<(String, String)>,
-    stdout: Option<String>,
-    stderr: Option<String>,
-    exit_code: Option<i32>,
     errors: Option<String>,
-    /// Expected `aipl report` for the case — the readable form of the same run,
-    /// compared as written and refilled only when the section is already there.
+    /// Whether the case pins an `aipl report`, which `check` validates.
     report: Option<String>,
     /// CLI arguments passed to the built binary, one per line of the
     /// `--- cli ---` section. Reaches the program as `main`'s `str[]`.
     cli: Vec<String>,
-    /// Expected stdout of `aipl check` (the in-language `.test` runner) for this
-    /// case, byte-for-byte.
-    /// When present, the harness compares `check`'s output against it (so a
-    /// *failing* test can be a documented fixture); when absent, a case with
-    /// `.test` blocks must instead pass cleanly (`check` exits 0).
-    check: Option<String>,
-    /// Expected exit status of `aipl check` for this case. The other half of
-    /// `check`: a `--- check ---` section alone says nothing about the status, so
-    /// a case whose point is that `check` *fails* while its tests pass — the
-    /// `trace` fixtures — needs this to say so. Compared against the same single
-    /// run; see [`check_plan`].
-    check_exit_code: Option<i32>,
-    /// Every `check` section by projection, under its old name or its new one.
-    checks: Vec<(String, String)>,
 }
 
-/// Parse a case file into its [`Spec`].
+/// Parse a case file into its [`Spec`]: only what the harness itself still reads. Every
+/// expectation in the file is `aipl check`'s to validate.
 ///
-/// Dogfooded: the sectioning, body trimming and per-section validation all live
-/// in the AIPL `parse_spec` (`crates/aipl-codegen/src/parse_spec.aipl`), reached
-/// through the FFI. This is only the marshaling shim that widens the flat
-/// `SpecFields` into the harness's own struct — there is deliberately no second
-/// implementation of the rules here to drift from it.
+/// Dogfooded: the sectioning and body trimming live in the AIPL `parse_spec`
+/// (`crates/aipl-codegen/src/parse_spec.aipl`), reached through the FFI.
 ///
 /// A malformed case (unknown section, non-integer `exit code`, unusable
-/// companion path) panics, as it did when the rules lived here: a case whose
-/// markup is wrong should stop the run, not silently lose an expectation.
+/// companion path) panics: a case whose markup is wrong should stop the run,
+/// not silently lose an expectation.
 fn parse_spec(contents: &str) -> Spec {
     let f = aipl::parse_spec(contents).unwrap_or_else(|e| panic!("{e}"));
     Spec {
         source: f.source,
         extra_files: f.extra_files,
-        expect_files: f.expect_files,
-        stdout: f.stdout,
-        stderr: f.stderr,
-        exit_code: f.exit_code,
         errors: f.errors,
         report: f.report,
         cli: f.cli,
-        check: f.check,
-        check_exit_code: f.check_exit_code,
-        checks: f.checks,
     }
-}
-
-/// What one `aipl check` run for a case is compared against.
-///
-/// There is exactly **one** of these, or none — never two — which is how "check
-/// runs at most once per case" is stated in the types rather than left to the
-/// shape of an `if`/`else`. Both sections are served by the same run's output, so
-/// pinning the report, the exit code, both, or neither all cost the one
-/// subprocess. See [`check_plan`].
-struct CheckPlan<'a> {
-    /// The `--- check ---` body: `check`'s stdout, byte-for-byte.
-    report: Option<&'a str>,
-    /// The `--- check exit code ---` body: the status `check` exits with.
-    exit_code: Option<i32>,
-    /// Nothing is pinned, so the only expectation left is that the case's
-    /// in-language tests pass. False as soon as either section says what to
-    /// expect — a fixture documenting a *failing* `check` must not also be
-    /// required to succeed.
-    require_success: bool,
-}
-
-/// Whether the source holds a test or benchmark block: on a function (`.test(`,
-/// `.benchmark(`) or a top-level `test({ .. })` / `benchmark({ .. })` at the start of a line.
-fn has_test_blocks(source: &str) -> bool {
-    source.contains(".test")
-        || source.contains(".benchmark")
-        || source
-            .lines()
-            .any(|l| l.starts_with("test(") || l.starts_with("benchmark("))
-}
-
-/// Whether `aipl check` has to run for this case, and what its one run is
-/// compared against.
-///
-/// `None` is the block-less majority of the corpus, which pays nothing. Otherwise
-/// the run happens because the source carries test or benchmark blocks —
-/// `check` is the only thing that runs either, so a case whose claims live in a
-/// benchmark block is held to them only by this run — or because a section
-/// pins something about `check`: a case may pin a report with no tests of its own
-/// (a compile failure's report, say), which is why the sections count on their own.
-fn check_plan(spec: &Spec) -> Option<CheckPlan<'_>> {
-    let report = spec.check.as_deref();
-    let exit_code = spec.check_exit_code;
-    let pinned = report.is_some() || exit_code.is_some() || !spec.checks.is_empty();
-    if !pinned && !has_test_blocks(&spec.source) {
-        return None;
-    }
-    Some(CheckPlan {
-        report,
-        exit_code,
-        require_success: !pinned,
-    })
 }
 
 /// The result of running a single case.
 ///
 /// `Filled` mirrors `Fail`: it carries a message and represents a non-`Pass`
 /// outcome, but instead of a validation failure it means fill mode (the
-/// `fill_expected` helper) rewrote the case's stale sections from the actual
-/// output. Only [`Fills::flush`] builds one — a section check itself only
-/// `Pass`es or `Fail`s, because fill mode *records* the new body and the whole
-/// batch is written back once, when the case is done.
+/// `fill_expected` helper) had `aipl check --fix` rewrite the case.
 enum Outcome {
     Pass,
     Filled(String),
     Fail(String),
-}
-
-/// Propagate a section check's `Outcome` like `?`: a validation `Fail` returns
-/// from the enclosing case, so a later section can never mask an earlier
-/// failure. Anything else falls through to the next section.
-macro_rules! check_section {
-    ($outcome:expr) => {
-        if let fail @ Outcome::Fail(_) = $outcome {
-            return fail;
-        }
-    };
-}
-
-/// The section rewrites a fill run has decided on for one case, held until every
-/// section has been checked and then written back in a single pass.
-///
-/// `enabled` is what makes a run a *fill* run: with it off a differing section
-/// is a failure, with it on it is recorded here instead. Batching is the point
-/// — [`flush`](Fills::flush) costs one read, one walk of the file and one write
-/// for the whole case, where rewriting per section paid for all three once per
-/// stale section (and a case whose `stdout`, `exit code` and `report` all
-/// moved is the common shape after a codegen change).
-struct Fills {
-    enabled: bool,
-    /// `(section name, new body)`, in the order the sections were checked. The
-    /// file's own order is what the rewrite follows, so this one only decides
-    /// where *appended* (absent) sections land.
-    pending: Vec<(String, String)>,
-}
-
-impl Fills {
-    /// A collector for a run in fill mode (`enabled`) or a normal validating one.
-    fn new(enabled: bool) -> Self {
-        Fills {
-            enabled,
-            pending: Vec::new(),
-        }
-    }
-
-    /// Write every recorded section back to `path` in one pass, reporting what
-    /// was refreshed (one line per section, so a case's diff is legible in the
-    /// fill summary). `Pass` when nothing was recorded — including every normal
-    /// run, where nothing ever is.
-    fn flush(self, path: &Path) -> Outcome {
-        if self.pending.is_empty() {
-            return Outcome::Pass;
-        }
-        let note = self
-            .pending
-            .iter()
-            .map(|(section, _)| format!("[{}]: refreshed `{section}`", path.display()))
-            .collect::<Vec<_>>()
-            .join("\n");
-        let p = path.to_str().expect("utf-8 case path");
-        aipl::codegen::fill_or_add_sections_file(p, &self.pending)
-            .unwrap_or_else(|e| panic!("fill_or_add_sections_file({p:?}): {e}"));
-        Outcome::Filled(note)
-    }
 }
 
 // One `#[test]` per case: libtest runs them in parallel on its own thread pool,
@@ -747,40 +587,44 @@ fn collect_all_cases(cases_root: &Path, examples_root: &Path, crates_root: &Path
     out
 }
 
-/// Validate one expected section, or record it for refresh in fill mode.
+/// What a failed `aipl check` run for a case says, as the case's failure.
 ///
-/// - Normal run (`fills.enabled == false`): `Outcome::Pass` if `actual ==
-///   expected`, otherwise `Outcome::Fail`. There is no `?`/placeholder escape
-///   hatch, so a stale (or `?`) section fails like any other mismatch.
-/// - Fill mode: a matching section is still `Pass`; a differing one is queued on
-///   `fills` — also `Pass`, so the caller keeps checking the *remaining*
-///   sections. [`Fills::flush`] writes the whole batch back at the end of the
-///   case, which is why one fill pass refreshes every section of every case.
-fn check_or_fill(
-    fills: &mut Fills,
-    ctx: &str,
-    section: &str,
-    actual: &str,
-    expected: &str,
-) -> Outcome {
-    if actual == expected {
-        return Outcome::Pass;
-    }
-    if fills.enabled {
-        fills
-            .pending
-            .push((section.to_string(), actual.to_string()));
-        return Outcome::Pass;
-    }
-    Outcome::Fail(format!(
-        "{ctx}: `{section}` mismatch\n--- expected ---\n{expected}\n--- actual ---\n{actual}\n\
-         If this change is intended, run `{}`.\n{}",
-        scoped_fill_cmd(ctx),
-        Fill::Section {
-            case: case_of(ctx),
-            section: section.to_string(),
+/// `check` names the file by its path from the project root and asks for a refill with a
+/// `handoff-fill:` line carrying it; the harness's own name for the case (`cases/..`) is what
+/// `cargo handoff` and `AIPL_CASE` know it by, so each such line is said again under that name.
+fn check_failure(ctx: &str, stdout: &str, stderr: &str) -> Outcome {
+    let (asked, _) = Fill::scan(stdout);
+    let report: String = stdout
+        .lines()
+        .filter(|line| Fill::parse(line).is_none())
+        .map(|line| format!("{line}\n"))
+        .collect();
+    let mut markers = String::new();
+    for fill in asked {
+        if let Fill::Section { section, .. } = fill {
+            markers.push_str(&format!(
+                "{}\n",
+                Fill::Section {
+                    case: case_of(ctx),
+                    section,
+                }
+                .marker()
+            ));
         }
-        .marker()
+    }
+    let how = if markers.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "If this change is intended, run `{}`.\n",
+            scoped_fill_cmd(ctx)
+        )
+    };
+    Outcome::Fail(format!(
+        "{ctx}: `aipl check` failed:\n{report}{stderr}\nRun just this case with `aipl check {}`,\n\
+         or through this harness with `{}`.\n{how}{markers}",
+        case_of(ctx),
+        scoped_run_cmd(ctx),
     ))
 }
 
@@ -945,19 +789,49 @@ fn collect_cases(dir: &Path, out: &mut Vec<PathBuf>) {
     out.extend(found.into_iter().map(PathBuf::from));
 }
 
-/// Run one case: parse its sections, stage its sources, and check (or, in fill
-/// mode, refresh) every expectation.
+/// Run one case: `aipl check` validates the file, and the harness holds what `check` does not
+/// yet — the case's row in the baseline table, and the leak gate on every running case.
 ///
-/// The case file is read and parsed **once**, here. Fill mode collects the
-/// sections that moved in a [`Fills`] and flushes them back in one rewrite when
-/// the case is done, so a case with three stale sections costs one read/walk/
-/// write, not three — and the flush is the only thing that touches the file.
+/// `check` is run the way a person at the project root runs it, so everything a case records
+/// (`errors`, `check`, `stdout`, `stderr`, `exit code`, `report`, `expect file:`) is validated by
+/// the one implementation users have. In fill mode the same run is `check --fix`, which rewrites
+/// what a rewrite repairs.
 fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill: bool) -> Outcome {
     let contents = fs::read_to_string(path).expect("read test case");
     let spec = parse_spec(&contents);
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap();
     let ctx = format!("[{}]", rel.display());
-    let mut fills = Fills::new(fill);
+
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut check = Command::new(env!("CARGO_BIN_EXE_aipl"));
+    // From the project root, the case named relative to it: `check` prints the file's name, and a
+    // section that pinned this machine's path would fail on every other checkout.
+    check.current_dir(root).arg("check");
+    if fill {
+        check.arg("--fix");
+    }
+    let output = match check.arg(path.strip_prefix(root).unwrap_or(path)).output() {
+        Ok(o) => o,
+        Err(e) => return Outcome::Fail(format!("{ctx}: `aipl check` spawn failed: {e}")),
+    };
+    let stdout = normalize_output(&String::from_utf8_lossy(&output.stdout));
+    let stderr = normalize_output(&String::from_utf8_lossy(&output.stderr));
+    if !output.status.success() {
+        return check_failure(&ctx, &stdout, &stderr);
+    }
+    if fill {
+        let repaired: Vec<&str> = stdout
+            .lines()
+            .filter(|line| line.starts_with("fixed ") || line.starts_with("formatted "))
+            .collect();
+        if !repaired.is_empty() {
+            return Outcome::Filled(format!("[{}]: {}", path.display(), repaired.join("; ")));
+        }
+    }
+    // A case that must not compile has no program to measure.
+    if spec.errors.is_some() {
+        return Outcome::Pass;
+    }
 
     // Two modes for staging:
     //   - tests/cases/, or any file with `file:` sections (as `check` does): stage
@@ -973,42 +847,7 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
         fs::create_dir_all(&dir).expect("mkdir case output");
         (path.to_path_buf(), dir)
     };
-
-    let outcome = if spec.errors.is_some() {
-        if spec.stdout.is_some() || spec.stderr.is_some() || spec.exit_code.is_some() {
-            return Outcome::Fail(format!(
-                "{ctx}: `errors` section is mutually exclusive with stdout/stderr/exit code"
-            ));
-        }
-        if spec.report.is_some() {
-            return Outcome::Fail(format!(
-                "{ctx}: `report` section requires a running program, so it cannot coexist with `errors`"
-            ));
-        }
-        if spec.check.is_some() {
-            return Outcome::Fail(format!(
-                "{ctx}: `check` section requires a compiling program, so it cannot coexist with `errors`"
-            ));
-        }
-        if !spec.expect_files.is_empty() {
-            return Outcome::Fail(format!(
-                "{ctx}: `expect file:` section requires a running program, so it cannot coexist with `errors`"
-            ));
-        }
-        run_error_case(&ctx, path, &src_path, &spec, &mut fills)
-    } else {
-        run_success_case(&ctx, path, &src_path, stem, &spec, &case_dir, &mut fills)
-    };
-    // Write back whatever fill mode collected, whether or not a later section
-    // failed: the sections checked before the failure were measured on this run
-    // and refusing to record them would only mean measuring them again on the
-    // next. A failure still decides the case's outcome.
-    let filled = fills.flush(path);
-    if matches!(outcome, Outcome::Fail(_)) {
-        outcome
-    } else {
-        filled
-    }
+    measure_case(&ctx, path, &src_path, stem, &spec, &case_dir)
 }
 
 /// The directory a staged case's project root is: the staging directory holds the case at
@@ -1058,39 +897,6 @@ fn load_case(src_path: &Path) -> Result<Program, Vec<Error>> {
         .find(|dir| dir.file_name().is_some_and(|name| name == STAGED_ROOT))
         .unwrap_or(Path::new(env!("CARGO_MANIFEST_DIR")));
     loader::load_program_rooted(src_path, root, debug_opts())
-}
-
-/// Check (or refresh) the `--- errors ---` section of a case that is expected
-/// not to compile. Fill mode records the rendered diagnostic through the same
-/// [`check_or_fill`] every other section goes through, so there is no second
-/// splicing path for this one section to drift from.
-fn run_error_case(
-    ctx: &str,
-    orig_path: &Path,
-    src_path: &Path,
-    spec: &Spec,
-    fills: &mut Fills,
-) -> Outcome {
-    let result =
-        load_case(src_path).and_then(|prog| Compilation::new(&prog, debug_opts()).map(|_| ()));
-    let errs = match result {
-        Err(e) => e,
-        Ok(()) => {
-            // Nothing a refill can fix — the case claims an error the compiler
-            // no longer reports, so the expectation itself is what's wrong.
-            return Outcome::Fail(format!(
-                "{ctx}: expected an error, but compilation succeeded"
-            ));
-        }
-    };
-    let actual = Error::render_all(&errs, &spec.source, &render_path(orig_path));
-    check_or_fill(
-        fills,
-        ctx,
-        "errors",
-        &actual,
-        spec.errors.as_deref().unwrap_or(""),
-    )
 }
 
 // ---------- Perf-monitor refresh (non-deterministic metrics) ----------
@@ -1667,16 +1473,21 @@ fn render_path(path: &Path) -> String {
     format!("./{}", rel.to_string_lossy().replace('\\', "/"))
 }
 
-fn run_success_case(
+/// Measure a case that runs (see [`perf::measure`]: an instrumented build, linked against the
+/// instrumented runtime and run once), refuse it if it leaks, and hold the counts to the case's
+/// row in the metrics table.
+///
+/// **Every running case is measured, whether or not it pins anything**: the run is what the leak
+/// gate needs, and the gate is the one check here that has found real bugs, so it must not depend
+/// on a case having a section to compare. For a case with a `main` the measured program is that
+/// `main`; for a library it is the synthesized `.test` driver, so its row measures the test run.
+fn measure_case(
     ctx: &str,
     orig_path: &Path,
     src_path: &Path,
     stem: &str,
     spec: &Spec,
     case_dir: &Path,
-    // Where a fill run collects the sections that moved; `fills.enabled` is what
-    // distinguishes fill mode from a normal validating run.
-    fills: &mut Fills,
 ) -> Outcome {
     let program = match load_case(src_path) {
         Ok(p) => p,
@@ -1687,33 +1498,9 @@ fn run_success_case(
             ))
         }
     };
-    // A *library* case has `.test` blocks but no `main`: it's exercised only
-    // through `aipl check` (below), and its baseline row and `report` measure that
-    // test run. Behavior sections (which observe a run's stdout/exit/files) need a
-    // `main` to drive them.
-    let has_main = program
-        .items
-        .iter()
-        .any(|it| matches!(it, aipl::ast::Item::Fn(f) if f.name == "main"));
-    if !has_main
-        && (spec.stdout.is_some()
-            || spec.stderr.is_some()
-            || spec.exit_code.is_some()
-            || !spec.cli.is_empty()
-            || !spec.expect_files.is_empty())
-    {
-        return Outcome::Fail(format!(
-            "{ctx}: a case with no `main` runs only its `.test` blocks — it can't have a \
-             stdout/stderr/exit/cli/expect-file section"
-        ));
-    }
-    // The object whose `binary size` and perf are measured: the case's own program
-    // when it has a `main`; otherwise the synthesized `.test` driver. So a
-    // library's perf section measures the same test run `aipl check` verifies.
     let measured = perf::measured_program(&program);
-    // The object used for behavior checks (and the basis for `aipl build`) is
-    // *not* instrumented — production runs carry no instruction-counter overhead.
-    // The measurement builds its own instrumented object below.
+    // The production object: the baseline's code size is read off it, and the measurement builds
+    // its own instrumented one.
     let obj_comp = match ObjectCompilation::new(&measured, stem, debug_opts(), false) {
         Ok(c) => c,
         Err(e) => {
@@ -1723,8 +1510,8 @@ fn run_success_case(
             ))
         }
     };
-    // What the object's symbols are called in AIPL, for the per-function `code`
-    // breakdown in the `report`. Read before `emit` consumes `obj_comp`.
+    // What the object's symbols are called in AIPL, for the per-function `code` breakdown. Read
+    // before `emit` consumes `obj_comp`.
     let symbol_names = obj_comp.code_symbol_names();
     let obj_bytes = match obj_comp.emit() {
         Ok(b) => b,
@@ -1735,187 +1522,11 @@ fn run_success_case(
             ))
         }
     };
-
-    // Behavior (stdout/stderr/exit + written files) needs a real `main`. A library
-    // skips straight to its `.test` blocks below.
-    if has_main {
-        let exe_path = case_dir.join(binary::default_exe_name(stem));
-        if let Err(e) = binary::link(&obj_bytes, &exe_path) {
-            return Outcome::Fail(format!(
-                "{ctx}: link failed:\n{}",
-                e.render(&spec.source, &render_path(orig_path))
-            ));
-        }
-
-        // Run in the case's staging dir so relative file reads (e.g.
-        // `read_file_to_string("data.txt")`) resolve against its `file:` companions.
-        let output = match Command::new(&exe_path)
-            .args(&spec.cli)
-            .current_dir(case_dir)
-            .output()
-        {
-            Ok(o) => o,
-            Err(e) => return Outcome::Fail(format!("{ctx}: spawn failed: {e}")),
-        };
-
-        // Strip trailing whitespace/newlines so a single-line expected like
-        // "hello world" matches a child that wrote "hello world\n". Also
-        // collapse CRLF to LF — on Windows, libc text-mode stdout translates
-        // `\n` from the runtime into `\r\n` at the pipe.
-        let stdout = normalize_output(&String::from_utf8_lossy(&output.stdout));
-        let stderr = normalize_output(&String::from_utf8_lossy(&output.stderr));
-        let exit = output.status.code().unwrap_or(-1) & 0xff;
-
-        let exp_stdout = spec.stdout.as_deref().unwrap_or("");
-        let exp_stderr = spec.stderr.as_deref().unwrap_or("");
-        let exp_exit = spec.exit_code.unwrap_or(0) & 0xff;
-
-        check_section!(check_or_fill(fills, ctx, "stdout", &stdout, exp_stdout));
-        check_section!(check_or_fill(fills, ctx, "stderr", &stderr, exp_stderr));
-        check_section!(check_or_fill(
-            fills,
-            ctx,
-            "exit code",
-            &exit.to_string(),
-            &exp_exit.to_string(),
-        ));
-
-        // Validate any files the program was expected to *write* (e.g. via
-        // `write_string_to_file`). Checked after stdout/exit so a file mismatch
-        // never masks a behavioral regression. The behavior run above wrote them
-        // into `case_dir`.
-        for (rel, expected) in &spec.expect_files {
-            let actual = match fs::read_to_string(case_dir.join(rel)) {
-                Ok(c) => normalize_output(&c),
-                Err(e) => {
-                    return Outcome::Fail(format!(
-                        "{ctx}: expected output file {rel:?} was not written: {e}"
-                    ))
-                }
-            };
-            check_section!(check_or_fill(
-                fills,
-                ctx,
-                &format!("expect file: {rel}"),
-                &actual,
-                expected,
-            ));
-        }
-    } // end `if has_main` (behavior run)
-
-    // Run the case's in-language `.test({ .. })` blocks via the real `aipl
-    // check` binary — at most once, whichever of its two sections are in play
-    // (see `check_plan`). A subprocess (not in-process) because the test runner
-    // keeps process-global pass/fail counters — a fresh process gives each case
-    // its own clean state and avoids races between parallel shards.
-    //
-    // Pointed at the *original* case file, not the staged copy: `check` stages
-    // each file's `--- file: ---` companions into a scratch directory and runs
-    // the tests there (so writes never land in the tree), and it can only read
-    // those sections from the unstripped source. That keeps one staging
-    // implementation — `check`'s — rather than a second one here.
-    if let Some(plan) = check_plan(spec) {
-        // Run from the project root with the case named relative to it, the way a person at
-        // the root runs it: `check` prints the file's name, and a `--- check ---` section
-        // that pinned this machine's path would fail on every other checkout.
-        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let output = match Command::new(env!("CARGO_BIN_EXE_aipl"))
-            .current_dir(root)
-            .arg("check")
-            // The harness validates the sections itself (and, in fill mode,
-            // against the file as it was before this run rewrites it), so this
-            // run is for the `.test` blocks alone.
-            .arg("--ignore-sections")
-            .arg(orig_path.strip_prefix(root).unwrap_or(orig_path))
-            .output()
-        {
-            Ok(o) => o,
-            Err(e) => return Outcome::Fail(format!("{ctx}: `aipl check` spawn failed: {e}")),
-        };
-        let report = normalize_output(&String::from_utf8_lossy(&output.stdout));
-        let exit = output.status.code().unwrap_or(-1) & 0xff;
-        // A `--- check ---` section pins the report byte-for-byte and a
-        // `--- check exit code ---` section pins the status, each independently —
-        // that a *failing* `check` can be a documented fixture is the point of
-        // both.
-        if let Some(expected) = plan.report {
-            check_section!(check_or_fill(fills, ctx, "check", &report, expected));
-        }
-        if let Some(expected) = plan.exit_code {
-            check_section!(check_or_fill(
-                fills,
-                ctx,
-                "check exit code",
-                &exit.to_string(),
-                &expected.to_string(),
-            ));
-        }
-        // Neither pinned: the in-language tests must simply pass.
-        if plan.require_success && !output.status.success() {
-            let errs = normalize_output(&String::from_utf8_lossy(&output.stderr));
-            return Outcome::Fail(format!(
-                "{ctx}: `aipl check` (in-language tests) failed:\n{report}{errs}\n\
-                 Run just this case's tests with `aipl check {}`,\n\
-                 or through this harness with `{}`.",
-                render_path(orig_path),
-                scoped_run_cmd(ctx),
-            ));
-        }
-    }
-
-    // Allocation accounting. Correctness (above) is checked first so a perf
-    // mismatch never masks a behavioral regression.
-    //
-    // **Every running case is measured, whether or not it pins anything**: the run
-    // is what the leak gate needs, and the gate is the one check here that has
-    // found real bugs, so it must not depend on a case having a section to compare.
-    // (That used to be true by accident — a `benchmark` section was required on
-    // every case but the examples.)
-    // What is *compared* is the case's row in the metrics table, and its `report`
-    // where it pins one: one measurement serves both.
-    check_section!(run_benchmark_check(
-        ctx,
-        orig_path,
+    let actual = match perf::measure(
         &measured,
         stem,
-        spec,
-        case_dir,
-        spec.report.as_deref(),
         &obj_bytes,
         &symbol_names,
-        fills,
-    ));
-    // Every section matched, or fill mode queued the ones that didn't; a normal
-    // run would have short-circuited to `Fail` before here. The caller flushes.
-    Outcome::Pass
-}
-
-/// Measure the case (see [`perf::measure`]: an instrumented build, linked against
-/// the instrumented runtime and run once), refuse it if it leaks, and verify, or
-/// fill in, the `--- report ---` section when the case has one (`Some`), and hold
-/// the counts to the case's row in the metrics table.
-///
-/// The leak gate does not depend on either: it runs for every case, section or no
-/// section. The instrumented object is separate from the behavior-check one so
-/// production/JIT runs carry no counter overhead.
-#[allow(clippy::too_many_arguments)]
-fn run_benchmark_check(
-    ctx: &str,
-    orig_path: &Path,
-    program: &Program,
-    stem: &str,
-    spec: &Spec,
-    case_dir: &Path,
-    report: Option<&str>,
-    production: &[u8],
-    symbol_names: &HashMap<String, String>,
-    fills: &mut Fills,
-) -> Outcome {
-    let actual = match perf::measure(
-        program,
-        stem,
-        production,
-        symbol_names,
         &spec.cli,
         case_dir,
         debug_opts(),
@@ -1929,41 +1540,12 @@ fn run_benchmark_check(
         }
     };
 
-    // Memory-leak gate: every heap allocation must be paired with a free. Checked
-    // even in fill mode so `fill_expected` cannot bake in a leak, and with no
-    // section to refresh there is nothing to say about counts afterwards.
+    // Memory-leak gate: every heap allocation must be paired with a free.
     if actual.allocations != actual.deallocations {
-        let then = if report.is_some() {
-            format!(
-                "Fix the leak, then re-run `{}` to refresh the report.",
-                scoped_fill_cmd(ctx)
-            )
-        } else {
-            "Fix the leak.".to_string()
-        };
         return Outcome::Fail(format!(
-            "{ctx}: memory leak — allocations ({}) != deallocations ({})\n{then}",
+            "{ctx}: memory leak — allocations ({}) != deallocations ({})\nFix the leak.",
             actual.allocations, actual.deallocations,
         ));
-    }
-
-    let report = match report {
-        // A section body has its trailing newlines stripped, and a report ends in
-        // one. Compared as written: it is text a reader is meant to read.
-        Some(expected) => check_or_fill(
-            fills,
-            ctx,
-            "report",
-            actual.render_report().trim_end(),
-            expected,
-        ),
-        None => Outcome::Pass,
-    };
-    // The case's row in the metrics table comes last, so a stale section — which
-    // a refill fixes — is what a run says first. A fill run leaves it alone: the
-    // table is refreshed by `refresh_perfmon`, not by `fill_expected`.
-    if fills.enabled || !matches!(report, Outcome::Pass) {
-        return report;
     }
     check_baseline(ctx, &actual)
 }
@@ -1976,88 +1558,6 @@ fn normalize_output(s: &str) -> String {
     aipl::codegen::normalize_output(s)
 }
 
-/// `aipl check` runs **at most once** per case, whichever of its two sections are
-/// in play — the property [`CheckPlan`] exists to make statable.
-///
-/// Reading "pin the report" and "pin the exit code" as two independent
-/// expectations is the obvious implementation and the wrong one: it spawns the
-/// compiler twice for a case that uses both, and the corpus runs `check` hundreds
-/// of times. `check_plan` returns one plan or none, so there is no shape that can
-/// yield two runs, and this walks every combination to show the count never
-/// changes — only what that one run is compared against.
-#[test]
-fn check_runs_at_most_once_whichever_sections_are_used() {
-    const TESTS: &str = "fn f() -> i64 { 1 }.test({ assert(true); })\n";
-    const REPORT: &str = "--- check ---\n1 tests: 1 passed, 0 failed\n";
-    const EXIT: &str = "--- check exit code ---\n1\n";
-    // Owned, because a `CheckPlan` borrows the `Spec` it was read from: what is
-    // under test is the plan's content, not its lifetime.
-    let plan = |src: &str| {
-        let spec = parse_spec(src);
-        check_plan(&spec).map(|p| (p.report.map(str::to_string), p.exit_code, p.require_success))
-    };
-
-    // Neither section and no test or benchmark blocks: nothing to ask `check`, so it never
-    // runs — which is what keeps the testless majority of the corpus free.
-    for src in ["fn main() {}\n", "fn main() {}\n--- stdout ---\nhi\n"] {
-        assert!(plan(src).is_none(), "should not run check: {src:?}");
-    }
-
-    // A top-level `test({ .. })` or `benchmark({ .. })` is a block too: with nothing else
-    // in the file to ask `check`, it is the only reason the run happens, and a failing
-    // top-level test would otherwise pass.
-    for src in [
-        "test({ assert(true); })\n",
-        "fn f() {}\n\nbenchmark({ assert(true); })\n",
-    ] {
-        assert_eq!(
-            plan(src),
-            Some((None, None, true)),
-            "should run check: {src:?}"
-        );
-    }
-
-    // A `.benchmark` block is run by `check` and by nothing else, so a file with
-    // only that block still needs the run: its claims are otherwise never held.
-    let benchmark = "fn f() -> i64 { 1 }.benchmark({ assert(true); })\nfn main() {}\n";
-    assert_eq!(plan(benchmark), Some((None, None, true)));
-
-    // Every other combination is exactly one run. Two of the three reasons to run
-    // are the sections themselves, so a case may pin `check` with no tests of its
-    // own.
-    for src in [
-        TESTS.to_string(),
-        format!("fn main() {{}}\n{REPORT}"),
-        format!("fn main() {{}}\n{EXIT}"),
-        format!("fn main() {{}}\n{REPORT}{EXIT}"),
-        format!("{TESTS}{REPORT}"),
-        format!("{TESTS}{EXIT}"),
-        format!("{TESTS}{REPORT}{EXIT}"),
-    ] {
-        assert!(plan(&src).is_some(), "should run check once: {src:?}");
-    }
-
-    // What that one run is compared against, per combination.
-    let pinned_report = Some("1 tests: 1 passed, 0 failed".to_string());
-    // Nothing pinned, so the one expectation left is that the tests pass.
-    assert_eq!(plan(TESTS), Some((None, None, true)));
-    // Each section pins its own half and leaves the other unasked. Either one
-    // turns `require_success` off: a fixture whose point is that `check` *fails*
-    // while its tests pass could not otherwise exist.
-    assert_eq!(
-        plan(&format!("{TESTS}{REPORT}")),
-        Some((pinned_report.clone(), None, false))
-    );
-    assert_eq!(
-        plan(&format!("{TESTS}{EXIT}")),
-        Some((None, Some(1), false))
-    );
-    assert_eq!(
-        plan(&format!("{TESTS}{REPORT}{EXIT}")),
-        Some((pinned_report, Some(1), false))
-    );
-}
-
 // ---- The `cargo handoff` contract -------------------------------------------
 //
 // `cargo handoff` regenerates only what a failing test asks it to (see
@@ -2067,14 +1567,21 @@ fn check_runs_at_most_once_whichever_sections_are_used() {
 
 #[test]
 fn a_stale_section_asks_for_a_refill_of_its_case() {
-    let mut fills = Fills::new(false);
-    let Outcome::Fail(message) =
-        check_or_fill(&mut fills, "[cases/x/y.aipl]", "stdout", "new\n", "old\n")
-    else {
-        panic!("a differing section must fail");
+    // What `check` prints for a stale section: its own name for the file, and the line that asks.
+    let stdout = format!(
+        "./tests/cases/x/y.aipl: `stdout` mismatch\n{}\n",
+        Fill::Section {
+            case: "tests/cases/x/y.aipl".to_string(),
+            section: "stdout".to_string(),
+        }
+        .marker()
+    );
+    let Outcome::Fail(message) = check_failure("[cases/x/y.aipl]", &stdout, "") else {
+        panic!("a failed check must fail the case");
     };
     let (asked, unreadable) = Fill::scan(&message);
     assert!(unreadable.is_empty(), "{unreadable:?}");
+    // The case is named the way `cargo handoff` and `AIPL_CASE` know it.
     assert_eq!(
         asked,
         vec![Fill::Section {
@@ -2082,6 +1589,17 @@ fn a_stale_section_asks_for_a_refill_of_its_case() {
             section: "stdout".to_string(),
         }]
     );
+}
+
+#[test]
+fn a_failed_check_with_nothing_to_refill_asks_for_nothing() {
+    let Outcome::Fail(message) =
+        check_failure("[cases/x/y.aipl]", "./x.aipl: the tests leaked\n", "")
+    else {
+        panic!("a failed check must fail the case");
+    };
+    assert_eq!(Fill::scan(&message).0, vec![]);
+    assert!(message.contains("the tests leaked"), "{message}");
 }
 
 #[test]

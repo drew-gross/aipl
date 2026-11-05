@@ -524,6 +524,7 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  turn trace rejection into a lint, but make some lints non-squelchable
   turn refuse_sectioned_import into a lint
   let some(x) = e else { return none; } should just be let x = e?;
   lint against unused variables and unused field destructuring items (even with as _, I don't think we need to adopt the "_ is intentionally unused" pattern)

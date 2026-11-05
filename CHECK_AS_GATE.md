@@ -291,20 +291,24 @@ section header, and the 27 `tests/fmt` fixtures, `fixtures_match_expected` and `
   `--tests` alone. The harness (`check_plan`) counts any `check` section as a pin, so it no longer requires those cases'
   `check` run to succeed; 3.7 deletes that code.
 
-**3.6 Prove the two validators agree**
-- [ ] Differential test over the whole corpus: the old harness verdict equals the new `check` verdict for every
-      file (pass or fail, and the message), and `--fix` produces byte-identical files and baseline rows.
-- [ ] A migrated twin of every old-style file validates identically to the original (the migration script's
-      acceptance test, run before any file is written).
-- [ ] Canaries, per projection: wrong body, missing section for output the file produces, unknown flag, duplicate
-      projection, a section that contradicts another, a section on a file that does not compile.
+**3.6 Prove the two validators agree** (cancelled)
+Not done: the differential test, migrated twins and canaries were judged overkill. 3.7 swaps the harness's validators
+for `check`'s, and the corpus (every case now runs through `check`) is the test.
 
-**3.7 The harness delegates (`tests/cases.rs`)**
-- [ ] Replace its per-section code (`run_error_case`, the section checks in `run_success_case`, `check_plan`,
-      `run_benchmark_check`, `check_or_fill`'s per-name logic) with one `aipl check` run per case, for the new
-      sections and the run-observing ones alike (`check` already validates the latter). It keeps the baseline
-      compare and `refresh_perfmon` until G1 moves them into `check`.
-- [ ] `fill_expected` becomes a wrapper over `check --fix`, scoped by `AIPL_CASE`.
+**3.7 The harness delegates (`tests/cases.rs`)** (2026-11-05)
+- [x] `run_case` runs one `aipl check <case>` from the project root and fails the case when it exits non-zero, carrying
+      `check`'s output and its `handoff-fill:` lines said again under the case's display path (`check_failure`).
+      Gone: `run_error_case`, the section comparisons in `run_success_case` (which built, linked and ran `main`),
+      `check_plan`, `check_or_fill`, `Fills`, the harness's own `Spec` fields for sections, and the test of
+      `check_plan`.
+- [x] What the harness keeps, since `check` does not hold it yet: `measure_case` (an instrumented run of every
+      running case, the leak gate on it, and the case's row in `tests/performance_metrics.md`), and `refresh_perfmon`.
+- [x] `fill_expected` is `check --fix` over the matched cases (`AIPL_CASE` unchanged); a case it rewrote is reported
+      as refreshed.
+- Changed with it: a case with a `main` and no run-observing section no longer has its `main` run and held to empty
+  output (decided with the plan's Prerequisite A); every case now spends one `aipl check` process, which Phase 4 batches.
+- `debug/trace` is a `check --tests` case now: `check` refuses a file with a `trace`, so a `main` that traces cannot
+  have a `stdout` section. Its values and refusals are pinned the way `trace_fails_check` pins them.
 
 **3.8 Make the old `check` name free**
 - [ ] Migrate the 7 `--- check ---` and 4 `--- check exit code ---` files to `--- check --tests ---` first; the
