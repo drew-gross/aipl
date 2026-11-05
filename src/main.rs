@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use aipl::binary;
-use aipl::check::{CheckResult, Checked, Formatting};
-use aipl::codegen::{Compilation, ObjectCompilation};
+use aipl::check::{self, BatchTotals, CheckResult, Checked, Formatting};
+use aipl::codegen::{Compilation, ObjectCompilation, TestRun};
 use aipl::loader;
 use aipl::{sections, DebugOptions, Error, SpecFields};
 
@@ -350,14 +350,16 @@ struct Staged {
 /// once the tests have had their chance to hit it and print, so the caller
 /// reports it after this returns.
 ///
-/// The pass/fail tallies live in the test runtime and accumulate across calls,
-/// which is what lets a batch run report one aggregate at the end.
+/// What the tests did (rows, counts, failure text, `.benchmark` blocks and leak
+/// checks included) is added to `run`, which is the file's own: a batch's
+/// aggregate is the sum of its files' runs.
 fn check_file(
     staged: &Staged,
     label: &str,
     spec: &SpecFields,
     section_label: Option<&str>,
     baseline: Option<&sections::Baseline>,
+    run: &mut TestRun,
     dbg: DebugOptions,
 ) -> Result<Checked, String> {
     let render = |e| render_err_at(&staged.entry, label, e);
@@ -393,6 +395,7 @@ fn check_file(
     // which gives codegen room for deep `.test` driver/expression trees.)
     let comp = Compilation::new(&test_program, dbg).map_err(render)?;
     let mut exit_code = comp.run_0("__test_main").map_err(|e| e.to_string())?;
+    run.absorb(aipl::codegen::take_test_run());
 
     // The `.benchmark` blocks, run apart from the tests above: they need an
     // instrumented build, which the JIT is not. Their failures print as the tests'
@@ -406,26 +409,26 @@ fn check_file(
             .unwrap_or("a.out");
         let batch_label = aipl::codegen::test_file().unwrap_or_default();
         match aipl::perf::run_benchmark_tests(&driver, stem, &batch_label, dbg) {
-            Ok(run) => {
-                aipl::codegen::add_failure_report(&run.report);
-                let mut failed = run.failed;
-                let mut total = run.total;
+            Ok(bench) => {
+                run.add_failure_report(&bench.report);
+                let mut failed = bench.failed;
+                let mut total = bench.total;
                 // A leak fails the file as a test of its own would, named like one:
                 // every instrumented run is held to freeing what it allocates.
-                if let Some((allocated, freed)) = run.leaked {
+                if let Some((allocated, freed)) = bench.leaked {
                     let at = if batch_label.is_empty() {
                         String::new()
                     } else {
                         format!("{batch_label}::")
                     };
-                    aipl::codegen::add_failure_report(&format!(
+                    run.add_failure_report(&format!(
                         "test {at}benchmark blocks ... FAIL\n  leak: {} of {allocated} allocations were never freed ({freed} deallocations)\n",
                         allocated.abs_diff(freed)
                     ));
                     total += 1;
                     failed += 1;
                 }
-                aipl::codegen::add_test_totals(total, failed);
+                run.add_external(total, failed);
                 if failed > 0 {
                     exit_code = 1;
                 }
@@ -454,14 +457,14 @@ fn check_file(
             format!("{batch_label}::")
         };
         for (what, leak) in &leaks {
-            aipl::codegen::add_failure_report(&format!(
+            run.add_failure_report(&format!(
                 "test {at}{what} ... FAIL\n  leak: {} of {} allocations were never freed ({} deallocations)\n",
                 leak.allocations.abs_diff(leak.deallocations),
                 leak.allocations,
                 leak.deallocations,
             ));
         }
-        aipl::codegen::add_test_totals(leaks.len() as i64, leaks.len() as i64);
+        run.add_external(leaks.len() as i64, leaks.len() as i64);
         exit_code = 1;
     }
 
@@ -679,6 +682,7 @@ fn check_resolved(
     project_root: &Path,
     sections: bool,
     baseline: Option<&sections::Baseline>,
+    run: &mut TestRun,
     dbg: DebugOptions,
 ) -> Result<Checked, String> {
     let spec = read_spec(path, label)?;
@@ -690,6 +694,7 @@ fn check_resolved(
             &spec,
             section_label.as_deref(),
             baseline,
+            run,
             dbg,
         )
     })?
@@ -785,8 +790,10 @@ fn check_path(
     // invocation knowing about every problem, not just the first kind.
     let formatting = check_format(path, fix);
     emit(formatting.line(label));
-    let outcome = check_resolved(path, label, project_root, sections, baseline, dbg);
-    let tests = aipl::codegen::take_test_records();
+    let mut run = TestRun::default();
+    let outcome = check_resolved(path, label, project_root, sections, baseline, &mut run, dbg);
+    // Anything a run that failed part-way left behind belongs to this file, not the next.
+    run.absorb(aipl::codegen::take_test_run());
     let outcome = outcome.map(|mut checked| {
         if fix {
             apply_fixes(path, &mut checked);
@@ -796,7 +803,7 @@ fn check_path(
     CheckResult {
         label: label.to_string(),
         formatting,
-        tests,
+        run,
         outcome,
     }
 }
@@ -941,9 +948,8 @@ fn check_cmd(args: &[String]) -> ExitCode {
                 // thing said about the file.
                 emit(result.render_fixed());
                 print!("{}", result.render_rows());
-                print_test_failures();
-                let (total, passed, failed) = aipl::codegen::test_totals();
-                if let Some(summary) = result.render_summary(total, passed, failed) {
+                print!("{}", check::render_failures(&result.run.failure_report));
+                if let Some(summary) = result.render_summary() {
                     println!("{summary}");
                 }
                 if let Some(report) = &checked.traces {
@@ -961,10 +967,7 @@ fn check_cmd(args: &[String]) -> ExitCode {
     }
 
     aipl::codegen::set_quiet_summary(true);
-    let mut broken = 0usize;
-    let mut unformatted = 0usize;
-    let mut traced = 0usize;
-    let mut mismatched = 0usize;
+    let mut totals = BatchTotals::default();
     for (path, label) in &resolved {
         aipl::codegen::set_test_file(Some(label));
         let result = check_path(
@@ -976,85 +979,26 @@ fn check_cmd(args: &[String]) -> ExitCode {
             baseline.as_ref(),
             dbg,
         );
-        if result.formatting.is_unformatted() {
-            unformatted += 1;
-        }
+        totals.add(&result);
         print!("{}", result.render_rows());
         match &result.outcome {
             Ok(checked) => {
                 if let Some(report) = &checked.traces {
                     eprintln!("{report}");
-                    traced += 1;
                 }
                 emit(result.render_fixed());
-                if result.has_section_findings() {
-                    eprint!("{}", result.render_findings());
-                    mismatched += 1;
-                }
+                eprint!("{}", result.render_findings());
             }
-            Err(msg) => {
-                eprintln!("{msg}");
-                broken += 1;
-            }
+            Err(msg) => eprintln!("{msg}"),
         }
     }
     aipl::codegen::set_test_file(None);
 
-    print_test_failures();
-    let (total, passed, failed) = aipl::codegen::test_totals();
-    let n = files.len();
-    let files_word = if n == 1 { "file" } else { "files" };
-    println!("{n} {files_word}, {total} tests: {passed} passed, {failed} failed");
-    if broken > 0 {
-        // Called out separately: a file that never compiled contributes no test
-        // counts, so "0 failed" above must not read as "everything is fine".
-        let word = if broken == 1 { "file" } else { "files" };
-        println!("{broken} {word} failed to compile");
-    }
-    if unformatted > 0 {
-        // Likewise: an unformatted file's tests may all have passed, so the
-        // tallies above give no hint that the run is about to exit non-zero.
-        let word = if unformatted == 1 {
-            "file needs"
-        } else {
-            "files need"
-        };
-        println!("{unformatted} {word} formatting");
-    }
-    if traced > 0 {
-        // And likewise: `trace(..)` is a debugging aid, so its files' tests
-        // pass — the run still fails, and this is what says why.
-        let phrase = if traced == 1 {
-            "file still calls"
-        } else {
-            "files still call"
-        };
-        println!("{traced} {phrase} trace()");
-    }
-    if mismatched > 0 {
-        // Likewise: a file whose sections disagree with what it does may have
-        // passed every test, so "0 failed" says nothing about it.
-        let (word, verb) = if mismatched == 1 {
-            ("file", "has")
-        } else {
-            ("files", "have")
-        };
-        println!("{mismatched} {word} {verb} mismatched sections");
-    }
-    if failed > 0 || broken > 0 || unformatted > 0 || traced > 0 || mismatched > 0 {
-        ExitCode::FAILURE
-    } else {
+    print!("{}", totals.render());
+    if totals.passed_all() {
         ExitCode::SUCCESS
-    }
-}
-
-/// What the failing tests said, under one heading after every line about the
-/// tests that passed. Nothing when none failed.
-fn print_test_failures() {
-    let report = aipl::codegen::take_failure_report();
-    if !report.is_empty() {
-        println!("test failures:");
-        print!("{report}");
+    } else {
+        ExitCode::FAILURE
     }
 }
 

@@ -6,10 +6,11 @@
 //! than the terminal (a section that pins part of this output) can read the same result, and so each
 //! piece has one renderer, tested apart from the command.
 //!
-//! Nothing here runs a file. The runtime's pass/fail tallies and failure text stay in
-//! `aipl::codegen` because they accumulate across a batch; a file's result carries only its own rows.
+//! Nothing here runs a file. A file's tests are handed over by the runtime as a [`TestRun`] (rows,
+//! counts, failure text) and a batch's totals are the sum of its files' runs, so no count lives
+//! anywhere but in a result.
 
-use crate::codegen::TestRecord;
+use crate::codegen::{TestRecord, TestRun};
 use crate::sections::Finding;
 
 /// Whether a file is in canonical format, and what `--fix` did about it.
@@ -71,8 +72,9 @@ pub struct CheckResult {
     /// The file's path as the user typed it or as discovery found it.
     pub label: String,
     pub formatting: Formatting,
-    /// The file's tests, one record each; empty when it has none or never compiled.
-    pub tests: Vec<TestRecord>,
+    /// What the file's tests did, `.benchmark` blocks and leak checks included; all zero when it
+    /// has none or never compiled.
+    pub run: TestRun,
     /// `Err` is a rendered load/compile failure.
     pub outcome: Result<Checked, String>,
 }
@@ -80,7 +82,9 @@ pub struct CheckResult {
 impl CheckResult {
     /// Whether the file compiled and every test passed.
     pub fn tests_passed(&self) -> bool {
-        self.outcome.as_ref().is_ok_and(|c| c.exit_code == 0)
+        self.outcome
+            .as_ref()
+            .is_ok_and(|c| c.exit_code == 0 && self.run.failed == 0)
     }
 
     pub fn failed_to_compile(&self) -> bool {
@@ -106,7 +110,7 @@ impl CheckResult {
 
     /// The tests as rows under the file's name; see [`render_test_rows`].
     pub fn render_rows(&self) -> String {
-        render_test_rows(&self.label, &self.tests)
+        render_test_rows(&self.label, &self.run.records)
     }
 
     /// The line saying which sections `--fix` wrote, or why it could not.
@@ -127,9 +131,15 @@ impl CheckResult {
     }
 
     /// The `N tests: P passed, F failed` line of a single-file report, when tests ran.
-    pub fn render_summary(&self, total: i64, passed: i64, failed: i64) -> Option<String> {
+    pub fn render_summary(&self) -> Option<String> {
         let ran = self.outcome.as_ref().is_ok_and(|c| c.ran_tests);
-        ran.then(|| format!("{total} tests: {passed} passed, {failed} failed"))
+        ran.then(|| {
+            let run = &self.run;
+            format!(
+                "{} tests: {} passed, {} failed",
+                run.total, run.passed, run.failed
+            )
+        })
     }
 
     /// The lines for each way the file's sections disagree with what it does, naming the file.
@@ -138,6 +148,103 @@ impl CheckResult {
             Ok(checked) => render_findings(&self.label, &checked.sections),
             Err(_) => String::new(),
         }
+    }
+}
+
+/// The totals of a batch: its files' runs added up, and how many files failed in each way.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct BatchTotals {
+    pub files: usize,
+    pub total: i64,
+    pub passed: i64,
+    pub failed: i64,
+    /// Files that did not compile.
+    pub broken: usize,
+    /// Files not in canonical format.
+    pub unformatted: usize,
+    /// Files that still call `trace(..)`.
+    pub traced: usize,
+    /// Files whose sections disagree with what they do.
+    pub mismatched: usize,
+    /// What the failing tests said, in file order.
+    pub failure_report: String,
+}
+
+impl BatchTotals {
+    /// Count one more checked file in.
+    pub fn add(&mut self, result: &CheckResult) {
+        self.files += 1;
+        self.total += result.run.total;
+        self.passed += result.run.passed;
+        self.failed += result.run.failed;
+        self.failure_report.push_str(&result.run.failure_report);
+        self.broken += usize::from(result.failed_to_compile());
+        self.unformatted += usize::from(result.formatting.is_unformatted());
+        self.traced += usize::from(result.has_traces());
+        self.mismatched += usize::from(result.has_section_findings());
+    }
+
+    /// Whether every file passed everything.
+    pub fn passed_all(&self) -> bool {
+        self.failed == 0
+            && self.broken == 0
+            && self.unformatted == 0
+            && self.traced == 0
+            && self.mismatched == 0
+    }
+
+    /// The aggregate report: the failing tests' text under its heading (when there is any), then
+    /// the `N files, T tests` line, then one line for each way a file can fail that the test counts
+    /// give no hint of (a file that never compiled contributes no counts; an unformatted file's
+    /// tests may all have passed). Every line ends in a newline.
+    pub fn render(&self) -> String {
+        let mut out = render_failures(&self.failure_report);
+        let files_word = if self.files == 1 { "file" } else { "files" };
+        out.push_str(&format!(
+            "{} {files_word}, {} tests: {} passed, {} failed\n",
+            self.files, self.total, self.passed, self.failed
+        ));
+        let plural =
+            |n: usize, one: &'static str, many: &'static str| if n == 1 { one } else { many };
+        if self.broken > 0 {
+            out.push_str(&format!(
+                "{} {} failed to compile\n",
+                self.broken,
+                plural(self.broken, "file", "files")
+            ));
+        }
+        if self.unformatted > 0 {
+            out.push_str(&format!(
+                "{} {} formatting\n",
+                self.unformatted,
+                plural(self.unformatted, "file needs", "files need")
+            ));
+        }
+        if self.traced > 0 {
+            out.push_str(&format!(
+                "{} {} trace()\n",
+                self.traced,
+                plural(self.traced, "file still calls", "files still call")
+            ));
+        }
+        if self.mismatched > 0 {
+            out.push_str(&format!(
+                "{} {} mismatched sections\n",
+                self.mismatched,
+                plural(self.mismatched, "file has", "files have")
+            ));
+        }
+        out
+    }
+}
+
+/// What the failing tests said, under one heading after every line about the tests that passed.
+/// Nothing when none failed.
+pub fn render_failures(report: &str) -> String {
+    if report.is_empty() {
+        String::new()
+    } else {
+        format!("test failures:\n{report}")
     }
 }
 
@@ -268,6 +375,64 @@ mod tests {
             render_findings("./sub/a.aipl", &found),
             "./sub/a.aipl: the tests leaked\n./sub/a.aipl: stdout is stale\nhandoff-fill: section\tsub/a.aipl\tstdout\n"
         );
+    }
+
+    fn result(label: &str, total: i64, failed: i64) -> CheckResult {
+        CheckResult {
+            label: label.to_string(),
+            formatting: Formatting::Clean,
+            run: TestRun {
+                total,
+                passed: total - failed,
+                failed,
+                ..TestRun::default()
+            },
+            outcome: Ok(Checked {
+                exit_code: i64::from(failed > 0),
+                traces: None,
+                sections: Vec::new(),
+                fixed: Vec::new(),
+                fix_error: None,
+                ran_tests: true,
+            }),
+        }
+    }
+
+    #[test]
+    fn a_batch_adds_its_files_up() {
+        let mut totals = BatchTotals::default();
+        totals.add(&result("./a.aipl", 2, 0));
+        let mut b = result("./b.aipl", 3, 1);
+        b.run.failure_report = "test ./b.aipl::f ... FAIL\n".to_string();
+        totals.add(&b);
+        assert!(!totals.passed_all());
+        assert_eq!(
+            totals.render(),
+            "test failures:\ntest ./b.aipl::f ... FAIL\n2 files, 5 tests: 4 passed, 1 failed\n"
+        );
+    }
+
+    #[test]
+    fn a_batch_names_each_way_a_file_can_fail_that_the_counts_hide() {
+        let mut totals = BatchTotals::default();
+        let mut broken = result("./a.aipl", 0, 0);
+        broken.outcome = Err("error: no".to_string());
+        totals.add(&broken);
+        let mut unformatted = result("./b.aipl", 1, 0);
+        unformatted.formatting = Formatting::Needs;
+        totals.add(&unformatted);
+        assert_eq!(
+            totals.render(),
+            "2 files, 1 tests: 1 passed, 0 failed\n1 file failed to compile\n1 file needs formatting\n"
+        );
+    }
+
+    #[test]
+    fn a_clean_single_file_batch_is_one_line() {
+        let mut totals = BatchTotals::default();
+        totals.add(&result("./a.aipl", 4, 0));
+        assert!(totals.passed_all());
+        assert_eq!(totals.render(), "1 file, 4 tests: 4 passed, 0 failed\n");
     }
 
     #[test]

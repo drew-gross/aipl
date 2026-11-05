@@ -209,9 +209,13 @@ touched anywhere in this phase except where `check` reads them into the structur
       prints `fixed` after the rows, the single report before them).
 - [x] Renderers, one per part, in `check.rs` with unit tests: `render_test_rows`, `render_findings` (with the
       `handoff-fill:` line), `Formatting::line`, `CheckResult::render_fixed` and `render_summary`. Compile
-      diagnostics and traces are already rendered strings. Still not structured: the runtime's failure text
-      (`test failures:`) and pass/fail tallies, which accumulate across a batch inside `aipl::codegen`; 3.2 and
-      3.5 need them as data, so they are next.
+      diagnostics and traces are already rendered strings.
+- [x] The runtime's tallies are data too: `aipl::codegen::take_test_run()` hands over a `TestRun` (records, counts,
+      failure text) and starts the next file from zero; the global totals, `take_failure_report` and the
+      `add_*` helpers are gone. A file's `.benchmark` blocks and leak checks are added to its own `TestRun`, and a
+      batch is `BatchTotals`, the sum of its files' results, rendered by `BatchTotals::render` (tested). One
+      change in behavior, a fix: the driver's exit code used to be cumulative over a batch, so a file after a
+      failing one reported a failing driver.
 
 **3.2 One output stream (DS3)**
 - [ ] Move compile diagnostics, section mismatches, format notices, trace refusals and `fix` lines into the

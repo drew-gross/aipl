@@ -956,10 +956,11 @@ extern "C" fn aipl_count_call(_name: i64) {}
 // failures print: a failing test gets one `test <name> ... FAIL` header line
 // followed by an indented line per failed assertion; passing tests are silent.
 //
-// `check`'s batch mode runs one such driver per file in a single process, so the
-// counters here deliberately accumulate across drivers: [`set_test_file`] adds
-// the file to each FAIL header and [`set_quiet_summary`] suppresses the per-file
-// summary line, leaving one aggregate that [`test_totals`] reports at the end.
+// `check`'s batch mode runs one such driver per file in a single process. What a
+// driver did is handed over as a [`TestRun`] by [`take_test_run`], which also
+// starts the next file from zero, so each file's tests are data of its own and the
+// caller adds them up: [`set_test_file`] adds the file to each FAIL header and
+// [`set_quiet_summary`] suppresses the per-file summary line.
 
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering as TestOrd};
 use std::sync::Mutex;
@@ -975,7 +976,7 @@ static TEST_CUR_NAME: Mutex<Option<String>> = Mutex::new(None);
 /// The running test's assertion tallies, reset at `test_begin`.
 static TEST_CUR_ASSERTS_PASSED: AtomicI64 = AtomicI64::new(0);
 static TEST_CUR_ASSERTS_FAILED: AtomicI64 = AtomicI64::new(0);
-/// One record per finished test, kept until [`take_test_records`] hands them over.
+/// One record per finished test, kept until [`take_test_run`] hands them over.
 static TEST_RECORDS: Mutex<Vec<TestRecord>> = Mutex::new(Vec::new());
 /// Everything the failing tests said, in the order they said it. Held rather than
 /// printed so the caller can put it after the lines about the tests that passed,
@@ -993,9 +994,6 @@ static TEST_QUIET_SUMMARY: AtomicBool = AtomicBool::new(false);
 /// Name the file whose tests are running now, so a failure in a many-file run
 /// says which file it came from (`test <file>::<name> ... FAIL`). Passing `None`
 /// restores the bare `test <name> ... FAIL` used when checking a single file.
-///
-/// The counters this module keeps are cumulative across every program run in the
-/// process, which is exactly what batch mode wants — one aggregate at the end.
 pub fn set_test_file(file: Option<&str>) {
     let mut cur = TEST_CUR_FILE.lock().unwrap_or_else(|e| e.into_inner());
     *cur = file.map(str::to_string);
@@ -1008,16 +1006,6 @@ pub fn set_quiet_summary(quiet: bool) {
     TEST_QUIET_SUMMARY.store(quiet, TestOrd::Relaxed);
 }
 
-/// Cumulative `(total, passed, failed)` test counts across every program run in
-/// this process, for batch mode's aggregate report.
-pub fn test_totals() -> (i64, i64, i64) {
-    (
-        TEST_TOTAL.load(TestOrd::Relaxed),
-        TEST_PASSED.load(TestOrd::Relaxed),
-        TEST_FAILED.load(TestOrd::Relaxed),
-    )
-}
-
 /// The file whose tests are running now — what [`set_test_file`] last set, or
 /// `None` in single-file mode.
 pub fn test_file() -> Option<String> {
@@ -1025,16 +1013,6 @@ pub fn test_file() -> Option<String> {
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .clone()
-}
-
-/// Fold tests run elsewhere into the cumulative counts: `total` of them, `failed`
-/// of which failed. This is how a file's `.benchmark` blocks, which have to run
-/// in an instrumented build rather than in this process, still land in the one
-/// aggregate the summary reports.
-pub fn add_test_totals(total: i64, failed: i64) {
-    TEST_TOTAL.fetch_add(total, TestOrd::Relaxed);
-    TEST_FAILED.fetch_add(failed, TestOrd::Relaxed);
-    TEST_PASSED.fetch_add(total - failed, TestOrd::Relaxed);
 }
 
 /// What running one test came to: how many of its assertions held and how many
@@ -1065,27 +1043,59 @@ impl TestRecord {
     }
 }
 
-/// Hand over the records of every test that has finished since the last call.
-pub fn take_test_records() -> Vec<TestRecord> {
-    std::mem::take(&mut *TEST_RECORDS.lock().unwrap_or_else(|e| e.into_inner()))
+/// What the tests of one program did: a record for each, the counts, and everything the
+/// failing ones said.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TestRun {
+    pub records: Vec<TestRecord>,
+    /// Everything the failing tests said, in the order they said it. Held rather than printed
+    /// so the caller can put it after the lines about the tests that passed, where nobody has
+    /// to scroll past them to find it.
+    pub failure_report: String,
+    pub total: i64,
+    pub passed: i64,
+    pub failed: i64,
 }
 
-/// Hand over what the failing tests have said since the last call.
-pub fn take_failure_report() -> String {
-    std::mem::take(
-        &mut *TEST_FAILURE_REPORT
-            .lock()
-            .unwrap_or_else(|e| e.into_inner()),
-    )
+impl TestRun {
+    /// Fold in tests that ran elsewhere: `total` of them, `failed` of which failed. This is how a
+    /// file's `.benchmark` blocks, which have to run in an instrumented build rather than in this
+    /// process, land in the same counts as its `.test` blocks.
+    pub fn add_external(&mut self, total: i64, failed: i64) {
+        self.total += total;
+        self.failed += failed;
+        self.passed += total - failed;
+    }
+
+    /// Add to the failure report text produced elsewhere, such as a `.benchmark` run's.
+    pub fn add_failure_report(&mut self, text: &str) {
+        self.failure_report.push_str(text);
+    }
+
+    /// Fold `other` in after this one.
+    pub fn absorb(&mut self, other: TestRun) {
+        self.records.extend(other.records);
+        self.failure_report.push_str(&other.failure_report);
+        self.total += other.total;
+        self.passed += other.passed;
+        self.failed += other.failed;
+    }
 }
 
-/// Add to the failure report text produced elsewhere, such as a `.benchmark`
-/// run's, which happens in another process.
-pub fn add_failure_report(text: &str) {
-    TEST_FAILURE_REPORT
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .push_str(text);
+/// Hand over what every test that has run since the last call did, and start counting again
+/// from zero.
+pub fn take_test_run() -> TestRun {
+    TestRun {
+        records: std::mem::take(&mut *TEST_RECORDS.lock().unwrap_or_else(|e| e.into_inner())),
+        failure_report: std::mem::take(
+            &mut *TEST_FAILURE_REPORT
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()),
+        ),
+        total: TEST_TOTAL.swap(0, TestOrd::Relaxed),
+        passed: TEST_PASSED.swap(0, TestOrd::Relaxed),
+        failed: TEST_FAILED.swap(0, TestOrd::Relaxed),
+    }
 }
 
 /// One line of the failure report.
@@ -1192,7 +1202,9 @@ extern "C" fn aipl_test_end() {
 
 #[no_mangle]
 extern "C" fn aipl_test_summary() -> i64 {
-    let (total, passed, failed) = test_totals();
+    let total = TEST_TOTAL.load(TestOrd::Relaxed);
+    let passed = TEST_PASSED.load(TestOrd::Relaxed);
+    let failed = TEST_FAILED.load(TestOrd::Relaxed);
     if !TEST_QUIET_SUMMARY.load(TestOrd::Relaxed) {
         println!("{total} tests: {passed} passed, {failed} failed");
     }
