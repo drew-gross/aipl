@@ -383,7 +383,6 @@ fn check_file(
             loader::load_program_overlay(&staged.entry, Some(&staged.root), &spec.source, dbg)
                 .and_then(|program| Compilation::new(&program, dbg).map(|_| ()));
         let mut found = sections::conflicts(spec);
-        found.extend(sections::unvalidated_checks(spec));
         found.extend(sections::errors(spec, compiled, section_label));
         return Ok(Checked {
             exit_code: 0,
@@ -500,9 +499,6 @@ fn check_file(
     }
 
     let mut found = Vec::new();
-    if section_label.is_some() {
-        found.extend(sections::unvalidated_checks(spec));
-    }
     if section_label.is_some() && sections::runs_main(spec) {
         let stem = staged
             .entry
@@ -717,25 +713,65 @@ fn check_resolved(
     label: &str,
     project_root: &Path,
     sections: bool,
+    spec: &SpecFields,
     baseline: Option<&sections::Baseline>,
     parts: Parts,
     run: &mut TestRun,
     dbg: DebugOptions,
 ) -> Result<Checked, String> {
-    let spec = read_spec(path, label)?;
     let section_label = sections.then(|| section_label(path, project_root));
-    in_staged_dir(path, &spec, project_root, |staged| {
+    let mut checked = in_staged_dir(path, spec, project_root, |staged| {
         check_file(
             staged,
             label,
-            &spec,
+            spec,
             section_label.as_deref(),
             baseline,
             parts,
             run,
             dbg,
         )
-    })?
+    })??;
+    // The `check` sections for parts this run left out. A file that holds an `errors` section is a
+    // file that does not compile, which `conflicts` already says about any of them.
+    let pinned = sections::pinned_parts(spec);
+    if sections && (pinned.tests || pinned.benchmarks) {
+        // The refusal comes after the run it belongs to, so a section for that run records it.
+        checked.traces = None;
+    }
+    if let (Some(section_label), None) = (&section_label, &spec.errors) {
+        checked
+            .sections
+            .extend(sections::projections(spec, |flags| {
+                run_check_for(project_root, section_label, flags)
+            }));
+    }
+    Ok(checked)
+}
+
+/// Run `aipl check --ignore-sections <flags> <file>` from the project root, and give back what it
+/// printed and its exit status: the output a `check <flags>` section records.
+///
+/// A child process, because the run's own output (a `trace` value, say) goes straight to the
+/// process's stdout, which is part of what the section records.
+fn run_check_for(
+    project_root: &Path,
+    section_label: &str,
+    flags: &str,
+) -> Result<(String, i32), String> {
+    let exe = env::current_exe().map_err(|e| format!("cannot find the `aipl` binary: {e}"))?;
+    let output = std::process::Command::new(exe)
+        .current_dir(project_root)
+        .arg("check")
+        .arg("--ignore-sections")
+        .args(flags.split(' '))
+        .arg(section_label)
+        .output()
+        .map_err(|e| format!("`aipl check {flags}` could not start: {e}"))?;
+    Ok((
+        aipl::codegen::normalize_output(&String::from_utf8_lossy(&output.stdout)),
+        output.status.code().unwrap_or(-1) & 0xff,
+    ))
 }
 
 /// `--fix` for the sections: write each finding that has a fix back into `path`,
@@ -752,7 +788,18 @@ fn apply_fixes(path: &Path, checked: &mut Checked) {
         .into_iter()
         .partition(|f| f.fix.is_some());
     if !fixable.is_empty() {
-        let fills: Vec<(String, String)> = fixable.iter().filter_map(|f| f.fix.clone()).collect();
+        // A fix names the new spelling of the section, `check --tests`; a file that wrote the old
+        // bare `check` header is rewritten under the header it has.
+        let bare_check = std::fs::read_to_string(path)
+            .is_ok_and(|text| text.lines().any(|line| line == "--- check ---"));
+        let fills: Vec<(String, String)> = fixable
+            .iter()
+            .filter_map(|f| f.fix.clone())
+            .map(|(name, body)| match name.as_str() {
+                "check --tests" if bare_check => ("check".to_string(), body),
+                _ => (name, body),
+            })
+            .collect();
         match aipl::codegen::fill_or_add_sections_file(&path.to_string_lossy(), &fills) {
             Ok(()) => {
                 for (section, _) in &fills {
@@ -816,6 +863,19 @@ fn check_path(
     parts: Parts,
     dbg: DebugOptions,
 ) -> CheckResult {
+    // The parts the file's own `check` sections pin are run for the sections (see
+    // `check_resolved`), not here: a section that records a failing run must not fail the file.
+    let mut spec = parts.loads().then(|| read_spec(path, label));
+    let pinned = match &spec {
+        Some(Ok(spec)) if sections => sections::pinned_parts(spec),
+        _ => Parts {
+            format: false,
+            compile: false,
+            tests: false,
+            benchmarks: false,
+        },
+    };
+    let parts = parts.without(pinned);
     // Reported before the tests run, and either way: the point is to end the
     // invocation knowing about every problem, not just the first kind.
     let formatting = if parts.format {
@@ -826,18 +886,25 @@ fn check_path(
     if let Some(line) = formatting.line(label) {
         println!("{line}");
     }
+    // Formatting moved the lines a recorded diagnostic names, so what follows reads the new text.
+    if formatting == Formatting::Rewritten && spec.is_some() {
+        spec = Some(read_spec(path, label));
+    }
     let mut run = TestRun::default();
-    let outcome = if parts.loads() {
-        check_resolved(
-            path,
-            label,
-            project_root,
-            sections,
-            baseline,
-            parts,
-            &mut run,
-            dbg,
-        )
+    let outcome = if let Some(spec) = spec {
+        spec.and_then(|spec| {
+            check_resolved(
+                path,
+                label,
+                project_root,
+                sections,
+                &spec,
+                baseline,
+                parts,
+                &mut run,
+                dbg,
+            )
+        })
     } else {
         Ok(Checked {
             exit_code: 0,

@@ -11,16 +11,17 @@
 //!
 //! | section | checked against |
 //! |---|---|
-//! | `errors` | the diagnostics compiling the file produces; the file must not compile |
+//! | `errors` (`check --compile`) | the diagnostics compiling the file produces; the file must not compile |
+//! | `check <flags>` | what `check` prints for those parts |
 //! | `stdout`, `stderr`, `exit code` | one run of the built `main` |
 //! | `cli` | not compared: the arguments that run is given |
 //! | `report` | what `aipl report` prints for the file |
 //! | `expect file: p` | the file `p` the run left in its working directory |
 //!
 //! `--- file: p ---` companions are not expectations; they are staged beside the
-//! file by the caller so imports and fixtures resolve. `check` and `check exit code`
-//! are not read at all: they pin a run of `check` itself, which the cases harness
-//! compares.
+//! file by the caller so imports and fixtures resolve. `check` sections (and the old
+//! `check exit code`) pin what `check` itself prints for some of its parts; they are compared with
+//! a run of `check` for those parts (see [`projections`]).
 
 use std::fs;
 use std::path::Path;
@@ -28,6 +29,7 @@ use std::process::Command;
 
 use crate::ast::{Item, Program};
 use crate::binary;
+use crate::check::Parts;
 use crate::codegen::{normalize_output, ObjectCompilation};
 use crate::{DebugOptions, Error, SpecFields};
 use handoff::protocol::Fill;
@@ -77,19 +79,69 @@ fn mismatch(section: &str, actual: &str, expected: &str) -> Option<Finding> {
     })
 }
 
-/// A `check` section whose part of `check`'s output nothing validates yet. The two with an old
-/// spelling (`--compile` is `errors`, `--tests` is `check`) are held to their fields; any other would
-/// be a recorded expectation that nothing compares, and the file would pass for the wrong reason.
-pub fn unvalidated_checks(spec: &SpecFields) -> Vec<Finding> {
-    spec.checks
+/// The parts of `check` that the file's own `check` sections pin. `check` does not run them in this
+/// process: each section is compared with a run of `check` for just those parts (see [`projections`]),
+/// and a pinned part that failed on purpose is the section's to say, not the file's to fail on.
+/// `--compile` is not among them: it is the `errors` section, validated where the file is compiled.
+pub fn pinned_parts(spec: &SpecFields) -> Parts {
+    let pinned = |flag: &str| {
+        spec.checks
+            .iter()
+            .any(|(projection, _)| projection.split(' ').any(|named| named == flag))
+            || (flag == "--tests" && spec.check_exit_code.is_some())
+    };
+    Parts {
+        format: pinned("--format"),
+        compile: false,
+        tests: pinned("--tests"),
+        benchmarks: pinned("--benchmarks"),
+    }
+}
+
+/// Check every `check` section other than `--compile` against `run_check`, which runs `check` for
+/// the named flags and gives back what it printed and the status it exited with.
+///
+/// A section's body is that output byte for byte, so it records the trace values a run printed and
+/// the refusal after them as well as the test rows. The old `check exit code` section pins the
+/// status of the `--tests` run; the new sections have none, since the status follows from the body.
+pub fn projections(
+    spec: &SpecFields,
+    mut run_check: impl FnMut(&str) -> Result<(String, i32), String>,
+) -> Vec<Finding> {
+    let mut found = Vec::new();
+    let mut wanted: Vec<(&str, Option<&str>)> = spec
+        .checks
         .iter()
-        .filter(|(projection, _)| !matches!(projection.as_str(), "--compile" | "--tests"))
-        .map(|(projection, _)| {
-            Finding::unfixable(format!(
-                "`check {projection}` section is not validated yet: only `check --compile` and `check --tests` are"
-            ))
-        })
-        .collect()
+        .filter(|(projection, _)| projection != "--compile")
+        .map(|(projection, body)| (projection.as_str(), Some(body.as_str())))
+        .collect();
+    if spec.check_exit_code.is_some()
+        && !wanted
+            .iter()
+            .any(|(projection, _)| *projection == "--tests")
+    {
+        wanted.push(("--tests", None));
+    }
+    for (projection, body) in wanted {
+        let (output, status) = match run_check(projection) {
+            Ok(ran) => ran,
+            Err(message) => {
+                found.push(Finding::unfixable(message));
+                continue;
+            }
+        };
+        if let Some(body) = body {
+            found.extend(mismatch(&format!("check {projection}"), &output, body));
+        }
+        if let (Some(expected), "--tests") = (spec.check_exit_code, projection) {
+            found.extend(mismatch(
+                "check exit code",
+                &status.to_string(),
+                &expected.to_string(),
+            ));
+        }
+    }
+    found
 }
 
 /// Sections that cannot sit together. `errors` describes a program that does not
@@ -109,9 +161,13 @@ pub fn conflicts(spec: &SpecFields) -> Vec<Finding> {
             "`report` section requires a running program, so it cannot coexist with `errors`",
         );
     }
-    if spec.check.is_some() {
+    if spec
+        .checks
+        .iter()
+        .any(|(projection, _)| projection != "--compile" && projection != "--format")
+    {
         found.push(
-            "`check` section requires a compiling program, so it cannot coexist with `errors`",
+            "`check` section for tests or benchmarks requires a compiling program, so it cannot coexist with `errors`",
         );
     }
     if !spec.expect_files.is_empty() {
@@ -352,4 +408,79 @@ pub fn baseline(
         }
         .marker()
     ))])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn spec(checks: &[(&str, &str)], check_exit_code: Option<i32>) -> SpecFields {
+        SpecFields {
+            checks: checks
+                .iter()
+                .map(|(projection, body)| (projection.to_string(), body.to_string()))
+                .collect(),
+            check_exit_code,
+            ..SpecFields::default()
+        }
+    }
+
+    #[test]
+    fn a_section_pins_every_part_its_header_names_and_never_the_compile() {
+        let pinned = pinned_parts(&spec(
+            &[("--tests --benchmarks", ""), ("--compile", "")],
+            None,
+        ));
+        assert_eq!(
+            (
+                pinned.format,
+                pinned.compile,
+                pinned.tests,
+                pinned.benchmarks
+            ),
+            (false, false, true, true)
+        );
+    }
+
+    #[test]
+    fn an_old_exit_code_section_pins_the_tests_though_no_body_does() {
+        assert!(pinned_parts(&spec(&[], Some(1))).tests);
+        assert!(!pinned_parts(&spec(&[], None)).tests);
+    }
+
+    #[test]
+    fn each_section_is_compared_with_the_run_for_its_own_flags() {
+        let mut asked = Vec::new();
+        let found = projections(
+            &spec(&[("--tests", "same"), ("--format", "other")], None),
+            |flags| {
+                asked.push(flags.to_string());
+                Ok(("same".to_string(), 0))
+            },
+        );
+        assert_eq!(asked, ["--tests", "--format"]);
+        assert_eq!(found.len(), 1);
+        assert!(found[0].message.starts_with("`check --format` mismatch"));
+        assert_eq!(
+            found[0].fix,
+            Some(("check --format".to_string(), "same".to_string()))
+        );
+    }
+
+    #[test]
+    fn the_old_exit_code_is_compared_with_the_tests_status_even_with_no_body() {
+        let found = projections(&spec(&[], Some(1)), |_| Ok((String::new(), 0)));
+        assert_eq!(found.len(), 1);
+        assert!(found[0].message.starts_with("`check exit code` mismatch"));
+        assert!(projections(&spec(&[], Some(0)), |_| Ok((String::new(), 0))).is_empty());
+    }
+
+    #[test]
+    fn a_run_that_could_not_start_is_a_finding_without_a_fix() {
+        let found = projections(&spec(&[("--tests", "")], None), |_| {
+            Err("no binary".to_string())
+        });
+        assert_eq!(found.len(), 1);
+        assert!(found[0].fix.is_none());
+    }
 }

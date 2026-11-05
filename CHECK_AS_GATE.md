@@ -48,7 +48,7 @@ measurement and not a validation, so it stays out of `check`; the section is a t
 | `errors` | 273 | compile diagnostics, rendered | `sections::errors` (check), `run_error_case` (harness) | `check --compile` |
 | `check` | 7 | stdout of the *tests* run only | the harness only (`check_plan`) | `check --tests` (the bare name changes meaning, see DS6) |
 | `check exit code` | 4 | that run's status | the harness only | gone: derived from the body (DS4) |
-| `formatted` (in `tests/fmt`) | 27 | expected `format_source` output | `tests/suites/fmt.rs` only | `check --format --fix` (DS5b) |
+| `formatted` (in `tests/fmt`) | 27 | expected `format_source` output | `tests/suites/fmt.rs` only | deleted (DS5b) |
 | `report` | 43 | `aipl report` text | `sections::report`, harness, the `report_agrees_with_the_pinned_report_*` tests | **unchanged** |
 | `stdout` | 73 | the run's stdout | `sections::behavior`, `run_success_case` | **unchanged** |
 | `stderr` | 1 | the run's stderr | same | **unchanged** |
@@ -86,31 +86,29 @@ stay.
 
 ### Decisions to settle before Phase 3 starts
 Each has a recommendation; none is made yet.
-- [ ] **DS1 header grammar.** `--- check [flags] ---`, flags exactly as on the command line, space separated,
+- [x] **DS1 header grammar.** `--- check [flags] ---`, flags exactly as on the command line, space separated,
       written in a canonical order so one projection has one spelling; an unknown flag, or the same projection
       twice, is an error (the existing rule that a malformed header is the file's error, not a dropped
       expectation). Recommended.
-- [ ] **DS2 projections and flag names.** Selector flags choose what `check` prints and verifies; none given means
+- [x] **DS2 projections and flag names.** Selector flags choose what `check` prints and verifies; none given means
       everything. Recommended set: `--format`, `--compile` (diagnostics), `--tests`, `--benchmarks`, plus
       `--baseline` and `--leaks` when G1/G2 land. No `--run`, no `--report`. `--fix` and `--ignore-sections` keep their
       meaning. Alternative: one full-output section per file (simpler, but any unrelated rendering change churns
       every file). Rejected for churn; sections should pin narrow projections.
-- [ ] **DS3 one stream.** All of `check`'s report on a file goes to stdout in a defined order; stderr is for
+- [x] **DS3 one stream.** All of `check`'s report on a file goes to stdout in a defined order; stderr is for
       usage and I/O errors only. Costs: about 40 expectations in `tests/suites/check.rs` and the convention for
       `trace` refusals and "needs formatting" notices. Recommended.
-- [ ] **DS4 exit status.** Derived for check projections; no separate section. Alternative: a trailing
+- [x] **DS4 exit status.** Derived for check projections; no separate section. Alternative: a trailing
       `exit: N` line. Recommended: derive.
 - [x] **DS5 `report` (decided).** It is a measurement, not a validation: `aipl report` and `--- report ---` stay as they
       are and `check` gains no `--report`. The report tests and the `report` rows of the migration are out of this
       project.
-- [ ] **DS5b formatter fixtures.** `check --format --fix` as a section means "the file after the fix", the one
-      projection whose body is a file and not a report, so the 27 `tests/fmt` fixtures move into the same
-      mechanism and `fmt.rs`'s fixture runner goes. Alternative: leave formatter fixtures outside the scheme.
-      Recommended: move them in.
-- [ ] **DS6 the stale `check` name.** Bare `--- check ---` becomes "everything", so the 7+4 existing
+- [x] **DS5b formatter fixtures (decided: no `--fix` in a section header).** Formatting is covered by every `.aipl` in the tree having to be canonical (`all_aipl_files_stay_formatted`), so the 27 `tests/fmt` fixtures, `fixtures_match_expected` and `fill_expected_fmt` are deleted rather than moved. Not adopted: `check --format --fix` as a section, which
+      would have meant "the file after the fix", the one projection whose body is a file and not a report.
+- [x] **DS6 the stale `check` name.** Bare `--- check ---` becomes "everything", so the 7+4 existing
       `check`/`check exit code` files must move to `check --tests` first (stage 3.8 orders it). Recommended.
-- [ ] **DS7 editor and LSP support** for section headers (highlighting, a diagnostic for a malformed header):
-      optional, after the rest.
+- [x] **DS7 editor and LSP support (decided: none for now).** Nothing new is added; what works today keeps working, which
+      is that the editor and LSP do not report sections as errors to be fixed.
 
 ## Background
 Two separate costs sit under "process startup":
@@ -140,7 +138,7 @@ loudly); running `main` under the JIT is rejected (the AOT linker runtime is the
 - [x] **D3 (Phase 1):** the project root is the directory the tool is run in; no marker file (see G4).
 - [ ] **D4 (end of Phase 0):** the speedup that justifies Phases 4-5 (suggestion: discovery well under
       half of the current number).
-- [ ] **DS1-DS7:** see "Direction" above (DS5 is decided); settle the rest before Phase 3 starts.
+- [x] **DS1-DS7:** all settled (see "Decisions" above).
 - [ ] **D7:** how, if at all, to enforce "`main` only for programs, real-builtin coverage and
       entry-point mechanics". Directory-based enforcement was rejected; no mechanism chosen. Until then it
       is held by review.
@@ -269,13 +267,29 @@ projection), DS4 (exit status derived; no section for it) and DS6 (bare `--- che
 - Shipped in two handoffs because the live artifact's `Spec` had no `checks` field: the AIPL change first (the Rust
   side looks fields up by name, so the extra one was harmless), then the Rust side that reads it.
 
-**3.5 Validation of the new sections in `check`**
-- [ ] Compare each `check` section to its projection of the one `CheckResult` computed with sections ignored.
-- [ ] Re-express `conflicts()` (`sections.rs`) for the new forms: a `--compile` section that holds diagnostics cannot
-      sit with a run-observing section, or with `report`; a run section on a file with no `main` is still reported.
-- [ ] A `--- check ---` over everything, and `--- check --tests ---` as the replacement for the old `check`.
-- [ ] `--fix` rewrites and adds them.
-- [ ] Old names are aliases of the new projections inside `check`, so both spellings validate identically.
+**3.5 Validation of the new sections in `check`** (2026-11-05)
+Settled before it, from the recommendations or by decision: DS1, DS2, DS3, DS4, DS6 as recommended; DS5b no `--fix` in a
+section header, and the 27 `tests/fmt` fixtures, `fixtures_match_expected` and `fill_expected_fmt` are deleted
+(formatting is held by every `.aipl` in the tree having to be canonical); DS7 no editor or LSP support for now.
+- [x] Each `check` section is compared with what `check` prints for its flags with the file's sections ignored
+      (`sections::projections`). It is a child run, `aipl check --ignore-sections <flags> <file>` from the project root,
+      the way the harness did it: a `trace` value goes straight to the process's stdout and is part of what a section
+      records, so an in-process render could not hold it. A file's `--compile` section stays on the in-process path
+      (`errors`). Cost: one child per pinned projection, which is 7 + 2 files today.
+- [x] The parts a file pins are left out of its own run (`sections::pinned_parts`, `Parts::without`): a section that
+      records a failing run is not the file failing, and a trace refusal belongs to the run that is pinned.
+- [x] `conflicts()` knows the new forms: a `check` section for the tests or benchmarks cannot sit with `errors`.
+- [x] `--- check --tests ---` is the replacement for the old `check`. Bare `--- check ---` is not "everything" yet: it keeps
+      meaning `--tests` until 3.8.
+- [x] `--fix` rewrites and adds them, under the header the file has (a file with the old bare `check` is rewritten
+      under that name). The old `check exit code` is compared with the status of the `--tests` run; the new sections
+      have no status section.
+- [x] Old names are aliases: both spellings validate through the same code (tested side by side).
+- [x] Deleted the "not validated yet" guard (`unvalidated_checks`).
+- Two fixtures that pinned a benchmark failure under the old `check` (`benchmark/block_failure`,
+  `benchmark/measure_claim_fails`) moved early to `--- check --tests --benchmarks ---`, since the old name now means
+  `--tests` alone. The harness (`check_plan`) counts any `check` section as a pin, so it no longer requires those cases'
+  `check` run to succeed; 3.7 deletes that code.
 
 **3.6 Prove the two validators agree**
 - [ ] Differential test over the whole corpus: the old harness verdict equals the new `check` verdict for every
@@ -301,8 +315,7 @@ Each script rewrites headers, runs both validators and refuses to write a file w
 changes (the lesson from the error-fixture pass: a refill pins whatever the compiler now says). Each leaves the
 differential test green.
 - [ ] `errors` (273) to `check --compile`.
-- [ ] The `formatted` fixtures (27 in `tests/fmt`) to `check --format --fix` (DS5b), and port the fixture runner and
-      `fill_expected_fmt` in `tests/suites/fmt.rs`.
+- [x] ~~The `formatted` fixtures to `check --format --fix`~~ Not migrated (DS5b): they are deleted in 3.5.
 - [ ] Files with these sections outside `tests/cases/` and `tests/fmt` (`examples/`, `projects/`).
 
 **3.10 Remove the old names**
@@ -329,8 +342,7 @@ differential test green.
       and that run-observing sections make a file a test of `main`.
 - [ ] README, `projects/README.md`, the skills (`write-aipl`, `add-lint`, `add-builtin`), the headers of
       `tests/cases.rs` and `tests/suites/fmt.rs`, `aipl --help`.
-- [ ] Optional (DS7): highlighting for section header lines in the editor grammar, and an LSP diagnostic for a
-      malformed header.
+- [x] ~~Optional (DS7)~~ Not done: no editor or LSP support for now.
 
 **3.14 Done when**
 - [ ] The corpus holds only `check ..` sections, the run-observing sections, `report`, `cli` and `file:`; the guard

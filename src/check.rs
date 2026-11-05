@@ -62,6 +62,17 @@ impl Parts {
         (rest, (parts != none).then_some(parts))
     }
 
+    /// These parts, less the ones in `pinned`. The compile part is never left out: it is what a
+    /// pinned part's own run reports a broken file by.
+    pub fn without(self, pinned: Parts) -> Parts {
+        Parts {
+            format: self.format && !pinned.format,
+            compile: self.compile,
+            tests: self.tests && !pinned.tests,
+            benchmarks: self.benchmarks && !pinned.benchmarks,
+        }
+    }
+
     /// Whether any part loads the file.
     pub fn loads(&self) -> bool {
         self.compile || self.tests || self.benchmarks

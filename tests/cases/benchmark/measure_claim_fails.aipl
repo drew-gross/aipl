@@ -18,10 +18,8 @@ fn filled(n: i64) -> i64[] {
 fn building() {}.benchmark({
     assert(measure("build", 10, filled).allocations == 0);
 })
---- check ---
+--- check --tests --benchmarks ---
 test failures:
 test building.benchmark ... FAIL
   assert failed at ./tests/cases/benchmark/measure_claim_fails.aipl:19 measure("build", 10, filled).allocations == 0
 1 tests: 0 passed, 1 failed
---- check exit code ---
-1

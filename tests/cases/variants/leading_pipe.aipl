@@ -37,7 +37,7 @@ fn perimeter(s: Shape) -> i64 {
 // its keep: this one fits on a line, so canonical format has no `|` at all
 // (the formatter drops it, the way it drops a list's trailing comma when the list
 // goes flat). The dropped-on-input direction is covered by the formatter's own
-// fixture, `tests/fmt/variant_leading_pipe.aipl`.
+// tests in `walker.aipl`.
 variant Only = Just(i64)
 
 fn unwrap(o: Only) -> i64 {

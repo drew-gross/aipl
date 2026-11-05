@@ -9,12 +9,10 @@ fn answer() -> i64 { 41 }.test({
 }).benchmark({
     assert(answer() == 42);
 })
---- check ---
+--- check --tests --benchmarks ---
 ./tests/cases/benchmark/block_failure.aipl:
     answer: 1 assertion passed
 test failures:
 test answer.benchmark ... FAIL
   assert failed at ./tests/cases/benchmark/block_failure.aipl:10 answer() == 42
 2 tests: 1 passed, 1 failed
---- check exit code ---
-1

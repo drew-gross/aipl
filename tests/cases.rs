@@ -198,6 +198,8 @@ struct Spec {
     /// `trace` fixtures — needs this to say so. Compared against the same single
     /// run; see [`check_plan`].
     check_exit_code: Option<i32>,
+    /// Every `check` section by projection, under its old name or its new one.
+    checks: Vec<(String, String)>,
 }
 
 /// Parse a case file into its [`Spec`].
@@ -225,6 +227,7 @@ fn parse_spec(contents: &str) -> Spec {
         cli: f.cli,
         check: f.check,
         check_exit_code: f.check_exit_code,
+        checks: f.checks,
     }
 }
 
@@ -269,7 +272,7 @@ fn has_test_blocks(source: &str) -> bool {
 fn check_plan(spec: &Spec) -> Option<CheckPlan<'_>> {
     let report = spec.check.as_deref();
     let exit_code = spec.check_exit_code;
-    let pinned = report.is_some() || exit_code.is_some();
+    let pinned = report.is_some() || exit_code.is_some() || !spec.checks.is_empty();
     if !pinned && !has_test_blocks(&spec.source) {
         return None;
     }

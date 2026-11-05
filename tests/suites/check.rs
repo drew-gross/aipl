@@ -2067,16 +2067,105 @@ fn fix_with_a_part_named_formats_only_when_format_is_named() {
     assert_eq!(tree_file("parts_fix_tests", "f.aipl"), UNFORMATTED);
 }
 
-/// A `check` section for a part nothing validates yet is refused rather than passed unread: a
-/// recorded expectation that is never compared would make the file pass for the wrong reason.
+/// A file records what `check` prints for some of its parts, and `--fix` writes the section: the
+/// body is exactly the rows and the count line of that projection.
 #[test]
-fn a_check_section_for_a_part_nothing_validates_yet_is_reported() {
-    let src = "import { equal as == } from builtins;\n\n\
-               fn a() -> i64 { 1 }.test({\n    assert(a() == 1);\n})\n--- check --format ---\n";
-    let (stdout, stderr, code) = check_here("check_unvalidated", src);
-    assert_eq!(stderr, "");
+fn a_check_section_records_the_output_of_its_parts_and_is_held_to_it() {
+    let src = format!("{PASSES}--- check --tests ---\n?\n");
+    let (stdout, stderr, code) = check_tree(
+        "check_section_fix",
+        &[("f.aipl", &src)],
+        &["--fix", "f.aipl"],
+    );
+    assert_eq!(
+        stdout, "fixed ./f.aipl: check --tests\n",
+        "the file's own tests are the section's to run"
+    );
+    assert_eq!((stderr.as_str(), code), ("", 0));
+    assert_eq!(
+        tree_file("check_section_fix", "f.aipl"),
+        format!(
+            "{PASSES}--- check --tests ---\n./f.aipl:\n    a: 1 assertion passed\n1 tests: 1 passed, 0 failed\n"
+        )
+    );
+
+    // The recorded section now agrees, and a stale one is a mismatch that names it.
+    let (stdout, _, code) = check_tree(
+        "check_section_ok",
+        &[("f.aipl", &tree_file("check_section_fix", "f.aipl"))],
+        &["f.aipl"],
+    );
+    assert_eq!((stdout.as_str(), code), ("", 0));
+    let stale = format!("{PASSES}--- check --tests ---\nnothing\n");
+    let (stdout, _, code) = check_tree("check_section_stale", &[("f.aipl", &stale)], &["f.aipl"]);
     assert!(
-        stdout.contains("`check --format` section is not validated yet"),
+        stdout.contains("`check --tests` mismatch"),
+        "got:\n{stdout}"
+    );
+    assert_eq!(code, 1);
+}
+
+/// What a section pins is the section's to say: a failing test recorded in one is not the file
+/// failing, and the status follows from the body rather than from a second section.
+#[test]
+fn a_check_section_may_record_a_failing_run() {
+    let src = format!("{FAILS}--- check --tests ---\n?\n");
+    let (_, _, code) = check_tree(
+        "check_section_fails",
+        &[("f.aipl", &src)],
+        &["--fix", "f.aipl"],
+    );
+    assert_eq!(code, 0);
+    assert!(
+        tree_file("check_section_fails", "f.aipl").contains("FAIL"),
+        "got:\n{}",
+        tree_file("check_section_fails", "f.aipl")
+    );
+    let (stdout, _, code) = check_tree(
+        "check_section_fails_again",
+        &[("f.aipl", &tree_file("check_section_fails", "f.aipl"))],
+        &["f.aipl"],
+    );
+    assert_eq!((stdout.as_str(), code), ("", 0), "got:\n{stdout}");
+}
+
+/// The old names are the same sections: bare `check` is `check --tests`, and `--fix` rewrites it
+/// under the header the file has, so both spellings validate and repair identically.
+#[test]
+fn the_old_check_header_is_validated_like_the_new_one_and_fixed_in_place() {
+    let src = format!("{PASSES}--- check ---\nstale\n--- check exit code ---\n3\n");
+    let (stdout, _, code) = check_tree("check_old_names", &[("f.aipl", &src)], &["f.aipl"]);
+    assert!(
+        stdout.contains("`check --tests` mismatch"),
+        "got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("`check exit code` mismatch"),
+        "got:\n{stdout}"
+    );
+    assert_eq!(code, 1);
+    let (_, _, code) = check_tree(
+        "check_old_names_fix",
+        &[("f.aipl", &src)],
+        &["--fix", "f.aipl"],
+    );
+    assert_eq!(code, 0);
+    assert_eq!(
+        tree_file("check_old_names_fix", "f.aipl"),
+        format!(
+            "{PASSES}--- check ---\n./f.aipl:\n    a: 1 assertion passed\n1 tests: 1 passed, 0 failed\n--- check exit code ---\n0\n"
+        )
+    );
+}
+
+/// A section for the tests cannot sit with `errors`: the file does not compile, so there is nothing
+/// to run.
+#[test]
+fn a_check_section_for_tests_contradicts_an_errors_section() {
+    let src = "fn f() -> i64 { missing() }\n--- check --compile ---\n?\n--- check --tests ---\n?\n";
+    let (stdout, _, code) = check_tree("check_section_conflict", &[("f.aipl", src)], &["f.aipl"]);
+    assert!(
+        stdout.contains("requires a compiling program, so it cannot coexist with `errors`"),
         "got:\n{stdout}"
     );
     assert_eq!(code, 1);

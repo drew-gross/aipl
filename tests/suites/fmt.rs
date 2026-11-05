@@ -1,11 +1,5 @@
 //! Formatter tests.
 //!
-//! Two layers:
-//! - **Fixtures** (`tests/fmt/*.aipl`): input source followed by a final
-//!   `--- formatted ---` section holding the expected `format_source` output,
-//!   byte for byte. Refresh with
-//!   `cargo test --test compiler -- --ignored fmt::fill_expected_fmt` (scope with
-//!   `AIPL_FMT_CASE=<substring>`), then review the diff.
 //! - **Corpus invariants**: every parseable `.aipl` in the repo (test cases,
 //!   dogfooded compiler sources, examples) must format without error and format
 //!   *idempotently*. Token and comment preservation is not checked here — it is
@@ -33,9 +27,7 @@ fn aipl_files(dir: &str, out: &mut Vec<PathBuf>) {
 
 /// The `.aipl` files whose checked-in text is required to already be in
 /// canonical format (see [`all_aipl_files_stay_formatted`] /
-/// [`format_corpus`]). This is every `.aipl` in the repo *except* the
-/// formatter's own `tests/fmt/` fixtures, whose inputs are deliberately
-/// misformatted to exercise the formatter.
+/// [`format_corpus`]): every `.aipl` in the repo.
 fn enforced_files() -> Vec<PathBuf> {
     let mut files = Vec::new();
     for dir in [
@@ -163,7 +155,7 @@ fn format_corpus() {
 fn corpus_formats_idempotently_and_losslessly() {
     setup();
     let mut files = Vec::new();
-    for dir in ["tests/cases", "crates", "examples", "tests/fmt"] {
+    for dir in ["tests/cases", "crates", "examples"] {
         aipl_files(dir, &mut files);
     }
     assert!(files.len() > 100, "corpus walk found too few files");
@@ -247,134 +239,6 @@ fn par_map<T: Send>(paths: &[PathBuf], f: impl Fn(&Path) -> T + Sync) -> Vec<T> 
         .into_iter()
         .map(|slot| slot.into_inner().unwrap().expect("every path was visited"))
         .collect()
-}
-
-// ---------- fixtures ----------
-
-const FIXTURE_HEADER: &str = "\n--- formatted ---\n";
-
-/// Split a fixture into (input, expected-output). The `--- formatted ---`
-/// section is last in the file; everything before it (which may itself end
-/// with other `--- .. ---` sections that must ride through formatting) is the
-/// formatter's input.
-fn split_fixture(contents: &str) -> Option<(&str, &str)> {
-    let idx = contents.rfind(FIXTURE_HEADER)?;
-    Some((
-        &contents[..idx + 1], // keep the input's trailing newline
-        &contents[idx + FIXTURE_HEADER.len()..],
-    ))
-}
-
-fn fixture_files() -> Vec<PathBuf> {
-    let mut files = Vec::new();
-    aipl_files("tests/fmt", &mut files);
-    assert!(!files.is_empty(), "no fixtures under tests/fmt");
-    files
-}
-
-fn fixture_filter() -> Option<String> {
-    std::env::var("AIPL_FMT_CASE").ok()
-}
-
-#[test]
-fn fixtures_match_expected() {
-    setup();
-    let filter = fixture_filter();
-    let opts = FmtOptions::default();
-    let mut failures = Vec::new();
-    let mut ran = 0usize;
-    for path in fixture_files() {
-        if let Some(f) = &filter {
-            if !path.to_string_lossy().contains(f.as_str()) {
-                continue;
-            }
-        }
-        ran += 1;
-        let contents = std::fs::read_to_string(&path).unwrap();
-        let Some((input, expected)) = split_fixture(&contents) else {
-            failures.push(format!(
-                "[{}] missing `--- formatted ---` section; add one with a `?` body and run \
-                 `cargo test --test compiler -- --ignored fmt::fill_expected_fmt`",
-                path.display()
-            ));
-            continue;
-        };
-        let actual = match format_source(input, &opts) {
-            Ok(a) => a,
-            Err(e) => {
-                failures.push(format!("[{}] format failed: {e}", path.display()));
-                continue;
-            }
-        };
-        if expected.trim() == "?" {
-            failures.push(format!(
-                "[{}] expected body is `?`; run `cargo test --test compiler -- --ignored fmt:: \
-                 fill_expected_fmt` to fill it. Actual:\n{actual}",
-                path.display()
-            ));
-            continue;
-        }
-        if actual != expected {
-            failures.push(format!(
-                "[{}] output mismatch\n--- expected ---\n{expected}--- actual ---\n{actual}",
-                path.display()
-            ));
-        }
-    }
-    if filter.is_some() {
-        // Mirror the cases harness: a focused run fails on purpose so a stray
-        // filter can't masquerade as a green suite.
-        assert!(
-            failures.is_empty(),
-            "{} fixture failure(s):\n{}",
-            failures.len(),
-            failures.join("\n\n")
-        );
-        panic!(
-            "AIPL_FMT_CASE filter active: ran {ran} fixture(s), all passing — unset it to run \
-             the full suite"
-        );
-    }
-    assert!(
-        failures.is_empty(),
-        "{} fixture failure(s):\n{}",
-        failures.len(),
-        failures.join("\n\n")
-    );
-}
-
-/// Authoring helper: rewrite every fixture's `--- formatted ---` section with
-/// the formatter's actual output, then fail so the run is visibly a refresh.
-/// Scope with `AIPL_FMT_CASE=<substring>`.
-#[test]
-#[ignore]
-fn fill_expected_fmt() {
-    setup();
-    let filter = fixture_filter();
-    let opts = FmtOptions::default();
-    let mut filled = 0usize;
-    for path in fixture_files() {
-        if let Some(f) = &filter {
-            if !path.to_string_lossy().contains(f.as_str()) {
-                continue;
-            }
-        }
-        let contents = std::fs::read_to_string(&path).unwrap();
-        let input = match split_fixture(&contents) {
-            Some((input, _)) => input.to_string(),
-            None => contents.clone(),
-        };
-        let actual = format_source(&input, &opts)
-            .unwrap_or_else(|e| panic!("[{}] format failed: {e}", path.display()));
-        let new_contents = format!("{input}--- formatted ---\n{actual}");
-        std::fs::write(&path, new_contents).unwrap();
-        eprintln!("[{}]: filled expected formatting", path.display());
-        filled += 1;
-    }
-    panic!(
-        "filled {filled} fixture(s); review the diff, then re-run `cargo test --test compiler -- fmt::` \
-         normally (this run fails intentionally so the refresh is visible)"
-    );
 }
 
 /// Formatting through the CLI: `aipl check` reports an unformatted file without

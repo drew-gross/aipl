@@ -200,8 +200,7 @@ section above) formats first, then tests, so a single handoff run leaves the
 tree both green and formatted.
 
 ## AIPL source formatting (`aipl check --fix`)
-Every checked-in `.aipl` file (outside the formatter's own `tests/fmt/`
-fixtures) must be in canonical format — the `all_aipl_files_stay_formatted`
+Every checked-in `.aipl` file must be in canonical format — the `all_aipl_files_stay_formatted`
 test in `tests/fmt.rs` enforces it over `tests/cases/`, `crates/`, `examples/`,
 and `tests/ffi_fixtures/`. So a **new or edited `.aipl` file must be formatted**:
 run `aipl check --fix <file>` (in place; plain `aipl check` reports without writing), or reformat
@@ -223,10 +222,9 @@ turns a real problem into a passing file: a failing test, a leak, a `trace`, a f
 that does not compile, an expected file the run never wrote, or sections that
 contradict each other are still failures (and a report of a leaking run is not
 recorded). It is the user-facing version of `fill_expected` and writes through the
-same dogfooded function — but not the same set of sections: `check` does not
-validate `--- check ---` (it pins a run of `check` itself), so `--fix` cannot
-refresh it, and the corpus's own refills (and handoff) still go through
-`fill_expected`.
+same dogfooded function. `--- check <flags> ---` sections (a recorded run of
+`check` itself, for those parts) are validated and rewritten too; the corpus's own
+refills (and handoff) still go through `fill_expected`, which does not know them yet.
 
 The formatter (`aipl-fmt` crate, `aipl::fmt::format_source`) is canonical
 (gofmt-style — it decides line breaks; width defaults to 100) and works off the
@@ -237,9 +235,7 @@ which invalidates any section holding a rendered diagnostic: refill
 not move a case's baseline row on its own (see the handoff note above on
 content-hashed literal symbols), and the checked-in `dogfood.clif` is renumbered
 and stays stable, so neither normally needs regenerating — the
-`checked_in_ir_is_current` test will tell you if the IR does. Fixture files under
-`tests/fmt/*.aipl` are *intentionally* misformatted inputs and are exempt from
-the enforcement test.
+`checked_in_ir_is_current` test will tell you if the IR does.
 
 ## Performance monitoring
 Performance is tracked in two places: what a case *states* about cost, and the
