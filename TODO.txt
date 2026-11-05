@@ -106,7 +106,6 @@ benchmark:
 
 misc cleanup:
   merge aipl's top level doc and docs commands
-  remember to delete all the codemods from CHECK_AS_GATE when it's done
   some sort of enforcement/restriction on tests with main+sections
   come up with a better strategy for constant slots
   make reserved_names_not_bound into a lint (and also make the assert and trace work a bit more like builtin functions for most purposes so that they can be shadowed. It should fail at lint but work if squelched)
