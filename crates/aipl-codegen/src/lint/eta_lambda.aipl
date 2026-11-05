@@ -104,6 +104,11 @@ pub fn eta_lambda(program: Program) -> LintHit[] {
     assert(messages("map, wrapping_add as +", "xs.map(|n| n + 1)")? == []);
     assert(messages("", "xs.map(|p| p.name)")? == []);
 
+    // A name that is no method of this file (`g` is nothing declared here), and a lambda that is not
+    // a `map`'s argument.
+    assert(messages("map", "ys.map(g)")? == []);
+    assert(messages("filter", `xs.filter(|p| p.name == "a")`)? == []);
+
     // A lambda that only forwards its arguments is the function itself, anywhere.
     assert(messages("filter", "xs.filter(|p| g(p))")? == [
         `lambda only forwards its argument(s) to "g" — pass "g" directly`,

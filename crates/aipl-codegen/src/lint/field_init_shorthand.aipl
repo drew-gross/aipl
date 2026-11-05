@@ -54,6 +54,15 @@ pub fn field_init_shorthand(Function { body }) -> LintHit[] {
             field_init_shorthand,
         )? == [],
     );
+
+    // A range inside a struct body desugars to a `Span` whose bound names match its fields, and the
+    // value's preceding source character is the outer `span:` colon; neither is a written `field: field`.
+    assert(
+        lint_function_messages(
+            "fn tok(start: i64, end: i64) -> Tok { span: start..end }",
+            field_init_shorthand,
+        )? == [],
+    );
 })
 
 # The hits for the fields of `self` that are written `name: name`, when it is a struct literal.

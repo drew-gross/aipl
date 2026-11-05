@@ -65,6 +65,12 @@ pub fn step_by_one(program: Program) -> LintHit[] {
     if (steps.is_empty()) { return []; };
     program.on_functions(|Function { body }| body.descendants()$long_step(steps).collect_ok())
 }.test({
+    fn on_field(body: str) -> str[]!ParseFailure {
+        lint_messages(
+            `import \{ wrapping_add as + } from builtins; fn f(mut c: Counter, m: i64) \{ {body} }`,
+            step_by_one,
+        )
+    }
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
         lint_messages(
             `import \{ {imports} } from builtins; fn f(x: i64) -> i64 \{ mut n = x; {body} n }`,
@@ -94,57 +100,34 @@ pub fn step_by_one(program: Program) -> LintHit[] {
     assert(messages("saturating_add as +, wrapping_increment as ++", "set n = n + 1;")? == []);
     assert(messages("len", "set n = n + 1;")? == []);
 
-    // Shapes the lint flags, and what it says of them.
-    assert(
-        lint_messages(
-            """
-                fn bump(start: i64) -> i64 {
-                    mut n = start;
-                    set n = n + 1;
-                    n
-                }
-            """,
-            step_by_one,
-        )? == [],
-    );
+    // The compound spellings are the same statements, paired against the operator that was written,
+    // so the plain `+` need not be imported at all.
+    assert(messages("wrapping_add_assign as +=", "set n += 1;")? == [
+        """adding 1 to "n" — use the increment form "set n++;", importing `wrapping_increment as ++` from builtins""",
+    ]);
+    assert(messages("wrapping_sub_assign as -=", "set n -= 1;")? == [
+        """subtracting 1 from "n" — use the decrement form "set n--;", importing `wrapping_decrement as --` from builtins""",
+    ]);
 
-    // The same lint the other way round: `set x--;` is the form for `set x = x - 1;`.
-    // Only the receiver-on-the-left order counts here — `1 - n` subtracts `n` from
-    // one, which is no decrement at all.
+    // The decrement names the flavor of the operator written: a saturating subtract is not
+    // recommended a wrapping decrement, and a file whose `-` and `--` differ is quiet.
+    assert(messages("saturating_sub as -", "set n = n - 1;")? == [
+        """subtracting 1 from "n" — use the decrement form "set n--;", importing `saturating_decrement as --` from builtins""",
+    ]);
+    assert(messages("saturating_sub as -, wrapping_decrement as --", "set n = n - 1;")? == []);
+
+    // Only the same place on both sides is a step: another binding, or a field fed from one, is not.
+    assert(messages(wrapping, "set n = x + 1;")? == []);
+    assert(messages(wrapping, "set n = x - 1;")? == []);
+    assert(on_field("set c.n = c.n + 1;")? == [
+        """adding 1 to "c.n" — use the increment form "set c.n++;", importing `wrapping_increment as ++` from builtins""",
+    ]);
+    assert(on_field("set c.n = m + 1;")? == []);
+
+    // An operator bound to one of the file's own functions is not the builtin, whatever it is called.
     assert(
         lint_messages(
-            """
-                fn drop_one(start: i64) -> i64 {
-                    mut n = start;
-                    set n = n - 1;
-                    n
-                }
-            """,
-            step_by_one,
-        )? == [],
-    );
-    // A field path is a target like any other, quoted as written.
-    assert(
-        lint_messages(
-            """
-                fn bump_field(mut self: Counter) {
-                    set self.n = self.n + 1;
-                }
-            """,
-            step_by_one,
-        )? == [],
-    );
-    assert(
-        lint_messages(
-            """
-                fn subject() !prints {
-                    print(bump(1).to_str());
-                    print(drop_one(1).to_str());
-                    mut c = Counter { n: 1 };
-                    set c.bump_field();
-                    print(c.n.to_str());
-                }
-            """,
+            """import { add as + } from "./mymath.aipl"; fn f(x: i64) -> i64 { mut n = x; set n = n + 1; n }""",
             step_by_one,
         )? == [],
     );

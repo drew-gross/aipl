@@ -1,0 +1,27 @@
+# `#[allow]` is line-scoped: it squelches the hits that start on its own line. A
+# marker on a neighbouring line squelches nothing, and a marker on a line where
+# nothing fires is stale; both are reported, and the hit stays.
+fn subject(s: str) -> str {
+    #[allow]
+    let neighbour = s[0..2];
+    let stale = s[1..3]; #[allow]
+    neighbour
+}
+--- errors ---
+error: slice starts at 0 — drop it for the open-ended "s[..2]" (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/allow_marker_scope.aipl:6:23
+  |
+6 |     let neighbour = s[0..2];
+  |                       ^
+
+error: this `#[allow]` squelches nothing — remove it
+ --> ./tests/cases/lints/allow_marker_scope.aipl:5:5
+  |
+5 |     #[allow]
+  |     ^^^^^^^^
+
+error: this `#[allow]` squelches nothing — remove it
+ --> ./tests/cases/lints/allow_marker_scope.aipl:7:26
+  |
+7 |     let stale = s[1..3]; #[allow]
+  |                          ^^^^^^^^

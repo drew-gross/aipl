@@ -97,24 +97,23 @@ pub fn compound_assign(program: Program) -> LintHit[] {
         "set n = n + 1;",
     )? == [`"n" accumulates onto itself — use the compound form "set n += ...;"`]);
 
-    // Shapes the lint must leave alone.
+    // A field path is a target like any other, quoted as written, and a fed-from-another-binding
+    // store is not an accumulate.
+    fn on_field(body: str) -> str[]!ParseFailure {
+        lint_messages(
+            `import \{ wrapping_add as +, wrapping_add_assign as += } from builtins; fn f(mut c: Counter, m: i64) \{ {body} }`,
+            compound_assign,
+        )
+    }
+    assert(on_field("set c.n = c.n + 5;")? == [
+        `"c.n" accumulates onto itself — use the compound form "set c.n += ...;"`,
+    ]);
+    assert(on_field("set c.n = m + 5;")? == []);
 
-    // Shapes the lint flags, and what it says of them.
+    // An operator the file binds to a function of its own is not the builtin.
     assert(
         lint_messages(
-            """
-                fn subject() !prints {
-                    mut n = 10;
-                    set n = n + 5;
-                    set n = 3 + n; // the commutative order counts too
-                    set n = n / 2;
-                    print(n.to_str());
-                    // A field path is a target like any other, quoted as written.
-                    mut c = Counter { n: 1 };
-                    set c.n = c.n + 5;
-                    print(c.n.to_str());
-                }
-            """,
+            """import { add as +, wrapping_add_assign as += } from "./mymath.aipl"; fn f(x: i64) -> i64 { mut n = x; set n = n + x; n }""",
             compound_assign,
         )? == [],
     );

@@ -229,12 +229,12 @@ entry-point-mechanics tests (exit code, `cli`, `stderr`, `file:`, `expect file:`
       leaves a section untouched when the file compiles, so it called a deletion "unchanged" when it had removed the
       error). Two keep it: `effects/err_random_main` (the error is that `main` cannot declare `!random`) and
       `generics/errors/err_type_param_conflict` (needs a root: G7).
-- [ ] **Lint fixtures still in `tests/cases/lints/`** (their `main`s are converted; mapping each shape-named one to its lint is left, tracked in `CLAUDE_TODO.txt`) (41 files). The 10 lints that were Rust (2026-11-04: all
-      lints are AIPL now; the Rust lint code is gone, and their `err_`/`_allow`/`_not_flagged` fixtures moved into
-      each lint's own `.test` assertions) left behind the fixtures that are named for a shape and not a lint
-      (`err_struct_literals`, `err_emptiness_tests`, `incr_shapes_not_flagged`, `decr_*`, `err_step_*`, ...: map
-      each to its lint first), and the `_allow` fixtures that need a `struct`/`variant` or output a test block
-      cannot hold (`len_gt_zero_allow`, `set_spread_field_allow`).
+- [x] **Lint fixtures** (2026-11-04): `tests/cases/lints/` is down from 41 files to the two that test the squelching
+      infrastructure itself (`allow_squelch`, `allow_marker_scope`). The shape-named fixtures were deleted where a lint's
+      `.test` already covered them and their unique cases ported into `step_by_one`, `compound_assign`, `len_gt_zero`,
+      `is_empty_longhand`, `return_loop_find_if`, `eta_lambda` and `field_init_shorthand` (which also had vacuous
+      `== []` blocks, with no import to fire on, replaced by real assertions). The per-lint `_allow` fixtures went:
+      squelching is one mechanism, tested once.
 - [x] **Per batch:** `cargo handoff`, then review moved baseline rows (the `main` to test-driver switch moves
       `instructions` and `code bytes` for every converted case).
 - [x] **Update CLAUDE.md for `main` only, now:** delete "Test `main` style" (its premise, a void `main` driving a
@@ -391,7 +391,6 @@ differential test green.
       and that run-observing sections make a file a test of `main`.
 - [ ] README, `projects/README.md`, the skills (`write-aipl`, `add-lint`, `add-builtin`), the headers of
       `tests/cases.rs` and `tests/suites/fmt.rs`, `aipl --help`.
-- [ ] `scripts/`: `errors_fixture_main.py` and `lint_fixtures_to_tests.py` name `errors` sections; update or retire.
 - [ ] Optional (DS7): highlighting for section header lines in the editor grammar, and an LSP diagnostic for a
       malformed header.
 

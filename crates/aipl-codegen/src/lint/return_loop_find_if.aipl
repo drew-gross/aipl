@@ -110,6 +110,33 @@ pub fn return_loop_find_if(Function { body }) -> UnfilledHit[] {
             return_loop_find_if,
         )? == [],
     );
+
+    // An `if`/`else` returns on every element, so it is no search; a fall-through that is not `none`
+    // is not the not-found answer; a second statement in the guarded block is work `find_if` has
+    // nowhere to put; and a `while` has no sequence to search.
+    for (let source : [
+        "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { return some(1); } else { return some(0); }; } none }",
+        "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { return some(x); }; } xs[0] }",
+        "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { g(x); return some(x); }; } none }",
+        "fn f(n: i64) -> i64? { mut i = 0; while (i < n) { if (i == 3) { return some(i); }; set i++; } none }",
+    ]) {
+        assert(lint_function_unfilled_messages(source, return_loop_find_if)? == []);
+    }
+
+    // `any`'s shape reports only that a match existed, which is another lint's, and the rewrite
+    // itself must not flag.
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(xs: i64[]) -> bool { for (let x : xs) { if (x > 1) { return true; }; } false }",
+            return_loop_find_if,
+        )? == [],
+    );
+    assert(
+        lint_function_unfilled_messages(
+            "fn f(xs: i64[]) -> i64? { xs.find_if(|x| x > 1) }",
+            return_loop_find_if,
+        )? == [],
+    );
 })
 
 # What is said of a loop over `receiver` binding `variable`, for a file that does not

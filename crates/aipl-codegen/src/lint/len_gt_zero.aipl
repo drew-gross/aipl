@@ -93,34 +93,27 @@ pub fn len_gt_zero(program: Program) -> LintHit[] {
     assert(messages(all, "0 > x.len()")? == []);
     assert(messages("len", "x.len() > 0")? == []);
 
-    // Shapes the lint must leave alone.
-    // A different bound is a different question.
-    assert(
-        lint_messages("fn at_least_two(xs: i64[]) -> bool { 1 < xs.len() }", len_gt_zero)? == [],
-    );
-    assert(
-        lint_messages("fn more_than_one(xs: i64[]) -> bool { xs.len() > 1 }", len_gt_zero)? == [],
-    );
+    // A different bound is a different question. `>= 1` and `!= 0` mean the same thing but are not
+    // the two idioms the lint rewrites, and inventing a third spelling to flag would make the rule
+    // harder to state than to follow.
+    assert(messages(all, "1 < x.len()")? == []);
+    assert(messages(all, "x.len() > 1")? == []);
+    assert(messages(all, "x.len() >= 1")? == []);
 
-    // `>= 1` means the same thing, but it is not one of the two idioms the lint
-    // rewrites, and inventing a third spelling to flag would make the rule harder
-    // to state than to follow.
-    assert(
-        lint_messages("fn at_least_one(xs: i64[]) -> bool { xs.len() >= 1 }", len_gt_zero)? == [],
-    );
-    // So does `!= 0`, and it is left alone for the same reason.
-    assert(lint_messages("fn not_zero(xs: i64[]) -> bool { xs.len() != 0 }", len_gt_zero)? == []);
-    // Zero compared against anything that isn't a length.
-    assert(lint_messages("fn positive(n: u64) -> bool { 0 < n }", len_gt_zero)? == []);
-    // The spelling the lint asks for, which must not then flag itself.
-    assert(
-        lint_messages("fn any_items(xs: i64[]) -> bool { xs.is_nonempty() }", len_gt_zero)? == [],
-    );
+    // Zero compared against anything that isn't a length; the spelling the lint asks for, which must
+    // not then flag itself; and the other question, an un-negated `is_empty`.
+    assert(messages(all, "0 < x")? == []);
+    assert(messages(all, "!(0 < x)")? == []);
+    assert(messages(all, "x.is_nonempty()")? == []);
+    assert(messages(all, "x.is_empty()")? == []);
 
-    // An un-negated `is_empty` is the other question, and a negation of anything
-    // but `is_empty` is not this idiom.
-    assert(lint_messages("fn no_items(xs: i64[]) -> bool { xs.is_empty() }", len_gt_zero)? == []);
-    assert(lint_messages("fn not_positive(n: u64) -> bool { !(0 < n) }", len_gt_zero)? == []);
+    // An operator the file binds to a function of its own is a call to that function, not a length test.
+    assert(
+        lint_messages(
+            """import { len } from builtins; import { my_lt as < } from "./myord.aipl"; fn f(x: i64[]) -> bool { 0 < x.len() }""",
+            len_gt_zero,
+        )? == [],
+    );
 })
 
 # The hit for `self`, when it is a comparison of a length with zero, or a negated `is_empty`.

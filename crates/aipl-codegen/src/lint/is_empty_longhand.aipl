@@ -26,7 +26,6 @@ import {
     as_case,
     collect_ok,
     equal as ==,
-    is_empty,
     len,
     logical_not as !,
     logical_or as ||,
@@ -92,38 +91,25 @@ pub fn is_empty_longhand(program: Program) -> LintHit[] {
     assert(messages(all, "x.len() == 1")? == []);
     assert(messages("len, is_empty", "x.len() == 0")? == []);
 
-    // Shapes the lint must leave alone.
+    // The free-call spelling of `len` is the same AST, so it is the same hit.
+    assert(messages(all, "len(x) == 0")? == [
+        `emptiness asked the long way — use "x.is_empty()"`,
+    ]);
 
-    // Shapes the lint flags, and what it says of them.
+    // A `len` of the file's own is a different function answering a different question, and
+    // `is_empty` does not even accept what it takes, so advising it would advise code that does not
+    // compile. (A file cannot both define `len` and import the builtin one.)
     assert(
         lint_messages(
-            "fn negated(xs: i64[]) -> bool { !xs.is_nonempty() }",
+            """
+                import { equal as == } from builtins;
+                variant List = Nil | Cons(i64)
+                fn len(self: List) -> i64 { match (self) { Nil => 0, Cons(..) => 1 } }
+                fn is_nil(xs: List) -> bool { xs.len() == 0 }
+            """,
             is_empty_longhand,
         )? == [],
     );
-    assert(
-        lint_messages("fn len_zero(xs: i64[]) -> bool { xs.len() == 0 }", is_empty_longhand)? == [],
-    );
-    assert(
-        lint_messages("fn zero_len(xs: i64[]) -> bool { 0 == xs.len() }", is_empty_longhand)? == [],
-    );
-
-    // The free-call spelling of `len` is the same AST, so it is the same hit — the
-    // advice names the receiver rather than splicing it, since a call's span stops
-    // before its closing paren.
-    assert(
-        lint_messages("fn free_call(xs: i64[]) -> bool { len(xs) == 0 }", is_empty_longhand)? == [],
-    );
-    // A `str` receiver counts too: `len` takes it, so `is_empty` does.
-    assert(
-        lint_messages("fn empty_str(s: str) -> bool { s.len() == 0 }", is_empty_longhand)? == [],
-    );
-
-    // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
-    fn the_long_way(xs: i64[]) -> bool { xs.len() == 0 } #[allow]
-    fn the_short_way(xs: i64[]) -> bool { xs.is_empty() }
-    assert(`{the_long_way([])} {the_short_way([])}` == "true true");
-    assert(`{the_long_way([1])} {the_short_way([1])}` == "false false");
 })
 
 # The hit for `self`, when it is a negated `is_nonempty` or a length compared with zero for equality.
