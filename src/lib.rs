@@ -42,6 +42,7 @@ pub use aipl_loader as loader;
 pub use aipl_lsp as lsp;
 pub use aipl_mono as mono;
 
+pub mod check;
 pub mod flamegraph;
 pub mod perf;
 pub mod profile;

@@ -1,15 +1,14 @@
 # `aipl check` as the whole case gate: what is left
 
-Status as of 2026-11-03. Done and removed from this list (git has the history): effect-free tests
+Status as of 2026-11-04. Done and removed from this list (git has the history): effect-free tests
 (Phase 2a), forbidding imports of files that have sections (the earlier Phase 3), top-level `test`/`benchmark` blocks, the
-`.performance` to `.benchmark` rename, root-relative `./` labels (DESIGN_PRINCIPLES.md §6 and §7), and most of
-Phase 2b, which reserved `main` for programs and tests of the real implementation of an effect.
+`.performance` to `.benchmark` rename, root-relative `./` labels (DESIGN_PRINCIPLES.md §6 and §7), Phase 1 (the
+parity gaps) and Phase 2b (reserving `main`); see "Done" below.
 
 Each phase lands green via `cargo handoff` and is worth merging on its own.
 
 **New direction (2026-11-03): the sections that are `check`'s own output become `--- check .. ---` sections.** See
-"Direction" below and Phase 3. It changes the order of the remaining work: Phase 1 (parity gaps) first, then
-Phase 3 (those sections are `check` invocations), then the batch runner and the flip, which get smaller because
+"Direction" below and Phase 3. It changes the order of the remaining work: Phase 3 (those sections are `check` invocations), then the batch runner and the flip, which get smaller because
 of it. The sections that observe a run of `main` (`stdout`, `stderr`, `exit code`, `expect file:`) and the inputs
 (`cli`, `file:`) are not part of it and stay as they are.
 
@@ -155,153 +154,64 @@ loudly); running `main` under the JIT is rejected (the AOT linker runtime is the
 - [ ] Check that a `Compilation` frees its JIT code on drop (memory growth in a long process).
 - [ ] Write the timing table into this doc; resolve D4; go/no-go for Phases 4-5.
 
-## Phase 1: close the parity gaps in `check`
-Each gap gets a failing-fixture test in `tests/suites/check.rs` (model:
-`the_leak_gate_runs_for_a_case_with_no_sections`).
-- [x] G1 (2026-11-04) baseline row compare: `aipl check --baseline <table.md>` holds each file's run (its `main`, or
-      its tests' driver when it has none, measured as `aipl report` does) to its row, the five asserted columns
-      exactly, and prints `BaselineMoved`/`BaselineMissing` as `handoff-fill:` lines. Opt-in, so the tool does not
-      carry this repository's table path. Rows are named by the file's path from the root without `.aipl`
-      (`tests/cases/arrays/slice`), so the table was re-keyed (`cases/` became `tests/cases/`, 658 rows, no value
-      moved) and the harness uses the same key. The comparison (`perf::baseline_moves`, `read_baseline`) is one
-      definition shared with the harness. `--fix` does not touch the table: it is one file many files share, so
-      the reader of the fill line rewrites it. Not done: skipping the second measurement when the leak gate has
-      already run the same program (Phase 4).
-- [x] G2 leak gate (2026-11-03). `check` runs the tests' synthesized driver once in an instrumented build for every
-      file with tests, and `main` too when it is being run anyway because the file records what it does; either
-      leaking fails the file (`test memory leak in tests|main ... FAIL`). A plain program's `main` is never run
-      (it may be a server or read a terminal), so a `main` with no run-observing section is not gated by `check`.
-      Open: the harness still measures `main` of every case, including `examples/` with no sections; to move that
-      into `check`, such a file would need a section (even `--- exit code ---` / `0`), which makes it a test of
-      `main` and so safe to run. While the harness also measures, a case's tests are built and run twice (once
-      in `check --ignore-sections`, once by the harness); that duplication ends when the harness delegates (3.7).
-- [x] ~~G3 `check` / `check exit code` sections~~ subsumed by Phase 3 (a `check` section is validated by the same
-      mechanism as every other section).
-- [x] G4 root the harness at the project root (2026-11-04; D3 resolved: **the root is the directory the tool
-      is run in**, no marker file). The harness roots a case at the repository (`load_case`) and stages a case
-      with companions under `<out>/<case>/case-root/` at the path it has in the repository; `check` stages the
-      same way (`in_staged_dir`), and `aipl report` roots at the cwd like `check`. A case is now
-      `./tests/cases/<dir>/<case>.aipl` in the loader error, the caret block and a baked `assert`/`trace`; the
-      9 `imports` cases that `check <dir>` disagreed with now agree. A baked label is longer, so baseline
-      `code bytes` and pinned stdout/reports/errors moved once (handoff refills them).
-      `report_does_not_depend_on_where_it_is_run_from` became
-      `report_names_the_file_by_its_path_from_the_directory_it_is_run_in`: the spelling of the path does not matter,
-      the directory does. Not done: the report == pinned section check from a second cwd (a file's report
-      differs by design from another directory).
-- [x] G5 (2026-11-04) the harness's "`file:` section on an in-place source is an error" rule is dropped rather
-      than copied into `check`: it would have put this repository's directory names into the tool users run. Both
-      now stage any file that has `file:` sections and load the rest in place. No corpus file had one outside
-      `tests/cases/`.
-- [x] G6 `check` prints `handoff-fill:` lines via `handoff::protocol::Fill` (one definition).
-      A section finding that a rewrite repairs prints `Fill::Section` on its own stderr line after the message, with
-      the file's path from the root (`sub/wrong.aipl`) as the case and the section as `--fix` names it. Findings no
-      rewrite repairs print none. `handoff` is now a normal dependency of the root package. The baseline kinds
-      (`BaselineMoved`/`BaselineMissing`) arrive with G1. The names are not yet the harness's display paths
-      (`cases/x/y`); Phase 5, when handoff reads `check`, settles that.
-- [x] G7 **which functions does `check` compile?** Decided 2026-11-04: accept. `check` and the cases harness
-      compile identically (both load, then `Compilation::new`; `tests/cases.rs` and `check_file` agree), so there is
-      no parity gap to close. Errors found while instantiating generic code (`conflicting types for "T"`) are only
-      found for code reachable from a root (`main`, or a test), under both. Making every non-generic function a
-      mono root is not done here: the fix belongs to checking generic functions at their definition, which is a
-      separate project. Fixtures that pin such an error keep a root (`generics/errors/err_type_param_conflict`
-      has a `main` that calls it).
-- ~~Differential test~~ dropped (2026-11-04): too expensive for what it adds, since the corpus would run twice.
-- ~~Canary set~~ dropped (2026-11-04): `tests/suites/check.rs` already has a failing-fixture test for each
-  rejection (wrong stdout, exit code, `errors`, `report`, leak, trace, unformatted, benchmark, and now baseline
-  moved/missing and a lint hit).
-
-## Phase 2b: what is left of reserving `main`
-Target state: `fn main` appears only in (a) real programs (`projects/`, `examples/`), (b) tests of the real
-implementation of an effect (stdin, terminal, process, real clock, real files), and (c) the
-entry-point-mechanics tests (exit code, `cli`, `stderr`, `file:`, `expect file:`).
-
-- [x] **Recount the files with a `main`, sections and tests** (2026-11-04): the 64 of 2026-11-03 plus 31 more
-      (every `file:` import case, the lint fixtures, `options/is_some_and`, `chars/to_digit`, ...) are converted.
-      47 remain, all deliberate: entry mechanics and real effects (`cli/`, `results/`, `functions/exit_code`,
-      `functions/void/main_returns_nothing`, `execute_program/`, `files/`, `builtins/{read_*,terminal,now_nanos,
-      monotonic_now}`, `debug/trace`), whole-program `report` pins (`report/`, `optimizations/inline_inspected`,
-      `strings/concat/print_rope`), `strings/int_parse` (exit-code paths), `effects/{shim_clock,random,
-      random_provider_block}` (a second effect besides `prints`), and 17 `err_` fixtures whose messages change
-      when `main` goes (the import-error ones, the unclosed-literal and missing-semicolon ones,
-      `err_random_main`, `err_type_param_conflict`).
-- [x] The 26 error fixtures that kept their `main` (2026-11-03): 24 had it renamed `subject` once the conversion was
-      verified by compiling the file and reading its errors (the earlier verification went through `--fix`, which
-      leaves a section untouched when the file compiles, so it called a deletion "unchanged" when it had removed the
-      error). Two keep it: `effects/err_random_main` (the error is that `main` cannot declare `!random`) and
-      `generics/errors/err_type_param_conflict` (needs a root: G7).
-- [x] **Lint fixtures** (2026-11-04): `tests/cases/lints/` is down from 41 files to the two that test the squelching
-      infrastructure itself (`allow_squelch`, `allow_marker_scope`). The shape-named fixtures were deleted where a lint's
-      `.test` already covered them and their unique cases ported into `step_by_one`, `compound_assign`, `len_gt_zero`,
-      `is_empty_longhand`, `return_loop_find_if`, `eta_lambda` and `field_init_shorthand` (which also had vacuous
-      `== []` blocks, with no import to fire on, replaced by real assertions). The per-lint `_allow` fixtures went:
-      squelching is one mechanism, tested once.
-- [x] **Per batch:** `cargo handoff`, then review moved baseline rows (the `main` to test-driver switch moves
-      `instructions` and `code bytes` for every converted case).
-- [x] **Update CLAUDE.md for `main` only, now:** delete "Test `main` style" (its premise, a void `main` driving a
-      case, is gone for ordinary cases); say where `main` may appear; say that behavior is pinned by `.test` blocks
-      and sections are for diagnostics, reports and the real-implementation and entry-point cases. The section
-      *vocabulary* in CLAUDE.md changes again in Phase 3, so leave it for 3.13 and do not rewrite it twice.
-- [x] **Update the skills for `main` only, now:** `write-aipl` (its `main`/`stdout` examples and the capture-shim
-      template) and `add-builtin` ("a case is for ... output a `main` prints"). Section names in the skills wait for 3.13.
-- [x] **Re-count** the cases that link a production executable after the last conversion; it should be small
-      (this is what Phase 0's "fewer executables" saving rests on). Record it here: 47 files keep a `main` with sections, listed above.
-
-How to convert (the shape a reader should see):
-- **Prefer a returned value.** If a function only prints because it was convenient, make it return the value
-  and assert on that: `assert(describe(3) == "three")`. No shim.
-- **If the printing is the behavior**, capture it inline in a top-level `test({ .. })` (no dummy function).
-  `print` adds a newline and `put` does not, so the stand-in models both, and the expected text stays visible:
-  ```
-  test({
-      mut out = "";
-      shim prints {
-          print = |text| { set out = `{out}{text}\n`; },
-          put = |text| { set out = `{out}{text}`; },
-      } {
-          demo();            // the old main's body, verbatim
-      };
-      assert(out == """
-          expected text, copied from the old `--- stdout ---`
-          """);
-  })
-  ```
-  A `"""` block is dedented, drops trailing whitespace on a line, and needs a blank line before the closing
-  quotes for the final newline; use an escaped string when the output has trailing whitespace or blank lines
-  at the end. Watch `--- ` markers inside a `"""` block.
-- **A `report` case** pins the whole program's call counts, so print-capture adds rows of its own: turn the
-  prints into asserts (`print(X)` to `assert(X == "line")`) and keep the capture only where helper functions
-  print.
-- The old `--- stdout ---` text is the oracle: the new assert must say the same bytes, so a codemod slip fails a
-  test and does not pass quietly. Read a sample of each batch's diff.
-- **Verify a fixture change by compiling the file and reading the errors it really prints**, never through
-  `--fix`: it leaves a section alone when the file compiles, so it compares the old text with itself. A refill
-  pins whatever the compiler now says, including a different error; read a freshly filled `--- errors ---` body by
-  eye once.
-
-The conversion scripts (`main_to_test.py`, `main_to_asserts.py`, `errors_fixture_main.py`,
-`lint_fixtures_to_tests.py`) are deleted: their work is done, and git has them.
-
-## Small follow-ups found on the way
-- [x] **A leak the new gate found: `projects/minesweeper`'s tests leaked** (51 of 7028 allocations). Not minesweeper's
-      and not the shim's: any struct with an array field, a `mut self` method that is not inlined (called twice),
-      and a move of the binding afterwards (`let f = a;`, or an inlined callee taking it) leaked one block. After
-      the call the binding's slot named the call's own result buffer, which the call also tracks for release; the
-      move empties a binding's buffer field by field, so the call's release found nothing. The mutating-method arm
-      of `compile_call_expr` now gives a struct receiver a buffer of its own. Pinned by
-      `tests/cases/structs/mut_method_then_move.aipl`.
-The open follow-ups from this list moved to `CLAUDE_TODO.txt`.
+## Done: Phases 1 and 2b (2026-11-04), and what they leave behind
+Git has the history; these are the facts later phases lean on.
+- **Baseline (G1).** `aipl check --baseline <table.md>` holds each file's run (its `main`, or its tests' driver when
+  it has none, measured as `aipl report` does) to its row, the five asserted columns exactly, and prints
+  `BaselineMoved`/`BaselineMissing` as `handoff-fill:` lines. Opt-in, so the tool does not carry this repository's
+  table path. Rows are keyed by the path from the root without `.aipl` (`tests/cases/arrays/slice`);
+  `perf::baseline_moves` is the one comparison, shared with the harness. `--fix` does not touch the table (many
+  files share it); the reader of the fill line rewrites it. Open for Phase 4: skip the second measurement when the
+  leak gate already ran the same program.
+- **Leak gate (G2).** `check` runs the tests' synthesized driver once, instrumented, for every file with tests, and
+  `main` too when it is being run anyway because the file records what it does; either leaking fails the file. A
+  plain program's `main` is never run (it may be a server), so a `main` with no run-observing section is not gated
+  by `check`; the harness still measures every case's `main`. Until the harness delegates (3.7) a case's tests are
+  built and run twice.
+- **Rooting (G4, D3).** The project root is the directory the tool is run in; no marker file. Harness, `check` and
+  `aipl report` all label a file `./path/from/root.aipl` (loader errors, caret blocks, baked `assert`/`trace`). A
+  file with `file:` sections is staged under `<out>/<case>/case-root/` at the path it has in the repository.
+  Not done: the report == pinned section check from a second cwd (a report differs by design from another directory).
+- **`file:` on an in-place source (G5)** is not an error in `check` (the rule would put this repository's directory
+  names into the tool users run); both stage any file with `file:` sections.
+- **Fill lines (G6).** A section finding that a rewrite repairs prints `Fill::Section` on its own stderr line after
+  the message, with the file's path from the root as the case; findings no rewrite repairs print none. The names are
+  not yet the harness's display paths (`cases/x/y`); Phase 5 settles that.
+- **Which functions `check` compiles (G7).** Same as the harness: load, then `Compilation::new`. Errors found while
+  instantiating generic code are found only for code reachable from a root (`main` or a test), under both. Fixing
+  that belongs to checking generic functions at their definition (`CLAUDE_TODO.txt`). Fixtures that pin such an
+  error keep a root.
+- **Dropped:** the differential test (the corpus would run twice) and the canary set (`tests/suites/check.rs` has a
+  failing fixture per rejection).
+- **`main` is reserved** (CLAUDE.md, "Where `main` may appear"). 47 files keep a `main` with sections, all
+  deliberate: entry mechanics and real effects (`cli/`, `results/`, `functions/exit_code`,
+  `functions/void/main_returns_nothing`, `execute_program/`, `files/`, `builtins/{read_*,terminal,now_nanos,
+  monotonic_now}`, `debug/trace`), whole-program `report` pins (`report/`, `optimizations/inline_inspected`,
+  `strings/concat/print_rope`), `strings/int_parse`, `effects/{shim_clock,random,random_provider_block}`, and 17
+  `err_` fixtures whose messages change when `main` goes. `tests/cases/lints/` holds only the two squelching tests.
+- **Converting a print-only `main`** (the shape if one is ever needed): prefer a returned value and an assert; if the
+  printing is the behavior, capture it with `shim prints { print = .., put = .. }` in a top-level `test({ .. })` and
+  assert the captured text. Verify a fixture change by compiling the file and reading the errors it prints, never
+  through `--fix` (it leaves a section alone when the file compiles).
+- Open follow-ups are in `CLAUDE_TODO.txt`.
 
 ## Phase 3: `check`'s own output is written as `check` sections
 Order matters, and the reasons are in "Why this order" below. Each numbered item is a stage that lands green on
 its own; the corpus migration (3.9) is one handoff per kind. The run-observing sections and the inputs are not
 touched anywhere in this phase except where `check` reads them into the structured result.
 
-**3.1 Structure first (no behavior change)**
-- [ ] Split `check_file` (`src/main.rs`) into producing a structured `CheckResult` (formatting findings, compile
-      diagnostics, test records, benchmark outcome, the run, the report, trace refusals, later leak and baseline)
-      and rendering it. Existing tests stay green unchanged; this is the stage that makes the rest cheap.
-- [ ] Give each part of the result a stable, testable renderer (rows, failures, diagnostics), used by both the
-      CLI and, later, section comparison.
+**3.1 Structure first (no behavior change)** (2026-11-04)
+- [x] `check` produces a `CheckResult` per file (`src/check.rs`): the formatting verdict (`Formatting`), the tests'
+      rows, and either a rendered load/compile failure or a `Checked` (driver exit code, traces, section findings
+      left after `--fix`, the sections `--fix` wrote and why it could not, whether tests ran). `check_path` in
+      `main.rs` produces it and prints only the formatting line, first, so it still precedes whatever the run
+      prints; the single-file and batch modes then print the result in the orders they always used (the batch
+      prints `fixed` after the rows, the single report before them).
+- [x] Renderers, one per part, in `check.rs` with unit tests: `render_test_rows`, `render_findings` (with the
+      `handoff-fill:` line), `Formatting::line`, `CheckResult::render_fixed` and `render_summary`. Compile
+      diagnostics and traces are already rendered strings. Still not structured: the runtime's failure text
+      (`test failures:`) and pass/fail tallies, which accumulate across a batch inside `aipl::codegen`; 3.2 and
+      3.5 need them as data, so they are next.
 
 **3.2 One output stream (DS3)**
 - [ ] Move compile diagnostics, section mismatches, format notices, trace refusals and `fix` lines into the
