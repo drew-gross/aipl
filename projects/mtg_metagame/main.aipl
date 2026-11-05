@@ -2,57 +2,52 @@
 # archetype is, and how well it does. A port of `mtg_metagame_stats`, grown one
 # piece at a time.
 
-import {
-    equal as ==,
-    greater_than as >,
-    print,
-    saturating_divide as /,
-    wrapping_add as +,
-    wrapping_mul as *,
-} from builtins;
+import { equal as ==, print, read_file_to_string, value_or } from builtins;
+import { CardCount, card_counts } from "./card_stats.aipl";
+import { Json, optional_text_field, parse_json } from "./json.aipl";
+import { Metagame, load_metagame } from "./metagame.aipl";
 
-# How one match ended, from a deck's point of view.
-variant Result = Win | Loss | Draw
-
-# Matches won, lost and drawn.
-struct Record { win: u64, loss: u64, draw: u64 }
-
-# `a` and `b` counted together.
-fn add_records(a: Record, b: Record) -> Record {
-    win: a.win + b.win,
-    loss: a.loss + b.loss,
-    draw: a.draw + b.draw,
+# The file in `data/` that `name` stands for: the file `index` maps it to, or
+# `name` itself when the index does not know it.
+fn data_path(index: Json, name: str) -> str {
+    let target = index.optional_text_field(name).value_or(name);
+    `data/{target}.json.gz`
 }.test({
-    assert(add_records(
-        Record { win: 1, loss: 2, draw: 3 },
-        Record { win: 10, loss: 20, draw: 30 },
-    ) == Record { win: 11, loss: 22, draw: 33 });
+    let index = parse_json("""{"standard_26Q2_rc_japan": "metagame_410903"}""")?;
+    assert(data_path(index, "standard_26Q2_rc_japan") == "data/metagame_410903.json.gz");
+    assert(data_path(index, "metagame_1") == "data/metagame_1.json.gz");
 })
 
-# The record a single match result is worth.
-fn record_of(self: Result) -> Record {
-    match (self) {
-        Win => Record { win: 1, loss: 0, draw: 0 },
-        Loss => Record { win: 0, loss: 1, draw: 0 },
-        Draw => Record { win: 0, loss: 0, draw: 1 },
+# A card's line in the listing: its copies, then its name.
+fn card_line(self: CardCount) -> str { `{self.count} {self.name}` }.test({
+    assert(CardCount { name: "Island", count: 12 }.card_line() == "12 Island");
+})
+
+# One line per card played in the metagame `name` stands for, most played first.
+fn listing(name: str) !read_files !execute_program -> str[]!str {
+    let index = parse_json(read_file_to_string("data/index.json")?)?;
+    let Metagame { decks } = load_metagame(data_path(index, name))?;
+    ok(card_counts(decks)$card_line())
+}
+
+# Print every card played in the metagame named on the command line, with how
+# many copies, most played first. The name is a file in `data/` (without its
+# `.json.gz`), or one of the names in `data/index.json`.
+fn main(args: str[]) !prints !read_files !execute_program -> i64 {
+    let [name] = args else {
+        print("usage: mtg_metagame <metagame>");
+        return 1;
+    };
+    match (listing(name)) {
+        ok(lines) => {
+            for (let line : lines) {
+                print(line);
+            }
+            0
+        },
+        err(message) => {
+            print(`mtg_metagame: {message}`);
+            1
+        },
     }
-}.test({
-    assert(Win.record_of() == Record { win: 1, loss: 0, draw: 0 });
-    assert(Draw.record_of() == Record { win: 0, loss: 0, draw: 1 });
-})
-
-# The win rate of `self` in tenths of a percent (so 0.5 is 500), or `none` when
-# there is no decided match. Draws are left out of the denominator. Whole numbers
-# stand in for the original's floats until the language has them.
-fn winrate_permille(self: Record) -> u64? {
-    let decided = self.win + self.loss;
-    if (decided > 0) { some(self.win * 1000 / decided) } else { none }
-}.test({
-    assert(Record { win: 0, loss: 0, draw: 4 }.winrate_permille() == none);
-    assert(Record { win: 1, loss: 1, draw: 0 }.winrate_permille() == some(500));
-    assert(Record { win: 2, loss: 1, draw: 9 }.winrate_permille() == some(666));
-})
-
-fn main() !prints {
-    print("mtg_metagame: nothing to analyze yet\n");
 }

@@ -1,0 +1,103 @@
+# How many copies of each card were played across a metagame's decks.
+
+import {
+    equal as ==,
+    extend,
+    get,
+    greater_than as >,
+    less_than as <,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    push,
+    sort_by,
+    to_array,
+    to_dict,
+    to_set,
+    try_set,
+    value_or,
+    wrapping_add as +,
+} from builtins;
+import { Card, Deck } from "./metagame.aipl";
+
+# A card and the number of copies of it played, main decks and sideboards both.
+struct CardCount { name: str, count: i64 }
+
+# True when `a` goes before `b`: more copies first, and cards with as many
+# copies in name order.
+fn is_listed_before(a: CardCount, b: CardCount) -> bool {
+    a.count > b.count || (a.count == b.count && a.name < b.name)
+}.test({
+    assert(is_listed_before(CardCount { name: "b", count: 5 }, CardCount { name: "a", count: 4 }));
+    assert(!is_listed_before(CardCount { name: "a", count: 4 }, CardCount { name: "b", count: 5 }));
+    assert(is_listed_before(CardCount { name: "a", count: 4 }, CardCount { name: "b", count: 4 }));
+    assert(!is_listed_before(CardCount { name: "a", count: 4 }, CardCount { name: "a", count: 4 }));
+})
+
+# Every card of every deck's main deck and sideboard, in deck order.
+fn all_cards(decks: Deck[]) -> Card[] {
+    mut cards: Card[] = [];
+    for (let deck : decks) {
+        set cards.extend(deck.maindeck);
+        set cards.extend(deck.sideboard);
+    }
+    cards
+}.test({
+    let island = Card { name: "Island", count: 4, card_type: "Land" };
+    let bolt = Card { name: "Bolt", count: 2, card_type: "Instant" };
+    let deck = Deck {
+        deck_id: "1",
+        name: "",
+        pilot: "",
+        tournament: "",
+        maindeck: [island],
+        sideboard: [bolt],
+        matches: [],
+    };
+    assert(all_cards([deck, deck]) == [island, bolt, island, bolt]);
+    assert(all_cards([]) == []);
+})
+
+# The copies of each card played in `decks`, most played first.
+pub fn card_counts(decks: Deck[]) -> CardCount[] {
+    let cards = all_cards(decks);
+    let distinct: #<{str} = cards$name.to_set();
+    let names = distinct.to_array();
+    mut positions: (str, u64)[] = [];
+    mut totals: i64[] = [];
+    for (let i, name : names) {
+        set positions.push((name, i));
+        set totals.push(0);
+    }
+    let position_of = positions.to_dict();
+    for (let card : cards) {
+        if (let some(i) = position_of.get(card.name)) {
+            set totals.try_set(i, totals[i].value_or(0) + card.count);
+        };
+    }
+    mut counts: CardCount[] = [];
+    for (let i, name : names) {
+        set counts.push(CardCount { name, count: totals[i].value_or(0) });
+    }
+    counts.sort_by(is_listed_before)
+}.test({
+    let deck = |main: Card[], side: Card[]| {
+        Deck {
+            deck_id: "",
+            name: "",
+            pilot: "",
+            tournament: "",
+            maindeck: main,
+            sideboard: side,
+            matches: [],
+        }
+    };
+    let island = |n: i64| { Card { name: "Island", count: n, card_type: "Land" } };
+    let bolt = |n: i64| { Card { name: "Bolt", count: n, card_type: "Instant" } };
+    let decks = [deck([island(4), bolt(2)], [bolt(1)]), deck([island(3)], [])];
+    assert(card_counts(decks) == [
+        CardCount { name: "Island", count: 7 },
+        CardCount { name: "Bolt", count: 3 },
+    ]);
+    assert(card_counts([]) == []);
+})

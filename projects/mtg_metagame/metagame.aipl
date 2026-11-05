@@ -1,0 +1,197 @@
+# What the data directory holds: a metagame is the decks played at some
+# tournaments, each with its cards and how its matches went. `load_metagame`
+# reads one of the gzipped JSON files `tools/pkl_to_json.py` wrote.
+
+import {
+    ExecResult,
+    collect_ok,
+    equal as ==,
+    execute_program,
+    greater_than as >,
+    not_equal as !=,
+    saturating_divide as /,
+    try_map,
+    value_or,
+    value_or_err,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
+import {
+    Json,
+    field,
+    integer_field,
+    list_field,
+    optional_text_field,
+    parse_json,
+    scalar_text,
+    text_field,
+} from "./json.aipl";
+
+# How one match ended, from a deck's point of view.
+variant Result = Win | Loss | Draw
+
+# Matches (or games) won, lost and drawn.
+struct Record { win: i64, loss: i64, draw: i64 }
+
+# One line of a decklist: a card, how many copies, and its type line category.
+struct Card { name: str, count: i64, card_type: str }
+
+# One round of a deck's tournament.
+struct Match { opponent_deck_id: str?, result: Result, record: Record, round: str }
+
+# A decklist and how it did. The id is text: the sources number decks with
+# integers and with strings.
+struct Deck {
+    deck_id: str,
+    name: str,
+    pilot: str,
+    tournament: str,
+    maindeck: Card[],
+    sideboard: Card[],
+    matches: Match[],
+}
+
+# The decks of one or more tournaments. `name` is the file it was loaded from.
+struct Metagame { name: str, tournament_ids: str[], decks: Deck[] }
+
+# `a` and `b` counted together.
+fn add_records(a: Record, b: Record) -> Record {
+    win: a.win + b.win,
+    loss: a.loss + b.loss,
+    draw: a.draw + b.draw,
+}.test({
+    assert(add_records(
+        Record { win: 1, loss: 2, draw: 3 },
+        Record { win: 10, loss: 20, draw: 30 },
+    ) == Record { win: 11, loss: 22, draw: 33 });
+})
+
+# The win rate of `self` in tenths of a percent (so 0.5 is 500), or `none` when
+# there is no decided match. Draws are left out of the denominator. Whole numbers
+# stand in for the original's floats until the language has them.
+fn winrate_permille(self: Record) -> i64? {
+    let decided = self.win + self.loss;
+    if (decided > 0) { some(self.win * 1000 / decided) } else { none }
+}.test({
+    assert(Record { win: 0, loss: 0, draw: 4 }.winrate_permille() == none);
+    assert(Record { win: 1, loss: 1, draw: 0 }.winrate_permille() == some(500));
+    assert(Record { win: 2, loss: 1, draw: 9 }.winrate_permille() == some(666));
+})
+
+# `self` as a `Result`: `win`, `loss` or `draw`.
+fn decode_result(self: str) -> Result!str {
+    if (self == "win") {
+        ok(Win)
+    } else if (self == "loss") {
+        ok(Loss)
+    } else if (self == "draw") {
+        ok(Draw)
+    } else {
+        err(`unknown match result "{self}"`)
+    }
+}.test({
+    assert(decode_result("win") == ok(Win));
+    assert(decode_result("loss") == ok(Loss));
+    assert(decode_result("draw") == ok(Draw));
+    assert(decode_result("bye") == err(`unknown match result "bye"`));
+})
+
+# A card line: `{"name": .., "count": .., "card_type": ..}`.
+fn decode_card(self: Json) -> Card!str {
+    ok(Card {
+        name: self.text_field("name")?,
+        count: self.integer_field("count")?,
+        card_type: self.text_field("card_type")?,
+    })
+}.test({
+    let json = parse_json("""{"name":"Island","count":4,"card_type":"Land"}""")?;
+    assert(decode_card(json) == ok(Card { name: "Island", count: 4, card_type: "Land" }));
+    let bad = parse_json("""{"name":"Island"}""")?;
+    assert(decode_card(bad) == err(`missing "count"`));
+})
+
+# A game record: `{"win": .., "loss": .., "draw": ..}`.
+fn decode_record(self: Json) -> Record!str {
+    ok(Record {
+        win: self.integer_field("win")?,
+        loss: self.integer_field("loss")?,
+        draw: self.integer_field("draw")?,
+    })
+}.test({
+    let json = parse_json("""{"win":2,"loss":1,"draw":0}""")?;
+    assert(decode_record(json) == ok(Record { win: 2, loss: 1, draw: 0 }));
+})
+
+# One round of a match history.
+fn decode_match(self: Json) -> Match!str {
+    let record = self.field("record").value_or_err(`missing "record"`)?;
+    ok(Match {
+        opponent_deck_id: self.optional_text_field("opponent_deck_id"),
+        result: self.text_field("result")?.decode_result()?,
+        record: decode_record(record)?,
+        // A round is a label, or a list of them when the source split it.
+        round: self.optional_text_field("round").value_or(""),
+    })
+}.test({
+    let json = parse_json(
+        """{"opponent_deck_id":7,"result":"win","record":{"win":2,"loss":0,"draw":0},"round":"Round 1"}""",
+    )?;
+    assert(decode_match(json) == ok(Match {
+        opponent_deck_id: some("7"),
+        result: Win,
+        record: Record { win: 2, loss: 0, draw: 0 },
+        round: "Round 1",
+    }));
+})
+
+# A deck, with its cards and matches.
+fn decode_deck(self: Json) -> Deck!str {
+    ok(Deck {
+        deck_id: self.text_field("deck_id")?,
+        name: self.optional_text_field("name").value_or(""),
+        pilot: self.optional_text_field("pilot").value_or(""),
+        tournament: self.optional_text_field("tournament").value_or(""),
+        maindeck: self.list_field("maindeck")?.try_map(decode_card)?,
+        sideboard: self.list_field("sideboard")?.try_map(decode_card)?,
+        matches: self.list_field("match_history")?.try_map(decode_match)?,
+    })
+}.test({
+    let json = parse_json("""
+        {"deck_id":"d1","name":null,"pilot":"Ana","tournament":5,
+         "maindeck":[{"name":"Island","count":4,"card_type":"Land"}],
+         "sideboard":[],"match_history":[]}
+    """)?;
+    assert(decode_deck(json) == ok(Deck {
+        deck_id: "d1",
+        name: "",
+        pilot: "Ana",
+        tournament: "5",
+        maindeck: [Card { name: "Island", count: 4, card_type: "Land" }],
+        sideboard: [],
+        matches: [],
+    }));
+})
+
+# A whole metagame document, as `tools/pkl_to_json.py` writes it.
+pub fn decode_metagame(self: Json) -> Metagame!str {
+    ok(Metagame {
+        name: self.text_field("name")?,
+        tournament_ids: self.list_field("tournament_ids")?$scalar_text().collect_ok(),
+        decks: self.list_field("decks")?.try_map(decode_deck)?,
+    })
+}.test({
+    let json = parse_json("""{"name":"m","tournament_ids":[1,"b"],"decks":[]}""")?;
+    assert(decode_metagame(json) == ok(Metagame {
+        name: "m",
+        tournament_ids: ["1", "b"],
+        decks: [],
+    }));
+})
+
+# The metagame in the gzipped JSON file at `path`. The file is unpacked by
+# `gzip`, since nothing here reads binary files or decompresses yet.
+pub fn load_metagame(path: str) !execute_program -> Metagame!str {
+    let ExecResult { stdout, stderr, exit_code } = "gzip".execute_program(args=["-dc", path])?;
+    if (exit_code != 0) { return err(`gzip {path}: {stderr}`); };
+    parse_json(stdout)?.decode_metagame()
+}

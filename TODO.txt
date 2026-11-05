@@ -25,6 +25,8 @@ projects:
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg metagame analyzer
     probably need floats for this
+    accept paths, don't do munging
+    reuse existing json parser from lib
 
 argparser:
   make it

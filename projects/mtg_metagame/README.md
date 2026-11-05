@@ -5,15 +5,34 @@ A Magic: The Gathering metagame analyzer, ported from the Python
 one performs.
 
 ```sh
-$ ./aipl run
-mtg_metagame: nothing to analyze yet
+$ ./aipl run -- standard_26Q2_rc_japan
+1441 Forest
+1441 Island
+916 Steam Vents
+…
 ```
+
+Lists every card played in a metagame, most copies first (main decks and
+sideboards together; equal counts in name order). The argument is a file in
+`data/` without its `.json.gz`, or one of the names in `data/index.json`. Run it
+from this directory.
+
+## Layout
+
+| file | what it is |
+|---|---|
+| `main.aipl` | the command line: resolve the name, load, print |
+| `metagame.aipl` | `Metagame`, `Deck`, `Card`, `Match`, `Record`; decoding them from JSON; `load_metagame` |
+| `card_stats.aipl` | `card_counts`: copies played per card |
+| `json.aipl` | a JSON parser and the accessors the decoder uses |
+
+The files are unpacked by running `gzip -dc` (`execute_program`): nothing here
+reads binary files or decompresses yet.
 
 ## Status
 
-Scaffolding. `main.aipl` holds the first data types (`Result`, `Record`) and win
-rate arithmetic, with tests. Win rates are whole permille until the language has
-floats.
+Loading and the card listing work. Win rates are whole permille until the
+language has floats.
 
 ## Plan, following the Python original
 
