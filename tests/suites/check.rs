@@ -172,6 +172,32 @@ fn a_file_with_sections_cannot_be_imported() {
     assert_eq!(code, 1);
 }
 
+/// The refusal names the section as written, flags included.
+#[test]
+fn a_file_with_a_check_section_cannot_be_imported_either() {
+    let (stdout, stderr, code) = check_tree(
+        "import_check_sectioned",
+        &[
+            (
+                "main.aipl",
+                "import { shared } from \"./sectioned.aipl\";\n\nfn main() -> i64 { shared(1) }\n",
+            ),
+            (
+                "sectioned.aipl",
+                "import { wrapping_add as + } from builtins;\n\n\
+                 pub fn shared(n: i64) -> i64 { n + 1 }\n--- check --tests ---\n",
+            ),
+        ],
+        &["main.aipl"],
+    );
+    assert_eq!(stderr, "");
+    assert!(
+        stdout.contains("that file has a `--- check --tests ---` section"),
+        "got:\n{stdout}"
+    );
+    assert_eq!(code, 1);
+}
+
 /// A `.test` body declares no effect, so one that uses an effect it has not
 /// shimmed is refused, and a `shim` inside the body discharges it.
 #[test]
@@ -2039,4 +2065,19 @@ fn fix_with_a_part_named_formats_only_when_format_is_named() {
     assert_eq!(code, 0, "{stdout}");
     assert!(!stdout.contains("formatted "), "got:\n{stdout}");
     assert_eq!(tree_file("parts_fix_tests", "f.aipl"), UNFORMATTED);
+}
+
+/// A `check` section for a part nothing validates yet is refused rather than passed unread: a
+/// recorded expectation that is never compared would make the file pass for the wrong reason.
+#[test]
+fn a_check_section_for_a_part_nothing_validates_yet_is_reported() {
+    let src = "import { equal as == } from builtins;\n\n\
+               fn a() -> i64 { 1 }.test({\n    assert(a() == 1);\n})\n--- check --format ---\n";
+    let (stdout, stderr, code) = check_here("check_unvalidated", src);
+    assert_eq!(stderr, "");
+    assert!(
+        stdout.contains("`check --format` section is not validated yet"),
+        "got:\n{stdout}"
+    );
+    assert_eq!(code, 1);
 }

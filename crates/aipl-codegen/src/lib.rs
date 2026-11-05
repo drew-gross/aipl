@@ -2314,6 +2314,18 @@ pub fn parse_spec(src: &str) -> Result<SpecFields, String> {
             other => panic!("dogfooded parse_spec() Spec.{name}: {other:?}"),
         }
     }
+    fn checks(f: &[(String, FfiValue)], name: &str) -> Vec<(String, String)> {
+        match get(f, name) {
+            FfiValue::Array(items) => items
+                .iter()
+                .map(|i| {
+                    let e = fields(i, "Check");
+                    (as_str(&e, "projection"), as_str(&e, "body"))
+                })
+                .collect(),
+            other => panic!("dogfooded parse_spec() Spec.{name}: {other:?}"),
+        }
+    }
     fn entries(f: &[(String, FfiValue)], name: &str) -> Vec<(String, String)> {
         match get(f, name) {
             FfiValue::Array(items) => items
@@ -2342,6 +2354,7 @@ pub fn parse_spec(src: &str) -> Result<SpecFields, String> {
                     cli: str_array(&f, "cli"),
                     check: opt_str(&f, "check"),
                     check_exit_code: opt_int(&f, "check_exit_code"),
+                    checks: checks(&f, "checks"),
                 })
             }
             Ok(FfiValue::Res(Err(e))) => match *e {
@@ -2368,6 +2381,10 @@ pub struct SpecFields {
     pub cli: Vec<String>,
     pub check: Option<String>,
     pub check_exit_code: Option<i32>,
+    /// What each part of `aipl check`'s output must be: the canonical flags that select it
+    /// (`--compile --tests`) and the body, in file order. `errors` is `--compile` and `check` is
+    /// `--tests`, and each of those also fills its own field above.
+    pub checks: Vec<(String, String)>,
 }
 
 /// The parser's trailing-whitespace hook (see [`install_parser_hooks`]): the

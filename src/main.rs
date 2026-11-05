@@ -383,6 +383,7 @@ fn check_file(
             loader::load_program_overlay(&staged.entry, Some(&staged.root), &spec.source, dbg)
                 .and_then(|program| Compilation::new(&program, dbg).map(|_| ()));
         let mut found = sections::conflicts(spec);
+        found.extend(sections::unvalidated_checks(spec));
         found.extend(sections::errors(spec, compiled, section_label));
         return Ok(Checked {
             exit_code: 0,
@@ -499,6 +500,9 @@ fn check_file(
     }
 
     let mut found = Vec::new();
+    if section_label.is_some() {
+        found.extend(sections::unvalidated_checks(spec));
+    }
     if section_label.is_some() && sections::runs_main(spec) {
         let stem = staged
             .entry

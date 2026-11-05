@@ -288,6 +288,28 @@ pub fn fill_or_add_sections(contents: str, fills: #{str: str}) -> str {
 
     """);
 
+    // A `check` section is found by its canonical header, flags and all, and added under it.
+    assert(fill_or_add_sections(
+        """
+            code
+            --- check --tests ---
+            old
+            --- stdout ---
+            x
+
+        """,
+        #{"check --tests": "new", "check --compile": "e"},
+    ) == """
+        code
+        --- check --tests ---
+        new
+        --- stdout ---
+        x
+        --- check --compile ---
+        e
+
+    """);
+
     // Several missing sections are appended in the batch's order.
     assert(fill_or_add_sections("code", #{"stdout": "hi", "exit code": "3"}) == """
         code

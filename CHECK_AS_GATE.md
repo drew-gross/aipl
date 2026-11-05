@@ -247,19 +247,27 @@ touched anywhere in this phase except where `check` reads them into the structur
 - [x] Exit status: non-zero exactly when a chosen part reports a failure (unformatted, a compile diagnostic, a
       failing test or benchmark, a leak, a `trace`).
 
-**3.4 The header grammar and the data model (additive; old names keep working)**
-- [ ] `parse_test_section_header` (AIPL) accepts `check` plus flags; canonical spelling; unknown flag, duplicate
-      projection, and flags on any other section are errors. `.test` blocks in the AIPL file, and
-      `tests/suites/parser.rs`.
-- [ ] `parse_spec` (AIPL): keep the fields for the run-observing sections and inputs; replace `errors`, `check` and
-      `check_exit_code` with an ordered list of `(projection, body)` expectations; the old names parse into the same
-      list as aliases. The Rust `SpecFields` in `src/lib.rs`, the FFI marshalling in `aipl-codegen/src/lib.rs`
-      (~2317) and the `Spec` in `tests/cases.rs` follow.
-- [ ] `fill_or_add_sections` / `fill_or_add_sections_file` (AIPL) address a `check` section by its canonical header.
-- [ ] `split_test_sections`, `strip_test_sections`, `companion_files`, the formatter's byte-for-byte preservation,
-      the loader's `refuse_sectioned_import`, `aipl-index` and `lex_aipl` keep working with a header that has flags
-      (tests for each). The compiler's own sources have no sections, so the bootstrap risk is only the live
-      artifact's `parse_spec`, which `check --fix` calls: keep it additive until the corpus has moved.
+**3.4 The header grammar and the data model (additive; old names keep working)** (2026-11-04)
+Settled with it, from the recommendations: DS1 (the header is `--- check <flags> ---`, one canonical spelling per
+projection), DS4 (exit status derived; no section for it) and DS6 (bare `--- check ---` keeps its old meaning,
+`--tests`, until 3.8 migrates the 7+4 files).
+- [x] `parse_spec` (`parse_spec.aipl`) accepts `check` plus flags. The flags are `--format --compile --tests
+      --benchmarks`, each once, in that order, single-spaced; an unknown flag, a repeat, any other spelling and two
+      sections for one projection are errors that say what to write. Flags on any other section stay "unknown
+      section". Tests in the AIPL file and `tests/suites/parser.rs`.
+- [x] `Spec.checks: Check[]` is the ordered list of `(projection, body)`; `errors` is `--compile` and bare `check` is
+      `--tests`, so the old names are in the same list. Additive: `errors`, `check` and `check_exit_code` keep their
+      fields, and `check --compile` / `check --tests` also fill the field of their old spelling, so the existing
+      validation holds them. Rust: `SpecFields.checks` and its FFI marshalling. Not touched until 3.7: the harness's
+      own `Spec` in `tests/cases.rs`.
+- [x] A `check` section for any other projection is reported by `check` ("not validated yet", `sections::
+      unvalidated_checks`) instead of being parsed and ignored. 3.5 deletes this guard when it validates them.
+- [x] `fill_or_add_sections` finds and adds a section by its canonical header (tested). `parse_test_section_header`,
+      `split_test_sections`, `strip_test_sections` and `companion_files` treat a flagged header like any other
+      (tested in each file), and so do the loader's refusal to import a file with sections (names the header as
+      written; `check.rs`) and the formatter (preserves the tail byte for byte; `fmt.rs`).
+- Shipped in two handoffs because the live artifact's `Spec` had no `checks` field: the AIPL change first (the Rust
+  side looks fields up by name, so the extra one was harmless), then the Rust side that reads it.
 
 **3.5 Validation of the new sections in `check`**
 - [ ] Compare each `check` section to its projection of the one `CheckResult` computed with sections ignored.

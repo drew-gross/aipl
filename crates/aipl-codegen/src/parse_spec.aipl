@@ -4,20 +4,27 @@
 # opens a section whose body runs to the next marker or EOF.
 
 import {
+    any,
     contains,
     drop_n,
     equal as ==,
     extend,
+    filter,
     int_parse,
     is_empty,
     is_err_and,
+    join,
     len,
+    logical_and as &&,
+    logical_not as !,
     logical_or as ||,
+    not_equal as !=,
     push,
     starts_with,
     trim,
     value_or,
     value_or_err,
+    words,
 } from builtins;
 import { lines as split_lines } from "./lines.aipl";
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
@@ -26,6 +33,10 @@ import { trim_end_while } from "./trim_end_while.aipl";
 # One `--- file: p ---` / `--- expect file: p ---` companion: a path and the
 # body that follows it.
 struct Entry { path: str, contents: str }
+
+# One `check` expectation: the part of `aipl check`'s output a section pins (the canonical
+# flags that select it, `--compile` or `--compile --tests`) and the body it must equal.
+struct Check { projection: str, body: str }
 
 struct Spec {
     source: str,
@@ -39,6 +50,7 @@ struct Spec {
     cli: str[],
     check: str?,
     check_exit_code: i64?,
+    checks: Check[],
 }
 
 # Parses a case file into its `Spec`: the entry-point source (everything before
@@ -60,6 +72,7 @@ pub fn parse_spec(src: str) -> Spec!str {
         cli: [],
         check: none,
         check_exit_code: none,
+        checks: [],
     };
 
     // The section currently being collected, or `""` for the entry-point source
@@ -126,6 +139,58 @@ pub fn parse_spec(src: str) -> Spec!str {
         "check exit code section",
     )));
 
+    // `check` with flags pins a projection of `aipl check`'s output. The old spellings are the
+    // `--compile` (`errors`) and `--tests` (`check`) projections, and either spelling fills both
+    // the expectation list and the field the old name always had.
+    let flagged = parse_spec("x\n--- check --compile --tests ---\nbody\n")?;
+    assert(flagged.checks == [Check { projection: "--compile --tests", body: "body" }]);
+    assert(flagged.errors == none);
+    assert(flagged.check == none);
+    let compile = parse_spec("x\n--- check --compile ---\ne\n")?;
+    assert(compile.checks == [Check { projection: "--compile", body: "e" }]);
+    assert(compile.errors == some("e"));
+    let tests = parse_spec("x\n--- check --tests ---\nt\n")?;
+    assert(tests.checks == [Check { projection: "--tests", body: "t" }]);
+    assert(tests.check == some("t"));
+    let old = parse_spec("x\n--- errors ---\ne\n--- check ---\nt\n")?;
+    assert(old.checks == [
+        Check { projection: "--compile", body: "e" },
+        Check { projection: "--tests", body: "t" },
+    ]);
+    assert(parse_spec("x\n--- stdout ---\nhi\n")?.checks.is_empty());
+    // The projection is the file's expectation, not the header's spelling of the old name.
+    let both = parse_spec("x\n--- check --format ---\nf\n--- check --benchmarks ---\nb\n")?;
+    assert(both.checks$projection == ["--format", "--benchmarks"]);
+
+    // A header is the one spelling of its projection, and a mistake in it is the file's error.
+    assert(parse_spec("x\n--- check --run ---\n").is_err_and(|m| m.contains(
+        `unknown flag "--run"`,
+    )));
+    assert(parse_spec("x\n--- check --tests --tests ---\n").is_err_and(|m| m.contains(
+        "given twice",
+    )));
+    assert(parse_spec("x\n--- check --tests --compile ---\n").is_err_and(|m| m.contains(
+        `as "--- check --compile --tests ---"`,
+    )));
+    assert(parse_spec("x\n--- check  --tests ---\n").is_err_and(|m| m.contains(
+        "one spelling per projection",
+    )));
+    // The same projection twice, however it is spelled.
+    assert(parse_spec(
+        "x\n--- check --tests ---\na\n--- check --tests ---\nb\n",
+    ).is_err_and(|m| m.contains("same part")));
+    assert(parse_spec(
+        "x\n--- errors ---\na\n--- check --compile ---\nb\n",
+    ).is_err_and(|m| m.contains("same part")));
+    assert(parse_spec("x\n--- check ---\na\n--- check --tests ---\nb\n").is_err_and(|m| m.contains(
+        "same part",
+    )));
+    // Flags belong to `check` alone.
+    assert(parse_spec("x\n--- stdout --tests ---\n").is_err_and(|m| m.contains("unknown section")));
+    assert(parse_spec("x\n--- check exit code --tests ---\n").is_err_and(|m| m.contains(
+        "unknown flag",
+    )));
+
     // `cli` is one argument per line — and an *empty* section is no arguments,
     // not one empty argument (`lines("")` is `[""]`, unlike Rust's `str::lines`).
     assert(parse_spec("x\n--- cli ---\na\nb\n")?.cli == ["a", "b"]);
@@ -164,15 +229,28 @@ fn finalize(spec: Spec, name: str, buf: str) -> Spec!str {
         set out.push(Entry { path, contents: body });
         return ok(Spec { ..spec, extra_files: out });
     };
+
+    // `check` with flags pins one projection of `aipl check`'s output. It is also stored in the field
+    // the old spelling of the same projection uses, so the code that validates `errors` and `check`
+    // sections validates it too.
+    if (name.starts_with("check ") && name != "check exit code") {
+        let projection = check_projection(name)?;
+        let pinned = with_check(spec, projection, body)?;
+        return ok(match (projection) {
+            "--compile" => Spec { ..pinned, errors: some(body) },
+            "--tests" => Spec { ..pinned, check: some(body) },
+            _ => pinned,
+        });
+    };
     match (name) {
         "stdout" => ok(Spec { ..spec, stdout: some(body) }),
         "stderr" => ok(Spec { ..spec, stderr: some(body) }),
-        "errors" => ok(Spec { ..spec, errors: some(body) }),
+        "errors" => with_check(Spec { ..spec, errors: some(body) }, "--compile", body),
         "performance" => err(
             "the `performance` section is gone: a case's counts are its row in tests/performance_metrics.md, and a property is stated by a `.benchmark` block or a `--- report ---` section",
         ),
         "report" => ok(Spec { ..spec, report: some(body) }),
-        "check" => ok(Spec { ..spec, check: some(body) }),
+        "check" => with_check(Spec { ..spec, check: some(body) }, "--tests", body),
         // One argument per line. An empty section is *no* arguments: `lines("")`
         // yields a single empty element, which would become one empty argument.
         "cli" => ok(Spec { ..spec, cli: if (body == "") { [] } else { body.split_lines() } }),
@@ -203,4 +281,44 @@ fn companion_path(name: str, prefix: str) -> str!str {
         return err(```use "/" (not "\") in "{prefix}" section paths: "{path}"```);
     };
     ok(path)
+}
+
+# The parts of `aipl check` a section can pin, in the one order they are written.
+fn check_parts() -> str[] { ["--format", "--compile", "--tests", "--benchmarks"] }
+
+# The projection a `check <flags>` header names, as its canonical flags
+# (`--compile --tests`). A header is one spelling of its projection: the flags are the
+# command line's own, each at most once, in the command line's order, single-spaced — so
+# a section is found by its header and no two spell the same projection differently.
+fn check_projection(name: str) -> str!str {
+    let flags = name.words().drop_n(1);
+    for (let flag : flags) {
+        if (!check_parts().any(|part| part == flag)) {
+            return err(
+                `unknown flag "{flag}" in "--- {name} ---": a check section names the parts of \`aipl check\` it pins, {check_parts().join(sep=", ")}`,
+            );
+        };
+    }
+    let canonical = check_parts().filter(|part| flags.any(|flag| flag == part));
+    if (canonical.len() != flags.len()) {
+        return err(`a flag is given twice in "--- {name} ---"`);
+    };
+    let projection = canonical.join(sep=" ");
+    if (name != `check {projection}`) {
+        return err(
+            `write "--- {name} ---" as "--- check {projection} ---": one spelling per projection`,
+        );
+    };
+    ok(projection)
+}
+
+# `spec` with the expectation that `projection` of `check`'s output is `body`. Two sections cannot
+# pin the same projection, however they are spelled (`errors` is `--compile`, `check` is `--tests`).
+fn with_check(spec: Spec, projection: str, body: str) -> Spec!str {
+    if (spec.checks.any(|existing| existing.projection == projection)) {
+        return err(`two sections pin the same part of \`aipl check\`'s output ("{projection}")`);
+    };
+    mut checks = spec.checks;
+    set checks.push(Check { projection, body });
+    ok(Spec { ..spec, checks })
 }

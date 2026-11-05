@@ -33,6 +33,8 @@ pub fn strip_test_sections(src: str) -> str {
     // A marker line cuts there; keep everything before it.
     assert(strip_test_sections("code\n--- stdout ---\nfoo") == "code\n");
     assert(strip_test_sections("a\nb\n--- c ---\nd") == "a\nb\n");
+    // A marker that carries flags cuts like any other.
+    assert(strip_test_sections("code\n--- check --compile ---\nfoo") == "code\n");
     // A marker as the very first line keeps nothing.
     assert(strip_test_sections("--- x ---") == "");
     assert(strip_test_sections("--- x ---\nbody") == "");

@@ -33,6 +33,10 @@ pub fn parse_test_section_header(line: str) -> str? {
     assert(parse_test_section_header("--- stdout ---   ") == some("stdout"));
     assert(parse_test_section_header("--- multi word ---") == some("multi word"));
     assert(parse_test_section_header("---x---") == some("x"));
+    // A `check` section carries its flags in the name, spaces and all.
+    assert(parse_test_section_header("--- check --compile --tests ---") == some(
+        "check --compile --tests",
+    ));
     // Not markers (or empty inner) -> none.
     assert(parse_test_section_header("") == none);
     assert(parse_test_section_header("fn main() {") == none);

@@ -493,3 +493,14 @@ fn aipl_fmt_probe() {
         Err(e) => eprintln!("PROBE-ERR {e}"),
     }
 }
+
+/// A trailing `check` section with flags is a section like any other to the formatter: it rides
+/// along byte for byte, however oddly its body is spaced.
+#[test]
+fn a_check_section_with_flags_is_preserved_by_the_formatter() {
+    aipl::install_parser_hooks();
+    let tail = "--- check --compile --tests ---\n  odd   spacing { here\n";
+    let src = format!("fn   f( )  {{ }}\n{tail}");
+    let out = aipl::fmt::format_source(&src, &aipl::fmt::FmtOptions::default()).expect("formats");
+    assert_eq!(out, format!("fn f() {{}}\n{tail}"));
+}

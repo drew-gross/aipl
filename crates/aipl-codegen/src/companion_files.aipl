@@ -107,6 +107,9 @@ pub fn companion_files(src: str) -> Companion[]!str {
     """;
     assert(companion_files(inner)? == [Companion { path: "gap.txt", contents: "a\n\nb" }]);
 
+    // A `check` section with flags is not a companion, and neither is the text under it.
+    assert(companion_files("fn main() {}\n--- check --tests ---\nok\n")? == []);
+
     // No `file:` sections at all -> nothing, whether or not other sections exist.
     assert(companion_files("fn main() {}\n")? == []);
     assert(companion_files("fn main() {}\n--- stdout ---\nok\n")? == []);

@@ -37,6 +37,11 @@ pub fn split_test_sections(src: str) -> (str, str) {
     // A marker line splits there.
     assert(split_test_sections("code\n--- stdout ---\nfoo") == ("code\n", "--- stdout ---\nfoo"));
     assert(split_test_sections("a\nb\n--- c ---\nd") == ("a\nb\n", "--- c ---\nd"));
+    // A marker that carries flags splits like any other.
+    assert(split_test_sections("code\n--- check --tests ---\nfoo") == (
+        "code\n",
+        "--- check --tests ---\nfoo",
+    ));
     // A marker as the very first line: main empty.
     assert(split_test_sections("--- x ---") == ("", "--- x ---"));
     assert(split_test_sections("--- x ---\nbody") == ("", "--- x ---\nbody"));

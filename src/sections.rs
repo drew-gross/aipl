@@ -77,6 +77,21 @@ fn mismatch(section: &str, actual: &str, expected: &str) -> Option<Finding> {
     })
 }
 
+/// A `check` section whose part of `check`'s output nothing validates yet. The two with an old
+/// spelling (`--compile` is `errors`, `--tests` is `check`) are held to their fields; any other would
+/// be a recorded expectation that nothing compares, and the file would pass for the wrong reason.
+pub fn unvalidated_checks(spec: &SpecFields) -> Vec<Finding> {
+    spec.checks
+        .iter()
+        .filter(|(projection, _)| !matches!(projection.as_str(), "--compile" | "--tests"))
+        .map(|(projection, _)| {
+            Finding::unfixable(format!(
+                "`check {projection}` section is not validated yet: only `check --compile` and `check --tests` are"
+            ))
+        })
+        .collect()
+}
+
 /// Sections that cannot sit together. `errors` describes a program that does not
 /// compile, so a section that observes a run, or one that needs a compiled
 /// program, contradicts it; the file is wrong, not the program, and neither

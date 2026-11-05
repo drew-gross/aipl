@@ -105,6 +105,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  merge aipl's top level doc and docs commands
   remember to delete all the codemods from CHECK_AS_GATE when it's done
   some sort of enforcement/restriction on tests with main+sections
   come up with a better strategy for constant slots

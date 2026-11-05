@@ -36,6 +36,20 @@
 
 
 
+        <section class="item" id="item-Check">
+          <h3>
+            <a class="anchor" href="#item-Check">Check</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Check</code></pre>
+
+          <div class="doc"><p>One <code>check</code> expectation: the part of <code>aipl check</code>'s output a section pins (the canonical flags that select it, <code>--compile</code> or <code>--compile --tests</code>) and the body it must equal.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-Spec">
           <h3>
             <a class="anchor" href="#item-Spec">Spec</a>
@@ -107,6 +121,48 @@
           <pre class="signature"><code>fn companion_path(name: str, prefix: str) -&#62; str!str</code></pre>
 
           <div class="doc"><p>The path a <code>file:</code>-style marker carries, validated. <code>\</code> is a path-separator nuisance in this markup, so the source side is held to <code>/</code> and the harness canonicalizes on disk.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-check_parts">
+          <h3>
+            <a class="anchor" href="#item-check_parts">check_parts</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn check_parts() -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The parts of <code>aipl check</code> a section can pin, in the one order they are written.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-check_projection">
+          <h3>
+            <a class="anchor" href="#item-check_projection">check_projection</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn check_projection(name: str) -&#62; str!str</code></pre>
+
+          <div class="doc"><p>The projection a <code>check &lt;flags&gt;</code> header names, as its canonical flags (<code>--compile --tests</code>). A header is one spelling of its projection: the flags are the command line's own, each at most once, in the command line's order, single-spaced — so a section is found by its header and no two spell the same projection differently.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-with_check">
+          <h3>
+            <a class="anchor" href="#item-with_check">with_check</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn with_check(spec: Spec, projection: str, body: str) -&#62; Spec!str</code></pre>
+
+          <div class="doc"><p><code>spec</code> with the expectation that <code>projection</code> of <code>check</code>'s output is <code>body</code>. Two sections cannot pin the same projection, however they are spelled (<code>errors</code> is <code>--compile</code>, <code>check</code> is <code>--tests</code>).</p></div>
 
 
         </section>
