@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use aipl::binary;
-use aipl::check::{self, BatchTotals, CheckResult, Checked, Formatting, Parts};
+use aipl::check::{self, BatchTotals, CheckResult, Checked, Formatting, Parts, Shard};
 use aipl::codegen::{Compilation, ObjectCompilation, TestRun};
 use aipl::loader;
 use aipl::{sections, DebugOptions, Error, SpecFields};
@@ -102,7 +102,7 @@ fn usage(prog: &str) -> String {
   {prog} doc   <file.aipl>                  print the file's and each declaration's `# ..` docs
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
-  {prog} check [path...] [--format] [--compile] [--tests] [--benchmarks] [--fix] [--ignore-sections] [--baseline <table.md>]
+  {prog} check [path...] [--format] [--compile] [--tests] [--benchmarks] [--fix] [--ignore-sections] [--baseline <table.md>] [--shard i/n]
                                             run the tests, and check formatting and each file's sections
   {prog} report <file.aipl> [--machine] [-- args...]  count what a run of the file costs
   {prog} lsp                                serve the Language Server Protocol on stdin/stdout
@@ -134,6 +134,9 @@ refusal) without running anything. `--tests` and `--benchmarks` also run the `.t
 a part leaves the file's recorded sections and `--baseline` out, since they describe
 runs of `main` and of the whole file. The exit status is non-zero exactly when a chosen
 part reports a failure.
+`--shard i/n` checks only the i-th of n slices of the sorted file list (position k is in shard
+k % n + 1), so n processes started with the same paths cover every file once between them. It is
+a batch even for one file, and a slice with no files passes.
 `--baseline <table.md>` also holds each file's run to its row in that table (the five
 counts `report` prints, exactly; the row is named by the file's path from where `check`
 was started, without `.aipl`), and a file with no row fails. It reports every failure rather than stopping at the first, and exits 0 only if all
@@ -964,6 +967,17 @@ fn check_cmd(args: &[String]) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    let (args, shard) = match take_value_flag(args, "--shard").and_then(|(rest, text)| {
+        text.map(|text| Shard::parse(&text))
+            .transpose()
+            .map(|shard| (rest, shard))
+    }) {
+        Ok(taken) => taken,
+        Err(msg) => {
+            eprintln!("{msg}");
+            return ExitCode::FAILURE;
+        }
+    };
     let baseline = match baseline_path.map(|path| read_baseline_table(&path)) {
         Some(Ok(table)) => Some(table),
         Some(Err(msg)) => {
@@ -981,7 +995,7 @@ fn check_cmd(args: &[String]) -> ExitCode {
     // and the runtime's own summary line. Anything else — no argument, a
     // directory, or several paths — is a batch, which prefixes failures with
     // their file and prints one aggregate.
-    let single = args.len() == 1 && Path::new(&args[0]).is_file();
+    let single = args.len() == 1 && Path::new(&args[0]).is_file() && shard.is_none();
 
     let mut files = Vec::new();
     if args.is_empty() {
@@ -1004,7 +1018,13 @@ fn check_cmd(args: &[String]) -> ExitCode {
     }
     files.sort();
     files.dedup();
-    if files.is_empty() {
+    // Chosen after the list is complete and in order, so every shard sees the same one. A slice
+    // with nothing in it is a pass; an empty tree is not.
+    let empty_tree = files.is_empty();
+    if let Some(shard) = shard {
+        files = shard.take(files);
+    }
+    if empty_tree {
         // Checking nothing and reporting success would quietly disarm a handoff
         // that runs a bare `aipl check`, so an empty tree is a failure.
         let where_ = if args.is_empty() {
@@ -1472,7 +1492,7 @@ fn take_value_flag(args: Vec<String>, flag: &str) -> Result<(Vec<String>, Option
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         if arg == flag {
-            value = Some(args.next().ok_or_else(|| format!("{flag} needs a file"))?);
+            value = Some(args.next().ok_or_else(|| format!("{flag} needs a value"))?);
         } else {
             rest.push(arg);
         }

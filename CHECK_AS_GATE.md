@@ -367,7 +367,11 @@ only after the whole tree has moved (3.10), so a half-migrated tree is never gre
   is built.
 
 ## Phase 4: batch runner
-- [ ] `aipl check --shard i/n` over a file list; deterministic assignment.
+- [x] `aipl check --shard i/n` over a file list; deterministic assignment (2026-11-05). The list is sorted and de-duplicated,
+      then position k is in shard k % n + 1, so every process given the same paths takes the same slice, the slices cover
+      the list once between them, and neighbouring files (which tend to cost alike) are split. It is a batch even for one
+      named file, and a slice with no files passes (an empty tree still fails). `aipl::check::Shard`, tested in `check.rs`
+      and `tests/suites/check.rs`.
 - [ ] Progress line naming the file in flight (a crash must say where it died).
 - [ ] One writer for `tests/performance_metrics.md`: shards report rows; handoff (or an unsharded
       `check --fix`) merges.

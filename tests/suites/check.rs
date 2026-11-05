@@ -2149,3 +2149,63 @@ fn a_check_section_for_tests_contradicts_an_errors_section() {
     );
     assert_eq!(code, 1);
 }
+
+/// `--shard i/n` checks one slice of the sorted file list, so n processes given the same paths
+/// cover every file exactly once between them.
+#[test]
+fn shards_together_check_every_file_once() {
+    let files: Vec<(String, String)> = (1..=5)
+        .map(|n| (format!("f{n}.aipl"), PASSES.to_string()))
+        .collect();
+    let tree: Vec<(&str, &str)> = files
+        .iter()
+        .map(|(n, s)| (n.as_str(), s.as_str()))
+        .collect();
+    let mut checked = 0;
+    for index in 1..=3 {
+        let spec = format!("{index}/3");
+        let (stdout, stderr, code) =
+            check_tree(&format!("shard_{index}"), &tree, &["--shard", &spec]);
+        assert_eq!((stderr.as_str(), code), ("", 0), "shard {spec}:\n{stdout}");
+        // Files 1..=5 are positions 0..=4: shard 1 holds positions 0 and 3, shard 2 holds 1 and 4,
+        // shard 3 holds 2.
+        let wanted = [2, 2, 1][index - 1];
+        assert!(
+            stdout.contains(&format!("{wanted} file")),
+            "shard {spec}:\n{stdout}"
+        );
+        checked += wanted;
+    }
+    assert_eq!(checked, 5);
+}
+
+#[test]
+fn a_shard_with_no_files_passes_and_a_malformed_one_is_refused() {
+    let (stdout, stderr, code) =
+        check_tree("shard_empty", &[("only.aipl", PASSES)], &["--shard", "2/2"]);
+    assert_eq!((stderr.as_str(), code), ("", 0), "{stdout}");
+    assert!(stdout.contains("0 files"), "{stdout}");
+
+    for bad in ["2", "0/2", "3/2", "x/2"] {
+        let (stdout, stderr, code) =
+            check_tree("shard_bad", &[("only.aipl", PASSES)], &["--shard", bad]);
+        assert_eq!((stdout.as_str(), code), ("", 1), "{bad}");
+        assert!(stderr.contains("--shard wants `i/n`"), "{bad}: {stderr}");
+    }
+    let (_, stderr, code) = check_tree("shard_missing", &[("only.aipl", PASSES)], &["--shard"]);
+    assert_eq!(code, 1);
+    assert!(stderr.contains("--shard needs a value"), "{stderr}");
+}
+
+/// A named file with `--shard` is still a batch (it may land in an empty slice), so its report is
+/// the batch's, not the single-file one.
+#[test]
+fn a_shard_makes_one_named_file_a_batch() {
+    let (stdout, _, code) = check_tree(
+        "shard_named",
+        &[("only.aipl", PASSES)],
+        &["--shard", "1/1", "only.aipl"],
+    );
+    assert_eq!(code, 0, "{stdout}");
+    assert!(stdout.contains("1 file, 1 tests"), "{stdout}");
+}

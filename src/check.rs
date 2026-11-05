@@ -79,6 +79,45 @@ impl Parts {
     }
 }
 
+/// One of `count` slices of a sorted file list, as `--shard index/count` names it.
+///
+/// A file belongs to the shard its position in the list says: position `k` is in shard
+/// `k % count + 1`. The list is sorted and de-duplicated before the choice, so the same tree
+/// split the same way gives every process the same slice, the slices together are the whole list
+/// and none overlaps another. Neighbouring files, which tend to cost alike, land in different
+/// shards.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Shard {
+    /// Which slice, from 1.
+    pub index: usize,
+    pub count: usize,
+}
+
+impl Shard {
+    /// The shard a `--shard` value names: `i/n` with `1 <= i <= n`.
+    pub fn parse(text: &str) -> Result<Shard, String> {
+        let bad =
+            || format!("--shard wants `i/n` with 1 <= i <= n (for example `2/4`), not `{text}`");
+        let (index, count) = text.split_once('/').ok_or_else(bad)?;
+        let index: usize = index.parse().map_err(|_| bad())?;
+        let count: usize = count.parse().map_err(|_| bad())?;
+        if index == 0 || index > count {
+            return Err(bad());
+        }
+        Ok(Shard { index, count })
+    }
+
+    /// The members of `files` (already in the order every process sees) that fall in this shard.
+    pub fn take<T>(&self, files: Vec<T>) -> Vec<T> {
+        files
+            .into_iter()
+            .enumerate()
+            .filter(|(position, _)| position % self.count + 1 == self.index)
+            .map(|(_, file)| file)
+            .collect()
+    }
+}
+
 /// Whether a file is in canonical format, and what `--fix` did about it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Formatting {
@@ -407,6 +446,31 @@ pub fn render_findings(label: &str, found: &[Finding]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_shard_is_written_index_over_count() {
+        assert_eq!(Shard::parse("2/4"), Ok(Shard { index: 2, count: 4 }));
+        assert_eq!(Shard::parse("1/1"), Ok(Shard { index: 1, count: 1 }));
+        for text in ["", "2", "0/4", "5/4", "a/4", "2/b", "2/4/6", "-1/4", "2/0"] {
+            let error = Shard::parse(text).expect_err(text);
+            assert!(
+                error.contains("`i/n`") && error.contains(text),
+                "{text}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn shards_partition_the_list_and_neighbours_are_split() {
+        let files: Vec<u32> = (0..7).collect();
+        let slices: Vec<Vec<u32>> = (1..=3)
+            .map(|index| Shard { index, count: 3 }.take(files.clone()))
+            .collect();
+        assert_eq!(slices, [vec![0, 3, 6], vec![1, 4], vec![2, 5]]);
+        // More shards than files leaves the later ones empty.
+        assert!(Shard { index: 9, count: 9 }.take(vec![1, 2]).is_empty());
+        assert_eq!(Shard { index: 1, count: 1 }.take(vec![1, 2]), vec![1, 2]);
+    }
 
     fn record(name: &str, passed: u64, failed: u64, test_failed: bool) -> TestRecord {
         TestRecord {
