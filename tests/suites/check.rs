@@ -2209,3 +2209,38 @@ fn a_shard_makes_one_named_file_a_batch() {
     assert_eq!(code, 0, "{stdout}");
     assert!(stdout.contains("1 file, 1 tests"), "{stdout}");
 }
+
+/// With a baseline to compare, a library's tests are run once, by the measurement, and that run is
+/// still held to freeing what it allocates: the leak is a finding of its own, with no row judged.
+#[test]
+fn a_library_that_leaks_fails_its_baseline_check_rather_than_passing_unmeasured() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join("check_baseline")
+        .join("baseline_leak");
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let src = "import { equal as ==, heap_str } from builtins;\n\n\
+               fn word() -> str { heap_str(\"hello\") }.test({\n    assert(word() == \"hello\");\n})\n";
+    fs::write(dir.join("baseline_leak.aipl"), src).expect("write temp source");
+    fs::write(dir.join("table.md"), TABLE_HEAD).expect("write temp table");
+    let run = |leak: bool| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_aipl"));
+        command
+            .args(["check", "--baseline", "table.md", "baseline_leak.aipl"])
+            .current_dir(&dir);
+        if leak {
+            command.env("AIPL_INJECT_LEAK", "1");
+        }
+        let out = command.output().expect("run aipl check");
+        (
+            String::from_utf8_lossy(&out.stdout).into_owned(),
+            out.status.code().unwrap_or(-1),
+        )
+    };
+    let (stdout, code) = run(true);
+    assert_eq!(code, 1, "{stdout}");
+    assert!(stdout.contains("memory leak"), "{stdout}");
+    // Without the leak the file has no row, which is the other thing a baseline check says.
+    let (stdout, code) = run(false);
+    assert_eq!(code, 1, "{stdout}");
+    assert!(stdout.contains("performance baseline missing"), "{stdout}");
+}

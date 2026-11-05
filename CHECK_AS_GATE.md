@@ -384,6 +384,13 @@ only after the whole tree has moved (3.10), so a half-migrated tree is never gre
 - [ ] Re-measure against the Phase 0 table; record in this doc; confirm D4 still holds.
 
 ## Phase 5: flip
+Started early (2026-11-05): handoff's discovery, staged-IR and final runs now run the corpus as `aipl check --baseline
+--shard i/n` processes, one per core (`corpus_run` in `handoff/src/main.rs`), beside a nextest run of every test that is
+not per-case. `Run::with_check` turns the shards' output into the same `Run` the nextest events made: `handoff-fill:`
+lines become one fillable failure (cases renamed from `tests/cases/x` to the harness's `cases/x`), and anything else
+(failed test, no compile, formatting, trace, leak, a dead shard, a mismatch no marker accounts for) is a failure that asks
+for nothing, so the gate stops. The final run re-checks only the refilled files. The per-case `#[test]`s still exist
+and are only no longer run by handoff.
 The harness already delegates its section checking to `check` (Phase 3, 3.7), so the flip is about the per-case nextest
 structure and handoff's scoping, not about section code.
 - [ ] Handoff runs the shards and reads `handoff-fill:` lines; replace `case_test_names_from`,

@@ -474,11 +474,19 @@ fn check_file(
         .file_stem()
         .and_then(OsStr::to_str)
         .unwrap_or("a.out");
+    // A library's baseline measurement is a run of the very same test driver this gate would
+    // build, link and run, held to the same leak rule (`sections::baseline`), so with a baseline
+    // to compare the gate does not make that run twice.
+    let has_main = program
+        .items
+        .iter()
+        .any(|item| matches!(item, aipl::ast::Item::Fn(f) if f.name == "main"));
+    let measured_by_baseline = baseline.is_some() && section_label.is_some() && !has_main;
     let leaks = leak_gate(
         &program,
         spec,
         stem,
-        parts.tests,
+        parts.tests && !measured_by_baseline,
         section_label.is_some(),
         label,
         dbg,

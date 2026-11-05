@@ -34,7 +34,9 @@
 //!    regeneration that would have fixed it. Doing it here costs no extra suite
 //!    run: the discovery run below becomes the corpus validation that step 5
 //!    would otherwise have run separately.
-//! 2. Discovery run. Three outcomes:
+//! 2. Discovery run: the suite's non-case tests under nextest, and the corpus as
+//!    `aipl check --shard` processes, one per core, each file held to its sections and its
+//!    baseline row ([`corpus_run`]). Three outcomes:
 //!    - green → done.
 //!    - only fillable staleness (a section mismatch, a drifted per-case
 //!      `#[test]` list, a stale docs site, a stale per-project compiler, or IR
@@ -122,10 +124,9 @@ mod discovery;
 mod machine;
 mod runner;
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use runner::{Cmd, Output, Runner, BOLD, DIM, GREEN, OFF};
+use runner::{Cmd, Runner, BOLD, DIM, GREEN, OFF};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -167,16 +168,6 @@ does not start from an application, which roughly doubles its time; set
 /// rather than by remembering to widen this.
 const ALL_TESTS: [&str; 2] = ["--workspace", "--all-targets"];
 
-/// The whole suite. `--no-fail-fast` because nextest cancels on the first
-/// failure by default and this gate needs to see *all* remediable staleness in
-/// one pass (see the discovery step).
-fn nextest() -> Cmd {
-    Cmd::new("cargo")
-        .args(["nextest", "run", "--color", "never", "--no-fail-fast"])
-        .args(ALL_TESTS)
-        .json()
-}
-
 /// The two tests the staged-IR corpus run must not run, both about the
 /// compilers the projects under `projects/` carry.
 ///
@@ -207,107 +198,150 @@ fn nextest() -> Cmd {
 const STAGED_IR_SKIP: &str =
     "not test(checked_in_compilers_are_current) and not test(projects_pass_their_own_check)";
 
-/// The whole suite minus the per-case tests not named in `keep`: everything
-/// outside the `cases` binary, plus exactly those case tests.
-fn nextest_scoped(keep: &[String]) -> Cmd {
+/// Every test that is not a per-case test: everything outside the `cases` binary, plus the few
+/// in it that are not named for a case (`every_case_has_a_test`, the leak-gate test, the
+/// harness's own unit tests). The per-case tests are what the
+/// sharded `aipl check` runs ([`corpus_run`]) do instead, so this is the rest of the suite.
+///
+/// Phrased as an exclusion of the `cases` binary, so a newly added non-case test, or one this gate
+/// has never heard of, is run by default — the direction a gate has to fail in.
+const NON_CASE_TESTS: &str = "not binary(=cases) or not test(/^(cases|examples|crates)_/)";
+
+/// The suite's non-case tests, minus whatever `extra` (a filterset) excludes.
+fn nextest_non_case(extra: Option<&str>) -> Cmd {
+    let expr = match extra {
+        Some(extra) => format!("({NON_CASE_TESTS}) and ({extra})"),
+        None => NON_CASE_TESTS.to_string(),
+    };
     Cmd::new("cargo")
         .args(["nextest", "run", "--color", "never", "--no-fail-fast"])
         .args(ALL_TESTS)
-        .args(["-E", &scoped_filter_expr(keep)])
+        .args(["-E", &expr])
         .json()
 }
 
-/// The filterset for [`nextest_scoped`].
-///
-/// Phrased as *keep* rather than *skip* only because the keep list is the short
-/// one; the safety property is the leading `not binary(=cases)`, which runs
-/// every test that is not a per-case test whatever this gate knows about it. A
-/// newly added non-case test, or one handoff has never heard of, is therefore
-/// run by default — the direction a gate has to fail in.
-///
-/// `every_case_has_a_test` lives in the `cases` binary but is not a per-case
-/// test (it compares the checked-in list against the tree), so it is named back
-/// in explicitly.
-fn scoped_filter_expr(keep: &[String]) -> String {
-    let mut expr = String::from("not binary(=cases) or test(=every_case_has_a_test)");
-    for name in keep {
-        expr.push_str(" or test(=");
-        expr.push_str(name);
-        expr.push(')');
-    }
-    expr
+/// What the corpus is, as paths `aipl check` walks: every file under `tests/cases` and `crates`,
+/// and the `.aipl` files directly in `examples` — its subdirectories hold libraries the examples
+/// import, which are not cases and have no row in the baseline table.
+fn corpus_paths() -> Vec<String> {
+    let mut paths = vec!["tests/cases".to_string(), "crates".to_string()];
+    let mut examples: Vec<String> = std::fs::read_dir("examples")
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_file() && p.extension().is_some_and(|x| x == "aipl"))
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect();
+    examples.sort();
+    paths.extend(examples);
+    paths
 }
 
-/// The per-case `#[test]` names, keyed by the display path each was generated
-/// from — `cases/arrays/nonempty` → `cases_arrays_nonempty`.
+/// The paths to re-check after refills, or `None` when the whole corpus has to be.
 ///
-/// Parsed out of the checked-in `tests/support/case_tests.rs` rather than
-/// re-derived by mangling the path here. The mangling is the *generator's* rule,
-/// and a second copy of it in this crate would be a rule that can drift: the
-/// generated file already states the mapping, so this reads it. An unreadable
-/// file yields an empty map, which [`final_run_scope`] treats as "don't narrow".
-fn case_test_names(repo: &Path) -> HashMap<String, String> {
-    let path = repo.join("tests/support/case_tests.rs");
-    let text = std::fs::read_to_string(path).unwrap_or_default();
-    case_test_names_from(&text)
-}
-
-/// [`case_test_names`] over the file's text: one `name = "display/path",` entry
-/// per line inside the `case_tests!` block.
-fn case_test_names_from(text: &str) -> HashMap<String, String> {
-    text.lines()
-        .filter_map(|line| {
-            let (name, rest) = line.trim().split_once(" = \"")?;
-            let display = rest.split_once('"')?.0;
-            Some((display.to_string(), name.to_string()))
-        })
-        .collect()
-}
-
-/// The per-case tests the final run has to re-execute, or `None` when the run
-/// must not be narrowed at all.
-fn final_run_scope(repo: &Path, plan: &discovery::Plan) -> Option<Vec<String>> {
-    final_run_scope_from(&case_test_names(repo), plan)
-}
-
-/// [`final_run_scope`] against an already-read name map.
-///
-/// The narrowing is sound exactly when every input a *skipped* case reads is
-/// byte-identical to what it read during the discovery run that passed it.
-/// Three things could break that, and each is a `None` here:
-///
-/// - **`need_ir`** — step 5 rewrote `dogfood.o`, which every case compiles
-///   against. (Step 1b's promotion is fine: it happens *before* discovery, so
-///   the discovery run is already against the new artifact.)
-/// - **`need_case_tests`** — the case list was regenerated, so cases exist that
-///   discovery never executed, and the test binary was rebuilt.
-/// - **an unmappable case** — a refilled path with no `#[test]` name means this
-///   function and the generator disagree about the corpus, and guessing is
-///   worse than running everything.
-///
-/// What is *not* a hazard, and is the reason this is worth doing at all: a
-/// refill rewrites only a case's own trailing `--- section ---` blocks, and
-/// `aipl_parser::parse_with_allows` strips those from every file it parses —
-/// imports included. So refilling `ty.aipl`'s `--- stdout ---` cannot
-/// change what `grammar_aipl.aipl` compiles to, even though it imports it.
-/// `fill_docs` is likewise harmless: nothing under `docs/` is a case input, and
-/// the test that reads it is not a per-case test, so it runs regardless. So is
-/// `fill_project_compilers`: a project's `aipl` is read by nothing but the two
-/// tests that own it, neither of them a per-case test.
-fn final_run_scope_from(
-    names: &HashMap<String, String>,
-    plan: &discovery::Plan,
-) -> Option<Vec<String>> {
-    if plan.need_ir || plan.need_case_tests || names.is_empty() {
+/// Narrowing is sound exactly when every input a *skipped* file read is byte-identical to what it
+/// read during the discovery run that passed it. A regenerated artifact (`need_ir`) is an input to
+/// every file. What is not a hazard: a refill rewrites only a file's own trailing sections, which
+/// the parser strips from every file it reads, imports included, and a regenerated `#[test]` list,
+/// docs site or project compiler is read by nothing `aipl check` runs.
+fn final_scope(plan: &discovery::Plan) -> Option<Vec<String>> {
+    if plan.need_ir {
         return None;
     }
-    plan.fail_cases
-        .iter()
-        .map(|case| {
-            let display = case.strip_suffix(".aipl").unwrap_or(case);
-            names.get(display).cloned()
-        })
-        .collect()
+    Some(
+        plan.fail_cases
+            .iter()
+            .map(|case| match case.strip_prefix("cases/") {
+                Some(rest) => format!("tests/cases/{rest}"),
+                None => case.clone(),
+            })
+            .collect(),
+    )
+}
+
+/// How many shards to split a check of `files` paths into: one per core, and no more than there
+/// are files when they are named one by one.
+fn shard_count(paths: &[String]) -> usize {
+    let cores = std::thread::available_parallelism().map_or(4, |n| n.get());
+    if paths.iter().any(|p| !p.ends_with(".aipl")) {
+        cores
+    } else {
+        cores.min(paths.len()).max(1)
+    }
+}
+
+/// `aipl check` over `paths` as `shards` parallel processes, each one slice of the sorted file
+/// list, every file held to its sections and its row in the baseline table. Each shard's output
+/// goes to a file of its own so concurrent writers cannot interleave a `handoff-fill:` line, and
+/// they are printed one after another when all have finished.
+fn check_shards(paths: &[String], shards: usize) -> Cmd {
+    let aipl = format!(
+        "{}/debug/aipl",
+        std::env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| "target".to_string())
+    );
+    Cmd::new("sh")
+        .args([
+            "-c",
+            r#"aipl=$1; n=$2; shift 2
+dir=$(mktemp -d)
+i=1
+while [ $i -le $n ]; do
+  "$aipl" check --baseline tests/performance_metrics.md --shard $i/$n "$@" > $dir/$i.out 2>&1 &
+  i=$((i+1))
+done
+wait
+cat $dir/*.out
+rm -rf $dir"#,
+            "sh",
+            &aipl,
+            &shards.to_string(),
+        ])
+        .args(paths)
+        .data_stdout()
+}
+
+/// One run of the corpus and of every other test, returning whether both were clean and what
+/// they said as one [`discovery::Run`].
+///
+/// The non-case tests are one nextest run; the corpus is the sharded `aipl check`, which
+/// validates every section and the baseline row of every file with the one implementation users
+/// have. `exclude` is a nextest filterset for the first (the staged-IR run skips two tests) and
+/// `dogfood_ir` points both at a candidate artifact. With no `paths` only the first half runs.
+fn corpus_run(
+    r: &mut Runner,
+    label: &str,
+    paths: &[String],
+    exclude: Option<&str>,
+    dogfood_ir: Option<&str>,
+) -> (bool, discovery::Run) {
+    let mut tests = nextest_non_case(exclude);
+    if let Some(ir) = dogfood_ir {
+        tests = tests.env("AIPL_DOGFOOD_IR", ir);
+    }
+    let tests_ok = r.step(&format!("nextest ({label} — non-case tests)"), tests);
+    let tests_out = std::mem::take(&mut r.out);
+    let mut run = discovery::Run::parse(&tests_out);
+    let mut log = tests_out.merged;
+    if !paths.is_empty() {
+        let shards = shard_count(paths);
+        let mut check = check_shards(paths, shards);
+        if let Some(ir) = dogfood_ir {
+            check = check.env("AIPL_DOGFOOD_IR", ir);
+        }
+        r.step(
+            &format!(
+                "aipl check ({label} — {shards} shards over {} path(s))",
+                paths.len()
+            ),
+            check,
+        );
+        run = run.with_check(&r.out.stdout, shards);
+        log.push_str(&r.out.merged);
+    }
+    r.out.merged = log;
+    let ok = tests_ok && run.failures().is_empty();
+    (ok, run)
 }
 
 /// Build every test target without running anything.
@@ -666,7 +700,8 @@ fn handoff() -> ! {
     // fails both. While only the first was known to `discovery`, the second
     // counted as a hard failure and stopped a run that had already set
     // `need_ir`, one step short of the regeneration that would have fixed it.
-    if r.step("nextest (discovery)", nextest()) {
+    let (discovery_ok, run) = corpus_run(&mut r, "discovery", &corpus_paths(), None, None);
+    if discovery_ok {
         // Step 1b may already have regenerated; saying "no regeneration needed"
         // then would contradict a step the reader just watched run.
         let note = if regenerated_ir {
@@ -679,7 +714,6 @@ fn handoff() -> ! {
         std::process::exit(0);
     }
     r.save_out(); // keep the discovery output for any failure message below
-    let run = discovery::Run::parse(&r.out);
 
     // The run failed, so it ran tests, so the JSON stream must have carried
     // events. None means the machine-readable interface moved — which would
@@ -861,18 +895,19 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
             r.fail("validate_staged_ir", &detail);
         }
 
-        let ok = r.step(
+        let (ok, staged_run) = corpus_run(
+            &mut r,
             "staged-IR corpus run (AIPL_DOGFOOD_IR)",
-            nextest()
-                .args(["-E", STAGED_IR_SKIP])
-                .env("AIPL_DOGFOOD_IR", &staged.to_string_lossy()),
+            &corpus_paths(),
+            Some(STAGED_IR_SKIP),
+            Some(&staged.to_string_lossy()),
         );
         // A baseline that moved is not evidence against the candidate: moving
         // is what a codegen change *does*, and the table is judged by the final
         // run, against the IR that was actually promoted.
-        if !ok && !discovery::Run::parse(&r.out).only_baseline() {
+        if !ok && !staged_run.only_baseline() {
             r.save_out();
-            let detail = failure_excerpt(&r.out);
+            let detail = run_excerpt(&staged_run);
             r.fail(
                 "staged-IR corpus run (candidate IR is wrong — diff .staged vs live)",
                 &detail,
@@ -952,32 +987,27 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
     // --- 6. Final confirmation against the live artifacts ------------------
 
     // Scoped to what the remediation above could possibly have changed, when it
-    // can be (see `final_run_scope`). Every case this skips passed in the
-    // discovery run and has read-for-read identical inputs since, so re-running
-    // it re-establishes nothing — and it is the bulk of the suite: 864 of 1240
-    // tests are per-case, each paying ~0.9s of process and setup overhead for
-    // ~0.6s of work.
-    let scope = final_run_scope(&repo, &plan);
-    let (label, cmd) = match &scope {
-        Some(keep) => (
-            format!(
-                "nextest (final — scoped to {} refilled case(s))",
-                keep.len()
-            ),
-            nextest_scoped(keep),
+    // can be (see `final_scope`): the non-case tests all run, and `aipl check` only
+    // on the files that were refilled, since every other file passed in the
+    // discovery run and has read-for-read identical inputs since.
+    let scope = final_scope(&plan);
+    let (label, paths) = match &scope {
+        Some(paths) => (
+            format!("final — scoped to {} refilled case(s)", paths.len()),
+            paths.clone(),
         ),
-        None => ("nextest (final)".to_string(), nextest()),
+        None => ("final".to_string(), corpus_paths()),
     };
-    if !r.step(&label, cmd) {
+    let (final_ok, last) = corpus_run(&mut r, &label, &paths, None, None);
+    if !final_ok {
         r.save_out();
-        let last = discovery::Run::parse(&r.out);
         if !last.only_baseline() {
-            let detail = failure_excerpt(&r.out);
-            r.fail("nextest (final — regeneration didn't settle)", &detail);
+            let detail = run_excerpt(&last);
+            r.fail("final run (regeneration didn't settle)", &detail);
         }
-        // A full run is authoritative: the artifact or the case list changed
-        // under the discovery run's numbers. A scoped one only re-ran some
-        // cases, so the others stand as discovery reported them.
+        // A full run is authoritative: the artifact changed under the
+        // discovery run's numbers. A scoped one only re-ran some cases, so the
+        // others stand as discovery reported them.
         if scope.is_none() {
             baseline = last.baseline();
         } else {
@@ -1124,13 +1154,8 @@ fn print_moved(moved: &std::collections::BTreeMap<String, Vec<String>>) {
 }
 
 /// The failing tests of a corpus run, each with the first line it printed.
-///
-/// Replaces the original's `grep -nE 'mismatch|FAILED|Abort'` over a flat blob:
-/// the JSON already knows which tests failed and what each one said, so the
-/// excerpt names them instead of quoting whichever nearby lines matched.
-fn failure_excerpt(out: &Output) -> String {
-    let run = discovery::Run::parse(out);
-    let mut lines: Vec<String> = run
+fn run_excerpt(run: &discovery::Run) -> String {
+    let lines: Vec<String> = run
         .failures()
         .iter()
         .take(20)
@@ -1141,8 +1166,8 @@ fn failure_excerpt(out: &Output) -> String {
         .collect();
     if lines.is_empty() {
         // A failed run with no failed *test* — a build error, or nextest itself
-        // giving up. The human stream is all there is.
-        lines.push(tail(&out.stderr, 20));
+        // giving up; the saved log has the whole of it.
+        return "(no failed test was reported; see the saved log)".to_string();
     }
     lines.join("\n")
 }
@@ -1235,83 +1260,33 @@ mod tests {
         }
     }
 
-    const GENERATED: &str = r#"
-// @generated by `cargo test --test cases -- --ignored fill_case_tests`.
-case_tests! {
-    cases_arrays_nonempty = "cases/arrays/nonempty",
-    crates_aipl_codegen_src_walker = "crates/aipl-codegen/src/walker",
-    examples_hello = "examples/hello",
-}
-"#;
-
     #[test]
-    fn reads_the_generated_case_test_mapping() {
-        let names = case_test_names_from(GENERATED);
-        assert_eq!(names.len(), 3);
-        assert_eq!(
-            names.get("cases/arrays/nonempty").map(String::as_str),
-            Some("cases_arrays_nonempty")
-        );
-        // A hyphenated directory still maps through the generator's own name.
-        assert_eq!(
-            names
-                .get("crates/aipl-codegen/src/walker")
-                .map(String::as_str),
-            Some("crates_aipl_codegen_src_walker")
-        );
-        // The header comment and the `case_tests! {` line are not entries.
-        assert!(!names.contains_key("@generated"));
-    }
-
-    #[test]
-    fn scopes_the_final_run_to_the_refilled_cases() {
-        let names = case_test_names_from(GENERATED);
+    fn scopes_the_final_check_to_the_refilled_files_by_their_paths() {
         let plan = plan_with(&["cases/arrays/nonempty.aipl", "examples/hello.aipl"]);
-        let keep = final_run_scope_from(&names, &plan).expect("narrowable");
-        assert_eq!(keep, ["cases_arrays_nonempty", "examples_hello"]);
+        assert_eq!(
+            final_scope(&plan),
+            Some(vec![
+                "tests/cases/arrays/nonempty.aipl".to_string(),
+                "examples/hello.aipl".to_string()
+            ])
+        );
     }
 
     #[test]
-    fn refuses_to_scope_when_a_skipped_case_could_have_changed() {
-        let names = case_test_names_from(GENERATED);
-
-        // A regenerated artifact is an input to *every* case.
+    fn a_regenerated_artifact_is_an_input_to_every_file_so_nothing_is_skipped() {
         let mut ir = plan_with(&["cases/arrays/nonempty.aipl"]);
         ir.need_ir = true;
-        assert_eq!(final_run_scope_from(&names, &ir), None);
-
-        // A regenerated `#[test]` list means cases discovery never ran.
-        let mut listed = plan_with(&["cases/arrays/nonempty.aipl"]);
-        listed.need_case_tests = true;
-        assert_eq!(final_run_scope_from(&names, &listed), None);
-
-        // A case with no `#[test]` name: this gate and the generator disagree.
-        let unknown = plan_with(&["cases/arrays/nonempty.aipl", "cases/who/knows.aipl"]);
-        assert_eq!(final_run_scope_from(&names, &unknown), None);
-
-        // No mapping to read at all.
-        let empty = HashMap::new();
-        assert_eq!(
-            final_run_scope_from(&empty, &plan_with(&["cases/arrays/nonempty.aipl"])),
-            None
-        );
+        assert_eq!(final_scope(&ir), None);
     }
 
     #[test]
-    fn the_scoped_filter_runs_every_non_case_test() {
+    fn the_non_case_filter_runs_every_test_outside_the_cases_binary() {
         // The leading arm is what makes an unrecognized test run rather than be
-        // skipped; `every_case_has_a_test` is named back in because it lives in
-        // the `cases` binary without being a per-case test.
-        let expr = scoped_filter_expr(&["cases_arrays_nonempty".to_string()]);
+        // skipped; what it leaves out of the `cases` binary is exactly the tests
+        // named for a case's display path.
         assert_eq!(
-            expr,
-            "not binary(=cases) or test(=every_case_has_a_test) \
-             or test(=cases_arrays_nonempty)"
-        );
-        // Nothing refilled still confirms the whole non-case half of the suite.
-        assert_eq!(
-            scoped_filter_expr(&[]),
-            "not binary(=cases) or test(=every_case_has_a_test)"
+            NON_CASE_TESTS,
+            "not binary(=cases) or not test(/^(cases|examples|crates)_/)"
         );
     }
 

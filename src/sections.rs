@@ -368,8 +368,13 @@ pub fn baseline(
         });
     let _ = fs::remove_dir_all(&dir);
     let stats = measured?;
-    if stats.leaked().is_some() {
-        return Ok(Vec::new());
+    // Every running case is held to freeing what it allocates, whether or not it pins anything;
+    // a count that includes a leak is not one to compare, so no row is judged.
+    if let Some(leaked) = stats.leaked() {
+        return Ok(vec![Finding::unfixable(format!(
+            "memory leak: {leaked} of {} allocations were never freed ({} deallocations)",
+            stats.allocations, stats.deallocations
+        ))]);
     }
     let Some(row) = table.rows.get(key) else {
         return Ok(vec![Finding::unfixable(format!(

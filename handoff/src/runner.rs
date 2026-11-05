@@ -55,6 +55,13 @@ impl Cmd {
         self
     }
 
+    /// This command's stdout is data for the gate, not something to show a human, but it is not
+    /// nextest's event stream (see [`Cmd::json`]).
+    pub fn data_stdout(mut self) -> Self {
+        self.json = true;
+        self
+    }
+
     /// Ask nextest for the machine-readable event stream: one JSON object per
     /// line on **stdout**, with the ordinary human output still on **stderr**.
     ///

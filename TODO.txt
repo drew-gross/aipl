@@ -893,6 +893,8 @@ vscode:
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 
 handoff:
+  dynamic work queue for running tests to balance work across shards better
+  have some progress report type thingy
   maybe: fewer executables per case (reuse instrumented, or test behaviour in JIT). Need to decide if I actually want this.
   handoff should be able to regenerated staged ir artifacts on it's own without a two-stage approach
   auto-fix unused imports
