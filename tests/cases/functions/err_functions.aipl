@@ -70,7 +70,7 @@ fn unit_used_as_value() !prints -> i64 { print("hi") + 1 }
 
 // A void `main` (the default) with a trailing value.
 fn subject() { 5 }
---- errors ---
+--- check --compile ---
 error: fn "add" expects 2 arg(s), got 1
   --> ./tests/cases/functions/err_functions.aipl:18:30
    |

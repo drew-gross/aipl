@@ -1,7 +1,7 @@
 fn f(a: i64, b: i64 = 1) -> i64 { a }
 
 fn subject() -> i64 { f(1, a=2) }
---- errors ---
+--- check --compile ---
 error: parameter "a" of fn "f" is positional (it has no default) and cannot be passed by keyword
  --> ./tests/cases/kwargs/err_kw_for_positional.aipl:3:28
   |

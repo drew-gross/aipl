@@ -2,7 +2,7 @@
 # Never referenced on purpose, so `#[allow]` squelches the unused-import lint.
 
 import { char_at } from builtins; #[allow]
---- errors ---
+--- check --compile ---
 error: "char_at" is not a builtin
  --> ./tests/cases/strings/err_char_at_removed.aipl:4:10
   |

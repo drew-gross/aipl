@@ -7,7 +7,7 @@ fn double(n: i64) -> i64 { four() + n }.test({
     fn four() -> i64 { 4 }
     assert(double(2) == 6);
 })
---- errors ---
+--- check --compile ---
 error: call to undefined fn "four"
  --> ./tests/cases/tests/err_fn_in_test_unreachable.aipl:6:28
   |

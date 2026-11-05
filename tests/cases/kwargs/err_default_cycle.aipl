@@ -3,5 +3,5 @@
 fn f(a: i64 = g()) -> i64 { a }
 
 fn g(b: i64 = f()) -> i64 { b }
---- errors ---
+--- check --compile ---
 error: cycle in keyword-parameter defaults: f -> g -> f

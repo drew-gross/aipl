@@ -14,7 +14,7 @@ fn subject() {
         reads();
     };
 }
---- errors ---
+--- check --compile ---
 error: shim of "!clock" does not cover operation "monotonic_now"; a partial shim cannot discharge the effect
   --> ./tests/cases/effects/err_shim_partial_coverage.aipl:13:5
    |

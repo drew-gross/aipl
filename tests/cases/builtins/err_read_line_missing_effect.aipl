@@ -4,7 +4,7 @@
 import { read_line } from builtins;
 
 fn next() -> str? { read_line() }
---- errors ---
+--- check --compile ---
 error: fn "read_line" has effect "!read_stdin" but the calling function does not declare it
  --> ./tests/cases/builtins/err_read_line_missing_effect.aipl:6:21
   |

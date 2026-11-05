@@ -10,7 +10,7 @@ fn no_target(n: i64) !prints {
 }
 
 fn not_an_integer(n: i64) -> str? { n.narrow() }
---- errors ---
+--- check --compile ---
 error: "narrow" takes the integer type it converts to from where its value goes, and nothing here says which — bind it with one, as in `let b: u8? = n.narrow();`
  --> ./tests/cases/integers/err_narrow_no_target.aipl:8:13
   |

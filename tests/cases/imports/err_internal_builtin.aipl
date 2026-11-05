@@ -8,7 +8,7 @@ fn subject() {
     mut xs: i64[] = [];
     set xs.reserve(4);
 }
---- errors ---
+--- check --compile ---
 error: "reserve" is internal to the builtins' implementation and not available to programs
  --> ./tests/cases/imports/err_internal_builtin.aipl:5:10
   |

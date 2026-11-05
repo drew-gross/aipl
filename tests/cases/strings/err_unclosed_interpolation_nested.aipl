@@ -14,7 +14,7 @@ import { print } from builtins;
 fn subject() !prints {
     print(```{1 ```)
 }
---- errors ---
+--- check --compile ---
 error: unterminated triple-backtick template literal
   --> ./tests/cases/strings/err_unclosed_interpolation_nested.aipl:15:17
    |

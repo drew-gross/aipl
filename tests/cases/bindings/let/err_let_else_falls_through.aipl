@@ -10,7 +10,7 @@ fn pick(o: i64?) -> i64 {
     n
 }
 
---- errors ---
+--- check --compile ---
 error: the `else` of a `let .. else` has to leave the function, as in `else { return none; }`
  --> ./tests/cases/bindings/let/err_let_else_falls_through.aipl:8:9
   |

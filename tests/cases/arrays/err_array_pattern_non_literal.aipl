@@ -15,7 +15,7 @@ fn match_non_literal(xs: i64[]) -> i64 {
     }
 }
 
---- errors ---
+--- check --compile ---
 error: expected `(`, `,`, `.`, `]`, or `{`, found `+`
   --> ./tests/cases/arrays/err_array_pattern_non_literal.aipl:13:15
    |

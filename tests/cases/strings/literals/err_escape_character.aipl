@@ -1,5 +1,5 @@
 fn f() -> str { "\e" }
---- errors ---
+--- check --compile ---
 error: unknown escape sequence \e
  --> ./tests/cases/strings/literals/err_escape_character.aipl:1:18
   |

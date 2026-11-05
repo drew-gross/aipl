@@ -43,7 +43,7 @@
           </h3>
           <pre class="signature"><code>struct Check</code></pre>
 
-          <div class="doc"><p>One <code>check</code> expectation: the part of <code>aipl check</code>'s output a section pins (the canonical flags that select it, <code>--compile</code> or <code>--compile --tests</code>) and the body it must equal.</p></div>
+          <div class="doc"><p>One <code>check</code> expectation: the part of <code>aipl check</code>'s output a section pins (the canonical flags that select it, <code>--compile</code> or <code>--compile --tests</code>, or none for all of it) and the body it must equal.</p></div>
 
 
         </section>
@@ -106,7 +106,7 @@
           </h3>
           <pre class="signature"><code>fn whole_number(section: str, body: str) -&#62; i64!str</code></pre>
 
-          <div class="doc"><p>The single integer an exit-code section's body must be, named by its own section in the error so a bad <code>--- check exit code ---</code> doesn't report itself as <code>--- exit code ---</code>.</p></div>
+          <div class="doc"><p>The single integer an exit-code section's body must be, named by its own section in the error.</p></div>
 
 
         </section>
@@ -162,7 +162,7 @@
           </h3>
           <pre class="signature"><code>fn with_check(spec: Spec, projection: str, body: str) -&#62; Spec!str</code></pre>
 
-          <div class="doc"><p><code>spec</code> with the expectation that <code>projection</code> of <code>check</code>'s output is <code>body</code>. Two sections cannot pin the same projection, however they are spelled (<code>errors</code> is <code>--compile</code>, <code>check</code> is <code>--tests</code>).</p></div>
+          <div class="doc"><p><code>spec</code> with the expectation that <code>projection</code> of <code>check</code>'s output is <code>body</code>. Two sections cannot pin the same projection, however they are spelled.</p></div>
 
 
         </section>

@@ -9,7 +9,7 @@ fn if_cond_not_bool() -> i64 { if (5) { 1 } else { 2 } }
 
 // No `else`, so the `then` branch must produce nothing.
 fn if_no_else_non_unit_then() { if (true) { 2 } }
---- errors ---
+--- check --compile ---
 error: if branches have mismatched types: i64 vs str
  --> ./tests/cases/conditionals/err_conditionals.aipl:5:39
   |

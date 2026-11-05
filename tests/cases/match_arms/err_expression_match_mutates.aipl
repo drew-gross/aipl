@@ -19,7 +19,7 @@ fn subject() !prints {
     print(v.to_str());
     print(n.to_str());
 }
---- errors ---
+--- check --compile ---
 error: this arm assigns to "n", which is declared outside the `match` — an expression `match` produces a value and may not also mutate. Make every arm a statement (ending the `match` with ";"), or lift the assignment out and use the `match`'s value
   --> ./tests/cases/match_arms/err_expression_match_mutates.aipl:14:17
    |

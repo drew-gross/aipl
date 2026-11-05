@@ -14,7 +14,7 @@ fn subject() {
     mut xs = [1];
     set xs.extend(["a"]);
 }
---- errors ---
+--- check --compile ---
 error: "extend" source expects i64[], i64, or i64?, got str[]
   --> ./tests/cases/arrays/extend/err_extend_type_mismatch.aipl:15:19
    |

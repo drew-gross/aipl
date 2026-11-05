@@ -1,5 +1,5 @@
 fn f() -> char { 'ab' }
---- errors ---
+--- check --compile ---
 error: char literal must contain exactly one character
  --> ./tests/cases/chars/err_multi_char_literal.aipl:1:18
   |

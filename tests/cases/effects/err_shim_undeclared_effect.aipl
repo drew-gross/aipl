@@ -14,7 +14,7 @@ fn fake_mono() -> u64 { 2 }
 fn subject() {
     shim clock { now_nanos = logging_clock, monotonic_now = fake_mono } {};
 }
---- errors ---
+--- check --compile ---
 error: shim fn "logging_clock" has effect "!prints" but the function installing the shim does not declare it
   --> ./tests/cases/effects/err_shim_undeclared_effect.aipl:15:5
    |

@@ -9,7 +9,7 @@ fn subject() {
         random_u64();
     };
 }
---- errors ---
+--- check --compile ---
 error: `shim random` has providers `seeded_with_int(seed)` and `seeded_with_clock()`; `seeded_with_clock` with 1 argument(s) is neither
  --> ./tests/cases/effects/err_random_provider.aipl:8:5
   |

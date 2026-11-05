@@ -13,7 +13,7 @@ fn subject() !prints {
     };
     print("done");
 }
---- errors ---
+--- check --compile ---
 error: this `match` produces i64, but its value is unused — bind it with "let", return it, or make every arm a statement so the `match` is a statement too
   --> ./tests/cases/match_arms/err_expression_match_unused.aipl:10:5
    |

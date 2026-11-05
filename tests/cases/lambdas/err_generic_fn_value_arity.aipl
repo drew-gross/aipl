@@ -5,7 +5,7 @@ fn pair<A: any, B: any>(a: A, b: B) -> (A, B) { (a, b) }
 fn subject() {
     let ps = [1].map(pair);
 }
---- errors ---
+--- check --compile ---
 error: fn "pair" takes 2 parameter(s), but a function taking 1 is expected here
  --> ./tests/cases/lambdas/err_generic_fn_value_arity.aipl:6:22
   |

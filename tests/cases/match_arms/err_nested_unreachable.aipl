@@ -13,7 +13,7 @@ fn f(a: i64, b: i64?) -> str {
 fn subject() !prints {
     print(f(1, none));
 }
---- errors ---
+--- check --compile ---
 error: unreachable arm: every value it matches is matched by an arm above it
  --> ./tests/cases/match_arms/err_nested_unreachable.aipl:9:9
   |

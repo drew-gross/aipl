@@ -16,7 +16,7 @@ fn non_exhaustive(s: Shape) -> i64 {
         Empty => 0,
     }
 }
---- errors ---
+--- check --compile ---
 error: constructor "Circle" expects 1 argument(s), got 2
  --> ./tests/cases/variants/err_variants.aipl:9:18
   |

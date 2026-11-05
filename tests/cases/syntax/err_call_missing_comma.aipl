@@ -1,6 +1,6 @@
 fn g(a: i64, b: i64) -> i64 { a }
 fn subject() -> i64 { g(1 2) }
---- errors ---
+--- check --compile ---
 error: expected `$`, `)`, `,`, `.`, `?`, `[`, or an operator, found `2`
  --> ./tests/cases/syntax/err_call_missing_comma.aipl:2:27
   |

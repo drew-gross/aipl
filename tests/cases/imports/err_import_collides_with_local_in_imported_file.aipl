@@ -13,7 +13,7 @@ fn dup() -> i64 { 2 }
 pub fn run() -> i64 { dup() }
 --- file: util.aipl ---
 pub fn dup() -> i64 { 1 }
---- errors ---
+--- check --compile ---
 error: ./tests/cases/imports/mid.aipl: import "dup" conflicts with a local item
  --> ./tests/cases/imports/mid.aipl:1:10
   |

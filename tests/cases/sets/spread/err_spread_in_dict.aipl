@@ -5,7 +5,7 @@ fn subject() {
     let a = #{1, 2};
     let d = #{1: 2, ..a};
 }
---- errors ---
+--- check --compile ---
 error: a `..` spread is only allowed in a set literal — a "#{ .. }" holding "key: value" pairs is a dict
  --> ./tests/cases/sets/spread/err_spread_in_dict.aipl:6:13
   |

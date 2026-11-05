@@ -1,7 +1,7 @@
 import { wrapping_add as + } from builtins;
 
 fn subject() -> i64 { if (true + false) { 1 } else { 2 } }
---- errors ---
+--- check --compile ---
 error: arithmetic operand: expected i64, got bool
  --> ./tests/cases/arithmetic/err_arith_on_bool.aipl:3:27
   |

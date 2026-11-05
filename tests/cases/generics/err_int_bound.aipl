@@ -9,7 +9,7 @@ fn subject() {
     identity('a');
     identity("text");
 }
---- errors ---
+--- check --compile ---
 error: fn "identity": type parameter "T" requires "int", but the enclosing "T" is declared "ord"
  --> ./tests/cases/generics/err_int_bound.aipl:6:35
   |

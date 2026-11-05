@@ -1,5 +1,5 @@
 variant Shape = Circle(color: str = "red", r: i64)
---- errors ---
+--- check --compile ---
 error: variant case "Circle": parameter "r" has no default but follows keyword parameter "color"; parameters with defaults must come last
  --> ./tests/cases/variants/err_payload_positional_after_default.aipl:1:37
   |

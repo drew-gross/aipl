@@ -7,7 +7,7 @@ import { write_string_to_file } from builtins;
 fn subject() !read_files {
     write_string_to_file("x.txt", "data");
 }
---- errors ---
+--- check --compile ---
 error: fn "write_string_to_file" has effect "!write_files" but the calling function does not declare it
  --> ./tests/cases/files/err_missing_write_effect.aipl:8:5
   |

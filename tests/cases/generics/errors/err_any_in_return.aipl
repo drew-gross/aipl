@@ -1,5 +1,5 @@
 fn g(v: any[]) -> any[] { v }
---- errors ---
+--- check --compile ---
 error: fn "g": bare "any" is not allowed in a return type; declare "<T: any>" and return "T"
  --> ./tests/cases/generics/errors/err_any_in_return.aipl:1:4
   |

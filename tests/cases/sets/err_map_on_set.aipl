@@ -14,7 +14,7 @@ fn subject() !prints {
     let s: #{i64} = [3, 1, 2].to_set();
     print(s$to_str().len().to_str());
 }
---- errors ---
+--- check --compile ---
 error: map has no set form, so it does not take #{i64} — use "set_map", which maps a set to a set. It is a separate name because the result can be *smaller* than the receiver, when two elements map to the same answer; `map` promises one element out per element in, and over a set it could not keep that promise
   --> ./tests/cases/sets/err_map_on_set.aipl:15:11
    |

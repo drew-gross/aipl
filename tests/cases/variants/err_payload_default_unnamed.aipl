@@ -1,6 +1,6 @@
 variant Shape = Circle(i64 = 1)
 
---- errors ---
+--- check --compile ---
 error: expected `!`, `)`, `,`, `:`, `<`, `?`, `[`, or `without`, found `=`
  --> ./tests/cases/variants/err_payload_default_unnamed.aipl:1:28
   |

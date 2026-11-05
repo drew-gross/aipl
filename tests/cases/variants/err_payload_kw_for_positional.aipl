@@ -5,7 +5,7 @@ fn subject() -> i64 {
         Circle(..) => 0,
     }
 }
---- errors ---
+--- check --compile ---
 error: parameter "r" of variant case "Circle" is positional (it has no default) and cannot be passed by keyword
  --> ./tests/cases/variants/err_payload_kw_for_positional.aipl:4:22
   |

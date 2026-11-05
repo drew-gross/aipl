@@ -118,9 +118,10 @@ process, so the engine links once); pass a file to check just that one, or a
 directory to check the tree under it. It also reports any file that isn't in
 canonical format, runs a function's `.benchmark({{ .. }})` block too (in an
 instrumented build, which needs the linker `build` does), and validates the
-`--- section ---` blocks a file may end with: `errors` (the file must fail to
-compile with exactly those diagnostics, named relative to where `check` was
-started), `stdout`, `stderr`, `exit code`, `cli` and `expect file: p` (one run of
+`--- section ---` blocks a file may end with: `check <flags>` (what `check` prints for
+those parts, byte for byte; `check --compile` is a file that must fail to compile with exactly
+those diagnostics, named relative to where `check` was started, and a bare `check` is all
+of it), `stdout`, `stderr`, `exit code`, `cli` and `expect file: p` (one run of
 its `main`, made only when one of them is present), and `report` (what `aipl
 report` prints for it). `--- file: p ---` sections are staged beside the file so
 its imports and fixtures resolve. `--ignore-sections` checks the tests alone.
@@ -141,7 +142,7 @@ of them were formatted, compiled, passed, and matched.
 `--fix` repairs what a rewrite can: it formats each file in place, then rewrites
 each recorded section that no longer says what the file does (printing `formatted
 <file>` and `fixed <file>: <sections>`). Formatting goes first because it moves
-line numbers that `errors` and `report` record. It does not hide a real problem:
+line numbers that `check --compile` and `report` record. It does not hide a real problem:
 a failing test, a leak, a `trace`, a file that does not compile, a section for a
 file that was never written, or sections that contradict each other are still
 failures. A section a file does not have is added only for output the file's own
@@ -349,10 +350,10 @@ struct Staged {
 /// for why the tests run from a different directory than this was started in.
 ///
 /// `section_label` is `Some` when the file's sections are validated, and is the
-/// path an `errors` section names in its diagnostics; `None` checks the tests
+/// path a `check --compile` section names in its diagnostics; `None` checks the tests
 /// alone (`--ignore-sections`).
 ///
-/// A file with an `errors` section is *expected* not to compile, so it is
+/// A file with a `check --compile` section is *expected* not to compile, so it is
 /// compiled for its diagnostics and nothing else runs. Any other file runs its
 /// tests, and also its `main` when it has a section that observes a run (see
 /// [`sections::runs_main`]).
@@ -617,7 +618,7 @@ fn read_spec(file: &Path, label: &str) -> Result<SpecFields, String> {
     }
 }
 
-/// The path an `errors` section names `file` by: relative to the directory
+/// The path a `check --compile` section names `file` by: relative to the directory
 /// `check` was started in, `./`-prefixed — the same spelling however `check` was
 /// pointed at it (`a.aipl`, `./a.aipl`, an absolute path, or found by walking a
 /// directory), which is what lets a recorded diagnostic be compared at all.
@@ -732,7 +733,7 @@ fn check_resolved(
             dbg,
         )
     })??;
-    // The `check` sections for parts this run left out. A file that holds an `errors` section is a
+    // The `check` sections for parts this run left out. A file that holds a `check --compile` section is a
     // file that does not compile, which `conflicts` already says about any of them.
     let pinned = sections::pinned_parts(spec);
     if sections && (pinned.tests || pinned.benchmarks) {
@@ -750,28 +751,23 @@ fn check_resolved(
 }
 
 /// Run `aipl check --ignore-sections <flags> <file>` from the project root, and give back what it
-/// printed and its exit status: the output a `check <flags>` section records.
+/// printed: the output a `check <flags>` section records.
 ///
 /// A child process, because the run's own output (a `trace` value, say) goes straight to the
 /// process's stdout, which is part of what the section records.
-fn run_check_for(
-    project_root: &Path,
-    section_label: &str,
-    flags: &str,
-) -> Result<(String, i32), String> {
+fn run_check_for(project_root: &Path, section_label: &str, flags: &str) -> Result<String, String> {
     let exe = env::current_exe().map_err(|e| format!("cannot find the `aipl` binary: {e}"))?;
     let output = std::process::Command::new(exe)
         .current_dir(project_root)
         .arg("check")
         .arg("--ignore-sections")
-        .args(flags.split(' '))
+        .args(flags.split(' ').filter(|flag| !flag.is_empty()))
         .arg(section_label)
         .output()
         .map_err(|e| format!("`aipl check {flags}` could not start: {e}"))?;
-    Ok((
-        aipl::codegen::normalize_output(&String::from_utf8_lossy(&output.stdout)),
-        output.status.code().unwrap_or(-1) & 0xff,
-    ))
+    Ok(aipl::codegen::normalize_output(&String::from_utf8_lossy(
+        &output.stdout,
+    )))
 }
 
 /// `--fix` for the sections: write each finding that has a fix back into `path`,
@@ -788,18 +784,7 @@ fn apply_fixes(path: &Path, checked: &mut Checked) {
         .into_iter()
         .partition(|f| f.fix.is_some());
     if !fixable.is_empty() {
-        // A fix names the new spelling of the section, `check --tests`; a file that wrote the old
-        // bare `check` header is rewritten under the header it has.
-        let bare_check = std::fs::read_to_string(path)
-            .is_ok_and(|text| text.lines().any(|line| line == "--- check ---"));
-        let fills: Vec<(String, String)> = fixable
-            .iter()
-            .filter_map(|f| f.fix.clone())
-            .map(|(name, body)| match name.as_str() {
-                "check --tests" if bare_check => ("check".to_string(), body),
-                _ => (name, body),
-            })
-            .collect();
+        let fills: Vec<(String, String)> = fixable.iter().filter_map(|f| f.fix.clone()).collect();
         match aipl::codegen::fill_or_add_sections_file(&path.to_string_lossy(), &fills) {
             Ok(()) => {
                 for (section, _) in &fills {
@@ -820,7 +805,7 @@ fn apply_fixes(path: &Path, checked: &mut Checked) {
 /// Check `file` against the canonical format, rewriting it first when `fix` is set.
 ///
 /// Done before anything else is checked, because formatting moves line numbers and
-/// an `errors` or `report` section records them: fixing those first would record
+/// a `check --compile` or `report` section records them: fixing those first would record
 /// positions the next format changes. Unformatted source is a `check` failure, but
 /// not a fatal one: it is reported and the file's tests still run, so one
 /// invocation surfaces every problem — the same reason a file that fails to
@@ -875,10 +860,13 @@ fn check_path(
             benchmarks: false,
         },
     };
+    // A rewrite still formats a file whose section records the formatting: the section is then
+    // refreshed against the formatted text.
+    let format = parts.format && (fix || !pinned.format);
     let parts = parts.without(pinned);
     // Reported before the tests run, and either way: the point is to end the
     // invocation knowing about every problem, not just the first kind.
-    let formatting = if parts.format {
+    let formatting = if format {
         check_format(path, fix)
     } else {
         Formatting::Clean
@@ -952,7 +940,7 @@ fn check_path(
 /// made ready.
 ///
 /// A file's trailing `--- section ---` blocks are expectations about it, and are
-/// validated too (see [`sections`]): `errors` for a file that must not compile,
+/// validated too (see [`sections`]): `check --compile` for a file that must not compile,
 /// `stdout`/`stderr`/`exit code`/`cli`/`expect file:` for what its `main` does.
 /// `--ignore-sections` checks the tests alone, for a caller that validates the
 /// sections itself.

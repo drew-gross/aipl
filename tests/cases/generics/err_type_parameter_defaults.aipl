@@ -19,7 +19,7 @@ fn too_few() -> u64 { three::<str>([], []) }
 fn too_many() -> u64 { two::<str, u8, bool>([], []) }
 
 fn a_type_to_hold_it() -> u64 { two::<str, str>(["a"], [1]) }
---- errors ---
+--- check --compile ---
 error: fn "not_the_bound": type parameter "T" requires "int", but its default str is not one
  --> ./tests/cases/generics/err_type_parameter_defaults.aipl:5:4
   |

@@ -13,7 +13,7 @@ fn f() -> i64 {
     let Q { x } = make();
     x
 }
---- errors ---
+--- check --compile ---
 error: cannot destructure P as Q — the pattern names the struct it takes apart, and two structs that merely share field names are not interchangeable
   --> ./tests/cases/structs/err_destructure_wrong_struct.aipl:13:19
    |

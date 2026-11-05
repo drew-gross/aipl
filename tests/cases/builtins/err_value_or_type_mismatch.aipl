@@ -3,7 +3,7 @@
 import { value_or } from builtins;
 
 fn subject() -> i64 { some(1).value_or('z') }
---- errors ---
+--- check --compile ---
 error: conflicting types for "T" in "value_or": i64 vs char
  --> ./tests/cases/builtins/err_value_or_type_mismatch.aipl:5:23
   |

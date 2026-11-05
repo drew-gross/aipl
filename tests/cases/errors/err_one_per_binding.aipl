@@ -19,7 +19,7 @@ fn first_bad_let_only(v: str[]) -> u64 {
     len(v);
     a
 }
---- errors ---
+--- check --compile ---
 error: len expects an array, got i64
   --> ./tests/cases/errors/err_one_per_binding.aipl:17:17
    |

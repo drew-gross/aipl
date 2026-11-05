@@ -6,7 +6,7 @@
 struct Box<T> { value: T }
 
 fn f() -> i64 { [Box { value: 5 }] }
---- errors ---
+--- check --compile ---
 error: fn "f": body returns Box<i64>[], but the declared return type is i64
  --> ./tests/cases/generics/err_instance_name_demangled.aipl:8:17
   |

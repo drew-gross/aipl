@@ -3,7 +3,7 @@
 fn subject() {
     let grid: i64[,] = [[1, 2, 3], [4, 5]];
 }
---- errors ---
+--- check --compile ---
 error: every row of a grid must have the same length: this row has 2, the first has 3
  --> ./tests/cases/grids/err_ragged_literal.aipl:4:36
   |

@@ -18,7 +18,7 @@ fn subject() !prints {
     }
     print(`{pairs}`);
 }
---- errors ---
+--- check --compile ---
 error: tuple element 0 has no type of its own here — a bare `none` or `[]` takes its type from context, and a tuple slot gives it none; annotate the binding it comes from (e.g. `mut p: i64? = none;`)
  --> ./tests/cases/tuples/err_none_element.aipl:8:14
   |

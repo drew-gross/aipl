@@ -5,7 +5,7 @@ import { print } from builtins;
 
 fn main() !prints {
     print(`{1
---- errors ---
+--- check --compile ---
 error: unterminated template literal
  --> ./tests/cases/strings/err_unclosed_interpolation_single_backtick.aipl:7:11
   |

@@ -1,7 +1,7 @@
 struct A { x: i64 }
 
 struct A { y: i64 }
---- errors ---
+--- check --compile ---
 error: ./tests/cases/structs/err_duplicate_struct.aipl: duplicate top-level item "A"
  --> ./tests/cases/structs/err_duplicate_struct.aipl:3:8
   |

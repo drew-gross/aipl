@@ -6,7 +6,7 @@ import { print, read_file_to_string, to_str } from builtins;
 fn subject() !prints {
     print(to_str(read_file_to_string("x.txt")));
 }
---- errors ---
+--- check --compile ---
 error: fn "read_file_to_string" has effect "!read_files" but the calling function does not declare it
  --> ./tests/cases/files/err_missing_effect.aipl:7:18
   |

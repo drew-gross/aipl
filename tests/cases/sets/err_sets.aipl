@@ -15,7 +15,7 @@ fn index_set() !prints {
     let s = #{1, 2, 3};
     print(to_str(s[0]));
 }
---- errors ---
+--- check --compile ---
 error: "contains" takes an array or str receiver; for set membership use "has"
  --> ./tests/cases/sets/err_sets.aipl:6:41
   |

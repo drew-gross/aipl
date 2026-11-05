@@ -19,7 +19,7 @@ import { wrapping_add as + } from builtins;
 // `nosuchfn` is undefined — the checker reports it, and the caret below must
 // name util.aipl, not the file that imported it.
 pub fn helper(n: i64) -> i64 { nosuchfn(n) + 1 }
---- errors ---
+--- check --compile ---
 error: call to undefined fn "nosuchfn"
  --> ./tests/cases/imports/util.aipl:5:32
   |

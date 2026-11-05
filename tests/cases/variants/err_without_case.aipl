@@ -40,7 +40,7 @@ fn dead_wildcard(v: VMinus) -> str {
 fn no_such_case(v: V without Nope) -> i64 { 1 }
 
 fn not_a_variant(n: i64 without C) -> i64 { 1 }
---- errors ---
+--- check --compile ---
 error: V without C has no constructor "C"
   --> ./tests/cases/variants/err_without_case.aipl:13:9
    |

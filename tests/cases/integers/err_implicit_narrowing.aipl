@@ -19,7 +19,7 @@ fn returned(n: u16) -> u8 { n }
 fn field(n: i32) -> Byte { b: n }
 
 fn signed_to_unsigned(n: i8) -> u64 { n }
---- errors ---
+--- check --compile ---
 error: binding "b" is declared u8, but its value is i64 — u8 cannot hold every i64, so convert with `.narrow()`, which gives `none` when the value does not fit
   --> ./tests/cases/integers/err_implicit_narrowing.aipl:11:17
    |

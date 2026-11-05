@@ -9,7 +9,7 @@ fn take(c: Color) -> i64 { 0 }
 fn main() -> i64 { take(A(5)) }
 --- file: color.aipl ---
 variant Color = A(i64) | B
---- errors ---
+--- check --compile ---
 error: call to undefined fn "A" — "A" is a variant constructor that isn't in scope; import it with `import { A } from` its defining file, or write it qualified as `Variant.A`
  --> ./tests/cases/imports/err_constructor_not_imported.aipl:9:25
   |

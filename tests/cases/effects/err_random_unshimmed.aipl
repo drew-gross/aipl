@@ -9,7 +9,7 @@ fn roll() !random -> u64 { random_u64() }
 fn subject() !prints {
     print(to_str(roll()));
 }
---- errors ---
+--- check --compile ---
 error: fn "roll" has effect "!random" but the calling function does not declare it
   --> ./tests/cases/effects/err_random_unshimmed.aipl:10:18
    |

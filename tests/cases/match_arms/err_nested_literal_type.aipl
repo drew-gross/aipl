@@ -12,7 +12,7 @@ fn f(a: i64?) -> str {
 fn subject() !prints {
     print(f(some(1)));
 }
---- errors ---
+--- check --compile ---
 error: string-literal pattern matches a str, not i64
  --> ./tests/cases/match_arms/err_nested_literal_type.aipl:7:9
   |

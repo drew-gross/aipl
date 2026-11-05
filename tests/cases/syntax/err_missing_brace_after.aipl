@@ -1,5 +1,5 @@
 fn f() 1 }
---- errors ---
+--- check --compile ---
 error: expected `->`, `{`, or an effect, found `1`
  --> ./tests/cases/syntax/err_missing_brace_after.aipl:1:8
   |

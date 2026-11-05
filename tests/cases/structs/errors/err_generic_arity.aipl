@@ -3,7 +3,7 @@
 struct Pair<A, B> { first: A, second: B }
 
 fn take(p: Pair<i64>) -> i64 { p.first }
---- errors ---
+--- check --compile ---
 error: generic type "Pair" expects 2 type argument(s), got 1
  --> ./tests/cases/structs/errors/err_generic_arity.aipl:5:4
   |

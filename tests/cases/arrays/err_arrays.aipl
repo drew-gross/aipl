@@ -59,7 +59,7 @@ fn push_immutable() -> i64 {
     set xs.push(2);
     0
 }
---- errors ---
+--- check --compile ---
 error: cannot index a value of type i64
   --> ./tests/cases/arrays/err_arrays.aipl:21:5
    |

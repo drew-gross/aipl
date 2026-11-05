@@ -10,7 +10,7 @@ fn subject() {
     let unpinned = empty();
     let text: str? = nothing("x");
 }
---- errors ---
+--- check --compile ---
 error: fn "empty" takes a type from where its result goes, and nothing here says which — bind the result to a declared type, as in `let n: u8? = ..;`
   --> ./tests/cases/generics/err_return_only_type_param.aipl:10:20
    |

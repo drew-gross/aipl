@@ -4,7 +4,7 @@
 
 import { +=, print, to_str } from builtins;
 
---- errors ---
+--- check --compile ---
 error: the "+=" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_add_assign as +=` or `saturating_add_assign as +=` from builtins
  --> ./tests/cases/compound_assign/err_bare_import.aipl:5:10
   |

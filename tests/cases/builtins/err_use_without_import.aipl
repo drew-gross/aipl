@@ -1,5 +1,5 @@
 fn subject() -> i64 { len([1, 2, 3]) }
---- errors ---
+--- check --compile ---
 error: call to undefined fn "len" — "len" is a builtin; import it with `import { len } from builtins;`
  --> ./tests/cases/builtins/err_use_without_import.aipl:1:23
   |

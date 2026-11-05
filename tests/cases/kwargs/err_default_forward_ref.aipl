@@ -5,7 +5,7 @@
 import { wrapping_add as + } from builtins;
 
 fn f(a: i64 = b, b: i64 = 1) -> i64 { a + b }
---- errors ---
+--- check --compile ---
 error: fn "f": the default for parameter "a" reads parameter "b", which is declared after it — a default may only read parameters declared before it
  --> ./tests/cases/kwargs/err_default_forward_ref.aipl:7:15
   |

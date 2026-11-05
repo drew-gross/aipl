@@ -12,7 +12,7 @@ fn label(x: i64?) -> str {
 fn subject() !prints {
     print(label(some(1)));
 }
---- errors ---
+--- check --compile ---
 error: string-literal pattern matches a str, not i64?
  --> ./tests/cases/options/err_match_str_literal.aipl:7:9
   |

@@ -6,7 +6,7 @@ import { print, to_array } from builtins;
 fn subject() !prints {
     print(`{#{1, 2}.to_array()}`);
 }
---- errors ---
+--- check --compile ---
 error: "to_array" needs an ordered set (`#>{..}` or `#<{..}`) — a #{i64} promises no order for its elements to come out in
  --> ./tests/cases/sets/err_to_array_unordered.aipl:7:13
   |

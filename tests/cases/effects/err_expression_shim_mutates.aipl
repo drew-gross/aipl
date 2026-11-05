@@ -20,7 +20,7 @@ fn subject() !prints {
     print(v.to_str());
     print(seen.to_str());
 }
---- errors ---
+--- check --compile ---
 error: this body assigns to "seen", which is declared outside the `shim` — an expression `shim` produces a value and may not also mutate. Make the body a statement (ending the `shim` with ";"), or lift the assignment out and use the `shim`'s value
   --> ./tests/cases/effects/err_expression_shim_mutates.aipl:17:13
    |

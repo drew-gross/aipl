@@ -18,7 +18,7 @@ fn subject() !prints {
     let f = FmtError { ..e };
     print(f.message);
 }
---- errors ---
+--- check --compile ---
 error: cannot spread LexError into FmtError — a ".." spread copies fields from another value of the same struct, and two structs that merely share field names are not interchangeable
   --> ./tests/cases/structs/err_spread_type_mismatch.aipl:18:26
    |

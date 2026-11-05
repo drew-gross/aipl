@@ -16,7 +16,7 @@ fn subject() !prints {
     print(v.to_str());
     print(n.to_str());
 }
---- errors ---
+--- check --compile ---
 error: this branch assigns to "n", which is declared outside the `if` — an expression `if` produces a value and may not also mutate. Make every branch a statement (ending the `if` with ";"), or lift the assignment out and use the `if`'s value
   --> ./tests/cases/if_let/err_expression_if_let_mutates.aipl:11:13
    |

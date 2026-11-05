@@ -11,7 +11,7 @@ fn subject() {
 fn other() {
     let d = 4
 }
---- errors ---
+--- check --compile ---
 error: expected `;`, found `let`
  --> ./tests/cases/syntax/err_multiple_missing_semicolons.aipl:7:5
   |

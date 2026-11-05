@@ -7,7 +7,7 @@ fn subject() -> i64 {
     let p = Phantom { tag: "x" };
     0
 }
---- errors ---
+--- check --compile ---
 error: cannot infer type parameter "T" of generic struct "Phantom" — provide a field whose value determines it
  --> ./tests/cases/structs/errors/err_generic_cannot_infer.aipl:7:13
   |

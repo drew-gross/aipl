@@ -4,7 +4,7 @@
 # file, so an importer doesn't re-run an already-independently-checked file's
 # tests — it must still keep every test body belonging to the root file
 # itself. Two functions here, each with its own passing test, pin the count
-# via `--- check ---` so a regression that only ran one of them would show up
+# via `--- check --tests ---` so a regression that only ran one of them would show up
 # as "1 tests: 1 passed, 0 failed" instead of the expected "2 tests: ...".
 
 import { equal as ==, wrapping_mul as * } from builtins;
@@ -18,7 +18,7 @@ fn triple(x: i64) -> i64 { x * 3 }.test({
     assert(triple(2) == 6);
     assert(triple(0) == 0);
 })
---- check ---
+--- check --tests ---
 ./tests/cases/tests/all_tests_in_file_run.aipl:
     double: 2 assertions passed
     triple: 2 assertions passed

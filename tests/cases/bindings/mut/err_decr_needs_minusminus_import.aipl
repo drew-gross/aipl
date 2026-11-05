@@ -12,7 +12,7 @@ fn drain(start: i64) -> i64 {
     }
     n
 }
---- errors ---
+--- check --compile ---
 error: operator "--" must be imported: add `import { wrapping_decrement as -- } from builtins;`
   --> ./tests/cases/bindings/mut/err_decr_needs_minusminus_import.aipl:11:13
    |

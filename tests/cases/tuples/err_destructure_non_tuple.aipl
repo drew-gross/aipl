@@ -4,7 +4,7 @@
 fn subject() {
     let (a, b) = 5;
 }
---- errors ---
+--- check --compile ---
 error: cannot destructure i64 as a tuple — a pattern like "(a, b)" takes apart a tuple value
  --> ./tests/cases/tuples/err_destructure_non_tuple.aipl:5:18
   |

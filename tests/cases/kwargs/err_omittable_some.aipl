@@ -8,7 +8,7 @@ fn clamp(x: u64, hi?: u64 = none) -> str { `{x} {hi.value_or(99)}` }
 fn subject() !prints {
     print(clamp(5, hi=some(3)));
 }
---- errors ---
+--- check --compile ---
 error: fn "clamp": keyword argument "hi" takes the value itself, not an optional — drop the "some(..)"
  --> ./tests/cases/kwargs/err_omittable_some.aipl:9:23
   |

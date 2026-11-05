@@ -2,7 +2,7 @@
 # one is reported at the function that wrote it rather than with no location.
 
 fn area(shape: Shape) -> i64 { 0 }
---- errors ---
+--- check --compile ---
 error: fn "area": unknown type "Shape"
  --> ./tests/cases/functions/err_unknown_type_in_signature.aipl:4:4
   |

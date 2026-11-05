@@ -8,7 +8,7 @@ fn takes_an_arg(n: i64) -> u64 { 2 }
 fn subject() {
     shim clock { now_nanos = fake_wall, monotonic_now = takes_an_arg } {};
 }
---- errors ---
+--- check --compile ---
 error: fn "takes_an_arg" cannot shim "monotonic_now": it is (i64) -> u64, but "monotonic_now" is () -> u64
  --> ./tests/cases/effects/err_shim_signature_mismatch.aipl:9:5
   |

@@ -8,7 +8,7 @@ fn size(s: Shape) -> i64 {
         Circle(r) => r,
     }
 }
---- errors ---
+--- check --compile ---
 error: the `_` arm must be last (arms after it are unreachable)
  --> ./tests/cases/match_arms/err_wildcard_not_last.aipl:7:9
   |

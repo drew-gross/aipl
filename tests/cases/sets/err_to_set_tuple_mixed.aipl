@@ -5,7 +5,7 @@ import { to_set } from builtins;
 fn subject() {
     let s = (1, "one").to_set();
 }
---- errors ---
+--- check --compile ---
 error: "to_set": a tuple's elements must all have one type to make a set, got (i64, str)
  --> ./tests/cases/sets/err_to_set_tuple_mixed.aipl:6:13
   |

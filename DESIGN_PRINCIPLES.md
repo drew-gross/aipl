@@ -649,8 +649,8 @@ diagnostic can be compared at all), and a path with it is one a terminal can ope
 
 Three things depend on it:
 
-- **Reproducibility.** Output that is pinned in the repository (an `--- errors ---` or
-  `--- check ---` section, a `--- report ---`, a baked `assert` or `trace` location) is compared on
+- **Reproducibility.** Output that is pinned in the repository (a `--- check --compile ---` or
+  `--- check --tests ---` section, a `--- report ---`, a baked `assert` or `trace` location) is compared on
   every checkout. A pinned path from one person's home directory passes where it was recorded and
   fails everywhere else, and nothing about the failure says why.
 - **Navigation.** A person at the project root can cmd+click a root-relative path in a terminal and

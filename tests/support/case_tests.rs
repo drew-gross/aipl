@@ -811,7 +811,6 @@ case_tests! {
     cases_tail_calls_mutual_cycle = "cases/tail_calls/mutual_cycle",
     cases_tests_all_tests_in_file_run = "cases/tests/all_tests_in_file_run",
     cases_tests_asserts = "cases/tests/asserts",
-    cases_tests_check_exit_code = "cases/tests/check_exit_code",
     cases_tests_err_fn_in_test_pub = "cases/tests/err_fn_in_test_pub",
     cases_tests_err_fn_in_test_unreachable = "cases/tests/err_fn_in_test_unreachable",
     cases_tests_failing_test = "cases/tests/failing_test",

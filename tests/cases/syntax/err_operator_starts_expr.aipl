@@ -1,5 +1,5 @@
 fn subject() -> i64 { + 1 }
---- errors ---
+--- check --compile ---
 error: expected `}`, a field, a statement, or an expression, found `+`
  --> ./tests/cases/syntax/err_operator_starts_expr.aipl:1:23
   |

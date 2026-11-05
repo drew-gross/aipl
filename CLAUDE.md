@@ -130,7 +130,7 @@ The dependencies that bite:
 
 - **Formatting moves line numbers, so it must come first.** A rendered
   diagnostic embeds its own `--> path:line:col` and caret row, so every
-  `--- errors ---`/`--- check ---` section is line-sensitive: reformat after
+  `--- check --compile ---`/`--- check --tests ---` section is line-sensitive: reformat after
   refilling one and what you just validated is already stale. (Data symbols are
   *not* in this set — a string literal's symbol is a content hash, so it keeps
   its name when unrelated source above it moves, and `binary size` and the
@@ -215,23 +215,32 @@ batch summary ends with `N files need formatting`.
 **`aipl check --fix` is the other half: it repairs what a rewrite can.** There is
 no separate formatting subcommand. `--fix` formats each
 file in place, *then* rewrites every recorded `stdout`/`stderr`/`exit code`/
-`errors`/`expect file:`/`report` section that no longer says what the file does,
+`expect file:`/`report`/`check <flags>` section that no longer says what the file does,
 printing `formatted <file>` and `fixed <file>: <sections>`. Formatting goes first
-because it moves the line numbers an `errors` or `report` body records. It never
+because it moves the line numbers a `check --compile` or `report` body records. It never
 turns a real problem into a passing file: a failing test, a leak, a `trace`, a file
 that does not compile, an expected file the run never wrote, or sections that
 contradict each other are still failures (and a report of a leaking run is not
-recorded). It is the user-facing version of `fill_expected` and writes through the
-same dogfooded function. `--- check <flags> ---` sections (a recorded run of
-`check` itself, for those parts) are validated and rewritten too; the corpus's own
-refills (and handoff) still go through `fill_expected`, which does not know them yet.
+recorded). It is the user-facing version of `fill_expected`, which is this same run over
+the corpus's cases, scoped by `AIPL_CASE`.
+
+**A `--- check <flags> ---` section records what `check` prints for those parts** — byte
+for byte, with the file's other sections ignored. The flags are the command line's own
+(`--format --compile --tests --benchmarks`), each at most once, in that order, single-spaced;
+a header spelled any other way is an error that says what to write, and so is a second
+section for the same part. A bare `--- check ---` records all of it. `check --compile` is a
+file that must not compile (its body is the rendered diagnostics); `check --tests` is the
+test rows and failures. There is no section for the exit status: it follows from the body.
+The old `errors`, `check exit code` and `formatted` names are refused by the parser, naming
+what replaced them. Each pinned part is run for the section (a child `aipl check`) rather
+than by the file's own run, so a section may record a failing run.
 
 The formatter (`aipl-fmt` crate, `aipl::fmt::format_source`) is canonical
 (gofmt-style — it decides line breaks; width defaults to 100) and works off the
 lexer token stream, so it preserves comments/literals verbatim and leaves
 trailing `--- section ---` blocks byte-for-byte. Reformatting moves line numbers,
 which invalidates any section holding a rendered diagnostic: refill
-`--- errors ---`/`--- check ---` sections with `fill_expected` afterward. It does
+`--- check --compile ---`/`--- check --tests ---` sections with `fill_expected` afterward. It does
 not move a case's baseline row on its own (see the handoff note above on
 content-hashed literal symbols), and the checked-in `dogfood.clif` is renumbered
 and stays stable, so neither normally needs regenerating — the
@@ -389,7 +398,7 @@ measurement from inside a block (`check` then refuses the file, as it does any
 entry, which is why `begin` and `end` get blocks of their own in codegen; a
 window inside one block would count nothing.
 
-Fixtures: claims that pass, and one that fails and is pinned by `--- check ---`,
+Fixtures: claims that pass, and one that fails and is pinned by `--- check --tests --benchmarks ---`,
 live in `tests/cases/benchmark/`. The compile-time refusals are tests in `tests/suites/check.rs`.
 Two `lint` interactions to know: two measurements compared by field are fine (the
 destructure lint stays quiet when a field is read off more than one value), but a
@@ -432,7 +441,7 @@ Paths inside a moved suite are now one level deeper — anchor fixtures at
 ## Prefer the cases framework for tests
 Default to the `tests/cases/**/*.aipl` framework over Rust unit tests in
 `tests/*.rs`. A case file is just real AIPL source plus the expected
-`--- stdout ---` / `--- exit code ---` / `--- errors ---`, so it doubles as
+`--- stdout ---` / `--- exit code ---` / `--- check --compile ---`, so it doubles as
 documentation: a reviewer sees exactly what a user would write and exactly
 what they'd get back. Rust unit tests that embed source as escaped string
 literals (e.g. `"fn f() { \"\"\"...\"\"\" }"`) and assert on internal AST
@@ -496,7 +505,7 @@ header now carries it as module docs instead** — including the builtin sources
 whose header sat under the imports because that was the only place it could go.
 A new file describing itself does the same; a `//` comment is for a note about
 the code next to it. Adding one moves line numbers, so refill any
-`--- errors ---`/`--- check ---` sections after.
+`--- check --compile ---`/`--- check --tests ---` sections after.
 
 The docs renderer is not a Markdown one, but it knows the four habits this prose
 has: paragraphs, `` `code spans` `` (a run of backticks, so a span can hold one),
@@ -612,7 +621,7 @@ The loader gates operator *usage* per file against its imports (unimported →
 compile error). So every new `.aipl` (test case, example, embedded compiler
 source, and each `--- file:` companion) that uses operators needs the matching
 import — and since the import shifts line numbers, refill any
-`--- errors ---`/`--- check ---` sections. A case's baseline row does *not* need
+`--- check --compile ---`/`--- check --tests ---` sections. A case's baseline row does *not* need
 one: string-literal symbols are content-hashed, so a line shift on its own leaves
 `code bytes` alone.
 
@@ -1109,7 +1118,7 @@ but prefer the staged workflow for any change that touches IR generation logic.
 Never hand-write the expected error block in a `tests/cases/` error fixture.
 The expected text must match the compiler's `Error::render` byte-for-byte —
 caret columns, and even a trailing space on an empty source line — so
-transcribing it by hand is error-prone. Instead write a `--- errors ---`
+transcribing it by hand is error-prone. Instead write a `--- check --compile ---`
 section (any body is fine) and run the `fill_expected` helper, scoped to the
 fixture with `AIPL_CASE`:
 `AIPL_CASE='structs/err_foo' cargo test --test cases -- --ignored fill_expected`.

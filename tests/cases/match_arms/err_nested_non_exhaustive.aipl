@@ -14,7 +14,7 @@ fn f(a: i64, b: i64?) -> str {
 fn subject() !prints {
     print(f(1, none));
 }
---- errors ---
+--- check --compile ---
 error: non-exhaustive match: (_, none) is not matched
  --> ./tests/cases/match_arms/err_nested_non_exhaustive.aipl:7:5
   |

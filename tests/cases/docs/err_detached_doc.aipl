@@ -8,7 +8,7 @@ import { print } from builtins;
 # file to document from here — the top of the file is taken.
 
 fn later() -> i64 { 1 }
---- errors ---
+--- check --compile ---
 error: this `# ..` block documents nothing — a blank line detaches it from the declaration below, and only the block at the top of a file, which documents the file, may stand apart
  --> ./tests/cases/docs/err_detached_doc.aipl:7:1
   |

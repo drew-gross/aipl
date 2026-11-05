@@ -39,7 +39,7 @@ fn annotation_literal_too_big() {
 fn annotation_unknown_type() {
     let n: Nope = 1;
 }
---- errors ---
+--- check --compile ---
 error: unknown identifier "bogus"
  --> ./tests/cases/bindings/err_bindings.aipl:9:31
   |

@@ -8,7 +8,7 @@
 
 variant Invalid = Whoops(i64) | Whoops
 
---- errors ---
+--- check --compile ---
 error: duplicate case "Whoops"
  --> ./tests/cases/variants/err_duplicate_case.aipl:9:33
   |

@@ -4,7 +4,7 @@
 variant V = A | B
 
 variant Bad = V without Nope
---- errors ---
+--- check --compile ---
 error: "Bad" leaves out "Nope", but V has no such case
  --> ./tests/cases/variants/err_without_case_declaration.aipl:6:9
   |

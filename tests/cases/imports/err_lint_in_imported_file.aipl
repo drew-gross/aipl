@@ -12,7 +12,7 @@ fn main() !prints {
 }
 --- file: util.aipl ---
 pub fn head(s: str) -> str { s[0..2] }
---- errors ---
+--- check --compile ---
 error: slice starts at 0 — drop it for the open-ended "s[..2]" (or append #[allow] to this line to keep it)
  --> ./tests/cases/imports/util.aipl:1:32
   |

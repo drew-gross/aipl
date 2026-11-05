@@ -11,7 +11,7 @@ fn subject() !prints {
     let p = P { a: 9, ..base };
     print(p.a.to_str());
 }
---- errors ---
+--- check --compile ---
 error: a ".." spread must come first in a struct literal, before the fields that override it
   --> ./tests/cases/structs/err_spread_not_first.aipl:11:25
    |

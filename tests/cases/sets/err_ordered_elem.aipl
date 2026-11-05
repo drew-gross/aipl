@@ -7,7 +7,7 @@ fn subject() !prints {
     let b = #>{true, false};
     print(`{b}`);
 }
---- errors ---
+--- check --compile ---
 error: set literal: an ordered set (`#>{..}` / `#<{..}`) sorts its elements, so its element must be an integer, char, or str, got bool
  --> ./tests/cases/sets/err_ordered_elem.aipl:7:13
   |

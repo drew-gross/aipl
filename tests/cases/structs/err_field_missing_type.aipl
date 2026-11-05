@@ -1,5 +1,5 @@
 struct P { x }
---- errors ---
+--- check --compile ---
 error: expected `:`, found `}`
  --> ./tests/cases/structs/err_field_missing_type.aipl:1:14
   |

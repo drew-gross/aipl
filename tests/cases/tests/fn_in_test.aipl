@@ -30,7 +30,7 @@ fn triple(n: i64) -> i64 { n + n + n }.test({
     fn four() -> i64 { 12 }
     assert(triple(4) == four());
 })
---- check ---
+--- check --tests ---
 ./tests/cases/tests/fn_in_test.aipl:
     double: 6 assertions passed
     triple: 1 assertion passed

@@ -11,7 +11,7 @@ fn subject() -> i64 {
         _ => 0,
     }
 }
---- errors ---
+--- check --compile ---
 error: expected `,` or `]`, found `a`
   --> ./tests/cases/arrays/spread/err_spread_in_pattern.aipl:10:12
    |

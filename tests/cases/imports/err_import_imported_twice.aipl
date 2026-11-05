@@ -10,7 +10,7 @@ fn main() -> i64 { val() }
 pub fn val() -> i64 { 1 }
 --- file: b.aipl ---
 pub fn val() -> i64 { 2 }
---- errors ---
+--- check --compile ---
 error: ./tests/cases/imports/err_import_imported_twice.aipl: import "val" conflicts with another import
  --> ./tests/cases/imports/err_import_imported_twice.aipl:6:10
   |

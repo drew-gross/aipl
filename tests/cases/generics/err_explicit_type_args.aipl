@@ -17,7 +17,7 @@ fn subject() {
     pair::<i64>(1, 2);
     identity::<str>(5);
 }
---- errors ---
+--- check --compile ---
 error: fn "nothing" takes 1 type argument(s) (T), got 2; name all of them or none
   --> ./tests/cases/generics/err_explicit_type_args.aipl:14:5
    |

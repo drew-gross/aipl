@@ -9,7 +9,7 @@ fn clamp(x: u64, hi?: u64 = none) -> str { `{x} {hi.value_or(99)}` }
 fn subject() !prints {
     print(clamp(5, hi?=3));
 }
---- errors ---
+--- check --compile ---
 error: fn "clamp" arg 1: expected u64?, got i64
   --> ./tests/cases/kwargs/err_omittable_forward_value.aipl:10:24
    |

@@ -5,7 +5,7 @@ variant V = A | B | C
 variant First = Second without A
 
 variant Second = First without B
---- errors ---
+--- check --compile ---
 error: "First" refines itself: First -> Second -> First
  --> ./tests/cases/variants/err_without_case_cycle.aipl:5:9
   |

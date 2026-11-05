@@ -1,5 +1,5 @@
 fn f() -> str { "abc\
---- errors ---
+--- check --compile ---
 error: incomplete escape sequence: \ at end of input
  --> ./tests/cases/strings/literals/err_incomplete_escape.aipl:1:21
   |

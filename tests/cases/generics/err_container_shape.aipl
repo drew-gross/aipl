@@ -41,7 +41,7 @@ fn bad_arg(xs: i64[]) -> i64[] { xs.zip_with(5, |a, b| a + b) }
 fn subject() !prints {
     print(to_str(scalar().len()));
 }
---- errors ---
+--- check --compile ---
 error: map expects an array, an optional or a Span, got i64
   --> ./tests/cases/generics/err_container_shape.aipl:23:5
    |

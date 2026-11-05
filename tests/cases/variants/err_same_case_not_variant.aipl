@@ -5,7 +5,7 @@
 import { same_case } from builtins;
 
 fn subject() -> i64 { if (same_case(1, 2)) { 1 } else { 0 } }
---- errors ---
+--- check --compile ---
 error: fn "same_case": type parameter "T" requires "variant", but was inferred as i64
  --> ./tests/cases/variants/err_same_case_not_variant.aipl:7:27
   |

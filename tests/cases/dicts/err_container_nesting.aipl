@@ -21,7 +21,7 @@ fn dict_value() -> i64 {
 }
 
 fn subject() -> i64 { opt_core() + dict_value() }
---- errors ---
+--- check --compile ---
 error: fn "opt_core": a dict can be an array element but not an optional or dict element
   --> ./tests/cases/dicts/err_container_nesting.aipl:14:27
    |

@@ -6,7 +6,7 @@
 import { equal } from builtins;
 
 fn f() -> bool { equal("a") }
---- errors ---
+--- check --compile ---
 error: "equal" takes 2 arguments, got 1
  --> ./tests/cases/imports/err_operator_builtin_bare_arity.aipl:8:18
   |

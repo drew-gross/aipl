@@ -10,7 +10,7 @@ fn padded<T: any>(xs: T[], pad: T = 0) -> T[] { xs }
 fn subject() !prints {
     print(to_str(padded(["a"])));
 }
---- errors ---
+--- check --compile ---
 error: conflicting types for "T" in "padded": str vs i64
   --> ./tests/cases/kwargs/err_generic_default_conflicts.aipl:11:18
    |

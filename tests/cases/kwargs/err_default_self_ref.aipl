@@ -2,7 +2,7 @@
 # so it can only read parameters already decided there — never itself.
 
 fn f(a: i64 = a) -> i64 { a }
---- errors ---
+--- check --compile ---
 error: fn "f": the default for parameter "a" reads itself — a default may only read parameters declared before it
  --> ./tests/cases/kwargs/err_default_self_ref.aipl:4:15
   |

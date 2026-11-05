@@ -6,7 +6,7 @@ import { wrapping_add as + } from builtins;
 pub fn add(a: i64, b: i64) -> i64 {
     a + b
 }.doc("Adds two integers.")
---- errors ---
+--- check --compile ---
 error: `.doc("..")` is no longer a function attribute — write the documentation as `# ..` lines above the declaration, which also documents structs and variants
  --> ./tests/cases/docs/err_doc_attr.aipl:8:3
   |

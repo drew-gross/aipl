@@ -2,7 +2,7 @@
 # function type has no keyword parameters.
 
 fn apply(g: (i64) -> i64) -> i64 { g(5, k=1) }
---- errors ---
+--- check --compile ---
 error: "g" is a function value, and a function value takes no keyword arguments
  --> ./tests/cases/kwargs/err_kw_call_through_fn_value.aipl:4:41
   |

@@ -1,5 +1,5 @@
 f() { 1 }
---- errors ---
+--- check --compile ---
 error: expected an item or end of input, found `f`
  --> ./tests/cases/functions/err_missing_fn_keyword.aipl:1:1
   |

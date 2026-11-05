@@ -2,7 +2,7 @@
 # `#[allow]` squelches the unused-import lint and leaves the real error.
 
 import { frobnicate } from builtins; #[allow]
---- errors ---
+--- check --compile ---
 error: "frobnicate" is not a builtin
  --> ./tests/cases/builtins/err_unknown_builtin.aipl:4:10
   |

@@ -7,7 +7,7 @@ fn subject() !prints {
     let a: #>{i64} = #<{1};
     print(`{a}`);
 }
---- errors ---
+--- check --compile ---
 error: binding "a" is declared #>{i64}, but its value is #<{i64}
  --> ./tests/cases/sets/err_ordered_mismatch.aipl:7:22
   |

@@ -1177,17 +1177,15 @@ fn a_section_marker_inside_a_companion_ends_it_and_belongs_to_the_main_file() {
     );
 }
 
-/// `check` with flags names a projection of `aipl check`'s output. The two it shares with an old
-/// name land in that name's field, so the code that validates `errors` and `check` sections
-/// validates these too.
+/// `check` with flags names a projection of `aipl check`'s output, in file order. `errors` is the
+/// `--compile` one.
 #[test]
-fn a_check_section_with_flags_fills_the_field_of_its_old_spelling() {
+fn check_sections_are_one_list_in_file_order() {
     aipl::install_parser_hooks();
     let spec =
         aipl::parse_spec("fn f() {}\n--- check --compile ---\nerrs\n--- check --tests ---\nrows\n")
             .expect("the sections parse");
     assert_eq!(spec.errors.as_deref(), Some("errs"));
-    assert_eq!(spec.check.as_deref(), Some("rows"));
     assert_eq!(spec.source, "fn f() {}");
     assert_eq!(
         spec.checks,
@@ -1196,21 +1194,6 @@ fn a_check_section_with_flags_fills_the_field_of_its_old_spelling() {
             ("--tests".to_string(), "rows".to_string()),
         ]
     );
-}
-
-/// The old spellings are expectations of the same list, in file order, and a projection with no old
-/// spelling is only in the list.
-#[test]
-fn every_check_expectation_is_in_one_list_whatever_it_is_called() {
-    aipl::install_parser_hooks();
-    let spec = aipl::parse_spec(
-        "fn f() {}\n--- errors ---\ne\n--- check --format ---\nf\n--- check ---\nt\n",
-    )
-    .expect("the sections parse");
-    let projections: Vec<_> = spec.checks.iter().map(|(p, _)| p.as_str()).collect();
-    assert_eq!(projections, ["--compile", "--format", "--tests"]);
-    assert_eq!(spec.errors.as_deref(), Some("e"));
-    assert_eq!(spec.check.as_deref(), Some("t"));
 }
 
 /// A header is the file's to get right: an unknown flag, a repeated one, a different order, and two
@@ -1226,7 +1209,7 @@ fn a_malformed_check_header_is_the_files_error() {
             "as \"--- check --compile --tests ---\"",
         ),
         (
-            "x\n--- check --tests ---\na\n--- check ---\nb\n",
+            "x\n--- check --tests ---\na\n--- check --tests ---\nb\n",
             "two sections pin the same part",
         ),
         ("x\n--- stdout --tests ---\n", "unknown section name"),

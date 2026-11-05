@@ -1,5 +1,5 @@
 fn f() { "abc }
---- errors ---
+--- check --compile ---
 error: unterminated string literal
  --> ./tests/cases/strings/literals/err_unterminated_string.aipl:1:10
   |

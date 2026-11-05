@@ -43,7 +43,7 @@ fn enforced_files() -> Vec<PathBuf> {
 }
 
 /// No checked-in AIPL file names a place on one machine (DESIGN_PRINCIPLES.md, "Paths are
-/// relative to the project root"). A pinned `--- errors ---` or `--- check ---` section that
+/// relative to the project root"). A pinned `--- check --compile ---` or `--- check ---` section that
 /// holds `/Users/someone/...` passes where it was recorded and fails on every other checkout.
 /// A fixture that needs to show an absolute path writes one that is plainly not real.
 #[test]
@@ -114,9 +114,39 @@ fn all_aipl_files_stay_formatted() {
     );
 }
 
+/// The section names the parser refuses (`errors`, `check exit code`, `formatted`) appear on a line
+/// of their own in no file that carries sections: the parser's message is the first anyone hears
+/// of them, so a leftover in the tree is a file that cannot be read at all.
+#[test]
+fn no_retired_section_name_remains_in_the_tree() {
+    setup();
+    const RETIRED: [&str; 3] = [
+        "--- errors ---",
+        "--- check exit code ---",
+        "--- formatted ---",
+    ];
+    let mut files = Vec::new();
+    for dir in ["tests/cases", "examples", "projects", "tests/ffi_fixtures"] {
+        aipl_files(dir, &mut files);
+    }
+    let found: Vec<String> = files
+        .iter()
+        .filter(|path| {
+            std::fs::read_to_string(path)
+                .is_ok_and(|text| text.lines().any(|line| RETIRED.contains(&line)))
+        })
+        .map(|path| path.display().to_string())
+        .collect();
+    assert!(
+        found.is_empty(),
+        "a retired section name remains in:\n{}",
+        found.join("\n")
+    );
+}
+
 /// Authoring helper: rewrite every enforced `.aipl` file in place with its
 /// canonical formatting, then fail so the run is visibly a bulk rewrite.
-/// Review the diff (and refill any `--- report ---`/`--- errors ---`
+/// Review the diff (and refill any `--- report ---`/`--- check --compile ---`
 /// sections whose spans shifted) before committing.
 #[test]
 #[ignore]
@@ -142,7 +172,7 @@ fn format_corpus() {
     .count();
     panic!(
         "reformatted {changed} file(s); review the diff, refill any shifted \
-         --- report ---/--- errors ---/--- check --- sections \
+         --- report ---/--- check .. --- sections \
          (`fill_expected`) and regenerate dogfood IR (`fill_dogfood_ir`), \
          then re-run the suite (this run fails intentionally)"
     );

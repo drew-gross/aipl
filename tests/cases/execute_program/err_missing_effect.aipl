@@ -9,7 +9,7 @@ fn subject() !prints {
         err(e) => print(e),
     };
 }
---- errors ---
+--- check --compile ---
 error: fn "execute_program" has effect "!execute_program" but the calling function does not declare it
  --> ./tests/cases/execute_program/err_missing_effect.aipl:7:12
   |

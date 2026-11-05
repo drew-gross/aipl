@@ -2342,6 +2342,7 @@ pub fn parse_spec(src: &str) -> Result<SpecFields, String> {
         match comp.call_values("parse_spec", &[FfiValue::Str(src.to_string())]) {
             Ok(FfiValue::Res(Ok(ok))) => {
                 let f = fields(&ok, "Spec");
+                let checks = checks(&f, "checks");
                 Ok(SpecFields {
                     source: as_str(&f, "source"),
                     extra_files: entries(&f, "extra_files"),
@@ -2349,12 +2350,13 @@ pub fn parse_spec(src: &str) -> Result<SpecFields, String> {
                     stdout: opt_str(&f, "stdout"),
                     stderr: opt_str(&f, "stderr"),
                     exit_code: opt_int(&f, "exit_code"),
-                    errors: opt_str(&f, "errors"),
+                    errors: checks
+                        .iter()
+                        .find(|(projection, _)| projection == "--compile")
+                        .map(|(_, body)| body.clone()),
                     report: opt_str(&f, "report"),
                     cli: str_array(&f, "cli"),
-                    check: opt_str(&f, "check"),
-                    check_exit_code: opt_int(&f, "check_exit_code"),
-                    checks: checks(&f, "checks"),
+                    checks,
                 })
             }
             Ok(FfiValue::Res(Err(e))) => match *e {
@@ -2376,14 +2378,13 @@ pub struct SpecFields {
     pub stdout: Option<String>,
     pub stderr: Option<String>,
     pub exit_code: Option<i32>,
+    /// The body of the `check --compile` section, which is the one most of `check` is told apart
+    /// by: a file that must not compile.
     pub errors: Option<String>,
     pub report: Option<String>,
     pub cli: Vec<String>,
-    pub check: Option<String>,
-    pub check_exit_code: Option<i32>,
     /// What each part of `aipl check`'s output must be: the canonical flags that select it
-    /// (`--compile --tests`) and the body, in file order. `errors` is `--compile` and `check` is
-    /// `--tests`, and each of those also fills its own field above.
+    /// (`--compile --tests`, or none for all of it) and the body, in file order.
     pub checks: Vec<(String, String)>,
 }
 

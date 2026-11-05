@@ -1,5 +1,5 @@
 fn f() -> char { '' }
---- errors ---
+--- check --compile ---
 error: empty char literal
  --> ./tests/cases/chars/err_empty_char_literal.aipl:1:18
   |

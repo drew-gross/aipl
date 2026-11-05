@@ -3,7 +3,7 @@
 fn subject() {
     let n: Count = 1;
 }
---- errors ---
+--- check --compile ---
 error: fn "subject": unknown type "Count"
  --> ./tests/cases/bindings/err_unknown_type_in_annotation.aipl:4:20
   |

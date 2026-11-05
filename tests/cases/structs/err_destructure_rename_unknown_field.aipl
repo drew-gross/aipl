@@ -9,7 +9,7 @@ fn f() -> i64 {
     let P { z as a } = make();
     a
 }
---- errors ---
+--- check --compile ---
 error: struct P has no field "z"
  --> ./tests/cases/structs/err_destructure_rename_unknown_field.aipl:9:24
   |

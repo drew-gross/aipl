@@ -1,6 +1,7 @@
 //! Integration tests for the `aipl check` command — the in-language test
 //! runner. These drive the real CLI binary as a subprocess (the cases harness
-//! only runs a program's `main`, so it can't exercise `check`), staging a
+//! runs `check` on each case but not on a tree it builds, so it can't exercise
+//! `check`'s own options), staging a
 //! temp `.aipl` file — or a whole temp tree, for the batch mode a bare
 //! `aipl check` runs — and asserting on `check`'s stdout and exit code.
 //!
@@ -577,7 +578,7 @@ fn a_type_error_in_a_test_body_is_reported() {
 ///
 /// That `check` prints the trace, reports the passing test, and *still* exits
 /// non-zero is pinned in the corpus — `tests/cases/debug/trace_fails_check.aipl`,
-/// whose `--- check ---` and `--- check exit code ---` sections are that claim
+/// whose `--- check --tests ---` section is that claim
 /// written out. What stays here is everything a case cannot reach: `check`'s
 /// stream, and the working directory it was invoked from.
 const TRACED: &str = "import { equal as ==, wrapping_add as + } from builtins;\n\n\
@@ -755,7 +756,7 @@ fn a_mismatch_a_rewrite_repairs_asks_handoff_for_it_by_path_from_the_root() {
 
     // A finding no rewrite repairs asks for nothing: `errors` and `report` cannot
     // sit together, and the conflict itself has no fix.
-    let src = "fn bad() -> i64 { true }\n--- errors ---\nx\n--- report ---\ny\n";
+    let src = "fn bad() -> i64 { true }\n--- check --compile ---\nx\n--- report ---\ny\n";
     let (stdout, _, _) = check_here("sections_fill_marker_conflict", src);
     let conflict = stdout.lines().next().unwrap_or_default();
     assert!(conflict.contains("cannot coexist"), "{conflict}");
@@ -897,13 +898,16 @@ fn an_errors_section_makes_a_failing_compile_the_expected_outcome() {
     // Written as `?`, the section is wrong, and the mismatch shows what to write.
     let (stdout, stderr, code) = check_tree(
         "sections_errors_record",
-        &[("bad.aipl", &format!("{program}--- errors ---\n?\n"))],
+        &[(
+            "bad.aipl",
+            &format!("{program}--- check --compile ---\n?\n"),
+        )],
         &[],
     );
     assert_eq!(
         stdout,
         format!(
-            "./bad.aipl: `errors` mismatch\n--- expected ---\n?\n--- actual ---\n{BAD_ERRORS}\nhandoff-fill: section\tbad.aipl\terrors\n\
+            "./bad.aipl: `check --compile` mismatch\n--- expected ---\n?\n--- actual ---\n{BAD_ERRORS}\nhandoff-fill: section\tbad.aipl\tcheck --compile\n\
              1 file, 0 tests: 0 passed, 0 failed\n1 file has mismatched sections\n"
         )
     );
@@ -924,7 +928,7 @@ fn an_errors_section_makes_a_failing_compile_the_expected_outcome() {
             "sections_errors_ok",
             &[(
                 "bad.aipl",
-                &format!("{program}--- errors ---\n{BAD_ERRORS}\n"),
+                &format!("{program}--- check --compile ---\n{BAD_ERRORS}\n"),
             )],
             args,
         );
@@ -938,7 +942,7 @@ fn an_errors_section_makes_a_failing_compile_the_expected_outcome() {
 
 #[test]
 fn an_errors_section_on_a_file_that_compiles_is_reported() {
-    let src = "fn ok() -> i64 { 1 }\n--- errors ---\nerror: nope\n";
+    let src = "fn ok() -> i64 { 1 }\n--- check --compile ---\nerror: nope\n";
     let (stdout, stderr, code) = check_here("sections_errors_compiles", src);
     assert_eq!(stderr, "");
     assert_eq!(
@@ -950,14 +954,14 @@ fn an_errors_section_on_a_file_that_compiles_is_reported() {
 
 #[test]
 fn an_errors_section_cannot_sit_with_a_section_that_observes_a_run() {
-    let src = "fn bad() -> i64 { true }\n--- errors ---\nx\n--- stdout ---\ny\n";
+    let src = "fn bad() -> i64 { true }\n--- check --compile ---\nx\n--- stdout ---\ny\n";
     let (stdout, stderr, code) = check_here("sections_errors_conflict", src);
     assert_eq!(stderr, "");
     assert_eq!(
         stdout,
         "\
-./sections_errors_conflict.aipl: `errors` section is mutually exclusive with stdout/stderr/exit code
-./sections_errors_conflict.aipl: `errors` mismatch
+./sections_errors_conflict.aipl: `check --compile` section is mutually exclusive with stdout/stderr/exit code
+./sections_errors_conflict.aipl: `check --compile` mismatch
 --- expected ---
 x
 --- actual ---
@@ -966,7 +970,7 @@ error: fn \"bad\": body returns bool, but the declared return type is i64
   |
 1 | fn bad() -> i64 { true }
   |                   ^^^^
-handoff-fill: section\tsections_errors_conflict.aipl\terrors
+handoff-fill: section\tsections_errors_conflict.aipl\tcheck --compile
 "
     );
     assert_eq!(code, 1);
@@ -1175,14 +1179,14 @@ handoff-fill: section\tsections_report_cli.aipl\treport
 
 #[test]
 fn a_report_section_cannot_sit_with_an_errors_section() {
-    let src = "fn bad() -> i64 { true }\n--- errors ---\nx\n--- report ---\ny\n";
+    let src = "fn bad() -> i64 { true }\n--- check --compile ---\nx\n--- report ---\ny\n";
     let (stdout, stderr, code) = check_here("sections_report_errors", src);
     assert_eq!(stderr, "");
     assert_eq!(
         stdout,
         "\
-./sections_report_errors.aipl: `report` section requires a running program, so it cannot coexist with `errors`
-./sections_report_errors.aipl: `errors` mismatch
+./sections_report_errors.aipl: `report` section requires a running program, so it cannot coexist with `check --compile`
+./sections_report_errors.aipl: `check --compile` mismatch
 --- expected ---
 x
 --- actual ---
@@ -1191,7 +1195,7 @@ error: fn \"bad\": body returns bool, but the declared return type is i64
   |
 1 | fn bad() -> i64 { true }
   |                   ^^^^
-handoff-fill: section\tsections_report_errors.aipl\terrors
+handoff-fill: section\tsections_report_errors.aipl\tcheck --compile
 "
     );
     assert_eq!(code, 1);
@@ -1680,16 +1684,19 @@ fn fix_refreshes_an_errors_section_after_formatting_has_moved_its_line_numbers()
     // The diagnostic records a line and column, and formatting moves both — so the
     // formatter has to have run first, or the section would record a position the
     // next format changes.
-    let src = "fn   bad()  ->  i64   {   true   }\n--- errors ---\nstale\n";
+    let src = "fn   bad()  ->  i64   {   true   }\n--- check --compile ---\nstale\n";
     let (stdout, stderr, code) =
         check_tree("fix_errors", &[("bad.aipl", src)], &["--fix", "bad.aipl"]);
-    assert_eq!(stdout, "formatted ./bad.aipl\nfixed ./bad.aipl: errors\n");
+    assert_eq!(
+        stdout,
+        "formatted ./bad.aipl\nfixed ./bad.aipl: check --compile\n"
+    );
     assert_eq!((stderr.as_str(), code), ("", 0));
     assert_eq!(
         tree_file("fix_errors", "bad.aipl"),
         "\
 fn bad() -> i64 { true }
---- errors ---
+--- check --compile ---
 error: fn \"bad\": body returns bool, but the declared return type is i64
  --> ./bad.aipl:1:19
   |
@@ -2129,43 +2136,15 @@ fn a_check_section_may_record_a_failing_run() {
     assert_eq!((stdout.as_str(), code), ("", 0), "got:\n{stdout}");
 }
 
-/// The old names are the same sections: bare `check` is `check --tests`, and `--fix` rewrites it
-/// under the header the file has, so both spellings validate and repair identically.
-#[test]
-fn the_old_check_header_is_validated_like_the_new_one_and_fixed_in_place() {
-    let src = format!("{PASSES}--- check ---\nstale\n--- check exit code ---\n3\n");
-    let (stdout, _, code) = check_tree("check_old_names", &[("f.aipl", &src)], &["f.aipl"]);
-    assert!(
-        stdout.contains("`check --tests` mismatch"),
-        "got:\n{stdout}"
-    );
-    assert!(
-        stdout.contains("`check exit code` mismatch"),
-        "got:\n{stdout}"
-    );
-    assert_eq!(code, 1);
-    let (_, _, code) = check_tree(
-        "check_old_names_fix",
-        &[("f.aipl", &src)],
-        &["--fix", "f.aipl"],
-    );
-    assert_eq!(code, 0);
-    assert_eq!(
-        tree_file("check_old_names_fix", "f.aipl"),
-        format!(
-            "{PASSES}--- check ---\n./f.aipl:\n    a: 1 assertion passed\n1 tests: 1 passed, 0 failed\n--- check exit code ---\n0\n"
-        )
-    );
-}
-
-/// A section for the tests cannot sit with `errors`: the file does not compile, so there is nothing
+/// A section for the tests cannot sit with `check --compile`: the file does not compile, so there is nothing
 /// to run.
 #[test]
 fn a_check_section_for_tests_contradicts_an_errors_section() {
     let src = "fn f() -> i64 { missing() }\n--- check --compile ---\n?\n--- check --tests ---\n?\n";
     let (stdout, _, code) = check_tree("check_section_conflict", &[("f.aipl", src)], &["f.aipl"]);
     assert!(
-        stdout.contains("requires a compiling program, so it cannot coexist with `errors`"),
+        stdout
+            .contains("requires a compiling program, so it cannot coexist with `check --compile`"),
         "got:\n{stdout}"
     );
     assert_eq!(code, 1);

@@ -310,48 +310,43 @@ for `check`'s, and the corpus (every case now runs through `check`) is the test.
 - `debug/trace` is a `check --tests` case now: `check` refuses a file with a `trace`, so a `main` that traces cannot
   have a `stdout` section. Its values and refusals are pinned the way `trace_fails_check` pins them.
 
-**3.8 Make the old `check` name free**
-- [ ] Migrate the 7 `--- check ---` and 4 `--- check exit code ---` files to `--- check --tests ---` first; the
-      exit code is derived, so the second section goes. Only then does bare `--- check ---` mean everything.
+**3.8 Make the old `check` name free** (2026-11-05)
+- [x] The 7 `--- check ---` files moved to `--- check --tests ---` (two of them to `--tests --benchmarks`, in 3.5) and
+      the `check exit code` sections went with them: the status follows from the body. `tests/cases/tests/check_exit_code`
+      was a fixture of the retired section and is deleted. Bare `--- check ---` now pins everything (`projection ""`):
+      `pinned_parts` treats it as every part, and `--fix` writes it under that header.
 
-**3.9 Migrate the corpus, one kind per handoff, by script**
-Each script rewrites headers, runs both validators and refuses to write a file whose verdict or `--fix` result
-changes (the lesson from the error-fixture pass: a refill pins whatever the compiler now says). Each leaves the
-differential test green.
-- [ ] `errors` (273) to `check --compile`.
-- [x] ~~The `formatted` fixtures to `check --format --fix`~~ Not migrated (DS5b): they are deleted in 3.5.
-- [ ] Files with these sections outside `tests/cases/` and `tests/fmt` (`examples/`, `projects/`).
+**3.9 Migrate the corpus** (2026-11-05)
+- [x] `errors` (255 files with the section at the start of a line) to `check --compile`, by script (a header rename; no
+      body changed, so no verdict can have).
+- [x] The `formatted` fixtures: deleted in 3.5 (DS5b). Nothing in `examples/` or `projects/` carried these sections.
 
-**3.10 Remove the old names**
-- [ ] The parser refuses `errors`, `check exit code` and `formatted` with a message naming the replacement, as
-      `.performance` does. `stdout`, `stderr`, `exit code`, `expect file`, `report`, `cli` and `file:` are not touched.
-- [ ] Delete the alias layer, the old `Spec` fields, the old `sections.rs` paths for these and the harness leftovers.
-- [ ] A guard test that no retired section name remains anywhere in the tree.
+**3.10 Remove the old names** (2026-11-05)
+- [x] `parse_spec` refuses `errors`, `check exit code` and `formatted`, each saying what replaced it (tests in
+      `parse_spec.aipl`). `stdout`, `stderr`, `exit code`, `expect file`, `report`, `cli` and `file:` are untouched.
+- [x] Deleted: the `errors`, `check` and `check_exit_code` fields of the AIPL `Spec` (the Rust `SpecFields.errors` is
+      the `--compile` body, read off the list), the status-section code in `sections.rs`, the bare-`check` special case
+      in `--fix`, and the old-name tests.
+- [x] Guard: `fmt::no_retired_section_name_remains_in_the_tree`.
 
-**3.11 Commands**
-- [ ] Confirm `check --fix` is the only formatting entry (the `aipl::fmt::format_source` library stays for the LSP
-      and tests), and that `usage()`, `--help` and the long help in `main.rs` describe the flags. `aipl report` is
-      untouched.
+**3.11 Commands** (2026-11-05)
+- [x] `check --fix` is the only formatting entry; `usage()` and the long help describe `check <flags>` sections and the
+      four selectors. `aipl report` is untouched.
 
-**3.12 Handoff protocol**
-- [ ] `Fill::Section { case, section }` carries the canonical header for the new sections;
-      `handoff/src/discovery.rs` and its unit tests, `scoped_fill_cmd`, and the `handoff-fill:` lines `check` prints
-      (G6) follow.
+**3.12 Handoff protocol** (2026-11-05)
+- [x] Nothing to change in `handoff`: `check` prints `handoff-fill: section <file> <header>` with the canonical header
+      (`check --compile`), the harness says it again under the case's display path, and discovery treats every section
+      name but `report` as a behavioral change.
 
-**3.13 Docs and tooling**
-- [ ] CLAUDE.md: Handoff, formatting and `--fix`, "Prefer the cases framework", "Authoring error-case fixtures"
-      (`--- errors ---` becomes `--- check --compile ---`), the benchmark fixtures paragraph, and the Performance
-      monitoring text where it names `check` sections.
-- [ ] DESIGN_PRINCIPLES.md §2: `check`'s own output is writable as `check` sections; one stream; the projections;
-      and that run-observing sections make a file a test of `main`.
-- [ ] README, `projects/README.md`, the skills (`write-aipl`, `add-lint`, `add-builtin`), the headers of
-      `tests/cases.rs` and `tests/suites/fmt.rs`, `aipl --help`.
-- [x] ~~Optional (DS7)~~ Not done: no editor or LSP support for now.
+**3.13 Docs and tooling** (2026-11-05)
+- [x] CLAUDE.md (formatting and `--fix`, the section sections, error-case fixtures, benchmark fixtures), DESIGN_PRINCIPLES.md's
+      reproducibility bullet, the headers of `tests/cases.rs` and `tests/suites/{fmt,check}.rs`, and `aipl check --help`.
+- [x] ~~DS7 editor and LSP support~~ not done, by decision.
 
 **3.14 Done when**
-- [ ] The corpus holds only `check ..` sections, the run-observing sections, `report`, `cli` and `file:`; the guard
-      test is green.
-- [ ] `cargo handoff` green, then once more with a refill, to show `check --fix` and the fill lines end to end.
+- [x] The corpus holds only `check ..` sections, the run-observing sections, `report`, `cli` and `file:`; the guard test
+      is the proof.
+- [x] `cargo handoff` green (below), after a first run that regenerates the artifact.
 
 **Why this order.** 3.1 first because every later stage reads or renders the structured result, and Phase 1's
 parity gaps (leak, baseline, the harness/`check` compile difference) become parts of it. 3.2 before the flags

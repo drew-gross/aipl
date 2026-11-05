@@ -500,14 +500,14 @@ fn visit_aipl(dir: &Path, prefix: &'static str, out: &mut Vec<(PathBuf, &'static
     out.extend(found.into_iter().map(|p| (PathBuf::from(p), prefix)));
 }
 
-/// True if the file declares an `--- errors ---` section — i.e. it
+/// True if the file declares a `--- check --compile ---` section — i.e. it
 /// intentionally fails to compile, so its source may have parse-level
 /// issues we shouldn't expect the grammar to tokenize cleanly.
 fn declares_errors(contents: &str) -> bool {
     contents
         .lines()
         .filter_map(parse_test_section_header)
-        .any(|h| h == "errors")
+        .any(|h| h == "check --compile")
 }
 
 /// The scopes a *contextual* pattern may paint over a token's declared one.

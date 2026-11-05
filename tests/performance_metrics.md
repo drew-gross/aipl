@@ -119,7 +119,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/operator_named_forms | 14 | 928 | 928 | 2875 | 7880 | 6.00 | 68.94 | 1488 |
 | crates/aipl-codegen/src/parse | 7617 | 828674 | 144080 | 3744050 | 650156 | 937.00 | 3749.21 | 2832 |
 | crates/aipl-codegen/src/parse_and_partial_load | 31548 | 3728700 | 758179 | 14709988 | 6079516 | 4307.00 | 28651.50 | 8416 |
-| crates/aipl-codegen/src/parse_spec | 357 | 16861 | 6955 | 176661 | 220040 | 76.00 | 422.60 | 1776 |
+| crates/aipl-codegen/src/parse_spec | 310 | 14728 | 6175 | 131117 | 128424 | 63.00 | 422.74 | 1680 |
 | crates/aipl-codegen/src/parse_test_section_header | 0 | 0 | 0 | 1441 | 3468 | 5.00 | 64.61 | 1488 |
 | crates/aipl-codegen/src/parsed | 40 | 3477 | 3017 | 2444 | 55952 | 10.00 | 980.91 | 1536 |
 | crates/aipl-codegen/src/pat | 181 | 15914 | 5560 | 13633 | 78568 | 26.00 | 450.10 | 1584 |
@@ -804,7 +804,6 @@ cargo test --test cases -- --ignored refresh_perfmon
 | tests/cases/tail_calls/mutual_cycle | 150014 | 10800913 | 10800180 | 28500856 | 4704 | 10694.00 | 69.97 | 13312 |
 | tests/cases/tests/all_tests_in_file_run | 0 | 0 | 0 | 76 | 416 | 1.00 | 60.71 | 1456 |
 | tests/cases/tests/asserts | 5 | 464 | 288 | 819 | 5268 | 5.00 | 67.23 | 1488 |
-| tests/cases/tests/check_exit_code | 0 | 0 | 0 | 25 | 148 | 1.00 | 60.11 | 1440 |
 | tests/cases/tests/failing_test | 0 | 0 | 0 | 62 | 332 | 1.00 | 59.82 | 1440 |
 | tests/cases/tests/fn_in_test | 1 | 32 | 32 | 518 | 2140 | 3.00 | 65.41 | 1488 |
 | tests/cases/tests/run_ignores_tests | 2 | 106 | 106 | 304 | 2788 | 5.00 | 62.30 | 1488 |

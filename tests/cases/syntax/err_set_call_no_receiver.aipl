@@ -6,7 +6,7 @@ import { print } from builtins;
 fn subject() !prints {
     set print("x");
 }
---- errors ---
+--- check --compile ---
 error: set: a mutating method call needs a receiver to write back to, as in `set xs.push(x);`
  --> ./tests/cases/syntax/err_set_call_no_receiver.aipl:7:9
   |

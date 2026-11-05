@@ -2,7 +2,7 @@
 # arguments of a struct or a variant are always written.
 
 struct Box<T: any = i64> { value: T }
---- errors ---
+--- check --compile ---
 error: struct "Box": a type parameter's default is for a function, where a call can leave the type for inference; a struct's type arguments are always written
  --> ./tests/cases/generics/err_struct_type_parameter_default.aipl:4:8
   |

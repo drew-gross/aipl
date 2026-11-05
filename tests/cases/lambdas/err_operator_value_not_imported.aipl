@@ -4,7 +4,7 @@
 fn apply(a: i64, b: i64, f: (i64, i64) -> i64) -> i64 { f(a, b) }
 
 fn subject() -> i64 { apply(2, 3, +) }
---- errors ---
+--- check --compile ---
 error: operator "+" must be imported: add `import { wrapping_add as + } from builtins;`
  --> ./tests/cases/lambdas/err_operator_value_not_imported.aipl:6:35
   |

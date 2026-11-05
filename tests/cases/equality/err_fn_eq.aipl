@@ -7,7 +7,7 @@ fn apply(f: (i64) -> i64) -> bool { f == f }
 fn subject() {
     print("unreachable");
 }
---- errors ---
+--- check --compile ---
 error: "==" is not supported for function values
  --> ./tests/cases/equality/err_fn_eq.aipl:5:37
   |

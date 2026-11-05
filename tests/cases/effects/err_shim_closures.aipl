@@ -82,7 +82,7 @@ fn not_an_operation() {
         noisy();
     };
 }
---- errors ---
+--- check --compile ---
 error: the closure bound to "print" takes 2 parameter(s), but "print" takes 1
   --> ./tests/cases/effects/err_shim_closures.aipl:12:27
    |

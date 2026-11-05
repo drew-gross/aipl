@@ -4,7 +4,7 @@
 fn subject() {
     trace(1, 2);
 }
---- errors ---
+--- check --compile ---
 error: `trace` takes exactly one argument: the expression to print (got 2)
  --> ./tests/cases/debug/err_trace_takes_one_argument.aipl:5:5
   |

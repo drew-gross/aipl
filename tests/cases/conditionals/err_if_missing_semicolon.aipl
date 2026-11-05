@@ -11,7 +11,7 @@ fn subject() !io {
     }
     print("done");
 }
---- errors ---
+--- check --compile ---
 error: missing `;` before `print`: every statement ends with one, even an `if` or `match` whose value is unused
   --> ./tests/cases/conditionals/err_if_missing_semicolon.aipl:12:5
    |

@@ -11,7 +11,7 @@ fn subject() {
 fn f() {}
 
 fn g() {}
---- errors ---
+--- check --compile ---
 error: expected `;`, found `while`
  --> ./tests/cases/syntax/err_missing_semicolon_before_refusal.aipl:6:5
   |

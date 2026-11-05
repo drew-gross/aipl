@@ -11,7 +11,7 @@ fn subject() !prints {
     let r: u8 = identity(300);
     print(to_str(r));
 }
---- errors ---
+--- check --compile ---
 error: binding "r" is declared u8, but its value is i64 — u8 cannot hold every i64, so convert with `.narrow()`, which gives `none` when the value does not fit
   --> ./tests/cases/generics/errors/err_int_literal_arg_out_of_range.aipl:11:17
    |

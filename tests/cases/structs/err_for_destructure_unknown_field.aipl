@@ -8,7 +8,7 @@ fn f(ps: P[]) -> i64 {
     }
     0
 }
---- errors ---
+--- check --compile ---
 error: struct P has no field "z"
  --> ./tests/cases/structs/err_for_destructure_unknown_field.aipl:6:24
   |

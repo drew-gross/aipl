@@ -5,7 +5,7 @@ import { map } from builtins;
 fn subject() {
     let xs = [(1, 2)].map(|(a)| a);
 }
---- errors ---
+--- check --compile ---
 error: a tuple pattern needs at least 2 names, e.g. |(a, b)| expr
  --> ./tests/cases/bindings/lambda/err_tuple_needs_two_names.aipl:6:28
   |

@@ -14,7 +14,7 @@ fn subject() {
     mut cs = [];
     set cs.push('a');
 }
---- errors ---
+--- check --compile ---
 error: cannot push a char onto an array that started as an untyped empty literal (`mut cs = []`) — initialize it with a char first, e.g. "mut cs = ['a']", since the first push can't be proven to run only once
   --> ./tests/cases/arrays/push/err_push_char_from_empty.aipl:15:9
    |

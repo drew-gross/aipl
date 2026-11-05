@@ -9,7 +9,7 @@ fn plain(k: u64 = 0) -> u64 { k }
 fn subject() !prints {
     print(plain(k?=some(1)));
 }
---- errors ---
+--- check --compile ---
 error: fn "plain": keyword parameter "k" is not declared "k?: T", so "?=" has nothing to forward — pass it as "k = .."
   --> ./tests/cases/kwargs/err_omittable_forward_plain.aipl:10:17
    |

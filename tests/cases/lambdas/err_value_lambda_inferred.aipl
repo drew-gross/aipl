@@ -31,7 +31,7 @@ fn uninferable() -> Json {
         Const(v) => v,
     }
 }
---- errors ---
+--- check --compile ---
 error: lambda parameter "x" is annotated str, but i64 was expected
   --> ./tests/cases/lambdas/err_value_lambda_inferred.aipl:14:36
    |

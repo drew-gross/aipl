@@ -14,7 +14,7 @@ struct Tok { span: Span }
 variant Node = At(Span) | Nowhere
 
 fn lo(s: Span) -> u64 { s.start } #[allow]
---- errors ---
+--- check --compile ---
 error: struct "Tok" field "span": unknown type "Span" — "Span" is a builtin type; import it with `import { Span } from builtins;`
   --> ./tests/cases/imports/err_builtin_type_not_imported.aipl:12:8
    |

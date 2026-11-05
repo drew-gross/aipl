@@ -12,7 +12,7 @@ fn f(ps: P[]) -> i64 {
     }
     0
 }
---- errors ---
+--- check --compile ---
 error: cannot destructure P as Q — the pattern names the struct it takes apart, and two structs that merely share field names are not interchangeable
   --> ./tests/cases/structs/err_for_destructure_wrong_struct.aipl:10:24
    |

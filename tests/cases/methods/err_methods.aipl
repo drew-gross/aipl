@@ -45,7 +45,7 @@ fn non_first_mut(self: i64, mut x: i64) {
 }
 
 fn mutating_returns_value(mut self: i64) -> i64 { self }
---- errors ---
+--- check --compile ---
 error: call to undefined fn "nope"
   --> ./tests/cases/methods/err_methods.aipl:16:37
    |

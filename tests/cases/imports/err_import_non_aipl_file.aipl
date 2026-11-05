@@ -9,7 +9,7 @@ fn main() {
 }
 --- file: greeting.txt ---
 pub fn greeting() {}
---- errors ---
+--- check --compile ---
 error: import "./greeting.txt": an imported file's name must end in `.aipl`
  --> ./tests/cases/imports/err_import_non_aipl_file.aipl:5:26
   |

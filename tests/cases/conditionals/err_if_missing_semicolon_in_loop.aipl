@@ -11,7 +11,7 @@ fn subject() !io {
         let doubled = i * 2;
     }
 }
---- errors ---
+--- check --compile ---
 error: missing `;` before `let`: every statement ends with one, even an `if` or `match` whose value is unused
   --> ./tests/cases/conditionals/err_if_missing_semicolon_in_loop.aipl:11:9
    |

@@ -4,7 +4,7 @@ fn subject() {
     let xs = [1, 2];
     let s = #{..xs, 3};
 }
---- errors ---
+--- check --compile ---
 error: fn "union" arg 1: expected a set, got i64[]
  --> ./tests/cases/sets/spread/err_spread_array.aipl:5:17
   |

@@ -9,7 +9,7 @@ fn subject() {
     let a = [1];
     takes(..a);
 }
---- errors ---
+--- check --compile ---
 error: `..` spread is only allowed in an array or set literal, not in a call argument list
   --> ./tests/cases/arrays/spread/err_spread_in_call.aipl:10:13
    |

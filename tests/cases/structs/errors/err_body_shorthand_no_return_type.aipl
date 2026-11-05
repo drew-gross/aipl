@@ -4,7 +4,7 @@
 struct Vec2 { x: i64, y: i64 }
 
 fn origin() { x: 0, y: 0 }
---- errors ---
+--- check --compile ---
 error: fn "origin": a `{ field: value, .. }` body needs a struct return type to name, but this function declares no return type; add `-> Struct`, or give the literal its type
  --> ./tests/cases/structs/errors/err_body_shorthand_no_return_type.aipl:6:15
   |

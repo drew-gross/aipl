@@ -1,5 +1,5 @@
 variant Shape = Circle(r: i64 = r)
---- errors ---
+--- check --compile ---
 error: variant case "Circle": the default for parameter "r" reads itself — a default may only read parameters declared before it
  --> ./tests/cases/variants/err_payload_default_self_ref.aipl:1:33
   |

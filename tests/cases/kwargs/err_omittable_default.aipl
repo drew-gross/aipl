@@ -11,7 +11,7 @@ fn bad_default(hi?: u64 = 0) -> u64 { hi.value_or(0) }
 fn subject() !prints {
     print(bad_default(hi=1));
 }
---- errors ---
+--- check --compile ---
 error: fn "bad_default": parameter "hi" is declared "hi?: T", so its default must be "none" — that is what leaving the argument out yields; write "hi: T = <default>" for a parameter whose default a caller can also pass
  --> ./tests/cases/kwargs/err_omittable_default.aipl:9:27
   |

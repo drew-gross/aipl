@@ -9,7 +9,7 @@ fn subject() !prints {
     let s = Circle(1);
     print(`{s.as_case(s.case_of())}`);
 }
---- errors ---
+--- check --compile ---
 error: "as_case" needs the case written as a constructor name, as in `x.as_case(Circle)` — a value of type `Case<..>` does not say which case it holds until run time, so the result could not be typed by it
   --> ./tests/cases/variants/err_as_case_value.aipl:10:23
    |

@@ -13,7 +13,7 @@ fn f(a: i64) -> str {
 fn subject() !prints {
     print(f(1));
 }
---- errors ---
+--- check --compile ---
 error: non-exhaustive match: not every value is matched — add a `_` or binder arm
  --> ./tests/cases/match_arms/err_nested_literal_open.aipl:7:5
   |

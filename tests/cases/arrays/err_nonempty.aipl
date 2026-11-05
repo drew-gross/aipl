@@ -20,7 +20,7 @@ fn not_an_array() -> i64 {
     let n: i64 without [] = 5;
     n
 }
---- errors ---
+--- check --compile ---
 error: binding "xs" is declared i64[] without [], but its value is []
  --> ./tests/cases/arrays/err_nonempty.aipl:8:32
   |

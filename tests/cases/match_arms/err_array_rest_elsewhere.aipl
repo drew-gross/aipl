@@ -8,7 +8,7 @@ fn f(p: Pair) -> i64 {
     }
 }
 
---- errors ---
+--- check --compile ---
 error: `..` is only allowed as the last element of an array pattern, as in `[a, ..]`
  --> ./tests/cases/match_arms/err_array_rest_elsewhere.aipl:7:16
   |

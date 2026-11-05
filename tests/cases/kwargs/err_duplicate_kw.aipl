@@ -1,7 +1,7 @@
 fn f(a: i64, b: i64 = 1) -> i64 { a }
 
 fn subject() -> i64 { f(1, b=2, b=3) }
---- errors ---
+--- check --compile ---
 error: duplicate keyword argument "b"
  --> ./tests/cases/kwargs/err_duplicate_kw.aipl:3:33
   |

@@ -1,7 +1,7 @@
 # The `?` operator is allowed inside a `.test` body. On an `ok` it unwraps the
 # value in place and the test proceeds; on an `err` it fails the current test
 # with the error's rendered message and stops that test (later asserts don't
-# run). The `--- check ---` section below pins that report.
+# run). The `--- check --tests ---` section below pins that report.
 #
 # An optional operand behaves the same way — `some` unwraps, `none` fails the
 # test — so a test needs no optional return type to use `?`, just as it needs no
@@ -44,7 +44,7 @@ fn hits_none() -> i64 { 0 }.test({
     let bad = first("")?;
     assert(false);
 })
---- check ---
+--- check --tests ---
 ./tests/cases/tests/try_in_test.aipl:
     all_ok: 1 assertion passed
     hits_err: 0 assertions passed, test failed

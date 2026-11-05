@@ -4,7 +4,7 @@ fn subject() {
     mut xs = [1, 2];
     set xs[5] = 1;
 }
---- errors ---
+--- check --compile ---
 error: an indexed write can miss, because the index may be off the end: say what happens then, as in `set xs[i] = x else { return none; };`, or `else {}` to do nothing
  --> ./tests/cases/arrays/err_index_set_without_else.aipl:5:18
   |

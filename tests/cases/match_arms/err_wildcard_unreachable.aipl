@@ -11,7 +11,7 @@ fn size(s: Shape) -> i64 {
         _ => 1,
     }
 }
---- errors ---
+--- check --compile ---
 error: unreachable `_` arm: every case is already matched above it
   --> ./tests/cases/match_arms/err_wildcard_unreachable.aipl:11:9
    |

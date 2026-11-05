@@ -7,7 +7,7 @@ fn subject(s: str) -> str {
     let stale = s[1..3]; #[allow]
     neighbour
 }
---- errors ---
+--- check --compile ---
 error: slice starts at 0 — drop it for the open-ended "s[..2]" (or append #[allow] to this line to keep it)
  --> ./tests/cases/lints/allow_marker_scope.aipl:6:23
   |

@@ -10,7 +10,7 @@ fn first(t: (i64, i64)) -> i64 {
     a
 }
 
---- errors ---
+--- check --compile ---
 error: `else` follows a pattern that can fail to match, like `Some(x)`; a name, a tuple or a struct pattern always matches
  --> ./tests/cases/bindings/let/err_let_else_irrefutable.aipl:7:5
   |

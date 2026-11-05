@@ -3,7 +3,7 @@ import { len, map } from builtins;
 variant Shape = Circle(r: i64, color: str = "red")
 
 fn subject() -> i64 { [1, 2].map(Circle).len() }
---- errors ---
+--- check --compile ---
 error: variant case "Circle" has keyword parameters, so it cannot be passed as a function value
  --> ./tests/cases/variants/err_payload_ctor_as_value.aipl:5:34
   |

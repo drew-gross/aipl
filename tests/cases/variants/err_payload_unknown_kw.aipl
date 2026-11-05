@@ -5,7 +5,7 @@ fn subject() -> i64 {
         Circle(..) => 0,
     }
 }
---- errors ---
+--- check --compile ---
 error: variant case "Circle" has no keyword parameter "colour"; its keyword parameter is "color"
  --> ./tests/cases/variants/err_payload_unknown_kw.aipl:4:22
   |

@@ -11,7 +11,7 @@
 //!
 //! | section | checked against |
 //! |---|---|
-//! | `errors` (`check --compile`) | the diagnostics compiling the file produces; the file must not compile |
+//! | `check --compile` | the diagnostics compiling the file produces; the file must not compile |
 //! | `check <flags>` | what `check` prints for those parts |
 //! | `stdout`, `stderr`, `exit code` | one run of the built `main` |
 //! | `cli` | not compared: the arguments that run is given |
@@ -19,8 +19,7 @@
 //! | `expect file: p` | the file `p` the run left in its working directory |
 //!
 //! `--- file: p ---` companions are not expectations; they are staged beside the
-//! file by the caller so imports and fixtures resolve. `check` sections (and the old
-//! `check exit code`) pin what `check` itself prints for some of its parts; they are compared with
+//! file by the caller so imports and fixtures resolve. `check` sections pin what `check` itself prints for some of its parts; they are compared with
 //! a run of `check` for those parts (see [`projections`]).
 
 use std::fs;
@@ -82,13 +81,13 @@ fn mismatch(section: &str, actual: &str, expected: &str) -> Option<Finding> {
 /// The parts of `check` that the file's own `check` sections pin. `check` does not run them in this
 /// process: each section is compared with a run of `check` for just those parts (see [`projections`]),
 /// and a pinned part that failed on purpose is the section's to say, not the file's to fail on.
-/// `--compile` is not among them: it is the `errors` section, validated where the file is compiled.
+/// `--compile` is not among them: it is validated where the file is compiled. A section with no
+/// flags pins every part.
 pub fn pinned_parts(spec: &SpecFields) -> Parts {
     let pinned = |flag: &str| {
-        spec.checks
-            .iter()
-            .any(|(projection, _)| projection.split(' ').any(|named| named == flag))
-            || (flag == "--tests" && spec.check_exit_code.is_some())
+        spec.checks.iter().any(|(projection, _)| {
+            projection.is_empty() || projection.split(' ').any(|named| named == flag)
+        })
     };
     Parts {
         format: pinned("--format"),
@@ -98,47 +97,34 @@ pub fn pinned_parts(spec: &SpecFields) -> Parts {
     }
 }
 
+/// The header a projection is written under: `check --tests`, or `check` for all of it.
+fn header(projection: &str) -> String {
+    if projection.is_empty() {
+        "check".to_string()
+    } else {
+        format!("check {projection}")
+    }
+}
+
 /// Check every `check` section other than `--compile` against `run_check`, which runs `check` for
-/// the named flags and gives back what it printed and the status it exited with.
+/// the named flags and gives back what it printed.
 ///
 /// A section's body is that output byte for byte, so it records the trace values a run printed and
-/// the refusal after them as well as the test rows. The old `check exit code` section pins the
-/// status of the `--tests` run; the new sections have none, since the status follows from the body.
+/// the refusal after them as well as the test rows. The status is not recorded: it follows from the
+/// body.
 pub fn projections(
     spec: &SpecFields,
-    mut run_check: impl FnMut(&str) -> Result<(String, i32), String>,
+    mut run_check: impl FnMut(&str) -> Result<String, String>,
 ) -> Vec<Finding> {
     let mut found = Vec::new();
-    let mut wanted: Vec<(&str, Option<&str>)> = spec
+    for (projection, body) in spec
         .checks
         .iter()
         .filter(|(projection, _)| projection != "--compile")
-        .map(|(projection, body)| (projection.as_str(), Some(body.as_str())))
-        .collect();
-    if spec.check_exit_code.is_some()
-        && !wanted
-            .iter()
-            .any(|(projection, _)| *projection == "--tests")
     {
-        wanted.push(("--tests", None));
-    }
-    for (projection, body) in wanted {
-        let (output, status) = match run_check(projection) {
-            Ok(ran) => ran,
-            Err(message) => {
-                found.push(Finding::unfixable(message));
-                continue;
-            }
-        };
-        if let Some(body) = body {
-            found.extend(mismatch(&format!("check {projection}"), &output, body));
-        }
-        if let (Some(expected), "--tests") = (spec.check_exit_code, projection) {
-            found.extend(mismatch(
-                "check exit code",
-                &status.to_string(),
-                &expected.to_string(),
-            ));
+        match run_check(projection) {
+            Ok(output) => found.extend(mismatch(&header(projection), &output, body)),
+            Err(message) => found.push(Finding::unfixable(message)),
         }
     }
     found
@@ -154,11 +140,11 @@ pub fn conflicts(spec: &SpecFields) -> Vec<Finding> {
     }
     let mut found = Vec::new();
     if spec.stdout.is_some() || spec.stderr.is_some() || spec.exit_code.is_some() {
-        found.push("`errors` section is mutually exclusive with stdout/stderr/exit code");
+        found.push("`check --compile` section is mutually exclusive with stdout/stderr/exit code");
     }
     if spec.report.is_some() {
         found.push(
-            "`report` section requires a running program, so it cannot coexist with `errors`",
+            "`report` section requires a running program, so it cannot coexist with `check --compile`",
         );
     }
     if spec
@@ -167,18 +153,18 @@ pub fn conflicts(spec: &SpecFields) -> Vec<Finding> {
         .any(|(projection, _)| projection != "--compile" && projection != "--format")
     {
         found.push(
-            "`check` section for tests or benchmarks requires a compiling program, so it cannot coexist with `errors`",
+            "`check` section for tests or benchmarks requires a compiling program, so it cannot coexist with `check --compile`",
         );
     }
     if !spec.expect_files.is_empty() {
         found.push(
-            "`expect file:` section requires a running program, so it cannot coexist with `errors`",
+            "`expect file:` section requires a running program, so it cannot coexist with `check --compile`",
         );
     }
     found.into_iter().map(Finding::unfixable).collect()
 }
 
-/// Check an `errors` section: the file must fail to compile, with exactly the
+/// Check a `check --compile` section: the file must fail to compile, with exactly the
 /// recorded diagnostics. `compiled` is the outcome of compiling it; `label` is
 /// the path the diagnostics should name, which is part of what the section
 /// records.
@@ -199,7 +185,9 @@ pub fn errors(spec: &SpecFields, compiled: Result<(), Vec<Error>>, label: &str) 
         )],
         Err(errs) => {
             let actual = Error::render_all(&errs, &spec.source, label);
-            mismatch("errors", &actual, expected).into_iter().collect()
+            mismatch("check --compile", &actual, expected)
+                .into_iter()
+                .collect()
         }
     }
 }
@@ -414,23 +402,19 @@ pub fn baseline(
 mod tests {
     use super::*;
 
-    fn spec(checks: &[(&str, &str)], check_exit_code: Option<i32>) -> SpecFields {
+    fn spec(checks: &[(&str, &str)]) -> SpecFields {
         SpecFields {
             checks: checks
                 .iter()
                 .map(|(projection, body)| (projection.to_string(), body.to_string()))
                 .collect(),
-            check_exit_code,
             ..SpecFields::default()
         }
     }
 
     #[test]
     fn a_section_pins_every_part_its_header_names_and_never_the_compile() {
-        let pinned = pinned_parts(&spec(
-            &[("--tests --benchmarks", ""), ("--compile", "")],
-            None,
-        ));
+        let pinned = pinned_parts(&spec(&[("--tests --benchmarks", ""), ("--compile", "")]));
         assert_eq!(
             (
                 pinned.format,
@@ -443,19 +427,28 @@ mod tests {
     }
 
     #[test]
-    fn an_old_exit_code_section_pins_the_tests_though_no_body_does() {
-        assert!(pinned_parts(&spec(&[], Some(1))).tests);
-        assert!(!pinned_parts(&spec(&[], None)).tests);
+    fn a_section_with_no_flags_pins_every_part() {
+        let pinned = pinned_parts(&spec(&[("", "")]));
+        assert_eq!(
+            (
+                pinned.format,
+                pinned.compile,
+                pinned.tests,
+                pinned.benchmarks
+            ),
+            (true, false, true, true)
+        );
+        assert!(!pinned_parts(&spec(&[])).tests);
     }
 
     #[test]
     fn each_section_is_compared_with_the_run_for_its_own_flags() {
         let mut asked = Vec::new();
         let found = projections(
-            &spec(&[("--tests", "same"), ("--format", "other")], None),
+            &spec(&[("--tests", "same"), ("--format", "other")]),
             |flags| {
                 asked.push(flags.to_string());
-                Ok(("same".to_string(), 0))
+                Ok("same".to_string())
             },
         );
         assert_eq!(asked, ["--tests", "--format"]);
@@ -468,18 +461,14 @@ mod tests {
     }
 
     #[test]
-    fn the_old_exit_code_is_compared_with_the_tests_status_even_with_no_body() {
-        let found = projections(&spec(&[], Some(1)), |_| Ok((String::new(), 0)));
-        assert_eq!(found.len(), 1);
-        assert!(found[0].message.starts_with("`check exit code` mismatch"));
-        assert!(projections(&spec(&[], Some(0)), |_| Ok((String::new(), 0))).is_empty());
+    fn a_section_with_no_flags_is_written_as_bare_check() {
+        let found = projections(&spec(&[("", "old")]), |_| Ok("new".to_string()));
+        assert_eq!(found[0].fix, Some(("check".to_string(), "new".to_string())));
     }
 
     #[test]
     fn a_run_that_could_not_start_is_a_finding_without_a_fix() {
-        let found = projections(&spec(&[("--tests", "")], None), |_| {
-            Err("no binary".to_string())
-        });
+        let found = projections(&spec(&[("--tests", "")]), |_| Err("no binary".to_string()));
         assert_eq!(found.len(), 1);
         assert!(found[0].fix.is_none());
     }

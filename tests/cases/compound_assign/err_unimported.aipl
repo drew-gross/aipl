@@ -8,7 +8,7 @@ fn subject() !prints {
     set n += 2;
     print(n.to_str());
 }
---- errors ---
+--- check --compile ---
 error: operator "+=" must be imported: add `import { wrapping_add_assign as += } from builtins;`
  --> ./tests/cases/compound_assign/err_unimported.aipl:8:11
   |

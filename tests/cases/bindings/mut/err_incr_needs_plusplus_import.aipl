@@ -12,7 +12,7 @@ fn bump(limit: i64) -> i64 {
     }
     n
 }
---- errors ---
+--- check --compile ---
 error: operator "++" must be imported: add `import { wrapping_increment as ++ } from builtins;`
   --> ./tests/cases/bindings/mut/err_incr_needs_plusplus_import.aipl:11:13
    |

@@ -6,7 +6,7 @@ fn main() !prints -> i64 {
     print("""oops, never closed);
     0
 }
---- errors ---
+--- check --compile ---
 error: unterminated raw string literal
  --> ./tests/cases/strings/raw/err_raw_string_unterminated.aipl:6:11
   |

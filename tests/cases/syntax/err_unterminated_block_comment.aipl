@@ -1,5 +1,5 @@
 fn f() { /* never closed }
---- errors ---
+--- check --compile ---
 error: unterminated block comment
  --> ./tests/cases/syntax/err_unterminated_block_comment.aipl:1:10
   |
