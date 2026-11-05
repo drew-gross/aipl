@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use aipl::binary;
-use aipl::check::{self, BatchTotals, CheckResult, Checked, Formatting};
+use aipl::check::{self, BatchTotals, CheckResult, Checked, Formatting, Parts};
 use aipl::codegen::{Compilation, ObjectCompilation, TestRun};
 use aipl::loader;
 use aipl::{sections, DebugOptions, Error, SpecFields};
@@ -102,7 +102,8 @@ fn usage(prog: &str) -> String {
   {prog} doc   <file.aipl>                  print the file's and each declaration's `# ..` docs
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
-  {prog} check [path...] [--fix] [--ignore-sections] [--baseline <table.md>]  run the tests, and check formatting and each file's sections
+  {prog} check [path...] [--format] [--compile] [--tests] [--benchmarks] [--fix] [--ignore-sections] [--baseline <table.md>]
+                                            run the tests, and check formatting and each file's sections
   {prog} report <file.aipl> [--machine] [-- args...]  count what a run of the file costs
   {prog} lsp                                serve the Language Server Protocol on stdin/stdout
 
@@ -123,6 +124,15 @@ started), `stdout`, `stderr`, `exit code`, `cli` and `expect file: p` (one run o
 its `main`, made only when one of them is present), and `report` (what `aipl
 report` prints for it). `--- file: p ---` sections are staged beside the file so
 its imports and fixtures resolve. `--ignore-sections` checks the tests alone.
+
+`--format`, `--compile`, `--tests` and `--benchmarks` choose the parts of that to run; none
+means all of them. `--format` checks the canonical format only. `--compile` loads and
+compiles each file and reports what it earns (syntax and type errors, lints, the `trace`
+refusal) without running anything. `--tests` and `--benchmarks` also run the `.test` and
+`.benchmark` blocks; a file that cannot compile has its errors reported either way. Naming
+a part leaves the file's recorded sections and `--baseline` out, since they describe
+runs of `main` and of the whole file. The exit status is non-zero exactly when a chosen
+part reports a failure.
 `--baseline <table.md>` also holds each file's run to its row in that table (the five
 counts `report` prints, exactly; the row is named by the file's path from where `check`
 was started, without `.aipl`), and a file with no row fails. It reports every failure rather than stopping at the first, and exits 0 only if all
@@ -136,6 +146,7 @@ a failing test, a leak, a `trace`, a file that does not compile, a section for a
 file that was never written, or sections that contradict each other are still
 failures. A section a file does not have is added only for output the file's own
 run produced, since an absent `stdout` already means `prints nothing`.
+With a part named, `--fix` has only formatting to rewrite, so it applies to `--format`.
 
 `report` builds the file's `main` (or, for a file with only `.test` blocks, the run
 of those tests) in the instrumented build and runs it once: heap allocations,
@@ -359,6 +370,7 @@ fn check_file(
     spec: &SpecFields,
     section_label: Option<&str>,
     baseline: Option<&sections::Baseline>,
+    parts: Parts,
     run: &mut TestRun,
     dbg: DebugOptions,
 ) -> Result<Checked, String> {
@@ -393,15 +405,25 @@ fn check_file(
     // `__test_main` runs each test and returns the exit code (0 ok, 1 failures),
     // printing failures itself. (Runs on `main`'s large-stack worker thread,
     // which gives codegen room for deep `.test` driver/expression trees.)
+    let mut exit_code = 0;
+    // Compiled whichever part runs: a file that does not compile has nothing to run, and the
+    // diagnostics are the same however the run was asked for.
     let comp = Compilation::new(&test_program, dbg).map_err(render)?;
-    let mut exit_code = comp.run_0("__test_main").map_err(|e| e.to_string())?;
-    run.absorb(aipl::codegen::take_test_run());
+    if parts.tests {
+        exit_code = comp.run_0("__test_main").map_err(|e| e.to_string())?;
+        run.absorb(aipl::codegen::take_test_run());
+    }
 
     // The `.benchmark` blocks, run apart from the tests above: they need an
     // instrumented build, which the JIT is not. Their failures print as the tests'
     // do and their tallies join the same aggregate, so a failing block fails the
     // file exactly as a failing test does — and, like one, stops nothing else.
-    if let Some(driver) = aipl::codegen::build_benchmark_program(&program) {
+    let benchmarks = if parts.benchmarks {
+        aipl::codegen::build_benchmark_program(&program)
+    } else {
+        None
+    };
+    if let Some(driver) = benchmarks {
         let stem = staged
             .entry
             .file_stem()
@@ -448,7 +470,15 @@ fn check_file(
         .file_stem()
         .and_then(OsStr::to_str)
         .unwrap_or("a.out");
-    let leaks = leak_gate(&program, spec, stem, section_label.is_some(), label, dbg)?;
+    let leaks = leak_gate(
+        &program,
+        spec,
+        stem,
+        parts.tests,
+        section_label.is_some(),
+        label,
+        dbg,
+    )?;
     if !leaks.is_empty() {
         let batch_label = aipl::codegen::test_file().unwrap_or_default();
         let at = if batch_label.is_empty() {
@@ -516,7 +546,7 @@ fn check_file(
         sections: found,
         fixed: Vec::new(),
         fix_error: None,
-        ran_tests: true,
+        ran_tests: parts.tests,
     })
 }
 
@@ -533,14 +563,16 @@ fn leak_gate(
     program: &aipl::ast::Program,
     spec: &SpecFields,
     stem: &str,
+    tests_ran: bool,
     sections_on: bool,
     label: &str,
     dbg: DebugOptions,
 ) -> Result<Vec<(&'static str, aipl::perf::Leak)>, String> {
-    let has_tests = program.items.iter().any(|item| {
-        matches!(item, aipl::ast::Item::Fn(f) if f.test_body.is_some()
+    let has_tests = tests_ran
+        && program.items.iter().any(|item| {
+            matches!(item, aipl::ast::Item::Fn(f) if f.test_body.is_some()
             && aipl::benchmark_source_name(&f.name).is_none())
-    });
+        });
     let main_runs = sections_on && sections::runs_main(spec) && spec.report.is_none();
     let mut runs: Vec<(&'static str, aipl::ast::Program)> = Vec::new();
     if has_tests {
@@ -682,6 +714,7 @@ fn check_resolved(
     project_root: &Path,
     sections: bool,
     baseline: Option<&sections::Baseline>,
+    parts: Parts,
     run: &mut TestRun,
     dbg: DebugOptions,
 ) -> Result<Checked, String> {
@@ -694,6 +727,7 @@ fn check_resolved(
             &spec,
             section_label.as_deref(),
             baseline,
+            parts,
             run,
             dbg,
         )
@@ -775,16 +809,41 @@ fn check_path(
     sections: bool,
     fix: bool,
     baseline: Option<&sections::Baseline>,
+    parts: Parts,
     dbg: DebugOptions,
 ) -> CheckResult {
     // Reported before the tests run, and either way: the point is to end the
     // invocation knowing about every problem, not just the first kind.
-    let formatting = check_format(path, fix);
+    let formatting = if parts.format {
+        check_format(path, fix)
+    } else {
+        Formatting::Clean
+    };
     if let Some(line) = formatting.line(label) {
         println!("{line}");
     }
     let mut run = TestRun::default();
-    let outcome = check_resolved(path, label, project_root, sections, baseline, &mut run, dbg);
+    let outcome = if parts.loads() {
+        check_resolved(
+            path,
+            label,
+            project_root,
+            sections,
+            baseline,
+            parts,
+            &mut run,
+            dbg,
+        )
+    } else {
+        Ok(Checked {
+            exit_code: 0,
+            traces: None,
+            sections: Vec::new(),
+            fixed: Vec::new(),
+            fix_error: None,
+            ran_tests: false,
+        })
+    };
     // Anything a run that failed part-way left behind belongs to this file, not the next.
     run.absorb(aipl::codegen::take_test_run());
     let outcome = outcome.map(|mut checked| {
@@ -833,7 +892,11 @@ fn check_path(
 /// compiled, had every test pass, and matched its sections.
 fn check_cmd(args: &[String]) -> ExitCode {
     let (args, dbg) = take_debug_flag(args);
-    let validate_sections = !args.iter().any(|a| a == "--ignore-sections");
+    let (args, selected) = Parts::take_from(args);
+    // A selector names the parts to run, and a file's recorded sections are not among them: they
+    // are validated when nothing is selected, like the baseline.
+    let parts = selected.unwrap_or(Parts::ALL);
+    let validate_sections = selected.is_none() && !args.iter().any(|a| a == "--ignore-sections");
     let fix = args.iter().any(|a| a == "--fix");
     let (args, baseline_path) = match take_value_flag(args, "--baseline") {
         Ok(taken) => taken,
@@ -931,6 +994,7 @@ fn check_cmd(args: &[String]) -> ExitCode {
             validate_sections,
             fix,
             baseline.as_ref(),
+            parts,
             dbg,
         );
         print!("{}", result.render());
@@ -958,6 +1022,7 @@ fn check_cmd(args: &[String]) -> ExitCode {
             validate_sections,
             fix,
             baseline.as_ref(),
+            parts,
             dbg,
         );
         totals.add(&result);

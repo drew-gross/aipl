@@ -1847,3 +1847,196 @@ handoff-fill: baseline-missing\tbaseline_missing.aipl
     assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
+
+// ---------------------------------------------------------------------------
+// `--format`, `--compile`, `--tests`, `--benchmarks`: the parts of a check
+// ---------------------------------------------------------------------------
+
+/// A file with something for every part to find: its import is not canonical, its test fails and
+/// so does its benchmark.
+const EVERY_PART_FAILS: &str = "import { equal as ==, measure} from builtins;\n\n\
+     fn one() -> i64 { 1 }.test({\n    assert(one() == 2);\n}).benchmark({\n    \
+     assert(measure(\"m\", 1, |n| n).instructions == 0);\n})\n";
+const NEEDS_FORMATTING: &str = "./f.aipl: needs formatting (run `aipl check --fix ./f.aipl`)\n";
+const TEST_FAILS: &str = "test one ... FAIL\n  assert failed at ./f.aipl:4 one() == 2\n";
+
+#[test]
+fn with_no_part_named_every_part_runs() {
+    let (stdout, stderr, code) =
+        check_tree("parts_all", &[("f.aipl", EVERY_PART_FAILS)], &["f.aipl"]);
+    assert_eq!(stderr, "");
+    assert!(stdout.starts_with(NEEDS_FORMATTING), "got:\n{stdout}");
+    assert!(stdout.contains(TEST_FAILS), "got:\n{stdout}");
+    assert!(stdout.contains("instructions == 0"), "got:\n{stdout}");
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn format_checks_only_the_format() {
+    let (stdout, stderr, code) = check_tree(
+        "parts_format",
+        &[("f.aipl", EVERY_PART_FAILS)],
+        &["--format", "f.aipl"],
+    );
+    // Nothing ran, so there is no summary either.
+    assert_eq!(
+        (stdout.as_str(), stderr.as_str(), code),
+        (NEEDS_FORMATTING, "", 1)
+    );
+
+    // A canonical file passes however its tests fare.
+    let (stdout, stderr, code) = check_tree(
+        "parts_format_ok",
+        &[("f.aipl", FAILS)],
+        &["--format", "f.aipl"],
+    );
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("", "", 0));
+}
+
+#[test]
+fn compile_loads_and_compiles_without_running_anything() {
+    let (stdout, stderr, code) = check_tree(
+        "parts_compile",
+        &[("f.aipl", EVERY_PART_FAILS)],
+        &["--compile", "f.aipl"],
+    );
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("", "", 0));
+
+    // What a compile earns is reported, with the exit status to match.
+    let (stdout, stderr, code) = check_tree(
+        "parts_compile_broken",
+        &[("f.aipl", BROKEN)],
+        &["--compile", "f.aipl"],
+    );
+    assert!(
+        stdout.contains("declared return type is i64"),
+        "got:\n{stdout}"
+    );
+    assert_eq!((stderr.as_str(), code), ("", 1));
+
+    // A `trace` is refused without the program having run: no trace value is printed.
+    let (stdout, stderr, code) = check_tree(
+        "parts_compile_trace",
+        &[("f.aipl", TRACED)],
+        &["--compile", "f.aipl"],
+    );
+    assert!(
+        stdout.contains("`trace(..)` prints for debugging"),
+        "got:\n{stdout}"
+    );
+    assert!(!stdout.contains("= 7"), "the file ran:\n{stdout}");
+    assert_eq!((stderr.as_str(), code), ("", 1));
+}
+
+#[test]
+fn tests_run_the_test_blocks_and_neither_format_nor_benchmarks() {
+    let (stdout, stderr, code) = check_tree(
+        "parts_tests",
+        &[("f.aipl", EVERY_PART_FAILS)],
+        &["--tests", "f.aipl"],
+    );
+    assert_eq!(stderr, "");
+    assert!(!stdout.contains("needs formatting"), "got:\n{stdout}");
+    assert!(stdout.contains(TEST_FAILS), "got:\n{stdout}");
+    assert!(
+        !stdout.contains("instructions == 0"),
+        "the benchmark ran:\n{stdout}"
+    );
+    assert!(
+        stdout.ends_with("1 tests: 0 passed, 1 failed\n"),
+        "got:\n{stdout}"
+    );
+    assert_eq!(code, 1);
+
+    // A file that cannot compile is reported the same way under either run part.
+    for part in ["--tests", "--benchmarks"] {
+        let (stdout, stderr, code) = check_tree(
+            "parts_tests_broken",
+            &[("f.aipl", BROKEN)],
+            &[part, "f.aipl"],
+        );
+        assert!(
+            stdout.contains("declared return type is i64"),
+            "{part}:\n{stdout}"
+        );
+        assert_eq!((stderr.as_str(), code), ("", 1));
+    }
+}
+
+#[test]
+fn benchmarks_run_the_benchmark_blocks_and_not_the_tests() {
+    let (stdout, stderr, code) = check_tree(
+        "parts_benchmarks",
+        &[("f.aipl", EVERY_PART_FAILS)],
+        &["--benchmarks", "f.aipl"],
+    );
+    assert_eq!(stderr, "");
+    assert!(!stdout.contains("needs formatting"), "got:\n{stdout}");
+    assert!(!stdout.contains(TEST_FAILS), "the test ran:\n{stdout}");
+    assert!(stdout.contains("instructions == 0"), "got:\n{stdout}");
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn named_parts_combine_and_the_status_follows_the_parts_chosen() {
+    let run = |name: &str, args: &[&str]| {
+        let mut all = args.to_vec();
+        all.push("f.aipl");
+        check_tree(name, &[("f.aipl", EVERY_PART_FAILS)], &all)
+    };
+    let (stdout, _, code) = run("parts_format_tests", &["--format", "--tests"]);
+    assert!(stdout.starts_with(NEEDS_FORMATTING), "got:\n{stdout}");
+    assert!(
+        stdout.contains(TEST_FAILS) && !stdout.contains("instructions == 0"),
+        "got:\n{stdout}"
+    );
+    assert_eq!(code, 1);
+
+    let (stdout, _, code) = run("parts_tests_benchmarks", &["--tests", "--benchmarks"]);
+    assert!(
+        stdout.contains(TEST_FAILS) && stdout.contains("instructions == 0"),
+        "got:\n{stdout}"
+    );
+    assert!(!stdout.contains("needs formatting"), "got:\n{stdout}");
+    assert_eq!(code, 1);
+
+    // The failing parts left out, nothing is left to fail.
+    let (stdout, stderr, code) = run("parts_compile_only_ok", &["--compile"]);
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("", "", 0));
+}
+
+#[test]
+fn naming_a_part_leaves_the_files_recorded_sections_out() {
+    let src = format!("{GREETS}--- stdout ---\nbye\n");
+    let (stdout, _, code) = check_tree("parts_sections", &[("f.aipl", &src)], &["f.aipl"]);
+    assert!(stdout.contains("`stdout` mismatch"), "got:\n{stdout}");
+    assert_eq!(code, 1);
+    for part in ["--format", "--compile", "--tests", "--benchmarks"] {
+        let (stdout, stderr, code) =
+            check_tree("parts_sections", &[("f.aipl", &src)], &[part, "f.aipl"]);
+        assert!(!stdout.contains("mismatch"), "{part}:\n{stdout}");
+        assert_eq!((stderr.as_str(), code), ("", 0), "{part}");
+    }
+}
+
+#[test]
+fn fix_with_a_part_named_formats_only_when_format_is_named() {
+    let (stdout, _, code) = check_tree(
+        "parts_fix_format",
+        &[("f.aipl", UNFORMATTED)],
+        &["--format", "--fix", "f.aipl"],
+    );
+    assert_eq!((stdout.as_str(), code), ("formatted ./f.aipl\n", 0));
+    assert!(
+        tree_file("parts_fix_format", "f.aipl").contains("import { equal as == } from builtins;")
+    );
+
+    let (stdout, _, code) = check_tree(
+        "parts_fix_tests",
+        &[("f.aipl", UNFORMATTED)],
+        &["--tests", "--fix", "f.aipl"],
+    );
+    assert_eq!(code, 0, "{stdout}");
+    assert!(!stdout.contains("formatted "), "got:\n{stdout}");
+    assert_eq!(tree_file("parts_fix_tests", "f.aipl"), UNFORMATTED);
+}

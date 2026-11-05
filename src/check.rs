@@ -13,6 +13,61 @@
 use crate::codegen::{TestRecord, TestRun};
 use crate::sections::Finding;
 
+/// Which parts of `check` a run performs. With none selected on the command line, all of them.
+///
+/// - `format`: the file against the canonical format (and, with `--fix`, rewriting it).
+/// - `compile`: loading and compiling, so every diagnostic a file earns: syntax and type errors,
+///   lints, the `.benchmark` refusals and the `trace(..)` refusal. Nothing runs.
+/// - `tests`: also running the `.test` blocks (and holding that run to freeing what it allocates).
+/// - `benchmarks`: also running the `.benchmark` blocks.
+///
+/// Running a part needs the file to compile, so `tests` and `benchmarks` report compile failures
+/// too; the selectors differ in what runs, not in what is reported about a file that cannot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Parts {
+    pub format: bool,
+    pub compile: bool,
+    pub tests: bool,
+    pub benchmarks: bool,
+}
+
+impl Parts {
+    pub const ALL: Parts = Parts {
+        format: true,
+        compile: true,
+        tests: true,
+        benchmarks: true,
+    };
+
+    /// The selectors named in `args`, with the arguments that are not selectors; `None` when no
+    /// selector is named, which means every part.
+    pub fn take_from(args: Vec<String>) -> (Vec<String>, Option<Parts>) {
+        let none = Parts {
+            format: false,
+            compile: false,
+            tests: false,
+            benchmarks: false,
+        };
+        let mut parts = none;
+        let mut rest = Vec::new();
+        for arg in args {
+            match arg.as_str() {
+                "--format" => parts.format = true,
+                "--compile" => parts.compile = true,
+                "--tests" => parts.tests = true,
+                "--benchmarks" => parts.benchmarks = true,
+                _ => rest.push(arg),
+            }
+        }
+        (rest, (parts != none).then_some(parts))
+    }
+
+    /// Whether any part loads the file.
+    pub fn loads(&self) -> bool {
+        self.compile || self.tests || self.benchmarks
+    }
+}
+
 /// Whether a file is in canonical format, and what `--fix` did about it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Formatting {
@@ -451,6 +506,26 @@ mod tests {
         totals.add(&result("./a.aipl", 4, 0));
         assert!(totals.passed_all());
         assert_eq!(totals.render(), "1 file, 4 tests: 4 passed, 0 failed\n");
+    }
+
+    #[test]
+    fn selectors_are_taken_out_of_the_arguments_and_none_means_every_part() {
+        let args = |list: &[&str]| list.iter().map(|a| a.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            Parts::take_from(args(&["a.aipl", "--fix"])),
+            (args(&["a.aipl", "--fix"]), None)
+        );
+        let (rest, parts) = Parts::take_from(args(&["--tests", "a.aipl", "--format"]));
+        assert_eq!(rest, args(&["a.aipl"]));
+        assert_eq!(
+            parts,
+            Some(Parts {
+                format: true,
+                compile: false,
+                tests: true,
+                benchmarks: false
+            })
+        );
     }
 
     #[test]

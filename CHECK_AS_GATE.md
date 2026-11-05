@@ -233,12 +233,19 @@ touched anywhere in this phase except where `check` reads them into the structur
       `--- check ---` section of `tests/cases/debug/trace_fails_check.aipl`, which now also pins the diagnostic.
       The handoff reads `handoff-fill:` lines from stdout.
 
-**3.3 Selector flags (DS2)**
-- [ ] `--format`, `--compile`, `--tests`, `--benchmarks`: composable; none means all. A test per flag and per
-      combination in `check.rs`; `usage()` and `--help` text. (No `--run` and no `--report`.)
-- [ ] `--fix` per selector: what it rewrites and what it may add (today it formats, refreshes recorded sections,
-      and adds a run section only for output the file's own run produced).
-- [ ] Exit status per selector (non-zero exactly when the selected parts report a failure).
+**3.3 Selector flags (DS2)** (2026-11-04)
+- [x] `--format`, `--compile`, `--tests`, `--benchmarks` (`Parts` in `src/check.rs`): composable, none means all. No
+      `--run`, no `--report`. `--format` is the canonical-format check alone and does not load the file. `--compile`
+      loads and compiles (syntax and type errors, lints, the benchmark refusals, the `trace` refusal) and runs
+      nothing. `--tests` and `--benchmarks` also run those blocks, and report compile failures too, since a file
+      that does not compile has nothing to run. The tests' leak gate is part of `--tests`. One test per flag and
+      for the combinations in `tests/suites/check.rs`; `usage()` and the long help describe them.
+- [x] A selector leaves the file's recorded sections and `--baseline` out (they describe a run of `main` and of the
+      whole file, which no selector names), so naming a part implies `--ignore-sections`.
+- [x] `--fix` with a part named: the only thing there is to rewrite is formatting, so it applies to `--format`;
+      sections are repaired only by an unselected run.
+- [x] Exit status: non-zero exactly when a chosen part reports a failure (unformatted, a compile diagnostic, a
+      failing test or benchmark, a leak, a `trace`).
 
 **3.4 The header grammar and the data model (additive; old names keep working)**
 - [ ] `parse_test_section_header` (AIPL) accepts `check` plus flags; canonical spelling; unknown flag, duplicate
