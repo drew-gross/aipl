@@ -405,7 +405,22 @@ fn check_file(
         return Err(render(faults));
     }
     let traces = aipl::trace_diagnostics(&program, "check");
-    let test_program = aipl::codegen::build_test_program(&program);
+    // The tests as the one program every later build of them is also made from — the object the
+    // leak gate and the baseline measure — so the lowering that dominates compile time is done
+    // once for all of them (`aipl_codegen::lowered`). Its entry is `main`, taking the CLI args.
+    let test_program =
+        aipl::codegen::binary_entry_program(&aipl::perf::test_driver_as_main(&program))
+            .map_err(|e| e.to_string())?;
+    // That program has no `main` of the file's own (the driver takes its place), so its body would
+    // go unchecked, and some of what is refused about a body is found only once it is compiled:
+    // compile the program the tests were always built from as well, and keep only what it says.
+    if program
+        .items
+        .iter()
+        .any(|item| matches!(item, aipl::ast::Item::Fn(f) if f.name == "main"))
+    {
+        Compilation::new(&aipl::codegen::build_test_program(&program), dbg).map_err(render)?;
+    }
     // `__test_main` runs each test and returns the exit code (0 ok, 1 failures),
     // printing failures itself. (Runs on `main`'s large-stack worker thread,
     // which gives codegen room for deep `.test` driver/expression trees.)
@@ -414,7 +429,7 @@ fn check_file(
     // diagnostics are the same however the run was asked for.
     let comp = Compilation::new(&test_program, dbg).map_err(render)?;
     if parts.tests {
-        exit_code = comp.run_0("__test_main").map_err(|e| e.to_string())?;
+        exit_code = comp.run_cli("main", &[]).map_err(|e| e.to_string())?;
         run.absorb(aipl::codegen::take_test_run());
     }
 

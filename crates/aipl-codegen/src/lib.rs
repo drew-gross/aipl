@@ -2890,22 +2890,14 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
     })
 }
 
-/// Compile every function in `program` into `module`. When `main_export_name`
-/// is set, the user's `main` function is exported under that name instead
-/// (used by the binary-builder path so a C-style `main()` wrapper in the
-/// runtime can call it).
-fn compile_program<M: Module>(
-    module: &mut M,
+/// The part of compiling a program that does not depend on the backend: resolve, lower,
+/// type-check, optimize, monomorphize, optimize again and mark last uses. What it hands back is
+/// what [`emit_program`] turns into machine code, so a JIT module and an object file built from the
+/// same program can share one of these (see [`lowered`]).
+fn lower_program(
     program: &Program,
-    main_export_name: Option<&str>,
     dbg: DebugOptions,
-    // When set, instrument each function to tally executed instructions (the
-    // `instructions executed` perf counter). Off for JIT and production binary
-    // builds — it adds a per-block call — and on only for the test harness's
-    // separate measurement object.
-    instrument: bool,
-    const_base: usize,
-) -> Result<(HashMap<String, FuncInfo>, HashMap<String, TypeDef>, String), Vec<Error>> {
+) -> Result<aipl_mono::MonoProgram, Vec<Error>> {
     // The frontend — resolve, lower and type-check — then compile what it
     // hands back. Split out so a caller that only wants the diagnostics can
     // run it without paying for codegen; see `frontend`.
@@ -3135,7 +3127,7 @@ fn compile_program<M: Module>(
     // Last of all, mark each binding's last-use call arguments for moving —
     // after every pass that reorders pure reads, so a mark reflects the order
     // codegen will actually evaluate in. See `aipl_mono::move_last_use`.
-    let program = &aipl_mono::move_last_uses_post_mono(program);
+    let program = aipl_mono::move_last_uses_post_mono(program);
     if let Ok(want) = std::env::var("AIPL_DUMP_FN") {
         for f in &program.fns {
             if f.name == want {
@@ -3144,6 +3136,63 @@ fn compile_program<M: Module>(
         }
     }
 
+    Ok(program)
+}
+
+/// The most programs whose lowering is kept for [`lowered`].
+const LOWERED_KEPT: usize = 2;
+
+thread_local! {
+    /// The last few programs lowered on this thread, with their results.
+    static LOWERED: RefCell<Vec<(Program, Rc<aipl_mono::MonoProgram>)>> =
+        const { RefCell::new(Vec::new()) };
+}
+
+/// [`lower_program`], remembered: a program equal to one of the last [`LOWERED_KEPT`] lowered on
+/// this thread gets that result back.
+///
+/// The front end is the larger part of what compiling a program costs (the optimization passes
+/// alone were half of a measured `aipl check`), and `check` compiles the same synthesized test
+/// driver several times over: the JIT that runs the tests, the object that is measured, the
+/// instrumented object that counts, the leak gate. Lowering depends on nothing but the program, so
+/// those share one.
+fn lowered(program: &Program, dbg: DebugOptions) -> Result<Rc<aipl_mono::MonoProgram>, Vec<Error>> {
+    if let Some(found) = LOWERED.with(|kept| {
+        kept.borrow()
+            .iter()
+            .find(|(seen, _)| seen == program)
+            .map(|(_, result)| Rc::clone(result))
+    }) {
+        return Ok(found);
+    }
+    let result = Rc::new(lower_program(program, dbg)?);
+    LOWERED.with(|kept| {
+        let mut kept = kept.borrow_mut();
+        if kept.len() == LOWERED_KEPT {
+            kept.remove(0);
+        }
+        kept.push((program.clone(), Rc::clone(&result)));
+    });
+    Ok(result)
+}
+
+/// Compile every function in `program` into `module`. When `main_export_name`
+/// is set, the user's `main` function is exported under that name instead
+/// (used by the binary-builder path so a C-style `main()` wrapper in the
+/// runtime can call it).
+fn compile_program<M: Module>(
+    module: &mut M,
+    program: &Program,
+    main_export_name: Option<&str>,
+    dbg: DebugOptions,
+    // When set, instrument each function to tally executed instructions (the
+    // `instructions executed` perf counter). Off for JIT and production binary
+    // builds — it adds a per-block call — and on only for the test harness's
+    // separate measurement object.
+    instrument: bool,
+    const_base: usize,
+) -> Result<(HashMap<String, FuncInfo>, HashMap<String, TypeDef>, String), Vec<Error>> {
+    let program = &*lowered(program, dbg)?;
     let mut ctx = module.make_context();
     let mut fbc = FunctionBuilderContext::new();
     let mut funcs: HashMap<String, FuncInfo> = HashMap::new();
@@ -6232,6 +6281,13 @@ fn fn_value_signature<M: Module>(
 ///
 /// (A `main` that returns nothing is handled in codegen, which gives the entry
 /// an `i64` result emitting 0 while still checking the body is unit-typed.)
+/// `program` as an object build compiles it: `main` taking the CLI arguments. A JIT module built
+/// from the same program shares its lowering with the object (see [`lowered`]), and runs `main` with
+/// [`Compilation::run_cli`].
+pub fn binary_entry_program(program: &Program) -> Result<Program, Error> {
+    with_cli_args_main(program).map(|(program, _)| program)
+}
+
 fn with_cli_args_main(program: &Program) -> Result<(Program, bool), Error> {
     let mut program = program.clone();
     let mut wants_args = false;

@@ -375,6 +375,12 @@ only after the whole tree has moved (3.10), so a half-migrated tree is never gre
 - [ ] Progress line naming the file in flight (a crash must say where it died).
 - [ ] One writer for `tests/performance_metrics.md`: shards report rows; handoff (or an unsharded
       `check --fix`) merges.
+- [x] (2026-11-05) Not the loader: a flamegraph of `lint/set_spread_push.aipl` (17s) put 51% in the optimization passes
+      (`inline_single_use_post_mono` alone 26%), 26% in Cranelift, 14% in loading and ~0.3% in linking and running. `check`
+      compiled the same test driver 3 times (JIT, production object, instrumented object), each paying the whole front
+      end. `aipl_codegen::lowered` now keeps the last two lowered programs (equal `Program` in, same `MonoProgram` out) and
+      `check` JITs the exact program the objects are built from (`binary_entry_program(test_driver_as_main(..))`, run
+      as `main`). 28.3s -> 17.5s with `--baseline` on that file, baseline rows unmoved.
 - [ ] Memoize pure loader work (parse+lint of builtins and shared crate files) across files in a
       process; profile first.
 - [ ] Audit the process-global state a batch run leans on. The JIT's cached constants and shim cells leaked
