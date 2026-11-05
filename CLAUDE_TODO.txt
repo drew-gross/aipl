@@ -42,3 +42,19 @@ finishing the per-case harness out (handoff no longer runs the per-case #[test]s
   linking a shard's instrumented objects into one executable and forking per case: measured as ~7% of the corpus at best (linking and running was ~0.3% of a heavy file, ~0.1s of a 0.13s case), so not worth it on this machine; the Phase 0 launchd-session measurement was never taken
   `aipl report` "binary size": object vs linked exe was never checked
 
+
+mtg_metagame workarounds:
+  no binary file read / gzip: load_metagame shells out to `gzip -dc` via execute_program
+  no JSON library a project can use (grammar_json.aipl is compiler-internal): projects/mtg_metagame/json.aipl is hand-written
+  json.aipl: `\u` escapes (and \b \f) refused; no char-from-code-point, and `"\u{8}"` isn't a string escape
+  `insert_key` is internal, so counting by key means to_dict for positions + an array with try_set; a dict-update/`entry` API would do
+  `sort_by` is a quadratic insertion sort; no native sort by key/comparator (card_counts sorts ~500-3000 entries with it)
+  `to_array` needs an ordered set: `let s: #<{str} = xs.to_set()` just to get sorted unique values (a `sorted_unique`/`distinct` builtin?)
+  no `break` in loops: `while (true)` + `return` in a match arm, with an unreachable trailing `err("unreachable")`
+  `while (let some(c) = ..)` doesn't parse
+  lambdas need a braced body even for a struct literal: `|n| { Card { .. } }`
+  `ok(Struct { f: x? })` is required: a bare field-list body can't be a `T!E` return, and `?` on `T?` in a `T!E` fn needs value_or_err
+  no `T!E` constructors for struct bodies returning `Deck!str` (`ok(Deck {..})` wrapping is noisy)
+  `str[i]` is a byte (invalid UTF-8 chars show as �); fine for scanning, but no char iteration by code point
+  ExecResult must be imported by name just to destructure it
+  floats: win rates are permille integers (also in TODO.txt)
