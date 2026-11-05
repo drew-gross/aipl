@@ -115,9 +115,10 @@ fn a_file_that_does_not_compile_is_reported_without_stopping_the_run() {
     );
     // The broken file sorts first, so the run would end there if it aborted.
     assert!(
-        stderr.contains("declared return type is i64"),
-        "expected the compile error, got:\n{stderr}"
+        stdout.contains("declared return type is i64"),
+        "expected the compile error, got:\n{stdout}"
     );
+    assert_eq!(stderr, "");
     assert!(
         stdout.contains("test ./c_fails.aipl::b ... FAIL"),
         "the run should continue past the broken file, got:\n{stdout}"
@@ -157,9 +158,9 @@ fn a_file_with_sections_cannot_be_imported() {
         ],
         &["main.aipl"],
     );
-    assert_eq!(stdout, "");
+    assert_eq!(stderr, "");
     assert_eq!(
-        stderr,
+        stdout,
         "error: import \"./sectioned.aipl\": that file has a `--- stdout ---` section, which makes it \
          a case of its own, and a file with sections cannot be imported — move what is shared into \
          a file without sections\n \
@@ -178,9 +179,9 @@ fn a_test_cannot_let_an_effect_escape() {
     let unshimmed = "import { print } from builtins;\n\n\
          fn greet() !prints {\n    print(\"hello\");\n}.test({\n    greet();\n})\n";
     let (stdout, stderr, code) = check_here("test_unshimmed_effect", unshimmed);
-    assert_eq!(stdout, "");
+    assert_eq!(stderr, "");
     assert_eq!(
-        stderr,
+        stdout,
         "error: fn \"greet\" has effect \"!prints\" but the calling function does not declare it\n \
          --> ./test_unshimmed_effect.aipl:6:5\n  \
          |\n\
@@ -284,16 +285,14 @@ const UNFORMATTED: &str = "import { equal as ==} from builtins;\n\
 #[test]
 fn an_unformatted_file_fails_even_when_its_tests_pass() {
     let (stdout, stderr, code) = check_here("unformatted", UNFORMATTED);
-    // The tests still ran — formatting is reported alongside them, not instead.
+    // The tests still ran — formatting is reported alongside them, not instead — and the
+    // diagnostic names the command that fixes it.
     assert_eq!(
         stdout,
-        "./unformatted.aipl:\n    a: 1 assertion passed\n1 tests: 1 passed, 0 failed\n"
+        "./unformatted.aipl: needs formatting (run `aipl check --fix ./unformatted.aipl`)\n\
+         ./unformatted.aipl:\n    a: 1 assertion passed\n1 tests: 1 passed, 0 failed\n"
     );
-    // And the diagnostic names the command that fixes it.
-    assert_eq!(
-        stderr,
-        "./unformatted.aipl: needs formatting (run `aipl check --fix ./unformatted.aipl`)\n"
-    );
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -305,7 +304,8 @@ fn formatting_and_test_failures_are_both_reported_from_one_run() {
          fn b() -> i64 { 5 }.test({ assert(b() == 6); })\n";
     let (stdout, stderr, code) = check("unformatted_fail", unformatted_and_failing);
     assert!(stdout.contains("test b ... FAIL"), "got:\n{stdout}");
-    assert!(stderr.contains("needs formatting"), "got:\n{stderr}");
+    assert!(stdout.contains("needs formatting"), "got:\n{stdout}");
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -322,9 +322,10 @@ fn an_unformatted_file_does_not_stop_the_batch() {
     );
     // The unformatted file sorts first, so the run would end there if it aborted.
     assert!(
-        stderr.contains("./a_unformatted.aipl: needs formatting"),
-        "expected a file-qualified formatting diagnostic, got:\n{stderr}"
+        stdout.contains("./a_unformatted.aipl: needs formatting"),
+        "expected a file-qualified formatting diagnostic, got:\n{stdout}"
     );
+    assert_eq!(stderr, "");
     assert!(
         stdout.contains("test ./c_fails.aipl::b ... FAIL"),
         "the run should continue past the unformatted file, got:\n{stdout}"
@@ -344,15 +345,16 @@ fn an_unformatted_file_does_not_stop_the_batch() {
 fn a_file_that_does_not_parse_gets_no_formatting_complaint() {
     // The parse error is the diagnostic that helps; "needs formatting" stacked
     // on top of a source the formatter couldn't read is noise.
-    let (_stdout, stderr, code) = check("unparseable", "this is not valid aipl at all\n");
+    let (stdout, stderr, code) = check("unparseable", "this is not valid aipl at all\n");
     assert!(
-        stderr.contains("expected an item or end of input"),
-        "expected the parse error, got:\n{stderr}"
+        stdout.contains("expected an item or end of input"),
+        "expected the parse error, got:\n{stdout}"
     );
     assert!(
-        !stderr.contains("needs formatting"),
-        "expected no formatting complaint, got:\n{stderr}"
+        !stdout.contains("needs formatting"),
+        "expected no formatting complaint, got:\n{stdout}"
     );
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -506,16 +508,17 @@ fn all_asserts_in_a_test_run_and_each_failure_is_reported() {
 
 #[test]
 fn assert_outside_a_test_is_a_compile_error() {
-    let (_stdout, stderr, code) = check(
+    let (stdout, stderr, code) = check(
         "assert_outside",
         "fn f() -> i64 {\n    assert(true);\n    0\n}\n\nfn main() -> i64 { f() }\n",
     );
     // `assert` is rewritten only inside `.test` bodies, so elsewhere it's an
     // ordinary (undefined) call.
     assert!(
-        stderr.contains("undefined fn \"assert\""),
-        "expected an undefined-assert error, got:\n{stderr}"
+        stdout.contains("undefined fn \"assert\""),
+        "expected an undefined-assert error, got:\n{stdout}"
     );
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -529,11 +532,15 @@ fn a_program_with_no_tests_passes_zero_tests() {
 #[test]
 fn a_type_error_in_a_test_body_is_reported() {
     // The test body is type-checked: asserting on a non-bool is an error.
-    let (_stdout, stderr, code) = check(
+    let (stdout, stderr, code) = check(
         "bad_assert",
         "fn f() -> i64 { 1 }.test({\n    assert(f());\n})\n",
     );
-    assert!(!stderr.is_empty(), "expected a type error on stderr");
+    assert!(
+        stdout.starts_with("error:"),
+        "expected a type error, got:\n{stdout}"
+    );
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -546,7 +553,7 @@ fn a_type_error_in_a_test_body_is_reported() {
 /// non-zero is pinned in the corpus — `tests/cases/debug/trace_fails_check.aipl`,
 /// whose `--- check ---` and `--- check exit code ---` sections are that claim
 /// written out. What stays here is everything a case cannot reach: `check`'s
-/// stderr, and the working directory it was invoked from.
+/// stream, and the working directory it was invoked from.
 const TRACED: &str = "import { equal as ==, wrapping_add as + } from builtins;\n\n\
      fn bump(v: i64) -> i64 { trace(v + 2) }.test({\n    assert(bump(5) == 7);\n})\n";
 
@@ -590,11 +597,12 @@ fn a_trace_in_an_imported_file_fails_the_importing_files_check() {
         "expected the imported file's trace output, got:\n{stdout}"
     );
     assert!(
-        stderr.contains("`trace(..)` prints for debugging"),
-        "expected the trace diagnostic, got:\n{stderr}"
+        stdout.contains("`trace(..)` prints for debugging"),
+        "expected the trace diagnostic, got:\n{stdout}"
     );
     // The caret underlines the traced expression, not the whole `trace(..)` call.
-    assert!(stderr.contains("trace(v + 2)"), "got:\n{stderr}");
+    assert!(stdout.contains("trace(v + 2)"), "got:\n{stdout}");
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -615,9 +623,10 @@ fn a_trace_does_not_stop_the_batch_and_is_counted_separately() {
         "the run should continue past the traced file, got:\n{stdout}"
     );
     assert!(
-        stderr.contains("`trace(..)` prints for debugging"),
-        "got:\n{stderr}"
+        stdout.contains("`trace(..)` prints for debugging"),
+        "got:\n{stdout}"
     );
+    assert_eq!(stderr, "");
     // Called out separately for the same reason "needs formatting" is: the traced
     // file's own tests passed, so the tallies give no hint why this exits
     // non-zero.
@@ -688,18 +697,17 @@ fn matching_stdout_and_exit_code_sections_pass() {
 fn a_stdout_mismatch_names_the_file_the_section_and_both_sides() {
     let src = format!("{GREETS}--- stdout ---\nbye\n");
     let (stdout, stderr, code) = check_here("sections_stdout_wrong", &src);
-    assert_eq!(stdout, NO_TESTS);
-    assert_eq!(
-        stderr,
-        "\
+    // What the file reports, then the summary: one stream, in that order.
+    let findings = "\
 ./sections_stdout_wrong.aipl: `stdout` mismatch
 --- expected ---
 bye
 --- actual ---
 hi
 handoff-fill: section\tsections_stdout_wrong.aipl\tstdout
-"
-    );
+";
+    assert_eq!(stdout, format!("{findings}{NO_TESTS}"));
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -708,8 +716,8 @@ fn a_mismatch_a_rewrite_repairs_asks_handoff_for_it_by_path_from_the_root() {
     // The same line a failing case prints, so `cargo handoff` reads `check` and the
     // harness alike. The case is the file's path from the directory `check` is run in.
     let src = format!("{GREETS}--- stdout ---\nbye\n");
-    let (_, stderr, _) = check_tree("sections_fill_marker", &[("sub/wrong.aipl", &src)], &[]);
-    let (asked, unreadable) = handoff::protocol::Fill::scan(&stderr);
+    let (stdout, _, _) = check_tree("sections_fill_marker", &[("sub/wrong.aipl", &src)], &[]);
+    let (asked, unreadable) = handoff::protocol::Fill::scan(&stdout);
     assert_eq!(
         asked,
         vec![handoff::protocol::Fill::Section {
@@ -722,8 +730,8 @@ fn a_mismatch_a_rewrite_repairs_asks_handoff_for_it_by_path_from_the_root() {
     // A finding no rewrite repairs asks for nothing: `errors` and `report` cannot
     // sit together, and the conflict itself has no fix.
     let src = "fn bad() -> i64 { true }\n--- errors ---\nx\n--- report ---\ny\n";
-    let (_, stderr, _) = check_here("sections_fill_marker_conflict", src);
-    let conflict = stderr.lines().next().unwrap_or_default();
+    let (stdout, _, _) = check_here("sections_fill_marker_conflict", src);
+    let conflict = stdout.lines().next().unwrap_or_default();
     assert!(conflict.contains("cannot coexist"), "{conflict}");
     assert!(!conflict.contains("handoff-fill"), "{conflict}");
 }
@@ -732,9 +740,9 @@ fn a_mismatch_a_rewrite_repairs_asks_handoff_for_it_by_path_from_the_root() {
 fn a_lint_hit_fails_the_file_like_a_compile_error() {
     let src = "fn f(x: i64) -> i64 {\n    match (x) {\n        0 => { 1 },\n        _ => 2,\n    }\n}.test({\n    assert(f(0) == 1);\n})\n";
     let (stdout, stderr, code) = check_here("lint_hit", src);
-    assert_eq!(stdout, "");
+    assert_eq!(stderr, "");
     assert_eq!(
-        stderr,
+        stdout,
         "\
 error: this arm's block holds nothing but its value — write the value as the arm's body, without the braces (or append #[allow] to this line to keep it)
  --> ./lint_hit.aipl:3:18
@@ -752,18 +760,17 @@ fn an_absent_section_records_silence_and_a_clean_exit() {
     // missing `stdout` means "prints nothing" — and `hi` is a finding.
     let src = format!("{GREETS}--- exit code ---\n0\n");
     let (stdout, stderr, code) = check_here("sections_absent_means_empty", &src);
-    assert_eq!(stdout, NO_TESTS);
-    assert_eq!(
-        stderr,
-        "\
+    // What the file reports, then the summary: one stream, in that order.
+    let findings = "\
 ./sections_absent_means_empty.aipl: `stdout` mismatch
 --- expected ---
 
 --- actual ---
 hi
 handoff-fill: section\tsections_absent_means_empty.aipl\tstdout
-"
-    );
+";
+    assert_eq!(stdout, format!("{findings}{NO_TESTS}"));
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -775,18 +782,17 @@ fn an_exit_code_section_is_compared_with_the_status_main_returns() {
 
     let src = "fn main() -> i64 { 3 }\n--- exit code ---\n4\n";
     let (stdout, stderr, code) = check_here("sections_exit_wrong", src);
-    assert_eq!(stdout, NO_TESTS);
-    assert_eq!(
-        stderr,
-        "\
+    // What the file reports, then the summary: one stream, in that order.
+    let findings = "\
 ./sections_exit_wrong.aipl: `exit code` mismatch
 --- expected ---
 4
 --- actual ---
 3
 handoff-fill: section\tsections_exit_wrong.aipl\texit code
-"
-    );
+";
+    assert_eq!(stdout, format!("{findings}{NO_TESTS}"));
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -814,29 +820,27 @@ fn an_expect_file_section_checks_what_the_run_wrote() {
         "sections_expect_wrong",
         &format!("{writer}--- expect file: out.txt ---\nother\n"),
     );
-    assert_eq!(stdout, NO_TESTS);
-    assert_eq!(
-        stderr,
-        "\
+    // What the file reports, then the summary: one stream, in that order.
+    let findings = "\
 ./sections_expect_wrong.aipl: `expect file: out.txt` mismatch
 --- expected ---
 other
 --- actual ---
 written
 handoff-fill: section\tsections_expect_wrong.aipl\texpect file: out.txt
-"
-    );
+";
+    assert_eq!(stdout, format!("{findings}{NO_TESTS}"));
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 
     let (stdout, stderr, code) = check_here(
         "sections_expect_missing",
         &format!("{writer}--- expect file: never.txt ---\nx\n"),
     );
-    assert_eq!(stdout, NO_TESTS);
-    assert_eq!(
-        stderr,
-        "./sections_expect_missing.aipl: expected output file \"never.txt\" was not written: No such file or directory (os error 2)\n"
-    );
+    // What the file reports, then the summary: one stream, in that order.
+    let findings = "./sections_expect_missing.aipl: expected output file \"never.txt\" was not written: No such file or directory (os error 2)\n";
+    assert_eq!(stdout, format!("{findings}{NO_TESTS}"));
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -844,11 +848,10 @@ handoff-fill: section\tsections_expect_wrong.aipl\texpect file: out.txt
 fn a_run_section_on_a_file_with_no_main_is_reported() {
     let src = "fn f() -> i64 { 1 }\n--- stdout ---\nx\n";
     let (stdout, stderr, code) = check_here("sections_no_main", src);
-    assert_eq!(stdout, NO_TESTS);
-    assert_eq!(
-        stderr,
-        "./sections_no_main.aipl: a file with no `main` runs only its `.test` blocks — it can't have a stdout/stderr/exit/cli/expect-file section\n"
-    );
+    // What the file reports, then the summary: one stream, in that order.
+    let findings = "./sections_no_main.aipl: a file with no `main` runs only its `.test` blocks — it can't have a stdout/stderr/exit/cli/expect-file section\n";
+    assert_eq!(stdout, format!("{findings}{NO_TESTS}"));
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -873,14 +876,12 @@ fn an_errors_section_makes_a_failing_compile_the_expected_outcome() {
     );
     assert_eq!(
         stdout,
-        "1 file, 0 tests: 0 passed, 0 failed\n1 file has mismatched sections\n"
-    );
-    assert_eq!(
-        stderr,
         format!(
-            "./bad.aipl: `errors` mismatch\n--- expected ---\n?\n--- actual ---\n{BAD_ERRORS}\nhandoff-fill: section\tbad.aipl\terrors\n"
+            "./bad.aipl: `errors` mismatch\n--- expected ---\n?\n--- actual ---\n{BAD_ERRORS}\nhandoff-fill: section\tbad.aipl\terrors\n\
+             1 file, 0 tests: 0 passed, 0 failed\n1 file has mismatched sections\n"
         )
     );
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 
     // Written as what it showed, it passes, however the file is named on the
@@ -913,9 +914,9 @@ fn an_errors_section_makes_a_failing_compile_the_expected_outcome() {
 fn an_errors_section_on_a_file_that_compiles_is_reported() {
     let src = "fn ok() -> i64 { 1 }\n--- errors ---\nerror: nope\n";
     let (stdout, stderr, code) = check_here("sections_errors_compiles", src);
-    assert_eq!(stdout, "");
+    assert_eq!(stderr, "");
     assert_eq!(
-        stderr,
+        stdout,
         "./sections_errors_compiles.aipl: expected an error, but compilation succeeded\n"
     );
     assert_eq!(code, 1);
@@ -925,9 +926,9 @@ fn an_errors_section_on_a_file_that_compiles_is_reported() {
 fn an_errors_section_cannot_sit_with_a_section_that_observes_a_run() {
     let src = "fn bad() -> i64 { true }\n--- errors ---\nx\n--- stdout ---\ny\n";
     let (stdout, stderr, code) = check_here("sections_errors_conflict", src);
-    assert_eq!(stdout, "");
+    assert_eq!(stderr, "");
     assert_eq!(
-        stderr,
+        stdout,
         "\
 ./sections_errors_conflict.aipl: `errors` section is mutually exclusive with stdout/stderr/exit code
 ./sections_errors_conflict.aipl: `errors` mismatch
@@ -982,28 +983,26 @@ fn a_mismatched_section_does_not_hide_a_failing_test() {
                fn main() !prints {\n    print(\"hi\");\n}\n\
                --- stdout ---\nbye\n";
     let (stdout, stderr, code) = check_here("sections_with_failing_test", src);
+    // The file's own report (rows, then its findings), then the aggregate (the failing tests'
+    // text and the count).
     assert_eq!(
         stdout,
         "\
 ./sections_with_failing_test.aipl:
     f: 0 assertions passed, 1 failed
-test failures:
-test f ... FAIL
-  assert failed at ./sections_with_failing_test.aipl:4 f() == 2
-1 tests: 0 passed, 1 failed
-"
-    );
-    assert_eq!(
-        stderr,
-        "\
 ./sections_with_failing_test.aipl: `stdout` mismatch
 --- expected ---
 bye
 --- actual ---
 hi
 handoff-fill: section\tsections_with_failing_test.aipl\tstdout
+test failures:
+test f ... FAIL
+  assert failed at ./sections_with_failing_test.aipl:4 f() == 2
+1 tests: 0 passed, 1 failed
 "
     );
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -1019,7 +1018,7 @@ fn the_batch_counts_files_with_mismatched_sections_and_keeps_going() {
         &[],
     );
     assert_eq!(
-        stderr,
+        stdout,
         "\
 ./a_wrong.aipl: `stdout` mismatch
 --- expected ---
@@ -1033,12 +1032,11 @@ bye
 --- actual ---
 hi
 handoff-fill: section\tc_wrong.aipl\tstdout
+3 files, 0 tests: 0 passed, 0 failed
+2 files have mismatched sections
 "
     );
-    assert_eq!(
-        stdout,
-        "3 files, 0 tests: 0 passed, 0 failed\n2 files have mismatched sections\n"
-    );
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -1067,9 +1065,9 @@ fn ignore_sections_checks_the_tests_alone() {
 fn a_malformed_section_is_the_files_error_not_a_dropped_expectation() {
     let src = format!("{GREETS}--- stdotu ---\nhi\n");
     let (stdout, stderr, code) = check_here("sections_unknown", &src);
-    assert_eq!(stdout, "");
+    assert_eq!(stderr, "");
     assert_eq!(
-        stderr,
+        stdout,
         "./sections_unknown.aipl: unknown section name \"stdotu\"\n"
     );
     assert_eq!(code, 1);
@@ -1102,13 +1100,12 @@ fn a_report_section_that_does_not_match_shows_what_report_printed() {
     // by copying it — or by running `aipl report`, which prints the same text.
     let src = "fn main() {}\n--- report ---\n?\n";
     let (stdout, stderr, code) = check_here("sections_report_wrong", src);
-    assert_eq!(stdout, NO_TESTS);
-    assert_eq!(
-        stderr,
-        format!(
+    // What the file reports, then the summary: one stream, in that order.
+    let findings = format!(
             "./sections_report_wrong.aipl: `report` mismatch\n--- expected ---\n?\n--- actual ---\n{REPORT_OF_EMPTY_MAIN}\nhandoff-fill: section\tsections_report_wrong.aipl\treport\n"
-        )
-    );
+        );
+    assert_eq!(stdout, format!("{findings}{NO_TESTS}"));
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -1121,10 +1118,8 @@ fn a_report_is_of_the_run_the_cli_section_asks_for() {
                fn main(args: str[]) !prints {\n    print(to_str(len(args)));\n}\n\
                --- cli ---\none\ntwo\n--- stdout ---\n2\n--- report ---\n?\n";
     let (stdout, stderr, code) = check_here("sections_report_cli", src);
-    assert_eq!(stdout, NO_TESTS);
-    assert_eq!(
-        stderr,
-        "\
+    // What the file reports, then the summary: one stream, in that order.
+    let findings = "\
 ./sections_report_cli.aipl: `report` mismatch
 --- expected ---
 ?
@@ -1146,8 +1141,9 @@ aipl_u64_len            2    external
 aipl_write_u64          1    external
 main                    1         196
 handoff-fill: section\tsections_report_cli.aipl\treport
-"
-    );
+";
+    assert_eq!(stdout, format!("{findings}{NO_TESTS}"));
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
@@ -1155,9 +1151,9 @@ handoff-fill: section\tsections_report_cli.aipl\treport
 fn a_report_section_cannot_sit_with_an_errors_section() {
     let src = "fn bad() -> i64 { true }\n--- errors ---\nx\n--- report ---\ny\n";
     let (stdout, stderr, code) = check_here("sections_report_errors", src);
-    assert_eq!(stdout, "");
+    assert_eq!(stderr, "");
     assert_eq!(
-        stderr,
+        stdout,
         "\
 ./sections_report_errors.aipl: `report` section requires a running program, so it cannot coexist with `errors`
 ./sections_report_errors.aipl: `errors` mismatch
@@ -1386,9 +1382,9 @@ fn measure_outside_a_benchmark_block_is_refused() {
     let in_test = "import { equal as ==, measure } from builtins;\n\n\
                    fn one() -> i64 { 1 }.test({\n    assert(measure(\"x\", 1, |n| n).allocations == 0);\n})\n";
     let (stdout, stderr, code) = check_here("measure_in_test", in_test);
-    assert_eq!(stdout, "");
+    assert_eq!(stderr, "");
     assert_eq!(
-        stderr,
+        stdout,
         "\
 error: fn \"measure\" can only be called from a `.benchmark` block
  --> ./measure_in_test.aipl:4:12
@@ -1402,9 +1398,9 @@ error: fn \"measure\" can only be called from a `.benchmark` block
     let in_fn = "import { measure } from builtins;\n\n\
                  fn main() {\n    measure(\"x\", 1, |n| n);\n}\n";
     let (stdout, stderr, code) = check_here("measure_in_main", in_fn);
-    assert_eq!(stdout, "");
+    assert_eq!(stderr, "");
     assert_eq!(
-        stderr,
+        stdout,
         "\
 error: fn \"measure\" can only be called from a `.benchmark` block
  --> ./measure_in_main.aipl:4:5
@@ -1442,9 +1438,9 @@ fn work() {}.benchmark({
     let (stdout, stderr, code) = check_here("benchmark_effects", src);
     // Each of the three uses is refused, and each says why: printing in the block
     // itself, handing it a function that prints, and a closure that prints.
-    assert_eq!(stdout, "");
+    assert_eq!(stderr, "");
     assert_eq!(
-        stderr,
+        stdout,
         "\
 error: effects are not supported in a `.benchmark` block yet: fn \"print\" has effect \"!prints\"
  --> ./benchmark_effects.aipl:9:5
@@ -1473,9 +1469,9 @@ fn a_literal_measurement_label_used_twice_in_one_block_is_refused() {
     let src = "import { measure } from builtins;\n\n\
                fn work() {}.benchmark({\n    measure(\"same\", 1, |n| n);\n    measure(\"same\", 2, |n| n);\n})\n";
     let (stdout, stderr, code) = check_here("benchmark_duplicate_label", src);
-    assert_eq!(stdout, "");
+    assert_eq!(stderr, "");
     assert_eq!(
-        stderr,
+        stdout,
         "\
 error: duplicate measurement label \"same\" in this `.benchmark` block — a report could not tell the two apart
  --> ./benchmark_duplicate_label.aipl:5:13
@@ -1503,9 +1499,9 @@ fn a_type_error_in_a_benchmark_block_is_reported_with_its_source() {
         "benchmark_type_error",
         &benchmark_block("assert(measure(\"x\", 1, |n| n).allocations == true);"),
     );
-    assert_eq!(stdout, "");
+    assert_eq!(stderr, "");
     assert_eq!(
-        stderr,
+        stdout,
         "\
 error: \"==\" between u64 and bool: both sides must be the same type
  --> ./benchmark_type_error.aipl:4:12
@@ -1701,9 +1697,9 @@ fn fix_does_not_hide_a_failing_test() {
     assert_eq!(
         stdout,
         "\
-fixed ./t.aipl: stdout
 ./t.aipl:
     f: 0 assertions passed, 1 failed
+fixed ./t.aipl: stdout
 test failures:
 test f ... FAIL
   assert failed at ./t.aipl:4 f() == 2
@@ -1722,11 +1718,10 @@ fn fix_leaves_what_a_rewrite_cannot_repair() {
     let no_main = "fn f() -> i64 { 1 }\n--- stdout ---\nx\n";
     let (stdout, stderr, code) =
         check_tree("fix_no_main", &[("n.aipl", no_main)], &["--fix", "n.aipl"]);
-    assert_eq!(stdout, NO_TESTS);
-    assert_eq!(
-        stderr,
-        "./n.aipl: a file with no `main` runs only its `.test` blocks — it can't have a stdout/stderr/exit/cli/expect-file section\n"
-    );
+    // What the file reports, then the summary: one stream, in that order.
+    let findings = "./n.aipl: a file with no `main` runs only its `.test` blocks — it can't have a stdout/stderr/exit/cli/expect-file section\n";
+    assert_eq!(stdout, format!("{findings}{NO_TESTS}"));
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
     // And the file is as it was.
     assert_eq!(tree_file("fix_no_main", "n.aipl"), no_main);
@@ -1734,11 +1729,10 @@ fn fix_leaves_what_a_rewrite_cannot_repair() {
     let missing = "fn main() {}\n--- expect file: never.txt ---\nx\n";
     let (stdout, stderr, code) =
         check_tree("fix_missing", &[("m.aipl", missing)], &["--fix", "m.aipl"]);
-    assert_eq!(stdout, NO_TESTS);
-    assert_eq!(
-        stderr,
-        "./m.aipl: expected output file \"never.txt\" was not written: No such file or directory (os error 2)\n"
-    );
+    // What the file reports, then the summary: one stream, in that order.
+    let findings = "./m.aipl: expected output file \"never.txt\" was not written: No such file or directory (os error 2)\n";
+    assert_eq!(stdout, format!("{findings}{NO_TESTS}"));
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
     assert_eq!(tree_file("fix_missing", "m.aipl"), missing);
 }
@@ -1783,8 +1777,8 @@ fn fix_leaves_a_file_that_does_not_parse_alone() {
     let src = "fn main( {\n";
     let (stdout, stderr, code) =
         check_tree("fix_unparsed", &[("p.aipl", src)], &["--fix", "p.aipl"]);
-    assert_eq!(stdout, "");
-    assert!(stderr.starts_with("error:"), "got:\n{stderr}");
+    assert_eq!(stderr, "");
+    assert!(stdout.starts_with("error:"), "got:\n{stdout}");
     assert_eq!(code, 1);
     assert_eq!(tree_file("fix_unparsed", "p.aipl"), src);
 }
@@ -1830,28 +1824,26 @@ fn a_run_that_reproduces_its_baseline_row_passes() {
 fn a_run_that_moved_from_its_baseline_row_names_each_column_and_asks_for_a_refresh() {
     let table = format!("{TABLE_HEAD}| baseline_moved | 0 | 0 | 0 | 1 | 8 | 1.00 | 1.0 | 1 |\n");
     let (stdout, stderr, code) = check_against("baseline_moved", &table);
-    assert_eq!(stdout, NO_TESTS);
-    assert_eq!(
-        stderr,
-        "\
+    // What the file reports, then the summary: one stream, in that order.
+    let findings = "\
 ./baseline_moved.aipl: performance baseline moved (table.md):
   instructions: 1 -> 3 (+200.0%)
 handoff-fill: baseline-moved\tbaseline_moved.aipl\tinstructions: 1 -> 3 (+200.0%)
-"
-    );
+";
+    assert_eq!(stdout, format!("{findings}{NO_TESTS}"));
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }
 
 #[test]
 fn a_file_with_no_baseline_row_fails_and_asks_for_one() {
     let (stdout, stderr, code) = check_against("baseline_missing", TABLE_HEAD);
-    assert_eq!(stdout, NO_TESTS);
-    assert_eq!(
-        stderr,
-        "\
+    // What the file reports, then the summary: one stream, in that order.
+    let findings = "\
 ./baseline_missing.aipl: performance baseline missing: table.md has no row for `baseline_missing`
 handoff-fill: baseline-missing\tbaseline_missing.aipl
-"
-    );
+";
+    assert_eq!(stdout, format!("{findings}{NO_TESTS}"));
+    assert_eq!(stderr, "");
     assert_eq!(code, 1);
 }

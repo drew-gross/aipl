@@ -184,7 +184,7 @@ fix for the lint is sometimes different once you know the type error exists.
 
 | Validation | Conforms | Behaviour |
 |---|---|---|
-| formatting | yes | an unformatted file is named on stderr, its tests still run, and the summary ends `N files need formatting` |
+| formatting | yes | an unformatted file is named in the report, its tests still run, and the summary ends `N files need formatting` |
 | lints | **no** | a lint hit fails the load, so codegen and the file's tests never run |
 | parse errors | **no** | a file that does not parse contributes nothing else |
 | type errors | **no** | one bad function stops the whole file, including tests for unrelated ones |

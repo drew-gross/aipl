@@ -8,8 +8,8 @@
 # report says so — and `check` still exits 1. Nothing but the trace stands
 # between this file and a green run.
 #
-# The diagnostic itself goes to stderr, which `--- check ---` does not capture;
-# its wording is covered in `tests/suites/check.rs`.
+# The diagnostic is part of the report, after the rows, so it is pinned below as
+# well; its wording is also covered in `tests/suites/check.rs`.
 
 import { equal as ==, wrapping_add as + } from builtins;
 
@@ -20,6 +20,11 @@ fn bump(v: i64) -> i64 { trace(v + 2) }.test({
 ./tests/cases/debug/trace_fails_check.aipl:16 v + 2 = 7
 ./tests/cases/debug/trace_fails_check.aipl:
     bump: 1 assertion passed
+error: `trace(..)` prints for debugging and declares no effect, so `check` refuses a program that still contains one; remove it
+  --> ./tests/cases/debug/trace_fails_check.aipl:16:32
+   |
+16 | fn bump(v: i64) -> i64 { trace(v + 2) }.test({
+   |                                ^^^^^
 1 tests: 1 passed, 0 failed
 --- check exit code ---
 1

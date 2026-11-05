@@ -763,15 +763,6 @@ fn check_format(file: &Path, fix: bool) -> Formatting {
     }
 }
 
-/// Write one line a renderer produced: stdout when `to_stdout`, else stderr.
-fn emit(line: Option<(String, bool)>) {
-    match line {
-        Some((text, true)) => println!("{text}"),
-        Some((text, false)) => eprintln!("{text}"),
-        None => {}
-    }
-}
-
 /// Check one file end to end: its format, then (loading, compiling, running its
 /// tests and validating its sections), then `--fix`'s repairs. Nothing is
 /// printed except the formatting line, which comes first so it precedes anything
@@ -789,7 +780,9 @@ fn check_path(
     // Reported before the tests run, and either way: the point is to end the
     // invocation knowing about every problem, not just the first kind.
     let formatting = check_format(path, fix);
-    emit(formatting.line(label));
+    if let Some(line) = formatting.line(label) {
+        println!("{line}");
+    }
     let mut run = TestRun::default();
     let outcome = check_resolved(path, label, project_root, sections, baseline, &mut run, dbg);
     // Anything a run that failed part-way left behind belongs to this file, not the next.
@@ -940,24 +933,12 @@ fn check_cmd(args: &[String]) -> ExitCode {
             baseline.as_ref(),
             dbg,
         );
-        match &result.outcome {
-            // Reported after the run, so a trace the tests hit has already
-            // printed its value by the time the diagnostic explains itself.
-            Ok(checked) => {
-                // Fixed before the summary is printed, so the summary is the last
-                // thing said about the file.
-                emit(result.render_fixed());
-                print!("{}", result.render_rows());
-                print!("{}", check::render_failures(&result.run.failure_report));
-                if let Some(summary) = result.render_summary() {
-                    println!("{summary}");
-                }
-                if let Some(report) = &checked.traces {
-                    eprintln!("{report}");
-                }
-                eprint!("{}", result.render_findings());
+        print!("{}", result.render());
+        if result.outcome.is_ok() {
+            print!("{}", check::render_failures(&result.run.failure_report));
+            if let Some(summary) = result.render_summary() {
+                println!("{summary}");
             }
-            Err(msg) => eprintln!("{msg}"),
         }
         return if result.passed() {
             ExitCode::SUCCESS
@@ -980,17 +961,7 @@ fn check_cmd(args: &[String]) -> ExitCode {
             dbg,
         );
         totals.add(&result);
-        print!("{}", result.render_rows());
-        match &result.outcome {
-            Ok(checked) => {
-                if let Some(report) = &checked.traces {
-                    eprintln!("{report}");
-                }
-                emit(result.render_fixed());
-                eprint!("{}", result.render_findings());
-            }
-            Err(msg) => eprintln!("{msg}"),
-        }
+        print!("{}", result.render());
     }
     aipl::codegen::set_test_file(None);
 

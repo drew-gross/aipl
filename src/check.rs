@@ -33,18 +33,15 @@ impl Formatting {
         matches!(self, Formatting::Needs | Formatting::RewriteFailed(_))
     }
 
-    /// The line this step prints for `label`, and whether it goes to stdout (`false`: stderr).
-    pub fn line(&self, label: &str) -> Option<(String, bool)> {
+    /// The line this step reports for `label`, if any.
+    pub fn line(&self, label: &str) -> Option<String> {
         match self {
             Formatting::Clean => None,
-            Formatting::Needs => Some((
-                format!("{label}: needs formatting (run `aipl check --fix {label}`)"),
-                false,
+            Formatting::Needs => Some(format!(
+                "{label}: needs formatting (run `aipl check --fix {label}`)"
             )),
-            Formatting::Rewritten => Some((format!("formatted {label}"), true)),
-            Formatting::RewriteFailed(why) => {
-                Some((format!("{label}: could not rewrite: {why}"), false))
-            }
+            Formatting::Rewritten => Some(format!("formatted {label}")),
+            Formatting::RewriteFailed(why) => Some(format!("{label}: could not rewrite: {why}")),
         }
     }
 }
@@ -114,20 +111,41 @@ impl CheckResult {
     }
 
     /// The line saying which sections `--fix` wrote, or why it could not.
-    pub fn render_fixed(&self) -> Option<(String, bool)> {
+    pub fn render_fixed(&self) -> Option<String> {
         let checked = self.outcome.as_ref().ok()?;
         if let Some(why) = &checked.fix_error {
-            return Some((
-                format!("{}: could not write the fixed sections: {why}", self.label),
-                false,
+            return Some(format!(
+                "{}: could not write the fixed sections: {why}",
+                self.label
             ));
         }
-        (!checked.fixed.is_empty()).then(|| {
-            (
-                format!("fixed {}: {}", self.label, checked.fixed.join(", ")),
-                true,
-            )
-        })
+        (!checked.fixed.is_empty())
+            .then(|| format!("fixed {}: {}", self.label, checked.fixed.join(", ")))
+    }
+
+    /// Everything the file reports after its formatting line, in the one order every mode
+    /// uses: the tests' rows, then either the compile failure or (what `--fix` wrote, the
+    /// `trace(..)` refusal, the section findings). All of it is for stdout; stderr is for
+    /// usage and I/O errors. Every line ends in a newline.
+    ///
+    /// The formatting line is separate because it is reported before the file runs, so it
+    /// precedes anything the run prints. The failing tests' text and the pass/fail counts
+    /// follow the last file, as an aggregate.
+    pub fn render(&self) -> String {
+        let mut out = self.render_rows();
+        match &self.outcome {
+            Err(msg) => out.push_str(&format!("{msg}\n")),
+            Ok(checked) => {
+                if let Some(line) = self.render_fixed() {
+                    out.push_str(&format!("{line}\n"));
+                }
+                if let Some(report) = &checked.traces {
+                    out.push_str(&format!("{report}\n"));
+                }
+                out.push_str(&self.render_findings());
+            }
+        }
+        out
     }
 
     /// The `N tests: P passed, F failed` line of a single-file report, when tests ran.
@@ -436,20 +454,44 @@ mod tests {
     }
 
     #[test]
-    fn formatting_lines_go_to_the_stream_check_uses() {
+    fn formatting_lines_name_the_file() {
         assert_eq!(Formatting::Clean.line("a.aipl"), None);
         assert_eq!(
             Formatting::Needs.line("a.aipl"),
-            Some((
-                "a.aipl: needs formatting (run `aipl check --fix a.aipl`)".to_string(),
-                false
-            ))
+            Some("a.aipl: needs formatting (run `aipl check --fix a.aipl`)".to_string())
         );
         assert_eq!(
             Formatting::Rewritten.line("a.aipl"),
-            Some(("formatted a.aipl".to_string(), true))
+            Some("formatted a.aipl".to_string())
         );
         assert!(Formatting::Needs.is_unformatted());
         assert!(!Formatting::Rewritten.is_unformatted());
+    }
+
+    #[test]
+    fn a_file_reports_rows_then_what_fix_wrote_then_traces_then_findings() {
+        let mut checked = result("./a.aipl", 1, 0);
+        checked.run.records = vec![record("f", 1, 0, false)];
+        let Ok(c) = &mut checked.outcome else {
+            unreachable!()
+        };
+        c.fixed = vec!["stdout".to_string()];
+        c.traces = Some("error: trace".to_string());
+        c.sections = vec![Finding::unfixable("exit code is stale")];
+        assert_eq!(
+            checked.render(),
+            "./a.aipl:\n    f: 1 assertion passed\nfixed ./a.aipl: stdout\nerror: trace\n./a.aipl: exit code is stale\n"
+        );
+    }
+
+    #[test]
+    fn a_compile_failure_follows_the_rows_of_the_tests_that_ran_first() {
+        let mut broken = result("./a.aipl", 1, 0);
+        broken.run.records = vec![record("f", 1, 0, false)];
+        broken.outcome = Err("error: bad".to_string());
+        assert_eq!(
+            broken.render(),
+            "./a.aipl:\n    f: 1 assertion passed\nerror: bad\n"
+        );
     }
 }

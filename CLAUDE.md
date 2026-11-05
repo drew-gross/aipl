@@ -210,7 +210,7 @@ the whole corpus at once with the author helper
 
 `aipl check` reports it too, so a project using `check` as its whole handoff gate
 gets one command for "is this tree ready". An unformatted file is a `check`
-failure but not a fatal one — it is named on stderr, its tests still run, and the
+failure but not a fatal one — it is named in the report, its tests still run, and the
 batch summary ends with `N files need formatting`.
 
 **`aipl check --fix` is the other half: it repairs what a rewrite can.** There is
@@ -394,8 +394,7 @@ entry, which is why `begin` and `end` get blocks of their own in codegen; a
 window inside one block would count nothing.
 
 Fixtures: claims that pass, and one that fails and is pinned by `--- check ---`,
-live in `tests/cases/benchmark/`. The compile-time refusals print to stderr,
-which a case section cannot pin, so they are tests in `tests/suites/check.rs`.
+live in `tests/cases/benchmark/`. The compile-time refusals are tests in `tests/suites/check.rs`.
 Two `lint` interactions to know: two measurements compared by field are fine (the
 destructure lint stays quiet when a field is read off more than one value), but a
 single one read only by field wants destructuring — struct patterns have no `..`,

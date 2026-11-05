@@ -217,12 +217,21 @@ touched anywhere in this phase except where `check` reads them into the structur
       change in behavior, a fix: the driver's exit code used to be cumulative over a batch, so a file after a
       failing one reported a failing driver.
 
-**3.2 One output stream (DS3)**
-- [ ] Move compile diagnostics, section mismatches, format notices, trace refusals and `fix` lines into the
-      rendered report on stdout, in a fixed order per file; stderr only for usage and I/O errors.
-- [ ] Update every expectation that reads stderr: `tests/suites/check.rs` (about 40), `fmt.rs`
-      (`cli_check_formats_with_fix`), `report.rs`, `source_extension.rs`, the 8 `--- check ---` cases, and the
-      scripts that run `check`. Own handoff: it moves all of those at once.
+**3.2 One output stream (DS3)** (2026-11-04)
+- [x] Compile diagnostics, section mismatches (with their `handoff-fill:` lines), format notices, trace refusals and
+      `fix` lines are all on stdout. stderr is for usage and I/O errors only (no such path, an unreadable
+      baseline table, an empty tree). The order is fixed, one for every mode:
+      1. the formatting notice, first, because it is reported before the file runs;
+      2. whatever the run itself prints (`trace(..)` values);
+      3. the file's rows, then either its compile failure or (what `--fix` wrote, the `trace` refusal, each section
+         finding), as `CheckResult::render`;
+      4. after the last file: the failing tests' text under `test failures:`, then the count line (a batch's
+         `N files, T tests` line and its one line per way a file failed).
+      Moved from the old single-file order: the `fixed` line is now after the rows (as in a batch), and the
+      traces and findings are now before the failure text and the summary instead of after.
+- [x] Expectations updated: `tests/suites/check.rs` (37 tests), `fmt::cli_check_formats_with_fix`, and the
+      `--- check ---` section of `tests/cases/debug/trace_fails_check.aipl`, which now also pins the diagnostic.
+      The handoff reads `handoff-fill:` lines from stdout.
 
 **3.3 Selector flags (DS2)**
 - [ ] `--format`, `--compile`, `--tests`, `--benchmarks`: composable; none means all. A test per flag and per
