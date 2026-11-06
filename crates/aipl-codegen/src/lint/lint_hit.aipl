@@ -7,6 +7,7 @@ import {
     collect_arms,
     collect_ok,
     contains,
+    distinct,
     ends_with,
     equal as ==,
     filter,
@@ -21,7 +22,6 @@ import {
     logical_not as !,
     map,
     map_join,
-    push,
     starts_with,
     value_or,
     wrapping_sub as -,
@@ -54,18 +54,6 @@ pub fn unfilled(builtin: str, before: str, after: str, span: Span) -> UnfilledHi
     span,
 }.test({
     assert(unfilled("len", "use ", "()", 1..2).span == 1..2);
-})
-
-# `self` without a name it has already listed, in the order it first appears.
-fn distinct(self: str[]) -> str[] {
-    mut seen: str[] = [];
-    for (let name : self) {
-        if (!seen.contains(name)) { set seen.push(name); };
-    }
-    seen
-}.test({
-    assert(["map", "join", "map"].distinct() == ["map", "join"]);
-    assert([].distinct() == []);
 })
 
 # `self` as the hit it is for a file that spells builtin `name` as `spelled(name)`,

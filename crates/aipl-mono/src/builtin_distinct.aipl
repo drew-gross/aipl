@@ -1,0 +1,46 @@
+# The AIPL implementation of the `distinct` builtin. The loader names this function by the
+# canonical name `__builtin_distinct` (see `aipl_syntax::builtin`), so a user's
+# `xs.distinct()` specializes through the ordinary generic machinery — the in-file name is only
+# for this file's own tests, which read exactly like user code.
+#
+# It keeps the order the elements first appear in, which is what a set does not promise:
+# `to_set` on an unordered set gives none, and an ordered one gives *sorted* order, which a
+# type without `<` cannot have. In exchange it compares each element with the ones kept so
+# far, so it costs one comparison per kept element per input element; for a large array of
+# something with an order, `to_set` is the cheaper way to the same elements.
+#
+# No lint steers the longhand here: the loop that keeps an element unless it was already kept
+# has too many spellings (`contains` or `any` on the array, `has` on a set kept alongside, a
+# guard that also does other work) for a shape that could be advised precisely, and a
+# mis-advised lint is worse than none.
+
+import { any, equal as ==, logical_not as !, push } from builtins;
+
+# `self` without its repeats: each element once, in the order it first appears. Elements are
+# compared with `==`, so a type that has none (a float) is refused. Callable as a method.
+pub fn distinct<T: any>(self: T[]) -> T[] {
+    mut seen: T[] = [];
+    for (let x : self) {
+        if (!seen.any(|each| each == x)) { set seen.push(x); };
+    }
+    seen
+}.test({
+    // Each once, in the order first met.
+    assert([1, 2, 1, 3, 2, 1].distinct() == [1, 2, 3]);
+    assert([3, 1, 3, 2, 1].distinct() == [3, 1, 2]);
+    assert(["b", "a", "b", "c", "a"].distinct() == ["b", "a", "c"]);
+
+    // Nothing, one thing, and nothing to remove.
+    let nothing: i64[] = [];
+    assert(nothing.distinct() == []);
+    assert([7].distinct() == [7]);
+    assert([1, 2, 3].distinct() == [1, 2, 3]);
+    assert([5, 5, 5].distinct() == [5]);
+
+    // Elements are compared whole, so tuples that share a part are not repeats of each other.
+    assert([(1, "a"), (1, "b"), (1, "a")].distinct() == [(1, "a"), (1, "b")]);
+    assert([[1], [2], [1]].distinct() == [[1], [2]]);
+
+    // Free-call form.
+    assert(distinct([true, false, true]) == [true, false]);
+})

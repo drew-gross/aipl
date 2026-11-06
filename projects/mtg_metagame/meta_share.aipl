@@ -2,8 +2,8 @@
 # counts toward every archetype it matches, so the shares can add up to more than all.
 
 import {
-    any,
     count_if,
+    distinct,
     equal as ==,
     filter,
     float_div as /,
@@ -12,7 +12,6 @@ import {
     join,
     len,
     less_than as <,
-    logical_not as !,
     map,
     max,
     push,
@@ -23,15 +22,7 @@ import {
     value_or,
     wrapping_add as +,
 } from builtins;
-import {
-    Archetype,
-    Identifier,
-    Meta,
-    Other,
-    archetypes_of,
-    deck_of,
-    label,
-} from "./archetypes.aipl";
+import { Identifier, Meta, Other, archetypes_of, deck_of, label } from "./archetypes.aipl";
 import { Counted, ranked } from "./counted.aipl";
 import { Deck } from "./metagame.aipl";
 
@@ -100,23 +91,6 @@ pub fn shares(decks: Deck[], identifiers: Identifier[]) -> Counted[] {
         Counted { name: "Other", count: 1 },
         Counted { name: "Other", count: 2 },
     ]);
-})
-
-# `self` without its repeats, in the order each first appears.
-fn distinct(self: Archetype[]) -> Archetype[] {
-    mut seen: Archetype[] = [];
-    for (let archetype : self) {
-        if (!seen.any(|each| each == archetype)) { set seen.push(archetype); };
-    }
-    seen
-}.test({
-    assert([Meta("a"), Other("a"), Meta("a"), Meta("b"), Other("a")].distinct() == [
-        Meta("a"),
-        Other("a"),
-        Meta("b"),
-    ]);
-    let nothing: Archetype[] = [];
-    assert(nothing.distinct() == []);
 })
 
 # `count` out of `total` as a percentage with one decimal: `33.3%`. Rounded as the

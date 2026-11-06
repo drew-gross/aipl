@@ -11,6 +11,7 @@ import {
     any,
     contains,
     count_if,
+    distinct,
     equal as ==,
     filter,
     greater_than as >,
@@ -60,10 +61,7 @@ struct Uses {
 # How `name` is used inside `self`.
 pub fn uses_of(self: Expr, name: str) -> Uses {
     let nodes = self.descendants();
-    mut fields: str[] = [];
-    for (let read : self.field_reads().filter(|r| r.base == name)) {
-        if (!fields.contains(read.field)) { set fields.push(read.field); };
-    }
+    let fields = self.field_reads().filter(|r| r.base == name)$field.distinct();
     Uses {
         mentions: nodes.count_if(|node| node.is_name(name)),
         field_reads: nodes.count_if(|node| node.read().is_some_and(|r| r.base == name)),

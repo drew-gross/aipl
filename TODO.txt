@@ -24,7 +24,6 @@ projects:
     press() should destructure self. Also we should have tuple destructuring
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg:
-    distinct() should be a builtin utility
     split out the logic for rendering stuff into a table
     accept paths, don't do munging
     archetypes_of does some weird stuff with sets (why convert to array when caller converts back to set?)
@@ -535,6 +534,7 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  lint against reimplementations of to_set()/distinct()
   turn trace rejection into a lint, but make some lints non-squelchable
   turn refuse_sectioned_import into a lint
   let some(x) = e else { return none; } should just be let x = e?;

@@ -1040,6 +1040,7 @@ case_tests! {
     crates_aipl_mono_src_builtin_count_is_less_than = "crates/aipl-mono/src/builtin_count_is_less_than",
     crates_aipl_mono_src_builtin_count_is_not_equal = "crates/aipl-mono/src/builtin_count_is_not_equal",
     crates_aipl_mono_src_builtin_count_while = "crates/aipl-mono/src/builtin_count_while",
+    crates_aipl_mono_src_builtin_distinct = "crates/aipl-mono/src/builtin_distinct",
     crates_aipl_mono_src_builtin_drop_first = "crates/aipl-mono/src/builtin_drop_first",
     crates_aipl_mono_src_builtin_drop_last = "crates/aipl-mono/src/builtin_drop_last",
     crates_aipl_mono_src_builtin_drop_last_n = "crates/aipl-mono/src/builtin_drop_last_n",
