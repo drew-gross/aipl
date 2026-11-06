@@ -13,6 +13,7 @@ import {
     parse_json,
     print,
     read_file_to_string,
+    starts_with,
     value_or,
     value_or_err,
     wrapping_increment as ++,
@@ -26,7 +27,7 @@ import { Metagame, load_metagame } from "./metagame.aipl";
 
 let USAGE = """
     usage: mtg_metagame cards <metagame>
-           mtg_metagame share <metagame> [--archetypes <config>] [--jank]
+           mtg_metagame share <metagame> [--archetypes <config>]
 """;
 
 # The archetype list `share` uses when `--archetypes` is not given.
@@ -61,47 +62,40 @@ fn cards_listing(args: str[]) !read_files !execute_program -> str[]!str {
     ok(card_counts(decks)$card_line())
 }
 
-# What `share` was asked: the metagame, the archetype list to classify its decks with, and
-# whether to list the decks that match none of them.
-struct ShareOptions { metagame: str, archetypes: str, jank: bool }
+# What `share` was asked: the metagame, and the archetype list to classify its decks with.
+struct ShareOptions { metagame: str, archetypes: str }
 
-# The options in `args`: one metagame, then `--archetypes <config>` and `--jank` in any order.
+# The options in `args`: one metagame, and `--archetypes <config>`, in any order.
 fn parse_share_options(args: str[]) -> ShareOptions!str {
     mut metagame = "";
     mut archetypes = DEFAULT_ARCHETYPES;
-    mut jank = false;
     mut i: u64 = 0;
     while (i < args.len()) {
         let arg = args[i].value_or("");
-        if (arg == "--jank") {
-            set jank = true;
+        if (arg == "--archetypes") {
+            set i++;
+            set archetypes = args[i].value_or_err("--archetypes needs the name of a list")?;
         } else {
-            if (arg == "--archetypes") {
-                set i++;
-                set archetypes = args[i].value_or_err("--archetypes needs the name of a list")?;
-            } else {
-                if (metagame != "") { return err(`unexpected argument "{arg}"`); };
-                set metagame = arg;
-            };
+            if (arg.starts_with("--")) { return err(`unknown option "{arg}"`); };
+            if (metagame != "") { return err(`unexpected argument "{arg}"`); };
+            set metagame = arg;
         };
         set i++;
     }
     if (metagame == "") { return err("share needs a metagame"); };
-    ok(ShareOptions { metagame, archetypes, jank })
+    ok(ShareOptions { metagame, archetypes })
 }.test({
     assert(parse_share_options(["m"]) == ok(ShareOptions {
         metagame: "m",
         archetypes: "Standard2026Q4RC",
-        jank: false,
     }));
-    assert(parse_share_options([
-        "--jank",
-        "m",
-        "--archetypes",
-        "Modern2026Q3RC",
-    ]) == ok(ShareOptions { metagame: "m", archetypes: "Modern2026Q3RC", jank: true }));
+    assert(parse_share_options(["--archetypes", "Modern2026Q3RC", "m"]) == ok(ShareOptions {
+        metagame: "m",
+        archetypes: "Modern2026Q3RC",
+    }));
     assert(parse_share_options([]) == err("share needs a metagame"));
     assert(parse_share_options(["m", "n"]) == err(`unexpected argument "n"`));
+    assert(parse_share_options(["m", "--jank"]) == err(`unknown option "--jank"`));
     assert(parse_share_options(["m", "--archetypes"]) == err(
         "--archetypes needs the name of a list",
     ));
@@ -109,10 +103,10 @@ fn parse_share_options(args: str[]) -> ShareOptions!str {
 
 # The share report for the metagame named by `args`, one line each.
 fn share_listing(args: str[]) !read_files !execute_program -> str[]!str {
-    let ShareOptions { metagame, archetypes, jank } = parse_share_options(args)?;
+    let ShareOptions { metagame, archetypes } = parse_share_options(args)?;
     let identifiers = load_identifiers("data/archetypes.json", archetypes)?;
     let Metagame { decks } = load_named(metagame)?;
-    ok(share_report(metagame, decks, identifiers, jank))
+    ok(share_report(metagame, decks, identifiers))
 }
 
 # The lines a command line asks for, or why it asks for none.

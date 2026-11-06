@@ -111,26 +111,26 @@ fn matches(self: Identifier, Holdings { main, held }) -> bool {
 })
 
 # An archetype a deck is: one an identifier names (`Meta`), or, when none did, the deck's own
-# name (`Jank`), which is not an archetype of the format but is what the deck was called.
-variant Archetype = Meta(name: str) | Jank(name: str)
+# name (`Other`), which is not an archetype of the format but is what the deck was called.
+variant Archetype = Meta(name: str) | Other(name: str)
 
-# How `self` reads in a report: a `Jank` one says that is what it is.
+# How `self` reads in a report: an `Other` one says that is what it is.
 pub fn label(self: Archetype) -> str {
     match (self) {
         Meta(name) => name,
-        Jank(name) => `{name} (self-titled)`,
+        Other(name) => `{name} (self-titled)`,
     }
 }.test({
     assert(Meta("Landfall").label() == "Landfall");
-    assert(Jank("Some Deck").label() == "Some Deck (self-titled)");
+    assert(Other("Some Deck").label() == "Some Deck (self-titled)");
 })
 
 # The archetypes `self` is, each once: the identifiers in `identifiers` it matches, by name. A
-# deck that matches none is its own, as a `Jank` archetype.
+# deck that matches none is its own, as an `Other` archetype.
 pub fn archetypes_of(self: Deck, identifiers: Identifier[]) -> Archetype[] {
     let deck_holdings = self.holdings();
     let found: #<{str} = identifiers.filter(|i| i.matches(deck_holdings))$name.to_set();
-    if (found.is_empty()) { [Jank(self.name)] } else { found.to_array()$Meta() }
+    if (found.is_empty()) { [Other(self.name)] } else { found.to_array()$Meta() }
 }.test({
     let landfall = Identifier { ..identifier(["Forest"], [], [], []), name: "Landfall" };
     let mono = Identifier { ..identifier(["Forest"], ["Island"], [], []), name: "Mono-G" };
@@ -149,7 +149,7 @@ pub fn archetypes_of(self: Deck, identifiers: Identifier[]) -> Archetype[] {
     assert(deck_of(["Forest"], []).archetypes_of([landfall, landfall]) == [Meta("Landfall")]);
 
     // None: the deck is its own archetype, however it is called.
-    assert(deck_of(["Swamp"], []).archetypes_of(identifiers) == [Jank("Some Deck")]);
+    assert(deck_of(["Swamp"], []).archetypes_of(identifiers) == [Other("Some Deck")]);
 })
 
 # `self` as an identifier.
