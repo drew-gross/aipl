@@ -223,7 +223,7 @@ fn finalize(spec: Spec, name: str, buf: str) -> Spec!str {
             "the `formatted` section is gone: formatting is held by every `.aipl` file being canonical",
         ),
         "performance" => err(
-            "the `performance` section is gone: a case's counts are its row in tests/performance_metrics.md, and a property is stated by a `.benchmark` block or a `--- report ---` section",
+            "the `performance` section is gone: a case's counts are its row in tests/performance_baseline.md, and a property is stated by a `.benchmark` block or a `--- report ---` section",
         ),
         "report" => ok(Spec { ..spec, report: some(body) }),
         "check" => with_check(spec, "", body),

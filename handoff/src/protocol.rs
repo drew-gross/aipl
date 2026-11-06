@@ -50,13 +50,13 @@ pub enum Fill {
     ///
     /// Fields: one per added case, none when the list only has stale entries.
     CaseTests { added: Vec<String> },
-    /// A case's row in `tests/performance_metrics.md` disagrees with its run.
-    /// Rewritten by `refresh_perfmon`, and listed for review: the move may be the
+    /// A case's row in `tests/performance_baseline.md` disagrees with its run.
+    /// Rewritten by `refresh_baseline`, and listed for review: the move may be the
     /// regression the table exists to catch.
     ///
     /// Fields: `case`, then one line per metric that moved.
     BaselineMoved { case: String, moves: Vec<String> },
-    /// A case has no row in `tests/performance_metrics.md`. Fields: `case`.
+    /// A case has no row in `tests/performance_baseline.md`. Fields: `case`.
     BaselineMissing { case: String },
     /// The checked-in dogfood artifact no longer matches the sources it was built
     /// from. Regenerated through the staged-IR flow. No fields.

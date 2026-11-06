@@ -724,7 +724,7 @@ impl PerfStats {
     }
 }
 
-/// The deterministic columns of the baseline table (`tests/performance_metrics.md`), in
+/// The deterministic columns of the baseline table (`tests/performance_baseline.md`), in
 /// the order they appear after the row's name: one list, so reading the table, comparing a
 /// run against it and naming a column in a failure cannot disagree about which are asserted.
 pub const BASELINE_METRICS: [&str; 5] = [

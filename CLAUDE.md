@@ -301,45 +301,52 @@ baseline table, which pins what every case costs.
   `measure` can state the property, since a pinned report churns with every
   codegen change that moves a size. Examples: `tests/cases/report/`, and the
   fusion cases in `tests/cases/optimizations/`.
-- **The baseline table, `tests/performance_metrics.md`** — one row for **every
-  case that runs**, whatever else it carries. It is also the whole-compiler
-  metric: the dogfooded compiler's sources under `crates/` are cases like any
-  other, so a codegen change that makes the compiler slower or larger moves their
-  rows, and there is no separate harness. Its columns come in two groups:
-  - *Asserted*: allocations, bytes allocated, peak live bytes, instructions and
-    code bytes. Deterministic, and every case's run must reproduce its row
-    **exactly** (there are no thresholds, and none are planned: a codegen change
-    costs one changed file). A case whose numbers moved fails with `performance
-    baseline moved`, naming each metric (old → new, %) and the scoped command that
-    accepts the change; a case with no row fails with `performance baseline
-    missing`. Unlike a section, this is not stale text, so `fill_expected` leaves
-    it alone — but `cargo handoff` settles both kinds itself, with one
-    `refresh_perfmon` scoped to exactly those cases, run last (the numbers depend
-    on everything before it settling). **There is no manual step.** A move is not
-    made unremarkable by that: handoff lists every moved case and metric in its
-    closing report and the rewritten rows are in the diff of
-    `tests/performance_metrics.md`, which is where to review it — a change that
-    was meant to be free is the regression this table exists to catch. The
-    `refresh_perfmon` command below is for refreshing outside a handoff.
-  - *Not asserted*: wall-clock (measured in-process, so process spawn/teardown is
-    excluded), build time, and peak RSS. These drift run-to-run, so they're checked
-    in only to track trends.
+- **Two tables, split by whether anything asserts on them.**
+  - **The baseline, `tests/performance_baseline.md`** — one row for **every case
+    that runs**, whatever else it carries. It is also the whole-compiler metric: the
+    dogfooded compiler's sources under `crates/` are cases like any other, so a
+    codegen change that makes the compiler slower or larger moves their rows, and
+    there is no separate harness. Its columns are allocations, bytes allocated, peak
+    live bytes, instructions and code bytes: deterministic, and every case's run must
+    reproduce its row **exactly** (there are no thresholds, and none are planned: a
+    codegen change costs one changed file). A case whose numbers moved fails with
+    `performance baseline moved`, naming each metric (old → new, %) and the scoped
+    command that accepts the change; a case with no row fails with `performance
+    baseline missing`. Unlike a section, this is not stale text, so `fill_expected`
+    leaves it alone — but `cargo handoff` settles both kinds itself, with one
+    `refresh_baseline` scoped to exactly those cases, run last (the numbers depend on
+    everything before it settling). **There is no manual step.** A move is not made
+    unremarkable by that: handoff lists every moved case and metric in its closing
+    report and the rewritten rows are in the diff of `tests/performance_baseline.md`,
+    which is where to review it — a change that was meant to be free is the
+    regression this table exists to catch.
+  - **The trends, `tests/performance_trends.md`** — wall-clock (measured in-process,
+    so process spawn/teardown is excluded), build time and peak RSS, one row per
+    case. These drift run-to-run, so nothing asserts on them, and **nothing but
+    `refresh_perfmon` writes the file**: handoff never touches it, so it holds the
+    numbers as of the last time Drew chose to look, which is what makes a refresh
+    before and after a change show that change's effect. Do not refresh it as part
+    of a task unless asked.
 
-Refresh the table with:
+Refresh the baseline with:
+`cargo test --test cases -- --ignored refresh_baseline`
+It builds each case with the instrumented build only, rewrites
+`tests/performance_baseline.md`, and prints the overall (summed-across-cases) change
+plus every case whose counts moved and added/removed cases, then fails intentionally
+so the summary is visible. Refresh the trends with:
 `cargo test --test cases -- --ignored refresh_perfmon`
-It runs serially, builds each case both ways (the production binary for the
-non-deterministic columns, the instrumented one for the counts), rewrites
-`tests/performance_metrics.md`, and prints an overall (summed-across-tests)
-change plus every case whose counts moved, the per-test timing outliers, and
-added/removed tests, then fails intentionally so the summary is visible.
-**`AIPL_CASE` scopes it** the way it scopes `fill_expected` (a path substring, or a
+It runs serially, builds each case's production binary (timing the build), runs it
+`PERFMON_RUNS` times keeping the least-perturbed sample, rewrites
+`tests/performance_trends.md`, and prints the overall change, the per-test timing
+outliers, and added/removed tests, then fails intentionally the same way.
+**`AIPL_CASE` scopes both** the way it scopes `fill_expected` (a path substring, or a
 comma-separated list): only the matching rows are rewritten and the rest carried
-over; a run of any scope drops rows whose case no longer exists. Review the
-printed summary, then commit the regenerated file. The runtime self-times
-only when `AIPL_PERFMON_STATS` points at a file, so normal runs and `aipl build`
-binaries are unaffected.
+over; a run of any scope drops rows whose case no longer exists. Review the printed
+summary, then commit the regenerated file. The runtime self-times only when
+`AIPL_PERFMON_STATS` points at a file, so normal runs and `aipl build` binaries are
+unaffected.
 
-The two author-helper "refresh" modes are `#[ignore]`d tests, not env vars: a
+The author-helper "refresh" modes are `#[ignore]`d tests, not env vars: a
 normal `cargo test` skips them; opt in by name with `-- --ignored <name>`. The
 relevant failure messages (a stale section, a moved or missing baseline row)
 print the exact command to run.

@@ -11,7 +11,7 @@
 //!
 //! What the harness still holds itself, because `check` does not yet: **every running case is
 //! measured** (an instrumented build, run once), refused if it leaks (allocations !=
-//! deallocations), and held to its row in `tests/performance_metrics.md`.
+//! deallocations), and held to its row in `tests/performance_baseline.md`.
 //!
 //! Section format (all lines like `--- name ---` on their own line):
 //!   `--- stdout ---`, `--- stderr ---`, `--- exit code ---` — what a run of `main` prints and
@@ -27,7 +27,7 @@
 //!                          it. Optional, and for the properties the function
 //!                          list shows — an instance that was not minted, a call
 //!                          inlined away. Mutually exclusive with `errors`.
-//!                          (A case's counts are its row in `tests/performance_metrics.md`,
+//!                          (A case's counts are its row in `tests/performance_baseline.md`,
 //!                          and the properties an optimization is *for* are stated
 //!                          by a `.benchmark` block or a `--- report ---`.)
 //!   `--- check --tests ---` and the other `check <flags>` sections — what `aipl check` prints
@@ -74,13 +74,13 @@
 //!     Every entry must match at least one case, so a mistyped path in a batch
 //!     fails rather than silently refreshing nothing.
 //!   - `cargo test --test cases -- --ignored refresh_perfmon` — rewrite the
-//!     `tests/performance_metrics.md` table: the deterministic columns every
+//!     `tests/performance_baseline.md` table: the deterministic columns every
 //!     case's run is held to (below), and the non-deterministic ones that only
 //!     track trends. `AIPL_CASE` scopes it the same way, to the matching rows.
 //!   - `cargo test --test cases -- --ignored fill_case_tests` — regenerate the
 //!     per-case `#[test]` list after adding or removing a case file.
 //!
-//! **Every running case has a row in `tests/performance_metrics.md`**, and its run
+//! **Every running case has a row in `tests/performance_baseline.md`**, and its run
 //! must reproduce the row's deterministic columns (allocations, bytes allocated,
 //! peak live bytes, instructions, code bytes) exactly: see [`check_baseline`].
 //! That is the one comparison here a refill cannot make — `fill_expected` leaves
@@ -138,8 +138,10 @@ fn scoped_run_cmd(ctx: &str) -> String {
 
 /// The command that regenerates the per-case `#[test]` list ([`fill_case_tests`]).
 const CASE_TESTS_CMD: &str = "cargo test --test cases -- --ignored fill_case_tests";
-/// The command that runs the ignored perfmon-table refresh ([`refresh_perfmon`]).
+/// The command that refreshes the trends table ([`refresh_perfmon`]).
 const PERFMON_CMD: &str = "cargo test --test cases -- --ignored refresh_perfmon";
+/// The command that refreshes the baseline table ([`refresh_baseline`]).
+const BASELINE_CMD: &str = "cargo test --test cases -- --ignored refresh_baseline";
 
 /// Tracing for the cases harness, enabled by setting the `AIPL_DEBUG` env var.
 /// Lets you re-run a hanging case (`AIPL_DEBUG=1 cargo test ...`) and read the
@@ -488,13 +490,26 @@ fn fill_case_tests() {
 
 /// Perf-monitor refresh: measure non-deterministic metrics (wall-clock, build
 /// time, peak memory) for every runnable case and rewrite
-/// `tests/performance_metrics.md`, printing an improvement/regression summary.
-/// Run with:
+/// `tests/performance_trends.md`, printing an improvement/regression summary.
+/// Nothing asserts on that file and nothing but this refresh writes it, so it
+/// records the metrics at the moments someone chose to look. Run with:
 ///   cargo test --test cases -- --ignored refresh_perfmon
 #[test]
 #[ignore = "perfmon refresh — run: cargo test --test cases -- --ignored refresh_perfmon"]
 fn refresh_perfmon() {
     on_big_stack(run_perfmon);
+}
+
+/// Baseline refresh: measure the deterministic metrics (allocations, bytes, peak
+/// live bytes, instructions, code bytes) of every runnable case and rewrite
+/// `tests/performance_baseline.md`, the table every case's run is held to.
+/// `cargo handoff` runs it, scoped to the cases whose row moved or is missing.
+/// Run with:
+///   cargo test --test cases -- --ignored refresh_baseline
+#[test]
+#[ignore = "baseline refresh — run: cargo test --test cases -- --ignored refresh_baseline"]
+fn refresh_baseline() {
+    on_big_stack(run_baseline);
 }
 
 /// One discovered case: its file `path`, the `root` its display path is relative
@@ -540,6 +555,11 @@ fn setup_cases() -> &'static (Vec<CaseFile>, PathBuf) {
 fn run_perfmon() {
     let (cases, out_root) = setup_cases();
     run_perfmon_refresh(&cases, &out_root);
+}
+
+fn run_baseline() {
+    let (cases, out_root) = setup_cases();
+    run_baseline_refresh(&cases, &out_root);
 }
 
 /// Collect every `.aipl` case (sorted within each group for run-to-run-stable
@@ -901,19 +921,11 @@ fn load_case(src_path: &Path) -> Result<Program, Vec<Error>> {
 
 // ---------- Perf-monitor refresh (non-deterministic metrics) ----------
 
-/// One row of the metrics table.
-///
-/// The first five fields are **deterministic** and asserted: every case's run
-/// must reproduce them exactly (see [`check_baseline`]). The last three are the
-/// non-deterministic ones, kept only to track trends.
+/// One row of the trends table (`tests/performance_trends.md`): the metrics that differ
+/// from run to run, kept only to look at how they move. Nothing asserts on them.
 #[derive(Clone, PartialEq)]
-struct PerfRow {
+struct TrendRow {
     test: String,
-    allocations: u64,
-    bytes_allocated: u64,
-    peak_live_bytes: u64,
-    instructions: u64,
-    code_bytes: u64,
     wall_us: f64,
     build_ms: f64,
     peak_kb: u64,
@@ -943,32 +955,41 @@ fn stage_case_for_build(
     }
 }
 
-/// Build a case both ways: the production (non-instrumented) binary, whose build
-/// is timed and which the wall-clock and memory columns run, and the instrumented
-/// one, which `perf::measure` runs once for the deterministic columns.
-///
-/// Returns the production binary's path, how long it took to build (load +
-/// compile + link, the instrumented build excluded), and the measurement — the
-/// same one the case's own run takes, since `cwd` is the directory the harness
-/// would have staged it in.
+/// Build a case's production (non-instrumented) binary, the one the wall-clock and
+/// memory columns run. Returns its path and how long it took to build (load +
+/// compile + link).
 fn build_case_binary(
     src_path: &Path,
     stem: &str,
     case_dir: &Path,
-    cli: &[String],
-) -> Result<(PathBuf, f64, PerfStats), String> {
+) -> Result<(PathBuf, f64), String> {
     let start = Instant::now();
+    let program = load_case(src_path).map_err(|e| Error::display_all(&e))?;
+    let measured = perf::measured_program(&program);
+    let comp = ObjectCompilation::new(&measured, stem, debug_opts(), false)
+        .map_err(|e| Error::display_all(&e))?;
+    let obj = comp.emit().map_err(|e| e.to_string())?;
+    let exe = case_dir.join(binary::default_exe_name(stem));
+    binary::link(&obj, &exe).map_err(|e| e.to_string())?;
+    Ok((exe, start.elapsed().as_secs_f64() * 1000.0))
+}
+
+/// Measure a case with the instrumented build, for the baseline's columns: the same
+/// measurement the case's own run takes, since `cwd` is the directory the harness
+/// would have staged it in.
+fn measure_case_stats(
+    src_path: &Path,
+    stem: &str,
+    case_dir: &Path,
+    cli: &[String],
+) -> Result<PerfStats, String> {
     let program = load_case(src_path).map_err(|e| Error::display_all(&e))?;
     let measured = perf::measured_program(&program);
     let comp = ObjectCompilation::new(&measured, stem, debug_opts(), false)
         .map_err(|e| Error::display_all(&e))?;
     let symbol_names = comp.code_symbol_names();
     let obj = comp.emit().map_err(|e| e.to_string())?;
-    let exe = case_dir.join(binary::default_exe_name(stem));
-    binary::link(&obj, &exe).map_err(|e| e.to_string())?;
-    let build_ms = start.elapsed().as_secs_f64() * 1000.0;
-
-    let stats = perf::measure(
+    perf::measure(
         &measured,
         stem,
         &obj,
@@ -977,8 +998,7 @@ fn build_case_binary(
         case_dir,
         debug_opts(),
     )
-    .map_err(|e| e.render("", ""))?;
-    Ok((exe, build_ms, stats))
+    .map_err(|e| e.render("", ""))
 }
 
 /// Run `exe` once with `AIPL_PERFMON_STATS` set and read back the
@@ -1010,11 +1030,19 @@ fn run_once_perfmon(
     Some((wall?, peak?))
 }
 
-/// Where the metrics table lives, relative to the repo root.
-const METRICS_FILE: &str = "tests/performance_metrics.md";
+/// Where the baseline table lives, relative to the repo root: the deterministic metrics every
+/// case's run is held to, rewritten whenever a change moves them.
+const METRICS_FILE: &str = "tests/performance_baseline.md";
+/// Where the trends table lives: the metrics that differ from run to run, rewritten only by
+/// [`refresh_perfmon`].
+const TRENDS_FILE: &str = "tests/performance_trends.md";
 
 fn metrics_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(METRICS_FILE)
+}
+
+fn trends_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(TRENDS_FILE)
 }
 
 /// The key a case's table row is filed under: its path from the repository root,
@@ -1032,15 +1060,30 @@ fn row_key(display_with_extension: &str) -> String {
     }
 }
 
-fn run_perfmon_refresh(cases: &[CaseFile], out_root: &Path) {
-    // Scoped like `fill_expected`: `AIPL_CASE` names the cases whose rows are
-    // rewritten and every other row is carried over as it is.
+/// What a refresh of one table produced: the rows it started from, the rows to write
+/// (sorted by case), and how many cases it measured and skipped.
+struct Refreshed<R> {
+    old: HashMap<String, R>,
+    rows: Vec<(String, R)>,
+    measured: usize,
+    skipped: usize,
+}
+
+/// Measure the cases `AIPL_CASE` selects (all of them when unset) with `measure`, which is
+/// given a case's staged source, its name, its output directory and its spec and answers
+/// `None` for a case it cannot measure. Every other row of `old` is carried over, and a
+/// row whose case no longer exists goes, whatever the scope: nothing else would ever
+/// remove it.
+fn refresh_rows<R: Clone>(
+    cases: &[CaseFile],
+    out_root: &Path,
+    old: HashMap<String, R>,
+    measure: impl Fn(&Path, &str, &Path, &Spec) -> Option<R>,
+) -> Refreshed<R> {
     let mut filter = CaseFilter::from_env();
-    let path = metrics_path();
-    let old = read_metrics(&path);
     let mut kept = old.clone();
     let mut existing: HashSet<String> = HashSet::new();
-    let mut measured: Vec<PerfRow> = Vec::new();
+    let mut measured: Vec<(String, R)> = Vec::new();
     let mut skipped = 0usize;
     for (case_path, root, prefix, stage) in cases {
         let rel = case_path.strip_prefix(root).unwrap_or(case_path);
@@ -1058,7 +1101,7 @@ fn run_perfmon_refresh(cases: &[CaseFile], out_root: &Path) {
         kept.remove(&display);
         let contents = fs::read_to_string(case_path).expect("read case");
         let spec = parse_spec(&contents);
-        // Error cases never build a binary, so there's nothing to time.
+        // Error cases never build a binary, so there's nothing to measure.
         if spec.errors.is_some() {
             skipped += 1;
             continue;
@@ -1066,60 +1109,58 @@ fn run_perfmon_refresh(cases: &[CaseFile], out_root: &Path) {
         let stem = case_path.file_stem().and_then(|s| s.to_str()).unwrap();
         let (src_path, case_dir) =
             stage_case_for_build(case_path, &rel_with_prefix, out_root, stem, &spec, *stage);
-
-        let (exe, build_ms, stats) = match build_case_binary(&src_path, stem, &case_dir, &spec.cli)
-        {
-            Ok(built) => built,
-            Err(_) => {
-                skipped += 1;
-                continue;
-            }
-        };
-
-        let stats_path = case_dir.join("perfmon_stats.txt");
-        let (mut wall_ns, mut peak_bytes) = (u64::MAX, u64::MAX);
-        let mut ok = true;
-        for _ in 0..PERFMON_RUNS {
-            match run_once_perfmon(&exe, &spec.cli, &case_dir, &stats_path) {
-                Some((w, p)) => {
-                    wall_ns = wall_ns.min(w);
-                    peak_bytes = peak_bytes.min(p);
-                }
-                None => {
-                    ok = false;
-                    break;
+        match measure(&src_path, stem, &case_dir, &spec) {
+            Some(row) => {
+                measured.push((display, row));
+                if measured.len().is_multiple_of(25) {
+                    eprintln!("measured {} case(s)...", measured.len());
                 }
             }
-        }
-        if !ok {
-            skipped += 1;
-            continue;
-        }
-        measured.push(PerfRow {
-            test: display,
-            allocations: stats.allocations,
-            bytes_allocated: stats.bytes_allocated,
-            peak_live_bytes: stats.peak_live_bytes,
-            instructions: stats.instructions,
-            code_bytes: stats.binary_size.code,
-            wall_us: wall_ns as f64 / 1000.0,
-            build_ms,
-            peak_kb: peak_bytes.div_ceil(1024),
-        });
-        if measured.len().is_multiple_of(25) {
-            eprintln!("measured {} case(s)...", measured.len());
+            None => skipped += 1,
         }
     }
     filter.assert_all_matched(cases.len());
 
-    // A row whose case no longer exists goes, whatever the scope: nothing else
-    // would ever remove it.
     kept.retain(|test, _| existing.contains(test));
-    let mut rows: Vec<PerfRow> = kept.into_values().chain(measured.iter().cloned()).collect();
-    rows.sort_by(|a, b| a.test.cmp(&b.test));
+    let count = measured.len();
+    let mut rows: Vec<(String, R)> = kept.into_iter().chain(measured).collect();
+    rows.sort_by(|a, b| a.0.cmp(&b.0));
+    Refreshed {
+        old,
+        rows,
+        measured: count,
+        skipped,
+    }
+}
 
-    fs::write(&path, render_metrics(&rows)).expect("write metrics file");
-    eprintln!("{}", compare_metrics(&old, &rows));
+/// Rewrite the trends table: wall-clock, build time and peak memory of the production
+/// build of every selected case.
+fn run_perfmon_refresh(cases: &[CaseFile], out_root: &Path) {
+    let path = trends_path();
+    let old = read_trends(&path);
+    let refreshed = refresh_rows(cases, out_root, old, |src_path, stem, case_dir, spec| {
+        let (exe, build_ms) = build_case_binary(src_path, stem, case_dir).ok()?;
+        let stats_path = case_dir.join("perfmon_stats.txt");
+        let (mut wall_ns, mut peak_bytes) = (u64::MAX, u64::MAX);
+        for _ in 0..PERFMON_RUNS {
+            let (w, p) = run_once_perfmon(&exe, &spec.cli, case_dir, &stats_path)?;
+            wall_ns = wall_ns.min(w);
+            peak_bytes = peak_bytes.min(p);
+        }
+        Some(TrendRow {
+            test: String::new(),
+            wall_us: wall_ns as f64 / 1000.0,
+            build_ms,
+            peak_kb: peak_bytes.div_ceil(1024),
+        })
+    });
+    let rows: Vec<TrendRow> = refreshed
+        .rows
+        .into_iter()
+        .map(|(test, row)| TrendRow { test, ..row })
+        .collect();
+    fs::write(&path, render_trends(&rows)).expect("write trends file");
+    eprintln!("{}", compare_trends(&refreshed.old, &rows));
 
     // Diverge so the summary is visible (cargo hides passing tests' output) and a
     // refresh is never mistaken for a normal green run.
@@ -1128,58 +1169,98 @@ fn run_perfmon_refresh(cases: &[CaseFile], out_root: &Path) {
          intentionally so the summary above is visible — this is not a normal test \
          run (`{PERFMON_CMD}`).",
         path.display(),
-        measured.len(),
-        skipped,
+        refreshed.measured,
+        refreshed.skipped,
         rows.len(),
     );
 }
 
-/// Render the metrics table (Markdown, rows already sorted by test path).
-fn render_metrics(rows: &[PerfRow]) -> String {
+/// Rewrite the baseline table: the deterministic metrics of the instrumented build of every
+/// selected case. No wall-clock runs, so it is the cheap half of the old refresh.
+fn run_baseline_refresh(cases: &[CaseFile], out_root: &Path) {
+    let path = metrics_path();
+    let old = perf::read_baseline(&path).unwrap_or_default();
+    let refreshed = refresh_rows(cases, out_root, old, |src_path, stem, case_dir, spec| {
+        let stats = measure_case_stats(src_path, stem, case_dir, &spec.cli).ok()?;
+        Some(perf::baseline_values(&stats))
+    });
+    fs::write(&path, render_baseline(&refreshed.rows)).expect("write baseline file");
+    eprintln!("{}", compare_baseline(&refreshed.old, &refreshed.rows));
+    panic!(
+        "baseline refresh complete: wrote {} ({} measured, {} skipped, {} rows). Failing \
+         intentionally so the summary above is visible — this is not a normal test \
+         run (`{BASELINE_CMD}`).",
+        path.display(),
+        refreshed.measured,
+        refreshed.skipped,
+        refreshed.rows.len(),
+    );
+}
+
+/// Render the baseline table (Markdown, rows already sorted by test path).
+fn render_baseline(rows: &[(String, [u64; 5])]) -> String {
     let mut s = String::new();
-    s.push_str("# Performance metrics\n\n");
+    s.push_str("# Performance baseline\n\n");
     s.push_str(
-        "One row per case that runs. The columns come in two groups.\n\n\
-         **Asserted** — allocations, bytes allocated, peak live bytes, instructions and\n\
-         code bytes. These are deterministic, measured by the instrumented build, and\n\
-         every case's run must reproduce its row exactly: a case whose numbers moved\n\
-         fails with `performance baseline moved`, and a case with no row fails too. The\n\
-         failure names the scoped refresh that accepts the change.\n\n\
-         **Not asserted** — wall-clock (measured in-process, so process spawn/teardown is\n\
-         excluded), build time (load + compile + link) and peak resident memory. These\n\
-         drift run-to-run, so they're checked in only to track trends.\n\n\
-         Regenerate and review the printed summary with the command below. `AIPL_CASE`\n\
-         (a path substring, or a comma-separated list) rewrites only the matching rows;\n\
-         rows whose case no longer exists are always dropped.\n\n\
+        "One row per case that runs: allocations, bytes allocated, peak live bytes,\n\
+         instructions and code bytes. These are deterministic, measured by the\n\
+         instrumented build, and every case's run must reproduce its row exactly: a case\n\
+         whose numbers moved fails with `performance baseline moved`, and a case with no\n\
+         row fails too. `cargo handoff` rewrites the rows that moved, and lists them for\n\
+         review; the failure names the scoped refresh that accepts a change by hand.\n\n\
+         The metrics that differ from run to run are in `performance_trends.md`.\n\n\
+         `AIPL_CASE` (a path substring, or a comma-separated list) rewrites only the\n\
+         matching rows; rows whose case no longer exists are always dropped.\n\n\
          ```\n\
-         cargo test --test cases -- --ignored refresh_perfmon\n\
+         cargo test --test cases -- --ignored refresh_baseline\n\
          ```\n\n",
     );
-    s.push_str(
-        "| Test | allocations | bytes allocated | peak live bytes | instructions | code bytes \
-         | wall-clock (µs) | build (ms) | peak RSS (KB) |\n",
-    );
-    s.push_str("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
-    for r in rows {
+    s.push_str(&format!(
+        "| Test | {} |\n",
+        perf::BASELINE_METRICS.join(" | ")
+    ));
+    s.push_str("| --- | ---: | ---: | ---: | ---: | ---: |\n");
+    for (test, v) in rows {
         s.push_str(&format!(
-            "| {} | {} | {} | {} | {} | {} | {:.2} | {:.2} | {} |\n",
-            r.test,
-            r.allocations,
-            r.bytes_allocated,
-            r.peak_live_bytes,
-            r.instructions,
-            r.code_bytes,
-            r.wall_us,
-            r.build_ms,
-            r.peak_kb
+            "| {test} | {} | {} | {} | {} | {} |\n",
+            v[0], v[1], v[2], v[3], v[4]
         ));
     }
     s
 }
 
-/// Parse a previously-written metrics file into `test -> row`. Returns empty on a
+/// Render the trends table (Markdown, rows already sorted by test path).
+fn render_trends(rows: &[TrendRow]) -> String {
+    let mut s = String::new();
+    s.push_str("# Performance trends\n\n");
+    s.push_str(
+        "One row per case that runs: wall-clock (measured in-process, so process\n\
+         spawn/teardown is excluded), build time (load + compile + link) and peak resident\n\
+         memory. These drift run-to-run, so nothing asserts on them, and nothing but the\n\
+         refresh below writes this file: it holds the numbers as of the last time someone\n\
+         chose to look. Run it before and after a change to see its effect, or now and\n\
+         then to see the trend, and read the printed summary.\n\n\
+         The deterministic metrics every case is held to are in `performance_baseline.md`.\n\n\
+         `AIPL_CASE` (a path substring, or a comma-separated list) rewrites only the\n\
+         matching rows; rows whose case no longer exists are always dropped.\n\n\
+         ```\n\
+         cargo test --test cases -- --ignored refresh_perfmon\n\
+         ```\n\n",
+    );
+    s.push_str("| Test | wall-clock (µs) | build (ms) | peak RSS (KB) |\n");
+    s.push_str("| --- | ---: | ---: | ---: |\n");
+    for r in rows {
+        s.push_str(&format!(
+            "| {} | {:.2} | {:.2} | {} |\n",
+            r.test, r.wall_us, r.build_ms, r.peak_kb
+        ));
+    }
+    s
+}
+
+/// Parse a previously-written trends file into `test -> row`. Returns empty on a
 /// missing/unreadable file (first run).
-fn read_metrics(path: &Path) -> HashMap<String, PerfRow> {
+fn read_trends(path: &Path) -> HashMap<String, TrendRow> {
     let mut map = HashMap::new();
     let Ok(contents) = fs::read_to_string(path) else {
         return map;
@@ -1190,33 +1271,21 @@ fn read_metrics(path: &Path) -> HashMap<String, PerfRow> {
             continue;
         }
         let cols: Vec<&str> = line.trim_matches('|').split('|').map(str::trim).collect();
-        if cols.len() != 9 || cols[0] == "Test" || cols[0].starts_with("---") {
+        if cols.len() != 4 {
             continue;
         }
-        let int = |i: usize| cols[i].parse::<u64>().ok();
-        let float = |i: usize| cols[i].parse::<f64>().ok();
-        if let (Some(a), Some(b), Some(p), Some(i), Some(c), Some(w), Some(bm), Some(kb)) = (
-            int(1),
-            int(2),
-            int(3),
-            int(4),
-            int(5),
-            float(6),
-            float(7),
-            int(8),
+        if let (Ok(wall_us), Ok(build_ms), Ok(peak_kb)) = (
+            cols[1].parse::<f64>(),
+            cols[2].parse::<f64>(),
+            cols[3].parse::<u64>(),
         ) {
             map.insert(
                 cols[0].to_string(),
-                PerfRow {
+                TrendRow {
                     test: cols[0].to_string(),
-                    allocations: a,
-                    bytes_allocated: b,
-                    peak_live_bytes: p,
-                    instructions: i,
-                    code_bytes: c,
-                    wall_us: w,
-                    build_ms: bm,
-                    peak_kb: kb,
+                    wall_us,
+                    build_ms,
+                    peak_kb,
                 },
             );
         }
@@ -1224,21 +1293,21 @@ fn read_metrics(path: &Path) -> HashMap<String, PerfRow> {
     map
 }
 
-/// The checked-in table, read once.
-fn baselines() -> &'static HashMap<String, PerfRow> {
-    static BASELINES: std::sync::OnceLock<HashMap<String, PerfRow>> = std::sync::OnceLock::new();
-    BASELINES.get_or_init(|| read_metrics(&metrics_path()))
+/// The checked-in baseline table, read once.
+fn baselines() -> &'static HashMap<String, [u64; 5]> {
+    static BASELINES: std::sync::OnceLock<HashMap<String, [u64; 5]>> = std::sync::OnceLock::new();
+    BASELINES.get_or_init(|| perf::read_baseline(&metrics_path()).unwrap_or_default())
 }
 
-/// Hold a case's measurement to its row in the metrics table: every deterministic
-/// column must match exactly. (Exact for now; thresholds are undecided.)
+/// Hold a case's measurement to its row in the baseline table: every column must
+/// match exactly. (Exact for now; thresholds are undecided.)
 ///
 /// The two failures are told apart by the [`Fill`] each prints, a contract with
 /// `cargo handoff`: it runs everything else to the end and then settles them with
-/// one `refresh_perfmon`, rather than stopping at the first.
+/// one `refresh_baseline`, rather than stopping at the first.
 fn check_baseline(ctx: &str, stats: &PerfStats) -> Outcome {
     let key = row_key(ctx.trim_start_matches('[').trim_end_matches(']'));
-    let accept = format!("AIPL_CASE='{key}.aipl' {PERFMON_CMD}");
+    let accept = format!("AIPL_CASE='{key}.aipl' {BASELINE_CMD}");
     let Some(row) = baselines().get(&key) else {
         return Outcome::Fail(format!(
             "{ctx}: performance baseline missing: {METRICS_FILE} has no row for this case.\n\
@@ -1246,16 +1315,7 @@ fn check_baseline(ctx: &str, stats: &PerfStats) -> Outcome {
             Fill::BaselineMissing { case: case_of(ctx) }.marker()
         ));
     };
-    let moved = perf::baseline_moves(
-        [
-            row.allocations,
-            row.bytes_allocated,
-            row.peak_live_bytes,
-            row.instructions,
-            row.code_bytes,
-        ],
-        stats,
-    );
+    let moved = perf::baseline_moves(*row, stats);
     if moved.is_empty() {
         return Outcome::Pass;
     }
@@ -1275,14 +1335,12 @@ fn check_baseline(ctx: &str, stats: &PerfStats) -> Outcome {
     ))
 }
 
-/// One metric's per-test outlier rules: only flag a change that is both
+/// One trend metric's per-test outlier rules: only flag a change that is both
 /// relatively large (`> threshold` percent) and absolutely non-trivial (`> floor`
 /// in the metric's unit), so normal run-to-run jitter doesn't swamp the lists.
 /// These programs run in (sub-)microseconds and link in tens of milliseconds,
 /// where tiny absolute jitter is a huge *percentage*; the floors filter that out.
 /// The overall aggregate (below) still reflects every shared test regardless.
-///
-/// A deterministic metric has neither: any change at all is a move.
 struct Metric {
     name: &'static str,
     unit: &'static str,
@@ -1290,30 +1348,11 @@ struct Metric {
     decimals: usize,
     threshold: f64,
     floor: f64,
-    read: fn(&PerfRow) -> f64,
+    read: fn(&TrendRow) -> f64,
 }
 
-impl Metric {
-    /// A metric that is asserted exactly, so every change is reported.
-    const fn exact(name: &'static str, unit: &'static str, read: fn(&PerfRow) -> f64) -> Self {
-        Metric {
-            name,
-            unit,
-            decimals: 0,
-            threshold: 0.0,
-            floor: 0.0,
-            read,
-        }
-    }
-}
-
-/// Every column of the table, in its order.
-const METRICS: [Metric; 8] = [
-    Metric::exact("allocations", "", |r| r.allocations as f64),
-    Metric::exact("bytes allocated", "B", |r| r.bytes_allocated as f64),
-    Metric::exact("peak live bytes", "B", |r| r.peak_live_bytes as f64),
-    Metric::exact("instructions", "", |r| r.instructions as f64),
-    Metric::exact("code bytes", "B", |r| r.code_bytes as f64),
+/// Every column of the trends table, in its order.
+const METRICS: [Metric; 3] = [
     Metric {
         name: "wall-clock",
         unit: "µs",
@@ -1385,11 +1424,11 @@ fn metric_outliers(m: &Metric, deltas: &[(String, f64, f64)]) -> String {
     out
 }
 
-/// Build the improvement/regression summary comparing the previous metrics to the
+/// Build the improvement/regression summary comparing the previous trends to the
 /// freshly measured `rows`: an aggregate "overall change" per metric (summed over
 /// shared tests), per-test outliers for **every** metric (see [`METRICS`]), and
 /// added/removed tests.
-fn compare_metrics(old: &HashMap<String, PerfRow>, rows: &[PerfRow]) -> String {
+fn compare_trends(old: &HashMap<String, TrendRow>, rows: &[TrendRow]) -> String {
     let pct = |o: f64, n: f64| if o > 0.0 { (n - o) / o * 100.0 } else { 0.0 };
 
     let mut totals = [(0.0f64, 0.0f64); METRICS.len()];
@@ -1454,6 +1493,73 @@ fn compare_metrics(old: &HashMap<String, PerfRow>, rows: &[PerfRow]) -> String {
     }
     if !removed.is_empty() {
         out.push_str(&format!("removed test(s): {}\n", removed.len()));
+        for t in &removed {
+            out.push_str(&format!("  - {t}\n"));
+        }
+    }
+    out
+}
+
+/// The summary of a baseline refresh: each column's total over the shared cases before and
+/// after, then every case whose row moved (the first twenty) and the cases added or removed.
+fn compare_baseline(old: &HashMap<String, [u64; 5]>, rows: &[(String, [u64; 5])]) -> String {
+    let pct = |o: u64, n: u64| {
+        if o > 0 {
+            (n as f64 - o as f64) / o as f64 * 100.0
+        } else {
+            0.0
+        }
+    };
+    let mut totals = [(0u64, 0u64); 5];
+    let mut moved: Vec<String> = Vec::new();
+    let mut added: Vec<&str> = Vec::new();
+    for (test, now) in rows {
+        let Some(was) = old.get(test) else {
+            added.push(test);
+            continue;
+        };
+        for (total, (o, n)) in totals.iter_mut().zip(was.iter().zip(now)) {
+            total.0 += o;
+            total.1 += n;
+        }
+        if was != now {
+            let columns: Vec<String> = perf::BASELINE_METRICS
+                .iter()
+                .zip(was.iter().zip(now))
+                .filter(|(_, (o, n))| o != n)
+                .map(|(name, (o, n))| format!("{name}: {o} -> {n} ({:+.1}%)", pct(*o, *n)))
+                .collect();
+            moved.push(format!("  {test}\n      {}", columns.join("\n      ")));
+        }
+    }
+    let present: HashSet<&str> = rows.iter().map(|(t, _)| t.as_str()).collect();
+    let removed: Vec<&String> = old
+        .keys()
+        .filter(|k| !present.contains(k.as_str()))
+        .collect();
+
+    let mut out = String::from("\n=== baseline refresh summary ===\n");
+    out.push_str("overall change across the shared case(s):\n");
+    for (name, (o, n)) in perf::BASELINE_METRICS.iter().zip(totals) {
+        out.push_str(&format!(
+            "  {:<16}{o} -> {n} ({:+.1}%)\n",
+            format!("{name}:"),
+            pct(o, n)
+        ));
+    }
+    out.push_str(&format!("\nmoved case(s): {}\n", moved.len()));
+    for m in moved.iter().take(20) {
+        out.push_str(m);
+        out.push('\n');
+    }
+    if !added.is_empty() {
+        out.push_str(&format!("\nnew case(s): {}\n", added.len()));
+        for t in &added {
+            out.push_str(&format!("  + {t}\n"));
+        }
+    }
+    if !removed.is_empty() {
+        out.push_str(&format!("removed case(s): {}\n", removed.len()));
         for t in &removed {
             out.push_str(&format!("  - {t}\n"));
         }

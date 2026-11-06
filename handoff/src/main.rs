@@ -93,8 +93,8 @@
 //!    A regenerated artifact or `#[test]` list is an input to cases that did
 //!    *not* re-run, so either falls back to the full suite — see
 //!    [`final_run_scope_from`], which states the whole argument.
-//! 7. `refresh_perfmon`, scoped to the cases whose row in
-//!    `tests/performance_metrics.md` is missing or no longer matches their run
+//! 7. `refresh_baseline`, scoped to the cases whose row in
+//!    `tests/performance_baseline.md` is missing or no longer matches their run
 //!    (see [`settle_baseline`]). Last, because the numbers it records depend on
 //!    everything above settling — a regenerated artifact moves the compiler's
 //!    own rows. A move is listed in the closing report and left in the git diff
@@ -287,7 +287,7 @@ fn check_shards(paths: &[String], shards: usize) -> Cmd {
 dir=$(mktemp -d)
 i=1
 while [ $i -le $n ]; do
-  "$aipl" check --baseline tests/performance_metrics.md --shard $i/$n "$@" > $dir/$i.out 2>&1 &
+  "$aipl" check --baseline tests/performance_baseline.md --shard $i/$n "$@" > $dir/$i.out 2>&1 &
   i=$((i+1))
 done
 wait
@@ -1023,10 +1023,10 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
     conclude(&mut r, &baseline, &plan, regenerated_ir, scope.as_deref());
 }
 
-/// Bring `tests/performance_metrics.md` in line with the run: a row for every
+/// Bring `tests/performance_baseline.md` in line with the run: a row for every
 /// case that has none, and a fresh one for every case whose numbers moved.
 ///
-/// One `refresh_perfmon` for both, scoped to exactly those cases. A moved row is
+/// One `refresh_baseline` for both, scoped to exactly those cases. A moved row is
 /// not stale *text* but a number — the change may be the regression the table
 /// exists to catch — so this does not make it unremarkable: [`conclude`] still
 /// lists every move, and the rewritten rows are in the git diff for review, the
@@ -1047,13 +1047,13 @@ fn settle_baseline(r: &mut Runner, baseline: &discovery::Baseline) {
     }
     let joined = cases.into_iter().cloned().collect::<Vec<_>>().join(",");
     let label = format!(
-        "refresh_perfmon ({} moved, {} new baseline row(s))",
+        "refresh_baseline ({} moved, {} new baseline row(s))",
         baseline.moved.len(),
         baseline.missing.len()
     );
-    r.step(&label, helper("refresh_perfmon").env("AIPL_CASE", &joined));
+    r.step(&label, helper("refresh_baseline").env("AIPL_CASE", &joined));
     let out = helper_output(r, &label);
-    if !out.contains("perfmon refresh complete") {
+    if !out.contains("baseline refresh complete") {
         r.save_out();
         let detail = tail(&out, 40);
         r.fail(&label, &detail);
@@ -1103,7 +1103,7 @@ fn conclude(
     }
     if !moved.is_empty() {
         eprintln!(
-            "  refreshed {} moved baseline row(s) in tests/performance_metrics.md",
+            "  refreshed {} moved baseline row(s) in tests/performance_baseline.md",
             moved.len()
         );
     }
@@ -1137,7 +1137,7 @@ const MOVED_SHOWN: usize = 40;
 /// whole-codegen change, and the diff is the place to read it.
 fn print_moved(moved: &std::collections::BTreeMap<String, Vec<String>>) {
     eprintln!(
-        "{BOLD}  ! performance baseline moved — review tests/performance_metrics.md in the git diff{OFF}"
+        "{BOLD}  ! performance baseline moved — review tests/performance_baseline.md in the git diff{OFF}"
     );
     eprintln!(
         "{DIM}    (a change that was meant to be free is the regression this table exists to catch){OFF}"

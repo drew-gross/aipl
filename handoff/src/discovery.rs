@@ -394,7 +394,7 @@ impl Run {
                 Fill::Docs => plan.need_docs = true,
                 Fill::TmLanguage => plan.need_tmlanguage = true,
                 Fill::Compilers => plan.need_compilers = true,
-                // Settled by `refresh_perfmon` at the end, not a remediation step
+                // Settled by `refresh_baseline` at the end, not a remediation step
                 // of their own.
                 Fill::BaselineMoved { .. } | Fill::BaselineMissing { .. } => {}
             }
@@ -430,13 +430,13 @@ fn first_line(output: &str) -> String {
         .to_string()
 }
 
-/// Cases whose row in `tests/performance_metrics.md` disagreed with their run.
+/// Cases whose row in `tests/performance_baseline.md` disagreed with their run.
 ///
 /// Neither kind is stale *text* a section refill can rewrite, and neither is a
 /// broken program: a `moved` row is a number somebody should look at (the change
 /// may be the regression the table exists to catch), and a `missing` row is
 /// bookkeeping for a case that has none yet. Both are rewritten by one scoped
-/// `refresh_perfmon` at the end of the gate, and a move is reported for review
+/// `refresh_baseline` at the end of the gate, and a move is reported for review
 /// in the diff — see [`Run::baseline`].
 #[derive(Default, Debug, PartialEq, Eq)]
 pub struct Baseline {

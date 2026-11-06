@@ -98,7 +98,7 @@ Forget the rule and monomorphization stops on the first program that reaches
 it, naming the table.
 
 Nothing else needs touching. The per-case `#[test]` list
-(`tests/support/case_tests.rs`), the row in `tests/performance_metrics.md` every new
+(`tests/support/case_tests.rs`), the row in `tests/performance_baseline.md` every new
 case needs (handoff adds it), and any IR regeneration are all
 `cargo handoff`'s job — don't hand-drive them.
 
@@ -127,7 +127,7 @@ interacts with something else (a fusion, a lint, a `shim`) or a real effect.
 Expect the conversion to show up as a small instruction-count shift in every
 case that transitively compiles the converted file. Handoff refreshes those
 baseline rows itself and lists them in its closing report: review them in the
-diff of `tests/performance_metrics.md`. That is the expected cost of the
+diff of `tests/performance_baseline.md`. That is the expected cost of the
 conversion, not a regression.
 
 ## 4. Lint against ad-hoc reimplementations
