@@ -45,7 +45,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/grammar | 654 | 72543 | 37768 | 75286 | 98416 | 73.00 | 402.74 | 1744 |
 | crates/aipl-codegen/src/grammar_aipl | 1904644 | 429177022 | 1564573 | 761528438 | 5026724 | 177389.00 | 13871.05 | 10368 |
 | crates/aipl-codegen/src/grammar_calc | 9059 | 902241 | 41588 | 3354459 | 298924 | 901.00 | 2747.07 | 2512 |
-| crates/aipl-codegen/src/grammar_json | 16601 | 1980424 | 32825 | 6717568 | 324700 | 1663.00 | 2841.90 | 2480 |
+| crates/aipl-codegen/src/grammar_json | 16685 | 1983323 | 32697 | 6720434 | 328156 | 1574.00 | 2776.18 | 2656 |
 | crates/aipl-codegen/src/grammar_sexp | 5263 | 494227 | 13320 | 1968740 | 289568 | 589.00 | 2742.66 | 2336 |
 | crates/aipl-codegen/src/highlight | 501 | 39605 | 7383 | 113852 | 82108 | 82.00 | 680.77 | 1680 |
 | crates/aipl-codegen/src/highlight_aipl | 3935 | 339067 | 111600 | 1385874 | 157208 | 579.00 | 904.95 | 2176 |

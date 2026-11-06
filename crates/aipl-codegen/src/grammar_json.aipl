@@ -4,7 +4,7 @@
 # alternatives, and a heterogeneous AST. Still no precedence; that arrives with
 # the calculator in `grammar_calc.aipl`.
 #
-# Complete but tiny: eight productions and one `variant Json`, against a rule set
+# Complete but tiny: eight productions, one `variant Json` and its `Member`, against a rule set
 # cribbed from `lexer.aipl`'s own JSON-flavored test table.
 #
 # Two things worth reading before the grammar:
@@ -14,16 +14,18 @@
 #     arbitrary-precision integer is legal JSON), so *what a number means* is the
 #     consumer's policy, exactly as it is for the lexer's `Int`/`Float`, which
 #     hand over their digits unparsed for the same reason.
-#   - **`Member` is where a uniform lowering type shows its seam.** `Build<A>`
+#   - **`member` is where a uniform lowering type shows its seam.** `Build<A>`
 #     pins one `A` for every production in a grammar, so the `member` production
 #     — whose natural result is a key/value *pair*, not a JSON value — has to
-#     lower to a `Json` too. It gets a case of its own, meaningful only as an
-#     element of a `Object`. That is the honest cost of one lowering type per
+#     lower to a `Json` too. It lowers to the object holding just that member, and
+#     the `object` production joins the members of its children, so `Json` has no
+#     case that only means "a member". That is the cost of one lowering type per
 #     grammar, and it is worth knowing before the grammar describes AIPL itself,
 #     where the AST has many more shapes than its expression type.
 
 import {
     equal as ==,
+    extend,
     first,
     join,
     len,
@@ -85,16 +87,12 @@ import { unescape } from "./unescape.aipl";
 # string token tell itself apart from a number, which is all `Term` needs.
 variant JsonTok = Str(str) | Num | Kw | Punct
 
-# The AST. `Number` keeps the source spelling (see the header); `Member` is a
-# key/value pair and is meaningful only inside a `Object`.
-variant Json =
-    | Null
-    | Bool(bool)
-    | Number(str)
-    | String(str)
-    | Array(Json[])
-    | Object(Json[])
-    | Member(str, Json)
+# The AST. `Number` keeps the source spelling (see the header); an `Object` keeps
+# its members in source order, a repeated key included.
+variant Json = Null | Bool(bool) | Number(str) | String(str) | Array(Json[]) | Object(Member[])
+
+# One `"key": value` pair of an object.
+struct Member { key: str, value: Json }
 
 # Whitespace is recorded as **trivia** rather than skipped, so the concrete tree
 # covers every byte of the source and reconstructs it exactly. JSON has no
@@ -127,7 +125,7 @@ fn json_rules() -> TokenRule<JsonTok>[] {
 // ---------- lowering ----------
 //
 // A production whose value *is* one of its constructors names the constructor
-// (`Kids(Object)`); one that is a one-liner over its text is a lambda at the
+// (`Kids(Array)`); one that is a one-liner over its text is a lambda at the
 // production, taking its parameter type from `Build`'s payload; one that is
 // whichever alternative matched is `Kid`, the pass-through. Only a
 // lowering with something to say — a key to read off a leaf — gets a name of
@@ -135,7 +133,8 @@ fn json_rules() -> TokenRule<JsonTok>[] {
 
 # A member's value is its one interior child; its key is the string token in
 # front of the `:`, which is a *leaf* and so has no lowered value — the first of
-# the node's own tokens is where it is read from.
+# the node's own tokens is where it is read from. It lowers to the object holding
+# just that member, which `object_of` joins with its siblings.
 fn lower_member(src: str, node: Parts, kids: Json[]) -> Json!ParseError {
     let key = node.tokens
         .first()
@@ -143,8 +142,28 @@ fn lower_member(src: str, node: Parts, kids: Json[]) -> Json!ParseError {
     let value = kids
         .first()
         .value_or_err(ParseError { message: "a member has no value", span: node.span() })?;
-    ok(Member(unquote(src[key]).unescape(), value))
+    ok(Object([Member { key: unquote(src[key]).unescape(), value }]))
 }
+
+# The object holding every member of `members`, each a one-member object, in
+# order.
+fn object_of(members: Json[]) -> Json {
+    mut all: Member[] = [];
+    for (let m : members) {
+        match (m) {
+            Object(one) => {
+                set all.extend(one);
+            },
+            Null | Bool(..) | Number(..) | String(..) | Array(..) => {},
+        };
+    }
+    Object(all)
+}.test({
+    let a = Member { key: "a", value: Null };
+    let b = Member { key: "b", value: Bool(true) };
+    assert(object_of([Object([a]), Object([b])]) == Object([a, b]));
+    assert(object_of([]) == Object([]));
+})
 
 # `s` without its first and last byte — a string token's surrounding quotes. The
 # lexer guarantees both are there (a `Delimited` match spans them), so this needs
@@ -209,7 +228,7 @@ pub fn json_grammar() -> Grammar<JsonTok, Json> {
                 expect_as: "a JSON value",
                 layout: Inline,
             },
-            Production { name: "object", rule: r_object, build: Kids(Object), layout: Inline },
+            Production { name: "object", rule: r_object, build: Kids(object_of), layout: Inline },
             Production {
                 name: "member",
                 rule: r_member,
@@ -349,13 +368,13 @@ pub fn parse_json(src: str) -> Json!ParseError {
 
     // ---- objects ----
     assert(parse_json("{}")? == Object([]));
-    assert(parse_json("""{"a": 1}""")? == Object([Member("a", Number("1"))]));
+    assert(parse_json("""{"a": 1}""")? == Object([Member { key: "a", value: Number("1") }]));
     assert(parse_json("""{"a": 1, "b": [2]}""")? == Object([
-        Member("a", Number("1")),
-        Member("b", Array([Number("2")])),
+        Member { key: "a", value: Number("1") },
+        Member { key: "b", value: Array([Number("2")]) },
     ]));
     // A key with an escape in it goes through the same decoding as a value.
-    assert(parse_json("""{"a\tb": null}""")? == Object([Member("a\tb", Null)]));
+    assert(parse_json("""{"a\tb": null}""")? == Object([Member { key: "a\tb", value: Null }]));
 
     // ---- strict about trailing separators ----
     //
@@ -384,8 +403,6 @@ pub fn parse_json(src: str) -> Json!ParseError {
 # `v` a parse produced — which is what makes the pair a usable end-to-end check
 # of the library.
 #
-# A bare `Member` renders as the `"key":value` it is; it is only meaningful
-# inside a `Object`, which is where a parse ever puts one.
 pub fn render_json(self: Json) -> str {
     match (self) {
         Null => "null",
@@ -393,8 +410,7 @@ pub fn render_json(self: Json) -> str {
         Number(n) => n,
         String(s) => `"{escape_json(s)}"`,
         Array(xs) => `[{xs$render_json().join(sep=",")}]`,
-        Object(ms) => `\{{ms$render_json().join(sep=",")}}`,
-        Member(k, v) => `"{escape_json(k)}":{v.render_json()}`,
+        Object(ms) => `\{{ms$render_member().join(sep=",")}}`,
     }
 }.test({
     // ---- round trip: parse -> lower -> render -> parse ----
@@ -418,7 +434,14 @@ pub fn render_json(self: Json) -> str {
 
     assert(render_json(Array([])) == "[]");
     assert(render_json(Object([])) == "{}");
-    assert(render_json(Member("k", Null)) == `"k":null`);
+    assert(render_json(Object([Member { key: "k", value: Null }])) == """{"k":null}""");
+})
+
+# One `"key":value` of an object.
+fn render_member(self: Member) -> str {
+    `"{escape_json(self.key)}":{self.value.render_json()}`
+}.test({
+    assert(Member { key: "k", value: Number("1") }.render_member() == `"k":1`);
 })
 
 # The inverse of the `unescape` lowering applies: the two characters JSON

@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/grammar_json.aipl</code></h1>
 
-      <div class="module-doc"><p>JSON: the library's second end-to-end target, and the one that adds everything S-expressions deliberately left out — several terminal classes rather than one, a separated <code>Many</code> with a trailing-comma rule, an <code>OneOf</code> across six alternatives, and a heterogeneous AST. Still no precedence; that arrives with the calculator in <code>grammar_calc.aipl</code>.</p><p>Complete but tiny: eight productions and one <code>variant Json</code>, against a rule set cribbed from <code>lexer.aipl</code>'s own JSON-flavored test table.</p><p>Two things worth reading before the grammar:</p><ul><li><strong>Numbers stay text.</strong> <code>Number</code> carries the source spelling rather than a parsed value. JSON's number syntax is wider than any one AIPL type (an arbitrary-precision integer is legal JSON), so <em>what a number means</em> is the consumer's policy, exactly as it is for the lexer's <code>Int</code>/<code>Float</code>, which hand over their digits unparsed for the same reason.</li><li><strong><code>Member</code> is where a uniform lowering type shows its seam.</strong> <code>Build&lt;A&gt;</code> pins one <code>A</code> for every production in a grammar, so the <code>member</code> production — whose natural result is a key/value <em>pair</em>, not a JSON value — has to lower to a <code>Json</code> too. It gets a case of its own, meaningful only as an element of a <code>Object</code>. That is the honest cost of one lowering type per grammar, and it is worth knowing before the grammar describes AIPL itself, where the AST has many more shapes than its expression type.</li></ul></div>
+      <div class="module-doc"><p>JSON: the library's second end-to-end target, and the one that adds everything S-expressions deliberately left out — several terminal classes rather than one, a separated <code>Many</code> with a trailing-comma rule, an <code>OneOf</code> across six alternatives, and a heterogeneous AST. Still no precedence; that arrives with the calculator in <code>grammar_calc.aipl</code>.</p><p>Complete but tiny: eight productions, one <code>variant Json</code> and its <code>Member</code>, against a rule set cribbed from <code>lexer.aipl</code>'s own JSON-flavored test table.</p><p>Two things worth reading before the grammar:</p><ul><li><strong>Numbers stay text.</strong> <code>Number</code> carries the source spelling rather than a parsed value. JSON's number syntax is wider than any one AIPL type (an arbitrary-precision integer is legal JSON), so <em>what a number means</em> is the consumer's policy, exactly as it is for the lexer's <code>Int</code>/<code>Float</code>, which hand over their digits unparsed for the same reason.</li><li><strong><code>member</code> is where a uniform lowering type shows its seam.</strong> <code>Build&lt;A&gt;</code> pins one <code>A</code> for every production in a grammar, so the <code>member</code> production — whose natural result is a key/value <em>pair</em>, not a JSON value — has to lower to a <code>Json</code> too. It lowers to the object holding just that member, and the <code>object</code> production joins the members of its children, so <code>Json</code> has no case that only means &quot;a member&quot;. That is the cost of one lowering type per grammar, and it is worth knowing before the grammar describes AIPL itself, where the AST has many more shapes than its expression type.</li></ul></div>
 
 
 
@@ -67,7 +67,7 @@
           </h3>
           <pre class="signature"><code>variant Json</code></pre>
 
-          <div class="doc"><p>The AST. <code>Number</code> keeps the source spelling (see the header); <code>Member</code> is a key/value pair and is meaningful only inside a <code>Object</code>.</p></div>
+          <div class="doc"><p>The AST. <code>Number</code> keeps the source spelling (see the header); an <code>Object</code> keeps its members in source order, a repeated key included.</p></div>
 
 
           <ul class="cases">
@@ -97,17 +97,26 @@
 
             </li>
 
-            <li id="item-Object"><code>Object(Json[])</code>
-
-
-            </li>
-
-            <li id="item-Member"><code>Member(str, Json)</code>
+            <li id="item-Object"><code>Object(Member[])</code>
 
 
             </li>
 
           </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-Member">
+          <h3>
+            <a class="anchor" href="#item-Member">Member</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Member</code></pre>
+
+          <div class="doc"><p>One <code>&quot;key&quot;: value</code> pair of an object.</p></div>
+
 
         </section>
 
@@ -162,7 +171,7 @@
           </h3>
           <pre class="signature"><code>pub fn render_json(self: Json) -&#62; str</code></pre>
 
-          <div class="doc"><p><code>self</code> printed back as JSON source, in one canonical compact spelling: no spaces, no trailing separators, strings escaped.</p><p>Round-trips with <code>parse_json</code> — <code>parse_json(render_json(v)) == v</code> for every <code>v</code> a parse produced — which is what makes the pair a usable end-to-end check of the library.</p><p>A bare <code>Member</code> renders as the <code>&quot;key&quot;:value</code> it is; it is only meaningful inside a <code>Object</code>, which is where a parse ever puts one.</p></div>
+          <div class="doc"><p><code>self</code> printed back as JSON source, in one canonical compact spelling: no spaces, no trailing separators, strings escaped.</p><p>Round-trips with <code>parse_json</code> — <code>parse_json(render_json(v)) == v</code> for every <code>v</code> a parse produced — which is what makes the pair a usable end-to-end check of the library.</p></div>
 
 
         </section>
@@ -211,7 +220,21 @@
           </h3>
           <pre class="signature"><code>fn lower_member(src: str, node: Parts, kids: Json[]) -&#62; Json!ParseError</code></pre>
 
-          <div class="doc"><p>A member's value is its one interior child; its key is the string token in front of the <code>:</code>, which is a <em>leaf</em> and so has no lowered value — the first of the node's own tokens is where it is read from.</p></div>
+          <div class="doc"><p>A member's value is its one interior child; its key is the string token in front of the <code>:</code>, which is a <em>leaf</em> and so has no lowered value — the first of the node's own tokens is where it is read from. It lowers to the object holding just that member, which <code>object_of</code> joins with its siblings.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-object_of">
+          <h3>
+            <a class="anchor" href="#item-object_of">object_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn object_of(members: Json[]) -&#62; Json</code></pre>
+
+          <div class="doc"><p>The object holding every member of <code>members</code>, each a one-member object, in order.</p></div>
 
 
         </section>
@@ -240,6 +263,20 @@
           <pre class="signature"><code>fn lex_json(src: str) -&#62; LexResult&#60;JsonTok&#62;!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-render_member">
+          <h3>
+            <a class="anchor" href="#item-render_member">render_member</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn render_member(self: Member) -&#62; str</code></pre>
+
+          <div class="doc"><p>One <code>&quot;key&quot;:value</code> of an object.</p></div>
 
 
         </section>
