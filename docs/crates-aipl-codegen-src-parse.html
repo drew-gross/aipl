@@ -930,6 +930,20 @@
 
 
 
+        <section class="item" id="item-lower_children">
+          <h3>
+            <a class="anchor" href="#item-lower_children">lower_children</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_children&#60;K: variant, A: any&#62;(src: str, __spat$62209: Parts, prods: Production&#60;K, A&#62;[]) -&#62; A[]!ParseError</code></pre>
+
+          <div class="doc"><p>The children in <code>parts</code> lowered, in order. <code>parts</code> is the one walk of a node's direct kids (<code>Cst.parts</code>), which splices groups away, so a production that wraps a bracket pair hands its <code>build</code> the same children it would without one — and walking once is what stops each <code>build</code> from rebuilding the same list.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-only_kid">
           <h3>
             <a class="anchor" href="#item-only_kid">only_kid</a>
@@ -977,7 +991,7 @@
             <a class="anchor" href="#item-build_node">build_node</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn build_node(src: str, __spat$101302: Parts, kids: Node[]) -&#62; Node</code></pre>
+          <pre class="signature"><code>fn build_node(src: str, __spat$101790: Parts, kids: Node[]) -&#62; Node</code></pre>
 
           <div class="doc"><p>The lowering every fixture production uses: a node with no interior children is a leaf carrying its text, anything else a branch carrying its children.</p></div>
 

@@ -811,13 +811,10 @@ fn step_len(self: Matcher, src: str, at: u64, unterminated: str) -> u64!LexError
 # would build a new array at every position of every lex.
 fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[], mode: i64) -> StepResult<K>!LexError {
     for (let r : rules) {
-        let res = if (r.mode != mode) {
-            StepResult { end: at }
-        } else {
+        if (r.mode == mode) {
             let n = r.matcher.step_len(src, at, r.unterminated)?;
-            step_result(r, src, at, n)?
+            if (0 < n) { return step_result(r, src, at, n); };
         };
-        if (at < res.end) { return ok(res); };
     }
     ok(StepResult { end: at })
 }

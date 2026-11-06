@@ -1399,27 +1399,29 @@ pub fn lower<K: variant, A: any>(src: str, node: Cst, g: Grammar<K, A>) -> A!Par
 
 fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]) -> A!ParseError {
     match (node) {
-        Tree(i, kids) => {
-            // One walk of the direct kids, splitting them into the children to
-            // recurse into and the token spans a `build` reads. It splices
-            // groups away, so a production that wraps a bracket pair hands its
-            // `build` the same children it would without one — and doing it
-            // here is what stops each `build` from rebuilding the same list.
-            let parts = node.parts();
-            let vals = parts.children.try_map(|k| lower_node(src, k, prods))?;
+        Tree(i, _) => {
             let Production { build } = prods[i].value_or_err(ParseError {
                 message: `no production at index {i}`,
                 span: node.extent(),
             })?;
+
+            // A `build` that reads only the node's text, or nothing, has no use
+            // for the children, so they are neither split out nor lowered.
             match (build) {
-                Mk(f) => ok(f(src, parts, vals)),
-                TryMk(f) => f(src, parts, vals),
-                Kids(f) => ok(f(vals)),
-                TryKids(f) => f(vals),
-                Kid => only_kid(vals, node.extent()),
                 Text(f) => ok(f(node.token_text(src))),
                 TryText(f) => f(node.token_text(src)),
                 Const(v) => ok(v),
+                Mk(f) => {
+                    let parts = node.parts();
+                    ok(f(src, parts, lower_children(src, parts, prods)?))
+                },
+                TryMk(f) => {
+                    let parts = node.parts();
+                    f(src, parts, lower_children(src, parts, prods)?)
+                },
+                Kids(f) => ok(f(lower_children(src, node.parts(), prods)?)),
+                TryKids(f) => f(lower_children(src, node.parts(), prods)?),
+                Kid => only_kid(lower_children(src, node.parts(), prods)?, node.extent()),
             }
         },
         Leaf(span) => err(ParseError { message: "a token leaf has no lowered value", span }),
@@ -1438,6 +1440,16 @@ fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]
         }),
     }
 }
+
+# The children in `parts` lowered, in order. `parts` is the one walk of a node's
+# direct kids (`Cst.parts`), which splices groups away, so a production that
+# wraps a bracket pair hands its `build` the same children it would without one —
+# and walking once is what stops each `build` from rebuilding the same list.
+fn lower_children<K: variant, A: any>(
+    src: str,
+    Parts { children },
+    prods: Production<K, A>[],
+) -> A[]!ParseError { children.try_map(|k| lower_node(src, k, prods)) }
 
 # The single lowered child a `Kid` lowering declared, or a refusal naming what
 # the node actually matched. Reaching this is a grammar bug rather than a bad
