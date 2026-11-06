@@ -1,0 +1,11 @@
+import { IEEE754Float64 as F64, equal as == } from builtins;
+
+struct Sample { reading: F64 }
+
+fn same(a: Sample, b: Sample) -> bool { a == b }
+--- check --compile ---
+error: "==" does not compare Sample: it holds floats, whose equality is IEEE 754's (NaN is not equal to itself) and not a structural one; compare the float parts with `float_equal`
+ --> ./tests/cases/floats/err_float_struct_equal.aipl:5:41
+  |
+5 | fn same(a: Sample, b: Sample) -> bool { a == b }
+  |                                         ^

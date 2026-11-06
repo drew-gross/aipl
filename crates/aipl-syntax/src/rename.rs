@@ -113,6 +113,7 @@ pub fn rename_scoped(e: &Expr, map: &HashMap<String, String>, fresh: bool) -> Ex
             *m,
         ),
         ExprKind::Num(_)
+        | ExprKind::Float(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
         | ExprKind::Char(_)

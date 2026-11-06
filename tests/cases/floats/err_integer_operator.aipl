@@ -1,0 +1,9 @@
+import { IEEE754Float64 as F64, wrapping_add as + } from builtins;
+
+fn sum(a: F64, b: F64) -> F64 { a + b }
+--- check --compile ---
+error: "+" here is integer arithmetic and does not take IEEE754Float64: floats never mix with the integer operations; import `float_add as +` to + floats
+ --> ./tests/cases/floats/err_integer_operator.aipl:3:33
+  |
+3 | fn sum(a: F64, b: F64) -> F64 { a + b }
+  |                                 ^

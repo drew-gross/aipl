@@ -483,6 +483,7 @@ fn expr_kind(v: &FfiValue) -> R<ast::ExprKind> {
     let name = |i: usize| -> R<String> { text(at(payload, i, case)?) };
     Ok(match case {
         "Num" => K::Num(int(at(payload, 0, case)?)?),
+        "FloatLit" => K::Float(name(0)?),
         "Bool" => K::Bool(flag(at(payload, 0, case)?)?),
         "Str" => K::Str(name(0)?),
         "Char" => K::Char(byte(at(payload, 0, case)?)?),

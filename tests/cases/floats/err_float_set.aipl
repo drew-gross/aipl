@@ -1,0 +1,9 @@
+import { IEEE754Float64 as F64, to_set } from builtins;
+
+fn bag(xs: F64[]) -> #{F64} { xs.to_set() }
+--- check --compile ---
+error: fn "bag": a set element must be an integer (i8..i64, u8..u64), bool, char, str, struct or variant, got IEEE754Float64
+ --> ./tests/cases/floats/err_float_set.aipl:3:4
+  |
+3 | fn bag(xs: F64[]) -> #{F64} { xs.to_set() }
+  |    ^^^

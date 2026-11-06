@@ -1,0 +1,9 @@
+import { IEEE754Float32 as F32, IEEE754Float64 as F64, float_add as + } from builtins;
+
+fn sum(a: F32, b: F64) -> F64 { a + b }
+--- check --compile ---
+error: "float_add" takes two floats of one type, got IEEE754Float32 and IEEE754Float64
+ --> ./tests/cases/floats/err_mixed_widths.aipl:3:37
+  |
+3 | fn sum(a: F32, b: F64) -> F64 { a + b }
+  |                                     ^

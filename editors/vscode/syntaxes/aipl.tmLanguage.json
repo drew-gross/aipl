@@ -110,6 +110,10 @@
           "name": "variable.other.aipl"
         },
         {
+          "match": "-?[0-9]+\\.[0-9]+",
+          "name": "constant.numeric.float.aipl"
+        },
+        {
           "match": "-?[0-9]+",
           "name": "constant.numeric.integer.aipl"
         },

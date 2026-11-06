@@ -1,0 +1,55 @@
+# A float literal is an `IEEE754Float64` until the position it sits in declares another
+# float type, the way an integer literal is an `i64` until then. It takes the type of an
+# annotation, a parameter, a return, a field, an element, a payload or the other operand,
+# and is rounded once, at that width, from its digits.
+
+import {
+    IEEE754Float32 as F32,
+    IEEE754Float64 as F64,
+    equal,
+    float_add as +,
+    float_equal as ==,
+    to_str,
+} from builtins;
+
+struct Sample { narrow: F32, wide: F64 }
+
+fn narrow_tenth() -> F32 { 0.1 }
+
+fn widen(x: F64) -> F64 { x + 0.1 }
+
+fn pick(first: bool) -> F32 { if (first) { 0.1 } else { 0.2 } }
+
+test({
+    // Unpinned, a literal is the wide type.
+    let free = 0.1;
+    assert(free == 0.1);
+    assert(to_str(free + 0.2).equal("0.30000000000000004"));
+
+    // Pinned by an annotation, a return type, a parameter and the other operand: each is
+    // rounded at 32 bits, so none of them equals the 64-bit tenth.
+    let narrow: F32 = 0.1;
+    assert(to_str(narrow).equal("0.1"));
+    assert(to_str(narrow_tenth()).equal("0.1"));
+    assert(to_str(narrow + 0.2).equal("0.3"));
+    assert(narrow == 0.1);
+    assert(to_str(widen(0.2)).equal("0.30000000000000004"));
+    assert(to_str(pick(false)).equal("0.2"));
+
+    // Inside a container or a constructor, the declared element type decides.
+    let row: F32[] = [0.1, 0.2];
+    assert(to_str(row).equal("[0.1, 0.2]"));
+    let maybe: F32? = some(0.5);
+    assert(to_str(maybe).equal("some(0.5)"));
+    let sample = Sample { narrow: 0.1, wide: 0.1 };
+    assert(to_str(sample).equal("Sample { narrow: 0.1, wide: 0.1 }"));
+
+    // A literal that nothing pins stays wide inside a literal array.
+    let free_row = [1.5, 2.5];
+    assert(to_str(free_row).equal("[1.5, 2.5]"));
+
+    // A negative literal is one token, and an exponent is part of it.
+    assert(to_str(-1.5).equal("-1.5"));
+    assert(to_str(-2.5e-3).equal("-0.0025"));
+    assert(to_str(1.5e3).equal("1500.0"));
+})

@@ -4,7 +4,7 @@
 import { * } from builtins;
 
 --- check --compile ---
-error: the "*" operator has no bare form; import it aliased: `wrapping_mul as *` from builtins
+error: the "*" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_mul as *` or `float_mul as *` from builtins
  --> ./tests/cases/arithmetic/err_bare_star.aipl:4:10
   |
 4 | import { * } from builtins;

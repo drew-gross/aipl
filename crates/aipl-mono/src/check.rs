@@ -909,6 +909,15 @@ impl<'a> Cx<'a> {
             (Type::Without(base, Exclusion::EmptyArray), ExprKind::ArrayLit(_)) => {
                 self.lock_flexed(e, base);
             }
+            // A float literal is built at the width it lands at, so the width is recorded
+            // on the literal, and on the negation around it.
+            (Type::Primitive(p), ExprKind::Float(_)) if p.is_float() => {
+                self.lock_node(node_id(e), target);
+            }
+            (Type::Primitive(p), ExprKind::Neg(inner)) if p.is_float() => {
+                self.lock_node(node_id(e), target);
+                self.lock_flexed(inner, target);
+            }
             (Type::Optional(inner), ExprKind::Call(Callee::Some, args, _)) if args.len() == 1 => {
                 self.lock_flexed(&args[0], inner);
             }
@@ -1064,6 +1073,38 @@ impl<'a> Cx<'a> {
     /// template's fields are returned with its type variables substituted by the
     /// application's arguments (which may still be abstract inside a generic
     /// function). This is what lets `b.value` type-check where `b: Box<T>`.
+    /// Whether a value of `ty` holds a float anywhere inside it — in an element, a field
+    /// (through any struct, tuple or generic instance), a payload of an optional or a
+    /// result. Structural equality over such a value would compare floats by their
+    /// bits, which is not what `float_equal` says (NaN, and the two zeros).
+    fn contains_float(&self, ty: &Type, seen: &mut HashSet<String>) -> bool {
+        match ty {
+            Type::Primitive(p) => p.is_float(),
+            Type::Array(inner) | Type::Optional(inner) | Type::Set(inner, _) => {
+                self.contains_float(inner, seen)
+            }
+            Type::Dict(key, value) => {
+                self.contains_float(key, seen) || self.contains_float(value, seen)
+            }
+            Type::Result(ok, err) => {
+                self.contains_float(ok, seen) || self.contains_float(err, seen)
+            }
+            Type::Tuple(elems) => elems.iter().any(|e| self.contains_float(e, seen)),
+            Type::Named(name) | Type::Generic(name, _) => {
+                // A recursive type is walked once.
+                if !seen.insert(name.clone()) {
+                    return false;
+                }
+                self.fields_of(ty).is_some_and(|fields| {
+                    fields
+                        .iter()
+                        .any(|(_, field_ty, _)| self.contains_float(field_ty, seen))
+                })
+            }
+            _ => false,
+        }
+    }
+
     fn fields_of(&self, ty: &Type) -> Option<Vec<(String, Type, bool)>> {
         match ty {
             Type::Named(sn) => self.struct_fields(sn),
@@ -3989,6 +4030,9 @@ impl Cx<'_> {
                 self.check_shim(effect, bindings, body, env, effects, pos, span.clone())?
             }
             ExprKind::Num(_) => Type::Primitive(Primitive::I64),
+            // A literal is `IEEE754Float64` until a position that declares another float
+            // type says otherwise (`flex_fit`), as an integer literal is `i64` until then.
+            ExprKind::Float(_) => Type::Primitive(Primitive::F64),
             ExprKind::Bool(_) => Type::Primitive(Primitive::Bool),
             ExprKind::Str(_) => Type::Primitive(Primitive::Str),
             ExprKind::Char(_) => Type::Primitive(Primitive::Char),
@@ -4078,6 +4122,11 @@ impl Cx<'_> {
             }
             ExprKind::Neg(x) => {
                 let t = self.check_expr(x, env, effects)?;
+                // Negation is the one operator that is not imported, so it takes either
+                // kind of number: a float negates to a float of its own type.
+                if is_float_ty(&t) {
+                    return Ok(t);
+                }
                 expect(
                     &t,
                     &Type::Primitive(Primitive::I64),
@@ -5435,6 +5484,41 @@ impl Cx<'_> {
                 );
             }
         }
+        // The float operations: both operands the same float type, with a bare float
+        // literal taking the other operand's type as an integer literal does. Reserved,
+        // not imported, like the integer ones above.
+        if let Some((op, yields_bool)) = match callee {
+            Callee::FloatAdd => Some(("float_add", false)),
+            Callee::FloatSub => Some(("float_sub", false)),
+            Callee::FloatMul => Some(("float_mul", false)),
+            Callee::FloatDivide => Some(("float_div", false)),
+            Callee::FloatEqual => Some(("float_equal", true)),
+            Callee::FloatNotEqual => Some(("float_not_equal", true)),
+            Callee::FloatLessThan => Some(("float_less_than", true)),
+            Callee::FloatGreaterThan => Some(("float_greater_than", true)),
+            Callee::FloatLessThanOrEqual => Some(("float_less_than_or_equal", true)),
+            Callee::FloatGreaterThanOrEqual => Some(("float_greater_than_or_equal", true)),
+            _ => None,
+        } {
+            if args.len() == 2 {
+                let lt = self.check_expr(&args[0], env, effects)?;
+                let rt = self.check_expr(&args[1], env, effects)?;
+                let rt2 = self.flex_int(&args[1], &rt, &lt)?;
+                let lt2 = self.flex_int(&args[0], &lt, &rt)?;
+                let operand = check_float_operands(
+                    op,
+                    &lt2,
+                    &rt2,
+                    args[0].span.clone(),
+                    args[1].span.clone(),
+                )?;
+                return Ok(if yields_bool {
+                    Type::Primitive(Primitive::Bool)
+                } else {
+                    operand
+                });
+            }
+        }
         // `(row, column).is_in_bounds_of(grid)`.
         if *callee == Callee::IsInBoundsOf && args.len() == 2 {
             let index = self.check_expr(&args[0], env, effects)?;
@@ -6592,6 +6676,24 @@ impl Cx<'_> {
         if aipl_syntax::is_int_ty(lt) && lt == rt {
             return Ok(lt.clone());
         }
+        // A float operand is a float's operation spelled with the integer one's import.
+        for (ty, span) in [(lt, &lspan), (rt, &rspan)] {
+            if is_float_ty(ty) {
+                let hint = aipl_syntax::operator_named_forms(op)
+                    .into_iter()
+                    .find(|name| name.starts_with("float_"))
+                    .map(|name| format!("; import `{name} as {op}` to {op} floats"))
+                    .unwrap_or_default();
+                return Err(Error::at(
+                    format!(
+                        "\"{op}\" here is integer arithmetic and does not take {}: floats never \
+                         mix with the integer operations{hint}",
+                        tyname(ty)
+                    ),
+                    span.clone(),
+                ));
+            }
+        }
         // A string operand is the common mistake now that `+`/`-` are integer-only.
         // For `+`, point at a template (string building).
         if is_str_repr(lt) || is_str_repr(rt) {
@@ -6638,6 +6740,12 @@ impl Cx<'_> {
         rspan: Span,
         span: Span,
     ) -> Result<Type, Error> {
+        // The integer and `equal`/`less_than` operators do not take floats: those have
+        // operations of their own, which an import names.
+        if !matches!(op, BinOp::And | BinOp::Or) {
+            reject_float_operand(op, lt, &lspan)?;
+            reject_float_operand(op, rt, &rspan)?;
+        }
         // Arithmetic/comparison operate within a single integer type — both
         // operands must be the *same* width and signedness: neither operand is
         // the declared type the other widens to, so nothing widens here. `i64`
@@ -6668,6 +6776,22 @@ impl Cx<'_> {
                 Ok(Type::Primitive(Primitive::I64))
             }
             BinOp::Eq | BinOp::Ne => {
+                // A float anywhere inside has no structural equality: it would be the
+                // bits, not the IEEE comparison. Naked floats were refused above.
+                for (ty, span) in [(lt, &lspan), (rt, &rspan)] {
+                    if self.contains_float(ty, &mut HashSet::new()) {
+                        return Err(Error::at(
+                            format!(
+                                "{:?} does not compare {}: it holds floats, whose equality is \
+                                 IEEE 754's (NaN is not equal to itself) and not a structural \
+                                 one; compare the float parts with `float_equal`",
+                                binop_spelling(op),
+                                tyname(ty)
+                            ),
+                            span.clone(),
+                        ));
+                    }
+                }
                 // Equality works for any two values of the *same* type — scalars,
                 // str, optionals, arrays, sets, structs, variants — compared
                 // structurally (sets order-independently). The two sides must be
@@ -6744,6 +6868,76 @@ impl Cx<'_> {
             }
         }
     }
+}
+
+/// Whether `ty` is one of the IEEE 754 float types.
+fn is_float_ty(ty: &Type) -> bool {
+    matches!(ty, Type::Primitive(p) if p.is_float())
+}
+
+/// The float builtin that provides the operator `op` — `float_add` for `+` — as the
+/// import a diagnostic can suggest.
+fn float_builtin_for(op: BinOp) -> Option<&'static str> {
+    aipl_syntax::operator_named_forms(binop_spelling(op))
+        .into_iter()
+        .find(|name| name.starts_with("float_"))
+}
+
+/// An error unless `ty` is something the integer operators take: a float operand to one of
+/// them is a mistake whose fix is the float operation, so the message names the import.
+fn reject_float_operand(op: BinOp, ty: &Type, span: &Span) -> Result<(), Error> {
+    if !is_float_ty(ty) {
+        return Ok(());
+    }
+    let spelling = binop_spelling(op);
+    let hint = match float_builtin_for(op) {
+        Some(name) => format!("; import `{name} as {spelling}` to {spelling} floats"),
+        None => String::new(),
+    };
+    Err(Error::at(
+        format!(
+            "\"{spelling}\" does not take {}: floats never mix with the integer operations{hint}",
+            tyname(ty)
+        ),
+        span.clone(),
+    ))
+}
+
+/// The type of a float operation's operands: both the same float type. `name` is the
+/// builtin, for the message.
+fn check_float_operands(
+    name: &str,
+    lt: &Type,
+    rt: &Type,
+    lspan: Span,
+    rspan: Span,
+) -> Result<Type, Error> {
+    if is_unknown(lt) || is_unknown(rt) {
+        return Ok(Type::Unknown);
+    }
+    for (ty, span) in [(lt, &lspan), (rt, &rspan)] {
+        if !is_float_ty(ty) {
+            return Err(Error::at(
+                format!(
+                    "\"{name}\" takes IEEE 754 floats, but this operand is {}: floats and \
+                     integers never mix, and nothing converts between them",
+                    tyname(ty)
+                ),
+                span.clone(),
+            ));
+        }
+    }
+    if lt != rt {
+        return Err(Error::at(
+            format!(
+                "\"{name}\" takes two floats of one type, got {} and {}",
+                tyname(lt),
+                tyname(rt)
+            ),
+            rspan,
+        ));
+    }
+    Ok(lt.clone())
 }
 
 /// `map`'s signature over an optional receiver: the declared array form with

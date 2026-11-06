@@ -247,6 +247,7 @@ fn own_names(self: Expr) -> #{str} {
         // A destructuring `let` or `for` names the struct or case it takes apart.
         LetPattern(pattern, _, _) | ForPattern(pattern, _, _, _) => pattern.destructure_names(),
         Num(..)
+        | FloatLit(..)
         | Bool(..)
         | Str(..)
         | Char(..)

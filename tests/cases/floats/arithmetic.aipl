@@ -1,0 +1,84 @@
+# The IEEE 754 operations: each is its own named builtin, imported as the operator it
+# provides, and takes two floats of one type. Floats and integers never mix. A file has
+# one `==`, so one importing `float_equal as ==` compares anything else with `equal`.
+
+import {
+    IEEE754Float32 as F32,
+    IEEE754Float64 as F64,
+    equal,
+    float_add as +,
+    float_div as /,
+    float_equal as ==,
+    float_greater_than as >,
+    float_greater_than_or_equal as >=,
+    float_less_than as <,
+    float_less_than_or_equal as <=,
+    float_mul as *,
+    float_not_equal as !=,
+    float_sub as -,
+    logical_not as !,
+    to_str,
+} from builtins;
+
+test({
+    let a: F64 = 1.5;
+    let b: F64 = 2.25;
+    assert(to_str(a + b).equal("3.75"));
+    assert(to_str(b - a).equal("0.75"));
+    assert(to_str(a * b).equal("3.375"));
+    assert(to_str(b / a).equal("1.5"));
+
+    // Unary minus is the one operator with no import of its own: `float_sub as -` lets
+    // a file negate.
+    assert(to_str(-a).equal("-1.5"));
+
+    // The comparisons.
+    assert(a < b);
+    assert(a <= b);
+    assert(b > a);
+    assert(b >= a);
+    assert(a == a);
+    assert(a != b);
+    assert(!(b < a));
+
+    // A float is rendered the way its literal is written: whole numbers keep a `.0`,
+    // and the digits are the shortest that read back as the same value.
+    assert(to_str(2.0).equal("2.0"));
+    assert(to_str(0.1 + 0.2).equal("0.30000000000000004"));
+    assert(to_str(1.0e21).equal("1e21"));
+    assert(to_str(-0.0).equal("-0.0"));
+})
+
+test({
+    // NaN and the infinities come out of division. NaN is unordered: every comparison
+    // with it is false except `!=`, and it is not equal to itself.
+    let zero: F64 = 0.0;
+    let one: F64 = 1.0;
+    let nan = zero / zero;
+    let infinity = one / zero;
+    assert(to_str(nan).equal("NaN"));
+    assert(to_str(infinity).equal("inf"));
+    assert(to_str(-infinity).equal("-inf"));
+    assert(!(nan == nan));
+    assert(nan != nan);
+    assert(!(nan < one));
+    assert(!(nan > one));
+    assert(!(nan <= nan));
+    assert(!(nan >= nan));
+    assert(infinity > one);
+    // Negative zero is equal to zero.
+    assert(-zero == zero);
+})
+
+test({
+    // `IEEE754Float32` is its own type, rounded to 32 bits: the same digits are a
+    // different value, and the sum of two of them is a 32-bit sum.
+    let c: F32 = 0.1;
+    let d: F32 = 0.2;
+    assert(to_str(c + d).equal("0.3"));
+    assert(to_str(c).equal("0.1"));
+    let big: F32 = 16777216.0;
+    assert(to_str(big + 1.0).equal("16777216.0"));
+    let wide: F64 = 16777216.0;
+    assert(to_str(wide + 1.0).equal("16777217.0"));
+})

@@ -1,0 +1,9 @@
+import { IEEE754Float64 as F64, equal as == } from builtins;
+
+fn same(a: F64, b: F64) -> bool { a == b }
+--- check --compile ---
+error: "==" does not take IEEE754Float64: floats never mix with the integer operations; import `float_equal as ==` to == floats
+ --> ./tests/cases/floats/err_equal_on_floats.aipl:3:35
+  |
+3 | fn same(a: F64, b: F64) -> bool { a == b }
+  |                                   ^

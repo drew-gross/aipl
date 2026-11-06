@@ -28,7 +28,6 @@ projects:
     reuse existing json parser from lib
 
 floats:
-  Time to implement floats. Type names are IEEE754Float32 and IEEE754Float64 but the convention is to import as Float, of F32 and F64 if both are used in the same file. For now they basically shouldn't interact with integers (separate add/subtract/etc. operations, no implicit conversions, etc)
   to string for floats (use rust shortest roundtrip algo probably)
   to string for floats with options (number of digits, leading +, exponential notation (with e or E), etc.
   to_int option (considering rounding, overflow, etc)
@@ -847,6 +846,7 @@ check:
   can for sure recover from format errors
 
 tests:
+  named standalone test blocks
   check section, errors section, format failure section, etc. should be unified. Make `--- check --format ---` or `--- check --lint ---` an option for testing check itself, or if there is another situation where we want subsets.
   scripted-input via sections for read_* testing
   show test failures when there are also lint or format failures

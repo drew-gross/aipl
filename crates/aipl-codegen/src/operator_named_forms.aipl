@@ -13,36 +13,38 @@ import { equal as == } from builtins;
 # once.
 pub fn operator_named_forms(self: str) -> str[] {
     match (self) {
-        "+" => ["wrapping_add", "saturating_add"],
-        "-" => ["wrapping_sub", "saturating_sub"],
-        "*" => ["wrapping_mul"],
+        "+" => ["wrapping_add", "saturating_add", "float_add"],
+        "-" => ["wrapping_sub", "saturating_sub", "float_sub"],
+        "*" => ["wrapping_mul", "float_mul"],
         "++" => ["wrapping_increment", "saturating_increment"],
         "--" => ["wrapping_decrement", "saturating_decrement"],
         "+=" => ["wrapping_add_assign", "saturating_add_assign"],
         "-=" => ["wrapping_sub_assign", "saturating_sub_assign"],
         "*=" => ["wrapping_mul_assign"],
         "/=" => ["saturating_divide_assign"],
-        "==" => ["equal"],
-        "!=" => ["not_equal"],
-        "<" => ["less_than"],
-        ">" => ["greater_than"],
-        "<=" => ["less_than_or_equal"],
-        ">=" => ["greater_than_or_equal"],
+        "==" => ["equal", "float_equal"],
+        "!=" => ["not_equal", "float_not_equal"],
+        "<" => ["less_than", "float_less_than"],
+        ">" => ["greater_than", "float_greater_than"],
+        "<=" => ["less_than_or_equal", "float_less_than_or_equal"],
+        ">=" => ["greater_than_or_equal", "float_greater_than_or_equal"],
         "&&" => ["logical_and"],
         "||" => ["logical_or"],
         "!" => ["logical_not"],
-        "/" => ["saturating_divide"],
+        "/" => ["saturating_divide", "float_div"],
         "%" => ["saturating_remainder"],
         _ => [],
     }
 }.test({
     // Two flavors, in the order the compiler declares them.
-    assert("+".operator_named_forms() == ["wrapping_add", "saturating_add"]);
+    assert("+".operator_named_forms() == ["wrapping_add", "saturating_add", "float_add"]);
     assert("+=".operator_named_forms() == ["wrapping_add_assign", "saturating_add_assign"]);
     assert("--".operator_named_forms() == ["wrapping_decrement", "saturating_decrement"]);
+    // The float operations follow the integer ones, one name per operator.
+    assert("==".operator_named_forms() == ["equal", "float_equal"]);
+    assert("/".operator_named_forms() == ["saturating_divide", "float_div"]);
+    assert("<=".operator_named_forms() == ["less_than_or_equal", "float_less_than_or_equal"]);
     // One flavor, still listed: every operator is imported the same way.
-    assert("==".operator_named_forms() == ["equal"]);
-    assert("/".operator_named_forms() == ["saturating_divide"]);
     assert("%".operator_named_forms() == ["saturating_remainder"]);
     assert("/=".operator_named_forms() == ["saturating_divide_assign"]);
     // Not an operator: nothing.

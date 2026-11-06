@@ -1,0 +1,42 @@
+# `to_str` of a float in a built program, which renders through the linked runtime
+# rather than the in-process one the `.test` blocks use; the two have to agree byte for
+# byte. `print` is only how the text reaches `stdout`.
+
+import {
+    IEEE754Float32 as F32,
+    IEEE754Float64 as F64,
+    float_add as +,
+    float_div as /,
+    print,
+    to_str,
+} from builtins;
+
+struct Reading { celsius: F64, humidity: F32 }
+
+fn main() !prints -> i64 {
+    let tenth: F64 = 0.1;
+    print(to_str(tenth + 0.2));
+    let narrow: F32 = 0.1;
+    print(to_str(narrow + 0.2));
+    print(to_str(2.0));
+    print(to_str(1.0e21));
+    print(to_str(-1.5e-7));
+    let zero: F64 = 0.0;
+    print(to_str(zero / zero));
+    print(to_str(1.0 / zero));
+    print(to_str([1.5, 2.5]));
+    print(to_str(Reading { celsius: 21.5, humidity: 0.55 }));
+    print(`{tenth} and {narrow}`);
+    0
+}
+--- stdout ---
+0.30000000000000004
+0.3
+2.0
+1e21
+-1.5e-7
+NaN
+inf
+[1.5, 2.5]
+Reading { celsius: 21.5, humidity: 0.55 }
+0.1 and 0.1

@@ -385,6 +385,8 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_arr_retain_opt_warr" => sig(2, false),
         "aipl_arr_elem_ptr" => sig(3, true),
         "aipl_i64_len" | "aipl_u64_len" => sig(1, true),
+        "aipl_float_len" => sig(2, true),
+        "aipl_write_float" => sig(3, true),
         "aipl_rec_alloc" | "aipl_write_i64" | "aipl_write_u64" => sig(2, true),
         "aipl_write_bytes" | "aipl_array_new" | "aipl_array_with_cap" => sig(3, true),
         // The bridge array value's entries (`arr24`): a window (the out value,

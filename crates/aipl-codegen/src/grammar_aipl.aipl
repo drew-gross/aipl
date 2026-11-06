@@ -69,6 +69,7 @@ import {
     greater_than as >,
     int_parse,
     is_case,
+    is_digit,
     is_empty,
     is_nonempty,
     is_some,
@@ -181,6 +182,7 @@ import {
     Expr,
     Field,
     FieldInit,
+    FloatLit,
     For,
     ForPattern,
     Ident,
@@ -286,6 +288,7 @@ import {
     AllowMarker,
     CharTok,
     DocComment,
+    FloatLit as FloatTok,
     IntLit,
     Name,
     StrLit,
@@ -853,6 +856,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
     // minus), so they stay the expression's and are not diagnosed here.
     let statement_start: Rule<AiplTok> = OneOf([
         Term(Name),
+        Term(FloatTok),
         Term(IntLit),
         Term(StrLit),
         Term(CharTok),
@@ -1159,6 +1163,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
             nest("(", Named("args"), ")", loose()),
             Named("block"),
         ]),
+        Term(FloatTok),
         Term(IntLit),
         Term(StrLit),
         Term(CharTok),
@@ -1644,6 +1649,27 @@ fn field_name(name: SpanStr, span: Span) -> SpanStr!ParseError {
     }
 }
 
+# Whether the token text `self` is a float literal rather than an integer one: it opens
+# like a number (a digit, or a `-` and a digit) and carries a fraction or an exponent,
+# which no integer literal does. The lexer has already decided; this is how the token's
+# kind is read back from its text.
+fn is_float_literal(self: str) -> bool {
+    let opens_like_a_number = self.first().is_some_and(is_digit) || (self.first() == some(
+        '-',
+    ) && self[1].is_some_and(is_digit));
+    opens_like_a_number && (self.contains(".") || self.contains("e") || self.contains("E"))
+}.test({
+    assert("1.5".is_float_literal());
+    assert("-2.5e-3".is_float_literal());
+    assert("1e5".is_float_literal());
+    // Integers, and the names a head token can also be.
+    assert(!"15".is_float_literal());
+    assert(!"-15".is_float_literal());
+    assert(!"e5".is_float_literal());
+    assert(!"x.y".is_float_literal());
+    assert(!"".is_float_literal());
+})
+
 # The name a slot holds, with where it was written; `fallback` when the slot is a
 # child position, which has no token of its own.
 fn slot_name(self: Slot, src: str, fallback: Span) -> SpanStr {
@@ -1692,6 +1718,7 @@ fn lower_atom(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
                 return ok(AExpr(at(Char(c), tsp)));
             };
             if (let some(n) = head.int_parse()) { return ok(AExpr(at(Num(n), tsp))); };
+            if (head.is_float_literal()) { return ok(AExpr(at(FloatLit(head), tsp))); };
 
             // What is left opens with an identifier, and the token after it says which
             // of the three name forms was written.
@@ -3527,12 +3554,12 @@ fn bare_operator_import(op: str) -> str {
     assert(
         bare_operator_import(
             "+",
-        ) == """the "+" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_add as +` or `saturating_add as +` from builtins""",
+        ) == """the "+" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_add as +` or `saturating_add as +` or `float_add as +` from builtins""",
     );
     assert(
         bare_operator_import(
             "==",
-        ) == """the "==" operator has no bare form; import it aliased: `equal as ==` from builtins""",
+        ) == """the "==" operator has no bare form; pick a semantics and import it aliased, e.g. `equal as ==` or `float_equal as ==` from builtins""",
     );
 })
 
@@ -4607,8 +4634,12 @@ pub fn lower_aipl_pattern(src: str) -> Pat!ParseError {
 pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     ok(as_expr(parse(src, lex_lossless(src)?, aipl_grammar(), "expr")?, 0..src.len())?.desugared())
 }.test({
-    // Literals, and the identifier that is not one.
+    // Literals, and the identifier that is not one. A float literal is kept as written, and
+    // a call on an integer or a range over integers is not one.
     assert(expr_dump("1") == "1");
+    assert(expr_dump("1.5") == "1.5");
+    assert(expr_dump("-2.5e-3") == "-2.5e-3");
+    assert(expr_dump("f(1.5, 2)") == "f(1.5, 2)");
 
     // Type arguments follow the callee's name, in a free call and a method call.
     assert(expr_dump("f::<u8>(x)") == "TypeArgs(f(x), [u8])");
@@ -5494,7 +5525,7 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     assert(
         program_dump(
             "import { a, - } from builtins;",
-        ) == """error: the "-" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_sub as -` or `saturating_sub as -` from builtins""",
+        ) == """error: the "-" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_sub as -` or `saturating_sub as -` or `float_sub as -` from builtins""",
     );
     assert(program_dump("""import { x } from "./p.aipl";""") == `import [x] from "./p.aipl"`);
 

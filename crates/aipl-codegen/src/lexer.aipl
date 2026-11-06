@@ -629,11 +629,15 @@ fn number_end(self: str, int_end: u64) -> u64 {
     end
 }
 
-# `Float`: a digit run that extends past a fraction and/or exponent. A bare
-# digit run is 0 (no match) — it belongs to the int rule.
+# `Float`: an optional leading `-` then a digit run that extends past a fraction
+# and/or exponent. A bare digit run is 0 (no match) — it belongs to the int rule —
+# and so is a `-` not immediately followed by a digit, as for `Int`, so the sign is
+# part of a literal exactly where it is part of an integer one.
 fn float_len(self: str) -> u64 {
-    let int_end = self.count_while(is_digit);
-    if (int_end == 0) { return 0; };
+    let signed = self.first() == some('-') && self[1].is_some_and(is_digit);
+    let start: u64 = if (signed) { 1 } else { 0 };
+    let int_end = start + self[start..].count_while(is_digit);
+    if (int_end == start) { return 0; };
     let end = self.number_end(int_end);
     if (int_end < end) { end } else { 0 }
 }

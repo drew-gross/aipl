@@ -1100,12 +1100,13 @@ fn is_to_set(callee: &Callee) -> bool {
 fn is_const_literal(e: &Expr) -> bool {
     match &e.kind {
         ExprKind::Num(_)
+        | ExprKind::Float(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
         | ExprKind::Char(_)
         | ExprKind::Unit => true,
         // `-1` is a literal with a sign on it.
-        ExprKind::Neg(inner) => matches!(inner.kind, ExprKind::Num(_)),
+        ExprKind::Neg(inner) => matches!(inner.kind, ExprKind::Num(_) | ExprKind::Float(_)),
         // `"…".to_set()` — a character class. Written as a call, but it names a
         // value rather than computing one: the receiver is a literal, there is
         // no second operand to order against it, and codegen folds it to the
@@ -1352,6 +1353,7 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
         }
         ExprKind::Lambda(_, body) => check_operators(body, view)?,
         ExprKind::Num(_)
+        | ExprKind::Float(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
         | ExprKind::Char(_)
@@ -1635,7 +1637,11 @@ fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[TypeParam
             } else {
                 // User-defined struct/variant name → look up the mangled name
                 // through the file's view.
-                Type::Named(view.get(s).cloned().unwrap_or_else(|| s.clone()))
+                let resolved = view.get(s).cloned().unwrap_or_else(|| s.clone());
+                match aipl_syntax::float_primitive_of_canonical(&resolved) {
+                    Some(float) => Type::Primitive(float),
+                    None => Type::Named(resolved),
+                }
             }
         }
         Type::Optional(inner) => Type::Optional(Box::new(rewrite_type(inner, view, type_vars))),
@@ -1729,6 +1735,7 @@ fn rewrite_expr(
     };
     let kind = match &e.kind {
         ExprKind::Num(_)
+        | ExprKind::Float(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
         | ExprKind::Char(_)

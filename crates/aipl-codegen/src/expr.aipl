@@ -255,6 +255,10 @@ variant ExprKind =
     # `for (let (a, b) : xs) { .. }` and its struct and case twins, with the
     # optional index binder. Lowered by `desugar.aipl` like `LetPattern`.
     | ForPattern(pattern: Destructure, iterable: Expr, body: Expr, index: str? = none)
+    # An IEEE 754 literal, as written (`1.5`, `-2e-3`). It stays text because its width
+    # is the checker's to decide, from the position it sits in, and a literal has to be
+    # rounded once, to the width it lands at.
+    | FloatLit(str)
 
 # What a `let`, a `for` or a parameter takes a value apart with, as written. A
 # tuple's slots are its positions, so only the names are kept; a case's payload
@@ -294,6 +298,7 @@ pub fn join_spans(a: Span, b: Span) -> Span {
 pub fn show_expr(self: Expr) -> str {
     match (self.kind) {
         Num(n) => `{n}`,
+        FloatLit(text) => text,
         Bool(b) => if (b) { "true" } else { "false" },
         Str(s) => `Str({s})`,
         Char(c) => `Char({c})`,
@@ -554,7 +559,14 @@ fn wrap(e: Expr) -> Expr { expr(Neg(e)) }
 # names, so only a shim's body and an arm's body nest expressions.
 pub fn map_subexprs(self: Expr, f: (Expr) -> Expr) -> Expr {
     let kind = match (self.kind) {
-        Num(..) | Bool(..) | Str(..) | Char(..) | Ident(..) | None | Unit => self.kind,
+        Num(..)
+        | FloatLit(..)
+        | Bool(..)
+        | Str(..)
+        | Char(..)
+        | Ident(..)
+        | None
+        | Unit => self.kind,
         Call(name, args, method_style) => Call(name, each_mapped(args, f), method_style),
         Neg(x) => Neg(f(x)),
         If(cond, then_branch, else_branch) => If(f(cond), f(then_branch), f(else_branch)),
@@ -677,7 +689,7 @@ pub fn is_spread(self: Expr) -> bool {
 # body and an arm's body nest expressions.
 pub fn subexprs(self: Expr) -> Expr[] {
     match (self.kind) {
-        Num(..) | Bool(..) | Str(..) | Char(..) | Ident(..) | None | Unit => [],
+        Num(..) | FloatLit(..) | Bool(..) | Str(..) | Char(..) | Ident(..) | None | Unit => [],
         Call(_, args, _) | ArrayLit(args) | SetLit(args, _) | TupleLit(args) => args,
         Neg(x)
         | Field(x, _)

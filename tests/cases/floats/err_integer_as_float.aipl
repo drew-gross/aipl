@@ -1,0 +1,9 @@
+import { IEEE754Float64 as F64 } from builtins;
+
+fn whole() -> F64 { 1 }
+--- check --compile ---
+error: fn "whole": body returns i64, but the declared return type is IEEE754Float64
+ --> ./tests/cases/floats/err_integer_as_float.aipl:3:21
+  |
+3 | fn whole() -> F64 { 1 }
+  |                     ^

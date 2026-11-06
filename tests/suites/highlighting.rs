@@ -616,8 +616,22 @@ fn grammar_highlights_every_lexed_token() {
             .cloned()
             .collect::<Vec<_>>()
             .join("\n");
+        // The grammar read here is the checked-in one, so a lexer rule written since it was
+        // generated (a new token kind, a new scope) fails every file that uses it. That is
+        // what regenerating answers, and saying so is what lets the gate do it.
+        let stale = fs::read_to_string(tmlanguage_path()).ok() != Some(generated_tmlanguage());
+        let refill = if stale {
+            format!(
+                "\nthe checked-in grammar is out of date with its generator, which is the \
+                 likeliest cause; regenerate it with:\n    \
+                 cargo test --test compiler -- --ignored highlighting::fill_tmlanguage\n{}",
+                Fill::TmLanguage.marker()
+            )
+        } else {
+            String::new()
+        };
         panic!(
-            "{} highlighter mismatch(es) across {checked} file(s):\n{shown}",
+            "{} highlighter mismatch(es) across {checked} file(s):\n{shown}{refill}",
             failures.len()
         );
     }

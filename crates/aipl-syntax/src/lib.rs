@@ -1013,6 +1013,11 @@ pub mod ast {
         Bool,
         Char,
         Str,
+        /// IEEE 754 binary32. Spelled `IEEE754Float32` and imported from the builtins
+        /// like any other builtin type — never a bare name, so `from_name` does not know it.
+        F32,
+        /// IEEE 754 binary64, `IEEE754Float64`.
+        F64,
     }
 
     impl Primitive {
@@ -1050,7 +1055,14 @@ pub mod ast {
                 Primitive::Bool => "bool",
                 Primitive::Char => "char",
                 Primitive::Str => "str",
+                Primitive::F32 => "IEEE754Float32",
+                Primitive::F64 => "IEEE754Float64",
             }
+        }
+
+        /// Whether this is one of the IEEE 754 float types.
+        pub fn is_float(self) -> bool {
+            matches!(self, Primitive::F32 | Primitive::F64)
         }
 
         /// Whether this is one of the fixed-width integer types (`i8`..`u64`) —
@@ -1699,6 +1711,11 @@ pub mod ast {
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub enum ExprKind {
         Num(i64),
+        /// An IEEE 754 literal as written (`1.5`, `-2e-3`). It stays text until codegen:
+        /// the checker decides its width (`IEEE754Float32` or `IEEE754Float64`, default
+        /// `IEEE754Float64`) from where it sits, and a literal is rounded once, at that
+        /// width, from the digits — not from a `f64` that was already rounded.
+        Float(String),
         Bool(bool),
         Str(String),
         /// Single ASCII byte. UTF-8 codepoints above 0x7F are rejected at
@@ -2337,6 +2354,16 @@ pub fn int_signed(name: &str) -> bool {
     Primitive::from_name(name).is_some_and(Primitive::int_signed)
 }
 
+/// Whether `e` is a float literal, possibly negated: the one shape that takes the type of
+/// the float position it sits in.
+pub fn is_float_literal(e: &ast::Expr) -> bool {
+    match &e.kind {
+        ast::ExprKind::Float(_) => true,
+        ast::ExprKind::Neg(inner) => is_float_literal(inner),
+        _ => false,
+    }
+}
+
 /// If `e` is a compile-time integer constant — an integer literal, possibly
 /// negated — return its value. Used to let a bare literal flow into a narrow
 /// integer context (e.g. `i8_val == 5`) without an explicit conversion, with a
@@ -2496,6 +2523,15 @@ pub fn flex_fit(
                 Some(v) => Err((*v, p.name())),
                 None => Ok(Some(target.clone())),
             }
+        }
+        // A bare (possibly negated) float literal takes the float type its position
+        // declares. Only a literal: an integer, or a float of the other width, is
+        // never converted — the types do not mix.
+        Type::Primitive(p) if p.is_float() => {
+            if ety == target || !is_float_literal(e) {
+                return Ok(None);
+            }
+            Ok(Some(target.clone()))
         }
         // A container literal flexes when every element does. An *empty* literal
         // is left alone: it already coerces through the `__none__`/empty-arg
@@ -2684,6 +2720,27 @@ const OPERATOR_BUILTINS: &[(&str, &str, Callee)] = &[
     ("logical_not", "!", Callee::LogicalNot),
     ("saturating_divide", "/", Callee::SaturatingDivide),
     ("saturating_remainder", "%", Callee::SaturatingRemainder),
+    // The IEEE 754 operations: the float types never mix with the integers, so each
+    // operation has a name of its own, listed after the integer ones so a diagnostic
+    // that suggests an import offers the integer spelling first.
+    ("float_add", "+", Callee::FloatAdd),
+    ("float_sub", "-", Callee::FloatSub),
+    ("float_mul", "*", Callee::FloatMul),
+    ("float_div", "/", Callee::FloatDivide),
+    ("float_equal", "==", Callee::FloatEqual),
+    ("float_not_equal", "!=", Callee::FloatNotEqual),
+    ("float_less_than", "<", Callee::FloatLessThan),
+    ("float_greater_than", ">", Callee::FloatGreaterThan),
+    (
+        "float_less_than_or_equal",
+        "<=",
+        Callee::FloatLessThanOrEqual,
+    ),
+    (
+        "float_greater_than_or_equal",
+        ">=",
+        Callee::FloatGreaterThanOrEqual,
+    ),
 ];
 
 /// The single [`BinOp`] a canonical `__builtin_*` impl performs, for the
@@ -2752,7 +2809,17 @@ pub fn operator_arity(canonical: &Callee) -> Option<usize> {
         | Callee::SaturatingAdd
         | Callee::WrappingSub
         | Callee::SaturatingSub
-        | Callee::WrappingMul => Some(2),
+        | Callee::WrappingMul
+        | Callee::FloatAdd
+        | Callee::FloatSub
+        | Callee::FloatMul
+        | Callee::FloatDivide
+        | Callee::FloatEqual
+        | Callee::FloatNotEqual
+        | Callee::FloatLessThan
+        | Callee::FloatGreaterThan
+        | Callee::FloatLessThanOrEqual
+        | Callee::FloatGreaterThanOrEqual => Some(2),
         _ => binop_for_builtin(canonical).map(|_| 2),
     }
 }
@@ -3158,7 +3225,14 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
                 collect_operators(e, out);
             }
         }
-        K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::None | K::Unit | K::Ident(_) => {}
+        K::Num(_)
+        | K::Float(_)
+        | K::Bool(_)
+        | K::Str(_)
+        | K::Char(_)
+        | K::None
+        | K::Unit
+        | K::Ident(_) => {}
     }
 }
 
@@ -3761,6 +3835,7 @@ pub mod concrete {
 
     pub fn is_array_elem(t: &ConcreteType) -> bool {
         is_int_ty(t)
+            || matches!(t, ConcreteType::Primitive(p) if p.is_float())
             || matches!(
                 t,
                 ConcreteType::Primitive(Primitive::Bool | Primitive::Char | Primitive::Str)
@@ -3977,6 +4052,7 @@ pub fn type_name(t: &Type) -> String {
 /// inline composites wider than 8 bytes and aren't yet supported as elements.
 pub fn is_array_elem(t: &Type) -> bool {
     is_int_ty(t)
+        || matches!(t, Type::Primitive(p) if p.is_float())
         || matches!(
             t,
             Type::Primitive(Primitive::Bool | Primitive::Char | Primitive::Str)
@@ -4190,7 +4266,20 @@ pub const IMPORTABLE_BUILTIN_TYPES: &[&str] = &[
     "Measurement",
     "Grid",
     "RandomProvider",
+    "IEEE754Float32",
+    "IEEE754Float64",
 ];
+
+/// The float [`ast::Primitive`] that the canonical name of an imported builtin type
+/// stands for (`__builtin_IEEE754Float64` → `F64`). The loader resolves such a name
+/// to the primitive itself, so no pass after it ever sees a named float type.
+pub fn float_primitive_of_canonical(canonical: &str) -> Option<ast::Primitive> {
+    match canonical.strip_prefix("__builtin_")? {
+        "IEEE754Float32" => Some(ast::Primitive::F32),
+        "IEEE754Float64" => Some(ast::Primitive::F64),
+        _ => None,
+    }
+}
 
 /// The canonical name of the builtin `Span` struct — what an imported `Span`
 /// resolves to, and the name every pass that dispatches on "is this a range?"

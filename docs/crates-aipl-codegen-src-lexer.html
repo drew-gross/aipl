@@ -746,7 +746,7 @@
           </h3>
           <pre class="signature"><code>fn float_len(self: str) -&#62; u64</code></pre>
 
-          <div class="doc"><p><code>Float</code>: a digit run that extends past a fraction and/or exponent. A bare digit run is 0 (no match) — it belongs to the int rule.</p></div>
+          <div class="doc"><p><code>Float</code>: an optional leading <code>-</code> then a digit run that extends past a fraction and/or exponent. A bare digit run is 0 (no match) — it belongs to the int rule — and so is a <code>-</code> not immediately followed by a digit, as for <code>Int</code>, so the sign is part of a literal exactly where it is part of an integer one.</p></div>
 
 
         </section>

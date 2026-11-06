@@ -612,7 +612,11 @@ fn is_composite_literal(e: &Expr) -> bool {
 /// anything not recognized answers `false`.
 fn scalar_valued(e: &Expr) -> bool {
     match &e.kind {
-        ExprKind::Bool(_) | ExprKind::Num(_) | ExprKind::Char(_) | ExprKind::Neg(_) => true,
+        ExprKind::Bool(_)
+        | ExprKind::Num(_)
+        | ExprKind::Float(_)
+        | ExprKind::Char(_)
+        | ExprKind::Neg(_) => true,
         ExprKind::Call(callee, _, _) => {
             aipl_syntax::binop_for_builtin(callee).is_some()
                 || matches!(

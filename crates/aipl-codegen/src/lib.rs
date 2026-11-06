@@ -92,7 +92,7 @@ use cranelift::{
         Context,
     },
     prelude::{
-        settings, types, AbiParam, Configurable, FunctionBuilder, FunctionBuilderContext,
+        settings, types, AbiParam, Configurable, FloatCC, FunctionBuilder, FunctionBuilderContext,
         InstBuilder, IntCC, MemFlagsData, StackSlotData, StackSlotKind, Value,
     },
 };
@@ -540,6 +540,54 @@ extern "C" fn aipl_write_i64(dst: *const u8, n: i64) -> *const u8 {
         std::ptr::copy_nonoverlapping(buf.as_ptr(), dst as *mut u8, len);
         dst.add(len)
     }
+}
+
+/// The rendered byte length of the IEEE 754 float whose bits are `bits` (the low 32 of
+/// them for `width` 32). Must agree, byte-for-byte, with `aipl_write_float`.
+#[no_mangle]
+extern "C" fn aipl_float_len(bits: i64, width: i64) -> i64 {
+    let mut buf = [0u8; 48];
+    fmt_float(&mut buf, bits, width) as i64
+}
+
+/// Write the float's rendering at `dst`; return the advanced cursor.
+#[no_mangle]
+extern "C" fn aipl_write_float(dst: *const u8, bits: i64, width: i64) -> *const u8 {
+    let mut buf = [0u8; 48];
+    let len = fmt_float(&mut buf, bits, width);
+    unsafe {
+        std::ptr::copy_nonoverlapping(buf.as_ptr(), dst as *mut u8, len);
+        dst.add(len)
+    }
+}
+
+/// Render a float the way its literal is written: the shortest digits that read back as
+/// the same value, with a `.0` on a whole number (`1.5`, `2.0`, `1e21`, `NaN`, `inf`).
+/// Returns the byte count. The AOT runtime's `fmt_float` is the same function.
+fn fmt_float(buf: &mut [u8; 48], bits: i64, width: i64) -> usize {
+    use std::fmt::Write;
+    struct Cursor<'a> {
+        buf: &'a mut [u8; 48],
+        len: usize,
+    }
+    impl Write for Cursor<'_> {
+        fn write_str(&mut self, s: &str) -> std::fmt::Result {
+            let end = self.len + s.len();
+            if end > self.buf.len() {
+                return Err(std::fmt::Error);
+            }
+            self.buf[self.len..end].copy_from_slice(s.as_bytes());
+            self.len = end;
+            Ok(())
+        }
+    }
+    let mut out = Cursor { buf, len: 0 };
+    let _ = if width == 32 {
+        write!(out, "{:?}", f32::from_bits(bits as u32))
+    } else {
+        write!(out, "{:?}", f64::from_bits(bits as u64))
+    };
+    out.len
 }
 
 /// Format `n` in decimal into `buf[0..]`, returning the byte count.
@@ -3729,6 +3777,8 @@ fn new_jit_module(frame_pointers: bool) -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_measure_read", aipl_measure_read as *const u8);
     jit_builder.symbol("aipl_test_summary", aipl_test_summary as *const u8);
     jit_builder.symbol("aipl_i64_len", aipl_i64_len as *const u8);
+    jit_builder.symbol("aipl_float_len", aipl_float_len as *const u8);
+    jit_builder.symbol("aipl_write_float", aipl_write_float as *const u8);
     jit_builder.symbol("aipl_write_i64", aipl_write_i64 as *const u8);
     jit_builder.symbol("aipl_u64_len", aipl_u64_len as *const u8);
     jit_builder.symbol("aipl_write_u64", aipl_write_u64 as *const u8);
@@ -6842,6 +6892,8 @@ fn is_inline_slot(ty: &ConcreteType, decls: &HashMap<&str, TypeDeclRef>) -> bool
         // Every scalar: any integer width, `bool`, `char`, `str` — and a
         // `Case<V>`, which is its tag alone, one word wide and owning nothing.
         _ if is_set_elem(ty) => true,
+        // A float, held as its bits in the one word.
+        ConcreteType::Primitive(p) if p.is_float() => true,
         // Another declared struct or variant, stored inline — unless it is boxed
         // (recursive), when the slot is an 8-byte pointer instead.
         ConcreteType::Named(n) => decls.contains_key(n.as_str()),
@@ -6895,7 +6947,7 @@ fn resolve_inline_sizes(
 /// The inline-slot types, spelled for a diagnostic. Shared by the `struct` field
 /// and `variant` payload messages so one list cannot drift from the other or
 /// from [`is_inline_slot`].
-const INLINE_SLOT_TYPES: &str = "an integer (i8..i64, u8..u64), bool, char, str, \
+const INLINE_SLOT_TYPES: &str = "an integer (i8..i64, u8..u64), a float, bool, char, str, \
      a function, a struct, a variant, an array, a set, a dict, or an optional of any of those";
 
 /// Lay out a `struct`: fields are stored sequentially (no padding — every
@@ -6998,6 +7050,40 @@ fn build_variant_layout(
 
 fn cl_type_of(_t: &ConcreteType) -> types::Type {
     types::I64
+}
+
+/// The bits a float literal's text stands for at width `p`, as the `i64` register value:
+/// an `IEEE754Float64`'s own 64 bits, or an `IEEE754Float32`'s 32 in the low half with the
+/// rest zero. Parsed at that width, so an `IEEE754Float32` is rounded once, from the
+/// digits. `None` when the text is not a number.
+fn float_literal_bits(text: &str, p: Primitive) -> Option<i64> {
+    match p {
+        Primitive::F32 => text.parse::<f32>().ok().map(|f| i64::from(f.to_bits())),
+        _ => text.parse::<f64>().ok().map(|f| f.to_bits() as i64),
+    }
+}
+
+/// A float held in its `i64` register — all bits at its own width, the low half of the
+/// register for an `IEEE754Float32` — as a Cranelift float value.
+fn float_from_bits(builder: &mut FunctionBuilder, v: Value, p: Primitive) -> Value {
+    match p {
+        Primitive::F32 => {
+            let low = builder.ins().ireduce(types::I32, v);
+            builder.ins().bitcast(types::F32, MemFlagsData::new(), low)
+        }
+        _ => builder.ins().bitcast(types::F64, MemFlagsData::new(), v),
+    }
+}
+
+/// The inverse of [`float_from_bits`]: the register form of a Cranelift float value.
+fn float_to_bits(builder: &mut FunctionBuilder, f: Value, p: Primitive) -> Value {
+    match p {
+        Primitive::F32 => {
+            let low = builder.ins().bitcast(types::I32, MemFlagsData::new(), f);
+            builder.ins().uextend(types::I64, low)
+        }
+        _ => builder.ins().bitcast(types::I64, MemFlagsData::new(), f),
+    }
 }
 
 /// Re-canonicalize an `i64`-register value to integer type `name`'s width: a
@@ -7294,6 +7380,10 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_str_write_ptr" | "aipl_i64_len" | "aipl_u64_len" | "aipl_const_peek" => {
             (1, Ret::Word)
         }
+        // A float's rendered length (its bits and its width, 32 or 64), and the same
+        // rendering written at a cursor.
+        "aipl_float_len" => (2, Ret::Word),
+        "aipl_write_float" => (3, Ret::Word),
         // A constant's cache slot: the index and the byte size to give it on
         // first request.
         "aipl_const_slot" => (2, Ret::Word),
@@ -13322,6 +13412,20 @@ fn emit_render<M: Module>(
             }
             len
         }
+        // A float renders as it is written as a literal (`1.5`, `2.0`, `NaN`, `inf`): the
+        // runtime formats it from its bits, given its width.
+        ConcreteType::Primitive(p) if p.is_float() => {
+            let width = builder
+                .ins()
+                .iconst(types::I64, if *p == Primitive::F32 { 32 } else { 64 });
+            let len = { b.call(module, builder, "aipl_float_len", &[value, width]) };
+            if let Sink::Write(cur) = sink {
+                let dst = builder.ins().stack_load(types::I64, types::I64, cur, 0);
+                let adv = b.call(module, builder, "aipl_write_float", &[dst, value, width]);
+                builder.ins().stack_store(types::I64, adv, cur, 0);
+            }
+            len
+        }
         ConcreteType::Primitive(Primitive::Bool) => {
             // "true" (4) or "false" (5).
             let four = builder.ins().iconst(types::I64, 4);
@@ -16669,6 +16773,72 @@ fn compile_call_expr_direct<M: Module>(
                 emit_int_addsub(builder, lv, rv, p, sub, saturating)
             };
             (out, ConcreteType::Primitive(p))
+        }
+        Callee::FloatAdd
+        | Callee::FloatSub
+        | Callee::FloatMul
+        | Callee::FloatDivide
+        | Callee::FloatEqual
+        | Callee::FloatNotEqual
+        | Callee::FloatLessThan
+        | Callee::FloatGreaterThan
+        | Callee::FloatLessThanOrEqual
+        | Callee::FloatGreaterThanOrEqual => {
+            // Both operands the same float type (checker-verified), each held as its bits
+            // in an `i64`; the operation is done on the float and the result put back.
+            // A comparison involving NaN is false, and `float_not_equal` true, which are
+            // the ordered/unordered condition codes below.
+            let [lhs, rhs] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (lv, lt) = compile_expr(module, builder, cx, scopes, lhs)?;
+            let (rv, rt) = compile_expr(module, builder, cx, scopes, rhs)?;
+            let p = match (&lt, &rt) {
+                (ConcreteType::Primitive(a), ConcreteType::Primitive(b))
+                    if a.is_float() && a == b =>
+                {
+                    *a
+                }
+                _ => {
+                    return Err(Error::at(
+                        format!(
+                            "{name} takes two floats of one type, got {} and {}",
+                            type_name(&lt),
+                            type_name(&rt)
+                        ),
+                        span.clone(),
+                    ))
+                }
+            };
+            let l = float_from_bits(builder, lv, p);
+            let r = float_from_bits(builder, rv, p);
+            let arithmetic = match callee {
+                Callee::FloatAdd => Some(builder.ins().fadd(l, r)),
+                Callee::FloatSub => Some(builder.ins().fsub(l, r)),
+                Callee::FloatMul => Some(builder.ins().fmul(l, r)),
+                Callee::FloatDivide => Some(builder.ins().fdiv(l, r)),
+                _ => None,
+            };
+            if let Some(result) = arithmetic {
+                (
+                    float_to_bits(builder, result, p),
+                    ConcreteType::Primitive(p),
+                )
+            } else {
+                let cc = match callee {
+                    Callee::FloatEqual => FloatCC::Equal,
+                    Callee::FloatNotEqual => FloatCC::NotEqual,
+                    Callee::FloatLessThan => FloatCC::LessThan,
+                    Callee::FloatGreaterThan => FloatCC::GreaterThan,
+                    Callee::FloatLessThanOrEqual => FloatCC::LessThanOrEqual,
+                    _ => FloatCC::GreaterThanOrEqual,
+                };
+                let flag = builder.ins().fcmp(cc, l, r);
+                (
+                    builder.ins().uextend(types::I64, flag),
+                    ConcreteType::Primitive(Primitive::Bool),
+                )
+            }
         }
         Callee::ToStr | Callee::TemplateInterp => {
             // Generic `to_str(x)`, and a template literal's `{x}`, which is the
@@ -20275,6 +20445,8 @@ fn compile_call_expr_direct<M: Module>(
             match &t {
                 // Every scalar: any integer width, `bool`, `char`, `str`.
                 _ if is_set_elem(&t) => {}
+                // A float is one word of bits, like a scalar.
+                ConcreteType::Primitive(p) if p.is_float() => {}
                 // A struct (`Point?`) is stored inline, as is a nested optional
                 // (`some(some(..))` → `T??`). An array and a set are each one
                 // heap pointer, which fits the optional slot.
@@ -21239,6 +21411,24 @@ fn compile_expr_inner<M: Module>(
             builder.ins().iconst(types::I64, *n),
             ConcreteType::Primitive(Primitive::I64),
         ),
+        ExprKind::Float(text) => {
+            // The checker recorded the width the literal landed at; one nothing pinned
+            // is `IEEE754Float64`. It is rounded here, once, from its digits.
+            let p = match expr.ty.as_deref() {
+                Some(Type::Primitive(Primitive::F32)) => Primitive::F32,
+                _ => Primitive::F64,
+            };
+            let bits = float_literal_bits(text, p).ok_or_else(|| {
+                Error::at(
+                    format!("{text:?} is not a valid {} literal", p.name()),
+                    span.clone(),
+                )
+            })?;
+            (
+                builder.ins().iconst(types::I64, bits),
+                ConcreteType::Primitive(p),
+            )
+        }
         ExprKind::Bool(b) => (
             builder.ins().iconst(types::I64, if *b { 1 } else { 0 }),
             ConcreteType::Primitive(Primitive::Bool),
@@ -21625,6 +21815,14 @@ fn compile_expr_inner<M: Module>(
         }
         ExprKind::Neg(inner) => {
             let (v, t) = compile_expr(module, builder, cx, scopes, inner)?;
+            // A float negates by flipping its sign bit, which also negates zero and NaN.
+            if let ConcreteType::Primitive(p) = &t {
+                if p.is_float() {
+                    let f = float_from_bits(builder, v, *p);
+                    let negated = builder.ins().fneg(f);
+                    return Ok((float_to_bits(builder, negated, *p), t));
+                }
+            }
             expect_type(
                 &t,
                 &ConcreteType::Primitive(Primitive::I64),

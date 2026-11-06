@@ -1628,6 +1628,54 @@ pub extern "C" fn aipl_write_i64(dst: *const u8, n: i64) -> *const u8 {
     }
 }
 
+/// The rendered byte length of the IEEE 754 float whose bits are `bits` (the low 32 of
+/// them for `width` 32), matching `aipl_write_float`.
+#[no_mangle]
+pub extern "C" fn aipl_float_len(bits: i64, width: i64) -> i64 {
+    let mut buf = [0u8; 48];
+    fmt_float(&mut buf, bits, width) as i64
+}
+
+/// Write the float's rendering at `dst`; return the advanced cursor.
+#[no_mangle]
+pub extern "C" fn aipl_write_float(dst: *const u8, bits: i64, width: i64) -> *const u8 {
+    unsafe {
+        let mut buf = [0u8; 48];
+        let len = fmt_float(&mut buf, bits, width);
+        memcpy(dst as *mut c_void, buf.as_ptr() as *const c_void, len);
+        dst.add(len)
+    }
+}
+
+/// Render a float the way its literal is written: the shortest digits that read back as
+/// the same value, with a `.0` on a whole number. The JIT runtime's `fmt_float` is the
+/// same function; `core::fmt` is the one implementation of shortest round-trip both use.
+fn fmt_float(buf: &mut [u8; 48], bits: i64, width: i64) -> usize {
+    use core::fmt::Write;
+    struct Cursor<'a> {
+        buf: &'a mut [u8; 48],
+        len: usize,
+    }
+    impl Write for Cursor<'_> {
+        fn write_str(&mut self, s: &str) -> core::fmt::Result {
+            let end = self.len + s.len();
+            if end > self.buf.len() {
+                return Err(core::fmt::Error);
+            }
+            self.buf[self.len..end].copy_from_slice(s.as_bytes());
+            self.len = end;
+            Ok(())
+        }
+    }
+    let mut out = Cursor { buf, len: 0 };
+    let _ = if width == 32 {
+        write!(out, "{:?}", f32::from_bits(bits as u32))
+    } else {
+        write!(out, "{:?}", f64::from_bits(bits as u64))
+    };
+    out.len
+}
+
 /// Format `n` (unsigned) into the END of `buf`, returning the start index.
 fn fmt_u64(buf: &mut [u8; 20], mut n: u64) -> usize {
     let mut i = buf.len();

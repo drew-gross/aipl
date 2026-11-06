@@ -375,7 +375,9 @@ fn lcr_expr(e: &Expr, lcr: &Lcr<'_>, scope: &mut Vec<String>) -> Expr {
             );
             rw(K::Lambda(params, Box::new(body)))
         }
-        K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::None | K::Unit => e.clone(),
+        K::Num(_) | K::Float(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::None | K::Unit => {
+            e.clone()
+        }
         K::Call(name, args, method) => rw(K::Call(
             name.clone(),
             args.iter().map(|a| lcr_expr(a, lcr, scope)).collect(),
@@ -855,6 +857,7 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
             ExprKind::Lambda(new_params, Box::new(lt_expr(body, fm, ord)))
         }
         ExprKind::Num(_)
+        | ExprKind::Float(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
         | ExprKind::Char(_)
@@ -1302,9 +1305,14 @@ impl GenericLowerer {
                     .collect::<Result<_, Error>>()?;
                 K::Lambda(params, b(self, body)?)
             }
-            K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::None | K::Unit | K::Ident(_) => {
-                e.kind.clone()
-            }
+            K::Num(_)
+            | K::Float(_)
+            | K::Bool(_)
+            | K::Str(_)
+            | K::Char(_)
+            | K::None
+            | K::Unit
+            | K::Ident(_) => e.kind.clone(),
             K::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
             K::TypeArgs(x, tys) => K::TypeArgs(b(self, x)?, tys.clone()),
             K::Spread(..) => unreachable!("array spreads are desugared by the loader"),
@@ -6659,6 +6667,14 @@ impl Mono<'_> {
                 )
             }
             ExprKind::Num(_) => (expr.clone(), Type::Primitive(Primitive::I64)),
+            // The width the checker recorded on the literal, else `IEEE754Float64`.
+            ExprKind::Float(_) => (
+                expr.clone(),
+                match expr.ty.as_deref() {
+                    Some(t @ Type::Primitive(p)) if p.is_float() => t.clone(),
+                    _ => Type::Primitive(Primitive::F64),
+                },
+            ),
             ExprKind::Bool(_) => (expr.clone(), Type::Primitive(Primitive::Bool)),
             ExprKind::Str(_) => (expr.clone(), Type::Primitive(Primitive::Str)),
             ExprKind::Char(_) => (expr.clone(), Type::Primitive(Primitive::Char)),
@@ -8981,9 +8997,14 @@ fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
             r(body),
         ),
         // Leaves: nothing to rewrite.
-        K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::Ident(_) | K::None | K::Unit => {
-            e.kind.clone()
-        }
+        K::Num(_)
+        | K::Float(_)
+        | K::Bool(_)
+        | K::Str(_)
+        | K::Char(_)
+        | K::Ident(_)
+        | K::None
+        | K::Unit => e.kind.clone(),
         // Everything else just carries the substitution to its children.
         K::Call(name, args, m) => K::Call(name.clone(), args.iter().map(|a| *r(a)).collect(), *m),
         K::Neg(x) => K::Neg(r(x)),
@@ -9248,6 +9269,7 @@ fn collect_free(
             }
         }
         ExprKind::Num(_)
+        | ExprKind::Float(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
         | ExprKind::Char(_)
@@ -9772,6 +9794,7 @@ pub(crate) fn body_size(e: &Expr) -> usize {
     let leaf = matches!(
         e.kind,
         ExprKind::Num(_)
+            | ExprKind::Float(_)
             | ExprKind::Bool(_)
             | ExprKind::Str(_)
             | ExprKind::Char(_)
@@ -10555,6 +10578,7 @@ fn replace_call(
             Box::new(rc(body, replaced)),
         ),
         ExprKind::Num(_)
+        | ExprKind::Float(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
         | ExprKind::Char(_)
@@ -11269,6 +11293,7 @@ fn aliases_or_unsafe(
         ExprKind::Shim(_, _, body) => rec_tail(body),
         ExprKind::Ident(n) => n == name && !tail,
         ExprKind::Num(_)
+        | ExprKind::Float(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
         | ExprKind::Char(_)
@@ -11490,6 +11515,7 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
         ExprKind::Shim(_, _, body) => c(body),
         ExprKind::Ident(n) => usize::from(n == name),
         ExprKind::Num(_)
+        | ExprKind::Float(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
         | ExprKind::Char(_)
@@ -11571,6 +11597,7 @@ fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
         ExprKind::Lambda(_, body) => find_move_into(param, body),
         ExprKind::Ident(_)
         | ExprKind::Num(_)
+        | ExprKind::Float(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
         | ExprKind::Char(_)

@@ -252,9 +252,18 @@ fn final_scope(plan: &discovery::Plan) -> Option<Vec<String>> {
     Some(
         plan.fail_cases
             .iter()
-            .map(|case| match case.strip_prefix("cases/") {
-                Some(rest) => format!("tests/cases/{rest}"),
-                None => case.clone(),
+            .map(|case| {
+                // A case that was added is named without its extension (the name its
+                // `#[test]` is spelled from); `check` takes a file.
+                let file = if case.ends_with(".aipl") {
+                    case.clone()
+                } else {
+                    format!("{case}.aipl")
+                };
+                match file.strip_prefix("cases/") {
+                    Some(rest) => format!("tests/cases/{rest}"),
+                    None => file,
+                }
             })
             .collect(),
     )
@@ -1268,6 +1277,18 @@ mod tests {
             Some(vec![
                 "tests/cases/arrays/nonempty.aipl".to_string(),
                 "examples/hello.aipl".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn a_case_added_in_this_run_is_scoped_by_its_file_though_it_is_named_without_one() {
+        let plan = plan_with(&["cases/floats/arithmetic", "crates/aipl-codegen/src/add"]);
+        assert_eq!(
+            final_scope(&plan),
+            Some(vec![
+                "tests/cases/floats/arithmetic.aipl".to_string(),
+                "crates/aipl-codegen/src/add.aipl".to_string()
             ])
         );
     }

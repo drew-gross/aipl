@@ -496,7 +496,7 @@ fn fmt_kind(k: AiplTok) -> FmtKind {
         Pub | Let | For | While | Mut | Set | Match | Return | Shim | Builtins | Without => Keyword,
         True | False | None => Constant,
         Name(n) => if (is_builtin_type_name(n)) { BuiltinType } else { Ident },
-        IntLit(_) => Num,
+        IntLit(_) | FloatLit(_) => Num,
         StrLit(_, _) => StrTok,
         CharTok(_) => CharTok,
         EqEq | Ne | Arrow | FatArrow | AndAnd | OrOr | Pipe | DotDot => Op,

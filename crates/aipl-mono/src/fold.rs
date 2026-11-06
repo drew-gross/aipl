@@ -168,6 +168,7 @@ fn fold_expr(e: &Expr, env: &HashMap<String, ExprKind>) -> Expr {
         // other name stands for itself.
         ExprKind::Ident(n) => env.get(n).cloned().unwrap_or_else(|| e.kind.clone()),
         ExprKind::Num(_)
+        | ExprKind::Float(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
         | ExprKind::Char(_)

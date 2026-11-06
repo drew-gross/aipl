@@ -415,6 +415,7 @@ fn mentionable(e: &Expr) -> bool {
         e.kind,
         ExprKind::Ident(_)
             | ExprKind::Num(_)
+            | ExprKind::Float(_)
             | ExprKind::Bool(_)
             | ExprKind::Str(_)
             | ExprKind::Char(_)
@@ -1229,6 +1230,7 @@ impl Expander {
         };
         let kind = match &e.kind {
             ExprKind::Num(_)
+            | ExprKind::Float(_)
             | ExprKind::Bool(_)
             | ExprKind::Str(_)
             | ExprKind::Char(_)

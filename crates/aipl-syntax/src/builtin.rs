@@ -394,6 +394,60 @@ const BUILTINS: &[Builtin] = &[
          `saturating_remainder as %`.",
     ),
     Builtin::described(
+        Callee::FloatAdd,
+        "fn float_add<T: float>(a: T, b: T) -> T",
+        "Addition of IEEE 754 floats of one type; floats and integers never mix. Import it as the \
+         operator: `float_add as +`.",
+    ),
+    Builtin::described(
+        Callee::FloatSub,
+        "fn float_sub<T: float>(a: T, b: T) -> T",
+        "Subtraction of IEEE 754 floats of one type; floats and integers never mix. Import it as the \
+         operator: `float_sub as -`.",
+    ),
+    Builtin::described(
+        Callee::FloatMul,
+        "fn float_mul<T: float>(a: T, b: T) -> T",
+        "Multiplication of IEEE 754 floats of one type; floats and integers never mix. Import it as the \
+         operator: `float_mul as *`.",
+    ),
+    Builtin::described(
+        Callee::FloatDivide,
+        "fn float_div<T: float>(a: T, b: T) -> T",
+        "Division of IEEE 754 floats of one type; floats and integers never mix. Import it as the \
+         operator: `float_div as /`.",
+    ),
+    Builtin::described(
+        Callee::FloatEqual,
+        "fn float_equal<T: float>(a: T, b: T) -> bool",
+        "Whether the two floats are equal (false when either is NaN). Import it as the operator: `float_equal as ==`.",
+    ),
+    Builtin::described(
+        Callee::FloatNotEqual,
+        "fn float_not_equal<T: float>(a: T, b: T) -> bool",
+        "Whether the two floats differ (true when either is NaN). Import it as the operator: `float_not_equal as !=`.",
+    ),
+    Builtin::described(
+        Callee::FloatLessThan,
+        "fn float_less_than<T: float>(a: T, b: T) -> bool",
+        "Whether `a` is less than `b` (false when either is NaN). Import it as the operator: `float_less_than as <`.",
+    ),
+    Builtin::described(
+        Callee::FloatGreaterThan,
+        "fn float_greater_than<T: float>(a: T, b: T) -> bool",
+        "Whether `a` is greater than `b` (false when either is NaN). Import it as the operator: `float_greater_than as >`.",
+    ),
+    Builtin::described(
+        Callee::FloatLessThanOrEqual,
+        "fn float_less_than_or_equal<T: float>(a: T, b: T) -> bool",
+        "Whether `a` is less than or equal to `b` (false when either is NaN). Import it as the operator: `float_less_than_or_equal as <=`.",
+    ),
+    Builtin::described(
+        Callee::FloatGreaterThanOrEqual,
+        "fn float_greater_than_or_equal<T: float>(a: T, b: T) -> bool",
+        "Whether `a` is greater than or equal to `b` (false when either is NaN). Import it as the operator: `float_greater_than_or_equal as >=`.",
+    ),
+    Builtin::described(
         Callee::Equal,
         "fn equal<T: any>(a: T, b: T) -> bool",
         "Whether the two values are equal. Import it as the operator: `equal as ==`.",

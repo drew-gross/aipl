@@ -25,7 +25,7 @@ variant Shape = Circle(r: i64) | Square(i64) | Empty
 - `fn main() { .. }` void; effects (`!prints`, `!read_files`, ..) must be declared by callers too.
 
 ## Types
-`i64 u64 u8 .. bool char str`, `T[]`, `T?`, `T!E`, `T[,]` grid, `#{T}` set (`#>{T}` `#<{T}` ordered), `#{K: V}` dict,
+`i64 u64 u8 .. bool char str`, floats (`import { IEEE754Float64 as Float } from builtins;`, or `as F32`/`as F64` when a file uses both; never mixed with ints), `T[]`, `T?`, `T!E`, `T[,]` grid, `#{T}` set (`#>{T}` `#<{T}` ordered), `#{K: V}` dict,
 `(A, B)` tuple, `(A) -> B` function, `Case<V>`. `()` unit.
 
 ## Expressions
@@ -69,4 +69,5 @@ less_than_or_equal greater_than_or_equal`; `&& ||` `logical_and logical_or`; `!`
 - **grids**: grid_of grid_from grid_get grid_try_set width height is_in_bounds_of
 - **io/terminal**: read_file_to_string write_string_to_file list_files read_line read_byte read_key execute_program clear_terminal move_to
 - **json**: parse_json (`Json!str`; `Json` cases Null Bool Number String Array Object(Member[]), `Member { key, value }`; numbers stay text)
+- **floats**: float_add float_sub float_mul float_div float_equal float_not_equal float_less_than float_greater_than float_less_than_or_equal float_greater_than_or_equal (import `name as op`; a file has one `==`, so use `equal(a, b)` for non-floats beside `float_equal as ==`; unary `-` needs `float_sub as -`; floats are not `ord`, not set/dict keys, and a struct holding one has no `==`)
 - **misc**: min max hash now_nanos measure Measurement Span

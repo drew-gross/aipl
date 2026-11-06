@@ -76,3 +76,10 @@ language perf (from the parse_json investigation; counts are IR instructions via
   `mut t = f(); set t.field++; t` forks the struct (16 retain/release pairs, ~480 instr) vs ~4 for the spread: move the dead call result into the `mut`
   `[x].repeat(n)` ~37 IR instr/element: bulk fill
   unexplained: a 2-param recursive `m(r: Rule, d) { Opt(sub) => m(sub, d) }` does one rec_inc_strong/dec_strong per node, the 1-param version none; `acc.extend(heap_array)` reallocs where `extend([i])` doesn't
+floats (first landing: types, literals, + - * /, comparisons, to_str; conversions and formatting options are TODO.txt's):
+  no compound float operators (`set x += 0.5;`): float_add_assign etc. are not defined, and the compound_assign lint cannot pair float_add
+  `t.0.1` (nested tuple slots) lexes `0.1` as a float: write `(t.0).1`
+  a variant payload holding a float is not rejected by `==` (only struct, tuple, array, optional, set, dict, result are walked)
+  a file can import one `==`: with `float_equal as ==` every other comparison there is `equal(a, b)`; consider `==` choosing by operand type if this proves noisy
+  no way to compare floats within a tolerance, no float literals in patterns, no float to int or int to float conversion
+  `wrapping_add(a, b)` on floats says "expected i64"; only the operator spelling names the float import

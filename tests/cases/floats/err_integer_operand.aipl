@@ -1,0 +1,9 @@
+import { IEEE754Float64 as F64, float_add as + } from builtins;
+
+fn bump(a: F64) -> F64 { a + 1 }
+--- check --compile ---
+error: "float_add" takes IEEE 754 floats, but this operand is i64: floats and integers never mix, and nothing converts between them
+ --> ./tests/cases/floats/err_integer_operand.aipl:3:30
+  |
+3 | fn bump(a: F64) -> F64 { a + 1 }
+  |                              ^

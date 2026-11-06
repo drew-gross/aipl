@@ -139,9 +139,14 @@ impl Expr {
     pub fn children(&self) -> Children<'_> {
         use ExprKind as K;
         match &self.kind {
-            K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::Ident(_) | K::None | K::Unit => {
-                Children::none()
-            }
+            K::Num(_)
+            | K::Float(_)
+            | K::Bool(_)
+            | K::Str(_)
+            | K::Char(_)
+            | K::Ident(_)
+            | K::None
+            | K::Unit => Children::none(),
             K::Shim(_, _, x)
             | K::Neg(x)
             | K::Field(x, _)
@@ -176,9 +181,14 @@ impl Expr {
     pub fn children_mut(&mut self) -> ChildrenMut<'_> {
         use ExprKind as K;
         match &mut self.kind {
-            K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::Ident(_) | K::None | K::Unit => {
-                ChildrenMut::none()
-            }
+            K::Num(_)
+            | K::Float(_)
+            | K::Bool(_)
+            | K::Str(_)
+            | K::Char(_)
+            | K::Ident(_)
+            | K::None
+            | K::Unit => ChildrenMut::none(),
             K::Shim(_, _, x)
             | K::Neg(x)
             | K::Field(x, _)

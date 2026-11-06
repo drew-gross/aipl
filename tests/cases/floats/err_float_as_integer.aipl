@@ -1,0 +1,7 @@
+fn tenth() -> i64 { 0.1 }
+--- check --compile ---
+error: fn "tenth": body returns IEEE754Float64, but the declared return type is i64
+ --> ./tests/cases/floats/err_float_as_integer.aipl:1:21
+  |
+1 | fn tenth() -> i64 { 0.1 }
+  |                     ^^^
