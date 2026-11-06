@@ -34,15 +34,13 @@ deallocations     9
 reallocations     0
 bytes allocated   609
 peak live bytes   609
-instructions      1338
-binary size       6192 bytes (code 2924, data 482, metadata 2786)
+instructions      1743
+binary size       7040 bytes (code 3900, data 482, metadata 2658)
 
 function                   calls  code bytes
-__ctor$Tagged$Nums             3         192
-__test$__test_block_1          1         876
+__ctor$Tagged$Nums             3         248
+__test$__test_block_1          1        1332
 __to_str_Tagged                3        1184
-aipl_arr_inc                   6    external
-aipl_array_dec                 6    external
 aipl_assert                    3    external
 aipl_i64_len                  10    external
 aipl_test_begin                1    external
@@ -50,5 +48,5 @@ aipl_test_end                  1    external
 aipl_test_summary              1    external
 aipl_write_bytes              17    external
 aipl_write_i64                 5    external
-applied                        3         564
+applied                        3        1028
 main                           1         108

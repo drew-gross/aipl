@@ -67,29 +67,26 @@ deallocations     389
 reallocations     0
 bytes allocated   23820
 peak live bytes   23820
-instructions      17747
-binary size       9200 bytes (code 4700, data 495, metadata 4005)
+instructions      21154
+binary size       11568 bytes (code 7392, data 495, metadata 3681)
 
 function                   calls  code bytes
-__arr_drop_Rule               59         116
-__arr_retain_Rule              0         116
-__rec_drop_Rule              306         124
-__test$__test_block_1          1        3136
+__arr_drop_Rule               59         148
+__arr_retain_Rule              0          84
+__rec_drop_Rule              306         168
+__test$__test_block_1          1        5652
 __to_str_u64                  10         204
-aipl_arr_inc                   1    external
-aipl_array_dec                60    external
+aipl_array_dec                59    external
 aipl_array_new                59    external
 aipl_assert                    3    external
 aipl_rec_alloc               306    external
-aipl_rec_dec_strong          365    external
+aipl_rec_dec_strong          306    external
 aipl_rec_dec_weak            178    external
-aipl_rec_inc_strong           59    external
-aipl_rec_inc_weak            178    external
 aipl_test_begin                1    external
 aipl_test_end                  1    external
 aipl_test_summary              1    external
 aipl_u64_len                  20    external
 aipl_write_u64                10    external
-deep                         179         596
+deep                         179         728
 main                           1         108
 styles$len                   306         300

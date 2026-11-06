@@ -55,12 +55,12 @@ fn filled(n: i64, x: i64) -> i64[] {
     assert(allocations == 1);
     assert(bytes_allocated == 64);
     assert(peak_live_bytes == 1552);
-    assert(instructions == 2700);
+    assert(instructions == 2748);
     let three_times = measure("build 300", 300, |n| filled(n, 7));
     assert(three_times.allocations == 1);
     assert(three_times.bytes_allocated == 64);
     assert(three_times.peak_live_bytes == 3088);
-    assert(three_times.instructions == 7900);
+    assert(three_times.instructions == 7948);
 })
 
 // Counting stops once the answer is settled, so it costs the same on ten elements

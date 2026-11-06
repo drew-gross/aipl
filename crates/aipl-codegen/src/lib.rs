@@ -7953,28 +7953,6 @@ fn reject_unit_binding(ty: &ConcreteType, name: &str, span: Span) -> Result<(), 
     Ok(())
 }
 
-/// Replace whole-token occurrences of `from` in `s`, where "whole-token" means the
-/// match is not immediately followed by an ASCII digit. This avoids replacing
-/// "userextname7" inside "userextname70".
-fn replace_whole_number_token(s: &str, from: &str, to: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut rest = s;
-    while let Some(pos) = rest.find(from) {
-        let end = pos + from.len();
-        if rest[end..].starts_with(|c: char| c.is_ascii_digit()) {
-            // Part of a larger number-suffixed token; skip one character and retry.
-            out.push_str(&rest[..pos + 1]);
-            rest = &rest[pos + 1..];
-        } else {
-            out.push_str(&rest[..pos]);
-            out.push_str(to);
-            rest = &rest[end..];
-        }
-    }
-    out.push_str(rest);
-    out
-}
-
 /// Post-process a CLIF function's IR text to replace opaque `userextname<N>` tokens
 /// (used by Cranelift's display for global-value symbol names) with the explicit
 /// `u<ns>:<idx>` form for any entry that has `namespace == 1` (data-object refs).
@@ -7985,30 +7963,37 @@ fn replace_whole_number_token(s: &str, from: &str, to: &str) -> String {
 /// data refs at the wrong slot. Emitting `u1:<idx>` makes the reference self-describing
 /// so the reader inserts the correct `UserExternalName { namespace: 1, index: idx }`.
 fn fix_data_ref_names(func: &Function, ir: &str) -> String {
-    let mut data_refs: Vec<(u32, u32)> = func
+    const TOKEN: &str = "userextname";
+    let data_refs: HashMap<u32, u32> = func
         .params
         .user_named_funcs()
         .iter()
-        .filter_map(|(ref_, name)| {
-            if name.namespace == 1 {
-                Some((ref_.as_u32(), name.index))
-            } else {
-                None
-            }
-        })
+        .filter_map(|(ref_, name)| (name.namespace == 1).then_some((ref_.as_u32(), name.index)))
         .collect();
     if data_refs.is_empty() {
         return ir.to_string();
     }
-    // Process larger indices first so "userextname70" is handled before "userextname7".
-    data_refs.sort_by(|(a, _), (b, _)| b.cmp(a));
-    let mut result = ir.to_string();
-    for (n, idx) in data_refs {
-        let from = format!("userextname{n}");
-        let to = format!("u1:{idx}");
-        result = replace_whole_number_token(&result, &from, &to);
+    // One pass over the text, reading each token's whole number, so that
+    // `userextname7` is never taken for the start of `userextname70` and the cost
+    // does not grow with the number of data refs times the size of the function.
+    let mut out = String::with_capacity(ir.len());
+    let mut rest = ir;
+    while let Some(at) = rest.find(TOKEN) {
+        out.push_str(&rest[..at]);
+        let after = &rest[at + TOKEN.len()..];
+        let digits = after.bytes().take_while(u8::is_ascii_digit).count();
+        match after[..digits]
+            .parse::<u32>()
+            .ok()
+            .and_then(|n| data_refs.get(&n))
+        {
+            Some(idx) => out.push_str(&format!("u1:{idx}")),
+            None => out.push_str(&rest[at..at + TOKEN.len() + digits]),
+        }
+        rest = &after[digits..];
     }
-    result
+    out.push_str(rest);
+    out
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -8474,7 +8459,7 @@ trait IrPass {
 }
 
 /// Every pass, in the order they run.
-const IR_PASSES: &[&dyn IrPass] = &[&ElideRcPairs];
+const IR_PASSES: &[&dyn IrPass] = &[&ElideRcPairs, &InlineStrRefcounts];
 
 /// Run [`IR_PASSES`] over `func`.
 fn run_ir_passes<M: Module>(
@@ -8588,6 +8573,128 @@ impl IrPass for ElideRcPairs {
             func.layout.remove_inst(*i);
         }
         doomed.len() / 2
+    }
+}
+
+/// Every `aipl_inc(s)`/`aipl_dec(s)` call that is still there after
+/// [`ElideRcPairs`], replaced by the fast path inline: classify the value by its
+/// tag, and for one that owns a refcounted allocation, bump or lower the count
+/// in place. What the call did stays as the slow path for the one case that
+/// needs the runtime — the last reference, which frees.
+///
+/// A pass over the finished function rather than code at the emit sites because
+/// [`ElideRcPairs`] has to see the calls to pair them. Splitting a block at a
+/// call is what makes this an IR rewrite and not a peephole: the instructions
+/// after the call move to a new block, and the sequence is laid out between.
+struct InlineStrRefcounts;
+
+impl IrPass for InlineStrRefcounts {
+    fn name(&self) -> &'static str {
+        "inline-str-refcounts"
+    }
+
+    fn run(&self, func: &mut Function, cx: &PassCx) -> usize {
+        let mut sites: Vec<(Inst, Value, bool)> = Vec::new();
+        let blocks: Vec<Block> = func.layout.blocks().collect();
+        for block in blocks {
+            for inst in func.layout.block_insts(block) {
+                if let Some(v) = calls_builtin(func, inst, cx.inc) {
+                    sites.push((inst, v, false));
+                } else if let Some(v) = calls_builtin(func, inst, cx.dec) {
+                    sites.push((inst, v, true));
+                }
+            }
+        }
+        // Last first: splitting a block moves everything after the call into the
+        // new block, so working from the end moves each instruction once rather
+        // than once per site before it.
+        //
+        // The pass stops expanding once the function is as big as the limit
+        // allows, each site adding about a dozen instructions.
+        let allowed = INLINE_RC_LIMIT.saturating_sub(func.dfg.num_insts()) / 12;
+        sites.truncate(allowed);
+        for &(call, s, is_dec) in sites.iter().rev() {
+            inline_str_refcount(func, call, s, is_dec);
+        }
+        sites.len()
+    }
+}
+
+/// Rewrite the retain (`is_dec` false) or release `call` of the `str` at address
+/// `s` into its inline fast path; see [`InlineStrRefcounts`].
+fn inline_str_refcount(func: &mut Function, call: Inst, s: Value, is_dec: bool) {
+    let block = func
+        .layout
+        .inst_block(call)
+        .expect("a call sits in a block");
+    let after = func
+        .layout
+        .next_inst(call)
+        .expect("a block ends in a terminator");
+    let done = func.dfg.make_block();
+    func.layout.split_block(done, after);
+    func.layout.remove_inst(call);
+
+    // The blocks of the sequence, laid out between `block` and `done`: the
+    // owner test, the count test, the count update, and for a release the
+    // reference that frees.
+    let owns = func.dfg.make_block();
+    let check = func.dfg.make_block();
+    let change = func.dfg.make_block();
+    let mut new_blocks = vec![owns, check, change];
+    let free = is_dec.then(|| func.dfg.make_block());
+    new_blocks.extend(free);
+    for b in new_blocks {
+        func.layout.insert_block_after(b, block);
+    }
+
+    let count_at = -(buffer::BUF_REFCOUNT_BACK as i32);
+    let mut pos = FuncCursor::new(func).at_bottom(block);
+    // An inline value, or the zeroed empty (a buffer with a null base), owns
+    // nothing; so does a static buffer, whose count is never touched.
+    let w2 = pos
+        .ins()
+        .load(types::I64, MemFlagsData::trusted(), s, 2 * 8);
+    let tag = pos.ins().ushr_imm_u(w2, str24::TAG_SHIFT as i64);
+    let inline = pos
+        .ins()
+        .icmp_imm_s(IntCC::Equal, tag, str24::TAG_INLINE as i64);
+    pos.ins().brif(inline, done, &[], owns, &[]);
+
+    pos = pos.at_bottom(owns);
+    let owner = pos.ins().load(types::I64, MemFlagsData::trusted(), s, 0);
+    let null = pos.ins().icmp_imm_s(IntCC::Equal, owner, 0);
+    pos.ins().brif(null, done, &[], check, &[]);
+
+    pos = pos.at_bottom(check);
+    let rc = pos
+        .ins()
+        .load(types::I64, MemFlagsData::trusted(), owner, count_at);
+    let is_static = pos.ins().icmp_imm_s(IntCC::Equal, rc, STATIC_REFCOUNT);
+    let (step, to_free) = if let Some(free) = free {
+        // The reference that frees goes to the runtime, as the call did.
+        let is_last = pos.ins().icmp_imm_s(IntCC::Equal, rc, 1);
+        let counted = pos.func.dfg.make_block();
+        pos.func.layout.insert_block_after(counted, block);
+        pos.ins().brif(is_static, done, &[], counted, &[]);
+        pos = pos.at_bottom(counted);
+        pos.ins().brif(is_last, free, &[], change, &[]);
+        (-1, Some(free))
+    } else {
+        pos.ins().brif(is_static, done, &[], change, &[]);
+        (1, None)
+    };
+
+    pos = pos.at_bottom(change);
+    let next = pos.ins().iadd_imm_s(rc, step);
+    pos.ins()
+        .store(MemFlagsData::trusted(), next, owner, count_at);
+    pos.ins().jump(done, &[]);
+
+    if let Some(free) = to_free {
+        pos.func.layout.append_inst(call, free);
+        pos = pos.at_bottom(free);
+        pos.ins().jump(done, &[]);
     }
 }
 
@@ -10768,6 +10875,182 @@ fn emit_rc<M: Module>(
     emit_rc_w(builder, module, builtins, structs, v, ty, op, None);
 }
 
+/// How far back from a boxed value's payload its `strong` and `weak` counts sit
+/// (the header is `REC_HEADER_SIZE` bytes, `strong` first).
+const REC_STRONG_BACK: i32 = -(REC_HEADER_SIZE as i32);
+const REC_WEAK_BACK: i32 = -((REC_HEADER_SIZE - 8 * REC_WEAK_WORD) as i32);
+
+/// How many instructions a function may have before its refcount operations stop
+/// being expanded inline. Every expansion adds several blocks, and register
+/// allocation is superlinear in a function's blocks and live ranges, so an
+/// unbounded expansion turns the largest functions (a generated `match` over
+/// hundreds of cases) from seconds into minutes to compile. Past the limit the
+/// operations stay calls into the runtime, which is what they were.
+const INLINE_RC_LIMIT: usize = 4000;
+
+/// Whether `func` is still small enough to expand a refcount operation inline.
+fn inline_rc_allowed(func: &Function) -> bool {
+    func.dfg.num_insts() < INLINE_RC_LIMIT
+}
+
+/// Take a reference on the array block `ptr` (tagged, or null for a value that
+/// holds none), inline: what `aipl_arr_inc` does, without the call. A static
+/// block (the shared empty array included) carries `STATIC_REFCOUNT` and is left
+/// alone.
+fn emit_array_retain<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    builtins: &Builtins,
+    ptr: Value,
+) {
+    if !inline_rc_allowed(builder.func) {
+        builtins.call_void(module, builder, "aipl_arr_inc", &[ptr]);
+        return;
+    }
+    let check = builder.create_block();
+    let bump = builder.create_block();
+    let done = builder.create_block();
+    let is_null = builder.ins().icmp_imm_s(IntCC::Equal, ptr, 0);
+    builder.ins().brif(is_null, done, &[], check, &[]);
+    builder.switch_to_block(check);
+    builder.seal_block(check);
+    let base = builder.ins().band_imm_u(ptr, !(ARR_TAG_MASK as i64));
+    let rc = builder.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        base,
+        -(HEADER_SIZE as i32),
+    );
+    let is_static = builder.ins().icmp_imm_s(IntCC::Equal, rc, STATIC_REFCOUNT);
+    builder.ins().brif(is_static, done, &[], bump, &[]);
+    builder.switch_to_block(bump);
+    builder.seal_block(bump);
+    let next = builder.ins().iadd_imm_s(rc, 1);
+    builder
+        .ins()
+        .store(MemFlagsData::trusted(), next, base, -(HEADER_SIZE as i32));
+    builder.ins().jump(done, &[]);
+    builder.switch_to_block(done);
+    builder.seal_block(done);
+}
+
+/// Drop a reference on the array block `ptr`, inline while other references
+/// remain. The last reference calls `aipl_array_dec`, which releases the elements
+/// and frees the block; a static block is left alone.
+fn emit_array_release<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    builtins: &Builtins,
+    ptr: Value,
+) {
+    if !inline_rc_allowed(builder.func) {
+        builtins.call_void(module, builder, "aipl_array_dec", &[ptr]);
+        return;
+    }
+    let check = builder.create_block();
+    let last = builder.create_block();
+    let drop = builder.create_block();
+    let done = builder.create_block();
+    let is_null = builder.ins().icmp_imm_s(IntCC::Equal, ptr, 0);
+    builder.ins().brif(is_null, done, &[], check, &[]);
+    builder.switch_to_block(check);
+    builder.seal_block(check);
+    let base = builder.ins().band_imm_u(ptr, !(ARR_TAG_MASK as i64));
+    let rc = builder.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        base,
+        -(HEADER_SIZE as i32),
+    );
+    let is_static = builder.ins().icmp_imm_s(IntCC::Equal, rc, STATIC_REFCOUNT);
+    let decrement = builder.create_block();
+    builder.ins().brif(is_static, done, &[], decrement, &[]);
+    builder.switch_to_block(decrement);
+    builder.seal_block(decrement);
+    let is_last = builder.ins().icmp_imm_s(IntCC::Equal, rc, 1);
+    builder.ins().brif(is_last, last, &[], drop, &[]);
+    builder.switch_to_block(drop);
+    builder.seal_block(drop);
+    let next = builder.ins().iadd_imm_s(rc, -1);
+    builder
+        .ins()
+        .store(MemFlagsData::trusted(), next, base, -(HEADER_SIZE as i32));
+    builder.ins().jump(done, &[]);
+    builder.switch_to_block(last);
+    builder.seal_block(last);
+    builtins.call_void(module, builder, "aipl_array_dec", &[ptr]);
+    builder.ins().jump(done, &[]);
+    builder.switch_to_block(done);
+    builder.seal_block(done);
+}
+
+/// Take a reference on the boxed value `p` by bumping the count `back` bytes
+/// below its payload (`REC_STRONG_BACK` or `REC_WEAK_BACK`), inline.
+fn emit_rec_retain<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    builtins: &Builtins,
+    p: Value,
+    back: i32,
+) {
+    if !inline_rc_allowed(builder.func) {
+        let sym = if back == REC_STRONG_BACK {
+            "aipl_rec_inc_strong"
+        } else {
+            "aipl_rec_inc_weak"
+        };
+        builtins.call_void(module, builder, sym, &[p]);
+        return;
+    }
+    let count = builder
+        .ins()
+        .load(types::I64, MemFlagsData::trusted(), p, back);
+    let next = builder.ins().iadd_imm_s(count, 1);
+    builder.ins().store(MemFlagsData::trusted(), next, p, back);
+}
+
+/// Drop an external reference on the boxed value `p` (null once its reference
+/// was moved out), inline while other strong references remain. The last strong
+/// reference calls `aipl_rec_dec_strong`, which frees the block if no weak
+/// reference holds it either.
+fn emit_rec_release_strong<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    builtins: &Builtins,
+    p: Value,
+) {
+    if !inline_rc_allowed(builder.func) {
+        builtins.call_void(module, builder, "aipl_rec_dec_strong", &[p]);
+        return;
+    }
+    let check = builder.create_block();
+    let last = builder.create_block();
+    let drop = builder.create_block();
+    let done = builder.create_block();
+    let is_null = builder.ins().icmp_imm_s(IntCC::Equal, p, 0);
+    builder.ins().brif(is_null, done, &[], check, &[]);
+    builder.switch_to_block(check);
+    builder.seal_block(check);
+    let strong = builder
+        .ins()
+        .load(types::I64, MemFlagsData::trusted(), p, REC_STRONG_BACK);
+    let is_last = builder.ins().icmp_imm_s(IntCC::Equal, strong, 1);
+    builder.ins().brif(is_last, last, &[], drop, &[]);
+    builder.switch_to_block(drop);
+    builder.seal_block(drop);
+    let next = builder.ins().iadd_imm_s(strong, -1);
+    builder
+        .ins()
+        .store(MemFlagsData::trusted(), next, p, REC_STRONG_BACK);
+    builder.ins().jump(done, &[]);
+    builder.switch_to_block(last);
+    builder.seal_block(last);
+    builtins.call_void(module, builder, "aipl_rec_dec_strong", &[p]);
+    builder.ins().jump(done, &[]);
+    builder.switch_to_block(done);
+    builder.seal_block(done);
+}
+
 /// [`emit_rc`] with a *weak context*: when `weak_scc` is `Some(g)`, the value
 /// being retained/dropped is (about to be / was) held by a field of a boxed
 /// value of recursion group `g`, so a reference to a boxed value of that same
@@ -10829,11 +11112,10 @@ fn emit_rc_w<M: Module>(
             } else {
                 ptr
             };
-            let sym = match op {
-                RcOp::Retain => "aipl_arr_inc",
-                RcOp::Drop => "aipl_array_dec",
-            };
-            builtins.call_void(module, builder, sym, &[ptr]);
+            match op {
+                RcOp::Retain => emit_array_retain(builder, module, builtins, ptr),
+                RcOp::Drop => emit_array_release(builder, module, builtins, ptr),
+            }
         }
         ConcreteType::Named(n) => match structs.get(n) {
             // A boxed (recursive) value counts as one reference to its heap
@@ -10844,13 +11126,18 @@ fn emit_rc_w<M: Module>(
             // is internal → weak; everything else is external → strong.
             Some(d) if d.boxed() => {
                 let internal = weak_scc == Some(d.scc());
-                let sym = match (op, internal) {
-                    (RcOp::Retain, false) => "aipl_rec_inc_strong",
-                    (RcOp::Drop, false) => "aipl_rec_dec_strong",
-                    (RcOp::Retain, true) => "aipl_rec_inc_weak",
-                    (RcOp::Drop, true) => "aipl_rec_dec_weak",
-                };
-                builtins.call_void(module, builder, sym, &[v]);
+                match (op, internal) {
+                    (RcOp::Retain, false) => {
+                        emit_rec_retain(builder, module, builtins, v, REC_STRONG_BACK)
+                    }
+                    (RcOp::Drop, false) => emit_rec_release_strong(builder, module, builtins, v),
+                    (RcOp::Retain, true) => {
+                        emit_rec_retain(builder, module, builtins, v, REC_WEAK_BACK)
+                    }
+                    (RcOp::Drop, true) => {
+                        builtins.call_void(module, builder, "aipl_rec_dec_weak", &[v])
+                    }
+                }
             }
             Some(TypeDef::Struct(_)) => {
                 // Recurse over the struct's heap-bearing fields. Clone the field

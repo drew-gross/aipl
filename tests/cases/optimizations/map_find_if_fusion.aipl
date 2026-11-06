@@ -57,7 +57,7 @@ fn first_big(xs: i64[]) -> i64? { xs.map(stepped).find_if(is_big) }.benchmark({
     // twice, and costs two orders of magnitude more.
     let unfused = measure("every element mapped", xs, first_big_twice);
     assert(unfused.bytes_allocated == 1850);
-    assert(unfused.instructions == 9370);
+    assert(unfused.instructions == 9388);
 })
 
 // Not fused: the array is bound in between, and read twice below, so it has
@@ -79,17 +79,16 @@ deallocations     8
 reallocations     7
 bytes allocated   1926
 peak live bytes   3958
-instructions      15216
-binary size       6232 bytes (code 3196, data 418, metadata 2618)
+instructions      15484
+binary size       7008 bytes (code 4024, data 418, metadata 2566)
 
 function                                                                     calls  code bytes
 __builtin_find_if$i64$lam$__test$__test_block_1$lambda1                          1         224
 __builtin_find_if$i64$lam$is_big                                                 1         224
 __builtin_map_find_if$i64$i64$lam$stepped$__test$__test_block_1$lambda2          1         232
 __builtin_map_find_if$i64$i64$lam$stepped$is_big                                 1         232
-__test$__test_block_1                                                            1        1800
+__test$__test_block_1                                                            1        2628
 __to_str_i64$opt                                                                 4         376
-aipl_arr_inc                                                                     1    external
 aipl_array_dec                                                                   2    external
 aipl_array_with_cap                                                              1    external
 aipl_assert                                                                      3    external

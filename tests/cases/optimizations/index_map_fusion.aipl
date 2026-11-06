@@ -149,17 +149,17 @@ deallocations     19
 reallocations     0
 bytes allocated   991
 peak live bytes   991
-instructions      2010
-binary size       14144 bytes (code 8276, data 1218, metadata 4650)
+instructions      2727
+binary size       16768 bytes (code 10968, data 1218, metadata 4582)
 
 function                   calls  code bytes
-__test$__test_block_1          1        6424
+__test$__test_block_1          1        9116
 __to_str_i64                   1         204
 __to_str_i64$arr               1         704
 __to_str_i64$opt               6         376
 __to_str_str$opt               1         460
 aipl_arr_inc                   1    external
-aipl_array_dec                 4    external
+aipl_array_dec                 2    external
 aipl_array_new                 1    external
 aipl_assert                    9    external
 aipl_i64_len                  14    external
