@@ -265,6 +265,7 @@ case_tests! {
     cases_floats_err_to_float_of_float = "cases/floats/err_to_float_of_float",
     cases_floats_err_to_float_of_str = "cases/floats/err_to_float_of_str",
     cases_floats_inference = "cases/floats/inference",
+    cases_floats_shortest_round_trip = "cases/floats/shortest_round_trip",
     cases_floats_to_float = "cases/floats/to_float",
     cases_floats_to_str = "cases/floats/to_str",
     cases_functions_destructured_params = "cases/functions/destructured_params",

@@ -24627,3 +24627,217 @@ fn undefined_fn(name: &str, span: Span) -> Error {
         Error::at(format!("call to undefined fn {name:?}"), span.clone())
     }
 }
+
+/// A float renders as the shortest decimal that reads back as the same value, which is what
+/// `to_str` promises. Checked against an independent search rather than against the
+/// algorithm that is meant to do it: for each value, the first digit count `n` at which the
+/// correctly rounded `n`-digit decimal parses back to the value is the shortest there is, and
+/// the rendering has to have that many digits, and be the `n`-digit decimal nearest the value.
+///
+/// Where the value sits exactly halfway between two `n`-digit decimals that both read back
+/// (a double like `256710931600.515625` is, at 17 digits), either is the shortest and the
+/// nearest, and the rendering takes the larger. That tie rule is the standard library's.
+#[cfg(test)]
+mod float_rendering_tests {
+    use super::fmt_float;
+
+    fn render(bits: i64, width: i64) -> String {
+        let mut buf = [0u8; 48];
+        let len = fmt_float(&mut buf, bits, width);
+        String::from_utf8(buf[..len].to_vec()).expect("a rendering is ASCII")
+    }
+
+    /// The digits a rendering says, without sign, point, exponent or zeros at either end:
+    /// `0.00123` and `1.23e-7` are `123`, `1500.0` is `15`.
+    fn significant_digits(text: &str) -> String {
+        let mantissa = text
+            .trim_start_matches('-')
+            .split(['e', 'E'])
+            .next()
+            .unwrap();
+        let digits: String = mantissa.chars().filter(char::is_ascii_digit).collect();
+        digits
+            .trim_start_matches('0')
+            .trim_end_matches('0')
+            .to_string()
+    }
+
+    /// The shortest digit string that parses back to `x`, by trying 1, 2, ... digits.
+    fn shortest_digits_64(x: f64) -> String {
+        for n in 1..=17 {
+            let candidate = format!("{:.*e}", n - 1, x);
+            if candidate.parse::<f64>().unwrap() == x {
+                return significant_digits(&candidate);
+            }
+        }
+        unreachable!("17 digits always round-trip a binary64")
+    }
+
+    fn shortest_digits_32(x: f32) -> String {
+        for n in 1..=9 {
+            let candidate = format!("{:.*e}", n - 1, x);
+            if candidate.parse::<f32>().unwrap() == x {
+                return significant_digits(&candidate);
+            }
+        }
+        unreachable!("9 digits always round-trip a binary32")
+    }
+
+    /// Whether `rendered` is the shortest digit string, `reference` being the nearest
+    /// `n`-digit decimal (halves to even) for the `n` that is shortest: the same digits, or,
+    /// when the value is exactly halfway, the next ones up. `exact` is the value's complete
+    /// decimal expansion, which every binary float has.
+    fn is_the_shortest(rendered: &str, reference: &str, exact: &str) -> bool {
+        if rendered == reference {
+            return true;
+        }
+        let n = reference.len();
+        let halfway = exact.len() > n && exact[n..].trim_end_matches('0') == "5";
+        let next: u128 = reference.parse::<u128>().unwrap() + 1;
+        halfway && rendered == next.to_string()
+    }
+
+    fn exact_digits(text: &str) -> String {
+        // Digits as written, no trailing-zero trim past the point: `significant_digits`
+        // already trims, which is right for a tail that is "5" then zeros.
+        significant_digits(text)
+    }
+
+    fn check_64(x: f64) {
+        let text = render(x.to_bits() as i64, 64);
+        assert_eq!(
+            text.parse::<f64>().unwrap().to_bits(),
+            x.to_bits(),
+            "{text} does not read back as {x:e}"
+        );
+        let exact = exact_digits(&format!("{:.*e}", 800, x));
+        assert!(
+            is_the_shortest(&significant_digits(&text), &shortest_digits_64(x), &exact),
+            "{text} is not the shortest for {x:e}: wanted {}",
+            shortest_digits_64(x)
+        );
+        // A float reads as a float: it has a point or an exponent.
+        assert!(
+            text.contains('.') || text.contains('e'),
+            "{text} reads as an integer"
+        );
+    }
+
+    fn check_32(x: f32) {
+        let text = render(i64::from(x.to_bits()), 32);
+        assert_eq!(
+            text.parse::<f32>().unwrap().to_bits(),
+            x.to_bits(),
+            "{text} does not read back as {x:e}"
+        );
+        let exact = exact_digits(&format!("{:.*e}", 800, x));
+        assert!(
+            is_the_shortest(&significant_digits(&text), &shortest_digits_32(x), &exact),
+            "{text} is not the shortest for {x:e}: wanted {}",
+            shortest_digits_32(x)
+        );
+        assert!(
+            text.contains('.') || text.contains('e'),
+            "{text} reads as an integer"
+        );
+    }
+
+    /// A deterministic stream of bit patterns, so a failure is the same failure every run.
+    fn bit_patterns(seed: u64) -> impl Iterator<Item = u64> {
+        let mut state = seed;
+        std::iter::repeat_with(move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        })
+    }
+
+    #[test]
+    fn the_famous_values_are_the_shortest_that_round_trip() {
+        // 0.1 is not its 17-digit expansion, and 1e23 is not 9.999999999999999e22.
+        for (x, want) in [
+            (0.1, "0.1"),
+            (0.1 + 0.2, "0.30000000000000004"),
+            (1e23, "1e23"),
+            (5e-324, "5e-324"),
+            (f64::MAX, "1.7976931348623157e308"),
+            (f64::MIN_POSITIVE, "2.2250738585072014e-308"),
+            (f64::EPSILON, "2.220446049250313e-16"),
+            (9007199254740992.0, "9007199254740992.0"),
+            (123456789012345680.0, "1.2345678901234568e17"),
+            (1.0 / 3.0, "0.3333333333333333"),
+            // Exactly halfway between two 17-digit decimals that both read back.
+            (256710931600.515625, "256710931600.51563"),
+            (100.0, "100.0"),
+            (-0.0, "-0.0"),
+        ] {
+            assert_eq!(render(x.to_bits() as i64, 64), want);
+            check_64(x);
+        }
+        for (x, want) in [
+            (0.1f32, "0.1"),
+            (0.3f32, "0.3"),
+            (f32::MAX, "3.4028235e38"),
+            (f32::MIN_POSITIVE, "1.1754944e-38"),
+            (1e-45f32, "1e-45"),
+            (16777216.0f32, "16777216.0"),
+            (0.1f32 + 0.2f32, "0.3"),
+        ] {
+            assert_eq!(render(i64::from(x.to_bits()), 32), want);
+            check_32(x);
+        }
+    }
+
+    #[test]
+    fn binary64_is_the_shortest_for_every_bit_pattern_sampled() {
+        let mut checked = 0;
+        for bits in bit_patterns(0x9E37_79B9_7F4A_7C15).take(60_000) {
+            let x = f64::from_bits(bits);
+            if x.is_finite() {
+                check_64(x);
+                checked += 1;
+            }
+        }
+        assert!(
+            checked > 58_000,
+            "only {checked} finite values were sampled"
+        );
+    }
+
+    #[test]
+    fn binary64_is_the_shortest_across_ordinary_magnitudes() {
+        // Random bit patterns are mostly huge or tiny; this is the range programs use.
+        for bits in bit_patterns(0xD1B5_4A32_D192_ED03).take(30_000) {
+            let unit = (bits >> 11) as f64 / (1u64 << 53) as f64;
+            let exponent = (bits & 0x3f) as i32 - 20;
+            check_64(unit * 2f64.powi(exponent));
+            check_64((unit * 1000.0).round() / 100.0);
+        }
+    }
+
+    #[test]
+    fn binary32_is_the_shortest_for_every_bit_pattern_sampled() {
+        let mut checked = 0;
+        for bits in bit_patterns(0x2545_F491_4F6C_DD1D).take(60_000) {
+            let x = f32::from_bits(bits as u32);
+            if x.is_finite() {
+                check_32(x);
+                checked += 1;
+            }
+        }
+        assert!(
+            checked > 58_000,
+            "only {checked} finite values were sampled"
+        );
+    }
+
+    #[test]
+    fn the_float_that_is_not_a_number_and_the_infinities_have_their_own_spellings() {
+        assert_eq!(render(f64::NAN.to_bits() as i64, 64), "NaN");
+        assert_eq!(render(f64::INFINITY.to_bits() as i64, 64), "inf");
+        assert_eq!(render(f64::NEG_INFINITY.to_bits() as i64, 64), "-inf");
+        assert_eq!(render(i64::from(f32::NAN.to_bits()), 32), "NaN");
+        assert_eq!(render(i64::from(f32::INFINITY.to_bits()), 32), "inf");
+    }
+}

@@ -29,7 +29,6 @@ projects:
 
 floats:
   trig operations (sine, cosine, etc. NOT sin, cos. User can import as if they want abbreviations)
-  to string for floats (use rust shortest roundtrip algo probably)
   to string for floats with options (number of digits, leading +, exponential notation (with e or E), etc.
   to_int option (considering rounding, overflow, etc)
   inequalities (nearby comparison, almost_eq, etc)

@@ -405,6 +405,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/files/write_file | 4 | 84 | 63 | 293 | 2020 |
 | tests/cases/floats/arithmetic | 20 | 419 | 194 | 1678 | 6652 |
 | tests/cases/floats/inference | 15 | 401 | 401 | 1453 | 5884 |
+| tests/cases/floats/shortest_round_trip | 18 | 890 | 890 | 1069 | 1644 |
 | tests/cases/floats/to_float | 11 | 281 | 281 | 747 | 2964 |
 | tests/cases/floats/to_str | 14 | 483 | 483 | 1010 | 4780 |
 | tests/cases/functions/destructured_params | 16 | 1057 | 1057 | 2703 | 7504 |

@@ -1,0 +1,84 @@
+# `to_str` of a float is the shortest decimal that reads back as the same value, in both
+# runtimes: the in-process one the `.test` blocks use and the linked one a built program
+# does. The same list is asserted and printed, so the `stdout` below pins the linked
+# runtime to the values the assertions give the other. Where the digits come from is checked
+# exhaustively in `float_rendering_tests` (`aipl-codegen/src/lib.rs`).
+#
+# What the values are for: `0.1` is not its 17-digit expansion; `1e23` is not
+# `9.999999999999999e22`; `5e-324` is the smallest subnormal in one digit; the largest and
+# smallest normal numbers need 17; a double exactly between two 17-digit decimals takes the
+# larger; and the exponent form begins at 1e16 and below 1e-4 (a whole number keeps `.0`).
+
+import { IEEE754Float32 as F32, equal, print, to_str } from builtins;
+
+fn rendered() -> str[] {
+    let f32_tenth: F32 = 0.1;
+    let f32_third_tenth: F32 = 0.3;
+    let f32_largest: F32 = 3.4028235e38;
+    let f32_subnormal: F32 = 1.0e-45;
+    let f32_exact: F32 = 16777216.0;
+    [
+        to_str(0.1),
+        to_str(0.30000000000000004),
+        to_str(1.0e23),
+        to_str(5.0e-324),
+        to_str(1.7976931348623157e308),
+        to_str(2.2250738585072014e-308),
+        to_str(9007199254740993.0),
+        to_str(256710931600.515625),
+        to_str(1.0e15),
+        to_str(1.0e16),
+        to_str(0.0001),
+        to_str(0.00001),
+        to_str(f32_tenth),
+        to_str(f32_third_tenth),
+        to_str(f32_largest),
+        to_str(f32_subnormal),
+        to_str(f32_exact),
+    ]
+}.test({
+    assert(rendered().equal([
+        "0.1",
+        "0.30000000000000004",
+        "1e23",
+        "5e-324",
+        "1.7976931348623157e308",
+        "2.2250738585072014e-308",
+        "9007199254740992.0",
+        "256710931600.51563",
+        "1000000000000000.0",
+        "1e16",
+        "0.0001",
+        "1e-5",
+        "0.1",
+        "0.3",
+        "3.4028235e38",
+        "1e-45",
+        "16777216.0",
+    ]));
+})
+
+fn main() !prints -> i64 {
+    for (let text : rendered()) {
+        print(text);
+    }
+    0
+}
+--- stdout ---
+0.1
+0.30000000000000004
+1e23
+5e-324
+1.7976931348623157e308
+2.2250738585072014e-308
+9007199254740992.0
+256710931600.51563
+1000000000000000.0
+1e16
+0.0001
+1e-5
+0.1
+0.3
+3.4028235e38
+1e-45
+16777216.0
