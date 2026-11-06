@@ -2,12 +2,13 @@
 # counts toward every archetype it matches, so the shares can add up to more than all.
 
 import {
-    contains,
+    any,
     count_if,
     equal as ==,
     filter,
     float_div as /,
     float_mul as *,
+    is_case,
     join,
     len,
     logical_not as !,
@@ -18,25 +19,34 @@ import {
     render,
     repeat,
     saturating_sub as -,
-    to_array,
     to_float,
-    to_set,
     value_or,
     wrapping_add as +,
 } from builtins;
-import { Identifier, archetypes_of, deck_of } from "./archetypes.aipl";
+import {
+    Archetype,
+    Identifier,
+    Jank,
+    Meta,
+    archetypes_of,
+    deck_of,
+    label,
+} from "./archetypes.aipl";
 import { Counted, ranked } from "./counted.aipl";
 import { Deck } from "./metagame.aipl";
 
-# The decks of each archetype, most decks first. A deck that is none of `identifiers` is
-# `<name> (self-titled)`, which is left out unless `jank`.
+# The decks of each archetype, most decks first. A deck that is none of `identifiers` is a
+# `Jank` archetype of its own, which is left out unless `jank`.
 pub fn shares(decks: Deck[], identifiers: Identifier[], jank: bool) -> Counted[] {
-    let names = decks$archetypes_of(identifiers).join();
-    let distinct: #<{str} = names.to_set();
-    distinct
-        .to_array()
-        .filter(|name| jank || !name.contains("self-titled"))
-        .map(|name| { Counted { name, count: names.count_if(|each| each == name) } })
+    let wanted = decks
+        $archetypes_of(identifiers)
+        .join()
+        .filter(|archetype| jank || archetype.is_case(Meta));
+    wanted
+        .distinct()
+        .map(|archetype| {
+            Counted { name: archetype.label(), count: wanted.count_if(|each| each == archetype) }
+        })
         .ranked()
 }.test({
     let nothing: str[] = [];
@@ -67,6 +77,30 @@ pub fn shares(decks: Deck[], identifiers: Identifier[], jank: bool) -> Counted[]
         Counted { name: "Some Deck (self-titled)", count: 1 },
     ]);
     assert(shares([], [landfall], true) == []);
+
+    // What is left out is the `Jank` kind, not whatever has "self-titled" in its name: an
+    // archetype an identifier names that way is an archetype.
+    let odd = Identifier { ..landfall, name: "Odd (self-titled)" };
+    assert(shares([deck_of(["Forest"], [])], [odd], false) == [
+        Counted { name: "Odd (self-titled)", count: 1 },
+    ]);
+})
+
+# `self` without its repeats, in the order each first appears.
+fn distinct(self: Archetype[]) -> Archetype[] {
+    mut seen: Archetype[] = [];
+    for (let archetype : self) {
+        if (!seen.any(|each| each == archetype)) { set seen.push(archetype); };
+    }
+    seen
+}.test({
+    assert([Meta("a"), Jank("a"), Meta("a"), Meta("b"), Jank("a")].distinct() == [
+        Meta("a"),
+        Jank("a"),
+        Meta("b"),
+    ]);
+    let nothing: Archetype[] = [];
+    assert(nothing.distinct() == []);
 })
 
 # `count` out of `total` as a percentage with one decimal: `33.3%`. Rounded as the

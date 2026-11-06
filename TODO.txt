@@ -24,7 +24,6 @@ projects:
     press() should destructure self. Also we should have tuple destructuring
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg:
-    name.contains("self-titled") shouldn't be necessary, use a variant for the deck with Meta and Jank to identify
     accept paths, don't do munging
     archetypes_of does some weird stuff with sets (why convert to array when caller converts back to set?)
 
