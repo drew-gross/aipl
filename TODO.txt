@@ -24,9 +24,15 @@ projects:
     press() should destructure self. Also we should have tuple destructuring
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg metagame analyzer
-    probably need floats for this
     accept paths, don't do munging
     reuse existing json parser from lib
+
+floats:
+  Time to implement floats. Type names are IEEE754Float32 and IEEE754Float64 but the convention is to import as Float, of F32 and F64 if both are used in the same file. For now they basically shouldn't interact with integers (separate add/subtract/etc. operations, no implicit conversions, etc)
+  to string for floats (use rust shortest roundtrip algo probably)
+  to string for floats with options (number of digits, leading +, exponential notation (with e or E), etc.
+  to_int option (considering rounding, overflow, etc)
+  inequalities (nearby comparison, almost_eq, etc)
 
 argparser:
   make it

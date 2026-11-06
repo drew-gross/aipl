@@ -51,6 +51,23 @@ struct Deck {
     matches: Match[],
 }
 
+# The cards of `self`'s main deck followed by its sideboard.
+pub fn all_cards(self: Deck) -> Card[] { [..self.maindeck, ..self.sideboard] }.test({
+    let island = Card { name: "Island", count: 4, card_type: "Land" };
+    let bolt = Card { name: "Bolt", count: 2, card_type: "Instant" };
+    let deck = Deck {
+        deck_id: "1",
+        name: "",
+        pilot: "",
+        tournament: "",
+        maindeck: [island],
+        sideboard: [bolt],
+        matches: [],
+    };
+    assert(deck.all_cards() == [island, bolt]);
+    assert(Deck { ..deck, maindeck: [], sideboard: [] }.all_cards() == []);
+})
+
 # The decks of one or more tournaments. `name` is the file it was loaded from.
 struct Metagame { name: str, tournament_ids: str[], decks: Deck[] }
 

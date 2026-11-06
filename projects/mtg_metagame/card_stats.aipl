@@ -2,9 +2,9 @@
 
 import {
     equal as ==,
-    extend,
     get,
     greater_than as >,
+    join,
     less_than as <,
     logical_and as &&,
     logical_not as !,
@@ -19,7 +19,7 @@ import {
     wrapping_add as +,
     zip_with,
 } from builtins;
-import { Card, Deck } from "./metagame.aipl";
+import { Card, Deck, all_cards } from "./metagame.aipl";
 
 # A card and the number of copies of it played, main decks and sideboards both.
 struct CardCount { name: str, count: i64 }
@@ -35,33 +35,9 @@ fn is_listed_before(a: CardCount, b: CardCount) -> bool {
     assert(!is_listed_before(CardCount { name: "a", count: 4 }, CardCount { name: "a", count: 4 }));
 })
 
-# Every card of every deck's main deck and sideboard, in deck order.
-fn all_cards(decks: Deck[]) -> Card[] {
-    mut cards: Card[] = [];
-    for (let deck : decks) {
-        set cards.extend(deck.maindeck);
-        set cards.extend(deck.sideboard);
-    }
-    cards
-}.test({
-    let island = Card { name: "Island", count: 4, card_type: "Land" };
-    let bolt = Card { name: "Bolt", count: 2, card_type: "Instant" };
-    let deck = Deck {
-        deck_id: "1",
-        name: "",
-        pilot: "",
-        tournament: "",
-        maindeck: [island],
-        sideboard: [bolt],
-        matches: [],
-    };
-    assert(all_cards([deck, deck]) == [island, bolt, island, bolt]);
-    assert(all_cards([]) == []);
-})
-
 # The copies of each card played in `decks`, most played first.
 pub fn card_counts(decks: Deck[]) -> CardCount[] {
-    let cards = all_cards(decks);
+    let cards = decks$all_cards().join();
     let distinct: #<{str} = cards$name.to_set();
     let names = distinct.to_array();
     mut positions: (str, u64)[] = [];
